@@ -1,6 +1,6 @@
 /**
- * Answering the extra steps. A WhatsApp code is only sent once the number it
- * goes to has been typed back, a method that is not owed changes nothing, and
+ * Answering the extra steps. A WhatsApp or email code is only sent once the
+ * number or address it goes to has been typed back, a method that is not owed changes nothing, and
  * the session opens only when the last owed step is answered.
  */
 
@@ -11,6 +11,7 @@ const stepUp = vi.hoisted(() => ({ proveStepUp: vi.fn(), sendStepUpCode: vi.fn()
 const service = vi.hoisted(() => ({ advanceStepUp: vi.fn() }));
 const authPkg = vi.hoisted(() => ({ getUserPhone: vi.fn(), verifySecurityAnswers: vi.fn() }));
 const limits = vi.hoisted(() => ({ rateLimit: vi.fn() }));
+const delivery = vi.hoisted(() => ({ codeEmailAddress: vi.fn() }));
 
 vi.mock("@polaris/db", () => ({ prisma: db }));
 vi.mock("@/lib/auth", () => ({ auth: {} }));
@@ -22,6 +23,7 @@ vi.mock("@/lib/step-up", () => stepUp);
 vi.mock("@/lib/two-factor-policy-service", () => service);
 vi.mock("@/lib/two-factor-policy-store", () => ({ rememberSignInCountry: vi.fn() }));
 vi.mock("@polaris/auth", () => authPkg);
+vi.mock("@/lib/two-factor-delivery", () => delivery);
 
 import * as actions from "@/app/oauth/step-up/actions";
 import { serializeStepUp, type StepUpState } from "@/lib/two-factor-policy";
@@ -33,6 +35,7 @@ const owing: StepUpState = {
     question: false,
     questionDone: false,
     phoneConfirmed: false,
+    emailConfirmed: true,
     reason: "unusual-country"
 };
 
@@ -47,6 +50,7 @@ beforeEach(() => {
     stepUp.sendStepUpCode.mockResolvedValue({});
     stepUp.proveStepUp.mockResolvedValue({});
     authPkg.getUserPhone.mockResolvedValue({ phone: "+34600111222", verified: true });
+    delivery.codeEmailAddress.mockResolvedValue("fran@example.com");
     stored(owing);
 });
 
@@ -76,6 +80,30 @@ describe("confirming the number before a WhatsApp code", () => {
     it("does not ask for a number before an email code", async () => {
         expect(await actions.sendStepUpFactorCodeAction({ method: "email" })).toEqual({});
         expect(authPkg.getUserPhone).not.toHaveBeenCalled();
+    });
+});
+
+describe("confirming the address before an email code", () => {
+    beforeEach(() => stored({ ...owing, emailConfirmed: false }));
+
+    it("sends nothing to an address that was not typed back correctly", async () => {
+        expect(await actions.sendStepUpFactorCodeAction({ method: "email", email: "fran@example.org" })).toEqual({
+            error: "stepUp.wrongEmail"
+        });
+        expect(await actions.sendStepUpFactorCodeAction({ method: "email" })).toEqual({ error: "stepUp.wrongEmail" });
+        expect(stepUp.sendStepUpCode).not.toHaveBeenCalled();
+        expect(limits.rateLimit).toHaveBeenCalledWith("step-up-email:user-1", 5, expect.any(Number));
+    });
+
+    it("sends once the address matches in any casing, and remembers that it did", async () => {
+        expect(await actions.sendStepUpFactorCodeAction({ method: "email", email: " Fran@Example.com " })).toEqual({});
+        expect(service.advanceStepUp.mock.calls[0]![2]).toMatchObject({ emailConfirmed: true });
+        expect(stepUp.sendStepUpCode).toHaveBeenCalledWith("user-1", "sign-in-step-up:email", "email", { anyReachable: true });
+    });
+
+    it("refuses an email code before the address was confirmed", async () => {
+        expect(await actions.proveStepUpFactorAction({ method: "email", code: "123456" })).toEqual({ error: "stepUp.notOwed" });
+        expect(stepUp.proveStepUp).not.toHaveBeenCalled();
     });
 });
 

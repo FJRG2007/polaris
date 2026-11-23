@@ -13,8 +13,8 @@ import { redirect } from "next/navigation";
 import { StepUpView } from "./step-up-view";
 import { resolveSession } from "@/lib/session";
 import { getUserPhone, listSecurityQuestions } from "@polaris/auth";
-import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
-import { parseStepUp, stepUpProgress, stepUpRemaining } from "@/lib/two-factor-policy";
+import { codeEmailAddress, describeTwoFactorMethods } from "@/lib/two-factor-delivery";
+import { emailHint, parseStepUp, stepUpProgress, stepUpRemaining } from "@/lib/two-factor-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -30,15 +30,19 @@ export default async function StepUpPage() {
     if (!row?.stepUp || !state) redirect("/");
 
     const left = stepUpRemaining(state);
-    const [statuses, questions, phone] = await Promise.all([
+    const [statuses, questions, phone, email] = await Promise.all([
         left.methods.length > 0 ? describeTwoFactorMethods(session.id) : Promise.resolve([]),
         left.questionLeft ? listSecurityQuestions(session.id) : Promise.resolve([]),
-        left.methods.includes("whatsapp") && !state.phoneConfirmed ? getUserPhone(session.id) : Promise.resolve(null)
+        left.methods.includes("whatsapp") && !state.phoneConfirmed ? getUserPhone(session.id) : Promise.resolve(null),
+        left.methods.includes("email") && !state.emailConfirmed ? codeEmailAddress(session.id) : Promise.resolve(null)
     ]);
     // Only what can actually be answered right now: a state read back from a
     // damaged row lists every method, and a channel can go down after sign-in.
+    // Reachable is enough - the stored state already holds only the methods
+    // this sign-in may use, and a risk check on an account with no second
+    // factor offers every way it can receive a code, none of them switched on.
     const methods = left.methods.flatMap((method) => {
-        const status = statuses.find((entry) => entry.method === method && entry.enabled && entry.available);
+        const status = statuses.find((entry) => entry.method === method && entry.available);
         return status ? [{ method, target: status.target ?? null }] : [];
     });
 
@@ -50,6 +54,8 @@ export default async function StepUpPage() {
             questions={questions.map((entry) => entry.question)}
             phoneHint={phone?.verified ? maskPhone(phone.phone) : null}
             phoneConfirmed={state.phoneConfirmed}
+            emailHint={email ? emailHint(email) : null}
+            emailConfirmed={state.emailConfirmed}
         />
     );
 }

@@ -38,7 +38,9 @@ export function StepUpView({
     methods,
     questions,
     phoneHint,
-    phoneConfirmed
+    phoneConfirmed,
+    emailHint,
+    emailConfirmed
 }: {
     reason: StepUpReason;
     progress: { done: number; total: number };
@@ -47,6 +49,9 @@ export function StepUpView({
     /** The number a WhatsApp code would go to, masked. */
     phoneHint: string | null;
     phoneConfirmed: boolean;
+    /** The address an email code would go to, as f***@g***.com. */
+    emailHint: string | null;
+    emailConfirmed: boolean;
 }) {
     const router = useRouter();
     const t = useTranslations("auth");
@@ -56,6 +61,7 @@ export function StepUpView({
     const method = methods.some((option) => option.method === picked) ? picked : (methods[0]?.method ?? null);
     const [code, setCode] = useState("");
     const [phone, setPhone] = useState("");
+    const [email, setEmail] = useState("");
     const [answers, setAnswers] = useState<string[]>(questions.map(() => ""));
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -63,6 +69,7 @@ export function StepUpView({
     // The questions come once the methods are done, so one step shows at a time.
     const askingQuestions = methods.length === 0 && questions.length > 0;
     const needsPhone = method === "whatsapp" && !phoneConfirmed;
+    const needsEmail = method === "email" && !emailConfirmed;
     const needsSending = method !== null && method !== "totp";
 
     async function run(action: () => Promise<StepUpResult>): Promise<StepUpResult> {
@@ -85,13 +92,20 @@ export function StepUpView({
     // be typed first; the button is the resend (components/use-code-sending.ts).
     const sending = useCodeSending({
         scope: needsSending && method ? `step-up:${method}` : null,
-        auto: !needsPhone,
+        auto: !needsPhone && !needsEmail,
         send: async () => {
             if (!method || method === "totp") return { error: "" };
             const typedPhone = needsPhone;
-            const result = await run(() => sendStepUpFactorCodeAction({ method, phone: typedPhone ? phone : undefined }));
+            const typedEmail = needsEmail;
+            const result = await run(() =>
+                sendStepUpFactorCodeAction({
+                    method,
+                    phone: typedPhone ? phone : undefined,
+                    email: typedEmail ? email : undefined
+                })
+            );
             if (result.error || result.complete) return { error: "" };
-            if (typedPhone) router.refresh();
+            if (typedPhone || typedEmail) router.refresh();
             return {};
         }
     });
@@ -198,11 +212,32 @@ export function StepUpView({
                                 </div>
                             ) : null}
 
+                            {needsEmail ? (
+                                <div className="flex flex-col gap-1 text-sm">
+                                    <label htmlFor="step-up-email" className="break-words">
+                                        {emailHint ? t("stepUp.emailLabel", { hint: emailHint }) : t("stepUp.emailLabelPlain")}
+                                    </label>
+                                    <Input
+                                        id="step-up-email"
+                                        type="email"
+                                        autoComplete="email"
+                                        maxLength={320}
+                                        value={email}
+                                        onChange={(event) => setEmail(event.target.value)}
+                                    />
+                                </div>
+                            ) : null}
+
                             {needsSending ? (
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    disabled={pending || sending.cooldown > 0 || (needsPhone && phone.trim().length < 6)}
+                                    disabled={
+                                        pending ||
+                                        sending.cooldown > 0 ||
+                                        (needsPhone && phone.trim().length < 6) ||
+                                        (needsEmail && !email.includes("@"))
+                                    }
                                     onClick={sending.resend}
                                 >
                                     {sending.sending

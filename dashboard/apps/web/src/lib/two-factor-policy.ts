@@ -152,6 +152,8 @@ export interface StepUpState {
     questionDone: boolean;
     /** Whether the phone number was confirmed before a WhatsApp code. */
     phoneConfirmed: boolean;
+    /** Whether the whole address was typed back before an email code. */
+    emailConfirmed: boolean;
     reason: StepUpReason;
 }
 
@@ -162,6 +164,8 @@ const stepUpStateSchema = z.object({
     question: z.boolean(),
     questionDone: z.boolean(),
     phoneConfirmed: z.boolean(),
+    // Rows written before the address was asked for read as not confirmed yet.
+    emailConfirmed: z.boolean().default(false),
     reason: z.enum(["unusual-country", "all-methods", "not-accepted", "new-device", "impossible-travel", "datacenter"])
 });
 
@@ -184,6 +188,7 @@ export function parseStepUp(value: string | null | undefined): StepUpState | nul
         question: false,
         questionDone: false,
         phoneConfirmed: false,
+        emailConfirmed: false,
         reason: "not-accepted"
     };
 }
@@ -231,6 +236,7 @@ export function planStepUp(input: {
         question: requirement.question,
         questionDone: false,
         phoneConfirmed: false,
+        emailConfirmed: false,
         reason
     };
 }
@@ -253,6 +259,7 @@ export function planRiskCheck(input: {
         question: false,
         questionDone: false,
         phoneConfirmed: false,
+        emailConfirmed: false,
         reason: input.reason
     };
 }
@@ -317,4 +324,35 @@ export function isStricter(previous: TwoFactorPolicy, next: TwoFactorPolicy): bo
         rank(next.strictness) > rank(previous.strictness) ||
         next.refused.some((method) => !previous.refused.includes(method))
     );
+}
+
+/**
+ * The address an email code would go to, shown the way Google does before it
+ * sends one: "f***@g***.com". Enough for the owner to know which inbox, not
+ * enough for somebody holding only the password to learn it.
+ */
+export function emailHint(email: string): string {
+    const at = email.lastIndexOf("@");
+    if (at <= 0 || at === email.length - 1) return "***";
+    const domain = email.slice(at + 1);
+    const dot = domain.lastIndexOf(".");
+    const suffix = dot > 0 ? domain.slice(dot) : "";
+    return `${email[0]}***@${domain[0]}***${suffix}`;
+}
+
+/**
+ * Whether what somebody typed is the whole address a code would go to, in any
+ * casing. Compared over a fixed width so the time taken does not depend on
+ * where the first wrong character is.
+ */
+export function emailMatches(typed: string, email: string): boolean {
+    const given = typed.trim().toLowerCase();
+    const expected = email.trim().toLowerCase();
+    if (given.length === 0 || expected.length === 0) return false;
+    const width = 320;
+    let diff = given.length === expected.length ? 0 : 1;
+    for (let index = 0; index < width; index += 1) {
+        diff |= (given.charCodeAt(index) || 0) ^ (expected.charCodeAt(index) || 0);
+    }
+    return diff === 0;
 }

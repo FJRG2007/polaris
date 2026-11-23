@@ -22,7 +22,7 @@ vi.mock("@/lib/integrations/provider-pause", () => lookups);
 vi.mock("@/lib/integrations/criminalip", () => criminalIp);
 
 const { impossibleTravel, signInRisk, TRAVEL_WINDOW_MS } = await import("@/lib/sign-in-risk");
-const { planRiskCheck, parseStepUp, serializeStepUp } = await import("@/lib/two-factor-policy");
+const { emailHint, emailMatches, planRiskCheck, parseStepUp, serializeStepUp } = await import("@/lib/two-factor-policy");
 
 const NOW = new Date("2026-11-23T12:00:00Z");
 
@@ -92,5 +92,25 @@ describe("signInRisk datacenter address", () => {
         lookups.takeServedLookup.mockResolvedValue(true);
         criminalIp.checkCriminalIp.mockRejectedValue(new Error("down"));
         expect(await signInRisk(input)).toBeNull();
+    });
+});
+
+describe("the email typed back before a code", () => {
+    it("is shown as f***@g***.com", () => {
+        expect(emailHint("fran@gmail.com")).toBe("f***@g***.com");
+        expect(emailHint("a@mail.example.co.uk")).toBe("a***@m***.uk");
+        expect(emailHint("broken")).toBe("***");
+    });
+
+    it("matches only the whole address, in any casing", () => {
+        expect(emailMatches(" Fran@Gmail.com ", "fran@gmail.com")).toBe(true);
+        expect(emailMatches("fran@gmail.co", "fran@gmail.com")).toBe(false);
+        expect(emailMatches("fran@gmail.comm", "fran@gmail.com")).toBe(false);
+        expect(emailMatches("", "fran@gmail.com")).toBe(false);
+    });
+
+    it("reads a stored state from before the address was asked as not confirmed", () => {
+        const { emailConfirmed: _, ...older } = planRiskCheck({ available: ["email"], reason: "new-device" })!;
+        expect(parseStepUp(JSON.stringify(older))?.emailConfirmed).toBe(false);
     });
 });

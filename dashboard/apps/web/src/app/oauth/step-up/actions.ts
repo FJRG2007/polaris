@@ -19,10 +19,12 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { proveStepUp, sendStepUpCode } from "@/lib/step-up";
 import { advanceStepUp } from "@/lib/two-factor-policy-service";
+import { codeEmailAddress } from "@/lib/two-factor-delivery";
 import { getUserPhone, verifySecurityAnswers } from "@polaris/auth";
 import { rememberSignInCountry } from "@/lib/two-factor-policy-store";
 import { otpCodeField, TWO_FACTOR_DELIVERY_METHODS } from "@polaris/core";
 import {
+    emailMatches,
     parseStepUp,
     phoneMatches,
     recordFactor,
@@ -47,7 +49,8 @@ const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 
 const sendSchema = z.object({
     method: z.enum(TWO_FACTOR_DELIVERY_METHODS),
-    phone: z.string().trim().max(32).optional()
+    phone: z.string().trim().max(32).optional(),
+    email: z.string().trim().toLowerCase().max(320).optional()
 });
 
 const proveSchema = z.object({
@@ -101,7 +104,7 @@ export async function sendStepUpFactorCodeAction(input: unknown): Promise<StepUp
     if (!current) return { complete: true };
     const parsed = sendSchema.safeParse(input);
     if (!parsed.success) return { error: t("stepUp.notOwed") };
-    const { method, phone } = parsed.data;
+    const { method, phone, email } = parsed.data;
     if (!stepUpRemaining(current.state).methods.includes(method)) return { error: t("stepUp.notOwed") };
 
     // Like Google asks before texting a code: the number has to be typed back
@@ -124,6 +127,24 @@ export async function sendStepUpFactorCodeAction(input: unknown): Promise<StepUp
         if (!(await advanceStepUp(current.sessionId, current.raw, next))) return { error: t("stepUp.changed") };
     }
 
+    // The same for an email code: the whole address, shown only as f***@g***.com.
+    if (method === "email" && !current.state.emailConfirmed) {
+        const throttle = await rateLimit(`step-up-email:${current.userId}`, ATTEMPT_LIMIT, ATTEMPT_WINDOW_MS);
+        if (!throttle.ok) return { error: t("stepUp.tooMany") };
+        const known = await codeEmailAddress(current.userId);
+        if (!email || !known || !emailMatches(email, known)) {
+            await recordAudit({
+                actorId: current.userId,
+                action: "account.signin.step-up-email-failed",
+                targetType: "session",
+                targetId: current.sessionId
+            });
+            return { error: t("stepUp.wrongEmail") };
+        }
+        const next = { ...current.state, emailConfirmed: true };
+        if (!(await advanceStepUp(current.sessionId, current.raw, next))) return { error: t("stepUp.changed") };
+    }
+
     // The method was checked against this session's own stored step-up above,
     // which for a risk check lists every way the account can receive a code.
     const sent = await sendStepUpCode(current.userId, purposeFor(method), method, { anyReachable: true });
@@ -140,6 +161,7 @@ export async function proveStepUpFactorAction(input: unknown): Promise<StepUpRes
     if (!stepUpRemaining(current.state).methods.includes(method)) return { error: t("stepUp.notOwed") };
     // A WhatsApp code can only have been sent after the number was confirmed.
     if (method === "whatsapp" && !current.state.phoneConfirmed) return { error: t("stepUp.notOwed") };
+    if (method === "email" && !current.state.emailConfirmed) return { error: t("stepUp.notOwed") };
 
     const proven = await proveStepUp(current.userId, purposeFor(method), { proof: method, code }, { anyReachable: true });
     if (proven.error) return { error: proven.error };

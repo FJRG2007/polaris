@@ -142,6 +142,11 @@ async function telegramDestination(userId: string): Promise<Resolution> {
     return { destination: { address: chatId, channelId: route.channelId }, blocker: null };
 }
 
+/** The address an email code goes to, or null when no code can be emailed. */
+export async function codeEmailAddress(userId: string): Promise<string | null> {
+    return (await emailDestination(userId)).destination?.address ?? null;
+}
+
 function resolveDestination(userId: string, method: TwoFactorDeliveryMethod): Promise<Resolution> {
     if (method === "email") return emailDestination(userId);
     return method === "telegram" ? telegramDestination(userId) : whatsappDestination(userId);
