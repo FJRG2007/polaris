@@ -30,6 +30,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { spokenWait } from "@/lib/chat/durations";
 import * as core from "@polaris/core";
 import { Composer } from "./composer";
+import { knownPeopleOf } from "./known-people";
 import { CallRoom } from "./call-room";
 import { SidePane } from "./side-pane";
 import { threadRootFor } from "./links";
@@ -253,6 +254,17 @@ export function ChannelView({
         useChat();
     const [unblocking, setUnblocking] = useState(false);
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
+    // Who @ offers before any search answers: the members this screen was
+    // handed and the authors of what it is showing (`knownPeopleOf`).
+    const knownPeople = useMemo(
+        () =>
+            knownPeopleOf({
+                viewerId,
+                members: channels.find((entry) => entry.id === channelId)?.others ?? [],
+                authors: messages ?? []
+            }),
+        [viewerId, channels, channelId, messages]
+    );
     // Polar's answers being written, at the end - see `polar-draft.ts`.
     const { rows: drafting, onFrame: onDraftFrame } = usePolarDrafts(channelId, null, messages);
     const [pending, setPending] = useState<readonly ChatMessageView[]>([]);
@@ -2907,6 +2919,7 @@ export function ChannelView({
                     )}
                     <Composer
                         channelId={channelId}
+                        knownPeople={knownPeople}
                         emoji={composerEmoji}
                         outgoingInConversation
                         // The chat's own announcement, handed in: the box is also

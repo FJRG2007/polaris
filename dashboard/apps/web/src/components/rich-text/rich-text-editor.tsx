@@ -27,14 +27,16 @@ import { SelectionToolbar } from "./toolbar";
 import type { JSONContent } from "@tiptap/core";
 import { afterComposition } from "./composed-shortcuts";
 import { findFillIn } from "./fill-in";
-import { mentionExtension, popupOpen } from "./suggestion";
+import { sendAction } from "@/lib/poll-fetch";
+import { mentionExtension, popupOpen, seededPeople, type KnownPerson } from "./suggestion";
 import { EditorMenu, type ListAction } from "./editor-menu";
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import type { CustomEmojiEntry } from "./custom-emoji";
 import { withCustomEmojiNodes } from "./custom-emoji-doc";
 import { CustomEmojiNode, emojiExtension } from "./emoji-suggestion";
-import { resolveReferencesAction, searchMentionsAction } from "@/app/(app)/mention-actions";
+import type { searchMentionsAction } from "@/app/(app)/mention-actions";
+import { resolveReferencesAction } from "@/app/(app)/mention-actions";
 import { enterBreaksLine, enterKeyHint } from "@/lib/enter-key";
 
 export interface RichTextEditorProps {
@@ -155,6 +157,13 @@ export interface RichTextEditorProps {
      * has no account for it to be asked about. A caller with its own roster
      * hands it over here, and the picker knows no different.
      */
+    /**
+     * People this screen already has - the conversation's members, the authors
+     * of what is on screen - drawn under "@" the moment it is typed, before any
+     * search answers. The search only adds whoever is not here yet. Read when
+     * the picker opens, so a list that grows while somebody writes is used.
+     */
+    knownPeople?: readonly KnownPerson[];
     mentionSource?:
         | ((
               kinds: readonly refs.ReferenceKind[],
@@ -262,6 +271,7 @@ export function RichTextEditor({
     roomMentions = true,
     slashCommands,
     mentionSource = null,
+    knownPeople,
     listAction,
     emoji = null,
     bordered = false,
@@ -288,6 +298,8 @@ export function RichTextEditor({
     // Read through a ref, like the commands: the list changes while somebody is
     // writing - an emoji added in another tab - and rebuilding the editor for it
     // would throw away what they were writing.
+    const known = useRef(knownPeople);
+    known.current = knownPeople;
     const customEmoji = useRef(emoji?.custom ?? []);
     customEmoji.current = emoji?.custom ?? [];
     const writesEmoji = emoji !== null;
@@ -309,9 +321,12 @@ export function RichTextEditor({
                     image: entry.image ?? null
                 }));
             }
+            // Through its route, not as a server action: those run one at a
+            // time per tab, and typing "@" also sends the typing ping, so the
+            // search waited behind it (`/api/mentions/search`).
             const result = await runAction(
                 () =>
-                    searchMentionsAction({
+                    sendAction<Awaited<ReturnType<typeof searchMentionsAction>>>("/api/mentions/search", {
                         kinds: [...kinds],
                         query,
                         ...(mentionsIn ? { channelId: mentionsIn } : {})
@@ -341,7 +356,8 @@ export function RichTextEditor({
                 search,
                 mentionsIn !== null && roomMentions,
                 mentionsIn !== null || polarMentions,
-                (id) => words.current(`editor.mentions.${id}`)
+                (id) => words.current(`editor.mentions.${id}`),
+                () => seededPeople(known.current)
             ),
             ...(writesEmoji ? [CustomEmojiNode, emojiExtension(() => customEmoji.current)] : []),
             ...(foldableHeadings

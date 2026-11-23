@@ -90,6 +90,16 @@ vi.mock("@/app/(app)/chat/actions", () => ({
     voicePresenceAction: async () => ({ inRoom: {} })
 }));
 
+// The send goes through its route; answer it with the mocked action above.
+vi.mock("@/lib/poll-fetch", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@/lib/poll-fetch")>()),
+    sendAction: async (path: string, body: unknown) => {
+        if (path !== "/api/chat/send") throw new Error(`unexpected route ${path}`);
+        const actions = await import("@/app/(app)/chat/actions");
+        return actions.sendAction(body as Parameters<typeof actions.sendAction>[0]);
+    }
+}));
+
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({ liveCallAction: async () => null }));
 
 vi.mock("@/app/(app)/chat/use-chat-stream", () => ({

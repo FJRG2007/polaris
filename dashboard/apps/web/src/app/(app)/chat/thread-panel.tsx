@@ -39,6 +39,7 @@ import { resetPaneLayout } from "./pane-preferences";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { MessagesSkeleton } from "./messages-skeleton";
+import { knownPeopleOf } from "./known-people";
 
 /**
  * What the thread may be narrowed and widened to.
@@ -93,6 +94,12 @@ export function ThreadPanel({
     // squeezed to nothing.
     const { drawn, ceiling, measure, resize, reset } = useChatPane("thread", THREAD_PANE);
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
+    // Who @ offers before any search answers: whoever wrote the message this
+    // answers and everybody answering it (`knownPeopleOf`).
+    const knownPeople = useMemo(
+        () => knownPeopleOf({ viewerId, authors: [root, ...(messages ?? [])] }),
+        [viewerId, root, messages]
+    );
     const [error, setError] = useState("");
     const outgoing = useOutgoing(threadDraftKey(root.id));
     // Replies with files on their way are rows of the thread, under the replies
@@ -268,6 +275,7 @@ export function ThreadPanel({
 
                 <Composer
                     channelId={root.channelId}
+                    knownPeople={knownPeople}
                     emoji={composerEmoji}
                     outgoingInConversation
                     onTyping={(kind) => void actions.typingAction(root.channelId, kind)}

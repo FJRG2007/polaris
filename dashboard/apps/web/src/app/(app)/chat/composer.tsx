@@ -134,6 +134,7 @@ export function Composer({
     disabled,
     attachable = true,
     mentionSource = null,
+    knownPeople,
     inCall = false,
     placeholder,
     editing,
@@ -203,6 +204,9 @@ export function Composer({
      *  call, where half the room are guests. Left unset everywhere else, and the
      *  editor asks the usual question. */
     mentionSource?: React.ComponentProps<typeof RichTextEditor>["mentionSource"];
+    /** The people this screen already has, drawn under "@" before any search
+     *  answers - see `RichTextEditor.knownPeople`. */
+    knownPeople?: React.ComponentProps<typeof RichTextEditor>["knownPeople"];
     /**
      * Whether this box is inside a call.
      *
@@ -1667,6 +1671,8 @@ export function Composer({
                 field, the way every chat client draws it. Buttons in a row
                 underneath read as a form somebody has to fill in and submit. */}
             <div
+                // The phone's @, #, / and : lists dock on this box.
+                data-popup-dock=""
                 className="rounded-md border border-border bg-field transition-colors focus-within:border-border-strong"
                 // The text field taken again: the keyboard comes back in the
                 // panel's place, never on top of it.
@@ -1698,6 +1704,7 @@ export function Composer({
                         roomMentions={roomMentions}
                         slashCommands={commands}
                         mentionSource={mentionSource}
+                        knownPeople={knownPeople}
                         focusWhere={focusWhere}
                         // A screenshot on the clipboard is a screenshot somebody
                         // is sending: it is staged like a picked file, with the

@@ -38,3 +38,6 @@ Security findings are not kept here; they live in
 | BUG-0025 | In Polaris desktop the top right of the window shows different or missing buttons compared with the web | Desktop | Fixed, watching | dashboard/packages/ui/src/shell/window-controls.ts | 2026-11-23 |
 | BUG-0026 | Sharing a screen larger than 4K freezes the sharer, and the others cannot watch it | Calls | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/call-quality.ts | 2026-11-23 |
 | BUG-0027 | A call is lost when Polaris desktop or the phone app updates, instead of carrying on | Calls | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/call-resume.ts | 2026-11-23 |
+| BUG-0028 | A message with a link is not shown as sent until its preview has loaded | Chat | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/outbox.ts | 2026-11-23 |
+| BUG-0029 | Typing @ in a group DM shows only Polar, @here and @everyone at first | Chat | Fixed, watching | dashboard/apps/web/src/components/rich-text/suggestion.tsx | 2026-11-23 |
+| BUG-0030 | The @ picker is a small desktop popover on an iPhone | Chat | Fixed, watching | dashboard/apps/web/src/components/rich-text/suggestion.tsx | 2026-11-23 |

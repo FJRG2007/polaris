@@ -11,7 +11,7 @@
  */
 
 import { useEffect } from "react";
-import * as actions from "./actions";
+import { sendAction } from "@/lib/poll-fetch";
 import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 import { chatStore } from "@/lib/chat/offline/chat-cache";
 import { drainOutbox, type OutboxEntry, type OutboxEvent, type OutboxSendResult } from "@/lib/chat/offline/outbox";
@@ -55,13 +55,30 @@ export async function discard(key: string): Promise<void> {
 type Sendable = Pick<OutboxEntry, "channelId" | "body" | "replyToId" | "translation"> & { key?: string; parentId?: string | null };
 
 /**
+ * The ordinary send, through its route (`/api/chat/send`) rather than as a
+ * server action: a tab's actions run one at a time behind its navigations, and
+ * a message waited on its clock behind every typing ping and read mark the
+ * screen had sent before it. Answers what `sendAction` answers.
+ */
+export function postMessage(input: {
+    channelId: string;
+    body: string;
+    parentId?: string;
+    replyToId?: string | null;
+    translation?: OutboxEntry["translation"];
+    clientKey?: string;
+}): Promise<{ id?: string; error?: string }> {
+    return sendAction<{ id?: string; error?: string }>("/api/chat/send", input);
+}
+
+/**
  * Send one message now, for a caller that could not keep it in the outbox:
  * answers as `sendAction` does and throws when the server cannot be reached.
  * With sealed chat off it is `sendAction` itself.
  */
 export async function sendNow(entry: Sendable): Promise<{ id?: string; error?: string }> {
     if (!sealedChat.sealedChatActive())
-        return actions.sendAction({
+        return postMessage({
             channelId: entry.channelId,
             body: entry.body,
             ...(entry.parentId ? { parentId: entry.parentId } : {}),
@@ -97,7 +114,7 @@ export async function deliver(entry: Sendable): Promise<OutboxSendResult> {
         }
     }
     try {
-        const result = await actions.sendAction({
+        const result = await postMessage({
             channelId: entry.channelId,
             body: entry.body,
             replyToId: entry.replyToId,

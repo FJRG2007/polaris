@@ -293,7 +293,7 @@ export const BlockMenu = Extension.create<{
                                 editor: props.editor,
                                 className: POPUP_LAYER_CLASS
                             });
-                            unmount = mountPopup(props.mount, renderer.element as HTMLElement);
+                            unmount = mountPopup(props.mount, renderer.element as HTMLElement, props.editor.view.dom);
                         },
                         onUpdate: (props) => renderer?.updateProps(props),
                         onKeyDown: (props) => {

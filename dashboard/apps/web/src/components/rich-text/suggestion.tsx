@@ -69,6 +69,14 @@ export const POPUP_CLASS =
     "max-h-64 w-72 overflow-y-auto overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 shadow-popover";
 
 /**
+ * What a docked list looks like: the shell edge to edge, rows a thumb can hit.
+ * On the element rather than on each list, so the @, #, / and : lists - which
+ * all mount through `mountPopup` - change together.
+ */
+export const DOCKED_CLASS =
+    "data-[docked=true]:[&_ul]:w-full data-[docked=true]:[&_ul]:max-h-[var(--dock-max)] data-[docked=true]:[&_ul]:rounded-none data-[docked=true]:[&_ul]:rounded-t-xl data-[docked=true]:[&_ul]:border-x-0 data-[docked=true]:[&_ul]:border-b-0 data-[docked=true]:[&_ul]:p-1.5 data-[docked=true]:[&_li>button]:min-h-12 data-[docked=true]:[&_li>button]:gap-3 data-[docked=true]:[&_li>button]:px-3 data-[docked=true]:[&_li>button]:text-base data-[docked=true]:[&_[role=option]]:min-h-12 data-[docked=true]:[&_[role=option]]:text-base";
+
+/**
  * What the plugin's own element is given once it is mounted.
  *
  * That element goes on the body, positioned but with no layer of its own, and
@@ -77,17 +85,115 @@ export const POPUP_CLASS =
  * come back for the same reason: a modal dialog switches them off for
  * everything outside itself, and the list is outside it.
  */
-export const POPUP_LAYER_CLASS = "z-[60] pointer-events-auto";
+export const POPUP_LAYER_CLASS = `z-[60] pointer-events-auto ${DOCKED_CLASS}`;
 
-/** Mount a popup's element where the plugin puts it, with its own scrolling
- *  kept over a modal dialog - see `keepOwnScroll`. */
+/**
+ * Mount a popup's element where the plugin puts it, with its own scrolling
+ * kept over a modal dialog - see `keepOwnScroll`.
+ *
+ * On a phone it is docked instead (`dockPopup`): given the editor it serves,
+ * the list sits across the whole width right above the box being written in.
+ */
 export function mountPopup(
     mount: (element: HTMLElement) => () => void,
-    element: HTMLElement
+    element: HTMLElement,
+    editorElement?: HTMLElement | null
 ): () => void {
     keepOwnScroll(element);
+    if (editorElement && dockedLayout()) return dockPopup(element, editorElement);
     return mount(element);
 }
+
+/** A phone: narrow and touched. A narrow desktop window keeps the popover. */
+const DOCK_QUERY = "(max-width: 640px) and (pointer: coarse)";
+
+export function dockedLayout(): boolean {
+    return typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(DOCK_QUERY).matches;
+}
+
+/** The box the dock sits on: the composer's frame when the editor is in one. */
+export const DOCK_ANCHOR_ATTRIBUTE = "data-popup-dock";
+
+/**
+ * Where a docked list goes, worked out from numbers alone so it can be
+ * asserted: across the visible width, its bottom edge on the top of the box
+ * being written in, and no taller than the room above that box - with the
+ * keyboard open, the visual viewport is what is left of the screen, and a list
+ * taller than that would be scrolled under the top of it.
+ *
+ * Both rects are in layout-viewport coordinates, which is what
+ * `getBoundingClientRect` answers and what `position: fixed` places by, in
+ * Safari as everywhere else.
+ */
+export function dockFrame(
+    box: { readonly top: number },
+    viewport: { readonly width: number; readonly height: number; readonly offsetTop: number; readonly offsetLeft: number },
+    layoutHeight: number
+): { left: number; width: number; bottom: number; maxHeight: number } {
+    const room = box.top - viewport.offsetTop - 8;
+    return {
+        left: Math.round(viewport.offsetLeft),
+        width: Math.round(viewport.width),
+        bottom: Math.max(0, Math.round(layoutHeight - box.top)),
+        maxHeight: Math.max(96, Math.round(Math.min(room, viewport.height * 0.5)))
+    };
+}
+
+/**
+ * The phone picker: Discord's and WhatsApp's, docked on the composer rather
+ * than floating at the caret. A popover sized for a mouse, hanging off a caret
+ * near the bottom of a phone, was half under the keyboard and a third as wide
+ * as the thumb reaching for it.
+ *
+ * Follows the visual viewport, so it rides up with the keyboard and back down
+ * with it, and the box itself, which grows as a message gets longer.
+ */
+function dockPopup(element: HTMLElement, editorElement: HTMLElement): () => void {
+    const box = (editorElement.closest(`[${DOCK_ANCHOR_ATTRIBUTE}]`) as HTMLElement | null) ?? editorElement;
+    element.dataset.docked = "true";
+    Object.assign(element.style, {
+        position: "fixed",
+        top: "auto",
+        paddingLeft: "env(safe-area-inset-left)",
+        paddingRight: "env(safe-area-inset-right)"
+    });
+    document.body.appendChild(element);
+    let frame = 0;
+    const place = () => {
+        frame = 0;
+        const viewport = window.visualViewport;
+        const placed = dockFrame(
+            box.getBoundingClientRect(),
+            viewport
+                ? { width: viewport.width, height: viewport.height, offsetTop: viewport.offsetTop, offsetLeft: viewport.offsetLeft }
+                : { width: window.innerWidth, height: window.innerHeight, offsetTop: 0, offsetLeft: 0 },
+            window.innerHeight
+        );
+        element.style.left = `${placed.left}px`;
+        element.style.width = `${placed.width}px`;
+        element.style.bottom = `${placed.bottom}px`;
+        element.style.setProperty("--dock-max", `${placed.maxHeight}px`);
+    };
+    const soon = () => {
+        if (!frame) frame = requestAnimationFrame(place);
+    };
+    place();
+    window.visualViewport?.addEventListener("resize", soon);
+    window.visualViewport?.addEventListener("scroll", soon);
+    window.addEventListener("resize", soon);
+    const watch = typeof ResizeObserver === "function" ? new ResizeObserver(soon) : null;
+    watch?.observe(box);
+    return () => {
+        if (frame) cancelAnimationFrame(frame);
+        window.visualViewport?.removeEventListener("resize", soon);
+        window.visualViewport?.removeEventListener("scroll", soon);
+        window.removeEventListener("resize", soon);
+        watch?.disconnect();
+        element.remove();
+    };
+}
+
+
 
 /** One row of either popup. */
 export const POPUP_ITEM_CLASS =
@@ -160,6 +266,50 @@ export function roomMatches(
     );
 }
 
+/** Somebody the screen already has, as a caller hands them in. */
+export interface KnownPerson {
+    readonly id: string;
+    readonly label: string;
+    /** The handle, "@ana", where the screen knows it. */
+    readonly detail?: string;
+    readonly image?: string | null;
+}
+
+/** The people a screen has, as picker rows: once each, nameless ones left out. */
+export function seededPeople(known: readonly KnownPerson[] | undefined): MentionCandidate[] {
+    const seen = new Set<string>();
+    const rows: MentionCandidate[] = [];
+    for (const person of known ?? []) {
+        if (!person.id || !person.label.trim() || seen.has(person.id)) continue;
+        seen.add(person.id);
+        rows.push({ kind: "user", id: person.id, label: person.label, detail: person.detail ?? "", image: person.image ?? null });
+    }
+    return rows;
+}
+
+/**
+ * The people already known that answer what is typed, then whoever a search
+ * found that was not among them.
+ *
+ * Known people keep their place when the answer lands - only their line is
+ * swapped for the server's, which knows the nickname and the handle - so the
+ * row under somebody's thumb never moves. A search adds people; it never takes
+ * one away from a list that was right before it answered.
+ */
+export function mergeKnown(
+    query: string,
+    known: readonly MentionCandidate[],
+    found: readonly MentionCandidate[]
+): MentionCandidate[] {
+    const key = (row: MentionCandidate) => `${row.kind}-${row.id}`;
+    const answered = new Map(found.map((row) => [key(row), row] as const));
+    const first = known
+        .filter((row) => matchesTyped(row.label, query) || (row.detail !== "" && matchesTyped(row.detail, query)))
+        .map((row) => answered.get(key(row)) ?? row);
+    const placed = new Set(first.map(key));
+    return [...first, ...found.filter((row) => !placed.has(key(row)))];
+}
+
 /** How a caller looks candidates up, so this file needs no server import. */
 export type MentionSearch = (
     kinds: readonly refs.ReferenceKind[],
@@ -172,6 +322,8 @@ type ListProps = SuggestionProps<SuggestionItem>;
 const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
     const [active, setActive] = useState(0);
     const items = props.items;
+    // A phone draws the list docked, with rows and faces a thumb can find.
+    const [docked] = useState(dockedLayout);
 
     // Back to the top when the rows are a different list, not when the same
     // rows come back from the server again: a highlight that jumps while
@@ -240,7 +392,7 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
                             {item.kind === "user" ? (
                                 <Avatar
                                     person={{ id: item.id, name: item.label, image: item.image }}
-                                    size={20}
+                                    size={docked ? 32 : 20}
                                 />
                             ) : item.kind === "room" && item.id === "polar" ? (
                                 <PolarFace size={20} />
@@ -322,7 +474,9 @@ export function mentionExtension(
     search: MentionSearch,
     rooms = false,
     polar = false,
-    words?: RoomWords
+    words?: RoomWords,
+    /** The people the screen already has, read each time the list is drawn. */
+    known: () => readonly MentionCandidate[] = () => []
 ) {
     return Extension.create({
         name: "polarisMentions",
@@ -338,7 +492,7 @@ export function mentionExtension(
                 Suggestion({
                     editor: this.editor,
                     pluginKey: POPUP_KEYS.people,
-                    ...mentionSuggestion("@", ["user", "team"], search, rooms, polar, words)
+                    ...mentionSuggestion("@", ["user", "team"], search, rooms, polar, words, known)
                 }),
                 Suggestion({
                     editor: this.editor,
@@ -458,7 +612,8 @@ function mentionSuggestion(
     rooms = false,
     /** Whether Polar can be asked here, which any conversation allows. */
     polar = false,
-    words?: RoomWords
+    words?: RoomWords,
+    known: () => readonly MentionCandidate[] = () => []
 ): Omit<SuggestionOptions<SuggestionItem>, "editor"> {
     /** The room words matching a query, in the reader's language. Worked out
      *  here rather than waited for: they never come from the server. */
@@ -498,7 +653,7 @@ function mentionSuggestion(
     const meanwhile = (query: string): SuggestionItem[] => {
         const people =
             fresh(query) ?? lastPeople.filter((person) => matchesTyped(person.label, query));
-        return ordered(query, people, named(query));
+        return ordered(query, mergeKnown(query, known(), people), named(query));
     };
 
     return {
@@ -514,7 +669,7 @@ function mentionSuggestion(
             const people = fresh(query) ?? (await search(kinds, query));
             remember(query, people);
             lastPeople = people;
-            return ordered(query, people, named(query));
+            return ordered(query, mergeKnown(query, known(), people), named(query));
         },
 
         command: ({ editor, range, props }) => {
@@ -553,7 +708,7 @@ function mentionSuggestion(
                         editor: props.editor,
                         className: POPUP_LAYER_CLASS
                     });
-                    unmount = mountPopup(props.mount, renderer.element as HTMLElement);
+                    unmount = mountPopup(props.mount, renderer.element as HTMLElement, props.editor.view.dom);
                 },
                 onUpdate: (props) => renderer?.updateProps(drawn(props)),
                 onKeyDown: (props) => {

@@ -162,14 +162,39 @@ export async function knownPreviews(urls: readonly string[]): Promise<Map<string
  * Every failure is recorded rather than thrown, so a dead link is asked about
  * once an hour instead of on every render.
  */
-export async function unfurl(
+export function unfurl(
     address: string,
     /** Look now, however recently it was looked at - for a card whose picture
      *  has stopped answering. The caller bounds how often. */
     options: { force?: boolean } = {}
 ): Promise<void> {
     const url = safeUrl(address);
-    if (!url) return;
+    if (!url) return Promise.resolve();
+    return joinLook(url.href, options.force === true, () => look(url, options));
+}
+
+/**
+ * The looks running in this process, by address and by whether they were
+ * forced.
+ *
+ * A link is looked at twice the moment it is sent: by the warm-up the send
+ * starts, and by the reader's own screen asking for the card a second later.
+ * Each read the whole page and asked the site's oEmbed on its own, so the card
+ * waited on the slower of two identical fetches racing for the same site. The
+ * second asker now waits on the first one's answer instead.
+ */
+const looking = new Map<string, Promise<void>>();
+
+export function joinLook(key: string, force: boolean, run: () => Promise<void>): Promise<void> {
+    const slot = `${force ? "force" : "plain"}:${key}`;
+    const running = looking.get(slot) ?? (force ? undefined : looking.get(`force:${key}`));
+    if (running) return running;
+    const started = run().finally(() => looking.delete(slot));
+    looking.set(slot, started);
+    return started;
+}
+
+async function look(url: URL, options: { force?: boolean }): Promise<void> {
 
     const existing = await prisma.linkPreview.findUnique({
         where: { url: url.href },

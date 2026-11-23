@@ -27,6 +27,7 @@
  */
 
 import { Composer } from "./composer";
+import { knownPeopleOf } from "./known-people";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Avatar } from "@/components/avatar";
 import type { CallState } from "./call-state";
@@ -136,6 +137,20 @@ export function MeetingChat({
                     .map((person) => person.id)
             ),
         [call.meeting]
+    );
+
+    // Who @ offers before the roster is asked: the people admitted to the call
+    // that this page already draws, and whoever has written here.
+    const knownPeople = useMemo(
+        () =>
+            knownPeopleOf({
+                viewerId: null,
+                members: (call.meeting?.participants ?? [])
+                    .filter((person) => person.admission === "admitted" && person.userId !== null)
+                    .map((person) => ({ id: person.userId!, name: person.name })),
+                authors: (lines ?? []).map((line) => ({ authorId: line.userId, authorName: line.name }))
+            }),
+        [call.meeting, lines]
     );
 
     const mentions = useCallback(
@@ -314,6 +329,7 @@ export function MeetingChat({
                     fixedLimits
                     disabled={false}
                     mentionSource={mentions}
+                    knownPeople={knownPeople}
                     placeholder={t("meetingChat.saySomething")}
                     onSend={send}
                     onPoll={ask}
