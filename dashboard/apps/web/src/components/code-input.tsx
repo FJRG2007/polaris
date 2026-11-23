@@ -20,6 +20,16 @@ import { Input, type InputProps } from "@polaris/ui";
 /** How many digits a code has. `otpCodeField` in `@polaris/core` is the rule. */
 export const CODE_LENGTH = 6;
 
+/** What an empty box shows: digits that read like a real code, where a row of
+ *  zeros reads like a broken field. A number, not a sentence, so it is the same
+ *  in every language. */
+const EXAMPLE_DIGITS = "482913705162"; // i18n-ignore digits, not words
+
+/** The example an empty box of `length` digits shows. */
+export function exampleCode(length = CODE_LENGTH): string {
+    return EXAMPLE_DIGITS.repeat(Math.ceil(length / EXAMPLE_DIGITS.length)).slice(0, length);
+}
+
 /** Only the digits of what was typed, at most a code's worth. */
 export function codeDigits(typed: string, length = CODE_LENGTH): string {
     return typed.replace(/\D/g, "").slice(0, length);
@@ -65,7 +75,7 @@ export function CodeInput({
         <Input
             inputMode="numeric"
             autoComplete={masked ? "off" : "one-time-code"}
-            placeholder={"0".repeat(length)}
+            placeholder={exampleCode(length)}
             {...props}
             type={masked ? "password" : "text"}
             value={value}

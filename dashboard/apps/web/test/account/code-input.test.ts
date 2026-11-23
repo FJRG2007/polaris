@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { codeDigits, isWholeCode } from "../../src/components/code-input";
+import { codeDigits, exampleCode, isWholeCode } from "../../src/components/code-input";
 
 describe("a code box", () => {
     it("keeps only the digits", () => {
@@ -27,5 +27,12 @@ describe("a code box", () => {
         expect(isWholeCode("")).toBe(false);
         expect(isWholeCode("12345")).toBe(false);
         expect(isWholeCode("123456")).toBe(true);
+    });
+
+    it("shows an example that reads like a real code, as long as the code", () => {
+        expect(exampleCode()).toMatch(/^\d{6}$/);
+        expect(exampleCode()).not.toBe("000000");
+        expect(exampleCode(4)).toHaveLength(4);
+        expect(exampleCode(20)).toHaveLength(20);
     });
 });
