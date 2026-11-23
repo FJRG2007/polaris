@@ -54,6 +54,19 @@ const RULES: ReadonlyArray<{ readonly bad: RegExp; readonly want: string }> = [
  *  drop it first - which is what this looks for beside every ADD CONSTRAINT. */
 const ADDS_CONSTRAINT = /ADD CONSTRAINT\s+"([^"]+)"/gi;
 
+/** The other rerunnable spelling: the add inside a `DO $$ ... $$` block that
+ *  swallows `duplicate_object`, so a second run finds it there and moves on.
+ *  True when the add at `index` sits in such a block. */
+function guardedByDuplicateHandler(sql: string, index: number): boolean {
+    const start = sql.lastIndexOf("DO $$", index);
+    if (start < 0) return false;
+    const closedBefore = sql.indexOf("END $$", start);
+    if (closedBefore >= 0 && closedBefore < index) return false;
+    const end = sql.indexOf("END $$", index);
+    if (end < 0) return false;
+    return /EXCEPTION\s+WHEN\s+duplicate_object\s+THEN\s+NULL/i.test(sql.slice(index, end));
+}
+
 /** A backfill is not DDL, so no IF NOT EXISTS covers it: run the same INSERT
  *  twice and the rows are simply there twice. */
 const INSERTS = /INSERT\s+INTO/i;
@@ -106,6 +119,7 @@ describe("a migration written from now on", () => {
                 // in the file: a drop that comes after the add leaves the second
                 // run failing on the add exactly as it would without one.
                 const constraint = add[1] ?? "";
+                if (guardedByDuplicateHandler(sql, add.index)) continue;
                 const drop = new RegExp(
                     `DROP CONSTRAINT\\s+IF EXISTS\\s+"${quoted(constraint)}"`,
                     "i"
