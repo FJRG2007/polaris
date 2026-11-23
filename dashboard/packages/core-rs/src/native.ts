@@ -47,7 +47,11 @@ export function nativeSource(directory?: string): BindingSource | null {
             const path = getBuiltin("node:path") as typeof import("node:path");
             const url = getBuiltin("node:url") as typeof import("node:url");
             const mod = getBuiltin("node:module") as typeof import("node:module");
-            const dir = directory ?? url.fileURLToPath(new URL("../native/", import.meta.url));
+            // Through a variable: a bundler reading `new URL("...", import.meta.url)`
+            // literally treats the folder as an asset of every browser and edge
+            // chunk that reaches this module, and fails the build looking for it.
+            const here = import.meta.url;
+            const dir = directory ?? url.fileURLToPath(new URL("../native/", here));
             const file = path.join(dir, nativeFileName(proc.platform ?? "", proc.arch ?? "", isMusl(proc)));
             if (!fs.existsSync(file)) throw new BindingMissingError(`no Node binding at ${file}`);
             return pickBinding(mod.createRequire(import.meta.url)(file));
