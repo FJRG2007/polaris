@@ -310,13 +310,13 @@
             "clipHint": "Intro lo copia",
             "system": "Sistema",
             "systemHint": "Se ejecuta en este equipo",
-            "systemConfirmHint": "Pregunta antes de hacerlo",
+            "systemConfirmHint": "Pide confirmación",
             "commands": {
-                "lock": "Bloquear pantalla",
-                "sleep": "Suspender",
+                "lock": "Bloquear",
+                "sleep": "Reposo",
                 "restart": "Reiniciar",
                 "shutdown": "Apagar",
-                "logout": "Cerrar sesión",
+                "logout": "Salir",
                 "empty-trash": "Vaciar papelera"
             }
         },

@@ -317,7 +317,7 @@
                 "restart": "Restart",
                 "shutdown": "Shut down",
                 "logout": "Log out",
-                "empty-trash": "Empty bin"
+                "empty-trash": "Empty the bin"
             }
         },
         "calculationCopied": "{value} copied to the clipboard",
