@@ -67,7 +67,7 @@ function ConfirmVariableDialog({
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle className="break-words">{title}</DialogTitle>
-                    <DialogDescription>{body}</DialogDescription>
+                    <DialogDescription className="break-words">{body}</DialogDescription>
                 </DialogHeader>
                 {error && (
                     <p role="alert" className="text-sm text-danger-ink">
