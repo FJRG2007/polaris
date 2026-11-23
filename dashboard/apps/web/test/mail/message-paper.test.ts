@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { dressesItself } from "@/app/(app)/mail/message-body";
+import { dressesItself } from "@/app/(app)/mail/frame-document";
 
 describe("whether a message brought its own page", () => {
     it("says so for a newsletter that sets a background", () => {

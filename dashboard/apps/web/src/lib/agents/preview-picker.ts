@@ -183,7 +183,12 @@ const HTML = /<html(?:\s[^>]*)?>/i;
 /** An HTML document with the picker in it, first in its head so it runs
  *  before the page's own scripts can stop events from reaching it. */
 export function injectPicker(html: string): string {
-    const tag = `<script data-polaris-picker>${PICKER_SCRIPT}</script>`;
+    return injectFirst(html, `<script data-polaris-picker>${PICKER_SCRIPT}</script>`);
+}
+
+/** `tag` first in the document's head, else right after `<html>`, else at
+ *  the very start. */
+export function injectFirst(html: string, tag: string): string {
     const at = HEAD.exec(html) ?? HTML.exec(html);
     if (!at) return `${tag}${html}`;
     const end = at.index + at[0].length;

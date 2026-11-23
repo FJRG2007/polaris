@@ -12,7 +12,7 @@
 
 import { cn } from "@polaris/ui";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { injectPicker } from "@/lib/agents/preview-picker";
+import { injectFirst, injectPicker } from "@/lib/agents/preview-picker";
 import { PreviewPickContext, usePreviewPicker } from "@/components/preview/use-preview-picker";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Crosshair, Eraser, Eye, Loader2, Play, Square, X } from "lucide-react";
@@ -197,6 +197,36 @@ export function RunButton({ run, kind }: { run: CodeRun; kind: RunKind }) {
 }
 
 /**
+ * Links in a previewed page open outside it, the way every other outside link
+ * in Polaris does: in a new tab, and in the desktop app in the browser. Left to
+ * the frame, a plain link navigated the preview into a page that refuses to be
+ * framed, and a `target=_blank` one was a popup the sandbox blocked - either
+ * way the click did nothing. Only absolute web and mail addresses: a relative
+ * one would resolve against the Polaris page around the frame.
+ */
+const PREVIEW_LINKS_SCRIPT = `(function () {
+    function follow(event) {
+        if (event.defaultPrevented || (event.button !== 0 && event.button !== 1)) return;
+        var link = event.target && event.target.closest ? event.target.closest("a[href], area[href]") : null;
+        if (!link) return;
+        var raw = String(link.getAttribute("href")).trim();
+        if (!raw || raw.charAt(0) === "#") return;
+        var url;
+        try { url = new URL(raw.slice(0, 2) === "//" ? "https:" + raw : raw); } catch (error) { return; }
+        if (!/^(https?:|mailto:)$/i.test(url.protocol)) return;
+        event.preventDefault();
+        window.open(url.href, "_blank", "noopener,noreferrer");
+    }
+    document.addEventListener("click", follow);
+    document.addEventListener("auxclick", follow);
+})();`;
+
+/** The previewed page with its links opening outside it. */
+export function withOutsideLinks(srcdoc: string): string {
+    return injectFirst(srcdoc, `<script data-polaris-links>${PREVIEW_LINKS_SCRIPT}</script>`);
+}
+
+/**
  * A page's preview, in a frame of its own origin. Inside a thread that takes
  * picked elements (Polar's chat), the picker goes into the page too, and what
  * is clicked there goes into the next message, as in the Code preview.
@@ -231,9 +261,12 @@ function PagePreview({ id, srcdoc }: { id: number; srcdoc: string }) {
                 ref={frame}
                 key={id}
                 title={t("editor.previewTitle")}
-                sandbox="allow-scripts"
+                // Popups, so a link can open outside the preview; escaping the
+                // sandbox, so the page it opens is a normal one. The frame
+                // never shares this origin.
+                sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
                 referrerPolicy="no-referrer"
-                srcDoc={onPick ? injectPicker(srcdoc) : srcdoc}
+                srcDoc={onPick ? injectPicker(withOutsideLinks(srcdoc)) : withOutsideLinks(srcdoc)}
                 className="block h-80 w-full resize-y bg-white"
             />
         </div>

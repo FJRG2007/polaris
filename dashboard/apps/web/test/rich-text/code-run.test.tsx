@@ -164,7 +164,8 @@ describe("a page", () => {
         render(<CodeBlock code="<h1>Hi</h1>" language="html" />, { wrapper: MessagesWrapper });
         fireEvent.click(screen.getByRole("button", { name: "Preview this page" }));
         const frame = document.querySelector("iframe") as HTMLIFrameElement;
-        expect(frame.getAttribute("sandbox")).toBe("allow-scripts");
+        expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-popups allow-popups-to-escape-sandbox");
+        expect(frame.getAttribute("srcdoc")).toContain("data-polaris-links");
         expect(frame.getAttribute("srcdoc")).toContain("<h1>Hi</h1>");
         fireEvent.click(screen.getByRole("button", { name: "Close the preview" }));
         expect(document.querySelector("iframe")).toBeNull();

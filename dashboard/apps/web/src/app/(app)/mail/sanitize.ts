@@ -58,34 +58,44 @@ export async function sanitizeMail(html: string): Promise<string> {
     const already = cleaned.get(html);
     if (already !== undefined) return already;
     const purify = await purifier();
-    const result = purify.sanitize(html, {
-        // `data-remote-*` is how the server parks an address it held back. It
-        // has to survive the sanitizer or "show pictures" has nothing to put
-        // back.
-        ADD_ATTR: [
-            "target",
-            "data-remote-src",
-            "data-remote-srcset",
-            "data-remote-background",
-            "data-remote-poster"
-        ],
-        FORBID_TAGS: [
-            "script",
-            "iframe",
-            "object",
-            "embed",
-            "form",
-            "input",
-            "button",
-            "meta",
-            "base"
-        ],
-        FORBID_ATTR: ["srcdoc", "formaction", "ping"],
-        // Mail is full of tables and inline styles and always will be. They are
-        // safe inside a frame with no same-origin and a policy that forbids
-        // every outside load.
-        ALLOW_DATA_ATTR: true
-    });
+    const base = messageBase(html);
+    // The message's <base> is stripped - it would also redirect pictures and
+    // the frame's own addresses - but what it says still decides where a
+    // relative link goes, so those are resolved against it here, once.
+    if (base) purify.addHook("afterSanitizeAttributes", (node) => resolveLink(node, base));
+    let result: string;
+    try {
+        result = purify.sanitize(html, {
+            // `data-remote-*` is how the server parks an address it held back. It
+            // has to survive the sanitizer or "show pictures" has nothing to put
+            // back.
+            ADD_ATTR: [
+                "target",
+                "data-remote-src",
+                "data-remote-srcset",
+                "data-remote-background",
+                "data-remote-poster"
+            ],
+            FORBID_TAGS: [
+                "script",
+                "iframe",
+                "object",
+                "embed",
+                "form",
+                "input",
+                "button",
+                "meta",
+                "base"
+            ],
+            FORBID_ATTR: ["srcdoc", "formaction", "ping"],
+            // Mail is full of tables and inline styles and always will be. They are
+            // safe inside a frame with no same-origin and a policy that forbids
+            // every outside load.
+            ALLOW_DATA_ATTR: true
+        });
+    } finally {
+        if (base) purify.removeHook("afterSanitizeAttributes");
+    }
     cleaned.set(html, result);
     cleaned.set(result, result);
     while (cleaned.size > KEEP) {
@@ -94,4 +104,43 @@ export async function sanitizeMail(html: string): Promise<string> {
         cleaned.delete(oldest.value);
     }
     return result;
+}
+
+const XLINK = "http://www.w3.org/1999/xlink";
+
+/**
+ * The absolute web address a message's own `<base href>` names, or null. Only
+ * http and https: a base is a place relative links are read against, never a
+ * way to turn them into another scheme.
+ */
+export function messageBase(html: string): string | null {
+    const found = /<base\b[^>]*?\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i.exec(html);
+    const raw = (found?.[1] ?? found?.[2] ?? found?.[3] ?? "").trim();
+    if (!raw) return null;
+    try {
+        const url = new URL(raw);
+        return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+    } catch {
+        return null;
+    }
+}
+
+/** A link's relative address made absolute against the message's base. A
+ *  fragment and an address with a scheme of its own are left as they are. */
+function resolveLink(node: Element, base: string): void {
+    const name = node.nodeName.toLowerCase();
+    if (name !== "a" && name !== "area") return;
+    const read = (raw: string | null): string | null => {
+        const value = raw?.trim() ?? "";
+        if (!value || value.startsWith("#") || /^[a-z][a-z0-9+.-]*:/i.test(value)) return null;
+        try {
+            return new URL(value, base).href;
+        } catch {
+            return null;
+        }
+    };
+    const plain = read(node.getAttribute("href"));
+    if (plain) node.setAttribute("href", plain);
+    const linked = read(node.getAttributeNS(XLINK, "href"));
+    if (linked) node.setAttributeNS(XLINK, "xlink:href", linked);
 }

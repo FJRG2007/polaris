@@ -7,7 +7,7 @@
 
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
-import { frameDocument } from "@/app/(app)/mail/message-body";
+import { frameDocument } from "@/app/(app)/mail/frame-document";
 
 function drawn(body: string, url?: string) {
     const dom = new JSDOM(frameDocument(body, false, "reader", "https://polaris.example"), {
@@ -101,13 +101,23 @@ describe("links in a message frame", () => {
         expect(opened(posted)).toEqual(["https://example.com/area"]);
     });
 
-    it("resolves a relative link against the frame's base", () => {
+    // BUG-0020: the frame's base is the Polaris page, so a relative link read
+    // against it opened a Polaris address the sender never wrote. The
+    // sanitizer resolves against the message's own <base>; what is still
+    // relative here has no base and is refused.
+    it("never resolves a relative link against the Polaris page", () => {
         const { document, window, posted } = drawn(
             `<a id="l" href="/track?id=1">rel</a>`,
             "https://polaris.example/mail"
         );
+        expect(click(window as never, document.getElementById("l")!)).toBe(true);
+        expect(opened(posted)).toEqual([]);
+    });
+
+    it("opens a scheme-relative link over https", () => {
+        const { document, window, posted } = drawn(`<a id="l" href="//example.com/x">x</a>`);
         click(window as never, document.getElementById("l")!);
-        expect(opened(posted)).toEqual(["https://polaris.example/track?id=1"]);
+        expect(opened(posted)).toEqual(["https://example.com/x"]);
     });
 
     it("keeps a long address whole and trims the spaces around it", () => {

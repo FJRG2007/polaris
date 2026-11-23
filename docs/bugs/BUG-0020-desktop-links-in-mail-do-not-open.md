@@ -8,6 +8,10 @@ related:
   - dashboard/apps/web/src/lib/open-link.ts
   - desktop/src/main/windows.ts
   - desktop/src/main/open-external.ts
+  - desktop/src/main/default-browser.ts
+  - dashboard/apps/web/src/app/(app)/mail/frame-document.ts
+  - dashboard/apps/web/src/app/(app)/mail/sanitize.ts
+  - dashboard/apps/web/src/components/rich-text/code-run.tsx
   - desktop/src/main/navigation.ts
   - desktop/src/preload/outside-links.ts
 reported: 2026-11-23
@@ -113,6 +117,44 @@ they still do not and no dialog appears, `shell.openExternal` is resolving
 without a browser starting; `links.log` will then be empty, which is itself
 the answer, and the next step is a different route on Windows.
 
+## Second fix (desktop 0.1.60, dashboard image)
+
+The first fix could only say "Couldn't open the link" when a route rejected.
+The owner's report (right-click > Open link in browser does nothing either,
+Windows 11, Brave as the https default) fits Windows' hand-over resolving
+with no browser appearing, which no dialog can catch, and `rundll32` reported
+success whether or not anything opened. So opening a link no longer depends
+on that hand-over alone:
+
+- **Windows (`default-browser.ts`).** The default browser's registered command
+  is read (`HKCU\...\UrlAssociations\<scheme>\UserChoice` ProgId, then
+  `HKCR\<ProgId>\shell\open\command`), parsed the way Windows does (quoted or
+  unquoted `.exe`, `%1`/`%L`, `%VAR%`, `CommandLineToArgvW` quoting) and
+  started with an argument array, never a shell; `cmd`, PowerShell,
+  `rundll32` and other programs that run their argument are refused. That
+  start is the first route because its success can be seen (the process was
+  created). `shell.openExternal` is the second route (a Store browser has no
+  command). `rundll32` is gone.
+- **macOS / Linux.** `shell.openExternal`, then `open` / `xdg-open`, whose exit
+  code is checked.
+- **Copy link always reachable.** The dialog with Copy link when every route
+  fails; Copy link on every link's right-click menu; and the tray menu keeps
+  "Copy last link opened" for a link the system took without a browser
+  showing it.
+- **Mail relative links.** The sanitizer still strips the message's `<base>`
+  but resolves relative links against it first; the frame no longer resolves
+  a still-relative link against the Polaris page (it opened a Polaris
+  address) and refuses it instead.
+- **Other frames.** The code-block page preview had no popups: a
+  `target=_blank` link was blocked and a plain one navigated the frame into a
+  page that refuses framing. It now has `allow-popups
+  allow-popups-to-escape-sandbox` and opens absolute links in a new window
+  (outside the app in the desktop). Agent session HTML artifacts gained
+  `allow-popups-to-escape-sandbox`.
+
+Not yet confirmed on the owner's machine: whether Brave starts from the
+direct launch there. Status stays **open** until they confirm on 0.1.60.
+
 ## Regression test
 
 - `desktop/test/main/open-external.test.ts`: a several-thousand-character
@@ -127,8 +169,19 @@ the answer, and the next step is a different route on Windows.
   recorded instead of called): the desktop's own `openPolarisWindow`, built
   preload and the dashboard's real mail frame and `openLink`. Mail button left
   and middle click, a plain link and a `target=_blank` link all reach
-  `shell.openExternal`. This harness is not in the repo yet.
-- Not exercised: the real Windows hand-over to a browser, and the dialog.
+  `shell.openExternal`.
+- `desktop/test/main/default-browser.test.ts`: Brave, Chrome (current and
+  older), Edge, Firefox, Opera (unquoted path), Outlook command lines;
+  `%VAR%` expansion; localised `reg.exe` output; ProgId traversal and
+  shell programs refused.
+- `desktop/test/electron/links/` (`npm run test:electron`): the harness above,
+  now in the repo, with the registry reader, launcher, `shell.openExternal`,
+  dialog and clipboard injected as recorders. Also checks the dialog and Copy
+  link when every route fails.
+- `dashboard/apps/web/test/mail/message-base.test.ts`,
+  `dashboard/apps/web/test/rich-text/preview-links.test.ts`.
+- Not exercised: a real browser starting from the direct launch (never run
+  here, so no browser opens on this machine).
 
 ## History of earlier attempts
 
@@ -140,6 +193,8 @@ the answer, and the next step is a different route on Windows.
 - `036c284d0f` (2026-11-21, desktop 0.1.48, BUG-0006) - a plain click on a link
   to another site is taken by the preload and opened outside before the page
   starts to leave. Main frame only; it never sees clicks inside the mail frame.
+- `2b4a9d8d07` (desktop 0.1.58) - the dialog with Copy link, `links.log`, and
+  SVG/area/relative links in the mail frame. Did not fix the owner's case.
 - `f0988c488e` - Polaris's own right-click menu everywhere, including over a
   link in a message (posted out of the frame as `polarisMailMenu`).
 

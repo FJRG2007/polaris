@@ -24,8 +24,10 @@ import { MarkdownContent } from "@/app/(app)/drive/viewer/markdown-content";
 import { Download, FileText, Package, RefreshCw, Share2 } from "lucide-react";
 import type { ArtifactVersionView, ArtifactView } from "@/lib/agents/session-artifacts";
 
-/** No `allow-same-origin`: the page gets an opaque origin, never this one. */
-const ARTIFACT_FRAME_SANDBOX = "allow-scripts allow-popups";
+/** No `allow-same-origin`: the page gets an opaque origin, never this one.
+ *  A link it opens in a new window escapes the sandbox, so the page it lands
+ *  on works as it would anywhere else instead of loading sandboxed. */
+const ARTIFACT_FRAME_SANDBOX = "allow-scripts allow-popups allow-popups-to-escape-sandbox";
 /** Text drawn at most; a longer file is offered as a download. */
 const TEXT_LIMIT = 1024 * 1024;
 
