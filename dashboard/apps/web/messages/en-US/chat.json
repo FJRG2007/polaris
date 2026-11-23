@@ -16,6 +16,7 @@
         "directCannotBeLeft": "A direct message cannot be left",
         "directHasNoName": "A direct message has no name to change",
         "pollNotEditable": "A poll cannot be rewritten. Delete it and ask again.",
+        "sealedNotEditable": "An encrypted message cannot be edited yet. Delete it and send it again.",
         "pollQuestionRequired": "Ask something first",
         "pollAnswersRequired": "Give it at least two answers",
         "meetingNameRequired": "Give the meeting a name",

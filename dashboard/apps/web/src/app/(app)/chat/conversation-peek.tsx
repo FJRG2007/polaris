@@ -16,10 +16,13 @@ import { Skeleton, cn } from "@polaris/ui";
 import { unlockProofFor } from "./lock-session";
 import { useEffect, useMemo, useState } from "react";
 import { PEEK_LIMIT, peekLines } from "./phone-chat";
+import { useOpenedSealed } from "./opened-sealed";
 import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+
+const NONE: readonly ChatMessageView[] = [];
 
 /** The newest messages per conversation peeked at, capped so a long visit does
  *  not keep every conversation it ever looked into. */
@@ -63,10 +66,11 @@ export function ConversationPeek({ channel }: { channel: ChatChannelView }) {
             live = false;
         };
     }, [channel.id, channel.locked]);
+    const opened = useOpenedSealed(messages ?? NONE);
 
     const lines = useMemo(
-        () => (messages ? peekLines(messages, viewerId, t) : null),
-        [messages, viewerId, t]
+        () => (messages ? peekLines(opened, viewerId, t) : null),
+        [messages, opened, viewerId, t]
     );
     // Who said it matters only where more than one other person could have.
     const named = channel.spaceId !== null || channel.others.length > 1;

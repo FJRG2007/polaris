@@ -151,6 +151,37 @@ device or its WebAssembly, and every send and read is the plain one. On:
   sender's own text is kept the moment the server takes it, so a row never
   blinks empty after its draft. A row that does not open keeps its empty body.
 
+### Other places a message is shown
+
+Nothing below ever sends a sealed message's words to the server; each opens it
+on the device, through `openSealed`, with the same page cache.
+
+- **Conversation list.** `lastMessages` marks a sealed last message with its
+  id (`sealedId`); the row (`useOpenedLast`) opens it and shows a line of it,
+  and says nothing until it does - never "attachment".
+- **Peek, pins, search hits.** Each list runs its messages through
+  `useOpenedSealed` / `useOpenedWithin` and draws what they open to.
+- **Notices.** `messageToasts` marks a sealed message `sealed` with the general
+  "Sent a message" line; the shell's notice handler opens it on the device and
+  shows its words instead (one behind the reader's chat lock stays redacted).
+  An answer typed into the notice of a sealed conversation is sealed too
+  (`sendSealedMessage`), then the conversation is read up to it. Chat
+  messages are not sent as server pushes, so no notice is drawn anywhere the
+  device could not open it.
+- **Search.** The server searches bodies, and a sealed one is empty, so a
+  sealed message is found only by who, where, when and what is attached to it;
+  its text is not searchable. Searching sealed text needs a local index on the
+  device over every message it has opened, which is not built. This is the
+  limit, stated where search is documented for people when the flag goes on.
+- **Link cards.** Not made for a sealed message: the server makes a card by
+  fetching the link, which would tell it what was sent. The link is still a
+  link. A card the sender makes and seals beside the message is the way to
+  have one, and is not built.
+- **Edits.** A plain edit of a sealed message is refused
+  (`errors.sealedNotEditable`), since it would put the new words in the clear.
+  A sealed edit (re-sealing under the same message id at the current epoch) is
+  not built.
+
 ## Server-run members: the design (decided, not built)
 
 Polar and webhooks take part as MLS members the server runs (proposal 7),
@@ -191,10 +222,8 @@ through the Node binding and `mls-store.ts`:
 
 ## Not built yet
 
-- Other surfaces that read a body on the server - conversation previews,
-  notifications, search, link cards, pins and edits - see an empty one for a
-  sealed message. Each needs its own client-side opening before the flag can
-  go on.
+- Searching sealed text, sealed link cards and sealed edits (see "Other
+  places a message is shown").
 - The `org` history-key envelope. The organisation recovery key (proposal 3.5)
   has no public key stored anywhere yet - its custodian setup is not built - so
   nothing can serve it and no `org` envelope can be sealed until it is.

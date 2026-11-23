@@ -32,6 +32,7 @@ import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useOpenedWithin } from "./opened-sealed";
 import type { ChatPinView } from "@/lib/chat/pins";
 import { PIN_DURATIONS, type PinDuration } from "@/lib/chat/pin-rules";
 import {
@@ -92,7 +93,9 @@ export function usePins(channelId: string | null) {
     );
 
     const ids = useMemo(() => new Set((pins ?? []).map((entry) => entry.message.id)), [pins]);
-    return { pins, ids, reload, setPins, onFrame };
+    // Sealed pins are drawn with what they open to on this device.
+    const shown = useOpenedWithin(pins);
+    return { pins: shown, ids, reload, setPins, onFrame };
 }
 
 /** One line of a message, for the bar and the list. */

@@ -24,6 +24,7 @@ import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { searchMessagesAction, searchPeopleAction } from "./actions";
 import { unlockProofFor } from "./lock-session";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useOpenedWithin } from "./opened-sealed";
 import { useChatStream } from "./use-chat-stream";
 import type { ChatSearchHit } from "@/lib/chat/search";
 import { MessageTime } from "@/components/message-time";
@@ -70,6 +71,8 @@ export function SearchPanel({
     const [before, setBefore] = useState("");
     const [hits, setHits] = useState<readonly ChatSearchHit[] | null>(null);
     const [busy, setBusy] = useState(false);
+    // A sealed hit (found by who, where or when: its text is not on the server) shows what it opens to here.
+    const shownHits = useOpenedWithin(hits);
 
     const query = useMemo(
         () => ({
@@ -236,19 +239,19 @@ export function SearchPanel({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                {hits === null ? (
+                {shownHits === null ? (
                     <p className="px-3 py-6 text-center text-xs text-muted-foreground">
                         {empty
                             ? t("search.typeSomethingOrPickWho")
                             : t("search.pressSearchWhenTheFilters")}
                     </p>
-                ) : hits.length === 0 ? (
+                ) : shownHits.length === 0 ? (
                     <p className="px-3 py-6 text-center text-xs text-muted-foreground">
                         {t("search.nothingMatchesThat")}
                     </p>
                 ) : (
                     <ol className="flex flex-col">
-                        {hits.map((hit) => (
+                        {shownHits.map((hit) => (
                             <li key={hit.message.id}>
                                 <button
                                     type="button"

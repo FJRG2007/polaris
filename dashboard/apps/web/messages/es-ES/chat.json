@@ -16,6 +16,7 @@
         "directCannotBeLeft": "No puedes salir de un mensaje directo",
         "directHasNoName": "Un mensaje directo no tiene nombre que cambiar",
         "pollNotEditable": "Una encuesta no se puede reescribir. Bórrala y vuelve a preguntar.",
+        "sealedNotEditable": "Un mensaje cifrado aún no se puede editar. Bórralo y envíalo de nuevo.",
         "pollQuestionRequired": "Pregunta algo antes",
         "pollAnswersRequired": "Añade al menos dos respuestas",
         "meetingNameRequired": "Ponle un nombre a la reunión",

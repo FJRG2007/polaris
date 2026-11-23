@@ -100,6 +100,9 @@ export interface MessageToast {
     /** Behind the reader's chat lock: every field above that would say what
      *  was sent, or by whom, is empty - see `redactAlert`. */
     readonly locked?: boolean;
+    /** A sealed message (docs/chat-e2ee-mls.md): the server holds no words for
+     *  it, so `excerpt` is what was sent in general until the device opens it. */
+    readonly sealed?: boolean;
 }
 
 /** The fields of an attachment a toast is described from. */
@@ -345,7 +348,8 @@ export async function messageToasts(
             authorName: authorNameOf(row, names) || "Somebody",
             excerpt: plainExcerpt(row.body, EXCERPT) || describeFiles(row.attachments),
             media: previewOf(row.attachments),
-            at: row.createdAt.toISOString()
+            at: row.createdAt.toISOString(),
+            ...(row.e2eeEpoch != null ? { sealed: true } : {})
         };
         toasts.push(locked.has(row.channelId) ? redactAlert(toast) : toast);
     }
@@ -377,6 +381,7 @@ async function recentIn(userId: string, channelIds: readonly string[], since: Da
             id: true,
             channelId: true,
             body: true,
+            e2eeEpoch: true,
             createdAt: true,
             ...AUTHOR_SELECT,
             replyToId: true,

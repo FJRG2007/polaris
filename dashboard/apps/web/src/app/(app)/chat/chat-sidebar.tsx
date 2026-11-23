@@ -53,6 +53,7 @@ import { GameLinkMark } from "./game-link-badge";
 import { blockPersonAction, unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import { MuteOptions, type MenuParts } from "./mute-menu";
 import { previewText } from "./phone-chat";
+import { useOpenedLast } from "./opened-sealed";
 import { ConversationPeek } from "./conversation-peek";
 import { TOUCH_TARGET, usePhone } from "@/components/use-phone";
 import { LeaveDialog } from "./leave-dialog";
@@ -1787,7 +1788,7 @@ function DetailedLine({
     const locale = useLocale();
     const { viewerId } = useChat();
     // A list kept from before this field existed has none: read as nothing said.
-    const last = channel.last ?? null;
+    const last = useOpenedLast(channel.id, channel.last ?? null);
     const mine = last !== null && last.authorId === viewerId;
     const oneToOne = channel.others.length === 1;
     const sender =

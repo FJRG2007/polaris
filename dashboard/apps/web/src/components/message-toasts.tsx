@@ -46,6 +46,9 @@ import { playCallSound } from "@/lib/call-sounds";
 import { useToast, type Toast, type ToastLine } from "@polaris/ui";
 import { claimForDevice } from "@/lib/device-once";
 import { useCallback, useEffect, useRef } from "react";
+import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
+import { plainExcerpt } from "@/components/rich-text/excerpt";
+import type { MessageToast } from "@/lib/chat/toasts";
 import { ToastPicture } from "@/components/toast-picture";
 import { useSessionScope } from "@/components/session-scope";
 import { useDoNotDisturb } from "@/components/do-not-disturb";
@@ -99,6 +102,50 @@ function markReadAction(t: Translate, channelId: string, messageId: string): Not
     };
 }
 
+/** As many characters of an opened message as a notice shows (as `toasts.ts` cuts a plain one). */
+const EXCERPT = 90;
+
+/** Conversations whose notices were sealed messages: an answer to one is sealed too. */
+const sealedChannels = new Set<string>();
+
+/**
+ * Sealed messages' words, opened on this device - the server never had them
+ * (docs/chat-e2ee-mls.md). One behind the reader's chat lock stays as the
+ * server redacted it, and one that does not open keeps the general line.
+ */
+async function withOpenedWords(viewerId: string, toasts: readonly MessageToast[]): Promise<readonly MessageToast[]> {
+    if (!viewerId || !toasts.some((one) => one.sealed)) return toasts;
+    // Only a sealed row says sealed chat is on, so this is where the shell turns it on for the account.
+    sealedChat.configureSealedChat(viewerId);
+    return Promise.all(
+        toasts.map(async (one) => {
+            if (!one.sealed) return one;
+            sealedChannels.add(one.channelId);
+            if (one.locked) return one;
+            const opened = await sealedChat.openSealed(one.channelId, [one.messageId]).catch(() => null);
+            const words = plainExcerpt(opened?.get(one.messageId)?.body ?? "", EXCERPT);
+            return words ? { ...one, excerpt: words } : one;
+        })
+    );
+}
+
+/** Answer a sealed conversation sealed, never in the clear, then read it up to the notice. */
+async function answerSealed(t: Translate, channelId: string, messageId: string | undefined, text: string): Promise<string | null> {
+    try {
+        await sealedChat.sendSealedMessage({ channelId, clientKey: crypto.randomUUID(), body: text });
+    } catch (caught) {
+        console.warn("polaris: a sealed answer from a notice was not sent:", caught);
+        return t("messageToasts.notSent");
+    }
+    if (messageId)
+        void fetch(`/api/chat/channels/${encodeURIComponent(channelId)}/read`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ messageId })
+        }).catch(() => undefined);
+    return null;
+}
+
 /** Send an answer to a conversation from its notice. Answers why it did not go,
  *  or null when it did. */
 async function answer(
@@ -107,6 +154,7 @@ async function answer(
     messageId: string | undefined,
     text: string
 ): Promise<string | null> {
+    if (sealedChannels.has(channelId) && sealedChat.sealedChatActive()) return answerSealed(t, channelId, messageId, text);
     const result = await replyFromNoticeAction({ channelId, messageId, body: text }).catch(() => ({
         error: t("messageToasts.notSent")
     }));
@@ -238,7 +286,8 @@ export function MessageToasts() {
         pending.current.clear();
         if (asked.length === 0) return;
 
-        const { toasts } = await messageToastsAction(asked).catch(() => ({ toasts: [] }));
+        const { toasts: arrived } = await messageToastsAction(asked).catch(() => ({ toasts: [] }));
+        const toasts = await withOpenedWords(device.current, arrived);
         let sounded = false;
         for (const message of toasts) {
             const inThatChat = showsConversation(here.current, message.channelId);

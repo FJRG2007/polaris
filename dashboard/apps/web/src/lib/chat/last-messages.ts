@@ -20,6 +20,9 @@ export interface ChatLastMessage {
     readonly delivered: boolean;
     readonly read: boolean;
     readonly deleted: boolean;
+    /** The message's id when it is sealed (docs/chat-e2ee-mls.md): its body is
+     *  empty here, and the row opens it on the device to show a line of it. */
+    readonly sealedId?: string;
 }
 
 interface Row {
@@ -31,6 +34,8 @@ interface Row {
     delivered: boolean;
     read: boolean;
     deleted: boolean;
+    messageId: string;
+    sealed: boolean;
 }
 
 /** As much of a body as one row can show, with room to spare. */
@@ -67,10 +72,11 @@ export async function lastMessages(
         SELECT c.id::text AS "channelId", m."authorId"::text AS "authorId", m.kind,
                CASE WHEN m."deletedAt" IS NULL THEN left(m.body, ${SOURCE_CHARS}::int) ELSE '' END AS body,
                m."createdAt", m."deliveredAt" IS NOT NULL AS delivered,
-               m."readAt" IS NOT NULL AS read, m."deletedAt" IS NOT NULL AS deleted
+               m."readAt" IS NOT NULL AS read, m."deletedAt" IS NOT NULL AS deleted,
+               m.id::text AS "messageId", m."e2eeEpoch" IS NOT NULL AS sealed
         FROM unnest(${[...channelIds]}::uuid[]) AS c(id)
         CROSS JOIN LATERAL (
-            SELECT "authorId", kind, body, "createdAt", "deliveredAt", "readAt", "deletedAt"
+            SELECT id, "authorId", kind, body, "createdAt", "deliveredAt", "readAt", "deletedAt", "e2eeEpoch"
             FROM "ChatMessage"
             WHERE "channelId" = c.id AND "parentId" IS NULL
               AND cardinality("audience") = 0
@@ -97,7 +103,8 @@ export async function lastMessages(
                 receipts: false,
                 delivered: row.delivered,
                 read: row.read,
-                deleted: row.deleted
+                deleted: row.deleted,
+                ...(row.sealed && !row.deleted ? { sealedId: row.messageId } : {})
             }
         ])
     );

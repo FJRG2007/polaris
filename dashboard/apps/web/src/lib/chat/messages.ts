@@ -1150,10 +1150,14 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
             authorId: true,
             body: true,
             deletedAt: true,
-            createdAt: true
+            createdAt: true,
+            e2eeEpoch: true
         }
     });
     if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
+    // A sealed message's text is not the server's to rewrite: a plain edit would
+    // put the new words in the clear beside the ciphertext (docs/chat-e2ee-mls.md).
+    if (message.e2eeEpoch != null) throw new ChatRuleError({ key: "errors.sealedNotEditable" });
     const editable = await requirePostable(actor, message.channelId);
     await history.requireReadable(actor, message.channelId, input.messageId);
     if (message.authorId !== actor.id) throw new ChatAccessError({ key: "errors.editOwnOnly" });
