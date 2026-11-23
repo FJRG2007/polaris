@@ -29,6 +29,9 @@ mls = [
     "dep:rand_core",
     "dep:ed25519-dalek",
 ]
+# OPAQUE (RFC 9807) for password sign-in (docs/chat-e2ee-phase1.md). Off by
+# default; the Node binding and the dedicated OPAQUE WebAssembly module turn it on.
+opaque = ["dep:opaque-ke", "dep:argon2", "dep:sha2", "dep:base64", "dep:generic-array", "dep:rand_core", "dep:rand_chacha"]
 
 [dependencies]
 # Pinned exactly: the stored group state and the wire format are tied to the
@@ -45,6 +48,14 @@ rand_core = { version = "=0.6.4", optional = true }
 # The Ed25519 key is derived from the injected seed, not from OpenMLS's own
 # entropy; same crate and major version openmls_rust_crypto signs with.
 ed25519-dalek = { version = "=2.2.0", optional = true }
+# Same suite and versions as @serenity-kit/opaque 1.x (ristretto255, 3DH over
+# SHA-512, Argon2id KSF), so records and server setups written through it keep
+# working byte for byte. rand_chacha above expands the binding's 32-byte seed.
+opaque-ke = { version = "=4.0.1", default-features = false, features = ["ristretto255", "argon2"], optional = true }
+argon2 = { version = "=0.5.3", default-features = false, features = ["alloc"], optional = true }
+sha2 = { version = "0.10", default-features = false, optional = true }
+base64 = { version = "0.22", default-features = false, features = ["alloc"], optional = true }
+generic-array = { version = "=0.14.7", optional = true }
 
 # Browsers: OpenMLS's crypto provider draws its HPKE and nonce entropy from the
 # platform (crypto.getRandomValues through getrandom), and its clock from
@@ -56,6 +67,10 @@ getrandom_02 = { package = "getrandom", version = "=0.2.17", features = ["js"] }
 [dev-dependencies]
 polaris-core-vectors = { path = "../polaris-core-vectors" }
 proptest = "1.7.0"
+rand_core = { version = "0.6", features = ["getrandom"] }
+opaque-ke = { version = "=4.0.1", default-features = false, features = ["ristretto255", "argon2"] }
+sha2 = "0.10"
+base64 = "0.22"
 criterion = { version = "=0.7.0", default-features = false, features = ["cargo_bench_support"] }
 # The RFC 9420 passive-client vectors hand over raw private keys, which only
 # OpenMLS's test API can place in a key package bundle; dev builds only.
@@ -75,3 +90,7 @@ harness = false
 name = "mls"
 harness = false
 required-features = ["mls"]
+
+[[test]]
+name = "opaque"
+required-features = ["opaque"]

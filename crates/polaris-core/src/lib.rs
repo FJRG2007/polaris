@@ -9,3 +9,6 @@ pub mod probe;
 
 #[cfg(feature = "mls")]
 pub mod mls;
+
+#[cfg(feature = "opaque")]
+pub mod opaque;
