@@ -141,9 +141,26 @@
         "settings": "Ajustes"
     },
     "popup": {
+        "updater": {
+            "broken": "Las actualizaciones automáticas no funcionan: {reason}",
+            "repair": "Para repararlas, pega otra vez esta línea de instalación donde la pegaste. Mientras, actualiza a mano.",
+            "copy": "Copiar la línea de instalación",
+            "reason": {
+                "unreachable": "no se pudo contactar con GitHub.",
+                "noRelease": "no se encontró ninguna versión que instalar.",
+                "noPackage": "la última versión no trae paquete para este navegador.",
+                "digest": "la descarga no coincide con su checksum publicado, así que no se instaló.",
+                "badPackage": "la descarga no era una extensión válida, así que no se instaló.",
+                "install": "no se pudo poner la nueva versión en la carpeta.",
+                "task": "no se pudo crear la tarea que lanza el actualizador.",
+                "missingTool": "falta un programa que el actualizador necesita.",
+                "unknown": "el actualizador se detuvo a medias.",
+                "stopped": "el actualizador no ha funcionado desde {when}."
+            }
+        },
         "update": {
             "store": "Ya está la versión {version}. Tu navegador la instala en unas horas.",
-            "auto": "Ya está la versión {version}. El actualizador de este equipo la instala en horas.",
+            "auto": "Ya está la versión {version}. El actualizador de este equipo la instala en menos de una hora.",
             "manual": "Ya está la versión {version}. Esta copia se cargó desde una carpeta: se actualiza a mano.",
             "download": "Descargar",
             "stepsChromium": "Descomprímela sobre la carpeta de la que se cargó y pulsa la flecha de recarga de Polaris en extensiones.",
@@ -273,7 +290,7 @@
             "current": "Actualizada",
             "available": "Versión {version} disponible",
             "store": "Se instala sola en horas",
-            "auto": "El actualizador la instala en horas",
+            "auto": "El actualizador la instala en menos de una hora",
             "manual": "Actualízala a mano",
             "updateNow": "Actualizar ya",
             "check": "Buscar actualizaciones",

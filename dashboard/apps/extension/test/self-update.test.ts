@@ -7,7 +7,16 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { coveredBy, safeToRestart, versionIn, waitingVersion } from "../src/lib/self-update";
+import {
+    coveredBy,
+    installLine,
+    INSTALL_LINES,
+    lastCheck,
+    safeToRestart,
+    updaterTrouble,
+    versionIn,
+    waitingVersion
+} from "../src/lib/self-update";
 
 describe("the updater's note", () => {
     it("covers a copy the task or the job keeps current", () => {
@@ -58,5 +67,72 @@ describe("when a restart may happen", () => {
         for (const key of Object.keys(idle) as (keyof typeof idle)[]) {
             expect(safeToRestart({ ...idle, [key]: true })).toBe(false);
         }
+    });
+});
+
+describe("the updater's last run (BUG-0022)", () => {
+    const HOUR = 60 * 60 * 1000;
+    const at = Date.UTC(2026, 10, 23, 12);
+    const note = (check: Record<string, unknown> | undefined, updater = "windows-task") => ({
+        updater,
+        tag: "extension-v0.1.275",
+        ...(check ? { check } : {})
+    });
+    const ran = (outcome: string, reason: string | null = null, detail: string | null = null) => ({
+        at: new Date(at).toISOString(),
+        outcome,
+        reason,
+        detail,
+        everyMinutes: 60
+    });
+
+    it("reads the check the scripts write, and nothing that is not one", () => {
+        expect(lastCheck(note(ran("current")))).toEqual({
+            at,
+            outcome: "current",
+            reason: null,
+            detail: null,
+            everyMinutes: 60
+        });
+        expect(lastCheck(note(undefined))).toBeNull();
+        expect(lastCheck(note({ ...ran("current"), at: "yesterday" }))).toBeNull();
+        expect(lastCheck(note({ ...ran("exploded") }))).toBeNull();
+        expect(lastCheck(note({ ...ran("current"), everyMinutes: -1 }))?.everyMinutes).toBe(60);
+        expect(lastCheck(note(ran("failed", "install", "x".repeat(1000))))?.detail).toHaveLength(300);
+    });
+
+    it("says nothing for an updater too old to write a check, or a pinned copy", () => {
+        expect(updaterTrouble(note(undefined), at + 100 * HOUR, true)).toBeNull();
+        expect(updaterTrouble(note(ran("failed", "task"), "none"), at, true)).toBeNull();
+    });
+
+    it("reports a failure at once, in the updater's words", () => {
+        expect(updaterTrouble(note(ran("failed", "digest", "extension-v0.1.276")), at, false)).toEqual({
+            reason: "digest",
+            detail: "extension-v0.1.276",
+            at
+        });
+        expect(updaterTrouble(note(ran("failed", "something-new")), at, false)?.reason).toBe("unknown");
+    });
+
+    it("lets GitHub being out of reach pass while nothing newer is waiting", () => {
+        expect(updaterTrouble(note(ran("failed", "unreachable")), at, false)).toBeNull();
+        expect(updaterTrouble(note(ran("failed", "unreachable")), at, true)?.reason).toBe("unreachable");
+    });
+
+    it("calls an updater stopped once a newer version has waited three of its runs", () => {
+        const fine = note(ran("current"));
+        expect(updaterTrouble(fine, at + 3 * HOUR, true)).toBeNull();
+        expect(updaterTrouble(fine, at + 3 * HOUR + 1, true)).toEqual({ reason: "stopped", detail: null, at });
+        expect(updaterTrouble(fine, at + 30 * HOUR, false)).toBeNull();
+        // A clock moved backwards is not hours of silence.
+        expect(updaterTrouble(fine, at - 10 * HOUR, true)).toBeNull();
+    });
+
+    it("hands each system its own install line", () => {
+        expect(installLine("win")).toBe(INSTALL_LINES.windows);
+        expect(installLine("mac")).toBe(INSTALL_LINES.unix);
+        expect(installLine("linux")).toBe(INSTALL_LINES.unix);
+        expect(installLine(null)).toBe(INSTALL_LINES.unix);
     });
 });

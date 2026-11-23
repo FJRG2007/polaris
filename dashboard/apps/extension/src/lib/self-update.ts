@@ -92,3 +92,115 @@ export function safeToRestart(now: InFlight): boolean {
         !now.answering
     );
 }
+
+/** What the updater's last run says it found (`check` in the marker). */
+export type CheckOutcome = "current" | "installed" | "failed";
+
+/** Why the updater says a run failed, as the install scripts spell it. */
+export const TROUBLE_REASONS = [
+    "unreachable",
+    "no-release",
+    "no-package",
+    "digest",
+    "bad-package",
+    "install",
+    "task",
+    "missing-tool",
+    "unknown"
+] as const;
+
+/** A reason the updater gave, or `stopped`: it has not run for hours. */
+export type TroubleReason = (typeof TROUBLE_REASONS)[number] | "stopped";
+
+/** The updater's last run, read from the marker. */
+export interface UpdaterCheck {
+    /** When it ran, ms. */
+    readonly at: number;
+    readonly outcome: CheckOutcome;
+    readonly reason: string | null;
+    /** What went wrong in the updater's own words (an error message), or null. */
+    readonly detail: string | null;
+    /** How often it runs. */
+    readonly everyMinutes: number;
+}
+
+/** Automatic updates that are not arriving, and why. */
+export interface UpdaterTrouble {
+    readonly reason: TroubleReason;
+    readonly detail: string | null;
+    /** When the updater last ran, ms. */
+    readonly at: number;
+}
+
+/** The longest detail shown: an error message, not a log. */
+const DETAIL_LIMIT = 300;
+
+/**
+ * The updater's last run, or null when the note has none - an updater from
+ * before it wrote one, which `update.effectiveKind`'s grace period covers.
+ */
+export function lastCheck(note: unknown): UpdaterCheck | null {
+    if (typeof note !== "object" || note === null) return null;
+    const check = (note as { check?: unknown }).check;
+    if (typeof check !== "object" || check === null) return null;
+    const held = check as Record<string, unknown>;
+    const at = typeof held.at === "string" ? Date.parse(held.at) : Number.NaN;
+    const outcome = held.outcome;
+    if (!Number.isFinite(at)) return null;
+    if (outcome !== "current" && outcome !== "installed" && outcome !== "failed") return null;
+    const every = typeof held.everyMinutes === "number" && held.everyMinutes > 0 ? held.everyMinutes : 60;
+    const detail =
+        typeof held.detail === "string" && held.detail.trim() !== ""
+            ? held.detail.trim().slice(0, DETAIL_LIMIT)
+            : null;
+    return {
+        at,
+        outcome,
+        reason: typeof held.reason === "string" && held.reason !== "" ? held.reason : null,
+        detail,
+        everyMinutes: every
+    };
+}
+
+/** How many runs may go missing before the updater counts as stopped. */
+const MISSED_RUNS = 3;
+
+/**
+ * Whether automatic updates have stopped working, and why - or null.
+ *
+ * `behind` is a newer version out that is not on disk yet. A run that could not
+ * reach GitHub only counts then: a laptop offline for an hour has lost nothing,
+ * and the next run tries again. Any other failure counts at once, because the
+ * next release will meet it too. A run that last went well counts once a newer
+ * version has been out for several of its periods without it running again -
+ * the task removed, disabled, or the computer never awake when it is due.
+ */
+export function updaterTrouble(note: unknown, now: number, behind: boolean): UpdaterTrouble | null {
+    if (!coveredBy(note)) return null;
+    const check = lastCheck(note);
+    if (!check) return null;
+    if (check.outcome === "failed") {
+        const reason = (TROUBLE_REASONS as readonly string[]).includes(check.reason ?? "")
+            ? (check.reason as TroubleReason)
+            : "unknown";
+        if (reason === "unreachable" && !behind) return null;
+        return { reason, detail: check.detail, at: check.at };
+    }
+    // A clock moved backwards is not hours of silence.
+    if (!behind || check.at > now) return null;
+    return now - check.at > MISSED_RUNS * check.everyMinutes * 60 * 1000
+        ? { reason: "stopped", detail: null, at: check.at }
+        : null;
+}
+
+/** The line that installs the extension, and repairs its updater when run again. */
+export const INSTALL_LINES = {
+    windows:
+        "irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/apps/extension/scripts/install.ps1 | iex",
+    unix: "curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/apps/extension/scripts/install.sh | sh"
+} as const;
+
+/** The install line for the system `runtime.getPlatformInfo()` names. */
+export function installLine(os: string | null | undefined): string {
+    return os === "win" ? INSTALL_LINES.windows : INSTALL_LINES.unix;
+}

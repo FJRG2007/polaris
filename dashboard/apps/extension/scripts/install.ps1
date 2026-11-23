@@ -15,8 +15,10 @@
 #
 # So the script also leaves behind the one thing that puts new files there: a
 # scheduled task of this user's own (no administrator rights, nothing for anybody
-# else on the machine) that runs every six hours, out of sight, asks GitHub for
-# the newest extension release, and swaps the folder when there is one.
+# else on the machine) that runs every hour, out of sight, asks GitHub for the
+# newest extension release, and swaps the folder when there is one. Each run
+# also writes what it found into the folder (`check` in polaris-updater.json),
+# so the extension can say when updating has stopped working, and why.
 # What the task runs is a copy of THIS script as the release attached it,
 # checked against the digest GitHub publishes for it and refreshed with every
 # update, so the updater is always the one the installed version shipped with.
@@ -81,6 +83,42 @@ function Invoke-PolarisExtensionInstall {
     # Written into the extension's own folder, so the extension can read it and
     # know that this copy is kept current by the task rather than by hand.
     $marker = "polaris-updater.json"
+    # How often the task runs. Every six hours let a morning of releases wait
+    # until the evening, with nothing on screen to say it was coming; once an
+    # hour is still far inside what GitHub lets one address ask unsigned (60 an
+    # hour), since a run asks once and downloads only what changed.
+    $every = New-TimeSpan -Hours 1
+    # What this run found, written into the extension's folder whatever happened
+    # (`Write-Check`), because nobody reads update.log. A run that ends before
+    # setting it says it failed, rather than nothing at all.
+    $check = [ordered]@{ outcome = "failed"; reason = "unknown"; detail = $null }
+
+    function Set-Failure {
+        param($Reason, $Detail = $null)
+        $check.outcome = "failed"
+        $check.reason = $Reason
+        $check.detail = $Detail
+    }
+
+    function Write-Check {
+        $notePath = Join-Path $dir $marker
+        if (-not (Test-Path $notePath)) { return }
+        try {
+            $held = Get-Content -Raw -Path $notePath | ConvertFrom-Json
+            $line = [ordered]@{
+                at = (Get-Date).ToUniversalTime().ToString("o")
+                outcome = $check.outcome
+                reason = $check.reason
+                detail = $check.detail
+                everyMinutes = [int]$every.TotalMinutes
+            }
+            $held | Add-Member -NotePropertyName check -NotePropertyValue ([pscustomobject]$line) -Force
+            # Beside it and renamed over it, so the extension never reads half a file.
+            $temp = "$notePath.$([System.Guid]::NewGuid().ToString('N')).tmp"
+            Set-Content -Path $temp -Value ($held | ConvertTo-Json -Compress -Depth 4) -Encoding UTF8
+            Move-Item -Path $temp -Destination $notePath -Force
+        } catch { }
+    }
 
     function Write-Log {
         param($Message)
@@ -106,247 +144,269 @@ function Invoke-PolarisExtensionInstall {
         return
     }
 
-    $agent = @{ "User-Agent" = "polaris-extension-installer"; "Accept" = "application/vnd.github+json" }
-
-    # The newest EXTENSION release, which is not the newest release. This
-    # repository publishes the dashboard too and marks those as latest, so
-    # `releases/latest` answers with a dashboard build carrying no extension.
-    # POLARIS_EXTENSION_TAG pins one instead, and a pinned install is left
-    # without the task: somebody who asked for that version asked to stay on it.
-    # Asked for a short page at a time, newest first, up to the 100 newest: the
-    # extension is nearly always on the first page, and one page of 100 is over
-    # a megabyte to download and parse.
-    $pinned = [bool]$env:POLARIS_EXTENSION_TAG
-    $release = $null
     try {
-        if ($pinned) {
-            $release = Invoke-RestMethod -Uri "$api/repos/$repo/releases/tags/$($env:POLARIS_EXTENSION_TAG)" -Headers $agent
+        $agent = @{ "User-Agent" = "polaris-extension-installer"; "Accept" = "application/vnd.github+json" }
+
+        # The newest EXTENSION release, which is not the newest release. This
+        # repository publishes the dashboard too and marks those as latest, so
+        # `releases/latest` answers with a dashboard build carrying no extension.
+        # POLARIS_EXTENSION_TAG pins one instead, and a pinned install is left
+        # without the task: somebody who asked for that version asked to stay on it.
+        # Asked for a short page at a time, newest first, up to the 100 newest: the
+        # extension is nearly always on the first page, and one page of 100 is over
+        # a megabyte to download and parse.
+        $pinned = [bool]$env:POLARIS_EXTENSION_TAG
+        $release = $null
+        try {
+            if ($pinned) {
+                $release = Invoke-RestMethod -Uri "$api/repos/$repo/releases/tags/$($env:POLARIS_EXTENSION_TAG)" -Headers $agent
+            } else {
+                for ($page = 1; $page -le 4 -and -not $release; $page++) {
+                    # Kept before it is listed: Windows PowerShell hands the parsed array
+                    # on as ONE object, which @() around the call would wrap in another.
+                    $listed = Invoke-RestMethod -Uri "$api/repos/$repo/releases?per_page=25&page=$page" -Headers $agent
+                    $releases = @($listed)
+                    $release = $releases |
+                        Where-Object { $_.tag_name -like "extension-v*" -and -not $_.draft -and -not $_.prerelease } |
+                        Select-Object -First 1
+                    if ($releases.Count -lt 25) { break }
+                }
+            }
+        } catch {
+            Write-Log "could not reach GitHub: $($_.Exception.Message)"
+            Set-Failure "unreachable" $_.Exception.Message
+            return
+        }
+        if (-not $release) {
+            Write-Log "no extension release has been published yet"
+            Set-Failure "no-release"
+            return
+        }
+        $tag = $release.tag_name
+        $version = $tag -replace "^extension-v", ""
+
+        # The package is asked for rather than spelled out: published releases do not
+        # agree on a filename, and "chrome" is the one word that tells it apart from
+        # the Firefox build and the sources archive.
+        $asset = $release.assets | Where-Object { $_.name -like "*chrome*.zip" } | Select-Object -First 1
+        if (-not $asset) {
+            Write-Log "release $tag carries no Chromium package"
+            Set-Failure "no-package" $tag
+            return
+        }
+
+        function Test-Digest {
+            # GitHub publishes a sha256 for every asset it stores. A download that
+            # does not match it is not installed, whatever else it looks like.
+            # Releases uploaded before GitHub computed digests carry none, and those
+            # are accepted on the other checks alone.
+            param($File, $Expected)
+            if (-not $Expected) { return $true }
+            if ($Expected -notmatch "^sha256:([0-9a-fA-F]{64})$") { return $false }
+            return (Get-FileHash -Algorithm SHA256 -Path $File).Hash -eq $Matches[1].ToUpperInvariant()
+        }
+
+        function Expand-PolarisZip {
+            # .NET's own extraction rather than Expand-Archive: that cmdlet draws a
+            # progress bar for every file whatever this function's
+            # $ProgressPreference says, which took seconds for a few hundred files.
+            # It refuses an entry that would land outside the folder, as
+            # Expand-Archive does.
+            param($Zip, $Destination)
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            [System.IO.Compression.ZipFile]::ExtractToDirectory($Zip, $Destination)
+        }
+
+        function Get-InstalledVersion {
+            $manifest = Join-Path $dir "manifest.json"
+            if (-not (Test-Path $manifest)) { return $null }
+            try { return (Get-Content -Raw -Path $manifest | ConvertFrom-Json).version } catch { return $null }
+        }
+
+        $installed = Get-InstalledVersion
+        $current = $installed -eq $version -and (Test-Path (Join-Path $dir $marker))
+
+        if (-not (Test-Path $base)) { New-Item -ItemType Directory -Path $base -Force | Out-Null }
+
+        if (-not $current) {
+            # Downloaded, unpacked and checked BESIDE the live folder, on the same
+            # volume, so the swap at the end is two renames and a failure anywhere
+            # before it leaves the copy the browser is loading exactly as it was.
+            $stage = Join-Path $base (".incoming-" + [System.Guid]::NewGuid().ToString("N"))
+            $retired = Join-Path $base (".retired-" + [System.Guid]::NewGuid().ToString("N"))
+            New-Item -ItemType Directory -Path $stage -Force | Out-Null
+            try {
+                Write-Log "fetching $tag"
+                $zip = Join-Path $stage "extension.zip"
+                Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip -UseBasicParsing -Headers @{ "User-Agent" = $agent["User-Agent"] }
+                if (-not (Test-Digest $zip $asset.digest)) {
+                    Write-Log "the download for $tag does not match its published digest; nothing was changed"
+                    Set-Failure "digest" $tag
+                    return
+                }
+                $unpacked = Join-Path $stage "unpacked"
+                Expand-PolarisZip $zip $unpacked
+                $manifest = Join-Path $unpacked "manifest.json"
+                $read = $null
+                try { $read = Get-Content -Raw -Path $manifest | ConvertFrom-Json } catch { }
+                if (-not $read -or $read.version -ne $version -or -not $read.background) {
+                    Write-Log "the package for $tag is not the extension it says it is; nothing was changed"
+                    Set-Failure "bad-package" $tag
+                    return
+                }
+                $note = [ordered]@{ updater = "windows-task"; tag = $tag; updatedAt = (Get-Date).ToUniversalTime().ToString("o") }
+                if ($pinned) { $note.updater = "none" }
+                Set-Content -Path (Join-Path $unpacked $marker) -Value ($note | ConvertTo-Json -Compress) -Encoding UTF8
+
+                # The swap. The live folder is renamed away and the new one renamed
+                # in; if the second rename fails the first is undone.
+                if (Test-Path $dir) { Move-Item -Path $dir -Destination $retired }
+                try {
+                    Move-Item -Path $unpacked -Destination $dir
+                } catch {
+                    if (Test-Path $retired) { Move-Item -Path $retired -Destination $dir }
+                    throw
+                }
+                Write-Log "installed $version in $dir"
+                $check.outcome = "installed"
+                $check.reason = $null
+            } catch {
+                Write-Log "could not install ${tag}: $($_.Exception.Message)"
+                Set-Failure "install" $_.Exception.Message
+                return
+            } finally {
+                foreach ($path in @($stage, $retired)) {
+                    if (Test-Path $path) { Remove-Item -Recurse -Force $path -ErrorAction SilentlyContinue }
+                }
+            }
         } else {
-            for ($page = 1; $page -le 4 -and -not $release; $page++) {
-                # Kept before it is listed: Windows PowerShell hands the parsed array
-                # on as ONE object, which @() around the call would wrap in another.
-                $listed = Invoke-RestMethod -Uri "$api/repos/$repo/releases?per_page=25&page=$page" -Headers $agent
-                $releases = @($listed)
-                $release = $releases |
-                    Where-Object { $_.tag_name -like "extension-v*" -and -not $_.draft -and -not $_.prerelease } |
-                    Select-Object -First 1
-                if ($releases.Count -lt 25) { break }
+            $check.outcome = "current"
+            $check.reason = $null
+            if (-not $scheduled) { Write-Log "$version is already installed in $dir" }
+        }
+
+        if ($pinned) {
+            Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+            if (-not $scheduled) { Write-Log "pinned to $tag, so it will not update itself" }
+        } else {
+            # The updater the task runs: this script, exactly as the release
+            # attached it. Refreshed on every run, so a release that changes how
+            # updating works is followed by the task too.
+            $script = $release.assets | Where-Object { $_.name -eq "install.ps1" } | Select-Object -First 1
+            $same = $script -and $script.digest -and (Test-Path $updater) -and (Test-Digest $updater $script.digest)
+            if ($script -and -not $same) {
+                $fresh = Join-Path $base ("update-" + [System.Guid]::NewGuid().ToString("N") + ".ps1")
+                try {
+                    Invoke-WebRequest -Uri $script.browser_download_url -OutFile $fresh -UseBasicParsing -Headers @{ "User-Agent" = $agent["User-Agent"] }
+                    if (Test-Digest $fresh $script.digest) {
+                        Move-Item -Path $fresh -Destination $updater -Force
+                    } else {
+                        Write-Log "the updater attached to $tag does not match its published digest; keeping the one there was"
+                    }
+                } catch {
+                    Write-Log "could not fetch the updater: $($_.Exception.Message)"
+                } finally {
+                    if (Test-Path $fresh) { Remove-Item -Force $fresh -ErrorAction SilentlyContinue }
+                }
+            }
+
+            # What the task runs. A console program started with the user's own
+            # token gets a console window from conhost before PowerShell starts, so
+            # -WindowStyle Hidden can only hide it after it has flashed on screen.
+            # conhost's headless mode (Windows 10 1809 and later) starts the same
+            # command with no window to flash. Older builds keep the direct launch.
+            # A logon type that runs with no window at all ("whether the user is
+            # logged on or not") is not used: assigning one needs elevation, and
+            # this line runs without it.
+            $powershell = Join-Path $PSHOME "powershell.exe"
+            if (-not (Test-Path $powershell)) { $powershell = "powershell.exe" }
+            $command = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" scheduled "{1}" "{2}" "{3}"' -f
+                $updater, $dir, $repo, $api
+            $conhost = if ($env:SystemRoot) { Join-Path $env:SystemRoot "System32\conhost.exe" } else { "" }
+            if ($conhost -and [System.Environment]::OSVersion.Version.Build -ge 17763 -and (Test-Path $conhost)) {
+                $execute = $conhost
+                $arguments = '--headless "{0}" {1}' -f $powershell, $command
+            } else {
+                $execute = $powershell
+                $arguments = $command
+            }
+
+            # A person's run always (re)registers the task. A scheduled run leaves
+            # its own task alone, except to bring one an older release registered
+            # up to date: those ran at sign-in and opened a console window every
+            # time, or every six hours, and nobody who installed them will run the
+            # line again to get the fix. Once it matches, this is one comparison per
+            # run. A task the user deleted is not put back.
+            $register = -not $scheduled
+            if ($scheduled) {
+                $held = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+                if ($held) {
+                    $atLogOn = @($held.Triggers | Where-Object { $_.CimClass.CimClassName -eq "MSFT_TaskLogonTrigger" }).Count -gt 0
+                    $interval = [System.Xml.XmlConvert]::ToString($every)
+                    $slow = @($held.Triggers | Where-Object { $_.Repetition.Interval -ne $interval }).Count -gt 0
+                    $register = $atLogOn -or $slow -or $held.Actions.Count -ne 1 -or
+                        $held.Actions[0].Execute -ne $execute -or $held.Actions[0].Arguments -ne $arguments
+                }
+            }
+
+            # -Force replaces a task of the same name, which is what makes running
+            # the line twice leave one task rather than two. The repeating trigger
+            # is enough on its own: -StartWhenAvailable runs a window that passed
+            # while the machine was off shortly after it starts again.
+            if ($register -and (Test-Path $updater)) {
+                try {
+                    $user = "$env:USERDOMAIN\$env:USERNAME"
+                    $action = New-ScheduledTaskAction -Execute $execute -Argument $arguments
+                    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(10) -RepetitionInterval $every
+                    $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries `
+                        -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 15) -MultipleInstances IgnoreNew
+                    $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
+                    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings `
+                        -Principal $principal -Description "Keeps the Polaris browser extension in $dir up to date." -Force | Out-Null
+                    if ($scheduled) {
+                        Write-Log "re-registered the updates task with this release's settings"
+                    } else {
+                        Write-Log "it updates itself every hour"
+                    }
+                    $updating = $true
+                } catch {
+                    Write-Log "could not set up the updates task: $($_.Exception.Message)"
+                    Set-Failure "task" $_.Exception.Message
+                }
+            }
+        }
+
+        # The note in the folder says a task keeps it current. Where none could be
+        # set up it says so, and the extension keeps showing the manual steps.
+        $notePath = Join-Path $dir $marker
+        if (-not $scheduled -and (Test-Path $notePath)) {
+            try {
+                $held = Get-Content -Raw -Path $notePath | ConvertFrom-Json
+                $held.updater = if ($updating) { "windows-task" } else { "none" }
+                Set-Content -Path $notePath -Value ($held | ConvertTo-Json -Compress) -Encoding UTF8
+            } catch { }
+        }
+
+        if (-not $scheduled) {
+            Write-Log ""
+            Write-Log "First time: open chrome://extensions (brave://, edge:// or opera:// in"
+            Write-Log "those), turn on Developer mode, press Load unpacked and choose:"
+            Write-Log "  $dir"
+            Write-Log ""
+            if ($updating) {
+                Write-Log "That is the only time. New versions arrive in that folder by themselves"
+                Write-Log "and the extension restarts into them."
+            } else {
+                Write-Log "To update it, run this line again and press the refresh arrow on the"
+                Write-Log "Polaris card."
             }
         }
     } catch {
-        Write-Log "could not reach GitHub: $($_.Exception.Message)"
-        return
-    }
-    if (-not $release) {
-        Write-Log "no extension release has been published yet"
-        return
-    }
-    $tag = $release.tag_name
-    $version = $tag -replace "^extension-v", ""
-
-    # The package is asked for rather than spelled out: published releases do not
-    # agree on a filename, and "chrome" is the one word that tells it apart from
-    # the Firefox build and the sources archive.
-    $asset = $release.assets | Where-Object { $_.name -like "*chrome*.zip" } | Select-Object -First 1
-    if (-not $asset) {
-        Write-Log "release $tag carries no Chromium package"
-        return
-    }
-
-    function Test-Digest {
-        # GitHub publishes a sha256 for every asset it stores. A download that
-        # does not match it is not installed, whatever else it looks like.
-        # Releases uploaded before GitHub computed digests carry none, and those
-        # are accepted on the other checks alone.
-        param($File, $Expected)
-        if (-not $Expected) { return $true }
-        if ($Expected -notmatch "^sha256:([0-9a-fA-F]{64})$") { return $false }
-        return (Get-FileHash -Algorithm SHA256 -Path $File).Hash -eq $Matches[1].ToUpperInvariant()
-    }
-
-    function Expand-PolarisZip {
-        # .NET's own extraction rather than Expand-Archive: that cmdlet draws a
-        # progress bar for every file whatever this function's
-        # $ProgressPreference says, which took seconds for a few hundred files.
-        # It refuses an entry that would land outside the folder, as
-        # Expand-Archive does.
-        param($Zip, $Destination)
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($Zip, $Destination)
-    }
-
-    function Get-InstalledVersion {
-        $manifest = Join-Path $dir "manifest.json"
-        if (-not (Test-Path $manifest)) { return $null }
-        try { return (Get-Content -Raw -Path $manifest | ConvertFrom-Json).version } catch { return $null }
-    }
-
-    $installed = Get-InstalledVersion
-    $current = $installed -eq $version -and (Test-Path (Join-Path $dir $marker))
-
-    if (-not (Test-Path $base)) { New-Item -ItemType Directory -Path $base -Force | Out-Null }
-
-    if (-not $current) {
-        # Downloaded, unpacked and checked BESIDE the live folder, on the same
-        # volume, so the swap at the end is two renames and a failure anywhere
-        # before it leaves the copy the browser is loading exactly as it was.
-        $stage = Join-Path $base (".incoming-" + [System.Guid]::NewGuid().ToString("N"))
-        $retired = Join-Path $base (".retired-" + [System.Guid]::NewGuid().ToString("N"))
-        New-Item -ItemType Directory -Path $stage -Force | Out-Null
-        try {
-            Write-Log "fetching $tag"
-            $zip = Join-Path $stage "extension.zip"
-            Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip -UseBasicParsing -Headers @{ "User-Agent" = $agent["User-Agent"] }
-            if (-not (Test-Digest $zip $asset.digest)) {
-                Write-Log "the download for $tag does not match its published digest; nothing was changed"
-                return
-            }
-            $unpacked = Join-Path $stage "unpacked"
-            Expand-PolarisZip $zip $unpacked
-            $manifest = Join-Path $unpacked "manifest.json"
-            $read = $null
-            try { $read = Get-Content -Raw -Path $manifest | ConvertFrom-Json } catch { }
-            if (-not $read -or $read.version -ne $version -or -not $read.background) {
-                Write-Log "the package for $tag is not the extension it says it is; nothing was changed"
-                return
-            }
-            $note = [ordered]@{ updater = "windows-task"; tag = $tag; updatedAt = (Get-Date).ToUniversalTime().ToString("o") }
-            if ($pinned) { $note.updater = "none" }
-            Set-Content -Path (Join-Path $unpacked $marker) -Value ($note | ConvertTo-Json -Compress) -Encoding UTF8
-
-            # The swap. The live folder is renamed away and the new one renamed
-            # in; if the second rename fails the first is undone.
-            if (Test-Path $dir) { Move-Item -Path $dir -Destination $retired }
-            try {
-                Move-Item -Path $unpacked -Destination $dir
-            } catch {
-                if (Test-Path $retired) { Move-Item -Path $retired -Destination $dir }
-                throw
-            }
-            Write-Log "installed $version in $dir"
-        } catch {
-            Write-Log "could not install ${tag}: $($_.Exception.Message)"
-            return
-        } finally {
-            foreach ($path in @($stage, $retired)) {
-                if (Test-Path $path) { Remove-Item -Recurse -Force $path -ErrorAction SilentlyContinue }
-            }
-        }
-    } elseif (-not $scheduled) {
-        Write-Log "$version is already installed in $dir"
-    }
-
-    if ($pinned) {
-        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
-        if (-not $scheduled) { Write-Log "pinned to $tag, so it will not update itself" }
-    } else {
-        # The updater the task runs: this script, exactly as the release
-        # attached it. Refreshed on every run, so a release that changes how
-        # updating works is followed by the task too.
-        $script = $release.assets | Where-Object { $_.name -eq "install.ps1" } | Select-Object -First 1
-        if ($script) {
-            $fresh = Join-Path $base ("update-" + [System.Guid]::NewGuid().ToString("N") + ".ps1")
-            try {
-                Invoke-WebRequest -Uri $script.browser_download_url -OutFile $fresh -UseBasicParsing -Headers @{ "User-Agent" = $agent["User-Agent"] }
-                if (Test-Digest $fresh $script.digest) {
-                    Move-Item -Path $fresh -Destination $updater -Force
-                } else {
-                    Write-Log "the updater attached to $tag does not match its published digest; keeping the one there was"
-                }
-            } catch {
-                Write-Log "could not fetch the updater: $($_.Exception.Message)"
-            } finally {
-                if (Test-Path $fresh) { Remove-Item -Force $fresh -ErrorAction SilentlyContinue }
-            }
-        }
-
-        # What the task runs. A console program started with the user's own
-        # token gets a console window from conhost before PowerShell starts, so
-        # -WindowStyle Hidden can only hide it after it has flashed on screen.
-        # conhost's headless mode (Windows 10 1809 and later) starts the same
-        # command with no window to flash. Older builds keep the direct launch.
-        # A logon type that runs with no window at all ("whether the user is
-        # logged on or not") is not used: assigning one needs elevation, and
-        # this line runs without it.
-        $powershell = Join-Path $PSHOME "powershell.exe"
-        if (-not (Test-Path $powershell)) { $powershell = "powershell.exe" }
-        $command = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" scheduled "{1}" "{2}" "{3}"' -f
-            $updater, $dir, $repo, $api
-        $conhost = Join-Path $env:SystemRoot "System32\conhost.exe"
-        if ([System.Environment]::OSVersion.Version.Build -ge 17763 -and (Test-Path $conhost)) {
-            $execute = $conhost
-            $arguments = '--headless "{0}" {1}' -f $powershell, $command
-        } else {
-            $execute = $powershell
-            $arguments = $command
-        }
-
-        # A person's run always (re)registers the task. A scheduled run leaves
-        # its own task alone, except to bring one an older release registered
-        # up to date: those ran at sign-in and opened a console window every
-        # time, and nobody who installed them will run the line again to get
-        # the fix. Once it matches, this is one comparison per run. A task the
-        # user deleted is not put back.
-        $register = -not $scheduled
-        if ($scheduled) {
-            $held = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-            if ($held) {
-                $atLogOn = @($held.Triggers | Where-Object { $_.CimClass.CimClassName -eq "MSFT_TaskLogonTrigger" }).Count -gt 0
-                $register = $atLogOn -or $held.Actions.Count -ne 1 -or
-                    $held.Actions[0].Execute -ne $execute -or $held.Actions[0].Arguments -ne $arguments
-            }
-        }
-
-        # -Force replaces a task of the same name, which is what makes running
-        # the line twice leave one task rather than two. The repeating trigger
-        # is enough on its own: -StartWhenAvailable runs a window that passed
-        # while the machine was off shortly after it starts again.
-        if ($register -and (Test-Path $updater)) {
-            try {
-                $user = "$env:USERDOMAIN\$env:USERNAME"
-                $action = New-ScheduledTaskAction -Execute $execute -Argument $arguments
-                $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(10) -RepetitionInterval (New-TimeSpan -Hours 6)
-                $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries `
-                    -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 15) -MultipleInstances IgnoreNew
-                $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
-                Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings `
-                    -Principal $principal -Description "Keeps the Polaris browser extension in $dir up to date." -Force | Out-Null
-                if ($scheduled) {
-                    Write-Log "re-registered the updates task with this release's settings"
-                } else {
-                    Write-Log "it updates itself every 6 hours"
-                }
-                $updating = $true
-            } catch {
-                Write-Log "could not set up the updates task: $($_.Exception.Message)"
-            }
-        }
-    }
-
-    # The note in the folder says a task keeps it current. Where none could be
-    # set up it says so, and the extension keeps showing the manual steps.
-    $notePath = Join-Path $dir $marker
-    if (-not $scheduled -and (Test-Path $notePath)) {
-        try {
-            $held = Get-Content -Raw -Path $notePath | ConvertFrom-Json
-            $held.updater = if ($updating) { "windows-task" } else { "none" }
-            Set-Content -Path $notePath -Value ($held | ConvertTo-Json -Compress) -Encoding UTF8
-        } catch { }
-    }
-
-    if (-not $scheduled) {
-        Write-Log ""
-        Write-Log "First time: open chrome://extensions (brave://, edge:// or opera:// in"
-        Write-Log "those), turn on Developer mode, press Load unpacked and choose:"
-        Write-Log "  $dir"
-        Write-Log ""
-        if ($updating) {
-            Write-Log "That is the only time. New versions arrive in that folder by themselves"
-            Write-Log "and the extension restarts into them."
-        } else {
-            Write-Log "To update it, run this line again and press the refresh arrow on the"
-            Write-Log "Polaris card."
-        }
+        # Anything not foreseen above still ends as a reason on screen.
+        Write-Log "the update stopped: $($_.Exception.Message)"
+        Set-Failure "unknown" $_.Exception.Message
+    } finally {
+        Write-Check
     }
 }
 

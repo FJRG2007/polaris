@@ -273,7 +273,7 @@ copy is kept current the nearest real way: `scripts/install.ps1` and
 `scripts/install.sh` put it in one fixed folder and leave a job of the user's own
 behind - a Task Scheduler task on Windows, a launchd agent on macOS, a systemd
 user timer (or a crontab line) on Linux, none of them needing administrator
-rights - that runs every six hours (on macOS and Linux also at sign-in; on
+rights - that runs every hour (on macOS and Linux also at sign-in; on
 Windows a run missed while the machine was off happens soon after it starts, with
 no console window). It asks GitHub for the newest
 `extension-v*` release, downloads the Chromium package beside the live folder,

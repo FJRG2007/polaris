@@ -3213,6 +3213,23 @@ async function updaterCovers(): Promise<boolean> {
 }
 
 /**
+ * Whether the updater keeping this folder says it is not working, or has not
+ * run for hours while a newer version is out (`selfUpdate.updaterTrouble`).
+ * `behind` is that newer version, not already waiting on disk.
+ */
+async function updaterTroubleFor(behind: boolean): Promise<selfUpdate.UpdaterTrouble | null> {
+    if ((await installType()) !== "development") return null;
+    return selfUpdate.updaterTrouble(await ownFile(selfUpdate.UPDATER_MARKER), Date.now(), behind);
+}
+
+/** `updaterTroubleFor`, behind the stored notice. */
+async function updaterTroubleNow(): Promise<selfUpdate.UpdaterTrouble | null> {
+    const held = await UPDATE.getValue();
+    const newer = held !== null && update.isNewer(held.version, browser.runtime.getManifest().version);
+    return updaterTroubleFor(newer && (await diskVersion()) === null);
+}
+
+/**
  * The stored notice, as it stands now: gone once this version is the one out,
  * and with how this copy is kept current read again.
  */
@@ -3227,7 +3244,8 @@ async function currentNotice(): Promise<update.UpdateNotice | null> {
             await updateUrl()
         ),
         await BEHIND.getValue(),
-        Date.now()
+        Date.now(),
+        (await updaterTroubleNow()) !== null
     );
     if (kind === held.kind) return held;
     const current = { ...held, kind };
@@ -3283,8 +3301,11 @@ async function checkForUpdate(): Promise<boolean> {
         const now = Date.now();
         const since = update.behindSince(await BEHIND.getValue(), running, found !== null, now);
         await BEHIND.setValue(since);
+        // And whether the updater says it has stopped, which is sooner and says why.
+        const broken =
+            found !== null && (await updaterTroubleFor((await diskVersion()) === null)) !== null;
         await UPDATE.setValue(
-            found ? { ...found, kind: update.effectiveKind(found.kind, since, now) } : null
+            found ? { ...found, kind: update.effectiveKind(found.kind, since, now, broken) } : null
         );
         // The toolbar icon is where somebody with the popup closed finds out.
         await badge();
@@ -4044,7 +4065,8 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     update: await currentNotice(),
                     pending: await diskVersion(),
                     latest: await LATEST.getValue(),
-                    dismissed: await DISMISSED.getValue()
+                    dismissed: await DISMISSED.getValue(),
+                    updater: await updaterTroubleNow()
                 };
 
             case "checkUpdate":
@@ -4054,7 +4076,8 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     update: await currentNotice(),
                     pending: await diskVersion(),
                     latest: await LATEST.getValue(),
-                    dismissed: await DISMISSED.getValue()
+                    dismissed: await DISMISSED.getValue(),
+                    updater: await updaterTroubleNow()
                 };
 
             case "dismissUpdate": {

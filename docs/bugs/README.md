@@ -32,3 +32,4 @@ Security findings are not kept here; they live in
 | BUG-0019 | A conversation you are reading, or have just answered, stays unread for a while | Chat | Fixed, watching | dashboard/apps/web/src/lib/chat/read-marks.ts | 2026-11-22 |
 | BUG-0020 | A link in a received email does nothing when clicked in Polaris desktop | Desktop | Open | dashboard/apps/web/src/app/(app)/mail/message-body.tsx | 2026-11-23 |
 | BUG-0021 | A Gmail mailbox asks to be connected again when its authorization still works | Mail | Fixed, watching | dashboard/apps/web/src/lib/mailbox/credentials.ts | 2026-11-23 |
+| BUG-0022 | The browser extension's automatic updates leave it versions behind, with nothing on screen | Extension | Fixed, watching | dashboard/apps/extension/scripts/install.ps1 | 2026-11-23 |

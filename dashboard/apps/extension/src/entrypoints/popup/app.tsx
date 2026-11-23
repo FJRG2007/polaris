@@ -25,6 +25,8 @@ import { addable, AddressNote, useAddressCheck } from "./server-check";
 import { VpnPanel } from "./vpn-panel";
 import { Home, SectionBar, TopBar, useSection } from "./shell";
 import { useWords } from "./words";
+import { UpdaterBroken } from "./updater-broken";
+import type { UpdaterTrouble } from "@/lib/self-update";
 import type { Words } from "@/lib/words";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askBackground, type ItemSummary, type Request, type VaultStatus } from "@/lib/messages";
@@ -117,6 +119,8 @@ interface UpdateState {
     readonly latest: string | null;
     /** The version whose one-time notice was dismissed. */
     readonly dismissed: string | null;
+    /** The install script's updater saying it is not working. */
+    readonly updater: UpdaterTrouble | null;
 }
 
 function useUpdate(): UpdateState & {
@@ -127,7 +131,8 @@ function useUpdate(): UpdateState & {
         notice: null,
         pending: null,
         latest: null,
-        dismissed: null
+        dismissed: null,
+        updater: null
     });
     useEffect(() => {
         void (async () => {
@@ -137,7 +142,8 @@ function useUpdate(): UpdateState & {
                     notice: reply.update,
                     pending: reply.pending,
                     latest: reply.latest ?? null,
-                    dismissed: reply.dismissed ?? null
+                    dismissed: reply.dismissed ?? null,
+                    updater: reply.updater ?? null
                 });
         })();
     }, []);
@@ -222,7 +228,8 @@ function CheckUpdates({
             notice: reply.update,
             pending: reply.pending,
             latest: reply.latest,
-            dismissed: reply.dismissed ?? null
+            dismissed: reply.dismissed ?? null,
+            updater: reply.updater ?? null
         });
         const { store, storeVersion, polaris } = reply.checked;
         const running = browser.runtime.getManifest().version;
@@ -402,6 +409,7 @@ function VersionLine({
     notice,
     pending,
     latest,
+    updater,
     apply
 }: UpdateState & {
     apply: (state: UpdateState) => void;
@@ -442,6 +450,7 @@ function VersionLine({
                     updateNow={!pending && notice?.kind === "store"}
                 />
             </p>
+            {updater ? <UpdaterBroken trouble={updater} /> : null}
             {manual && steps ? (
                 <div className="notice small version-steps">
                     <ManualSteps notice={manual} />

@@ -141,9 +141,26 @@
         "settings": "Settings"
     },
     "popup": {
+        "updater": {
+            "broken": "Automatic updates are not working: {reason}",
+            "repair": "To repair them, paste this install line again where you first pasted it. Until then, update by hand.",
+            "copy": "Copy the install line",
+            "reason": {
+                "unreachable": "GitHub could not be reached.",
+                "noRelease": "no release was found to install.",
+                "noPackage": "the newest release has no package for this browser.",
+                "digest": "the download did not match its published checksum, so it was not installed.",
+                "badPackage": "the download was not a working extension, so it was not installed.",
+                "install": "the new version could not be put in the folder.",
+                "task": "the task that runs the updater could not be set up.",
+                "missingTool": "a program the updater needs is missing.",
+                "unknown": "the updater stopped part way.",
+                "stopped": "the updater has not run since {when}."
+            }
+        },
         "update": {
             "store": "Version {version} is out. Your browser installs it within hours.",
-            "auto": "Version {version} is out. The updater on this computer installs it within hours.",
+            "auto": "Version {version} is out. The updater on this computer installs it within the hour.",
             "manual": "Version {version} is out. This copy was loaded from a folder, so it is updated by hand.",
             "download": "Download",
             "stepsChromium": "Unzip it over the folder this copy was loaded from, then press the reload arrow on Polaris in the extensions page.",
@@ -273,7 +290,7 @@
             "current": "Up to date",
             "available": "Version {version} is available",
             "store": "Installs itself within hours",
-            "auto": "The updater installs it within hours",
+            "auto": "The updater installs it within the hour",
             "manual": "Update it by hand",
             "updateNow": "Update now",
             "check": "Check for updates",

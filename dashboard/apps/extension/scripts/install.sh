@@ -16,9 +16,11 @@
 #
 # So the script also leaves behind the one thing that puts new files there: a
 # job of this user's own - a launchd agent on macOS, a systemd user timer on
-# Linux, or a crontab line where there is no systemd - that runs a few times a
-# day and at sign-in, asks GitHub for the newest extension release, and swaps
-# the folder when there is one. What the job runs is a copy of THIS script as
+# Linux, or a crontab line where there is no systemd - that runs every hour and
+# at sign-in, asks GitHub for the newest extension release, and swaps the folder
+# when there is one. Each run also writes what it found into the folder
+# (`check` in polaris-updater.json), so the extension can say when updating has
+# stopped working, and why. What the job runs is a copy of THIS script as
 # the release attached it, checked against the digest GitHub publishes for it
 # and refreshed with every update, so the updater is always the one the
 # installed version shipped with.
@@ -47,6 +49,10 @@ JOB="polaris-extension-update"
 # Written into the extension's own folder, so the extension can read it and know
 # that this copy is kept current by the job rather than by hand.
 MARKER="polaris-updater.json"
+# How often the job runs, in minutes. Every six hours let a morning of releases
+# wait until the evening; once an hour is still far inside what GitHub lets one
+# address ask unsigned (60 an hour), at two requests a run.
+EVERY_MINUTES=60
 
 # One fixed home per platform, following what each system already does with
 # application data. Override with POLARIS_EXTENSION_DIR if you keep such things
@@ -71,6 +77,34 @@ log() {
 }
 err() {
     if [ "$SCHEDULED" = 1 ]; then log "$1"; else printf 'polaris: %s\n' "$1" >&2; fi
+}
+
+# What this run found, written into the extension's folder (`write_check`),
+# because nobody reads update.log. The marker is the one-line object this
+# script writes, so the previous check is cut off and the new one appended.
+CHECK_OUTCOME=failed
+CHECK_REASON=unknown
+CHECK_DETAIL=""
+write_check() {
+    [ -n "${DIR:-}" ] && [ -f "$DIR/$MARKER" ] || return 0
+    # Only text that cannot break the JSON it is written into.
+    detail=$(printf '%s' "$CHECK_DETAIL" | tr -d '"\\' | tr -d '\000-\037' | cut -c1-300)
+    reason=null
+    [ -n "$CHECK_REASON" ] && reason="\"$CHECK_REASON\""
+    line=$(printf '"check":{"at":"%s","outcome":"%s","reason":%s,"detail":"%s","everyMinutes":%s}' \
+        "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$CHECK_OUTCOME" "$reason" "$detail" "$EVERY_MINUTES")
+    head -n1 "$DIR/$MARKER" | sed 's/,"check":{[^}]*}//; s/}[[:space:]]*$//' >"$DIR/$MARKER.tmp" &&
+        printf ',%s}\n' "$line" >>"$DIR/$MARKER.tmp" &&
+        mv "$DIR/$MARKER.tmp" "$DIR/$MARKER" || rm -f "$DIR/$MARKER.tmp"
+}
+# A failed run: said where somebody is reading, and written down for the extension.
+fail() {
+    CHECK_OUTCOME=failed
+    CHECK_REASON=$1
+    CHECK_DETAIL=$2
+    err "$3"
+    write_check
+    return 1
 }
 
 fetch() { curl -fsSL -H "User-Agent: $AGENT" -H "Accept: application/vnd.github+json" "$@"; }
@@ -180,12 +214,15 @@ install_job() {
         <key>POLARIS_GITHUB_API</key><string>$API</string>
     </dict>
     <key>RunAtLoad</key><true/>
-    <key>StartInterval</key><integer>21600</integer>
+    <key>StartInterval</key><integer>$((EVERY_MINUTES * 60))</integer>
     <key>ProcessType</key><string>Background</string>
 </dict>
 </plist>
 EOF
             uid=$(id -u)
+            # From the job itself, the new plist is left for the next sign-in to
+            # load: booting the agent out would end the very run doing it.
+            [ "$SCHEDULED" = 1 ] && return 0
             launchctl bootout "gui/$uid/$JOB" >/dev/null 2>&1 || true
             launchctl bootstrap "gui/$uid" "$plist" || return 1
             ;;
@@ -207,7 +244,7 @@ Description=Keep the Polaris browser extension up to date
 
 [Timer]
 OnStartupSec=2min
-OnUnitActiveSec=6h
+OnUnitActiveSec=${EVERY_MINUTES}min
 Persistent=true
 
 [Install]
@@ -219,7 +256,7 @@ EOF
         cron)
             line="POLARIS_EXTENSION_DIR='$DIR' POLARIS_REPO='$REPO' POLARIS_GITHUB_API='$API' /bin/sh '$UPDATER' scheduled # $JOB"
             { crontab -l 2>/dev/null | grep -v "# $JOB\$" || true
-              printf '17 */6 * * * %s\n' "$line"
+              printf '17 * * * * %s\n' "$line"
               printf '@reboot %s\n' "$line"; } | crontab - || return 1
             ;;
         *)
@@ -227,8 +264,31 @@ EOF
             return 1
             ;;
     esac
-    log "it updates itself: every 6 hours and when you sign in"
+    log "it updates itself: every hour and when you sign in"
     UPDATING=1
+}
+
+# Whether the job set up for THIS updater runs on an older schedule than this
+# release's - every six hours, before. Only a job that names this updater
+# counts, so a run against another folder never rewrites somebody's real job.
+job_outdated() {
+    case "$(job_kind)" in
+        launchd) file=$(launchd_plist) want="<integer>$((EVERY_MINUTES * 60))</integer>" ;;
+        systemd) file="$(systemd_dir)/$JOB.timer" want="OnUnitActiveSec=${EVERY_MINUTES}min" ;;
+        cron)
+            held=$(crontab -l 2>/dev/null | grep -F "$UPDATER" | grep "# $JOB\$" || true)
+            [ -n "$held" ] && ! printf '%s\n' "$held" | grep -q '^17 \* \* \* \* '
+            return
+            ;;
+        *) return 1 ;;
+    esac
+    [ -f "$file" ] || return 1
+    if [ "$(job_kind)" = systemd ]; then
+        grep -qF "$UPDATER" "$(systemd_dir)/$JOB.service" 2>/dev/null || return 1
+    else
+        grep -qF "$UPDATER" "$file" || return 1
+    fi
+    ! grep -qF "$want" "$file"
 }
 
 remove_job() {
@@ -263,21 +323,15 @@ swap_in() {
     trap "rm -rf '$stage' '$retired'" EXIT INT TERM
 
     log "fetching $tag"
-    fetch "$url" -o "$stage/extension.zip" || {
-        err "could not download $url"
-        return 1
-    }
-    digest_ok "$stage/extension.zip" "$digest" || {
-        err "the download for $tag does not match its published digest; nothing was changed"
-        return 1
-    }
-    unzip -q "$stage/extension.zip" -d "$stage/unpacked" || {
-        err "that download is not a readable zip"
-        return 1
-    }
+    fetch "$url" -o "$stage/extension.zip" ||
+        { fail unreachable "$tag" "could not download $url"; return 1; }
+    digest_ok "$stage/extension.zip" "$digest" ||
+        { fail digest "$tag" "the download for $tag does not match its published digest; nothing was changed"; return 1; }
+    unzip -q "$stage/extension.zip" -d "$stage/unpacked" ||
+        { fail bad-package "$tag" "that download is not a readable zip"; return 1; }
     if [ "$(manifest_version "$stage/unpacked")" != "$version" ] ||
         ! grep -q '"background"' "$stage/unpacked/manifest.json"; then
-        err "the package for $tag is not the extension it says it is; nothing was changed"
+        fail bad-package "$tag" "the package for $tag is not the extension it says it is; nothing was changed"
         return 1
     fi
     updater_kind=$5
@@ -287,15 +341,17 @@ swap_in() {
     # The swap. The live folder is renamed away and the new one renamed in; if
     # the second rename fails the first is undone.
     if [ -e "$DIR" ] && ! mv "$DIR" "$retired"; then
-        err "could not move the version in $DIR aside; it was kept"
+        fail install "$tag" "could not move the version in $DIR aside; it was kept"
         return 1
     fi
     if ! mv "$stage/unpacked" "$DIR"; then
         [ -e "$retired" ] && mv "$retired" "$DIR"
-        err "could not put $tag in place; the version there was kept"
+        fail install "$tag" "could not put $tag in place; the version there was kept"
         return 1
     fi
     log "installed $version in $DIR"
+    CHECK_OUTCOME=installed
+    CHECK_REASON=""
 }
 
 main() {
@@ -324,7 +380,7 @@ main() {
 
     for tool in curl unzip awk; do
         command -v "$tool" >/dev/null 2>&1 || {
-            err "$tool is needed and was not found"
+            fail missing-tool "$tool" "$tool is needed and was not found"
             return 1
         }
     done
@@ -340,18 +396,18 @@ main() {
         tag=$(newest_extension_tag) || tag=""
     fi
     [ -n "$tag" ] || {
-        err "no extension release has been published yet, or GitHub could not be reached"
+        fail unreachable "" "no extension release has been published yet, or GitHub could not be reached"
         return 1
     }
     version=${tag#extension-v}
 
     release=$(fetch "$API/repos/$REPO/releases/tags/$tag") || {
-        err "could not read release $tag"
+        fail unreachable "$tag" "could not read release $tag"
         return 1
     }
     package=$(asset_of "$release" 'chrome.*[.]zip$')
     [ -n "$package" ] || {
-        err "release $tag carries no Chromium package"
+        fail no-package "$tag" "release $tag carries no Chromium package"
         return 1
     }
 
@@ -361,6 +417,8 @@ main() {
 
     if [ "$(manifest_version "$DIR")" = "$version" ] && [ -f "$DIR/$MARKER" ]; then
         [ "$SCHEDULED" = 1 ] || log "$version is already installed in $DIR"
+        CHECK_OUTCOME=current
+        CHECK_REASON=""
     else
         # shellcheck disable=SC2086
         swap_in "$tag" "$version" ${package%% *} "${package#* }" "$kind" || return 1
@@ -374,6 +432,10 @@ main() {
         # it. Refreshed on every run, so a release that changes how updating
         # works is followed by the job too.
         script=$(asset_of "$release" '^install[.]sh$')
+        # Downloaded only when it changed: the job runs every hour.
+        if [ -n "$script" ] && [ -n "${script#* }" ] && [ -f "$UPDATER" ] && digest_ok "$UPDATER" "${script#* }"; then
+            script=""
+        fi
         if [ -n "$script" ]; then
             fresh=$(mktemp "$BASE/.update-XXXXXX")
             if fetch "${script%% *}" -o "$fresh" && digest_ok "$fresh" "${script#* }"; then
@@ -383,9 +445,16 @@ main() {
                 log "could not refresh the updater from $tag; keeping the one there was"
             fi
         fi
-        # Set up by a person's run only; a scheduled run leaves its own job alone.
-        if [ "$SCHEDULED" = 0 ] && [ -f "$UPDATER" ]; then
-            install_job || err "could not set up a job to keep it up to date, so it will not update itself"
+        # Set up by a person's run. A scheduled run leaves its own job alone,
+        # except to bring one an older release set up to this one's schedule:
+        # nobody who installed it will run the line again to get that.
+        if [ -f "$UPDATER" ] && { [ "$SCHEDULED" = 0 ] || job_outdated; }; then
+            install_job || {
+                CHECK_OUTCOME=failed
+                CHECK_REASON=task
+                CHECK_DETAIL=$(job_kind)
+                err "could not set up a job to keep it up to date, so it will not update itself"
+            }
         fi
     fi
 
@@ -397,6 +466,8 @@ main() {
         sed "s/\"updater\":\"[^\"]*\"/\"updater\":\"$noted\"/" "$DIR/$MARKER" >"$DIR/$MARKER.tmp" &&
             mv "$DIR/$MARKER.tmp" "$DIR/$MARKER"
     fi
+
+    write_check
 
     if [ "$SCHEDULED" = 0 ]; then
         log ""

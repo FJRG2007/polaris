@@ -247,9 +247,12 @@ export function checkDue(lastCheckedAt: number | null, now: number): boolean {
  * How long a folder the updater marked as its own may go without the new
  * version arriving before the popup stops promising it will.
  *
- * The updater runs every six hours; two missed runs is an updater that is not
- * running - removed, blocked, or a folder copied away from where it looks - and
- * from then on this copy is told how to update by hand, like any other.
+ * For an updater too old to write down how its runs went
+ * (`selfUpdate.lastCheck`), which ran every six hours: two missed runs is an
+ * updater that is not running - removed, blocked, or a folder copied away from
+ * where it looks - and from then on this copy is told how to update by hand,
+ * like any other. A newer updater says so itself, sooner
+ * (`selfUpdate.updaterTrouble`).
  */
 export const AUTO_GRACE_MS = 12 * 60 * 60 * 1000;
 
@@ -276,11 +279,19 @@ export function behindSince(
 
 /**
  * The install kind as it stands after the updater has had its chance: `auto`
- * that has waited past `AUTO_GRACE_MS` is `manual`, because the promise on
- * screen ("installs itself within hours") has stopped being true.
+ * that has waited past `AUTO_GRACE_MS`, or whose updater says it is not
+ * working (`broken`), is `manual`, because the promise on screen ("installs
+ * it within the hour") has stopped being true.
  */
-export function effectiveKind(kind: InstallKind, since: BehindSince | null, now: number): InstallKind {
-    if (kind !== "auto" || since === null) return kind;
+export function effectiveKind(
+    kind: InstallKind,
+    since: BehindSince | null,
+    now: number,
+    broken = false
+): InstallKind {
+    if (kind !== "auto") return kind;
+    if (broken) return "manual";
+    if (since === null) return kind;
     return now - since.at > AUTO_GRACE_MS ? "manual" : kind;
 }
 

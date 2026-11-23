@@ -359,6 +359,12 @@ describe("the updater's promise", () => {
         for (const kind of ["store", "manual", "desktop"] as const)
             expect(effectiveKind(kind, since, start + AUTO_GRACE_MS * 10)).toBe(kind);
     });
+
+    it("tells it to update by hand at once when the updater says it is not working", () => {
+        expect(effectiveKind("auto", null, start, true)).toBe("manual");
+        expect(effectiveKind("auto", { running: "0.1.275", at: start }, start, true)).toBe("manual");
+        expect(effectiveKind("store", null, start, true)).toBe("store");
+    });
 });
 
 describe("checking in the background", () => {

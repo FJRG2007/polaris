@@ -1606,7 +1606,7 @@
         "command": {
             "title": "One line, and it keeps itself up to date",
             "system": "Which system you are installing on",
-            "hint": "Paste it into {shell}. The first time, press Load unpacked and choose the folder it names. After that it checks for a new version every few hours and the extension restarts into it by itself. Firefox is not covered: its temporary add-on is gone when Firefox closes, so there is nothing for a script to keep current."
+            "hint": "Paste it into {shell}. The first time, press Load unpacked and choose the folder it names. After that it checks for a new version every hour and the extension restarts into it by itself. Firefox is not covered: its temporary add-on is gone when Firefox closes, so there is nothing for a script to keep current."
         },
         "steps": {
             "yourBrowser": "Your browser",

@@ -14,6 +14,7 @@
 
 import type { VpnState } from "@/lib/vpn";
 import type { UpdateNotice } from "@/lib/update";
+import type { UpdaterTrouble } from "@/lib/self-update";
 import type { ServerRef } from "@/lib/servers";
 import type { ReachStatus } from "@/lib/local-address";
 import { ENGLISH, type Words } from "@/lib/words";
@@ -606,6 +607,8 @@ export type Reply =
           readonly latest?: string | null;
           /** The version whose notice was dismissed, or null. */
           readonly dismissed?: string | null;
+          /** The install script's updater saying it is not working, or null. */
+          readonly updater?: UpdaterTrouble | null;
       }
     | {
           readonly ok: true;
@@ -620,6 +623,7 @@ export type Reply =
           readonly pending: string | null;
           readonly latest: string | null;
           readonly dismissed?: string | null;
+          readonly updater?: UpdaterTrouble | null;
       }
     | { readonly ok: true; readonly items: readonly ItemSummary[] }
     | { readonly ok: true; readonly value: string }
