@@ -51,10 +51,13 @@ async function signedInHere(accounts: readonly DeviceAccount[]): Promise<SignedI
     const phones = await prisma.userPhone
         .findMany({
             where: { userId: { in: accounts.map((account) => account.userId) }, verifiedAt: { not: null } },
-            select: { userId: true, phone: true }
+            select: { userId: true, phone: true, primary: true },
+            orderBy: [{ primary: "desc" }, { createdAt: "asc" }],
+            take: accounts.length * 10
         })
         .catch(() => []);
-    const phoneOf = new Map(phones.map((row) => [row.userId, row.phone]));
+    const phonesOf = new Map<string, string[]>();
+    for (const row of phones) phonesOf.set(row.userId, [...(phonesOf.get(row.userId) ?? []), row.phone]);
     return accounts.map((account) => ({
         id: account.sessionId,
         userId: account.userId,
@@ -63,7 +66,8 @@ async function signedInHere(accounts: readonly DeviceAccount[]): Promise<SignedI
         image: null,
         active: account.active,
         username: account.username,
-        phone: phoneOf.get(account.userId) ?? null
+        phone: phonesOf.get(account.userId)?.[0] ?? null,
+        phones: phonesOf.get(account.userId) ?? []
     }));
 }
 

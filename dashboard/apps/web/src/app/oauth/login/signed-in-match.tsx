@@ -24,6 +24,8 @@ export interface SignedInHere extends DeviceAccountView {
     readonly username: string | null;
     /** The account's verified phone number, when it has one. */
     readonly phone: string | null;
+    /** Every verified number on the account, the primary among them. */
+    readonly phones?: readonly string[];
 }
 
 /** Long enough to skip the keystrokes in the middle of a word, short enough to

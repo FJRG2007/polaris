@@ -86,7 +86,7 @@ function contactMatches(
         if (phone.success) {
             return {
                 field: "findByPhone",
-                where: [{ phone: { is: { phone: phone.data, verifiedAt: { not: null } } } }]
+                where: [{ phones: { some: { phone: phone.data, verifiedAt: { not: null } } } }]
             };
         }
     }

@@ -65,7 +65,7 @@ export function AccountView({
     secondLastName,
     emails,
     mailReady,
-    phone,
+    phones,
     canSendWhatsApp,
     phoneRequired = false
 }: {
@@ -76,7 +76,7 @@ export function AccountView({
     /** Whether an email channel is configured, which decides whether an address
      *  can be verified at all. */
     mailReady: boolean;
-    phone: UserPhoneView | null;
+    phones: UserPhoneView[];
     /** Whether a WhatsApp channel is connected, which is what confirms a number. */
     canSendWhatsApp: boolean;
     /** The instance requires a confirmed phone on this account. */
@@ -205,7 +205,7 @@ export function AccountView({
                 <EmailsView emails={emails} mailReady={mailReady} />
             </SectionCard>
 
-            <PhoneCard phone={phone} canSend={canSendWhatsApp} enforced={phoneRequired} />
+            <PhoneCard phones={phones} canSend={canSendWhatsApp} enforced={phoneRequired} />
         </div>
     );
 }

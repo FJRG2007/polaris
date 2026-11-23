@@ -22,7 +22,13 @@ import { getTranslations } from "@/lib/i18n/request";
 import { setTotpUnclaimed } from "@polaris/auth";
 import type { EnrollmentChoice } from "./enroll-view";
 import { enrollmentOptions, owesPhone, owesSecondFactor } from "@/lib/instance-security";
-import { removePhoneFor, sendPhoneCodeFor, setPhoneFor, verifyPhoneFor } from "@/app/(app)/account/security/phone-steps";
+import {
+    addPhoneFor,
+    makePhonePrimaryFor,
+    removePhoneFor,
+    sendPhoneCodeFor,
+    verifyPhoneFor
+} from "@/app/(app)/account/security/phone-steps";
 import { armFactorByEmail, sendEnrollmentCode } from "@/lib/second-factor-enrollment";
 
 interface ActionResult {
@@ -115,22 +121,27 @@ async function heldForPhone(): Promise<{ userId: string } | ActionResult> {
     return { userId: user.id };
 }
 
-export async function enrollSetPhoneAction(input: unknown): Promise<ActionResult> {
+export async function enrollAddPhoneAction(input: unknown): Promise<ActionResult & { id?: string }> {
     const held = await heldForPhone();
-    return "userId" in held ? setPhoneFor(held.userId, input) : held;
+    return "userId" in held ? addPhoneFor(held.userId, input) : held;
 }
 
-export async function enrollRemovePhoneAction(password: unknown): Promise<ActionResult> {
+export async function enrollRemovePhoneAction(input: unknown): Promise<ActionResult> {
     const held = await heldForPhone();
-    return "userId" in held ? removePhoneFor(held.userId, password) : held;
+    return "userId" in held ? removePhoneFor(held.userId, input) : held;
 }
 
-export async function enrollSendPhoneCodeAction(): Promise<ActionResult> {
+export async function enrollMakePhonePrimaryAction(id: unknown): Promise<ActionResult> {
     const held = await heldForPhone();
-    return "userId" in held ? sendPhoneCodeFor(held.userId) : held;
+    return "userId" in held ? makePhonePrimaryFor(held.userId, id) : held;
 }
 
-export async function enrollVerifyPhoneAction(code: unknown): Promise<ActionResult> {
+export async function enrollSendPhoneCodeAction(id?: unknown): Promise<ActionResult> {
     const held = await heldForPhone();
-    return "userId" in held ? verifyPhoneFor(held.userId, code) : held;
+    return "userId" in held ? sendPhoneCodeFor(held.userId, id) : held;
+}
+
+export async function enrollVerifyPhoneAction(input: unknown): Promise<ActionResult> {
+    const held = await heldForPhone();
+    return "userId" in held ? verifyPhoneFor(held.userId, input) : held;
 }

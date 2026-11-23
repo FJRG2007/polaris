@@ -268,7 +268,8 @@ export async function emailForUsername(username: string): Promise<string | null>
  * password (or the phone approval) instead of the address.
  *
  * Only a number its owner has verified counts, and only when exactly one
- * account holds it verified: a number two accounts share names neither, so it
+ * account holds it verified - any of its numbers, not only the primary. A
+ * number two accounts share names neither, so it
  * never picks one of them at random. Null for a number nobody has, for one that
  * is not verified, for one shared, and for a banned account - all the same
  * answer, so the sign-in screen cannot be used to find out which is which.
@@ -283,6 +284,8 @@ export async function emailForPhone(phone: string, e164: string | null): Promise
     const rows = await prisma.userPhone.findMany({
         where: { phone: { in: spellings }, verifiedAt: { not: null } },
         select: { user: { select: { email: true, bannedAt: true } } },
+        // Per account: one account may hold both spellings of the same number.
+        distinct: ["userId"],
         take: 2
     });
     if (rows.length !== 1) return null;

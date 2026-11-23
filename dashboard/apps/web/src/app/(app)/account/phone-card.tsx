@@ -1,20 +1,23 @@
 "use client";
 
 /**
- * The account's phone number: a profile detail that doubles as the address a
- * second-factor code is sent to.
+ * The phone numbers on the account, managed the way the email addresses are:
+ * a list with the primary marked, each number confirmed on its own, any
+ * confirmed one made the primary, any removed.
  *
- * It is written down first and confirmed second, because a mistyped digit would
- * otherwise send codes to a stranger for as long as nobody noticed. The
- * confirmation arrives the same way the codes themselves will - through one of
- * the user's own WhatsApp channels - so a number that confirms is a number that
- * can be reached, not just one that looks right.
+ * A number is written down first and confirmed second, because a mistyped digit
+ * would otherwise send codes to a stranger for as long as nobody noticed. The
+ * confirmation arrives the same way the codes themselves will, so a number that
+ * confirms is a number that can be reached, not just one that looks right. The
+ * code box only ever appears under the number it was sent to, labelled with
+ * that number, so it never reads as a second phone field.
  */
 
 import { useRouter } from "next/navigation";
 import type { UserPhoneView } from "@polaris/auth";
-import { otpCodeField, phoneField } from "@polaris/core";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
+import { formatPhoneInternational, otpCodeField, phoneField } from "@polaris/core";
+import { MoreHorizontal, Plus, Send, Smartphone, Star, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -25,15 +28,27 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
     Input,
     PhoneInput
 } from "@polaris/ui";
 import {
+    addPhoneAction,
+    makePhonePrimaryAction,
     removePhoneAction,
     sendPhoneCodeAction,
-    setPhoneAction,
     verifyPhoneAction
 } from "./security/two-factor-actions";
+import { Feedback } from "./security/setting-card";
+import { knownMessage } from "./security/known-sentences";
+import { CodeInput, isWholeCode } from "@/components/code-input";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+
+type Result = { error?: string };
 
 /**
  * The server actions behind the card. Account > Details uses the account's own;
@@ -41,235 +56,230 @@ import {
  * holding rather than bouncing it back to the step.
  */
 export interface PhoneActions {
-    setPhone: (input: { phone: string; password: string }) => Promise<{ error?: string }>;
-    removePhone: (password: string) => Promise<{ error?: string }>;
-    sendCode: () => Promise<{ error?: string }>;
-    verify: (code: string) => Promise<{ error?: string }>;
+    addPhone: (input: { phone: string; password: string }) => Promise<Result & { id?: string }>;
+    removePhone: (input: { id: string; password: string }) => Promise<Result>;
+    makePrimary: (id: string) => Promise<Result>;
+    sendCode: (id: string) => Promise<Result>;
+    verify: (input: { id: string; code: string }) => Promise<Result>;
 }
 
 const ACCOUNT_PHONE_ACTIONS: PhoneActions = {
-    setPhone: setPhoneAction,
+    addPhone: addPhoneAction,
     removePhone: removePhoneAction,
+    makePrimary: makePhonePrimaryAction,
     sendCode: sendPhoneCodeAction,
     verify: verifyPhoneAction
 };
-import { Feedback } from "./security/setting-card";
-import { knownMessage } from "./security/known-sentences";
-import { CodeInput, isWholeCode } from "@/components/code-input";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+
+/** How many numbers one account may hold. Mirrors MAX_USER_PHONES, which the
+ *  server enforces; this only keeps Add from offering what will be refused. */
+export const PHONE_LIMIT = 5;
 
 /**
- * What the field holds measured against the number on the account: the number
- * to save when it is a whole, valid one that is not already there (typed again,
- * or only regrouped, it is nothing to save).
+ * The number to add, when the field holds a whole, valid one that is not
+ * already on the account (typed again, or only regrouped, it is nothing new).
  */
-export function phoneDraftToSave(draft: string, stored: string): string | null {
+export function phoneToAdd(draft: string, held: readonly string[]): string | null {
     const candidate = phoneField.safeParse(draft);
     if (!candidate.success) return null;
-    const current = phoneField.safeParse(stored);
-    return current.success && current.data === candidate.data ? null : candidate.data;
+    const same = held.some((phone) => {
+        const stored = phoneField.safeParse(phone);
+        return stored.success && stored.data === candidate.data;
+    });
+    return same ? null : candidate.data;
+}
+
+/** A stored number spelled for reading: grouped, with its country code. */
+function readable(phone: string): string {
+    try {
+        return formatPhoneInternational(phone) || phone;
+    } catch {
+        return phone;
+    }
 }
 
 export function PhoneCard({
-    phone,
+    phones,
     canSend,
     enforced = false,
     actions = ACCOUNT_PHONE_ACTIONS,
     onVerified
 }: {
-    phone: UserPhoneView | null;
+    phones: readonly UserPhoneView[];
     canSend: boolean;
-    /** The instance requires a confirmed phone on this account, so it cannot be removed here. */
+    /** The instance requires a confirmed phone on this account, so its last
+     *  confirmed number cannot be removed here. */
     enforced?: boolean;
     actions?: PhoneActions;
-    /** Called once the number is confirmed, instead of refreshing the page. */
+    /** Called once a number is confirmed, instead of refreshing the page. */
     onVerified?: () => void;
 }) {
     const router = useRouter();
     const t = useTranslations("account");
-    const tc = useTranslations("common");
     const ts = useTranslations("accountSecurity");
-    const tv = useTranslations("validation");
-    // The number just saved, shown as the account's while the save is on its
-    // way and dropped again if it fails.
+    const addId = useId();
+    // The number just added, listed while the save is on its way and dropped
+    // again if it fails.
     const [pending, setPending] = useState<UserPhoneView | null>(null);
-    const shown = pending ?? phone;
-    const [draft, setDraft] = useState(phone?.phone ?? "");
+    const shown = pending ? [...phones, pending] : phones;
+    const [draft, setDraft] = useState("");
     const [touched, setTouched] = useState(false);
-    const [dialog, setDialog] = useState<"password" | "remove" | null>(null);
+    const [asking, setAsking] = useState(false);
     const [passwordError, setPasswordError] = useState<string | null>(null);
-    const [code, setCode] = useState("");
-    const [busy, setBusy] = useState(false);
+    const [removing, setRemoving] = useState<UserPhoneView | null>(null);
+    // The number a code was sent to, whose confirmation box is open.
+    const [confirming, setConfirming] = useState<string | null>(null);
+    const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [notice, setNotice] = useState<string | null>(null);
 
-    // A number the server reports anew (after a save, a removal, another tab)
-    // is what the field holds from then on.
+    // What the server reports replaces the optimistic row, and a box left open
+    // for a number that is gone or confirmed in another tab closes.
     useEffect(() => {
         setPending(null);
-        setDraft(phone?.phone ?? "");
-        setTouched(false);
-    }, [phone?.phone]);
+        setConfirming((open) =>
+            open && phones.some((entry) => entry.id === open && !entry.verified) ? open : null
+        );
+    }, [phones]);
 
-    const toSave = busy ? null : phoneDraftToSave(draft, shown?.phone ?? "");
+    const held = phones.map((entry) => entry.phone);
+    const toAdd = phoneToAdd(draft, held);
+    const parsedDraft = phoneField.safeParse(draft);
+    const duplicate = parsedDraft.success && toAdd === null;
+    const full = phones.length >= PHONE_LIMIT;
+    const confirmedCount = phones.filter((entry) => entry.verified).length;
 
-    async function run(action: () => Promise<{ error?: string }>, ok?: string, refresh = true) {
-        setBusy(true);
+    async function run(key: string, action: () => Promise<Result>, refresh = true): Promise<boolean> {
+        setBusy(key);
         setError(null);
-        setNotice(null);
-        const result = await action();
-        setBusy(false);
+        const result = await action().catch(() => ({ error: ts("errors.checkForm") }));
+        setBusy(null);
         if (result.error) {
             setError(result.error);
             return false;
         }
-        if (ok) setNotice(ok);
         if (refresh) router.refresh();
         return true;
     }
 
-    function askToSave(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        setTouched(true);
-        if (!toSave) return;
-        setPasswordError(null);
-        setDialog("password");
+    /** Send a code and open the box for it under that number. */
+    async function sendCode(entry: UserPhoneView) {
+        if (await run(entry.id, () => actions.sendCode(entry.id), false)) setConfirming(entry.id);
     }
 
-    /** Writing the number is a way into the account, so it re-asks for the password. */
-    async function confirmSave(password: string) {
-        const next = phoneDraftToSave(draft, shown?.phone ?? "");
+    function askToAdd(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        setTouched(true);
+        if (!toAdd || full) return;
+        setPasswordError(null);
+        setAsking(true);
+    }
+
+    /** Adding a number is a way into the account, so it re-asks for the password. */
+    async function confirmAdd(password: string) {
+        const next = phoneToAdd(draft, held);
         if (!next) return;
-        setDialog(null);
-        setPending({ phone: next, verified: false });
-        setBusy(true);
+        setAsking(false);
+        setPending({ id: "pending", phone: next, verified: false, primary: phones.length === 0 });
+        setBusy("add");
         setError(null);
-        setNotice(null);
-        const result = await actions.setPhone({ phone: next, password }).catch(() => ({
-            error: ts("errors.checkForm")
-        }));
-        setBusy(false);
-        if (result.error) {
+        const result = await actions
+            .addPhone({ phone: next, password })
+            .catch((): Result & { id?: string } => ({ error: ts("errors.checkForm") }));
+        setBusy(null);
+        if (result.error || !result.id) {
             // Back to what the account really has. The typed number stays in
             // the field, and the password is asked again with the reason.
             setPending(null);
-            setPasswordError(result.error);
-            setDialog("password");
+            setPasswordError(result.error ?? ts("errors.checkForm"));
+            setAsking(true);
             return;
         }
+        setDraft("");
+        setTouched(false);
         router.refresh();
-    }
-
-    async function verify(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        const parsed = otpCodeField.safeParse(code);
-        if (!parsed.success) {
-            const issue = parsed.error.issues[0]?.message;
-            setError(issue ? knownMessage(ts, tv, issue) : ts("errors.enterCode"));
-            return;
-        }
-        const typed = parsed.data;
-        if (!(await run(() => actions.verify(typed), undefined, !onVerified))) return;
-        setCode("");
-        onVerified?.();
+        // The next thing anybody does with a new number is confirm it.
+        const added = result.id;
+        if (canSend && (await run(added, () => actions.sendCode(added), false))) setConfirming(added);
     }
 
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
-                <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <h2 className="text-sm font-medium">
-                                <label htmlFor="account-phone">{t("phone.title")}</label>
-                            </h2>
-                            {shown ? (
-                                shown.verified ? (
-                                    <Badge className="border-success-edge text-success">
-                                        {t("phone.confirmed")}
-                                    </Badge>
-                                ) : (
-                                    <Badge className="border-warning-edge text-warning">
-                                        {t("phone.unconfirmed")}
-                                    </Badge>
-                                )
-                            ) : null}
-                        </div>
-                        <p className="text-xs text-muted-foreground">{t("phone.description")}</p>
-                        {enforced ? (
-                            <p className="mt-1 text-xs text-muted-foreground">{t("phone.requiredByAdmin")}</p>
-                        ) : null}
-                    </div>
-                    {shown ? (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="shrink-0"
-                            disabled={busy || enforced}
-                            title={enforced ? t("phone.requiredByAdmin") : undefined}
-                            onClick={() => setDialog("remove")}
-                        >
-                            {t("phone.remove")}
-                        </Button>
+                <div className="min-w-0">
+                    <h2 className="text-sm font-medium">{t("phone.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("phone.description")}</p>
+                    {enforced ? (
+                        <p className="mt-1 text-xs text-muted-foreground">{t("phone.requiredByAdmin")}</p>
                     ) : null}
                 </div>
 
-                <form onSubmit={askToSave} noValidate className="flex min-w-0 flex-wrap items-start gap-2">
-                    <PhoneInput
-                        id="account-phone"
-                        value={draft}
-                        onChange={setDraft}
-                        showError={touched}
-                        onBlur={() => setTouched(true)}
-                        className="min-w-0 flex-1 basis-56"
-                    />
-                    <Button type="submit" disabled={!toSave}>
-                        {busy && pending ? tc("actions.saving") : tc("actions.save")}
-                    </Button>
+                {shown.length > 0 ? (
+                    <ul className="overflow-hidden rounded-md border border-border">
+                        {shown.map((entry) => (
+                            <PhoneRow
+                                key={entry.id}
+                                entry={entry}
+                                busy={busy}
+                                canSend={canSend}
+                                locked={enforced && entry.verified && confirmedCount <= 1}
+                                open={confirming === entry.id}
+                                actions={actions}
+                                onSendCode={() => void sendCode(entry)}
+                                onMakePrimary={() => void run(entry.id, () => actions.makePrimary(entry.id))}
+                                onRemove={() => setRemoving(entry)}
+                                onVerified={() => {
+                                    setConfirming(null);
+                                    if (onVerified) onVerified();
+                                    else router.refresh();
+                                }}
+                            />
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-sm text-muted-foreground">{t("phone.empty")}</p>
+                )}
+
+                <form onSubmit={askToAdd} noValidate className="flex min-w-0 flex-col gap-1">
+                    <label htmlFor={addId} className="text-xs font-medium">
+                        {t("phone.addLabel")}
+                    </label>
+                    <div className="flex min-w-0 flex-wrap items-start gap-2">
+                        <PhoneInput
+                            id={addId}
+                            value={draft}
+                            onChange={setDraft}
+                            showError={touched}
+                            onBlur={() => draft && setTouched(true)}
+                            disabled={full}
+                            className="min-w-0 flex-1 basis-56"
+                        />
+                        <Button type="submit" disabled={!toAdd || full || busy === "add"}>
+                            <Plus className="size-4" />
+                            {busy === "add" ? t("phone.adding") : t("phone.add")}
+                        </Button>
+                    </div>
+                    {full ? (
+                        <p className="text-xs text-muted-foreground">{t("phone.limitReached")}</p>
+                    ) : duplicate ? (
+                        <p className="text-xs text-danger">{t("phone.duplicate")}</p>
+                    ) : null}
                 </form>
 
-                {shown && !shown.verified ? (
-                    <form onSubmit={verify} className="flex flex-col gap-2">
-                        <div className="flex min-w-0 flex-wrap items-start gap-2">
-                            <CodeInput
-                                autoSubmit
-                                value={code}
-                                aria-label={t("phone.code")}
-                                onValueChange={setCode}
-                                className="min-w-0 flex-1 basis-56"
-                            />
-                            <Button type="submit" disabled={busy || !isWholeCode(code)}>
-                                {t("phone.confirm")}
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                disabled={busy || !canSend}
-                                title={canSend ? undefined : ts("errors.connectWhatsAppFirst")}
-                                onClick={() => void run(actions.sendCode, t("phone.codeSent"))}
-                            >
-                                {t("phone.sendCode")}
-                            </Button>
-                        </div>
-                    </form>
-                ) : null}
-
-                <Feedback error={error} ok={notice} />
+                <Feedback error={error} />
             </CardBody>
 
             <PasswordDialog
-                open={dialog === "password"}
-                title={shown ? t("phone.changeTitle") : t("phone.addTitle")}
+                open={asking}
                 error={passwordError}
-                onOpenChange={(open) => !open && setDialog(null)}
-                onConfirm={(password) => void confirmSave(password)}
+                onOpenChange={(open) => !open && setAsking(false)}
+                onConfirm={(password) => void confirmAdd(password)}
             />
             <RemovePhoneDialog
+                entry={removing}
                 remove={actions.removePhone}
-                open={dialog === "remove"}
-                onOpenChange={(open) => !open && setDialog(null)}
+                onOpenChange={(open) => !open && setRemoving(null)}
                 onDone={() => {
-                    setDialog(null);
+                    setRemoving(null);
                     router.refresh();
                 }}
             />
@@ -277,16 +287,228 @@ export function PhoneCard({
     );
 }
 
-/** The password a save is confirmed with, asked only once Save is pressed. */
+function PhoneRow({
+    entry,
+    busy,
+    canSend,
+    locked,
+    open,
+    actions,
+    onSendCode,
+    onMakePrimary,
+    onRemove,
+    onVerified
+}: {
+    entry: UserPhoneView;
+    busy: string | null;
+    canSend: boolean;
+    /** The last confirmed number on an account that must keep one. */
+    locked: boolean;
+    open: boolean;
+    actions: PhoneActions;
+    onSendCode: () => void;
+    onMakePrimary: () => void;
+    onRemove: () => void;
+    onVerified: () => void;
+}) {
+    const t = useTranslations("account");
+    const ts = useTranslations("accountSecurity");
+    const number = readable(entry.phone);
+    const saving = entry.id === "pending";
+    const working = saving || busy === entry.id;
+    const sendTitle = canSend ? undefined : ts("errors.connectWhatsAppFirst");
+
+    return (
+        <li className="flex flex-col gap-2 border-t border-border px-3 py-2 first:border-t-0">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <div className="flex min-w-0 flex-1 basis-48 items-center gap-2">
+                    <Smartphone className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate text-sm tabular-nums" title={number}>
+                        {number}
+                    </span>
+                </div>
+                <div className="ms-auto flex shrink-0 flex-wrap items-center gap-1.5">
+                    {entry.primary ? <Badge variant="primary">{t("phone.primary")}</Badge> : null}
+                    {entry.verified ? (
+                        <Badge className="border-success-edge text-success">{t("phone.confirmed")}</Badge>
+                    ) : (
+                        <Badge className="border-warning-edge text-warning">{t("phone.unconfirmed")}</Badge>
+                    )}
+                    {entry.verified || open ? null : (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={working || !canSend}
+                            title={sendTitle}
+                            aria-label={t("phone.confirmNamed", { phone: number })}
+                            onClick={onSendCode}
+                        >
+                            {t("phone.confirm")}
+                        </Button>
+                    )}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                disabled={saving}
+                                aria-label={t("phone.menuFor", { phone: number })}
+                                title={t("phone.menuFor", { phone: number })}
+                            >
+                                <MoreHorizontal className="size-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                            {entry.primary ? null : (
+                                <DropdownMenuItem
+                                    disabled={!entry.verified || working}
+                                    title={entry.verified ? undefined : t("phone.needsConfirm")}
+                                    onSelect={onMakePrimary}
+                                >
+                                    <Star className="size-3.5" />
+                                    <span className="flex min-w-0 flex-col">
+                                        {t("phone.makePrimary")}
+                                        {entry.verified ? null : (
+                                            <span className="text-xs text-muted-foreground">
+                                                {t("phone.needsConfirm")}
+                                            </span>
+                                        )}
+                                    </span>
+                                </DropdownMenuItem>
+                            )}
+                            {entry.verified ? null : (
+                                <DropdownMenuItem disabled={!canSend || working} title={sendTitle} onSelect={onSendCode}>
+                                    <Send className="size-3.5" />
+                                    {open ? t("phone.resend") : t("phone.sendCode")}
+                                </DropdownMenuItem>
+                            )}
+                            {entry.primary && entry.verified ? null : <DropdownMenuSeparator />}
+                            <DropdownMenuItem
+                                variant="danger"
+                                disabled={locked || working}
+                                title={locked ? t("phone.lastRequired") : undefined}
+                                onSelect={onRemove}
+                            >
+                                <Trash2 className="size-3.5" />
+                                <span className="flex min-w-0 flex-col">
+                                    {t("phone.remove")}
+                                    {locked ? (
+                                        <span className="text-xs text-muted-foreground">{t("phone.lastRequired")}</span>
+                                    ) : null}
+                                </span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </div>
+            {open ? (
+                <ConfirmPhoneForm
+                    entry={entry}
+                    number={number}
+                    canSend={canSend}
+                    resending={busy === entry.id}
+                    verify={actions.verify}
+                    onResend={onSendCode}
+                    onVerified={onVerified}
+                />
+            ) : null}
+        </li>
+    );
+}
+
+/** The code box for one number, labelled with the number the code went to. */
+function ConfirmPhoneForm({
+    entry,
+    number,
+    canSend,
+    resending,
+    verify,
+    onResend,
+    onVerified
+}: {
+    entry: UserPhoneView;
+    number: string;
+    canSend: boolean;
+    resending: boolean;
+    verify: PhoneActions["verify"];
+    onResend: () => void;
+    onVerified: () => void;
+}) {
+    const t = useTranslations("account");
+    const ts = useTranslations("accountSecurity");
+    const tv = useTranslations("validation");
+    const codeId = useId();
+    const hintId = useId();
+    const [code, setCode] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    async function onSubmit(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        const parsed = otpCodeField.safeParse(code);
+        if (!parsed.success) {
+            const issue = parsed.error.issues[0]?.message;
+            setError(issue ? knownMessage(ts, tv, issue) : ts("errors.enterCode"));
+            return;
+        }
+        setBusy(true);
+        setError(null);
+        const result = await verify({ id: entry.id, code: parsed.data }).catch(() => ({
+            error: ts("errors.checkForm")
+        }));
+        setBusy(false);
+        if (result.error) {
+            setError(result.error);
+            setCode("");
+            return;
+        }
+        onVerified();
+    }
+
+    return (
+        <form onSubmit={onSubmit} className="flex flex-col gap-1 rounded-md bg-muted/40 p-2">
+            <label htmlFor={codeId} className="text-xs font-medium">
+                {t("phone.codeSentTo", { phone: number })}
+            </label>
+            <div className="flex min-w-0 flex-wrap items-start gap-2">
+                <CodeInput
+                    id={codeId}
+                    autoSubmit
+                    autoFocus
+                    value={code}
+                    aria-describedby={hintId}
+                    onValueChange={setCode}
+                    className="min-w-0 flex-1 basis-40"
+                />
+                <Button type="submit" disabled={busy || !isWholeCode(code)}>
+                    {t("phone.confirm")}
+                </Button>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={busy || resending || !canSend}
+                    title={canSend ? undefined : ts("errors.connectWhatsAppFirst")}
+                    onClick={onResend}
+                >
+                    {t("phone.resend")}
+                </Button>
+            </div>
+            <p id={hintId} className="text-xs text-muted-foreground">
+                {t("phone.codeHint")}
+            </p>
+            <Feedback error={error} />
+        </form>
+    );
+}
+
+/** The password an add is confirmed with, asked only once Add is pressed. */
 function PasswordDialog({
     open,
-    title,
     error,
     onOpenChange,
     onConfirm
 }: {
     open: boolean;
-    title: string;
     error: string | null;
     onOpenChange: (open: boolean) => void;
     onConfirm: (password: string) => void;
@@ -308,7 +530,7 @@ function PasswordDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
+                    <DialogTitle>{t("phone.addTitle")}</DialogTitle>
                     <DialogDescription>{t("phone.setDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
@@ -330,7 +552,7 @@ function PasswordDialog({
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={!password}>
-                            {tc("actions.save")}
+                            {t("phone.add")}
                         </Button>
                     </div>
                 </form>
@@ -340,27 +562,33 @@ function PasswordDialog({
 }
 
 function RemovePhoneDialog({
+    entry,
     remove,
-    open,
     onOpenChange,
     onDone
 }: {
+    entry: UserPhoneView | null;
     remove: PhoneActions["removePhone"];
-    open: boolean;
     onOpenChange: (open: boolean) => void;
     onDone: () => void;
 }) {
     const t = useTranslations("account");
     const tc = useTranslations("common");
+    const ts = useTranslations("accountSecurity");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    useEffect(() => {
+        if (entry) setError(null);
+    }, [entry]);
+
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        if (!entry) return;
         const password = String(new FormData(event.currentTarget).get("password") ?? "");
         setBusy(true);
         setError(null);
-        const result = await remove(password);
+        const result = await remove({ id: entry.id, password }).catch(() => ({ error: ts("errors.checkForm") }));
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -370,21 +598,18 @@ function RemovePhoneDialog({
     }
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={entry !== null} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
                     <DialogTitle>{t("phone.removeTitle")}</DialogTitle>
-                    <DialogDescription>{t("phone.removeDescription")}</DialogDescription>
+                    <DialogDescription>
+                        {t("phone.removeDescription", { phone: entry ? readable(entry.phone) : "" })}
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         {t("emails.currentPassword")}
-                        <Input
-                            name="password"
-                            type="password"
-                            required
-                            autoComplete="current-password"
-                        />
+                        <Input name="password" type="password" required autoFocus autoComplete="current-password" />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">

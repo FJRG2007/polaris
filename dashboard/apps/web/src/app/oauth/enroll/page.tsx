@@ -14,7 +14,7 @@
  */
 
 import { redirect } from "next/navigation";
-import { getUserPhone } from "@polaris/auth";
+import { listUserPhones } from "@polaris/auth";
 import { PhoneStep } from "./phone-step";
 import { EnrollView } from "./enroll-view";
 import { resolveSession } from "@/lib/session";
@@ -37,7 +37,7 @@ export default async function EnrollPage() {
     // The phone card's own words live with the account screens it comes from.
     return (
         <Messages namespaces={["account", "accountSecurity", "common"]}>
-            <PhoneStep name={session.name} phone={await getUserPhone(session.id)} />
+            <PhoneStep name={session.name} phones={await listUserPhones(session.id)} />
         </Messages>
     );
 }

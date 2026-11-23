@@ -128,9 +128,9 @@ export async function owesPhone(
     if (!account) {
         const row = await prisma.user.findUnique({
             where: { id: userId },
-            select: { isAdmin: true, phone: { select: { verifiedAt: true } } }
+            select: { isAdmin: true, phones: { where: { verifiedAt: { not: null } }, select: { id: true }, take: 1 } }
         });
-        account = { isAdmin: row?.isAdmin === true, phoneVerified: Boolean(row?.phone?.verifiedAt) };
+        account = { isAdmin: row?.isAdmin === true, phoneVerified: (row?.phones.length ?? 0) > 0 };
     }
     if (account.isAdmin || account.phoneVerified) return false;
     return (await phoneCodeRoute(userId)) !== null;

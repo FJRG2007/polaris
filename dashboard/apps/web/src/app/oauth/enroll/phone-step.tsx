@@ -13,20 +13,22 @@ import type { UserPhoneView } from "@polaris/auth";
 import { PhoneCard, type PhoneActions } from "@/app/(app)/account/phone-card";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
+    enrollAddPhoneAction,
+    enrollMakePhonePrimaryAction,
     enrollRemovePhoneAction,
     enrollSendPhoneCodeAction,
-    enrollSetPhoneAction,
     enrollVerifyPhoneAction
 } from "./actions";
 
 const ENROLL_PHONE_ACTIONS: PhoneActions = {
-    setPhone: enrollSetPhoneAction,
+    addPhone: enrollAddPhoneAction,
     removePhone: enrollRemovePhoneAction,
+    makePrimary: enrollMakePhonePrimaryAction,
     sendCode: enrollSendPhoneCodeAction,
     verify: enrollVerifyPhoneAction
 };
 
-export function PhoneStep({ name, phone }: { name: string; phone: UserPhoneView | null }) {
+export function PhoneStep({ name, phones }: { name: string; phones: UserPhoneView[] }) {
     const t = useTranslations("auth");
     const router = useRouter();
     return (
@@ -37,7 +39,7 @@ export function PhoneStep({ name, phone }: { name: string; phone: UserPhoneView 
                 <p className="text-sm text-muted-foreground">{t("enroll.phone.intro", { name })}</p>
             </header>
             <PhoneCard
-                phone={phone}
+                phones={phones}
                 canSend
                 actions={ENROLL_PHONE_ACTIONS}
                 onVerified={() => router.replace("/")}

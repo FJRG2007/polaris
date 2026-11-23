@@ -23,6 +23,8 @@ export interface SignedInIdentity {
     readonly username?: string | null;
     /** The account's verified phone number, in any stored spelling. */
     readonly phone?: string | null;
+    /** Every verified number on the account, when it holds several. */
+    readonly phones?: readonly string[];
 }
 
 /** A typed identifier in each form an account could be stored under. */
@@ -76,6 +78,7 @@ export function signedInAccountFor<T extends SignedInIdentity>(
             return account;
         }
         if (forms.phone && storedPhone(account.phone) === forms.phone) return account;
+        if (forms.phone && account.phones?.some((phone) => storedPhone(phone) === forms.phone)) return account;
     }
     return null;
 }

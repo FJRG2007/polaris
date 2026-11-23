@@ -18,7 +18,7 @@ import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
 import { AccountView } from "./account-view";
 import { getAuthMailStatus } from "@/lib/auth-mail";
-import { getUserPhone, listUserEmails } from "@polaris/auth";
+import { listUserEmails, listUserPhones } from "@polaris/auth";
 import { getInstanceSecurity } from "@/lib/instance-security";
 import { phoneCodeRoute } from "@/lib/messaging/code-senders";
 
@@ -27,14 +27,14 @@ export const dynamic = "force-dynamic";
 export default async function AccountDetailsPage() {
     const session = await requireUser();
     const t = await getTranslations("account");
-    const [user, emails, mail, phone, phoneRoute, instancePolicy] = await Promise.all([
+    const [user, emails, mail, phones, phoneRoute, instancePolicy] = await Promise.all([
         prisma.user.findUnique({
             where: { id: session.id },
             select: { firstName: true, lastName: true, secondLastName: true }
         }),
         listUserEmails(session.id),
         getAuthMailStatus(),
-        getUserPhone(session.id),
+        listUserPhones(session.id),
         // Confirming a number is sent the same way a sign-in code is - the
         // deployment's sender or the account's own channel - so the card needs to
         // know whether there is anything to send with.
@@ -56,7 +56,7 @@ export default async function AccountDetailsPage() {
                 secondLastName={user?.secondLastName ?? ""}
                 emails={emails}
                 mailReady={mail.channelId !== null}
-                phone={phone}
+                phones={phones}
                 canSendWhatsApp={phoneRoute !== null}
                 phoneRequired={instancePolicy.requirePhone && !session.isAdmin}
             />

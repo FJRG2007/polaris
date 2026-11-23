@@ -26,9 +26,10 @@ import {
     CODE_CHECK_WINDOW_MS,
     CODE_SEND_LIMIT,
     CODE_SEND_WINDOW_MS,
+    addPhoneFor,
+    makePhonePrimaryFor,
     removePhoneFor,
     sendPhoneCodeFor,
-    setPhoneFor,
     verifyPhoneFor
 } from "./phone-steps";
 import { checkTelegramLink, startTelegramLink, unlinkTelegram } from "@/lib/messaging/telegram-link";
@@ -40,26 +41,33 @@ import { getUserSecurity, regenerateBackupCodes, setTwoFactorPreferences, verify
 
 type ActionResult = { error?: string };
 
-export async function setPhoneAction(input: unknown): Promise<ActionResult> {
+export async function addPhoneAction(input: unknown): Promise<ActionResult & { id?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
-    return setPhoneFor(user.id, input);
+    return addPhoneFor(user.id, input);
 }
 
-export async function removePhoneAction(password: unknown): Promise<ActionResult> {
+export async function removePhoneAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
-    return removePhoneFor(user.id, password);
+    return removePhoneFor(user.id, input);
 }
 
-/** Send a confirmation code to the number on the account (see sendPhoneCodeFor). */
-export async function sendPhoneCodeAction(): Promise<ActionResult> {
+export async function makePhonePrimaryAction(id: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
-    return sendPhoneCodeFor(user.id);
+    return makePhonePrimaryFor(user.id, id);
+}
+
+/** Send a confirmation code to a number on the account (see sendPhoneCodeFor). */
+export async function sendPhoneCodeAction(id?: unknown): Promise<ActionResult> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    return sendPhoneCodeFor(user.id, id);
 }
 
 /**
@@ -101,11 +109,11 @@ export async function unlinkTelegramAction(): Promise<ActionResult> {
     return {};
 }
 
-export async function verifyPhoneAction(code: unknown): Promise<ActionResult> {
+export async function verifyPhoneAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
-    return verifyPhoneFor(user.id, code);
+    return verifyPhoneFor(user.id, input);
 }
 
 /** How often one account may mint a set of backup codes. The endpoint checks a

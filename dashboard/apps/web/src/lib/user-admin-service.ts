@@ -89,7 +89,8 @@ const DIRECTORY_SELECT = {
     banReason: true,
     bannedUntil: true,
     emailVerified: true,
-    phone: { select: { phone: true, verifiedAt: true } },
+    // The primary number, the one the directory shows and an administrator marks.
+    phones: { select: { phone: true, verifiedAt: true }, orderBy: { primary: "desc" }, take: 1 },
     twoFactorEnabled: true,
     createdAt: true,
     roles: { select: { role: { select: { name: true } } } },
@@ -133,8 +134,8 @@ function toDirectoryUser(row: DirectoryRow): DirectoryUser {
         bannedAt: row.bannedAt?.toISOString() ?? null,
         bannedUntil: row.bannedUntil?.toISOString() ?? null,
         emailVerified: row.emailVerified,
-        phone: row.phone?.phone ?? null,
-        phoneVerified: row.phone?.verifiedAt !== null && row.phone?.verifiedAt !== undefined,
+        phone: row.phones[0]?.phone ?? null,
+        phoneVerified: Boolean(row.phones[0]?.verifiedAt),
         twoFactorEnabled: row.twoFactorEnabled,
         roles: row.roles.map((entry) => entry.role.name),
         groups: row.groups.map((entry) => entry.group.name),
@@ -452,13 +453,15 @@ export async function setContactVerified(
     if (what === "email") {
         await prisma.user.update({ where: { id: userId }, data: { emailVerified: verified } });
     } else {
-        const phone = await prisma.userPhone.findUnique({
+        // The primary: the number codes go to and the directory shows.
+        const phone = await prisma.userPhone.findFirst({
             where: { userId },
-            select: { phone: true }
+            select: { id: true },
+            orderBy: [{ primary: "desc" }, { createdAt: "asc" }]
         });
         if (!phone) return { error: (await readerWords("api"))("refusals.users.noNumber") };
         await prisma.userPhone.update({
-            where: { userId },
+            where: { id: phone.id },
             // The code goes with it either way. One that is still outstanding
             // would let somebody finish a proof that has just been made
             // meaningless, and one left behind after a number is un-verified is

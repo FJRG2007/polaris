@@ -63,3 +63,11 @@ describe("signedInAccountFor", () => {
         expect(signedInAccountFor("ana@fixture.test", [])).toBeNull();
     });
 });
+
+describe("signedInAccountFor with several numbers", () => {
+    it("names the account by any of its verified numbers, not only the primary", () => {
+        const DEV = { id: "dev", email: "dev@fixture.test", username: null, phone: "+34600999111", phones: ["+34600999111", "+34600999222"] };
+        expect(signedInAccountFor("+34 600 999 222", [ANA, DEV])?.id).toBe("dev");
+        expect(signedInAccountFor("+34600999333", [ANA, DEV])).toBeNull();
+    });
+});

@@ -338,7 +338,7 @@ model User {
     accountDevices      AccountDevice[]
     deviceCodes         DeviceCode[]
     emails              UserEmail[]
-    phone               UserPhone?
+    phones              UserPhone[]
     telegram            UserTelegram?
     avatar              UserAvatar?
     banner              UserBanner?
@@ -920,17 +920,23 @@ model EmailVerification {
     @@index([userId])
 }
 
-// The number a second-factor code can be sent to. One per account, keyed by the
-// user, because it exists to reach one person rather than to be a directory:
-// there is nothing to choose between two numbers at the moment someone is
-// waiting on a code. Stored in international form, exactly as it will be dialled.
+// The numbers on an account, any of which can sign in with the password once
+// it is confirmed. One of them is the primary: the number second-factor codes,
+// WhatsApp codes and the step-up are sent to. At most one primary per account,
+// held by a partial unique index the migration creates (Prisma cannot declare
+// one), and a confirmed number belongs to one account only - checked by the
+// code that confirms it, since numbers several accounts confirmed before that
+// rule existed are left as they were (sign-in by such a number names neither).
+// Stored in international form, exactly as it will be dialled.
 //
-// The pending confirmation lives on the same row - a low-entropy code, hashed
-// with the password hasher like the quick-unlock PIN, with an expiry and a cap
-// on wrong guesses. A number is only usable as a factor once verifiedAt is set.
+// The pending confirmation lives on the row - a low-entropy code, hashed with
+// the password hasher like the quick-unlock PIN, with an expiry and a cap on
+// wrong guesses. A number is only usable as a factor once verifiedAt is set.
 model UserPhone {
-    userId        String    @id @db.Uuid
+    id            String    @id @default(uuid(7)) @db.Uuid
+    userId        String    @db.Uuid
     phone         String
+    primary       Boolean   @default(false)
     verifiedAt    DateTime?
     codeHash      String?
     codeExpiresAt DateTime?
@@ -939,6 +945,9 @@ model UserPhone {
     updatedAt     DateTime  @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, phone])
+    @@index([phone])
 }
 
 // The Telegram chat an account's second-factor codes go to. A bot cannot write to

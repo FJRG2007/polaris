@@ -177,8 +177,11 @@ export {
 } from "./devices.js";
 export {
     getUserPhone,
-    setUserPhone,
+    listUserPhones,
+    addUserPhone,
     removeUserPhone,
+    promoteUserPhone,
+    MAX_USER_PHONES,
     issuePhoneCode,
     verifyPhoneCode,
     type UserPhoneView

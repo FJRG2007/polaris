@@ -92,7 +92,11 @@ export async function accountIdentity(userId: string): Promise<AccountIdentity |
             orderBy: { createdAt: "asc" },
             take: 50
         }),
-        prisma.userPhone.findUnique({ where: { userId }, select: { phone: true } })
+        prisma.userPhone.findFirst({
+            where: { userId },
+            select: { phone: true },
+            orderBy: [{ primary: "desc" }, { createdAt: "asc" }]
+        })
     ]);
     return identityFromAccount({
         ...user,

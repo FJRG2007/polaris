@@ -15,7 +15,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-let phone: { phone: string; verifiedAt: Date | null } | null = null;
+let phone: { id: string; phone: string; verifiedAt: Date | null } | null = null;
 let users: Record<string, unknown>[] = [];
 let phones: Record<string, unknown>[] = [];
 let audits: Record<string, unknown>[] = [];
@@ -25,7 +25,7 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         user: { update: async (query: Record<string, unknown>) => users.push(query) },
         userPhone: {
-            findUnique: async () => phone,
+            findFirst: async () => phone,
             update: async (query: Record<string, unknown>) => phones.push(query)
         }
     }
@@ -51,7 +51,7 @@ vi.mock("@/lib/audit-service", () => ({
 const { setContactVerified } = await import("@/lib/user-admin-service");
 
 beforeEach(() => {
-    phone = { phone: "+34600000000", verifiedAt: null };
+    phone = { id: "phone-1", phone: "+34600000000", verifiedAt: null };
     users = [];
     phones = [];
     audits = [];
@@ -87,7 +87,7 @@ describe("a number", () => {
     });
 
     it("clears the stamp and the code when it is taken back", async () => {
-        phone = { phone: "+34600000000", verifiedAt: new Date() };
+        phone = { id: "phone-1", phone: "+34600000000", verifiedAt: new Date() };
         await setContactVerified("admin-1", "u1", "phone", false);
         expect(phones[0]?.data).toMatchObject({ verifiedAt: null, codeHash: null });
     });

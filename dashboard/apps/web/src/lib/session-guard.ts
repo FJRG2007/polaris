@@ -286,9 +286,9 @@ export async function guardSession({
                 isAdmin: true,
                 // A temporary password an administrator handed out, still unreplaced.
                 passwordChangeRequired: true,
-                // Whether the number on the account is confirmed, for the
+                // Whether any number on the account is confirmed, for the
                 // instance's phone requirement.
-                phone: { select: { verifiedAt: true } },
+                phones: { where: { verifiedAt: { not: null } }, select: { id: true }, take: 1 },
                 security: {
                     select: {
                         idleLockMinutes: true,
@@ -503,7 +503,7 @@ export async function guardSession({
             // request through per sign-in, which is one more than none.
             return (
                 (await secondFactorVerdict(record.twoFactorEnabled === true)) ??
-                (await phoneVerdict(userId, record.isAdmin === true, Boolean(record.phone?.verifiedAt))) ??
+                (await phoneVerdict(userId, record.isAdmin === true, record.phones.length > 0)) ??
                 (await phishingResistantVerdict(userId, sessionId, record.isAdmin === true)) ??
                 ALLOWED
             );
@@ -540,7 +540,7 @@ export async function guardSession({
     if (owed) return owed;
 
     // 6. (cont.) The instance's demand for a confirmed phone, on the same step.
-    const phoneOwed = await phoneVerdict(userId, record.isAdmin === true, Boolean(record.phone?.verifiedAt));
+    const phoneOwed = await phoneVerdict(userId, record.isAdmin === true, record.phones.length > 0);
     if (phoneOwed) return phoneOwed;
 
     // 6a. The instance's demand that this session was opened with a passkey or a
