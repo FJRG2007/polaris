@@ -444,7 +444,9 @@
         "authenticator": "Autenticador",
         "authenticatorCode": "Código del autenticador",
         "set": "Contraseña establecida. Se ha cerrado la sesión en todas las demás sesiones.",
-        "setButton": "Guardar"
+        "setButton": "Guardar",
+        "notChanged": "La contraseña no se ha cambiado. Inténtalo de nuevo.",
+        "tooLong": "Usa como máximo 256 caracteres."
     },
     "pin": {
         "setTitle": "Fijar un PIN",

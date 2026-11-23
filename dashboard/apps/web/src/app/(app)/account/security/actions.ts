@@ -25,6 +25,8 @@ import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
+import { opaqueFinish } from "@/lib/chat/e2ee/schemas";
+import { provesPassword, setPasswordOverOpaque } from "@/lib/chat/e2ee/opaque-password";
 import { setConnectionSignIn } from "@/lib/connections/store";
 import { stepUpGranted } from "@/lib/step-up-grant";
 import { proveStepUp, sendStepUpCode } from "@/lib/step-up";
@@ -53,6 +55,7 @@ import {
     clearQuickPin,
     clearSecurityQuestions,
     getUserSecurity,
+    repairCredentialAccounts,
     resetUserPassword,
     setLoginApprovalRequired,
     setQuickPin,
@@ -217,6 +220,31 @@ export async function changePasswordAction(currentPassword: string, newPassword:
         await recordAudit({ actorId: user.id, action: "account.password.changed" });
     }
     return localized(result);
+}
+
+/**
+ * `changePasswordAction` without either password: the current one proven and the
+ * new one registered over OPAQUE in the browser (docs/chat-e2ee-phase1.md,
+ * "Password flows over OPAQUE"). The same gates, the same session sweep and the
+ * same audit entry; the proof is spent whether it holds or not, and the
+ * attempts count against the same per-account limit the OPAQUE routes keep.
+ */
+export async function changePasswordOpaqueAction(input: unknown): Promise<ActionResult> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    // No `set` when the browser already knew the current password was wrong:
+    // the proof is still spent here, so the attempt counts.
+    const parsed = z.object({ proof: opaqueFinish, set: opaqueFinish.optional() }).safeParse(input);
+    const t = await getTranslations("accountSecurity");
+    if (!parsed.success) return { error: t("errors.unreadable") };
+    if (!(await provesPassword(user.id, parsed.data.proof))) return localized({ error: "Current password is incorrect." });
+    if (!parsed.data.set || !(await setPasswordOverOpaque(user.id, parsed.data.set)))
+        return { error: t("password.notChanged") };
+    await repairCredentialAccounts(user.id);
+    await revokeOtherSessions(user.id, user.sessionId);
+    await recordAudit({ actorId: user.id, action: "account.password.changed", metadata: { method: "opaque" } });
+    return {};
 }
 
 /** What the code sent beside the recovery answers is minted against. */

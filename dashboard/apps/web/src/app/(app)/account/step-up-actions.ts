@@ -17,10 +17,9 @@ import { z } from "zod";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { localized } from "./security/action-messages";
-import { proveStepUp, sendStepUpCode, stepUpOptions, type StepUpChoice } from "@/lib/step-up";
+import { anyStepUpProofSchema, proveStepUp, sendStepUpCode, stepUpOptions, type StepUpChoice } from "@/lib/step-up";
 import { grantStepUp, stepUpRemainingMs, STEP_UP_PURPOSES } from "@/lib/step-up-grant";
 import {
-    stepUpProofSchema,
     TWO_FACTOR_DELIVERY_METHODS,
     type TwoFactorDeliveryMethod
 } from "@polaris/core";
@@ -75,7 +74,7 @@ export async function sendStepUpCodeAction(purpose: unknown, method: unknown): P
 export async function proveStepUpAction(purpose: unknown, proof: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const scope = z.enum(STEP_UP_PURPOSES).safeParse(purpose);
-    const parsed = stepUpProofSchema.safeParse(proof);
+    const parsed = anyStepUpProofSchema.safeParse(proof);
     if (!scope.success || !parsed.success) return { error: (await getTranslations("accountSecurity"))("errors.unreadable") };
 
     const result = await proveStepUp(user.id, scope.data, parsed.data);

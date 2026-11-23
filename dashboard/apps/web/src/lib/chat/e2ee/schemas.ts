@@ -72,6 +72,16 @@ export const keysBody = z.discriminatedUnion("op", [
         loginId,
         finishLoginRequest: opaqueMessage,
         passwordLock: passwordLock.optional()
+    }),
+    // Proving the current password to a server action, without the password.
+    z.object({ op: z.literal("proof-start"), startLoginRequest: opaqueMessage }),
+    // A new password: registration, then a login against the record it made.
+    z.object({ op: z.literal("set-start"), registrationRequest: opaqueMessage }),
+    z.object({
+        op: z.literal("set-verify"),
+        registrationRecord: opaqueMessage,
+        ksfVersion: z.union([z.literal(1), z.literal(2)]),
+        startLoginRequest: opaqueMessage
     })
 ]);
 export type KeysBody = z.infer<typeof keysBody>;
@@ -126,3 +136,12 @@ export const mlsBody = z.discriminatedUnion("op", [
     z.object({ op: z.literal("history-keys"), channelId, from: epoch.default("0") })
 ]);
 export type MlsBody = z.infer<typeof mlsBody>;
+
+/**
+ * The second half of an OPAQUE login a server action finishes itself: a proof of
+ * the current password (`proof-start`) or the verification of a new one
+ * (`set-verify`). `finishLoginRequest` is absent when the client's own finish
+ * failed - a wrong password - so the server still spends and counts the attempt.
+ */
+export const opaqueFinish = z.object({ loginId, finishLoginRequest: opaqueMessage.optional() });
+export type OpaqueFinish = z.infer<typeof opaqueFinish>;

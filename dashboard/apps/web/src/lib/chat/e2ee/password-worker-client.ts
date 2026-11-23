@@ -40,6 +40,14 @@ interface Pending {
     readonly timer: ReturnType<typeof setTimeout>;
 }
 
+/** The worker's `PasswordRejectedError`, by name: importing the class would pull
+ *  the OPAQUE module onto the page's thread. */
+function rejectedPassword(): Error {
+    const error = new Error("The password did not match");
+    error.name = "PasswordRejectedError";
+    return error;
+}
+
 let worker: Worker | null = null;
 let idle: ReturnType<typeof setTimeout> | null = null;
 let nextId = 0;
@@ -61,13 +69,13 @@ function started(): Worker {
         type: "module",
         name: "Password lock"
     });
-    made.onmessage = (event: MessageEvent<{ id: number; ok: boolean; value?: unknown }>) => {
+    made.onmessage = (event: MessageEvent<{ id: number; ok: boolean; value?: unknown; rejected?: boolean }>) => {
         const entry = pending.get(event.data.id);
         if (!entry) return;
         pending.delete(event.data.id);
         clearTimeout(entry.timer);
         if (event.data.ok) entry.resolve(event.data.value);
-        else entry.reject(new Error("The password step failed"));
+        else entry.reject(event.data.rejected ? rejectedPassword() : new Error("The password step failed"));
         if (pending.size === 0) idleSoon();
     };
     made.onerror = () => stop("The password worker stopped");

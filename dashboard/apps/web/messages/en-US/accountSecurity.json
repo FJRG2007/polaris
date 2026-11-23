@@ -444,7 +444,9 @@
         "authenticator": "Authenticator",
         "authenticatorCode": "Authenticator code",
         "set": "Password set. Every other session was signed out.",
-        "setButton": "Set password"
+        "setButton": "Set password",
+        "notChanged": "The password was not changed. Try again.",
+        "tooLong": "Use at most 256 characters."
     },
     "pin": {
         "setTitle": "Set an unlock PIN",

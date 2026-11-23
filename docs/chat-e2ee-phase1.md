@@ -123,7 +123,26 @@ The owner decided to switch the password lock on, on the condition that nobody n
 
 The server never sees a password registered over OPAQUE, so the rules are enforced in the client, as Bitwarden, 1Password and Proton do. `lib/chat/e2ee/password-rules.ts` (`startCheckedRegistration`) runs before any registration of a new password and reuses the server's own rules: `passwordField` (10-256, the bounds `recoveryResetSchema` also uses), `passwordMatchesIdentity` (behind `refuseIdentityPassword`), and the breached check by k-anonymity through `/api/polaris/pwned/[prefix]` (fails open, like every breach check here). Adoption at sign-in does not re-check: that password was checked by the server when it was set.
 
-What a modified client could bypass: the rules for its own account's password, nothing else - no other account, record or key. What the server still enforces: rate limits per address and per account on every OPAQUE route, the second factor after an OPAQUE sign-in, and every rule on each route where it still receives the password (`/sign-in/email`, sign-up, reset, change, the adoption's hash check). Recorded as accepted risk [VULN-0044](vulnerabilities/VULN-0044-password-rules-client-enforced-under-opaque.md); client integrity verification (docs/integrity.md once it exists) narrows it further.
+What a modified client could bypass: the rules for its own account's password, nothing else - no other account, record or key. What the server still enforces: rate limits per address and per account on every OPAQUE route, the second factor after an OPAQUE sign-in, and every rule on each route where it still receives the password (`/sign-in/email`, sign-up, reset, the old change action, the adoption's hash check). Recorded as accepted risk [VULN-0044](vulnerabilities/VULN-0044-password-rules-client-enforced-under-opaque.md); client integrity verification (docs/integrity.md once it exists) narrows it further.
+
+## Password flows over OPAQUE
+
+Goal: no flow that proves or sets a password sends it to the server. Two primitives, both on `/api/e2ee/keys` (session required, behind `passwordLockEnabled()`), finished by the server action itself so the result is spent once and bound to the session that runs it:
+
+- **Proof** (`proof-start`, then the action calls `provesPassword`): an OPAQUE login against the account's verified record. The login state carries the session id; a finish from another session, for another account, replayed, or absent (the browser already knew the password was wrong - it still sends the login id, so the attempt is spent, counted and audited) is refused. Limited per account (`e2ee-proof:`), on top of the action's own limits.
+- **Set** (`set-start`, `set-verify`, then the action calls `setPasswordOverOpaque`): the browser runs the shared rule guard (`startCheckedRegistration`), registers, and proves the new record with a full login before anything is written. The record waits inside that login state, never where an exchange could use it. The commit is one transaction: the better-auth hash becomes the hash of a random secret nobody keeps (so `/sign-in/email` and every check still made against the hash refuse every password) and the record is stored verified, tagged with that hash. An old client's reset or an administrator writing a real hash retires the record by its tag, as before. Limited per account (`e2ee-set:`).
+
+Browser side: `lib/chat/e2ee/password-flows-client.ts`, loaded on submit only. `opaquePasswordReady()` (the `state` op: adopted, plus the name and address the rules check against) decides the path; null - lock switched off, account not moved yet, a host without these ops, a network failure - keeps the old action. A worker or network failure before the commit throws `PasswordFlowUnavailable` and the form uses the old action too; nothing is half-written. Every Argon2id is in the password worker, which now reports a refused password apart from a broken worker. The submit shows `SlowSubmitLabel` with the encryption line only when OPAQUE runs.
+
+| Flow | State | Evidence |
+| --- | --- | --- |
+| Change password (`changePasswordOpaqueAction`; old `changePasswordAction` kept for unmoved accounts) | done | `apps/web/test/chat/e2ee/opaque-password-flows.test.ts` |
+| Step-up password proof through `StepUpDialog` / `proveStepUpAction` (`opaque-password` proof = the "password" choice) | done | same file, "a step-up password becomes its OPAQUE proof" |
+| Step-up proofs sent by the screens that embed `StepUpFields` directly (org delete, successor, lockdown, close account) | open | their schemas take `stepUpProofSchema` from core; route them through `sentStepUpProof` and `anyStepUpProofSchema` |
+| Forgot-password reset, recovery completion, `recoverPasswordAction`, sign-up, promote email, admin reset, 2FA enable/disable, chat lock ops | open | reset, recovery and sign-up need a token-authorised variant of the set primitive (no session) |
+| Desktop, extension, mobile, TV | nothing to change | none posts a password itself; they sign in through the web form |
+
+Consequence to know: an account whose password was set over OPAQUE has no password hash any more. With the kill switch (`POLARIS_INTERNAL_PASSWORD_LOCK=0`) such an account cannot sign in with its password until it resets it through the old reset form, which writes a real hash again.
 
 ## Adversarial review checklist (phase 1)
 

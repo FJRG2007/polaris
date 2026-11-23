@@ -217,7 +217,10 @@ export async function handleKeys(request: Request): Promise<Response> {
                             envelope: text(lock.envelope)
                         }))
                     },
-                    adopted: await opaque.adopted(user.id)
+                    adopted: await opaque.adopted(user.id),
+                    // What a new password must not be built from, for the rules
+                    // the browser checks before registering one.
+                    identity: { name: user.name, email: user.email }
                 });
             }
             case "create-account-key": {
@@ -248,6 +251,37 @@ export async function handleKeys(request: Request): Promise<Response> {
                     { userId: user.id, known: true },
                     "unlock",
                     body.startLoginRequest
+                );
+                return json({ ...started, userId: user.id });
+            }
+            case "proof-start": {
+                const refusal = await limited([[`e2ee-proof:${user.id}`, PER_ACCOUNT]]);
+                if (refusal) return refusal;
+                const started = await opaque.startLogin(
+                    { userId: user.id, known: true },
+                    "proof",
+                    body.startLoginRequest,
+                    user.sessionId
+                );
+                return json({ ...started, userId: user.id });
+            }
+            case "set-start": {
+                const refusal = await limited([[`e2ee-set:${user.id}`, PER_ACCOUNT]]);
+                if (refusal) return refusal;
+                return json({
+                    userId: user.id,
+                    registrationResponse: await opaque.registrationResponse(user.id, body.registrationRequest)
+                });
+            }
+            case "set-verify": {
+                const refusal = await limited([[`e2ee-set:${user.id}`, PER_ACCOUNT]]);
+                if (refusal) return refusal;
+                const started = await opaque.startSetLogin(
+                    user.id,
+                    body.registrationRecord,
+                    body.ksfVersion,
+                    body.startLoginRequest,
+                    user.sessionId
                 );
                 return json({ ...started, userId: user.id });
             }

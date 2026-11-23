@@ -34,7 +34,10 @@ const LOGIN_TTL_MS = 2 * 60 * 1000;
 const PASSWORD_TAG_SCOPE = "chat-e2ee/opaque-password";
 const UNKNOWN_ID_SCOPE = "chat-e2ee/opaque-unknown-account";
 
-export type LoginPurpose = "sign-in" | "verify" | "unlock";
+/** `proof` proves the signed-in account's current password to a server action
+ *  (step-up, change password) without the password; `set` verifies a record for
+ *  a NEW password before it replaces the current one (`startSetLogin`). */
+export type LoginPurpose = "sign-in" | "verify" | "unlock" | "proof" | "set";
 
 /** Why an OPAQUE step was refused. One shape for every cause, so a reply never
  *  tells a wrong password from an unknown address or a stale login. */
@@ -163,7 +166,9 @@ export async function identityFor(email: string): Promise<{ userId: string; know
 export async function startLogin(
     identity: { userId: string; known: boolean },
     purpose: LoginPurpose,
-    startLoginRequest: string
+    startLoginRequest: string,
+    /** The session a proof is for; its finish must come from the same one. */
+    bind?: string
 ): Promise<{ loginId: string; loginResponse: string; ksfVersion: PasswordKsfVersion }> {
     const usable = identity.known ? await usableRecord(identity.userId, purpose) : null;
     const record = usable?.record ?? null;
@@ -172,7 +177,7 @@ export async function startLogin(
         data: {
             userId: identity.known && record ? identity.userId : null,
             purpose,
-            state: JSON.stringify({ s: step.serverLoginState, r: record ? digest(record) : null }),
+            state: JSON.stringify({ s: step.serverLoginState, r: record ? digest(record) : null, b: bind }),
             expiresAt: new Date(Date.now() + LOGIN_TTL_MS)
         },
         select: { id: true }
@@ -192,9 +197,31 @@ export async function startLogin(
 export async function finishLogin(
     loginId: string,
     purpose: LoginPurpose,
-    finishLoginRequest: string,
-    expectUserId?: string
+    /** Absent when the client's own finish already failed (a wrong password):
+     *  the login is still spent here, so the attempt counts like any other. */
+    finishLoginRequest: string | undefined,
+    expectUserId?: string,
+    expectBind?: string
 ): Promise<{ userId: string; recordDigest: string }> {
+    const { userId, state } = await takeLogin(loginId, purpose, expectUserId, expectBind);
+    if (typeof state.r !== "string" || finishLoginRequest === undefined) throw new OpaqueRefusal();
+    if (!(await opaque.finishLogin(userId, state.s, finishLoginRequest))) throw new OpaqueRefusal();
+    // A password changed between the two steps retires the record mid-login:
+    // the proof was against a password that no longer opens the account.
+    if (purpose !== "verify" && purpose !== "set") {
+        const current = await usableRecord(userId, purpose);
+        if (!current || digest(current.record) !== state.r) throw new OpaqueRefusal();
+    }
+    return { userId, recordDigest: state.r };
+}
+
+/** Spend a login state (single use: whoever deletes it owns it) and read it. */
+async function takeLogin(
+    loginId: string,
+    purpose: LoginPurpose,
+    expectUserId?: string,
+    expectBind?: string
+): Promise<{ userId: string; state: { s: string; r?: unknown; p?: unknown; k?: unknown } }> {
     const row = await prisma.opaqueLogin.findUnique({ where: { id: loginId } });
     if (!row) throw new OpaqueRefusal();
     const { count } = await prisma.opaqueLogin.deleteMany({ where: { id: loginId } });
@@ -202,21 +229,90 @@ export async function finishLogin(
     if (row.purpose !== purpose || row.expiresAt.getTime() <= Date.now() || !row.userId)
         throw new OpaqueRefusal();
     if (expectUserId !== undefined && row.userId !== expectUserId) throw new OpaqueRefusal();
-    let state: { s?: unknown; r?: unknown };
+    let state: { s?: unknown; r?: unknown; p?: unknown; k?: unknown; b?: unknown };
     try {
-        state = JSON.parse(row.state) as { s?: unknown; r?: unknown };
+        state = JSON.parse(row.state) as typeof state;
     } catch {
         throw new OpaqueRefusal();
     }
-    if (typeof state.s !== "string" || typeof state.r !== "string") throw new OpaqueRefusal();
-    if (!(await opaque.finishLogin(row.userId, state.s, finishLoginRequest))) throw new OpaqueRefusal();
-    // A password changed between the two steps retires the record mid-login:
-    // the proof was against a password that no longer opens the account.
-    if (purpose !== "verify") {
-        const current = await usableRecord(row.userId, purpose);
-        if (!current || digest(current.record) !== state.r) throw new OpaqueRefusal();
-    }
-    return { userId: row.userId, recordDigest: state.r };
+    if (typeof state.s !== "string") throw new OpaqueRefusal();
+    // A login bound to a session finishes only on that session, and one that
+    // was not bound never satisfies a caller that asks for a binding.
+    if ((state.b !== undefined || expectBind !== undefined) && state.b !== expectBind) throw new OpaqueRefusal();
+    return { userId: row.userId, state: { ...state, s: state.s } };
+}
+
+/**
+ * Step one of the login that verifies a record for a NEW password, made by the
+ * signed-in client from a registration this server answered. The record is not
+ * stored anywhere an exchange could use it: it waits inside the login state, and
+ * only `finishSetLogin` - a full OPAQUE login against it - hands it back to be
+ * committed. So a record that would not open is never written over a working one.
+ */
+export async function startSetLogin(
+    userId: string,
+    record: string,
+    ksfVersion: PasswordKsfVersion,
+    startLoginRequest: string,
+    bind: string
+): Promise<{ loginId: string; loginResponse: string; ksfVersion: PasswordKsfVersion }> {
+    const step = await opaque.startLogin(await serverSetup(), userId, record, startLoginRequest);
+    const row = await prisma.opaqueLogin.create({
+        data: {
+            userId,
+            purpose: "set",
+            state: JSON.stringify({ s: step.serverLoginState, r: digest(record), p: record, k: ksfVersion, b: bind }),
+            expiresAt: new Date(Date.now() + LOGIN_TTL_MS)
+        },
+        select: { id: true }
+    });
+    return { loginId: row.id, loginResponse: step.loginResponse, ksfVersion };
+}
+
+/** Step two: the record it verified, once the client proved it opens. */
+export async function finishSetLogin(
+    loginId: string,
+    finishLoginRequest: string | undefined,
+    userId: string,
+    bind: string
+): Promise<{ record: string; ksfVersion: PasswordKsfVersion }> {
+    const { state } = await takeLogin(loginId, "set", userId, bind);
+    if (typeof state.p !== "string" || (state.k !== 1 && state.k !== 2) || finishLoginRequest === undefined)
+        throw new OpaqueRefusal();
+    if (!(await opaque.finishLogin(userId, state.s, finishLoginRequest))) throw new OpaqueRefusal();
+    return { record: state.p, ksfVersion: state.k };
+}
+
+/**
+ * Make a verified record the account's password. The server never saw the new
+ * password, so the better-auth hash becomes a hash of a random secret nobody
+ * holds: `/sign-in/email` and every check still made against the hash refuse
+ * any password, and the record - tagged with that new hash - is the only way in.
+ * Any later write of a real hash (an old client's reset, an administrator)
+ * retires the record by its tag, exactly as before. One transaction, so the
+ * account is never left with neither. False when the account has no password
+ * account to replace.
+ */
+export async function commitPassword(
+    userId: string,
+    record: string,
+    ksfVersion: PasswordKsfVersion,
+    unusableHash: string
+): Promise<boolean> {
+    const tag = passwordTag(unusableHash);
+    return prisma.$transaction(async (tx) => {
+        const { count } = await tx.account.updateMany({
+            where: { userId, providerId: "credential" },
+            data: { password: unusableHash }
+        });
+        if (count === 0) return false;
+        await tx.opaqueRecord.upsert({
+            where: { userId },
+            create: { userId, record, passwordTag: tag, ksfVersion, verifiedAt: new Date() },
+            update: { record, passwordTag: tag, ksfVersion, verifiedAt: new Date() }
+        });
+        return true;
+    });
 }
 
 /** The adoption's registration step one, answered for any address alike. */

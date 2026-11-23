@@ -20,6 +20,7 @@ import type { StepUpProofInput } from "@polaris/core";
 import { StepUpFields } from "@/components/step-up-fields";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { proveStepUpAction } from "@/app/(app)/account/step-up-actions";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
 import {
     Button,
     Dialog,
@@ -50,13 +51,24 @@ export function StepUpDialog({
     const tc = useTranslations("common");
     const [proof, setProof] = useState<StepUpProofInput | null>(null);
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState("");
 
     async function confirm(): Promise<void> {
         if (!proof || busy) return;
         setBusy(true);
+        setProtecting(false);
         setError("");
-        const result = await proveStepUpAction(purpose, proof);
+        // A typed password is proven over OPAQUE when the account can, so it
+        // never leaves this browser; loaded only when one was typed.
+        const sent =
+            proof.proof === "password"
+                ? await import("@/lib/chat/e2ee/password-flows-client").then(
+                      (flows) => flows.sentStepUpProof(proof, () => setProtecting(true)),
+                      () => proof
+                  )
+                : proof;
+        const result = await proveStepUpAction(purpose, sent);
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -103,7 +115,11 @@ export function StepUpDialog({
                     </Button>
                     <Button disabled={busy || proof === null} onClick={() => void confirm()}>
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        {t("actions.confirm")}
+                        {busy ? (
+                            <SlowSubmitLabel busyLabel={t("actions.confirm")} protecting={protecting} />
+                        ) : (
+                            t("actions.confirm")
+                        )}
                     </Button>
                 </DialogFooter>
             </DialogContent>

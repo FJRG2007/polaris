@@ -19,9 +19,11 @@ import { headers } from "next/headers";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { deliverCode, describeTwoFactorMethods } from "@/lib/two-factor-delivery";
+import { z } from "zod";
 import { issueStepUpCode, verifyAccountPassword, verifyStepUpCode, verifyTotpForSession } from "@polaris/auth";
 import {
     STEP_UP_PROOF_LABELS,
+    stepUpProofSchema,
     type StepUpProof,
     type StepUpProofInput,
     type TwoFactorDeliveryMethod
@@ -29,6 +31,19 @@ import {
 import { codeMessageFor } from "@/lib/code-message";
 import { TWO_FACTOR_RESEND_SECONDS } from "@/lib/two-factor-resend";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { opaqueFinish } from "@/lib/chat/e2ee/schemas";
+import { provesPassword } from "@/lib/chat/e2ee/opaque-password";
+
+/**
+ * The password proof made over OPAQUE (docs/chat-e2ee-phase1.md, "Password flows
+ * over OPAQUE"): the finish of a `proof-start` login instead of the password. It
+ * is the account's "password" choice, offered and refused exactly like it.
+ */
+export const opaquePasswordProofSchema = opaqueFinish.extend({ proof: z.literal("opaque-password") });
+export type AnyStepUpProof = StepUpProofInput | z.infer<typeof opaquePasswordProofSchema>;
+
+/** The proof a form sent, either shape. */
+export const anyStepUpProofSchema = z.union([stepUpProofSchema, opaquePasswordProofSchema]);
 
 /** Wrong proofs one account may offer, and over what span. Tighter than a
  *  sign-in: nobody reaches this screen by accident, and the person holding the
@@ -142,7 +157,7 @@ export async function sendStepUpCode(
 export async function proveStepUp(
     userId: string,
     purpose: string,
-    proof: StepUpProofInput,
+    proof: AnyStepUpProof,
     /** As for `sendStepUpCode`: the sign-in risk check accepts any reachable method. */
     options: { anyReachable?: boolean } = {}
 ): Promise<{ error?: string }> {
@@ -151,9 +166,11 @@ export async function proveStepUp(
         return { error: (await readerWords("accountSecurity"))("errors.tooManyAttempts", { minutes: minutes(throttle.retryAfterMs) }) };
     }
 
+    // A password proven over OPAQUE is the same "password" choice.
+    const asked = proof.proof === "opaque-password" ? "password" : proof.proof;
     const offered = options.anyReachable
-        ? (await describeTwoFactorMethods(userId)).some((status) => status.method === proof.proof && status.available)
-        : (await stepUpOptions(userId)).choices.some((choice) => choice.proof === proof.proof);
+        ? (await describeTwoFactorMethods(userId)).some((status) => status.method === asked && status.available)
+        : (await stepUpOptions(userId)).choices.some((choice) => choice.proof === asked);
     if (!offered) {
         return { error: (await readerWords("accountSecurity"))("known.notAWayToConfirm") };
     }
@@ -167,7 +184,12 @@ export async function proveStepUp(
     return result;
 }
 
-async function check(userId: string, purpose: string, proof: StepUpProofInput): Promise<{ error?: string }> {
+async function check(userId: string, purpose: string, proof: AnyStepUpProof): Promise<{ error?: string }> {
+    if (proof.proof === "opaque-password") {
+        return (await provesPassword(userId, proof))
+            ? {}
+            : { error: (await readerWords("accountSecurity"))("known.wrongStepUpPassword") };
+    }
     if (proof.proof === "password") {
         return (await verifyAccountPassword(auth, userId, proof.password))
             ? {}

@@ -39,6 +39,13 @@ scope.onmessage = (event) => {
     const { id, request } = event.data;
     run(request).then(
         (value) => scope.postMessage({ id, ok: true, value }),
-        () => scope.postMessage({ id, ok: false })
+        // Only whether the password was refused crosses back, so a wrong
+        // password reads differently from a worker that broke.
+        (caught: unknown) =>
+            scope.postMessage({
+                id,
+                ok: false,
+                rejected: caught instanceof passwordLock.PasswordRejectedError
+            })
     );
 };

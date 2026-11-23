@@ -23,7 +23,8 @@ import type { StepUpChoice } from "@/lib/step-up";
 import { StepUpFields } from "@/components/step-up-fields";
 import { SECURITY_QUESTION_COUNT, type StepUpProofInput } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
-import { changePasswordAction, recoverPasswordAction, sendRecoveryCodeAction } from "./actions";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
+import { changePasswordAction, changePasswordOpaqueAction, recoverPasswordAction, sendRecoveryCodeAction } from "./actions";
 import { passwordWouldOpenVault, SAME_AS_VAULT } from "@/lib/vault/would-open";
 import { Feedback } from "./setting-card";
 import { knownMessage, questionLabel } from "./known-sentences";
@@ -40,8 +41,42 @@ export function ChangePasswordDialog({
     const tv = useTranslations("validation");
     const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
+
+    /**
+     * Over OPAQUE when the account can (docs/chat-e2ee-phase1.md, "Password flows
+     * over OPAQUE"): neither password leaves this browser. Null means "use the
+     * old action" - the account has not moved yet, or the worker or the network
+     * failed before anything was committed.
+     */
+    async function changeOverOpaque(current: string, next: string): Promise<{ error?: string } | null> {
+        const flows = await import("@/lib/chat/e2ee/password-flows-client").catch(() => null);
+        if (!flows) return null;
+        const identity = await flows.opaquePasswordReady();
+        if (!identity) return null;
+        setProtecting(true);
+        try {
+            const proof = await flows.provePassword(current);
+            // A wrong current password is known here already: no new password
+            // is registered for it, and the server still spends the proof.
+            if (!proof.finishLoginRequest) return await changePasswordOpaqueAction({ proof });
+            const set = await flows.prepareNewPassword(next, identity);
+            const result = await changePasswordOpaqueAction({ proof, set });
+            if (!result.error) flows.resealAfterNewPassword(next);
+            return result;
+        } catch (caught) {
+            const problem = caught instanceof Error && caught.name === "PasswordRuleError"
+                ? (caught as Error & { problem?: string }).problem
+                : null;
+            if (problem === "identity") return { error: tv("passwordIdentity") };
+            if (problem === "breached") return { error: tv("passwordBreached") };
+            if (problem === "length")
+                return { error: next.length < 10 ? t("password.minimum") : t("password.tooLong") };
+            return null;
+        }
+    }
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -58,7 +93,9 @@ export function ChangePasswordDialog({
             setError(knownMessage(t, tv, SAME_AS_VAULT));
             return;
         }
-        const result = await changePasswordAction(String(form.get("currentPassword") ?? ""), next);
+        const current = String(form.get("currentPassword") ?? "");
+        setProtecting(false);
+        const result = (await changeOverOpaque(current, next)) ?? (await changePasswordAction(current, next));
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -110,7 +147,11 @@ export function ChangePasswordDialog({
                                 {tc("actions.cancel")}
                             </Button>
                             <Button type="submit" disabled={busy}>
-                                {busy ? t("password.changing") : t("password.changeTitle")}
+                                {busy ? (
+                                    <SlowSubmitLabel busyLabel={t("password.changing")} protecting={protecting} />
+                                ) : (
+                                    t("password.changeTitle")
+                                )}
                             </Button>
                         </div>
                     </form>

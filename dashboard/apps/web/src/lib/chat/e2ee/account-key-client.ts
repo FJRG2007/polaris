@@ -44,6 +44,8 @@ export interface KeyState {
         readonly passkeyLocks: ReadonlyArray<{ lockId: string; akVersion: number; envelope: string }>;
     } | null;
     readonly adopted: boolean;
+    /** Absent from a host that predates the password flows over OPAQUE. */
+    readonly identity?: { readonly name: string | null; readonly email: string | null };
 }
 
 interface HeldKey {
