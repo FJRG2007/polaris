@@ -1,0 +1,50 @@
+# Device add-ons (docs/device-addons.md): build every add-on under
+# device-addons/, write the catalog, sign it, and publish all of it on the
+# `device-addons` release, which the desktop app reads from any host.
+name: Device add-ons
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "device-addons/**"
+      - "scripts/device-addons/**"
+      - ".github/workflows/device-addons.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: device-addons
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Install fflate
+        working-directory: desktop
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build and sign the catalog
+        env:
+          DEVICE_ADDONS_SIGNING_KEY: ${{ secrets.DEVICE_ADDONS_SIGNING_KEY }}
+        run: node scripts/device-addons/publish.mjs device-addons "$RUNNER_TEMP/device-addons"
+      - name: Publish on the device-addons release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view device-addons >/dev/null 2>&1; then
+            gh release create device-addons --title "Device add-ons" --notes "The catalog and packages of device add-ons. Updated by CI." --latest=false
+          fi
+          cd "$RUNNER_TEMP/device-addons"
+          # Packages first, the catalog that names them last, its signature after it.
+          ls | grep -v '^catalog\.json' | xargs -r gh release upload device-addons --clobber
+          gh release upload device-addons --clobber catalog.json
+          gh release upload device-addons --clobber catalog.json.sig

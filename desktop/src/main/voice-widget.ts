@@ -111,6 +111,11 @@ export function setVoiceWidgetGame(running: boolean): void {
     refreshVoiceWidget();
 }
 
+/** The call as the page in it last described it, or null outside one. */
+export function voiceStateNow(): VoiceState {
+    return state ?? null;
+}
+
 /** A press on the widget, handed to the page in the call. */
 export function voiceWidgetAction(action: VoiceAction): boolean {
     if (!holder || holder.isDestroyed() || !state) return false;

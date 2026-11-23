@@ -8,6 +8,7 @@
  * be free of a bug that lets somebody else's text reach this bridge.
  */
 
+import { registerAddonIpc } from "./addons/electron";
 import { z } from "zod";
 import { overlayHeight, titleBarColorsSchema } from "@/shared/title-bar";
 import { runningPrograms } from "./game-detect";
@@ -251,6 +252,7 @@ export function registerIpc(host: IpcHost): void {
         );
     };
     const from = (event: IpcMainInvokeEvent, kind: WindowKind): boolean => kindOf(event.sender) === kind;
+    registerAddonIpc(fromPolaris, () => host.showPolaris());
 
     ipcMain.handle(CHANNELS.notify, async (event, raw: unknown): Promise<boolean> => {
         if (!fromPolaris(event)) return false;

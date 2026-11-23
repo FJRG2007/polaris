@@ -178,6 +178,30 @@ export interface PolarisDesktop {
         /** Hear the app asking to show a category. Answers the way to stop. */
         onOpen(listener: (category: string) => void): () => void;
     };
+    /**
+     * Device add-ons on this computer (`main/addons`), for the host's Settings
+     * to draw its store and each add-on's page. Answers are read through
+     * `@polaris/core/device-addons` on the page's side; absent in apps that
+     * predate them.
+     */
+    addons?: {
+        /** The catalog, what is installed and how each one runs (`AddonsSnapshot`). */
+        get(): Promise<unknown>;
+        /** Fetch the catalog now. */
+        refresh(): Promise<void>;
+        /** Install or update; `accepted` must hold every permission the add-on asks for. */
+        install(id: string, accepted: readonly string[]): Promise<unknown>;
+        uninstall(id: string): Promise<boolean>;
+        setEnabled(id: string, enabled: boolean): Promise<boolean>;
+        /** Its settings as stored, every one present, or null when it is not installed. */
+        settings(id: string): Promise<unknown>;
+        /** Change one; answers every value after it, or null when refused. */
+        setSetting(id: string, key: string, value: unknown): Promise<unknown>;
+        /** Hear that anything changed (progress, a crash, an install). Answers the way to stop. */
+        onChange(listener: () => void): () => void;
+        /** Hear the app asking to show an add-on (its "found" notice was clicked). Answers the way to stop. */
+        onOpen(listener: (id: string) => void): () => void;
+    };
     /** Open Windows' Default apps at Polaris, where it can be picked for mailto
      *  links. False where there is no such screen to open (macOS, Linux). */
     openMailDefaults(): Promise<boolean>;
@@ -738,6 +762,15 @@ export const CHANNELS = {
     appSettingsAnnounce: "desktop:app-settings-announce",
     appSettingsChanged: "desktop:app-settings-changed",
     appSettingsOpen: "desktop:app-settings-open",
+    addonsGet: "desktop:addons-get",
+    addonsRefresh: "desktop:addons-refresh",
+    addonsInstall: "desktop:addons-install",
+    addonsUninstall: "desktop:addons-uninstall",
+    addonsEnable: "desktop:addons-enable",
+    addonsSettings: "desktop:addons-settings",
+    addonsSetSetting: "desktop:addons-set-setting",
+    addonsChanged: "desktop:addons-changed",
+    addonsOpen: "desktop:addons-open",
     openMailDefaults: "desktop:open-mail-defaults",
     appBadge: "desktop:app-badge",
     appIcon: "desktop:app-icon",

@@ -1,0 +1,106 @@
+/**
+ * The add-on catalog: a small signed index published on the Polaris
+ * repository's `device-addons` release, the same for every host and fetched
+ * from GitHub, never from a host.
+ *
+ * Read stale-while-revalidate: the copy kept on the device answers at once (and
+ * offline), a fetch in the background replaces it when it is newer. A catalog is
+ * used only when its signature checks out, and never traded for one issued
+ * earlier than the one already held, so an old signed catalog cannot be replayed
+ * to bring back a package that was withdrawn.
+ */
+
+import { join } from "node:path";
+import { randomBytes } from "node:crypto";
+import { TRUSTED_KEYS, verifySigned, type TrustedKey } from "./signature";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { ADDON_CATALOG_MAX_BYTES, readAddonCatalog, type AddonCatalog } from "@polaris/core/device-addons";
+
+export const CATALOG_URL = "https://github.com/FJRG2007/polaris/releases/download/device-addons/catalog.json";
+const CATALOG_FILE = "catalog.json";
+const SIGNATURE_FILE = "catalog.json.sig";
+
+export type Fetcher = (url: string, init?: { signal?: AbortSignal; }) => Promise<Response>;
+
+/** The catalog the bytes and signature make, or null when either does not check out. */
+export function openCatalog(bytes: Uint8Array, signatureText: string, keys: readonly TrustedKey[] = TRUSTED_KEYS): AddonCatalog | null {
+    if (bytes.byteLength > ADDON_CATALOG_MAX_BYTES) return null;
+    let signature: unknown;
+    let body: unknown;
+    try {
+        signature = JSON.parse(signatureText);
+    } catch {
+        return null;
+    }
+    if (!verifySigned(bytes, signature, keys)) return null;
+    try {
+        body = JSON.parse(Buffer.from(bytes).toString("utf8"));
+    } catch {
+        return null;
+    }
+    return readAddonCatalog(body);
+}
+
+/** The copy on this device, or null when there is none or it no longer checks out. */
+export async function cachedCatalog(dir: string, keys: readonly TrustedKey[] = TRUSTED_KEYS): Promise<AddonCatalog | null> {
+    try {
+        const [bytes, signature] = await Promise.all([readFile(join(dir, CATALOG_FILE)), readFile(join(dir, SIGNATURE_FILE), "utf8")]);
+        return openCatalog(bytes, signature, keys);
+    } catch {
+        return null;
+    }
+}
+
+async function body(response: Response, max: number): Promise<Uint8Array | null> {
+    if (!response.ok) return null;
+    const declared = Number(response.headers.get("content-length") ?? "0");
+    if (declared > max) return null;
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    return bytes.byteLength > max ? null : bytes;
+}
+
+/** Write a file by renaming a sibling over it, so a failed write never leaves half of one. */
+export async function writeWhole(path: string, data: Uint8Array | string): Promise<void> {
+    const temp = `${path}.${randomBytes(6).toString("hex")}.tmp`;
+    try {
+        await writeFile(temp, data);
+        await rename(temp, path);
+    } catch (error) {
+        await rm(temp, { force: true });
+        throw error;
+    }
+}
+
+export type Refresh = { readonly kind: "updated"; readonly catalog: AddonCatalog; } | { readonly kind: "unchanged"; } | { readonly kind: "failed"; };
+
+/**
+ * Fetch the published catalog and keep it when it checks out and is newer than
+ * `held`. A failure leaves the copy on the device as it was.
+ */
+export async function refreshCatalog(
+    dir: string,
+    fetcher: Fetcher,
+    held: AddonCatalog | null,
+    url = CATALOG_URL,
+    keys: readonly TrustedKey[] = TRUSTED_KEYS
+): Promise<Refresh> {
+    try {
+        const signal = AbortSignal.timeout(20_000);
+        const [catalogResponse, signatureResponse] = await Promise.all([fetcher(url, { signal }), fetcher(`${url}.sig`, { signal })]);
+        const bytes = await body(catalogResponse, ADDON_CATALOG_MAX_BYTES);
+        const signatureBytes = await body(signatureResponse, 1_024);
+        if (!bytes || !signatureBytes) return { kind: "failed" };
+        const signature = Buffer.from(signatureBytes).toString("utf8");
+        const catalog = openCatalog(bytes, signature, keys);
+        if (!catalog) return { kind: "failed" };
+        if (held && Date.parse(catalog.issued) <= Date.parse(held.issued)) return { kind: "unchanged" };
+        await mkdir(dir, { recursive: true });
+        // The signature last: a catalog without its signature is read as none.
+        await rm(join(dir, SIGNATURE_FILE), { force: true });
+        await writeWhole(join(dir, CATALOG_FILE), bytes);
+        await writeWhole(join(dir, SIGNATURE_FILE), signature);
+        return { kind: "updated", catalog };
+    } catch {
+        return { kind: "failed" };
+    }
+}

@@ -18,6 +18,7 @@
  * back is a press, not typing.
  */
 
+import { startDeviceAddons, stopDeviceAddons } from "./addons/electron";
 import { appSettingsTarget } from "@polaris/core/app-settings";
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
@@ -902,6 +903,9 @@ function start(): void {
         startNativeHost({ primary: () => current, server });
 
         launcher.startLauncher({ server, showPolaris });
+        // Device add-ons start after the window, never before it: with none
+        // installed this reads one small file and starts nothing.
+        setTimeout(() => startDeviceAddons(() => showPolaris()), 3_000).unref();
         registerIpc({
             server,
             showPolaris,
@@ -1079,6 +1083,7 @@ function start(): void {
 
     // Keys held system-wide are the operating system's until let go.
     app.on("will-quit", () => {
+        stopDeviceAddons();
         void runner().use(null);
         releaseCallHotkeys();
         closeVoiceWidget();

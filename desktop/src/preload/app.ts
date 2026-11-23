@@ -135,6 +135,31 @@ const bridge: PolarisDesktop = {
             };
         }
     },
+    addons: {
+        get: () => ipcRenderer.invoke(CHANNELS.addonsGet),
+        refresh: () => ipcRenderer.invoke(CHANNELS.addonsRefresh),
+        install: (id, accepted) => ipcRenderer.invoke(CHANNELS.addonsInstall, id, accepted),
+        uninstall: (id) => ipcRenderer.invoke(CHANNELS.addonsUninstall, id),
+        setEnabled: (id, enabled) => ipcRenderer.invoke(CHANNELS.addonsEnable, id, enabled),
+        settings: (id) => ipcRenderer.invoke(CHANNELS.addonsSettings, id),
+        setSetting: (id, key, value) => ipcRenderer.invoke(CHANNELS.addonsSetSetting, id, key, value),
+        onChange: (listener) => {
+            const heard = () => listener();
+            ipcRenderer.on(CHANNELS.addonsChanged, heard);
+            return () => {
+                ipcRenderer.removeListener(CHANNELS.addonsChanged, heard);
+            };
+        },
+        onOpen: (listener) => {
+            const heard = (_event: unknown, id: unknown) => {
+                if (typeof id === "string") listener(id);
+            };
+            ipcRenderer.on(CHANNELS.addonsOpen, heard);
+            return () => {
+                ipcRenderer.removeListener(CHANNELS.addonsOpen, heard);
+            };
+        }
+    },
     openMailDefaults: () => ipcRenderer.invoke(CHANNELS.openMailDefaults),
     setAppBadge: (input) => ipcRenderer.invoke(CHANNELS.appBadge, input),
     setAppIcon: (input) => ipcRenderer.invoke(CHANNELS.appIcon, input),
