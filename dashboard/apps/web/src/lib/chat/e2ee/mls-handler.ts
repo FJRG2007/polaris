@@ -9,6 +9,11 @@
  * names - whose key packages are claimed, who a Welcome or a history-key
  * envelope is for. A device reads only the group-wide log and its own
  * Welcomes, and only history keys sealed to its own account.
+ *
+ * `account-keys` hands out public keys only of accounts that reach the
+ * conversation, and answers an account outside it exactly as one without a
+ * key (left out, never refused), so it cannot be used to learn who exists or
+ * who has set up encryption anywhere but in a conversation the caller is in.
  */
 
 import { prisma } from "@polaris/db";
@@ -93,6 +98,19 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
             if (!(await allReach(body.channelId, body.userIds))) return json(REFUSED, 403);
             const claimed = await delivery.claimKeyPackages(body.userIds, body.ciphersuite);
             return json({ keyPackages: claimed.map((c) => ({ address: c.address, keyPackage: text(c.keyPackage) })) });
+        }
+        case "account-keys": {
+            const distinct = [...new Set(body.userIds)];
+            const reach = await Promise.all(distinct.map((id) => channelAccess({ id }, body.channelId)));
+            const keys = await delivery.accountPublicKeys(distinct.filter((_, i) => reach[i]));
+            return json({
+                accountKeys: keys.map((k) => ({
+                    userId: k.userId,
+                    akVersion: k.akVersion,
+                    signPublicKey: text(k.signPublicKey),
+                    hpkePublicKey: text(k.hpkePublicKey)
+                }))
+            });
         }
         case "group": {
             const group = await delivery.groupState(body.channelId);

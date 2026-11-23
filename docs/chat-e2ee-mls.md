@@ -40,6 +40,7 @@ the account to reach it, and so does every account the op names.
 | `application` | an MLS application message for the whole group |
 | `events` | the log after a sequence number: group-wide rows and this device's own Welcomes |
 | `put-history-keys` / `history-keys` | store envelopes (first write wins); read the ones sealed to the caller |
+| `account-keys` | the public account keys (signing, HPKE) of up to 100 named accounts that reach the conversation; an account outside it is left out exactly like one with no key, never refused, so the answer says nothing about accounts the caller shares no conversation with |
 
 Retention: the log keeps the last 256 epochs, pruned every 32 inside the commit
 transaction. A device further behind rejoins from the group's latest GroupInfo
@@ -87,7 +88,10 @@ are in `localStorage`.
 - Sealing chat message bodies with `sealMessage` and the history key, the
   `ChatMessage` columns that carry them, and the reader path.
 - History-key distribution: the HK as an MLS application message to the group
-  and `sealHistoryKey` envelopes to members' account keys and `org`.
+  and `sealHistoryKey` envelopes to members' account keys (served by
+  `account-keys`) and `org`. The organisation recovery key (proposal 3.5) has
+  no public key stored anywhere yet - its custodian setup is not built - so
+  nothing can serve it and no `org` envelope can be sealed until it is.
 - Server-run members (Polar, webhooks) through the Node binding and
   `mls-store.ts`.
 - A per-message device signature.

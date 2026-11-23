@@ -103,6 +103,7 @@ vi.mock("@polaris/db", () => {
         mlsGroup: table("mlsGroup", ["channelId"]),
         mlsGroupEvent: table("mlsGroupEvent", []),
         chatHistoryKey: table("chatHistoryKey", ["channelId", "epoch", "recipient"]),
+        chatAccountKey: table("chatAccountKey", ["userId"]),
         // All or nothing, one at a time (Postgres's row lock on the group does
         // the same for two commits): run on the live tables, put the copy back
         // on a throw.
@@ -251,6 +252,28 @@ describe("/api/e2ee/mls", () => {
         await call({ op: "put-history-keys", channelId: CHANNEL, epoch: "1", envelopes: [{ recipient: BOB, envelope: blob(9, 100) }] });
         const mine = (await call({ op: "history-keys", channelId: CHANNEL }, BOB)).body.historyKeys;
         expect(mine).toEqual([{ epoch: "1", envelope: blob(2, 100) }]);
+    });
+
+    it("serves the public account keys of members only, and answers an outsider like a member with no key", async () => {
+        const keyless = "77777777-7777-4777-8777-777777777777";
+        state.members.add(`${keyless}:${CHANNEL}`);
+        const key = (userId: string, fill: number) => ({
+            userId,
+            akVersion: 1,
+            signPublicKey: Buffer.alloc(32, fill),
+            hpkePublicKey: Buffer.alloc(1216, fill + 1)
+        });
+        state.tables.chatAccountKey = [key(ALICE, 1), key(BOB, 3), key(EVE, 5)];
+        const ask = (userIds: string[], as = ALICE) => call({ op: "account-keys", channelId: CHANNEL, userIds }, as);
+        const bob = { userId: BOB, akVersion: 1, signPublicKey: blob(3, 32), hpkePublicKey: blob(4, 1216) };
+        expect((await ask([BOB, BOB])).body).toEqual({ accountKeys: [bob] });
+        // Eve has a key but is outside the conversation; the keyless member has none. Same answer.
+        expect((await ask([EVE])).body).toEqual({ accountKeys: [] });
+        expect((await ask([keyless])).body).toEqual({ accountKeys: [] });
+        expect((await ask([BOB, EVE, keyless])).body).toEqual({ accountKeys: [bob] });
+        // An outsider asking learns nothing at all.
+        expect((await ask([BOB], EVE)).status).toBe(403);
+        expect((await ask([])).status).toBe(400);
     });
 });
 

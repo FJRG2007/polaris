@@ -114,6 +114,8 @@ export const mlsBody = z.discriminatedUnion("op", [
         lastResort: z.boolean().default(false)
     }),
     z.object({ op: z.literal("claim-key-packages"), channelId, userIds: z.array(z.string().uuid()).min(1).max(100), ciphersuite }),
+    // The public account keys of conversation members, to seal history keys to.
+    z.object({ op: z.literal("account-keys"), channelId, userIds: z.array(z.string().uuid()).min(1).max(100) }),
     z.object({ op: z.literal("group"), channelId }),
     z.object({ op: z.literal("create-group"), channelId, groupId: base64Url(16, 256), ciphersuite, groupInfo: mlsBytes }),
     z.object({

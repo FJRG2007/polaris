@@ -197,6 +197,14 @@ export async function readEvents(channelId: string, address: string, afterSeq: b
     return rows.map((row) => ({ ...row, payload: new Uint8Array(row.payload) }));
 }
 
+/** The public halves of these accounts' keys; accounts without one are left out. */
+export async function accountPublicKeys(userIds: readonly string[]) {
+    return prisma.chatAccountKey.findMany({
+        where: { userId: { in: [...new Set(userIds)].slice(0, MAX_CLAIM_USERS) } },
+        select: { userId: true, akVersion: true, signPublicKey: true, hpkePublicKey: true }
+    });
+}
+
 /** Store history-key envelopes; one per (epoch, recipient), the first written wins. */
 export async function putHistoryKeys(
     channelId: string,
