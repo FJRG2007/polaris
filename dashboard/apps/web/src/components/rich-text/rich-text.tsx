@@ -81,7 +81,7 @@ export function RichText({
     customEmoji = null,
     jumboEmoji = false,
     flaggedLinks,
-    remoteImages = false
+    remoteImages = true
 }: {
     value: string;
     className?: string;
@@ -112,11 +112,11 @@ export function RichText({
      */
     flaggedLinks?: readonly FlaggedLinkMark[];
     /**
-     * Load a picture from another site as it is drawn. Off by default: only this
-     * Polaris's own pictures load inline and any other one is shown as a link,
-     * because a picture somebody else wrote into a message, a task or a note
-     * would otherwise hand every reader's address, and the moment they read it,
-     * to whoever runs that site.
+     * Draw a picture from another site inline - always fetched through this
+     * Polaris (`/api/media/remote-image`), never by the reader's browser, so the
+     * site never learns who read it or from where. False shows it as a link
+     * instead, for text nobody here wrote - a model's answer, where fetching an
+     * image address at all is a way to send what it read to whoever owns it.
      */
     remoteImages?: boolean;
 }) {
@@ -170,7 +170,7 @@ export interface FlaggedLinkMark {
     readonly provider: string;
 }
 
-const NO_EMOJI: EmojiScope = { set: null, jumbo: false, flagged: null, remoteImages: false };
+const NO_EMOJI: EmojiScope = { set: null, jumbo: false, flagged: null, remoteImages: true };
 
 /**
  * Whether the message is one line of nothing but emoji, at most Discord's
@@ -375,6 +375,11 @@ function taskItems(nodes: readonly JSONContent[] | undefined, scope: EmojiScope)
     ));
 }
 
+/** Where a picture from another site is drawn from: through this Polaris. */
+export function remoteImageSrc(src: string): string {
+    return `/api/media/remote-image?url=${encodeURIComponent(src)}`;
+}
+
 function Media({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
     const src = typeof node.attrs?.src === "string" ? node.attrs.src.trim() : "";
     if (!src) return null;
@@ -392,8 +397,9 @@ function Media({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
         );
     }
     // Not next/image: these point at whatever somebody wrote, which is usually
-    // an attachment on this Polaris but can be any address at all.
-    return <img src={src} alt={alt} />;
+    // an attachment on this Polaris but can be any address at all - and one on
+    // another site is fetched by Polaris, so the reader's address stays theirs.
+    return <img src={local ? src : remoteImageSrc(src)} alt={alt} />;
 }
 
 function text(node: JSONContent): string {

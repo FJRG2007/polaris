@@ -59,7 +59,11 @@ describe("reading rich text", () => {
     it("draws a picture from another site, unless told to keep it to a link", () => {
         const source =
             "![chart](https://elsewhere.example/c.png?d=secret) and ![own](/api/polar/attachments/x)";
-        expect(render(source)).toContain('<img src="https://elsewhere.example/c.png?d=secret"');
+        // Drawn through this Polaris, so the site never sees who read it.
+        expect(render(source)).toContain(
+            `<img src="/api/media/remote-image?url=${encodeURIComponent("https://elsewhere.example/c.png?d=secret")}"`
+        );
+        expect(render(source)).not.toContain('<img src="https://elsewhere.example');
         const kept = renderToStaticMarkup(<RichText value={source} remoteImages={false} />);
         expect(kept).not.toContain('<img src="https://elsewhere.example');
         expect(kept).toContain('href="https://elsewhere.example/c.png?d=secret"');
