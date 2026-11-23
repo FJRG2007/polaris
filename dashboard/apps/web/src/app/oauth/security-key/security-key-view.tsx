@@ -19,6 +19,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PASSKEY_NAME_MAX, passkeyRelyingPartyId } from "@polaris/core";
 import { passkeyProblem } from "@/app/(app)/account/security/known-sentences";
 import { confirmPasswordForKeyAction, noteKeyAddedAction } from "./actions";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
+import { gatePasswordToSend } from "@/lib/password-proof-client";
 import { signInWithPasskeys, type PasskeyDescriptor } from "@/lib/passkey-sign-in";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 
@@ -40,6 +42,7 @@ export function SecurityKeyView({
     const [allow, setAllow] = useState(keys);
     const [label, setLabel] = useState("");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [added, setAdded] = useState(false);
 
@@ -72,8 +75,11 @@ export function SecurityKeyView({
         if (!trimmed || taken) return;
         const password = String(new FormData(event.currentTarget).get("password") ?? "");
         setBusy(true);
+        setProtecting(false);
         setError(null);
-        const proved = await confirmPasswordForKeyAction(password);
+        const proved = await confirmPasswordForKeyAction(
+            await gatePasswordToSend(password, () => setProtecting(true))
+        );
         if (proved.error) {
             setBusy(false);
             setError(proved.error);
@@ -147,7 +153,11 @@ export function SecurityKeyView({
                                 disabled={busy || supported !== true}
                                 aria-disabled={!trimmed || taken}
                             >
-                                {busy ? t("securityKey.adding") : t("securityKey.add")}
+                                {busy ? (
+                                    <SlowSubmitLabel busyLabel={t("securityKey.adding")} protecting={protecting} />
+                                ) : (
+                                    t("securityKey.add")
+                                )}
                             </Button>
                         </form>
                     )}

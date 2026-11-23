@@ -32,6 +32,8 @@ const state = vi.hoisted(() => ({
         locks: new Map<string, Record<string, unknown>>()
     },
     sessionUser: null as { id: string; name?: string; email?: string; sessionId?: string } | null,
+    // A session held at the lock, an owed second factor or security key.
+    gateSession: null as { id: string; sessionId: string } | null,
     hashed: [] as string[],
     bodies: [] as string[],
     issued: [] as { userId: string; challenged: boolean }[],
@@ -173,7 +175,10 @@ vi.mock("@polaris/auth", () => ({
 }));
 
 vi.mock("@/lib/request-context", () => ({ clientIp: async () => "203.0.113.9" }));
-vi.mock("@/lib/session", () => ({ backgroundUser: async () => state.sessionUser }));
+vi.mock("@/lib/session", () => ({
+    backgroundUser: async () => state.sessionUser,
+    passwordGateSession: async () => state.gateSession
+}));
 vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: async (key: string) => {
         const count = (state.limits.get(key) ?? 0) + 1;
@@ -257,6 +262,7 @@ beforeEach(() => {
     state.bodies.length = 0;
     state.limitCap = Number.POSITIVE_INFINITY;
     state.sessionUser = null;
+    state.gateSession = null;
     service.resetServerSetupCache();
     vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
         // The breach check's own range route is not under test: it fails open.
@@ -656,5 +662,112 @@ describe("a form that used to send the password", () => {
         const proof = await flows.provePassword(PASSWORD);
         expect(await server.provenPasswordHash(alice.id, proof)).toBe(`scrypt:${PASSWORD}`);
         expect(await server.provenPasswordHash(alice.id, proof)).toBeNull();
+    });
+});
+
+describe("a screen that clears a gate", () => {
+    /** Alice on OPAQUE, her session now held at the lock: no cleared session. */
+    async function lockedAlice(): Promise<{ id: string; sessionId: string }> {
+        const alice = await adoptedAccount();
+        state.sessionUser = null;
+        state.gateSession = { id: alice.id, sessionId: "session-1" };
+        return state.gateSession;
+    }
+
+    it("proves the password without sending it, and its stand-in reaches that one check once", async () => {
+        const gate = await lockedAlice();
+        let stretched = false;
+        const proof = await flows.sentGatePassword(PASSWORD, () => {
+            stretched = true;
+        });
+        expect(typeof proof).toBe("object");
+        expect(stretched).toBe(true);
+        expect(sent(PASSWORD)).toBe(false);
+        const checked: string[] = [];
+        const ran = await server.withGatePasswordOrProof(gate, proof, async (given) => {
+            checked.push(given);
+            return true;
+        });
+        expect(ran).toBe(true);
+        expect(checked).toEqual([`proven:scrypt:${PASSWORD}`]);
+        expect(await server.withGatePasswordOrProof(gate, proof, async () => true)).toBeNull();
+    });
+
+    it("counts the start per account and per address, as a sign-in", async () => {
+        await lockedAlice();
+        await flows.sentGatePassword(PASSWORD);
+        const counted = [...state.limits.keys()];
+        expect(counted.some((key) => key.startsWith("e2ee-proof:"))).toBe(true);
+        expect(counted).toContain("e2ee-proof-address:203.0.113.9");
+        state.limitCap = 0;
+        expect(await flows.sentGatePassword(PASSWORD)).toBe(PASSWORD);
+    });
+
+    it("finishes only on the gated session that started it, and only for its account", async () => {
+        const gate = await lockedAlice();
+        const proof = await flows.sentGatePassword(PASSWORD);
+        expect(await server.withGatePasswordOrProof({ ...gate, sessionId: "session-2" }, proof, async () => true)).toBeNull();
+        const again = await flows.sentGatePassword(PASSWORD);
+        const mallory = account("mallory@example.com", PASSWORD);
+        expect(await server.withGatePasswordOrProof({ id: mallory.id, sessionId: gate.sessionId }, again, async () => true)).toBeNull();
+    });
+
+    it("a wrong password, or neither shape, never reaches the check", async () => {
+        const gate = await lockedAlice();
+        const wrong = await flows.sentGatePassword("not the password at all");
+        expect(sent("not the password at all")).toBe(false);
+        let reached = false;
+        const reach = async () => {
+            reached = true;
+            return true;
+        };
+        expect(await server.withGatePasswordOrProof(gate, wrong, reach)).toBeNull();
+        expect(await server.withGatePasswordOrProof(gate, { nope: 1 }, reach)).toBeNull();
+        expect(reached).toBe(false);
+        // A typed password from an older client goes to the check as it is.
+        expect(await server.withGatePasswordOrProof(gate, PASSWORD, async (given) => given)).toBe(PASSWORD);
+    });
+
+    it("a held session reaches nothing else on the route", async () => {
+        const lock = await import("@polaris/chat-crypto/password-lock");
+        await lockedAlice();
+        const login = await lock.startPasswordLogin(PASSWORD);
+        const registration = await lock.startPasswordRegistration(NEXT);
+        for (const body of [
+            { op: "state" },
+            { op: "unlock-start", startLoginRequest: login.startLoginRequest },
+            { op: "set-start", registrationRequest: registration.registrationRequest },
+            { op: "unlock-finish", loginId: randomUUID(), finishLoginRequest: login.startLoginRequest },
+            { op: "delete-passkey-lock", lockId: "a-lock" }
+        ]) {
+            expect((await post("/api/e2ee/keys", body)).status).toBe(401);
+        }
+        expect(state.tables.logins.size).toBe(0);
+        // With every switch off it is not there at all, as before.
+        delete process.env.POLARIS_INTERNAL_CHAT_E2EE;
+        process.env.POLARIS_INTERNAL_PASSWORD_LOCK = "0";
+        expect((await post("/api/e2ee/keys", { op: "state" })).status).toBe(404);
+    });
+
+    it("a refused session (banned, waiting for approval) and an account not on OPAQUE send the password as typed", async () => {
+        await lockedAlice();
+        state.gateSession = null;
+        expect(await flows.sentGatePassword(PASSWORD)).toBe(PASSWORD);
+
+        const bob = account("bob@example.com", PASSWORD);
+        state.gateSession = { id: bob.id, sessionId: "session-b" };
+        expect(await flows.sentGatePassword(PASSWORD)).toBe(PASSWORD);
+        expect(state.tables.logins.size).toBe(0);
+
+        worker.down = true;
+        state.gateSession = { id: state.users[0]!.id, sessionId: "session-1" };
+        expect(await flows.sentGatePassword(PASSWORD)).toBe(PASSWORD);
+    });
+
+    it("a cleared session on an account not on OPAQUE gets no decoy to finish", async () => {
+        const bob = account("bob@example.com", PASSWORD);
+        state.sessionUser = { id: bob.id, name: "Bob", email: bob.email, sessionId: "session-b" };
+        expect(await flows.sentGatePassword(PASSWORD)).toBe(PASSWORD);
+        expect(state.tables.logins.size).toBe(0);
     });
 });

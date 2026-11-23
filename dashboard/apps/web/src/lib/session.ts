@@ -15,7 +15,7 @@ import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { guardSession, type SessionVerdict } from "@/lib/session-guard";
+import { ENROLL_PATH, SECURITY_KEY_PATH, guardSession, type SessionVerdict } from "@/lib/session-guard";
 import { appLockRedirect } from "@/lib/app-lock-service";
 import { canAny, userHasPermission } from "@polaris/auth";
 import { isAppInstalled } from "@/lib/apps/install-presence";
@@ -180,6 +180,32 @@ export async function resolveSession(): Promise<(SessionUser & { sessionCreatedA
         sessionId: session.session.id,
         sessionCreatedAt: new Date(session.session.createdAt)
     };
+}
+
+/** The gates whose own screen proves the account password: the idle lock, the
+ *  second factor an instance demands, and the security key it demands. */
+function passwordGates(): readonly string[] {
+    return ["/oauth/lock", ENROLL_PATH, SECURITY_KEY_PATH];
+}
+
+/**
+ * The real session when it is cleared or held only at a gate whose screen checks
+ * the account password (docs/chat-e2ee-phase1.md, "Password flows over OPAQUE"),
+ * or null. Every other refusal - a ban, a lockdown, a refused address, a sign-in
+ * waiting for approval or a step-up - still answers null, exactly as
+ * backgroundUser does. Only the OPAQUE proof start of those screens may use it;
+ * nothing else widens for a gated session.
+ */
+export async function passwordGateSession(): Promise<(SessionUser & { sessionCreatedAt: Date }) | null> {
+    const resolved = await resolveSession();
+    if (!resolved) return null;
+    const verdict = await guardSession({
+        userId: resolved.id,
+        sessionId: resolved.sessionId,
+        sessionCreatedAt: resolved.sessionCreatedAt,
+        touch: false
+    });
+    return verdict.ok || passwordGates().includes(verdict.redirect) ? resolved : null;
 }
 
 /**

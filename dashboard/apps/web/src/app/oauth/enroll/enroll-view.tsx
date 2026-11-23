@@ -45,8 +45,11 @@ import type { SecondFactorEnrollment } from "@polaris/core";
 import {
     armByEmailAction,
     noteAuthenticatorArmedAction,
-    sendEnrollmentCodeAction
+    sendEnrollmentCodeAction,
+    startAuthenticatorAction
 } from "./actions";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
+import { gatePasswordToSend } from "@/lib/password-proof-client";
 import { CodeInput, isWholeCode } from "@/components/code-input";
 import { useCodeSending } from "@/components/use-code-sending";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -195,6 +198,7 @@ export function EmailFactor({
     const t = useTranslations("auth");
     const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Sent by itself on choosing email, once; the button is the resend, quiet
@@ -214,8 +218,13 @@ export function EmailFactor({
         if (!isWholeCode(code)) return;
         const form = new FormData(event.currentTarget);
         setBusy(true);
+        setProtecting(false);
         setError(null);
-        const result = await armByEmailAction(password ?? String(form.get("password") ?? ""), code);
+        // An OPAQUE proof when the account has one, the password itself otherwise.
+        const sent = await gatePasswordToSend(password ?? String(form.get("password") ?? ""), () =>
+            setProtecting(true)
+        );
+        const result = await armByEmailAction(sent, code);
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -264,7 +273,11 @@ export function EmailFactor({
                     ) : null}
                     <div className="flex flex-wrap items-center gap-2">
                         <Button type="submit" disabled={busy || !isWholeCode(code)}>
-                            {busy ? t("enroll.turningOn") : t("enroll.turnOn")}
+                            {busy ? (
+                                <SlowSubmitLabel busyLabel={t("enroll.turningOn")} protecting={protecting} />
+                            ) : (
+                                t("enroll.turnOn")
+                            )}
                         </Button>
                         <Button
                             type="button"
@@ -316,13 +329,29 @@ function AuthenticatorFactor({
     const [codes, setCodes] = useState<string[]>([]);
     const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     async function start(given: string): Promise<void> {
         setBusy(true);
+        setProtecting(false);
         setError(null);
+        // A proof goes to the server action, which runs the same endpoint on it;
+        // a typed password (no OPAQUE here) goes to the endpoint as before.
+        const sent = await gatePasswordToSend(given, () => setProtecting(true));
+        if (typeof sent !== "string") {
+            const result = await startAuthenticatorAction(sent);
+            setBusy(false);
+            if (!result.totpURI || !result.backupCodes) {
+                setError(result.error ?? t("enroll.authenticator.startFailed"));
+                return;
+            }
+            setTotpUri(result.totpURI);
+            setCodes(result.backupCodes);
+            return;
+        }
         const { data, error: enableError } = await authClient.twoFactor.enable({
-            password: given,
+            password: sent,
             method: "totp"
         });
         setBusy(false);
@@ -406,9 +435,14 @@ function AuthenticatorFactor({
                                 {t("enroll.passwordReason")}
                             </p>
                             <Button type="submit" disabled={busy}>
-                                {busy
-                                    ? t("enroll.authenticator.starting")
-                                    : t("enroll.authenticator.continue")}
+                                {busy ? (
+                                    <SlowSubmitLabel
+                                        busyLabel={t("enroll.authenticator.starting")}
+                                        protecting={protecting}
+                                    />
+                                ) : (
+                                    t("enroll.authenticator.continue")
+                                )}
                             </Button>
                         </form>
                     )

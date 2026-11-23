@@ -13,7 +13,10 @@
  *
  * The authenticator path is not here. It runs through better-auth's browser
  * client, exactly as it does from Account > Security, so the two ways of arming an
- * authenticator are the same code and cannot drift apart.
+ * authenticator are the same code and cannot drift apart. Only its first step has
+ * a server side, `startAuthenticatorAction`, for a password sent as an OPAQUE
+ * proof - better-auth's endpoint on the proof's stand-in, as Account > Security's
+ * `startAuthenticatorOpaqueAction` does.
  */
 
 import { headers } from "next/headers";
@@ -29,7 +32,9 @@ import {
     sendPhoneCodeFor,
     verifyPhoneFor
 } from "@/app/(app)/account/security/phone-steps";
-import { armFactorByEmail, sendEnrollmentCode } from "@/lib/second-factor-enrollment";
+import { opaqueFinish } from "@/lib/chat/e2ee/schemas";
+import { withGatePasswordOrProof } from "@/lib/chat/e2ee/opaque-password";
+import { armFactorByEmail, sendEnrollmentCode, startAuthenticator } from "@/lib/second-factor-enrollment";
 
 interface ActionResult {
     error?: string;
@@ -77,12 +82,42 @@ export async function armByEmailAction(
     const t = await getTranslations("auth");
     const user = await resolveSession();
     if (!user) return { error: t("enroll.errors.signInAgain") };
-    if (typeof password !== "string" || password.length === 0) return { error: t("enroll.errors.enterPassword") };
+    // The password as typed, or its OPAQUE proof (`gatePasswordToSend`).
+    if (password === "" || password === undefined || password === null) return { error: t("enroll.errors.enterPassword") };
     if (typeof code !== "string" || !/^\d{6}$/.test(code.trim())) return { error: t("enroll.errors.enterCode") };
 
-    const result = await armFactorByEmail(user.id, await headers(), password, code);
+    const requestHeaders = await headers();
+    const result = await withGatePasswordOrProof(user, password, (given) =>
+        armFactorByEmail(user.id, requestHeaders, given, code)
+    );
+    // A proof that does not check out stops before the code is spent.
+    if (!result) return { error: t("lock.errors.wrongPassword") };
     if (result.error) return { error: result.error };
     return { ok: t("enroll.armed"), backupCodes: result.backupCodes };
+}
+
+/**
+ * The authenticator's first step on an OPAQUE proof of the password instead of
+ * the password: the secret and backup codes better-auth mints for this session.
+ */
+export async function startAuthenticatorAction(
+    proof: unknown
+): Promise<{ totpURI?: string; backupCodes?: string[]; error?: string }> {
+    const t = await getTranslations("auth");
+    const user = await resolveSession();
+    if (!user) return { error: t("enroll.errors.signInAgain") };
+    const parsed = opaqueFinish.safeParse(proof);
+    if (!parsed.success) return { error: t("enroll.authenticator.startFailed") };
+    const requestHeaders = await headers();
+    try {
+        const started = await withGatePasswordOrProof(user, parsed.data, (password) =>
+            startAuthenticator(requestHeaders, password)
+        );
+        if (!started?.totpURI || !started.backupCodes) return { error: t("enroll.authenticator.startFailed") };
+        return { totpURI: started.totpURI, backupCodes: started.backupCodes };
+    } catch {
+        return { error: t("enroll.authenticator.startFailed") };
+    }
 }
 
 /**

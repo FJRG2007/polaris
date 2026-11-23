@@ -106,9 +106,24 @@ async function spendEnrollmentCode(userId: string, code: string): Promise<{ erro
  *  the same reason the rest of the plugin is (see two-factor.ts). */
 interface EnableEndpoint {
     enableTwoFactor(input: {
-        body: { password: string };
+        body: { password: string; method?: "totp" };
         headers: Headers;
-    }): Promise<{ backupCodes?: string[] }>;
+    }): Promise<{ totpURI?: string; backupCodes?: string[] }>;
+}
+
+/**
+ * The first step of setting the authenticator up, server side: better-auth's own
+ * endpoint mints the secret and the backup codes exactly as the browser's call to
+ * it does, for the session in `headers`. For a password that arrived as an OPAQUE
+ * proof (the stand-in); a typed one goes through the browser client as before.
+ * Nothing is armed until the browser verifies a code from the app.
+ */
+export async function startAuthenticator(
+    headers: Headers,
+    password: string
+): Promise<{ totpURI?: string; backupCodes?: string[] }> {
+    const api = auth.api as unknown as EnableEndpoint;
+    return api.enableTwoFactor({ body: { password, method: "totp" }, headers });
 }
 
 /**

@@ -23,7 +23,7 @@ import * as keys from "./account-keys";
 import { chatE2eeEnabled, passwordLockEnabled } from "./flag";
 import { NextResponse } from "next/server";
 import * as opaque from "./opaque-service";
-import { backgroundUser } from "@/lib/session";
+import { backgroundUser, passwordGateSession } from "@/lib/session";
 import { clientIp } from "@/lib/request-context";
 import { signInWithOpaque } from "@polaris/auth";
 import { keysBody, signInBody } from "./schemas";
@@ -191,6 +191,46 @@ export async function handleSignIn(request: Request): Promise<Response> {
 }
 
 /**
+ * `/api/e2ee/keys` for a request without a cleared session. The one thing it
+ * serves is `proof-start` for a session held at a gate whose own screen checks
+ * the password (the idle lock, an owed second factor or security key -
+ * `passwordGateSession`), so that screen can send a proof instead of the
+ * password it already accepts. Only for an account already on OPAQUE (it has no
+ * state call to ask first; anything else answers as the route always did and the
+ * screen falls back to the typed password), counted per account and per address
+ * as a sign-in is, and bound to that session: the finish is spent by that
+ * screen's own action and unlocks nothing else. Every other op, and every other
+ * kind of session, gets exactly the answer it got before.
+ */
+async function handleGatedProof(request: Request, switchedOn: boolean): Promise<Response> {
+    // i18n-ignore: a status body no screen shows
+    const refused = switchedOn ? json({ error: "Unauthorized" }, 401) : json(NOT_FOUND, 404);
+    const parsed = keysBody.safeParse(await readBody(request));
+    if (!parsed.success || parsed.data.op !== "proof-start") return refused;
+    const body = parsed.data;
+    const gated = await passwordGateSession();
+    if (!gated) return refused;
+    try {
+        if (!(await opaque.adopted(gated.id))) return json(NOT_FOUND, 404);
+        const refusal = await limited([
+            [`e2ee-proof:${gated.id}`, PER_ACCOUNT],
+            [`e2ee-proof-address:${await addressKey()}`, PER_ADDRESS]
+        ]);
+        if (refusal) return refusal;
+        const started = await opaque.startLogin(
+            { userId: gated.id, known: true },
+            "proof",
+            body.startLoginRequest,
+            gated.sessionId
+        );
+        return json({ ...started, userId: gated.id });
+    } catch (caught) {
+        if (!(caught instanceof opaque.OpaqueRefusal)) console.error("polaris: a gated password proof failed:", caught);
+        return json(REFUSED, 401);
+    }
+}
+
+/**
  * Which switch an account-key operation sits behind: the passkey PRF locks stay
  * with chat encryption's internal flag, everything the password lock needs
  * (reading the state, creating the key, the OPAQUE unlock) with the password
@@ -206,10 +246,9 @@ export async function handleKeys(request: Request): Promise<Response> {
     const user = await backgroundUser();
     // With every switch off, the route exists only for an account already on
     // OPAQUE (its password may live nowhere else); the rest get the 404 as before.
-    const onOpaque = !switchedOn && user ? await opaque.adopted(user.id) : false;
+    if (!user) return handleGatedProof(request, switchedOn);
+    const onOpaque = !switchedOn ? await opaque.adopted(user.id) : false;
     if (!switchedOn && !onOpaque) return json(NOT_FOUND, 404);
-    // i18n-ignore: a status body no screen shows
-    if (!user) return json({ error: "Unauthorized" }, 401);
     const parsed = keysBody.safeParse(await readBody(request));
     if (!parsed.success) return json({ error: "invalid" }, 400);
     const body = parsed.data;
@@ -269,6 +308,10 @@ export async function handleKeys(request: Request): Promise<Response> {
                 return json({ ...started, userId: user.id });
             }
             case "proof-start": {
+                // An account not on OPAQUE has no record a proof could match: a
+                // start would only hand out a decoy whose finish reads as a wrong
+                // password, so the form is told to send the password instead.
+                if (!(await opaque.adopted(user.id))) return json(NOT_FOUND, 404);
                 const refusal = await limited([[`e2ee-proof:${user.id}`, PER_ACCOUNT]]);
                 if (refusal) return refusal;
                 const started = await opaque.startLogin(

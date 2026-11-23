@@ -23,7 +23,12 @@ vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/lib/session", () => ({ resolveSession: async () => state.session }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock("@polaris/auth", () => ({ setTotpUnclaimed: vi.fn() }));
-vi.mock("@/lib/second-factor-enrollment", () => ({ armFactorByEmail: vi.fn(), sendEnrollmentCode: vi.fn() }));
+vi.mock("@/lib/second-factor-enrollment", () => ({
+    armFactorByEmail: vi.fn(),
+    sendEnrollmentCode: vi.fn(),
+    startAuthenticator: vi.fn()
+}));
+vi.mock("@/lib/chat/e2ee/opaque-password", () => ({ withGatePasswordOrProof: vi.fn() }));
 vi.mock("@/lib/instance-security", () => ({
     enrollmentOptions: vi.fn(),
     owesSecondFactor: vi.fn(),

@@ -19,12 +19,16 @@ const guardSession = vi.fn();
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ auth: { api: { getSession } } }));
-vi.mock("@/lib/session-guard", () => ({ guardSession }));
+vi.mock("@/lib/session-guard", () => ({
+    guardSession,
+    ENROLL_PATH: "/oauth/enroll",
+    SECURITY_KEY_PATH: "/oauth/security-key"
+}));
 vi.mock("@/lib/view-as-service", () => ({ resolveViewAs: async () => null }));
 vi.mock("@/lib/apps/install-presence", () => ({ isAppInstalled: async () => true }));
 vi.mock("@polaris/auth", () => ({ canAny: vi.fn(), userHasPermission: vi.fn() }));
 
-const { backgroundUser, guardedUser } = await import("@/lib/session");
+const { backgroundUser, guardedUser, passwordGateSession } = await import("@/lib/session");
 
 const SIGNED_IN = {
     user: { id: "u1", email: "user@example.com", name: "User", isAdmin: false },
@@ -80,5 +84,37 @@ describe("no session at all", () => {
         getSession.mockResolvedValue(null);
         expect(await backgroundUser()).toBeNull();
         expect(guardSession).not.toHaveBeenCalled();
+    });
+});
+
+describe("the session a password gate's own proof start may use", () => {
+    for (const redirect of ["/oauth/lock", "/oauth/enroll", "/oauth/security-key"]) {
+        it(`is the real session at a gate that checks the password (${redirect})`, async () => {
+            guardSession.mockResolvedValue({ ok: false, redirect });
+            expect(await passwordGateSession()).toMatchObject({ id: "u1", sessionId: "s1" });
+            expect(guardSession).toHaveBeenCalledWith(expect.objectContaining({ touch: false }));
+        });
+    }
+
+    for (const redirect of [
+        "/oauth/login?banned=1",
+        "/oauth/login?lockdown=1",
+        "/oauth/login?blocked=1",
+        "/oauth/login?compromised=1",
+        "/oauth/login?denied=1",
+        "/oauth/pending",
+        "/oauth/step-up",
+        "/oauth/change-password",
+        "/oauth/login"
+    ]) {
+        it(`is nobody for every other refusal (${redirect})`, async () => {
+            guardSession.mockResolvedValue({ ok: false, redirect });
+            expect(await passwordGateSession()).toBeNull();
+        });
+    }
+
+    it("is nobody without a session", async () => {
+        getSession.mockResolvedValue(null);
+        expect(await passwordGateSession()).toBeNull();
     });
 });

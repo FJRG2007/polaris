@@ -13,6 +13,8 @@ import { signOut } from "@/lib/auth-client";
 import { unlockSessionAction } from "./actions";
 import { QuickPinInput, pinReady } from "@/components/quick-pin-input";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
+import { gatePasswordToSend } from "@/lib/password-proof-client";
 
 export function LockView({
     name,
@@ -29,6 +31,7 @@ export function LockView({
     const t = useTranslations("auth");
     const [method, setMethod] = useState<"pin" | "password">(hasPin ? "pin" : "password");
     const [pending, setPending] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pin, setPin] = useState("");
     const box = useRef<HTMLInputElement>(null);
@@ -41,8 +44,11 @@ export function LockView({
         if (checking.current || (method === "pin" && !pinReady(pin, pinLength))) return;
         checking.current = true;
         setPending(true);
+        setProtecting(false);
         setError(null);
-        const result = await unlockSessionAction(secret, method);
+        // The password goes as an OPAQUE proof when the account has one; the PIN as typed.
+        const sent = method === "pin" ? secret : await gatePasswordToSend(secret, () => setProtecting(true));
+        const result = await unlockSessionAction(sent, method);
         setPending(false);
         checking.current = false;
         if (result.error) {
@@ -100,7 +106,11 @@ export function LockView({
                         </label>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <Button type="submit" disabled={pending || (method === "pin" && !pinReady(pin, pinLength))}>
-                            {pending ? t("lock.unlocking") : t("lock.unlock")}
+                            {pending ? (
+                                <SlowSubmitLabel busyLabel={t("lock.unlocking")} protecting={protecting} />
+                            ) : (
+                                t("lock.unlock")
+                            )}
                         </Button>
                     </form>
                     <div className="mt-4 flex justify-between text-xs">

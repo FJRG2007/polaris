@@ -96,10 +96,12 @@ async function finishFor(password: string, state: string, step: Started): Promis
     }
 }
 
-/** A proof of the current password for one server action (single use). */
-export async function provePassword(password: string): Promise<OpaqueFinish> {
+/** A proof of the current password for one server action (single use).
+ *  `onStretching` fires once the server answered, right before the stretching. */
+export async function provePassword(password: string, onStretching?: () => void): Promise<OpaqueFinish> {
     const started = await inWorker(() => passwordWorker.startPasswordLogin(password));
     const step = await post<Started>({ op: "proof-start", startLoginRequest: started.startLoginRequest });
+    onStretching?.();
     return finishFor(password, started.state, step);
 }
 
@@ -150,6 +152,19 @@ export async function sentPassword(password: string, onStretching?: () => void):
     try {
         onStretching?.();
         return await provePassword(password);
+    } catch {
+        return password;
+    }
+}
+
+/** `sentPassword` for a screen that clears a gate (the idle lock, an owed
+ *  second factor or security key). Such a session has no state to ask first, so
+ *  the proof is tried straight away; the route answers it only for an account on
+ *  OPAQUE, and every refusal or failure sends the typed password as before. */
+export async function sentGatePassword(password: string, onStretching?: () => void): Promise<string | OpaqueFinish> {
+    if (!password) return password;
+    try {
+        return await provePassword(password, onStretching);
     } catch {
         return password;
     }

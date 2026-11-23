@@ -9,6 +9,8 @@
  * The PIN is four to six digits, which is guessable in a way a password is not,
  * so every attempt is counted per session and the window closes hard once the
  * budget is spent. A wrong PIN and a wrong password are reported identically.
+ * The password can arrive as an OPAQUE proof (`gatePasswordToSend`) instead of
+ * itself; a proof that does not check out counts as a wrong password.
  */
 
 import { verifyAccountPassword, verifyQuickPin } from "@polaris/auth";
@@ -18,12 +20,13 @@ import { recordAudit } from "@/lib/audit-service";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { resolveSession } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
+import { withGatePasswordOrProof } from "@/lib/chat/e2ee/opaque-password";
 
 /** Attempts allowed per locked session before it must be signed in again. */
 const UNLOCK_LIMIT = 5;
 const UNLOCK_WINDOW_MS = 10 * 60 * 1000;
 
-export async function unlockSessionAction(secret: string, method: "pin" | "password"): Promise<{ error?: string }> {
+export async function unlockSessionAction(secret: unknown, method: "pin" | "password"): Promise<{ error?: string }> {
     const t = await getTranslations("auth");
     const session = await resolveSession();
     if (!session) return { error: t("lock.errors.ended") };
@@ -34,11 +37,12 @@ export async function unlockSessionAction(secret: string, method: "pin" | "passw
         return { error: t("lock.errors.tooMany", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
     }
 
-    const value = String(secret);
     const unlocked =
         method === "pin"
-            ? await verifyQuickPin(auth, session.id, value)
-            : await verifyAccountPassword(auth, session.id, value);
+            ? await verifyQuickPin(auth, session.id, typeof secret === "string" ? secret : "")
+            : ((await withGatePasswordOrProof(session, secret, (password) =>
+                  verifyAccountPassword(auth, session.id, password)
+              )) ?? false);
     if (!unlocked) {
         await recordAudit({
             actorId: session.id,

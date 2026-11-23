@@ -20,3 +20,13 @@ export async function passwordToSend(password: string, onStretching?: () => void
         () => password
     );
 }
+
+/** `passwordToSend` for the screens that clear a gate - the idle lock, an owed
+ *  second factor or security key - whose session cannot ask for its state. */
+export async function gatePasswordToSend(password: string, onStretching?: () => void): Promise<SentPassword> {
+    if (!password) return password;
+    return import("@/lib/chat/e2ee/password-flows-client").then(
+        (flows) => flows.sentGatePassword(password, onStretching),
+        () => password
+    );
+}

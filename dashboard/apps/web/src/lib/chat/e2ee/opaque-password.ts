@@ -31,11 +31,12 @@ export async function opaqueFlowsOpen(userId: string): Promise<boolean> {
 }
 
 /** Whether this finish proves the signed-in account's current password. Spends
- *  the login whatever the outcome; never throws. */
-export async function provesPassword(userId: string, proof: OpaqueFinish): Promise<boolean> {
+ *  the login whatever the outcome; never throws. `onSession` is the session the
+ *  login was started on when that is not a cleared one (`withGatePasswordOrProof`). */
+export async function provesPassword(userId: string, proof: OpaqueFinish, onSession?: string): Promise<boolean> {
     try {
         if (!(await opaqueFlowsOpen(userId))) return false;
-        const bind = await sessionId();
+        const bind = onSession ?? (await sessionId());
         if (!bind) return false;
         await opaque.finishLogin(proof.loginId, "proof", proof.finishLoginRequest, userId, bind);
         return true;
@@ -55,9 +56,10 @@ export async function provesPassword(userId: string, proof: OpaqueFinish): Promi
 export async function withPasswordProof<T>(
     userId: string,
     proof: OpaqueFinish,
-    run: (standIn: string) => Promise<T>
+    run: (standIn: string) => Promise<T>,
+    onSession?: string
 ): Promise<T | null> {
-    const hash = await provenPasswordHash(userId, proof);
+    const hash = await provenPasswordHash(userId, proof, onSession);
     return hash ? withProvenPassword(hash, run) : null;
 }
 
@@ -66,8 +68,12 @@ export async function withPasswordProof<T>(
  * that runs several password checks on one proof: one `withProvenPassword` scope
  * per check, each accepted once. Null when the proof does not prove it.
  */
-export async function provenPasswordHash(userId: string, proof: OpaqueFinish): Promise<string | null> {
-    if (!(await provesPassword(userId, proof))) return null;
+export async function provenPasswordHash(
+    userId: string,
+    proof: OpaqueFinish,
+    onSession?: string
+): Promise<string | null> {
+    if (!(await provesPassword(userId, proof, onSession))) return null;
     return opaque.credentialHash(userId);
 }
 
@@ -86,6 +92,23 @@ export async function withPasswordOrProof<T>(
     if (typeof given === "string") return run(given);
     const proof = opaqueFinish.safeParse(given);
     return proof.success ? withPasswordProof(userId, proof.data, run) : null;
+}
+
+/**
+ * `withPasswordOrProof` for the screens that clear a gate - the idle lock, an
+ * owed second factor or security key - which resolve the session themselves
+ * (`resolveSession`) because a cleared one does not exist yet. A proof there was
+ * started on that same session (`passwordGateSession`), so it is finished
+ * against it, and its stand-in reaches only the check `run` makes.
+ */
+export async function withGatePasswordOrProof<T>(
+    session: { id: string; sessionId: string },
+    given: unknown,
+    run: (password: string) => Promise<T>
+): Promise<T | null> {
+    if (typeof given === "string") return run(given);
+    const proof = opaqueFinish.safeParse(given);
+    return proof.success ? withPasswordProof(session.id, proof.data, run, session.sessionId) : null;
 }
 
 /**
