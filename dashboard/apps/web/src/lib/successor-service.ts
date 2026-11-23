@@ -26,6 +26,7 @@
  * successor, it is a back door with a kind name.
  */
 
+import { findableBy, resolveNamedAccount } from "@/lib/people-search";
 import { prisma } from "@polaris/db";
 import { normalizePersonName } from "@polaris/core";
 import { contactLines } from "@/lib/privacy-service";
@@ -78,19 +79,26 @@ export async function getSuccessor(userId: string): Promise<SuccessorView | null
  * through, so "ana  garcia" finds the account written "Ana Garcia" without the
  * lookup depending on which database is underneath.
  */
-async function findPerson(identifier: string): Promise<{ id: string; name: string }> {
-    const login = identifier.trim().toLowerCase();
-    const byLogin = await prisma.user.findFirst({
-        where: { OR: [{ email: login }, { username: login }] },
-        select: { id: true, name: true }
-    });
-    if (byLogin) return byLogin;
+async function findPerson(
+    viewerId: string,
+    identifier: string
+): Promise<{ id: string; name: string }> {
+    // By login under the same rule as every people search, and by name only
+    // among accounts the viewer may find - otherwise this field would say
+    // whether an address or a full name has an account here.
+    const byLogin = await resolveNamedAccount({ id: viewerId }, identifier);
+    if (byLogin) return { id: byLogin.id, name: byLogin.name };
 
-    const byName = await prisma.user.findMany({
+    const named = await prisma.user.findMany({
         where: { name: normalizePersonName(identifier) },
         select: { id: true, name: true },
-        take: 2
+        take: 20
     });
+    const findable = await findableBy(
+        viewerId,
+        named.map((one) => one.id)
+    );
+    const byName = named.filter((one) => findable.has(one.id)).slice(0, 2);
     if (byName.length > 1) {
         throw new SuccessorError(
             "More than one account has that name - use their username or email address"
@@ -110,7 +118,7 @@ async function findPerson(identifier: string): Promise<{ id: string; name: strin
  * the day they did it.
  */
 export async function setSuccessor(userId: string, identifier: string): Promise<SuccessorView> {
-    const person = await findPerson(identifier);
+    const person = await findPerson(userId, identifier);
     if (person.id === userId)
         throw new SuccessorError("Name somebody else - you cannot succeed yourself");
 
@@ -219,7 +227,8 @@ export async function setOrgSuccessor(orgId: string, identifier: string): Promis
     });
     if (!org) throw new SuccessorError("That organization no longer exists");
 
-    const person = await findPerson(identifier);
+    // Found as the owner would find them: the owner is who answers for it.
+    const person = await findPerson(org.ownerId, identifier);
     if (person.id === org.ownerId) {
         throw new SuccessorError("Name somebody else - you already answer for this organization");
     }

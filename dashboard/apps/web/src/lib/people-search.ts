@@ -307,3 +307,51 @@ export async function findAccountsAsAdmin(
         take: Math.min(Math.max(limit, 1), 50)
     });
 }
+
+/**
+ * The one account a typed identifier names - their whole username, or a whole
+ * email address they own - when the person asking may find them that way.
+ *
+ * Every field that adds somebody by what was typed goes through here, so none
+ * of them answers "is there an account for this address?" for an account whose
+ * owner said it may not be found by it. An account the viewer may not find is
+ * answered exactly like no account at all - the same null, from the same read -
+ * so the caller's next sentence cannot tell them apart either. Administrators
+ * read the whole directory already and are not held to it.
+ */
+export async function resolveNamedAccount(
+    /** `isAdmin` is read from the account when the caller does not have it. */
+    viewer: { readonly id: string; readonly isAdmin?: boolean },
+    identifier: string
+): Promise<{ id: string; name: string; username: string | null } | null> {
+    const term = identifier.trim();
+    if (!term) return null;
+    const lowered = term.toLowerCase();
+    const handle = lowered.replace(/^@/, "");
+    const email = lowered.includes("@", 1) ? lowered : null;
+    const found = await prisma.user.findFirst({
+        where: {
+            OR: [
+                { username: handle },
+                ...(email ? addressMatches(email) : [])
+            ]
+        },
+        select: { id: true, name: true, username: true }
+    });
+    if (!found) return null;
+    if (found.id === viewer.id) return found;
+    const isAdmin =
+        viewer.isAdmin ??
+        (await prisma.user.findUnique({ where: { id: viewer.id }, select: { isAdmin: true } }))
+            ?.isAdmin === true;
+    if (isAdmin) return found;
+    const [friends, policy] = await Promise.all([friendIds(viewer.id), discoveryPolicy()]);
+    // Held to the same rule as every search: by default a whole username finds
+    // somebody, a whole address only when the policy and the account allow it.
+    const findable = await findableBy(viewer.id, [found.id], {
+        term,
+        friends: [...friends],
+        policy
+    });
+    return findable.has(found.id) ? found : null;
+}

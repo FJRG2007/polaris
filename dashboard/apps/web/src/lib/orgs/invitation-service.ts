@@ -19,6 +19,7 @@
  * the invitation is theirs, because nobody else can clear that for them.
  */
 
+import { resolveNamedAccount } from "@/lib/people-search";
 import { OrgError } from "./errors";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
@@ -145,10 +146,21 @@ export async function inviteToOrg(
     const invitedById = invitedBy.id;
 
     const needle = identifier.trim().toLowerCase();
-    const user = await prisma.user.findFirst({
-        where: { OR: [{ email: needle }, { username: needle }] },
-        select: { id: true, bannedAt: true }
-    });
+    // An account the inviter may not find by what they typed is invited like an
+    // address with no account, so the answer is no oracle for who has one.
+    const named = await resolveNamedAccount(invitedBy, needle);
+    const user = named
+        ? {
+              id: named.id,
+              bannedAt:
+                  (
+                      await prisma.user.findUnique({
+                          where: { id: named.id },
+                          select: { bannedAt: true }
+                      })
+                  )?.bannedAt ?? null
+          }
+        : null;
     if (!user) {
         if (!core.isEmailIdentifier(needle)) throw new OrgError("No account matches that username");
         return inviteByEmail(orgId, needle, role, invitedBy);

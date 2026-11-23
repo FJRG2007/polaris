@@ -15,6 +15,20 @@ const successorUpsert = vi.fn(async (_args: unknown) => ({}) as unknown);
 const successorFindUnique = vi.fn(async (_args: unknown) => null as unknown);
 const successorDeleteMany = vi.fn(async (_args: unknown) => ({ count: 1 }));
 
+// The shared lookup rule has its own test (test/privacy); here it answers as
+// the plain lookup it wraps, for an account the caller may find.
+vi.mock("@/lib/people-search", async () => ({
+    resolveNamedAccount: async (_viewer: unknown, identifier: string) => {
+        const { prisma } = await import("@polaris/db");
+        const needle = identifier.trim().toLowerCase();
+        return (prisma as any).user.findFirst({
+            where: { OR: [{ email: needle }, { username: needle }] },
+            select: { id: true, name: true, username: true }
+        });
+    },
+    findableBy: async (_viewer: string, ids: readonly string[]) => new Set(ids)
+}));
+
 vi.mock("@polaris/db", () => ({
     prisma: {
         // No administrator defaults: every field falls to the code's own.

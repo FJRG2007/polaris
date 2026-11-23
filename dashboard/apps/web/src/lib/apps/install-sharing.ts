@@ -21,6 +21,7 @@
  *     still holds. An invite must not be a way to hand out reach you have lost.
  */
 
+import { resolveNamedAccount } from "@/lib/people-search";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
@@ -203,10 +204,9 @@ export async function shareInstall(input: ShareInstallInput): Promise<ShareInsta
     // Passing it on is only ever passed on by somebody who holds it.
     const canShare = input.canShare && (user.isAdmin || access.isOwner || rights.mayPassOn);
 
-    const target = await prisma.user.findFirst({
-        where: { OR: [{ email: identifier }, { username: identifier }] },
-        select: { id: true, name: true }
-    });
+    // An account the sharer may not find by what they typed is a stranger here,
+    // exactly like no account, so the answer says nothing about whether it exists.
+    const target = await resolveNamedAccount(user, identifier);
     const verdict = await canDelegateShare({
         isAdmin: user.isAdmin,
         mayPassOn: rights.mayPassOn,

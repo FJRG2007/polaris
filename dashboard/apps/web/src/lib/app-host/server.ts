@@ -171,6 +171,7 @@ const load = {
     safeFetch: once(() => import("@/lib/safe-fetch")),
     seasonalService: once(() => import("@/lib/seasonal-service")),
     serverMetricsService: once(() => import("@/lib/server-metrics-service")),
+    peopleSearch: once(() => import("@/lib/people-search")),
     session: once(() => import("@/lib/session")),
     sessionDirectory: once(() => import("@/lib/session-directory")),
     settingStore: once(() => import("@/lib/setting-store")),
@@ -597,6 +598,11 @@ export const serverHost = {
     },
     sessionDirectory: {
         userSessionAddresses: later(load.sessionDirectory, "userSessionAddresses")
+    },
+    // Naming one account by what was typed, under the same rule as every
+    // people search - so no app's "add by email" is an account-existence oracle.
+    peopleSearch: {
+        resolveNamedAccount: later(load.peopleSearch, "resolveNamedAccount")
     },
     settingStore: {
         getSetting: later(load.settingStore, "getSetting"),

@@ -68,6 +68,20 @@ const state = vi.hoisted(() => ({
     quota: null as { members: number | null } | null
 }));
 
+// The shared lookup rule has its own test (test/privacy); here it answers as
+// the plain lookup it wraps, for an account the caller may find.
+vi.mock("@/lib/people-search", async () => ({
+    resolveNamedAccount: async (_viewer: unknown, identifier: string) => {
+        const { prisma } = await import("@polaris/db");
+        const needle = identifier.trim().toLowerCase();
+        return (prisma as any).user.findFirst({
+            where: { OR: [{ email: needle }, { username: needle }] },
+            select: { id: true, name: true, username: true }
+        });
+    },
+    findableBy: async (_viewer: string, ids: readonly string[]) => new Set(ids)
+}));
+
 vi.mock("@polaris/db", () => ({
     prisma: {
         user: {

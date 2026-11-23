@@ -1185,14 +1185,14 @@ export async function findArkPlayerByUserAction(
     if (!parsed.success)
         return { error: (await gameWords("games"))("errors.typeAPolarisUsernameOr") };
     try {
-        await requireGameServer("games.moderate", installedAppId);
-        const found = await findGameIdentity(parsed.data, "steam");
+        const { user } = await requireGameServer("games.moderate", installedAppId);
+        const found = await findGameIdentity(parsed.data, "steam", user);
         if (!found) return { error: (await gameWords("games"))("errors.nobodyHereGoesByThat") };
         if (!found.identity) {
             // Somebody who plays through Epic has no Steam id at all, and ARK's
             // own list refuses anything else - so the answer is about the server
             // rather than about them, and it says which.
-            const epic = await findGameIdentity(parsed.data, "epic").catch(() => null);
+            const epic = await findGameIdentity(parsed.data, "epic", user).catch(() => null);
             if (epic?.identity) {
                 return {
                     error: (await gameWords("games"))("errors.linkedEpic", { name: found.name })

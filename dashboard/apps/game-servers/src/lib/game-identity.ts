@@ -17,6 +17,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { host } from "@polaris/app-host";
 
 /**
  * The services a game identity can come from.
@@ -56,17 +57,18 @@ export interface GameIdentity {
  */
 export async function findGameIdentity(
     query: string,
-    provider: GameIdentityProvider
+    provider: GameIdentityProvider,
+    /** Who is asking. An account they may not find by what they typed is
+     *  answered exactly like nobody, so the lookup is no oracle for whether an
+     *  address or a handle has an account here. */
+    viewer: { readonly id: string; readonly isAdmin: boolean }
 ): Promise<{ userId: string; name: string; identity: GameIdentity | null } | null> {
     // Trimmed and lowercased, which is how both columns are stored - the same
     // normalization sharing a server with somebody uses, so the two screens
     // cannot disagree about who a name refers to.
     const identifier = query.trim().toLowerCase();
     if (!identifier) return null;
-    const person = await prisma.user.findFirst({
-        where: { OR: [{ email: identifier }, { username: identifier }] },
-        select: { id: true, name: true, username: true }
-    });
+    const person = await host.peopleSearch.resolveNamedAccount(viewer, identifier);
     if (!person) return null;
 
     const name = person.name || person.username || identifier;

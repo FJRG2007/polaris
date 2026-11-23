@@ -1202,23 +1202,27 @@ export async function addTeamMember(
     if (!team) throw new OrgError("That team no longer exists");
 
     const needle = identifier.trim().toLowerCase();
+    // Looked up on the roster only, with one answer for "no such account" and
+    // "not a member": two would say whether an address has an account here.
     const user = await prisma.user.findFirst({
-        where: { OR: [{ email: needle }, { username: needle }] },
+        where: {
+            AND: [
+                { OR: [{ email: needle }, { username: needle }] },
+                {
+                    OR: [
+                        { ownedOrgs: { some: { id: team.orgId } } },
+                        { orgMemberships: { some: { orgId: team.orgId } } }
+                    ]
+                }
+            ]
+        },
         select: { id: true }
     });
-    if (!user) throw new OrgError("No account matches that email or username");
-
-    const org = await prisma.organization.findUnique({
-        where: { id: team.orgId },
-        select: { ownerId: true }
-    });
-    const onRoster =
-        org?.ownerId === user.id ||
-        (await prisma.organizationMember.findUnique({
-            where: { orgId_userId: { orgId: team.orgId, userId: user.id } },
-            select: { id: true }
-        })) !== null;
-    if (!onRoster) throw new OrgError("Add them to the organization first");
+    if (!user) {
+        throw new OrgError(
+            "Nobody in the organization matches that email or username - add them to the organization first"
+        );
+    }
 
     await prisma.teamMember.upsert({
         where: { teamId_userId: { teamId, userId: user.id } },

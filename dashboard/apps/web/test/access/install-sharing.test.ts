@@ -28,6 +28,20 @@ let written: Record<string, unknown> | null = null;
 let invited: Record<string, unknown> | null = null;
 let announced: Record<string, unknown>[] = [];
 
+// The shared lookup rule has its own test (test/privacy); here it answers as
+// the plain lookup it wraps, for an account the caller may find.
+vi.mock("@/lib/people-search", async () => ({
+    resolveNamedAccount: async (_viewer: unknown, identifier: string) => {
+        const { prisma } = await import("@polaris/db");
+        const needle = identifier.trim().toLowerCase();
+        return (prisma as any).user.findFirst({
+            where: { OR: [{ email: needle }, { username: needle }] },
+            select: { id: true, name: true, username: true }
+        });
+    },
+    findableBy: async (_viewer: string, ids: readonly string[]) => new Set(ids)
+}));
+
 vi.mock("@/lib/chat/game-server-card-post", () => ({
     announceGameServerAccess: async (input: Record<string, unknown>) => {
         announced.push(input);

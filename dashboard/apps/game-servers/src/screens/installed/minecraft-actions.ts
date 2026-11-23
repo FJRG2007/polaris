@@ -986,8 +986,8 @@ export async function findMinecraftPlayerByUserAction(
     if (!parsed.success)
         return { error: (await gameWords("minecraft"))("errors.typeAPolarisUsernameOr") };
     try {
-        await requireGameServer("games.manage", installedAppId);
-        const found = await findGameIdentity(parsed.data, "minecraft");
+        const { user } = await requireGameServer("games.manage", installedAppId);
+        const found = await findGameIdentity(parsed.data, "minecraft", user);
         if (!found) return { error: (await gameWords("minecraft"))("errors.nobodyHereGoesByThat") };
         // Only the ones a rule can be written against. A session that arrived
         // over something this build cannot parse is not an address to offer.

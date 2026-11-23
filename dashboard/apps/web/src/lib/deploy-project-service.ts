@@ -9,6 +9,7 @@
  * place that answers that question.
  */
 
+import { resolveNamedAccount } from "@/lib/people-search";
 import { prisma } from "@polaris/db";
 import { createApiKey } from "@polaris/auth";
 import { contactLines } from "@/lib/privacy-service";
@@ -365,16 +366,9 @@ async function resolvePrincipal(
     const identifier = input.identifier?.trim() ?? "";
     const user = input.principalId
         ? await prisma.user.findUnique({ where: { id: input.principalId }, select: { id: true } })
-        : await prisma.user.findFirst({
-              where: {
-                  OR: [
-                      { email: { equals: identifier.toLowerCase() } },
-                      { username: { equals: identifier } },
-                      { emails: { some: { email: identifier.toLowerCase() } } }
-                  ]
-              },
-              select: { id: true }
-          });
+        : // Under the same rule as every people search, so this field cannot be
+          // used to ask whether an address has an account here.
+          await resolveNamedAccount({ id: granterId }, identifier);
     if (!user) throw new Error("No account here matches that email or username");
     const project = await prisma.project.findUnique({
         where: { id: projectId },
