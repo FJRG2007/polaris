@@ -30,6 +30,7 @@ import { registerMailHandler } from "./mail-handler";
 import { installContextMenu } from "./context-menu";
 import { mailtoIn, mailtoPath } from "@/shared/mailto";
 import { GameWatcher } from "./game-detect";
+import { installedGames } from "./launcher-apps";
 import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
 import { pushRunning } from "./push-local";
@@ -82,12 +83,13 @@ let loadError: string | null = null;
  * every minute while it runs. Only the main window: it is the one page that
  * reports it to Polaris, so a second window open on a log does not report it
  * twice. A game that starts while no window is open is told to the next one as
- * soon as it asks (`gameCurrent`).
+ * soon as it asks (`gameCurrent`). Games installed by a store are known by
+ * their folder, from the launcher's listing of them (`installedGames`).
  */
 const games = new GameWatcher((game) => {
     setVoiceWidgetGame(game !== null);
     if (main && !main.isDestroyed()) main.webContents.send(CHANNELS.gameActivity, game);
-});
+}, undefined, () => installedGames());
 
 /**
  * The same Polaris on a local address that proved it is this instance, while

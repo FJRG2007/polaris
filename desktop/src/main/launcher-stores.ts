@@ -35,6 +35,8 @@ export interface StoreApp {
     readonly launch: AppLaunch;
     /** A file to take the row's picture from: an executable, or an image the store keeps. */
     readonly icon?: string;
+    /** The game's own install folder, so a program running from inside it is known as this game. */
+    readonly folder?: string;
 }
 
 /** The largest store file read: a manifest is a few KB, a library list a few more. */
@@ -276,7 +278,9 @@ export async function epicGames(programData: string): Promise<StoreApp[]> {
             label: manifest.DisplayName ?? basename(manifest.InstallLocation),
             path: `epic:${manifest.AppName}`,
             launch: { kind: "uri", uri },
-            ...(exe ? { icon: exe } : {})
+            ...(exe ? { icon: exe } : {}),
+            // An engine (`UE_5.3`) is not a game somebody is playing.
+            ...(/^UE_/i.test(manifest.AppName) ? {} : { folder: manifest.InstallLocation })
         });
     }
     return out;
@@ -330,11 +334,14 @@ export async function steamGames(programFilesX86: string | undefined): Promise<S
                 if (/^(Steamworks|Steam Linux Runtime|Proton )/i.test(title.data)) continue;
                 seen.add(id);
                 const icon = join(root, "appcache", "librarycache", `${id}_icon.jpg`);
+                const installdir = vdfGet(state, "installdir");
+                const home = typeof installdir === "string" ? inside(join(apps, "common"), installdir) : null;
                 out.push({
                     label: title.data,
                     path: `steam:${id}`,
                     launch: { kind: "uri", uri: `steam://rungameid/${id}` },
-                    ...((await exists(icon)) ? { icon } : {})
+                    ...((await exists(icon)) ? { icon } : {}),
+                    ...(home ? { folder: home } : {})
                 });
             }
         }
@@ -390,7 +397,7 @@ export async function gogGames(): Promise<StoreApp[]> {
         if (!exe || !cwd) continue;
         const title = info?.name ?? entry?.values.get("displayname");
         if (!title) continue;
-        out.push({ label: title, path: `gog:${id}`, launch: { kind: "exe", path: exe, cwd }, icon: exe });
+        out.push({ label: title, path: `gog:${id}`, launch: { kind: "exe", path: exe, cwd }, icon: exe, folder: dir });
     }
     return out;
 }
@@ -411,7 +418,7 @@ export async function ubisoftGames(): Promise<StoreApp[]> {
             const dir = found.values.get("installdir")?.replace(/\//g, "\\").replace(/\\+$/, "");
             if (!id || !dir || !folder.safeParse(dir).success || out.some((app) => app.path === `ubisoft:${id}`)) continue;
             if (!(await exists(dir))) continue;
-            out.push({ label: basename(dir), path: `ubisoft:${id}`, launch: { kind: "uri", uri: `uplay://launch/${id}` } });
+            out.push({ label: basename(dir), path: `ubisoft:${id}`, launch: { kind: "uri", uri: `uplay://launch/${id}` }, folder: dir });
             if (out.length >= MAX_PER_STORE) return out;
         }
     }

@@ -10,7 +10,9 @@
  *
  * Reading the list is one look every `CHECK_MS`, cheap enough to leave
  * running: a PowerShell kept open and asked again on Windows (`WindowsLister`),
- * `ps` on macOS, and `/proc` on Linux,
+ * which also says where each program lives, so a game an installed store
+ * (Epic, Steam, GOG, Ubisoft) put in a folder is known by that store's name
+ * for it without being on any list here; `ps` on macOS, and `/proc` on Linux,
  * where a program's name in `ps` is cut to fifteen characters and a game run
  * through a compatibility layer is known by its Windows program name, which is
  * the first word of its command line.
@@ -37,6 +39,21 @@ export interface CustomGame {
     readonly name: string;
 }
 
+/** A running program: its name, and on Windows the file it was started from when that could be read. */
+export interface RunningProcess {
+    readonly name: string;
+    readonly path?: string;
+}
+
+/** What a look returns: bare names where the system gives nothing more. */
+export type Seen = string | RunningProcess;
+
+/** An installed store game: the folder its store put it in, and the store's name for it. */
+export interface StoreGame {
+    readonly name: string;
+    readonly folder: string;
+}
+
 /** The game running now, as it is reported. */
 export interface RunningGame {
     readonly key: string;
@@ -60,14 +77,24 @@ export function parseTasklist(text: string): string[] {
     return names;
 }
 
-/** Every program in the lines `WindowsLister` reads back: PowerShell's process
- *  names, which are the image names without their `.exe`. */
-export function parseProcessNames(text: string): string[] {
-    return text
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((name) => programKey(`${name}.exe`));
+/** The most programs one look keeps, and the longest path kept with one. */
+const MAX_PROCESSES = 5000;
+const MAX_PATH_CHARS = 1024;
+
+/** Every program in the `name<TAB>path` lines `WindowsLister` reads back; a
+ *  line without a path (a process that could not be opened, or a shell that
+ *  only gave names) keeps only its name. */
+export function parseProcessList(text: string): RunningProcess[] {
+    const out: RunningProcess[] = [];
+    for (const line of text.split(/\r?\n/)) {
+        if (out.length >= MAX_PROCESSES) break;
+        const [rawName = "", rawPath = ""] = line.split("\t");
+        const path = rawPath.trim();
+        const usable = path.length <= MAX_PATH_CHARS && /^[A-Za-z]:\\/.test(path);
+        if (!rawName.trim() && !usable) continue;
+        out.push(usable ? { name: programKey(path), path } : { name: programKey(`${rawName.trim()}.exe`) });
+    }
+    return out;
 }
 
 /** Every program in `ps -A -o comm=` output, which on macOS is a full path. */
@@ -93,18 +120,60 @@ export function parseCmdline(raw: string): string[] {
     return found.filter(Boolean);
 }
 
+/** A folder as it is compared: lowercased, backslashes, no trailing separator. */
+function folderKey(path: string): string {
+    return path.trim().replace(/\//g, "\\").replace(/\\+$/, "").toLowerCase();
+}
+
+/** Folders a store record could name that hold far more than one game. */
+const SHARED_FOLDERS = new Set([
+    "program files", "program files (x86)", "programdata", "windows", "users", "appdata", "games", "common",
+    "steamapps", "steamlibrary", "steam", "epic games", "gog games", "gog galaxy", "ubisoft", "ubisoft game launcher",
+    "xboxgames", "windowsapps"
+]);
+
+/** Programs that run from a game's folder without being the game: crash
+ *  reporters, anti-cheat services, installers and the store's helpers. */
+const HELPER = /crash|report|unins|redist|setup|prereq|easyanticheat|battleye|beservice|webhelper|cefsharp|dotnet/i;
+
 /**
- * The game running, out of these program names, or null.
+ * Store games' folders made ready to compare, leaving out a drive's root and
+ * any folder that holds more than one game (`C:\Program Files`, a Steam
+ * library's `common`), so a store record pointing at one never makes every
+ * program under it a game. The longest folder comes first, so a game installed
+ * inside another's folder is called by its own name.
+ */
+export function storeGameFolders(games: readonly StoreGame[]): StoreGame[] {
+    return games
+        .map((game) => ({ name: game.name.trim(), folder: folderKey(game.folder) }))
+        .filter((game) => game.name !== "" && /^[a-z]:\\./.test(game.folder) && !SHARED_FOLDERS.has(game.folder.split("\\").at(-1) ?? ""))
+        .sort((a, b) => b.folder.length - a.folder.length);
+}
+
+/** The installed store game `path` was started from, out of `storeGameFolders` output. */
+function storeGameOf(path: string, folders: readonly StoreGame[]): StoreGame | null {
+    const file = folderKey(path);
+    if (HELPER.test(programKey(file))) return null;
+    return folders.find((game) => file.startsWith(`${game.folder}\\`)) ?? null;
+}
+
+/**
+ * The game running, out of these programs, or null.
  *
  * Somebody's own additions come first, so a program they named themselves is
- * called what they called it, even when it is also on the built-in list.
+ * called what they called it, even when it is also on the built-in list. Then
+ * the built-in list, then any program started from inside an installed store
+ * game's folder, named the way its store names it. `folders` is
+ * `storeGameFolders` output.
  */
 export function matchGame(
-    running: Iterable<string>,
+    running: Iterable<Seen>,
     custom: readonly CustomGame[] = [],
-    known: readonly KnownGame[] = KNOWN_GAMES
+    known: readonly KnownGame[] = KNOWN_GAMES,
+    folders: readonly StoreGame[] = []
 ): { key: string; name: string } | null {
-    const names = new Set([...running].map(programKey));
+    const seen = [...running].map((entry): RunningProcess => (typeof entry === "string" ? { name: entry } : entry));
+    const names = new Set(seen.map((entry) => programKey(entry.name)));
     for (const game of custom) {
         const key = programKey(game.executable);
         if (names.has(key)) return { key, name: game.name };
@@ -112,6 +181,11 @@ export function matchGame(
     for (const game of known) {
         const program = game.programs.find((entry) => names.has(entry));
         if (program) return { key: program, name: game.name };
+    }
+    if (folders.length === 0) return null;
+    for (const entry of seen) {
+        const game = entry.path ? storeGameOf(entry.path, folders) : null;
+        if (game) return { key: programKey(entry.name), name: game.name };
     }
     return null;
 }
@@ -152,8 +226,37 @@ export type SpawnLister = () => ChildProcessWithoutNullStreams;
 /** The line PowerShell writes after each list, so a reply is known to be whole. */
 const LIST_END = "<<polaris-list-end>>";
 
-/** How long one list may take before the shell is taken for stuck. */
+/** How long one list may take before the shell is taken for stuck; a new
+ *  shell gets longer, since its first list waits on the reader being compiled. */
 const LIST_TIMEOUT_MS = 10_000;
+const FIRST_LIST_TIMEOUT_MS = 30_000;
+
+/** The most one list may print before it is taken for broken (~5000 programs with long paths). */
+const MAX_LIST_CHARS = 4 * 1024 * 1024;
+
+/**
+ * The reader the shell compiles once: every process's name and the file it was
+ * started from, as `name<TAB>path` lines in one string. The path comes from
+ * `QueryFullProcessImageName` with the least access Windows has
+ * (`PROCESS_QUERY_LIMITED_INFORMATION`), which answers for nearly every
+ * process, elevated games included, and quickly - where PowerShell's own
+ * `Path` walks each process's modules and fails on anything elevated. One
+ * line, with no single quote in it, since it travels inside one.
+ */
+const READER_TYPE = "PolarisProcessList";
+export const READER_SOURCE = [
+    "using System;using System.Text;using System.Diagnostics;using System.Runtime.InteropServices;",
+    `public static class ${READER_TYPE}{`,
+    "[DllImport(\"kernel32.dll\")]static extern IntPtr OpenProcess(uint access,bool inherit,int id);",
+    "[DllImport(\"kernel32.dll\",CharSet=CharSet.Unicode)]static extern bool QueryFullProcessImageName(IntPtr handle,uint flags,StringBuilder name,ref uint size);",
+    "[DllImport(\"kernel32.dll\")]static extern bool CloseHandle(IntPtr handle);",
+    "public static string Read(){var o=new StringBuilder();foreach(var p in Process.GetProcesses()){string path=\"\";",
+    "try{var h=OpenProcess(0x1000,false,p.Id);if(h!=IntPtr.Zero){var s=new StringBuilder(1024);uint n=1024;if(QueryFullProcessImageName(h,0,s,ref n))path=s.ToString();CloseHandle(h);}}catch{}",
+    "try{o.Append(p.ProcessName).Append(\"\\t\").Append(path).Append(\"\\n\");}catch{}p.Dispose();}return o.ToString();}}"
+].join("");
+
+/** One list: the compiled reader, or the bare names when it could not be compiled. */
+const LIST_COMMAND = `if ('${READER_TYPE}' -as [type]) { [${READER_TYPE}]::Read() } else { (Get-Process).ProcessName }; '${LIST_END}'\n`;
 
 /**
  * The running programs on Windows, read every `CHECK_MS` by one PowerShell that
@@ -162,10 +265,13 @@ const LIST_TIMEOUT_MS = 10_000;
  * shell answers the same question in ~15 ms. It exits by itself when this app
  * does, since its input closes. A shell that cannot start, or stops answering,
  * gives way to `tasklist` for that look and is started again on the next.
+ * Where the reader cannot be compiled (a locked-down PowerShell), the shell
+ * still answers with names, and only the store-folder match is lost.
  */
 export class WindowsLister {
     private child: ChildProcessWithoutNullStreams | null = null;
-    private pending: Promise<string[]> | null = null;
+    private pending: Promise<RunningProcess[]> | null = null;
+    private fresh = false;
 
     constructor(
         private readonly start: SpawnLister = () =>
@@ -174,11 +280,11 @@ export class WindowsLister {
     ) {}
 
     /** One list; a second asked while one is on its way gets the same answer. */
-    list(): Promise<string[]> {
+    list(): Promise<RunningProcess[]> {
         this.pending ??= this.ask()
-            .catch(() => {
+            .catch(async () => {
                 this.stop();
-                return this.fallback();
+                return (await this.fallback()).map((name) => ({ name }));
             })
             .finally(() => {
                 this.pending = null;
@@ -202,12 +308,16 @@ export class WindowsLister {
         });
         // Names outside the console's code page arrive as themselves.
         child.stdin.write("[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)\n");
+        child.stdin.write(`try { Add-Type -TypeDefinition '${READER_SOURCE}' -ErrorAction Stop } catch { }\n`);
         this.child = child;
+        this.fresh = true;
         return child;
     }
 
-    private ask(): Promise<string[]> {
+    private ask(): Promise<RunningProcess[]> {
         const child = this.shell();
+        const timeout = this.fresh ? FIRST_LIST_TIMEOUT_MS : LIST_TIMEOUT_MS;
+        this.fresh = false;
         return new Promise((resolve, reject) => {
             let text = "";
             const done = (error: Error | null) => {
@@ -215,17 +325,18 @@ export class WindowsLister {
                 child.stdout.off("data", heard);
                 child.off("exit", gone);
                 if (error) reject(error);
-                else resolve(parseProcessNames(text.slice(0, text.indexOf(LIST_END))));
+                else resolve(parseProcessList(text.slice(0, text.indexOf(LIST_END))));
             };
             const heard = (chunk: string) => {
                 text += chunk;
                 if (text.includes(LIST_END)) done(null);
+                else if (text.length > MAX_LIST_CHARS) done(new Error("The process list was too long."));
             };
             const gone = () => done(new Error("The process list stopped."));
-            const timer = setTimeout(() => done(new Error("The process list did not answer.")), LIST_TIMEOUT_MS);
+            const timer = setTimeout(() => done(new Error("The process list did not answer.")), timeout);
             child.stdout.on("data", heard);
             child.once("exit", gone);
-            child.stdin.write(`(Get-Process).ProcessName; '${LIST_END}'\n`, (error) => {
+            child.stdin.write(LIST_COMMAND, (error) => {
                 if (error) done(error);
             });
         });
@@ -233,7 +344,7 @@ export class WindowsLister {
 }
 
 /** The watcher's look: the open shell on Windows, `runningPrograms` elsewhere. */
-function watchedPrograms(): () => Promise<string[]> {
+function watchedPrograms(): () => Promise<readonly Seen[]> {
     if (process.platform !== "win32") return () => runningPrograms();
     const lister = new WindowsLister();
     return () => lister.list();
@@ -248,6 +359,10 @@ function watchedPrograms(): () => Promise<string[]> {
  * truth after the app restarts. A check that fails (a command that would not
  * run) changes nothing: not being able to look is not the same as nothing
  * running.
+ *
+ * `games` is the installed store games as last listed by whoever keeps that
+ * list (the launcher's): asked on each look and expected to answer from memory,
+ * never to read the stores, so a look stays one process read.
  */
 export class GameWatcher {
     private current: RunningGame | null = null;
@@ -255,10 +370,13 @@ export class GameWatcher {
     private custom: readonly CustomGame[] = [];
     private timer: ReturnType<typeof setInterval> | null = null;
     private first = true;
+    private storeGames: readonly StoreGame[] | null = null;
+    private folders: readonly StoreGame[] = [];
 
     constructor(
         private readonly onChange: (game: RunningGame | null) => void,
-        private readonly list: () => Promise<string[]> = watchedPrograms()
+        private readonly list: () => Promise<readonly Seen[]> = watchedPrograms(),
+        private readonly games: () => readonly StoreGame[] = () => []
     ) {}
 
     /** The programs somebody added as games, from the dashboard. */
@@ -287,13 +405,13 @@ export class GameWatcher {
 
     /** One look. Public for the tests; the timer is what calls it. */
     async check(now: number = Date.now()): Promise<void> {
-        let programs: string[];
+        let programs: readonly Seen[];
         try {
             programs = await this.list();
         } catch {
             return;
         }
-        const found = matchGame(programs, this.custom);
+        const found = matchGame(programs, this.custom, KNOWN_GAMES, this.storeFolders());
         const same = found && this.current && found.key === this.current.key && found.name === this.current.name;
         if (same) {
             if (now - this.said >= REPEAT_MS) this.say(this.current, now);
@@ -303,6 +421,16 @@ export class GameWatcher {
         this.first = false;
         this.current = found ? { ...found, startedAt: new Date(now).toISOString() } : null;
         this.say(this.current, now);
+    }
+
+    /** The store games ready to compare, made again only when a new listing arrives. */
+    private storeFolders(): readonly StoreGame[] {
+        const games = this.games();
+        if (games !== this.storeGames) {
+            this.storeGames = games;
+            this.folders = storeGameFolders(games);
+        }
+        return this.folders;
     }
 
     private say(game: RunningGame | null, now: number): void {

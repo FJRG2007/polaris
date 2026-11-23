@@ -104,7 +104,8 @@ describe("Epic Games", () => {
             label: "Fortnite",
             path: "epic:Fortnite",
             launch: { kind: "uri", uri: "com.epicgames.launcher://apps/fn%3A4fe75bbc5a674f4f9b356b5c90567da5%3AFortnite?action=launch&silent=true" },
-            icon: join(fortnite, "FortniteGame/Binaries/Win64/FortniteLauncher.exe")
+            icon: join(fortnite, "FortniteGame/Binaries/Win64/FortniteLauncher.exe"),
+            folder: fortnite
         });
         expect(stores.isVettedLaunchUri((game as { launch: { uri: string; }; }).launch.uri)).toBe(true);
     });
@@ -117,6 +118,16 @@ describe("Epic Games", () => {
         const games = await stores.epicGames(base);
         expect(games.map((game) => game.label)).toEqual(["Y"]);
         expect(games[0]?.icon).toBeUndefined();
+    });
+
+    it("gives no folder to an engine, so running it is never a game", async () => {
+        const engine = join(base, "Epic Games", "UE_5.3");
+        dir(engine);
+        dir(manifests, ["E.item"]);
+        file(join(manifests, "E.item"), JSON.stringify({ DisplayName: "Unreal Engine", AppName: "UE_5.3", CatalogNamespace: "ue", CatalogItemId: "i", InstallLocation: engine }));
+        const [app] = await stores.epicGames(base);
+        expect(app?.label).toBe("Unreal Engine");
+        expect(app?.folder).toBeUndefined();
     });
 
     it("lists nothing when Epic is not installed", async () => {
@@ -134,7 +145,7 @@ describe("Steam", () => {
         dir(join(steam, "steamapps"), ["appmanifest_228980.acf", "libraryfolders.vdf"]);
         dir(join(second, "steamapps"), ["appmanifest_730.acf", "appmanifest_570.acf"]);
         file(join(steam, "steamapps", "appmanifest_228980.acf"), `"AppState"\n{\n\t"appid"\t\t"228980"\n\t"name"\t\t"Steamworks Common Redistributables"\n\t"StateFlags"\t\t"4"\n}\n`);
-        file(join(second, "steamapps", "appmanifest_730.acf"), `"AppState"\n{\n\t"appid"\t\t"730"\n\t"name"\t\t"Counter-Strike 2"\n\t"StateFlags"\t\t"4"\n\t// a comment\n}\n`);
+        file(join(second, "steamapps", "appmanifest_730.acf"), `"AppState"\n{\n\t"appid"\t\t"730"\n\t"name"\t\t"Counter-Strike 2"\n\t"StateFlags"\t\t"4"\n\t"installdir"\t\t"Counter-Strike Global Offensive"\n\t// a comment\n}\n`);
         file(join(second, "steamapps", "appmanifest_570.acf"), `"AppState"\n{\n\t"appid"\t\t"570"\n\t"name"\t\t"Dota 2"\n\t"StateFlags"\t\t"1026"\n}\n`);
         file(join(steam, "appcache", "librarycache", "730_icon.jpg"), "jpg");
         expect(await stores.steamGames(undefined)).toEqual([
@@ -142,9 +153,19 @@ describe("Steam", () => {
                 label: "Counter-Strike 2",
                 path: "steam:730",
                 launch: { kind: "uri", uri: "steam://rungameid/730" },
-                icon: join(steam, "appcache", "librarycache", "730_icon.jpg")
+                icon: join(steam, "appcache", "librarycache", "730_icon.jpg"),
+                folder: join(second, "steamapps", "common", "Counter-Strike Global Offensive")
             }
         ]);
+    });
+
+    it("gives no folder to a game whose install folder climbs out of the library", async () => {
+        commands.set("reg.exe query HKCU\\Software\\Valve\\Steam /v SteamPath", `\r\nHKEY_CURRENT_USER\\Software\\Valve\\Steam\r\n    SteamPath    REG_SZ    ${steam}\r\n\r\n`);
+        dir(join(steam, "steamapps"), ["appmanifest_10.acf"]);
+        file(join(steam, "steamapps", "appmanifest_10.acf"), `"AppState"\n{\n\t"appid"\t\t"10"\n\t"name"\t\t"Odd"\n\t"StateFlags"\t\t"4"\n\t"installdir"\t\t"..\\\\..\\\\.."\n}\n`);
+        const [game] = await stores.steamGames(undefined);
+        expect(game?.label).toBe("Odd");
+        expect(game?.folder).toBeUndefined();
     });
 
     it("reads Valve's format strictly, and gives up on a broken file", () => {
@@ -172,7 +193,8 @@ describe("GOG", () => {
                 label: "The Witcher 3: Wild Hunt",
                 path: "gog:1207664663",
                 launch: { kind: "exe", path: join(game, "bin\\x64\\witcher3.exe"), cwd: game },
-                icon: join(game, "bin\\x64\\witcher3.exe")
+                icon: join(game, "bin\\x64\\witcher3.exe"),
+                folder: game
             }
         ]);
     });
@@ -185,7 +207,7 @@ describe("Ubisoft Connect", () => {
         dir(game);
         commands.set(`reg.exe query ${hive} /s`, `\r\n${long(hive)}\\13504\r\n    InstallDir    REG_SZ    ${game.replace(/\\/g, "/")}/\r\n\r\n${long(hive)}\\999\r\n    InstallDir    REG_SZ    ${join(base, "gone")}\r\n`);
         const apps = await stores.ubisoftGames();
-        expect(apps.map((app) => [app.label, app.launch])).toEqual([["Assassin's Creed Valhalla", { kind: "uri", uri: "uplay://launch/13504" }]]);
+        expect(apps.map((app) => [app.label, app.launch, app.folder])).toEqual([["Assassin's Creed Valhalla", { kind: "uri", uri: "uplay://launch/13504" }, game]]);
     });
 });
 

@@ -5,7 +5,9 @@
  * names, so one key means the same game everywhere; a game under a compatibility
  * layer on Linux is found by its Windows program; somebody's own additions win
  * over the built-in names; nothing on the built-in list is a program many
- * things share; and the watcher says a game once when it starts, again only as
+ * things share; a program started from inside an installed store game's folder
+ * is that game, by its store's name, unless it is the folder's crash reporter
+ * or anti-cheat, or the folder is one that holds many games; and the watcher says a game once when it starts, again only as
  * the heartbeat, once when it stops - and nothing at all when it could not look.
  */
 
@@ -18,11 +20,14 @@ import {
     GameWatcher,
     matchGame,
     parseCmdline,
-    parseProcessNames,
+    parseProcessList,
     parsePs,
     parseTasklist,
+    READER_SOURCE,
     REPEAT_MS,
     type RunningGame,
+    type StoreGame,
+    storeGameFolders,
     WindowsLister
 } from "@/main/game-detect";
 
@@ -71,20 +76,82 @@ describe("matching a game", () => {
     });
 });
 
+describe("knowing a store game by its folder", () => {
+    const folders = storeGameFolders([
+        { name: "Hades II", folder: "D:/SteamLibrary/steamapps/common/Hades II/" },
+        { name: "Satisfactory", folder: "C:\\Program Files\\Epic Games\\SatisfactoryEarlyAccess" },
+        { name: "Mod kit", folder: "C:\\Program Files\\Epic Games\\SatisfactoryEarlyAccess\\ModKit" },
+        { name: "Everything", folder: "C:\\Program Files" },
+        { name: "A library", folder: "D:\\SteamLibrary\\steamapps\\common" },
+        { name: "A drive", folder: "E:\\" },
+        { name: "  ", folder: "C:\\Games\\Nameless" }
+    ]);
+    const at = (path: string) => ({ name: path.split("\\").at(-1)!.toLowerCase(), path });
+
+    it("keeps only folders that hold one game, longest first", () => {
+        expect(folders.map((game) => game.name)).toEqual(["Mod kit", "Satisfactory", "Hades II"]);
+        expect(folders.find((game) => game.name === "Hades II")?.folder).toBe("d:\\steamlibrary\\steamapps\\common\\hades ii");
+    });
+
+    it("names a program from inside the folder the way its store does", () => {
+        expect(matchGame([at("D:\\SteamLibrary\\steamapps\\common\\Hades II\\Ship\\Hades2.exe")], [], KNOWN_GAMES, folders)).toEqual({
+            key: "hades2.exe",
+            name: "Hades II"
+        });
+        expect(matchGame([at("C:\\Program Files\\Epic Games\\SatisfactoryEarlyAccess\\ModKit\\kit.exe")], [], KNOWN_GAMES, folders)?.name).toBe("Mod kit");
+    });
+
+    it("does not take a folder that only starts with the same letters, or a program anywhere else", () => {
+        expect(matchGame([at("D:\\SteamLibrary\\steamapps\\common\\Hades II Demo\\Hades2.exe")], [], KNOWN_GAMES, folders)).toBeNull();
+        expect(matchGame([at("C:\\Program Files\\Notepad++\\notepad++.exe")], [], KNOWN_GAMES, folders)).toBeNull();
+        expect(matchGame(["hades2.exe"], [], KNOWN_GAMES, folders)).toBeNull();
+    });
+
+    it("never calls a crash reporter or anti-cheat left running in the folder the game", () => {
+        for (const helper of ["UnityCrashHandler64.exe", "CrashReportClient.exe", "EasyAntiCheat.exe", "BEService.exe", "unins000.exe"]) {
+            expect(matchGame([at(`D:\\SteamLibrary\\steamapps\\common\\Hades II\\${helper}`)], [], KNOWN_GAMES, folders)).toBeNull();
+        }
+    });
+
+    it("lets somebody's own name and the built-in list come first", () => {
+        const fortnite = at("C:\\Program Files\\Epic Games\\SatisfactoryEarlyAccess\\FortniteClient-Win64-Shipping.exe");
+        expect(matchGame([fortnite], [], KNOWN_GAMES, folders)?.name).toBe("Fortnite");
+        expect(matchGame([fortnite], [{ executable: "fortniteclient-win64-shipping.exe", name: "Mine" }], KNOWN_GAMES, folders)?.name).toBe("Mine");
+    });
+});
+
 describe("watching for a game", () => {
-    function watcher(lists: (string[] | Error)[]) {
+    function watcher(lists: (readonly (string | { name: string; path?: string; })[] | Error)[], games?: () => readonly StoreGame[]) {
         const said: (RunningGame | null)[] = [];
         let index = 0;
+        let looks = 0;
         const watch = new GameWatcher(
             (game) => said.push(game),
             async () => {
+                looks += 1;
                 const next = lists[Math.min(index++, lists.length - 1)]!;
                 if (next instanceof Error) throw next;
                 return next;
-            }
+            },
+            games
         );
-        return { watch, said };
+        return { watch, said, looks: () => looks };
     }
+
+    it("knows a store game from the listing it is handed, with one process read per look", async () => {
+        let listing: readonly StoreGame[] = [];
+        const asked = vi.fn(() => listing);
+        const path = "C:\\Games\\Hades II\\Hades2.exe";
+        const { watch, said, looks } = watcher([[{ name: "hades2.exe", path }]], asked);
+        await watch.check(0);
+        listing = [{ name: "Hades II", folder: "C:\\Games\\Hades II" }];
+        await watch.check(15_000);
+        await watch.check(30_000);
+        expect(said.map((game) => game?.name ?? null)).toEqual([null, "Hades II"]);
+        expect(said[1]?.key).toBe("hades2.exe");
+        expect(looks()).toBe(3);
+        expect(asked).toHaveBeenCalledTimes(3);
+    });
 
     it("says the game once when it starts, again only as a heartbeat, and once when it stops", async () => {
         const { watch, said } = watcher([["a.exe"], ["celeste.exe"], ["celeste.exe"], ["celeste.exe"], ["a.exe"]]);
@@ -116,9 +183,10 @@ describe("watching for a game", () => {
     });
 });
 
-/** A stand-in PowerShell: answers each list command with `names`, or stays
- *  silent, or exits, as the test says. */
-function fakeShell(behavior: { names?: string[]; silent?: boolean; exitOnAsk?: boolean; }) {
+/** A stand-in PowerShell: answers each list command with `names` (lines as
+ *  the reader prints them), or stays silent, or exits, or never stops
+ *  printing, as the test says. */
+function fakeShell(behavior: { names?: string[]; silent?: boolean; exitOnAsk?: boolean; flood?: boolean; }) {
     const child = new EventEmitter() as EventEmitter & {
         stdin: PassThrough;
         stdout: PassThrough;
@@ -150,6 +218,11 @@ function fakeShell(behavior: { names?: string[]; silent?: boolean; exitOnAsk?: b
             return;
         }
         if (behavior.silent) return;
+        if (behavior.flood) {
+            const line = `${"x".repeat(1023)}\n`;
+            for (let at = 0; at < 4200; at++) child.stdout.write(line);
+            return;
+        }
         // Split across chunks, the way a pipe can hand it over.
         const text = `${(behavior.names ?? []).join("\r\n")}\r\n${end}\r\n`;
         const half = Math.floor(text.length / 2);
@@ -160,8 +233,37 @@ function fakeShell(behavior: { names?: string[]; silent?: boolean; exitOnAsk?: b
 }
 
 describe("listing programs on Windows", () => {
-    it("reads PowerShell's names back as program keys", () => {
-        expect(parseProcessNames("Hollow_Knight\r\nexplorer\r\n\r\n  steam  \r\n")).toEqual(["hollow_knight.exe", "explorer.exe", "steam.exe"]);
+    it("reads each program's name and the file it was started from", () => {
+        const text = "Hollow_Knight\tD:\\Games\\Hollow Knight\\hollow_knight.exe\r\nexplorer\t\r\n\r\n  steam  \r\nodd\trelative\\odd.exe\r\nSystem\t\r\n";
+        expect(parseProcessList(text)).toEqual([
+            { name: "hollow_knight.exe", path: "D:\\Games\\Hollow Knight\\hollow_knight.exe" },
+            { name: "explorer.exe" },
+            { name: "steam.exe" },
+            { name: "odd.exe" },
+            { name: "system.exe" }
+        ]);
+    });
+
+    it("keeps a bounded list, and drops a path too long to be real", () => {
+        expect(parseProcessList("a\n".repeat(6000))).toHaveLength(5000);
+        expect(parseProcessList(`game\tC:\\${"x".repeat(1100)}.exe`)).toEqual([{ name: "game.exe" }]);
+    });
+
+    it("compiles its reader once per shell, from a source that fits in one quoted line", async () => {
+        expect(READER_SOURCE).not.toMatch(/['\r\n]/);
+        const shell = fakeShell({ names: ["Celeste\tC:\\Games\\Celeste\\Celeste.exe"] });
+        const lister = new WindowsLister(() => shell.child, async () => []);
+        expect(await lister.list()).toEqual([{ name: "celeste.exe", path: "C:\\Games\\Celeste\\Celeste.exe" }]);
+        await lister.list();
+        expect(shell.asked.filter((line) => line.includes("Add-Type"))).toHaveLength(1);
+        expect(shell.asked.filter((line) => line.includes("PolarisProcessList]::Read()"))).toHaveLength(2);
+    });
+
+    it("gives up on a list too long to be real and asks tasklist instead", async () => {
+        const shell = fakeShell({ flood: true });
+        const lister = new WindowsLister(() => shell.child, async () => ["from-tasklist.exe"]);
+        expect(await lister.list()).toEqual([{ name: "from-tasklist.exe" }]);
+        expect(shell.child.killed).toBe(true);
     });
 
     it("keeps one shell open and asks it again", async () => {
@@ -171,8 +273,8 @@ describe("listing programs on Windows", () => {
             shells.push(shell);
             return shell.child;
         }, async () => ["tasklist.exe"]);
-        expect(await lister.list()).toEqual(["celeste.exe", "explorer.exe"]);
-        expect(await lister.list()).toEqual(["celeste.exe", "explorer.exe"]);
+        expect(await lister.list()).toEqual([{ name: "celeste.exe" }, { name: "explorer.exe" }]);
+        expect(await lister.list()).toEqual([{ name: "celeste.exe" }, { name: "explorer.exe" }]);
         expect(shells).toHaveLength(1);
         expect(matchGame(await lister.list())?.name).toBe("Celeste");
     });
@@ -191,8 +293,8 @@ describe("listing programs on Windows", () => {
             started += 1;
             return fakeShell(started === 1 ? { exitOnAsk: true } : { names: ["explorer"] }).child;
         }, async () => ["from-tasklist.exe"]);
-        expect(await lister.list()).toEqual(["from-tasklist.exe"]);
-        expect(await lister.list()).toEqual(["explorer.exe"]);
+        expect(await lister.list()).toEqual([{ name: "from-tasklist.exe" }]);
+        expect(await lister.list()).toEqual([{ name: "explorer.exe" }]);
         expect(started).toBe(2);
     });
 
@@ -202,8 +304,11 @@ describe("listing programs on Windows", () => {
             const shell = fakeShell({ silent: true });
             const lister = new WindowsLister(() => shell.child, async () => ["from-tasklist.exe"]);
             const look = lister.list();
+            // A new shell is given longer, for the reader it compiles first.
             await vi.advanceTimersByTimeAsync(10_000);
-            expect(await look).toEqual(["from-tasklist.exe"]);
+            expect(shell.child.killed).toBe(false);
+            await vi.advanceTimersByTimeAsync(20_000);
+            expect(await look).toEqual([{ name: "from-tasklist.exe" }]);
             expect(shell.child.killed).toBe(true);
         } finally {
             vi.useRealTimers();

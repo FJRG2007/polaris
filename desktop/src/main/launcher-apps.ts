@@ -18,6 +18,7 @@ import { shell } from "electron";
 import { homedir } from "node:os";
 import { spawn } from "node:child_process";
 import { readdir } from "node:fs/promises";
+import type { StoreGame } from "./game-detect";
 import { isPackagedAppId, isVettedLaunchUri, storeApps, type AppLaunch } from "./launcher-stores";
 
 export interface InstalledApp {
@@ -28,6 +29,8 @@ export interface InstalledApp {
     readonly launch?: AppLaunch;
     /** A file to take its picture from, when that is not `path` itself. */
     readonly icon?: string;
+    /** A store game's install folder. */
+    readonly folder?: string;
 }
 
 /** How long a listing is trusted before the next open reads it again. */
@@ -36,8 +39,16 @@ const FRESH_MS = 10 * 60_000;
 const MAX_APPS = 4000;
 const MAX_DEPTH = 3;
 
-let cached: { readonly at: number; readonly apps: readonly InstalledApp[]; } | null = null;
-let reading: Promise<readonly InstalledApp[]> | null = null;
+interface Listing {
+    readonly apps: readonly InstalledApp[];
+    /** Every store game with its folder, kept even when the launcher lists it by a Start menu shortcut. */
+    readonly games: readonly StoreGame[];
+}
+
+let cached: (Listing & { readonly at: number; }) | null = null;
+let reading: Promise<Listing> | null = null;
+/** Whether a listing was ever started, so the game watcher starts at most one itself. */
+let started = false;
 
 function roots(platform: NodeJS.Platform): string[] {
     if (platform === "win32") {
@@ -69,13 +80,14 @@ async function walk(platform: NodeJS.Platform, dir: string, depth: number, out: 
     }
 }
 
-async function read(platform: NodeJS.Platform): Promise<readonly InstalledApp[]> {
+async function read(platform: NodeJS.Platform): Promise<Listing> {
     const out: InstalledApp[] = [];
     for (const root of roots(platform)) await walk(platform, root, 0, out);
+    const stores = platform === "win32" ? await storeApps().catch(() => []) : [];
     // A game with a Start menu shortcut is listed once, by its shortcut.
-    if (platform === "win32") out.push(...(await storeApps().catch(() => [])));
+    out.push(...stores);
     const seen = new Set<string>();
-    return out
+    const apps = out
         .filter((app) => {
             const key = app.label.toLowerCase();
             if (seen.has(key)) return false;
@@ -83,15 +95,18 @@ async function read(platform: NodeJS.Platform): Promise<readonly InstalledApp[]>
             return true;
         })
         .slice(0, MAX_APPS);
+    const games = stores.flatMap((app) => (app.folder ? [{ name: app.label, folder: app.folder }] : []));
+    return { apps, games };
 }
 
 /** The installed apps: the last listing straight away, read again behind it when stale. */
 export function installedApps(platform: NodeJS.Platform = process.platform): readonly InstalledApp[] {
     if ((!cached || Date.now() - cached.at > FRESH_MS) && !reading) {
+        started = true;
         reading = read(platform)
-            .then((apps) => {
-                cached = { at: Date.now(), apps };
-                return apps;
+            .then((listing) => {
+                cached = { at: Date.now(), ...listing };
+                return listing;
             })
             .finally(() => {
                 reading = null;
@@ -103,7 +118,19 @@ export function installedApps(platform: NodeJS.Platform = process.platform): rea
 /** The installed apps once a listing has been read, for the conflict check. */
 export async function installedAppsRead(platform: NodeJS.Platform = process.platform): Promise<readonly InstalledApp[]> {
     installedApps(platform);
-    return reading ?? cached?.apps ?? [];
+    return (await reading)?.apps ?? cached?.apps ?? [];
+}
+
+/**
+ * The installed store games and their folders from the last listing, for the
+ * game watcher, which asks on every look: answered from memory, never read
+ * again for it. The one exception is the first ask when the launcher never
+ * listed anything (switched off, say), which starts one listing; after that it
+ * is kept fresh by the launcher being opened.
+ */
+export function installedGames(platform: NodeJS.Platform = process.platform): readonly StoreGame[] {
+    if (!started && platform === "win32") installedApps(platform);
+    return cached?.games ?? [];
 }
 
 /** Whether `path` is one of the apps listed, so only those can be opened. */
