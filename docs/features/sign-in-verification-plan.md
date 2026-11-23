@@ -48,7 +48,9 @@ because a similar one worked.
 - [x] A verified number typed in international form names its account
       (`emailForPhone`); the password then goes through the same OPAQUE path.
       A number verified on two accounts names neither.
-- [ ] No country-less numbers: "600 000 003" without "+34" is not resolved.
+- [x] A number without its country code is read in the request's country
+      (edge header or address), else the reader's language; an all-digit
+      username still resolves when no verified number matches.
 - [x] SMS as a second factor: there is no SMS delivery method today
       (email, WhatsApp, Telegram only), so it is off and hidden by construction.
 - [ ] An admin switch to add SMS as a method (off by default) - not started.
