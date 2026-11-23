@@ -4,7 +4,9 @@
  * One terminal opened from the web: its panes listed through the relay
  * (`pane.list`), the chosen pane's output streamed live into a read-only
  * xterm, and - for whoever may control it - a line to insert into that pane's
- * input (`input.insert`). The socket uses a one-shot ticket for this terminal.
+ * input (`input.insert`). The socket uses a one-shot ticket for this terminal,
+ * from `open`: the account's own action here, a link's on `/k/<token>`, where
+ * the viewer is drawn on the page instead of in a dialog.
  */
 
 import "@xterm/xterm/css/xterm.css";
@@ -47,13 +49,31 @@ function decode(data: string): Uint8Array {
     return out;
 }
 
-export function TerminalViewer({ terminalId, name, onClose }: { terminalId: string; name: string; onClose: () => void }) {
+type Opened = { ticket: string; access: "owner" | "view" | "control" } | { error: string };
+
+export function TerminalViewer({
+    terminalId,
+    name,
+    onClose,
+    open = openTerminalAction,
+    inline = false,
+    access = "view"
+}: {
+    terminalId: string;
+    name: string;
+    /** What the caller expects to be allowed, until the ticket says. */
+    access?: "owner" | "view" | "control";
+    onClose?: () => void;
+    open?: (id: string) => Promise<Opened>;
+    inline?: boolean;
+}) {
     const t = useTranslations("account");
     const [state, setState] = useState<State>("connecting");
     const [problem, setProblem] = useState<string | null>(null);
     const [panes, setPanes] = useState<Pane[] | null>(null);
     const [pane, setPane] = useState<string | null>(null);
-    const [control, setControl] = useState(false);
+    const [control, setControl] = useState(access !== "view");
+    const [attempt, setAttempt] = useState(0);
     const [text, setText] = useState("");
     const [sent, setSent] = useState<string | null>(null);
     const socket = useRef<WebSocket | null>(null);
@@ -74,7 +94,7 @@ export function TerminalViewer({ terminalId, name, onClose }: { terminalId: stri
         let closed = false;
         const pending = new Map<string, (frame: { envelope?: unknown; code?: string }) => void>();
         void (async () => {
-            const opened = await openTerminalAction(terminalId).catch(() => ({ error: t("terminals.viewer.failed") }));
+            const opened = await open(terminalId).catch(() => ({ error: t("terminals.viewer.failed") }));
             if (closed) return;
             if ("error" in opened) {
                 setState("failed");
@@ -141,9 +161,9 @@ export function TerminalViewer({ terminalId, name, onClose }: { terminalId: stri
             socket.current?.close(1000, "closed");
             socket.current = null;
         };
-        // The socket belongs to this one terminal; `t` is stable.
+        // The socket belongs to this one terminal and attempt; `t` is stable.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [terminalId]);
+    }, [terminalId, attempt]);
 
     // The pane's output: a read-only xterm, watched while the dialog shows it.
     useEffect(() => {
@@ -187,75 +207,114 @@ export function TerminalViewer({ terminalId, name, onClose }: { terminalId: stri
         setSent(t("terminals.viewer.inserted"));
     };
 
-    return (
-        <Dialog open onOpenChange={(next) => !next && onClose()}>
-            <DialogContent className="max-w-4xl">
-                <DialogHeader>
-                    <DialogTitle className="truncate">{name}</DialogTitle>
-                    <DialogDescription>{control ? t("terminals.viewer.controlIntro") : t("terminals.viewer.viewIntro")}</DialogDescription>
-                </DialogHeader>
-                <div className="flex min-w-0 flex-col gap-3">
-                    {state === "connecting" ? <Skeleton className="h-80 w-full" /> : null}
-                    {state === "failed" ? (
-                        <p role="alert" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-                            {problem ?? t("terminals.viewer.failed")}
+    const intro = control
+        ? t("terminals.viewer.controlIntro")
+        : inline
+          ? t("terminals.viewer.linkIntro")
+          : t("terminals.viewer.viewIntro");
+    const body = (
+        <div className="flex min-w-0 flex-col gap-3">
+            {state === "connecting" ? <Skeleton className="h-80 w-full" /> : null}
+            {state === "failed" ? (
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+                    <p role="alert" className="min-w-0 text-sm text-muted-foreground">
+                        {problem ?? t("terminals.viewer.failed")}
+                    </p>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            setProblem(null);
+                            setPanes(null);
+                            setState("connecting");
+                            setAttempt((n) => n + 1);
+                        }}
+                    >
+                        {t("terminals.viewer.retry")}
+                    </Button>
+                </div>
+            ) : null}
+            {state === "ready" ? (
+                <>
+                    {panes && panes.length > 1 ? (
+                        <Select
+                            className="w-full sm:w-64"
+                            aria-label={t("terminals.viewer.pane")}
+                            value={pane ?? ""}
+                            onValueChange={setPane}
+                            options={panes.map((one) => ({
+                                value: one.pane_id,
+                                label: t("terminals.viewer.paneName", {
+                                    tab: (one.tab_index ?? 0) + 1,
+                                    pane: (one.index ?? 0) + 1
+                                })
+                            }))}
+                        />
+                    ) : null}
+                    {panes && panes.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t("terminals.viewer.noPanes")}</p>
+                    ) : (
+                        <div ref={host} className="h-80 min-w-0 overflow-hidden rounded-md bg-[#0b0e14] p-2" />
+                    )}
+                    {problem ? (
+                        <p role="status" className="text-sm text-muted-foreground">
+                            {problem}
                         </p>
                     ) : null}
-                    {state === "ready" ? (
-                        <>
-                            {panes && panes.length > 1 ? (
-                                <Select
-                                    className="w-full sm:w-64"
-                                    aria-label={t("terminals.viewer.pane")}
-                                    value={pane ?? ""}
-                                    onValueChange={setPane}
-                                    options={panes.map((one) => ({
-                                        value: one.pane_id,
-                                        label: t("terminals.viewer.paneName", {
-                                            tab: (one.tab_index ?? 0) + 1,
-                                            pane: (one.index ?? 0) + 1
-                                        })
-                                    }))}
-                                />
-                            ) : null}
-                            {panes && panes.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">{t("terminals.viewer.noPanes")}</p>
-                            ) : (
-                                <div ref={host} className="h-80 min-w-0 overflow-hidden rounded-md bg-[#0b0e14] p-2" />
-                            )}
-                            {problem ? (
-                                <p role="status" className="text-sm text-muted-foreground">
-                                    {problem}
-                                </p>
-                            ) : null}
-                            {control && pane ? (
-                                <form
-                                    className="flex min-w-0 gap-2"
-                                    onSubmit={(event) => {
-                                        event.preventDefault();
-                                        void insert();
-                                    }}
-                                >
-                                    <Input
-                                        className="min-w-0 flex-1 font-mono"
-                                        value={text}
-                                        maxLength={TEXT_MAX}
-                                        placeholder={t("terminals.viewer.inputPlaceholder")}
-                                        aria-label={t("terminals.viewer.inputLabel")}
-                                        onChange={(event) => {
-                                            setText(event.target.value);
-                                            setSent(null);
-                                        }}
-                                    />
-                                    <Button type="submit" aria-disabled={!text}>
-                                        {t("terminals.viewer.insert")}
-                                    </Button>
-                                </form>
-                            ) : null}
-                            {sent ? <p className="text-xs text-muted-foreground">{sent}</p> : null}
-                        </>
+                    {control && pane ? (
+                        <form
+                            className="flex min-w-0 gap-2"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                void insert();
+                            }}
+                        >
+                            <Input
+                                className="min-w-0 flex-1 font-mono"
+                                value={text}
+                                maxLength={TEXT_MAX}
+                                placeholder={t("terminals.viewer.inputPlaceholder")}
+                                aria-label={t("terminals.viewer.inputLabel")}
+                                onChange={(event) => {
+                                    setText(event.target.value);
+                                    setSent(null);
+                                }}
+                            />
+                            <Button type="submit" aria-disabled={!text}>
+                                {t("terminals.viewer.insert")}
+                            </Button>
+                        </form>
                     ) : null}
+                    {sent ? <p className="text-xs text-muted-foreground">{sent}</p> : null}
+                </>
+            ) : null}
+        </div>
+    );
+
+    if (inline) {
+        return (
+            <section className="flex min-w-0 flex-col gap-3">
+                <div className="min-w-0">
+                    <h1 className="truncate text-[1.0625rem] font-semibold tracking-tight" title={name}>
+                        {name}
+                    </h1>
+                    <p className="text-sm text-muted-foreground">{intro}</p>
                 </div>
+                {body}
+            </section>
+        );
+    }
+    return (
+        <Dialog open onOpenChange={(next) => !next && onClose?.()}>
+            <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                    <DialogTitle className="truncate pe-6" title={name}>
+                        {name}
+                    </DialogTitle>
+                    <DialogDescription>{intro}</DialogDescription>
+                </DialogHeader>
+                {body}
             </DialogContent>
         </Dialog>
     );

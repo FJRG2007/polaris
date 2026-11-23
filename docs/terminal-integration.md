@@ -275,7 +275,14 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   inventory. (2) A shared live session is the remote-control relay with a grant:
   `AccessGrant` on a `TerminalInstance` or one pane, with `view` (output only)
   and `control` (input too) levels, and a link variant for view-only
-  sharing with expiry. No separate RTC service.
+  sharing with expiry. No separate RTC service. **Built:** people and link on
+  `terminal.instance`. A link opens at `/k/<token>`, mints a viewer ticket
+  carrying the link's grant id (`containerRef` `link:<id>`, mode `relay`), and
+  the relay routes it with `linkId`: watch only, judged again on every frame and
+  at the minute standing check (`linkGrantStands`), never read as the owner.
+  Each open is a counted use and a line in the access log. A view share and a
+  link may make the layout reads (`pane|tab|window` `.list`/`.inspect`);
+  everything else needs control.
 
 ### CLI integration (`rookctrl` -> Polaris CLI)
 

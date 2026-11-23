@@ -97,6 +97,19 @@ export async function listTerminals(userId: string): Promise<{ owned: TerminalVi
     };
 }
 
+/**
+ * A terminal a link was handed out for, as somebody with no account sees it,
+ * and whose it is (the viewer ticket is written under them), or null once
+ * it was signed out.
+ */
+export async function linkedTerminal(id: string): Promise<{ view: TerminalView; ownerId: string } | null> {
+    const row = await prisma.terminalInstance.findFirst({
+        where: { id, apiKey: liveKey },
+        select: { ...select, userId: true }
+    });
+    return row ? { view: view(row, "view"), ownerId: row.userId } : null;
+}
+
 /** One terminal the caller may at least watch, or null. */
 export async function terminalFor(userId: string, id: string): Promise<TerminalView | null> {
     const { owned, shared } = await listTerminals(userId);

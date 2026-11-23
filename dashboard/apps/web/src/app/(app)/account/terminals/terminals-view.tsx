@@ -110,7 +110,15 @@ export function TerminalsView({ initial, openId }: { initial: Lists; openId: str
                         )
                     ) : null}
                 </div>
-                {!terminal.online ? <p className="text-xs text-muted-foreground">{t("terminals.list.offlineHint")}</p> : null}
+                {!terminal.online ? (
+                    <p className="text-xs text-muted-foreground">
+                        {terminal.access === "owner"
+                            ? t("terminals.list.offlineHint")
+                            : terminal.ownerName
+                              ? t("terminals.list.sharedOfflineHint", { name: terminal.ownerName })
+                              : t("terminals.list.sharedOfflineHintNoName")}
+                    </p>
+                ) : null}
             </div>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -169,7 +177,12 @@ export function TerminalsView({ initial, openId }: { initial: Lists; openId: str
                 </section>
             ) : null}
             {opened ? (
-                <TerminalViewer terminalId={opened.id} name={display(opened)} onClose={() => setOpened(null)} />
+                <TerminalViewer
+                    terminalId={opened.id}
+                    name={display(opened)}
+                    access={opened.access}
+                    onClose={() => setOpened(null)}
+                />
             ) : null}
             {sharing ? (
                 <ShareDialog

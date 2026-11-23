@@ -83,6 +83,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** A pane id as the terminal names it: opaque, short, printable. */
 const PANE = /^[\x21-\x7e]{1,200}$/;
 
+/**
+ * Requests that only read how a terminal is laid out, which a view share and
+ * a link may make: without `pane.list` a viewer could not pick what to watch.
+ * Everything else - input, history, settings, files - needs control.
+ */
+const VIEW_KINDS = new Set(["pane.list", "pane.inspect", "tab.list", "tab.inspect", "window.list", "window.inspect"]);
+
 /** The roles a socket may take, by its `?role=`. */
 const ROLES = new Set(["instance", "controller", "viewer"]);
 
@@ -351,7 +358,14 @@ export function createTerminalRelay(deps) {
         // A viewer's ticket names the one terminal it may reach.
         if (conn.role === "viewer" && conn.identity.bound !== instanceId) return { allowed: false, node: null };
         return deps
-            .app({ op: "route", userId: conn.identity.userId, keyId: conn.identity.keyId ?? null, instanceId, need })
+            .app({
+                op: "route",
+                userId: conn.identity.userId,
+                keyId: conn.identity.keyId ?? null,
+                linkId: conn.identity.linkId ?? null,
+                instanceId,
+                need
+            })
             .catch(() => null);
     }
 
@@ -424,7 +438,8 @@ export function createTerminalRelay(deps) {
 
         // Asked each time rather than cached: a grant withdrawn or a key revoked
         // stops the next request, not the next reconnect.
-        const route = await routeFor(conn, instanceId, "control");
+        const kind = frame.envelope?.action?.kind;
+        const route = await routeFor(conn, instanceId, VIEW_KINDS.has(kind) ? "view" : "control");
         if (conn.closed) return;
         if (!route?.allowed) return fail("not_found");
         if (!route.node) return fail("offline");
@@ -640,6 +655,7 @@ export function createTerminalRelay(deps) {
                     key: entry.key,
                     userId: conn.identity.userId,
                     keyId: conn.identity.keyId ?? null,
+                    linkId: conn.identity.linkId ?? null,
                     instanceId: entry.instanceId
                 });
         if (held.length === 0 && watching.length === 0) return;
@@ -647,7 +663,7 @@ export function createTerminalRelay(deps) {
             .app({
                 op: "standing",
                 instanceIds: held,
-                watches: watching.map(({ userId, keyId, instanceId }) => ({ userId, keyId, instanceId }))
+                watches: watching.map(({ userId, keyId, linkId, instanceId }) => ({ userId, keyId, linkId, instanceId }))
             })
             .catch(() => null);
         const ended = Array.isArray(answer?.ended) ? answer.ended : [];

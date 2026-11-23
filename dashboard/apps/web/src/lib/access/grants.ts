@@ -1086,6 +1086,28 @@ async function judgeLink(token: string, now: Date, paid: boolean): Promise<LinkR
     const [grant] = live([row], zone, now);
     return grant ? { standing: "live", grant, ...base } : { standing: "spent", ...base };
 }
+/**
+ * Whether a link grant opened earlier is still in force over the one subject
+ * it named, by its id: for something a link holds open past the page that
+ * opened it (a terminal's live output). The address, audience and password
+ * rules were judged when it was opened; deletion, dates and hours are judged
+ * again here, and the use count is not, as that open was the use.
+ */
+export async function linkGrantStands(
+    grantId: string,
+    subject: core.GrantSubject,
+    subjectId: string,
+    now = new Date()
+): Promise<boolean> {
+    const row = await prisma.accessGrant.findFirst({
+        where: { id: grantId, principalType: core.LINK_PRINCIPAL, subjectType: subject, subjectId },
+        select: GRANT_FIELDS
+    });
+    if (!row) return false;
+    const paid = { ...row, maxUses: null };
+    return live([paid], await houseZone([paid]), now).length === 1;
+}
+
 /** The unlock-cookie namespace grant links are signed under. */
 const GRANT_LINK_SCOPE = "grant_link";
 

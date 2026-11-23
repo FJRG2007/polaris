@@ -49,6 +49,7 @@ const bodySchema = z.discriminatedUnion("op", [
         op: z.literal("route"),
         userId: z.string().uuid(),
         keyId: z.string().uuid().nullable(),
+        linkId: z.string().uuid().nullish(),
         instanceId: z.string().uuid(),
         need: z.enum(["view", "control"]).default("control")
     }),
@@ -67,7 +68,14 @@ const bodySchema = z.discriminatedUnion("op", [
         op: z.literal("standing"),
         instanceIds: z.array(z.string().uuid()).max(10_000),
         watches: z
-            .array(z.object({ userId: z.string().uuid(), keyId: z.string().uuid().nullable(), instanceId: z.string().uuid() }))
+            .array(
+                z.object({
+                    userId: z.string().uuid(),
+                    keyId: z.string().uuid().nullable(),
+                    linkId: z.string().uuid().nullish(),
+                    instanceId: z.string().uuid()
+                })
+            )
             .max(100_000)
             .default([])
     })

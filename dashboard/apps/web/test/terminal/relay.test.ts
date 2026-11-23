@@ -8,13 +8,23 @@ import { describe, expect, it, vi } from "vitest";
 
 const fakes = vi.hoisted(() => ({
     db: {} as Record<string, any>,
-    granted: "" as string
+    granted: "" as string,
+    linkLive: false
 }));
 vi.mock("@polaris/db", () => ({ prisma: fakes.db }));
 vi.mock("@/lib/api-key-auth", () => ({ authenticateKeyToken: async () => null }));
-vi.mock("@/lib/access/grants", () => ({ grantedCapability: async () => fakes.granted }));
+vi.mock("@/lib/access/grants", () => ({
+    grantedCapability: async () => fakes.granted,
+    linkGrantStands: async () => fakes.linkLive
+}));
 
-import { createCallAssembler, encodeRemoteCall, routeTerminalRequest } from "../../src/lib/terminal/relay";
+import {
+    authenticateRelaySocket,
+    createCallAssembler,
+    encodeRemoteCall,
+    mintViewerTicket,
+    routeTerminalRequest
+} from "../../src/lib/terminal/relay";
 import { TERMINAL_CLOSE, TERMINAL_LIMITS, createTerminalRelay } from "../../terminal-relay.mjs";
 
 const INSTANCE = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
@@ -347,6 +357,45 @@ describe("terminal relay pane output", () => {
         expect(viewer.socket.sent).toContainEqual({ type: "watch_end", instance: INSTANCE, pane: "p1", code: "not_found" });
     });
 
+    it("lets a view share list panes, and asks for control to type", async () => {
+        const { relay, app, calls } = await online();
+        const LINK = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a58";
+        app.mockImplementation(async (body: Record<string, unknown>) => {
+            calls.push(body);
+            return body.op === "auth" ? { userId: USER, keyId: null, bound: INSTANCE, linkId: LINK } : { allowed: false, node: null };
+        });
+        const viewer = await connect(relay, "viewer", "ticket");
+        const request = (kind: string) =>
+            JSON.stringify({ type: "request", instance: INSTANCE, envelope: { request_id: kind, action: { kind, params: null } } });
+        viewer.handlers.message(request("pane.list"));
+        await flush();
+        viewer.handlers.message(request("input.insert"));
+        await flush();
+        viewer.handlers.message(request("history.list"));
+        await flush();
+        const routes = calls.filter((c) => c.op === "route");
+        expect(routes.map((c) => c.need)).toEqual(["view", "control", "control"]);
+        expect(routes.every((c) => c.linkId === LINK)).toBe(true);
+    });
+
+    it("carries a link's id into the standing check", async () => {
+        const { relay, app, calls } = await online();
+        const LINK = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a58";
+        app.mockImplementation(async (body: Record<string, unknown>) => {
+            calls.push(body);
+            if (body.op === "auth") return { userId: USER, keyId: null, bound: INSTANCE, linkId: LINK };
+            if (body.op === "standing") return { ended: [], withdrawn: [0] };
+            return { allowed: true, node: "a" };
+        });
+        const viewer = await connect(relay, "viewer", "ticket");
+        viewer.handlers.message(watch());
+        await flush();
+        await relay.checkStanding();
+        const standing = calls.find((c) => c.op === "standing") as { watches: Record<string, unknown>[] };
+        expect(standing.watches).toEqual([{ userId: USER, keyId: null, linkId: LINK, instanceId: INSTANCE }]);
+        expect(viewer.socket.sent.at(-1)).toEqual({ type: "watch_end", instance: INSTANCE, pane: "p1", code: "not_found" });
+    });
+
     it("ends a watch whose share was withdrawn at the standing check", async () => {
         const { relay, app } = await online();
         const viewer = await connect(relay, "controller");
@@ -380,6 +429,51 @@ describe("routeTerminalRequest", () => {
         expect(await ask("control", null)).toEqual({ allowed: true, node: "a" });
         fakes.db.user = { findUnique: async () => ({ bannedAt: new Date() }) };
         expect(await ask("view", null)).toEqual({ allowed: false, node: null });
+    });
+
+    it("never reads a link's ticket as the owner, and lets it only watch while it stands", async () => {
+        fakes.db.terminalInstance = { findUnique: async () => row };
+        fakes.db.apiKey = { findUnique: async () => standing };
+        fakes.db.user = { findUnique: async () => ({ bannedAt: null }) };
+        fakes.granted = "control";
+        const LINK = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a58";
+        const viaLink = (need: "view" | "control") =>
+            routeTerminalRequest({ userId: row.userId, keyId: null, linkId: LINK, instanceId: INSTANCE, need });
+        fakes.linkLive = true;
+        expect(await viaLink("view")).toEqual({ allowed: true, node: "a" });
+        expect(await viaLink("control")).toEqual({ allowed: false, node: null });
+        fakes.linkLive = false;
+        expect(await viaLink("view")).toEqual({ allowed: false, node: null });
+        fakes.linkLive = true;
+        fakes.db.user = { findUnique: async () => ({ bannedAt: new Date() }) };
+        expect(await viaLink("view")).toEqual({ allowed: false, node: null });
+    });
+});
+
+describe("viewer tickets", () => {
+    it("carries the link a ticket was minted for, once", async () => {
+        const rows: Record<string, any>[] = [];
+        fakes.db.deployTicket = {
+            create: async ({ data }: { data: Record<string, unknown> }) => rows.push({ id: String(rows.length), usedAt: null, ...data }),
+            findUnique: async ({ where }: { where: { tokenHash: string } }) => rows.find((r) => r.tokenHash === where.tokenHash) ?? null,
+            updateMany: async ({ where }: { where: { id: string; usedAt: null } }) => {
+                const found = rows.find((r) => r.id === where.id && r.usedAt === null);
+                if (found) found.usedAt = new Date();
+                return { count: found ? 1 : 0 };
+            }
+        };
+        const LINK = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a58";
+        const linked = await mintViewerTicket(USER, INSTANCE, LINK);
+        const own = await mintViewerTicket(USER, INSTANCE);
+        expect(rows.every((r) => r.mode === "relay")).toBe(true);
+        expect(await authenticateRelaySocket({ token: linked, role: "viewer" })).toEqual({
+            userId: USER,
+            keyId: null,
+            bound: INSTANCE,
+            linkId: LINK
+        });
+        expect(await authenticateRelaySocket({ token: linked, role: "viewer" })).toBeNull();
+        expect(await authenticateRelaySocket({ token: own, role: "viewer" })).toEqual({ userId: USER, keyId: null, bound: INSTANCE });
     });
 });
 

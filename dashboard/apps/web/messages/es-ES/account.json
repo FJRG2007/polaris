@@ -2271,7 +2271,8 @@
         "page": {
             "title": "Tus terminales",
             "intro": "Cada Polaris Terminal con tu sesión, y los que te han compartido. Abre uno para verlo o escribir en él desde aquí.",
-            "noAccess": "Tu rol no incluye acceder a terminales. Un administrador puede añadirlo a tu rol."
+            "noAccess": "Tu rol no incluye acceder a terminales. Un administrador puede añadirlo a tu rol.",
+            "linkTitle": "Terminal compartido"
         },
         "list": {
             "empty": "Aún no hay terminales. Inicia sesión desde Polaris Terminal y aparecerá aquí.",
@@ -2286,7 +2287,9 @@
             "canView": "Puede ver",
             "canControl": "Lo controla",
             "unnamed": "Polaris Terminal",
-            "actions": "Acciones de {name}"
+            "actions": "Acciones de {name}",
+            "sharedOfflineHint": "Aparece aquí cuando {name} abra Polaris Terminal en ese equipo.",
+            "sharedOfflineHintNoName": "Aparece aquí cuando su dueño abra Polaris Terminal en ese equipo."
         },
         "open": {
             "button": "Abrir",
@@ -2321,12 +2324,15 @@
             "busy": "Demasiadas personas lo están viendo ahora. Prueba de nuevo en un momento.",
             "notFound": "Ya no puedes acceder a este terminal.",
             "closed": "La conexión se cerró. Cierra esto y vuelve a abrir el terminal.",
-            "failed": "No se pudo acceder al terminal. Prueba de nuevo."
+            "failed": "No se pudo acceder al terminal. Prueba de nuevo.",
+            "linkIntro": "Compartido contigo con un enlace. Puedes mirarlo, no escribir.",
+            "retry": "Reintentar"
         },
         "errors": {
             "gone": "Ese terminal ya no está aquí.",
             "name": "Usa de 1 a 60 caracteres.",
-            "offline": "Ese terminal no tiene conexión ahora."
+            "offline": "Ese terminal no tiene conexión ahora.",
+            "tooMany": "Abierto demasiadas veces desde aquí. Prueba en unos minutos."
         }
     },
     "computers": {

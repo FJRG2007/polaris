@@ -769,7 +769,8 @@ export const GRANT_LINK_SUBJECTS = [
     "place.room",
     "place.panel",
     "watch.connectivity",
-    "agents.artifact"
+    "agents.artifact",
+    "terminal.instance"
 ] as const satisfies readonly GrantSubject[];
 
 export type GrantLinkSubject = (typeof GRANT_LINK_SUBJECTS)[number];
@@ -782,14 +783,15 @@ export function isGrantLinkSubject(value: unknown): value is GrantLinkSubject {
  * Subjects a link only ever shows. A NAS's fan and backups, and anything a
  * server or a domain could ever be given control of, need an account at the
  * other end: a link cannot be attributed to anybody, and those reach machines
- * other people depend on.
+ * other people depend on. A terminal's link watches its output and never types.
  */
 export const LINK_WATCH_ONLY_SUBJECTS = [
     "place.nas",
     "place.server",
     "place.domain",
     "watch.connectivity",
-    "agents.artifact"
+    "agents.artifact",
+    "terminal.instance"
 ] as const satisfies readonly GrantLinkSubject[];
 
 /**

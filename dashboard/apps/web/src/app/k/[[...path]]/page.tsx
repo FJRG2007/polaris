@@ -5,7 +5,7 @@
  * bound on it - dates, hours, uses, which actions, only near the place - is
  * judged on the server for each press (`lib/access/grants` `linkReach`). A
  * door and a camera are Places' to draw, so their page comes from the app's
- * bundle, and so does a wall panel, drawn full screen; a UPS, a NAS, a server and a domain are core's and drawn here. A link that opens nothing says why in one sentence
+ * bundle, and so does a wall panel, drawn full screen; a UPS, a NAS, a server, a domain and a terminal are core's and drawn here. A link that opens nothing says why in one sentence
  * and nothing about what it was.
  */
 
@@ -29,6 +29,8 @@ import { renderAppPage, type AppPageProps } from "@/lib/app-bundles/serve-page";
 import { artifactDetail } from "@/lib/agents/session-artifacts";
 import { SharedArtifact } from "./artifact-guest";
 import { linkPreviewMetadata } from "@/lib/link-preview/metadata";
+import { TerminalGuest } from "./terminal-guest";
+import { linkedTerminal } from "@/lib/terminal/instances";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -115,6 +117,21 @@ export default async function GuestLinkPage(props: AppPageProps) {
             <PublicShell>
                 <Messages namespaces={["polar", "publicPages", "driveViewer"]}>
                     <SharedArtifact token={token} artifact={detail.artifact} versions={detail.versions} />
+                </Messages>
+            </PublicShell>
+        );
+    }
+    if (reached.subjectType === "terminal.instance") {
+        const [terminal, account] = await Promise.all([linkedTerminal(reached.subjectId), getTranslations("account")]);
+        if (!terminal) return <LinkUnavailable message={words("guestLink.gone")} />;
+        return (
+            <PublicShell className="max-w-4xl">
+                <Messages namespaces={["account", "publicPages"]}>
+                    <TerminalGuest
+                        token={token}
+                        terminalId={terminal.view.id}
+                        name={terminal.view.name ?? account("terminals.page.linkTitle")}
+                    />
                 </Messages>
             </PublicShell>
         );

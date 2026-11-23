@@ -17,7 +17,7 @@ import os from "node:os";
 import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { generateToken, hashToken } from "@polaris/core/tokens";
-import { grantedCapability } from "@/lib/access/grants";
+import { grantedCapability, linkGrantStands } from "@/lib/access/grants";
 import * as live from "@/lib/live/pg-listener";
 import { authenticateKeyToken } from "@/lib/api-key-auth";
 import { splitBase64 } from "@/lib/computers/computer-commands";
@@ -56,17 +56,23 @@ export interface TerminalIdentity {
     readonly instanceId?: string;
     /** The one terminal a web viewer's ticket names. */
     readonly bound?: string;
+    /** The link grant a viewer came through, for somebody with no account:
+     *  `userId` is then the terminal's owner and gives nothing by itself. */
+    readonly linkId?: string;
 }
 
+/** A viewer ticket's `containerRef` when it was minted for a link. */
+const LINK_REF = "link:";
+
 /** A one-shot ticket for the web screen to reach one terminal through the relay. */
-export async function mintViewerTicket(userId: string, instanceId: string): Promise<string> {
+export async function mintViewerTicket(userId: string, instanceId: string, linkId?: string): Promise<string> {
     const token = generateToken();
     await prisma.deployTicket.create({
         data: {
             tokenHash: hashToken(token),
             userId,
             targetId: instanceId,
-            containerRef: "terminal",
+            containerRef: linkId ? `${LINK_REF}${linkId}` : "terminal",
             mode: VIEWER_TICKET_MODE,
             expiresAt: new Date(Date.now() + VIEWER_TICKET_MS)
         }
@@ -83,7 +89,8 @@ async function redeemViewerTicket(token: string): Promise<TerminalIdentity | nul
         data: { usedAt: new Date() }
     });
     if (spent.count !== 1) return null;
-    return { userId: ticket.userId, keyId: null, bound: ticket.targetId };
+    const linkId = ticket.containerRef.startsWith(LINK_REF) ? ticket.containerRef.slice(LINK_REF.length) : undefined;
+    return { userId: ticket.userId, keyId: null, bound: ticket.targetId, ...(linkId ? { linkId } : {}) };
 }
 
 /**
@@ -166,12 +173,14 @@ async function userStands(userId: string): Promise<boolean> {
 /**
  * Where a controller's or viewer's frame for `instanceId` goes. `need` is
  * `view` for watching a pane and `control` for a request; the owner has both,
- * anybody else what a share of it gives them. Not allowed reads the same for an
- * instance that does not exist and one the caller may not reach.
+ * anybody else what a share of it gives them, and a link only ever watching.
+ * Not allowed reads the same for an instance that does not exist and one the
+ * caller may not reach.
  */
 export async function routeTerminalRequest(input: {
     userId: string;
     keyId: string | null;
+    linkId?: string | null;
     instanceId: string;
     need?: "view" | "control";
 }): Promise<{ allowed: boolean; node: string | null }> {
@@ -180,7 +189,12 @@ export async function routeTerminalRequest(input: {
         select: { userId: true, apiKeyId: true, relayNode: true }
     });
     if (!row) return { allowed: false, node: null };
-    if (row.userId !== input.userId) {
+    if (input.linkId) {
+        // Checked before the owner shortcut: a link's ticket carries the
+        // owner's id, and must never be read as the owner.
+        if ((input.need ?? "control") !== "view" || input.keyId) return { allowed: false, node: null };
+        if (!(await linkGrantStands(input.linkId, TERMINAL_GRANT, input.instanceId))) return { allowed: false, node: null };
+    } else if (row.userId !== input.userId) {
         const held = await grantedCapability(input.userId, TERMINAL_GRANT, input.instanceId);
         if (!held || !core.atLeast(TERMINAL_GRANT, held, input.need ?? "control")) return { allowed: false, node: null };
     }
@@ -214,12 +228,12 @@ export async function endedTerminals(instanceIds: readonly string[]): Promise<st
 
 /** Of the watches a sidecar holds, the positions of those no longer allowed. */
 export async function withdrawnWatches(
-    watches: readonly { userId: string; keyId: string | null; instanceId: string }[]
+    watches: readonly { userId: string; keyId: string | null; linkId?: string | null; instanceId: string }[]
 ): Promise<number[]> {
     const answers = new Map<string, Promise<boolean>>();
     const out: number[] = [];
     for (const [index, watch] of watches.entries()) {
-        const key = `${watch.userId}|${watch.keyId ?? ""}|${watch.instanceId}`;
+        const key = `${watch.userId}|${watch.keyId ?? ""}|${watch.linkId ?? ""}|${watch.instanceId}`;
         let answer = answers.get(key);
         if (!answer) {
             answer = routeTerminalRequest({ ...watch, need: "view" }).then((route) => route.allowed);
