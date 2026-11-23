@@ -7,18 +7,26 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@polaris/ui";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, userHasManage } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { RecycleBinSettings } from "../recycle-bin-settings";
+import { NetworkIsolationCard } from "../network-isolation-card";
 import { openShelfBinPolicy } from "@/lib/deploy/recycle-bin-access";
+import { reviewNetworkIsolation } from "@/lib/deploy/network-isolation";
 
 export const dynamic = "force-dynamic";
 
 export default async function DeploySettingsPage() {
     const user = await requirePermission("deploy.read");
-    const [t, view] = await Promise.all([
+    const [t, view, isolation, canManage] = await Promise.all([
         getTranslations("deploySafety"),
-        openShelfBinPolicy(user)
+        openShelfBinPolicy(user),
+        // The offer is a nicety: a failed read leaves the page as it was.
+        reviewNetworkIsolation(user.id).catch((error) => {
+            console.error("polaris: could not review network isolation:", error);
+            return null;
+        }),
+        userHasManage(user, "deploy.manage")
     ]);
     return (
         <div className="mx-auto flex w-full max-w-2xl flex-col">
@@ -37,7 +45,10 @@ export default async function DeploySettingsPage() {
                         : t("binSettings.personalScope")
                 }
             />
-            <RecycleBinSettings initial={view.policy} lock={view.lock} orgName={view.orgName} />
+            <div className="flex flex-col gap-4">
+                {isolation && <NetworkIsolationCard review={isolation} canManage={canManage} />}
+                <RecycleBinSettings initial={view.policy} lock={view.lock} orgName={view.orgName} />
+            </div>
         </div>
     );
 }

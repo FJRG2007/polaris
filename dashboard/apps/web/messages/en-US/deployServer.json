@@ -380,5 +380,10 @@
     },
     "dependencies": {
         "loadFailed": "Could not load the dependencies"
+    },
+    "isolation": {
+        "nothingChosen": "Choose at least one environment",
+        "failed": "Could not close those environments. Try again in a moment.",
+        "alreadyDone": "This was already answered, so nothing changed. Reload the page to see where things stand."
     }
 }

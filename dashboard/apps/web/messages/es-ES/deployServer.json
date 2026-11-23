@@ -380,5 +380,10 @@
     },
     "dependencies": {
         "loadFailed": "No se cargaron las dependencias"
+    },
+    "isolation": {
+        "nothingChosen": "Elige al menos un entorno",
+        "failed": "No se pudieron cerrar esos entornos. Inténtalo de nuevo en un momento.",
+        "alreadyDone": "Esto ya tenía respuesta, así que nada cambió. Recarga la página para ver cómo está."
     }
 }

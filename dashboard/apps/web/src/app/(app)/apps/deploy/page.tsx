@@ -7,6 +7,7 @@ import { requirePermission, userHasManage } from "@/lib/session";
 import { mayCreateProjectIn } from "@/lib/deploy-project-access";
 import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { ProjectsGrid, type ProjectCardData } from "./projects-grid";
+import { reviewNetworkIsolation } from "@/lib/deploy/network-isolation";
 import { getApplicationDeployStatuses, listProjects } from "@/lib/deploy-service";
 
 export const dynamic = "force-dynamic";
@@ -25,10 +26,13 @@ export default async function DeployPage() {
     // The shelf that is open decides what is listed: your own services, or the
     // organization's. A project never appears on both. None of the three waits on
     // another.
-    const [, caps, projects] = await Promise.all([
+    const [, caps, projects, isolation] = await Promise.all([
         canManage ? getOrCreateLocalTarget(user.id) : null,
         canManage ? capabilitiesFor("deploy") : null,
-        listProjects(user.id, orgId)
+        listProjects(user.id, orgId),
+        // Only a pointer to Deploy settings, where the offer is made; a failed
+        // read simply shows none.
+        canManage ? reviewNetworkIsolation(user.id).catch(() => null) : null
     ]);
     const localReady = Boolean(caps?.deploy);
 
@@ -92,6 +96,7 @@ export default async function DeployPage() {
             canManage={canManage}
             localReady={localReady}
             canCreateHere={canCreateHere}
+            isolationOffered={isolation?.capable ? isolation.environments.length : 0}
         />
     );
 }

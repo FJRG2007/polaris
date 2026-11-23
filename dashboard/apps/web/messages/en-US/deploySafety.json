@@ -113,5 +113,29 @@
         "failed": "Could not save it. Try again in a moment.",
         "lockNoDeploy": "Changing this needs permission to manage Deploy.",
         "lockNotOrgAdmin": "Only the owners and admins of {org} can change this."
+    },
+    "isolation": {
+        "title": "Give each environment its own network",
+        "intro": "These environments still share one network with every other project, so any service can reach theirs by name. Closing them restarts what runs in them. Domains and published ports keep working.",
+        "needsUpdate": "This server cannot make private networks yet. Update Polaris from Settings, then come back here.",
+        "include": "Include {name}",
+        "changeIsolate": "Gets its own network. Everything running in it restarts, databases first.",
+        "changeRestart": "Already private, but its routed services still sit on the shared network until they restart.",
+        "nothingRuns": "Nothing is running, so nothing restarts.",
+        "restarts": "Restarts: {names}",
+        "restartsMore": "Restarts: {names} and {count} more",
+        "truncated": "More environments are waiting. They are listed here once these are done.",
+        "apply": "Close and restart",
+        "keep": "Keep as they are",
+        "kept": "Kept as they are. You can still change each environment under its project's Networking settings.",
+        "started": "Restarting {count, plural, one {# service} other {# services}}. Each one shows in its history.",
+        "failed": "Could not do that. Try again in a moment.",
+        "confirmTitle": "Restart onto private networks?",
+        "confirmBody": "{environments, plural, one {# environment gets} other {# environments get}} a network of its own and {count, plural, one {# service restarts} other {# services restart}}. Anything in another project that reaches them by name stops reaching them.",
+        "confirm": "Restart now",
+        "cancel": "Cancel",
+        "homeNotice": "{count, plural, one {# environment shares} other {# environments share}} one network with every other project.",
+        "review": "Review",
+        "isolatedOnly": "Done. Nothing was running, so nothing restarts."
     }
 }

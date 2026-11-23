@@ -104,11 +104,15 @@ export function ProjectsGrid({
     projects,
     canManage,
     localReady,
-    canCreateHere = canManage
+    canCreateHere = canManage,
+    isolationOffered = 0
 }: {
     projects: ProjectCardData[];
     canManage: boolean;
     localReady: boolean;
+    /** Environments still on the machine-wide network that Deploy settings
+     *  offers to close (see `lib/deploy/network-isolation.ts`). */
+    isolationOffered?: number;
     /** Whether the reader may make a project on the open shelf - the import's own check. */
     canCreateHere?: boolean;
 }) {
@@ -202,6 +206,17 @@ export function ProjectsGrid({
                     )}
                 </div>
             </div>
+
+            {canManage && isolationOffered > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 px-4 py-3 text-sm">
+                    <p className="min-w-0 text-muted-foreground">
+                        {tSafety("isolation.homeNotice", { count: isolationOffered })}
+                    </p>
+                    <Button asChild size="sm" variant="outline">
+                        <Link href="/apps/deploy/settings">{tSafety("isolation.review")}</Link>
+                    </Button>
+                </div>
+            )}
 
             {failure && (
                 <div className="flex items-start justify-between gap-3 rounded-lg border border-danger-edge bg-danger-soft px-4 py-3 text-sm text-danger-ink">

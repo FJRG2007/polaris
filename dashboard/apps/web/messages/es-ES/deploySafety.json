@@ -113,5 +113,29 @@
         "failed": "No se pudo guardar. Inténtalo de nuevo en un momento.",
         "lockNoDeploy": "Cambiar esto requiere permiso para gestionar Deploy.",
         "lockNotOrgAdmin": "Solo los propietarios y administradores de {org} pueden cambiarlo."
+    },
+    "isolation": {
+        "title": "Una red propia para cada entorno",
+        "intro": "Estos entornos aún comparten una red con todos los demás proyectos, así que cualquier servicio puede llegar a los suyos por nombre. Cerrarlos reinicia lo que se ejecuta en ellos. Los dominios y los puertos publicados siguen funcionando.",
+        "needsUpdate": "Este servidor aún no puede crear redes privadas. Actualiza Polaris desde Ajustes y vuelve aquí.",
+        "include": "Incluir {name}",
+        "changeIsolate": "Tendrá su propia red. Todo lo que se ejecuta en él se reinicia, primero las bases de datos.",
+        "changeRestart": "Ya es privado, pero sus servicios con dominio siguen en la red compartida hasta que se reinicien.",
+        "nothingRuns": "No hay nada en marcha, así que nada se reinicia.",
+        "restarts": "Se reinicia: {names}",
+        "restartsMore": "Se reinician: {names} y {count} más",
+        "truncated": "Hay más entornos esperando. Aparecerán aquí cuando terminen estos.",
+        "apply": "Cerrar y reiniciar",
+        "keep": "Dejarlos así",
+        "kept": "Se quedan así. Puedes cambiar cada entorno en los ajustes de Redes de su proyecto.",
+        "started": "Reiniciando {count, plural, one {# servicio} other {# servicios}}. Cada uno aparece en su historial.",
+        "failed": "No se pudo hacer. Inténtalo de nuevo en un momento.",
+        "confirmTitle": "¿Reiniciar en redes privadas?",
+        "confirmBody": "{environments, plural, one {# entorno tendrá} other {# entornos tendrán}} una red propia y {count, plural, one {se reinicia # servicio} other {se reinician # servicios}}. Lo que en otro proyecto llegue a ellos por nombre dejará de llegar.",
+        "confirm": "Reiniciar ya",
+        "cancel": "Cancelar",
+        "homeNotice": "{count, plural, one {# entorno comparte} other {# entornos comparten}} una red con todos los demás proyectos.",
+        "review": "Revisar",
+        "isolatedOnly": "Hecho. No había nada en marcha, así que nada se reinicia."
     }
 }
