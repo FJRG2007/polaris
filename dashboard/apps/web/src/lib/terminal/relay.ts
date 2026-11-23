@@ -14,7 +14,10 @@
 
 import { z } from "zod";
 import os from "node:os";
+import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
+import { generateToken, hashToken } from "@polaris/core/tokens";
+import { grantedCapability } from "@/lib/access/grants";
 import * as live from "@/lib/live/pg-listener";
 import { authenticateKeyToken } from "@/lib/api-key-auth";
 import { splitBase64 } from "@/lib/computers/computer-commands";
@@ -23,6 +26,13 @@ export const TERMINAL_CHANNEL = "polaris_terminal";
 
 /** The scope a key needs to hold a relay socket, as either side. */
 export const TERMINAL_CONTROL_SCOPE = "terminal.control";
+
+/** What a share of one terminal is filed under. */
+export const TERMINAL_GRANT = "terminal.instance" satisfies core.GrantSubject;
+
+/** A web viewer's ticket: a `DeployTicket` row of this mode, one terminal, once. */
+export const VIEWER_TICKET_MODE = "relay";
+const VIEWER_TICKET_MS = 60_000;
 
 /** The largest frame carried between nodes, matching the sidecar's own cap. */
 export const TERMINAL_FRAME_BYTES = 256 * 1024;
@@ -40,9 +50,40 @@ export function terminalNode(): string {
 
 export interface TerminalIdentity {
     readonly userId: string;
-    readonly keyId: string;
+    /** The key a terminal or controller presented; null for a web viewer. */
+    readonly keyId: string | null;
     /** Set for a terminal's own socket, absent for a controller. */
     readonly instanceId?: string;
+    /** The one terminal a web viewer's ticket names. */
+    readonly bound?: string;
+}
+
+/** A one-shot ticket for the web screen to reach one terminal through the relay. */
+export async function mintViewerTicket(userId: string, instanceId: string): Promise<string> {
+    const token = generateToken();
+    await prisma.deployTicket.create({
+        data: {
+            tokenHash: hashToken(token),
+            userId,
+            targetId: instanceId,
+            containerRef: "terminal",
+            mode: VIEWER_TICKET_MODE,
+            expiresAt: new Date(Date.now() + VIEWER_TICKET_MS)
+        }
+    });
+    return token;
+}
+
+/** Spend a viewer ticket: who it was minted for and which terminal, once. */
+async function redeemViewerTicket(token: string): Promise<TerminalIdentity | null> {
+    const ticket = await prisma.deployTicket.findUnique({ where: { tokenHash: hashToken(token) } });
+    if (!ticket || ticket.mode !== VIEWER_TICKET_MODE || ticket.usedAt || ticket.expiresAt < new Date()) return null;
+    const spent = await prisma.deployTicket.updateMany({
+        where: { id: ticket.id, usedAt: null },
+        data: { usedAt: new Date() }
+    });
+    if (spent.count !== 1) return null;
+    return { userId: ticket.userId, keyId: null, bound: ticket.targetId };
 }
 
 /**
@@ -52,10 +93,11 @@ export interface TerminalIdentity {
  */
 export async function authenticateRelaySocket(input: {
     token: string;
-    role: "instance" | "controller";
+    role: "instance" | "controller" | "viewer";
     ip?: string;
     userAgent?: string;
 }): Promise<TerminalIdentity | null> {
+    if (input.role === "viewer") return redeemViewerTicket(input.token);
     const principal = await authenticateKeyToken(input.token, input.ip, input.userAgent);
     if (!principal || !principal.scopes.includes(TERMINAL_CONTROL_SCOPE)) return null;
     if (input.role === "controller") return { userId: principal.userId, keyId: principal.keyId };
@@ -115,21 +157,35 @@ async function keyStands(keyId: string, now = new Date()): Promise<boolean> {
     );
 }
 
+/** Whether somebody who is not banned holds an account. */
+async function userStands(userId: string): Promise<boolean> {
+    const row = await prisma.user.findUnique({ where: { id: userId }, select: { bannedAt: true } });
+    return Boolean(row && !row.bannedAt);
+}
+
 /**
- * Where a controller's request for `instanceId` goes. Not allowed reads the
- * same for an instance that does not exist and one somebody else owns.
+ * Where a controller's or viewer's frame for `instanceId` goes. `need` is
+ * `view` for watching a pane and `control` for a request; the owner has both,
+ * anybody else what a share of it gives them. Not allowed reads the same for an
+ * instance that does not exist and one the caller may not reach.
  */
 export async function routeTerminalRequest(input: {
     userId: string;
-    keyId: string;
+    keyId: string | null;
     instanceId: string;
+    need?: "view" | "control";
 }): Promise<{ allowed: boolean; node: string | null }> {
     const row = await prisma.terminalInstance.findUnique({
         where: { id: input.instanceId },
         select: { userId: true, apiKeyId: true, relayNode: true }
     });
-    if (!row || row.userId !== input.userId) return { allowed: false, node: null };
-    if (!(await keyStands(input.keyId))) return { allowed: false, node: null };
+    if (!row) return { allowed: false, node: null };
+    if (row.userId !== input.userId) {
+        const held = await grantedCapability(input.userId, TERMINAL_GRANT, input.instanceId);
+        if (!held || !core.atLeast(TERMINAL_GRANT, held, input.need ?? "control")) return { allowed: false, node: null };
+    }
+    const callerStands = input.keyId ? await keyStands(input.keyId) : await userStands(input.userId);
+    if (!callerStands) return { allowed: false, node: null };
     if (!(await keyStands(row.apiKeyId))) return { allowed: true, node: null };
     return { allowed: true, node: row.relayNode };
 }
@@ -156,12 +212,38 @@ export async function endedTerminals(instanceIds: readonly string[]): Promise<st
     return instanceIds.filter((id) => !standing.has(id));
 }
 
+/** Of the watches a sidecar holds, the positions of those no longer allowed. */
+export async function withdrawnWatches(
+    watches: readonly { userId: string; keyId: string | null; instanceId: string }[]
+): Promise<number[]> {
+    const answers = new Map<string, Promise<boolean>>();
+    const out: number[] = [];
+    for (const [index, watch] of watches.entries()) {
+        const key = `${watch.userId}|${watch.keyId ?? ""}|${watch.instanceId}`;
+        let answer = answers.get(key);
+        if (!answer) {
+            answer = routeTerminalRequest({ ...watch, need: "view" }).then((route) => route.allowed);
+            answers.set(key, answer);
+        }
+        if (!(await answer)) out.push(index);
+    }
+    return out;
+}
+
 /* ---------------------------------------------------------------- cross-node */
 
 /** What one node asks of another's sidecar. */
 export type RemoteTerminalCall =
     | { readonly path: "/terminal/deliver"; readonly body: { instanceId: string; id: string; origin: string; envelope: unknown } }
-    | { readonly path: "/terminal/reply"; readonly body: { id: string; frame: unknown } };
+    | { readonly path: "/terminal/reply"; readonly body: { id: string; frame: unknown } }
+    | {
+          readonly path: "/terminal/watch";
+          readonly body: { instanceId: string; pane: string; origin: string; on: boolean };
+      }
+    | { readonly path: "/terminal/stream"; readonly body: { instanceId: string; pane: string; frame: unknown } };
+
+/** A pane id as the sidecar accepts it. */
+export const paneSchema = z.string().regex(/^[\x21-\x7e]{1,200}$/);
 
 const pieceSchema = z.object({
     n: z.string().min(1).max(255),
@@ -184,6 +266,19 @@ const callSchema = z.discriminatedUnion("path", [
     z.object({
         path: z.literal("/terminal/reply"),
         body: z.object({ id: z.string().uuid(), frame: z.unknown() })
+    }),
+    z.object({
+        path: z.literal("/terminal/watch"),
+        body: z.object({
+            instanceId: z.string().uuid(),
+            pane: paneSchema,
+            origin: z.string().min(1).max(255),
+            on: z.boolean()
+        })
+    }),
+    z.object({
+        path: z.literal("/terminal/stream"),
+        body: z.object({ instanceId: z.string().uuid(), pane: paneSchema, frame: z.unknown() })
     })
 ]);
 

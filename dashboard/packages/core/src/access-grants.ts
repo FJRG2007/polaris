@@ -98,7 +98,8 @@ export const GRANT_SUBJECTS = [
     "task.task",
     "place.place",
     "mail.mailbox",
-    "place.panel"
+    "place.panel",
+    "terminal.instance"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -269,7 +270,12 @@ export const GRANT_CAPABILITIES = {
     // the wall that nobody signs in on. Only what the panel shows - a device
     // taken off it, or out of a room card's room, stops being reached.
     // Arranging the panel stays with the people who run the house.
-    "place.panel": ["view", "control"]
+    "place.panel": ["view", "control"],
+    // One Polaris Terminal: watching its panes, or also typing into them and
+    // running its control actions - the split tmate and VS Code Live Share draw
+    // between a read-only and a read-write seat. Renaming, signing it out and
+    // sharing it stay with its owner.
+    "terminal.instance": ["view", "control"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -328,7 +334,8 @@ export const GRANT_ACTIONS = {
     "task.task": [],
     "place.place": ["watch", "open", "close", "operate"],
     "mail.mailbox": [],
-    "place.panel": ["watch", "open", "close", "operate"]
+    "place.panel": ["watch", "open", "close", "operate"],
+    "terminal.instance": []
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

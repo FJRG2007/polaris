@@ -15,6 +15,8 @@ import {
     TERMINAL_BODY_BYTES,
     authenticateRelaySocket,
     endedTerminals,
+    paneSchema,
+    withdrawnWatches,
     listenForTerminalCalls,
     recordTerminalPresence,
     routeTerminalRequest,
@@ -31,7 +33,7 @@ const bodySchema = z.discriminatedUnion("op", [
     z.object({
         op: z.literal("auth"),
         token: z.string().min(1).max(512),
-        role: z.enum(["instance", "controller"]),
+        role: z.enum(["instance", "controller", "viewer"]),
         headers: z.record(z.string(), z.string().max(1024)).default({})
     }),
     z.object({
@@ -46,9 +48,12 @@ const bodySchema = z.discriminatedUnion("op", [
     z.object({
         op: z.literal("route"),
         userId: z.string().uuid(),
-        keyId: z.string().uuid(),
-        instanceId: z.string().uuid()
+        keyId: z.string().uuid().nullable(),
+        instanceId: z.string().uuid(),
+        need: z.enum(["view", "control"]).default("control")
     }),
+    z.object({ op: z.literal("watch"), node, origin: node, instanceId: z.string().uuid(), pane: paneSchema, on: z.boolean() }),
+    z.object({ op: z.literal("stream"), node, instanceId: z.string().uuid(), pane: paneSchema, frame: z.unknown() }),
     z.object({
         op: z.literal("forward"),
         node,
@@ -58,7 +63,14 @@ const bodySchema = z.discriminatedUnion("op", [
         envelope: z.unknown()
     }),
     z.object({ op: z.literal("reply"), node, id: z.string().uuid(), frame: z.unknown() }),
-    z.object({ op: z.literal("standing"), instanceIds: z.array(z.string().uuid()).max(10_000) })
+    z.object({
+        op: z.literal("standing"),
+        instanceIds: z.array(z.string().uuid()).max(10_000),
+        watches: z
+            .array(z.object({ userId: z.string().uuid(), keyId: z.string().uuid().nullable(), instanceId: z.string().uuid() }))
+            .max(100_000)
+            .default([])
+    })
 ]);
 
 function safeEqual(a: string, b: string): boolean {
@@ -115,7 +127,24 @@ export async function POST(request: Request): Promise<Response> {
             return Response.json({
                 ok: await sendRemoteCall(body.node, { path: "/terminal/reply", body: { id: body.id, frame: body.frame } })
             });
+        case "watch":
+            return Response.json({
+                ok: await sendRemoteCall(body.node, {
+                    path: "/terminal/watch",
+                    body: { instanceId: body.instanceId, pane: body.pane, origin: body.origin, on: body.on }
+                })
+            });
+        case "stream":
+            return Response.json({
+                ok: await sendRemoteCall(body.node, {
+                    path: "/terminal/stream",
+                    body: { instanceId: body.instanceId, pane: body.pane, frame: body.frame }
+                })
+            });
         case "standing":
-            return Response.json({ ended: await endedTerminals(body.instanceIds) });
+            return Response.json({
+                ended: await endedTerminals(body.instanceIds),
+                withdrawn: await withdrawnWatches(body.watches)
+            });
     }
 }

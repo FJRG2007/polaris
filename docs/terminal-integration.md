@@ -233,9 +233,26 @@ vocabulary, `XWarpPointer`) carries over unchanged.
     through the web app and `pg_notify` (`polaris_terminal`, base64 pieces
     under the NOTIFY limit, 256 KiB per frame) to that node's sidecar, and the
     answer comes back the same way.
-  - **Not built yet:** watching a pane's output live (a capped stream on the
-    same socket, only while a viewer is attached) and a web screen listing the
-    account's terminals.
+  - **Live pane output:** a controller or viewer sends
+    `{ "type": "watch", "instance", "pane" }` (and `unwatch`); the first watcher
+    makes the relay send the terminal `{ "type": "attach", "pane" }`, the last
+    one leaving `{ "type": "detach", "pane" }`. The terminal sends
+    `{ "type": "output", "pane", "data" }` (base64 of the pane's bytes) only
+    while attached; watchers get it with `instance` added, and `"gap": true` on
+    the first frame after some were dropped. Answers: `watching`, or
+    `watch_end` with `code` `not_found`, `offline` or `busy`. Caps: 16 panes per
+    socket, 32 watchers per pane per node, 256 KiB/s per pane (1 MiB burst). A
+    watcher on another node is one entry on the holding node (`/terminal/watch`,
+    `/terminal/stream` over the same pg_notify path). The standing check ends a
+    watch whose share was withdrawn.
+  - **Web screen:** `/account/terminals` lists the account's terminals and the
+    ones shared with it (online = open relay socket), with open (live output,
+    pane picker, insert text via `input.insert` for control), rename (a `label`
+    column the hello never overwrites), share (`terminal.instance` grant,
+    `view`/`control`, people only - no link variant yet) and sign out (revokes
+    the key, drops the row and its shares). It opens the relay as
+    `?role=viewer` with a one-shot `DeployTicket` (mode `relay`) in
+    `Sec-WebSocket-Protocol`, bound to that one terminal.
 - **Code:** `apps/web/terminal-relay.mjs` (sidecar), `apps/web/ws-server.mjs`
   (wiring), `apps/web/src/lib/terminal/relay.ts` and
   `apps/web/src/app/api/terminal/relay/route.ts` (loopback),
@@ -355,6 +372,8 @@ vocabulary, `XWarpPointer`) carries over unchanged.
 | CI scaffold for `terminal/**` | `.github/workflows/terminal.yml` |
 | Remote-control relay at `/api/deploy/ws/terminal`, scope `terminal.control`, `TerminalInstance` | `apps/web/terminal-relay.mjs`, `apps/web/src/lib/terminal/relay.ts`, `app/api/terminal/relay/route.ts` |
 
-Not built, with the design above: live pane output over the relay, terminal
-objects and shared sessions, the `polaris terminal` CLI subcommand, and the Desktop
+| Live pane output, `/account/terminals`, `terminal.instance` shares | `terminal-relay.mjs`, `lib/terminal/instances.ts`, `app/(app)/account/terminals/` |
+
+Not built, with the design above: link shares of a terminal, terminal
+objects, the `polaris terminal` CLI subcommand, and the Desktop
 shared sign-in.

@@ -2267,6 +2267,68 @@
             "floor": "Never"
         }
     },
+    "terminals": {
+        "page": {
+            "title": "Your terminals",
+            "intro": "Every Polaris Terminal you signed in, and the ones shared with you. Open one to watch it or type into it from here.",
+            "noAccess": "Your role does not include reaching terminals. An administrator can add it to your role."
+        },
+        "list": {
+            "empty": "No terminal yet. Sign in from Polaris Terminal and it shows up here.",
+            "sharedTitle": "Shared with you",
+            "online": "Online",
+            "offline": "Not connected",
+            "offlineHint": "Open Polaris Terminal on that computer, signed in to this account. It reconnects by itself.",
+            "lastSeen": "Last seen",
+            "neverSeen": "Never connected",
+            "version": "Version {version}",
+            "owner": "{name}'s",
+            "canView": "Can watch",
+            "canControl": "Can control it",
+            "unnamed": "Polaris Terminal",
+            "actions": "Actions for {name}"
+        },
+        "open": {
+            "button": "Open",
+            "offline": "Open (not connected)"
+        },
+        "share": "Share access",
+        "rename": {
+            "button": "Rename",
+            "title": "Rename terminal",
+            "description": "Only you see this name. The terminal keeps its own.",
+            "label": "Name",
+            "cancel": "Cancel",
+            "save": "Save"
+        },
+        "revoke": {
+            "title": "Sign out {name}?",
+            "description": "It stops being reachable within a minute and everyone it was shared with loses it. Signing in again on that computer brings it back.",
+            "confirm": "Sign out terminal"
+        },
+        "viewer": {
+            "viewIntro": "Live output. You can watch, not type.",
+            "controlIntro": "Live output. Text you insert goes to the pane's input.",
+            "pane": "Pane",
+            "paneName": "Tab {tab}, pane {pane}",
+            "noPanes": "This terminal has no pane open.",
+            "gap": "some output skipped",
+            "inputLabel": "Text to insert",
+            "inputPlaceholder": "Text to insert",
+            "insert": "Insert",
+            "inserted": "Inserted.",
+            "offline": "The terminal went offline. It comes back here once it reconnects.",
+            "busy": "Too many people are watching this right now. Try again in a moment.",
+            "notFound": "You can no longer reach this terminal.",
+            "closed": "The connection closed. Close this and open the terminal again.",
+            "failed": "Could not reach the terminal. Try again."
+        },
+        "errors": {
+            "gone": "That terminal is no longer here.",
+            "name": "Use 1 to 60 characters.",
+            "offline": "That terminal is offline right now."
+        }
+    },
     "computers": {
         "page": {
             "title": "Your computers",

@@ -103,6 +103,8 @@ export interface RedeemedTicket {
 export async function redeemTerminalTicket(token: string): Promise<RedeemedTicket | null> {
     const ticket = await prisma.deployTicket.findUnique({ where: { tokenHash: hashToken(token) } });
     if (!ticket || ticket.usedAt || ticket.expiresAt < new Date()) return null;
+    // A Polaris Terminal viewer's ticket (lib/terminal/relay.ts) opens nothing here.
+    if (ticket.mode === "relay") return null;
     await prisma.deployTicket.update({ where: { id: ticket.id }, data: { usedAt: new Date() } });
 
     const mode = resolveMode(ticket.mode);

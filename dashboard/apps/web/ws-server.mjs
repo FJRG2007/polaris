@@ -156,7 +156,12 @@ const terminals = createTerminalRelay({
 });
 setInterval(() => terminals.sweep(), 5_000).unref();
 setInterval(() => void terminals.checkStanding(), 60_000).unref();
-const terminalWss = new WebSocketServer({ noServer: true, maxPayload: TERMINAL_LIMITS.frameBytes + 1024 });
+const terminalWss = new WebSocketServer({
+    noServer: true,
+    maxPayload: TERMINAL_LIMITS.frameBytes + 1024,
+    // A browser viewer offers its ticket as the subprotocol; echo it back.
+    handleProtocols: (protocols) => [...protocols][0] ?? false
+});
 
 // Two kinds of socket share the port, told apart by path: terminals, and the
 // runners on people's own computers (under the same edge prefix, so the
@@ -187,7 +192,14 @@ terminalWss.on("connection", (ws, req) => {
         const value = req.headers[name];
         if (typeof value === "string") headers[name] = value.slice(0, 1024);
     }
-    const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+    // A browser cannot send an Authorization header, so the web screen's
+    // one-shot ticket arrives as the subprotocol instead.
+    const token =
+        role === "viewer"
+            ? String(req.headers["sec-websocket-protocol"] ?? "").split(",")[0].trim()
+            : header.startsWith("Bearer ")
+              ? header.slice(7).trim()
+              : "";
     const handlers = terminals.accept(ws, { role, token, headers });
     // The protocol is JSON text frames only.
     ws.on("message", (data, isBinary) => {

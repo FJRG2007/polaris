@@ -1095,6 +1095,9 @@ model TerminalInstance {
     // As the terminal last reported them in its hello. Shown, never an input to
     // a decision.
     name      String?
+    // What its owner renamed it to on the web screen; wins over `name`, which
+    // the terminal rewrites on every hello.
+    label     String?
     os        String?
     version   String?
     // Which dashboard node holds its relay socket. Null while it is not

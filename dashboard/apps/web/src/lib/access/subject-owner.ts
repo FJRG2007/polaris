@@ -107,6 +107,11 @@ const READERS: Partial<Record<core.GrantSubject, OwnerReader>> = {
             })
         ).map((row) => [row.id, /^([0-9a-f-]{36}):/i.exec(row.scopeId)?.[1] ?? null] as const)
     ],
+    // A terminal is whoever signed it in.
+    "terminal.instance": async (ids) =>
+        (
+            await prisma.terminalInstance.findMany({ where: { id: { in: ids } }, select: { id: true, userId: true } })
+        ).map((row) => [row.id, row.userId] as const),
     // A workspace is its repository owner's, or whoever started it.
     "agents.session": async (ids) =>
         (

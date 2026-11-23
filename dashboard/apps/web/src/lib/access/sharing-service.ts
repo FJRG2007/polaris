@@ -208,6 +208,12 @@ export async function requireMayShare(
                 throw new GrantError("You cannot share that");
             }
             return;
+        case "terminal.instance": {
+            // Only whoever signed the terminal in shares it.
+            const row = await prisma.terminalInstance.findUnique({ where: { id: subjectId }, select: { userId: true } });
+            if (!row || row.userId !== user.id) throw new GrantError("You cannot share that");
+            return;
+        }
         case "agents.session": {
             // Whoever reaches it as its owner - the repository's, or whoever
             // started a workspace - lets somebody else read it.
@@ -637,6 +643,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
             return `/mail/shared/${subjectId}`;
         case "agents.session":
             return `/polar?session=${subjectId}`;
+        case "terminal.instance":
+            return `/account/terminals?open=${encodeURIComponent(subjectId)}`;
         case "agents.artifact":
             return `/polar/artifacts/${subjectId}`;
         case "dns.filter":

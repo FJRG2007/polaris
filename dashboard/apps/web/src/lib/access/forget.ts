@@ -65,6 +65,7 @@ export const SUBJECT_TABLES = {
     "note.note": "Note",
     "dns.filter": null,
     "agents.session": "AgentSession",
+    "terminal.instance": "TerminalInstance",
     "agents.artifact": "AgentSessionArtifact",
     "polar.project": "PolarProject",
     "task.task": "Task",

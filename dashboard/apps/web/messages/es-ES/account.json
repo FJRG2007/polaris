@@ -2267,6 +2267,68 @@
             "floor": "Nunca"
         }
     },
+    "terminals": {
+        "page": {
+            "title": "Tus terminales",
+            "intro": "Cada Polaris Terminal con tu sesión, y los que te han compartido. Abre uno para verlo o escribir en él desde aquí.",
+            "noAccess": "Tu rol no incluye acceder a terminales. Un administrador puede añadirlo a tu rol."
+        },
+        "list": {
+            "empty": "Aún no hay terminales. Inicia sesión desde Polaris Terminal y aparecerá aquí.",
+            "sharedTitle": "Compartidos contigo",
+            "online": "En línea",
+            "offline": "Sin conexión",
+            "offlineHint": "Abre Polaris Terminal en ese equipo con esta cuenta. Se vuelve a conectar solo.",
+            "lastSeen": "Visto",
+            "neverSeen": "Nunca se conectó",
+            "version": "Versión {version}",
+            "owner": "De {name}",
+            "canView": "Puede ver",
+            "canControl": "Lo controla",
+            "unnamed": "Polaris Terminal",
+            "actions": "Acciones de {name}"
+        },
+        "open": {
+            "button": "Abrir",
+            "offline": "Abrir (sin conexión)"
+        },
+        "share": "Compartir",
+        "rename": {
+            "button": "Renombrar",
+            "title": "Renombrar terminal",
+            "description": "Solo tú ves este nombre. El terminal mantiene el suyo.",
+            "label": "Nombre",
+            "cancel": "Cancelar",
+            "save": "Guardar"
+        },
+        "revoke": {
+            "title": "¿Cerrar la sesión de {name}?",
+            "description": "Deja de estar accesible en menos de un minuto y quien lo tenía compartido lo pierde. Iniciar sesión de nuevo en ese equipo lo recupera.",
+            "confirm": "Cerrar sesión"
+        },
+        "viewer": {
+            "viewIntro": "Salida en directo. Puedes verla, no escribir.",
+            "controlIntro": "Salida en directo. El texto que insertes va a la entrada del panel.",
+            "pane": "Panel",
+            "paneName": "Pestaña {tab}, panel {pane}",
+            "noPanes": "Este terminal no tiene ningún panel abierto.",
+            "gap": "salida omitida",
+            "inputLabel": "Texto a insertar",
+            "inputPlaceholder": "Texto a insertar",
+            "insert": "Insertar",
+            "inserted": "Insertado.",
+            "offline": "El terminal se desconectó. Vuelve aquí cuando se reconecte.",
+            "busy": "Demasiadas personas lo están viendo ahora. Prueba de nuevo en un momento.",
+            "notFound": "Ya no puedes acceder a este terminal.",
+            "closed": "La conexión se cerró. Cierra esto y vuelve a abrir el terminal.",
+            "failed": "No se pudo acceder al terminal. Prueba de nuevo."
+        },
+        "errors": {
+            "gone": "Ese terminal ya no está aquí.",
+            "name": "Usa de 1 a 60 caracteres.",
+            "offline": "Ese terminal no tiene conexión ahora."
+        }
+    },
     "computers": {
         "page": {
             "title": "Tus equipos",

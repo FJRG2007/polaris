@@ -6,10 +6,15 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@polaris/db", () => ({ prisma: {} }));
+const fakes = vi.hoisted(() => ({
+    db: {} as Record<string, any>,
+    granted: "" as string
+}));
+vi.mock("@polaris/db", () => ({ prisma: fakes.db }));
 vi.mock("@/lib/api-key-auth", () => ({ authenticateKeyToken: async () => null }));
+vi.mock("@/lib/access/grants", () => ({ grantedCapability: async () => fakes.granted }));
 
-import { createCallAssembler, encodeRemoteCall } from "../../src/lib/terminal/relay";
+import { createCallAssembler, encodeRemoteCall, routeTerminalRequest } from "../../src/lib/terminal/relay";
 import { TERMINAL_CLOSE, TERMINAL_LIMITS, createTerminalRelay } from "../../terminal-relay.mjs";
 
 const INSTANCE = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
@@ -62,7 +67,7 @@ describe("terminal relay sockets", () => {
 
     it("refuses an unknown role without asking about the key", async () => {
         const { relay, app } = setup();
-        const { socket } = await connect(relay, "viewer");
+        const { socket } = await connect(relay, "spy");
         expect(socket.closed?.code).toBe(TERMINAL_CLOSE.protocol);
         expect(app).not.toHaveBeenCalled();
     });
@@ -207,6 +212,174 @@ describe("terminal relay sockets", () => {
         const controller = await connect(relay, "controller");
         for (let i = 0; i <= TERMINAL_LIMITS.burst; i++) controller.handlers.message(JSON.stringify({ type: "ping" }));
         expect(controller.socket.closed?.code).toBe(TERMINAL_CLOSE.flood);
+    });
+});
+
+/** A greeted terminal and a controller on node "a". */
+async function online(route: { allowed: boolean; node: string | null } = { allowed: true, node: "a" }) {
+    const ctx = setup(route);
+    const instance = await connect(ctx.relay, "instance");
+    instance.handlers.message(JSON.stringify({ type: "hello" }));
+    await flush();
+    instance.socket.sent.length = 0;
+    return { ...ctx, instance };
+}
+
+const watch = (pane = "p1") => JSON.stringify({ type: "watch", instance: INSTANCE, pane });
+
+describe("terminal relay pane output", () => {
+    it("attaches on the first watcher, fans output out to every watcher, and detaches after the last", async () => {
+        const { relay, instance, calls } = await online();
+        const one = await connect(relay, "controller");
+        const two = await connect(relay, "controller");
+        one.handlers.message(watch());
+        two.handlers.message(watch());
+        await flush();
+        expect(calls.filter((call) => call.op === "route").map((call) => call.need)).toEqual(["view", "view"]);
+        expect(instance.socket.sent).toEqual([{ type: "attach", pane: "p1" }]);
+        expect(one.socket.sent).toContainEqual({ type: "watching", instance: INSTANCE, pane: "p1" });
+
+        instance.handlers.message(JSON.stringify({ type: "output", pane: "p1", data: "aGk=" }));
+        await flush();
+        const frame = { type: "output", instance: INSTANCE, pane: "p1", data: "aGk=" };
+        expect(one.socket.sent).toContainEqual(frame);
+        expect(two.socket.sent).toContainEqual(frame);
+
+        one.handlers.message(JSON.stringify({ type: "unwatch", instance: INSTANCE, pane: "p1" }));
+        await flush();
+        expect(instance.socket.sent).toHaveLength(1);
+        two.handlers.close();
+        expect(instance.socket.sent).toEqual([
+            { type: "attach", pane: "p1" },
+            { type: "detach", pane: "p1" }
+        ]);
+        expect(relay.watchers(INSTANCE, "p1")).toBe(0);
+    });
+
+    it("drops output nobody watches and output past the pane's byte rate, then marks the gap", async () => {
+        const { relay, instance, advance } = await online();
+        instance.handlers.message(JSON.stringify({ type: "output", pane: "p1", data: "x" }));
+        const viewer = await connect(relay, "controller");
+        viewer.handlers.message(watch());
+        await flush();
+        const big = "a".repeat(200 * 1024);
+        for (let i = 0; i < 6; i++) instance.handlers.message(JSON.stringify({ type: "output", pane: "p1", data: big }));
+        await flush();
+        const outputs = () => viewer.socket.sent.filter((frame) => frame.type === "output");
+        expect(outputs()).toHaveLength(Math.floor(TERMINAL_LIMITS.outputBurstBytes / big.length));
+        advance(2_000);
+        instance.handlers.message(JSON.stringify({ type: "output", pane: "p1", data: "b" }));
+        await flush();
+        expect(outputs().at(-1)).toMatchObject({ data: "b", gap: true });
+    });
+
+    it("refuses a watch the caller may not see, and ends watches when the terminal leaves", async () => {
+        const denied = await online({ allowed: false, node: null });
+        const nosy = await connect(denied.relay, "controller");
+        nosy.handlers.message(watch());
+        await flush();
+        expect(nosy.socket.sent).toContainEqual({ type: "watch_end", instance: INSTANCE, pane: "p1", code: "not_found" });
+        expect(denied.instance.socket.sent).toEqual([]);
+
+        const { relay, instance } = await online();
+        const viewer = await connect(relay, "controller");
+        viewer.handlers.message(watch());
+        await flush();
+        instance.handlers.close();
+        expect(viewer.socket.sent).toContainEqual({ type: "watch_end", instance: INSTANCE, pane: "p1", code: "offline" });
+        expect(relay.watchers(INSTANCE, "p1")).toBe(0);
+    });
+
+    it("caps the panes one socket watches", async () => {
+        const { relay } = await online();
+        const greedy = await connect(relay, "controller");
+        for (let i = 0; i <= TERMINAL_LIMITS.watches; i++) greedy.handlers.message(watch(`p${i}`));
+        await flush();
+        expect(greedy.socket.sent.filter((frame) => frame.type === "watching")).toHaveLength(TERMINAL_LIMITS.watches);
+        expect(greedy.socket.sent.at(-1)).toMatchObject({ type: "watch_end", code: "busy" });
+    });
+
+    it("watches a terminal on another node once per node and fans its stream out here", async () => {
+        const { relay, calls } = setup({ allowed: true, node: "b" });
+        const one = await connect(relay, "controller");
+        const two = await connect(relay, "controller");
+        one.handlers.message(watch());
+        two.handlers.message(watch());
+        await flush();
+        expect(calls.filter((call) => call.op === "watch")).toEqual([
+            { op: "watch", node: "b", origin: "a", instanceId: INSTANCE, pane: "p1", on: true }
+        ]);
+        relay.internal("/terminal/stream", { instanceId: INSTANCE, pane: "p1", frame: { type: "output", data: "aGk=" } });
+        expect(two.socket.sent).toContainEqual({ type: "output", instance: INSTANCE, pane: "p1", data: "aGk=" });
+        one.handlers.close();
+        two.handlers.close();
+        expect(calls.filter((call) => call.op === "watch").at(-1)).toMatchObject({ node: "b", on: false });
+    });
+
+    it("streams a pane held here to the nodes that asked for it", async () => {
+        const { relay, instance, calls } = await online();
+        expect(relay.internal("/terminal/watch", { instanceId: INSTANCE, pane: "p1", origin: "b", on: true })?.body).toEqual({
+            held: true
+        });
+        expect(instance.socket.sent).toEqual([{ type: "attach", pane: "p1" }]);
+        instance.handlers.message(JSON.stringify({ type: "output", pane: "p1", data: "aGk=" }));
+        await flush();
+        expect(calls).toContainEqual({
+            op: "stream",
+            node: "b",
+            instanceId: INSTANCE,
+            pane: "p1",
+            frame: { type: "output", instance: INSTANCE, pane: "p1", data: "aGk=" }
+        });
+        relay.internal("/terminal/watch", { instanceId: INSTANCE, pane: "p1", origin: "b", on: false });
+        expect(instance.socket.sent.at(-1)).toEqual({ type: "detach", pane: "p1" });
+    });
+
+    it("keeps a web viewer to the one terminal its ticket names", async () => {
+        const { relay, app } = await online();
+        app.mockImplementation(async (body: Record<string, unknown>) =>
+            body.op === "auth" ? { userId: USER, keyId: null, bound: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a59" } : { allowed: true, node: "a" }
+        );
+        const viewer = await connect(relay, "viewer", "ticket");
+        viewer.handlers.message(watch());
+        await flush();
+        expect(viewer.socket.closed).toBeNull();
+        expect(viewer.socket.sent).toContainEqual({ type: "watch_end", instance: INSTANCE, pane: "p1", code: "not_found" });
+    });
+
+    it("ends a watch whose share was withdrawn at the standing check", async () => {
+        const { relay, app } = await online();
+        const viewer = await connect(relay, "controller");
+        viewer.handlers.message(watch());
+        await flush();
+        app.mockImplementation(async (body: Record<string, unknown>) =>
+            body.op === "standing" ? { ended: [], withdrawn: [0] } : { ok: true }
+        );
+        await relay.checkStanding();
+        expect(viewer.socket.sent.at(-1)).toEqual({ type: "watch_end", instance: INSTANCE, pane: "p1", code: "not_found" });
+        expect(relay.watchers(INSTANCE, "p1")).toBe(0);
+    });
+});
+
+describe("routeTerminalRequest", () => {
+    const row = { userId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5f", apiKeyId: KEY, relayNode: "a" };
+    const standing = { revokedAt: null, enabled: true, expiresAt: null, user: { bannedAt: null } };
+    const ask = (need: "view" | "control", keyId: string | null = KEY) =>
+        routeTerminalRequest({ userId: USER, keyId, instanceId: INSTANCE, need });
+
+    it("lets somebody else in only as far as a share of it reaches", async () => {
+        fakes.db.terminalInstance = { findUnique: async () => row };
+        fakes.db.apiKey = { findUnique: async () => standing };
+        fakes.db.user = { findUnique: async () => ({ bannedAt: null }) };
+        fakes.granted = "";
+        expect(await ask("view")).toEqual({ allowed: false, node: null });
+        fakes.granted = "view";
+        expect(await ask("view")).toEqual({ allowed: true, node: "a" });
+        expect(await ask("control")).toEqual({ allowed: false, node: null });
+        fakes.granted = "control";
+        expect(await ask("control", null)).toEqual({ allowed: true, node: "a" });
+        fakes.db.user = { findUnique: async () => ({ bannedAt: new Date() }) };
+        expect(await ask("view", null)).toEqual({ allowed: false, node: null });
     });
 });
 

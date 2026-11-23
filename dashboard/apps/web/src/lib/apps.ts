@@ -2747,6 +2747,16 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: DEVELOPERS_GROUP,
             needs: "agents.manage"
         },
+        // Every Polaris Terminal the account signed in or was shared, opened
+        // through the relay.
+        {
+            label: "Your terminals", // i18n-ignore
+            href: "/account/terminals",
+            icon: Terminal,
+            keywords: ["terminal", "polaris terminal", "remote", "shell", "share terminal"],
+            group: DEVELOPERS_GROUP,
+            needs: "terminal.control"
+        },
         {
             label: "Domains", // i18n-ignore
             href: "/account/domains",
