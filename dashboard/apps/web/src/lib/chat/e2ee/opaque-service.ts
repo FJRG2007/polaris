@@ -26,6 +26,7 @@ import { loadEnv } from "@polaris/config";
 import { prisma, Prisma } from "@polaris/db";
 import { createHash, timingSafeEqual } from "node:crypto";
 import * as opaque from "@polaris/chat-crypto/opaque-server";
+import { PASSWORD_KSF_CURRENT, type PasswordKsfVersion } from "@polaris/chat-crypto/password-lock";
 import { CredentialDecryptError, decryptSecret, encryptSecret, secretFingerprint } from "@polaris/storage";
 
 const SETUP_ID = "default";
@@ -125,17 +126,17 @@ function digest(record: string): string {
 export async function usableRecord(
     userId: string,
     purpose: LoginPurpose
-): Promise<string | null> {
+): Promise<{ record: string; ksfVersion: PasswordKsfVersion } | null> {
     const [row, hash] = await Promise.all([
         prisma.opaqueRecord.findUnique({
             where: { userId },
-            select: { record: true, passwordTag: true, verifiedAt: true }
+            select: { record: true, passwordTag: true, verifiedAt: true, ksfVersion: true }
         }),
         credentialHash(userId)
     ]);
     if (!row || !hash || !sameTag(row.passwordTag, passwordTag(hash))) return null;
     if (purpose !== "verify" && !row.verifiedAt) return null;
-    return row.record;
+    return { record: row.record, ksfVersion: row.ksfVersion === 1 ? 1 : 2 };
 }
 
 /** Whether the account has already moved to OPAQUE for its current password. */
@@ -157,13 +158,15 @@ export async function identityFor(email: string): Promise<{ userId: string; know
 }
 
 /** Step one of a login. Runs the same for an account with no usable record, an
- *  unknown address and a real one, so the reply carries nothing to tell apart. */
+ *  unknown address and a real one, so the reply carries nothing to tell apart:
+ *  with no record it names the current profile, the one a record made today has. */
 export async function startLogin(
     identity: { userId: string; known: boolean },
     purpose: LoginPurpose,
     startLoginRequest: string
-): Promise<{ loginId: string; loginResponse: string }> {
-    const record = identity.known ? await usableRecord(identity.userId, purpose) : null;
+): Promise<{ loginId: string; loginResponse: string; ksfVersion: PasswordKsfVersion }> {
+    const usable = identity.known ? await usableRecord(identity.userId, purpose) : null;
+    const record = usable?.record ?? null;
     const step = await opaque.startLogin(await serverSetup(), identity.userId, record, startLoginRequest);
     const row = await prisma.opaqueLogin.create({
         data: {
@@ -174,7 +177,11 @@ export async function startLogin(
         },
         select: { id: true }
     });
-    return { loginId: row.id, loginResponse: step.loginResponse };
+    return {
+        loginId: row.id,
+        loginResponse: step.loginResponse,
+        ksfVersion: usable?.ksfVersion ?? PASSWORD_KSF_CURRENT
+    };
 }
 
 /**
@@ -207,7 +214,7 @@ export async function finishLogin(
     // the proof was against a password that no longer opens the account.
     if (purpose !== "verify") {
         const current = await usableRecord(row.userId, purpose);
-        if (!current || digest(current) !== state.r) throw new OpaqueRefusal();
+        if (!current || digest(current.record) !== state.r) throw new OpaqueRefusal();
     }
     return { userId: row.userId, recordDigest: state.r };
 }
@@ -222,7 +229,12 @@ export async function registrationResponse(userId: string, registrationRequest: 
  * when the account already has a verified record for its current password, so
  * a second sign-in racing the first can never replace a record in use.
  */
-export async function storePendingRecord(userId: string, hash: string, record: string): Promise<void> {
+export async function storePendingRecord(
+    userId: string,
+    hash: string,
+    record: string,
+    ksfVersion: PasswordKsfVersion = 1
+): Promise<void> {
     const tag = passwordTag(hash);
     const existing = await prisma.opaqueRecord.findUnique({
         where: { userId },
@@ -231,8 +243,8 @@ export async function storePendingRecord(userId: string, hash: string, record: s
     if (existing?.verifiedAt && sameTag(existing.passwordTag, tag)) return;
     await prisma.opaqueRecord.upsert({
         where: { userId },
-        create: { userId, record, passwordTag: tag },
-        update: { record, passwordTag: tag, verifiedAt: null }
+        create: { userId, record, passwordTag: tag, ksfVersion },
+        update: { record, passwordTag: tag, ksfVersion, verifiedAt: null }
     });
 }
 

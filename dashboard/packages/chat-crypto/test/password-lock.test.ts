@@ -27,20 +27,38 @@ async function register(setup: string, userId: string, password: string, akVersi
     });
 }
 
-async function login(setup: string, userId: string, record: string | null, password: string) {
+async function login(
+    setup: string,
+    userId: string,
+    record: string | null,
+    password: string,
+    ksfVersion: client.PasswordKsfVersion = client.PASSWORD_KSF_CURRENT
+) {
     const started = await client.startPasswordLogin(password);
     const step = await server.startLogin(setup, userId, record, started.startLoginRequest);
     const finished = await client.finishPasswordLogin({
         state: started.state,
         loginResponse: step.loginResponse,
         password,
-        userId
+        userId,
+        ksfVersion
     });
     const accepted = await server.finishLogin(userId, step.serverLoginState, finished.finishLoginRequest);
     return { ...finished, accepted, serverLoginState: step.serverLoginState };
 }
 
 describe("password lock over OPAQUE", { timeout: 120_000 }, () => {
+    it("makes new records with v2, and a login under the wrong profile is refused", async () => {
+        const setup = await server.createServerSetup();
+        const made = await register(setup, BOB, "profile pass");
+        expect(made.ksfVersion).toBe(2);
+        expect((await login(setup, BOB, made.registrationRecord, "profile pass")).accepted).toBeTruthy();
+        await expect(login(setup, BOB, made.registrationRecord, "profile pass", 1)).rejects.toBeInstanceOf(
+            client.PasswordRejectedError
+        );
+        expect(() => client.passwordKsf(3 as client.PasswordKsfVersion)).toThrow(RangeError);
+    });
+
     it("registers, logs in, and opens the account key", async () => {
         const setup = await server.createServerSetup();
         const { registrationRecord, envelope } = await register(setup, ALICE, "correct horse");

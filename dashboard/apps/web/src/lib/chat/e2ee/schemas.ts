@@ -43,7 +43,9 @@ export const signInBody = z.discriminatedUnion("op", [
         // Checked against the account's current password hash, exactly as the
         // password sign-in this follows checked it moments earlier.
         password: z.string().min(1).max(1024),
-        registrationRecord: opaqueMessage
+        registrationRecord: opaqueMessage,
+        // The profile the record was made with; a client from before v2 sends none.
+        ksfVersion: z.union([z.literal(1), z.literal(2)]).default(1)
     }),
     z.object({ op: z.literal("verify-start"), email, startLoginRequest: opaqueMessage }),
     z.object({

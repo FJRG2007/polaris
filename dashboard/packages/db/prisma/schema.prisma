@@ -19059,6 +19059,8 @@ model OpaqueRecord {
     // Keyed fingerprint of the credential hash the record was made against.
     passwordTag String
     verifiedAt  DateTime?
+    // Argon2id profile the client made the record with (password-lock.ts); 1 = 128 MiB, 2 = 19 MiB.
+    ksfVersion  Int       @default(1)
     createdAt   DateTime  @default(now())
     updatedAt   DateTime  @updatedAt
 
