@@ -20,7 +20,7 @@ does not exist. A unit becomes `built` only with the CI run that proves it.
 | P1 phone in Rust | phone | `dashboard/packages/core/src/phone.ts` | not started | |  | |  |
 | P2 phone facade | phone | `dashboard/packages/core/src/phone.ts` callers | not started | |  | |  |
 | P3 phone shadow -> serving | phone | - | not started | |  | |  |
-| E1 MLS core over OpenMLS | - | new | not started | |  | |  |
+| E1 MLS core over OpenMLS | - | new | built | [rust-core run 45148253895](https://github.com/FJRG2007/polaris/actions/runs/45148253895) (commit f002b56f03), every job green: `polaris_core::mls` over OpenMLS 0.9.2, default suite 0x004F (ML-KEM-768 + X25519, Ed25519; `src/mls/mod.rs` explains the code point); `cargo test` passes the RFC 9420 passive-client vectors (welcome, handling-commit, random), 16 adversarial tests (pitfalls P1-P14 on both suites) and the property suite on 5 native platforms; the MLS and RFC 9420 suites on wasm32 in Node, headless Chrome and Firefox (wasm-bindgen-test-runner) pass 16 + 3 each; `MlsMember` in the napi binding (napi 3.16.2, napi6) and the wasm `mls` chunk: `test:native` (5 platforms) and `test:wasm` run a group's life on both suites plus refusal codes; `check:bindings` 3 crates 0 problems; fuzz `mls_process`, `mls_welcome`, `mls_group_info`, `mls_key_package` 60 s each, no crash; criterion bench (report only) | MLS chunk `wasm-mls/polaris_core_mls_bg.wasm` 409,481 B brotli (1,334,492 B raw) in CI after wasm-opt -Oz, budget 430,080 B (`wasm-budget.json`); lazily loaded, the core module stays 8,628 B | |  |
 | E2 MLS storage providers | - | new | not started | |  | |  |
 | E3 MLS cross-target interop | - | new | not started | |  | |  |
 | E4 MLS scale benchmarks | - | new | not started | |  | |  |
