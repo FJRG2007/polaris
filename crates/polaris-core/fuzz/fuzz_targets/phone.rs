@@ -1,7 +1,13 @@
 //! The phone domain on any input (plan 4.3): no function panics, an error is
 //! one of the two classes the TypeScript implementation throws, every slice
-//! handed back lies inside the input on UTF-16 boundaries, and a number
-//! accepted as E.164 reads back as itself.
+//! handed back lies inside the input on UTF-16 boundaries, and an accepted
+//! number is written `+` and digits only.
+//!
+//! An accepted number does not always read back as itself without its country:
+//! libphonenumber-js accepts `8222222228` for Antigua (`AG`) as `+18222222228`
+//! but refuses `+18222222228` alone, since its /min metadata places that
+//! number in no NANP country by leading digits. Rust answers the same, so that
+//! is not checked here.
 //!
 //! The first byte picks the country argument (none, a real one, or a name the
 //! twin treats specially); the rest is the typed value.
@@ -54,10 +60,6 @@ fuzz_target!(|data: &[u8]| {
             assert!(
                 e164.starts_with('+') && e164[1..].bytes().all(|b| b.is_ascii_digit()),
                 "{e164}"
-            );
-            assert_eq!(
-                to_e164(&e164, None).map_err(|e| e.message),
-                Ok(Some(e164.clone()))
             );
         }
         Ok(None) => {}

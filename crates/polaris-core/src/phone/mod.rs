@@ -194,6 +194,18 @@ pub fn phone_country_from_regions<'a>(
 mod tests {
     use super::*;
 
+    /// Found by the fuzz target: libphonenumber-js accepts the number for
+    /// Antigua but not on its own, where /min metadata matches no NANP
+    /// country's leading digits. The answer is TypeScript's, so it stays.
+    #[test]
+    fn a_nanp_number_valid_only_with_its_country() {
+        assert_eq!(
+            to_e164("8222222228", Some("AG")).unwrap().as_deref(),
+            Some("+18222222228")
+        );
+        assert_eq!(to_e164("+18222222228", None).unwrap(), None);
+    }
+
     #[test]
     fn spain() {
         assert_eq!(
