@@ -42,7 +42,9 @@ export function StepUpFields({
     open,
     purpose,
     onChange,
-    autoSubmit = false
+    autoSubmit = false,
+    offered,
+    sendCode
 }: {
     /** Drives the reset: reopening must not inherit the last attempt's code. */
     open: boolean;
@@ -53,6 +55,12 @@ export function StepUpFields({
     /** Submit the surrounding form once a whole code is typed - only where the
      *  code is the last thing that form asks for and its submit checks the rest. */
     autoSubmit?: boolean;
+    /** The ways to confirm, when the caller already knows them and they are not
+     *  the account's usual step-up - recovering a forgotten password, where the
+     *  password itself is no proof. Fetched from the account when left out. */
+    offered?: StepUpChoice[];
+    /** How a code is sent for those, when not through the usual step-up. */
+    sendCode?: (method: StepUpChoice["proof"]) => Promise<{ error?: string }>;
 }) {
     const t = useTranslations("components");
     const fieldId = useId();
@@ -65,6 +73,11 @@ export function StepUpFields({
         if (!open) return;
         setValue("");
         setError("");
+        if (offered) {
+            setChoices(offered);
+            setProof(offered[0] ?? null);
+            return;
+        }
         let live = true;
         void polls
             .stepUpOptions()
@@ -105,7 +118,7 @@ export function StepUpFields({
         auto: true,
         send: async () => {
             if (!proof?.sends) return { error: "" };
-            const result = await sendStepUpCodeAction(purpose, proof.proof);
+            const result = sendCode ? await sendCode(proof.proof) : await sendStepUpCodeAction(purpose, proof.proof);
             return result.error ? { error: result.error } : {};
         }
     });

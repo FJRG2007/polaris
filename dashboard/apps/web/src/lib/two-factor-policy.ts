@@ -246,17 +246,22 @@ export function planStepUp(input: {
  * account with no second factor, signing in with its password. One code from
  * any way the account can receive one right now; null when there is none, so a
  * risky sign-in is never left at a step nobody can answer.
+ *
+ * An account with recovery questions is asked them too, after the code. They
+ * only ever add to it: with no way to send a code there is no step at all, so
+ * the answers are never the one thing standing between a password and a session.
  */
 export function planRiskCheck(input: {
     available: readonly TwoFactorMethod[];
     reason: "unusual-country" | "new-device" | "impossible-travel" | "datacenter";
+    hasQuestions?: boolean;
 }): StepUpState | null {
     if (input.available.length === 0) return null;
     return {
         need: 1,
         accepted: [...input.available],
         done: [],
-        question: false,
+        question: input.hasQuestions === true,
         questionDone: false,
         phoneConfirmed: false,
         emailConfirmed: false,

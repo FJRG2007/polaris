@@ -136,14 +136,9 @@ vi.mock("@polaris/db", () => ({
 }));
 
 vi.mock("@polaris/auth", () => ({
-    listSecurityQuestions: async (userId: string) =>
-        (correctAnswers[userId] ?? []).map((_, index) => ({
-            id: `q-${index}`,
-            question: `Question ${index + 1}?`
-        })),
-    verifySecurityAnswers: async (_auth: unknown, userId: string, answers: string[]) => {
-        const expected = correctAnswers[userId];
-        return Boolean(expected) && expected.every((answer, index) => answer === answers[index]);
+    verifySecurityAnswersAnyOrder: async (_auth: unknown, userId: string | null, answers: string[]) => {
+        const expected = userId ? correctAnswers[userId] : undefined;
+        return Boolean(expected) && expected!.length === answers.length && expected!.every((answer) => answers.includes(answer));
     },
     resetUserPassword: (...args: unknown[]) => resetPassword(...(args as []))
 }));
@@ -162,7 +157,6 @@ vi.mock("@/lib/user-admin-service", () => ({
 vi.mock("@/lib/pwned-passwords", () => ({ passwordIsBreached: async () => breached }));
 
 const {
-    accountRecoveryQuestions,
     accountRecoveryStatus,
     completeAccountRecovery,
     decideRecoveryRequest,
@@ -187,24 +181,6 @@ beforeEach(() => {
     resetPassword.mockResolvedValue({});
 });
 
-describe("finding out what to answer", () => {
-    it("returns the questions the account set", async () => {
-        const result = await accountRecoveryQuestions("ada@example.com", "203.0.113.7");
-        expect(result.questions).toHaveLength(3);
-    });
-
-    it("answers an unknown address exactly like an account with no questions", async () => {
-        const unknown = await accountRecoveryQuestions("nobody@example.com", "203.0.113.7");
-        const banned = await accountRecoveryQuestions("banned@example.com", "203.0.113.7");
-        expect(unknown.questions).toEqual([]);
-        expect(banned.questions).toEqual([]);
-    });
-
-    it("takes a username as readily as an address", async () => {
-        expect((await accountRecoveryQuestions("ada", "203.0.113.7")).questions).toHaveLength(3);
-    });
-});
-
 describe("raising a request", () => {
     it("hands back a ticket for an address that matches nothing, and tells nobody", async () => {
         const result = await raise("nobody@example.com");
@@ -221,6 +197,11 @@ describe("raising a request", () => {
             event: "account.recovery",
             actionRequired: true
         });
+    });
+
+    it("takes the answers in any order, since the questions are never shown", async () => {
+        await raise("ada@example.com", ["ada", "blue", "paris"]);
+        expect(rows[0]?.verified).toBe(true);
     });
 
     it("still raises the request when nothing could be verified", async () => {

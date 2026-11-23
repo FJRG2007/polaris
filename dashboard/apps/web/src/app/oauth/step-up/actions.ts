@@ -172,7 +172,10 @@ export async function answerStepUpQuestionsAction(input: unknown): Promise<StepU
     const t = await words();
     const current = await owed();
     if (!current) return { complete: true };
-    if (!stepUpRemaining(current.state).questionLeft) return { error: t("stepUp.notOwed") };
+    const left = stepUpRemaining(current.state);
+    // Answers are an extra signal on top of the codes, never a way round them:
+    // they are not even checked until every code owed has been entered.
+    if (!left.questionLeft || left.factorsLeft > 0) return { error: t("stepUp.notOwed") };
     const parsed = answersSchema.safeParse(input);
     if (!parsed.success) return { error: t("stepUp.wrongAnswers") };
 

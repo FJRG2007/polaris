@@ -21,10 +21,10 @@
  * password through. It is spent on first use.
  *
  * The route answers the same way whether or not an account exists, so it cannot
- * be swept for registered addresses. The one thing it does disclose is that an
- * address has recovery questions set, which is the same trade the sign-in page
- * already makes for the passkey hint, and it is throttled per address and per
- * network for the same reason.
+ * be swept for registered addresses. That includes the questions: an account's
+ * questions are its owner's own words and are never shown to whoever types its
+ * address. The form always asks for the same number of answers, in any order,
+ * and checking them costs the same whether the address belongs to anyone or not.
  */
 
 import { auth } from "./auth";
@@ -39,7 +39,7 @@ import { translatorFor } from "@/lib/i18n/translate";
 import { readerWords } from "@/lib/i18n/reader-words";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { generateToken, hashToken } from "@polaris/core/tokens";
-import { listSecurityQuestions, resetUserPassword, verifySecurityAnswers } from "@polaris/auth";
+import { resetUserPassword, verifySecurityAnswersAnyOrder } from "@polaris/auth";
 import {
     BREACHED_PASSWORD_MESSAGE,
     IDENTITY_PASSWORD_MESSAGE,
@@ -51,12 +51,6 @@ import {
 /** How long a request stays on the administrators' list, and how long an approved
  *  one stays redeemable. A day covers a night's sleep and no more. */
 const TICKET_TTL_MS = 24 * 60 * 60 * 1000;
-
-/** Reading back an account's questions is what makes this route usable, and also
- *  the only thing on it worth probing. Generous for a person who mistyped their
- *  address, useless for walking a list. */
-const LOOKUP_LIMIT = 10;
-const LOOKUP_WINDOW_MS = 15 * 60 * 1000;
 
 /** Raising a request is cheap for the requester and noisy for whoever decides it,
  *  so it is capped harder, and per network as well as per account. */
@@ -92,34 +86,6 @@ async function findAccount(identifier: string): Promise<{ id: string } | null> {
 }
 
 /**
- * The questions a requester has to answer, if their account set any.
- *
- * An empty list is the answer for an account with no questions AND for an
- * identifier that matches nothing, so the page that calls this cannot be used to
- * tell those apart - both go on to raise a request the same way.
- */
-export async function accountRecoveryQuestions(
-    identifier: string,
-    ip: string | null
-): Promise<{ questions: string[]; retryAfterMs: number }> {
-    const key = identifier.trim().toLowerCase();
-    const [byAccount, byNetwork] = await Promise.all([
-        rateLimit(`recovery-lookup:${key}`, LOOKUP_LIMIT, LOOKUP_WINDOW_MS),
-        rateLimit(`recovery-lookup-ip:${ip ?? "unknown"}`, LOOKUP_LIMIT * 3, LOOKUP_WINDOW_MS)
-    ]);
-    if (!byAccount.ok || !byNetwork.ok) {
-        return {
-            questions: [],
-            retryAfterMs: Math.max(byAccount.retryAfterMs, byNetwork.retryAfterMs)
-        };
-    }
-    const account = await findAccount(identifier);
-    if (!account) return { questions: [], retryAfterMs: 0 };
-    const rows = await listSecurityQuestions(account.id);
-    return { questions: rows.map((row) => row.question), retryAfterMs: 0 };
-}
-
-/**
  * Raise a request, and hand back the ticket that will redeem it.
  *
  * A ticket is issued whatever the identifier turned out to be. For one that
@@ -152,12 +118,13 @@ export async function requestAccountRecovery(input: {
 
     const ticket = generateToken();
     const account = await findAccount(input.identifier);
+    // Checked before the account is known to exist, so the time this takes is
+    // the same for an address nobody owns.
+    const answered = input.answers.length === SECURITY_QUESTION_COUNT;
+    const verified = answered && (await verifySecurityAnswersAnyOrder(auth, account?.id ?? null, input.answers));
     if (!account) return { ticket };
 
     const userId = account.id;
-    const verified =
-        input.answers.length === SECURITY_QUESTION_COUNT &&
-        (await verifySecurityAnswers(auth, userId, input.answers));
 
     // One undecided request per account: asking again replaces the one still
     // waiting, so a decision is always about the attempt in front of the

@@ -144,4 +144,12 @@ describe("the security questions", () => {
         authPkg.verifySecurityAnswers.mockResolvedValue(true);
         expect(await actions.answerStepUpQuestionsAction({ answers: ["yes"] })).toEqual({ complete: true });
     });
+
+    it("are not even checked while a code is still owed", async () => {
+        stored({ ...owing, done: ["totp"], question: true });
+        authPkg.verifySecurityAnswers.mockClear();
+        authPkg.verifySecurityAnswers.mockResolvedValue(true);
+        expect(await actions.answerStepUpQuestionsAction({ answers: ["yes"] })).toEqual({ error: "stepUp.notOwed" });
+        expect(authPkg.verifySecurityAnswers).not.toHaveBeenCalled();
+    });
 });

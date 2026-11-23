@@ -47,6 +47,7 @@ import {
     NEW_DEVICE_GRACE_CHOICES,
     SECURITY_QUESTION_COUNT,
     SESSION_MAX_CHOICES,
+    STEP_UP_PROOF_LABELS,
     type TwoFactorMethod
 } from "@polaris/core";
 
@@ -461,6 +462,14 @@ export function SecurityView({
                 onOpenChange={(open) => !open && close()}
                 questions={questions}
                 canUseAuthenticator={twoFactorEnabled}
+                codeChannels={twoFactorMethods
+                    .filter((status) => status.method !== "totp" && status.available)
+                    .map((status) => ({
+                        proof: status.method,
+                        label: STEP_UP_PROOF_LABELS[status.method],
+                        target: status.target,
+                        sends: true
+                    }))}
             />
             <EnableTwoFactorDialog
                 open={dialog === "2fa-on"}

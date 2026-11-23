@@ -139,7 +139,9 @@ async function riskCheck(input: {
                   .filter((status) => status.method !== "totp" && status.available)
                   .map((status) => status.method)
             : [];
-        const plan = reason ? planRiskCheck({ available, reason }) : null;
+        const hasQuestions =
+            available.length > 0 && (await prisma.securityQuestion.count({ where: { userId } })) > 0;
+        const plan = reason ? planRiskCheck({ available, reason, hasQuestions }) : null;
         if (!plan) await rememberSignInCountry(userId, country);
         return { stepUp: plan ? serializeStepUp(plan) : null, country };
     } catch (error) {

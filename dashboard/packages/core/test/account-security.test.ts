@@ -87,11 +87,17 @@ describe("recovery", () => {
         ).toBe(false);
     });
 
-    it("requires one proof of identity: every answer, or a code", () => {
+    it("requires a code: an authenticator one, or every answer plus a sent one", () => {
         const base = { newPassword: "a-long-enough-password" };
+        const sent = { method: "email", code: "123456" };
         expect(security.recoverPasswordSchema.safeParse(base).success).toBe(false);
-        expect(security.recoverPasswordSchema.safeParse({ ...base, answers: ["a1", "b2"] }).success).toBe(false);
-        expect(security.recoverPasswordSchema.safeParse({ ...base, answers: ["a1", "b2", "c3"] }).success).toBe(true);
+        expect(security.recoverPasswordSchema.safeParse({ ...base, answers: ["a1", "b2"], code: sent }).success).toBe(false);
+        // The answers are an extra signal, never a way in on their own.
+        expect(security.recoverPasswordSchema.safeParse({ ...base, answers: ["a1", "b2", "c3"] }).success).toBe(false);
+        expect(security.recoverPasswordSchema.safeParse({ ...base, answers: ["a1", "b2", "c3"], code: sent }).success).toBe(true);
+        expect(
+            security.recoverPasswordSchema.safeParse({ ...base, answers: ["a1", "b2", "c3"], code: { method: "pigeon", code: "123456" } }).success
+        ).toBe(false);
         expect(security.recoverPasswordSchema.safeParse({ ...base, totpCode: "123456" }).success).toBe(true);
         expect(security.recoverPasswordSchema.safeParse({ ...base, totpCode: "12345" }).success).toBe(false);
     });

@@ -45,6 +45,8 @@ a regression. Entries are sorted open/regressed first, then by severity.
 | VULN-0047 | Fields that add somebody by email confirm whether an address has an account | Low | Fixed | dashboard/apps/web/src/lib/people-search.ts | CWE-204 | 2026-11-23 |
 | VULN-0048 | Mention and account search matched colleagues by part of a hidden address | Low | Fixed | dashboard/apps/web/src/lib/rich-text/mention-service.ts | CWE-203 | 2026-11-23 |
 | VULN-0049 | Organization vault managers read every roster member's email | Low | Fixed | dashboard/apps/web/src/lib/vault/orgs.ts | CWE-359 | 2026-11-23 |
+| VULN-0050 | Public recovery form revealed whether an address has an account, and its security questions | Medium | Fixed | dashboard/apps/web/src/lib/account-recovery-service.ts | CWE-204 | 2026-11-23 |
+| VULN-0051 | Security answers alone could set a new password, and could be guessed before any code was entered | Medium | Fixed | dashboard/apps/web/src/app/(app)/account/security/actions.ts | CWE-640 | 2026-11-23 |
 | VULN-0043 | A Minecraft player's allowed address can be forged by quoting a login line in chat | Medium | Fixed | dashboard/apps/game-servers/src/lib/minecraft/parse.ts | CWE-345 | 2026-11-19 |
 | VULN-0038 | An open terminal keeps running commands after its account is banned or signed out | Medium | Fixed | dashboard/apps/web/ws-server.mjs | CWE-613 | 2026-11-12 |
 | VULN-0042 | A terminal that stops reading makes the sidecar queue shell output without limit | Medium | Fixed | dashboard/apps/web/ws-server.mjs | CWE-770 | 2026-11-12 |

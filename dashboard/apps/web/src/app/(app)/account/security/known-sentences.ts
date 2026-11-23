@@ -79,7 +79,7 @@ const EXACT: ReadonlyMap<string, SecurityKey> = new Map<string, SecurityKey>([
     ["Answer is too long", "known.answerTooLong"],
     ["Question is too short", "known.questionTooShort"],
     ["Enter the 6-digit code", "known.enterCode"],
-    ["Answer your security questions or use an authenticator code", "known.answerOrCode"],
+    ["Answer your security questions and enter the code we sent, or use an authenticator code", "known.answerOrCode"],
     ["Turn the method on before making it the default", "known.methodOffDefault"],
     ["Use the international form, for example +34600111222", "known.phoneFormat"],
     ["Enter your password", "known.enterPassword"]

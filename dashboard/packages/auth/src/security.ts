@@ -613,6 +613,56 @@ export async function verifySecurityAnswers(
     return allMatch;
 }
 
+/** A hash nothing matches, written once, so checking answers for an account
+ *  that does not exist costs what checking them for one that does costs. */
+let unmatchableHash: Promise<string> | null = null;
+
+/**
+ * Verify answers given without their questions, in any order - for the public
+ * recovery form, which never shows an account's questions to whoever types its
+ * address. Every answer has to match a different question and every question
+ * has to be answered.
+ *
+ * The same number of checks run whatever the outcome, and for an account that
+ * does not exist (`userId` null) they run against a hash nothing matches, so the
+ * time taken says nothing about whether the address belongs to anyone.
+ */
+export async function verifySecurityAnswersAnyOrder(
+    auth: Auth,
+    userId: string | null,
+    answers: readonly string[]
+): Promise<boolean> {
+    const rows = userId
+        ? await prisma.securityQuestion.findMany({ where: { userId }, select: { answerHash: true } })
+        : [];
+    const hashes =
+        rows.length > 0
+            ? rows.map((row) => row.answerHash)
+            : Array.from({ length: answers.length }, () => null);
+    const dummy = await (unmatchableHash ??= hashSecret(auth, `unmatchable:${crypto.randomUUID()}`));
+    const typed = answers.map(normalizeAnswer);
+    const matches: boolean[][] = [];
+    for (const hash of hashes) {
+        const row: boolean[] = [];
+        for (const answer of typed) row.push(await verifySecret(auth, hash ?? dummy, answer));
+        matches.push(row);
+    }
+    if (rows.length === 0 || rows.length !== answers.length) return false;
+    return perfectMatch(matches, 0, new Set());
+}
+
+/** Whether each question from `index` on can take a different matching answer. */
+function perfectMatch(matches: boolean[][], index: number, used: Set<number>): boolean {
+    if (index === matches.length) return true;
+    return (matches[index] ?? []).some((hit, answer) => {
+        if (!hit || used.has(answer)) return false;
+        used.add(answer);
+        const rest = perfectMatch(matches, index + 1, used);
+        used.delete(answer);
+        return rest;
+    });
+}
+
 /**
  * Write a new password without knowing the old one. The caller MUST have proven
  * identity another way first (recovery questions or a verified authenticator

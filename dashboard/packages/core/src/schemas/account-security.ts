@@ -15,6 +15,7 @@ import { ADDRESS_PIN_SCOPES } from "../session-binding.js";
 import { isCidr, isIpAddress } from "../cidr.js";
 import { CONTINENTS, COUNTRY_CODES } from "../geo.js";
 import { USER_AGENT_PATTERN_MAX } from "../user-agent.js";
+import { otpCodeField, TWO_FACTOR_DELIVERY_METHODS } from "./two-factor.js";
 import { expandPermissions, PERMISSIONS } from "../permissions.js";
 
 /** A single IP address or CIDR range in a network allowlist. */
@@ -237,18 +238,31 @@ export const securityQuestionsSchema = z.object({
         .length(SECURITY_QUESTION_COUNT, `Set ${SECURITY_QUESTION_COUNT} questions`)
 });
 
-/** Proving identity without the current password: answer every question, or
- *  present a valid authenticator code. */
+/**
+ * Proving identity without the current password: a valid authenticator code, or
+ * every answer together with a code sent to the account's email or phone.
+ *
+ * The answers are never enough on their own. They are low-entropy and anyone
+ * close to the person may know them, so they only ever add to a code from a
+ * channel the account confirmed - they never stand in for one.
+ */
 export const recoverPasswordSchema = z
     .object({
         newPassword: z.string().min(10, "Use at least 10 characters").max(256),
         answers: z.array(securityAnswerField).default([]),
-        totpCode: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code").optional()
+        totpCode: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code").optional(),
+        /** The code sent alongside the answers, and where it was sent. */
+        code: z.object({ method: z.enum(TWO_FACTOR_DELIVERY_METHODS), code: otpCodeField }).optional()
     })
-    .refine((value) => value.totpCode !== undefined || value.answers.length === SECURITY_QUESTION_COUNT, {
-        message: "Answer your security questions or use an authenticator code",
-        path: ["answers"]
-    });
+    .refine(
+        (value) =>
+            value.totpCode !== undefined ||
+            (value.answers.length === SECURITY_QUESTION_COUNT && value.code !== undefined),
+        {
+            message: "Answer your security questions and enter the code we sent, or use an authenticator code",
+            path: ["answers"]
+        }
+    );
 
 // ---------------------------------------------------------------------------
 // Successor

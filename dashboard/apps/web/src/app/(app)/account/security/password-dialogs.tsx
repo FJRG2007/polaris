@@ -19,9 +19,11 @@
 
 import { useState, type FormEvent } from "react";
 import { CodeInput, isWholeCode } from "@/components/code-input";
-import { SECURITY_QUESTION_COUNT } from "@polaris/core";
+import type { StepUpChoice } from "@/lib/step-up";
+import { StepUpFields } from "@/components/step-up-fields";
+import { SECURITY_QUESTION_COUNT, type StepUpProofInput } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
-import { changePasswordAction, recoverPasswordAction } from "./actions";
+import { changePasswordAction, recoverPasswordAction, sendRecoveryCodeAction } from "./actions";
 import { passwordWouldOpenVault, SAME_AS_VAULT } from "@/lib/vault/would-open";
 import { Feedback } from "./setting-card";
 import { knownMessage, questionLabel } from "./known-sentences";
@@ -122,20 +124,29 @@ export function RecoverPasswordDialog({
     open,
     onOpenChange,
     questions,
-    canUseAuthenticator
+    canUseAuthenticator,
+    codeChannels
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     questions: string[];
     canUseAuthenticator: boolean;
+    /** Where a code can be sent to go with the answers. The answers alone never
+     *  set a password, so without one of these they are not offered. */
+    codeChannels: StepUpChoice[];
 }) {
     const t = useTranslations("accountSecurity");
     const tv = useTranslations("validation");
     const tc = useTranslations("common");
-    const hasQuestions = questions.length === SECURITY_QUESTION_COUNT;
+    const hasQuestions = questions.length === SECURITY_QUESTION_COUNT && codeChannels.length > 0;
     const [method, setMethod] = useState<"questions" | "totp">(hasQuestions ? "questions" : "totp");
     const [answers, setAnswers] = useState<string[]>(() => questions.map(() => ""));
     const [totpCode, setTotpCode] = useState("");
+    const [sentProof, setSentProof] = useState<StepUpProofInput | null>(null);
+    const sentCode =
+        sentProof && sentProof.proof !== "password" && sentProof.proof !== "totp"
+            ? { method: sentProof.proof, code: sentProof.code }
+            : undefined;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
@@ -158,7 +169,8 @@ export function RecoverPasswordDialog({
         const result = await recoverPasswordAction({
             newPassword: next,
             answers: method === "questions" ? answers : [],
-            totpCode: method === "totp" ? totpCode : undefined
+            totpCode: method === "totp" ? totpCode : undefined,
+            code: method === "questions" ? sentCode : undefined
         });
         setBusy(false);
         if (result.error) {
@@ -236,6 +248,16 @@ export function RecoverPasswordDialog({
                               ))
                             : null}
 
+                        {method === "questions" && hasQuestions ? (
+                            <StepUpFields
+                                open={open}
+                                purpose="password-recovery"
+                                offered={codeChannels}
+                                sendCode={sendRecoveryCodeAction}
+                                onChange={setSentProof}
+                            />
+                        ) : null}
+
                         {method === "totp" && canUseAuthenticator ? (
                             <label className="flex flex-col gap-1 text-sm">
                                 {t("password.authenticatorCode")}
@@ -263,7 +285,11 @@ export function RecoverPasswordDialog({
                             </Button>
                             <Button
                                 type="submit"
-                                disabled={busy || (method === "totp" && !isWholeCode(totpCode))}
+                                disabled={
+                                    busy ||
+                                    (method === "totp" && !isWholeCode(totpCode)) ||
+                                    (method === "questions" && !sentCode)
+                                }
                             >
                                 {busy ? tc("actions.saving") : t("password.setButton")}
                             </Button>

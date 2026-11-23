@@ -27,6 +27,7 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { setConnectionSignIn } from "@/lib/connections/store";
 import { stepUpGranted } from "@/lib/step-up-grant";
+import { proveStepUp, sendStepUpCode } from "@/lib/step-up";
 import { getTranslations } from "@/lib/i18n/request";
 import { firstIssue, localized } from "./action-messages";
 import { revokeOtherSessions, sessionSignInRecord } from "@/lib/session-directory";
@@ -36,7 +37,9 @@ import {
     securityQuestionsSchema,
     sessionBindingSchema,
     sessionLimitsSchema,
-    setPinSchema
+    setPinSchema,
+    TWO_FACTOR_DELIVERY_METHODS,
+    type TwoFactorDeliveryMethod
 } from "@polaris/core";
 import {
     beginSessionRotation,
@@ -216,11 +219,42 @@ export async function changePasswordAction(currentPassword: string, newPassword:
     return localized(result);
 }
 
+/** What the code sent beside the recovery answers is minted against. */
+const RECOVERY_CODE_PURPOSE = "password-recovery";
+
+/**
+ * Send the code the recovery answers have to be accompanied by, to any email or
+ * phone the account can receive one on - set up as a second factor or not, since
+ * an account without one is exactly the one that needs this.
+ */
+export async function sendRecoveryCodeAction(method: unknown): Promise<ActionResult> {
+    const user = await requireUser();
+    const parsed = z.enum(TWO_FACTOR_DELIVERY_METHODS).safeParse(method);
+    if (!parsed.success) return { error: (await getTranslations("accountSecurity"))("errors.codeNotSent") };
+    return localized(await sendStepUpCode(user.id, RECOVERY_CODE_PURPOSE, parsed.data, { anyReachable: true }));
+}
+
+/** The answers and the sent code, both checked whatever the other says, so the
+ *  reply does not tell which of them was wrong. */
+async function answersWithCode(
+    userId: string,
+    answers: readonly string[],
+    code: { method: TwoFactorDeliveryMethod; code: string }
+): Promise<boolean> {
+    const [answered, sent] = await Promise.all([
+        verifySecurityAnswers(auth, userId, answers),
+        proveStepUp(userId, RECOVERY_CODE_PURPOSE, { proof: code.method, code: code.code }, { anyReachable: true })
+    ]);
+    return answered && !sent.error;
+}
+
 /**
  * Set a new password without the old one, for a user who has forgotten it while
- * still signed in. Identity is proven by the recovery questions or by a valid
- * authenticator code; both are throttled, because both are guessable in a way a
- * password is not. Succeeding also ends every other session.
+ * still signed in. Identity is proven by a valid authenticator code, or by the
+ * recovery questions together with a code sent to the account's email or phone.
+ * The answers never pass on their own: they only add weight to a code. Both are
+ * throttled, because both are guessable in a way a password is not. Succeeding
+ * also ends every other session.
  */
 export async function recoverPasswordAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
@@ -235,10 +269,10 @@ export async function recoverPasswordAction(input: unknown): Promise<ActionResul
         return { error: t("errors.tooManyAttempts", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
     }
 
-    const proven = parsed.data.totpCode
-        ? (await twoFactorEnabled(user.id)) &&
-          (await verifyTotpForSession(auth, await headers(), parsed.data.totpCode))
-        : await verifySecurityAnswers(auth, user.id, parsed.data.answers);
+    const { totpCode, code, answers } = parsed.data;
+    const proven = totpCode
+        ? (await twoFactorEnabled(user.id)) && (await verifyTotpForSession(auth, await headers(), totpCode))
+        : code !== undefined && (await answersWithCode(user.id, answers, code));
     if (!proven) {
         await recordAudit({ actorId: user.id, action: "account.password.recovery-failed" });
         return { error: (await getTranslations("accountSecurity"))("errors.notVerified") };

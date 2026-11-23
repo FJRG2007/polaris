@@ -22,7 +22,7 @@ vi.mock("@/lib/integrations/provider-pause", () => lookups);
 vi.mock("@/lib/integrations/criminalip", () => criminalIp);
 
 const { impossibleTravel, signInRisk, TRAVEL_WINDOW_MS } = await import("@/lib/sign-in-risk");
-const { emailHint, emailMatches, planRiskCheck, parseStepUp, serializeStepUp } = await import("@/lib/two-factor-policy");
+const { emailHint, emailMatches, planRiskCheck, parseStepUp, serializeStepUp, stepUpComplete } = await import("@/lib/two-factor-policy");
 
 const NOW = new Date("2026-11-23T12:00:00Z");
 
@@ -48,6 +48,15 @@ describe("planRiskCheck", () => {
 
     it("asks nothing when no code can be delivered", () => {
         expect(planRiskCheck({ available: [], reason: "impossible-travel" })).toBeNull();
+    });
+
+    it("adds the security questions after the code, never in place of it", () => {
+        const plan = planRiskCheck({ available: ["email"], reason: "new-device", hasQuestions: true });
+        expect(plan).toMatchObject({ need: 1, question: true });
+        expect(stepUpComplete({ ...plan!, questionDone: true })).toBe(false);
+        expect(stepUpComplete({ ...plan!, done: ["email"], questionDone: true })).toBe(true);
+        // No code to send means no step: answers alone never open a session.
+        expect(planRiskCheck({ available: [], reason: "new-device", hasQuestions: true })).toBeNull();
     });
 });
 

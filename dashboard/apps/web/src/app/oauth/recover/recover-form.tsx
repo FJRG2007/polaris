@@ -18,7 +18,7 @@ import * as polls from "./recover-polls";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 import { SECURITY_QUESTION_COUNT, type AccountRecoveryStatus } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { completeRecoveryAction, lookupRecoveryAction, requestRecoveryAction } from "./actions";
+import { completeRecoveryAction, requestRecoveryAction } from "./actions";
 
 /**
  * How often the waiting screen asks whether a decision has been made.
@@ -46,6 +46,10 @@ const MIN_PASSWORD = 10;
 
 type Step = "identify" | "prove" | "waiting" | "reset" | "done";
 
+function emptyAnswers(): string[] {
+    return Array.from({ length: SECURITY_QUESTION_COUNT }, () => "");
+}
+
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
     return (
         <main className="grid min-h-dvh grid-cols-[minmax(0,1fr)] place-items-center safe-p-4">
@@ -66,8 +70,10 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
     const tv = useTranslations("validation");
     const [step, setStep] = useState<Step>(initialTicket ? "waiting" : "identify");
     const [identifier, setIdentifier] = useState("");
-    const [questions, setQuestions] = useState<string[]>([]);
-    const [answers, setAnswers] = useState<string[]>([]);
+    // Always the same number of boxes, for every address: the account's own
+    // questions are never shown here, so this page cannot tell anybody whether
+    // an address has an account, or what its owner chose to be asked.
+    const [answers, setAnswers] = useState<string[]>(() => emptyAnswers());
     const [ticket, setTicket] = useState(initialTicket);
     const [status, setStatus] = useState<AccountRecoveryStatus>("pending");
     const [password, setPassword] = useState("");
@@ -147,34 +153,27 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
         };
     }, [step, ticket]);
 
-    async function onIdentify(event: FormEvent) {
+    function onIdentify(event: FormEvent) {
         event.preventDefault();
         if (!identifier.trim()) {
             setError(t("recover.errors.enterIdentifier"));
             return;
         }
-        setPending(true);
         setError(null);
-        const result = await lookupRecoveryAction({ identifier });
-        setPending(false);
-        if (result.error) {
-            setError(result.error);
-            return;
-        }
-        setQuestions(result.questions);
-        setAnswers(Array.from({ length: result.questions.length }, () => ""));
         setStep("prove");
     }
 
     async function onRequest(event: FormEvent) {
         event.preventDefault();
-        if (questions.length > 0 && answers.some((answer) => answer.trim().length < 2)) {
+        // All of them or none: somebody who never set questions leaves them empty.
+        const typed = answers.filter((answer) => answer.trim().length > 0);
+        if (typed.length > 0 && answers.some((answer) => answer.trim().length < 2)) {
             setError(t("recover.errors.answerAll"));
             return;
         }
         setPending(true);
         setError(null);
-        const result = await requestRecoveryAction({ identifier, answers });
+        const result = await requestRecoveryAction({ identifier, answers: typed.length > 0 ? answers : [] });
         setPending(false);
         if (result.error) {
             setError(result.error);
@@ -209,8 +208,7 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
 
     function startOver() {
         setStep("identify");
-        setQuestions([]);
-        setAnswers([]);
+        setAnswers(emptyAnswers());
         setTicket("");
         setError(null);
         window.history.replaceState(null, "", "/oauth/recover");
@@ -245,16 +243,15 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
     if (step === "prove") {
         return (
             <Shell title={t("recover.title")}>
-                {questions.length === SECURITY_QUESTION_COUNT ? (
-                    <p className="text-sm text-muted-foreground">{t("recover.questionsIntro")}</p>
-                ) : (
-                    <p className="text-sm text-muted-foreground">{t("recover.noQuestions")}</p>
-                )}
+                <p className="text-sm text-muted-foreground">{t("recover.questionsIntro")}</p>
                 <form onSubmit={onRequest} noValidate className="mt-3 flex flex-col gap-3">
-                    {questions.map((question, index) => (
-                        <div key={question} className="flex flex-col gap-1">
-                            <label className="text-sm">{question}</label>
+                    {answers.map((_, index) => (
+                        <div key={index} className="flex flex-col gap-1">
+                            <label className="text-sm" htmlFor={`recover-answer-${index}`}>
+                                {t("recover.answerLabel", { number: index + 1 })}
+                            </label>
                             <Input
+                                id={`recover-answer-${index}`}
                                 autoComplete="off"
                                 value={answers[index] ?? ""}
                                 onChange={(event) =>

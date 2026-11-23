@@ -99,6 +99,7 @@ export {
     setSecurityQuestions,
     clearSecurityQuestions,
     verifySecurityAnswers,
+    verifySecurityAnswersAnyOrder,
     resetUserPassword,
     updateSessionBinding,
     updateSignInRules,

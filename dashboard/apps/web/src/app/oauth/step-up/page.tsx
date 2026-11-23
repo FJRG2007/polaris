@@ -32,7 +32,10 @@ export default async function StepUpPage() {
     const left = stepUpRemaining(state);
     const [statuses, questions, phone, email] = await Promise.all([
         left.methods.length > 0 ? describeTwoFactorMethods(session.id) : Promise.resolve([]),
-        left.questionLeft ? listSecurityQuestions(session.id) : Promise.resolve([]),
+        // The questions are the account's own words, and nobody gets to read them
+        // - or try answers against them - on a password alone: only once every
+        // code this sign-in owes has been entered.
+        left.questionLeft && left.factorsLeft === 0 ? listSecurityQuestions(session.id) : Promise.resolve([]),
         left.methods.includes("whatsapp") && !state.phoneConfirmed ? getUserPhone(session.id) : Promise.resolve(null),
         left.methods.includes("email") && !state.emailConfirmed ? codeEmailAddress(session.id) : Promise.resolve(null)
     ]);
