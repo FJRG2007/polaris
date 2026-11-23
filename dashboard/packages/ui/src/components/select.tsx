@@ -24,6 +24,7 @@ import { Check, ChevronDown } from "lucide-react";
 import { SearchableSelect } from "./searchable-select";
 import * as RadixSelect from "@radix-ui/react-select";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from "react";
+import { clearOfWindowControls } from "../shell/window-controls";
 
 export const SelectRoot = RadixSelect.Root;
 export const SelectGroup = RadixSelect.Group;
@@ -57,12 +58,14 @@ SelectTrigger.displayName = "SelectTrigger";
 export const SelectContent = forwardRef<
     ElementRef<typeof RadixSelect.Content>,
     ComponentPropsWithoutRef<typeof RadixSelect.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
+>(({ className, children, position = "popper", collisionPadding = 10, ...props }, ref) => (
     <RadixSelect.Portal>
         <RadixSelect.Content
             ref={ref}
             position={position}
             sideOffset={position === "popper" ? 6 : undefined}
+            // Radix's own margin, plus the band the desktop app's window buttons take.
+            collisionPadding={position === "popper" ? clearOfWindowControls(collisionPadding) : collisionPadding}
             className={cn(
                 "relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-hidden rounded-lg border border-border-strong bg-elevated text-foreground shadow-popover",
                 FLOATING_MOTION,

@@ -8,6 +8,7 @@ import { useDiagramActionManager } from "./App";
 import type { ActionManager } from "../actions/manager";
 
 import * as Popover from "@radix-ui/react-popover";
+import { clearOfWindowControls } from "@polaris/ui";
 import { Island } from "./Island";
 import { QuickSearch } from "./QuickSearch";
 import { t } from "../i18n";
@@ -214,6 +215,7 @@ export const UserList = React.memo(
                 }}
                 align="end"
                 sideOffset={10}
+                collisionPadding={clearOfWindowControls(0)}
               >
                 <Island padding={2}>
                   {uniqueCollaboratorsArray.length >=

@@ -11,7 +11,7 @@
 import type { Config } from "tailwindcss";
 import plugin from "tailwindcss/plugin";
 import animate from "tailwindcss-animate";
-import defaultTheme from "tailwindcss/defaultTheme";
+import { TITLEBAR_SCREENS } from "./shell/titlebar-screens";
 
 /**
  * `safe-p-4`, `safe-px-6`, `safe-py-10`: the padding `p-4` and the rest would
@@ -44,10 +44,15 @@ const safePadding = plugin(({ matchUtilities, theme }) => {
  * `lg:` exactly and in the app the bar shows what a browser as wide as the room
  * it has would show. The widths stay in px: the desktop's text size scales the
  * root font, which a rem in a container query would follow.
+ *
+ * `under-tb-md:` and the rest match anywhere on the page while the bar is
+ * narrower than that screen (see `TitlebarWidths`), for the page copy of a
+ * control whose bar copy shows at `tb-md:`.
  */
 const titlebarWidths = plugin(({ addVariant }) => {
-    for (const [name, width] of Object.entries(defaultTheme.screens as Record<string, string>)) {
-        addVariant(`tb-${name}`, `@container titlebar (min-width: ${width})`);
+    for (const [name, width] of Object.entries(TITLEBAR_SCREENS)) {
+        addVariant(`tb-${name}`, `@container titlebar (min-width: ${width}px)`);
+        addVariant(`under-tb-${name}`, `:root[data-titlebar-under~="${name}"] &`);
     }
 });
 

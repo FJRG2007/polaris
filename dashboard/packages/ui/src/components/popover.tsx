@@ -9,6 +9,7 @@
 import * as RadixPopover from "@radix-ui/react-popover";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
 import { cn } from "../lib/cn";
+import { clearOfWindowControls } from "../shell/window-controls";
 
 export const Popover = RadixPopover.Root;
 export const PopoverTrigger = RadixPopover.Trigger;
@@ -23,7 +24,7 @@ export const PopoverContent = forwardRef<
         <RadixPopover.Content
             ref={ref}
             sideOffset={sideOffset}
-            collisionPadding={collisionPadding}
+            collisionPadding={clearOfWindowControls(collisionPadding)}
             className={cn(
                 "z-50 max-h-[--radix-popover-content-available-height] w-[min(22rem,calc(100vw-1rem))] overflow-y-auto overscroll-contain rounded-lg border border-border-strong bg-elevated p-3 text-foreground shadow-popover",
                 className

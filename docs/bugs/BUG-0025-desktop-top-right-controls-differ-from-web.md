@@ -172,11 +172,8 @@ open, and a picture at fit that could no longer be dragged.
 
 ### Not verified
 
-- The real Electron window was not run, and the headless-Chrome screenshots
-  with the band simulated were not taken in this pass.
-- Deploy's project and environment pickers still switch on window width
-  (`md:`) while the bar switches on its own (`tb-*`); popovers' collision
-  padding does not include the band yet.
+- The real Electron window was not run. Both items that were open here are
+  closed in "Pickers and menus" below.
 
 ### If it happens again
 
@@ -184,3 +181,45 @@ A control under the buttons: the sweep names the file unless the surface goes
 through `clearWindowControls`. A lighter or darker block under the buttons:
 compare `composite(...)` with what is drawn there at the point the preload
 samples (just left of the buttons, 8px down).
+
+## Pickers and menus 2026-11-23
+
+- **Controls portalled into the bar** (Deploy's project and environment,
+  Analytics' scope and site, the firewall scope): the bar's copy showed at
+  `md:` (window width) while the bar clips by its own width, so in the app,
+  between 768 px and 768 px plus the buttons, the pickers were cut off and the
+  page copy was hidden. The bar's copy now shows at `tb-md:`, and the page copy
+  at `md:hidden under-tb-md:flex`. `TitlebarWidths`
+  (`packages/ui/src/shell/titlebar-widths.tsx`, mounted in the shell's frame)
+  measures the frame's content box, the width `tb-*` queries, and lists on
+  `<html data-titlebar-under>` the screens it is narrower than; the preset's
+  `under-tb-<screen>:` variant matches that. Both read `TITLEBAR_SCREENS`
+  (`shell/titlebar-screens.ts`).
+- **Menus, lists, popovers, the calendar, the virtual keyboard and the diagram
+  editor's popovers** take the band in their top collision padding through
+  `clearOfWindowControls` (`shell/window-controls.ts`), which reads
+  `navigator.windowControlsOverlay` when the popper renders.
+
+### Verified
+
+- `apps/web/test/ui/titlebar-widths.test.ts`: `under-tb-md:` compiles to
+  `:root[data-titlebar-under~="md"]`, `TITLEBAR_SCREENS` equals Tailwind's
+  screens, and every `HeaderPortal` user has no window-width class in the
+  portal (or on an element it places by name) and a page copy that comes back
+  with `under-tb-*`. Pointing it at the old project shell fails.
+- `packages/ui/test/window-controls-poppers.test.tsx`: the padding is unchanged
+  in a browser and with the overlay off, takes 47 px at the top with it on;
+  every Radix popper content in `packages/ui` and the diagram editor goes
+  through `clearOfWindowControls` (fails if one does not); `TitlebarWidths`
+  writes and clears the attribute.
+- Headless Chrome (`--mute-audio`), band simulated as 138 x 47 px and a stubbed
+  `windowControlsOverlay`, widths 700/820/900/1100/1440, light and dark, with
+  and without a dialog: the picture viewer's controls and the dialog's close
+  never overlap the buttons; at 820 and 900 (window past `md`, bar under it) the
+  page copy shows and the bar copy is hidden, at 1100 and up the reverse, never
+  both or neither; a menu's available height drops from 728 px to 681 px with
+  the band (760 - 63 - 16).
+
+### Not verified
+
+- The real Electron window, and the real `windowControlsOverlay` geometry.

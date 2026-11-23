@@ -67,7 +67,7 @@ export function ScopePicker({
         <Select
             value={kind}
             aria-label={t("picker.scope")}
-            className="h-8 min-w-0 flex-1 font-medium md:w-48 md:min-w-[12rem] md:flex-none"
+            className="h-8 min-w-0 flex-1 font-medium tb-md:w-48 tb-md:min-w-[12rem] tb-md:flex-none"
             options={kinds.map((entry) => ({ value: entry, label: scopeKindLabel(t, entry) }))}
             onValueChange={(value) => {
                 // Moving to a kind that names something lands on its first entry - the
@@ -90,7 +90,7 @@ export function ScopePicker({
             placeholder={t("picker.target")}
             searchPlaceholder={t("picker.search")}
             emptyText={t("picker.empty")}
-            className="h-8 min-w-0 flex-1 md:w-60 md:min-w-[15rem] md:flex-none"
+            className="h-8 min-w-0 flex-1 tb-md:w-60 tb-md:min-w-[15rem] tb-md:flex-none"
         />
     ) : (
         <span className="whitespace-nowrap text-sm text-muted-foreground">{t("picker.none")}</span>
@@ -101,15 +101,15 @@ export function ScopePicker({
             {/* In the top bar where there is room beside the app switcher, and at the
                 top of the page where there is not - the same controls, never both. */}
             <HeaderPortal>
-                <span className="hidden text-muted-foreground/40 md:inline">/</span>
-                <span className="hidden items-center gap-2 md:flex">
+                <span className="hidden text-muted-foreground/40 tb-md:inline">/</span>
+                <span className="hidden items-center gap-2 tb-md:flex">
                     {kindSelect}
                     {targetSelect ? <span className="text-muted-foreground/40">/</span> : null}
                     {targetSelect}
                 </span>
             </HeaderPortal>
 
-            <div className="flex items-center gap-2 md:hidden">
+            <div className="flex items-center gap-2 md:hidden under-tb-md:flex">
                 {kindSelect}
                 {targetSelect}
             </div>

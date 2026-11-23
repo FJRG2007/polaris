@@ -67,4 +67,9 @@ declare module "@polaris/ui" {
   >;
   export const DialogHeader: React.FC<Div>;
   export const DialogTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement>>;
+  /** A popper's collision padding with the desktop app's window-buttons band
+   *  added at the top; unchanged in a browser. */
+  export function clearOfWindowControls(
+    padding: number | Partial<Record<Side, number>>,
+  ): number | Partial<Record<Side, number>>;
 }

@@ -9,6 +9,7 @@
 
 import { cn } from "../lib/cn";
 import { ShellMain } from "./shell-main";
+import { TitlebarWidths } from "./titlebar-widths";
 import type { ReactNode } from "react";
 
 export function AppShell({
@@ -56,6 +57,7 @@ export function AppShell({
                 app's buttons, so the bar shows what a browser of that width
                 shows (see `.app-titlebar-frame`). */}
             <div className="app-titlebar-frame z-40 h-[calc(var(--header-height)+var(--header-safe-top))] shrink-0 border-b border-border bg-surface pt-[var(--header-safe-top)]">
+                <TitlebarWidths />
                 <header className="app-titlebar flex h-full items-center justify-between gap-1 pe-[calc(0.5rem+var(--safe-end))] ps-[calc(0.5rem+var(--safe-start))] tb-sm:gap-4 tb-sm:pe-[calc(1rem+var(--safe-end))] tb-sm:ps-[calc(1rem+var(--safe-start))]">
                     {/* When the bar runs out of room - the desktop app's window
                         buttons take its right end at the same window width - this

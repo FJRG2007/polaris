@@ -418,7 +418,7 @@ function SitePicker({
         <Select
             value={scope}
             aria-label={t("view.whatToMeasure")}
-            className="h-8 min-w-0 flex-1 font-medium md:w-36 md:min-w-[9rem] md:flex-none"
+            className="h-8 min-w-0 flex-1 font-medium tb-md:w-36 tb-md:min-w-[9rem] tb-md:flex-none"
             options={scopes.map((entry) => ({
                 value: entry.value,
                 label: t(`scopes.${entry.value}`)
@@ -433,12 +433,12 @@ function SitePicker({
     const siteSelect = !scopeNeedsTarget(scope) ? null : choices === null ? (
         // The shape of the control that is coming, rather than a gap the header
         // closes up and then reopens.
-        <Skeleton className="h-8 min-w-0 flex-1 md:w-60 md:min-w-[15rem] md:flex-none" />
+        <Skeleton className="h-8 min-w-0 flex-1 tb-md:w-60 tb-md:min-w-[15rem] tb-md:flex-none" />
     ) : choices.length > 0 ? (
         <Select
             value={siteId || (choices[0]?.id ?? "")}
             aria-label={t(`scopes.${scope}` as NamespaceKey<"analytics">)}
-            className="h-8 min-w-0 flex-1 md:w-60 md:min-w-[15rem] md:flex-none"
+            className="h-8 min-w-0 flex-1 tb-md:w-60 tb-md:min-w-[15rem] tb-md:flex-none"
             options={choices.map((service) => ({ value: service.id, label: service.label }))}
             onValueChange={(value) => go(scope, value)}
         />
@@ -451,14 +451,14 @@ function SitePicker({
     return (
         <>
             <HeaderPortal>
-                <span className="hidden text-muted-foreground/40 md:inline">/</span>
-                <span className="hidden items-center gap-2 md:flex">
+                <span className="hidden text-muted-foreground/40 tb-md:inline">/</span>
+                <span className="hidden items-center gap-2 tb-md:flex">
                     {scopeSelect}
                     {siteSelect ? <span className="text-muted-foreground/40">/</span> : null}
                     {siteSelect}
                 </span>
             </HeaderPortal>
-            <div className="flex w-full min-w-0 items-center gap-2 md:hidden">
+            <div className="flex w-full min-w-0 items-center gap-2 md:hidden under-tb-md:flex">
                 {scopeSelect}
                 {siteSelect}
             </div>

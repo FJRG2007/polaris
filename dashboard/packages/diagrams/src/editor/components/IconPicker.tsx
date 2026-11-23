@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 import React, { useEffect } from "react";
 import * as Popover from "@radix-ui/react-popover";
+import { clearOfWindowControls } from "@polaris/ui";
 import { isArrowKey, KEYS } from "../keys";
 import { getLanguage, t } from "../i18n";
 import clsx from "clsx";
@@ -157,6 +158,7 @@ function Picker<T>({
       }
       align="start"
       sideOffset={12}
+      collisionPadding={clearOfWindowControls(0)}
       style={{ zIndex: "var(--zIndex-popup)" }}
       onKeyDown={handleKeyDown}
     >

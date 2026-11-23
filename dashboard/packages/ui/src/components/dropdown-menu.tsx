@@ -11,6 +11,7 @@ import { ignoreOpeningPress } from "../lib/menu-press";
 import { keepSearchFocus, redirectMenuFocus, tabThroughMenu } from "../lib/menu-search-focus";
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
+import { clearOfWindowControls } from "../shell/window-controls";
 
 /** How far a menu keeps from the edge of the screen, in px - the page's own
  *  gutter on a phone. */
@@ -42,7 +43,7 @@ export const DropdownMenuContent = forwardRef<
                 // left of it: the app switcher lists every app with a line of
                 // description under each, which is taller than a phone, and a surface
                 // that clipped its overflow left the bottom half of it unreachable.
-                collisionPadding={collisionPadding}
+                collisionPadding={clearOfWindowControls(collisionPadding)}
                 className={cn(
                     "z-50 max-h-[--radix-dropdown-menu-content-available-height] min-w-[min(12rem,calc(100vw-2rem))] max-w-[--radix-dropdown-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover",
                     FLOATING_MOTION,
@@ -178,7 +179,7 @@ export const DropdownMenuSubContent = forwardRef<
     <RadixMenu.Portal>
         <FittedSubContent
             ref={ref}
-            collisionPadding={collisionPadding}
+            collisionPadding={clearOfWindowControls(collisionPadding)}
             className={cn(
                 "z-50 max-h-[--radix-dropdown-menu-content-available-height] min-w-[min(12rem,calc(100vw-2rem))] max-w-[--radix-dropdown-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover",
                 FLOATING_MOTION,

@@ -31,6 +31,7 @@ import {
     type KeyboardLayoutId,
     type TextField
 } from "../lib/keyboard-layouts";
+import { clearOfWindowControls } from "../shell/window-controls";
 
 export interface VirtualKeyboardLabels {
     open: string;
@@ -147,7 +148,7 @@ export function VirtualKeyboard({
                     side="bottom"
                     align="end"
                     sideOffset={6}
-                    collisionPadding={8}
+                    collisionPadding={clearOfWindowControls(8)}
                     // The field keeps the focus and its caret.
                     onOpenAutoFocus={(event) => event.preventDefault()}
                     onInteractOutside={(event) => {

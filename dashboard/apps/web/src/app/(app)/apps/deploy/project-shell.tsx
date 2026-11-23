@@ -115,7 +115,7 @@ export function ProjectShell({
             value={project.id}
             onValueChange={(id) => (id === NEW_PROJECT ? setShowNewProject(true) : router.push(`/apps/deploy/${id}`))}
             options={[...projects.map((item) => ({ value: item.id, label: item.name })), ...newProjectOption]}
-            className="h-8 min-w-0 flex-1 font-medium md:w-44 md:min-w-[11rem] md:flex-none"
+            className="h-8 min-w-0 flex-1 font-medium tb-md:w-44 tb-md:min-w-[11rem] tb-md:flex-none"
             aria-label={t("shell.project")}
         />
     );
@@ -127,7 +127,7 @@ export function ProjectShell({
                 ...project.environments.map((environment) => ({ value: environment.id, label: environment.name })),
                 ...newEnvOption
             ]}
-            className="h-8 min-w-0 flex-1 md:w-52 md:min-w-[13rem] md:flex-none"
+            className="h-8 min-w-0 flex-1 tb-md:w-52 tb-md:min-w-[13rem] tb-md:flex-none"
             aria-label={t("shell.environment")}
         />
     );
@@ -139,15 +139,15 @@ export function ProjectShell({
                 the app switcher, and at the top of the page where there is not -
                 the same controls, never both visible at once. */}
             <HeaderPortal>
-                <span className="hidden text-muted-foreground/40 md:inline">/</span>
-                <span className="hidden items-center gap-2 md:flex">
+                <span className="hidden text-muted-foreground/40 tb-md:inline">/</span>
+                <span className="hidden items-center gap-2 tb-md:flex">
                     {projectSelect}
                     <span className="text-muted-foreground/40">/</span>
                     {environmentSelect}
                 </span>
             </HeaderPortal>
 
-            <div className="flex items-center gap-2 md:hidden">
+            <div className="flex items-center gap-2 md:hidden under-tb-md:flex">
                 {projectSelect}
                 {environmentSelect}
             </div>

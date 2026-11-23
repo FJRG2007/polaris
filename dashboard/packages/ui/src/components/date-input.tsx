@@ -21,6 +21,7 @@ import * as Popover from "@radix-ui/react-popover";
 import { useLocale, useTranslations } from "../i18n";
 import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { clearOfWindowControls } from "../shell/window-controls";
 
 export type DateInputMode = "date" | "datetime" | "time";
 
@@ -274,7 +275,7 @@ export function DateInput({
                     <Popover.Content
                         align="start"
                         sideOffset={6}
-                        collisionPadding={8}
+                        collisionPadding={clearOfWindowControls(8)}
                         className="z-50 max-h-[--radix-popover-content-available-height] w-[min(18rem,calc(100vw-1rem))] overflow-y-auto overscroll-contain rounded-lg border border-border-strong bg-elevated p-3 text-foreground shadow-popover"
                         onOpenAutoFocus={(event) => event.preventDefault()}
                     >

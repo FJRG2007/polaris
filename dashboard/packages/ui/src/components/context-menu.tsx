@@ -29,6 +29,7 @@ import {
 } from "react";
 import { MenuSurfaceProvider, useMenuSurface } from "../lib/menu-surface";
 import { useMenuExtrasSource } from "../lib/menu-extras";
+import { clearOfWindowControls } from "../shell/window-controls";
 
 export const ContextMenu = RadixMenu.Root;
 export const ContextMenuTrigger = RadixMenu.Trigger;
@@ -106,7 +107,7 @@ export const ContextMenuContent = forwardRef<
             <RadixMenu.Content
                 ref={mergeRefs(ref, setSurface)}
                 // Same bounds as the dropdown's - see `DropdownMenuContent`.
-                collisionPadding={collisionPadding}
+                collisionPadding={clearOfWindowControls(collisionPadding)}
                 className={cn(
                     "z-50 max-h-[--radix-context-menu-content-available-height] min-w-[min(11rem,calc(100vw-2rem))] max-w-[--radix-context-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover",
                     POINTER_MENU_MOTION,
@@ -337,7 +338,7 @@ export const ContextMenuSubContent = forwardRef<
                 ref={ref}
                 {...offsets}
                 forceMount={kept || undefined}
-                collisionPadding={collisionPadding}
+                collisionPadding={clearOfWindowControls(collisionPadding)}
                 className={cn(
                     "z-50 max-h-[--radix-context-menu-content-available-height] min-w-[min(11rem,calc(100vw-2rem))] max-w-[--radix-context-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover",
                     FLOATING_MOTION,

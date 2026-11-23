@@ -1,6 +1,7 @@
 import React, { type ReactNode } from "react";
 import clsx from "clsx";
 import * as Popover from "@radix-ui/react-popover";
+import { clearOfWindowControls } from "@polaris/ui";
 
 import { useDevice } from "./App";
 import { Island } from "./Island";
@@ -56,6 +57,7 @@ export const PropertiesPopover = React.forwardRef<
           }
           alignOffset={-16}
           sideOffset={20}
+          collisionPadding={clearOfWindowControls(0)}
           style={{
             zIndex: "var(--zIndex-popup)",
           }}

@@ -87,3 +87,31 @@ export function clearWindowControls(className: string | undefined): string {
 export function windowControlsBand(background: string): string {
     return cn("fixed inset-x-0 top-0 h-[var(--window-controls-height)] [app-region:drag]", background);
 }
+
+type Side = "top" | "right" | "bottom" | "left";
+/** A popper's collision padding, as Radix takes it. */
+export type CollisionPadding = number | Partial<Record<Side, number>>;
+
+type WindowControlsOverlay = { visible: boolean; getTitlebarAreaRect(): { height: number; }; };
+
+/** The height of the band the desktop app's window buttons take, in px - the
+ *  `--window-controls-height` the page's CSS reads, for code that positions in
+ *  numbers. 0 in a browser and while the app's overlay is off. */
+export function windowControlsHeight(): number {
+    if (typeof navigator === "undefined") return 0;
+    const overlay = (navigator as { windowControlsOverlay?: WindowControlsOverlay; }).windowControlsOverlay;
+    return overlay?.visible ? Math.max(0, overlay.getTitlebarAreaRect().height) : 0;
+}
+
+/**
+ * A popper's collision padding with the window buttons' band added at the top,
+ * so a menu, a list or a calendar that would reach the top edge of the window
+ * flips or shifts to below the band instead of opening under the buttons. Read
+ * when the popper renders, which is each time it opens. Unchanged in a browser.
+ */
+export function clearOfWindowControls(padding: CollisionPadding): CollisionPadding {
+    const band = windowControlsHeight();
+    if (band === 0) return padding;
+    const sides = typeof padding === "number" ? { top: padding, right: padding, bottom: padding, left: padding } : padding;
+    return { ...sides, top: (sides.top ?? 0) + band };
+}
