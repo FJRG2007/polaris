@@ -7,7 +7,7 @@ a regression. Entries are sorted open/regressed first, then by severity.
 
 | ID | Title | Severity | Status | Location | CWE | Discovered |
 |----|-------|----------|--------|----------|-----|------------|
-| VULN-0003 | Game server player lookup exposes any user's session IP addresses | Medium | Accepted risk | dashboard/apps/game-servers/src/screens/installed/minecraft-actions.ts | CWE-359 | 2026-09-28 |
+| VULN-0003 | Game server player lookup exposes any user's session IP addresses | Medium | Fixed | dashboard/apps/game-servers/src/screens/installed/minecraft-actions.ts | CWE-359 | 2026-09-28 |
 | VULN-0044 | Password rules are client-enforced under OPAQUE | Low | Accepted risk | dashboard/apps/web/src/lib/chat/e2ee/password-rules.ts | CWE-602 | 2026-11-23 |
 | VULN-0037 | Any member connects a "Local folder" at the server's root and reads or writes everything the web process can | Critical | Fixed | dashboard/apps/web/src/app/(app)/drive/actions.ts | CWE-862 | 2026-11-12 |
 | VULN-0006 | Sign-in approval gate bypassed through better-auth HTTP endpoints (2FA enable, revoke-other-sessions) | High | Fixed | dashboard/packages/auth/src/auth.ts:869 | CWE-863 | 2026-09-28 |
@@ -40,6 +40,9 @@ a regression. Entries are sorted open/regressed first, then by severity.
 | VULN-0002 | UniFi UNAS Home Assistant add-on does not verify the NAS SSH host key | Medium | Fixed | plugins/unifi-unas/homeassistant/custom_components/unifi_unas/ssh_manager.py:121 | CWE-295 | 2026-09-28 |
 | VULN-0004 | Private GitHub repositories can be built through the instance GitHub App by any deploy member | Medium | Fixed | dashboard/apps/web/src/lib/github-access.ts | CWE-863 | 2026-09-28 |
 | VULN-0001 | SSRF via DNS rebinding (TOCTOU) in safe-fetch link unfurl | Medium | Fixed | dashboard/apps/web/src/lib/safe-fetch.ts:118 | CWE-918 | 2026-08-16 |
+| VULN-0045 | A picture written into a message loads from its own site and hands every reader's address to it | Medium | Fixed | dashboard/apps/web/src/components/rich-text/rich-text.tsx | CWE-359 | 2026-11-23 |
+| VULN-0046 | Link and drop-point visitor logs show a signed-in visitor's address, browser and email | Medium | Fixed | dashboard/apps/web/src/lib/visitor-privacy.ts | CWE-359 | 2026-11-23 |
+| VULN-0047 | Fields that add somebody by email confirm whether an address has an account | Low | Fixed | dashboard/apps/web/src/lib/people-search.ts | CWE-204 | 2026-11-23 |
 | VULN-0043 | A Minecraft player's allowed address can be forged by quoting a login line in chat | Medium | Fixed | dashboard/apps/game-servers/src/lib/minecraft/parse.ts | CWE-345 | 2026-11-19 |
 | VULN-0038 | An open terminal keeps running commands after its account is banned or signed out | Medium | Fixed | dashboard/apps/web/ws-server.mjs | CWE-613 | 2026-11-12 |
 | VULN-0042 | A terminal that stops reading makes the sidecar queue shell output without limit | Medium | Fixed | dashboard/apps/web/ws-server.mjs | CWE-770 | 2026-11-12 |
