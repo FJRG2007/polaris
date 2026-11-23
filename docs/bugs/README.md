@@ -30,3 +30,4 @@ Security findings are not kept here; they live in
 | BUG-0017 | Active sessions on the same computer are not grouped under it | Sessions | Fixed, watching | dashboard/apps/web/src/lib/device-sessions/device-groups.ts | 2026-11-22 |
 | BUG-0018 | The conversation list shows an older chat above one with a newer message | Chat | Fixed, watching | dashboard/apps/web/src/lib/chat/conversation-list.ts | 2026-11-22 |
 | BUG-0019 | A conversation you are reading, or have just answered, stays unread for a while | Chat | Fixed, watching | dashboard/apps/web/src/lib/chat/read-marks.ts | 2026-11-22 |
+| BUG-0020 | A link in a received email does nothing when clicked in Polaris desktop | Desktop | Open | dashboard/apps/web/src/app/(app)/mail/message-body.tsx | 2026-11-23 |
