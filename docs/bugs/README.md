@@ -36,3 +36,4 @@ Security findings are not kept here; they live in
 | BUG-0023 | Polaris desktop does not seem to open with the computer, or opens minutes later | Desktop | Fixed, watching | desktop/src/main/login-item.ts | 2026-11-23 |
 | BUG-0024 | Pages with a dynamic route are told their code was changed, and password fields are blocked | Integrity | Fixed, watching | dashboard/packages/core/src/integrity-paths.ts | 2026-11-23 |
 | BUG-0025 | In Polaris desktop the top right of the window shows different or missing buttons compared with the web | Desktop | Fixed, watching | dashboard/packages/ui/src/shell/window-controls.ts | 2026-11-23 |
+| BUG-0026 | Sharing a screen larger than 4K freezes the sharer, and the others cannot watch it | Calls | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/call-quality.ts | 2026-11-23 |

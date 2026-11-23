@@ -604,6 +604,32 @@ export function cameraConstraints(
 }
 
 /**
+ * The most pixels a shared screen is sent with: a 4K display's worth.
+ *
+ * A 4K monitor goes out at its full size; a larger capture - a 7680x2160
+ * super-ultrawide, two screens side by side, an 8K panel - is scaled down to this
+ * many pixels in its own shape. Sent at full size, a 7680x2160 screen at 60 fps
+ * was more than the sharer's machine could encode (the whole computer stuttered
+ * while sharing) and more than a viewer's could decode (BUG-0026).
+ */
+export const SCREEN_MAX_PIXELS = 3840 * 2160;
+
+/** The bound that brings a screen of this size within `SCREEN_MAX_PIXELS`,
+ *  keeping its shape, or nothing when it already fits. */
+export function screenFit(
+    source: { readonly width?: number; readonly height?: number } | null | undefined
+): MediaTrackConstraints {
+    const width = source?.width ?? 0;
+    const height = source?.height ?? 0;
+    if (width <= 0 || height <= 0 || width * height <= SCREEN_MAX_PIXELS) return {};
+    const scale = Math.sqrt(SCREEN_MAX_PIXELS / (width * height));
+    return {
+        width: { max: Math.floor(width * scale) },
+        height: { max: Math.floor(height * scale) }
+    };
+}
+
+/**
  * What to ask the browser for when sharing a screen.
  *
  * The top rung names no size at all, which is what "the display's own
@@ -613,7 +639,10 @@ export function cameraConstraints(
 export function screenConstraints(
     level: CallLevel,
     /** The size the screen is being captured at now, when it already is. */
-    shape?: { readonly width?: number; readonly height?: number } | null
+    shape?: { readonly width?: number; readonly height?: number } | null,
+    /** The screen's own size, when it is open: the top rung keeps it within
+     *  `SCREEN_MAX_PIXELS` rather than handing it back at full size. */
+    source?: { readonly width?: number; readonly height?: number } | null
 ): MediaTrackConstraints {
     const rung = screenRung(level);
     // One edge, for the reason the camera gets one: a 16:10 laptop, an
@@ -625,7 +654,7 @@ export function screenConstraints(
             ? upright
                 ? { height: { ideal: rung.width } }
                 : { width: { ideal: rung.width } }
-            : {}),
+            : screenFit(source)),
         frameRate: { ideal: rung.frameRate }
     };
 }

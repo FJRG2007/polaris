@@ -141,6 +141,27 @@ describe("what a screen is asked for", () => {
         expect(want.frameRate).toEqual({ ideal: 60 });
     });
 
+    it("sends a 4K screen whole and scales a larger one to 4K's worth of pixels in its own shape", () => {
+        // A 7680x2160 super-ultrawide at full size froze the sharer's machine
+        // and reached nobody (BUG-0026).
+        expect(quality.screenFit({ width: 3840, height: 2160 })).toEqual({});
+        expect(quality.screenFit({ width: 5120, height: 1440 })).toEqual({});
+        const fit = quality.screenFit({ width: 7680, height: 2160 });
+        const width = (fit.width as { max: number }).max;
+        const height = (fit.height as { max: number }).max;
+        expect(width * height).toBeLessThanOrEqual(quality.SCREEN_MAX_PIXELS);
+        expect(width * height).toBeGreaterThan(quality.SCREEN_MAX_PIXELS * 0.99);
+        expect(width / height).toBeCloseTo(7680 / 2160, 2);
+    });
+
+    it("keeps an open oversized screen within the bound when the quality changes", () => {
+        // Replacing the open track's constraints with none would put it back
+        // to full size.
+        const want = screenConstraints("max", { width: 5430, height: 1527 }, { width: 7680, height: 2160 });
+        expect(want).toEqual({ ...quality.screenFit({ width: 7680, height: 2160 }), frameRate: { ideal: 60 } });
+        expect(screenConstraints("max", { width: 3840, height: 2160 }, { width: 3840, height: 2160 }).width).toBeUndefined();
+    });
+
     it("caps the size on every rung below it", () => {
         for (const level of ["low", "medium", "high"] as const) {
             expect(screenConstraints(level).width).toEqual({

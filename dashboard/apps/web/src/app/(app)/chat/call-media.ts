@@ -13,6 +13,7 @@
 import type { CallDevice } from "./call-state";
 import { desktopBridge } from "@/lib/desktop-bridge";
 import { micConstraints } from "./mic-cleanup";
+import { screenFit } from "./call-quality";
 import { withCameraDevice } from "./camera-device";
 import { canPickDesktopShare, pickDesktopShare } from "./desktop-share-picker";
 
@@ -137,6 +138,40 @@ export function canShareScreen(): boolean {
     return typeof navigator?.mediaDevices?.getDisplayMedia === "function";
 }
 
+/** Each open screen's own size, read before anything scaled it. */
+const sources = new WeakMap<MediaStreamTrack, { readonly width: number; readonly height: number }>();
+
+/**
+ * The size of the screen behind this track, as it was opened - not the size it
+ * is being sent at - so a later change of quality never hands an oversized
+ * screen back at full size.
+ */
+export function screenSource(
+    track: MediaStreamTrack | null | undefined
+): { readonly width?: number; readonly height?: number } | null {
+    if (!track) return null;
+    return sources.get(track) ?? track.getSettings?.() ?? null;
+}
+
+/**
+ * Bring a screen larger than a 4K display's worth of pixels down to it, in its
+ * own shape (`screenFit`).
+ *
+ * Asked of the open track rather than in the request, because naming a size in
+ * the request is what caps Safari's capture far below it. A screen that already
+ * fits is never touched, and a refusal leaves the capture as it was.
+ */
+export async function fitScreen(stream: MediaStream): Promise<MediaStream> {
+    const track = stream.getVideoTracks?.()[0];
+    const settings = track?.getSettings?.();
+    if (!track || !settings?.width || !settings.height) return stream;
+    sources.set(track, { width: settings.width, height: settings.height });
+    const fit = screenFit(settings);
+    if (!fit.width) return stream;
+    await track.applyConstraints({ ...track.getConstraints(), ...fit }).catch(() => undefined);
+    return stream;
+}
+
 /**
  * Open a screen, with its sound where this browser has any to offer.
  *
@@ -201,9 +236,9 @@ export async function openScreen(video: MediaTrackConstraints): Promise<MediaStr
                 : { ...PICKER, video }
         );
 
-    if (!screenSoundWorthAsking()) return ask(false);
+    if (!screenSoundWorthAsking()) return fitScreen(await ask(false));
     try {
-        return await ask(true);
+        return fitScreen(await ask(true));
     } catch (caught) {
         // A refusal is the reader's own answer - cancelling the picker is what
         // it usually is - and asking the same question twice over one press is
@@ -216,7 +251,7 @@ export async function openScreen(video: MediaTrackConstraints): Promise<MediaStr
         // that would not start this once, costs this share its sound and not
         // every share after it.
         if (cannotCarrySound(caught)) rememberNoScreenSound();
-        return await ask(false);
+        return fitScreen(await ask(false));
     }
 }
 

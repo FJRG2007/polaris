@@ -100,7 +100,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { holdReload } from "@/lib/reload-safety";
 import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
 import { applyMicCleanup, micCleanup, micConstraints, useMicCleanup } from "./mic-cleanup";
-import { callDevices, isDenial, openMedia, openScreen, refused, settle } from "./call-media";
+import { callDevices, isDenial, openMedia, openScreen, refused, screenSource, settle } from "./call-media";
 import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
 import { extraPublications, oneVoice, serialized, type PublishedTrack } from "./call-tracks";
 import { retuneScreenEncoding, swapScreen, type EncodedTrack } from "./call-share-menu";
@@ -3432,7 +3432,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 } else {
                     await quality.retune(
                         screen.current,
-                        quality.screenConstraints(level, screen.current?.getSettings())
+                        quality.screenConstraints(level, screen.current?.getSettings(), screenSource(screen.current))
                     );
                     if (screen.current) {
                         const tuning = quality.screenTuning(level, screenDegraded(level));
@@ -3632,7 +3632,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         moved = true;
                         void quality.retune(
                             screen.current,
-                            quality.screenConstraints(next.level, screen.current?.getSettings())
+                            quality.screenConstraints(
+                                next.level,
+                                screen.current?.getSettings(),
+                                screenSource(screen.current)
+                            )
                         );
                         // Held sharp once it has had to come down, and given the
                         // new allowance in place - never republished from here.

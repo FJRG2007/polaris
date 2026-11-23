@@ -33,7 +33,8 @@ vi.stubGlobal("navigator", {
     }
 });
 
-const { openScreen } = await import("../../src/app/(app)/chat/call-media");
+const { openScreen, screenSource } = await import("../../src/app/(app)/chat/call-media");
+const quality = await import("../../src/app/(app)/chat/call-quality");
 
 const failure = (name: string) => Object.assign(new Error(name), { name });
 /** A browser that takes a picture but rejects the whole request over the sound. */
@@ -118,5 +119,37 @@ describe("asking for a screen", () => {
         store.set("polaris.call.no-screen-sound", "1");
         await openScreen({});
         expect(asked[0]!.audio).toBeTruthy();
+    });
+});
+
+describe("a screen larger than 4K", () => {
+    /** A screen whose one video track reports `size` and records what it is asked. */
+    const sized = (size: { width: number; height: number }) => {
+        const applied: MediaTrackConstraints[] = [];
+        const track = {
+            getSettings: () => size,
+            getConstraints: () => ({ frameRate: { ideal: 60 } }),
+            applyConstraints: async (want: MediaTrackConstraints) => void applied.push(want)
+        };
+        return { stream: { getVideoTracks: () => [track] } as unknown as MediaStream, track, applied };
+    };
+
+    it("is scaled to 4K's worth of pixels in its own shape, keeping its frame rate, and its own size is remembered", async () => {
+        const { stream, track, applied } = sized({ width: 7680, height: 2160 });
+        answer = async () => stream;
+        await expect(openScreen({})).resolves.toBe(stream);
+        expect(applied).toHaveLength(1);
+        expect(applied[0]!.frameRate).toEqual({ ideal: 60 });
+        expect(applied[0]!.width).toEqual(quality.screenFit({ width: 7680, height: 2160 }).width);
+        expect(screenSource(track as unknown as MediaStreamTrack)).toEqual({ width: 7680, height: 2160 });
+    });
+
+    it("leaves a 4K screen and an ordinary ultrawide as they are", async () => {
+        for (const size of [{ width: 3840, height: 2160 }, { width: 3440, height: 1440 }]) {
+            const { stream, applied } = sized(size);
+            answer = async () => stream;
+            await openScreen({});
+            expect(applied).toEqual([]);
+        }
     });
 });
