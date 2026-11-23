@@ -1311,18 +1311,23 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git fetch --depth 1 origin integrity; then
-            git switch -C integrity FETCH_HEAD
-          else
-            git switch --orphan integrity
-          fi
-          mkdir -p manifests
-          cp "$RUNNER_TEMP/integrity/manifest.json" "manifests/$STAMP.json"
-          cp "$RUNNER_TEMP/integrity/manifest.sigstore.json" "manifests/$STAMP.sigstore.json"
-          git add manifests
-          git commit -q -m "integrity manifest for build $STAMP ($GITHUB_SHA)"
+          # Built again from the branch's newest tip on every attempt, rather than
+          # rebased: the fetch is one commit deep, and a rebase over a shallow
+          # history replays the old tip as if it were new.
           for attempt in 1 2 3; do
+            if git fetch --depth 1 origin integrity; then
+              git switch -f -C integrity FETCH_HEAD
+            else
+              git checkout -q --detach && { git branch -D integrity 2>/dev/null || true; }
+              git switch -f --orphan integrity
+            fi
+            mkdir -p manifests
+            cp "$RUNNER_TEMP/integrity/manifest.json" "manifests/$STAMP.json"
+            cp "$RUNNER_TEMP/integrity/manifest.sigstore.json" "manifests/$STAMP.sigstore.json"
+            git add manifests
+            git diff --cached --quiet && exit 0
+            git commit -q -m "integrity manifest for build $STAMP ($GITHUB_SHA)"
             git push origin integrity && exit 0
-            git fetch --depth 1 origin integrity && git rebase -q FETCH_HEAD
+            sleep $((attempt * 5))
           done
           exit 1
