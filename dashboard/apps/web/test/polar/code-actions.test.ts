@@ -103,6 +103,28 @@ vi.mock("@/lib/github-service", () => ({
     githubAppIsPublic: async () => true,
     githubAppVisibilityUrl: async () => "https://github.com/settings/apps/polaris-test/advanced"
 }));
+/** What the person's GitHub reaches, and what connecting a repository does. */
+const reach = {
+    repos: [] as { id: string; name: string }[],
+    asked: [] as unknown[],
+    linked: true,
+    connected: [] as string[],
+    connect: { id: "33333333-3333-4333-8333-333333333333", name: "acme/new" } as Record<string, unknown>
+};
+vi.mock("@/lib/agents/reachable-repos", () => ({
+    reachableRepoPage: async (_owner: string, request: { query: string }) => {
+        reach.asked.push(request);
+        const query = request.query.trim().toLowerCase();
+        return { items: reach.repos.filter((repo) => repo.name.toLowerCase().includes(query)), next: null };
+    },
+    connectSessionRepo: async (_owner: string, fullName: string) => {
+        reach.connected.push(fullName);
+        return reach.connect;
+    }
+}));
+vi.mock("@/lib/github-access", () => ({
+    githubCredentialsForUser: async () => (reach.linked ? [{ id: "gh" }] : [])
+}));
 vi.mock("@/lib/agents/agent-readiness", () => ({
     agentOptionsFor: async () => [
         {
@@ -199,6 +221,7 @@ vi.mock("@/components/agents/sessions/actions", () => ({
 const {
     polarCodeCancel,
     polarCodeChoices,
+    polarCodeConnectRepo,
     polarCodeOverview,
     polarCodeQueue,
     polarCodeStart,
@@ -506,6 +529,7 @@ describe("polarCodeStartLike", () => {
 
     it("starts a session like the one on screen, with no first message", async () => {
         state.held = new Set(["agents.read", "agents.manage"]);
+        reach.repos = [{ id: REPO, name: "acme/web" }];
         state.startedWith = null;
         Object.assign(session, like);
         try {
@@ -529,6 +553,25 @@ describe("polarCodeStartLike", () => {
             expect(state.startedWith).toBeNull();
         } finally {
             for (const key of Object.keys(like)) delete (session as Record<string, unknown>)[key];
+            reach.repos = [];
+        }
+    });
+
+    it("finds a named repository by searching everything the person reaches", async () => {
+        state.held = new Set(["agents.read", "agents.manage"]);
+        state.startedWith = null;
+        reach.repos = [{ id: REPO, name: "acme/web" }];
+        reach.asked = [];
+        Object.assign(session, like);
+        try {
+            expect(await polarCodeStartLike(USER, { from: SESSION, title: "X", repository: " acme/web " })).toEqual({
+                id: "started"
+            });
+            expect(reach.asked).toMatchObject([{ query: "acme/web" }]);
+            expect(state.startedWith).toMatchObject({ repoId: REPO });
+        } finally {
+            for (const key of Object.keys(like)) delete (session as Record<string, unknown>)[key];
+            reach.repos = [];
         }
     });
 
@@ -645,8 +688,73 @@ describe("polarCodeChoices", () => {
         expect(await polarCodeChoices(USER)).toMatchObject({
             skills: [{ name: "tdd", description: "Tests first" }],
             repos: [],
-            installUrl: "https://github.com/apps/polaris-test/installations/new"
+            installUrl: "https://github.com/apps/polaris-test/installations/new",
+            githubConnected: true
         });
+    });
+
+    it("lists every repository the person's GitHub reaches, and says when none is linked", async () => {
+        state.held.add("agents.manage");
+        reach.repos = [{ id: "github:acme/new", name: "acme/new" }];
+        reach.linked = false;
+        try {
+            expect(await polarCodeChoices(USER)).toMatchObject({
+                repos: [{ id: "github:acme/new", name: "acme/new" }],
+                reposNext: null,
+                githubConnected: false
+            });
+        } finally {
+            reach.repos = [];
+            reach.linked = true;
+        }
+    });
+});
+
+describe("polarCodeConnectRepo", () => {
+    beforeEach(() => {
+        reach.connected = [];
+        reach.connect = { id: "33333333-3333-4333-8333-333333333333", name: "acme/new" };
+    });
+
+    it("sets up a repository picked from GitHub, for somebody who may start sessions", async () => {
+        state.held = new Set(["agents.read", "agents.manage"]);
+        expect(await polarCodeConnectRepo(USER, { fullName: "acme/new" })).toEqual({
+            id: "33333333-3333-4333-8333-333333333333",
+            name: "acme/new"
+        });
+        expect(reach.connected).toEqual(["acme/new"]);
+    });
+
+    it("refuses a reader, a malformed name, and says why GitHub would not", async () => {
+        state.held = new Set(["agents.read"]);
+        expect(await polarCodeConnectRepo(USER, { fullName: "acme/new" })).toEqual({ error: "t:code.noAccess" });
+        state.held = new Set(["agents.read", "agents.manage"]);
+        expect(await polarCodeConnectRepo(USER, { fullName: "not a repo" })).toEqual({
+            error: "t:text.pickRepository"
+        });
+        reach.connect = { kind: "unreachable" };
+        expect(await polarCodeConnectRepo(USER, { fullName: "acme/gone" })).toEqual({
+            error: "t:errors.unreachableRepo"
+        });
+        reach.connect = { kind: "unchecked" };
+        expect(await polarCodeConnectRepo(USER, { fullName: "acme/gone" })).toEqual({
+            error: "t:errors.accessUnchecked"
+        });
+        const gap = { kind: "repo-not-selected", owner: "acme", repository: "acme/gone", url: "https://github.test" };
+        reach.connect = { kind: "gap", gap };
+        expect(await polarCodeConnectRepo(USER, { fullName: "acme/gone" })).toEqual({
+            error: "t:errors.githubRepoNotSelected",
+            githubGap: gap
+        });
+        expect(reach.connected).toEqual(["acme/gone", "acme/gone", "acme/gone"]);
+    });
+
+    it("sets up a repository a start names by its GitHub reference, then starts on its row", async () => {
+        state.held = new Set(["agents.read", "agents.manage"]);
+        state.startedWith = null;
+        await polarCodeStart(USER, { prompt: "Fix it", repoId: "github:acme/new" });
+        expect(reach.connected).toEqual(["acme/new"]);
+        expect(state.startedWith).toMatchObject({ repoId: "33333333-3333-4333-8333-333333333333" });
     });
 });
 

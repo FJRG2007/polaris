@@ -28,6 +28,7 @@ import {
     ExternalLink,
     Folder,
     FolderGit2,
+    Github,
     HardDrive,
     FolderPlus,
     Laptop,
@@ -318,12 +319,14 @@ function RepoItems({
                     </span>
                 </DropdownMenuItem>
             )}
-            <DropdownMenuItem asChild>
-                <Link href="/automations/code-review">
-                    <FolderGit2 className="size-3.5 shrink-0" />
-                    <span className="min-w-0 truncate">{t("code.connectInAgents")}</span>
-                </Link>
-            </DropdownMenuItem>
+            {choices?.githubConnected === false ? (
+                <DropdownMenuItem asChild>
+                    <Link href="/account/connections">
+                        <Github className="size-3.5 shrink-0" />
+                        <span className="min-w-0 truncate">{t("code.connectGithub")}</span>
+                    </Link>
+                </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem
                 disabled={refreshing}
                 onSelect={(event) => {

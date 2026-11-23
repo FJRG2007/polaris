@@ -62,6 +62,10 @@ import {
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
 import { lastChangeAt, lastToolAt, shownSessionBranch } from "@/lib/agents/session-branch";
 import * as repoOptions from "@/lib/agents/repo-options";
+import * as reachable from "@/lib/agents/reachable-repos";
+import { githubRepoOf } from "@/lib/agents/repo-ref";
+import { githubCredentialsForUser } from "@/lib/github-access";
+import { installGapMessage, type GithubInstallGap } from "@/lib/github-app-reach";
 import {
     getSession,
     hideSessionFromPolar,
@@ -412,6 +416,9 @@ export type PolarCodeChoices = Awaited<ReturnType<typeof sessionChoicesAction>> 
     /** GitHub's page for installing Polaris's App on more repositories, or null
      *  where no App is set up (a token connection, or none). */
     readonly installUrl: string | null;
+    /** Whether this person has linked a GitHub account at all: without one the
+     *  menu offers to link it rather than a list that cannot fill. */
+    readonly githubConnected: boolean;
     /** The person's Polar skills a task can start with, by name. */
     readonly skills: readonly { name: string; description: string }[];
     /** The person's sources and their models, and their own agents as
@@ -423,11 +430,18 @@ export type PolarCodeChoices = Awaited<ReturnType<typeof sessionChoicesAction>> 
  *  who cannot start a session. */
 export async function polarCodeChoices(user: SessionUser): Promise<PolarCodeChoices | null> {
     if ((await accessOf(user)) !== "manage") return null;
-    const [choices, installUrl, skills] = await Promise.all([
+    const [choices, installUrl, skills, repos, githubConnected] = await Promise.all([
         sessionChoicesAction(),
         // Unknown is no button rather than no choices.
         githubAppInstallUrl().catch(() => null),
-        listSkills(user.id).catch(() => [])
+        listSkills(user.id).catch(() => []),
+        // Every repository the person's GitHub account reaches, not only the
+        // ones set up for agents (`reachable-repos.ts`).
+        reachable.reachableRepoPage(user.id, repoOptions.repoOptionsInput.parse({})),
+        githubCredentialsForUser(user.id).then(
+            (accounts) => accounts.length > 0,
+            () => false
+        )
     ]);
     const code = await codeComposerFor(user.id, choices.agents).catch(
         (error: unknown): CodeComposer => {
@@ -437,7 +451,10 @@ export async function polarCodeChoices(user: SessionUser): Promise<PolarCodeChoi
     );
     return {
         ...choices,
+        repos: repos.items,
+        reposNext: repos.next,
         installUrl,
+        githubConnected,
         skills: skills.map(({ name, description }) => ({ name, description })),
         code
     };
@@ -520,7 +537,34 @@ export async function polarCodeRepos(
     request: repoOptions.RepoOptionsRequest
 ): Promise<{ items: repoOptions.RepoOption[]; next: string | null } | null> {
     if ((await accessOf(user)) !== "manage") return null;
-    return repoOptions.repoOptionsPage(user.id, request);
+    return reachable.reachableRepoPage(user.id, request);
+}
+
+const connectRepoInput = z.object({ fullName: core.repoFullNameSchema }).strict();
+
+/**
+ * A repository picked from the composer that has no agent row yet, set up so a
+ * session can start on it (`connectSessionRepo`). The refusal says why in the
+ * reader's words, with GitHub's step when the App is the reason.
+ */
+export async function polarCodeConnectRepo(
+    user: SessionUser,
+    raw: unknown
+): Promise<{ id?: string; name?: string; error?: string; githubGap?: GithubInstallGap }> {
+    const t = await getTranslations("agents");
+    if ((await accessOf(user)) !== "manage")
+        return { error: (await getTranslations("polar"))("code.noAccess") };
+    const parsed = connectRepoInput.safeParse(raw);
+    if (!parsed.success) return { error: t("text.pickRepository") };
+    const result = await reachable.connectSessionRepo(user.id, parsed.data.fullName);
+    if ("id" in result) return { id: result.id, name: result.name };
+    if (result.kind === "gap") {
+        const message = installGapMessage(result.gap, parsed.data.fullName);
+        return { error: t(message.key, message.values), githubGap: result.gap };
+    }
+    return {
+        error: result.kind === "unchecked" ? t("errors.accessUnchecked") : t("errors.unreachableRepo")
+    };
 }
 
 /** A repository's branches for the composer's branch chip. */
@@ -676,6 +720,16 @@ export async function polarCodeStart(
     // first turn is judged (`lib/agents/session-goal.ts`).
     const goal = startGoalSchema.safeParse(rawGoal ?? null);
     if (!goal.success) return { error: (await getTranslations("polar"))("goal.tooLong", { max: GOAL_CONDITION_MAX }) };
+    // A repository listed from GitHub with no agent row yet gets one now - the
+    // composer does this on picking it, a start by name (`polarCodeStartLike`)
+    // does it here.
+    const fromGithub =
+        typeof body.repoId === "string" ? githubRepoOf(body.repoId) : null;
+    if (fromGithub) {
+        const connected = await polarCodeConnectRepo(user, { fullName: fromGithub });
+        if (!connected.id) return { error: connected.error };
+        body.repoId = connected.id;
+    }
     const resolved = await resolvedStart(user, body);
     if ("error" in resolved) return { error: resolved.error };
     const rest = resolved.input;
@@ -911,9 +965,15 @@ export async function polarCodeStartLike(
     const view = thread.view;
     let repoId = view.repoId;
     if (input.repository) {
-        const choices = await polarCodeChoices(user);
-        if (!choices) return { error: (await getTranslations("polar"))("code.noAccess") };
-        const repo = repositoryNamed(choices.repos, input.repository);
+        if ((await accessOf(user)) !== "manage")
+            return { error: (await getTranslations("polar"))("code.noAccess") };
+        // Searched rather than read off the first page, so any repository the
+        // person reaches can be named.
+        const page = await reachable.reachableRepoPage(
+            user.id,
+            repoOptions.repoOptionsInput.parse({ query: input.repository.trim().slice(0, 200) })
+        );
+        const repo = repositoryNamed(page.items, input.repository);
         if (!repo) return { error: "no_repository" };
         repoId = repo.id;
     }

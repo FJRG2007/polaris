@@ -138,8 +138,10 @@ import {
     SessionSurfacePicker,
     readPermissionMode,
     readRepo,
+    REPOS_ROUTE,
     useRepoName
 } from "@/components/polar/polar-code-context";
+import { githubRepoOf } from "@/lib/agents/repo-ref";
 import type { PendingPermission } from "@/lib/agents/session-permissions";
 import { CodeAskCard, CodeTodos } from "@/components/polar/polar-code-asks";
 import { CodeSubagents } from "@/components/polar/polar-code-subagents";
@@ -601,7 +603,9 @@ function useCodeChoices(canStart: boolean) {
                 // A pick that is gone (a repository disconnected meanwhile) falls back.
                 // One past the first page is asked about by id rather than taken
                 // for gone because the page does not hold it.
-                const fallback = loaded.repos[0]?.id ?? NO_REPO;
+                // Only a repository already set up: one listed from GitHub is set
+                // up when somebody picks it, never by opening Code.
+                const fallback = loaded.repos.find((repo) => !githubRepoOf(repo.id))?.id ?? NO_REPO;
                 // The first load starts on the one picked last, checked like any pick.
                 const current = picked.current || readStored(REPO_KEY) || "";
                 if (current === "") setRepoId(fallback);
@@ -1039,6 +1043,9 @@ function CodeStart({
     const [engine, setEngine] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [gap, setGap] = useState<GithubAppGap | null>(null);
+    // A repository picked from GitHub that could not be set up, and what kept it.
+    const [repoGap, setRepoGap] = useState<{ id: string; gap: GithubAppGap } | null>(null);
+    const [connecting, setConnecting] = useState(false);
     const [busy, startTransition] = useTransition();
     const parts = useCodeComposerParts(busy);
     // Full access until the stored pick is read: the server render has no storage.
@@ -1308,6 +1315,32 @@ function CodeStart({
         });
     };
 
+    // A repository the person reaches on GitHub but has not used here yet is
+    // set up the moment it is picked, so the branch chip and the start see an
+    // ordinary one (`polarCodeConnectRepo`).
+    const chooseRepo = (id: string) => {
+        const fullName = githubRepoOf(id);
+        if (!fullName) return onRepo(id);
+        setError(null);
+        setRepoGap(null);
+        setConnecting(true);
+        void runAction(
+            () =>
+                postCode<{ id?: string; error?: string; githubGap?: GithubAppGap }>(REPOS_ROUTE, {
+                    fullName
+                }),
+            setError
+        )
+            .then((result) => {
+                if (result?.id) {
+                    onRepo(result.id);
+                    onRefresh();
+                } else if (result?.githubGap) setRepoGap({ id, gap: result.githubGap });
+                else if (result?.error) setError(result.error);
+            })
+            .finally(() => setConnecting(false));
+    };
+
     const shownError = error ?? choicesError;
     return (
         <div className="flex min-w-0 flex-col gap-2" aria-busy={pending || sent !== null || undefined}>
@@ -1401,12 +1434,12 @@ function CodeStart({
                     <CodeWhereChip
                         choices={choices}
                         repoId={repoId}
-                        onRepo={onRepo}
+                        onRepo={chooseRepo}
                         onRefresh={onRefresh}
                         refreshing={refreshing}
                         branch={baseRef}
                         onBranch={onBaseRef}
-                        disabled={busy || pending}
+                        disabled={busy || pending || connecting}
                     />
                     {repoId !== NO_REPO ? (
                         <CodeIssueChip
@@ -1457,11 +1490,36 @@ function CodeStart({
             ) : null}
             {choices !== null && choices.repos.length === 0 ? (
                 <Notice>
-                    {t("code.noRepos")}{" "}
-                    <Link href="/automations/code-review" className="text-primary hover:underline">
-                        {t("code.connectRepo")}
-                    </Link>
+                    {choices.githubConnected === false ? (
+                        <>
+                            {t("code.noGithub")}{" "}
+                            <Link href="/account/connections" className="text-primary hover:underline">
+                                {t("code.connectGithub")}
+                            </Link>
+                        </>
+                    ) : (
+                        <>
+                            {t("code.noRepos")}{" "}
+                            {choices.installUrl ? (
+                                <a
+                                    href={choices.installUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary hover:underline"
+                                >
+                                    {t("code.addRepos")}
+                                </a>
+                            ) : null}
+                        </>
+                    )}
                 </Notice>
+            ) : null}
+            {repoGap ? (
+                <GithubAppGapNotice
+                    gap={repoGap.gap}
+                    onCheckAgain={() => chooseRepo(repoGap.id)}
+                    checking={connecting}
+                />
             ) : null}
             {gap ? <GithubAppGapNotice gap={gap} onCheckAgain={() => submit()} checking={busy} /> : null}
             {shownError ? <Notice error>{shownError}</Notice> : null}

@@ -967,21 +967,62 @@ function toRepo(row: { full_name: string; default_branch: string; private: boole
     };
 }
 
+/** Most pages a list follows: 1,000 entries at GitHub's page size, a bound so
+ *  an account with an unusual number of repositories cannot hold a request open. */
+const LIST_PAGE_LIMIT = 10;
+
+/** The `rel="next"` address of a GitHub `Link` header, or null on the last page. */
+export function nextPageUrl(link: string | null): string | null {
+    if (!link) return null;
+    for (const part of link.split(",")) {
+        const match = /<([^>]+)>\s*;\s*rel="next"/.exec(part);
+        if (match?.[1]?.startsWith(`${API}/`)) return match[1];
+    }
+    return null;
+}
+
 /**
- * Repositories a personal access token reaches, most-recently-pushed first.
- * Capped by GitHub's page size to keep the picker snappy; the deploy UI also
- * accepts a manual URL for anything past that.
+ * Every page of a GitHub list, following its `Link` header up to
+ * `LIST_PAGE_LIMIT` pages. `read` takes one page's body to its entries; the
+ * first page's failure is thrown, a later one ends the list where it is.
+ */
+async function readAllPages<T>(
+    first: string,
+    token: string,
+    read: (body: unknown) => T[],
+    what: string
+): Promise<T[]> {
+    const out: T[] = [];
+    let url: string | null = first;
+    for (let page = 0; url && page < LIST_PAGE_LIMIT; page++) {
+        const res: Response = await fetch(url, { headers: apiHeaders(token), cache: "no-store" });
+        if (!res.ok) {
+            if (page > 0) break;
+            if (res.status === 401) throw new Error("GitHub rejected the token (unauthorized)");
+            throw new Error(`GitHub returned ${res.status} listing ${what}`);
+        }
+        out.push(...read(await res.json()));
+        url = nextPageUrl(res.headers.get("link"));
+    }
+    return out;
+}
+
+type RepoRow = { full_name: string; default_branch: string; private: boolean };
+
+/**
+ * Repositories a personal access token reaches, most-recently-pushed first:
+ * the ones it owns, collaborates on and reaches through its organizations,
+ * every page of them.
  */
 export async function listReposForPat(token: string): Promise<GithubRepo[]> {
     const url = `${API}/user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator,organization_member`;
-    const res = await fetch(url, { headers: apiHeaders(token), cache: "no-store" });
-    if (!res.ok) throw new Error(`GitHub returned ${res.status} listing repositories`);
-    const body = (await res.json()) as Array<{
-        full_name: string;
-        default_branch: string;
-        private: boolean;
-    }>;
-    return body.map(toRepo);
+    const rows = await readAllPages(
+        url,
+        token,
+        (body) => (Array.isArray(body) ? (body as RepoRow[]) : []),
+        "repositories"
+    );
+    return dedupeRepos(rows.map(toRepo));
 }
 
 /**
@@ -994,28 +1035,22 @@ export async function listReposForPat(token: string): Promise<GithubRepo[]> {
  * have told them.
  */
 export async function listReposForUserToken(token: string): Promise<GithubRepo[]> {
-    const res = await fetch(`${API}/user/installations?per_page=100`, {
-        headers: apiHeaders(token),
-        cache: "no-store"
-    });
-    if (res.status === 401) throw new Error("GitHub rejected the token (unauthorized)");
-    if (!res.ok) throw new Error(`GitHub returned ${res.status} listing installations`);
-    const body = (await res.json()) as { installations?: Array<{ id: number }> };
-
+    const installs = await readAllPages(
+        `${API}/user/installations?per_page=100`,
+        token,
+        (body) => (body as { installations?: Array<{ id: number }> }).installations ?? [],
+        "installations"
+    );
     const repos: GithubRepo[] = [];
-    for (const install of body.installations ?? []) {
-        const page = await fetch(
+    for (const install of installs) {
+        // One installation GitHub will not list is skipped, not the whole answer.
+        const listed = await readAllPages(
             `${API}/user/installations/${install.id}/repositories?per_page=100`,
-            {
-                headers: apiHeaders(token),
-                cache: "no-store"
-            }
-        );
-        if (!page.ok) continue;
-        const listed = (await page.json()) as {
-            repositories?: Array<{ full_name: string; default_branch: string; private: boolean }>;
-        };
-        repos.push(...(listed.repositories ?? []).map(toRepo));
+            token,
+            (body) => (body as { repositories?: RepoRow[] }).repositories ?? [],
+            "repositories"
+        ).catch(() => []);
+        repos.push(...listed.map(toRepo));
     }
     return dedupeRepos(repos);
 }

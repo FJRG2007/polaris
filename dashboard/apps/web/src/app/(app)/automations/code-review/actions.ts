@@ -30,8 +30,7 @@ import { pauseAgentRuns, resumeAgentRuns } from "@/lib/agents/agent-pause";
 import type { PickerModel } from "@/components/model-picker";
 import { syncRepoWorkflow } from "@/lib/agents/agent-workflow";
 import { listCatalogModels } from "@/lib/agents/model-catalog";
-import { MODEL_INTEGRATIONS } from "@/lib/integrations/registry";
-import { catalogProviders } from "@/lib/integrations/provider-catalog-snapshot";
+import { firstModelOf } from "@/lib/agents/model-default";
 import { stopServerRun } from "@/lib/agents/agent-server-executor";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { finishAgentRun, getAgentRun } from "@/lib/agents/agent-run-service";
@@ -97,16 +96,6 @@ import {
 } from "@polaris/core";
 
 const AGENTS_PATH = "/automations/code-review";
-
-/** The model each connected provider offers, from the same catalog the AI
- *  providers screen is built from. Used only to seed a form: an operator naming
- *  another model is accepted, and an unknown one fails at dispatch naming
- *  itself. */
-function modelDefault(provider: string): string | undefined {
-    const builtin = MODEL_INTEGRATIONS.find((entry) => entry.slug === provider)?.defaultModel;
-    if (builtin) return builtin.slug;
-    return catalogProviders().find((row) => row.slug === provider)?.defaultModel.slug || undefined;
-}
 
 /**
  * Every model a connected provider serves, for the picker.
@@ -198,7 +187,7 @@ export async function adviseRepoAction(input: unknown): Promise<{
 
     // The first connected provider's model is only a starting point; the tiers
     // above may name one, and `defaultConfigFor` lets them win.
-    const firstModel = providers.map((slug) => modelDefault(slug)).find(Boolean) ?? "";
+    const firstModel = firstModelOf(providers);
     const { advice, ...defaults } = await defaultConfigFor(
         user.id,
         parsed.data.repoFullName,
