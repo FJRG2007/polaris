@@ -75,7 +75,7 @@ export async function GET(
                 // is registered on is one nobody can join, and that has to be said
                 // where the address is, not on a tab somebody has to think to open.
                 listPlayerAccess(server.ownerId, id)
-                    .then(forViewer)
+                    .then((view) => forViewer(view, undefined, id))
                     .catch(() => null),
                 wantsRoster ? getServerFirewall(server.ownerId, id).catch(() => null) : null,
                 // Who arrived and who left, which only the log records. Gathered

@@ -171,7 +171,7 @@ export async function gameContextFor(app: {
         game.id === "ark" && ownerId ? readArkAccess(ownerId, app.id).catch(() => null) : null,
         game.id === "minecraft" && ownerId
             ? listPlayerAccess(ownerId, app.id)
-                  .then(forViewer)
+                  .then((view) => forViewer(view, undefined, app.id))
                   .catch(() => null)
             : null,
         game.id === "fivem" && ownerId ? readFivemAccess(ownerId, app.id).catch(() => null) : null,

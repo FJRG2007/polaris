@@ -224,7 +224,7 @@ export const gameServersExtension: AppExtension = {
                       .then((access) =>
                           access
                               .listPlayerAccess(ownerId, game.installedAppId)
-                              .then(access.forViewer)
+                              .then((view) => access.forViewer(view, undefined, game.installedAppId))
                       )
                       .catch(() => null)
                 : null;
