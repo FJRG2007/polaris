@@ -321,3 +321,91 @@ describe("the QR approval, both browsers", () => {
         expect(await onDevice()).toBeNull();
     });
 });
+
+describe("a sign-in that owed a second factor (no envelope came with it)", () => {
+    async function sealedElsewhere(ak: Uint8Array): Promise<void> {
+        const envelope = await locks.sealAccountKey(ak, await locks.importLockSecret(passwordSecret), {
+            userId: server.userId,
+            kind: "password",
+            lockId: "password",
+            akVersion: 1
+        });
+        server.passwordLock = { akVersion: 1, envelope: text(envelope) };
+    }
+
+    it("opens AK in a new browser through an unlock that writes nothing", async () => {
+        const ak = account.generateAccountKey();
+        await publish(ak);
+        await sealedElsewhere(ak);
+        const before = server.passwordLock;
+        expect(await client.settleAfterPassword("pw", null)).toBe(true);
+        expect(server.ops).toEqual(["state", "unlock-start", "unlock-finish"]);
+        expect(server.passwordLock).toBe(before);
+        expect(Array.from((await onDevice())!)).toEqual(Array.from(ak));
+    });
+
+    it("creates the first AK and its password lock for an account that never had one", async () => {
+        expect(await client.settleAfterPassword("pw", null)).toBe(true);
+        expect(server.key).not.toBeNull();
+        expect(server.passwordLock).not.toBeNull();
+        const held = (await onDevice())!;
+        expect(await signKeyOf(held)).toBe(await publishedKeyBytes());
+    });
+
+    it("never replaces a lock it cannot open (wrong password, or reset elsewhere) when this browser holds no key", async () => {
+        const ak = account.generateAccountKey();
+        await publish(ak);
+        await sealedElsewhere(ak);
+        const before = server.passwordLock;
+        passwordSecret = new Uint8Array(32).fill(8);
+        expect(await client.settleAfterPassword("other", null)).toBe(false);
+        expect(server.passwordLock).toBe(before);
+        expect(await onDevice()).toBeNull();
+    });
+
+    it("refuses an unlock that answers for another account", async () => {
+        const ak = account.generateAccountKey();
+        await publish(ak);
+        await sealedElsewhere(ak);
+        const other = `${server.userId.slice(0, -1)}f`;
+        vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+            const body = JSON.parse(init.body as string);
+            if (body.op === "unlock-start") return reply({ loginId: "l", loginResponse: "x", userId: other });
+            return route(body);
+        });
+        expect(await client.settleAfterPassword("pw", null)).toBe(false);
+        expect(await onDevice()).toBeNull();
+    });
+
+    it("settles from the challenge page with the held password, once", async () => {
+        const held = await import("../../../src/lib/chat/e2ee/held-password");
+        held.holdForSecondFactor("pw");
+        await held.settleAfterSecondFactor();
+        expect(server.key).not.toBeNull();
+        expect(server.passwordLock).not.toBeNull();
+        const ops = server.ops.length;
+        await held.settleAfterSecondFactor();
+        expect(server.ops.length).toBe(ops);
+    });
+
+    it("keeps the device copy under an app's platform store when one is offered", async () => {
+        const sealedWith = new Map<string, string>();
+        vi.stubGlobal("polarisDesktop", {
+            keyWrap: {
+                seal: async (data: string) => {
+                    const sealed = Buffer.from(`S${sealedWith.size}`).toString("base64url");
+                    sealedWith.set(sealed, data);
+                    return sealed;
+                },
+                open: async (sealed: string) => sealedWith.get(sealed) ?? null
+            }
+        });
+        expect(await client.settleAfterPassword("pw", null)).toBe(true);
+        expect(sealedWith.size).toBe(1);
+        // The raw IndexedDB record is the sealed one, not a device lock envelope.
+        await expect(deviceLock.openDeviceLock(deviceLock.indexedDbDeviceLockStore(), server.userId)).rejects.toThrow();
+        const opened = await deviceLock.openDeviceLock(client.deviceStore(), server.userId);
+        expect(await signKeyOf(opened!.accountKey)).toBe(await publishedKeyBytes());
+        vi.stubGlobal("polarisDesktop", undefined);
+    });
+});

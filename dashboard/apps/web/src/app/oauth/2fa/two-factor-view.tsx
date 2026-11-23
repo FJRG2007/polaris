@@ -14,6 +14,7 @@
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { abandonChallengeAction } from "./actions";
+import { dropHeldPassword, settleAfterSecondFactor } from "@/lib/chat/e2ee/held-password";
 import { landAfterSignIn } from "../login/post-login-target";
 import { KeyRound, Mail, Smartphone } from "lucide-react";
 import { WhatsAppLogo } from "./whatsapp-logo";
@@ -113,6 +114,8 @@ export function TwoFactorView({
             setError(backup ? t("twoFactor.backupInvalid") : t("twoFactor.codeInvalid"));
             return;
         }
+        setPending(true);
+        await settleAfterSecondFactor();
         landAfterSignIn(router, target());
     }
 
@@ -121,6 +124,7 @@ export function TwoFactorView({
         async (approved: string) => {
             const { error: verifyError } = await authClient.twoFactor.verifyOtp({ code: approved, trustDevice });
             if (verifyError) return false;
+            await settleAfterSecondFactor();
             landAfterSignIn(router, target());
             return true;
         },
@@ -268,7 +272,10 @@ export function TwoFactorView({
                         type="button"
                         disabled={pending}
                         className="mt-2 w-full text-center text-xs text-muted-foreground underline-offset-2 hover:underline"
-                        onClick={() => void abandonChallengeAction()}
+                        onClick={() => {
+                            dropHeldPassword();
+                            void abandonChallengeAction();
+                        }}
                     >
                         {t("twoFactor.someoneElse")}
                     </button>

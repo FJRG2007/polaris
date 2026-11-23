@@ -18,12 +18,15 @@
  */
 
 import * as qr from "@polaris/chat-crypto/qr-approval";
+import { fromText, toText } from "@/lib/chat/e2ee/base64url";
 import type { KeysBody } from "@/lib/chat/e2ee/schemas";
 import * as account from "@polaris/chat-crypto/account-key";
 import * as deviceLock from "@polaris/chat-crypto/device-lock";
 import * as passkeyLock from "@polaris/chat-crypto/passkey-lock";
 import { LOCK_ENVELOPE_BYTES } from "@polaris/chat-crypto/locks";
 import * as passwordLock from "@polaris/chat-crypto/password-lock";
+import { platformSealedStore } from "@polaris/chat-crypto/platform-store";
+import { platformKeyWrap } from "@/lib/chat/e2ee/platform-key-wrap";
 
 const ROUTE = "/api/e2ee/keys";
 /** The first key version of an account. Rotation is a later phase. */
@@ -47,17 +50,6 @@ interface HeldKey {
     readonly akVersion: number;
 }
 
-function fromText(value: string): Uint8Array {
-    const padded = value.replace(/-/g, "+").replace(/_/g, "/");
-    const binary = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
-    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
-
-function toText(value: Uint8Array): string {
-    let binary = "";
-    for (const byte of value) binary += String.fromCharCode(byte);
-    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
 
 async function post<T>(body: KeysBody): Promise<{ status: number; data: T | null }> {
     try {
@@ -112,14 +104,24 @@ export function publishedKeyVerifier(): account.AccountKeyVerifier {
     };
 }
 
+/**
+ * This device's lock store: IndexedDB, with the envelope sealed by the
+ * operating system's key store when a Polaris app offers one.
+ */
+export function deviceStore(): deviceLock.DeviceLockStore {
+    const inner = deviceLock.indexedDbDeviceLockStore();
+    const wrap = platformKeyWrap();
+    return wrap ? platformSealedStore(inner, wrap) : inner;
+}
+
 async function keepOnDevice(userId: string, held: HeldKey): Promise<void> {
-    await deviceLock.createDeviceLock(deviceLock.indexedDbDeviceLockStore(), userId, held.accountKey, held.akVersion);
+    await deviceLock.createDeviceLock(deviceStore(), userId, held.accountKey, held.akVersion);
 }
 
 /** This browser's copy, only when it is still the account's published key. */
 async function fromDevice(state: KeyState): Promise<HeldKey | null> {
     try {
-        const held = await deviceLock.openDeviceLock(deviceLock.indexedDbDeviceLockStore(), state.userId);
+        const held = await deviceLock.openDeviceLock(deviceStore(), state.userId);
         if (!held) return null;
         if (await isPublished(state, held)) return held;
         held.accountKey.fill(0);
@@ -240,6 +242,17 @@ export async function settleAfterPassword(
                 return true;
             }
         }
+        // No envelope came with this sign-in (an adoption, or a sign-in that
+        // owed a second factor first): ask for it through a fresh OPAQUE
+        // unlock, the only read that releases it, before deciding to seal.
+        if (!released?.lock && state.accountKey?.hasPasswordLock) {
+            const opened = await openWithUnlock(password, state);
+            if (opened) {
+                held = opened;
+                await keepOnDevice(state.userId, opened);
+                return true;
+            }
+        }
         held = await reachableKey(state);
         if (!held) return false;
         return await sealPasswordLock(password, held);
@@ -248,6 +261,29 @@ export async function settleAfterPassword(
     } finally {
         held?.accountKey.fill(0);
     }
+}
+
+/** The password envelope through an OPAQUE unlock that writes nothing. */
+async function openWithUnlock(password: string, state: KeyState): Promise<HeldKey | null> {
+    const login = await passwordLock.startPasswordLogin(password);
+    const step = await post<{ loginId: string; loginResponse: string; userId: string }>({
+        op: "unlock-start",
+        startLoginRequest: login.startLoginRequest
+    });
+    if (!step.data || step.data.userId !== state.userId) return null;
+    const finished = await passwordLock.finishPasswordLogin({
+        state: login.state,
+        loginResponse: step.data.loginResponse,
+        password,
+        userId: step.data.userId
+    });
+    const done = await post<{ passwordLock: ReleasedLock | null }>({
+        op: "unlock-finish",
+        loginId: step.data.loginId,
+        finishLoginRequest: finished.finishLoginRequest
+    });
+    if (!done.data?.passwordLock) return null;
+    return openReleased(state, finished.lockKey, done.data.passwordLock);
 }
 
 async function openReleased(state: KeyState, lockKey: CryptoKey, lock: ReleasedLock): Promise<HeldKey | null> {

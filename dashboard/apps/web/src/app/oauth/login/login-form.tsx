@@ -1,5 +1,6 @@
 "use client";
 
+import { holdForSecondFactor } from "@/lib/chat/e2ee/held-password";
 import Link from "next/link";
 import { Building2, KeyRound } from "lucide-react";
 import { QrSignInPanel } from "./qr-panel";
@@ -384,6 +385,10 @@ export function LoginForm({
         // With a second factor armed, the password alone issues no session: the
         // challenge page completes the sign-in. Carry the destination across.
         if ((data as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect) {
+            // Behind the internal flag only: the challenge page settles the
+            // account key once the session is whole, with the password this
+            // form typed (held in memory across the client-side move only).
+            if (e2ee) holdForSecondFactor(parsed.password);
             router.push(`/oauth/2fa?redirect=${encodeURIComponent(postLoginTarget())}`);
             return;
         }
