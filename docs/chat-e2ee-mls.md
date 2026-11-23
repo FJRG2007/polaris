@@ -1,0 +1,84 @@
+# Chat MLS: delivery service and devices
+
+How chat end-to-end encryption moves MLS messages between devices
+(docs/chat-e2ee-proposal.md; units E1-E5 of docs/rust-core-plan.md). Everything
+here is behind the internal flag `POLARIS_INTERNAL_CHAT_E2EE` (`flag.ts`), which
+is off: the route answers 404 and no screen opens a device.
+
+## Roles
+
+- **Devices** run the cryptography: a `MlsMember` from `@polaris/core-rs` (the
+  WebAssembly build in a browser, the Node binding on the server), its state in
+  a store that commits each operation together with what it has to send.
+- **The delivery service** (`apps/web/src/lib/chat/e2ee/mls-delivery.ts`, RFC
+  9750's DS role) stores and routes bytes it cannot read, and decides one
+  thing: the order of commits.
+
+## Tables (migration `20280101000000_chat_mls_delivery`, additive)
+
+| Model | Holds |
+|---|---|
+| `MlsDevice` | a device per account (`userId` + `device`), its signature key and declared protocol version |
+| `MlsKeyPackage` | one-use key packages per device and suite, plus at most one last-resort package |
+| `MlsGroup` | one group per conversation: group id, suite, current epoch, latest GroupInfo |
+| `MlsGroupEvent` | the group's ordered log: commits, application messages, and Welcomes addressed to one device |
+| `ChatHistoryKey` | the conversation's history key per epoch, sealed to one account's key or to `org` |
+
+## Route: `POST /api/e2ee/mls`
+
+One JSON body per op, validated by `mlsBody` (`schemas.ts`), handled by
+`mls-handler.ts`. Every op needs a session; every op about a conversation needs
+the account to reach it, and so does every account the op names.
+
+| Op | Does |
+|---|---|
+| `register-device` | record the device; answers how many one-use key packages it still has |
+| `publish-key-packages` | add one-use packages (at most 100 held) or replace the last-resort one |
+| `claim-key-packages` | take one package per device of the named accounts (one-use first, then last resort) |
+| `group` / `create-group` | read the conversation's group; create it (the first device wins, the rest get `groupExists`) |
+| `commit` | accepted only for the epoch the group is at, as one compare-and-set; the loser gets `staleEpoch` |
+| `application` | an MLS application message for the whole group |
+| `events` | the log after a sequence number: group-wide rows and this device's own Welcomes |
+| `put-history-keys` / `history-keys` | store envelopes (first write wins); read the ones sealed to the caller |
+
+Retention: the log keeps the last 256 epochs, pruned every 32 inside the commit
+transaction. A device further behind rejoins from the group's latest GroupInfo
+by an external commit.
+
+## A device (`mls-client.ts`, `mls-browser.ts`)
+
+`MlsDevice.open` restores the member from its store (a fresh one on first use)
+and resends whatever an earlier run committed and never sent. Then:
+
+- `register` refreshes the device and tops its key packages up to 20 when fewer
+  than 10 are left.
+- `ensureGroup` returns the conversation's group: the one the device is in, the
+  one a waiting Welcome puts it in, a new one when none exists, or the existing
+  one joined by an external commit (a member's new device, a lost store, or the
+  loser of two simultaneous creates).
+- `addAccounts` claims packages, commits the add and sends one Welcome per
+  device; on `staleEpoch` it drops its pending commit, reads the winner's and
+  tries again (three attempts).
+- `sendApplication` catches up first, so a message is never sealed in an epoch
+  the group has left; `sync` reads the log and returns the messages from others.
+
+Crash safety: an operation's state changes and its request are written in one
+transaction before the request is sent. A commit the server took while the
+device never heard the answer comes back `staleEpoch` on resend; the device then
+finds its own commit in the log and merges it.
+
+In a browser the member is the WebAssembly build staged at `public/core-rs/mls`
+(by `scripts/copy-core-rs-assets.mjs`, digest-named, fetched only when a device
+is opened), the state is `IndexedDbMlsStore`, and the device id and group notes
+are in `localStorage`.
+
+## Not built yet
+
+- Sealing chat message bodies with `sealMessage` and the history key, the
+  `ChatMessage` columns that carry them, and the reader path.
+- History-key distribution: the HK as an MLS application message to the group
+  and `sealHistoryKey` envelopes to members' account keys and `org`.
+- Server-run members (Polar, webhooks) through the Node binding and
+  `mls-store.ts`.
+- A per-message device signature.
+- Removing a device's stale leaf when it rejoins after losing its store.
