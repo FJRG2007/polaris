@@ -7,7 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 
 /**
- * Where Approve or Deny on an "Is this you?" notification lands. Not exported: only the notification's own
+ * Where Deny on an "Is this you?" notification lands, and how any answer is sent. Not exported: only the notification's own
  * PendingIntent reaches it. The answer is signed with this phone's key ({@link PolarisHttp#signed}), so the session
  * cookie alone - which a browser tab also holds - is never enough to let somebody in.
  */
@@ -26,23 +26,39 @@ public final class SignInAnswer extends BroadcastReceiver {
         String decision = intent.getStringExtra(EXTRA_DECISION);
         String origin = intent.getStringExtra(EXTRA_ORIGIN);
         String tag = intent.getStringExtra(EXTRA_TAG);
-        // Answered only to a Polaris still on this phone's list.
-        ServerStore.Host host = origin == null ? null : ServerStore.hostFor(context, origin);
-        boolean known = host != null && ServerAddress.sameOrigin(host.origin, origin);
-        if (id == null || !id.matches("[0-9a-f-]{36}") || tag == null || !known
-                || !("approve".equals(decision) || "deny".equals(decision))) {
+        // Only Deny is answered from the notification itself: approving goes through SignInConfirmActivity, which asks
+        // for the number on the sign-in screen and for the owner's fingerprint, face or screen lock first.
+        if (id == null || !id.matches("[0-9a-f-]{36}") || tag == null || !known(context, origin)
+                || !"deny".equals(decision)) {
             return;
         }
+        PendingResult pending = goAsync();
+        send(context, origin, id, decision, null, tag, pending::finish);
+    }
+
+    /** Whether {@code origin} is a Polaris still on this phone's list: nothing is answered to any other. */
+    static boolean known(Context context, String origin) {
+        ServerStore.Host host = origin == null ? null : ServerStore.hostFor(context, origin);
+        return host != null && ServerAddress.sameOrigin(host.origin, origin);
+    }
+
+    /**
+     * Sends the answer, signed with this phone's key, and says how it went in a short notification. {@code number} is
+     * the number picked on the phone, part of what is signed; null on a deny, or on a request that carries none.
+     */
+    static void send(Context context, String origin, String id, String decision, Integer number, String tag,
+            Runnable done) {
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         manager.cancel(tag, NoticeService.NOTICE_ID);
         Context app = context.getApplicationContext();
-        PendingResult pending = goAsync();
+        String address = origin + "/api/mobile/sign-in-approvals/" + id + "/" + decision
+                + (number == null ? "" : "?number=" + number);
+        String target = id + ":" + decision + (number == null ? "" : ":" + number);
         new Thread(() -> {
             String said;
             try {
-                PolarisHttp.Answer answer = PolarisHttp.signed(app, origin,
-                        origin + "/api/mobile/sign-in-approvals/" + id + "/" + decision, "sign-in-approval",
-                        id + ":" + decision, app.getString(R.string.sign_in_failed), 64 * 1024);
+                PolarisHttp.Answer answer = PolarisHttp.signed(app, origin, address, "sign-in-approval", target,
+                        app.getString(R.string.sign_in_failed), 64 * 1024);
                 said = answer.json().optString("text", app.getString(
                         "approve".equals(decision) ? R.string.sign_in_approved : R.string.sign_in_denied));
             } catch (PolarisHttp.Refused refused) {
@@ -57,7 +73,7 @@ public final class SignInAnswer extends BroadcastReceiver {
                     .setTimeoutAfter(RESULT_SHOWN_MS)
                     .build();
             manager.notify(tag, NoticeService.RESULT_ID, result);
-            pending.finish();
+            if (done != null) done.run();
         }, "sign-in-answer").start();
     }
 }

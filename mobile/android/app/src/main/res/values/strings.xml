@@ -74,6 +74,11 @@
     <string name="sign_in_approved">Sign-in approved</string>
     <string name="sign_in_denied">Sign-in denied</string>
     <string name="sign_in_failed">Your answer could not be sent. Answer from the device signing in instead.</string>
+    <string name="sign_in_pick">Pick the number shown on the sign-in screen</string>
+    <string name="sign_in_confirm_title">Confirm it is you</string>
+    <string name="sign_in_confirm_subtitle">To approve this sign-in</string>
+    <string name="sign_in_needs_lock">Set a screen lock on this phone to approve sign-ins.</string>
+    <string name="sign_in_expired">This sign-in request has expired.</string>
 
     <string name="link_invalid">That link isn\'t a Polaris page.</string>
     <string name="link_hosts_invalid">That code isn\'t a list of Polaris servers.</string>

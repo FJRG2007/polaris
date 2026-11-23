@@ -187,6 +187,16 @@
             android:name=".SignInAnswer"
             android:exported="false" />
 
+        <!-- Approving "Is this you?": the number to pick and the phone's lock, reached only from that notification. -->
+        <activity
+            android:name=".SignInConfirmActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Polaris.Link" />
+
         <!-- A ringing call: its answer screen over the lock screen, and Decline, reached only from the ring. -->
         <activity
             android:name=".IncomingCallActivity"

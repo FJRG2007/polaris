@@ -72,6 +72,11 @@
     <string name="sign_in_approved">Inicio de sesión aprobado</string>
     <string name="sign_in_denied">Inicio de sesión rechazado</string>
     <string name="sign_in_failed">No se pudo enviar tu respuesta. Responde desde el dispositivo que inicia sesión.</string>
+    <string name="sign_in_pick">Elige el número que sale en la pantalla de acceso</string>
+    <string name="sign_in_confirm_title">Confirma que eres tú</string>
+    <string name="sign_in_confirm_subtitle">Para aprobar este acceso</string>
+    <string name="sign_in_needs_lock">Pon un bloqueo de pantalla en este móvil para aprobar accesos.</string>
+    <string name="sign_in_expired">Esta solicitud de acceso ha caducado.</string>
 
     <string name="link_invalid">Ese enlace no es una página de Polaris.</string>
     <string name="link_hosts_invalid">Ese código no es una lista de servidores Polaris.</string>

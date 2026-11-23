@@ -11,7 +11,8 @@ import androidx.annotation.RequiresApi;
 
 /**
  * A screen that may have to ask the owner to prove who they are before the vault key opens: the phone's own prompt
- * (fingerprint, face, or the PIN, pattern or password), never a password of this app's.
+ * (fingerprint, face, or the PIN, pattern or password), never a password of this app's. Also what gates approving a
+ * sign-in ({@link SignInConfirmActivity}).
  */
 abstract class VaultAuthActivity extends Activity {
     private static final int CONFIRM = 41;
@@ -28,8 +29,7 @@ abstract class VaultAuthActivity extends Activity {
         KeyguardManager keyguard = getSystemService(KeyguardManager.class);
         @SuppressWarnings("deprecation")
         Intent ask = keyguard == null ? null
-                : keyguard.createConfirmDeviceCredentialIntent(getString(R.string.vault_unlock_title),
-                        getString(R.string.vault_unlock_subtitle));
+                : keyguard.createConfirmDeviceCredentialIntent(promptTitle(), promptSubtitle());
         if (ask == null) {
             settle(false);
             return;
@@ -37,11 +37,20 @@ abstract class VaultAuthActivity extends Activity {
         startActivityForResult(ask, CONFIRM);
     }
 
+    /** What the phone's prompt says it is for. A screen that is not the vault's says its own. */
+    String promptTitle() {
+        return getString(R.string.vault_unlock_title);
+    }
+
+    String promptSubtitle() {
+        return getString(R.string.vault_unlock_subtitle);
+    }
+
     @RequiresApi(Build.VERSION_CODES.R)
     private void prompt() {
         BiometricPrompt prompt = new BiometricPrompt.Builder(this)
-                .setTitle(getString(R.string.vault_unlock_title))
-                .setSubtitle(getString(R.string.vault_unlock_subtitle))
+                .setTitle(promptTitle())
+                .setSubtitle(promptSubtitle())
                 .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG
                         | BiometricManager.Authenticators.DEVICE_CREDENTIAL)
                 .build();

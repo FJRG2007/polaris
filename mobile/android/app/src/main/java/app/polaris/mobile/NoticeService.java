@@ -21,6 +21,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
@@ -220,20 +221,38 @@ public final class NoticeService extends Service {
         }
     }
 
-    /** "Is this you?", with the answer on the notification itself. */
+    /**
+     * "Is this you?". Deny is answered from the notification; Approve - and tapping the notification - opens
+     * {@link SignInConfirmActivity}, where the number on the sign-in screen is picked and the phone's lock confirms it.
+     */
     private void askSignIn(NotificationManager manager, String origin, JSONObject notice) {
         String id = notice.optString("approvalId");
         String tag = notice.optString("tag");
         if (!id.matches("[0-9a-f-]{36}") || tag.isEmpty()) return;
-        long left = notice.optLong("expiresAt", 0) - System.currentTimeMillis();
+        long expiresAt = notice.optLong("expiresAt", 0);
+        long left = expiresAt - System.currentTimeMillis();
         if (left <= 0) return;
+        int[] choices = null;
+        JSONArray offered = notice.optJSONArray("choices");
+        if (offered != null && offered.length() == 3) {
+            choices = new int[3];
+            for (int index = 0; index < 3; index++) choices[index] = offered.optInt(index, -1);
+        }
+        Intent confirm = SignInConfirmActivity.intent(this, origin, id, tag, notice.optString("title"),
+                notice.optString("body"), choices, expiresAt);
+        PendingIntent confirming = PendingIntent.getActivity(this, (id + "confirm").hashCode(), confirm,
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        Notification.Action.Builder approve = new Notification.Action.Builder(
+                Icon.createWithResource(this, R.drawable.ic_notification), getString(R.string.sign_in_approve),
+                confirming);
+        if (Build.VERSION.SDK_INT >= 31) approve.setAuthenticationRequired(true);
         Notification.Builder built = new Notification.Builder(this, SIGN_IN)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(notice.optString("title"))
-                .setContentIntent(open(Uri.parse(origin + "/account/sessions"), tag.hashCode()))
+                .setContentIntent(confirming)
                 .setCategory(Notification.CATEGORY_STATUS)
                 .setTimeoutAfter(left)
-                .addAction(answer(origin, id, tag, "approve", R.string.sign_in_approve))
+                .addAction(approve.build())
                 .addAction(answer(origin, id, tag, "deny", R.string.sign_in_deny));
         String body = notice.optString("body");
         if (!body.isEmpty()) built.setContentText(body).setStyle(new Notification.BigTextStyle().bigText(body));
