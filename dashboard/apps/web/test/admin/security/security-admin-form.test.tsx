@@ -63,7 +63,7 @@ describe("requiring a phone", () => {
     it("is disabled with the reason and the way to fix it when no sender is connected", () => {
         draw(INSTANCE_SECURITY_DEFAULTS, false);
         expect(toggle("Require a phone number on every account").disabled).toBe(true);
-        expect(screen.getByText(/no WhatsApp sender is connected/)).toBeTruthy();
+        expect(screen.getByText(/WhatsApp or SMS code, and neither is set up/)).toBeTruthy();
         expect(screen.getByRole("link", { name: "Set up WhatsApp codes" }).getAttribute("href")).toBe(
             "/admin/integrations/messaging"
         );

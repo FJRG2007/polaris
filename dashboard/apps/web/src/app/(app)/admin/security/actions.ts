@@ -15,7 +15,7 @@ import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { instanceSecuritySchema } from "@polaris/core";
-import { codeSenderReady } from "@/lib/messaging/code-senders";
+import { phoneSenderReady } from "@/lib/messaging/code-senders";
 import { getInstanceSecurity, setInstanceSecurity } from "@/lib/instance-security";
 import { setPlayerAddressesShared } from "@/lib/player-address-policy";
 
@@ -47,7 +47,7 @@ export async function saveInstanceSecurityAction(
     // Requiring a phone nobody can confirm would hold nobody and say it holds
     // everybody. Already on, it may stay on while the sender is fixed - the
     // guard lets through every account no code can reach in the meantime.
-    if (chosen.requirePhone && !previous.requirePhone && !(await codeSenderReady("whatsapp"))) {
+    if (chosen.requirePhone && !previous.requirePhone && !(await phoneSenderReady())) {
         return { error: t("security.phone.noChannel") };
     }
 

@@ -1719,7 +1719,14 @@
             "whatsapp": "WhatsApp codes",
             "telegram": "Telegram codes",
             "whatsappEmpty": "Add a WhatsApp channel to send codes there.",
-            "telegramEmpty": "Add a Telegram bot to send codes there."
+            "telegramEmpty": "Add a Telegram bot to send codes there.",
+            "sms": "SMS codes",
+            "smsEmpty": "Add an SMS sender before turning this on.",
+            "smsAdd": "Add SMS sender",
+            "smsStopped": "The SMS sender for codes is not connected, so nobody is offered SMS codes.",
+            "smsFix": "Fix sender",
+            "smsOn": "Accounts with a confirmed number can use a text message as a second factor.",
+            "smsOff": "Off. Nobody is offered SMS as a second factor."
         },
         "errors": {
             "checkForm": "Check the form and try again.",
@@ -3295,7 +3302,7 @@
         "phone": {
             "title": "Require a phone number on every account",
             "hint": "Accounts without a confirmed number add and confirm one the next time they sign in. Accounts no code can reach are not held, and administrators never are.",
-            "noChannel": "The number is confirmed with a WhatsApp code, and no WhatsApp sender is connected.",
+            "noChannel": "The number is confirmed with a WhatsApp or SMS code, and neither is set up under Integrations > Messaging.",
             "fix": "Set up WhatsApp codes"
         },
         "integrity": {

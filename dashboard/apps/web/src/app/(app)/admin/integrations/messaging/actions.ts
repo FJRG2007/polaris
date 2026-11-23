@@ -174,7 +174,7 @@ export async function messagingChannelStateAction(
 }
 
 const codeSenderSchema = z.object({
-    platform: z.enum(["whatsapp", "telegram"]),
+    platform: z.enum(["whatsapp", "telegram", "sms"]),
     channelId: z.string().uuid().nullable()
 });
 

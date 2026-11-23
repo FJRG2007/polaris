@@ -1,12 +1,16 @@
 "use server";
 
 import { requireAdmin } from "@/lib/session";
-import { getCodeSenders } from "@/lib/messaging/code-senders";
+import { getCodeSenders, listSmsCodeSenders } from "@/lib/messaging/code-senders";
 import { listMessagingChannels } from "@/lib/messaging/channel-admin";
 
-/** Every messaging channel, and which ones carry verification codes. */
+/** Every messaging channel, the SMS senders that could carry codes, and which ones do. */
 export async function loadMessagingAdminAction() {
     await requireAdmin();
-    const [channels, codeSenders] = await Promise.all([listMessagingChannels(), getCodeSenders()]);
-    return { channels, codeSenders };
+    const [channels, codeSenders, smsSenders] = await Promise.all([
+        listMessagingChannels(),
+        getCodeSenders(),
+        listSmsCodeSenders()
+    ]);
+    return { channels, codeSenders, smsSenders };
 }

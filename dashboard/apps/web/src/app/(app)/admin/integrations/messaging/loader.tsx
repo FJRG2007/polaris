@@ -20,7 +20,13 @@ export function MessagingAdminLoader({ revision }: { revision: number }) {
                 </>
             }
         >
-            {(data) => <MessagingAdmin initialChannels={data.channels} codeSenders={data.codeSenders} />}
+            {(data) => (
+                <MessagingAdmin
+                    initialChannels={data.channels}
+                    codeSenders={data.codeSenders}
+                    smsSenders={data.smsSenders ?? []}
+                />
+            )}
         </AfterPaint>
     );
 }

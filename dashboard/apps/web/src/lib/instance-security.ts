@@ -23,7 +23,7 @@
 import { cache } from "react";
 import { prisma } from "@polaris/db";
 import { getAuthMailStatus } from "@/lib/auth-mail";
-import { codeRouteFor } from "@/lib/messaging/code-senders";
+import { phoneCodeRoute } from "@/lib/messaging/code-senders";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { getUserSecurity, twoFactorEnabled } from "@polaris/auth";
 import {
@@ -133,7 +133,7 @@ export async function owesPhone(
         account = { isAdmin: row?.isAdmin === true, phoneVerified: Boolean(row?.phone?.verifiedAt) };
     }
     if (account.isAdmin || account.phoneVerified) return false;
-    return (await codeRouteFor("whatsapp", userId)).channelId !== null;
+    return (await phoneCodeRoute(userId)) !== null;
 }
 
 /**

@@ -1719,7 +1719,14 @@
             "whatsapp": "Códigos WhatsApp",
             "telegram": "Códigos Telegram",
             "whatsappEmpty": "Añade un canal de WhatsApp para enviar códigos.",
-            "telegramEmpty": "Añade un bot de Telegram para enviar códigos."
+            "telegramEmpty": "Añade un bot de Telegram para enviar códigos.",
+            "sms": "Códigos SMS",
+            "smsEmpty": "Añade un remitente SMS antes de activarlo.",
+            "smsAdd": "Añadir SMS",
+            "smsStopped": "El remitente SMS de los códigos no está conectado, así que nadie ve los códigos SMS.",
+            "smsFix": "Revisar",
+            "smsOn": "Las cuentas con un número confirmado pueden usar un SMS como segundo factor.",
+            "smsOff": "Desactivado. Nadie ve el SMS como segundo factor."
         },
         "errors": {
             "checkForm": "Revisa el formulario y reinténtalo.",
@@ -3295,7 +3302,7 @@
         "phone": {
             "title": "Exigir un teléfono en cada cuenta",
             "hint": "Las cuentas sin número confirmado añaden y confirman uno al volver a entrar. No se retiene a cuentas a las que no llega el código, ni nunca a administradores.",
-            "noChannel": "El número se confirma con un código de WhatsApp y no hay remitente de WhatsApp conectado.",
+            "noChannel": "El número se confirma con un código de WhatsApp o SMS, y ninguno está activo en Integraciones > Mensajería.",
             "fix": "Configurar WhatsApp"
         },
         "integrity": {

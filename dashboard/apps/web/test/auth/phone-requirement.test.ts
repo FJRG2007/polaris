@@ -16,7 +16,11 @@ const state = vi.hoisted(() => ({
 vi.mock("@polaris/db", () => ({ prisma: { user: { findUnique: vi.fn(async () => state.user) } } }));
 vi.mock("@/lib/setting-store", () => ({ getSetting: vi.fn(async () => state.policy), setSetting: vi.fn() }));
 vi.mock("@/lib/auth-mail", () => ({ getAuthMailStatus: vi.fn(async () => ({ channelId: null })) }));
-vi.mock("@/lib/messaging/code-senders", () => ({ codeRouteFor: vi.fn(async () => state.route) }));
+vi.mock("@/lib/messaging/code-senders", () => ({
+    phoneCodeRoute: vi.fn(async () =>
+        state.route.channelId ? { platform: "whatsapp", channelId: state.route.channelId } : null
+    )
+}));
 vi.mock("@polaris/auth", () => ({ getUserSecurity: vi.fn(), twoFactorEnabled: vi.fn() }));
 vi.mock("react", async (original) => ({ ...(await original<typeof import("react")>()), cache: (fn: unknown) => fn }));
 

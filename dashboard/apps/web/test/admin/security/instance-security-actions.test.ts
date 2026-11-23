@@ -20,7 +20,7 @@ vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string
 vi.mock("@/lib/audit-service", () => ({ recordAudit: state.recordAudit }));
 vi.mock("@polaris/db", () => ({ prisma: { passkey: { count: vi.fn(async () => 1) } } }));
 vi.mock("@/lib/player-address-policy", () => ({ setPlayerAddressesShared: vi.fn() }));
-vi.mock("@/lib/messaging/code-senders", () => ({ codeSenderReady: async () => state.senderReady }));
+vi.mock("@/lib/messaging/code-senders", () => ({ phoneSenderReady: async () => state.senderReady }));
 vi.mock("@/lib/instance-security", () => ({
     getInstanceSecurity: async () => state.stored,
     setInstanceSecurity: state.setInstanceSecurity

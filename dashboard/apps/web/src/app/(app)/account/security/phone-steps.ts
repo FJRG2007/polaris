@@ -20,7 +20,8 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { firstIssue, localized } from "./action-messages";
 import { normalizePeerId } from "@/lib/messaging-service";
-import { codeRouteFor } from "@/lib/messaging/code-senders";
+import { phoneCodeRoute } from "@/lib/messaging/code-senders";
+import { sendSmsThroughChannel } from "@/lib/notifications/sms-service";
 import { sendCodeThroughChannel } from "@/lib/messaging/channel-runtime";
 import { otpCodeField, phoneField, TWO_FACTOR_CODE_TTL_MINUTES } from "@polaris/core";
 import { issuePhoneCode, removeUserPhone, setUserPhone, verifyPhoneCode } from "@polaris/auth";
@@ -64,8 +65,8 @@ export async function removePhoneFor(userId: string, password: unknown): Promise
  * Send a confirmation code to the number on the account.
  *
  * It goes the way a second-factor code would - the deployment's WhatsApp code
- * sender, or the user's own connected channel on an older setup - so confirming
- * the number and confirming the route are the same act.
+ * sender, or the user's own connected channel on an older setup, else the SMS
+ * code sender - so confirming the number and confirming the route are the same act.
  */
 export async function sendPhoneCodeFor(userId: string): Promise<ActionResult> {
     const t = await getTranslations("accountSecurity");
@@ -74,20 +75,27 @@ export async function sendPhoneCodeFor(userId: string): Promise<ActionResult> {
         return { error: t("errors.tooManyCodes", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
     }
 
-    const route = await codeRouteFor("whatsapp", userId);
-    if (!route.channelId) return { error: t("errors.connectWhatsAppFirst") };
+    const route = await phoneCodeRoute(userId);
+    if (!route) return { error: t("errors.connectWhatsAppFirst") };
 
     const issued = await issuePhoneCode(auth, userId);
     if (issued.error || !issued.code || !issued.phone) {
         return issued.error ? localized({ error: issued.error }) : { error: t("known.addPhoneFirst") };
     }
 
+    // Sent to this same person, so in the language they are reading in.
+    const text = t("phone.confirmationMessage", { code: issued.code, minutes: TWO_FACTOR_CODE_TTL_MINUTES });
+    if (route.platform === "sms") {
+        const sent = await sendSmsThroughChannel(route.channelId, issued.phone, text);
+        if (sent.error) return { error: sent.error };
+        await recordAudit({ actorId: userId, action: "account.phone.code-sent" });
+        return {};
+    }
     try {
         await sendCodeThroughChannel(route.channelId, {
             peerId: normalizePeerId("whatsapp", issued.phone),
             code: issued.code,
-            // Sent to this same person, so in the language they are reading in.
-            text: t("phone.confirmationMessage", { code: issued.code, minutes: TWO_FACTOR_CODE_TTL_MINUTES })
+            text
         });
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : t("errors.messageNotSent") };
