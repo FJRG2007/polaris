@@ -1,6 +1,6 @@
 [package]
 name = "polaris-tunnel"
-version = "0.1.0"
+version = "0.1.1"
 description = "Polaris' tunnel daemon: userspace WireGuard with TCP and native UDP forwards, no TUN device and no privileges."
 edition.workspace = true
 rust-version.workspace = true

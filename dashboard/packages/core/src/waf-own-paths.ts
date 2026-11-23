@@ -42,6 +42,7 @@ export const POLARIS_ROUTE_ROOTS: readonly string[] = [
     "chat",
     "cli",
     "continue",
+    "core-rs",
     "crm",
     "diagram-assets",
     "drive",

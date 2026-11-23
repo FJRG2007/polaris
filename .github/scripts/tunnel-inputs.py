@@ -10,8 +10,11 @@ to a build of different sources; ci.yml refuses a pull request that changes the
 sources without raising the version.
 
 The inputs are the crate's manifest, its `src` tree and Dockerfile, the
-patched smoltcp under vendor/, the workspace manifest (profile and shared dependencies), and the Cargo.lock entries
-the crate reaches. Its tests are left out: they never reach the binary. A
+patched smoltcp under vendor/, the parts of the workspace manifest a release
+build of it reads (shared package fields and dependencies, lints, patches and
+the release profile), and the Cargo.lock entries the crate reaches. The
+workspace's member list and the other crates' profiles are left out: adding a
+crate beside it never reaches its binary. Its tests are left out: they never reach the binary. A
 Cargo.lock change for another crate is left out too. Cargo.lock does not tell
 dev-dependencies apart, so a change to one of those counts as a change.
 
@@ -20,13 +23,13 @@ version in the same change.
 """
 
 import hashlib
+import json
 import subprocess
 import sys
 import tomllib
 
 CRATE = "polaris-tunnel"
 PATHS = [
-    "Cargo.toml",
     "crates/polaris-tunnel/Cargo.toml",
     "crates/polaris-tunnel/Dockerfile",
     "crates/polaris-tunnel/src",
@@ -67,8 +70,23 @@ def lock_closure(ref: str) -> str:
         for key in sorted(reached)
     )
 
+def workspace_manifest(ref: str) -> str:
+    """The root manifest's sections a release build of the crate reads, canonical."""
+    manifest = tomllib.loads(git("show", f"{ref}:Cargo.toml").decode())
+    workspace = manifest.get("workspace", {})
+    read = {
+        "workspace.package": workspace.get("package"),
+        "workspace.dependencies": workspace.get("dependencies"),
+        "workspace.lints": workspace.get("lints"),
+        "patch": manifest.get("patch"),
+        "replace": manifest.get("replace"),
+        "profile.release": manifest.get("profile", {}).get("release"),
+    }
+    return json.dumps(read, sort_keys=True, separators=(",", ":"))
+
 def fingerprint(ref: str) -> str:
     digest = hashlib.sha256()
+    digest.update(b"Cargo.toml\0" + workspace_manifest(ref).encode() + b"\n")
     for path in PATHS:
         # The object id is a hash of the file's or tree's contents.
         digest.update(f"{path}\0".encode() + git("rev-parse", f"{ref}:{path}").strip() + b"\n")
