@@ -9,11 +9,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
     policy: null as string | null,
-    user: { isAdmin: false, phone: null as { verifiedAt: Date | null } | null },
+    user: { isAdmin: false, phones: [] as { verifiedAt: Date | null }[] },
     route: { channelId: "channel-1" as string | null }
 }));
 
-vi.mock("@polaris/db", () => ({ prisma: { user: { findUnique: vi.fn(async () => state.user) } } }));
+// The query asks only for confirmed numbers, so the mock answers the same way.
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        user: {
+            findUnique: vi.fn(async () => ({
+                isAdmin: state.user.isAdmin,
+                phones: state.user.phones.filter((phone) => phone.verifiedAt !== null)
+            }))
+        }
+    }
+}));
 vi.mock("@/lib/setting-store", () => ({ getSetting: vi.fn(async () => state.policy), setSetting: vi.fn() }));
 vi.mock("@/lib/auth-mail", () => ({ getAuthMailStatus: vi.fn(async () => ({ channelId: null })) }));
 vi.mock("@/lib/messaging/code-senders", () => ({
@@ -30,19 +40,19 @@ const ON = JSON.stringify({ requireSecondFactor: true, acceptedFactors: ["totp"]
 
 beforeEach(() => {
     state.policy = ON;
-    state.user = { isAdmin: false, phone: null };
+    state.user = { isAdmin: false, phones: [] };
     state.route = { channelId: "channel-1" };
 });
 
 describe("the phone requirement", () => {
     it("holds an account without a confirmed number that a code can reach", async () => {
         expect(await owesPhone("user-1")).toBe(true);
-        state.user = { isAdmin: false, phone: { verifiedAt: null } };
+        state.user = { isAdmin: false, phones: [{ verifiedAt: null }] };
         expect(await owesPhone("user-1")).toBe(true);
     });
 
     it("is done once the number is confirmed", async () => {
-        state.user = { isAdmin: false, phone: { verifiedAt: new Date() } };
+        state.user = { isAdmin: false, phones: [{ verifiedAt: new Date() }] };
         expect(await owesPhone("user-1")).toBe(false);
     });
 
@@ -52,7 +62,7 @@ describe("the phone requirement", () => {
     });
 
     it("never holds an administrator", async () => {
-        state.user = { isAdmin: true, phone: null };
+        state.user = { isAdmin: true, phones: [] };
         expect(await owesPhone("admin-1")).toBe(false);
     });
 

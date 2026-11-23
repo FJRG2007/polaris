@@ -30,7 +30,7 @@ function row(person: Person) {
         banReason: null,
         bannedUntil: null,
         emailVerified: true,
-        phone: null,
+        phones: [],
         twoFactorEnabled: false,
         roles: [],
         groups: [],
