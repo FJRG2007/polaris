@@ -8,12 +8,23 @@
 import * as core from "../../src/index";
 import * as probe from "../../src/probe";
 import * as twin from "../../src/domains/probe/ts";
-import type { CoreBinding } from "../../src/binding";
+import { DOMAIN_EXPORTS, type CoreBinding } from "../../src/binding";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+/** The phone exports, present so the binding is complete; these tests drive the probe domain only. */
+const unusedPhone = Object.fromEntries(
+    DOMAIN_EXPORTS.phone.map((name) => [
+        name,
+        () => {
+            throw new Error(`${name} is not under test here`);
+        }
+    ])
+) as unknown as Pick<CoreBinding, (typeof DOMAIN_EXPORTS.phone)[number]>;
 
 function jsBinding(overrides: Partial<CoreBinding> = {}): CoreBinding {
     const coded = (error: Error) => Object.assign(new Error(error.message), { code: error.name });
     return {
+        ...unusedPhone,
         probeFnv1a32: vi.fn((text: string) => twin.fnv1a32(text)),
         probeDecodeHex: vi.fn((hex: string) => {
             try {

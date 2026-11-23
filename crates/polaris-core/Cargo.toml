@@ -58,9 +58,11 @@ base64 = { version = "0.22", default-features = false, features = ["alloc"], opt
 generic-array = { version = "=0.14.7", optional = true }
 
 # Leftmost-first matching, like JavaScript's backtracking engine on the
-# metadata patterns (none use backreferences or lookaround). No Unicode tables:
-# `\d` is rewritten to ASCII before compiling, which is how JavaScript reads it.
-regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
+# metadata patterns (none use backreferences or lookaround). regex-lite keeps
+# the browser build small: it carries no Unicode tables and no literal
+# optimizer, and `\d` is rewritten to ASCII before compiling anyway, which is
+# how JavaScript reads it.
+regex-lite = "0.1.9"
 
 # Browsers: OpenMLS's crypto provider draws its HPKE and nonce entropy from the
 # platform (crypto.getRandomValues through getrandom), and its clock from

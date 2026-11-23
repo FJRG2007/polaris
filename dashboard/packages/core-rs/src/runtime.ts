@@ -12,7 +12,7 @@
 import { nativeSource } from "./native";
 import { hmac } from "@noble/hashes/hmac.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { BindingMissingError, type CoreBinding, pickBinding } from "./binding";
+import { BindingMissingError, type CoreBinding, pickBinding, serves } from "./binding";
 
 export { BindingMissingError };
 import { DOMAINS, MODES, type DomainName, type Mode } from "./registry";
@@ -132,7 +132,7 @@ function start() {
     }
     if (typeof (loaded as Promise<CoreBinding>)?.then !== "function") {
         try {
-            state = { status: "ready", binding: pickBinding(loaded) };
+            state = { status: "ready", binding: pickBinding(loaded, targetOf(from)) };
         } catch {
             loadFailed("load-failed", gen);
         }
@@ -142,7 +142,7 @@ function start() {
         (binding) => {
             if (gen !== generation) return;
             try {
-                state = { status: "ready", binding: pickBinding(binding) };
+                state = { status: "ready", binding: pickBinding(binding, targetOf(from)) };
             } catch {
                 loadFailed("load-failed", gen);
             }
@@ -150,6 +150,11 @@ function start() {
         (error: unknown) => loadFailed(classify(error), gen)
     );
     state = { status: "loading", ready };
+}
+
+/** The WebAssembly source is built without some domains; every other source (napi, a test's) has them all. */
+function targetOf(from: BindingSource) {
+    return from.kind === "wasm" ? "wasm" : "napi";
 }
 
 function acquire(): CoreBinding | null {
@@ -259,6 +264,8 @@ export function defineOp<A extends unknown[], R>(spec: OpSpec<A, R>): (...args: 
     return (...args: A): R => {
         const mode = getMode(domain);
         if (mode === "ts" || tripped.has(domain)) return spec.ts(...args);
+        const from = currentSource();
+        if (from && !serves(targetOf(from), domain)) return spec.ts(...args);
         const binding = acquire();
         if (!binding) return spec.ts(...args);
 

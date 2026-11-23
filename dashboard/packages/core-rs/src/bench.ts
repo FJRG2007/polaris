@@ -9,6 +9,7 @@
 import { nativeSource } from "./native";
 import type { CoreBinding } from "./binding";
 import * as twin from "./domains/probe/ts";
+import * as phone from "./domains/phone/ts";
 import { decodeValue, type VectorFile } from "./vectors";
 
 export interface BenchResult {
@@ -22,9 +23,42 @@ export interface BenchResult {
 
 type Call = (...args: unknown[]) => unknown;
 
+/** The vector files write `undefined` as `null`; TypeScript gets `undefined` back, the binding takes either. */
+const ts =
+    (fn: (...args: never[]) => unknown): Call =>
+    (...args) =>
+        (fn as Call)(...args.map((a) => (a === null ? undefined : a)));
+
+/** `new Intl.Locale(tag).region`, the part of phoneCountryFromLocales the facade keeps in JavaScript. */
+function regionOf(tag: unknown): string | null {
+    try {
+        return new Intl.Locale(tag as string).region ?? null;
+    } catch {
+        return null;
+    }
+}
+
 const OPS: Record<string, { ts: Call; napi: (binding: CoreBinding) => Call }> = {
     "probe/fnv1a32": { ts: (text) => twin.fnv1a32(text as string), napi: (b) => (text) => b.probeFnv1a32(text as string) },
-    "probe/decodeHex": { ts: (hex) => twin.decodeHex(hex as string), napi: (b) => (hex) => b.probeDecodeHex(hex as string) }
+    "probe/decodeHex": { ts: (hex) => twin.decodeHex(hex as string), napi: (b) => (hex) => b.probeDecodeHex(hex as string) },
+    // The binding side calls the raw exports with the vector's arguments; an
+    // argument outside the declared types is refused there, and counted.
+    "phone/phoneCountries": { ts: ts(phone.phoneCountries), napi: (b) => () => b.phoneCountries() },
+    "phone/isPhoneCountry": { ts: ts(phone.isPhoneCountry), napi: (b) => (code) => b.phoneIsCountry(code as string | null) },
+    "phone/phoneCallingCode": { ts: ts(phone.phoneCallingCode), napi: (b) => (country) => b.phoneCallingCode(country as string) },
+    "phone/phoneMainCountry": { ts: ts(phone.phoneMainCountry), napi: (b) => (code) => b.phoneMainCountry(code as string) },
+    "phone/toE164": { ts: ts(phone.toE164), napi: (b) => (value, country) => b.phoneToE164(value as string, country as string | null) },
+    "phone/phoneCountryOf": { ts: ts(phone.phoneCountryOf), napi: (b) => (value) => b.phoneCountryOf(value as string) },
+    "phone/splitPhone": { ts: ts(phone.splitPhone), napi: (b) => (value) => b.phoneSplit(value as string) },
+    "phone/formatPhoneAsTyped": {
+        ts: ts(phone.formatPhoneAsTyped),
+        napi: (b) => (value, country) => b.phoneFormatAsTyped(value as string, country as string | null)
+    },
+    "phone/formatPhoneInternational": { ts: ts(phone.formatPhoneInternational), napi: (b) => (value) => b.phoneFormatInternational(value as string) },
+    "phone/phoneCountryFromLocales": {
+        ts: ts(phone.phoneCountryFromLocales),
+        napi: (b) => (locales) => b.phoneCountryFromRegions((locales as unknown[]).map(regionOf))
+    }
 };
 
 /** The nearest-rank percentile of sorted samples. */

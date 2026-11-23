@@ -76,3 +76,10 @@ path = "fuzz_targets/opaque_client.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "phone"
+path = "fuzz_targets/phone.rs"
+test = false
+doc = false
+bench = false

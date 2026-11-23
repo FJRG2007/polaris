@@ -11,7 +11,7 @@ import * as core from "../../src/index";
 import * as probe from "../../src/probe";
 import * as phone from "../../src/phone";
 import * as phoneTwin from "../../src/domains/phone/ts";
-import { PHONE_RESET_INPUT } from "../support/phone-corpus";
+import { PHONE_RESET_INPUT, asVector } from "../support/phone-corpus";
 import { createRequire } from "node:module";
 import * as twin from "../../src/domains/probe/ts";
 import { canonical, outcome, replay } from "../../src/vectors";
@@ -42,18 +42,11 @@ const RAW_OPS: Record<string, (...args: unknown[]) => unknown> = {
         }
     }
 };
-/** A phone op as the vector files see it: `null` stands for `undefined`, in and out. */
-const asVector =
-    (fn: (...args: never[]) => unknown) =>
-    (...args: unknown[]) => {
-        const result = (fn as (...a: unknown[]) => unknown)(...args.map((a) => (a === null ? undefined : a)));
-        return result === undefined ? null : result;
-    };
 const FACADE_OPS: Record<string, (...args: unknown[]) => unknown> = {
     "probe/fnv1a32": (text) => probe.fnv1a32(text as string),
     "probe/decodeHex": (hex) => probe.decodeHex(hex as string),
     ...Object.fromEntries(
-        Object.entries(phone).map(([op, fn]) => [`phone/${op}`, asVector(fn as (...args: never[]) => unknown)])
+        Object.entries(phone).map(([op, fn]) => [`phone/${op}`, asVector(fn as (...args: never[]) => unknown) as (...args: unknown[]) => unknown])
     )
 };
 // The raw phone exports need the facade's conversions (null/undefined, input

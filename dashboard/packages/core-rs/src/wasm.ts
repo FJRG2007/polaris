@@ -24,10 +24,10 @@ interface WasmGlue {
 export async function loadWasmBinding(glueUrl: string, wasm: unknown) {
     const glue = (await import(/* webpackIgnore: true */ /* @vite-ignore */ glueUrl)) as WasmGlue;
     await glue.default({ module_or_path: wasm });
-    return pickBinding(glue);
+    return pickBinding(glue, "wasm");
 }
 
 /** Serve Rust-backed domains from the WebAssembly binding, loaded lazily by `load`. */
 export function useWasm(load: () => Promise<unknown>) {
-    setBindingSource({ kind: "wasm", load: async () => pickBinding(await load()) });
+    setBindingSource({ kind: "wasm", load: async () => pickBinding(await load(), "wasm") });
 }

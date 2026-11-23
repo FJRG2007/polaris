@@ -9,7 +9,8 @@ describe("domain registry", () => {
         // Moving a domain to shadow or rust needs the plan's gates; this table
         // changes in the same commit, next to the ledger row that proves them.
         expect(DOMAINS).toEqual({
-            probe: { mode: "ts", ledger: "F4", timeoutMs: 50 }
+            probe: { mode: "ts", ledger: "F4", timeoutMs: 50 },
+            phone: { mode: "ts", ledger: "P2", timeoutMs: 50, wasm: false }
         });
     });
 });

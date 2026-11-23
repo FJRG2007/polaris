@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CoreBinding } from "../../src/binding";
+import { DOMAIN_EXPORTS, type CoreBinding } from "../../src/binding";
 import { allVectorFiles, loadVectors } from "../support/files";
 import { bench, percentile } from "../../src/bench";
 import * as twin from "../../src/domains/probe/ts";
@@ -17,6 +17,7 @@ describe("bench", () => {
         const files = allVectorFiles().map(([domain, op]) => loadVectors(domain, op));
         const calls: string[] = [];
         const binding = {
+            ...Object.fromEntries(DOMAIN_EXPORTS.phone.map((name) => [name, () => (calls.push(name), null)])),
             probeFnv1a32: (text: string) => (calls.push("fnv1a32"), twin.fnv1a32(text)),
             probeDecodeHex: (hex: string) => (calls.push("decodeHex"), twin.decodeHex(hex))
         } as unknown as CoreBinding;
@@ -26,9 +27,10 @@ describe("bench", () => {
             expect(r.samples).toBeGreaterThanOrEqual(30);
             expect(r.p95).toBeGreaterThanOrEqual(r.median);
         }
-        expect(new Set(calls)).toEqual(new Set(["fnv1a32", "decodeHex"]));
+        expect(new Set(calls)).toEqual(new Set(["fnv1a32", "decodeHex", ...DOMAIN_EXPORTS.phone]));
         expect(bench(files, null, 5).every((r) => r.impl === "ts")).toBe(true);
-    });
+        // At least 30 passes over every file, the phone ones included, on each side.
+    }, 120_000);
 
     it("refuses a vector file it has no benchmark for", () => {
         expect(() => bench([{ domain: "probe", op: "nope", source: "", cases: [] }], null, 5)).toThrow("no benchmark for probe/nope");

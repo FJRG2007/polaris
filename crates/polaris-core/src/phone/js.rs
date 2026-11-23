@@ -3,7 +3,7 @@
 //! `String.prototype.replace` with a replacement template, `trim()` and
 //! UTF-16 lengths.
 
-use regex::Regex;
+use regex_lite::Regex;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
@@ -37,7 +37,7 @@ pub fn js_trim(text: &str) -> (&str, usize, usize) {
     (trimmed, start, start + utf16_len(trimmed))
 }
 
-/// Rewrite a JavaScript (non-`u`) pattern for the `regex` crate: `\d` is ASCII
+/// Rewrite a JavaScript (non-`u`) pattern for `regex-lite`: `\d` is ASCII
 /// in JavaScript and `.` stops at the four JavaScript line terminators.
 pub fn translate(source: &str) -> String {
     let mut out = String::with_capacity(source.len() + 8);

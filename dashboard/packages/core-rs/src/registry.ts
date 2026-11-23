@@ -8,6 +8,10 @@
  *   setup. A module moves ts -> shadow -> rust only through the plan's gates.
  * - `ledger`: the unit in `docs/rust-core-ledger.md` that owns the domain.
  * - `timeoutMs`: a Rust call slower than this is answered by TypeScript instead.
+ * - `wasm`: `false` keeps the domain out of the WebAssembly build, so browsers
+ *   answer it with TypeScript in every mode and only the Node binding serves it
+ *   from Rust. Set when the Rust build would ship more bytes than the
+ *   TypeScript it replaces (the ledger row records both sizes).
  */
 
 import table from "./domains.json";
@@ -20,11 +24,12 @@ export interface DomainConfig {
     readonly mode: Mode;
     readonly ledger: string;
     readonly timeoutMs: number;
+    readonly wasm?: boolean;
 }
 
 export type DomainName = keyof typeof table;
 
-function checked(raw: Record<string, { mode: string; ledger: string; timeoutMs: number }>) {
+function checked(raw: Record<string, { mode: string; ledger: string; timeoutMs: number; wasm?: boolean }>) {
     for (const [name, config] of Object.entries(raw)) {
         if (!MODES.includes(config.mode as Mode)) throw new Error(`core-rs: domain ${name} has an unknown mode ${config.mode}`);
         if (!(config.timeoutMs > 0)) throw new Error(`core-rs: domain ${name} needs a positive timeoutMs`);

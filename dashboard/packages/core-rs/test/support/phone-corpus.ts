@@ -17,8 +17,8 @@ const utf16 = (...units: number[]) => ({ $utf16: units });
 
 type Fn = (...args: never[]) => unknown;
 
-/** The twin as the vector files see it: `null` in for `undefined`, and out. */
-function asVector(fn: (...args: never[]) => unknown): Fn {
+/** A phone function as the vector files see it: `null` in for `undefined`, and out. */
+export function asVector(fn: (...args: never[]) => unknown): Fn {
     return ((...args: unknown[]) => {
         const result = (fn as (...a: unknown[]) => unknown)(...args.map((a) => (a === null ? undefined : a)));
         return result === undefined ? null : result;

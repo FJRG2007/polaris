@@ -9,11 +9,13 @@ import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import * as core from "../../src/index";
 import * as probe from "../../src/probe";
+import * as phone from "../../src/phone";
 import { pathToFileURL } from "node:url";
 import { replay } from "../../src/vectors";
 import * as twin from "../../src/domains/probe/ts";
 import type { CoreBinding } from "../../src/binding";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PHONE_RESET_INPUT, asVector } from "../support/phone-corpus";
 import { allVectorFiles, loadVectors, packageDir, requireBuilt } from "../support/files";
 
 const glueUrl = pathToFileURL(requireBuilt(join(packageDir, "wasm", "polaris_core_wasm.js"))).href;
@@ -22,7 +24,10 @@ const raw = await core.loadWasmBinding(glueUrl, wasmBytes);
 
 const FACADE_OPS: Record<string, (...args: unknown[]) => unknown> = {
     "probe/fnv1a32": (text) => probe.fnv1a32(text as string),
-    "probe/decodeHex": (hex) => probe.decodeHex(hex as string)
+    "probe/decodeHex": (hex) => probe.decodeHex(hex as string),
+    ...Object.fromEntries(
+        Object.entries(phone).map(([op, fn]) => [`phone/${op}`, asVector(fn as (...args: never[]) => unknown) as (...args: unknown[]) => unknown])
+    )
 };
 
 beforeEach(() => {
@@ -30,15 +35,31 @@ beforeEach(() => {
     core.clearRecords();
 });
 
-afterEach(() => core.setMode("probe", null));
+afterEach(() => {
+    core.setMode("probe", null);
+    core.setMode("phone", null);
+});
 
 describe("WebAssembly in Node", () => {
     it("matches every golden vector through the facade in rust mode", async () => {
         core.useWasm(() => core.loadWasmBinding(glueUrl, wasmBytes));
         core.setMode("probe", "rust");
+        core.setMode("phone", "rust");
         expect(await core.ready()).toBe("ready");
-        for (const [domain, op] of allVectorFiles()) expect(replay(loadVectors(domain, op), FACADE_OPS[`${domain}/${op}`]!), `${domain}/${op}`).toEqual([]);
+        for (const [domain, op] of allVectorFiles()) {
+            if (domain === "phone") phone.toE164(PHONE_RESET_INPUT);
+            expect(replay(loadVectors(domain, op), FACADE_OPS[`${domain}/${op}`]!), `${domain}/${op}`).toEqual([]);
+        }
         expect(core.status().source).toBe("wasm");
+        expect(core.records()).toEqual([]);
+    });
+
+    it("is built without the phone domain, which the facade answers with TypeScript in every mode", () => {
+        expect(core.DOMAINS.phone.wasm).toBe(false);
+        expect(Object.keys(raw).some((name) => name.startsWith("phone"))).toBe(false);
+        core.useWasm(() => core.loadWasmBinding(glueUrl, wasmBytes));
+        core.setMode("phone", "rust");
+        expect(phone.toE164("600 11 12 22", "ES")).toBe("+34600111222");
         expect(core.records()).toEqual([]);
     });
 
