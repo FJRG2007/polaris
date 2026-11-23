@@ -21,6 +21,15 @@ export const MAX_KEY_PACKAGES_PER_DEVICE = 100;
 export const MAX_CLAIM_USERS = 100;
 export const MAX_EVENTS_PER_READ = 200;
 export const MAX_WELCOMES_PER_COMMIT = 100;
+/**
+ * How much of a group's log is kept: the last 256 epochs. A device further
+ * behind than that cannot catch up commit by commit anyway once one is gone,
+ * and rejoins from the latest GroupInfo by an external commit, which is what
+ * the group keeps it for. Pruned every 32 epochs, inside the commit's own
+ * transaction, so the log of a busy group stays bounded with no job to run.
+ */
+export const RETAINED_EPOCHS = 256n;
+const PRUNE_EVERY_EPOCHS = 32n;
 
 /** A device across accounts: `${userId}/${device}`. */
 export const deviceAddress = (userId: string, device: string) => `${userId}/${device}`;
@@ -40,6 +49,11 @@ export async function registerDevice(userId: string, device: string, signatureKe
         create: { userId, device, signatureKey: Buffer.from(signatureKey), e2eeVersion, lastSeenAt: now },
         update: { signatureKey: Buffer.from(signatureKey), e2eeVersion, lastSeenAt: now }
     });
+}
+
+/** How many one-use key packages of this device are still unclaimed, so it tops them up only when low. */
+export async function heldKeyPackages(userId: string, device: string, ciphersuite: number): Promise<number> {
+    return prisma.mlsKeyPackage.count({ where: { userId, device, ciphersuite, lastResort: false } });
 }
 
 /** Publish one-use key packages, or replace the device's last-resort one. */
@@ -146,6 +160,9 @@ export async function submitCommit(
             throw new MlsDeliveryRefusal(known ? "staleEpoch" : "unknownGroup");
         }
         await tx.mlsGroupEvent.create({ data: { channelId, epoch, kind: "commit", sender, payload: Buffer.from(commit) } });
+        const next = epoch + 1n;
+        if (next % PRUNE_EVERY_EPOCHS === 0n && next > RETAINED_EPOCHS)
+            await tx.mlsGroupEvent.deleteMany({ where: { channelId, epoch: { lt: next - RETAINED_EPOCHS } } });
         if (welcomes.length)
             await tx.mlsGroupEvent.createMany({
                 data: welcomes.map(({ recipient, welcome }) => ({

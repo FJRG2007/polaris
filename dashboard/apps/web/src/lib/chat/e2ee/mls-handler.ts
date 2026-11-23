@@ -49,6 +49,9 @@ async function allReach(channelId: string, userIds: Iterable<string>): Promise<b
     return reached.every(Boolean);
 }
 
+/** The account half of a `${userId}/${device}` address (the schema fixes its shape). */
+const accountOf = (address: string) => address.slice(0, address.indexOf("/"));
+
 async function ownDevice(userId: string, device: string): Promise<boolean> {
     const row = await prisma.mlsDevice.findUnique({ where: { userId_device: { userId, device } }, select: { userId: true } });
     return Boolean(row);
@@ -77,7 +80,7 @@ export async function handleMls(request: Request): Promise<Response> {
 async function run(userId: string, body: MlsBody): Promise<Response> {
     if (body.op === "register-device") {
         await delivery.registerDevice(userId, body.device, bytes(body.signatureKey), body.e2eeVersion);
-        return json({ ok: true });
+        return json({ ok: true, heldKeyPackages: await delivery.heldKeyPackages(userId, body.device, body.ciphersuite) });
     }
     if (body.op === "publish-key-packages") {
         await delivery.publishKeyPackages(userId, body.device, body.ciphersuite, body.keyPackages.map(bytes), body.lastResort);
@@ -107,7 +110,7 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
             return json({ ok: true });
         case "commit": {
             if (!(await ownDevice(userId, body.device))) return json(REFUSED, 403);
-            if (!(await allReach(body.channelId, body.welcomes.map((w) => w.recipient.split("/")[0])))) return json(REFUSED, 403);
+            if (!(await allReach(body.channelId, body.welcomes.map((w) => accountOf(w.recipient))))) return json(REFUSED, 403);
             const moved = await delivery.submitCommit(
                 body.channelId,
                 delivery.deviceAddress(userId, body.device),

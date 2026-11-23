@@ -34,10 +34,11 @@ vi.mock("@polaris/db", () => {
             if (key === "OR") return (want as Row[]).some((w) => matches(row, w));
             if (key === "userId_device") return matches(row, want as Row);
             if (want && typeof want === "object" && !(want instanceof Uint8Array)) {
-                const cond = want as { in?: unknown[]; gt?: bigint; gte?: bigint };
+                const cond = want as { in?: unknown[]; gt?: bigint; gte?: bigint; lt?: bigint };
                 if (cond.in) return cond.in.includes(row[key]);
                 if (cond.gt !== undefined) return (row[key] as bigint) > cond.gt;
                 if (cond.gte !== undefined) return (row[key] as bigint) >= cond.gte;
+                if (cond.lt !== undefined) return (row[key] as bigint) < cond.lt;
             }
             return same(row[key] ?? null, want);
         });
@@ -175,6 +176,8 @@ describe("/api/e2ee/mls", () => {
             call({ op: "publish-key-packages", device: "bob-phone-1", ciphersuite: 0x004f, keyPackages, lastResort }, BOB);
         expect((await publish([blob(5)], false)).status).toBe(200);
         expect((await publish([blob(6)], true)).status).toBe(200);
+        const held = await call({ op: "register-device", device: "bob-phone-1", signatureKey: blob(7, 32), e2eeVersion: 1, ciphersuite: 0x004f }, BOB);
+        expect(held.body.heldKeyPackages).toBe(1);
         const claim = () => call({ op: "claim-key-packages", channelId: CHANNEL, userIds: [BOB], ciphersuite: 0x004f });
         const [one, two, three] = [await claim(), await claim(), await claim()];
         const first = (r: { body: Record<string, unknown> }) => (r.body.keyPackages as { keyPackage: string; address: string }[])[0];
@@ -184,6 +187,20 @@ describe("/api/e2ee/mls", () => {
         expect((await call({ op: "publish-key-packages", device: "not-registered", ciphersuite: 0x004f, keyPackages: [blob(5)] }, BOB)).status).toBe(409);
         expect((await publish(Array.from({ length: 100 }, () => blob(9)), false)).status).toBe(200);
         expect((await publish([blob(9)], false)).body.error).toBe("tooManyKeyPackages");
+    });
+
+    it("keeps the last 256 epochs of a group's log and the GroupInfo to rejoin from", async () => {
+        await device(ALICE, "alice-laptop");
+        await call({ op: "create-group", channelId: CHANNEL, groupId: blob(1, 16), ciphersuite: 0x004f, groupInfo: blob(2) });
+        for (let epoch = 0; epoch < 320; epoch++) {
+            const moved = await call({ op: "commit", channelId: CHANNEL, device: "alice-laptop", epoch: String(epoch), commit: blob(10), groupInfo: blob(11) });
+            expect(moved.status).toBe(200);
+        }
+        const epochs = state.tables.mlsGroupEvent.map((e) => e.epoch as bigint);
+        // The group is at epoch 320, a multiple of 32: everything before 320 - 256 is gone.
+        expect(epochs.reduce((a, b) => (a < b ? a : b))).toBe(64n);
+        expect(epochs).toHaveLength(256);
+        expect(((await call({ op: "group", channelId: CHANNEL })).body.group as { epoch: string; groupInfo: string }).groupInfo).toBe(blob(11));
     });
 
     it("gives a device the group log and only its own Welcomes", async () => {

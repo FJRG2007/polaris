@@ -88,7 +88,14 @@ const channelId = z.string().uuid();
 const deviceAddressText = z.string().max(110).regex(/^[0-9a-f-]{36}\/[A-Za-z0-9_-]{8,64}$/);
 
 export const mlsBody = z.discriminatedUnion("op", [
-    z.object({ op: z.literal("register-device"), device: deviceId, signatureKey: base64Url(32, 2048), e2eeVersion: z.number().int().min(1).max(1000) }),
+    z.object({
+        op: z.literal("register-device"),
+        device: deviceId,
+        signatureKey: base64Url(32, 2048),
+        e2eeVersion: z.number().int().min(1).max(1000),
+        // The suite whose unclaimed key packages the answer counts; older callers sent none.
+        ciphersuite: ciphersuite.default(0x004f)
+    }),
     z.object({
         op: z.literal("publish-key-packages"),
         device: deviceId,
