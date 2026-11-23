@@ -1,0 +1,20 @@
+[package]
+name = "polaris-core-opaque-wasm"
+version = "0.1.0"
+description = "OPAQUE (RFC 9807) WebAssembly binding of polaris-core: its own module, fetched only by the sign-in and password screens, so the core module keeps its size budget."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+polaris-core = { path = "../polaris-core", default-features = false, features = ["opaque"] }
+# Must equal the installed wasm-bindgen-cli version exactly.
+wasm-bindgen = { version = "=0.2.130", default-features = false, features = ["std"] }
+js-sys = { version = "=0.3.107", default-features = false, features = ["std"] }

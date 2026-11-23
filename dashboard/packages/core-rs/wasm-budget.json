@@ -1,3 +1,8 @@
 {
-    "polaris_core_wasm_bg.wasm": { "brotliBytes": 10240 }
+    "polaris_core_wasm_bg.wasm": {
+        "brotliBytes": 10240
+    },
+    "polaris_core_opaque_wasm_bg.wasm": {
+        "brotliBytes": 61440
+    }
 }

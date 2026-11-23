@@ -22,7 +22,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const packageDir = fileURLToPath(new URL("..", import.meta.url));
 const repoRoot = join(packageDir, "..", "..", "..");
 
-export const BINDING_CRATES = ["polaris-core-node", "polaris-core-wasm"];
+export const BINDING_CRATES = ["polaris-core-node", "polaris-core-wasm", "polaris-core-opaque-wasm"];
 
 const ALLOWED_DEPENDENCIES = new Set(["polaris-core", "napi", "napi-derive", "wasm-bindgen", "js-sys"]);
 const ALLOWED_BUILD_DEPENDENCIES = new Set(["napi-build"]);

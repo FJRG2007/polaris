@@ -3,6 +3,7 @@
  *
  *   native/polaris-core.<platform>.node   the Node binding (napi-rs), profile release-node
  *   wasm/polaris_core_wasm.js + _bg.wasm  the WebAssembly binding (wasm-bindgen --target web), wasm-opt -Oz
+ *   wasm/polaris_core_opaque_wasm.*      OPAQUE (RFC 9807) in its own module, same toolchain
  *
  *   npm run build:rust -w @polaris/core-rs [-- --node-target <rust triple>] [-- --only node|wasm]
  *
@@ -81,13 +82,22 @@ function buildNode(target) {
     process.stdout.write(`[build-rust] wrote ${dest}\n`);
 }
 
+/** Every WebAssembly module: the core one, and OPAQUE in its own (fetched only by the password screens). */
+export const WASM_CRATES = ["polaris-core-wasm", "polaris-core-opaque-wasm"];
+
 function buildWasm() {
-    run("cargo", ["build", "--locked", "-p", "polaris-core-wasm", "--target", "wasm32-unknown-unknown", "--profile", "release-wasm"]);
     const outDir = join(packageDir, "wasm");
     rmSync(outDir, { recursive: true, force: true });
-    const built = join(repoRoot, "target", "wasm32-unknown-unknown", "release-wasm", "polaris_core_wasm.wasm");
-    run("wasm-bindgen", ["--target", "web", "--out-dir", outDir, "--out-name", "polaris_core_wasm", built]);
-    const wasm = join(outDir, "polaris_core_wasm_bg.wasm");
+    for (const crate of WASM_CRATES) buildWasmCrate(crate, outDir);
+    process.stdout.write(`[build-rust] wrote ${outDir}\n`);
+}
+
+function buildWasmCrate(crate, outDir) {
+    const name = crate.replaceAll("-", "_");
+    run("cargo", ["build", "--locked", "-p", crate, "--target", "wasm32-unknown-unknown", "--profile", "release-wasm"]);
+    const built = join(repoRoot, "target", "wasm32-unknown-unknown", "release-wasm", `${name}.wasm`);
+    run("wasm-bindgen", ["--target", "web", "--out-dir", outDir, "--out-name", name, built]);
+    const wasm = join(outDir, `${name}_bg.wasm`);
     // rustc's wasm32-unknown-unknown enables these features by default and does
     // not declare them in the module, so wasm-opt has to be told.
     const features = [
