@@ -10614,6 +10614,24 @@ model ChatAgeConfirmation {
     @@unique([channelId, userId])
 }
 
+// A member the server runs, added to a conversation by a person: today only
+// Polar ("polar"), which then reads the conversation the way a member does - in a
+// sealed conversation, as an MLS member of its own (docs/chat-e2ee-mls.md,
+// "Server-run members"). Not a ChatChannelMember row: that is an account's, with
+// a read mark, a role and a timeout, and Polar has no account. A webhook needs no
+// row - it belongs to its channel already (ChatWebhook.channelId).
+model ChatServiceMember {
+    channelId String   @db.Uuid
+    service   String
+    // Who added it; kept when they leave, since the conversation still has it.
+    addedById String?  @db.Uuid
+    addedAt   DateTime @default(now())
+
+    channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+    @@id([channelId, service])
+}
+
 // An address something outside Polaris posts into a channel through - a CI
 // run, a monitor, a form. Discord's incoming webhook, and accepting Discord's
 // body shape (`content`, `username`), so the tools that already speak to one
@@ -10895,6 +10913,7 @@ model ChatChannel {
     uploads  ChatUpload[]
     invites  ChatSpaceInvite[]
     webhooks ChatWebhook[]
+    serviceMembers ChatServiceMember[]
     ageConfirmations ChatAgeConfirmation[]
     ruleProposals ChatRuleProposal[]
     forumTags     ChatForumTag[]

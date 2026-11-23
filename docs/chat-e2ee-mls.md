@@ -178,11 +178,13 @@ on the device, through `openSealed`, with the same page cache.
   link. A card the sender makes and seals beside the message is the way to
   have one, and is not built.
 - **Edits.** A plain edit of a sealed message is refused
-  (`errors.sealedNotEditable`), since it would put the new words in the clear.
+  (`errors.sealedNotEditable`), since it would put the new words in the clear,
+  and the pencil, the menu item and the edit key are not offered on a sealed
+  row (`rewritable.ts`), so nobody is shown an action only to be refused.
   A sealed edit (re-sealing under the same message id at the current epoch) is
   not built.
 
-## Server-run members: the design (decided, not built)
+## Server-run members: the design (decided; access built)
 
 Polar and webhooks take part as MLS members the server runs (proposal 7),
 through the Node binding and `mls-store.ts`:
@@ -206,6 +208,17 @@ through the Node binding and `mls-store.ts`:
   account - claiming its key packages, a Welcome addressed to it, its
   history-key envelope - so a person adds or removes Polar the way they add
   anybody.
+- **Where "Polar was added" lives (built).** A `ChatServiceMember` row
+  (`channelId`, `service: "polar"`, `addedById`, `addedAt`; migration
+  `20281124000000_chat_service_member`, additive), not a `ChatChannelMember`
+  one: that row is an account's - a read mark, a role, a timeout, a foreign key
+  to `User` - and Polar has no account and none of those. It goes with the
+  channel (cascade) and is kept when whoever added it leaves. A webhook needs no
+  row: `ChatWebhook.channelId` already says where it belongs.
+  `lib/chat/service-members.ts` holds the ids, the device id rule and
+  add/remove, and `channelAccess` answers a service account from it (a member
+  that posts and administers nothing; an archived conversation is closed to it),
+  so the route's per-account checks need no change.
 - **Transport.** In-process: the ops run against `mls-delivery.ts` and
   `sealed-messages.ts` directly, as the service account, with no session and
   no route. Polar's replies and a webhook's posts go through
@@ -227,6 +240,8 @@ through the Node binding and `mls-store.ts`:
 - The `org` history-key envelope. The organisation recovery key (proposal 3.5)
   has no public key stored anywhere yet - its custodian setup is not built - so
   nothing can serve it and no `org` envelope can be sealed until it is.
-- Server-run members (Polar, webhooks): designed above, not built.
+- Server-run members (Polar, webhooks): who they are and where they reach are
+  built; the service device (its store, outbox, lease and in-process ops), the
+  member list's "Add Polar" and Polar answering a sealed conversation are not.
 - Sign-out deletes the browser's MLS device, but its leaf stays in each group
   until another member removes it.

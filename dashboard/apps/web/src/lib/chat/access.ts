@@ -31,6 +31,7 @@ import { can } from "@polaris/auth";
 import { prisma, type Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { groupOwnerId } from "./ownership";
+import { serviceKind, serviceReaches, type ServiceKind } from "./service-members";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { currentChatOrgId, orgChatPeople } from "./isolation";
 import { findPeople, SHORTEST_SEARCH, type FoundPeople } from "@/lib/people-search";
@@ -310,6 +311,31 @@ export interface ChannelAccess {
 }
 
 /**
+ * A member the server runs (`service-members.ts`), in a conversation that put it
+ * there. It reads and posts like a member and administers nothing; an archived
+ * conversation is closed to it as to anybody.
+ */
+async function serviceAccess(service: ServiceKind, channelId: string): Promise<ChannelAccess | null> {
+    const channel = await prisma.chatChannel.findUnique({
+        where: { id: channelId },
+        select: { id: true, kind: true, spaceId: true, archived: true, space: { select: { archived: true } } }
+    });
+    if (!channel || !(await serviceReaches(service, channelId))) return null;
+    return {
+        channelId: channel.id,
+        spaceId: channel.spaceId,
+        kind: channel.kind,
+        archived: channel.archived,
+        member: false,
+        mayPost: !channel.archived && !(channel.space?.archived ?? false),
+        mutedUntil: null,
+        adminsOnly: false,
+        mayAdminister: false,
+        mayModerate: false
+    };
+}
+
+/**
  * Resolve one channel for one reader, or null when they cannot reach it.
  *
  * A direct message and a private channel are reached one way only: a membership
@@ -321,6 +347,8 @@ export async function channelAccess(
     actor: ChatActor,
     channelId: string
 ): Promise<ChannelAccess | null> {
+    const service = serviceKind(actor.id);
+    if (service) return serviceAccess(service, channelId);
     const channel = await prisma.chatChannel.findUnique({
         where: { id: channelId },
         select: {
