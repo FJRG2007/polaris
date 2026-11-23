@@ -309,6 +309,41 @@ export async function findAccountsAsAdmin(
 }
 
 /**
+ * The accounts a search found only through part of an address they do not show
+ * this viewer - to be left out of what the search answers.
+ *
+ * A colleague is matched by any part of their name, handle or address, and the
+ * address part is where a search becomes an oracle: typing "john.smith@" and
+ * watching who stays on the list spells out an address its owner keeps hidden.
+ * Found by the name, the handle or `alsoMatched` (a nickname the viewer gave),
+ * an account stays; found by the address alone, it stays only when that account
+ * shows its address to the viewer (`allowedBy`). Administrators read the whole
+ * directory already and are not held to it.
+ */
+export async function hiddenAddressMatches(
+    viewer: { readonly id: string; readonly isAdmin: boolean },
+    term: string,
+    users: readonly { id: string; name: string; username: string | null; email: string }[],
+    alsoMatched: ReadonlySet<string> = new Set()
+): Promise<Set<string>> {
+    const needle = term.trim().toLowerCase();
+    if (!needle || viewer.isAdmin) return new Set();
+    const byAddressOnly = users.filter(
+        (user) =>
+            !alsoMatched.has(user.id) &&
+            !user.name.toLowerCase().includes(needle) &&
+            !(user.username ?? "").toLowerCase().includes(needle)
+    );
+    if (byAddressOnly.length === 0) return new Set();
+    const shown = await allowedBy(
+        { id: viewer.id, isAdmin: false },
+        "email",
+        byAddressOnly.map((user) => user.id)
+    );
+    return new Set(byAddressOnly.filter((user) => !shown.has(user.id)).map((user) => user.id));
+}
+
+/**
  * The one account a typed identifier names - their whole username, or a whole
  * email address they own - when the person asking may find them that way.
  *

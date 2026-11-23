@@ -170,10 +170,19 @@ async function searchPeople(
         // them wins belongs to the avatar route - which puts an upload first.
         // Read here, it silently outranked the photo the person had actually
         // chosen, and kept being drawn after they took it down.
-        select: { id: true, name: true, username: true },
+        // The address is read only to tell whether it is what matched; it is never
+        // part of the answer (`hiddenAddressMatches`).
+        select: { id: true, name: true, username: true, email: true },
         orderBy: { name: "asc" },
         take: limit
     });
+    const { hiddenAddressMatches } = await import("@/lib/people-search");
+    const hidden = await hiddenAddressMatches(
+        { id: actor.id, isAdmin: actor.isAdmin },
+        term,
+        users,
+        new Set(named.map((row) => row.subjectId))
+    );
     // Nobody this account has blocked. Only that direction: leaving out somebody
     // who blocked THEM would take a name out of a picker for a reason the person
     // typing is not allowed to be told, and a name that quietly vanishes is how
@@ -198,7 +207,7 @@ async function searchPeople(
     );
 
     return users
-        .filter((user) => !shut.has(user.id))
+        .filter((user) => !shut.has(user.id) && !hidden.has(user.id))
         .map((user) => {
             const nickname = calls.get(user.id);
             const real = user.name || handle(user.username);
@@ -354,8 +363,15 @@ async function accountsInReach(
             found.filter((user) => !colleagues.has(user.id)).map((user) => user.id),
             match.term ? { term: match.term, friends: strangerFriends, policy } : undefined
         );
+        // A colleague matched by part of an address they keep from this account
+        // is not one the search may answer with.
+        const hidden = await search.hiddenAddressMatches(
+            { id: actor.id, isAdmin: false },
+            match.term ?? "",
+            found.filter((user) => colleagues.has(user.id))
+        );
         users = found
-            .filter((user) => colleagues.has(user.id) || findable.has(user.id))
+            .filter((user) => (colleagues.has(user.id) && !hidden.has(user.id)) || findable.has(user.id))
             .slice(0, limit);
     }
 
