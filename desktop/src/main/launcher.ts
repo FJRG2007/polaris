@@ -40,12 +40,12 @@ import { runningPrograms } from "./game-detect";
 import { quickAnswer } from "@/shared/quick-answer";
 import type { LauncherStatus } from "@/shared/bridge";
 import { takeFocus } from "./window-front";
-import { installedApps, installedAppsRead, isListedApp } from "./launcher-apps";
+import { installedApps, installedAppsRead, openListedApp } from "./launcher-apps";
 import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipEntry } from "@/shared/clipboard-history";
 import { DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator } from "@/shared/launcher-hotkey";
 import { conflictSentence, findLaunchers, likelyHolders, type FoundLauncher } from "@/shared/launcher-conflicts";
 import { LAUNCHER_CHANNELS, topMatches, webSearchUrl, type LauncherAnswer, type LauncherRow } from "@/shared/launcher";
-import { app, BrowserWindow, clipboard, ipcMain, net, powerMonitor, safeStorage, screen, session, shell, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, clipboard, ipcMain, nativeImage, net, powerMonitor, safeStorage, screen, session, type IpcMainInvokeEvent } from "electron";
 
 /** How long after start the hidden window is made, so it does not compete with the main window's first load. */
 export const WARM_DELAY_MS = 4_000;
@@ -240,10 +240,8 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
             }
         }
         for (const app of topMatches(query, installedApps().map((app) => ({ ...app, context: "" })), PER_KIND)) {
-            add({ kind: "app", title: app.label, subtitle: "Application" }, () => {
-                if (isListedApp(app.path)) void shell.openPath(app.path);
-            });
-            paths.set(String(rows.length - 1), app.path);
+            add({ kind: "app", title: app.label, subtitle: app.launch && app.launch.kind !== "open" ? appSource(app.path) : "Application" }, () => void openListedApp(app.path));
+            paths.set(String(rows.length - 1), app.icon ?? app.path);
         }
         if (origin) {
             add({ kind: "polar", title: `Ask Polar "${query.slice(0, 120)}"`, subtitle: "Opens Polar with the question ready to send" }, () =>
@@ -283,10 +281,25 @@ async function upgradeOwnPanel(kept: BrowserWindow): Promise<void> {
     make();
 }
 
-/** The program's own icon as a PNG data URL, asked of the system once per program. */
+/** What a store's row says under its name, from the `store:id` it is listed by. */
+function appSource(path: string): string {
+    const store = path.slice(0, path.indexOf(":"));
+    return { packaged: "Application", epic: "Epic Games", steam: "Steam", gog: "GOG", ubisoft: "Ubisoft Connect" }[store] ?? "Application";
+}
+
+/**
+ * The program's own icon as a PNG data URL, asked of the system once per
+ * program - or, for a picture a store keeps of its game, that picture.
+ */
 async function iconOf(path: string): Promise<string | null> {
     if (appIcons.has(path)) return appIcons.get(path) ?? null;
-    const image = await app.getFileIcon(path, { size: "normal" }).catch(() => null);
+    const picture = /\.(jpe?g|png)$/i.test(path);
+    const image = picture
+        ? (() => {
+              const found = nativeImage.createFromPath(path);
+              return found.isEmpty() ? null : found.resize({ width: 32, height: 32, quality: "good" });
+          })()
+        : await app.getFileIcon(path, { size: "normal" }).catch(() => null);
     const url = image && !image.isEmpty() ? image.toDataURL() : null;
     appIcons.set(path, url && url.startsWith("data:image/png;base64,") && url.length < 200_000 ? url : null);
     return appIcons.get(path) ?? null;
