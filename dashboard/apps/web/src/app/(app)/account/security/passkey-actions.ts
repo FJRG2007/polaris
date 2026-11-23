@@ -20,6 +20,7 @@ import { newDeviceRefusal } from "@/lib/device-grace";
 import { getTranslations } from "@/lib/i18n/request";
 import { localized } from "./action-messages";
 import { confirmAccountPassword } from "@polaris/auth";
+import { withPasswordOrProof } from "@/lib/chat/e2ee/opaque-password";
 import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
 import { announceNewPasskey } from "@/lib/passkey-announce";
 import { phishingResistantRequiredFor } from "@/lib/instance-security";
@@ -48,7 +49,9 @@ export async function confirmPasswordForPasskeyAction(
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
-    const ok = await confirmAccountPassword(auth, user.id, user.sessionId, String(password ?? ""));
+    const ok = await withPasswordOrProof(user.id, password, (typed) =>
+        confirmAccountPassword(auth, user.id, user.sessionId, typed)
+    );
     if (!ok) return { error: (await getTranslations("accountSecurity"))("known.wrongPassword") };
     return {};
 }

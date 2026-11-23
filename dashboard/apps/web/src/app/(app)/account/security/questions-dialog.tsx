@@ -14,6 +14,8 @@ import { useState, type FormEvent } from "react";
 import { SECURITY_QUESTION_COUNT, SECURITY_QUESTION_SUGGESTIONS, securityQuestionsSchema } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
 import { clearSecurityQuestionsAction, setSecurityQuestionsAction } from "./actions";
+import { passwordToSend } from "@/lib/password-proof-client";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
 import { Feedback } from "./setting-card";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { knownMessage, questionLabel } from "./known-sentences";
@@ -61,6 +63,7 @@ export function SecurityQuestionsDialog({
     const tc = useTranslations("common");
     const [entries, setEntries] = useState<Entry[]>(() => initialEntries(existing));
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     function update(index: number, patch: Partial<Entry>) {
@@ -84,7 +87,9 @@ export function SecurityQuestionsDialog({
         }
         setBusy(true);
         setError(null);
-        const result = await setSecurityQuestionsAction(password, { answers });
+        setProtecting(false);
+        const sent = await passwordToSend(password, () => setProtecting(true));
+        const result = await setSecurityQuestionsAction(sent, { answers });
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -150,7 +155,11 @@ export function SecurityQuestionsDialog({
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={busy}>
-                            {busy ? tc("actions.saving") : t("questions.save")}
+                            {busy ? (
+                                <SlowSubmitLabel busyLabel={tc("actions.saving")} protecting={protecting} />
+                            ) : (
+                                t("questions.save")
+                            )}
                         </Button>
                     </div>
                 </form>
@@ -169,15 +178,16 @@ export function ClearQuestionsDialog({
     const t = useTranslations("accountSecurity");
     const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setBusy(true);
         setError(null);
-        const result = await clearSecurityQuestionsAction(
-            String(new FormData(event.currentTarget).get("password") ?? "")
-        );
+        const password = String(new FormData(event.currentTarget).get("password") ?? "");
+        setProtecting(false);
+        const result = await clearSecurityQuestionsAction(await passwordToSend(password, () => setProtecting(true)));
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -204,7 +214,11 @@ export function ClearQuestionsDialog({
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" variant="danger" disabled={busy}>
-                            {busy ? t("dialog.removing") : t("passkeys.remove")}
+                            {busy ? (
+                                <SlowSubmitLabel busyLabel={t("dialog.removing")} protecting={protecting} />
+                            ) : (
+                                t("passkeys.remove")
+                            )}
                         </Button>
                     </div>
                 </form>

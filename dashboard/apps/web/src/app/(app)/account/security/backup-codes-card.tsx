@@ -21,6 +21,8 @@ import { BackupCodesPanel } from "./backup-codes-panel";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { regenerateBackupCodesAction } from "./two-factor-actions";
+import { passwordToSend } from "@/lib/password-proof-client";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
 import { Feedback, SettingCard, type SettingLock } from "./setting-card";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 
@@ -129,6 +131,7 @@ function RegenerateDialog({
     const tc = useTranslations("common");
     const [codes, setCodes] = useState<string[] | null>(null);
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     function close() {
@@ -147,7 +150,9 @@ function RegenerateDialog({
         const password = String(new FormData(event.currentTarget).get("password") ?? "");
         setBusy(true);
         setError(null);
-        const result = await regenerateBackupCodesAction({ password });
+        setProtecting(false);
+        const sent = await passwordToSend(password, () => setProtecting(true));
+        const result = await regenerateBackupCodesAction({ password: sent });
         setBusy(false);
         if (result.error || !result.codes) {
             setError(result.error ?? t("backupCodes.notGenerated"));
@@ -191,7 +196,11 @@ function RegenerateDialog({
                                 {tc("actions.cancel")}
                             </Button>
                             <Button type="submit" disabled={busy}>
-                                {busy ? t("backupCodes.generating") : t("backupCodes.generate")}
+                                {busy ? (
+                                    <SlowSubmitLabel busyLabel={t("backupCodes.generating")} protecting={protecting} />
+                                ) : (
+                                    t("backupCodes.generate")
+                                )}
                             </Button>
                         </div>
                     </form>

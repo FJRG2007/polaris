@@ -25,6 +25,9 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { authClient } from "@/lib/auth-client";
 import { useState, type FormEvent } from "react";
 import { beginSessionRotationAction } from "./actions";
+import { passwordToSend } from "@/lib/password-proof-client";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
+import { startAuthenticatorOpaqueAction, turnOffAuthenticatorOpaqueAction } from "./two-factor-actions";
 import { BackupCodesPanel } from "./backup-codes-panel";
 import { CodeInput, isWholeCode } from "@/components/code-input";
 import { noteAuthenticatorArmedAction } from "@/app/oauth/enroll/actions";
@@ -71,6 +74,7 @@ export function EnableTwoFactorDialog({
     const [backupCodes, setBackupCodes] = useState<string[]>([]);
     const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     function reset() {
@@ -86,18 +90,35 @@ export function EnableTwoFactorDialog({
         event.preventDefault();
         const password = String(new FormData(event.currentTarget).get("password") ?? "");
         setBusy(true);
+        setProtecting(false);
         setError(null);
-        const { data, error: enableError } = await authClient.twoFactor.enable({
-            password,
-            method: "totp"
-        });
+        const sent = await passwordToSend(password, () => setProtecting(true));
+        // A proof goes to the server action, which runs the same endpoint on it;
+        // a typed password (no OPAQUE here) goes to the endpoint as before.
+        let started: { totpURI: string; backupCodes: string[] } | { error: string };
+        if (typeof sent === "string") {
+            const { data, error: enableError } = await authClient.twoFactor.enable({
+                password: sent,
+                method: "totp"
+            });
+            started =
+                enableError || data?.method !== "totp"
+                    ? { error: enableError?.message ?? t("authenticator.startFailed") }
+                    : { totpURI: data.totpURI, backupCodes: data.backupCodes };
+        } else {
+            const result = await startAuthenticatorOpaqueAction(sent);
+            started =
+                result.totpURI && result.backupCodes
+                    ? { totpURI: result.totpURI, backupCodes: result.backupCodes }
+                    : { error: result.error ?? t("authenticator.startFailed") };
+        }
         setBusy(false);
-        if (enableError || data?.method !== "totp") {
-            setError(enableError?.message ?? t("authenticator.startFailed"));
+        if ("error" in started) {
+            setError(started.error);
             return;
         }
-        setTotpUri(data.totpURI);
-        setBackupCodes(data.backupCodes);
+        setTotpUri(started.totpURI);
+        setBackupCodes(started.backupCodes);
         setStep("verify");
     }
 
@@ -165,7 +186,11 @@ export function EnableTwoFactorDialog({
                                 {tc("actions.cancel")}
                             </Button>
                             <Button type="submit" disabled={busy}>
-                                {busy ? t("authenticator.working") : t("dialog.continue")}
+                                {busy ? (
+                                    <SlowSubmitLabel busyLabel={t("authenticator.working")} protecting={protecting} />
+                                ) : (
+                                    t("dialog.continue")
+                                )}
                             </Button>
                         </div>
                     </form>
@@ -256,19 +281,28 @@ export function DisableTwoFactorDialog({
     const t = useTranslations("accountSecurity");
     const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const password = String(new FormData(event.currentTarget).get("password") ?? "");
         setBusy(true);
+        setProtecting(false);
         setError(null);
+        const sent = await passwordToSend(password, () => setProtecting(true));
         // Removing the factor replaces this session too.
         await beginSessionRotationAction();
-        const { error: disableError } = await authClient.twoFactor.disable({ password });
+        let failure: string | null = null;
+        if (typeof sent === "string") {
+            const { error: disableError } = await authClient.twoFactor.disable({ password: sent });
+            if (disableError) failure = disableError.message ?? t("authenticator.turnOffFailed");
+        } else {
+            failure = (await turnOffAuthenticatorOpaqueAction(sent)).error ?? null;
+        }
         setBusy(false);
-        if (disableError) {
-            setError(disableError.message ?? t("authenticator.turnOffFailed"));
+        if (failure !== null) {
+            setError(failure);
             return;
         }
         onOpenChange(false);
@@ -298,7 +332,11 @@ export function DisableTwoFactorDialog({
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" variant="danger" disabled={busy}>
-                            {busy ? t("authenticator.working") : t("view.turnOff")}
+                            {busy ? (
+                                <SlowSubmitLabel busyLabel={t("authenticator.working")} protecting={protecting} />
+                            ) : (
+                                t("view.turnOff")
+                            )}
                         </Button>
                     </div>
                 </form>

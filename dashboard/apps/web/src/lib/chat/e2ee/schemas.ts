@@ -163,3 +163,7 @@ export type MlsBody = z.infer<typeof mlsBody>;
  */
 export const opaqueFinish = z.object({ loginId, finishLoginRequest: opaqueMessage.optional() });
 export type OpaqueFinish = z.infer<typeof opaqueFinish>;
+
+/** Where an action used to take the account password: the password itself (an
+ *  older client, an account not on OPAQUE yet) or a proof of it. */
+export const passwordOrProof = z.union([z.string().min(1, "Password is required"), opaqueFinish]);

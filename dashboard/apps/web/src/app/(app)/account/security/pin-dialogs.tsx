@@ -13,6 +13,8 @@ import { codeDigits } from "@/components/code-input";
 import { setPinSchema } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { clearPinAction, setPinAction } from "./actions";
+import { passwordToSend } from "@/lib/password-proof-client";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
 import { Feedback } from "./setting-card";
 import { knownMessage } from "./known-sentences";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -30,6 +32,7 @@ export function SetPinDialog({
     const tv = useTranslations("validation");
     const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pin, setPin] = useState("");
     const [confirmPin, setConfirmPin] = useState("");
@@ -58,7 +61,9 @@ export function SetPinDialog({
         }
         setBusy(true);
         setError(null);
-        const result = await setPinAction(input);
+        setProtecting(false);
+        const sent = await passwordToSend(password, () => setProtecting(true));
+        const result = await setPinAction({ ...input, password: sent });
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -119,7 +124,11 @@ export function SetPinDialog({
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={busy || !ready}>
-                            {busy ? tc("actions.saving") : t("pin.save")}
+                            {busy ? (
+                                <SlowSubmitLabel busyLabel={tc("actions.saving")} protecting={protecting} />
+                            ) : (
+                                t("pin.save")
+                            )}
                         </Button>
                     </div>
                 </form>
@@ -138,6 +147,7 @@ export function RemovePinDialog({
     const t = useTranslations("accountSecurity");
     const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -145,7 +155,8 @@ export function RemovePinDialog({
         setBusy(true);
         setError(null);
         const password = String(new FormData(event.currentTarget).get("password") ?? "");
-        const result = await clearPinAction(password);
+        setProtecting(false);
+        const result = await clearPinAction(await passwordToSend(password, () => setProtecting(true)));
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -172,7 +183,11 @@ export function RemovePinDialog({
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" variant="danger" disabled={busy}>
-                            {busy ? t("dialog.removing") : t("pin.remove")}
+                            {busy ? (
+                                <SlowSubmitLabel busyLabel={t("dialog.removing")} protecting={protecting} />
+                            ) : (
+                                t("pin.remove")
+                            )}
                         </Button>
                     </div>
                 </form>

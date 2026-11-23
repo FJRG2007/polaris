@@ -19,6 +19,11 @@ import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { getTranslations } from "@/lib/i18n/request";
+import { withProvenPassword } from "@polaris/auth";
+import { opaqueFinish, passwordOrProof } from "@/lib/chat/e2ee/schemas";
+import { provenPasswordHash, withPasswordOrProof, withPasswordProof } from "@/lib/chat/e2ee/opaque-password";
+import { setLoginApprovalAction } from "./actions";
+import { forwardAuthCookies } from "@/lib/auth-cookies";
 import { methodLabel } from "./known-sentences";
 import { firstIssue, localized } from "./action-messages";
 import {
@@ -122,7 +127,7 @@ const BACKUP_CODES_LIMIT = 5;
 const BACKUP_CODES_WINDOW_MS = 15 * 60 * 1000;
 
 const regenerateBackupCodesSchema = z.object({
-    password: z.string().min(1, "Password is required")
+    password: passwordOrProof
 });
 
 /**
@@ -151,7 +156,11 @@ export async function regenerateBackupCodesAction(
         return { error: t("errors.tooManyAttempts", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
     }
 
-    const result = await regenerateBackupCodes(auth, await headers(), parsed.data.password);
+    const requestHeaders = await headers();
+    const result =
+        (await withPasswordOrProof(user.id, parsed.data.password, (password) =>
+            regenerateBackupCodes(auth, requestHeaders, password)
+        )) ?? { error: (await getTranslations("accountSecurity"))("known.wrongPassword") };
     if (result.codes) {
         await recordAudit({
             actorId: user.id,
@@ -269,4 +278,117 @@ export async function saveTwoFactorPolicyAction(input: unknown): Promise<ActionR
     });
     revalidatePath("/account/security", "layout");
     return {};
+}
+
+const twoFactorChangesSchema = z.object({
+    preferences: z.unknown().optional(),
+    policy: z.unknown().optional(),
+    approval: z.boolean().optional(),
+    password: passwordOrProof
+});
+
+/**
+ * The method list, the policy and the approval gate, saved from the one
+ * confirmation that asked for the password once: each step is the action of its
+ * own, in this order, stopping at the first refusal. A typed password goes to
+ * each as it is; a proof (docs/chat-e2ee-phase1.md, "Password flows over
+ * OPAQUE") is checked once here and each step gets its own one-use stand-in for
+ * the hash read after it, so one Argon2id in the browser covers all three.
+ */
+export async function saveTwoFactorChangesAction(input: unknown): Promise<ActionResult> {
+    const parsed = twoFactorChangesSchema.safeParse(input);
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
+    const { preferences, policy, approval, password } = parsed.data;
+    let withPassword: <T>(run: (typed: string) => Promise<T>) => Promise<T>;
+    if (typeof password === "string") {
+        withPassword = (run) => run(password);
+    } else {
+        const user = await requireUser();
+        const blocked = await newDeviceRefusal(user);
+        if (blocked) return localized({ error: blocked });
+        const hash = await provenPasswordHash(user.id, opaqueFinish.parse(password));
+        if (!hash) return { error: (await getTranslations("accountSecurity"))("known.wrongPassword") };
+        withPassword = (run) => withProvenPassword(hash, run);
+    }
+    const steps: Array<() => Promise<ActionResult>> = [];
+    if (preferences !== undefined)
+        steps.push(() => withPassword((typed) => saveTwoFactorPreferencesAction({ preferences, password: typed })));
+    if (policy !== undefined)
+        steps.push(() => withPassword((typed) => saveTwoFactorPolicyAction({ policy, password: typed })));
+    if (approval !== undefined) steps.push(() => withPassword((typed) => setLoginApprovalAction(approval, typed)));
+    for (const step of steps) {
+        const result = await step();
+        if (result.error) return result;
+    }
+    return {};
+}
+
+/** better-auth's authenticator endpoints, narrowed here for the two calls below. */
+interface AuthenticatorEndpoints {
+    enableTwoFactor(input: {
+        body: { password: string; method: "totp" };
+        headers: Headers;
+    }): Promise<{ totpURI?: string; backupCodes?: string[] }>;
+    disableTwoFactor(input: {
+        body: { password: string };
+        headers: Headers;
+        returnHeaders: true;
+    }): Promise<{ headers: Headers }>;
+}
+
+/**
+ * The first step of setting the authenticator up, on a proof of the password
+ * instead of the password (docs/chat-e2ee-phase1.md, "Password flows over
+ * OPAQUE"): better-auth's own endpoint mints the secret and the backup codes,
+ * exactly as the browser's call to it does. Nothing is armed until the code
+ * from the app is checked, which stays the browser's call.
+ */
+export async function startAuthenticatorOpaqueAction(
+    proof: unknown
+): Promise<{ totpURI?: string; backupCodes?: string[]; error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    const parsed = opaqueFinish.safeParse(proof);
+    const t = await getTranslations("accountSecurity");
+    if (!parsed.success) return { error: t("errors.unreadable") };
+    const requestHeaders = await headers();
+    const api = auth.api as unknown as AuthenticatorEndpoints;
+    try {
+        const started = await withPasswordProof(user.id, parsed.data, (password) =>
+            api.enableTwoFactor({ body: { password, method: "totp" }, headers: requestHeaders })
+        );
+        if (!started) return { error: t("known.wrongPassword") };
+        if (!started.totpURI || !started.backupCodes) return { error: t("authenticator.startFailed") };
+        return { totpURI: started.totpURI, backupCodes: started.backupCodes };
+    } catch {
+        return { error: t("authenticator.startFailed") };
+    }
+}
+
+/**
+ * Remove the authenticator on a proof of the password. better-auth's endpoint
+ * replaces the session as it does for the browser's own call, and its cookies
+ * are carried onto this response, so the browser moves to the new session the
+ * caller announced with `beginSessionRotationAction` first.
+ */
+export async function turnOffAuthenticatorOpaqueAction(proof: unknown): Promise<ActionResult> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    const parsed = opaqueFinish.safeParse(proof);
+    const t = await getTranslations("accountSecurity");
+    if (!parsed.success) return { error: t("errors.unreadable") };
+    const requestHeaders = await headers();
+    const api = auth.api as unknown as AuthenticatorEndpoints;
+    try {
+        const done = await withPasswordProof(user.id, parsed.data, (password) =>
+            api.disableTwoFactor({ body: { password }, headers: requestHeaders, returnHeaders: true })
+        );
+        if (!done) return { error: t("known.wrongPassword") };
+        await forwardAuthCookies(done.headers);
+        return {};
+    } catch {
+        return { error: t("authenticator.turnOffFailed") };
+    }
 }

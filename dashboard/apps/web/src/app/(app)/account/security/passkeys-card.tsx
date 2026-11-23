@@ -37,6 +37,8 @@ import { BrowserMark, SystemMark } from "@/components/client-marks";
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import { PASSKEY_NAME_MAX, passkeyNameKey, passkeyRelyingPartyId } from "@polaris/core";
 import { confirmPasswordForPasskeyAction, notePasskeyAddedAction, removePasskeyAction } from "./passkey-actions";
+import { passwordToSend } from "@/lib/password-proof-client";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
 import {
     Button,
     Card,
@@ -78,6 +80,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
     const [name, setName] = useState("");
     const [asking, setAsking] = useState(false);
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [removing, startRemove] = useTransition();
 
@@ -125,8 +128,10 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         setBusy(true);
+        setProtecting(false);
         setError(null);
-        const result = await confirmPasswordForPasskeyAction(String(form.get("password") ?? ""));
+        const password = String(form.get("password") ?? "");
+        const result = await confirmPasswordForPasskeyAction(await passwordToSend(password, () => setProtecting(true)));
         if (result.error) {
             setBusy(false);
             setError(result.error);
@@ -312,7 +317,11 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                                 {tc("actions.cancel")}
                             </Button>
                             <Button type="submit" disabled={busy}>
-                                {busy ? t("dialog.waiting") : t("dialog.continue")}
+                                {busy ? (
+                                    <SlowSubmitLabel busyLabel={t("dialog.waiting")} protecting={protecting} />
+                                ) : (
+                                    t("dialog.continue")
+                                )}
                             </Button>
                         </div>
                     </form>

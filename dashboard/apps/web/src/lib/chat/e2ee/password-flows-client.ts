@@ -142,6 +142,19 @@ export function resealAfterNewPassword(password: string): void {
     void settleInBackground(password);
 }
 
+/** What a form sends where it used to send the account password: a proof when
+ *  the account can give one, the password itself otherwise and on every
+ *  fallback. `onStretching` fires when the key stretching is about to run. */
+export async function sentPassword(password: string, onStretching?: () => void): Promise<string | OpaqueFinish> {
+    if (!password || !(await opaquePasswordReady())) return password;
+    try {
+        onStretching?.();
+        return await provePassword(password);
+    } catch {
+        return password;
+    }
+}
+
 /** A step-up proof as it is sent: a typed password becomes its OPAQUE proof when
  *  the account can give one, anything else (and every fallback) goes as it is.
  *  `onStretching` fires when the key stretching is about to run. */

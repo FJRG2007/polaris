@@ -20,7 +20,7 @@ import { randomBytes } from "node:crypto";
 import * as opaque from "./opaque-service";
 import { passwordLockEnabled } from "./flag";
 import { backgroundUser } from "@/lib/session";
-import type { OpaqueFinish } from "./schemas";
+import { opaqueFinish, type OpaqueFinish } from "./schemas";
 
 /** Whether this account may prove or set its password over OPAQUE: always with
  *  the password lock on, and with the kill switch only when it is already on
@@ -57,10 +57,35 @@ export async function withPasswordProof<T>(
     proof: OpaqueFinish,
     run: (standIn: string) => Promise<T>
 ): Promise<T | null> {
+    const hash = await provenPasswordHash(userId, proof);
+    return hash ? withProvenPassword(hash, run) : null;
+}
+
+/**
+ * The account's password hash, read after this proof checked out, for a caller
+ * that runs several password checks on one proof: one `withProvenPassword` scope
+ * per check, each accepted once. Null when the proof does not prove it.
+ */
+export async function provenPasswordHash(userId: string, proof: OpaqueFinish): Promise<string | null> {
     if (!(await provesPassword(userId, proof))) return null;
-    const hash = await opaque.credentialHash(userId);
-    if (!hash) return null;
-    return withProvenPassword(hash, run);
+    return opaque.credentialHash(userId);
+}
+
+/**
+ * Run a check that takes the account password with what the form sent in its
+ * place: a typed password goes through as it is (an older client, or an account
+ * not on OPAQUE yet), a proof becomes the one-use stand-in `withPasswordProof`
+ * hands out, which every password check in this process accepts once. Null when
+ * it was a proof that does not prove the password, or neither shape at all.
+ */
+export async function withPasswordOrProof<T>(
+    userId: string,
+    given: unknown,
+    run: (password: string) => Promise<T>
+): Promise<T | null> {
+    if (typeof given === "string") return run(given);
+    const proof = opaqueFinish.safeParse(given);
+    return proof.success ? withPasswordProof(userId, proof.data, run) : null;
 }
 
 /**

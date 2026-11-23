@@ -25,8 +25,8 @@ import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
-import { opaqueFinish } from "@/lib/chat/e2ee/schemas";
-import { provesPassword, setPasswordOverOpaque } from "@/lib/chat/e2ee/opaque-password";
+import { opaqueFinish, passwordOrProof } from "@/lib/chat/e2ee/schemas";
+import { provesPassword, setPasswordOverOpaque, withPasswordOrProof } from "@/lib/chat/e2ee/opaque-password";
 import { setConnectionSignIn } from "@/lib/connections/store";
 import { stepUpGranted } from "@/lib/step-up-grant";
 import { proveStepUp, sendStepUpCode } from "@/lib/step-up";
@@ -35,11 +35,11 @@ import { firstIssue, localized } from "./action-messages";
 import { revokeOtherSessions, sessionSignInRecord } from "@/lib/session-directory";
 import {
     newDeviceGraceSchema,
+    setPinSchema,
     recoverPasswordSchema,
     securityQuestionsSchema,
     sessionBindingSchema,
     sessionLimitsSchema,
-    setPinSchema,
     TWO_FACTOR_DELIVERY_METHODS,
     type TwoFactorDeliveryMethod
 } from "@polaris/core";
@@ -334,13 +334,29 @@ export async function beginSessionRotationAction(): Promise<void> {
     await carrySignInRecord(user.id, await sessionSignInRecord(user.id, user.sessionId));
 }
 
+/** What a check refused over a proof reads as: the sentence a wrong typed
+ *  password gets, so the two are indistinguishable. */
+async function wrongPassword(): Promise<ActionResult> {
+    return { error: (await getTranslations("accountSecurity"))("known.wrongPassword") };
+}
+
+/** Stands in for the password in `setPinSchema` once `passwordOrProof` has read
+ *  it, so the PIN rules stay the shared schema's whatever shape it came in. */
+const READ_ABOVE = "-";
+
 export async function setPinAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
-    const parsed = setPinSchema.safeParse(input);
+    const given = z.object({ password: passwordOrProof }).safeParse(input);
+    if (!given.success) return firstIssue(given.error.issues, "errors.checkForm");
+    const parsed = setPinSchema.safeParse({ ...(input as object), password: READ_ABOVE });
     if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
-    const result = await setQuickPin(auth, user.id, parsed.data.pin, parsed.data.password);
+    const { pin } = parsed.data;
+    const result =
+        (await withPasswordOrProof(user.id, given.data.password, (password) =>
+            setQuickPin(auth, user.id, pin, password)
+        )) ?? (await wrongPassword());
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.pin.set" });
         revalidatePath("/account/security", "layout");
@@ -348,7 +364,7 @@ export async function setPinAction(input: unknown): Promise<ActionResult> {
     return localized(result);
 }
 
-export async function clearPinAction(password: string): Promise<ActionResult> {
+export async function clearPinAction(password: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
@@ -357,7 +373,9 @@ export async function clearPinAction(password: string): Promise<ActionResult> {
     if (security.requireLoginApproval) {
         return { error: (await getTranslations("accountSecurity"))("errors.approvalNeedsPin") };
     }
-    const result = await clearQuickPin(auth, user.id, String(password));
+    const result =
+        (await withPasswordOrProof(user.id, password, (typed) => clearQuickPin(auth, user.id, typed))) ??
+        (await wrongPassword());
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.pin.cleared" });
         revalidatePath("/account/security", "layout");
@@ -440,11 +458,11 @@ export async function updateSessionLimitsAction(input: unknown): Promise<ActionR
  * Taking the gate down widens the ways in, so it is verified the same way the
  * other second-factor settings are - a stolen session cannot quietly disarm it.
  */
-export async function setLoginApprovalAction(required: boolean, password: string): Promise<ActionResult> {
+export async function setLoginApprovalAction(required: boolean, password: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
-    if (!(await verifyAccountPassword(auth, user.id, String(password)))) {
+    if (!(await withPasswordOrProof(user.id, password, (typed) => verifyAccountPassword(auth, user.id, typed)))) {
         return { error: (await getTranslations("accountSecurity"))("known.wrongPassword") };
     }
     if (required === true && (await twoFactorEnabled(user.id))) {
@@ -462,13 +480,17 @@ export async function setLoginApprovalAction(required: boolean, password: string
     return {};
 }
 
-export async function setSecurityQuestionsAction(password: string, input: unknown): Promise<ActionResult> {
+export async function setSecurityQuestionsAction(password: unknown, input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
     const parsed = securityQuestionsSchema.safeParse(input);
     if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
-    const result = await setSecurityQuestions(auth, user.id, String(password), parsed.data.answers);
+    const { answers } = parsed.data;
+    const result =
+        (await withPasswordOrProof(user.id, password, (typed) =>
+            setSecurityQuestions(auth, user.id, typed, answers)
+        )) ?? (await wrongPassword());
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.security-questions.set" });
         revalidatePath("/account/security", "layout");
@@ -476,11 +498,13 @@ export async function setSecurityQuestionsAction(password: string, input: unknow
     return localized(result);
 }
 
-export async function clearSecurityQuestionsAction(password: string): Promise<ActionResult> {
+export async function clearSecurityQuestionsAction(password: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
-    const result = await clearSecurityQuestions(auth, user.id, String(password));
+    const result =
+        (await withPasswordOrProof(user.id, password, (typed) => clearSecurityQuestions(auth, user.id, typed))) ??
+        (await wrongPassword());
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.security-questions.cleared" });
         revalidatePath("/account/security", "layout");

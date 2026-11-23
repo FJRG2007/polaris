@@ -606,3 +606,55 @@ describe("a password set over OPAQUE still opens every check that takes one", ()
         expect(await check(alice.id, NEXT)).toBe(false);
     });
 });
+
+describe("a form that used to send the password", () => {
+    it("sends a proof instead, and the check runs once on the stand-in for the account's hash", async () => {
+        const alice = await adoptedAccount();
+        const given = await flows.sentPassword(PASSWORD);
+        expect(typeof given).toBe("object");
+        expect(sent(PASSWORD)).toBe(false);
+        const checked: string[] = [];
+        const run = async (password: string) => {
+            checked.push(password);
+            return true;
+        };
+        expect(await server.withPasswordOrProof(alice.id, given, run)).toBe(true);
+        expect(checked).toEqual([`proven:scrypt:${PASSWORD}`]);
+        // Single use: the same proof never runs a second check.
+        expect(await server.withPasswordOrProof(alice.id, given, run)).toBeNull();
+        expect(checked).toHaveLength(1);
+    });
+
+    it("a wrong password, another account's proof or neither shape never reaches the check", async () => {
+        const alice = await adoptedAccount();
+        const run = vi.fn(async () => true);
+        const wrong = await flows.sentPassword("not the password at all");
+        expect(await server.withPasswordOrProof(alice.id, wrong, run)).toBeNull();
+        const proof = await flows.sentPassword(PASSWORD);
+        const mallory = account("mallory@example.com", PASSWORD);
+        expect(await server.withPasswordOrProof(mallory.id, proof, run)).toBeNull();
+        expect(await server.withPasswordOrProof(alice.id, 42, run)).toBeNull();
+        expect(await server.withPasswordOrProof(alice.id, { loginId: "nope" }, run)).toBeNull();
+        expect(run).not.toHaveBeenCalled();
+    });
+
+    it("an account not moved yet, or a worker that does not start, sends the password as typed", async () => {
+        const bob = account("bob@example.com", PASSWORD);
+        state.sessionUser = { id: bob.id, name: "Bob", email: bob.email, sessionId: "session-b" };
+        expect(await flows.sentPassword(PASSWORD)).toBe(PASSWORD);
+        const run = vi.fn(async (password: string) => password === PASSWORD);
+        expect(await server.withPasswordOrProof(bob.id, PASSWORD, run)).toBe(true);
+
+        await adoptedAccount();
+        worker.down = true;
+        expect(await flows.sentPassword(PASSWORD)).toBe(PASSWORD);
+        expect(await flows.sentPassword("")).toBe("");
+    });
+
+    it("one proof gives the hash for several checks, once", async () => {
+        const alice = await adoptedAccount();
+        const proof = await flows.provePassword(PASSWORD);
+        expect(await server.provenPasswordHash(alice.id, proof)).toBe(`scrypt:${PASSWORD}`);
+        expect(await server.provenPasswordHash(alice.id, proof)).toBeNull();
+    });
+});

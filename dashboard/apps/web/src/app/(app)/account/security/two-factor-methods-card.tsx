@@ -30,8 +30,9 @@ import { knownMessage, methodLabel } from "./known-sentences";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { setLoginApprovalAction } from "./actions";
-import { saveTwoFactorPolicyAction, saveTwoFactorPreferencesAction } from "./two-factor-actions";
+import { passwordToSend } from "@/lib/password-proof-client";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
+import { saveTwoFactorChangesAction } from "./two-factor-actions";
 import { TWO_FACTOR_STRICTNESS, type TwoFactorPolicy, type TwoFactorStrictness } from "@/lib/two-factor-policy";
 import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
 import {
@@ -322,6 +323,7 @@ function ConfirmDialog({
     const t = useTranslations("accountSecurity");
     const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -329,19 +331,20 @@ function ConfirmDialog({
         const password = String(new FormData(event.currentTarget).get("password") ?? "");
         setBusy(true);
         setError(null);
-        // The methods are written first: the approval gate is the cheaper change to
-        // repeat, and leaving it on while the methods were refused is the safer half
-        // of the two to end up applied on its own.
-        const saved = savePreferences
-            ? await saveTwoFactorPreferencesAction({ preferences: { methods, preferred }, password })
-            : {};
-        const ruled = saved.error || policy === null ? {} : await saveTwoFactorPolicyAction({ policy, password });
-        const gated =
-            saved.error || ruled.error || approval === null ? {} : await setLoginApprovalAction(approval, password);
+        setProtecting(false);
+        // One password (or one proof of it) for every change; the server writes the
+        // methods first: the approval gate is the cheaper change to repeat, and
+        // leaving it on while the methods were refused is the safer half of the two
+        // to end up applied on its own.
+        const result = await saveTwoFactorChangesAction({
+            preferences: savePreferences ? { methods, preferred } : undefined,
+            policy: policy ?? undefined,
+            approval: approval ?? undefined,
+            password: await passwordToSend(password, () => setProtecting(true))
+        });
         setBusy(false);
-        const failure = saved.error ?? ruled.error ?? gated.error;
-        if (failure) {
-            setError(failure);
+        if (result.error) {
+            setError(result.error);
             return;
         }
         onDone();
@@ -365,7 +368,11 @@ function ConfirmDialog({
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={busy}>
-                            {busy ? tc("actions.saving") : tc("actions.save")}
+                            {busy ? (
+                                <SlowSubmitLabel busyLabel={tc("actions.saving")} protecting={protecting} />
+                            ) : (
+                                tc("actions.save")
+                            )}
                         </Button>
                     </div>
                 </form>
