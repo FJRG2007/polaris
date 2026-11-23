@@ -131,6 +131,9 @@ export async function installTool(window: BrowserWindow, input: tools.InstallReq
         // downloaded to a folder nor shown in the file manager.
         const store = storeEntry(input);
         if (store) return await registerFromStore(window, store.browser, store.entry);
+        // Asked for while the question is on screen rather than after it: a
+        // login shell can take seconds to start, and it is ready by the answer.
+        const environment = scriptEnvironment();
         const { response } = await dialog.showMessageBox(window, {
             type: "question",
             buttons: ["Install", "Cancel"],
@@ -141,7 +144,7 @@ export async function installTool(window: BrowserWindow, input: tools.InstallReq
         });
         if (response !== 0) return { ok: false, reason: "cancelled" };
         const launch = tools.installLaunch(input.tool, process.platform, repo);
-        const { code, output } = await run(launch, INSTALL_TIMEOUT_MS, await scriptEnvironment());
+        const { code, output } = await run(launch, INSTALL_TIMEOUT_MS, await environment);
         const path = tools.installedPath(input.tool, process.platform, folders());
         if (code !== 0 || !tools.scriptFinished(input.tool, output) || !existsSync(path)) {
             console.error("polaris: an install ended without the tool:", code, output);

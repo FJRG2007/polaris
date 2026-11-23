@@ -285,3 +285,10 @@ describe.skipIf(process.platform !== "win32")("install.ps1", () => {
         expect(stdout).toContain("could not find a CLI release on github.com/example/polaris");
     }, 60_000);
 });
+
+describe("install.ps1 as written", () => {
+    it("draws no progress bars, which made the download several times slower", () => {
+        const text = readFileSync(join(SCRIPTS, "install.ps1"), "utf8");
+        expect(text).toContain('$ProgressPreference = "SilentlyContinue"');
+    });
+});

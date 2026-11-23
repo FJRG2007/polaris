@@ -46,8 +46,19 @@ describe("how a script starts", () => {
         const launch = installLaunch("cli", "win32", REPO);
         expect(launch.file).toBe("powershell.exe");
         expect(launch.args.at(-1)).toBe(
-            "irm 'https://raw.githubusercontent.com/example/polaris/main/dashboard/packages/cli/scripts/install.ps1' | iex"
+            "$ProgressPreference = 'SilentlyContinue'; irm 'https://raw.githubusercontent.com/example/polaris/main/dashboard/packages/cli/scripts/install.ps1' | iex"
         );
+    });
+
+    it("starts PowerShell without anything that slows it down or waits for a person", () => {
+        for (const tool of INSTALL_TOOLS) {
+            const { args } = installLaunch(tool, "win32", REPO);
+            expect(args.slice(0, -2)).toEqual(["-NoLogo", "-NoProfile", "-NonInteractive"]);
+            expect(args.at(-2)).toBe("-Command");
+            // Progress bars cost the script several times its downloads, and the
+            // preference has to be the session's for module commands to see it.
+            expect(args.at(-1)).toMatch(/^\$ProgressPreference = 'SilentlyContinue'; irm '[^']+\/install\.ps1' \| iex$/);
+        }
     });
 
     it("runs the official script elsewhere", () => {

@@ -144,14 +144,22 @@ function Invoke-PolarisStreamDeckInstall {
     # repository publishes the dashboard too and marks those as latest.
     # Asked twice: a list GitHub answers while a release is being published has
     # been seen to come back without any plugin release in it, and the line then
-    # reported that none had ever been published.
+    # reported that none had ever been published. Each time a short page at a
+    # time, newest first, up to the 100 newest: one page of 100 is over a
+    # megabyte to download and parse, and the plugin is nearly always near the top.
     $release = $null
     foreach ($attempt in 1..2) {
         try {
-            $releases = Invoke-RestMethod -Uri "$api/repos/$repo/releases?per_page=100" -Headers $agent
-            $release = $releases |
-                Where-Object { $_.tag_name -like "streamdeck-v*" -and -not $_.draft -and -not $_.prerelease } |
-                Select-Object -First 1
+            for ($page = 1; $page -le 4 -and -not $release; $page++) {
+                # Kept before it is listed: Windows PowerShell hands the parsed array
+                # on as ONE object, which @() around the call would wrap in another.
+                $listed = Invoke-RestMethod -Uri "$api/repos/$repo/releases?per_page=25&page=$page" -Headers $agent
+                $releases = @($listed)
+                $release = $releases |
+                    Where-Object { $_.tag_name -like "streamdeck-v*" -and -not $_.draft -and -not $_.prerelease } |
+                    Select-Object -First 1
+                if ($releases.Count -lt 25) { break }
+            }
         } catch {
             if ($attempt -eq 2) {
                 Write-Log "could not reach GitHub: $($_.Exception.Message)"
@@ -185,6 +193,17 @@ function Invoke-PolarisStreamDeckInstall {
         return (Get-FileHash -Algorithm SHA256 -Path $File).Hash -eq $Matches[1].ToUpperInvariant()
     }
 
+    function Expand-PolarisZip {
+        # .NET's own extraction rather than Expand-Archive: that cmdlet draws a
+        # progress bar for every file whatever this function's
+        # $ProgressPreference says, which took seconds for a few hundred files.
+        # It refuses an entry that would land outside the folder, as
+        # Expand-Archive does.
+        param($Zip, $Destination)
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($Zip, $Destination)
+    }
+
     function Get-InstalledVersion {
         $manifest = Join-Path $dir "manifest.json"
         if (-not (Test-Path $manifest)) { return $null }
@@ -207,11 +226,9 @@ function Invoke-PolarisStreamDeckInstall {
                 Write-Log "the download for $tag does not match its published digest; nothing was changed"
                 return
             }
-            # Expand-Archive accepts nothing but a .zip name.
-            $zip = Join-Path $stage "plugin.zip"
-            Copy-Item -Path $file -Destination $zip
+            # A .streamDeckPlugin file is a zip under another name.
             $unpacked = Join-Path $stage "unpacked"
-            Expand-Archive -Path $zip -DestinationPath $unpacked -Force
+            Expand-PolarisZip $file $unpacked
             $fresh = Join-Path $unpacked "$uuid.sdPlugin"
             $read = $null
             try { $read = Get-Content -Raw -Path (Join-Path $fresh "manifest.json") | ConvertFrom-Json } catch { }

@@ -113,15 +113,25 @@ function Invoke-PolarisExtensionInstall {
     # `releases/latest` answers with a dashboard build carrying no extension.
     # POLARIS_EXTENSION_TAG pins one instead, and a pinned install is left
     # without the task: somebody who asked for that version asked to stay on it.
+    # Asked for a short page at a time, newest first, up to the 100 newest: the
+    # extension is nearly always on the first page, and one page of 100 is over
+    # a megabyte to download and parse.
     $pinned = [bool]$env:POLARIS_EXTENSION_TAG
+    $release = $null
     try {
         if ($pinned) {
             $release = Invoke-RestMethod -Uri "$api/repos/$repo/releases/tags/$($env:POLARIS_EXTENSION_TAG)" -Headers $agent
         } else {
-            $releases = Invoke-RestMethod -Uri "$api/repos/$repo/releases?per_page=100" -Headers $agent
-            $release = $releases |
-                Where-Object { $_.tag_name -like "extension-v*" -and -not $_.draft -and -not $_.prerelease } |
-                Select-Object -First 1
+            for ($page = 1; $page -le 4 -and -not $release; $page++) {
+                # Kept before it is listed: Windows PowerShell hands the parsed array
+                # on as ONE object, which @() around the call would wrap in another.
+                $listed = Invoke-RestMethod -Uri "$api/repos/$repo/releases?per_page=25&page=$page" -Headers $agent
+                $releases = @($listed)
+                $release = $releases |
+                    Where-Object { $_.tag_name -like "extension-v*" -and -not $_.draft -and -not $_.prerelease } |
+                    Select-Object -First 1
+                if ($releases.Count -lt 25) { break }
+            }
         }
     } catch {
         Write-Log "could not reach GitHub: $($_.Exception.Message)"
@@ -154,6 +164,17 @@ function Invoke-PolarisExtensionInstall {
         return (Get-FileHash -Algorithm SHA256 -Path $File).Hash -eq $Matches[1].ToUpperInvariant()
     }
 
+    function Expand-PolarisZip {
+        # .NET's own extraction rather than Expand-Archive: that cmdlet draws a
+        # progress bar for every file whatever this function's
+        # $ProgressPreference says, which took seconds for a few hundred files.
+        # It refuses an entry that would land outside the folder, as
+        # Expand-Archive does.
+        param($Zip, $Destination)
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($Zip, $Destination)
+    }
+
     function Get-InstalledVersion {
         $manifest = Join-Path $dir "manifest.json"
         if (-not (Test-Path $manifest)) { return $null }
@@ -181,7 +202,7 @@ function Invoke-PolarisExtensionInstall {
                 return
             }
             $unpacked = Join-Path $stage "unpacked"
-            Expand-Archive -Path $zip -DestinationPath $unpacked -Force
+            Expand-PolarisZip $zip $unpacked
             $manifest = Join-Path $unpacked "manifest.json"
             $read = $null
             try { $read = Get-Content -Raw -Path $manifest | ConvertFrom-Json } catch { }

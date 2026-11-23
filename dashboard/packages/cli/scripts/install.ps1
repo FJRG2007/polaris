@@ -26,6 +26,9 @@ function Install-PolarisCli {
     param()
 
     $ErrorActionPreference = "Stop"
+    # Windows PowerShell draws a progress bar for every block a download reads,
+    # which made fetching the CLI several times slower than the download itself.
+    $ProgressPreference = "SilentlyContinue"
     $repo = if ($env:POLARIS_REPO) { $env:POLARIS_REPO } else { "FJRG2007/polaris" }
     # Where GitHub's API is. Only ever changed to test this script against a stand-in.
     $api = if ($env:POLARIS_GITHUB_API) { $env:POLARIS_GITHUB_API } else { "https://api.github.com" }

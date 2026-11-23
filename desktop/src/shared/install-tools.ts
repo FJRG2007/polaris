@@ -65,14 +65,28 @@ export function repositorySlug(repository: string): string | null {
     return /^(?:git\+)?https:\/\/github\.com\/([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(repository)?.[1] ?? null;
 }
 
-/** How to run a tool's installer: the program and its arguments, with no shell
- *  in between on Windows and a fixed line on the others. */
+/**
+ * How to run a tool's installer: the program and its arguments, with no shell
+ * in between on Windows and a fixed line on the others.
+ *
+ * On Windows the progress bars are switched off for the whole session, not
+ * only inside the script: Windows PowerShell draws one for every block a
+ * download reads and for every file a module command such as Expand-Archive
+ * writes, and a function's own `$ProgressPreference` does not reach a module.
+ * With them on, the same script took several times longer than its downloads.
+ */
 export function installLaunch(tool: InstallTool, platform: string, repo: string): Launch {
     const scripts = `https://raw.githubusercontent.com/${repo}/main/${SCRIPTS[tool]}`;
     if (platform === "win32") {
         return {
             file: "powershell.exe",
-            args: ["-NoProfile", "-NonInteractive", "-Command", `irm '${scripts}/install.ps1' | iex`]
+            args: [
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                `$ProgressPreference = 'SilentlyContinue'; irm '${scripts}/install.ps1' | iex`
+            ]
         };
     }
     return { file: "/bin/sh", args: ["-c", `curl -fsSL '${scripts}/install.sh' | sh`] };
