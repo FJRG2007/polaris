@@ -7,7 +7,7 @@
 
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const SOURCE_KEY = Buffer.alloc(32, 1).toString("base64");
@@ -141,6 +141,42 @@ describe("moving an instance", () => {
         const audit = tables.get("AuditLog")![0]!;
         expect(audit.seq).toBeNull();
         expect(audit.hash).toBeNull();
+    });
+
+    it("carries a sealed variable only inside the sealed file, and it arrives still sealed", async () => {
+        const secret = encryptSecret("sealed-value-never-in-clear", SOURCE_KEY);
+        tables.set("EnvVar", [
+            {
+                id: "e2",
+                key: "SIGNING_KEY",
+                isSecret: true,
+                sealed: true,
+                value: null,
+                encryptedValue: secret.ciphertext,
+                valueNonce: secret.nonce,
+                valueKeyId: secret.keyId
+            }
+        ]);
+        const { path } = await exported();
+        const file = await readFile(path);
+        expect(file.includes(Buffer.from("sealed-value-never-in-clear"))).toBe(false);
+        expect(file.includes(Buffer.from("SIGNING_KEY"))).toBe(false);
+        tables.clear();
+        tables.set("User", [{ id: "fresh-admin" }]);
+        useKey(TARGET_KEY);
+        await transfer.applyTransfer(path, "correct horse battery staple");
+        const envVar = tables.get("EnvVar")![0]!;
+        expect(envVar.sealed).toBe(true);
+        expect(envVar.value).toBeNull();
+        const opened = decryptSecret(
+            {
+                ciphertext: envVar.encryptedValue as Buffer,
+                nonce: envVar.valueNonce as Buffer,
+                keyId: envVar.valueKeyId as string
+            },
+            TARGET_KEY
+        );
+        expect(opened).toBe("sealed-value-never-in-clear");
     });
 
     it("refuses an instance that is already in use, before writing anything", async () => {

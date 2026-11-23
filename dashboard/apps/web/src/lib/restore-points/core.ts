@@ -69,23 +69,35 @@ export interface ItemChange {
 
 const MASK = "********";
 
-function display(field: string, value: unknown): string | null {
+function display(field: string, value: unknown, sealed: boolean): string | null {
     if (value === undefined || value === null) return null;
     if (field === SECRET_FIELD) return MASK;
+    // A sealed item is never read back, so a point from before it was sealed -
+    // which still holds its plain value - shows that value masked too.
+    if (sealed && field === "value") return MASK;
     return typeof value === "string" ? value : canonical(value);
 }
 
 /**
  * What would change if `to` replaced `from`, item by item. A secret field is
- * compared by its stored envelope and shown as a mask on both sides.
+ * compared by its stored envelope and shown as a mask on both sides, and so is
+ * the plain value of an item that is sealed on either side or named in
+ * `sealedItems` (sealed in any point of the timeline, so one deleted since
+ * still does not show the value it had before it was sealed).
  */
-export function diffBodies(from: SnapshotBody, to: SnapshotBody): ItemChange[] {
+export function diffBodies(
+    from: SnapshotBody,
+    to: SnapshotBody,
+    sealedItems: ReadonlySet<string> = new Set()
+): ItemChange[] {
     const changes: ItemChange[] = [];
     const keys = [...new Set([...Object.keys(from.items), ...Object.keys(to.items)])].sort();
     for (const item of keys) {
         const before = from.items[item];
         const after = to.items[item];
         const fields: FieldChange[] = [];
+        const sealed =
+            sealedItems.has(item) || before?.sealed === true || after?.sealed === true;
         const names = [
             ...new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])
         ].sort();
@@ -93,7 +105,7 @@ export function diffBodies(from: SnapshotBody, to: SnapshotBody): ItemChange[] {
             const was = before?.[field];
             const now = after?.[field];
             if (canonical(was) === canonical(now)) continue;
-            fields.push({ field, before: display(field, was), after: display(field, now) });
+            fields.push({ field, before: display(field, was, sealed), after: display(field, now, sealed) });
         }
         if (!before) changes.push({ item, kind: "added", fields });
         else if (!after) changes.push({ item, kind: "removed", fields });
@@ -133,4 +145,13 @@ export function parseBody(text: string): SnapshotBody {
         throw new Error("Restore point body is not readable");
     }
     return parsed as SnapshotBody;
+}
+
+/** The items sealed in any of these bodies. */
+export function sealedItemsOf(bodies: readonly SnapshotBody[]): Set<string> {
+    const sealed = new Set<string>();
+    for (const body of bodies)
+        for (const [item, fields] of Object.entries(body.items))
+            if (fields.sealed === true) sealed.add(item);
+    return sealed;
 }

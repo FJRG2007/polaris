@@ -66,6 +66,12 @@ vi.mock("@/lib/audit-service", () => ({
 vi.mock("@/lib/activity/activity", () => ({ record: async () => undefined }));
 vi.mock("@/lib/domain-dns", () => ({ provisionHostnameDns: async () => null }));
 vi.mock("@/lib/env-var-service", () => ({
+    SealedVariableError: class SealedVariableError extends Error {
+        constructor(key: string) {
+            super(`${key} is sealed: its value can be replaced but not read.`);
+            this.name = "SealedVariableError";
+        }
+    },
     envVarScope: async () => ({ scope: "application", scopeId: APP }),
     revealEnvVar: (...args: unknown[]) => revealEnvVar(...args),
     setEnvVar: (...args: unknown[]) => setEnvVar(...args),
@@ -245,6 +251,20 @@ describe("what is recorded", () => {
         expect(event.action).toBe("deploy.variable.reveal");
         expect(event.metadata.key).toBe("DATABASE_URL");
         expect(JSON.stringify(event)).not.toContain("postgres://");
+    });
+
+    it("answers a sealed variable with a 403 that says it is sealed, and audits nothing", async () => {
+        const { SealedVariableError } = await import("@/lib/env-var-service");
+        revealEnvVar.mockRejectedValue(new SealedVariableError("DATABASE_URL"));
+        const caught = await surface
+            .revealVariable(caller(["deploy.manage"]), "var-1")
+            .catch((error: unknown) => error);
+        const { publicFailure } = await import("@/lib/deploy/api/refusal");
+        expect(publicFailure(caught, "read the variable")).toEqual({
+            status: 403,
+            message: "DATABASE_URL is sealed: its value can be replaced but not read."
+        });
+        expect(recordAudit).not.toHaveBeenCalled();
     });
 });
 

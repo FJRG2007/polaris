@@ -5,7 +5,8 @@ import {
     isDuplicate,
     hashOf,
     parseBody,
-    prunable
+    prunable,
+    sealedItemsOf
 } from "@/lib/restore-points/core";
 
 describe("restore point diff", () => {
@@ -29,6 +30,24 @@ describe("restore point diff", () => {
             before: "********",
             after: "********"
         });
+    });
+
+    it("masks the plain value a point kept from before the variable was sealed", () => {
+        const now = { items: { KEY: { secret: true, envelope: "e", sealed: true } } };
+        const point = { items: { KEY: { secret: false, value: "plain-text" } } };
+        const changes = diffBodies(now, point);
+        expect(JSON.stringify(changes)).not.toContain("plain-text");
+        expect(changes[0]?.fields.find((field) => field.field === "value")?.after).toBe("********");
+    });
+
+    it("masks it too once the sealed variable is deleted, from the rest of the timeline", () => {
+        const deleted = { items: { KEY: { secret: true, envelope: "e", sealed: true } } };
+        const older = { items: { KEY: { secret: false, value: "plain-text" } } };
+        const now = { items: {} };
+        const sealed = sealedItemsOf([now, deleted, older]);
+        expect(sealed).toEqual(new Set(["KEY"]));
+        expect(JSON.stringify(diffBodies(now, older, sealed))).not.toContain("plain-text");
+        expect(JSON.stringify(diffBodies(now, older))).toContain("plain-text");
     });
 
     it("finds nothing to restore in a point equal to the present", () => {

@@ -48,6 +48,7 @@ import {
     revealEnvVar,
     setEnvVar,
     setEnvVars,
+    SealedVariableError,
     type EnvScope,
     type EnvVarView
 } from "@/lib/env-var-service";
@@ -1095,7 +1096,12 @@ export async function revealVariable(
         where: { id: variableId },
         select: { key: true }
     });
-    const value = await revealEnvVar(variableId, access.ownerId);
+    // A sealed variable is never read back, by anyone: say so as a refusal the
+    // caller can act on, not as a failure of the instance.
+    const value = await revealEnvVar(variableId, access.ownerId).catch((caught: unknown) => {
+        if (caught instanceof SealedVariableError) throw new DeployApiRefusal(403, caught.message);
+        throw caught;
+    });
     await recordChange(caller, {
         action: "deploy.variable.reveal",
         targetType: envScope,

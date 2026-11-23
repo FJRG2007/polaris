@@ -414,12 +414,14 @@ export async function listRestorePoints(
           })
         : [];
     const names = new Map(actors.map((actor) => [actor.id, actor.name]));
-    return points.map((point) => ({
+    const bodies = points.map((point) => core.parseBody(point.body));
+    const sealed = core.sealedItemsOf([current, ...bodies]);
+    return points.map((point, index) => ({
         id: point.id,
         createdAt: point.createdAt.toISOString(),
         reason: point.reason,
         actorName: point.actorId ? (names.get(point.actorId) ?? null) : null,
-        changes: core.diffBodies(current, core.parseBody(point.body))
+        changes: core.diffBodies(current, bodies[index]!, sealed)
     }));
 }
 
