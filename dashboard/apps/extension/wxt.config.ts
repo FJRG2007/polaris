@@ -1,4 +1,5 @@
 import { defineConfig } from "wxt";
+import { searchStyles } from "./scripts/search-styles.mjs";
 import { wasmAssets } from "../../packages/core-rs/scripts/wasm-assets.mjs";
 
 /**
@@ -30,6 +31,8 @@ import { wasmAssets } from "../../packages/core-rs/scripts/wasm-assets.mjs";
 export default defineConfig({
     srcDir: "src",
     modules: ["@wxt-dev/module-react"],
+    // The on-page launcher's stylesheet, the dashboard's own (scripts/search-styles.mjs).
+    vite: () => ({ plugins: [searchStyles()] }),
     hooks: {
         /**
          * The Rust core's WebAssembly binding, under `core-rs/` with the

@@ -543,7 +543,9 @@ export type Request =
      *  this account, and the launcher's few sentences. */
     | { readonly kind: "launcherIndex" }
     /** Open a launcher entry: a Polaris path, in a new tab on the instance. */
-    | { readonly kind: "launcherOpen"; readonly href: string };
+    | { readonly kind: "launcherOpen"; readonly href: string }
+    /** Put the launcher's panel (`launcher-ui`) into the asking tab, on its first press there. */
+    | { readonly kind: "launcherShow" };
 
 /** One thing the on-page launcher can open. */
 export interface LauncherEntry {
@@ -557,6 +559,13 @@ export interface LauncherEntry {
 export interface LauncherWords {
     readonly placeholder: string;
     readonly empty: string;
+    /** The result list's name, read out rather than drawn. */
+    readonly results: string;
+    /** The key hints along the bottom. */
+    readonly hintMove: string;
+    readonly hintClose: string;
+    /** The phone's close button, read out rather than drawn. */
+    readonly close: string;
 }
 
 /** Hosts a list added, unnamed rows it gave a name, and rows left out because
@@ -707,7 +716,8 @@ export const FROM_PAGE: ReadonlySet<Request["kind"]> = new Set([
     // and apps - what its palette shows - drawn in a closed shadow root and only
     // after a trusted key press. Opening takes a Polaris path and nothing else.
     "launcherIndex",
-    "launcherOpen"
+    "launcherOpen",
+    "launcherShow"
 ] satisfies Request["kind"][]);
 
 /**

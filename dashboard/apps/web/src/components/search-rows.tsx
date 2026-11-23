@@ -14,6 +14,7 @@
  */
 
 import { AppLogo, Badge, cn } from "@polaris/ui";
+import { SearchItem } from "@polaris/ui/search-panel";
 import { Avatar } from "@/components/avatar";
 import type { LucideIcon } from "lucide-react";
 import type { ClockCommand, RecentSearch } from "@polaris/core";
@@ -80,26 +81,17 @@ export function EntryRow({ entry, ...row }: RowProps & { entry: CommandEntry }) 
     const Icon: LucideIcon = entry.icon;
     return (
         <Row {...row} label={entry.label}>
-            <AppLogo
-                appId={entry.appId ?? ""}
-                size={18}
-                fallback={
-                    <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <SearchItem
+                icon={
+                    <AppLogo
+                        appId={entry.appId ?? ""}
+                        size={18}
+                        fallback={<Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
+                    />
                 }
+                label={entry.label}
+                context={entry.context}
             />
-            <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm" title={entry.label}>
-                    {entry.label}
-                </span>
-                {entry.context ? (
-                    <span
-                        className="block truncate text-xs text-muted-foreground"
-                        title={entry.context}
-                    >
-                        {entry.context}
-                    </span>
-                ) : null}
-            </span>
         </Row>
     );
 }
@@ -344,22 +336,5 @@ export function RecentRow({
                 <X className="size-3.5" aria-hidden="true" />
             </button>
         </Row>
-    );
-}
-
-/** Placeholder rows while a scoped search is in flight. */
-export function HitSkeleton() {
-    return (
-        <div aria-hidden="true" className="space-y-1 p-1">
-            {[0, 1, 2].map((row) => (
-                <div key={row} className="flex items-center gap-3 rounded-md px-2 py-2">
-                    <span className="size-2.5 shrink-0 animate-pulse rounded-full bg-muted" />
-                    <span
-                        className="h-3 flex-1 animate-pulse rounded bg-muted"
-                        style={{ maxWidth: `${70 - row * 12}%` }}
-                    />
-                </div>
-            ))}
-        </div>
     );
 }

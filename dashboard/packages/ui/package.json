@@ -203,6 +203,14 @@
             "types": "./src/search/search-palette.tsx",
             "import": "./src/search/search-palette.tsx"
         },
+        "./ui-strings": {
+            "types": "./src/lib/ui-strings.tsx",
+            "import": "./src/lib/ui-strings.tsx"
+        },
+        "./search-panel": {
+            "types": "./src/search/search-panel.tsx",
+            "import": "./src/search/search-panel.tsx"
+        },
         "./search-match": {
             "types": "./src/search/search-match.ts",
             "import": "./src/search/search-match.ts"

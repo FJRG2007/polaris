@@ -9,9 +9,10 @@
  */
 
 import { build } from "esbuild";
+import { launcherCss, ownPackages } from "./launcher-ui.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { CORE_RS_NATIVE, mainNode, node } from "./node-build.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -39,9 +40,27 @@ await build({
     minify: true,
     logLevel: "info",
     legalComments: "none",
-    entryPoints: ["connect", "api-key", "push", "tv", "usb", "overlay", "voice-widget", "updating", "launcher"].map((page) => join(ROOT, "src/renderer", `${page}.ts`)),
+    entryPoints: ["connect", "api-key", "push", "tv", "usb", "overlay", "voice-widget", "updating"].map((page) => join(ROOT, "src/renderer", `${page}.ts`)),
     outdir: join(DIST, "renderer")
 });
+// The launcher draws the dashboard's own search panel with React, and its
+// stylesheet is the dashboard's tokens and Tailwind classes (build/launcher-ui.mjs).
+await build({
+    bundle: true,
+    platform: "browser",
+    target: "chrome140",
+    format: "iife",
+    minify: true,
+    logLevel: "info",
+    legalComments: "none",
+    jsx: "automatic",
+    define: { "process.env.NODE_ENV": JSON.stringify("production") },
+    plugins: [ownPackages()],
+    entryPoints: [join(ROOT, "src/renderer/launcher.tsx")],
+    outdir: join(DIST, "renderer")
+});
+mkdirSync(join(DIST, "renderer"), { recursive: true });
+writeFileSync(join(DIST, "renderer", "launcher.css"), await launcherCss());
 
 mkdirSync(join(DIST, "renderer"), { recursive: true });
 for (const file of ["connect.html", "api-key.html", "push.html", "tv.html", "usb.html", "overlay.html", "voice-widget.html", "updating.html", "launcher.html", "styles.css", "mark.svg"]) {

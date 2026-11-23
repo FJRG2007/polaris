@@ -551,6 +551,10 @@
         "empty": "Nothing in Polaris matches that.",
         "openPolaris": "Open Polaris",
         "signIn": "Sign in to Polaris to search it",
-        "unreachable": "Polaris is not answering. Try again soon."
+        "unreachable": "Polaris is not answering. Try again soon.",
+        "results": "Search results",
+        "hintMove": "Up and down to move, Enter to open",
+        "hintClose": "Esc to close",
+        "close": "Close"
     }
 }

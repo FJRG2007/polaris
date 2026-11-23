@@ -551,6 +551,10 @@
         "empty": "Nada en Polaris coincide.",
         "openPolaris": "Abrir Polaris",
         "signIn": "Entra en Polaris para buscar",
-        "unreachable": "Polaris no responde. Prueba pronto."
+        "unreachable": "Polaris no responde. Prueba pronto.",
+        "results": "Resultados",
+        "hintMove": "Arriba y abajo para moverte, Intro para abrir",
+        "hintClose": "Esc para cerrar",
+        "close": "Cerrar"
     }
 }

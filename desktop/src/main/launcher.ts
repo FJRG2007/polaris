@@ -30,14 +30,12 @@ import { isConcealed, withClip, type ClipEntry } from "@/shared/clipboard-histor
 import { DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator } from "@/shared/launcher-hotkey";
 import { conflictSentence, findLaunchers, likelyHolders, type FoundLauncher } from "@/shared/launcher-conflicts";
 import { LAUNCHER_CHANNELS, topMatches, webSearchUrl, type LauncherAnswer, type LauncherRow } from "@/shared/launcher";
-import { BrowserWindow, clipboard, ipcMain, nativeTheme, net, powerMonitor, screen, shell, type IpcMainInvokeEvent } from "electron";
+import { BrowserWindow, clipboard, ipcMain, net, powerMonitor, screen, shell, type IpcMainInvokeEvent } from "electron";
 
 /** Hidden this long, the window is destroyed; the next press makes a new one. */
 export const IDLE_MS = 5 * 60_000;
 /** How long Polaris's index is used before an open asks for it again. */
 const INDEX_FRESH_MS = 60_000;
-const WIDTH = 680;
-const HEIGHT = 440;
 /** The most rows of each kind, so the list stays one screen. */
 const PER_KIND = 6;
 
@@ -193,10 +191,15 @@ function hide(): void {
 
 function create(): BrowserWindow {
     const made = new BrowserWindow({
-        width: WIDTH,
-        height: HEIGHT,
         show: false,
         frame: false,
+        // The page draws the dashboard's search panel in the middle of a
+        // window that covers the work area (see place): the rest is clear,
+        // so only the panel shows, where the dashboard's palette would be.
+        transparent: true,
+        hasShadow: false,
+        thickFrame: false,
+        roundedCorners: false,
         resizable: false,
         minimizable: false,
         maximizable: false,
@@ -207,7 +210,7 @@ function create(): BrowserWindow {
         // A panel on macOS comes up over the app in front without bringing
         // Polaris's other windows along.
         ...(process.platform === "darwin" ? { type: "panel" } : {}),
-        backgroundColor: nativeTheme.shouldUseDarkColors ? "#16171a" : "#ffffff",
+        backgroundColor: "#00000000",
         webPreferences: {
             preload: join(__dirname, "..", "preload", "launcher.js"),
             contextIsolation: true,
@@ -230,15 +233,16 @@ function create(): BrowserWindow {
     return made;
 }
 
-/** Centre the window on the screen the pointer is on and bring it up. */
+/**
+ * Lay the window over the work area of the screen the pointer is on and bring
+ * it up. The window is clear and the page centres the panel in it both ways,
+ * exactly as the dashboard's dialog centres its palette in a browser window -
+ * so the panel lands in the middle of that screen, whatever its size, and grows
+ * from the middle as results arrive instead of hanging from a fixed top.
+ */
 function place(target: BrowserWindow): void {
     const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-    target.setBounds({
-        x: Math.round(workArea.x + (workArea.width - WIDTH) / 2),
-        y: Math.round(workArea.y + workArea.height * 0.2),
-        width: WIDTH,
-        height: HEIGHT
-    });
+    target.setBounds(workArea);
     target.show();
     target.focus();
     target.webContents.send(LAUNCHER_CHANNELS.opened);

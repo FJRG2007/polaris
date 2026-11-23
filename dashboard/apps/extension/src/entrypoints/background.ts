@@ -3344,6 +3344,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             request.kind !== "polarBrowserStop" &&
             request.kind !== "launcherIndex" &&
             request.kind !== "launcherOpen" &&
+            request.kind !== "launcherShow" &&
             (!(await PAGE_FILLING.getValue()) || !(await LINK_VAULT.getValue()))
         ) {
             return request.kind === "blocked"
@@ -3353,6 +3354,16 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
         switch (request.kind) {
             case "launcherIndex":
                 return launcherEntries();
+
+            case "launcherShow": {
+                // Only into the top frame of the tab that asked, which is where
+                // the key was pressed (launcher.ts ignores frames).
+                if (!sender.tab?.id) return { ok: false, error: "" };
+                await browser.scripting
+                    .executeScript({ target: { tabId: sender.tab.id, frameIds: [0] }, files: ["/launcher-ui.js"] })
+                    .catch(() => undefined);
+                return { ok: true };
+            }
 
             case "launcherOpen": {
                 const home = await currentOrigin();
@@ -4830,7 +4841,14 @@ async function launcherEntries(): Promise<messages.Reply> {
     const home = await currentOrigin();
     const origin = home ? readOrigin(home) : null;
     if (!origin) return { ok: false, error: await say("launcher.unreachable") };
-    const words = { placeholder: await say("launcher.placeholder"), empty: await say("launcher.empty") };
+    const words: messages.LauncherWords = {
+        placeholder: await say("launcher.placeholder"),
+        empty: await say("launcher.empty"),
+        results: await say("launcher.results"),
+        hintMove: await say("launcher.hintMove"),
+        hintClose: await say("launcher.hintClose"),
+        close: await say("launcher.close")
+    };
     const first: messages.LauncherEntry = { label: await say("launcher.openPolaris"), context: "", href: "/" };
     const fresh = launcherIndex && launcherIndex.origin === origin && Date.now() - launcherIndex.at < LAUNCHER_INDEX_TTL_MS;
     if (fresh && launcherIndex) return { ok: true, launcher: { entries: [first, ...launcherIndex.entries], words } };

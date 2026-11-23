@@ -95,7 +95,8 @@ describe("what a page may ask the worker for", () => {
                 "saveCaptured",
                 "totpNow",
                 "launcherIndex",
-                "launcherOpen"
+                "launcherOpen",
+                "launcherShow"
             ].sort()
         );
     });

@@ -54,12 +54,11 @@ import {
     CommandRow,
     EntryRow,
     HitRow,
-    HitSkeleton,
     RecentRow
 } from "@/components/search-rows";
 import { useToast } from "@polaris/ui";
 import { groupRows, stepActive } from "@polaris/ui/search-match";
-import { SearchGroup, SearchPalette } from "@polaris/ui/search-palette";
+import { SearchGroup, SearchMessage, SearchPalette, SearchSkeleton } from "@polaris/ui/search-palette";
 import { useDisplayFormat } from "@/components/display-format";
 import {
     COMMAND_ENTRY_FIELDS,
@@ -965,11 +964,11 @@ export function CommandPalette({
                     types the name that account is under. */}
                 <PlainNames>
                     {failure ? (
-                        <p className="px-2 py-10 text-center text-sm text-danger">{failure}</p>
+                        <SearchMessage tone="danger">{failure}</SearchMessage>
                     ) : rows.length === 0 && searching ? (
-                        <HitSkeleton />
+                        <SearchSkeleton />
                     ) : rows.length === 0 ? (
-                        <p className="px-2 py-10 text-center text-sm text-muted-foreground">
+                        <SearchMessage>
                             {scope
                                 ? trimmed
                                     ? t("search.noScopeMatch", {
@@ -980,7 +979,7 @@ export function CommandPalette({
                                           scope: scopeWords(t, scope.id).label.toLowerCase()
                                       })
                                 : t("search.noMatch", { query: trimmed })}
-                        </p>
+                        </SearchMessage>
                     ) : (
                         groups.map((group) => (
                             <SearchGroup

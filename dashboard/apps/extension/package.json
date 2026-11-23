@@ -1,6 +1,6 @@
 {
     "name": "@polaris/extension",
-    "version": "0.1.269",
+    "version": "0.1.270",
     "private": true,
     "type": "module",
     "description": "The Polaris browser extension for Chrome and Firefox: Polaris in the toolbar, starting with your logins and autofill.",
@@ -17,6 +17,7 @@
     },
     "dependencies": {
         "@polaris/core": "0.1.0",
+        "@polaris/ui": "0.1.0",
         "@polaris/vault-crypto": "0.1.0",
         "jsqr": "1.4.0",
         "react": "19.0.8",
@@ -27,6 +28,8 @@
         "@types/react": "19.0.7",
         "@types/react-dom": "19.0.3",
         "@wxt-dev/module-react": "1.2.2",
+        "postcss": "8.5.30",
+        "tailwindcss": "3.4.17",
         "wxt": "0.21.4"
     }
 }
