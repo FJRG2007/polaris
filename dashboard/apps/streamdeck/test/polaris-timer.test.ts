@@ -93,6 +93,25 @@ describe("a press before Polaris answers", () => {
         });
     });
 
+    it("silences a ringing timer - rung, or out of time - instead of starting it over", () => {
+        const rung: DeckState = {
+            tone: "bad",
+            countdown: { state: "rung", remainingMs: 0, durationMs: 300_000 }
+        };
+        expect(remote.predictTimer(rung, "toggle", 0, 0)?.countdown).toEqual({
+            state: "idle",
+            remainingMs: 300_000,
+            durationMs: 300_000
+        });
+        const atZero = remote.predictTimer(running(10_000, 0), "toggle", 20_000, 0)!;
+        expect(atZero.countdown?.state).toBe("idle");
+        const focus: DeckState = {
+            tone: "bad",
+            countdown: { state: "rung", remainingMs: 0, durationMs: 300_000, phase: "focus" }
+        };
+        expect(remote.predictTimer(focus, "toggle", 0, 0)).toBeNull();
+    });
+
     it("adds and turns minutes, resets, and waits on a phase to skip", () => {
         const state = running(70_000, 10_000);
         expect(remote.predictTimer(state, "add", 10_000, 0)!.countdown?.endsAt).toBe(130_000);

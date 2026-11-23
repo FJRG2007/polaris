@@ -139,8 +139,15 @@ export function predictTimer(
     };
     switch (op) {
         case "toggle":
+            // A press on a ringing timer silences it (Polaris answers it with
+            // Stop): back to its full length, stopped. A focus cycle moves on to
+            // a phase the key does not know, so that one waits for the answer.
+            if (countdown.state === "rung" || (countdown.state === "running" && left === 0))
+                return countdown.phase !== undefined
+                    ? null
+                    : faceOf(state, stopped("idle", countdown.durationMs));
             if (countdown.state === "running") return faceOf(state, stopped("paused", left));
-            return faceOf(state, running(countdown.state === "rung" ? countdown.durationMs : left));
+            return faceOf(state, running(left));
         case "reset":
             // A focus cycle goes back to its first phase, whose length the key
             // may not hold: that one waits for Polaris.

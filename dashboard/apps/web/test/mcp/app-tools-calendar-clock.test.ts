@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
     changeTimer: vi.fn(),
     deleteTimer: vi.fn(),
     shiftTimer: vi.fn(),
+    stopTimer: vi.fn(),
     startFocus: vi.fn()
 }));
 
@@ -44,6 +45,7 @@ vi.mock("@polaris-app/calendar/src/lib/clock/service", () => ({
     changeTimer: mocks.changeTimer,
     deleteTimer: mocks.deleteTimer,
     shiftTimer: mocks.shiftTimer,
+    stopTimer: mocks.stopTimer,
     startFocus: mocks.startFocus
 }));
 
@@ -233,6 +235,12 @@ describe("the timer tools", () => {
     it("resume a timer found by its label", async () => {
         await call("clock_timer_change", { timer: "tea", action: "resume" });
         expect(mocks.changeTimer).toHaveBeenCalledWith("user-1", TEA, "start");
+    });
+
+    it("silence a ringing timer with stop", async () => {
+        await call("clock_timer_change", { timer: "tea", action: "stop" });
+        expect(mocks.stopTimer).toHaveBeenCalledWith("user-1", TEA);
+        expect(mocks.changeTimer).not.toHaveBeenCalled();
     });
 });
 

@@ -374,6 +374,7 @@ const TIMER_ACTIONS = [
     "add_minute",
     "shift",
     "skip",
+    "stop",
     "delete"
 ] as const;
 
@@ -382,7 +383,7 @@ const timerChangeInput = z.object({
     action: z
         .enum(TIMER_ACTIONS)
         .describe(
-            "pause or resume it; reset it to its full length, stopped; add_minute adds a minute; shift adds or takes away the minutes given; skip moves a focus cycle to its next phase; delete removes it."
+            "pause or resume it; reset it to its full length, stopped; add_minute adds a minute; shift adds or takes away the minutes given; skip moves a focus cycle to its next phase; stop silences one that is ringing; delete removes it."
         ),
     minutes: z
         .number()
@@ -411,6 +412,7 @@ const timerChangeTool = () =>
             const timer = timerNamed(snapshot.timers, input.timer);
             await attempt(async () => {
                 if (input.action === "delete") return clock.deleteTimer(user.id, timer.id);
+                if (input.action === "stop") return clock.stopTimer(user.id, timer.id);
                 if (input.action === "shift")
                     return clock.shiftTimer(user.id, timer.id, input.minutes ?? 0);
                 if (input.action === "skip" && !timer.pomodoro)

@@ -65,6 +65,14 @@ describe("a press", () => {
         });
     });
 
+    it("silences a ringing timer instead of starting it over or pausing it at zero", () => {
+        const rung = row({ state: "rung", endsAt: null, remainingMs: 0 });
+        expect(press({ timer: TEA }, list(rung)).input).toEqual({ timer: TEA, action: "stop" });
+        // Out of time, and the scheduler has not marked it rung yet.
+        const atZero = row({ endsAt: "2026-10-22T09:59:59.000Z", remainingMs: 0 });
+        expect(press({ timer: TEA }, list(atZero)).input).toEqual({ timer: TEA, action: "stop" });
+    });
+
     it("creates a new timer on its first press, and works it by its name after", () => {
         const options = { timer: "new", name: "Tea", minutes: 3 };
         expect(press(options, list())).toEqual({
@@ -190,5 +198,16 @@ describe("what the key shows", () => {
         expect(
             action.read!.press!(state, { timer: TEA, op: "reset" }, null, "en-US")
         ).toBeUndefined();
+    });
+
+    it("shows a ringing timer silenced, back at its length, at once", () => {
+        const rung = list(row({ state: "rung", endsAt: null, remainingMs: 0 }));
+        const state = action.read!.pick(rung, "en-US", { timer: TEA });
+        const press = action.read!.press!(state, { timer: TEA }, rung, "en-US");
+        expect(press?.face?.countdown).toEqual({
+            state: "idle",
+            remainingMs: 300_000,
+            durationMs: 300_000
+        });
     });
 });

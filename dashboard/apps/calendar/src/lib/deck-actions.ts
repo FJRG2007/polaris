@@ -163,20 +163,42 @@ export function timerState(structured: unknown, locale: Locale, raw: unknown): D
 export function toggledFace(state: DeckState, locale: Locale): DeckState | undefined {
     const countdown = state.countdown;
     if (!countdown) return undefined;
-    if (countdown.state === "running") {
-        const { endsAt: _endsAt, serverNow: _serverNow, ...rest } = countdown;
-        return countdownFace({ ...rest, state: "paused" }, state.detail, locale);
+    const { endsAt: _endsAt, serverNow: _serverNow, ...rest } = countdown;
+    // A ringing timer is silenced: back to its full length, stopped. A focus
+    // cycle moves to a phase the key does not know yet, so it waits for Polaris.
+    const ringingNow =
+        countdown.state === "rung" ||
+        (countdown.state === "running" &&
+            countdown.endsAt !== undefined &&
+            countdown.serverNow !== undefined &&
+            countdown.endsAt <= countdown.serverNow);
+    if (ringingNow) {
+        if (countdown.phase !== undefined) return undefined;
+        return countdownFace(
+            { ...rest, state: "idle", remainingMs: countdown.durationMs },
+            undefined,
+            locale
+        );
     }
-    // A rung timer starts over from its full length, as Start does on the screen.
-    const left = countdown.state === "rung" ? countdown.durationMs : countdown.remainingMs;
+    if (countdown.state === "running")
+        return countdownFace({ ...rest, state: "paused" }, state.detail, locale);
     return countdownFace(
-        { ...countdown, state: "running", remainingMs: left },
-        countdown.state === "rung" ? undefined : state.detail,
+        { ...countdown, state: "running", remainingMs: countdown.remainingMs },
+        state.detail,
         locale
     );
 }
 
 type Press = { readonly step?: number; readonly read?: unknown };
+
+/** Whether a timer is ringing: rung, or counting with no time left. */
+function ringing(row: TimerRow, press: Press): boolean {
+    if (row.state === "rung") return true;
+    if (row.state !== "running" || row.endsAt === null) return false;
+    const read = rowsOf(press.read).serverNow;
+    const now = read ? Date.parse(read) : Date.now();
+    return Date.parse(row.endsAt) <= now;
+}
 
 /** The tool a press calls: one that creates the timer the first time, the one
  *  that changes it after. */
@@ -201,6 +223,10 @@ export function timerInput(raw: Record<string, unknown>, press: Press): unknown 
     }
     switch (op) {
         case "toggle":
+            // A press on a ringing timer silences it, as Stop on the ringing
+            // screen does - it neither starts it over nor tries to pause a
+            // countdown that is already at zero.
+            if (ringing(found, press)) return { timer: found.id, action: "stop" };
             return { timer: found.id, action: found.state === "running" ? "pause" : "resume" };
         case "reset":
             return { timer: found.id, action: "reset" };

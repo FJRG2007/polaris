@@ -581,6 +581,22 @@ export async function dismissTimer(
     if (rung) await noteStopped("timer", userId, id, rung);
 }
 
+/**
+ * Silence a timer that is ringing, the way Stop on the ringing screen does:
+ * one whose time ran out goes on as `dismissTimer` leaves it (a plain timer
+ * rung, a focus cycle on its next phase), and one already rung goes back to its
+ * full length, stopped. Either way the ring is answered everywhere it sounds -
+ * the notice in the middle of the screen included. Anything not ringing is left
+ * as it is: a press meant for a ring that just ended must not start it again.
+ */
+export async function stopTimer(userId: string, id: string, now = new Date()): Promise<void> {
+    const timer = await ownTimer(userId, id);
+    const state = model.timerState(timer);
+    if (state === "running" && timer.endsAt !== null && timer.endsAt.getTime() <= now.getTime())
+        return dismissTimer(userId, id, now);
+    if (state === "rung") return changeTimer(userId, id, "reset", now);
+}
+
 // ---------------------------------------------------------------------------
 // The stopwatch
 
