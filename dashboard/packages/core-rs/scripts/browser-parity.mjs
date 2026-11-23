@@ -2,7 +2,9 @@
  * Cross-target parity in real browsers (docs/rust-core-plan.md, 4.4): the built
  * facade and WebAssembly binding replay every golden vector in headless
  * Chromium, WebKit and Firefox, and the page proves the module is not fetched
- * before a Rust-backed call (first paint never waits on it).
+ * before a Rust-backed call (first paint never waits on it). A domain marked
+ * `"wasm": false` in src/domains.json is not in the WebAssembly build (browsers
+ * answer it with TypeScript, unchanged), so its vectors are not replayed here.
  *
  *   npm run build -w @polaris/core-rs && npm run build:rust -w @polaris/core-rs
  *   npm run test:browsers -w @polaris/core-rs [-- chromium webkit firefox]
@@ -13,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, normalize, resolve, sep } from "node:path";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { chromium, firefox, webkit } from "playwright";
 
 const packageDir = fileURLToPath(new URL("..", import.meta.url));
@@ -26,9 +28,10 @@ const TYPES = { ".js": "text/javascript", ".wasm": "application/wasm", ".json": 
 for (const need of ["dist/index.js", "dist/probe.js", "dist/vectors.js", "wasm/polaris_core_wasm.js", "wasm/polaris_core_wasm_bg.wasm"])
     if (!existsSync(join(packageDir, need))) throw new Error(`${need} is missing: run npm run build and npm run build:rust first`);
 
+const domains = JSON.parse(readFileSync(join(packageDir, "src", "domains.json"), "utf8"));
 const vectorFiles = [];
 for (const entry of readdirSync(vectorsDir, { withFileTypes: true }))
-    if (entry.isDirectory() && entry.name !== "src" && entry.name !== "tests")
+    if (entry.isDirectory() && domains[entry.name] && domains[entry.name].wasm !== false)
         for (const file of readdirSync(join(vectorsDir, entry.name))) if (file.endsWith(".json")) vectorFiles.push(`${entry.name}/${file}`);
 
 const PAGE = `<!doctype html><meta charset="utf-8"><title>core-rs parity</title><p>parity</p>
