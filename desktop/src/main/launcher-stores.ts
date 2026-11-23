@@ -15,7 +15,10 @@
 import { z } from "zod";
 import { execFile } from "node:child_process";
 import { readdir, readFile, stat } from "node:fs/promises";
-import { basename, isAbsolute, join, normalize, sep } from "node:path";
+import { win32 } from "node:path";
+
+/** Every path here is a Windows path from a store or the registry, whatever machine runs the code. */
+const { basename, isAbsolute, join, normalize, sep } = win32;
 
 /** How a listed program is started. */
 export type AppLaunch =

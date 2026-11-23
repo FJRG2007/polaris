@@ -6,7 +6,7 @@
  * real store, registry key or program is read or started.
  */
 
-import { join } from "node:path";
+import { win32 } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const files = new Map<string, string>();
@@ -38,7 +38,8 @@ vi.mock("node:child_process", () => ({
 
 const stores = await import("../../src/main/launcher-stores");
 
-const base = process.platform === "win32" ? "C:\\fixture" : "/fixture";
+const { join } = win32;
+const base = "C:\\fixture";
 const file = (path: string, text: string) => files.set(path, text);
 const dir = (path: string, names: string[] = []) => dirs.set(path, names);
 /** `reg` takes the short hive name and prints the long one. */
