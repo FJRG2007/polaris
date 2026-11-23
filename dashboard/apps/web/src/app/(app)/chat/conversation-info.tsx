@@ -37,6 +37,7 @@ import { VANISH_DURATIONS, type VanishDuration } from "@/lib/chat/vanish-rules";
 import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { PolarMemberRow } from "./polar-member-row";
 import { useState, type ReactNode } from "react";
 import { blockPersonAction, unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import { Dialog, DialogContent, DialogTitle, Switch, cn, useToast } from "@polaris/ui";
@@ -453,6 +454,7 @@ function InfoBody({
                         {t("channelHeader.addPeople")}
                     </InfoRow>
                 )}
+                <PolarMemberRow channelId={channel.id} rowClass={ROW} />
                 {members.slice(0, MEMBERS_SHOWN).map((member) => (
                     <div key={member.id} className={cn(ROW, "hover:bg-transparent")}>
                         <Avatar person={member} size={24} />

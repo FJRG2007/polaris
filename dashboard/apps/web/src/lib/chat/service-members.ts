@@ -21,9 +21,9 @@
  */
 
 import { prisma } from "@polaris/db";
+import { POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID } from "./service-ids";
 
-export const POLAR_SERVICE_ID = "00000000-0000-0000-0000-000000000001";
-export const WEBHOOK_SERVICE_ID = "00000000-0000-0000-0000-000000000002";
+export { POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID };
 
 /** The `service` a `ChatServiceMember` row names. */
 export const POLAR_SERVICE = "polar";

@@ -19,7 +19,8 @@ export function memoryPrisma(state: MemoryTablesState) {
     const matches = (row: Row, where: Row = {}): boolean =>
         Object.entries(where).every(([key, want]) => {
             if (key === "OR") return (want as Row[]).some((w) => matches(row, w));
-            if (key === "userId_device") return matches(row, want as Row);
+            if (key === "AND") return (want as Row[]).every((w) => matches(row, w));
+            if (key === "userId_device" || key === "channelId_service") return matches(row, want as Row);
             if (want && typeof want === "object" && !(want instanceof Uint8Array)) {
                 const cond = want as { in?: unknown[]; gt?: bigint; gte?: bigint; lt?: bigint };
                 if (cond.in) return cond.in.some((value) => same(row[key], value));
@@ -101,6 +102,8 @@ export function memoryPrisma(state: MemoryTablesState) {
         chatChannel: table("chatChannel", ["id"]),
         chatWebhook: table("chatWebhook", ["id"]),
         mlsStoreEntry: table("mlsStoreEntry", ["device", "key"]),
+        chatServiceMember: table("chatServiceMember", ["channelId", "service"]),
+        user: table("user", ["id"]),
         // All or nothing, one at a time (Postgres's row lock on the group does
         // the same for two commits): run on the live tables, put the copy back
         // on a throw.

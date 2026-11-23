@@ -268,6 +268,8 @@ export async function postThroughWebhook(
     const body = await confineCustomEmoji(input.content, channel.spaceId);
 
     const label = input.username ?? webhook.name;
+    const sealed = await import("./e2ee/sealed-messages");
+    if (await sealed.conversationSealed(webhook.channelId)) return postSealedThroughWebhook(webhook, body, label, input.avatar_url ?? null);
     const id = await prisma.$transaction(async (tx) => {
         const message = await tx.chatMessage.create({
             data: {
@@ -299,6 +301,37 @@ export async function postThroughWebhook(
     publishChatChange({ channelId: webhook.channelId, kind: "posted", actorId: "" });
     unfurlLater(input.content, { id, channelId: webhook.channelId, authorId: null });
     checkLinksLater(id);
+    return id;
+}
+
+/**
+ * A webhook's post in a sealed conversation: sealed by the webhook's own MLS
+ * device (`e2ee/service-device.ts`), never stored in the clear. The name and
+ * picture the call gave are metadata beside it, as on a plain post; nothing
+ * reads the body, so no link card is made for it.
+ */
+async function postSealedThroughWebhook(
+    webhook: { id: string; channelId: string; name: string },
+    body: string,
+    label: string,
+    avatarUrl: string | null
+): Promise<string> {
+    const [{ withServiceDevice }, { encodeSealedContent }] = await Promise.all([
+        import("./e2ee/service-device"),
+        import("./e2ee/sealed-chat")
+    ]);
+    const id = await withServiceDevice("webhook", webhook.id, async (device) => {
+        // Joins the group on first use, by its own external commit: it belongs to the channel.
+        await device.ensureGroup(webhook.channelId);
+        return device.sendSealed(webhook.channelId, encodeSealedContent({ body }));
+    });
+    if (label !== webhook.name || avatarUrl) {
+        await prisma.chatMessage.updateMany({
+            where: { id, webhookId: webhook.id },
+            data: { authorLabel: label, authorAvatarUrl: avatarUrl }
+        });
+    }
+    await prisma.chatWebhook.updateMany({ where: { id: webhook.id }, data: { lastUsedAt: new Date() } });
     return id;
 }
 

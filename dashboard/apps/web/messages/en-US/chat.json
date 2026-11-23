@@ -2853,7 +2853,10 @@
         "media": "Photos and videos",
         "mediaSeeAll": "See all",
         "mediaFailed": "Photos and videos did not load",
-        "mediaRetry": "Try again"
+        "mediaRetry": "Try again",
+        "polar": "Polar in this chat",
+        "polarHint": "Polar reads what is said here from now on, and so do whoever runs Polaris and the model provider. Ask it with @polar.",
+        "polarNotYours": "Only someone who may add people here can change this."
     },
     "location": {
         "title": "Share location",

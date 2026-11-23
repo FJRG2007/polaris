@@ -274,6 +274,11 @@ export class MlsDevice {
         await this.commitAndSend({ op: "publish-key-packages", device: this.options.device, ciphersuite: this.ciphersuite as 0x004f, keyPackages, lastResort: false });
     }
 
+    /** Whether this device is in the conversation's group (as far as it has read). */
+    hasGroup(channelId: string): boolean {
+        return this.groupOf(channelId) !== null;
+    }
+
     /**
      * The conversation's group id: the group this device is in, the one a
      * Welcome waiting in the log puts it in, a new one when nobody has created

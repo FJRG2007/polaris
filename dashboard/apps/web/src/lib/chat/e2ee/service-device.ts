@@ -175,11 +175,32 @@ export interface ServiceDeviceOptions {
  */
 export async function withServiceDevice<T>(kind: ServiceKind, owner: string, work: (device: MlsDevice) => Promise<T>, options: ServiceDeviceOptions = {}): Promise<T> {
     if (!chatE2eeEnabled()) throw new Error("sealed chat is off on this instance");
+    const { userId, device, address } = serviceAddress(kind, owner);
+    return queued(address, () => run(userId, device, address, work, options));
+}
+
+/**
+ * Drop everything the server holds for one service device - its member state,
+ * notes, history keys and outbox - once it no longer belongs where it was
+ * (Polar taken out of a conversation). Taken in turn with its operations, so a
+ * run in flight finishes first and nothing is written back after. Adding it
+ * again starts a new member, which joins the group afresh.
+ */
+export async function forgetServiceDevice(kind: ServiceKind, owner: string): Promise<void> {
+    const { address } = serviceAddress(kind, owner);
+    await queued(address, () => destroyMlsStore(address));
+}
+
+function serviceAddress(kind: ServiceKind, owner: string) {
     const userId = kind === "polar" ? POLAR_SERVICE_ID : WEBHOOK_SERVICE_ID;
     const device = serviceDevice(owner);
-    const address = `${userId}/${device}`;
+    return { userId, device, address: `${userId}/${device}` };
+}
+
+/** Run `work` after what this process already queued for `address`, under its lease. */
+async function queued<T>(address: string, work: () => Promise<T>): Promise<T> {
     const before = running.get(address) ?? Promise.resolve();
-    const turn = before.catch(() => undefined).then(() => leased(address, () => run(userId, device, address, work, options)));
+    const turn = before.catch(() => undefined).then(() => leased(address, work));
     running.set(address, turn);
     try {
         return await turn;

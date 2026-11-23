@@ -2853,7 +2853,10 @@
         "media": "Fotos y vídeos",
         "mediaSeeAll": "Ver todo",
         "mediaFailed": "No se cargaron las fotos",
-        "mediaRetry": "Reintentar"
+        "mediaRetry": "Reintentar",
+        "polar": "Polar en este chat",
+        "polarHint": "Polar lee lo que se diga aquí a partir de ahora, igual que quien gestiona Polaris y el proveedor del modelo. Pregúntale con @polar.",
+        "polarNotYours": "Solo quien puede añadir gente aquí puede cambiarlo."
     },
     "location": {
         "title": "Enviar ubicación",

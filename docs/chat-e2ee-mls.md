@@ -233,6 +233,30 @@ through the Node binding and `mls-store.ts`:
 - **Honesty.** What reaches a service member is read by whoever runs Polaris
   and, for Polar, the model provider; the member list says so.
 
+What is built on top of it:
+
+- **A sealed conversation** (server side) is one with an `MlsGroup` row while
+  `chatE2eeEnabled()` is on (`conversationSealed` in `sealed-messages.ts`).
+- **Adding Polar** (`lib/chat/polar-member.ts`, the "Polar in this chat"
+  switch in the conversation's info, drawn only while sealed chat is on): the
+  same check as adding a person - whoever runs a channel, a group's owner, or
+  anybody in a group whose owner left adding open. Added, its device opens once
+  and joins the group (a Welcome, or its own external commit), so it opens what
+  is said from then on and nothing before. Taken out, its `ChatServiceMember`
+  row goes, everything `MlsStoreEntry` held for its device is dropped
+  (`forgetServiceDevice`, in turn with its operations), and the remover's
+  device takes its leaf out of the group (`removeSealedAccounts`).
+- **Polar answering** (`e2ee/sealed-polar.ts`): every sealed message a person
+  sends, where Polar is a member, is opened by Polar's device; one that asks it
+  (`@polar`, or a reply to Polar) is answered through `answerPolarMention` with
+  a `SealedReply`: the conversation before it is opened by the same device, the
+  answer is sealed and posted by it as a reply. Only the MLS work holds the
+  device's lease; the model's answer is written outside it. A sealed answer has
+  no tools, no buttons and no draft streamed in the clear.
+- **A webhook posting** (`postThroughWebhook`): in a sealed conversation the
+  webhook's device seals the post; the name and picture the call gave stay
+  metadata beside it, and no link card is made.
+
 ## Not built yet
 
 - Searching sealed text, sealed link cards and sealed edits (see "Other
@@ -245,8 +269,7 @@ through the Node binding and `mls-store.ts`:
   through `nativeMlsMember`, its store, outbox, notes and history keys in
   `MlsStoreEntry` under the reserved prefix `\0polaris/`, a lease per device
   address, ops in-process through `answerMls`; a service's sealed message is
-  stored with no author under Polar's or the webhook's name). Not built: the
-  member list's "Add Polar", Polar reading a sealed question and answering it,
-  and a webhook's route posting sealed in a sealed conversation.
+  stored with no author under Polar's or the webhook's name). Polar answering,
+  a webhook posting and the member list's switch are built too (see below).
 - Sign-out deletes the browser's MLS device, but its leaf stays in each group
   until another member removes it.

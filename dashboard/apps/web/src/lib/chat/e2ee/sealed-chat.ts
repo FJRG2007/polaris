@@ -162,3 +162,15 @@ export async function openSealed(channelId: string, ids: readonly string[]): Pro
     }
     return out;
 }
+
+/**
+ * Take these accounts' devices out of a sealed conversation's group from this
+ * browser's device (Polar, once somebody took it out), so what is said there
+ * next is sealed to keys they no longer hold. A conversation this device has
+ * no group for is left alone: a device that is in it will do it.
+ */
+export async function removeSealedAccounts(channelId: string, userIds: readonly string[]): Promise<void> {
+    const mls = await device();
+    if (!mls.hasGroup(channelId)) return;
+    await mls.removeAccounts(channelId, [...userIds]);
+}

@@ -32,6 +32,8 @@ import * as pins from "@/lib/chat/pins";
 import * as reminders from "@/lib/chat/reminders";
 import * as webhooks from "@/lib/chat/webhooks";
 import * as follows from "@/lib/chat/follows";
+import * as polarMember from "@/lib/chat/polar-member";
+import { chatE2eeEnabled } from "@/lib/chat/e2ee/flag";
 import { channelGroupCandidates, grantChannelGroups } from "@/lib/chat/channel-groups";
 import { confirmAge } from "@/lib/chat/age-gate";
 import { MAX_REREAD } from "@/lib/chat/reread-limit";
@@ -2290,5 +2292,29 @@ export async function unfollowChannelAction(input: unknown): Promise<{ error?: s
     const parsed = core.chatChannelFollowSchema.safeParse(input);
     if (!parsed.success) return followRefused();
     const result = await guardChat(() => follows.unfollow(me, parsed.data));
+    return result.error ? { error: result.error } : {};
+}
+
+// ---------------------------------------------------------------------------
+// Polar as a member of a sealed conversation
+// ---------------------------------------------------------------------------
+
+const polarMemberSchema = z.object({ channelId: z.string().uuid(), on: z.boolean() });
+
+/** Whether Polar is in a conversation and whether this reader may change that; null while sealed chat is off. */
+export async function polarMembershipAction(channelId: unknown): Promise<{ membership: polarMember.PolarMembership | null; error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(channelId);
+    if (!parsed.success || !chatE2eeEnabled()) return { membership: null };
+    const result = await guard(() => polarMember.polarMembership(me, parsed.data));
+    return result.error ? { membership: null, error: result.error } : { membership: result.value ?? null };
+}
+
+/** Add Polar to a sealed conversation, or take it out. */
+export async function setPolarMemberAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = polarMemberSchema.safeParse(input);
+    if (!parsed.success || !chatE2eeEnabled()) return { error: (await getTranslations("chat"))("info.notSaved") };
+    const result = await guard(() => polarMember.setPolarMember(me, parsed.data.channelId, parsed.data.on));
     return result.error ? { error: result.error } : {};
 }

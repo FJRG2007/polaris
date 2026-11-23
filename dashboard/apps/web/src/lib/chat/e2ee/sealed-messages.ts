@@ -23,6 +23,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { chatE2eeEnabled } from "./flag";
 import { publishChatChange } from "@/lib/chat/live";
 import { expiryForChannel } from "@/lib/chat/vanish";
 import { unhideOnMessage } from "@/lib/chat/chat-lock";
@@ -71,7 +72,7 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
     if (!(await content.verifyMessageSignature(signatureKey, binding, input.ciphertext, input.signature))) throw new SealedRefusal("badSignature");
     const service = serviceKind(userId);
     if (service) return postAsService(service, input, signatureKey);
-    return messages.send(
+    const id = await messages.send(
         { id: userId },
         { channelId: input.channelId, body: "", clientKey: input.clientKey, parentId: input.parentId ?? null },
         [],
@@ -88,6 +89,19 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
             e2eeSignatureKey: owned(signatureKey)
         }
     );
+    // Where Polar was added, it opens the message with its own device to see whether it is asked.
+    void import("./sealed-polar")
+        .then((polar) =>
+            polar.answerSealedPolarLater({ channelId: input.channelId, messageId: id, authorId: userId, parentId: input.parentId ?? null, replyToId: input.replyToId ?? null })
+        )
+        .catch((error: unknown) => console.error("chat: Polar could not be asked:", error));
+    return id;
+}
+
+/** Whether a conversation is sealed: sealed chat is on and its MLS group exists. */
+export async function conversationSealed(channelId: string): Promise<boolean> {
+    if (!chatE2eeEnabled()) return false;
+    return (await prisma.mlsGroup.count({ where: { channelId }, take: 1 })) > 0;
 }
 
 /** One stored sealed message, as a reader opens it. */

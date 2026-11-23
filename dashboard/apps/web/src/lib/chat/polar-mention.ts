@@ -59,6 +59,19 @@ export interface PolarMention {
 }
 
 /**
+ * A sealed conversation's side of an answer (`e2ee/sealed-polar.ts`): how
+ * Polar reads what is sealed there and posts its answer sealed. The server
+ * holds no text for those messages, so without it Polar would read an empty
+ * conversation and answer in the clear where everything else is sealed.
+ */
+export interface SealedReply {
+    /** The text of these messages as Polar's device opened them; one it could not open is left out. */
+    open(ids: readonly string[]): Promise<ReadonlyMap<string, string>>;
+    /** Seal and post Polar's answer; answers its message id. */
+    post(body: string): Promise<string>;
+}
+
+/**
  * Messages Polar is answering in this process. One message asks Polar once,
  * however it asks: `@polar` written twice, a reply to Polar that also names it,
  * or `/polar` with a mention after it (`app-commands.ts` answers those).
@@ -75,7 +88,7 @@ export function claimPolarAnswer(messageId: string): boolean {
 }
 
 /** Whether `replyToId` is one of Polar's own messages in this conversation. */
-async function repliesToPolar(channelId: string, replyToId: string | null | undefined): Promise<boolean> {
+export async function repliesToPolar(channelId: string, replyToId: string | null | undefined): Promise<boolean> {
     if (!replyToId) return false;
     const row = await prisma.chatMessage.findFirst({
         where: { id: replyToId, channelId, agent: POLAR_AGENT, authorId: null, deletedAt: null },
@@ -113,11 +126,17 @@ export function polarCommandQuestion(body: string): string {
  * message of Polar's - the one whose "Try again" or "Approve" was pressed -
  * instead of posting a second. `done` is the changes already approved for this
  * mention, for Polar to report on.
+ *
+ * With `sealed`, the conversation is sealed: Polar reads it through its own
+ * device and answers sealed, with no tools (a change waits under its message
+ * for a button the sealed row does not carry), no buttons, and no draft
+ * streamed in the clear while it writes.
  */
 export async function answerPolarMention(
     mention: PolarMention,
     replace: string | null = null,
-    done: readonly DoneCall[] = []
+    done: readonly DoneCall[] = [],
+    sealed: SealedReply | null = null
 ): Promise<string | null> {
     // Still in the conversation: a message from somebody who has since left it
     // is answered nowhere.
@@ -133,9 +152,9 @@ export async function answerPolarMention(
     // replies to.
     const shielded = await isShielded(mention.channelId);
     const [history, repliedTo, toolkit] = await Promise.all([
-        shielded ? Promise.resolve([]) : conversationBefore(mention),
-        shielded ? Promise.resolve(null) : messageRepliedTo(mention),
-        mentionToolkit(mention.authorId)
+        shielded ? Promise.resolve([]) : conversationBefore(mention, sealed),
+        shielded ? Promise.resolve(null) : messageRepliedTo(mention, sealed),
+        sealed ? Promise.resolve(null) : mentionToolkit(mention.authorId)
     ]);
 
     const answer = await answerMentionWithReason({
@@ -152,7 +171,7 @@ export async function answerPolarMention(
         where: "a chat mention",
         // Read as it is written, unless the answer goes over one already
         // there: a "Try again" rewrites that message in place.
-        ...(replace ? {} : { draft: (text: string) => sendDraft(mention, text) }),
+        ...(replace || sealed ? {} : { draft: (text: string) => sendDraft(mention, text) }),
         typing: () =>
             publishChatChange({
                 channelId: mention.channelId,
@@ -164,6 +183,8 @@ export async function answerPolarMention(
     });
     const rules = await import("./rules").then((module) => module.rulesForChannel(mention.channelId));
     const fit = (text: string) => [...text].slice(0, rules.maxMessageLength).join("");
+    // The provider link stays in the text: a sealed row carries no button to move it to.
+    if (sealed) return sealed.post(fit(answer.text));
     const pending = answer.pending ?? null;
     if (pending) {
         // What it will do goes last and whole, so a long answer is what gets cut.
@@ -351,7 +372,8 @@ function attribute(name: string): string {
 
 /** The conversation before the question, oldest first: the same thread, or the channel. */
 async function conversationBefore(
-    mention: PolarMention
+    mention: PolarMention,
+    sealed: SealedReply | null = null
 ): Promise<{ name: string; text: string }[]> {
     const asked = await prisma.chatMessage.findUnique({
         where: { id: mention.messageId },
@@ -372,14 +394,21 @@ async function conversationBefore(
         },
         orderBy: { createdAt: "desc" },
         take: HISTORY,
-        select: { authorId: true, authorLabel: true, body: true, agent: true, components: true }
+        select: { id: true, authorId: true, authorLabel: true, body: true, agent: true, components: true, e2eeDevice: true }
     });
     // Polar's own "I couldn't answer" lines are left out: read back as part of
     // the conversation they are what a small model goes on to repeat, the
     // whole transcript with them, in place of an answer. Filtered here rather
     // than in the query, where NOT over a nullable agent drops every person's
     // message too.
-    const read = rows.filter((row) => !(row.agent === POLAR_AGENT && row.components !== null));
+    const kept = rows.filter((row) => !(row.agent === POLAR_AGENT && row.components !== null));
+    // A sealed row's text is what Polar's device opened; one it could not open is left out.
+    const opened = sealed ? await sealed.open(kept.filter((row) => row.e2eeDevice).map((row) => row.id)) : null;
+    const read = kept.flatMap((row) => {
+        if (!row.e2eeDevice) return [row];
+        const body = opened?.get(row.id);
+        return body ? [{ ...row, body }] : [];
+    });
     const ids = [...new Set(read.flatMap((row) => (row.authorId ? [row.authorId] : [])))];
     const people = ids.length
         ? await prisma.user.findMany({
@@ -402,7 +431,8 @@ async function conversationBefore(
  * cleared it. Its text may name somebody's attachment; only the words are read.
  */
 async function messageRepliedTo(
-    mention: PolarMention
+    mention: PolarMention,
+    sealed: SealedReply | null = null
 ): Promise<{ name: string; text: string } | null> {
     const asked = await prisma.chatMessage.findUnique({
         where: { id: mention.messageId },
@@ -417,9 +447,10 @@ async function messageRepliedTo(
             deletedAt: null,
             AND: [history.sinceClause(floor, mention.authorId)]
         },
-        select: { authorId: true, authorLabel: true, body: true }
+        select: { id: true, authorId: true, authorLabel: true, body: true, e2eeDevice: true }
     });
-    if (!row || !row.body.trim()) return null;
+    const text = row?.e2eeDevice ? ((sealed ? (await sealed.open([row.id])).get(row.id) : undefined) ?? "") : (row?.body ?? "");
+    if (!row || !text.trim()) return null;
     const author = row.authorId
         ? await prisma.user.findUnique({
               where: { id: row.authorId },
@@ -428,7 +459,7 @@ async function messageRepliedTo(
         : null;
     return {
         name: (author ? author.name || author.username : row.authorLabel) || "?",
-        text: row.body.slice(0, LINE_CHARS * 2)
+        text: text.slice(0, LINE_CHARS * 2)
     };
 }
 
