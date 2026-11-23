@@ -18,6 +18,7 @@
  */
 
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { updateChangelog, type UpdateChangelog } from "@/lib/update-changelog";
 
 const FROM_KEY = "updates.installFrom";
 const LAST_KEY = "updates.lastInstalled";
@@ -85,4 +86,23 @@ export async function installedRange(running: string | null): Promise<InstalledR
     const [from, to] = (await getSetting(LAST_KEY))?.split(" ") ?? [];
     if (!from || !to || !SHA.test(from) || !same(to, sha)) return { from: null, to: short(sha) };
     return { from: short(from), to: short(sha) };
+}
+
+/** The update the running build was installed by, and what it changed. */
+export interface InstalledUpdate extends InstalledRange {
+    /** Null when the range is unknown or GitHub could not be read. */
+    readonly changelog: UpdateChangelog | null;
+}
+
+/**
+ * The installed range with its changelog, read through the changelog's own
+ * database slot: asked of GitHub once per installed build, then served from
+ * the row.
+ */
+export async function installedUpdate(running: string | null): Promise<InstalledUpdate> {
+    const range = await installedRange(running).catch((): InstalledRange => ({ from: null, to: null }));
+    const changelog = range.from
+        ? await updateChangelog(range.from, range.to, "installed").catch(() => null)
+        : null;
+    return { ...range, changelog };
 }

@@ -15,7 +15,7 @@ import { collectUpdateReport, issueUrl } from "@/lib/update-report";
 import { getUpdateStatus, resetUpdateStatus, type UpdateStatus } from "@/lib/update-service";
 import { getAutoUpdatePolicy, saveAutoUpdatePolicy, startUpdate } from "@/lib/update-watcher";
 import { recordAudit } from "@/lib/audit-service";
-import { installedRange, type InstalledRange } from "@/lib/update-installed";
+import { installedUpdate, type InstalledUpdate } from "@/lib/update-installed";
 import {
     DEFAULT_QUIET_HOUR,
     getSecurityUpdatePolicy,
@@ -116,12 +116,6 @@ export async function updateChangelogAction(): Promise<UpdateChangelog | null> {
     return updateChangelog(status.current, status.latest).catch(() => null);
 }
 
-/** The update the running build was installed by, and what it changed. */
-export interface InstalledUpdate extends InstalledRange {
-    /** Null when the range is unknown or GitHub could not be read. */
-    readonly changelog: UpdateChangelog | null;
-}
-
 /**
  * What the last installed update changed: the build that ran before it to the
  * one running now. The range is recorded when the install starts, so it ends
@@ -131,11 +125,7 @@ export interface InstalledUpdate extends InstalledRange {
  */
 export async function installedChangelogAction(): Promise<InstalledUpdate> {
     await requireAdmin();
-    const range = await installedRange(loadEnv().POLARIS_BUILD_SHA ?? null).catch(
-        (): InstalledRange => ({ from: null, to: null })
-    );
-    const changelog = range.from ? await updateChangelog(range.from, range.to, "installed").catch(() => null) : null;
-    return { ...range, changelog };
+    return installedUpdate(loadEnv().POLARIS_BUILD_SHA ?? null);
 }
 
 /** How a security fix installs itself here, and the hour "quiet" means. */

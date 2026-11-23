@@ -28,7 +28,7 @@ import { usersWithPermission } from "@polaris/auth";
 import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus, type UpdateStatus } from "@/lib/update-service";
 import { forgetSettingReads, getSetting, setSetting } from "@/lib/setting-store";
-import { recordInstallFrom } from "@/lib/update-installed";
+import { installedUpdate, recordInstallFrom } from "@/lib/update-installed";
 import { currentUpdateRun, markUpdateStarted } from "@/lib/update-timing-store";
 import { notifyOperators, type OperatorAlert } from "@/lib/notifications/operators";
 import { translatorFor } from "@/lib/i18n/translate";
@@ -564,6 +564,22 @@ export async function checkForUpdate(): Promise<void> {
     await reportFailedInstall(sha);
 }
 
+/** Set once the installed build's changelog is in the database. */
+let installedWarm = false;
+
+/**
+ * Reads what the update that installed this build changed into its database
+ * row before anybody opens it. Otherwise the first visit to the Updates screen
+ * after every update waits on a dozen GitHub requests. Retried on the next tick
+ * while GitHub is out of reach; done once the row holds it, or when the range
+ * is not known at all.
+ */
+export async function warmInstalledChangelog(): Promise<void> {
+    if (installedWarm) return;
+    const installed = await installedUpdate(loadEnv().POLARIS_BUILD_SHA ?? null);
+    if (installed.changelog || !installed.from) installedWarm = true;
+}
+
 export function startUpdateWatcher(): void {
     if (started) return;
     started = true;
@@ -577,6 +593,7 @@ export function startUpdateWatcher(): void {
             .catch(() => undefined);
         if (internetOffline()) return;
         // On backup access the data saver holds the check (it may pull an image).
+        void warmInstalledChangelog().catch(() => undefined);
         void dataSaverActive()
             .then((saver) => (saver ? undefined : checkForUpdate()))
             .catch((error) => console.error("polaris: update watcher tick failed:", error));
