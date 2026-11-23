@@ -70,7 +70,8 @@
         "openPhoto": "Open {name}'s photo",
         "notListening": "Not listening",
         "microphoneOff": "Microphone off",
-        "onCall": "On a call you can join"
+        "onCall": "On a call you can join",
+        "typing": "Typing"
     },
     "denied": {
         "notice": "That page is not open to your role. This is where your access starts."

@@ -805,15 +805,15 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                                                 // whether they were there.
                                                 <PhoneSized
                                                     small={
-                                                        <Avatar
-                                                            decorated
+                                                        <DirectFace
+                                                            channelId={channel.id}
                                                             person={face}
                                                             size={detailed ? 40 : 24}
                                                         />
                                                     }
                                                     large={
-                                                        <Avatar
-                                                            decorated
+                                                        <DirectFace
+                                                            channelId={channel.id}
                                                             person={face}
                                                             size={40}
                                                         />
@@ -1866,6 +1866,26 @@ function DetailedLine({
             </span>
         </span>
     );
+}
+
+/**
+ * The face of a one-to-one conversation in the list, whose dot turns into the
+ * typing pill while they write here - Discord's list. A group's row has no one
+ * face to put it on, so it keeps saying who in words instead.
+ */
+function DirectFace({
+    channelId,
+    person,
+    size
+}: {
+    channelId: string;
+    person: React.ComponentProps<typeof Avatar>["person"];
+    size: number;
+}) {
+    const { viewerId } = useChat();
+    const typists = useTypingIn(channelId, viewerId);
+    const typing = typists.some((typist) => typist.userId === person.id);
+    return <Avatar decorated person={person} size={size} typing={typing} />;
 }
 
 /**

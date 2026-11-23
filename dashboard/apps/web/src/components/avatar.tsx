@@ -125,7 +125,8 @@ export function Avatar({
     fit = "cover",
     backdrop,
     onPicture,
-    lazy = false
+    lazy = false,
+    typing = false
 }: {
     person: AvatarPerson;
     size?: number;
@@ -214,6 +215,15 @@ export function Avatar({
     /** Ask for the picture only once the face scrolls near the screen - for a
      *  long list, where the initials already say who it is meanwhile. */
     lazy?: boolean;
+    /**
+     * Whether they are writing to the reader right now, the way Discord's lists
+     * say it: the dot stretches into a pill of three dots, in the same colour.
+     *
+     * For the lists only - the conversations, a room's members - where the
+     * caller already holds who is typing; the conversation itself says it in a
+     * line above the composer instead. Ignored wherever no dot would be drawn.
+     */
+    typing?: boolean;
 }) {
     const t = useTranslations("components");
     const source = person.image ?? (person.id ? avatarUrl(person.id) : null);
@@ -463,7 +473,10 @@ export function Avatar({
     // reads as somebody's status changing rather than as an answer arriving.
     // And nothing on a face too small to carry one - below this the dot is
     // larger than the initials it covers.
-    if (!where || inRoom || size < PRESENCE_FLOOR) {
+    // Somebody typing is here whatever the store has not answered yet, so the
+    // pill does not wait for it - a status still unknown is drawn as online.
+    const writing = typing && status && !square;
+    if ((!where && !writing) || inRoom || size < PRESENCE_FLOOR) {
         return viewer ? (
             <>
                 {shown}
@@ -485,7 +498,33 @@ export function Avatar({
         <span className="relative inline-flex h-fit shrink-0 align-middle">
             {shown}
             {viewer}
-            {where.inCall ? (
+            {writing ? (
+                // In place of the dot or the call, never beside them: one mark
+                // on a face. Anchored where the dot is, so it grows toward the
+                // face rather than past the edge of the row.
+                <span
+                    role="img"
+                    aria-label={t("avatar.typing")}
+                    title={t("avatar.typing")}
+                    className={cn(
+                        "typing-dots absolute -bottom-0.5 -end-0.5 flex items-center justify-center rounded-full ring-2 ring-background",
+                        PRESENCE_COLOURS[where && !where.inCall ? where.status : "online"]
+                    )}
+                    style={{
+                        width: dotSize(size) * 2 + 2,
+                        height: dotSize(size),
+                        gap: typingDot(size) * 0.6
+                    }}
+                >
+                    {[0, 1, 2].map((dot) => (
+                        <span
+                            key={dot}
+                            className="rounded-full bg-background"
+                            style={{ width: typingDot(size), height: typingDot(size) }}
+                        />
+                    ))}
+                </span>
+            ) : where?.inCall ? (
                 // A call they are in and this reader could walk into. It takes
                 // the dot's place rather than sitting beside it: somebody on a
                 // call is by definition here, and two marks on one face is a
@@ -504,7 +543,7 @@ export function Avatar({
                     title={autoWord ?? (seenWord || t(`presence.${where.status}`))}
                     className={cn(
                         "absolute -bottom-0.5 -end-0.5 rounded-full ring-2 ring-background",
-                        PRESENCE_COLOURS[where.status]
+                        PRESENCE_COLOURS[where?.status ?? "online"]
                     )}
                     style={{ width: dotSize(size), height: dotSize(size) }}
                 />
@@ -520,6 +559,12 @@ const PRESENCE_FLOOR = 20;
 /** A fifth of the face, floored so the smallest one is still a dot. */
 function dotSize(size: number): number {
     return Math.max(8, Math.round(size * 0.28));
+}
+
+/** One of the three dots in the typing pill: a quarter of its height, never
+ *  under two pixels so it is still a dot on the smallest face. */
+function typingDot(size: number): number {
+    return Math.max(2, Math.round(dotSize(size) * 0.25));
 }
 
 const PRESENCE_COLOURS: Record<Presence, string> = {

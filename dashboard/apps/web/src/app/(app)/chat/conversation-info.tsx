@@ -38,6 +38,7 @@ import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PolarMemberRow } from "./polar-member-row";
+import { useTypingIn } from "./typing-everywhere";
 import { useState, type ReactNode } from "react";
 import { blockPersonAction, unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import { Dialog, DialogContent, DialogTitle, Switch, cn, useToast } from "@polaris/ui";
@@ -208,6 +209,8 @@ function InfoBody({
     const direct = channel.kind === "dm" && channel.others.length === 1;
     const person = direct ? (channel.others[0] ?? null) : null;
     const { viewerId, viewerName } = useChat();
+    // Who is writing here, for the faces in the list of people below.
+    const typists = useTypingIn(channel.id, viewerId);
     // A group with one other person in it is still drawn as the group here.
     const face = direct ? person : channel.self ? conversationFace(channel, { id: viewerId, name: viewerName }) : null;
     // Somebody else on the other end: the one person a block can be about.
@@ -457,7 +460,11 @@ function InfoBody({
                 <PolarMemberRow channelId={channel.id} rowClass={ROW} />
                 {members.slice(0, MEMBERS_SHOWN).map((member) => (
                     <div key={member.id} className={cn(ROW, "hover:bg-transparent")}>
-                        <Avatar person={member} size={24} />
+                        <Avatar
+                            person={member}
+                            size={24}
+                            typing={typists.some((typist) => typist.userId === member.id)}
+                        />
                         <span className="min-w-0 flex-1 truncate" title={member.name}>
                             <PersonName id={member.id} name={member.name} />
                         </span>

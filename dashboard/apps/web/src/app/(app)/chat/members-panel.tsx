@@ -35,6 +35,7 @@ import Link from "next/link";
 import { Crown, Headphones, Users, X } from "lucide-react";
 import { useOpenDirect } from "./use-open-direct";
 import { useChatStream } from "./use-chat-stream";
+import { useTypingIn } from "./typing-everywhere";
 import {
     spaceVoiceIds,
     useVoiceRooms,
@@ -386,6 +387,11 @@ export function MemberRow({
     // What they are showing right now. Already on screen for the avatar's dot,
     // so this costs nothing: the store asked about them either way.
     const where = usePresence(member.userId);
+    // Writing in this room right now: the dot on their face says so, as
+    // Discord's member list does.
+    const typing = useTypingIn(channel.id, viewerId).some(
+        (typist) => typist.userId === member.userId
+    );
     const format = useDisplayFormat();
     // The line wins over the role when there is one. A role is a fact that does
     // not change; a status is what somebody is doing this afternoon, and two
@@ -444,7 +450,12 @@ export function MemberRow({
                     // a pill around a name to look like a mistake.
                     style={plate ? nameplateCss(plate) : undefined}
                 >
-                    <Avatar decorated person={{ id: member.userId, name: member.name }} size={28} />
+                    <Avatar
+                        decorated
+                        person={{ id: member.userId, name: member.name }}
+                        size={28}
+                        typing={typing}
+                    />
                     <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1">
                             <PersonName

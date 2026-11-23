@@ -88,7 +88,7 @@ import type { RosterModeration } from "./call-moderation-menu";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
 import type { KeptPick } from "@/components/file-picker/as-files";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
-import { withoutWriters } from "./typing-everywhere";
+import { TYPING_TTL_MS, withoutWriters } from "./typing-everywhere";
 import { ChatPrivacySection, type ChatRulesChange } from "./chat-privacy-section";
 import { unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import { callBandHeight, callBandLimit, callBandSize, type CallPlace } from "./call-band";
@@ -141,10 +141,6 @@ const ForumView = dynamic(() => import("./forum-view").then((module) => module.F
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
 const AT_BOTTOM_SLACK = 60;
-
-/** How long a typing indicator stays up after the last frame about it. Just
- *  longer than the interval the composer sends them at. */
-const TYPING_TTL_MS = 4000;
 
 /** How often a call drawn from outside is asked about again. Half the window
  *  the server gives a quiet browser before it lets the seat go, so somebody who

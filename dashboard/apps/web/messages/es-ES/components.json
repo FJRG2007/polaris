@@ -70,7 +70,8 @@
         "openPhoto": "Abrir la foto de {name}",
         "notListening": "No escucha",
         "microphoneOff": "Sin micrófono",
-        "onCall": "En una llamada abierta"
+        "onCall": "En una llamada abierta",
+        "typing": "Escribe"
     },
     "denied": {
         "notice": "Esa página no está abierta para tu rol. Tu acceso empieza aquí."
