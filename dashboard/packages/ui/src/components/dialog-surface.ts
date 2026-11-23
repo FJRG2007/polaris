@@ -35,6 +35,8 @@ export const DIALOG_CLOSE =
  *   where the thumb already is. A confirmation, a short form.
  * - `full`: takes the whole screen, as Discord and WhatsApp open "new message"
  *   or a picker on a phone. Anything with a list to search or a lot to fill in.
+ *   A screen of its own, so it wears the page's background, not the raised
+ *   tone a box floating over the page needs.
  * - `keep`: what the caller drew, untouched: a drawer docked to an edge, or a
  *   dialog that already says where it goes on a phone.
  *
@@ -50,7 +52,7 @@ export const PHONE_SHEET =
     "max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:max-h-[92dvh] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.25rem+var(--safe-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-8 max-sm:data-[state=closed]:slide-out-to-bottom-8";
 
 export const PHONE_FULL =
-    "max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:top-0 max-sm:h-dvh max-sm:w-full max-sm:max-w-none max-sm:max-h-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0 max-sm:pt-[calc(1.25rem+var(--safe-top))] max-sm:pb-[calc(1.25rem+var(--safe-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-8 max-sm:data-[state=closed]:slide-out-to-bottom-8";
+    "max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:top-0 max-sm:h-dvh max-sm:w-full max-sm:max-w-none max-sm:max-h-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0 max-sm:bg-background max-sm:shadow-none max-sm:pt-[calc(1.25rem+var(--safe-top))] max-sm:pb-[calc(1.25rem+var(--safe-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-8 max-sm:data-[state=closed]:slide-out-to-bottom-8";
 
 export const PHONE_CLASSES: Record<PhoneLayout, string> = {
     sheet: PHONE_SHEET,

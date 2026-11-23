@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { phoneLayout } from "@polaris/ui";
+import { PHONE_FULL } from "../../../../../packages/ui/src/components/dialog-surface";
 
 describe("phoneLayout", () => {
     it("keeps a small dialog a sheet from the bottom", () => {
@@ -21,5 +22,11 @@ describe("phoneLayout", () => {
     it("takes the layout a caller asks for over the guess", () => {
         expect(phoneLayout("max-w-md", "full")).toBe("full");
         expect(phoneLayout("max-w-5xl", "keep")).toBe("keep");
+    });
+});
+
+describe("a full-screen dialog on a phone", () => {
+    it("wears the page background, not the raised dialog tone", () => {
+        expect(PHONE_FULL.split(" ")).toContain("max-sm:bg-background");
     });
 });
