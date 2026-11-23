@@ -18,16 +18,16 @@ because a similar one worked.
 
 ## 1. Phone approval completed
 
-- [ ] Number matching: server picks a two-digit number per request, browser shows
+- [x] Number matching: server picks a two-digit number per request, browser shows
       it, phone shows three choices; wrong pick = denied and counted.
-- [ ] Three wrong picks in an hour switch phone approval off for that account
+- [x] Three wrong picks in an hour switch phone approval off for that account
       for the hour (push-bombing guard).
-- [ ] Attempt details on the prompt: device, IP, approximate place.
-- [ ] Denied or wrong pick raises an account security notice pointing at
+- [x] Attempt details on the prompt: device, IP, approximate place.
+- [x] Denied or wrong pick raises an account security notice pointing at
       /account/security (where the account can lock itself down).
-- [ ] Old phone app (no number support) cannot approve a request that carries a
+- [x] Old phone app (no number support) cannot approve a request that carries a
       number; it is told to update. Deny keeps working.
-- [ ] Android: Approve opens a confirm screen; the pick is gated by
+- [ ] (written; compiled only by the mobile CI, never run on a device) Android: Approve opens a confirm screen; the pick is gated by
       BiometricPrompt (BIOMETRIC_STRONG | DEVICE_CREDENTIAL, API 30+), device
       credential on 28-29, keyguard confirm on 26-27; no screen lock = no approve.
 - [ ] iOS parity - blocked: the iOS app has no device key or notice channel yet.
