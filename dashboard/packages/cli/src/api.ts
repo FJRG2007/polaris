@@ -226,7 +226,16 @@ export async function call<Schema extends z.ZodTypeAny>(
     schema: Schema,
     options: CallOptions = {}
 ): Promise<z.infer<Schema>> {
-    const response = await send(connection, method, path, options);
+    return answer(connection, await send(connection, method, path, options), schema);
+}
+
+/** What `call` does with an answer it was sent: for a caller that looked at the
+ *  status first (`send`) and wants the same refusals and parsing after. */
+export async function answer<Schema extends z.ZodTypeAny>(
+    connection: Connection,
+    response: Response,
+    schema: Schema
+): Promise<z.infer<Schema>> {
     // First: a server on a different API can answer anything at all, and the
     // only useful thing to say then is how to get the two back in step.
     requireCompatible(connection, response);

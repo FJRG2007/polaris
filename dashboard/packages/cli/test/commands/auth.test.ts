@@ -78,7 +78,7 @@ describe("plr login", () => {
         const asked = seen.find((request) => request.url.endsWith("/api/cli/authorize"));
         expect(asked?.body).toMatchObject({
             deviceName: "test-laptop",
-            scopes: ["deploy.read", "deploy.manage"]
+            scopes: ["deploy.read", "deploy.manage", "terminal.control"]
         });
         expect(asked?.headers.get("authorization")).toBeNull();
 
@@ -91,6 +91,30 @@ describe("plr login", () => {
             keyId: "key-1",
             storage: "keychain"
         });
+    });
+
+    it("asks again without terminal.control when an older Polaris does not know it", async () => {
+        const keychain = fakeKeychain();
+        const asked: unknown[] = [];
+        const base = server(APPROVED);
+        const { fetch } = scriptedFetch({
+            "POST /api/cli/authorize": ({ body }) => {
+                asked.push(body);
+                const scopes = (body as { scopes: string[] }).scopes;
+                return scopes.includes("terminal.control")
+                    ? Response.json({ error: "Invalid request" }, { status: 400 })
+                    : Response.json(AUTHORIZED);
+            },
+            "POST /api/cli/authorize/claim": () => Response.json(APPROVED),
+            "GET /api/v1/me": (request) => base.fetch(`${URL}/api/v1/me`, { headers: request.headers })
+        });
+        const { context, stdout } = await testContext({ fetch, run: keychain.run });
+        await run(["login", "--url", URL], context, clean);
+        expect(asked.map((body) => (body as { scopes: string[] }).scopes)).toEqual([
+            ["deploy.read", "deploy.manage", "terminal.control"],
+            ["deploy.read", "deploy.manage"]
+        ]);
+        expect(stdout()).toContain("Signed in to https://polaris.example.com");
     });
 
     it("shows the address and the code instead when there is no browser here", async () => {

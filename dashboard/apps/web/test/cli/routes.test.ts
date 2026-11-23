@@ -76,7 +76,7 @@ describe("POST /api/cli/authorize", () => {
         // read off the request, not the body.
         expect(opened[0]).toMatchObject({
             deviceName: "ada-laptop",
-            scopes: ["deploy.read", "deploy.manage"],
+            scopes: ["deploy.read", "deploy.manage", "terminal.control"],
             requestUserAgent: "polaris-cli/0.4.6 (linux; x64; node 22.0.0)",
             requestIp: "203.0.113.4"
         });

@@ -179,6 +179,26 @@ export const GROUPS: readonly Group[] = [
         }))
     },
     {
+        noun: "terminal",
+        title: "Polaris Terminal (on this computer, or anywhere you signed one in)",
+        defaultVerb: "list",
+        commands: [
+            {
+                verb: "list",
+                aliases: ["ls"],
+                summary: "Every terminal you can reach, and whether it is ready",
+                run: async (context, flags) => (await import("./commands/terminal.js")).list(context, flags)
+            },
+            {
+                verb: "run",
+                usage: "ACTION [--params JSON] [--instance ID] [--window W] [--tab T] [--pane P]",
+                summary: "Run one terminal action (e.g. pane.list, input.insert) and print its answer as JSON",
+                run: async (context, flags, [action]) =>
+                    (await import("./commands/terminal.js")).runAction(context, flags, action)
+            }
+        ]
+    },
+    {
         noun: "dashboard",
         title: "Dashboard",
         commands: [

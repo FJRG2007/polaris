@@ -41,6 +41,15 @@ export interface Flags {
     readonly format?: "default" | "json";
     /** `plr run`: end the session once the run is over. */
     readonly stop: boolean;
+    /** `plr terminal`: which terminal - a local instance id or a Polaris one. */
+    readonly instance?: string;
+    /** `plr terminal run`: the window, tab and pane acted on - `active`, an
+     *  index, or an id. */
+    readonly window?: string;
+    readonly tab?: string;
+    readonly pane?: string;
+    /** `plr terminal run`: the action's parameters, as a JSON object. */
+    readonly params?: string;
 }
 
 export interface Parsed {
@@ -68,7 +77,12 @@ const OPTIONS = {
     model: { type: "string", short: "m" },
     continue: { type: "string", short: "c" },
     format: { type: "string" },
-    stop: { type: "boolean" }
+    stop: { type: "boolean" },
+    instance: { type: "string" },
+    window: { type: "string" },
+    tab: { type: "string" },
+    pane: { type: "string" },
+    params: { type: "string" }
 } as const;
 
 /** The largest tail the server accepts. */
@@ -99,7 +113,7 @@ export function parse(argv: readonly string[]): Parsed {
     }
     if (values.format !== undefined && values.format !== "default" && values.format !== "json")
         throw usage("--format takes default or json.");
-    for (const name of ["url", "profile", "from-file", "repo", "agent", "title", "model", "continue"] as const) {
+    for (const name of ["url", "profile", "from-file", "repo", "agent", "title", "model", "continue", "instance", "window", "tab", "pane", "params"] as const) {
         if (values[name] === "") throw usage(`--${name} needs a value.`);
     }
 
@@ -124,7 +138,12 @@ export function parse(argv: readonly string[]): Parsed {
             model: typeof values.model === "string" ? values.model : undefined,
             continue: typeof values.continue === "string" ? values.continue : undefined,
             format: values.format === "json" || values.format === "default" ? values.format : undefined,
-            stop: values.stop === true
+            stop: values.stop === true,
+            instance: typeof values.instance === "string" ? values.instance : undefined,
+            window: typeof values.window === "string" ? values.window : undefined,
+            tab: typeof values.tab === "string" ? values.tab : undefined,
+            pane: typeof values.pane === "string" ? values.pane : undefined,
+            params: typeof values.params === "string" ? values.params : undefined
         }
     };
 }

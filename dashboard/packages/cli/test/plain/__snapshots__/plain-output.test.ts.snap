@@ -50,6 +50,12 @@ Environment variables (values are never shown)
   plr env remove|rm SERVICE NAME [--yes] [--restart]
                          Remove one. --restart redeploys so the change applies
 
+Polaris Terminal (on this computer, or anywhere you signed one in)
+  plr terminal list|ls   Every terminal you can reach, and whether it is ready
+  plr terminal run ACTION [--params JSON] [--instance ID] [--window W] [--tab T] [--pane P]
+                         Run one terminal action (e.g. pane.list, input.insert)
+                         and print its answer as JSON
+
 Dashboard
   plr dashboard open [home|deploy|keys|downloads]
                          Open the dashboard in your browser

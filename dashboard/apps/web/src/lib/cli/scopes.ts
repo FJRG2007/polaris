@@ -2,15 +2,16 @@
  * What the command-line client may ask to be allowed to do.
  *
  * A closed list rather than every permission: the CLI's commands reach the
- * Deploy API and nothing else, so a sign-in that asked for mail or the vault
- * would be a credential broader than anything it can use. Growing a command set
+ * Deploy API and the terminal relay (`polaris terminal`, `terminal.control`)
+ * and nothing else, so a sign-in that asked for mail or the vault would be a
+ * credential broader than anything it can use. Growing a command set
  * means growing this list, which is what puts the new reach on the approval
  * screen where the person saying yes can see it.
  *
  * Client-safe: the approval screen imports it.
  */
 
-export const CLI_SCOPES = ["deploy.read", "deploy.manage"] as const;
+export const CLI_SCOPES = ["deploy.read", "deploy.manage", "terminal.control"] as const;
 
 export type CliScope = (typeof CLI_SCOPES)[number];
 

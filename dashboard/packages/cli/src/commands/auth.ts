@@ -13,7 +13,7 @@ import { CLI_VERSION } from "../version.js";
 import { CliError, usage } from "../errors.js";
 import { line, printJson } from "../output.js";
 import { normalizeUrl, type Flags } from "../args.js";
-import { call, send, type Connection } from "../api.js";
+import { call, send, answer, type Connection } from "../api.js";
 import { authorizeSchema, claimSchema, meSchema } from "../schemas.js";
 import { fancy, report, spinning, type Ui } from "../ui.js";
 import { chosenProfileName, requireSession, type Context } from "../context.js";
@@ -26,7 +26,13 @@ import {
 } from "../config.js";
 
 /** What `plr login` asks to be allowed. Everything the commands use, and no more. */
-export const LOGIN_SCOPES = ["deploy.read", "deploy.manage"] as const;
+export const LOGIN_SCOPES = ["deploy.read", "deploy.manage", "terminal.control"] as const;
+
+/** What a Polaris from before `polaris terminal` lets the CLI ask for. It
+ *  refuses a scope it does not know with a 400, so the sign-in asks again with
+ *  these rather than failing; `polaris terminal` then says the remote half
+ *  needs a newer Polaris. */
+export const LEGACY_LOGIN_SCOPES = ["deploy.read", "deploy.manage"] as const;
 
 /** Consecutive failed polls tolerated before giving up: a Wi-Fi blip while
  *  somebody is approving must not throw the whole sign-in away. */
@@ -139,17 +145,22 @@ export async function login(context: Context, flags: Flags): Promise<void> {
     // under the same device as the desktop app and the Stream Deck beside it. A
     // Polaris from before it existed ignores the field.
     const device = await deviceIdentity();
-    const opened = await call(anonymous, "POST", "/api/cli/authorize", authorizeSchema, {
+    const request = (scopes: readonly string[]) => ({
         fetch: context.fetch,
         body: {
             deviceName: (context.machineName() || "Unknown computer").slice(0, 80),
             clientVersion: CLI_VERSION,
-            scopes: LOGIN_SCOPES,
+            scopes,
             ...(device.id
                 ? { device: { id: device.id, ...(device.osVersion ? { osVersion: device.osVersion } : {}) } }
                 : {})
         }
     });
+    const first = await send(anonymous, "POST", "/api/cli/authorize", request(LOGIN_SCOPES));
+    const opened =
+        first.status === 400
+            ? await call(anonymous, "POST", "/api/cli/authorize", authorizeSchema, request(LEGACY_LOGIN_SCOPES))
+            : await answer(anonymous, first, authorizeSchema);
 
     const approveUrl = `${url}${opened.approvePath}`;
     const code = formatCode(opened.userCode);
