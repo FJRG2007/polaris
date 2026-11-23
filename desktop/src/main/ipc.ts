@@ -16,7 +16,8 @@ import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
 import { strokeSchema } from "@/shared/annotate";
 import { setCallHotkeys } from "./call-hotkeys";
 import { followTextSize as followWidgetTextSize, setVoiceState, voiceWidgetAction } from "./voice-widget";
-import { rememberLauncherEngine, rememberTextSize, textSize } from "./settings";
+import { rememberLauncherClipboardKeep, rememberLauncherEngine, rememberTextSize, textSize } from "./settings";
+import { CLIPBOARD_KEEP_IDS } from "@/shared/clipboard-store";
 import { readTextSize } from "@/shared/text-size";
 import { voiceActionSchema, voiceStateSchema } from "@/shared/voice-widget";
 import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
@@ -70,7 +71,7 @@ import {
 } from "electron";
 import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
 import { SEARCH_ENGINE_IDS } from "@/shared/launcher";
-import { clearClipboardHistory, launcherStatus, recordLauncherKey, setLauncherBinding } from "./launcher";
+import { clearClipboardHistory, followClipboardKeep, launcherStatus, recordLauncherKey, setLauncherBinding } from "./launcher";
 
 export interface IpcHost extends PushHost {
     /** The game running now, as the watcher last saw it. */
@@ -705,6 +706,13 @@ export function registerIpc(host: IpcHost): void {
         const engine = z.enum(SEARCH_ENGINE_IDS).safeParse(raw);
         if (!from(event, "connect") || !engine.success) return false;
         rememberLauncherEngine(engine.data);
+        return true;
+    });
+    ipcMain.handle(CHANNELS.connectClipboardKeep, (event, raw: unknown): boolean => {
+        const keep = z.enum(CLIPBOARD_KEEP_IDS).safeParse(raw);
+        if (!from(event, "connect") || !keep.success) return false;
+        rememberLauncherClipboardKeep(keep.data);
+        followClipboardKeep();
         return true;
     });
     ipcMain.handle(CHANNELS.connectClipboardClear, (event) => {

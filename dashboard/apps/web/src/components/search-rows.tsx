@@ -18,7 +18,8 @@ import { SearchItem } from "@polaris/ui/search-panel";
 import { Avatar } from "@/components/avatar";
 import type { LucideIcon } from "lucide-react";
 import type { ClockCommand, RecentSearch } from "@polaris/core";
-import { AlarmClock, Calculator, Clock, Copy, CornerDownLeft, Timer, Watch, X } from "lucide-react";
+import { AlarmClock, AppWindow, Calculator, Clipboard, Clock, Copy, CornerDownLeft, Globe, Timer, Watch, X } from "lucide-react";
+import type { HostRow, HostRowKind } from "@/lib/search/search-host";
 import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { PersonName, PersonRow } from "@/components/person-name";
@@ -335,6 +336,57 @@ export function RecentRow({
             >
                 <X className="size-3.5" aria-hidden="true" />
             </button>
+        </Row>
+    );
+}
+
+type Translate = ReturnType<typeof useTranslations>;
+
+/** The heading a host's row is listed under. */
+export function hostGroup(t: Translate, kind: HostRowKind): string {
+    if (kind === "answer") return t("search.calculator");
+    if (kind === "app") return t("search.host.apps");
+    if (kind === "web") return t("search.host.web");
+    if (kind === "polar") return t("search.host.polar");
+    return t("search.host.clip");
+}
+
+/** A row the hosting page found: a program, a copy, the web, Polar. */
+export function HostResultRow({ row, query, ...props }: RowProps & { row: HostRow; query: string }) {
+    const t = useTranslations("components");
+    // The words are the palette's, in the reader's language; the host only
+    // says what kind of row it is and, for a program or a copy, its text.
+    const quoted = query.slice(0, 120);
+    const label =
+        row.kind === "web"
+            ? t("search.host.webTitle", { query: quoted })
+            : row.kind === "polar"
+              ? t("search.host.polarTitle", { query: quoted })
+              : row.title;
+    const context =
+        row.kind === "web"
+            ? t("search.host.webHint")
+            : row.kind === "polar"
+              ? t("search.host.polarHint")
+              : row.kind === "app"
+                ? t("search.host.app")
+                : row.kind === "clip"
+                  ? t("search.host.clipHint")
+                  : row.subtitle;
+    const fallback =
+        row.kind === "answer" ? Calculator : row.kind === "web" ? Globe : row.kind === "clip" ? Clipboard : AppWindow;
+    const Icon = fallback;
+    const icon =
+        row.kind === "polar" ? (
+            <AppLogo appId="polar" size={18} fallback={<Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />} />
+        ) : row.icon ? (
+            <img src={row.icon} alt="" width={18} height={18} className="size-[18px] shrink-0 object-contain" />
+        ) : (
+            <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        );
+    return (
+        <Row {...props} label={label}>
+            <SearchItem icon={icon} label={label} context={context} />
         </Row>
     );
 }

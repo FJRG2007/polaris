@@ -6,9 +6,17 @@
  * - The window is made on the first press, not at start, reused while it is
  *   in use, and destroyed after `IDLE_MS` hidden, so a launcher nobody opens
  *   holds no renderer at all. The key itself costs one OS registration.
- * - Nothing runs on a timer except the clipboard history, which is off unless
- *   somebody turns it on (see `watchClipboard` for why it has to look).
- * - Its preload carries five calls and no shared bundle.
+ * - Nothing runs on a timer except the clipboard history, on unless somebody
+ *   turns it off (see `watchClipboard` for why it has to look).
+ * - Its preload carries a handful of calls and no shared bundle.
+ *
+ * The window shows the dashboard's own search: it loads the instance's
+ * `/launcher` page (the very `CommandPalette` the header opens) in the main
+ * window's session, so recents, results, logos and commands are the same ones,
+ * and this module only adds what a browser cannot see - programs, the
+ * clipboard, the web - as rows the palette draws after its own. A host from
+ * before that page, or no session, answers 404 there; the window then draws
+ * its own panel (`renderer/launcher.tsx`) from the rows below.
  * - Polaris's index is asked on open and kept for `INDEX_FRESH_MS`; typing
  *   filters it here without touching the network, as the dashboard's palette
  *   does with the same route (`/api/search`).
@@ -19,6 +27,8 @@
 
 import { z } from "zod";
 import { join } from "node:path";
+import { renameSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { CLIPBOARD_KEEP, ClipboardStore } from "@/shared/clipboard-store";
 import * as settings from "./settings";
 import { openExternal } from "./open-external";
 import { holdGlobalKey } from "./call-hotkeys";
@@ -26,11 +36,11 @@ import { runningPrograms } from "./game-detect";
 import { quickAnswer } from "@/shared/quick-answer";
 import type { LauncherStatus } from "@/shared/bridge";
 import { installedApps, installedAppsRead, isListedApp } from "./launcher-apps";
-import { isConcealed, withClip, type ClipEntry } from "@/shared/clipboard-history";
+import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipEntry } from "@/shared/clipboard-history";
 import { DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator } from "@/shared/launcher-hotkey";
 import { conflictSentence, findLaunchers, likelyHolders, type FoundLauncher } from "@/shared/launcher-conflicts";
 import { LAUNCHER_CHANNELS, topMatches, webSearchUrl, type LauncherAnswer, type LauncherRow } from "@/shared/launcher";
-import { BrowserWindow, clipboard, ipcMain, net, powerMonitor, screen, shell, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, clipboard, ipcMain, net, powerMonitor, safeStorage, screen, session, shell, type IpcMainInvokeEvent } from "electron";
 
 /** Hidden this long, the window is destroyed; the next press makes a new one. */
 export const IDLE_MS = 5 * 60_000;
@@ -55,6 +65,12 @@ let heldAccelerator: string | null = null;
 let launchersFound: FoundLauncher[] = [];
 /** What each row listed last does, by its id. */
 let actions = new Map<string, () => void>();
+/** The program behind each app row listed last, for its icon. */
+let appPaths = new Map<string, string>();
+/** Program icons already asked of the system, by path. Bounded by the list of installed programs. */
+const appIcons = new Map<string, string | null>();
+/** The instance whose `/launcher` page the window shows, or null for the window's own panel. */
+let remote: string | null = null;
 
 /** The dashboard's own sections, listed even before its index answers. */
 const PAGES: readonly { label: string; path: string; }[] = [
@@ -129,9 +145,67 @@ function refreshIndex(): Promise<void> {
 
 let clips: readonly ClipEntry[] = [];
 
-function rowsFor(text: string): LauncherAnswer {
+/** The history between runs: encrypted by the system, or memory only (see `clipboard-store`). */
+let store: ClipboardStore | null = null;
+
+function clipboardStore(): ClipboardStore {
+    const path = join(app.getPath("userData"), "clipboard-history.bin");
+    store ??= new ClipboardStore(
+        {
+            available: () => safeStorage.isEncryptionAvailable(),
+            encrypt: (text) => safeStorage.encryptString(text),
+            decrypt: (data) => safeStorage.decryptString(Buffer.from(data))
+        },
+        {
+            read: () => {
+                try {
+                    return readFileSync(path);
+                } catch (caught) {
+                    if ((caught as NodeJS.ErrnoException).code === "ENOENT") return null;
+                    throw caught;
+                }
+            },
+            write: (data) => {
+                const temp = `${path}.${process.pid}.${Date.now()}.tmp`;
+                writeFileSync(temp, data, { mode: 0o600 });
+                try {
+                    renameSync(temp, path);
+                } catch (caught) {
+                    rmSync(temp, { force: true });
+                    throw caught;
+                }
+            },
+            remove: () => rmSync(path, { force: true })
+        }
+    );
+    return store;
+}
+
+function keepMs(): number {
+    return CLIPBOARD_KEEP[settings.launcherClipboardKeep()];
+}
+
+/** Whether the history outlives a restart on this computer. */
+export function clipboardPersists(): boolean {
+    return clipboardStore().persists();
+}
+
+/** The retention changed: prune now, so a shorter time takes effect at once. */
+export function followClipboardKeep(): void {
+    clips = clipboardStore().save(clips, Date.now(), keepMs());
+}
+
+/** Arithmetic only: the palette works that out itself, so the window does not repeat it. */
+const SUM = /^[\d\s+\-*/().,^%]+$/;
+
+/**
+ * The rows for `text`. `hostOnly` is the dashboard's palette asking: it has
+ * Polaris's own rows already, so only what it cannot find is listed.
+ */
+function rowsFor(text: string, hostOnly = false): LauncherAnswer {
     const query = text.trim();
     const next = new Map<string, () => void>();
+    const paths = new Map<string, string>();
     const rows: LauncherRow[] = [];
     const add = (row: Omit<LauncherRow, "id">, action: () => void) => {
         const id = String(rows.length);
@@ -140,7 +214,7 @@ function rowsFor(text: string): LauncherAnswer {
     };
     const origin = host?.server() ?? null;
 
-    const answer = quickAnswer(query);
+    const answer = hostOnly && SUM.test(query) ? null : quickAnswer(query);
     if (answer) add({ kind: "answer", title: answer.value, subtitle: `${answer.label} - Enter copies it` }, () => void clipboard.writeText(answer.value));
 
     if (/^clip(\s|$)/i.test(query) && settings.toggle("launcherClipboard")) {
@@ -150,7 +224,7 @@ function rowsFor(text: string): LauncherAnswer {
             add({ kind: "clip", title: clip.text.replace(/\s+/g, " ").slice(0, 200), subtitle: "Clipboard - Enter copies it" }, () => void clipboard.writeText(clip.text));
         }
     } else if (query) {
-        if (origin) {
+        if (origin && !hostOnly) {
             for (const entry of topMatches(query, index?.server === origin ? index.entries : [], PER_KIND)) {
                 add({ kind: "polaris", title: entry.label, subtitle: entry.context }, () => host?.showPolaris(entry.href));
             }
@@ -162,6 +236,7 @@ function rowsFor(text: string): LauncherAnswer {
             add({ kind: "app", title: app.label, subtitle: "Application" }, () => {
                 if (isListedApp(app.path)) void shell.openPath(app.path);
             });
+            paths.set(String(rows.length - 1), app.path);
         }
         if (origin) {
             add({ kind: "polar", title: `Ask Polar "${query.slice(0, 120)}"`, subtitle: "Opens Polar with the question ready to send" }, () =>
@@ -173,10 +248,11 @@ function rowsFor(text: string): LauncherAnswer {
         if (settings.toggle("launcherClipboard") && clips.some((clip) => clip.text.toLowerCase().includes(query.toLowerCase()))) {
             add({ kind: "clip", title: "Search clipboard history", subtitle: `Type "clip ${query.slice(0, 40)}"` }, () => undefined);
         }
-    } else if (origin) {
+    } else if (origin && !hostOnly) {
         for (const page of PAGES.slice(0, 6)) add({ kind: "page", title: page.label, subtitle: "Open in Polaris" }, () => host?.showPolaris(page.path));
     }
     actions = next;
+    appPaths = paths;
     return { rows, notice: origin ? indexNotice : "Connect to a Polaris to search it." };
 }
 
@@ -187,6 +263,51 @@ function hide(): void {
         idleTimer = null;
         if (window && !window.isDestroyed() && !window.isVisible()) window.destroy();
     }, IDLE_MS);
+}
+
+/** The program's own icon as a PNG data URL, asked of the system once per program. */
+async function iconOf(path: string): Promise<string | null> {
+    if (appIcons.has(path)) return appIcons.get(path) ?? null;
+    const image = await app.getFileIcon(path, { size: "normal" }).catch(() => null);
+    const url = image && !image.isEmpty() ? image.toDataURL() : null;
+    appIcons.set(path, url && url.startsWith("data:image/png;base64,") && url.length < 200_000 ? url : null);
+    return appIcons.get(path) ?? null;
+}
+
+/** The rows with each program's icon added. */
+async function withIcons(answer: LauncherAnswer): Promise<LauncherAnswer> {
+    const rows = await Promise.all(
+        answer.rows.map(async (row) => {
+            const path = row.kind === "app" ? appPaths.get(row.id) : undefined;
+            return path ? { ...row, icon: await iconOf(path) } : row;
+        })
+    );
+    return { ...answer, rows };
+}
+
+/**
+ * Whether the instance serves the dashboard's own search page to this
+ * session: a 200 from `/launcher`. A host from before it, or no session, is a
+ * 404 - and anything that is not a quick 200 means the window's own panel.
+ */
+async function servesLauncher(origin: string): Promise<boolean> {
+    try {
+        const response = await session.defaultSession.fetch(`${origin}/launcher`, {
+            redirect: "manual",
+            cache: "no-store",
+            signal: AbortSignal.timeout(4000)
+        });
+        void response.body?.cancel().catch(() => undefined);
+        return response.status === 200;
+    } catch {
+        return false;
+    }
+}
+
+/** The window's own panel, drawn from the rows here. */
+function loadOwnPanel(target: BrowserWindow): void {
+    remote = null;
+    void target.loadFile(join(__dirname, "..", "renderer", "launcher.html"));
 }
 
 function create(): BrowserWindow {
@@ -223,13 +344,27 @@ function create(): BrowserWindow {
     });
     made.setAlwaysOnTop(true, "pop-up-menu");
     made.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // Every Polaris result is opened in the main window; this one never leaves its page.
     made.webContents.on("will-navigate", (event) => event.preventDefault());
+    made.webContents.on("did-fail-load", (_event, code, _description, url, isMainFrame) => {
+        // The instance's page did not load (offline, a certificate): the own panel instead.
+        if (isMainFrame && remote && code !== -3 && url.startsWith(remote) && !made.isDestroyed()) loadOwnPanel(made);
+    });
     made.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     made.on("blur", hide);
     made.once("closed", () => {
         if (window === made) window = null;
     });
-    void made.loadFile(join(__dirname, "..", "renderer", "launcher.html"));
+    const origin = host?.server() ?? null;
+    void (origin ? servesLauncher(origin) : Promise.resolve(false)).then((served) => {
+        if (made.isDestroyed()) return;
+        if (served && origin) {
+            remote = origin;
+            void made.loadURL(`${origin}/launcher`).catch(() => {
+                if (!made.isDestroyed() && remote === origin) loadOwnPanel(made);
+            });
+        } else loadOwnPanel(made);
+    });
     return made;
 }
 
@@ -258,6 +393,9 @@ export function toggleLauncher(): void {
     }
     void refreshIndex();
     installedApps();
+    // Pointed at another Polaris since the window was made: make it again for that one.
+    const origin = host?.server() ?? null;
+    if (window && !window.isDestroyed() && remote && remote !== origin) window.destroy();
     if (window && !window.isDestroyed()) {
         place(window);
         return;
@@ -368,9 +506,12 @@ function watchClipboard(): void {
         clipTimer = null;
         clips = [];
         lastClip = "";
+        // Off means kept nowhere: the file goes too.
+        clipboardStore().clear();
         return;
     }
     if (clipTimer) return;
+    clips = clipboardStore().load(Date.now(), keepMs());
     let looking = false;
     void clipboard.readText().then((text) => (lastClip = text), () => undefined);
     clipTimer = setInterval(() => {
@@ -405,26 +546,51 @@ async function lookAtClipboard(): Promise<void> {
         }
     }).catch(() => true);
     // Copied again while this looked: the newer copy is the next look's.
-    if (!concealed && lastClip === text && settings.toggle("launcherClipboard")) clips = withClip(clips, text, Date.now());
+    if (!concealed && lastClip === text && settings.toggle("launcherClipboard")) {
+        const now = Date.now();
+        clips = clipboardStore().save(withClip(clips, text, now, CLIPBOARD_LIMIT), now, keepMs());
+    }
 }
 
 export function clearClipboardHistory(): void {
     clips = [];
+    clipboardStore().clear();
 }
 
+/**
+ * Whether a call came from the launcher's page: its window, and its top frame
+ * on the page it was given - the window's own file, or the instance's
+ * `/launcher` - never a frame inside it or a page it was moved to.
+ */
 function fromLauncher(event: IpcMainInvokeEvent): boolean {
-    return Boolean(window && !window.isDestroyed() && event.sender === window.webContents);
+    if (!window || window.isDestroyed() || event.sender !== window.webContents) return false;
+    const frame = event.senderFrame;
+    if (!frame || frame.parent) return false;
+    try {
+        const url = new URL(frame.url);
+        return remote ? url.origin === new URL(remote).origin && url.pathname === "/launcher" : url.protocol === "file:";
+    } catch {
+        return false;
+    }
 }
 
 /** Take the key and answer the launcher page. Called once, when the app is ready. */
 export function startLauncher(given: LauncherHost): void {
     host = given;
-    ipcMain.handle(LAUNCHER_CHANNELS.query, async (event, raw: unknown) => {
+    ipcMain.handle(LAUNCHER_CHANNELS.query, async (event, raw: unknown, rawMode: unknown) => {
         const text = z.string().max(500).safeParse(raw);
         if (!fromLauncher(event) || !text.success) return { rows: [], notice: null };
+        if (rawMode === "host-only") return withIcons(rowsFor(text.data, true));
         // The first keystrokes after opening wait for the index once, briefly.
         if (indexing) await Promise.race([indexing, new Promise((resolve) => setTimeout(resolve, 1500))]);
-        return rowsFor(text.data);
+        return withIcons(rowsFor(text.data));
+    });
+    ipcMain.handle(LAUNCHER_CHANNELS.open, (event, raw: unknown) => {
+        // A path of the instance, from its own palette; never another address.
+        const path = z.string().max(2048).regex(/^\/(?!\/)[^\\]*$/).safeParse(raw);
+        if (!fromLauncher(event) || !remote || !path.success) return;
+        hide();
+        host?.showPolaris(path.data);
     });
     ipcMain.handle(LAUNCHER_CHANNELS.run, (event, raw: unknown) => {
         const id = z.string().max(10).safeParse(raw);

@@ -23,6 +23,7 @@ import type { UpdateCheck } from "./update-check";
 import type { CallHotkey, CallHotkeysInput, CallHotkeysResult } from "./call-hotkeys";
 import type { VoiceAction, VoiceState, WidgetView } from "./voice-widget";
 import type { SearchEngine } from "./launcher";
+import type { ClipboardKeep } from "./clipboard-store";
 
 export type Outcome = { readonly ok: true; } | { readonly ok: false; readonly error: string; };
 
@@ -333,8 +334,12 @@ export interface Preferences {
     readonly voiceWidgetGameOnly: boolean;
     /** The launcher opens with its key from anywhere. */
     readonly launcher: boolean;
-    /** The launcher keeps what was copied, in memory only. */
+    /** The launcher keeps what was copied. */
     readonly launcherClipboard: boolean;
+    /** How long it keeps a copy. */
+    readonly launcherClipboardKeep: ClipboardKeep;
+    /** Whether the copies outlive a restart (the system has a key store), or stay in memory. */
+    readonly launcherClipboardPersists: boolean;
     /** Where a web search from the launcher goes. */
     readonly launcherEngine: SearchEngine;
     readonly version: string;
@@ -389,6 +394,8 @@ export interface PolarisLocal {
         /** Let the key go while a new one is recorded, so the press reaches the page. */
         recordLauncherKey(recording: boolean): Promise<void>;
         setLauncherEngine(engine: SearchEngine): Promise<boolean>;
+        /** How long the clipboard history keeps a copy. */
+        setClipboardKeep(keep: ClipboardKeep): Promise<boolean>;
         /** Forget every copy the launcher kept. */
         clearClipboardHistory(): Promise<void>;
         /** Close and open the app again, so a setting read at start applies. */
@@ -697,6 +704,7 @@ export const CHANNELS = {
     connectLauncherBinding: "local:connect-launcher-binding",
     connectLauncherRecord: "local:connect-launcher-record",
     connectLauncherEngine: "local:connect-launcher-engine",
+    connectClipboardKeep: "local:connect-clipboard-keep",
     connectClipboardClear: "local:connect-clipboard-clear",
     connectRelaunch: "local:connect-relaunch",
     connectSwitch: "local:connect-switch",

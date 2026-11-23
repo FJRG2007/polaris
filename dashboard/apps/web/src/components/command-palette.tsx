@@ -54,6 +54,8 @@ import {
     CommandRow,
     EntryRow,
     HitRow,
+    hostGroup,
+    HostResultRow,
     RecentRow
 } from "@/components/search-rows";
 import { useToast } from "@polaris/ui";
@@ -82,6 +84,7 @@ import {
     recordSearchAction
 } from "@/app/(app)/search-actions";
 import * as polls from "./shared-polls";
+import { readHostRows, type HostRow, type SearchHost } from "@/lib/search/search-host";
 import { keepUnlockProofs } from "@/app/(app)/chat/lock-session";
 import { openLockedChatsAction, searchLockAction } from "@/app/(app)/chat/lock-actions";
 import { maybeLockCode, revealLockedChats } from "@/app/(app)/chat/lock-reveal";
@@ -126,7 +129,8 @@ type Row =
     | { kind: "clock"; id: string; group: string; command: core.ClockCommand }
     | { kind: "entry"; id: string; group: string; entry: CommandEntry }
     | { kind: "hit"; id: string; group: string; hit: SearchHit }
-    | { kind: "recent"; id: string; group: string; entry: core.RecentSearch };
+    | { kind: "recent"; id: string; group: string; entry: core.RecentSearch }
+    | { kind: "host"; id: string; group: string; row: HostRow };
 
 /** The row's id in the document, for `aria-activedescendant` to point at. */
 function rowElementId(row: Row): string {
@@ -155,7 +159,8 @@ export function CommandPalette({
     isAdmin = false,
     appIds,
     held = [],
-    installed = []
+    installed = [],
+    host
 }: {
     isAdmin?: boolean;
     appIds: string[];
@@ -163,6 +168,10 @@ export function CommandPalette({
      *  never finds a screen the rail leaves out. */
     held?: string[];
     installed?: string[];
+    /** Set where the palette is the whole page (Polaris Desktop's Alt+Space
+     *  window, see `/launcher`): no header button, open from the start, the
+     *  host's own rows added, and results opened by the host. */
+    host?: SearchHost;
 }) {
     const router = useRouter();
     const pathname = usePathname();
@@ -171,7 +180,10 @@ export function CommandPalette({
     const toast = useToast();
     const display = useDisplayFormat();
     const navLabel = useNavLabel();
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(Boolean(host));
+    const [hostRows, setHostRows] = useState<HostRow[]>([]);
+    /** Each time a host brings the panel back up, which is a fresh open. */
+    const [openings, setOpenings] = useState(0);
     /** The scope the panel is to open on, when whatever opened it asked for one. */
     const presetRef = useRef<core.SearchScope | null>(null);
     /** The text the panel is to open with, when whatever opened it asked for some. */
@@ -199,7 +211,30 @@ export function CommandPalette({
     // found it - the destination is the better memory of the two.
     const openedRef = useRef(false);
 
+    /** Open a Polaris address: here, or in the host's own window. */
+    const navigate = useCallback(
+        (href: string) => (host ? host.navigate(href) : router.push(href)),
+        [host, router]
+    );
+
+    // The host brings the panel back up; each time is a fresh open.
     useEffect(() => {
+        host?.onOpened(() => {
+            presetRef.current = null;
+            setOpen(true);
+            setOpenings((count) => count + 1);
+        });
+    }, [host]);
+
+    // Closed, by any route - Escape, a result, a clock command: the host
+    // puts its window away.
+    useEffect(() => {
+        if (host && !open) host.close();
+    }, [host, open]);
+
+    useEffect(() => {
+        // The host holds the key system-wide; the page must not toggle on it too.
+        if (host) return;
         function onKeyDown(event: KeyboardEvent) {
             if (!shortcutPressed(event, "general.commandPalette")) return;
             // Option+Space in a Mac's text field is a non-breaking space being typed.
@@ -220,7 +255,7 @@ export function CommandPalette({
         }
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
-    }, [pathname]);
+    }, [pathname, host]);
 
     // Opened from a field somewhere else on the page, already narrowed.
     useEffect(() => {
@@ -274,7 +309,7 @@ export function CommandPalette({
             .recentSearches()
             .then((body) => setRecent(recentStore.mergeIntoStore(body.recent)))
             .catch(() => undefined);
-    }, [open, loadResources]);
+    }, [open, loadResources, openings]);
 
     const trimmed = query.trim();
 
@@ -384,13 +419,34 @@ export function CommandPalette({
                 setSecretCode(undefined);
                 setOpen(false);
                 revealLockedChats();
-                if (!pathname.startsWith("/chat")) router.push("/chat");
+                if (!pathname.startsWith("/chat") || host) navigate("/chat");
             })
             .catch(() => undefined);
         return () => {
             live = false;
         };
-    }, [open, codeShaped, secretCode, trimmed, pathname, router]);
+    }, [open, codeShaped, secretCode, trimmed, pathname, navigate, host]);
+
+    // What only the host can find (programs, the clipboard, the web), for the
+    // same text, beside the palette's own rows. Never inside a command.
+    useEffect(() => {
+        if (!host || !open || scope) {
+            setHostRows([]);
+            return;
+        }
+        let live = true;
+        void host
+            .query(trimmed)
+            .then((raw) => {
+                if (live) setHostRows(readHostRows(raw));
+            })
+            .catch(() => {
+                if (live) setHostRows([]);
+            });
+        return () => {
+            live = false;
+        };
+    }, [host, open, scope, trimmed]);
 
     // One scoped search per pause, dropped if the field moves on before it lands.
     useEffect(() => {
@@ -634,8 +690,19 @@ export function CommandPalette({
 
         // Something that works out as a sum was typed as one: its answer leads,
         // whatever else the search turns up for the same characters.
-        return [...sum, ...clock, ...remembered, ...commands, ...found];
+        // A sum is already the palette's own; the host's copy of it would say it twice.
+        const hosted: Row[] = hostRows
+            .filter((row) => !(row.kind === "answer" && calculation !== null))
+            .map((row) => ({
+                kind: "host",
+                id: `host:${row.id}`,
+                group: hostGroup(t, row.kind),
+                row
+            }));
+
+        return [...sum, ...clock, ...remembered, ...commands, ...found, ...hosted];
     }, [
+        hostRows,
         calculation,
         recentRows,
         suggestions,
@@ -699,7 +766,7 @@ export function CommandPalette({
                     key: "search-clock",
                     title: t("search.clock.done"),
                     body: clockCommandText(command, t, locale),
-                    onPress: () => router.push(href)
+                    onPress: () => navigate(href)
                 });
             })
             .catch((caught: unknown) =>
@@ -751,6 +818,12 @@ export function CommandPalette({
             runClock(row.command);
             return;
         }
+        if (row.kind === "host") {
+            openedRef.current = true;
+            host?.run(row.row.id);
+            setOpen(false);
+            return;
+        }
         if (row.kind === "command") {
             setScope(row.scope);
             setQuery("");
@@ -791,7 +864,7 @@ export function CommandPalette({
         // a push issued in the same tick as that hand-off is dropped when the
         // panel was dismissed from the keyboard - the row opens on a click and
         // does nothing on Enter, which is the sort of bug nobody reports.
-        router.push(target.href);
+        navigate(target.href);
         setOpen(false);
     }
 
@@ -833,6 +906,7 @@ export function CommandPalette({
 
     return (
         <>
+            {host ? null : (
             <button
                 type="button"
                 data-tour="shell.search"
@@ -858,6 +932,7 @@ export function CommandPalette({
                     </kbd>
                 ) : null}
             </button>
+            )}
 
             <SearchPalette
                 open={open}
@@ -1053,6 +1128,19 @@ export function CommandPalette({
                                                 key={row.id}
                                                 id={rowElementId(row)}
                                                 hit={row.hit}
+                                                selected={selected}
+                                                onSelect={select}
+                                                onHover={hover}
+                                            />
+                                        );
+                                    }
+                                    if (row.kind === "host") {
+                                        return (
+                                            <HostResultRow
+                                                key={row.id}
+                                                id={rowElementId(row)}
+                                                row={row.row}
+                                                query={trimmed}
                                                 selected={selected}
                                                 onSelect={select}
                                                 onHover={hover}

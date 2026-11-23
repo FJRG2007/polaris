@@ -10,7 +10,8 @@ export const LAUNCHER_CHANNELS = {
     run: "launcher:run",
     hide: "launcher:hide",
     opened: "launcher:opened",
-    clearClipboard: "launcher:clear-clipboard"
+    clearClipboard: "launcher:clear-clipboard",
+    open: "launcher:open"
 } as const;
 
 export type LauncherRowKind = "answer" | "polaris" | "page" | "app" | "polar" | "web" | "clip";
@@ -20,6 +21,8 @@ export interface LauncherRow {
     readonly kind: LauncherRowKind;
     readonly title: string;
     readonly subtitle: string;
+    /** A program's own icon, as a PNG data URL. */
+    readonly icon?: string | null;
 }
 
 export interface LauncherAnswer {
@@ -30,7 +33,10 @@ export interface LauncherAnswer {
 
 /** The bridge the launcher page gets as `window.polarisLauncher`. */
 export interface PolarisLauncher {
-    query(text: string): Promise<LauncherAnswer>;
+    /** `host-only`: the dashboard's palette asking, which lists Polaris's own rows itself. */
+    query(text: string, mode?: "host-only"): Promise<LauncherAnswer>;
+    /** Show a path of the instance in the main window (the dashboard's palette only). */
+    open(href: string): Promise<void>;
     run(id: string): Promise<boolean>;
     hide(): Promise<void>;
     clearClipboard(): Promise<void>;

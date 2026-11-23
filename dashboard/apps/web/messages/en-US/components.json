@@ -297,6 +297,18 @@
         },
         "actions": "Actions",
         "calculator": "Calculator",
+        "host": {
+            "apps": "Applications",
+            "web": "Web",
+            "polar": "Polar",
+            "clip": "Clipboard",
+            "app": "Application",
+            "webTitle": "Search the web for \"{query}\"",
+            "webHint": "Opens in your browser",
+            "polarTitle": "Ask Polar \"{query}\"",
+            "polarHint": "Opens Polar with it ready",
+            "clipHint": "Enter copies it"
+        },
         "calculationCopied": "{value} copied to the clipboard",
         "calculationCopyFailed": "The result could not be copied. Try again.",
         "calculationLabel": "Copy {value}",
