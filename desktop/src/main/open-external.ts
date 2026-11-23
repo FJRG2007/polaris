@@ -4,23 +4,38 @@
  *
  * Every outside link in the app ends here - a link the page opens in a new
  * window, a navigation away from the Polaris, the right-click menu, a deep link
- * for a different server. `shell.openExternal` rejects when Windows cannot
- * start the registered handler, and every caller used to drop that rejection
- * with `void`, so a link that failed to open did nothing at all and left no
- * trace. Now a failure is logged and, on Windows, retried through the shell's
- * own URL handler, which reads the same registration by a different route.
+ * for a different server. Each platform has an ordered list of routes and the
+ * first that works wins:
+ *
+ * - Windows: the default browser's registered command, started directly
+ *   (`default-browser.ts`), then `shell.openExternal`. The direct start comes
+ *   first because it is the one route whose failure can be seen: Windows' own
+ *   hand-over was found resolving with no browser appearing (BUG-0020), and
+ *   `rundll32 url.dll` reports success whether or not anything opened, so it is
+ *   no longer used.
+ * - macOS and Linux: `shell.openExternal`, then `open` / `xdg-open`, whose exit
+ *   code says whether the link was handed on.
+ *
+ * When every route fails the person is told and offered the address, and the
+ * last link handed out can always be copied from the tray.
  */
 
 import { BrowserWindow, app, clipboard, dialog, shell } from "electron";
-import { execFile } from "node:child_process";
 import { appendFileSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { isSafeExternalUrl } from "./navigation";
+import { rememberLink } from "./tray";
+import * as browser from "./default-browser";
+
+/** One way of handing a link to the system; rejects when it did not. */
+export interface OutsideRoute {
+    readonly name: string;
+    readonly run: (url: string) => Promise<void>;
+}
 
 export interface OpenExternalDeps {
-    readonly open: (url: string) => Promise<void>;
-    /** A second route to the same handler, or null where there is none. */
-    readonly fallback: ((url: string) => Promise<void>) | null;
+    /** Tried in order; the first that resolves wins. */
+    readonly routes: readonly OutsideRoute[];
     readonly log: (message: string, error: unknown) => void;
 }
 
@@ -43,33 +58,45 @@ export function outsideAddress(url: string): string | null {
 export async function openOutside(raw: string, deps: OpenExternalDeps): Promise<boolean> {
     const url = outsideAddress(raw);
     if (!url) return false;
-    try {
-        await deps.open(url);
-        return true;
-    } catch (error) {
-        deps.log("Opening a link outside the app failed", error);
+    for (const route of deps.routes) {
+        try {
+            await route.run(url);
+            return true;
+        } catch (error) {
+            deps.log(`Opening a link through ${route.name} failed`, error);
+        }
     }
-    if (!deps.fallback) return false;
-    try {
-        await deps.fallback(url);
-        return true;
-    } catch (error) {
-        deps.log("Opening a link through the shell's URL handler failed", error);
-        return false;
-    }
+    return false;
 }
 
 /**
- * `rundll32 url.dll,FileProtocolHandler <url>`: the shell's URL handler, run
- * with an argument array and no shell between, so nothing in the address is
- * read as a command. Only ever reached for a URL `isSafeExternalUrl` passed.
+ * What the routes reach the system through. One object, so the Electron
+ * harness (`test/electron/links`) can swap each part for a recorder and never
+ * start a real browser.
  */
-function windowsFallback(url: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-        execFile("rundll32.exe", ["url.dll,FileProtocolHandler", url], { windowsHide: true }, (error) =>
-            error ? reject(error) : resolve()
-        );
-    });
+export const outsideSystem = {
+    open: (url: string): Promise<void> => shell.openExternal(url),
+    readRegistry: browser.readRegistry,
+    launch: browser.launchDetached,
+    opener: browser.runOpener
+};
+
+/** The routes for a platform, in the order they are tried. */
+export function routesFor(platform: NodeJS.Platform, system: typeof outsideSystem = outsideSystem): OutsideRoute[] {
+    const handOver: OutsideRoute = { name: "the system's URL handler", run: (url) => system.open(url) };
+    if (platform === "win32") {
+        const direct: OutsideRoute = {
+            name: "the default browser's registered command",
+            run: async (url) => {
+                const launch = await browser.registeredLaunch(url, system.readRegistry);
+                if (!launch) throw new Error("No registered command for this kind of link");
+                await system.launch(launch.file, launch.args);
+            }
+        };
+        return [direct, handOver];
+    }
+    const opener = platform === "darwin" ? "open" : "xdg-open";
+    return [handOver, { name: opener, run: (url) => system.opener(opener, url) }];
 }
 
 /** Where a failed hand-over is written, beside the app's other logs, so it
@@ -100,7 +127,7 @@ async function sayFailed(url: string): Promise<void> {
         type: "warning" as const,
         title: "Couldn't open the link",
         message: "Couldn't open the link",
-        detail: `Windows didn't open it in your browser. Copy it and paste it into your browser instead.
+        detail: `${url.startsWith("mailto:") ? "Your mail app" : "Your browser"} didn't open it. Copy it and paste it there instead.
 
 ${url}`,
         buttons: ["Copy link", "Close"],
@@ -114,16 +141,16 @@ ${url}`,
 }
 
 const deps: OpenExternalDeps = {
-    open: (url) => shell.openExternal(url),
-    fallback: process.platform === "win32" ? windowsFallback : null,
+    routes: routesFor(process.platform),
     log: writeLog
 };
 
 /** Open a link outside the app, for callers that do not wait on the outcome.
  *  When every route fails, the person is told and offered the address. */
 export function openExternal(url: string): void {
+    const address = outsideAddress(url);
+    if (address) rememberLink(address);
     void openOutside(url, deps).then((opened) => {
-        const address = outsideAddress(url);
         if (!opened && address) void sayFailed(address).catch(() => undefined);
     });
 }

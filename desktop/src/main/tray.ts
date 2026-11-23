@@ -8,11 +8,25 @@
  */
 
 import { join } from "node:path";
-import { Menu, Tray, nativeImage, type MenuItemConstructorOptions } from "electron";
+import { Menu, Tray, clipboard, nativeImage, type MenuItemConstructorOptions } from "electron";
 
 let tray: Tray | null = null;
 /** The dressed image asked for, kept for a tray put up after the ask. */
 let wanted: Electron.NativeImage | null = null;
+/** What the menu was last put up with, so it can be put up again. */
+let held: { items: readonly MenuItemConstructorOptions[]; show: () => void } | null = null;
+/** The last link handed to the browser, for "Copy last link opened". */
+let lastLink: string | null = null;
+
+/**
+ * Remember the last link sent to the browser. A link that the system took but
+ * no browser showed leaves no dialog behind, so its address stays one click
+ * away here (BUG-0020).
+ */
+export function rememberLink(url: string): void {
+    lastLink = url;
+    if (held) installTray(held.items, held.show);
+}
 
 /** The tray icon in the season's dress, or the shipped one for null. A no-op
  *  until the tray is up, and on macOS, which has none. */
@@ -33,6 +47,7 @@ export function setTrayImage(image: Electron.NativeImage | null): void {
 /** Put the icon up, or refresh what it offers. Clicking it brings Polaris forward. */
 export function installTray(items: readonly MenuItemConstructorOptions[], show: () => void): void {
     if (process.platform === "darwin") return;
+    held = { items, show };
     if (!tray) {
         // The .ico on Windows, which carries every size the notification area
         // asks for at each display scale; the PNG elsewhere.
@@ -48,6 +63,14 @@ export function installTray(items: readonly MenuItemConstructorOptions[], show: 
             { label: "Open Polaris", click: show },
             { type: "separator" },
             ...items,
+            { type: "separator" },
+            {
+                label: "Copy last link opened",
+                enabled: lastLink !== null,
+                click: () => {
+                    if (lastLink) clipboard.writeText(lastLink);
+                }
+            },
             { type: "separator" },
             { label: "Quit Polaris", role: "quit" }
         ])

@@ -33,5 +33,7 @@
             "tailwind-merge": ["./node_modules/tailwind-merge"]
         }
     },
-    "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts"]
+    "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts"],
+    // Built against the dashboard's own "@" alias by run.mjs, not this one.
+    "exclude": ["test/electron/links/page.ts"]
 }

@@ -1,7 +1,7 @@
 {
     "name": "polaris-desktop",
     "productName": "Polaris",
-    "version": "0.1.59",
+    "version": "0.1.60",
     "private": true,
     "description": "Polaris for Windows, macOS and Linux: an instance in its own window, local pushes and native notifications.",
     "author": "FJRG2007 <fjrg2007@tpeoficial.com>",
@@ -16,6 +16,7 @@
         "build": "node build/bundle.mjs",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
+        "test:electron": "node test/electron/links/run.mjs",
         "start": "npm run build && electron-forge start",
         "package": "npm run build && electron-forge package",
         "make": "npm run build && electron-forge make",
