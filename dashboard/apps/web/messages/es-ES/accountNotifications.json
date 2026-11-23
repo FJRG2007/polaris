@@ -853,6 +853,7 @@
         "standing": {
             "on": "Activado en este dispositivo.",
             "off": "Desactivado en este dispositivo.",
+            "desktop": "Polaris Desktop muestra estos avisos por sí mismo mientras está abierto o en la bandeja.",
             "denied": "{clientKind, select, desktop {El sistema bloquea los avisos de Polaris. Permítelos en la configuración del sistema.} phone {El móvil bloquea los avisos de Polaris. Permítelos en los ajustes del móvil.} other {Este navegador bloquea los avisos de Polaris. Permítelos en su configuración del sitio.}}",
             "unsupported": "{clientKind, select, desktop {Esta app no puede recibir avisos con Polaris cerrado.} phone {Esta app no puede recibir avisos con Polaris cerrado.} other {Este navegador no puede recibir avisos con Polaris cerrado.}}"
         }
