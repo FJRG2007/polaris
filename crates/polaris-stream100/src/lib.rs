@@ -15,17 +15,25 @@
 //!   is loaded only while the controller is plugged in.
 //! - [`ownership`]: who holds the device on this machine, and what to offer.
 //! - [`settings`]: stored values, defaults, and the declarative settings schema.
+//! - [`addon`]: the same settings as the add-on page's flat fields.
+//! - [`engine`]: reports in, volume changes and Polaris actions out.
 //!
-//! Everything above is pure. The USB transport is behind the `usb` feature.
+//! Everything above is pure. The USB transport is behind the `usb` feature;
+//! the operating system's per-app volume and the Windows ownership probe are
+//! behind `native` ([`native`]).
 
+pub mod addon;
 pub mod audio;
 pub mod display;
 pub mod encoder;
+pub mod engine;
 pub mod manifest;
 pub mod ownership;
 pub mod report;
 pub mod settings;
 
+#[cfg(feature = "native")]
+pub mod native;
 #[cfg(feature = "usb")]
 pub mod transport;
 

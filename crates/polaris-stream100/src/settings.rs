@@ -25,7 +25,7 @@ pub enum DisplayMode {
 
 /// A lit button's action: an id from the Polaris deck catalogue
 /// (`GET /api/deck/actions`, the one the Stream Deck plugin uses, such as
-/// `call.mic` or `call.deafen`), a local media key, or nothing.
+/// `call.mic` or `call.deafen`), or nothing (empty).
 pub type ActionId = String;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -44,8 +44,7 @@ impl Default for Settings {
         Self {
             enabled: true,
             knobs: default_targets(),
-            buttons: ["call.mic", "call.deafen", "media.playPause", "call.hangup"]
-                .map(String::from),
+            buttons: ["call.mic", "call.deafen", "call.camera", "call.hangup"].map(String::from),
             tuning: Tuning::default(),
             display: DisplayMode::Mixer,
             brightness: 80,

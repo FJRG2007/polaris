@@ -7,8 +7,9 @@
 //!
 //! Each operating system's per-app volume sits behind [`AudioSessions`]:
 //! Windows Core Audio sessions (`IAudioSessionManager2`), PipeWire/PulseAudio
-//! sink inputs on Linux, and process taps on macOS 14.2+. The backends live
-//! with the desktop binding; this module is the shared model and the rules.
+//! sink inputs on Linux, and process taps on macOS 14.2+ (not built yet). The
+//! backends are in `native` (feature `native`); this module is the shared
+//! model and the rules.
 
 use serde::{Deserialize, Serialize};
 
@@ -253,8 +254,8 @@ pub trait AudioSessions {
 /// tell a person instead of failing silently.
 pub fn backend_status(os: &str) -> &'static str {
     match os {
-        "windows" => "planned: Core Audio sessions (IAudioSessionManager2)",
-        "linux" => "planned: PipeWire through its PulseAudio interface",
+        "windows" => "Core Audio sessions on every active output",
+        "linux" => "the PulseAudio protocol, served by PulseAudio and PipeWire",
         "macos" => "not yet: needs macOS 14.2 process taps",
         _ => "not supported",
     }
