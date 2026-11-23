@@ -9,7 +9,7 @@
  */
 
 import type { Endpoint } from "./ipc-path";
-import { frame, readFrame, type PairMessage } from "./protocol";
+import { frame, readFrame, type HostMessage } from "./protocol";
 import { chmodSync, lstatSync, mkdirSync, rmSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 import type { NativePairReply } from "../../../../dashboard/packages/core/src/device-pairing";
@@ -28,7 +28,7 @@ function preparePrivateDir(dir: string): string | null {
 }
 
 /** Answer one connection. */
-export function serveConnection(socket: Socket, handle: (message: PairMessage) => Promise<NativePairReply>): void {
+export function serveConnection(socket: Socket, handle: (message: HostMessage) => Promise<NativePairReply>): void {
     let received = Buffer.alloc(0);
     let answered = false;
     const answer = (reply: NativePairReply) => {
@@ -57,7 +57,7 @@ export function serveConnection(socket: Socket, handle: (message: PairMessage) =
 }
 
 /** Listen at the endpoint; null when it could not (logged, never thrown). */
-export async function listen(endpoint: Endpoint, handle: (message: PairMessage) => Promise<NativePairReply>): Promise<Server | null> {
+export async function listen(endpoint: Endpoint, handle: (message: HostMessage) => Promise<NativePairReply>): Promise<Server | null> {
     try {
         if (endpoint.dir) {
             const problem = preparePrivateDir(endpoint.dir);

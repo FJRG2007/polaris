@@ -3,8 +3,10 @@
  * this app over the local socket, and what it is answered.
  *
  * The same framing the browsers use: a 32-bit little-endian length, then that
- * many bytes of JSON. Exactly one message per connection, and the only one
- * accepted is a pairing nonce. Everything else - a frame over the size cap,
+ * many bytes of JSON. Exactly one message per connection, and only two are
+ * accepted: a pairing nonce from the extension (relayed by the host), and a
+ * Polaris Terminal on this computer handing over its sign-in code
+ * (`terminal-sign-in`), which connects to the socket itself. Everything else - a frame over the size cap,
  * bytes that are not JSON, any other shape - is answered `bad-request` and the
  * connection is closed.
  *
@@ -49,9 +51,23 @@ export const pairMessageSchema = z.strictObject({
 });
 export type PairMessage = z.infer<typeof pairMessageSchema>;
 
+/** A sign-in code, as the server issues them: eight letters, maybe grouped. */
+const userCodeSchema = z.string().max(16).regex(/^[A-Za-z]{4}-?[A-Za-z]{4}$/);
+
+export const terminalSignInSchema = z.strictObject({
+    type: z.literal("terminal-sign-in"),
+    server: serverSchema,
+    userCode: userCodeSchema
+});
+export type TerminalSignInMessage = z.infer<typeof terminalSignInSchema>;
+
+export type HostMessage = PairMessage | TerminalSignInMessage;
+
+const hostMessageSchema = z.union([pairMessageSchema, terminalSignInSchema]);
+
 export type FrameRead =
     | { readonly kind: "partial"; }
-    | { readonly kind: "message"; readonly message: PairMessage; }
+    | { readonly kind: "message"; readonly message: HostMessage; }
     | { readonly kind: "invalid"; readonly why: string; };
 
 /** Read the one message a connection carries from the bytes received so far. */
@@ -67,7 +83,7 @@ export function readFrame(received: Buffer): FrameRead {
     } catch {
         return { kind: "invalid", why: "not JSON" };
     }
-    const message = pairMessageSchema.safeParse(parsed);
+    const message = hostMessageSchema.safeParse(parsed);
     return message.success ? { kind: "message", message: message.data } : { kind: "invalid", why: "not a pairing message" };
 }
 

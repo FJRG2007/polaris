@@ -24,6 +24,16 @@ describe("reading the host's message", () => {
         expect(read).toEqual({ kind: "message", message: { ...valid, server: "https://polaris.example" } });
     });
 
+    it("accepts a terminal's sign-in code, and nothing more in it", () => {
+        const terminal = { type: "terminal-sign-in", server: "https://polaris.example/", userCode: "BCDF-GHJK" };
+        expect(readFrame(framed(terminal))).toEqual({
+            kind: "message",
+            message: { ...terminal, server: "https://polaris.example" }
+        });
+        expect(readFrame(framed({ ...terminal, token: "x" })).kind).toBe("invalid");
+        expect(readFrame(framed({ ...terminal, userCode: "../../etc" })).kind).toBe("invalid");
+    });
+
     it("waits for the rest of a message split across reads", () => {
         const whole = framed(valid);
         expect(readFrame(whole.subarray(0, 2)).kind).toBe("partial");

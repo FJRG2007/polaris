@@ -12,9 +12,10 @@
 import { z } from "zod";
 import { join } from "node:path";
 import { listen } from "./ipc-server";
-import { app, session } from "electron";
+import { app, dialog, session } from "electron";
 import { runReg } from "../mail-handler";
 import { presentNonce } from "./pairing";
+import { answerTerminalSignIn, type PendingTerminal } from "./terminal-sign-in";
 import { homedir, userInfo } from "node:os";
 import { endpointFor, socketDir } from "./ipc-path";
 import { deviceHeadersFor } from "../device-headers";
@@ -152,6 +153,52 @@ async function claim(origin: string, nonce: string): Promise<number | null> {
     }
 }
 
+/** POST over this app's session, for the terminal sign-in. */
+async function postWithSession(origin: string, path: string, body: unknown): Promise<{ status: number; body: unknown } | null> {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    const url = `${origin}${path}`;
+    Object.assign(headers, deviceHeadersFor(url, origin, await deviceIdentity().catch(() => null)) ?? {});
+    try {
+        const response = await session.defaultSession.fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(body),
+            credentials: "include",
+            cache: "no-store",
+            signal: AbortSignal.timeout(CALL_TIMEOUT_MS)
+        });
+        return { status: response.status, body: await response.json().catch(() => null) };
+    } catch {
+        return null;
+    }
+}
+
+/** What a terminal's scopes let it do, in the words the approval page uses. */
+const SCOPE_WORDS: Record<string, string> = {
+    "polar.use": "Talk to Polar",
+    "polar.spend": "Use this Polaris's AI keys",
+    "terminal.control": "Be reached and controlled from your other devices"
+};
+
+/** Ask before a terminal is signed in. No is the default: anything on this computer can ask. */
+async function confirmTerminal(pending: PendingTerminal, server: string): Promise<boolean> {
+    const code = `${pending.userCode.slice(0, 4)}-${pending.userCode.slice(4)}`;
+    const { response } = await dialog.showMessageBox({
+        type: "question",
+        buttons: ["Sign in", "Don't sign in"],
+        defaultId: 1,
+        cancelId: 1,
+        message: `Sign Polaris Terminal in to ${new URL(server).host}?`,
+        detail: [
+            `${pending.device ?? "A terminal"}${pending.os ? ` (${pending.os})` : ""} asked with the code ${code}. Check that the terminal shows the same code.`,
+            "",
+            "It will be able to:",
+            ...pending.scopes.map((scope) => `- ${SCOPE_WORDS[scope] ?? scope}`)
+        ].join("\n")
+    });
+    return response === 0;
+}
+
 export interface NativeHostContext {
     /** The server the window shows, by its usual address. */
     readonly primary: () => string | null;
@@ -164,12 +211,11 @@ export function startNativeHost(context: NativeHostContext): void {
     if (!shippedHost()) return;
     const endpoint = endpointFor(process.platform, userInfo().username, homedir(), process.env.XDG_CONFIG_HOME);
     if (endpoint) {
+        const servers = () => [context.primary(), context.server()].filter((origin): origin is string => !!origin);
         void listen(endpoint, (message) =>
-            presentNonce(message, {
-                servers: () => [context.primary(), context.server()].filter((origin): origin is string => !!origin),
-                allowedIds: () => allowed,
-                claim
-            })
+            message.type === "terminal-sign-in"
+                ? answerTerminalSignIn(message, { servers, post: postWithSession, confirm: confirmTerminal })
+                : presentNonce(message, { servers, allowedIds: () => allowed, claim })
         );
     }
     const refresh = () => void refreshManifests(context.server()).catch((error: unknown) => console.warn("polaris: browser manifests:", error));
