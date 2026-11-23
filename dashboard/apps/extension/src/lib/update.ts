@@ -195,16 +195,118 @@ export interface BadgeState {
  * update can wait for the next tab with nothing saved. The update still reaches
  * the icon either way, through its tooltip, and the popup says it in full.
  *
- * The mark itself is only for a copy somebody has to update by hand. A store
- * install, a folder the updater keeps current and the desktop app all deliver
- * the new version without anybody doing anything, and an icon asking for
- * attention it cannot use is one people learn to ignore.
+ * The mark is there until the popup's notice for that version has been seen and
+ * dismissed (`shouldAnnounce`) - for every install, since somebody with the
+ * popup closed has no other way to hear of it. A copy somebody has to update by
+ * hand keeps it after that, until the new version runs: there is still
+ * something for them to do. The desktop app says it itself.
  */
-export function badgeFor(count: string, notice: UpdateNotice | null): BadgeState {
+export function badgeFor(
+    count: string,
+    notice: UpdateNotice | null,
+    dismissed: string | null = null
+): BadgeState {
     const announce = notice && notice.kind !== "desktop" ? notice.version : null;
     if (count !== "") return { text: count, color: COUNT_COLOR, announce };
-    if (notice?.kind === "manual") return { text: "!", color: UPDATE_COLOR, announce };
+    if (notice?.kind === "manual" || shouldAnnounce(notice, dismissed))
+        return { text: "!", color: UPDATE_COLOR, announce };
     return { text: "", color: COUNT_COLOR, announce };
+}
+
+/**
+ * Whether the popup's one-time notice for this version is still to be shown.
+ *
+ * Once per version: dismissing it for 0.2.0 keeps it away until 0.2.1 is out,
+ * and never says the same thing on every open. The desktop app says it itself.
+ */
+export function shouldAnnounce(notice: UpdateNotice | null, dismissed: string | null): boolean {
+    return notice !== null && notice.kind !== "desktop" && notice.version !== dismissed;
+}
+
+/** How often the worker asks on its own: every few hours, and at browser start. */
+export const UPDATE_CHECK_EVERY_MINUTES = 6 * 60;
+
+/**
+ * The least time between two checks nobody asked for.
+ *
+ * A manifest v3 worker is started many times an hour, and the check that runs
+ * when it starts would otherwise be a request every time. A press of "Check for
+ * updates" and the browser's own start are not held back by it.
+ */
+export const UPDATE_MIN_GAP_MS = 60 * 60 * 1000;
+
+/** Whether an unasked check is due, given when the last one ran (ms, or null). */
+export function checkDue(lastCheckedAt: number | null, now: number): boolean {
+    if (lastCheckedAt === null || !Number.isFinite(lastCheckedAt)) return true;
+    // A clock moved backwards is not a reason to stay quiet for a day.
+    if (lastCheckedAt > now) return true;
+    return now - lastCheckedAt >= UPDATE_MIN_GAP_MS;
+}
+
+/**
+ * How long a folder the updater marked as its own may go without the new
+ * version arriving before the popup stops promising it will.
+ *
+ * The updater runs every six hours; two missed runs is an updater that is not
+ * running - removed, blocked, or a folder copied away from where it looks - and
+ * from then on this copy is told how to update by hand, like any other.
+ */
+export const AUTO_GRACE_MS = 12 * 60 * 60 * 1000;
+
+/** When this running version first heard that a newer one is out. */
+export interface BehindSince {
+    readonly running: string;
+    readonly at: number;
+}
+
+/**
+ * The record of when this copy fell behind: kept while the same version runs,
+ * started again once another does, cleared when nothing newer is out.
+ */
+export function behindSince(
+    held: BehindSince | null,
+    running: string,
+    behind: boolean,
+    now: number
+): BehindSince | null {
+    if (!behind) return null;
+    if (held && held.running === running && Number.isFinite(held.at) && held.at <= now) return held;
+    return { running, at: now };
+}
+
+/**
+ * The install kind as it stands after the updater has had its chance: `auto`
+ * that has waited past `AUTO_GRACE_MS` is `manual`, because the promise on
+ * screen ("installs itself within hours") has stopped being true.
+ */
+export function effectiveKind(kind: InstallKind, since: BehindSince | null, now: number): InstallKind {
+    if (kind !== "auto" || since === null) return kind;
+    return now - since.at > AUTO_GRACE_MS ? "manual" : kind;
+}
+
+/** The build a browser needs: WXT names the packages after it. */
+export type PackageBrowser = "chrome" | "firefox";
+
+/**
+ * The package to download for an update by hand.
+ *
+ * The server answers with the release page (`/releases/tag/<tag>` on GitHub),
+ * and the packages sit beside it under fixed names (`wxt.config.ts`, `zip`), so
+ * the file is derived rather than asked for - a server from before this knows
+ * nothing more to send. Anything that is not a GitHub release page is returned
+ * as it is: the page, where the files are listed.
+ */
+export function downloadUrl(releaseUrl: string, browser: PackageBrowser): string {
+    let parsed: URL;
+    try {
+        parsed = new URL(releaseUrl);
+    } catch {
+        return releaseUrl;
+    }
+    const match = /^\/([^/]+)\/([^/]+)\/releases\/tag\/([^/]+)\/?$/.exec(parsed.pathname);
+    if (parsed.protocol !== "https:" || parsed.hostname !== "github.com" || !match) return releaseUrl;
+    const [, owner, repo, tag] = match;
+    return `https://github.com/${owner}/${repo}/releases/download/${tag}/polaris-extension-${browser}.zip`;
 }
 
 /**
@@ -214,4 +316,33 @@ export function badgeFor(count: string, notice: UpdateNotice | null): BadgeState
  */
 export function upToDate(latest: string | null, running: string, newer: string | null): boolean {
     return !newer && !!latest && !isNewer(latest, running);
+}
+
+/** The alarm the periodic check runs on. */
+export const UPDATE_CHECK_ALARM = "update-check";
+
+/**
+ * Whether the periodic check's alarm has to be created: when it is missing, or
+ * on a period other than this build's. Creating one that exists starts its
+ * period again, so a worker that started every few minutes and created it each
+ * time would never let a period of hours come round.
+ */
+export function alarmNeedsCreating(held: { periodInMinutes?: number } | undefined | null): boolean {
+    return held?.periodInMinutes !== UPDATE_CHECK_EVERY_MINUTES;
+}
+
+/**
+ * The browser's extensions page, focused on this extension, for the Reload
+ * after an update by hand - or null where an extension may not open it. Every
+ * Chromium browser (Chrome, Edge, Brave, Opera) answers `chrome://extensions`;
+ * Firefox refuses to open `about:debugging` from an extension.
+ */
+export function extensionsPage(browser: string, id: string): string | null {
+    if (browser === "firefox") return null;
+    return `chrome://extensions/?id=${encodeURIComponent(id)}`;
+}
+
+/** The package for the browser this build is for. */
+export function packageBrowser(browser: string): PackageBrowser {
+    return browser === "firefox" ? "firefox" : "chrome";
 }

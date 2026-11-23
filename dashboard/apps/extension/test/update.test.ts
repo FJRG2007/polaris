@@ -2,7 +2,18 @@ import { describe, expect, it } from "vitest";
 import english from "../src/messages/en-US.json";
 import spanish from "../src/messages/es-ES.json";
 import {
+    alarmNeedsCreating,
+    AUTO_GRACE_MS,
     badgeFor,
+    behindSince,
+    checkDue,
+    downloadUrl,
+    effectiveKind,
+    extensionsPage,
+    packageBrowser,
+    shouldAnnounce,
+    UPDATE_CHECK_EVERY_MINUTES,
+    UPDATE_MIN_GAP_MS,
     compareVersions,
     COUNT_COLOR,
     installKind,
@@ -196,10 +207,19 @@ describe("the toolbar badge", () => {
         });
     });
 
-    it("asks nothing of an install that updates without anybody", () => {
-        expect(badgeFor("", notice("store")).text).toBe("");
-        expect(badgeFor("", notice("auto")).text).toBe("");
-        expect(badgeFor("", notice("store")).announce).toBe("0.2.0");
+    it("marks every install's update until its notice is dismissed", () => {
+        for (const kind of ["store", "auto"] as const) {
+            expect(badgeFor("", notice(kind))).toEqual({
+                text: "!",
+                color: UPDATE_COLOR,
+                announce: "0.2.0"
+            });
+            expect(badgeFor("", notice(kind), "0.2.0").text).toBe("");
+            // A dismissal of an older version is not one of this one.
+            expect(badgeFor("", notice(kind), "0.1.9").text).toBe("!");
+        }
+        // By hand there is still something to do after the notice is closed.
+        expect(badgeFor("", notice("manual"), "0.2.0").text).toBe("!");
         // The desktop app says it itself.
         expect(badgeFor("", notice("desktop"))).toEqual({
             text: "",
@@ -214,7 +234,21 @@ describe("what the popup says about it", () => {
 
     it("has every line in both languages", () => {
         for (const catalog of all) {
-            for (const key of ["byHand", "ready", "startNow", "startNowHint", "title"] as const)
+            for (const key of [
+                "store",
+                "auto",
+                "manual",
+                "download",
+                "stepsChromium",
+                "stepsFirefox",
+                "openExtensions",
+                "changes",
+                "dismiss",
+                "ready",
+                "startNow",
+                "startNowHint",
+                "title"
+            ] as const)
                 expect(catalog.popup.update[key]).toBeTruthy();
             for (const key of [
                 "running",
@@ -222,9 +256,37 @@ describe("what the popup says about it", () => {
                 "available",
                 "store",
                 "auto",
-                "manual"
+                "manual",
+                "updateNow"
             ] as const)
                 expect(catalog.popup.version[key]).toBeTruthy();
+        }
+    });
+
+    it("promises an update by itself only where something delivers one", () => {
+        // The store and the updater install it; a folder loaded by hand is
+        // never updated by the browser, and is told so.
+        expect(english.popup.version.store).toBe("Installs itself within hours");
+        expect(english.popup.update.store).toMatch(/browser installs it within hours/);
+        expect(english.popup.update.auto).toMatch(/updater/);
+        expect(english.popup.version.manual).toBe("Update it by hand");
+        expect(english.popup.update.manual).toMatch(/by hand/);
+        expect(english.popup.update.manual).not.toMatch(/within hours|itself/);
+        expect(spanish.popup.update.manual).toMatch(/a mano/);
+        expect(spanish.popup.update.manual).not.toMatch(/en horas|sola/);
+        for (const catalog of all)
+            for (const key of ["store", "auto", "manual"] as const)
+                expect(catalog.popup.update[key]).toContain("{version}");
+    });
+
+    it("keeps the Spanish near the English length", () => {
+        for (const section of ["update", "version"] as const) {
+            const en = english.popup[section] as Record<string, string>;
+            const es = spanish.popup[section] as Record<string, string>;
+            for (const key of Object.keys(en)) {
+                expect(es[key], key).toBeTruthy();
+                expect(es[key]!.length, key).toBeLessThanOrEqual(Math.ceil(en[key]!.length * 1.3) + 4);
+            }
         }
     });
 
@@ -242,5 +304,135 @@ describe("the version line's Up to date", () => {
         expect(upToDate(null, "0.1.115", null)).toBe(false);
         expect(upToDate("0.1.116", "0.1.115", null)).toBe(false);
         expect(upToDate("0.1.115", "0.1.115", "0.1.116")).toBe(false);
+    });
+});
+describe("how this build got here, for the advice", () => {
+    it("reads an unpacked or temporary load as by hand, without the updater", () => {
+        // Chromium's Load unpacked and Firefox's temporary add-on both report
+        // `development`.
+        expect(installKind("development")).toBe("manual");
+        expect(installKind("development", true)).toBe("auto");
+    });
+
+    it("reads a copy put there by policy or other software, with no update address, as by hand", () => {
+        expect(installKind("admin")).toBe("manual");
+        expect(installKind("sideload")).toBe("manual");
+        expect(installKind("other")).toBe("manual");
+        expect(installKind(null)).toBe("manual");
+    });
+
+    it("reads a store install as the browser's", () => {
+        expect(installKind("normal")).toBe("store");
+        expect(installKind("admin", false, false, "https://clients2.google.com/service/update2/crx")).toBe(
+            "store"
+        );
+    });
+});
+
+describe("the updater's promise", () => {
+    const start = 1_000_000;
+
+    it("starts counting when this version first hears of a newer one, and keeps that time", () => {
+        const first = behindSince(null, "0.1.275", true, start);
+        expect(first).toEqual({ running: "0.1.275", at: start });
+        expect(behindSince(first, "0.1.275", true, start + 5000)).toBe(first);
+    });
+
+    it("starts again on another running version, and clears when nothing is newer", () => {
+        const first = behindSince(null, "0.1.275", true, start);
+        expect(behindSince(first, "0.1.276", true, start + 10)).toEqual({
+            running: "0.1.276",
+            at: start + 10
+        });
+        expect(behindSince(first, "0.1.275", false, start + 10)).toBeNull();
+    });
+
+    it("stops promising after the grace, and tells it to update by hand", () => {
+        const since = { running: "0.1.275", at: start };
+        expect(effectiveKind("auto", since, start + AUTO_GRACE_MS)).toBe("auto");
+        expect(effectiveKind("auto", since, start + AUTO_GRACE_MS + 1)).toBe("manual");
+        expect(effectiveKind("auto", null, start + AUTO_GRACE_MS * 10)).toBe("auto");
+    });
+
+    it("leaves every other kind as it is", () => {
+        const since = { running: "0.1.275", at: start };
+        for (const kind of ["store", "manual", "desktop"] as const)
+            expect(effectiveKind(kind, since, start + AUTO_GRACE_MS * 10)).toBe(kind);
+    });
+});
+
+describe("checking in the background", () => {
+    const now = 50 * UPDATE_MIN_GAP_MS;
+
+    it("checks every few hours", () => {
+        expect(UPDATE_CHECK_EVERY_MINUTES).toBeGreaterThanOrEqual(60);
+        expect(UPDATE_CHECK_EVERY_MINUTES).toBeLessThanOrEqual(12 * 60);
+    });
+
+    it("creates the alarm only when it is missing or on another period", () => {
+        expect(alarmNeedsCreating(undefined)).toBe(true);
+        expect(alarmNeedsCreating(null)).toBe(true);
+        expect(alarmNeedsCreating({ periodInMinutes: 12 * 60 })).toBe(true);
+        // Recreating a held alarm restarts its period: never done.
+        expect(alarmNeedsCreating({ periodInMinutes: UPDATE_CHECK_EVERY_MINUTES })).toBe(false);
+    });
+
+    it("holds a worker's own starts to one check an hour", () => {
+        expect(checkDue(null, now)).toBe(true);
+        expect(checkDue(now - 60_000, now)).toBe(false);
+        expect(checkDue(now - UPDATE_MIN_GAP_MS, now)).toBe(true);
+        // A clock set back is not a reason to go quiet.
+        expect(checkDue(now + 60_000, now)).toBe(true);
+        expect(checkDue(Number.NaN, now)).toBe(true);
+    });
+});
+
+describe("the one-time notice", () => {
+    const notice = (kind: UpdateNotice["kind"], version = "0.1.279"): UpdateNotice => ({
+        version,
+        url: "https://github.com/example/polaris/releases/tag/extension-v0.1.279",
+        kind
+    });
+
+    it("is shown for a version until it is dismissed, and again for the next", () => {
+        expect(shouldAnnounce(notice("manual"), null)).toBe(true);
+        expect(shouldAnnounce(notice("manual"), "0.1.279")).toBe(false);
+        expect(shouldAnnounce(notice("store", "0.1.280"), "0.1.279")).toBe(true);
+    });
+
+    it("says nothing with no update, or for the desktop app", () => {
+        expect(shouldAnnounce(null, null)).toBe(false);
+        expect(shouldAnnounce(notice("desktop"), null)).toBe(false);
+    });
+});
+
+describe("updating by hand", () => {
+    const release = "https://github.com/example/polaris/releases/tag/extension-v0.1.279";
+
+    it("downloads the release's package for this browser", () => {
+        expect(downloadUrl(release, "chrome")).toBe(
+            "https://github.com/example/polaris/releases/download/extension-v0.1.279/polaris-extension-chrome.zip"
+        );
+        expect(downloadUrl(release, "firefox")).toBe(
+            "https://github.com/example/polaris/releases/download/extension-v0.1.279/polaris-extension-firefox.zip"
+        );
+        expect(packageBrowser("edge")).toBe("chrome");
+        expect(packageBrowser("firefox")).toBe("firefox");
+    });
+
+    it("falls back to the page it was given for anything else", () => {
+        for (const other of [
+            "https://example.test/releases/tag/x",
+            "http://github.com/a/b/releases/tag/x",
+            "https://github.com/a/b/releases",
+            "not a url"
+        ])
+            expect(downloadUrl(other, "chrome")).toBe(other);
+    });
+
+    it("opens the extensions page on Chromium only", () => {
+        expect(extensionsPage("chrome", "abc")).toBe("chrome://extensions/?id=abc");
+        expect(extensionsPage("edge", "abc")).toBe("chrome://extensions/?id=abc");
+        expect(extensionsPage("firefox", "abc")).toBeNull();
     });
 });

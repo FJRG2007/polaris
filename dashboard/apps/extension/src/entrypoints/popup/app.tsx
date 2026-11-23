@@ -5,7 +5,15 @@ import { timeoutChoices } from "@/lib/lock";
 import { EVERY_SITE } from "@/lib/injection";
 import { PAGE_FILLING_KEY } from "@/lib/page-filling";
 import { readIntendedLogin } from "@/lib/save";
-import { isNewer, upToDate, type UpdateNotice } from "@/lib/update";
+import {
+    downloadUrl,
+    extensionsPage,
+    isNewer,
+    packageBrowser,
+    shouldAnnounce,
+    upToDate,
+    type UpdateNotice
+} from "@/lib/update";
 import { readOrigin } from "@/lib/address";
 import { localPermissions, type ReachStatus } from "@/lib/local-address";
 import { accountHost, describeAccount } from "@/lib/accounts";
@@ -107,10 +115,20 @@ interface UpdateState {
     readonly notice: UpdateNotice | null;
     readonly pending: string | null;
     readonly latest: string | null;
+    /** The version whose one-time notice was dismissed. */
+    readonly dismissed: string | null;
 }
 
-function useUpdate(): UpdateState & { readonly apply: (state: UpdateState) => void } {
-    const [state, setState] = useState<UpdateState>({ notice: null, pending: null, latest: null });
+function useUpdate(): UpdateState & {
+    readonly apply: (state: UpdateState) => void;
+    readonly dismiss: (version: string) => void;
+} {
+    const [state, setState] = useState<UpdateState>({
+        notice: null,
+        pending: null,
+        latest: null,
+        dismissed: null
+    });
     useEffect(() => {
         void (async () => {
             const reply = await askBackground({ kind: "updateStatus" });
@@ -118,11 +136,26 @@ function useUpdate(): UpdateState & { readonly apply: (state: UpdateState) => vo
                 setState({
                     notice: reply.update,
                     pending: reply.pending,
-                    latest: reply.latest ?? null
+                    latest: reply.latest ?? null,
+                    dismissed: reply.dismissed ?? null
                 });
         })();
     }, []);
-    return { ...state, apply: setState };
+    // Gone from the screen at once; put back if the worker could not keep it.
+    const dismiss = useCallback((version: string) => {
+        let before: string | null = null;
+        setState((now) => {
+            before = now.dismissed;
+            return { ...now, dismissed: version };
+        });
+        void askBackground({ kind: "dismissUpdate", version })
+            .then((reply) => reply.ok)
+            .catch(() => false)
+            .then((kept) => {
+                if (!kept) setState((now) => ({ ...now, dismissed: before }));
+            });
+    }, []);
+    return { ...state, apply: setState, dismiss };
 }
 
 type Checked =
@@ -140,12 +173,15 @@ type Checked =
  */
 function CheckUpdates({
     onChecked,
-    currentShown
+    currentShown,
+    updateNow
 }: {
     onChecked: (state: UpdateState) => void;
     /** Whether the version line already says "Up to date", so a check that
      *  found nothing new does not say it a second time beside it. */
     currentShown: boolean;
+    /** A store install with a newer version out: the press asks the store now. */
+    updateNow: boolean;
 }): React.JSX.Element {
     const t = useWords();
     const [checked, setChecked] = useState<Checked | null>(null);
@@ -182,7 +218,12 @@ function CheckUpdates({
             setChecked({ kind: "failed" });
             return;
         }
-        onChecked({ notice: reply.update, pending: reply.pending, latest: reply.latest });
+        onChecked({
+            notice: reply.update,
+            pending: reply.pending,
+            latest: reply.latest,
+            dismissed: reply.dismissed ?? null
+        });
         const { store, storeVersion, polaris } = reply.checked;
         const running = browser.runtime.getManifest().version;
         if (store === "update_available")
@@ -224,7 +265,9 @@ function CheckUpdates({
                     >
                         {checked?.kind === "checking"
                             ? t("popup.version.checking")
-                            : t("popup.version.check")}
+                            : updateNow
+                              ? t("popup.version.updateNow")
+                              : t("popup.version.check")}
                     </button>
                 </>
             )}
@@ -232,34 +275,72 @@ function CheckUpdates({
     );
 }
 
-/** Where the steps for updating by hand are: this Polaris's downloads page, or
- *  the release itself before a Polaris has been named. */
-function stepsUrl(notice: UpdateNotice, server: string | null): string {
-    return server ? `${server}/account/downloads` : notice.url;
+/**
+ * Updating a copy loaded from a folder: the package, what to do with it, and
+ * the page where the Reload is.
+ *
+ * The download is the release's own package for this browser
+ * (`update.downloadUrl`), under the one name every release uses, so it can be
+ * unzipped over the same folder and the extension reloaded in place. The
+ * extensions page is opened by the worker where the browser allows it
+ * (Chromium); Firefox does not, and its steps name the page instead.
+ */
+function ManualSteps({ notice }: { notice: UpdateNotice; }): React.JSX.Element {
+    const t = useWords();
+    const target = import.meta.env.BROWSER;
+    const canOpen = extensionsPage(target, browser.runtime.id) !== null;
+    return (
+        <>
+            <p>{t("popup.update.manual", { version: notice.version })}</p>
+            <p className="muted">
+                {t(canOpen ? "popup.update.stepsChromium" : "popup.update.stepsFirefox")}
+            </p>
+            <div className="notice-actions">
+                <a
+                    className="button notice-download"
+                    href={downloadUrl(notice.url, packageBrowser(target))}
+                    target="_blank"
+                    rel="noreferrer"
+                >
+                    {t("popup.update.download")}
+                </a>
+                {canOpen ? (
+                    <button
+                        className="ghost"
+                        onClick={() => void askBackground({ kind: "openExtensionsPage" })}
+                    >
+                        {t("popup.update.openExtensions")}
+                    </button>
+                ) : null}
+                <a href={notice.url} target="_blank" rel="noreferrer">
+                    {t("popup.update.changes")}
+                </a>
+            </div>
+        </>
+    );
 }
 
 /**
- * The one thing this popup says without being asked, and only when there is
- * something for the reader to do:
+ * The one thing this popup says without being asked:
  *
  * - A newer version already on disk, put there by the install script's updater,
  *   starts by itself at the next safe moment (`lib/self-update.ts`). Said, with
  *   the way to start it now and what that costs.
- * - A copy loaded by hand stays on its version until it is loaded again, by hand,
- *   for now. Said, with the link to the steps on their own Polaris - never a
- *   command to type.
- *
- * A store install, a copy the updater keeps current and one the desktop app
- * looks after need nothing from anybody; the version line at the foot says it.
+ * - A newer version out, once per version (`update.shouldAnnounce`): what
+ *   happens next for this kind of install, and for a copy loaded from a folder
+ *   the package and the steps. Dismissed, it stays away until the next release;
+ *   the version line at the foot still says it.
  */
 function UpdateBanner({
     notice,
     pending,
-    server
+    dismissed,
+    onDismiss
 }: {
     notice: UpdateNotice | null;
     pending: string | null;
-    server: string | null;
+    dismissed: string | null;
+    onDismiss: (version: string) => void;
 }): React.JSX.Element | null {
     const t = useWords();
     const [starting, setStarting] = useState(false);
@@ -282,18 +363,28 @@ function UpdateBanner({
             </div>
         );
     }
-    if (notice?.kind !== "manual") return null;
+    if (!notice || !shouldAnnounce(notice, dismissed)) return null;
     return (
-        <div className="notice small">
-            {t.rich("popup.update.byHand", {
-                version: notice.version,
-                link: (chunks) => (
-                    <a key="link" href={stepsUrl(notice, server)} target="_blank" rel="noreferrer">
-                        {chunks}
-                    </a>
-                ),
-                where: server ? "polaris" : "changes"
-            })}
+        <div className="notice small notice-update" role="status">
+            <div className="notice-body">
+                {notice.kind === "manual" ? (
+                    <ManualSteps notice={notice} />
+                ) : (
+                    <p>
+                        {notice.kind === "store"
+                            ? t("popup.update.store", { version: notice.version })
+                            : t("popup.update.auto", { version: notice.version })}
+                    </p>
+                )}
+            </div>
+            <button
+                className="ghost notice-dismiss"
+                aria-label={t("popup.update.dismiss")}
+                title={t("popup.update.dismiss")}
+                onClick={() => onDismiss(notice.version)}
+            >
+                {"×"}
+            </button>
         </div>
     );
 }
@@ -303,51 +394,67 @@ function UpdateBanner({
  * is out - with what happens next for this kind of install.
  *
  * "Up to date" only once Polaris has actually named a version: no answer yet is
- * not the same as nothing new.
+ * not the same as nothing new. A copy updated by hand gets its steps back from
+ * here once the notice above was dismissed; a store install gets "Update now",
+ * which asks the store at once instead of waiting for its own schedule.
  */
 function VersionLine({
     notice,
     pending,
     latest,
-    server,
     apply
 }: UpdateState & {
-    server: string | null;
     apply: (state: UpdateState) => void;
 }): React.JSX.Element {
     const t = useWords();
+    const [steps, setSteps] = useState(false);
     const running = browser.runtime.getManifest().version;
     const newer = pending ?? (notice && notice.kind !== "desktop" ? notice.version : null);
     const current = upToDate(latest, running, newer);
+    const manual = !pending && notice?.kind === "manual" ? notice : null;
     return (
-        <p className="version-line">
-            <span>{t("popup.version.running", { version: running })}</span>
-            {newer ? (
-                <>
-                    <span>{t("popup.version.available", { version: newer })}</span>
-                    {pending ? null : notice?.kind === "manual" ? (
-                        <a href={stepsUrl(notice, server)} target="_blank" rel="noreferrer">
-                            {t("popup.version.manual")}
-                        </a>
-                    ) : notice?.kind === "store" ? (
-                        <span>{t("popup.version.store")}</span>
-                    ) : notice?.kind === "auto" ? (
-                        <span>{t("popup.version.auto")}</span>
-                    ) : null}
-                </>
-            ) : current ? (
-                <span>{t("popup.version.current")}</span>
+        <>
+            <p className="version-line">
+                <span>{t("popup.version.running", { version: running })}</span>
+                {newer ? (
+                    <>
+                        <span>{t("popup.version.available", { version: newer })}</span>
+                        {pending ? null : manual ? (
+                            <button
+                                className="link"
+                                aria-expanded={steps}
+                                onClick={() => setSteps((open) => !open)}
+                            >
+                                {t("popup.version.manual")}
+                            </button>
+                        ) : notice?.kind === "store" ? (
+                            <span>{t("popup.version.store")}</span>
+                        ) : notice?.kind === "auto" ? (
+                            <span>{t("popup.version.auto")}</span>
+                        ) : null}
+                    </>
+                ) : current ? (
+                    <span>{t("popup.version.current")}</span>
+                ) : null}
+                <CheckUpdates
+                    onChecked={apply}
+                    currentShown={current}
+                    updateNow={!pending && notice?.kind === "store"}
+                />
+            </p>
+            {manual && steps ? (
+                <div className="notice small version-steps">
+                    <ManualSteps notice={manual} />
+                </div>
             ) : null}
-            <CheckUpdates onChecked={apply} currentShown={current} />
-        </p>
+        </>
     );
 }
-
 export function App(): React.JSX.Element {
     const t = useWords();
     const [status, refresh] = useStatus();
     const updates = useUpdate();
-    const { notice: update, pending } = updates;
+    const { notice: update, pending, dismissed, dismiss } = updates;
     const [held, setSection] = useSection();
     /**
      * Asking Polaris to let this browser in, from the locked screen.
@@ -386,7 +493,12 @@ export function App(): React.JSX.Element {
     if (shown === "server" || shown === "link" || !status.server) {
         return (
             <div className="app">
-                <UpdateBanner notice={update} pending={pending} server={status.server} />
+                <UpdateBanner
+                    notice={update}
+                    pending={pending}
+                    dismissed={dismissed}
+                    onDismiss={dismiss}
+                />
                 {shown === "link" && status.server ? (
                     <LinkPolaris server={status.server} onDone={refresh} />
                 ) : (
@@ -394,7 +506,7 @@ export function App(): React.JSX.Element {
                 )}
                 <Accounts status={status} onChange={refresh} />
                 <ServersFold status={status} onChange={refresh} />
-                <VersionLine {...updates} server={status.server} />
+                <VersionLine {...updates} />
             </div>
         );
     }
@@ -402,7 +514,12 @@ export function App(): React.JSX.Element {
     // Connected: the frame, and either the home screen or the section open in it.
     return (
         <div className="app">
-            <UpdateBanner notice={update} pending={pending} server={status.server} />
+            <UpdateBanner
+                    notice={update}
+                    pending={pending}
+                    dismissed={dismissed}
+                    onDismiss={dismiss}
+                />
             <TopBar status={status} onChange={refresh} onOpen={setSection} />
             {status.reach ? <LocalAddress reach={status.reach} onChange={refresh} /> : null}
             {section === "home" ? (
@@ -469,7 +586,7 @@ export function App(): React.JSX.Element {
                     {shown === "signIn" || shown === "unlock" ? <Generator /> : null}
                 </>
             )}
-            <VersionLine {...updates} server={status.server} />
+            <VersionLine {...updates} />
         </div>
     );
 }

@@ -1384,6 +1384,48 @@ button.danger {
     margin-bottom: 6px;
 }
 
+/* A newer version out, said once: the words, and the cross that closes it. */
+.notice-update {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.notice-body {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.notice-dismiss {
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+/* Download, the extensions page and what changed: wraps rather than widening. */
+.notice-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin-bottom: 6px;
+}
+
+.notice a.notice-download {
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    font-weight: 500;
+    text-decoration: none;
+}
+
+/* The steps again, under the version line, once the notice was dismissed. */
+.version-steps {
+    border-top: 1px solid hsl(var(--border));
+    border-bottom: 0;
+}
+
 /* Which version this is, and whether a newer one is out, at the foot of every
    screen. Wraps rather than widening the popup. */
 .version-line {

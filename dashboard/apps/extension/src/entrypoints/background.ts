@@ -318,6 +318,17 @@ const UPDATE = storage.defineItem<update.UpdateNotice | null>("local:update.noti
 /** The newest version this Polaris last said is out, newer or not: what lets the
  *  popup say "up to date" only once somebody has actually answered. */
 const LATEST = storage.defineItem<string | null>("local:update.latest", { fallback: null });
+/** The version whose popup notice was dismissed: it is said once per version. */
+const DISMISSED = storage.defineItem<string | null>("local:update.dismissed", { fallback: null });
+/** When the last check nobody asked for went out, so a worker started many times
+ *  an hour does not ask every time (`update.checkDue`). */
+const CHECKED_AT = storage.defineItem<number | null>("local:update.checkedAt", { fallback: null });
+/** When this running version first heard of a newer one (`update.effectiveKind`). */
+const BEHIND = storage.defineItem<update.BehindSince | null>("local:update.behindSince", {
+    fallback: null
+});
+/** A version as a dismissal names it: what the popup was shown, nothing longer. */
+const VERSION_TEXT = z.string().min(1).max(64);
 /**
  * A login somebody has just submitted on a page, waiting to be offered.
  *
@@ -2465,7 +2476,7 @@ async function badge(): Promise<void> {
             held && update.isNewer(held.version, browser.runtime.getManifest().version)
                 ? held
                 : null;
-        const shown = update.badgeFor(count, notice);
+        const shown = update.badgeFor(count, notice, await DISMISSED.getValue());
         // The count and the update notice say more, so the VPN only takes an
         // empty badge. The tooltip below says it either way.
         const onVpn = await vpn.isConnected();
@@ -3107,9 +3118,10 @@ async function changePassword(id: string, password: string): Promise<messages.Re
     return { ok: true, status: await status() };
 }
 
-/** How often the server is asked whether a newer extension has been published.
- *  Twice a day: the answer changes a few times a year. */
-const UPDATE_EVERY_MINUTES = 12 * 60;
+/** How often the server is asked whether a newer extension has been published:
+ *  every few hours, so a release is known about the same day. The server caches
+ *  the answer, and `update.checkDue` keeps a worker's own starts from adding to it. */
+const UPDATE_EVERY_MINUTES = update.UPDATE_CHECK_EVERY_MINUTES;
 
 /** Long enough for a server on the other side of a tunnel, short enough that a
  *  worker is not held open by it. */
@@ -3207,11 +3219,15 @@ async function updaterCovers(): Promise<boolean> {
 async function currentNotice(): Promise<update.UpdateNotice | null> {
     const held = await UPDATE.getValue();
     if (!held || !update.isNewer(held.version, browser.runtime.getManifest().version)) return null;
-    const kind = update.installKind(
-        await installType(),
-        await updaterCovers(),
-        update.managedByDesktop(),
-        await updateUrl()
+    const kind = update.effectiveKind(
+        update.installKind(
+            await installType(),
+            await updaterCovers(),
+            update.managedByDesktop(),
+            await updateUrl()
+        ),
+        await BEHIND.getValue(),
+        Date.now()
     );
     if (kind === held.kind) return held;
     const current = { ...held, kind };
@@ -3244,6 +3260,7 @@ async function currentNotice(): Promise<update.UpdateNotice | null> {
 async function checkForUpdate(): Promise<boolean> {
     const origin = await reachOrigin();
     if (!origin) return false;
+    await CHECKED_AT.setValue(Date.now());
     try {
         const response = await fetch(`${origin}/api/polaris/extension`, {
             signal: AbortSignal.timeout(UPDATE_TIMEOUT_MS),
@@ -3252,15 +3269,22 @@ async function checkForUpdate(): Promise<boolean> {
         if (!response.ok) return false;
         const answer = (await response.json()) as { version?: unknown; url?: unknown };
         await LATEST.setValue(update.publishedVersion(answer));
+        const running = browser.runtime.getManifest().version;
+        const found = update.noticeFor(
+            answer,
+            running,
+            await installType(),
+            await updaterCovers(),
+            update.managedByDesktop(),
+            await updateUrl()
+        );
+        // How long this copy has been behind, so a folder the updater marked as
+        // its own stops being promised an update that has not come.
+        const now = Date.now();
+        const since = update.behindSince(await BEHIND.getValue(), running, found !== null, now);
+        await BEHIND.setValue(since);
         await UPDATE.setValue(
-            update.noticeFor(
-                answer,
-                browser.runtime.getManifest().version,
-                await installType(),
-                await updaterCovers(),
-                update.managedByDesktop(),
-                await updateUrl()
-            )
+            found ? { ...found, kind: update.effectiveKind(found.kind, since, now) } : null
         );
         // The toolbar icon is where somebody with the popup closed finds out.
         await badge();
@@ -3307,6 +3331,24 @@ async function checkUpdateNow(): Promise<{
         }
     }
     return { store, storeVersion, polaris: await checkForUpdate() };
+}
+
+/** The check a worker start makes, unless one went out within the hour. */
+async function checkForUpdateIfDue(): Promise<void> {
+    if (update.checkDue(await CHECKED_AT.getValue(), Date.now())) await checkForUpdate();
+}
+
+/**
+ * The periodic check, created only when it is missing or on another period.
+ *
+ * `alarms.create` with a name that exists replaces it and starts its period
+ * again, and a manifest v3 worker runs this on every start - many times an hour.
+ * Created unconditionally, a period of hours never once came round.
+ */
+async function scheduleUpdateCheck(): Promise<void> {
+    const held = await browser.alarms.get(update.UPDATE_CHECK_ALARM).catch(() => undefined);
+    if (!update.alarmNeedsCreating(held)) return;
+    await browser.alarms.create(update.UPDATE_CHECK_ALARM, { periodInMinutes: UPDATE_EVERY_MINUTES });
 }
 
 /** Polar using this browser (`lib/polar-browser.ts`): asks for each site when it first needs it. */
@@ -4001,7 +4043,8 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     ok: true,
                     update: await currentNotice(),
                     pending: await diskVersion(),
-                    latest: await LATEST.getValue()
+                    latest: await LATEST.getValue(),
+                    dismissed: await DISMISSED.getValue()
                 };
 
             case "checkUpdate":
@@ -4010,8 +4053,27 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     checked: await checkUpdateNow(),
                     update: await currentNotice(),
                     pending: await diskVersion(),
-                    latest: await LATEST.getValue()
+                    latest: await LATEST.getValue(),
+                    dismissed: await DISMISSED.getValue()
                 };
+
+            case "dismissUpdate": {
+                // Said once per version: the next release is announced again.
+                const version = VERSION_TEXT.safeParse(request.version);
+                if (!version.success) return { ok: false, error: "" };
+                await DISMISSED.setValue(version.data);
+                await badge();
+                return { ok: true };
+            }
+
+            case "openExtensionsPage": {
+                // Chromium only: Firefox refuses to open its add-ons debugging
+                // page from an extension, and the popup says where it is instead.
+                const page = update.extensionsPage(import.meta.env.BROWSER, browser.runtime.id);
+                if (!page) return { ok: false, error: "" };
+                const opened = await browser.tabs.create({ url: page }).catch(() => null);
+                return opened ? { ok: true } : { ok: false, error: "" };
+            }
 
             case "restartNow": {
                 // Only into a version that is actually waiting: a restart with
@@ -5043,7 +5105,10 @@ export default defineBackground(() => {
     // And a far slower one, for a question whose answer changes a few times a
     // year. An extension loaded by hand never updates itself, so this is the only
     // thing that would ever tell somebody they are months behind.
-    browser.alarms.create("update-check", { periodInMinutes: UPDATE_EVERY_MINUTES });
+    void scheduleUpdateCheck();
+    // And at browser start, whenever the last check was: a browser closed all
+    // weekend has not heard anything since.
+    browser.runtime.onStartup.addListener(() => void checkForUpdate());
     // And the one that makes ending a connection from Polaris mean something in
     // this browser: there is nothing to push it here, so it has to ask.
     browser.alarms.create("link-check", { periodInMinutes: LINK_CHECK_MINUTES });
@@ -5067,7 +5132,7 @@ export default defineBackground(() => {
             void polarBrowser.loop();
             return;
         }
-        if (alarm.name === "update-check") {
+        if (alarm.name === update.UPDATE_CHECK_ALARM) {
             void checkForUpdate();
             return;
         }
@@ -5112,8 +5177,9 @@ export default defineBackground(() => {
     void badge();
     // Except this, which needs no key and nothing typed: a browser that starts
     // once a day would otherwise wait for the alarm's whole period before finding
-    // out anything at all.
-    void checkForUpdate();
+    // out anything at all. Held to once an hour, because a worker starts far
+    // more often than that.
+    void checkForUpdateIfDue();
     // And this, which is what a browser that was disconnected while it was closed
     // finds out on the way back up.
     void refreshLink(true);

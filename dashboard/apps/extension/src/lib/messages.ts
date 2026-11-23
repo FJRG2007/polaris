@@ -418,6 +418,10 @@ export type Request =
     /** Ask now, from a press: the browser store where it installs this copy,
      *  and this Polaris for the version that is out. */
     | { readonly kind: "checkUpdate" }
+    /** The popup's notice for this version, closed: it is not shown again for it. */
+    | { readonly kind: "dismissUpdate"; readonly version: string }
+    /** The browser's extensions page, for the Reload after an update by hand. */
+    | { readonly kind: "openExtensionsPage" }
     /** Shut this extension out of the current site, or let it back in. `host`
      *  names a site from the settings list instead of the tab in front. */
     | { readonly kind: "setBlocked"; readonly blocked: boolean; readonly host?: string }
@@ -600,6 +604,8 @@ export type Reply =
           readonly update: UpdateNotice | null;
           readonly pending: string | null;
           readonly latest?: string | null;
+          /** The version whose notice was dismissed, or null. */
+          readonly dismissed?: string | null;
       }
     | {
           readonly ok: true;
@@ -613,6 +619,7 @@ export type Reply =
           readonly update: UpdateNotice | null;
           readonly pending: string | null;
           readonly latest: string | null;
+          readonly dismissed?: string | null;
       }
     | { readonly ok: true; readonly items: readonly ItemSummary[] }
     | { readonly ok: true; readonly value: string }
