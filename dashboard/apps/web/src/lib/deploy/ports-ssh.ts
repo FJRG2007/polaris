@@ -171,7 +171,16 @@ export class SshPorts implements RuntimePorts {
                       'tar -x -C "$d"',
                       `nixpacks build "$d"/${quoteArg(root || ".")} --name ${quoteArg(request.tag)}`
                   ].join("\n")
-                : `docker build -t ${quoteArg(request.tag)} -f ${quoteArg(dockerfile)} -`;
+                : [
+                      "docker build",
+                      `-t ${quoteArg(request.tag)}`,
+                      `-f ${quoteArg(dockerfile)}`,
+                      ...(request.target ? [`--target ${quoteArg(request.target)}`] : []),
+                      ...Object.entries(request.buildArgs ?? {}).map(
+                          ([key, value]) => `--build-arg ${quoteArg(`${key}=${value}`)}`
+                      ),
+                      "-"
+                  ].join(" ");
         const client = await this.connect();
         await this.holdImages(
             () =>

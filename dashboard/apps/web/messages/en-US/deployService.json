@@ -932,5 +932,22 @@
             "on-failure": "Started again only after it fails, up to the retries set.",
             "always": "Started again whenever it exits, unless you stopped it."
         }
+    },
+    "buildOptions": {
+        "title": "Build arguments",
+        "description": "Values the Dockerfile reads with ARG, and the stage the build stops at. They stay in the image's history, so keep secrets in Variables.",
+        "target": "Target stage",
+        "targetPlaceholder": "Last stage",
+        "name": "Name",
+        "value": "Value",
+        "add": "Add argument",
+        "remove": "Remove {name}",
+        "problem": {
+            "stage": "A stage name is letters, digits, dots, dashes or underscores.",
+            "name": "An argument name is letters, digits and underscores, not starting with a digit.",
+            "value": "A value is up to {max} characters on one line.",
+            "count": "Up to {count} arguments.",
+            "duplicate": "Each argument name once."
+        }
     }
 }

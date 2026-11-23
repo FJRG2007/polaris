@@ -515,9 +515,15 @@ export class HostdClient {
         dockerfile: string,
         contextTar: Buffer,
         builder: "docker" | "nixpacks" = "docker",
-        root = ""
+        root = "",
+        options: { readonly target?: string; readonly buildArgs?: Readonly<Record<string, string>> } = {}
     ): Promise<IncomingMessage> {
+        const args = options.buildArgs && Object.keys(options.buildArgs).length > 0 ? options.buildArgs : null;
         return this.callStream("POST", "/v1/deploy/build", contextTar, {
+            // Only sent when set: a daemon too old to read them ignores them, and the
+            // caller checks its capability before asking for either.
+            ...(options.target ? { "x-polaris-target": options.target } : {}),
+            ...(args ? { "x-polaris-build-args": asciiJson(args) } : {}),
             "content-type": "application/x-tar",
             "x-polaris-tag": tag,
             "x-polaris-dockerfile": dockerfile,
@@ -947,4 +953,13 @@ export interface HostdSnmpSource {
     user?: string;
     authPassword?: string;
     privPassword?: string;
+}
+
+/** JSON with everything past ASCII written as `\u` escapes, so a value in any
+ *  language fits in a header, which takes Latin-1 at most. */
+function asciiJson(value: unknown): string {
+    return JSON.stringify(value).replace(
+        /[\u007f-\uffff]/g,
+        (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`
+    );
 }

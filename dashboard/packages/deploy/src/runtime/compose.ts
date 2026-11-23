@@ -9,6 +9,7 @@
 import type { OutputSink } from "../ports.js";
 import { parseContainerState } from "./status.js";
 import { imageTag as toImageTag } from "../naming.js";
+import { dockerfileBuildOptions } from "../builders/index.js";
 import type { ComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
 import { RELEASE_IMAGE_GONE, askBeforeServe, pinRelease, rollbackImageOf } from "./release.js";
@@ -377,7 +378,12 @@ export class ComposeRuntime implements RuntimeDriver {
                         builder:
                             context.dockerfile || plan.build.method !== "nixpacks"
                                 ? "docker"
-                                : "nixpacks"
+                                : "nixpacks",
+                        ...dockerfileBuildOptions(
+                            plan.build,
+                            context.dockerfile || plan.build.method !== "nixpacks" ? "docker" : "nixpacks",
+                            Boolean(context.dockerfile)
+                        )
                     },
                     sink
                 );

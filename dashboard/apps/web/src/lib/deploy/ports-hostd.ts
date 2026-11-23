@@ -7,6 +7,7 @@
 
 import { Readable } from "node:stream";
 import { HostdClient } from "@polaris/hostd-client";
+import { getCapabilities } from "@polaris/config";
 import { reclaimHostSpace } from "@/lib/deploy/host-space";
 import { CONTAINER_ID, forCompose, forDaemon, isReleaseImage, releaseContainersIn } from "@polaris/deploy";
 import { ImageStoreBusy, LOCAL_MACHINE, withImageUse } from "@/lib/deploy/image-store-lock";
@@ -27,6 +28,10 @@ import type {
 /** Where the optimizer is put inside the container. The daemon runs this one
  *  path and no other, so the two have to agree on it. */
 const WORLD_TOOL_PATH = "/data/.polaris-world-trim.py";
+
+/** Why a build with a target stage or build arguments did not start here. */
+export const BUILD_OPTIONS_UNSUPPORTED =
+    "this machine's Polaris service cannot pass a target stage or build arguments yet - update Polaris from Settings, then deploy again";
 
 export class HostdPorts implements RuntimePorts {
     private readonly client: HostdClient;
@@ -50,7 +55,7 @@ export class HostdPorts implements RuntimePorts {
         // of them is escaped here - see `forCompose`. Held open against a prune:
         // compose fetches any image it does not have yet - see `image-store-lock`.
         await withImageUse(LOCAL_MACHINE, async () => {
-            const res = await this.client.deployUp(forDaemon(forCompose(spec)));
+            const res = await this.client.deployUp(forDaemon(forCompose(spec), { countedRestart: getCapabilities().countedRestart }));
             await drain(res, onOutput);
         });
     }
@@ -62,7 +67,7 @@ export class HostdPorts implements RuntimePorts {
 
     public async stackUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
         await withImageUse(LOCAL_MACHINE, async () => {
-            const res = await this.client.stackUp(forDaemon(forCompose(spec)));
+            const res = await this.client.stackUp(forDaemon(forCompose(spec), { countedRestart: getCapabilities().countedRestart }));
             await drain(res, onOutput);
         });
     }
@@ -73,6 +78,13 @@ export class HostdPorts implements RuntimePorts {
     }
 
     public async build(request: BuildRequest, onOutput?: OutputSink): Promise<string> {
+        const options = {
+            ...(request.target ? { target: request.target } : {}),
+            ...(request.buildArgs && Object.keys(request.buildArgs).length > 0 ? { buildArgs: request.buildArgs } : {})
+        };
+        // A daemon from before build options ignores both headers and would build
+        // something other than what was asked; better a deploy that says why.
+        if (Object.keys(options).length > 0 && !getCapabilities().buildOptions) throw new Error(BUILD_OPTIONS_UNSUPPORTED);
         const tar = await bufferStream(request.contextTar);
         await withImageUse(LOCAL_MACHINE, async () => {
             const res = await this.client.deployBuild(
@@ -80,7 +92,8 @@ export class HostdPorts implements RuntimePorts {
                 request.dockerfile ?? "Dockerfile",
                 tar,
                 request.builder ?? "docker",
-                request.root ?? ""
+                request.root ?? "",
+                options
             );
             await drain(res, onOutput);
         });

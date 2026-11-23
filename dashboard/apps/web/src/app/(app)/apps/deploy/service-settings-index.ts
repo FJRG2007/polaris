@@ -232,6 +232,13 @@ export const SERVICE_SETTINGS_INDEX = {
             es: ["comando de build", "instalacion", "arranque", "version", "salida"]
         }
     },
+    buildOptions: {
+        section: "build",
+        keywords: {
+            en: ["build args", "build arguments", "arg", "target stage", "multi-stage", "dockerfile"],
+            es: ["argumentos de build", "arg", "etapa objetivo", "multietapa", "dockerfile"]
+        }
+    },
     buildMachine: {
         section: "build",
         keywords: {

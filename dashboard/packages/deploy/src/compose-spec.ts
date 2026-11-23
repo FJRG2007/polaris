@@ -364,12 +364,14 @@ export function composeRestart(restart: RestartPolicy | undefined): string {
 }
 
 /**
- * The same spec as this machine's daemon takes it. The daemon accepts the plain
- * restart policy names only, so `on-failure:N` goes over as `on-failure`: it
- * still stops a service that exits cleanly, and retries one that fails without a
- * count until the daemon learns the counted form.
+ * The same spec as this machine's daemon takes it. A daemon that reports
+ * `countedRestart` takes `on-failure:N` as it is; an older one accepts the plain
+ * restart policy names only, so there `on-failure:N` goes over as `on-failure`:
+ * it still stops a service that exits cleanly, and retries one that fails
+ * without a count until the daemon updates.
  */
-export function forDaemon(spec: ComposeSpec): ComposeSpec {
+export function forDaemon(spec: ComposeSpec, options: { readonly countedRestart?: boolean } = {}): ComposeSpec {
+    if (options.countedRestart) return spec;
     return {
         ...spec,
         services: spec.services.map((service) =>

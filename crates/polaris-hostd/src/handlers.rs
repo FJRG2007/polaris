@@ -73,6 +73,14 @@ fn capabilities(config: &Config) -> serde_json::Value {
         // network of their own, and runs the forwarder that answers port 80 for
         // it. A dashboard newer than this daemon leaves both out until it updates.
         "privateNames": config.docker_socket.exists(),
+        // Takes `on-failure:N` (1-100) as a restart policy, so a service stops
+        // being retried after N failures. A dashboard newer than this daemon
+        // sends plain `on-failure`, retried without a count, until it updates.
+        "countedRestart": true,
+        // Passes a Dockerfile build its target stage and ARG values
+        // (`X-Polaris-Target`, `X-Polaris-Build-Args`). An older daemon ignores
+        // both headers, so a dashboard refuses such a build there instead.
+        "buildOptions": true,
         "kubernetes": kubernetes,
         "systemd": path_exists("/run/systemd/system"),
         "autoUpdate": config.auto_update,
@@ -811,6 +819,16 @@ fn deploy_build<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         return Response::bad_request("invalid X-Polaris-Root");
     }
 
+    // A Dockerfile build's target stage and ARG values. Read and refused before
+    // the context is taken in, so a bad one costs nothing to send back.
+    let options = match deploy::parse_build_options(
+        req.header("x-polaris-target").unwrap_or(""),
+        req.header("x-polaris-build-args").unwrap_or(""),
+    ) {
+        Ok(options) => options,
+        Err(message) => return Response::bad_request(&message),
+    };
+
     // Stream the tar context to a private file under the deploy root, bounded.
     let build_dir = state.config.deploy_root.join("_build");
     if std::fs::create_dir_all(&build_dir).is_err() {
@@ -865,7 +883,7 @@ fn deploy_build<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
     };
     // The tar file can be removed now; the child holds an open descriptor.
     let _ = std::fs::remove_file(&tar_path);
-    match deploy::build(tag, dockerfile, reopened) {
+    match deploy::build(tag, dockerfile, &options, reopened) {
         Ok(reader) => stream_response(reader),
         Err(_) => Response::text(502, "Bad Gateway", "could not start the build"),
     }
@@ -2397,5 +2415,7 @@ mod tests {
         assert!(caps["systemd"].is_boolean());
         assert!(caps["privateNetworks"].is_boolean());
         assert!(caps["privateNames"].is_boolean());
+        assert_eq!(caps["countedRestart"], true);
+        assert_eq!(caps["buildOptions"], true);
     }
 }

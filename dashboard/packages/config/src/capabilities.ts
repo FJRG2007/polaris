@@ -25,6 +25,12 @@ export interface HostdCapabilityReport {
      *  network and runs the port-80 forwarder. Absent on a daemon that predates
      *  it, which keeps every service reached by its container name alone. */
     readonly privateNames?: boolean;
+    /** Whether the daemon takes `on-failure:N` as a restart policy. Absent on a
+     *  daemon that predates it, which is sent plain `on-failure` instead. */
+    readonly countedRestart?: boolean;
+    /** Whether the daemon passes a Dockerfile build its target stage and ARG
+     *  values. Absent on a daemon that predates it, which ignores both. */
+    readonly buildOptions?: boolean;
     readonly kubernetes: boolean;
     readonly systemd: boolean;
     readonly autoUpdate: boolean;
@@ -45,6 +51,8 @@ export interface Capabilities {
     readonly deploy: boolean;
     readonly privateNetworks: boolean;
     readonly privateNames: boolean;
+    readonly countedRestart: boolean;
+    readonly buildOptions: boolean;
     readonly kubernetes: boolean;
     readonly systemd: boolean;
     readonly autoUpdate: boolean;
@@ -60,6 +68,8 @@ export const LIMITED_CAPABILITIES: Capabilities = {
     deploy: false,
     privateNetworks: false,
     privateNames: false,
+    countedRestart: false,
+    buildOptions: false,
     kubernetes: false,
     systemd: false,
     autoUpdate: false
@@ -92,6 +102,8 @@ export function deriveCapabilities(
         deploy: reported.deploy ?? reported.docker,
         privateNetworks: reported.privateNetworks ?? false,
         privateNames: reported.privateNames ?? false,
+        countedRestart: reported.countedRestart ?? false,
+        buildOptions: reported.buildOptions ?? false,
         kubernetes: reported.kubernetes,
         systemd: reported.systemd,
         autoUpdate: reported.autoUpdate && autoUpdateAllowed

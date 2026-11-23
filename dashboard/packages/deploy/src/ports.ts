@@ -28,6 +28,8 @@ export interface BuildRequest {
      *  keeps the whole context, which is what a shared package is built from. */
     readonly root?: string;
     readonly buildArgs?: Readonly<Record<string, string>>;
+    /** The Dockerfile stage to stop at (`docker build --target`). */
+    readonly target?: string;
     /** Build strategy: "docker" uses the Dockerfile, "nixpacks" auto-detects the
      *  framework and builds without one. Defaults to "docker". */
     readonly builder?: "docker" | "nixpacks";

@@ -184,6 +184,22 @@ pub struct HealthSpec {
 }
 
 const ALLOWED_RESTART: &[&str] = &["no", "always", "unless-stopped", "on-failure"];
+
+/// Whether `restart` is a policy compose takes: a plain name, or `on-failure:N`
+/// with a retry count of 1 to 100. The count is digits only, so nothing but a
+/// number reaches the rendered file.
+pub fn valid_restart(restart: &str) -> bool {
+    if ALLOWED_RESTART.contains(&restart) {
+        return true;
+    }
+    let Some(count) = restart.strip_prefix("on-failure:") else {
+        return false;
+    };
+    if count.is_empty() || count.len() > 3 || !count.bytes().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
+    matches!(count.parse::<u32>(), Ok(1..=100))
+}
 const ALLOWED_PULL_POLICY: &[&str] = &["always", "never", "missing", "build"];
 
 /// Validate a deploy spec against the host's roots. Returns a client-safe error
@@ -230,7 +246,7 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
             }
         }
         if let Some(restart) = &service.restart {
-            if !ALLOWED_RESTART.contains(&restart.as_str()) {
+            if !valid_restart(restart) {
                 return Err(format!("invalid restart policy: {restart}"));
             }
         }
@@ -1072,19 +1088,93 @@ pub fn stack_down(project: &str) -> io::Result<Box<dyn Read + Send>> {
     stream_command(cmd)
 }
 
+/// What a Dockerfile build is given beyond its context: the stage to stop at and
+/// the `ARG` values. Both arrive validated (see `parse_build_options`).
+#[derive(Debug, Default, PartialEq)]
+pub struct BuildOptions {
+    pub target: Option<String>,
+    pub args: Vec<(String, String)>,
+}
+
+/// The most build arguments one build takes, and the longest value.
+const MAX_BUILD_ARGS: usize = 64;
+const MAX_BUILD_ARG_VALUE: usize = 4096;
+
+/// Whether `stage` can name a Dockerfile stage (`FROM ... AS <stage>`).
+pub fn valid_build_target(stage: &str) -> bool {
+    !stage.is_empty()
+        && stage.len() <= 64
+        && stage
+            .bytes()
+            .next()
+            .is_some_and(|b| b.is_ascii_alphanumeric())
+        && stage
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-')
+}
+
+/// The build options from their two headers: the target stage as it is, and the
+/// arguments as a JSON object of strings. Empty or absent headers are no option.
+/// Every argument is a separate argv entry, so nothing here reaches a shell; the
+/// checks keep a value from carrying a control character into the build log.
+pub fn parse_build_options(target: &str, args: &str) -> Result<BuildOptions, String> {
+    let target = target.trim();
+    if !target.is_empty() && !valid_build_target(target) {
+        return Err("invalid X-Polaris-Target".into());
+    }
+    let mut parsed = Vec::new();
+    if !args.trim().is_empty() {
+        let map: std::collections::BTreeMap<String, String> =
+            serde_json::from_str(args).map_err(|_| "invalid X-Polaris-Build-Args".to_string())?;
+        if map.len() > MAX_BUILD_ARGS {
+            return Err("too many build arguments".into());
+        }
+        for (key, value) in map {
+            if !valid_env_key(&key) || key.len() > 128 {
+                return Err(format!("invalid build argument name: {key}"));
+            }
+            if value.len() > MAX_BUILD_ARG_VALUE || has_control(&value) {
+                return Err(format!("invalid value for build argument {key}"));
+            }
+            parsed.push((key, value));
+        }
+    }
+    Ok(BuildOptions {
+        target: (!target.is_empty()).then(|| target.to_string()),
+        args: parsed,
+    })
+}
+
+/// The argv after `docker` for a Dockerfile build read from stdin.
+pub fn build_args(tag: &str, dockerfile: &str, options: &BuildOptions) -> Vec<String> {
+    let mut argv = vec![
+        "build".to_string(),
+        "-t".into(),
+        tag.into(),
+        "-f".into(),
+        dockerfile.into(),
+    ];
+    if let Some(target) = &options.target {
+        argv.push("--target".into());
+        argv.push(target.clone());
+    }
+    for (key, value) in &options.args {
+        argv.push("--build-arg".into());
+        argv.push(format!("{key}={value}"));
+    }
+    argv.push("-".into());
+    argv
+}
+
 /// `docker build` from a tar context on stdin, streaming build output.
 pub fn build(
     tag: &str,
     dockerfile: &str,
+    options: &BuildOptions,
     context_tar: std::fs::File,
 ) -> io::Result<Box<dyn Read + Send>> {
     let mut cmd = Command::new("docker");
-    cmd.arg("build")
-        .arg("-t")
-        .arg(tag)
-        .arg("-f")
-        .arg(dockerfile)
-        .arg("-")
+    cmd.args(build_args(tag, dockerfile, options))
         .stdin(Stdio::from(context_tar));
     stream_command(cmd)
 }
@@ -1464,6 +1554,90 @@ mod tests {
 
     fn spec(json: &str) -> DeploySpec {
         serde_json::from_str(json).unwrap()
+    }
+
+    #[test]
+    fn build_options_are_validated_and_become_argv() {
+        let options = parse_build_options(
+            "runtime",
+            r#"{"NODE_ENV":"production","VERSION":"1.2 beta"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            build_args("app:1", "Dockerfile", &options),
+            vec![
+                "build",
+                "-t",
+                "app:1",
+                "-f",
+                "Dockerfile",
+                "--target",
+                "runtime",
+                "--build-arg",
+                "NODE_ENV=production",
+                "--build-arg",
+                "VERSION=1.2 beta",
+                "-"
+            ]
+        );
+        assert_eq!(
+            parse_build_options("", "").unwrap(),
+            BuildOptions::default()
+        );
+        assert_eq!(
+            build_args("app:1", "Dockerfile", &BuildOptions::default()),
+            vec!["build", "-t", "app:1", "-f", "Dockerfile", "-"]
+        );
+        for bad in ["-x", "a b", "a;b", "--target"] {
+            assert!(parse_build_options(bad, "").is_err(), "{bad}");
+        }
+        for bad in [
+            r#"{"1A":"x"}"#,
+            r#"{"A-B":"x"}"#,
+            r#"{"A":"x\ny"}"#,
+            r#"{"A":1}"#,
+            "not json",
+            r#"["A"]"#,
+        ] {
+            assert!(parse_build_options("", bad).is_err(), "{bad}");
+        }
+        let many: String = format!(
+            "{{{}}}",
+            (0..65)
+                .map(|i| format!(r#""A{i}":"x""#))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        assert!(parse_build_options("", &many).is_err());
+    }
+
+    #[test]
+    fn restart_takes_a_counted_on_failure() {
+        for ok in [
+            "no",
+            "always",
+            "unless-stopped",
+            "on-failure",
+            "on-failure:1",
+            "on-failure:10",
+            "on-failure:100",
+        ] {
+            assert!(valid_restart(ok), "{ok}");
+        }
+        for bad in [
+            "on-failure:0",
+            "on-failure:101",
+            "on-failure:",
+            "on-failure:-1",
+            "on-failure:+5",
+            "on-failure:5 ",
+            "on-failure:05x",
+            "on-failure:1000",
+            "sometimes",
+            "on-failure:5\n",
+        ] {
+            assert!(!valid_restart(bad), "{bad}");
+        }
     }
 
     #[test]

@@ -70,6 +70,7 @@ export {
 export {
     buildSpec,
     buildCommand,
+    dockerfileBuildOptions,
     normalizeRoot,
     resolveDockerfilePath,
     DEFAULT_BUILDPACKS_BUILDER,

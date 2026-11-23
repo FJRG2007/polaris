@@ -16,6 +16,24 @@ import {
 
 export * from "./types.js";
 
+/**
+ * The target stage and ARG values a Dockerfile build of `build` is given. None
+ * for Nixpacks, and no target for a Dockerfile Polaris generated: its stages are
+ * not the ones the operator named.
+ */
+export function dockerfileBuildOptions(
+    build: Pick<BuildInput, "targetStage" | "buildArgs">,
+    builder: "docker" | "nixpacks",
+    generated: boolean
+): { target?: string; buildArgs?: Readonly<Record<string, string>> } {
+    if (builder !== "docker") return {};
+    const args = build.buildArgs && Object.keys(build.buildArgs).length > 0 ? build.buildArgs : undefined;
+    return {
+        ...(build.targetStage && !generated ? { target: build.targetStage } : {}),
+        ...(args ? { buildArgs: args } : {})
+    };
+}
+
 /** Normalize source settings into a resolved BuildSpec (assigns the image tag). */
 export function buildSpec(input: BuildInput): BuildSpec {
     const buildArgs = input.buildArgs ?? {};

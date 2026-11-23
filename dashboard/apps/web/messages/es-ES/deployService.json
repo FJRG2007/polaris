@@ -932,5 +932,22 @@
             "on-failure": "Se reinicia solo si falla, hasta los reintentos fijados.",
             "always": "Se reinicia siempre que se detiene, salvo si lo paraste tú."
         }
+    },
+    "buildOptions": {
+        "title": "Argumentos de build",
+        "description": "Valores que el Dockerfile lee con ARG y la etapa en la que se detiene el build. Quedan en el historial de la imagen: los secretos van en Variables.",
+        "target": "Etapa objetivo",
+        "targetPlaceholder": "Última etapa",
+        "name": "Nombre",
+        "value": "Valor",
+        "add": "Añadir argumento",
+        "remove": "Quitar {name}",
+        "problem": {
+            "stage": "Una etapa lleva letras, cifras, puntos, guiones o guiones bajos.",
+            "name": "Un nombre lleva letras, cifras y guiones bajos, y no empieza por cifra.",
+            "value": "Un valor tiene hasta {max} caracteres en una línea.",
+            "count": "Hasta {count} argumentos.",
+            "duplicate": "Cada nombre una sola vez."
+        }
     }
 }

@@ -123,6 +123,7 @@ import { notifyVolumeHealth } from "./notifications/volume-events";
 import { nasBinding } from "./deploy/nas-binding";
 import * as quotas from "@/lib/orgs/quotas";
 import * as quota from "@/lib/orgs/quota-service";
+import { storedBuildOptions } from "./deploy/build-options-schema";
 import { refreshFileAccess, takeDownFileAccess } from "./deploy/file-access";
 import {
     appEdgeConfigSchema,
@@ -3306,7 +3307,10 @@ async function buildAppPlan(
                 typeof source.rootDirectory === "string" ? source.rootDirectory : undefined
             ),
             contextPath: ".",
-            composeYaml: typeof source.composeYaml === "string" ? source.composeYaml : undefined
+            composeYaml: typeof source.composeYaml === "string" ? source.composeYaml : undefined,
+            // Read whole through the same parser the settings card uses, so a
+            // stored value that no longer validates is no option at all.
+            ...storedBuildOptions(build)
         },
         env,
         replicas: app.replicas,

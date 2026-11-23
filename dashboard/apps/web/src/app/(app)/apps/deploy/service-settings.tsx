@@ -10,6 +10,7 @@
 import { ServerPicker } from "@/components/server-picker";
 import { DeployHooksCard } from "./deploy-hooks-card";
 import { RestartPolicyCard } from "./restart-policy-card";
+import { BuildOptionsCard } from "./build-options-card";
 import { RestoreHistoryButton } from "@/components/restore-history";
 import Link from "next/link";
 import * as deployActions from "./actions";
@@ -859,6 +860,9 @@ export function SettingsTab({
             <SettingsSection {...head("build")}>
                 <SourceCards {...sourceProps} part="builder" />
                 <SourceCards {...sourceProps} part="commands" />
+                {app.sourceType === "dockerfile" && (
+                    <BuildOptionsCard applicationId={app.id} canConfigure={configure} />
+                )}
                 {configure && <BuildMachineSection applicationId={app.id} />}
             </SettingsSection>
 

@@ -9,6 +9,7 @@
 
 import { parseContainerState } from "./status.js";
 import { imageTag as toImageTag } from "../naming.js";
+import { dockerfileBuildOptions } from "../builders/index.js";
 import { RELEASE_IMAGE_GONE, askBeforeServe, pinRelease, rollbackImageOf } from "./release.js";
 import { buildPorts, fetchPorts, holdImages, loadPrebuilt, shipRelease } from "./ship.js";
 import { appComposeSpec, dbComposeSpec, dbPlanImages, forSwarm } from "../compose-spec.js";
@@ -74,7 +75,12 @@ export class SwarmRuntime implements RuntimeDriver {
                     builder:
                         context.dockerfile || plan.build.method !== "nixpacks"
                             ? "docker"
-                            : "nixpacks"
+                            : "nixpacks",
+                    ...dockerfileBuildOptions(
+                        plan.build,
+                        context.dockerfile || plan.build.method !== "nixpacks" ? "docker" : "nixpacks",
+                        Boolean(context.dockerfile)
+                    )
                 },
                 sink
             );

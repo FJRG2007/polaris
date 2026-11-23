@@ -58,6 +58,13 @@ describe("a service's restart policy", () => {
         expect(never.services[0]!.restart).toBe("no");
     });
 
+    it("keeps its count for a daemon that takes one", () => {
+        const spec = forDaemon(appComposeSpec(plan({ policy: "on-failure", maxRetries: 5 }), "nginx:1.27", NETWORK), {
+            countedRestart: true
+        });
+        expect(spec.services[0]!.restart).toBe("on-failure:5");
+    });
+
     it("becomes swarm's restart_policy with its attempts", () => {
         const yaml = renderComposeYaml(
             forSwarm(appComposeSpec(plan({ policy: "on-failure", maxRetries: 4 }), "nginx:1.27", NETWORK)),
