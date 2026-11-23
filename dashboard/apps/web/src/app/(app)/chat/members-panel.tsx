@@ -102,7 +102,10 @@ const ROLE_WORDS: Record<string, string> = { admin: "Admin" };
 
 interface Roster {
     readonly members: readonly ChatRosterMember[];
+    /** Nothing to draw yet: no answer, and nothing the screen already held. */
     readonly loading: boolean;
+    /** The server's answer is in, so the count is the whole list's. */
+    readonly settled: boolean;
 }
 
 /**
@@ -151,7 +154,12 @@ const ROSTER_SETTLE_MS = 1000;
  *   that is closed: the roster would otherwise be read on every conversation
  *   somebody clicks through, to draw a column that is not there.
  */
-function useRoster(channelId: string, ownerId: string | null, showing: boolean): Roster {
+function useRoster(
+    channelId: string,
+    ownerId: string | null,
+    showing: boolean,
+    seed: readonly ChatRosterMember[]
+): Roster {
     const [members, setMembers] = useState<readonly ChatRosterMember[] | null>(null);
 
     const load = useCallback(async () => {
@@ -190,17 +198,21 @@ function useRoster(channelId: string, ownerId: string | null, showing: boolean):
 
     const owned = useMemo(
         () =>
-            (members ?? []).map((member) =>
+            (members ?? seed).map((member) =>
                 // A group has no roles of its own - the one thing there is to say
                 // about somebody in one is whether the group is theirs.
                 member.userId === ownerId && member.role === "member"
                     ? { ...member, role: "owner" }
                     : member
             ),
-        [members, ownerId]
+        [members, seed, ownerId]
     );
 
-    return { members: owned, loading: members === null };
+    return {
+        members: owned,
+        loading: members === null && seed.length === 0,
+        settled: members !== null
+    };
 }
 
 function MemberRows({
@@ -550,8 +562,24 @@ export function ChannelMembers({
     const t = useTranslations("chat");
     const { viewerId, refresh } = useChat();
     const wide = useWideScreen();
-    const { members, loading } = useRoster(channel.id, channel.ownerId, open);
-    const heading = loading
+    // A direct message or a group already lists everybody else in it, by the
+    // name this reader calls them, and has no roles beyond the owner - so those
+    // rows draw the moment the panel opens and the answer only adds the reader
+    // and who is online. A space channel lists nobody here and waits.
+    const seed = useMemo<readonly ChatRosterMember[]>(
+        () =>
+            channel.spaceId
+                ? []
+                : channel.others.map((person) => ({
+                      userId: person.id,
+                      name: person.name,
+                      role: "member",
+                      online: false
+                  })),
+        [channel.spaceId, channel.others]
+    );
+    const { members, loading, settled } = useRoster(channel.id, channel.ownerId, open, seed);
+    const heading = !settled
         ? t("members.heading")
         : t("members.headingCount", { count: members.length });
     // Above the two early returns below, and deliberately: a hook that only runs

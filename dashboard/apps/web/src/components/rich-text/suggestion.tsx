@@ -71,10 +71,13 @@ export const POPUP_CLASS =
 /**
  * What a docked list looks like: the shell edge to edge, rows a thumb can hit.
  * On the element rather than on each list, so the @, #, / and : lists - which
- * all mount through `mountPopup` - change together.
+ * all mount through `mountPopup` - change together. One arbitrary variant per
+ * rule (`[&[data-docked=true]_ul]`) rather than `data-[docked=true]:[&_ul]:`:
+ * Tailwind 3 applies stacked variants innermost first, so that spelling put the
+ * attribute on the `ul` (`.x ul[data-docked]`) and matched nothing.
  */
 export const DOCKED_CLASS =
-    "data-[docked=true]:[&_ul]:w-full data-[docked=true]:[&_ul]:max-h-[var(--dock-max)] data-[docked=true]:[&_ul]:rounded-none data-[docked=true]:[&_ul]:rounded-t-xl data-[docked=true]:[&_ul]:border-x-0 data-[docked=true]:[&_ul]:border-b-0 data-[docked=true]:[&_ul]:p-1.5 data-[docked=true]:[&_li>button]:min-h-12 data-[docked=true]:[&_li>button]:gap-3 data-[docked=true]:[&_li>button]:px-3 data-[docked=true]:[&_li>button]:text-base data-[docked=true]:[&_[role=option]]:min-h-12 data-[docked=true]:[&_[role=option]]:text-base";
+    "[&[data-docked=true]_ul]:w-full [&[data-docked=true]_ul]:max-h-[var(--dock-max)] [&[data-docked=true]_ul]:rounded-none [&[data-docked=true]_ul]:rounded-t-xl [&[data-docked=true]_ul]:border-x-0 [&[data-docked=true]_ul]:border-b-0 [&[data-docked=true]_ul]:p-1.5 [&[data-docked=true]_li>button]:min-h-12 [&[data-docked=true]_li>button]:gap-3 [&[data-docked=true]_li>button]:px-3 [&[data-docked=true]_li>button]:text-base [&[data-docked=true]_[role=option]]:min-h-12 [&[data-docked=true]_[role=option]]:text-base";
 
 /**
  * What the plugin's own element is given once it is mounted.
