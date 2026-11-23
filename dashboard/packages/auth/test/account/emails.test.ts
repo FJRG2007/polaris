@@ -285,6 +285,23 @@ describe("promoting an address", () => {
         expect((await listUserEmails("user-1"))[0]?.email).toBe("owner@example.com");
     });
 
+    it("swaps them on a password the caller proved without receiving it", async () => {
+        await addUserEmail("user-1", "spare@example.com");
+        const [, spare] = await listUserEmails("user-1");
+        expect(await promoteUserEmail(auth, "user-1", String(spare?.id), { proven: true })).toEqual({});
+        expect((await listUserEmails("user-1"))[0]?.email).toBe("spare@example.com");
+    });
+
+    it("a forged proven flag from untyped input changes nothing", async () => {
+        await addUserEmail("user-1", "spare@example.com");
+        const [, spare] = await listUserEmails("user-1");
+        const forged = { proven: "yes" } as unknown as { proven: true };
+        expect(await promoteUserEmail(auth, "user-1", String(spare?.id), forged)).toEqual({
+            error: "Current password is incorrect."
+        });
+        expect((await listUserEmails("user-1"))[0]?.email).toBe("owner@example.com");
+    });
+
     it("refuses an address that is not on the account", async () => {
         await addUserEmail("user-2", "theirs@example.com");
         expect(await promoteUserEmail(auth, "user-1", alternates[0].id, "hunter22")).toEqual({

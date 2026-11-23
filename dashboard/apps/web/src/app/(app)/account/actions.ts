@@ -29,6 +29,8 @@ import { publishChatChange } from "@/lib/chat/live";
 import { reachableChannelIds } from "@/lib/chat/access";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
+import { opaqueFinish } from "@/lib/chat/e2ee/schemas";
+import { provesPassword } from "@/lib/chat/e2ee/opaque-password";
 import {
     saveProfileDetails,
     setProfileCompanies,
@@ -344,6 +346,27 @@ export async function setEmailRecoveryAction(emailId: unknown, recovery: boolean
             actorId: user.id,
             action: recovery === true ? "account.email.recovery-set" : "account.email.recovery-cleared"
         });
+        revalidatePath("/account/details");
+    }
+    return localized(result);
+}
+
+/**
+ * `promoteEmailAction` without the password: proven over OPAQUE in the browser
+ * (docs/chat-e2ee-phase1.md, "Password flows over OPAQUE") and finished here,
+ * bound to this session and spent whether it holds or not. The address is
+ * checked first, as the old action does, so a proof is only spent on a real one.
+ */
+export async function promoteEmailOpaqueAction(emailId: unknown, proof: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    const parsed = z.object({ emailId: emailIdSchema, proof: opaqueFinish }).safeParse({ emailId, proof });
+    if (!parsed.success) return { error: (await getTranslations("account"))("profile.errors.addressGone") };
+    if (!(await provesPassword(user.id, parsed.data.proof))) return localized({ error: "Current password is incorrect." });
+    const result = await promoteUserEmail(auth, user.id, parsed.data.emailId, { proven: true });
+    if (!result.error) {
+        await recordAudit({ actorId: user.id, action: "account.email.primary-changed", metadata: { method: "opaque" } });
         revalidatePath("/account/details");
     }
     return localized(result);

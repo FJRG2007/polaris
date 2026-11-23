@@ -31,9 +31,11 @@ import {
 } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
 import {
     addEmailAction,
     promoteEmailAction,
+    promoteEmailOpaqueAction,
     removeEmailAction,
     setEmailRecoveryAction,
     verifyEmailAction
@@ -231,15 +233,31 @@ function PromoteEmailDialog({
     const t = useTranslations("account");
     const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    /** Over OPAQUE when the account can, so the password never leaves this
+     *  browser; null means the old action (not moved yet, or the worker or the
+     *  network failed before anything was sent). */
+    async function promoteOverOpaque(emailId: string, password: string): Promise<{ error?: string } | null> {
+        const flows = await import("@/lib/chat/e2ee/password-flows-client").catch(() => null);
+        if (!flows || !(await flows.opaquePasswordReady())) return null;
+        setProtecting(true);
+        try {
+            return await promoteEmailOpaqueAction(emailId, await flows.provePassword(password));
+        } catch {
+            return null;
+        }
+    }
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!entry?.id) return;
         const password = String(new FormData(event.currentTarget).get("password") ?? "");
         setBusy(true);
+        setProtecting(false);
         setError(null);
-        const result = await promoteEmailAction(entry.id, password);
+        const result = (await promoteOverOpaque(entry.id, password)) ?? (await promoteEmailAction(entry.id, password));
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -266,7 +284,11 @@ function PromoteEmailDialog({
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={busy}>
-                            {busy ? t("emails.working") : t("emails.makePrimary")}
+                            {busy ? (
+                                <SlowSubmitLabel busyLabel={t("emails.working")} protecting={protecting} />
+                            ) : (
+                                t("emails.makePrimary")
+                            )}
                         </Button>
                     </div>
                 </form>

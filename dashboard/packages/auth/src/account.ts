@@ -363,12 +363,16 @@ export async function setUserEmailRecovery(
  * re-verifies the password like any other email change. The outgoing primary is
  * kept as an alternate rather than dropped: losing it silently would strip an
  * address the account still owns.
+ *
+ * `{ proven: true }` stands for a password the caller already proved without
+ * receiving it (an OPAQUE proof finished on this session); a string is checked
+ * against the hash as before.
  */
 export async function promoteUserEmail(
     auth: Auth,
     userId: string,
     emailId: string,
-    currentPassword: string
+    currentPassword: string | { readonly proven: true }
 ): Promise<{ error?: string }> {
     const [user, alternate] = await Promise.all([
         prisma.user.findUnique({
@@ -381,7 +385,11 @@ export async function promoteUserEmail(
         })
     ]);
     if (!user || !alternate) return { error: "That address is no longer on your account." };
-    if (!(await verifyPassword(auth, userId, currentPassword))) {
+    const proven =
+        typeof currentPassword === "string"
+            ? await verifyPassword(auth, userId, currentPassword)
+            : currentPassword.proven === true;
+    if (!proven) {
         return { error: "Current password is incorrect." };
     }
     // Both addresses keep whatever they had proved: verification says the owner
