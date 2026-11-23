@@ -30,6 +30,12 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock("@/app/oauth/login/actions", () => actions);
 vi.mock("@/app/oauth/login/qr-panel", () => ({ QrSignInPanel: () => null }));
+vi.mock("@/app/oauth/login/phone-sign-in-actions", () => ({
+    phoneSignInOffered: vi.fn(async () => false),
+    startPhoneSignInAction: vi.fn(),
+    phoneSignInStatusAction: vi.fn(),
+    cancelPhoneSignInAction: vi.fn()
+}));
 vi.mock("@/app/oauth/login/account-chooser", () => ({ AccountChooser: () => null }));
 vi.mock("@/app/oauth/enroll/actions", () => ({ pendingEnrollmentAction: vi.fn() }));
 vi.mock("@/app/oauth/enroll/enroll-view", () => ({ EnrollView: () => null }));

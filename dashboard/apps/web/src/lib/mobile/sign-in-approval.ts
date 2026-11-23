@@ -243,7 +243,8 @@ export async function collectApproval(identifier: string, id: string): Promise<A
         select: { userId: true, challengeHash: true, status: true, reason: true, expiresAt: true, purpose: true }
     });
     const settled = await settle(row, identifier, "second-factor", id);
-    if (settled.state !== "approved" || !row) return settled;
+    if (settled.state !== "approved") return settled;
+    if (!row) return { state: "expired" };
 
     // The same row better-auth's send-otp writes for this challenge (`2fa-otp-`
     // plus the identifier, a SHA-256 base64url hash and the attempt count), so
