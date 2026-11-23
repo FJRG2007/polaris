@@ -1,6 +1,6 @@
 # Chat E2EE - phase 1: the account key and its locks
 
-Status of phase 1 of [chat-e2ee-proposal.md](chat-e2ee-proposal.md) (sections 3.1-3.4, 4.5, 11, 13, 14). Everything here sits behind the internal rollout flag; nothing is wired into a screen.
+Status of phase 1 of [chat-e2ee-proposal.md](chat-e2ee-proposal.md) (sections 3.1-3.4, 4.5, 11, 13, 14). The password lock is on by default since 2026-11-23 ("Switched on" below); everything else sits behind the internal rollout flag.
 
 ## What exists
 
@@ -11,7 +11,7 @@ Status of phase 1 of [chat-e2ee-proposal.md](chat-e2ee-proposal.md) (sections 3.
 | `account-key` | `AK` = 32 random bytes. Ed25519 signing pair and X-Wing (X25519 + ML-KEM-768) HPKE pair derived with HKDF-SHA256 under distinct versioned labels. Private signing key non-extractable |
 | `locks` | One envelope format for every lock: `version \|\| kind \|\| salt(32) \|\| AES-256-GCM(AK)`. Key and nonce come from HKDF over a fresh 256-bit salt (never a bare random nonce). AAD = header + canonical(label, userId, kind, lockId, akVersion). Closed lists for version and kind. One coarse error for every failure |
 | `device-lock` | Non-extractable HKDF `CryptoKey` + envelope in IndexedDB, one database per account (`polaris-chat-keys:<userId>`); sign-out deletes only that database |
-| `password-lock` / `opaque-server` | OPAQUE (RFC 9807). `exportKey` imported straight into a non-extractable key and used as the lock secret. Argon2id 128 MiB, t=3, p=1, fixed in code as profile v1 (never read from the server, so it cannot be downgraded). Client identity = userId, so a record is bound to its account |
+| `password-lock` / `opaque-server` | OPAQUE (RFC 9807). `exportKey` imported straight into a non-extractable key and used as the lock secret. Argon2id profiles fixed in code (v1 128 MiB t=3, v2 19 MiB t=2 for new records; a registration never takes its profile from the server). Client identity = userId, so a record is bound to its account |
 | `passkey-lock` | WebAuthn PRF: one fixed, labelled PRF input (the passkey sign-in is usernameless, so the input is asked for before the account is known; the per-credential authenticator secret makes the output unique), account + credential id in the binding. An assertion without PRF output yields `null` and no lock - never an error |
 | `hybrid-envelope` | RFC 9180 HPKE base mode, X-Wing KEM (0x647a) + HKDF-SHA256 + AES-256-GCM, header as AAD, purpose and binding in `info`. Suite is a closed list of one |
 | `qr-approval` | `AK` through the QR sign-in: ephemeral X-Wing offer, commitment in the link fragment, hybrid envelope (purpose `qr-approval`, binding = flow id + new device id + approver device id) signed with the `AK` signing key, and an `AccountKeyVerifier` that must answer `true` before the key is accepted |
@@ -95,13 +95,35 @@ Authoritative list: proposal section 14, phase 1. A row is done only with the co
 | 12 | Sign-out removes the account's device lock (proposal 3.3); "sign out of all" removes every one | done | `lib/account-switch.ts`, `forgetEveryDeviceLock` test |
 | 13 | Accounts with no password and no PRF passkey (magic link, connection, SSO) | open, by design until phase 2 | a device-only `AK` would be orphaned by the first cleared browser with nothing to re-key it; they get `AK` through the QR approval today and through `ORK` in phase 2 (proposal 3.3 rows 3-4) |
 | 14 | Retire the better-auth password hash | blocked | see below |
-| 15 | Key management live for everyone (flag default) | not flipped | see below |
+| 15 | Password lock live for everyone | on by default (2026-11-23); passkey PRF locks and the QR hand-over still behind the chat flag | see "Switched on" below |
 | 16 | Notice on every device when one is added or `AK` opens with the password only | open | needs the device list of phase 2 |
 | 17 | Transparency log behind `AccountKeyVerifier` | phase 3 | - |
 
 **Why the hash is not retired (14).** Retiring `account.password` while any of these still verifies the password against it would lock people out, which the owner forbids: `changePasswordAction` and `promoteEmailAction` (current password), better-auth's two-factor enable/disable (password), the step-up password proof, the reset and sign-up forms (they write the hash), administrator credential resets, and every client or host version that signs in through `/sign-in/email`. Each needs an OPAQUE equivalent first, and the OPAQUE path itself is still behind the internal flag. Order: move those flows to OPAQUE, switch the flag on, then delete the hash for accounts that signed in over OPAQUE at least twice - checked against the state, never a version number.
 
-**Why the flag stays off (15).** Proposal section 14 keeps phases 1-13 behind the internal flag until phase 14, and decision 11 / gate G7 forbid a visible slowdown. With the flag on, the first sign-in after the update runs Argon2id at 128 MiB up to four times in the page (OPAQUE attempt, registration, verification, unlock) - seconds on a laptop, more on a phone - which has not been measured on real devices. Switching it on is an owner call against those two rules, not something this round did silently.
+## Switched on (15)
+
+The owner decided to switch the password lock on, on the condition that nobody notices at sign-in: same form, same speed, sessions kept, nobody locked out.
+
+- **Switch.** `passwordLockEnabled()` (`lib/chat/e2ee/flag.ts`) is on with nothing set, so every install has it after the update with no `.env` change. `POLARIS_INTERNAL_PASSWORD_LOCK=0` is the kill switch: the form runs only `/sign-in/email` and both OPAQUE routes answer 404. It gates `/api/e2ee/sign-in` and the `state`, `create-account-key` and `unlock-*` operations; the passkey lock operations and the QR key hand-over stay on `chatE2eeEnabled()` (the form's separate `chatKeys` prop).
+- **Sign-in speed.** Every OPAQUE client step runs in a Web Worker (`password-worker.ts`, `password-worker-client.ts`), never on the page's thread. A submit runs at most one Argon2id before the redirect (the OPAQUE login). The adoption (registration + verification) and opening or sealing the account key are queued in the background (`adoptInBackground`, `settleInBackground`) and never awaited: the page moves on at once. A failure anywhere, including a worker that does not start, leaves the account on its password hash and the next sign-in tries again. The held password is dropped when its job ends. A full navigation right after sign-in (the mobile shell, an OAuth client's redirect) can cut a background adoption short; it is then retried at the next sign-in.
+- **Profile v2.** Measured headless (Chromium 1248, CPU throttling through DevTools, OPAQUE client finish only, median of 3; 2026-11-23, on a loaded dev machine):
+
+  | CPU | v1 128 MiB t=3 | 64 MiB t=3 | 46 MiB t=1 | v2 19 MiB t=2 |
+  | --- | --- | --- | --- | --- |
+  | 1x | 291 ms | 274 ms | 62 ms | 53 ms |
+  | 4x | 2012 ms | 1409 ms | 485 ms | 486 ms |
+  | 6x | 3650 ms | 1667 ms | 386 ms | 289 ms |
+  | 6x + memory pressure | 3394 ms | 1338 ms | 304 ms | 249 ms |
+
+  The old sign-in costs the browser nothing and the server one scrypt (~58 ms); the OPAQUE server steps cost ~1 ms. v1 is seconds slower on a slow phone, so new records use v2, OWASP's second Argon2id configuration (19 MiB, t=2, p=1), the largest that stays under 300 ms at 6x (46 MiB, the first configuration, came out at 386 ms). `OpaqueRecord.ksfVersion` (migration `20271227000000_opaque_record_ksf_version`, additive, default 1) records the profile; the three start replies report it; v1 records keep working. The client always registers with the current profile fixed in code, so a server can never choose a cheaper one for a new password; a wrong version in a login reply only makes that login fail. A start for an account with no record names the current profile, so it reads like a new account; a v1 record would read differently, and v1 records only exist where the internal flag was set before this change.
+- **Slow submit.** `components/slow-submit-label.tsx`: after 300 ms (a CSS delay, no timer) the busy label gives way, in the same grid cell, to a line with a shield; no layout shift, motion dropped for reduced motion. The encryption line shows only when the submit actually ran the key stretching (the form is told by `signInWithOpaque`), a neutral line otherwise.
+
+## Password rules under OPAQUE
+
+The server never sees a password registered over OPAQUE, so the rules are enforced in the client, as Bitwarden, 1Password and Proton do. `lib/chat/e2ee/password-rules.ts` (`startCheckedRegistration`) runs before any registration of a new password and reuses the server's own rules: `passwordField` (10-256, the bounds `recoveryResetSchema` also uses), `passwordMatchesIdentity` (behind `refuseIdentityPassword`), and the breached check by k-anonymity through `/api/polaris/pwned/[prefix]` (fails open, like every breach check here). Adoption at sign-in does not re-check: that password was checked by the server when it was set.
+
+What a modified client could bypass: the rules for its own account's password, nothing else - no other account, record or key. What the server still enforces: rate limits per address and per account on every OPAQUE route, the second factor after an OPAQUE sign-in, and every rule on each route where it still receives the password (`/sign-in/email`, sign-up, reset, change, the adoption's hash check). Recorded as accepted risk [VULN-0044](vulnerabilities/VULN-0044-password-rules-client-enforced-under-opaque.md); client integrity verification (docs/integrity.md once it exists) narrows it further.
 
 ## Adversarial review checklist (phase 1)
 

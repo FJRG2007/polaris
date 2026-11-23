@@ -8,6 +8,7 @@ a regression. Entries are sorted open/regressed first, then by severity.
 | ID | Title | Severity | Status | Location | CWE | Discovered |
 |----|-------|----------|--------|----------|-----|------------|
 | VULN-0003 | Game server player lookup exposes any user's session IP addresses | Medium | Accepted risk | dashboard/apps/game-servers/src/screens/installed/minecraft-actions.ts | CWE-359 | 2026-09-28 |
+| VULN-0044 | Password rules are client-enforced under OPAQUE | Low | Accepted risk | dashboard/apps/web/src/lib/chat/e2ee/password-rules.ts | CWE-602 | 2026-11-23 |
 | VULN-0037 | Any member connects a "Local folder" at the server's root and reads or writes everything the web process can | Critical | Fixed | dashboard/apps/web/src/app/(app)/drive/actions.ts | CWE-862 | 2026-11-12 |
 | VULN-0006 | Sign-in approval gate bypassed through better-auth HTTP endpoints (2FA enable, revoke-other-sessions) | High | Fixed | dashboard/packages/auth/src/auth.ts:869 | CWE-863 | 2026-09-28 |
 | VULN-0007 | Organization members with people.manage or roles.manage can grant themselves admin | High | Fixed | dashboard/apps/web/src/app/(app)/account/organizations/actions.ts | CWE-269 | 2026-09-28 |
