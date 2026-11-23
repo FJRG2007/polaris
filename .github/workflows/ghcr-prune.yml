@@ -128,6 +128,7 @@ jobs:
             case " $CACHE_PACKAGES " in *" $package "*) cache=true;; *) cache=false;; esac
 
             keep=""
+            signed_tag=""
             if [ "$cache" = false ]; then
               # The tag as the registry resolves it now. Everything it names is
               # load-bearing; anything else in the package is a replaced build.
@@ -139,6 +140,12 @@ jobs:
               fi
               keep=$(echo "$index" | jq -r '.manifests[]?.digest')
               echo "latest references $(echo "$keep" | grep -c . || true) manifest(s)"
+              # The cosign signature of what `latest` names is tagged after the
+              # digest it signs (`sha256-<hex>.sig`, or `sha256-<hex>` for a
+              # referrers fallback), and kept with it: deleting it is a release
+              # that can no longer be verified (docs/integrity.md).
+              signed=$(docker buildx imagetools inspect "ghcr.io/$repo/$package:latest" --format '{{json .Manifest}}' 2>/dev/null | jq -r '.digest // empty')
+              signed_tag="${signed/:/-}"
             fi
             refused=0
 
@@ -203,6 +210,9 @@ jobs:
                 [ -z "${tags:-}" ] || continue
               else
                 case ",${tags:-}," in *,latest,*) continue;; esac
+                if [ -n "${signed_tag:-}" ]; then
+                  case ",${tags:-}," in *,"$signed_tag",*|*,"$signed_tag".sig,*|*,"$signed_tag".att,*) continue;; esac
+                fi
                 # The installable apps' bundles live in the dashboard's package,
                 # each tagged `latest-app-<id>` by the job that moves `latest`
                 # (see dashboard/docker/app-bundles.sh). The tag is what the

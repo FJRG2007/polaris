@@ -442,6 +442,29 @@ jobs:
             POLARIS_BUILD_SKIP_TYPECHECK=1
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
           outputs: type=local,dest=${{ runner.temp }}/app-bundles
+      # The digest of every file of code this image serves, from the same build:
+      # every layer is already in this builder. Signed and published by the
+      # `integrity` job once the image is tagged (docs/integrity.md).
+      - name: Export the integrity manifest
+        uses: docker/build-push-action@v7
+        with:
+          context: dashboard
+          file: dashboard/docker/Dockerfile
+          target: integrity
+          build-args: |
+            POLARIS_BUILD_SHA=${{ github.sha }}
+            NODE_BUILD_OPTIONS=--max-old-space-size=10240
+            POLARIS_APP_BUNDLES=publish
+            POLARIS_BUILD_SKIP_LINT=1
+            POLARIS_BUILD_SKIP_TYPECHECK=1
+            POLARIS_CORE_RS_REQUIRED=1
+          outputs: type=local,dest=${{ runner.temp }}/integrity
+      - uses: actions/upload-artifact@v4
+        with:
+          name: integrity-manifest
+          path: ${{ runner.temp }}/integrity/manifest.json
+          if-no-files-found: error
+          retention-days: 7
       # Pushed untagged, like the image; the `tag` job names them once the suites
       # are green. A dashboard downloads a bundle only by the digest its image
       # names, so one pushed here and never tagged is never fetched by anybody.
@@ -1230,3 +1253,76 @@ jobs:
       - name: Report a dashboard held back for its tunnel daemon
         if: ${{ steps.tunnel.outputs.ready == 'false' }}
         run: exit 1
+
+  # The integrity manifest and the image, signed with keyless cosign under this
+  # workflow's GitHub identity - each signature written to the public Rekor log -
+  # and the manifest published on the `integrity` branch as
+  # `manifests/<build stamp>.json`, where the browser extension and the desktop
+  # app look it up by the stamp a server's /api/version answers. Only once the
+  # image is tagged: a manifest for a build nobody can pull would only ever
+  # vouch for nothing. See docs/integrity.md.
+  integrity:
+    needs: [web, tag]
+    if: ${{ !cancelled() && needs.web.result == 'success' && needs.tag.result == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.dry_run) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: integrity-manifest
+          path: ${{ runner.temp }}/integrity
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        with:
+          cosign-release: v3.1.4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check the manifest names this build
+        id: stamp
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          stamp=$(printf '%s' "$SHA" | sha256sum | cut -c1-16)
+          named=$(jq -r '.build' "$RUNNER_TEMP/integrity/manifest.json")
+          count=$(jq '.files | length' "$RUNNER_TEMP/integrity/manifest.json")
+          if [ "$named" != "$stamp" ] || [ "$count" -lt 1 ]; then
+            echo "::error::the manifest names build $named with $count files, expected $stamp"
+            exit 1
+          fi
+          echo "stamp=$stamp" >> "$GITHUB_OUTPUT"
+      - name: Sign the manifest and the image
+        env:
+          DIGEST: ${{ needs.web.outputs.digest }}
+        run: |
+          cosign sign-blob --yes --bundle "$RUNNER_TEMP/integrity/manifest.sigstore.json" "$RUNNER_TEMP/integrity/manifest.json"
+          cosign sign --yes "ghcr.io/fjrg2007/polaris-dashboard@$DIGEST"
+      - name: Publish the manifest
+        env:
+          STAMP: ${{ steps.stamp.outputs.stamp }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch --depth 1 origin integrity; then
+            git switch -C integrity FETCH_HEAD
+          else
+            git switch --orphan integrity
+          fi
+          mkdir -p manifests
+          cp "$RUNNER_TEMP/integrity/manifest.json" "manifests/$STAMP.json"
+          cp "$RUNNER_TEMP/integrity/manifest.sigstore.json" "manifests/$STAMP.sigstore.json"
+          git add manifests
+          git commit -q -m "integrity manifest for build $STAMP ($GITHUB_SHA)"
+          for attempt in 1 2 3; do
+            git push origin integrity && exit 0
+            git fetch --depth 1 origin integrity && git rebase -q FETCH_HEAD
+          done
+          exit 1

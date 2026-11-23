@@ -273,6 +273,19 @@ RUN POLARIS_BUILD_SHA="$POLARIS_BUILD_SHA" node packages/app-host/bundler/build.
 FROM scratch AS app-bundles
 COPY --from=app-bundles-build /build/app-bundles /
 
+# The integrity manifest of this build: the digest of every file of code the
+# web server serves (scripts/integrity-manifest.mjs). CI exports this stage
+# (`--target integrity --output type=local`), signs the file and publishes it
+# where the browser extension and the desktop app look for it (docs/integrity.md).
+# From the builder layer the image copies `.next/static` and `public` out of, so
+# the digests are of the files the image serves.
+FROM builder AS integrity-build
+ARG POLARIS_BUILD_SHA=""
+RUN node scripts/integrity-manifest.mjs apps/web /build/integrity/manifest.json "$POLARIS_BUILD_SHA"
+
+FROM scratch AS integrity
+COPY --from=integrity-build /build/integrity /
+
 # ---------------------------------------------------------------------------
 # Runner - minimal runtime. Non-root, only the standalone server + migrations.
 # `runtime-base` is the system packages and the Prisma CLI, which do not change
