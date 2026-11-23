@@ -30,7 +30,7 @@ export { isRouteHostname };
  * handshake. TCP forwards ride the tunnel end to end and UDP forwards ride it
  * natively, each datagram on its own.
  */
-export const WIREGUARD_IMAGE = "ghcr.io/fjrg2007/polaris-dashboard:latest-service-tunnel-0.1.1";
+export const WIREGUARD_IMAGE = "ghcr.io/fjrg2007/polaris-dashboard:latest-service-tunnel-0.1.2";
 
 /** Where the helper writes the config files, in the volume both containers mount. */
 export const CONFIG_DIR = "/etc/polaris-tunnel";
