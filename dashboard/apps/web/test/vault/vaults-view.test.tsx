@@ -103,7 +103,7 @@ afterEach(cleanup);
 async function openAccessDialog(): Promise<void> {
     render(<VaultsView />, { wrapper: MessagesWrapper });
     const edit = await screen.findByRole("button", {
-        name: "Change what bo@example.com reaches"
+        name: "Change what Bo reaches"
     });
     fireEvent.click(edit);
     await screen.findByRole("checkbox", { name: "The whole vault" });

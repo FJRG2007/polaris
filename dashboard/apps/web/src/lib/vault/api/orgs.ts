@@ -88,7 +88,9 @@ export async function getOrganizationKeys(context: VaultContext): Promise<Respon
 export async function listMembers(context: VaultContext): Promise<Response> {
     const guard = await administering(context);
     if (!guard.ok) return guard.response;
-    return list(await orgs.listMembers(guard.orgId));
+    // An administrator of Polaris is still only a member here: the vault client
+    // is not where the instance's own powers apply.
+    return list(await orgs.listMembers(guard.orgId, { id: requirePrincipal(context).userId, isAdmin: false }));
 }
 
 export async function listOrgCollections(context: VaultContext): Promise<Response> {

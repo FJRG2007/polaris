@@ -412,7 +412,7 @@ function VaultPanel({
     const tc = useTranslations("common");
     const [members, setMembers] = useState<MemberRow[]>([]);
     const [candidates, setCandidates] = useState<
-        { userId: string; name: string; email: string; hasVault: boolean }[]
+        { userId: string; name: string; line: string; hasVault: boolean }[]
     >([]);
     const { collections, reload: reloadCollections } = useVaultCollections(vault.vaultId);
     const [newCollection, setNewCollection] = useState("");
@@ -515,7 +515,7 @@ function VaultPanel({
 
     async function onRemove(member: MemberRow): Promise<void> {
         const confirmed = await confirm({
-            title: t("vaults.removeTitle", { email: member.email }),
+            title: t("vaults.removeTitle", { email: member.name || member.email }),
             description: t("vaults.removeBody"),
             confirmLabel: t("vaults.remove"),
             danger: true
@@ -710,9 +710,11 @@ function VaultPanel({
                                     placeholder={t("vaults.everybodyHere")}
                                     className="min-w-0 flex-1"
                                     options={candidates.map((person) => ({
-                                        value: person.email,
+                                        value: person.userId,
                                         label: person.hasVault
-                                            ? `${person.name} (${person.email})`
+                                            ? person.line
+                                                ? `${person.name} (${person.line})`
+                                                : person.name
                                             : t("vaults.noVaultYet", { name: person.name }),
                                         disabled: !person.hasVault
                                     }))}
@@ -737,7 +739,7 @@ function VaultPanel({
                                 <li key={member.id} className="flex items-center gap-2 p-2">
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-sm">
-                                            {member.name ?? member.email}
+                                            {member.name || member.email}
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {member.email}
@@ -758,7 +760,7 @@ function VaultPanel({
                                                 variant="ghost"
                                                 title={t("vaults.changeScope")}
                                                 aria-label={t("vaults.changeScopeNamed", {
-                                                    email: member.email
+                                                    email: member.name || member.email
                                                 })}
                                                 onClick={() => setAccess(member)}
                                             >
@@ -773,7 +775,7 @@ function VaultPanel({
                                                 variant="ghost"
                                                 title={t("vaults.letIn")}
                                                 aria-label={t("vaults.letInNamed", {
-                                                    email: member.email
+                                                    email: member.name || member.email
                                                 })}
                                                 disabled={pending || !vaultKey}
                                                 onClick={() => setAccess(member)}
@@ -791,7 +793,7 @@ function VaultPanel({
                                         variant="ghost"
                                         title={t("vaults.remove")}
                                         aria-label={t("vaults.removeNamed", {
-                                            email: member.email
+                                            email: member.name || member.email
                                         })}
                                         onClick={() => void onRemove(member)}
                                     >
@@ -993,8 +995,8 @@ function AccessDialog({
                 <DialogHeader>
                     <DialogTitle>
                         {firstTime
-                            ? t("vaults.letInNamed", { email: member?.email ?? "" })
-                            : t("vaults.scopeOf", { email: member?.email ?? "" })}
+                            ? t("vaults.letInNamed", { email: member?.name || member?.email || "" })
+                            : t("vaults.scopeOf", { email: member?.name || member?.email || "" })}
                     </DialogTitle>
                     <DialogDescription>{t("vaults.scopeIntro")}</DialogDescription>
                 </DialogHeader>

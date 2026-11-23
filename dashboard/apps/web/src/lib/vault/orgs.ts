@@ -21,6 +21,7 @@
 import { prisma, type Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
+import { contactLines, type PrivacyViewer } from "@/lib/privacy-service";
 import { bumpRevision } from "@/lib/vault/account";
 import { deleteVaultBlob } from "@/lib/vault/blobs";
 import { vaultAttachmentPaths } from "@/lib/vault/ciphers";
@@ -417,8 +418,15 @@ export async function removeMember(orgId: string, memberId: string): Promise<boo
     return true;
 }
 
-/** Everybody in an organization's vault, as a client lists them. */
-export async function listMembers(orgId: string): Promise<Record<string, unknown>[]> {
+/**
+ * Everybody in an organization's vault, as a client lists them.
+ *
+ * The address beside a member who has an account is the line the roster rule
+ * allows this viewer (`contactLines`): administering a vault is not a reason to
+ * read addresses its members keep to themselves. A pending invitation with no
+ * account behind it keeps the address it was sent to - the inviter typed it.
+ */
+export async function listMembers(orgId: string, viewer: PrivacyViewer): Promise<Record<string, unknown>[]> {
     const rows = await prisma.vaultOrgUser.findMany({
         where: { orgId },
         orderBy: { createdAt: "asc" },
@@ -429,19 +437,25 @@ export async function listMembers(orgId: string): Promise<Record<string, unknown
             status: true,
             type: true,
             accessAll: true,
-            vault: { select: { user: { select: { name: true } } } },
+            vault: { select: { user: { select: { name: true, username: true } } } },
             collections: {
                 where: { collection: { orgId } },
                 select: { collectionId: true, readOnly: true, hidePasswords: true }
             }
         }
     });
+    const lines = await contactLines(
+        viewer,
+        rows.flatMap((row) =>
+            row.userId ? [{ id: row.userId, email: row.email, username: row.vault?.user.username ?? null }] : []
+        )
+    );
     return rows.map((row) => ({
         object: "organizationUserUserDetails",
         id: row.id,
         userId: row.userId,
         name: row.vault?.user.name ?? null,
-        email: row.email,
+        email: row.userId ? (lines.get(row.userId) ?? "") : row.email,
         status: row.status,
         type: row.type,
         accessAll: row.accessAll,

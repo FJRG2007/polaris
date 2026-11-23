@@ -34,6 +34,7 @@ import { requirePermission } from "@/lib/session";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as vaultAccount from "@/lib/vault/account";
 import { listMyOrgs, resolveOrgAccess, orgCan } from "@/lib/orgs/org-service";
+import { contactLines } from "@/lib/privacy-service";
 
 /** One vault, as the vault screens need to see it. */
 export interface VaultView {
@@ -333,26 +334,21 @@ export async function leaveVaultAction(vaultId: string): Promise<{ error?: strin
 export async function vaultMembersAction(vaultId: string): Promise<{
     members?: Record<string, unknown>[];
     /** People on the organization's roster who are not in its vault yet. */
-    candidates?: { userId: string; name: string; email: string; hasVault: boolean }[];
+    candidates?: { userId: string; name: string; line: string; hasVault: boolean }[];
     error?: string;
 }> {
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
 
-    const members = await vaultOrgs.listMembers(gate.vaultId);
+    const viewer = { id: gate.userId, isAdmin: false };
+    const members = await vaultOrgs.listMembers(gate.vaultId, viewer);
     const vault = await vaultOrgs.vaultById(vaultId);
     // A vault of somebody's own has no roster to suggest from - it is shared with
     // whoever its owner names - so the screen asks for an address instead.
     if (!vault?.organizationId) return { members, candidates: [] };
 
-    const invited = new Set(members.map((row) => String(row.email ?? "").toLowerCase()));
-    const roster = await prisma.organization.findUnique({
-        where: { id: vault.organizationId },
-        select: {
-            owner: { select: { id: true, name: true, email: true } },
-            members: { select: { user: { select: { id: true, name: true, email: true } } } }
-        }
-    });
+    const invited = new Set(members.map((row) => String(row.userId ?? "")));
+    const roster = await rosterOf(vault.organizationId);
     const people = [
         ...(roster?.owner ? [roster.owner] : []),
         ...(roster?.members ?? []).map((row) => row.user)
@@ -365,28 +361,43 @@ export async function vaultMembersAction(vaultId: string): Promise<{
         select: { userId: true, publicKey: true }
     });
     const keyed = new Set(withVaults.filter((row) => row.publicKey).map((row) => row.userId));
+    // Offered by account, never by address: the picker names somebody the way
+    // every other roster does (`contactLines`), and the invitation finds their
+    // address on the server.
+    const lines = await contactLines(viewer, people);
     return {
         members,
         candidates: people
-            .filter((person) => !invited.has(person.email.toLowerCase()))
+            .filter((person) => !invited.has(person.id))
             .map((person) => ({
                 userId: person.id,
                 name: person.name,
-                email: person.email,
+                line: lines.get(person.id) ?? "",
                 hasVault: keyed.has(person.id)
             }))
     };
 }
 
+/** An organization's owner and members, as the vault's add picker offers them. */
+async function rosterOf(orgId: string) {
+    return prisma.organization.findUnique({
+        where: { id: orgId },
+        select: {
+            owner: { select: { id: true, name: true, email: true, username: true } },
+            members: { select: { user: { select: { id: true, name: true, email: true, username: true } } } }
+        }
+    });
+}
+
 /** Put somebody on the list. They hold no key until they are confirmed. */
 export async function inviteVaultMemberAction(
     vaultId: string,
-    email: unknown,
+    invitee: unknown,
     type: number
 ): Promise<{ error?: string }> {
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
-    const parsed = core.emailField.safeParse(email);
+    const parsed = await inviteeAddress(gate.vaultId, invitee);
     if (!parsed.success) return { error: await vaultRefusal("errors.invalidEmail") };
     const roles = [
         core.ORG_ROLE_OWNER,
@@ -402,6 +413,28 @@ export async function inviteVaultMemberAction(
     if (!invited.ok) return { error: await vaultRefusal("errors.isOwner") };
     revalidatePath("/vault/vaults");
     return {};
+}
+
+/**
+ * The address an invitation goes to. An organization's vault names somebody on
+ * its roster by account id, so the address never travels to the browser; a
+ * vault of somebody's own is shared by the address its owner types.
+ */
+async function inviteeAddress(
+    vaultId: string,
+    invitee: unknown
+): Promise<{ success: true; data: string } | { success: false }> {
+    const vault = await vaultOrgs.vaultById(vaultId);
+    if (vault?.organizationId && idSchema.safeParse(invitee).success) {
+        const roster = await rosterOf(vault.organizationId);
+        const person = [
+            ...(roster?.owner ? [roster.owner] : []),
+            ...(roster?.members ?? []).map((row) => row.user)
+        ].find((one) => one.id === invitee);
+        return person ? { success: true, data: person.email } : { success: false };
+    }
+    const parsed = core.emailField.safeParse(invitee);
+    return parsed.success ? { success: true, data: parsed.data } : { success: false };
 }
 
 /**
