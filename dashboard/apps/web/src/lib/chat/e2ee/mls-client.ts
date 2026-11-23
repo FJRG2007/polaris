@@ -31,6 +31,10 @@
  * committer also seals it to every other member with an account key
  * (`member-account-keys`), so a member with no device in the group yet - a
  * dormant one - finds it too.
+ * Before sealing a message a device brings the group's leaves in line with the
+ * conversation (`reconcile`): the devices of anybody who left are taken out,
+ * and those of anybody in it with no leaf are added, so a message is never
+ * sealed to a key of somebody who left, whoever moved who and from where.
  * Application messages carry a one-byte kind in front: 0 content, 1 an `HK`.
  *
  * Nothing here is reachable while `chatE2eeEnabled()` is off: the route answers
@@ -55,6 +59,9 @@ const HISTORY_KEY_KIND = 1;
 const ENVELOPES_PER_PUT = 100;
 /** Member pages a committer reads (100 members each): a conversation's first 10,000 people. */
 const MEMBER_PAGES = 100;
+/** Accounts per `roster` request. */
+const ROSTER_PAGE = 1_000;
+const ACCOUNT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export interface MlsCommitOut {
     commit: Uint8Array;
@@ -146,8 +153,8 @@ export interface MlsApplication {
 export interface MlsSealedMessage {
     id: string;
     authorId: string | null;
-    /** `${userId}/${device}` of the device that signed it. */
-    sender: string;
+    /** `${userId}/${device}` of the device that signed it; null when the server names no account for it. */
+    sender: string | null;
     epoch: bigint;
     /** The content; null when its signature or sealing does not check out, or no key here opens it. */
     opened: Uint8Array | null;
@@ -156,6 +163,8 @@ export interface MlsSealedMessage {
 interface SealedWire {
     id: string;
     authorId: string | null;
+    /** The account of the signing device when `authorId` is null (a member the server runs); absent from older servers. */
+    signer?: string | null;
     clientKey: string;
     device: string;
     epoch: string;
@@ -177,6 +186,11 @@ function toText(value: Uint8Array): string {
 function fromText(value: string): Uint8Array {
     const binary = atob(value.replaceAll("-", "+").replaceAll("_", "/"));
     return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+}
+
+/** The account ids in an answer's list; anything else in it is ignored. */
+function accountIds(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string" && ACCOUNT_ID.test(id)) : [];
 }
 
 const sameBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((byte, i) => byte === b[i]);
@@ -317,8 +331,15 @@ export class MlsDevice {
      */
     async addAccounts(channelId: string, userIds: string[]): Promise<string[]> {
         const groupId = this.requireGroup(channelId);
+        let wanted = userIds;
         for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt++) {
-            const claimed = await this.send({ op: "claim-key-packages", channelId, userIds, ciphersuite: this.ciphersuite as 0x004f });
+            // After losing the epoch, the accounts the winning commit already added are not added twice.
+            if (attempt) {
+                const present = new Set(this.rosterAccounts(groupId));
+                wanted = wanted.filter((id) => !present.has(id));
+                if (!wanted.length) return [];
+            }
+            const claimed = await this.send({ op: "claim-key-packages", channelId, userIds: wanted, ciphersuite: this.ciphersuite as 0x004f });
             const packages = claimed.keyPackages as { address: string; keyPackage: string }[];
             if (!packages.length) return [];
             const epoch = this.member.epoch(groupId);
@@ -342,6 +363,45 @@ export class MlsDevice {
             await this.sync(channelId);
         }
         throw new MlsRequestError(409, "staleEpoch");
+    }
+
+    /**
+     * Bring the group's leaves in line with who is in the conversation, as
+     * the server answers it (`roster`): every device of the accounts that
+     * left is removed, then the devices of the people in it who hold no leaf
+     * are added (a Welcome, and the new epoch's history key sealed to them),
+     * so they read what is said next without having opened the conversation.
+     * A removal that fails fails the caller - `sendSealed` does not seal past
+     * it; an add that fails is logged and tried again next time, and the
+     * newcomer can still join by its own external commit.
+     */
+    async reconcile(channelId: string): Promise<void> {
+        const roster = this.rosterAccounts(this.requireGroup(channelId));
+        if (!roster.length) return;
+        const departed = new Set<string>();
+        const joinable = new Set<string>();
+        for (let start = 0; start < roster.length; start += ROSTER_PAGE) {
+            const answer = await this.send({ op: "roster", channelId, accounts: roster.slice(start, start + ROSTER_PAGE), ciphersuite: this.ciphersuite as 0x004f });
+            for (const id of accountIds(answer.departed)) departed.add(id);
+            for (const id of accountIds(answer.joinable)) joinable.add(id);
+        }
+        departed.delete(this.options.userId);
+        if (departed.size) await this.removeAccounts(channelId, [...departed]);
+        const present = new Set(this.rosterAccounts(this.requireGroup(channelId)));
+        const adding = [...joinable].filter((id) => !present.has(id) && !departed.has(id));
+        if (!adding.length) return;
+        await this.addAccounts(channelId, adding).catch((caught: unknown) => {
+            console.warn("polaris: people new to a sealed conversation could not be added to its group:", caught);
+        });
+    }
+
+    /** The accounts holding a leaf in this copy of the group, this device's own among them. */
+    private rosterAccounts(groupId: Uint8Array): string[] {
+        const accounts = this.member.members(groupId).map((m) => {
+            const identity = decoder.decode(m.identity);
+            return identity.slice(0, identity.indexOf("/"));
+        });
+        return [...new Set(accounts)].filter((id) => ACCOUNT_ID.test(id));
     }
 
     /**
@@ -411,6 +471,7 @@ export class MlsDevice {
     async sendSealed(channelId: string, plaintext: Uint8Array, options: { clientKey?: string; parentId?: string | null; replyToId?: string | null } = {}): Promise<string> {
         this.requireGroup(channelId);
         await this.pull(channelId);
+        await this.reconcile(channelId);
         const groupId = this.requireGroup(channelId);
         const epoch = this.member.epoch(groupId);
         const key = await this.historyKey(channelId, epoch);
@@ -454,7 +515,9 @@ export class MlsDevice {
                 const key = await this.historyKey(channelId, epoch).catch(() => null);
                 if (key) opened = await content.openMessage(key, binding, ciphertext).catch(() => null);
             }
-            out.push({ id: row.id, authorId: row.authorId, sender: `${row.authorId}/${row.device}`, epoch, opened });
+            // A member the server runs stores no author; the account its device signs as comes beside it.
+            const signer = row.authorId ?? row.signer ?? null;
+            out.push({ id: row.id, authorId: row.authorId, sender: signer ? `${signer}/${row.device}` : null, epoch, opened });
         }
         return out;
     }

@@ -148,6 +148,8 @@ describe.skipIf(!nativeFile)("Polar's device against a person's", () => {
         expect(row).toMatchObject({ authorId: null, agent: "polar", authorLabel: "Polar", body: "", e2eeDevice: serviceDevice(CHANNEL) });
         const [opened] = await person.readSealed(CHANNEL, [id]);
         expect(opened?.opened && decoder.decode(opened.opened)).toBe("hello alice");
+        // No author on the row; the device it was signed by is still Polar's.
+        expect(opened?.sender).toBe(POLAR_ADDRESS);
 
         // Nothing left waiting to be sent; the notes it needs are kept.
         expect(reservedNames().filter((n) => n.startsWith("outbox/"))).toEqual([]);
@@ -199,6 +201,7 @@ describe.skipIf(!nativeFile)("Polar's device against a person's", () => {
         expect(state.tables.chatMessage?.find((r) => r.id === id)).toMatchObject({ authorId: null, agent: null, webhookId: HOOK, authorLabel: "Deploys" });
         const [opened] = await person.readSealed(CHANNEL, [id]);
         expect(opened?.opened && decoder.decode(opened.opened)).toBe("build 42 is out");
+        expect(opened?.sender).toBe(`${WEBHOOK_SERVICE_ID}/${serviceDevice(HOOK)}`);
     });
 
     it("reaches only conversations it was added to", async () => {

@@ -21,6 +21,8 @@ export const MAX_KEY_PACKAGES_PER_DEVICE = 100;
 export const MAX_CLAIM_USERS = 100;
 export const MAX_EVENTS_PER_READ = 200;
 export const MAX_WELCOMES_PER_COMMIT = 100;
+/** Key-package rows `accountsWithKeyPackages` reads at most. */
+const MAX_KEY_PACKAGE_ROWS = 2_000;
 /**
  * How much of a group's log is kept: the last 256 epochs. A device further
  * behind than that cannot catch up commit by commit anyway once one is gone,
@@ -195,6 +197,22 @@ export async function readEvents(channelId: string, address: string, afterSeq: b
         select: { seq: true, epoch: true, kind: true, sender: true, payload: true }
     });
     return rows.map((row) => ({ ...row, payload: new Uint8Array(row.payload) }));
+}
+
+/**
+ * Up to `limit` of these accounts that have a device with a key package in
+ * this suite, so adding them to a group has something to claim. Reads a
+ * bounded number of rows: an account not reached this time is reached once
+ * the ones before it are in the group and no longer asked about.
+ */
+export async function accountsWithKeyPackages(userIds: readonly string[], ciphersuite: number, limit: number): Promise<string[]> {
+    if (!userIds.length) return [];
+    const rows = await prisma.mlsKeyPackage.findMany({
+        where: { userId: { in: [...new Set(userIds)] }, ciphersuite },
+        select: { userId: true },
+        take: MAX_KEY_PACKAGE_ROWS
+    });
+    return [...new Set(rows.map((row) => row.userId))].slice(0, limit);
 }
 
 /** The public halves of these accounts' keys; accounts without one are left out. */

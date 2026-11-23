@@ -29,7 +29,7 @@ import { expiryForChannel } from "@/lib/chat/vanish";
 import { unhideOnMessage } from "@/lib/chat/chat-lock";
 import * as messages from "@/lib/chat/messages";
 import * as content from "@polaris/chat-crypto/message-content";
-import { POLAR_SERVICE, serviceDevice, serviceKind, type ServiceKind } from "@/lib/chat/service-members";
+import { POLAR_SERVICE, POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID, serviceDevice, serviceKind, type ServiceKind } from "@/lib/chat/service-members";
 
 export const MAX_SEALED_READ = 100;
 
@@ -161,6 +161,8 @@ async function postAsService(kind: ServiceKind, input: SealedSend, signatureKey:
 export interface SealedRow {
     id: string;
     authorId: string | null;
+    /** The account the signing device belongs to: the author, or the service a row with none came from. */
+    signer: string | null;
     clientKey: string;
     device: string;
     epoch: bigint;
@@ -183,6 +185,8 @@ export async function readSealed(userId: string, channelId: string, ids: readonl
         select: {
             id: true,
             authorId: true,
+            agent: true,
+            webhookId: true,
             clientKey: true,
             expiresAt: true,
             audience: true,
@@ -205,6 +209,7 @@ export async function readSealed(userId: string, channelId: string, ids: readonl
             {
                 id: row.id,
                 authorId: row.authorId,
+                signer: row.authorId ?? (row.agent === POLAR_SERVICE ? POLAR_SERVICE_ID : row.webhookId ? WEBHOOK_SERVICE_ID : null),
                 clientKey,
                 device: e2eeDevice,
                 epoch: e2eeEpoch,

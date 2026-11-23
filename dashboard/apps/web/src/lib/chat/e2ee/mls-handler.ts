@@ -15,7 +15,9 @@
  * key (left out, never refused), so it cannot be used to learn who exists or
  * who has set up encryption anywhere but in a conversation the caller is in.
  * `member-account-keys` lists the keys of the conversation's own people only,
- * to a caller who is one of them.
+ * to a caller who is one of them. `roster` answers a member which of the
+ * accounts it names have left the conversation - what anybody in it sees on
+ * its member list - and who is in it with a device but holds no leaf.
  */
 
 import { prisma } from "@polaris/db";
@@ -34,6 +36,8 @@ const PER_ACCOUNT = 1_200;
 const ORG_RECIPIENT = "org";
 /** Members per `member-account-keys` page. */
 const MEMBER_PAGE = 100;
+/** Accounts `roster` checks outside the list, and names to add, at most (a `claim-key-packages` call's worth). */
+const JOINABLE_PAGE = 100;
 
 function json(body: unknown, status = 200): NextResponse {
     return NextResponse.json(body, { status, headers: { "cache-control": "no-store" } });
@@ -138,6 +142,20 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                 next: page.length === MEMBER_PAGE ? page[page.length - 1] : null
             });
         }
+        case "roster": {
+            // The people on the conversation's list reach it; anybody else named (a member the
+            // server runs, or one who left) is asked of `channelAccess`, the rule every op follows -
+            // at most a page of them per call, so naming made-up ids buys no more than any other op.
+            const audience = new Set((await conversationAudience({ id: userId }, body.channelId)) ?? []);
+            const named = new Set(body.accounts);
+            const others = [...named].filter((id) => id !== userId && !audience.has(id)).slice(0, JOINABLE_PAGE);
+            const reach = await Promise.all(others.map((id) => channelAccess({ id }, body.channelId)));
+            const candidates = [...audience].filter((id) => id !== userId && !named.has(id));
+            return json({
+                departed: others.filter((_, i) => !reach[i]),
+                joinable: await delivery.accountsWithKeyPackages(candidates, body.ciphersuite, JOINABLE_PAGE)
+            });
+        }
         case "group": {
             const group = await delivery.groupState(body.channelId);
             return json({
@@ -206,6 +224,7 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                 messages: rows.map((r) => ({
                     id: r.id,
                     authorId: r.authorId,
+                    signer: r.signer,
                     clientKey: r.clientKey,
                     device: r.device,
                     epoch: r.epoch.toString(),

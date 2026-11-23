@@ -515,6 +515,53 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         expect(await bob.readSealed(CHANNEL, [id])).toEqual([]);
     });
 
+    it("before sealing, takes out the devices of who left and adds the people who joined", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        const bob = await open(BOB, "bob-phone-1");
+        const carol = await open(CAROL, "carol-desk-1");
+        for (const device of [alice, bob, carol]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB]);
+        await bob.sync(CHANNEL);
+        const commits = () => state.tables.mlsGroupEvent!.filter((e) => e.kind === "commit").length;
+
+        // Bob leaves; Carol, with a device, is in the conversation but holds no leaf.
+        state.members.delete(`${BOB}:${CHANNEL}`);
+        const before = commits();
+        const id = await alice.sendSealed(CHANNEL, new TextEncoder().encode("after bob left"));
+        expect(commits()).toBe(before + 2);
+
+        // Carol reads it without ever having opened the conversation herself.
+        expect(carol.groupOf(CHANNEL)).toBeNull();
+        await carol.sync(CHANNEL);
+        expect(carol.groupOf(CHANNEL)).toEqual(alice.groupOf(CHANNEL));
+        const [read] = await carol.readSealed(CHANNEL, [id]);
+        expect(new TextDecoder().decode(read!.opened!)).toBe("after bob left");
+
+        // Bob's device was taken out before the message was sealed: even served the row, it cannot open it.
+        state.members.add(`${BOB}:${CHANNEL}`);
+        expect(await heard(bob)).toEqual([]);
+        expect(bob.groupOf(CHANNEL)).toBeNull();
+        expect((await bob.readSealed(CHANNEL, [id]))[0]!.opened).toBeNull();
+        state.members.delete(`${BOB}:${CHANNEL}`);
+
+        // Nothing changed since: the next message commits nothing.
+        const settled = commits();
+        await alice.sendSealed(CHANNEL, new TextEncoder().encode("again"));
+        expect(commits()).toBe(settled);
+    });
+
+    it("answers who left and who has no leaf to a member only", async () => {
+        await device(CAROL, "carol-desk-1");
+        await call({ op: "publish-key-packages", device: "carol-desk-1", ciphersuite: 0x004f, keyPackages: [blob(5)] }, CAROL);
+        state.members.delete(`${BOB}:${CHANNEL}`);
+        const roster = (accounts: string[], as = ALICE) => call({ op: "roster", channelId: CHANNEL, accounts, ciphersuite: 0x004f }, as);
+        // Dave is in the conversation with no device, so there is nothing to add him by.
+        expect((await roster([ALICE, BOB])).body).toEqual({ departed: [BOB], joinable: [CAROL] });
+        expect((await roster([ALICE, CAROL])).body).toEqual({ departed: [], joinable: [] });
+        expect((await roster([ALICE], BOB)).status).toBe(403);
+    });
+
     it("refuses a sealed message with another device's signature, from a future epoch, or from a device not its own", async () => {
         const alice = await open(ALICE, "alice-laptop");
         await alice.register();

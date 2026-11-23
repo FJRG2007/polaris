@@ -35,6 +35,7 @@ the account to reach it, and so does every account the op names.
 | `register-device` | record the device; answers how many one-use key packages it still has |
 | `publish-key-packages` | add one-use packages (at most 100 held) or replace the last-resort one |
 | `claim-key-packages` | take one package per device of the named accounts (one-use first, then last resort) |
+| `roster` | of up to 1,000 accounts holding a leaf in the caller's copy of the group, the ones that no longer reach the conversation (`departed`), and up to 100 people in it with a key package who hold none (`joinable`); people on the conversation's list are answered from it, anybody else named through `channelAccess`, at most 100 per call |
 | `group` / `create-group` | read the conversation's group; create it (the first device wins, the rest get `groupExists`) |
 | `commit` | accepted only for the epoch the group is at, as one compare-and-set; the loser gets `staleEpoch` |
 | `application` | an MLS application message for the whole group |
@@ -60,7 +61,19 @@ and resends whatever an earlier run committed and never sent. Then:
 - `addAccounts` claims packages, commits the add and sends one Welcome per
   device; on `staleEpoch` it drops its pending commit, reads the winner's and
   tries again (three attempts). `removeAccounts` commits the removal of every
-  device of accounts that left, the same way.
+  device of accounts that left, the same way. A retry after a lost epoch
+  leaves out the accounts the winning commit already added.
+- `reconcile` brings the group's leaves in line with the conversation
+  (`roster`): every device of the accounts that left is removed, then the
+  devices of the people in it with no leaf are added (a Welcome each, and the
+  new epoch's history key sealed to them). `sendSealed` runs it before it
+  seals, so however somebody was added or left - the member list, an invite,
+  a join request, a space, an organisation, an account deleted - nothing said
+  afterwards is sealed to a key of somebody who left, and a newcomer reads it
+  without having opened the conversation since. A failed removal fails the
+  send (never sent in the clear instead); a failed add is logged and
+  tried again on the next send, and the newcomer still joins by its own
+  external commit when it opens the conversation.
 - A rejoin (external commit) first drops the device's own copy of the group
   (`forgetGroup`): a forked copy, one too far behind, or the previous attempt's
   join the server refused for a lost epoch race. A device that kept its key has
@@ -112,7 +125,10 @@ and `e2eeSignatureKey` (migration `20280102000000_chat_sealed_messages`,
 additive; its header has the reverse). `readSealed(channel, ids)` (op
 `read-sealed`, at most 100, only messages the account may see) checks each
 signature, then opens the content with the epoch's history key; a message that
-fails either comes back with `opened: null`. Verifying needs WebCrypto Ed25519
+fails either comes back with `opened: null`. Each row comes back with
+`sender`, the signing device's `${account}/${device}`: the author's, or for a
+row the server's own member posted (no author), the service account it signs
+as (`signer` on the wire). Verifying needs WebCrypto Ed25519
 (Node 20+, current browsers).
 
 Crash safety: an operation's state changes and its request are written in one
@@ -272,4 +288,5 @@ What is built on top of it:
   stored with no author under Polar's or the webhook's name). Polar answering,
   a webhook posting and the member list's switch are built too (see below).
 - Sign-out deletes the browser's MLS device, but its leaf stays in each group
-  until another member removes it.
+  until another member removes it (`reconcile` removes only the leaves of
+  accounts that left, not a signed-out device of an account still in it).
