@@ -987,6 +987,7 @@
         "giveLineQuality": "{quantity} x {what}, calidad {quality}",
         "localMachine": "Local (este servidor)",
         "hiddenSignIn": "Sesión Polaris (oculta)",
+        "addressRefUnknown": "Esa dirección ya no está en este servidor. Actualiza la lista y vuelve a intentarlo.",
         "aPolarisAccount": "Una cuenta de Polaris",
         "whitelistAdded": "Añadido a la lista blanca: {names}.",
         "whitelistRemoved": "Quitado {name} de la lista blanca.",

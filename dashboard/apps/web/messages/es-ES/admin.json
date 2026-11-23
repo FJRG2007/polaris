@@ -3276,7 +3276,7 @@
         },
         "playerAddresses": {
             "title": "Mostrar las direcciones de los jugadores a quienes gestionan servidores de juego",
-            "hint": "Cuando alguien que gestiona un servidor de juego busca una cuenta de Polaris para añadirla como jugador, ve las direcciones desde las que inicia sesión. Desactivado, solo las ven los administradores."
+            "hint": "Desactivado por defecto. Quienes gestionan siguen permitiendo, quitando y comparando direcciones, que ven como un código por servidor. Activado, ven las direcciones reales desde las que se conectan e inician sesión."
         },
         "errors": {
             "checkForm": "Revisa el formulario.",

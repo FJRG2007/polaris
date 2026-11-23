@@ -15,6 +15,7 @@
  * is not something a one-shot read shared with the others could do.
  */
 
+import { addressShown } from "../../lib/minecraft/address-label";
 import * as actions from "./minecraft-actions";
 import { useGameText, useSchemaText } from "../game-text";
 import type { GameKey } from "../../../messages";
@@ -1151,13 +1152,13 @@ export function PlayerAccessDialog({
                                         key={held}
                                         className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs"
                                     >
-                                        {held}
+                                        {addressShown(held, t)}
                                         {onRemoveAddress && !following && (
                                             <button
                                                 type="button"
                                                 disabled={pending}
                                                 aria-label={t("players.removeAddressFrom", {
-                                                    address: held,
+                                                    address: addressShown(held, t),
                                                     name: player.username
                                                 })}
                                                 title={t("players.removeNamed", { name: held })}

@@ -110,6 +110,7 @@ import {
 } from "lucide-react";
 import { hostUi } from "@polaris/app-host/client";
 import * as view from "../../lib/minecraft/players-view";
+import { addressShown } from "../../lib/minecraft/address-label";
 
 const { relativeTime } = hostUi.relativeTime;
 const { useConfirm } = hostUi.confirmDialog;
@@ -728,7 +729,7 @@ export function MinecraftPlayers({
                                     <span className="font-medium">{refusal.player}</span>
                                     <span className="text-muted-foreground">
                                         {from
-                                            ? t("playersTab.arrivedFrom", { address: from })
+                                            ? t("playersTab.arrivedFrom", { address: addressShown(from, t) })
                                             : t("playersTab.arrivedFromAnAddressThe")}
                                         {" - "}
                                         {format.dateTime(refusal.at)}
@@ -1539,7 +1540,7 @@ function PlayerRow({
                     ) : (
                         <TagList>
                             {player.addresses.map((address) => (
-                                <Badge key={address}>{schemaText(address)}</Badge>
+                                <Badge key={address}>{addressShown(address, t)}</Badge>
                             ))}
                         </TagList>
                     )}

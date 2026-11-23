@@ -3276,7 +3276,7 @@
         },
         "playerAddresses": {
             "title": "Show player addresses to game server managers",
-            "hint": "When someone managing a game server looks up a Polaris account to add it as a player, they see the addresses that account signs in from. Turned off, only administrators see them."
+            "hint": "Off by default. Managers still allow, remove and compare addresses, shown as a code per server. Turned on, they see the real addresses players connect and sign in from."
         },
         "errors": {
             "checkForm": "Check the form.",

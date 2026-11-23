@@ -81,7 +81,7 @@ export function RichText({
     customEmoji = null,
     jumboEmoji = false,
     flaggedLinks,
-    remoteImages = true
+    remoteImages = false
 }: {
     value: string;
     className?: string;
@@ -112,10 +112,11 @@ export function RichText({
      */
     flaggedLinks?: readonly FlaggedLinkMark[];
     /**
-     * Load a picture from another site as it is drawn. False leaves only this
-     * Polaris's own pictures inline and shows any other one as a link, for text
-     * nobody here wrote - a model's answer, where an image address is a way to
-     * send what it read to whoever owns that address.
+     * Load a picture from another site as it is drawn. Off by default: only this
+     * Polaris's own pictures load inline and any other one is shown as a link,
+     * because a picture somebody else wrote into a message, a task or a note
+     * would otherwise hand every reader's address, and the moment they read it,
+     * to whoever runs that site.
      */
     remoteImages?: boolean;
 }) {
@@ -169,7 +170,7 @@ export interface FlaggedLinkMark {
     readonly provider: string;
 }
 
-const NO_EMOJI: EmojiScope = { set: null, jumbo: false, flagged: null, remoteImages: true };
+const NO_EMOJI: EmojiScope = { set: null, jumbo: false, flagged: null, remoteImages: false };
 
 /**
  * Whether the message is one line of nothing but emoji, at most Discord's

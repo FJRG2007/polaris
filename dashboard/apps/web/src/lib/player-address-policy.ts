@@ -7,8 +7,9 @@
  * server, so an administrator decides it for the whole instance. Administrators
  * themselves always see them: they already read every session's address.
  *
- * On unless an administrator turns it off, because that is how the lookup has
- * always behaved and turning it off quietly would break the step people use.
+ * Off unless an administrator turns it on: where somebody connects from is
+ * theirs, so hidden is the default. With it off, the people running a server
+ * still see and act on every address, as an opaque reference per server.
  */
 
 import { getSetting, setSetting } from "@/lib/setting-store";
@@ -17,7 +18,7 @@ const KEY = "games.share-player-addresses";
 
 /** Whether managers of a game server are shown other accounts' addresses. */
 export async function playerAddressesShared(): Promise<boolean> {
-    return (await getSetting(KEY)) !== "false";
+    return (await getSetting(KEY)) === "true";
 }
 
 export async function setPlayerAddressesShared(shared: boolean): Promise<void> {

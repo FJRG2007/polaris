@@ -106,7 +106,7 @@ const playersTool = () =>
                     ? await Promise.all([
                           playerAccess
                               .listPlayerAccess(access.ownerId, input.serverId)
-                              .then((view) => playerAccess.forViewer(view, user))
+                              .then((view) => playerAccess.forViewer(view, user, input.serverId))
                               .catch(() => null),
                           presence?.answering
                               ? getServerRoster(access.ownerId, input.serverId).catch(() => null)

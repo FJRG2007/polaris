@@ -917,9 +917,16 @@ export async function grantPlayerAccessAction(
             "games.manage",
             parsed.data.installedAppId
         );
+        // A reference from the screen is resolved here, against the addresses
+        // this server already holds; a typed address passes through as typed.
+        const address = await playerAccess.resolveAddressInput(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.address
+        );
         await playerAccess.grantPlayerAccess(access.ownerId, parsed.data.installedAppId, user.id, {
             username: parsed.data.username,
-            address: parsed.data.address,
+            address,
             ...(parsed.data.note ? { note: parsed.data.note } : {})
         });
         await recordAudit({
@@ -927,7 +934,7 @@ export async function grantPlayerAccessAction(
             action: "minecraft.access-grant",
             targetType: "installedApp",
             targetId: parsed.data.installedAppId,
-            metadata: { player: parsed.data.username, address: parsed.data.address }
+            metadata: { player: parsed.data.username, address }
         });
         return {};
     } catch (caught) {
@@ -1173,7 +1180,9 @@ export async function playerAccessAction(
     try {
         const { access } = await requireGameServer("games.read", installedAppId);
         return await playerAccess.forViewer(
-            await playerAccess.listPlayerAccess(access.ownerId, installedAppId)
+            await playerAccess.listPlayerAccess(access.ownerId, installedAppId),
+            undefined,
+            installedAppId
         );
     } catch {
         return null;
@@ -1261,13 +1270,18 @@ export async function revokePlayerAddressAction(
 ): Promise<{ error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
-        await playerAccess.revokePlayerAddress(access.ownerId, installedAppId, username, address);
+        const resolved = await playerAccess.resolveAddressInput(
+            access.ownerId,
+            installedAppId,
+            address
+        );
+        await playerAccess.revokePlayerAddress(access.ownerId, installedAppId, username, resolved);
         await recordAudit({
             actorId: user.id,
             action: "minecraft.access-revoke-address",
             targetType: "installedApp",
             targetId: installedAppId,
-            metadata: { player: username, address }
+            metadata: { player: username, address: resolved }
         });
         return {};
     } catch (caught) {

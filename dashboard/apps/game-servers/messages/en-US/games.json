@@ -987,6 +987,7 @@
         "giveLineQuality": "{quantity} x {what}, quality {quality}",
         "localMachine": "Local (this server)",
         "hiddenSignIn": "Polaris sign-in (hidden)",
+        "addressRefUnknown": "That address is no longer on this server. Refresh the list and try again.",
         "aPolarisAccount": "A Polaris account",
         "whitelistAdded": "Added to the whitelist: {names}.",
         "whitelistRemoved": "Removed {name} from the whitelist.",
