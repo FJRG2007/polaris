@@ -57,8 +57,10 @@ of it, the gap is named; **missing** = nothing on screen. Paths are relative to
 | Service variables, raw editor | present | `variables-editor.tsx`, `variables-raw-dialog.tsx` |
 | Shared variables | present | `settings/shared-variables-section.tsx`, `${{shared.KEY}}` |
 | Reference variables `${{service.KEY}}` | present | `lib/deploy/references.ts`: resolved at deploy, scoped to the environment |
-| Sealed variables | missing | values can be revealed (audited) once saved |
-| Redeploy what references a changed variable | partial | saving offers a redeploy of the scope that changed; services in the same environment that reference it are not offered |
+| Sealed variables | present | `variable-action-dialogs.tsx` Seal; `sealEnvVar` + `revealEnvVar` refusal in `lib/env-var-service.ts`; copies get it empty (`lib/deploy/env-values.ts`) |
+| Variable generator `${{ secret(n, "chars") }}` | present | `lib/deploy/variable-generator.ts`; drawn again for every new environment / preview |
+| Promote to shared variable (with a dialog) | present | `promoteEnvVarAction`, `PromoteVariableDialog` |
+| Redeploy what references a changed variable | present | `lib/deploy/variable-referrers.ts`: Save and redeploy also reaches every service reading the changed keys, through references of references and shared variables |
 | Egress proxy template (private only, generated password by reference) | missing | template catalogue has none |
 | Volumes | present | `volumes-panel.tsx` |
 | Deploy / build / runtime logs, metrics | present | `logs-view.tsx`, `observability-view.tsx` |

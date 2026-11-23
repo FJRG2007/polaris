@@ -15,6 +15,10 @@ const envVarScope = vi.fn();
 const listEnvVars = vi.fn();
 const revealEnvVar = vi.fn();
 const promoteEnvVar = vi.fn();
+const sealedValue = vi.fn();
+const sealEnvVar = vi.fn();
+const setEnvVarGenerator = vi.fn();
+const environmentReferrers = vi.fn(async () => [] as string[]);
 const recordDeployAudit = vi.fn();
 
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
@@ -24,6 +28,7 @@ vi.mock("@/lib/deploy-audit", () => ({ recordDeployAudit }));
 vi.mock("@/lib/deploy-service", () => ({ redeployForEnvScope }));
 vi.mock("@/lib/deploy-project-access", () => ({ requireEnvScopeAccess }));
 vi.mock("@/lib/deploy/variable-links", () => ({ variableLinks: async () => ({}) }));
+vi.mock("@/lib/deploy/variable-referrers", () => ({ environmentReferrers }));
 vi.mock("@/lib/env-var-service", () => ({
     setEnvVar,
     setEnvVarSecrecy,
@@ -31,14 +36,19 @@ vi.mock("@/lib/env-var-service", () => ({
     envVarScope,
     listEnvVars,
     promoteEnvVar,
-    revealEnvVar
+    revealEnvVar,
+    sealedValue,
+    sealEnvVar,
+    setEnvVarGenerator
 }));
 
 const {
     saveEnvVarChangesAction,
     redeployEnvScopeAction,
     revealEnvScopeAction,
-    promoteEnvVarAction
+    promoteEnvVarAction,
+    sealEnvVarAction,
+    setEnvVarGeneratorAction
 } = await import("@/app/(app)/apps/deploy/variable-actions");
 
 const BASE = {
@@ -245,7 +255,7 @@ describe("promoteEnvVarAction", () => {
                 ? [{ id: "v1", key: "STRIPE_KEY", isSecret: true, value: null }]
                 : [{ id: "s1", key: "OTHER", isSecret: false, value: "x" }]
         );
-        revealEnvVar.mockResolvedValue("sk_live_123");
+        sealedValue.mockResolvedValue("sk_live_123");
         promoteEnvVar.mockResolvedValue(true);
     });
 
@@ -270,7 +280,9 @@ describe("promoteEnvVarAction", () => {
             environmentOwnerId: "owner-1",
             key: "STRIPE_KEY",
             value: "sk_live_123",
-            isSecret: true
+            isSecret: true,
+            sealed: false,
+            generator: null
         });
         expect(setEnvVar).not.toHaveBeenCalled();
         expect(recordDeployAudit).toHaveBeenCalledTimes(2);
@@ -306,8 +318,123 @@ describe("promoteEnvVarAction", () => {
                   ]
                 : []
         );
-        revealEnvVar.mockResolvedValue("${{shared.STRIPE_KEY}}");
+        sealedValue.mockResolvedValue("${{shared.STRIPE_KEY}}");
         expect((await promoteEnvVarAction({ id: "v1" })).error).toBeTruthy();
         expect(promoteEnvVar).not.toHaveBeenCalled();
+    });
+});
+
+describe("sealing a variable", () => {
+    beforeEach(() => {
+        for (const mock of [requireEnvScopeAccess, envVarScope, sealEnvVar, recordDeployAudit])
+            mock.mockReset();
+        requireEnvScopeAccess.mockResolvedValue({ ownerId: "owner-1", orgId: null });
+        envVarScope.mockResolvedValue({ scope: "application", scopeId: "app-1", key: "TOKEN" });
+        sealEnvVar.mockResolvedValue(true);
+    });
+
+    it("seals with the right to edit the variables, and writes down which one by name", async () => {
+        expect(await sealEnvVarAction({ id: "v1" })).toEqual({});
+        expect(requireEnvScopeAccess).toHaveBeenCalledWith(
+            "application",
+            "app-1",
+            "user-1",
+            "variables.write"
+        );
+        expect(sealEnvVar).toHaveBeenCalledWith("v1", "owner-1");
+        expect(recordDeployAudit).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "deploy.variable.seal",
+                metadata: { key: "TOKEN" }
+            })
+        );
+    });
+
+    it("seals nothing for somebody who may not edit the variables", async () => {
+        requireEnvScopeAccess.mockRejectedValue(new Error("You cannot change this service"));
+        expect(await sealEnvVarAction({ id: "v1" })).toEqual({
+            error: "You cannot change this service"
+        });
+        expect(sealEnvVar).not.toHaveBeenCalled();
+    });
+
+    it("leaves a sealed variable out of the raw editor's values", async () => {
+        listEnvVars.mockResolvedValue([
+            { id: "v1", key: "TOKEN", isSecret: true, value: null, sealed: true },
+            { id: "v2", key: "PORT", isSecret: false, value: "80", sealed: false }
+        ]);
+        revealEnvVar.mockReset();
+        const result = await revealEnvScopeAction({ scope: "application", scopeId: "app-1" });
+        expect(result).toEqual({ values: { v2: "80" } });
+        expect(revealEnvVar).not.toHaveBeenCalled();
+    });
+});
+
+describe("a variable's generator", () => {
+    beforeEach(() => {
+        for (const mock of [requireEnvScopeAccess, envVarScope, setEnvVarGenerator])
+            mock.mockReset();
+        requireEnvScopeAccess.mockResolvedValue({ ownerId: "owner-1", orgId: null });
+        envVarScope.mockResolvedValue({ scope: "environment", scopeId: "env-1", key: "PASS" });
+    });
+
+    it("saves a generator that reads, and replaces the value only when asked", async () => {
+        expect(
+            await setEnvVarGeneratorAction({
+                id: "v1",
+                generator: "${{ secret(16) }}",
+                regenerate: false
+            })
+        ).toEqual({});
+        expect(setEnvVarGenerator).toHaveBeenCalledWith(
+            "v1",
+            "owner-1",
+            "${{ secret(16) }}",
+            false
+        );
+    });
+
+    it("refuses one that does not read, before touching anything", async () => {
+        const result = await setEnvVarGeneratorAction({
+            id: "v1",
+            generator: "${{ secret(0) }}",
+            regenerate: true
+        });
+        expect(result.error).toBeTruthy();
+        expect(setEnvVarGenerator).not.toHaveBeenCalled();
+    });
+});
+
+describe("rotating a value", () => {
+    beforeEach(() => {
+        for (const mock of [requireEnvScopeAccess, redeployForEnvScope, setEnvVar, envVarScope])
+            mock.mockReset();
+        requireEnvScopeAccess.mockResolvedValue({ ownerId: "owner-1", orgId: null });
+        redeployForEnvScope.mockResolvedValue(undefined);
+        environmentReferrers.mockReset();
+        environmentReferrers.mockResolvedValue(["app-2", "app-3"]);
+    });
+
+    it("redeploys every service that reads the changed key along with this one", async () => {
+        const result = await saveEnvVarChangesAction({
+            ...BASE,
+            set: [{ key: "API_KEY", value: "new", isSecret: true }],
+            redeploy: true
+        });
+        expect(result).toEqual({ saved: 1, redeployed: true, referrers: 2 });
+        expect(environmentReferrers).toHaveBeenCalledWith("app-1", ["API_KEY"]);
+        await vi.waitFor(() => expect(redeployForEnvScope).toHaveBeenCalledTimes(3));
+        expect(redeployForEnvScope).toHaveBeenCalledWith("application", "app-2", "owner-1", "user-1", {
+            rotation: "app-1"
+        });
+    });
+
+    it("redeploys none of them on a save without a redeploy", async () => {
+        await saveEnvVarChangesAction({
+            ...BASE,
+            set: [{ key: "API_KEY", value: "new", isSecret: true }]
+        });
+        expect(environmentReferrers).not.toHaveBeenCalled();
+        expect(redeployForEnvScope).not.toHaveBeenCalled();
     });
 });

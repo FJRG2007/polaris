@@ -27,6 +27,8 @@ const mocks = vi.hoisted(() => ({
     revealEnvVarAction: vi.fn(),
     revealEnvScopeAction: vi.fn(),
     promoteEnvVarAction: vi.fn(),
+    sealEnvVarAction: vi.fn(),
+    setEnvVarGeneratorAction: vi.fn(),
     saveEnvVarChangesAction: vi.fn(),
     writeText: vi.fn()
 }));
@@ -44,7 +46,9 @@ vi.mock("@/app/(app)/apps/deploy/variable-actions", () => ({
     redeployEnvScopeAction: async () => ({}),
     saveEnvVarChangesAction: mocks.saveEnvVarChangesAction,
     revealEnvScopeAction: mocks.revealEnvScopeAction,
-    promoteEnvVarAction: mocks.promoteEnvVarAction
+    promoteEnvVarAction: mocks.promoteEnvVarAction,
+    sealEnvVarAction: mocks.sealEnvVarAction,
+    setEnvVarGeneratorAction: mocks.setEnvVarGeneratorAction
 }));
 
 const { VariablesEditor } = await import("@/app/(app)/apps/deploy/variables-editor");
@@ -64,6 +68,8 @@ beforeEach(() => {
     mocks.revealEnvVarAction.mockImplementation(async (id: string) => ({ value: SECRETS[id] }));
     mocks.revealEnvScopeAction.mockResolvedValue({ values: { ...SECRETS, v2: "production" } });
     mocks.promoteEnvVarAction.mockResolvedValue({ key: "DATABASE_URL" });
+    mocks.sealEnvVarAction.mockResolvedValue({});
+    mocks.setEnvVarGeneratorAction.mockResolvedValue({});
     mocks.saveEnvVarChangesAction.mockResolvedValue({ saved: 1, redeployed: false });
     mocks.writeText.mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
@@ -147,8 +153,93 @@ describe("a variable's row", () => {
         await userEvent.click(
             await screen.findByRole("menuitem", { name: "Share with every service" })
         );
+        // A dialog says what sharing does before anything moves.
+        const dialog = await screen.findByRole("dialog");
+        expect(within(dialog).getByText(/\$\{\{shared\.DATABASE_URL\}\}/)).toBeTruthy();
+        expect(mocks.promoteEnvVarAction).not.toHaveBeenCalled();
+        await userEvent.click(within(dialog).getByRole("button", { name: "Share variable" }));
         await waitFor(() => expect(mocks.promoteEnvVarAction).toHaveBeenCalledWith({ id: "v1" }));
         expect(mocks.listEnvVarsAction).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps the dialog open with the reason when sharing is refused", async () => {
+        mocks.promoteEnvVarAction.mockResolvedValue({ error: "DATABASE_URL is already shared" });
+        open();
+        const row = (await screen.findByText("DATABASE_URL")).closest("li")!;
+        await userEvent.click(
+            within(row).getByRole("button", { name: "Actions for DATABASE_URL" })
+        );
+        await userEvent.click(
+            await screen.findByRole("menuitem", { name: "Share with every service" })
+        );
+        const dialog = await screen.findByRole("dialog");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Share variable" }));
+        expect(await within(dialog).findByRole("alert")).toHaveProperty(
+            "textContent",
+            "DATABASE_URL is already shared"
+        );
+    });
+
+    it("seals a variable only once the dialog is confirmed", async () => {
+        open();
+        const row = (await screen.findByText("NODE_ENV")).closest("li")!;
+        await userEvent.click(within(row).getByRole("button", { name: "Actions for NODE_ENV" }));
+        await userEvent.click(await screen.findByRole("menuitem", { name: "Seal" }));
+        const dialog = await screen.findByRole("dialog");
+        expect(mocks.sealEnvVarAction).not.toHaveBeenCalled();
+        await userEvent.click(within(dialog).getByRole("button", { name: "Seal variable" }));
+        await waitFor(() => expect(mocks.sealEnvVarAction).toHaveBeenCalledWith({ id: "v2" }));
+    });
+
+    it("never offers to show, copy or unseal a sealed value", async () => {
+        mocks.listEnvVarsAction.mockResolvedValue([
+            {
+                id: "v9",
+                key: "SEALED_TOKEN",
+                isSecret: true,
+                value: null,
+                sealed: true,
+                needsValue: true,
+                generator: null
+            }
+        ]);
+        open();
+        const row = (await screen.findByText("SEALED_TOKEN")).closest("li")!;
+        expect(within(row).queryByRole("button", { name: /Show the value/ })).toBeNull();
+        expect(within(row).queryByRole("button", { name: /Copy the value/ })).toBeNull();
+        expect(within(row).getByText("Needs a value")).toBeTruthy();
+        await userEvent.click(
+            within(row).getByRole("button", { name: "Actions for SEALED_TOKEN" })
+        );
+        await screen.findByRole("menuitem", { name: "Generator" });
+        expect(screen.queryByRole("menuitem", { name: "Seal" })).toBeNull();
+        expect(screen.queryByRole("menuitem", { name: /not secret/ })).toBeNull();
+        expect(mocks.revealEnvVarAction).not.toHaveBeenCalled();
+    });
+
+    it("saves a generator from its dialog, without replacing the value unless asked", async () => {
+        open();
+        const row = (await screen.findByText("NODE_ENV")).closest("li")!;
+        await userEvent.click(within(row).getByRole("button", { name: "Actions for NODE_ENV" }));
+        await userEvent.click(await screen.findByRole("menuitem", { name: "Generator" }));
+        const dialog = await screen.findByRole("dialog");
+        const length = within(dialog).getByRole("textbox", { name: "Length" });
+        await userEvent.clear(length);
+        await userEvent.type(length, "0");
+        expect(within(dialog).getByRole("button", { name: "Save generator" })).toHaveProperty(
+            "disabled",
+            true
+        );
+        await userEvent.clear(length);
+        await userEvent.type(length, "16");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Save generator" }));
+        await waitFor(() =>
+            expect(mocks.setEnvVarGeneratorAction).toHaveBeenCalledWith({
+                id: "v2",
+                generator: "${{ secret(16) }}",
+                regenerate: false
+            })
+        );
     });
 });
 

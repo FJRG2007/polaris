@@ -10,6 +10,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import { loadEnv } from "@polaris/config";
+import { encryptSecret } from "@polaris/storage";
 import { dropGrantsOfGoneDomains } from "@/lib/access/grants";
 import * as core from "@/lib/restore-points/core";
 
@@ -46,11 +48,17 @@ const env: Adapter = {
                 value: true,
                 encryptedValue: true,
                 valueNonce: true,
-                valueKeyId: true
+                valueKeyId: true,
+                sealed: true,
+                generator: true
             }
         });
         const items: Body["items"] = {};
         for (const row of rows) {
+            const extra = {
+                ...(row.sealed ? { sealed: true } : {}),
+                ...(row.generator ? { generator: row.generator } : {})
+            };
             items[row.key] = row.isSecret
                 ? {
                       secret: true,
@@ -58,36 +66,66 @@ const env: Adapter = {
                           c: b64(row.encryptedValue),
                           n: b64(row.valueNonce),
                           k: row.valueKeyId
-                      }
+                      },
+                      ...extra
                   }
-                : { secret: false, value: row.value ?? "" };
+                : { secret: false, value: row.value ?? "", ...extra };
         }
         return { items };
     },
     async apply(objectKey, body) {
         const [scopeType, scopeId] = splitKey(objectKey);
         await prisma.$transaction(async (tx) => {
+            // Sealing is for good: a point from before a variable was sealed puts
+            // its value back sealed, never as readable text.
+            const sealed = new Set(
+                (
+                    await tx.envVar.findMany({
+                        where: { scopeType, scopeId, sealed: true },
+                        select: { key: true }
+                    })
+                ).map((row) => row.key)
+            );
             await tx.envVar.deleteMany({
                 where: { scopeType, scopeId, key: { notIn: Object.keys(body.items) } }
             });
             for (const [key, item] of Object.entries(body.items)) {
                 const envelope = item[core.SECRET_FIELD] as
                     { c?: string; n?: string; k?: string } | undefined;
-                const data =
-                    item.secret === true
+                const keepSealed = item.sealed === true || sealed.has(key);
+                const generator = typeof item.generator === "string" ? item.generator : null;
+                const sealedText =
+                    keepSealed && item.secret !== true
+                        ? encryptSecret(String(item.value ?? ""), loadEnv().POLARIS_MASTER_KEY)
+                        : null;
+                const data = sealedText
+                    ? {
+                          isSecret: true,
+                          value: null,
+                          encryptedValue: sealedText.ciphertext,
+                          valueNonce: sealedText.nonce,
+                          valueKeyId: sealedText.keyId,
+                          sealed: true,
+                          generator
+                      }
+                    : item.secret === true
                         ? {
                               isSecret: true,
                               value: null,
                               encryptedValue: bytes(envelope?.c),
                               valueNonce: bytes(envelope?.n),
-                              valueKeyId: envelope?.k ?? null
+                              valueKeyId: envelope?.k ?? null,
+                              sealed: keepSealed,
+                              generator
                           }
                         : {
                               isSecret: false,
                               value: String(item.value ?? ""),
                               encryptedValue: null,
                               valueNonce: null,
-                              valueKeyId: null
+                              valueKeyId: null,
+                              sealed: false,
+                              generator
                           };
                 await tx.envVar.upsert({
                     where: { scopeType_scopeId_key: { scopeType, scopeId, key } },

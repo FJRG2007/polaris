@@ -58,7 +58,10 @@
         "alreadyShared": "{key} is already a shared variable in this environment",
         "notPromotable": "Only a service variable with a value of its own can be shared",
         "promoteFailed": "Could not share the variable",
-        "revealAllFailed": "Could not show the values"
+        "revealAllFailed": "Could not show the values",
+        "sealFailed": "Could not seal the variable",
+        "generatorInvalid": "That generator cannot be read",
+        "generatorFailed": "Could not save the generator"
     },
     "notes": {
         "invalid": "That note cannot be posted",

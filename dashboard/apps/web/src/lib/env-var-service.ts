@@ -11,6 +11,7 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { ENV_VALUE_MAX, envValueMessage, hasControlCharacter } from "@polaris/core";
+import { formatGenerator, generateValue, parseGenerator } from "./deploy/variable-generator";
 
 export interface EnvVarView {
     id: string;
@@ -18,6 +19,12 @@ export interface EnvVarView {
     isSecret: boolean;
     /** Plain value for non-secrets; null for secrets (never returned to the client). */
     value: string | null;
+    /** Write-only: replaced, never read back. */
+    sealed: boolean;
+    /** A sealed variable copied here without its value, waiting for one. */
+    needsValue: boolean;
+    /** The `${{ secret(...) }}` its value was drawn from, if any. */
+    generator: string | null;
 }
 
 /** A service, an environment's shared variables, or a variable group
@@ -99,7 +106,10 @@ export async function listEnvVars(
         id: row.id,
         key: row.key,
         isSecret: row.isSecret,
-        value: row.isSecret ? null : row.value
+        value: row.isSecret ? null : row.value,
+        sealed: row.sealed,
+        needsValue: row.sealed && !row.encryptedValue,
+        generator: row.generator
     }));
 }
 
@@ -133,11 +143,49 @@ export async function envVarIdByKey(
     return row?.id ?? null;
 }
 
+/** Thrown when a sealed variable's value is asked for: it is never read back. */
+export class SealedVariableError extends Error {
+    constructor(key: string) {
+        super(`${key} is sealed: its value can be replaced but not read.`);
+        this.name = "SealedVariableError";
+    }
+}
+
 /** Reveal a single variable's value, decrypting a secret on demand (owner-gated).
- *  Used by the eye toggle so a secret is only sent to the client when asked for. */
+ *  Used by the eye toggle so a secret is only sent to the client when asked for.
+ *  A sealed variable is refused here - and so in every place that hands a value
+ *  over, the API and the raw editor included; only `sealedValue` opens one, for
+ *  the server's own moves of it. */
 export async function revealEnvVar(id: string, ownerId: string): Promise<string | null> {
     const row = await prisma.envVar.findUnique({ where: { id } });
     if (!row || !SCOPES.includes(row.scopeType)) return null;
+    if (row.sealed) throw new SealedVariableError(row.key);
+    return openValue(row, ownerId);
+}
+
+/**
+ * A variable's value whether or not it is sealed. Only for moving a value from
+ * one stored place to another on the server (promoting it to a shared one) -
+ * never for an answer that reaches a browser or an API client.
+ */
+export async function sealedValue(id: string, ownerId: string): Promise<string | null> {
+    const row = await prisma.envVar.findUnique({ where: { id } });
+    if (!row || !SCOPES.includes(row.scopeType)) return null;
+    return openValue(row, ownerId);
+}
+
+async function openValue(
+    row: {
+        scopeType: string;
+        scopeId: string;
+        isSecret: boolean;
+        value: string | null;
+        encryptedValue: Uint8Array | null;
+        valueNonce: Uint8Array | null;
+        valueKeyId: string | null;
+    },
+    ownerId: string
+): Promise<string | null> {
     await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
     if (!row.isSecret) return row.value;
     if (!row.encryptedValue || !row.valueNonce || !row.valueKeyId) return null;
@@ -177,7 +225,13 @@ function storedValue(
     };
 }
 
-/** Create or replace a variable by key. A secret value is encrypted at rest. */
+/**
+ * Create or replace a variable by key. A secret value is encrypted at rest.
+ *
+ * A value written as a generator (`${{ secret(32) }}`) is kept as the
+ * generator and stored as a value drawn from it. Replacing a sealed variable
+ * keeps it sealed, and so secret: sealing is for good.
+ */
 export async function setEnvVar(
     scope: EnvScope,
     scopeId: string,
@@ -197,10 +251,17 @@ export async function setEnvVar(
 
     const existing = await prisma.envVar.findFirst({
         where: { scopeType: scope, scopeId, key },
-        select: { id: true }
+        select: { id: true, sealed: true }
     });
 
-    const data = storedValue(input.value, input.isSecret);
+    const spec = parseGenerator(input.value);
+    const data = {
+        ...storedValue(
+            spec ? generateValue(spec) : input.value,
+            input.isSecret || Boolean(existing?.sealed)
+        ),
+        generator: spec ? formatGenerator(spec) : null
+    };
 
     if (existing) {
         await prisma.envVar.update({ where: { id: existing.id }, data });
@@ -224,6 +285,8 @@ export async function promoteEnvVar(input: {
     key: string;
     value: string;
     isSecret: boolean;
+    sealed: boolean;
+    generator: string | null;
 }): Promise<boolean> {
     await assertOwnsScope("application", input.serviceId, input.serviceOwnerId);
     await assertOwnsScope("environment", input.environmentId, input.environmentOwnerId);
@@ -235,7 +298,12 @@ export async function promoteEnvVar(input: {
         "env",
         restorePoints.restoreKeys.env("application", input.serviceId)
     );
-    const shared = storedValue(input.value, input.isSecret);
+    // A sealed variable stays sealed where it moves to, generator and all.
+    const shared = {
+        ...storedValue(input.value, input.isSecret || input.sealed),
+        sealed: input.sealed,
+        generator: input.generator
+    };
     const reference = storedValue(`\${{shared.${input.key}}}`, false);
     try {
         return await prisma.$transaction(async (tx) => {
@@ -254,7 +322,7 @@ export async function promoteEnvVar(input: {
             });
             const moved = await tx.envVar.updateMany({
                 where: { scopeType: "application", scopeId: input.serviceId, key: input.key },
-                data: reference
+                data: { ...reference, sealed: false, generator: null }
             });
             if (moved.count === 0) throw new Error("That variable no longer exists");
             return true;
@@ -263,6 +331,58 @@ export async function promoteEnvVar(input: {
         if ((caught as { code?: string }).code === "P2002") return false;
         throw caught;
     }
+}
+
+/**
+ * Seal a variable for good: it becomes a secret where it stands (a plain value
+ * is encrypted without leaving the server) and is never read back again. Its
+ * value is still injected and still answers references. False when it already
+ * was sealed.
+ */
+export async function sealEnvVar(id: string, ownerId: string): Promise<boolean> {
+    const row = await prisma.envVar.findUnique({ where: { id } });
+    if (!row || !SCOPES.includes(row.scopeType)) {
+        throw new Error("That variable no longer exists");
+    }
+    await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
+    if (row.sealed) return false;
+    await restorePoints.capture(
+        "env",
+        restorePoints.restoreKeys.env(row.scopeType as EnvScope, row.scopeId)
+    );
+    const data = row.isSecret ? {} : storedValue(row.value ?? "", true);
+    await prisma.envVar.update({ where: { id }, data: { ...data, sealed: true } });
+    return true;
+}
+
+/**
+ * Give a variable a generator, or take it away (null). With `regenerate` the
+ * value is replaced by one drawn from it now; without, the value stays as it
+ * is and only environments made from here on draw their own.
+ */
+export async function setEnvVarGenerator(
+    id: string,
+    ownerId: string,
+    generator: string | null,
+    regenerate: boolean
+): Promise<void> {
+    const row = await prisma.envVar.findUnique({ where: { id } });
+    if (!row || !SCOPES.includes(row.scopeType)) {
+        throw new Error("That variable no longer exists");
+    }
+    await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
+    const spec = generator === null ? null : parseGenerator(generator);
+    if (generator !== null && !spec) throw new Error("That generator cannot be read");
+    await restorePoints.capture(
+        "env",
+        restorePoints.restoreKeys.env(row.scopeType as EnvScope, row.scopeId)
+    );
+    const fresh =
+        spec && regenerate ? storedValue(generateValue(spec), row.isSecret || row.sealed) : {};
+    await prisma.envVar.update({
+        where: { id },
+        data: { ...fresh, generator: spec ? formatGenerator(spec) : null }
+    });
 }
 
 /** Moved to a pure module so the browser can stage a paste; kept here for callers. */
@@ -284,6 +404,7 @@ export async function setEnvVarSecrecy(
     }
     await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
     if (row.isSecret === isSecret) return;
+    if (row.sealed) throw new SealedVariableError(row.key);
     const value = row.isSecret ? await revealEnvVar(id, ownerId) : row.value;
     await setEnvVar(row.scopeType as EnvScope, row.scopeId, ownerId, {
         key: row.key,

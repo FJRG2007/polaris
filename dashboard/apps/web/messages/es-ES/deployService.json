@@ -918,7 +918,7 @@
         "otherShort": "Se construye como se configuró al crear el servicio."
     },
     "restart": {
-        "title": "Política de reinicio",
+        "title": "Reinicios",
         "policy": "Cuando se detiene",
         "maxRetries": "Reintentos",
         "retriesInvalid": "Entre 1 y {max}.",

@@ -176,7 +176,40 @@
             "findCtrl": "Find in the variables (Ctrl+F)",
             "download": "Download"
         },
-        "editHint": "Double-click or F2 to edit"
+        "editHint": "Double-click or F2 to edit",
+        "isSealed": "{name} is sealed",
+        "hasGenerator": "{name} is drawn from {generator}",
+        "needsValue": "Needs a value",
+        "sealAction": "Seal",
+        "generatorAction": "Generator",
+        "redeployReferrers": "{count, plural, one {Also redeploying one service that reads these variables.} other {Also redeploying # services that read these variables.}}",
+        "seal": {
+            "title": "Seal {name}?",
+            "body": "A sealed value can be replaced but never shown again, and new environments get it empty; services keep receiving it.",
+            "action": "Seal variable"
+        },
+        "promoteDialog": {
+            "title": "Share {name} with every service?",
+            "body": "The value moves to this environment's shared variables, and this service reads it from there as {reference}.",
+            "action": "Share variable"
+        },
+        "generator": {
+            "title": "Generator for {name}",
+            "body": "Every environment made from this one gets a fresh random value drawn this way.",
+            "length": "Length",
+            "characters": "Characters",
+            "lengthInvalid": "A whole number from 1 to {max}.",
+            "charactersInvalid": "At least two different characters, without quotes or backslashes.",
+            "preview": "Sample",
+            "another": "Another sample",
+            "regenerate": "Also replace the value here now",
+            "remove": "Remove generator",
+            "save": "Save generator"
+        },
+        "dialog": {
+            "cancel": "Cancel",
+            "failed": "That did not work. Try again."
+        }
     },
     "cron": {
         "presets": {

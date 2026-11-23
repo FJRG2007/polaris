@@ -176,7 +176,40 @@
             "findCtrl": "Buscar en las variables (Ctrl+F)",
             "download": "Descargar"
         },
-        "editHint": "Doble clic o F2 para editar"
+        "editHint": "Doble clic o F2 para editar",
+        "isSealed": "{name} está sellada",
+        "hasGenerator": "{name} se genera con {generator}",
+        "needsValue": "Falta el valor",
+        "sealAction": "Sellar",
+        "generatorAction": "Generador",
+        "redeployReferrers": "{count, plural, one {También se redespliega un servicio que lee estas variables.} other {También se redespliegan # servicios que leen estas variables.}}",
+        "seal": {
+            "title": "¿Sellar {name}?",
+            "body": "Un valor sellado se puede reemplazar pero nunca volver a ver, y los entornos nuevos lo reciben vacío; los servicios lo siguen recibiendo.",
+            "action": "Sellar variable"
+        },
+        "promoteDialog": {
+            "title": "¿Compartir {name} con todos?",
+            "body": "El valor pasa a las variables compartidas de este entorno, y este servicio lo lee desde ahí como {reference}.",
+            "action": "Compartir"
+        },
+        "generator": {
+            "title": "Generador de {name}",
+            "body": "Cada entorno creado a partir de este recibe un valor aleatorio nuevo generado así.",
+            "length": "Longitud",
+            "characters": "Caracteres",
+            "lengthInvalid": "Un número entero de 1 a {max}.",
+            "charactersInvalid": "Al menos dos caracteres distintos, sin comillas ni barras invertidas.",
+            "preview": "Ejemplo",
+            "another": "Otro ejemplo",
+            "regenerate": "Reemplazar ya también el valor actual",
+            "remove": "Quitar generador",
+            "save": "Guardar"
+        },
+        "dialog": {
+            "cancel": "Cancelar",
+            "failed": "No funcionó. Inténtalo de nuevo."
+        }
     },
     "cron": {
         "presets": {

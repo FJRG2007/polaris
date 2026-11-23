@@ -3,7 +3,8 @@
 /**
  * The variables editor's actions: save a batch of edits, redeploy on request,
  * say what each reference variable points at, hand over every value at once
- * for the raw editor, and promote a service's variable to a shared one.
+ * for the raw editor, promote a service's variable to a shared one, seal one
+ * for good, and give one a generator.
  *
  * Saving no longer redeploys by itself. Somebody changing five variables wants
  * one redeploy, not five, and somebody changing one before a migration lands
@@ -21,13 +22,18 @@ import { redeployForEnvScope } from "@/lib/deploy-service";
 import { requireEnvScopeAccess } from "@/lib/deploy-project-access";
 import { SET_TWICE, variableChangesSchema } from "@/lib/deploy/variable-changes";
 import { variableLinks, type VariableLink } from "@/lib/deploy/variable-links";
+import { environmentReferrers } from "@/lib/deploy/variable-referrers";
+import { parseGenerator } from "@/lib/deploy/variable-generator";
 import {
     deleteEnvVar,
     envVarScope,
     listEnvVars,
     promoteEnvVar,
     revealEnvVar,
+    sealEnvVar,
+    sealedValue,
     setEnvVar,
+    setEnvVarGenerator,
     setEnvVarSecrecy,
     type EnvScope
 } from "@/lib/env-var-service";
@@ -39,15 +45,37 @@ const DEPLOY_PATH = "/apps/deploy";
 
 const scopeSchema = variableScopeSchema;
 
+/** The services that read `keys` of a service (all of its keys when none are
+ *  given). A failure to work it out redeploys the service alone, as before. */
+async function readersOf(
+    serviceId: string,
+    ownerId: string,
+    keys: readonly string[] | undefined
+): Promise<string[]> {
+    try {
+        const wanted =
+            keys ?? (await listEnvVars("application", serviceId, ownerId)).map((row) => row.key);
+        return await environmentReferrers(serviceId, wanted);
+    } catch {
+        return [];
+    }
+}
+
 /** Start redeploying what a scope's variables reach: a service, an environment's
  *  services, or every deployed service linking a group that the actor may deploy.
- *  Answers how many of a group's services were skipped for lack of that right. */
+ *  Answers how many of a group's services were skipped for lack of that right.
+ *
+ *  A service's redeploy also reaches every service in its environment that reads
+ *  one of `keys` through a reference (`${{api.API_KEY}}`), since a rotated value
+ *  means nothing to them until they are deployed again; without `keys`, any of
+ *  its variables counts. Answers how many such services were added. */
 async function redeployScope(
     actor: { id: string; isAdmin: boolean },
     scope: EnvScope,
     scopeId: string,
-    ownerId: string
-): Promise<{ skipped: number }> {
+    ownerId: string,
+    keys?: readonly string[]
+): Promise<{ skipped: number; referrers: number }> {
     if (scope === "group") {
         const { skipped } = await groups.redeployLinked(
             actor,
@@ -55,10 +83,16 @@ async function redeployScope(
             (applicationId, appOwnerId) =>
                 redeployForEnvScope("application", applicationId, appOwnerId, actor.id)
         );
-        return { skipped };
+        return { skipped, referrers: 0 };
     }
-    void redeployForEnvScope(scope, scopeId, ownerId, actor.id).catch(() => undefined);
-    return { skipped: 0 };
+    const readers = scope === "application" ? await readersOf(scopeId, ownerId, keys) : [];
+    void (async () => {
+        await redeployForEnvScope(scope, scopeId, ownerId, actor.id);
+        // Same environment, so the same project and the same right to deploy.
+        for (const id of readers)
+            await redeployForEnvScope("application", id, ownerId, actor.id, { rotation: scopeId });
+    })().catch(() => undefined);
+    return { skipped: 0, referrers: readers.length };
 }
 
 async function audit(
@@ -87,7 +121,13 @@ async function audit(
  */
 export async function saveEnvVarChangesAction(
     input: unknown
-): Promise<{ error?: string; saved?: number; redeployed?: boolean; skipped?: number }> {
+): Promise<{
+    error?: string;
+    saved?: number;
+    redeployed?: boolean;
+    skipped?: number;
+    referrers?: number;
+}> {
     const user = await requirePermission("deploy.manage");
     const parsed = variableChangesSchema.safeParse(input);
     if (!parsed.success) {
@@ -170,18 +210,19 @@ export async function saveEnvVarChangesAction(
         }
 
         if (scope === "group") await groups.touchGroup(scopeId);
-        const skipped = redeploy
-            ? (
-                  await redeployScope(user, scope, scopeId, access.ownerId).catch(() => ({
-                      skipped: 0
-                  }))
-              ).skipped
-            : 0;
+        const changedKeys = [...set.map((item) => item.key), ...keys.values()];
+        const { skipped, referrers } = redeploy
+            ? await redeployScope(user, scope, scopeId, access.ownerId, changedKeys).catch(() => ({
+                  skipped: 0,
+                  referrers: 0
+              }))
+            : { skipped: 0, referrers: 0 };
         revalidatePath(DEPLOY_PATH);
         return {
             saved: set.length + secrecy.length + remove.length,
             redeployed: redeploy,
-            ...(skipped > 0 ? { skipped } : {})
+            ...(skipped > 0 ? { skipped } : {}),
+            ...(referrers > 0 ? { referrers } : {})
         };
     } catch (caught) {
         return {
@@ -193,7 +234,7 @@ export async function saveEnvVarChangesAction(
 /** Redeploy what a scope's variables reach, after changes were saved without one. */
 export async function redeployEnvScopeAction(
     input: unknown
-): Promise<{ error?: string; skipped?: number }> {
+): Promise<{ error?: string; skipped?: number; referrers?: number }> {
     const user = await requirePermission("deploy.manage");
     const parsed = scopeSchema.safeParse(input);
     if (!parsed.success) return { error: await reply("variables.nothingToRedeploy") };
@@ -204,14 +245,17 @@ export async function redeployEnvScopeAction(
             user,
             "deploy.run"
         );
-        const { skipped } = await redeployScope(
+        const { skipped, referrers } = await redeployScope(
             user,
             parsed.data.scope,
             parsed.data.scopeId,
             access.ownerId
         );
         revalidatePath(DEPLOY_PATH);
-        return skipped > 0 ? { skipped } : {};
+        return {
+            ...(skipped > 0 ? { skipped } : {}),
+            ...(referrers > 0 ? { referrers } : {})
+        };
     } catch (caught) {
         return {
             error:
@@ -265,6 +309,8 @@ export async function revealEnvScopeAction(
         const values: Record<string, string> = {};
         const secrets: string[] = [];
         for (const row of rows) {
+            // Never read back: the raw editor shows it empty, which saves as untouched.
+            if (row.sealed) continue;
             if (!row.isSecret) {
                 values[row.id] = row.value ?? "";
                 continue;
@@ -325,7 +371,8 @@ export async function promoteEnvVarAction(
             (one) => one.id === parsed.data.id
         );
         if (!row) return { error: await reply("variables.gone") };
-        const value = (await revealEnvVar(row.id, service.ownerId)) ?? "";
+        // Opened only to be sealed again where it moves to; never answered.
+        const value = (await sealedValue(row.id, service.ownerId)) ?? "";
         if (SHARED_REFERENCE.test(value.trim()))
             return { error: await reply("variables.notPromotable") };
         const promoted = await promoteEnvVar({
@@ -335,7 +382,9 @@ export async function promoteEnvVarAction(
             environmentOwnerId: shared.ownerId,
             key: row.key,
             value,
-            isSecret: row.isSecret
+            isSecret: row.isSecret,
+            sealed: Boolean(row.sealed),
+            generator: row.generator ?? null
         });
         if (!promoted) return { error: await reply("variables.alreadyShared", { key: row.key }) };
 
@@ -361,6 +410,111 @@ export async function promoteEnvVarAction(
     } catch (caught) {
         return {
             error: caught instanceof Error ? caught.message : await reply("variables.promoteFailed")
+        };
+    }
+}
+const variableIdSchema = z.object({ id: z.string().trim().min(1).max(100) });
+
+/** Where a variable lives, checked against the actor's right to edit it there. */
+async function writableVariable(
+    user: { id: string; isAdmin: boolean; },
+    id: string
+): Promise<
+    | { scope: EnvScope; scopeId: string; key: string; ownerId: string; orgId: string | null; }
+    | null
+> {
+    const located = await envVarScope(id);
+    if (!located) return null;
+    const access = await groups.requireVariableScopeAccess(
+        located.scope,
+        located.scopeId,
+        user,
+        "variables.write"
+    );
+    return { ...located, ownerId: access.ownerId, orgId: access.orgId };
+}
+
+/**
+ * Seal a variable, for good: from here on it can be replaced but never read -
+ * not from this screen, the raw editor or the API - while every deploy still
+ * gets it and references still resolve it.
+ */
+export async function sealEnvVarAction(input: unknown): Promise<{ error?: string; }> {
+    const user = await requirePermission("deploy.manage");
+    const parsed = variableIdSchema.safeParse(input);
+    if (!parsed.success) return { error: await reply("variables.gone") };
+    try {
+        const variable = await writableVariable(user, parsed.data.id);
+        if (!variable) return { error: await reply("variables.gone") };
+        if (await sealEnvVar(parsed.data.id, variable.ownerId)) {
+            await audit(
+                user.id,
+                variable.orgId,
+                variable.scope,
+                variable.scopeId,
+                "deploy.variable.seal",
+                { key: variable.key }
+            );
+        }
+        if (variable.scope === "group") await groups.touchGroup(variable.scopeId);
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return {
+            error: caught instanceof Error ? caught.message : await reply("variables.sealFailed")
+        };
+    }
+}
+
+const generatorInputSchema = z.object({
+    id: z.string().trim().min(1).max(100),
+    // Null takes the generator away; otherwise one `${{ secret(...) }}`.
+    generator: z
+        .string()
+        .trim()
+        .max(400)
+        .refine((value) => parseGenerator(value) !== null)
+        .nullable(),
+    regenerate: z.boolean()
+});
+
+/**
+ * Give a variable a generator - or take it away - so every environment made
+ * from this one draws a value of its own. `regenerate` also replaces the value
+ * here now; without it, what is running keeps the value it has.
+ */
+export async function setEnvVarGeneratorAction(input: unknown): Promise<{ error?: string; }> {
+    const user = await requirePermission("deploy.manage");
+    const parsed = generatorInputSchema.safeParse(input);
+    if (!parsed.success) return { error: await reply("variables.generatorInvalid") };
+    try {
+        const variable = await writableVariable(user, parsed.data.id);
+        if (!variable) return { error: await reply("variables.gone") };
+        await setEnvVarGenerator(
+            parsed.data.id,
+            variable.ownerId,
+            parsed.data.generator,
+            parsed.data.regenerate
+        );
+        await audit(
+            user.id,
+            variable.orgId,
+            variable.scope,
+            variable.scopeId,
+            "deploy.variable.set",
+            {
+                key: variable.key,
+                generator: parsed.data.generator,
+                regenerated: parsed.data.regenerate && parsed.data.generator !== null
+            }
+        );
+        if (variable.scope === "group") await groups.touchGroup(variable.scopeId);
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error ? caught.message : await reply("variables.generatorFailed")
         };
     }
 }

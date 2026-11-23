@@ -6317,6 +6317,10 @@ model EnvVar {
     encryptedValue Bytes?
     valueNonce     Bytes?
     valueKeyId     String?
+    // Write-only once set: replaced, never read back (always a secret too).
+    sealed         Boolean  @default(false)
+    // `${{ secret(...) }}` this value was drawn from; a copy draws its own.
+    generator      String?
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 

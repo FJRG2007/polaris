@@ -16,8 +16,10 @@
  * Laid out the way Railway's is. Every value is masked until its eye is
  * pressed, and can be shown and copied from its row by anybody who may read
  * the variables, a secret included (fetched on request, which the server
- * writes down). Editing, secrecy, sharing with every service and removing are
- * behind the row's menu. The list can be searched, and the raw editor
+ * writes down). Editing, secrecy, sharing with every service, sealing, a
+ * generator and removing are behind the row's menu - sharing, sealing and the
+ * generator through a dialog of their own (`variable-action-dialogs.tsx`). A
+ * sealed value is never shown or copied again: it can only be typed over. The list can be searched, and the raw editor
  * (`variables-raw-dialog.tsx`) shows the whole set as a .env or as JSON.
  */
 
@@ -26,6 +28,12 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { EnvVarView } from "@/lib/env-var-service";
 import type { VariableLink } from "@/lib/deploy/variable-links";
 import { VariablesRawDialog } from "./variables-raw-dialog";
+import {
+    GeneratorDialog,
+    PromoteVariableDialog,
+    SealVariableDialog,
+    type VariableDialog
+} from "./variable-action-dialogs";
 import { stageReplacement } from "@/lib/deploy/variable-raw";
 import { listEnvVarsAction, revealEnvVarAction } from "./actions";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -47,11 +55,14 @@ import {
     promoteEnvVarAction,
     redeployEnvScopeAction,
     saveEnvVarChangesAction,
+    sealEnvVarAction,
+    setEnvVarGeneratorAction,
     variableLinksAction
 } from "./variable-actions";
 import {
     Check,
     Copy,
+    Dices,
     Eye,
     EyeOff,
     Link2,
@@ -162,6 +173,10 @@ export function VariablesEditor({
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<"pending" | "redeploying" | null>(null);
     const [skipped, setSkipped] = useState(0);
+    const [referrers, setReferrers] = useState(0);
+    const [dialog, setDialog] = useState<{ kind: VariableDialog; row: EnvVarView } | null>(
+        null
+    );
     const [pending, startTransition] = useTransition();
     const counter = useRef(0);
     // The row the pointer is over, for F2: an editor's rename key works on what
@@ -271,6 +286,7 @@ export function VariablesEditor({
     /** A row's value: what is on screen, what the raw editor read, the listed
      *  one, or - for a secret nobody asked for yet - from the server. */
     async function valueOf(row: EnvVarView): Promise<string | null> {
+        if (row.sealed) return null;
         const held = revealed[row.id] ?? known[row.id];
         if (held !== undefined) return held;
         if (!row.isSecret) return row.value ?? "";
@@ -314,6 +330,12 @@ export function VariablesEditor({
     /** Edit a row in place: a secret is read first, so it is edited as it is. */
     async function startEditing(row: EnvVarView): Promise<void> {
         if (!canWrite || draft.removed.includes(row.id)) return;
+        // A sealed value is typed over, never read: the box opens empty, and
+        // left empty it saves as untouched.
+        if (row.sealed) {
+            setEditing((current) => new Set(current).add(row.id));
+            return;
+        }
         const value = await valueOf(row);
         if (value === null) return;
         setRevealed((current) => ({ ...current, [row.id]: value }));
@@ -340,40 +362,56 @@ export function VariablesEditor({
         });
     }
 
-    function promote(row: EnvVarView): void {
-        setError(null);
-        startTransition(async () => {
-            const result = await promoteEnvVarAction({ id: row.id }).catch(() => ({
-                error: t("variables.promoteFailed"),
-                key: undefined
-            }));
-            if (result.error) {
-                setError(result.error);
-                return;
-            }
-            setDraft((current) => {
-                const edits = { ...current.edits };
-                delete edits[row.id];
-                return {
-                    ...current,
-                    edits,
-                    removed: current.removed.filter((id) => id !== row.id)
-                };
-            });
-            setEditing((current) => {
-                const next = new Set(current);
-                next.delete(row.id);
+    /** Forget what the page holds about one row, after the server changed it. */
+    function forgetRow(id: string): void {
+        setDraft((current) => {
+            const edits = { ...current.edits };
+            delete edits[id];
+            return { ...current, edits, removed: current.removed.filter((one) => one !== id) };
+        });
+        setEditing((current) => {
+            const next = new Set(current);
+            next.delete(id);
+            return next;
+        });
+        for (const forget of [setRevealed, setKnown])
+            forget((current) => {
+                const next = { ...current };
+                delete next[id];
                 return next;
             });
-            for (const forget of [setRevealed, setKnown])
-                forget((current) => {
-                    const next = { ...current };
-                    delete next[row.id];
-                    return next;
-                });
+    }
+
+    async function promote(row: EnvVarView): Promise<{ error?: string }> {
+        const result = await promoteEnvVarAction({ id: row.id });
+        if (result.error) return result;
+        forgetRow(row.id);
+        setNotice("pending");
+        load();
+        return {};
+    }
+
+    async function seal(row: EnvVarView): Promise<{ error?: string }> {
+        const result = await sealEnvVarAction({ id: row.id });
+        if (result.error) return result;
+        forgetRow(row.id);
+        load();
+        return {};
+    }
+
+    async function saveGenerator(
+        row: EnvVarView,
+        generator: string | null,
+        regenerate: boolean
+    ): Promise<{ error?: string }> {
+        const result = await setEnvVarGeneratorAction({ id: row.id, generator, regenerate });
+        if (result.error) return result;
+        if (regenerate) {
+            forgetRow(row.id);
             setNotice("pending");
-            load();
-        });
+        }
+        load();
+        return {};
     }
 
     function stageRaw(
@@ -398,7 +436,8 @@ export function VariablesEditor({
             }).catch(() => ({
                 error: t("variables.saveFailed"),
                 redeployed: false,
-                skipped: 0
+                skipped: 0,
+                referrers: 0
             }));
             if (result.error) {
                 setError(result.error);
@@ -410,6 +449,7 @@ export function VariablesEditor({
             setEditing(new Set());
             setNotice(result.redeployed ? "redeploying" : "pending");
             setSkipped(result.skipped ?? 0);
+            setReferrers(result.referrers ?? 0);
             load();
         });
     }
@@ -419,12 +459,14 @@ export function VariablesEditor({
         startTransition(async () => {
             const result = await redeployEnvScopeAction({ scope, scopeId }).catch(() => ({
                 error: t("variables.redeployFailed"),
-                skipped: 0
+                skipped: 0,
+                referrers: 0
             }));
             if (result.error) setError(result.error);
             else {
                 setNotice("redeploying");
                 setSkipped(result.skipped ?? 0);
+                setReferrers(result.referrers ?? 0);
             }
         });
     }
@@ -507,6 +549,11 @@ export function VariablesEditor({
                     {skipped > 0 && (
                         <span className="block text-muted-foreground">
                             {t("variables.redeploySkipped", { count: skipped })}
+                        </span>
+                    )}
+                    {referrers > 0 && (
+                        <span className="block text-muted-foreground">
+                            {t("variables.redeployReferrers", { count: referrers })}
                         </span>
                     )}
                 </p>
@@ -656,15 +703,41 @@ export function VariablesEditor({
                                         >
                                             {row.key}
                                         </span>
-                                        {isSecret && (
-                                            <Lock
+                                        {row.sealed ? (
+                                            <EyeOff
                                                 className="size-3 shrink-0 text-foreground-subtle"
-                                                aria-label={t("variables.isSecret", {
+                                                aria-label={t("variables.isSealed", {
                                                     name: row.key
+                                                })}
+                                            />
+                                        ) : (
+                                            isSecret && (
+                                                <Lock
+                                                    className="size-3 shrink-0 text-foreground-subtle"
+                                                    aria-label={t("variables.isSecret", {
+                                                        name: row.key
+                                                    })}
+                                                />
+                                            )
+                                        )}
+                                        {row.generator && (
+                                            <Dices
+                                                className="size-3 shrink-0 text-foreground-subtle"
+                                                aria-label={t("variables.hasGenerator", {
+                                                    name: row.key,
+                                                    generator: row.generator
                                                 })}
                                             />
                                         )}
                                     </span>
+                                    {row.needsValue && (
+                                        <span className="flex">
+                                            <Badge variant="warning">
+                                                <TriangleAlert className="size-3" />{" "}
+                                                {t("variables.needsValue")}
+                                            </Badge>
+                                        </span>
+                                    )}
                                     {rowLinks && rowLinks.length > 0 && (
                                         <span className="flex flex-wrap gap-1">
                                             {rowLinks.map((link) => (
@@ -723,7 +796,7 @@ export function VariablesEditor({
                                     )}
                                 </div>
                                 <div className="flex shrink-0 items-center gap-1">
-                                    {!removed && (
+                                    {!removed && !row.sealed && (
                                         <div className="flex items-center gap-1 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:hover)]:opacity-0">
                                             <button
                                                 type="button"
@@ -801,22 +874,44 @@ export function VariablesEditor({
                                                     <Pencil /> {t("variables.edit")}
                                                     <ShortcutHint id="general.rename" />
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onSelect={() =>
-                                                        edit(row.id, { isSecret: !isSecret })
-                                                    }
-                                                >
-                                                    {isSecret ? <LockOpen /> : <Lock />}
-                                                    {isSecret
-                                                        ? t("variables.makePlain")
-                                                        : t("variables.makeSecret")}
-                                                </DropdownMenuItem>
+                                                {!row.sealed && (
+                                                    <DropdownMenuItem
+                                                        onSelect={() =>
+                                                            edit(row.id, { isSecret: !isSecret })
+                                                        }
+                                                    >
+                                                        {isSecret ? <LockOpen /> : <Lock />}
+                                                        {isSecret
+                                                            ? t("variables.makePlain")
+                                                            : t("variables.makeSecret")}
+                                                    </DropdownMenuItem>
+                                                )}
                                                 {scope === "application" && (
                                                     <DropdownMenuItem
                                                         disabled={pending}
-                                                        onSelect={() => promote(row)}
+                                                        onSelect={() =>
+                                                            setDialog({ kind: "promote", row })
+                                                        }
                                                     >
                                                         <Share2 /> {t("variables.promote")}
+                                                    </DropdownMenuItem>
+                                                )}
+                                                <DropdownMenuItem
+                                                    disabled={pending}
+                                                    onSelect={() =>
+                                                        setDialog({ kind: "generator", row })
+                                                    }
+                                                >
+                                                    <Dices /> {t("variables.generatorAction")}
+                                                </DropdownMenuItem>
+                                                {!row.sealed && (
+                                                    <DropdownMenuItem
+                                                        disabled={pending}
+                                                        onSelect={() =>
+                                                            setDialog({ kind: "seal", row })
+                                                        }
+                                                    >
+                                                        <EyeOff /> {t("variables.sealAction")}
                                                     </DropdownMenuItem>
                                                 )}
                                                 <DropdownMenuSeparator />
@@ -889,6 +984,31 @@ export function VariablesEditor({
                         )}
                     </div>
                 </div>
+            )}
+
+            {dialog?.kind === "seal" && (
+                <SealVariableDialog
+                    name={dialog.row.key}
+                    onSeal={() => seal(dialog.row)}
+                    onClose={() => setDialog(null)}
+                />
+            )}
+            {dialog?.kind === "promote" && (
+                <PromoteVariableDialog
+                    name={dialog.row.key}
+                    onPromote={() => promote(dialog.row)}
+                    onClose={() => setDialog(null)}
+                />
+            )}
+            {dialog?.kind === "generator" && (
+                <GeneratorDialog
+                    name={dialog.row.key}
+                    current={dialog.row.generator}
+                    onSave={(generator, regenerate) =>
+                        saveGenerator(dialog.row, generator, regenerate)
+                    }
+                    onClose={() => setDialog(null)}
+                />
             )}
 
             {rawOpen && (

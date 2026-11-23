@@ -105,11 +105,13 @@ export async function readInstallCopySource(
     if (!app) throw new InstallCopyRefusal("not-found");
     const rows = await prisma.envVar.findMany({
         where: { scopeType: "application", scopeId: app.id },
-        select: { id: true, key: true, value: true, isSecret: true },
+        select: { id: true, key: true, value: true, isSecret: true, sealed: true },
         orderBy: { key: "asc" }
     });
     const env: { key: string; value: string; isSecret: boolean }[] = [];
     for (const row of rows) {
+        // A sealed value is never carried into a copy; the copy mints its own.
+        if (row.sealed) continue;
         const value = row.isSecret ? await revealEnvVar(row.id, ownerId) : row.value;
         // A secret that cannot be opened is dropped rather than copied empty: the
         // copy's own default (or a freshly minted one) is better than a blank.

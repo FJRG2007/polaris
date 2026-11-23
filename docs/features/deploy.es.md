@@ -71,6 +71,23 @@ arranca con el valor actual. Una referencia solo alcanza servicios del mismo
 entorno: un servicio de staging no puede leer uno de producción. Si una
 referencia no se puede resolver, el despliegue se detiene y nombra la variable.
 
+**Guardar y redesplegar** en un servicio también redespliega cada servicio del
+entorno que lee alguna de las variables cambiadas con una referencia, así una
+contraseña rotada llega en un paso a todo lo que la usa.
+
+El menú de una variable tiene además:
+
+- **Compartir con todos** - pasa el valor a las variables compartidas del
+  entorno y deja `${{shared.CLAVE}}` en su lugar.
+- **Sellar** - el valor se puede reemplazar pero nunca volver a ver, ni aquí, ni
+  en el editor en bruto, ni por la API. Los servicios lo siguen recibiendo y las
+  referencias lo siguen resolviendo. Un entorno nuevo o una copia del servicio
+  lo recibe vacío, marcado *Falta el valor*. Sellar no se puede deshacer.
+- **Generador** - `${{ secret() }}` (32 letras y dígitos), `${{ secret(16) }}`
+  o `${{ secret(8, "abc") }}`. Cada entorno creado a partir de este, incluidas
+  las vistas previas, recibe un valor aleatorio nuevo generado así. Escribir uno
+  de estos como valor hace lo mismo.
+
 Cada servicio responde a `<nombre>.polaris.internal`, y a su nombre a secas, en
 una red privada. Los entornos creados desde Deploy se quedan esa red para
 ellos: a un servicio sin dominio público solo llegan los demás servicios de su

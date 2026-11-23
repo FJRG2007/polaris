@@ -71,6 +71,23 @@ current value. A reference only reaches services of the same environment: a
 staging service cannot read a production one. A reference that cannot be
 resolved stops the deploy and names the variable.
 
+**Save and redeploy** on a service also redeploys every service in the
+environment that reads one of the changed variables through a reference, so a
+rotated password reaches everything that uses it in one step.
+
+A variable's menu also has:
+
+- **Share with every service** - moves the value to the environment's shared
+  variables and leaves `${{shared.KEY}}` in its place.
+- **Seal** - the value can be replaced but never shown again, here, in the raw
+  editor or through the API. Services keep receiving it and references keep
+  resolving it. A new environment or a copy of the service gets it empty, marked
+  *Needs a value*. Sealing cannot be undone.
+- **Generator** - `${{ secret() }}` (32 letters and digits), `${{ secret(16) }}`
+  or `${{ secret(8, "abc") }}`. Every environment made from this one, previews
+  included, gets a fresh random value drawn this way. Typing one of these as a
+  value does the same.
+
 Every service answers to `<name>.polaris.internal`, and to its bare name, on a
 private network. Environments made from the Deploy screen keep that network to
 themselves: a service with no public domain can only be reached by the other

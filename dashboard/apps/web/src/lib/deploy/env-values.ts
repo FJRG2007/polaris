@@ -10,7 +10,8 @@
 
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
-import { decryptSecret } from "@polaris/storage";
+import { decryptSecret, encryptSecret } from "@polaris/storage";
+import { generateValue, parseGenerator } from "./variable-generator";
 
 /** The stored columns a variable's value lives in. */
 interface StoredValue {
@@ -59,6 +60,11 @@ export async function scopeValues(
  *
  * `secrets: false` leaves every secret behind and answers the keys it left, for
  * a copy whose code is not trusted with them.
+ *
+ * A variable with a generator gets a fresh value drawn from it instead - a
+ * preview included, since a new random value is nobody's secret. A sealed one
+ * without a generator is never carried over: the copy has it sealed and empty,
+ * which the editor flags as waiting for a value.
  */
 export async function copyScopeValues(
     from: { scopeType: "application" | "environment"; scopeId: string },
@@ -77,8 +83,42 @@ export async function copyScopeValues(
     const withheld: string[] = [];
     for (const row of rows) {
         if (taken.has(row.key)) continue;
+        const spec = row.generator ? parseGenerator(row.generator) : null;
+        if (spec) {
+            const fresh = generateValue(spec);
+            const secret = row.isSecret || row.sealed;
+            const blob = secret ? encryptSecret(fresh, loadEnv().POLARIS_MASTER_KEY) : null;
+            await prisma.envVar.create({
+                data: {
+                    scopeType: to.scopeType,
+                    scopeId: to.scopeId,
+                    key: row.key,
+                    isSecret: secret,
+                    sealed: row.sealed,
+                    generator: row.generator,
+                    value: blob ? null : fresh,
+                    encryptedValue: blob?.ciphertext ?? null,
+                    valueNonce: blob?.nonce ?? null,
+                    valueKeyId: blob?.keyId ?? null
+                }
+            });
+            copied += 1;
+            continue;
+        }
         if (row.isSecret && options.secrets === false) {
             withheld.push(row.key);
+            continue;
+        }
+        if (row.sealed) {
+            await prisma.envVar.create({
+                data: {
+                    scopeType: to.scopeType,
+                    scopeId: to.scopeId,
+                    key: row.key,
+                    isSecret: true,
+                    sealed: true
+                }
+            });
             continue;
         }
         await prisma.envVar.create({
