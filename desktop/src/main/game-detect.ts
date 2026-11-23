@@ -43,6 +43,8 @@ export interface CustomGame {
 export interface RunningProcess {
     readonly name: string;
     readonly path?: string;
+    /** On Windows, set on the program whose window is in front: whether that window covers its whole screen. */
+    readonly foreground?: "window" | "fullscreen";
 }
 
 /** What a look returns: bare names where the system gives nothing more. */
@@ -81,18 +83,24 @@ export function parseTasklist(text: string): string[] {
 const MAX_PROCESSES = 5000;
 const MAX_PATH_CHARS = 1024;
 
-/** Every program in the `name<TAB>path` lines `WindowsLister` reads back; a
- *  line without a path (a process that could not be opened, or a shell that
- *  only gave names) keeps only its name. */
+/** Every program in the `name<TAB>path<TAB>front` lines `WindowsLister`
+ *  reads back, `front` being `f` on the program whose window is in front (`F`
+ *  when it covers its screen); a line without a path (a process that could not
+ *  be opened, or a shell that only gave names) keeps only its name. */
 export function parseProcessList(text: string): RunningProcess[] {
     const out: RunningProcess[] = [];
     for (const line of text.split(/\r?\n/)) {
         if (out.length >= MAX_PROCESSES) break;
-        const [rawName = "", rawPath = ""] = line.split("\t");
+        const [rawName = "", rawPath = "", front = ""] = line.split("\t");
         const path = rawPath.trim();
         const usable = path.length <= MAX_PATH_CHARS && /^[A-Za-z]:\\/.test(path);
         if (!rawName.trim() && !usable) continue;
-        out.push(usable ? { name: programKey(path), path } : { name: programKey(`${rawName.trim()}.exe`) });
+        const foreground = front.trim() === "F" ? "fullscreen" : front.trim() === "f" ? "window" : null;
+        out.push({
+            name: programKey(usable ? path : `${rawName.trim()}.exe`),
+            ...(usable ? { path } : {}),
+            ...(foreground ? { foreground } : {})
+        });
     }
     return out;
 }
@@ -236,7 +244,9 @@ const MAX_LIST_CHARS = 4 * 1024 * 1024;
 
 /**
  * The reader the shell compiles once: every process's name and the file it was
- * started from, as `name<TAB>path` lines in one string. The path comes from
+ * started from, as `name<TAB>path` lines in one string, the program whose
+ * window is in front marked `f` in a third column, or `F` when that window
+ * covers its whole screen (the desktop itself never counts). The path comes from
  * `QueryFullProcessImageName` with the least access Windows has
  * (`PROCESS_QUERY_LIMITED_INFORMATION`), which answers for nearly every
  * process, elevated games included, and quickly - where PowerShell's own
@@ -250,9 +260,21 @@ export const READER_SOURCE = [
     "[DllImport(\"kernel32.dll\")]static extern IntPtr OpenProcess(uint access,bool inherit,int id);",
     "[DllImport(\"kernel32.dll\",CharSet=CharSet.Unicode)]static extern bool QueryFullProcessImageName(IntPtr handle,uint flags,StringBuilder name,ref uint size);",
     "[DllImport(\"kernel32.dll\")]static extern bool CloseHandle(IntPtr handle);",
-    "public static string Read(){var o=new StringBuilder();foreach(var p in Process.GetProcesses()){string path=\"\";",
+    "[DllImport(\"user32.dll\")]static extern IntPtr GetForegroundWindow();",
+    "[DllImport(\"user32.dll\")]static extern uint GetWindowThreadProcessId(IntPtr window,out uint id);",
+    "[DllImport(\"user32.dll\")]static extern bool GetWindowRect(IntPtr window,out Box box);",
+    "[DllImport(\"user32.dll\")]static extern IntPtr MonitorFromWindow(IntPtr window,uint flags);",
+    "[DllImport(\"user32.dll\")]static extern bool GetMonitorInfo(IntPtr monitor,ref Screen info);",
+    "[DllImport(\"user32.dll\",CharSet=CharSet.Unicode)]static extern int GetClassName(IntPtr window,StringBuilder name,int size);",
+    "[StructLayout(LayoutKind.Sequential)]public struct Box{public int Left,Top,Right,Bottom;}",
+    "[StructLayout(LayoutKind.Sequential)]public struct Screen{public int Size;public Box Monitor;public Box Work;public uint Flags;}",
+    "public static string Read(){uint front=0;bool full=false;",
+    "try{var w=GetForegroundWindow();if(w!=IntPtr.Zero){GetWindowThreadProcessId(w,out front);var c=new StringBuilder(64);GetClassName(w,c,64);var k=c.ToString();",
+    "if(k!=\"Progman\"&&k!=\"WorkerW\"){Box b;var m=new Screen();m.Size=Marshal.SizeOf(typeof(Screen));",
+    "if(GetWindowRect(w,out b)&&GetMonitorInfo(MonitorFromWindow(w,2),ref m))full=b.Left<=m.Monitor.Left&&b.Top<=m.Monitor.Top&&b.Right>=m.Monitor.Right&&b.Bottom>=m.Monitor.Bottom;}}}catch{}",
+    "var o=new StringBuilder();foreach(var p in Process.GetProcesses()){string path=\"\";",
     "try{var h=OpenProcess(0x1000,false,p.Id);if(h!=IntPtr.Zero){var s=new StringBuilder(1024);uint n=1024;if(QueryFullProcessImageName(h,0,s,ref n))path=s.ToString();CloseHandle(h);}}catch{}",
-    "try{o.Append(p.ProcessName).Append(\"\\t\").Append(path).Append(\"\\n\");}catch{}p.Dispose();}return o.ToString();}}"
+    "try{o.Append(p.ProcessName).Append(\"\\t\").Append(path);if(front!=0&&p.Id==front)o.Append(full?\"\\tF\":\"\\tf\");o.Append(\"\\n\");}catch{}p.Dispose();}return o.ToString();}}"
 ].join("");
 
 /** One list: the compiled reader, or the bare names when it could not be compiled. */
@@ -363,6 +385,10 @@ function watchedPrograms(): () => Promise<readonly Seen[]> {
  * `games` is the installed store games as last listed by whoever keeps that
  * list (the launcher's): asked on each look and expected to answer from memory,
  * never to read the stores, so a look stays one process read.
+ *
+ * The same look says whether a game - or any window covering its screen that
+ * is not this app's own - is in front (`onForeground`), on Windows, where the
+ * list marks the program in front; elsewhere it is never said to be.
  */
 export class GameWatcher {
     private current: RunningGame | null = null;
@@ -372,12 +398,26 @@ export class GameWatcher {
     private first = true;
     private storeGames: readonly StoreGame[] | null = null;
     private folders: readonly StoreGame[] = [];
+    private inFront = false;
+    private frontListener: ((busy: boolean) => void) | null = null;
 
     constructor(
         private readonly onChange: (game: RunningGame | null) => void,
         private readonly list: () => Promise<readonly Seen[]> = watchedPrograms(),
-        private readonly games: () => readonly StoreGame[] = () => []
+        private readonly games: () => readonly StoreGame[] = () => [],
+        /** This app's own program, whose full-screen windows are not somebody playing. */
+        private readonly ownPath: string = process.execPath
     ) {}
+
+    /** Told, when it changes, whether a game or a full-screen window is in front. */
+    onForeground(listener: (busy: boolean) => void): void {
+        this.frontListener = listener;
+    }
+
+    /** Whether a game or a full-screen window was in front at the last look. */
+    gameInFront(): boolean {
+        return this.inFront;
+    }
 
     /** The programs somebody added as games, from the dashboard. */
     setCustomGames(games: readonly CustomGame[]): void {
@@ -412,6 +452,7 @@ export class GameWatcher {
             return;
         }
         const found = matchGame(programs, this.custom, KNOWN_GAMES, this.storeFolders());
+        this.followFront(programs, found?.key ?? null);
         const same = found && this.current && found.key === this.current.key && found.name === this.current.name;
         if (same) {
             if (now - this.said >= REPEAT_MS) this.say(this.current, now);
@@ -421,6 +462,15 @@ export class GameWatcher {
         this.first = false;
         this.current = found ? { ...found, startedAt: new Date(now).toISOString() } : null;
         this.say(this.current, now);
+    }
+
+    private followFront(programs: readonly Seen[], game: string | null): void {
+        const front = programs.find((entry): entry is RunningProcess => typeof entry !== "string" && entry.foreground !== undefined);
+        const own = front?.path !== undefined && front.path.toLowerCase() === this.ownPath.toLowerCase();
+        const busy = front !== undefined && !own && (front.foreground === "fullscreen" || programKey(front.name) === game);
+        if (busy === this.inFront) return;
+        this.inFront = busy;
+        this.frontListener?.(busy);
     }
 
     /** The store games ready to compare, made again only when a new listing arrives. */

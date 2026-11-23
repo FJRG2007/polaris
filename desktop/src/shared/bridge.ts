@@ -344,6 +344,8 @@ export interface Preferences {
     readonly launcher: boolean;
     /** The launcher keeps what was copied. */
     readonly launcherClipboard: boolean;
+    /** The launcher's key is let go while a game or anything full screen is in front. */
+    readonly launcherGameMode: boolean;
     /** How long it keeps a copy. */
     readonly launcherClipboardKeep: ClipboardKeep;
     /** Whether the copies outlive a restart (the system has a key store), or stay in memory. */
@@ -367,7 +369,7 @@ export interface LauncherStatus {
 }
 
 /** The switches the settings window keeps with one call. */
-export const PREFERENCE_TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly", "launcher", "launcherClipboard"] as const;
+export const PREFERENCE_TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly", "launcher", "launcherClipboard", "launcherGameMode"] as const;
 
 export type PreferenceToggle = (typeof PREFERENCE_TOGGLES)[number];
 

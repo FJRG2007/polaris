@@ -138,6 +138,33 @@ describe("watching for a game", () => {
         return { watch, said, looks: () => looks };
     }
 
+    it("says when a game or a full-screen window comes to the front and when it leaves, only on a change", async () => {
+        const own = "C:\\Program Files\\Polaris\\Polaris.exe";
+        const lists = [
+            [{ name: "celeste.exe", path: "C:\\Games\\Celeste\\Celeste.exe" }, { name: "code.exe", foreground: "window" as const }],
+            [{ name: "celeste.exe", path: "C:\\Games\\Celeste\\Celeste.exe", foreground: "window" as const }],
+            [{ name: "celeste.exe", path: "C:\\Games\\Celeste\\Celeste.exe", foreground: "fullscreen" as const }],
+            [{ name: "vlc.exe", path: "C:\\Programs\\vlc.exe", foreground: "fullscreen" as const }],
+            [{ name: "polaris.exe", path: own, foreground: "fullscreen" as const }],
+            ["celeste.exe"]
+        ];
+        let index = 0;
+        const watch = new GameWatcher(() => undefined, async () => lists[Math.min(index++, lists.length - 1)]!, () => [], own);
+        const fronts: boolean[] = [];
+        watch.onForeground((busy) => fronts.push(busy));
+        for (let look = 0; look < lists.length; look++) await watch.check(look * 15_000);
+        // Behind code, in front, still in front full screen, a full-screen video, Polaris itself full screen, no window known.
+        expect(fronts).toEqual([true, false]);
+        expect(watch.gameInFront()).toBe(false);
+        index = 1;
+        await watch.check(100_000);
+        expect(fronts).toEqual([true, false, true]);
+        const video = new GameWatcher(() => undefined, async () => lists[3]!, () => [], own);
+        video.onForeground((busy) => fronts.push(busy));
+        await video.check(0);
+        expect(fronts.at(-1)).toBe(true);
+    });
+
     it("knows a store game from the listing it is handed, with one process read per look", async () => {
         let listing: readonly StoreGame[] = [];
         const asked = vi.fn(() => listing);
@@ -241,6 +268,15 @@ describe("listing programs on Windows", () => {
             { name: "steam.exe" },
             { name: "odd.exe" },
             { name: "system.exe" }
+        ]);
+    });
+
+    it("reads which program is in front, and whether it covers its screen", () => {
+        const text = "Celeste\tC:\\Games\\Celeste\\Celeste.exe\tF\r\nexplorer\t\r\nsecret\t\tf\r\n";
+        expect(parseProcessList(text)).toEqual([
+            { name: "celeste.exe", path: "C:\\Games\\Celeste\\Celeste.exe", foreground: "fullscreen" },
+            { name: "explorer.exe" },
+            { name: "secret.exe", foreground: "window" }
         ]);
     });
 

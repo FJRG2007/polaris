@@ -51,7 +51,8 @@ const toggles = {
     voiceWidget: byId<HTMLInputElement>("voice-widget"),
     voiceWidgetGameOnly: byId<HTMLInputElement>("voice-widget-game-only"),
     launcher: byId<HTMLInputElement>("launcher"),
-    launcherClipboard: byId<HTMLInputElement>("launcher-clipboard")
+    launcherClipboard: byId<HTMLInputElement>("launcher-clipboard"),
+    launcherGameMode: byId<HTMLInputElement>("launcher-game-mode")
 } as const;
 const restartDialog = byId<HTMLDialogElement>("confirm-restart");
 const restartFailure = byId<HTMLParagraphElement>("restart-failure");
@@ -746,6 +747,9 @@ function followLauncher(): void {
         : "The shortcut does nothing outside Polaris.";
     launcherEngine.disabled = !searching;
     toggles.launcherClipboard.disabled = !searching;
+    toggles.launcherGameMode.disabled = !searching;
+    // Only Windows can tell what is in front.
+    byId("launcher-game-mode-row").hidden = platformOf() !== "win32";
     launcherKeepRow.hidden = !keeping;
     launcherClearRow.hidden = !keeping;
 }
@@ -821,6 +825,7 @@ const preferencesLoaded = window.polarisLocal.connect.preferences().catch(() => 
     toggles.voiceWidgetGameOnly.checked = preferences.voiceWidgetGameOnly;
     toggles.launcher.checked = preferences.launcher;
     toggles.launcherClipboard.checked = preferences.launcherClipboard;
+    toggles.launcherGameMode.checked = preferences.launcherGameMode;
     launcherEngine.value = preferences.launcherEngine;
     launcherKeep.value = preferences.launcherClipboardKeep;
     launcherClipboardHint.textContent = preferences.launcherClipboardPersists ? CLIPBOARD_HINT.kept : CLIPBOARD_HINT.memory;

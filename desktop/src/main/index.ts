@@ -90,6 +90,8 @@ const games = new GameWatcher((game) => {
     setVoiceWidgetGame(game !== null);
     if (main && !main.isDestroyed()) main.webContents.send(CHANNELS.gameActivity, game);
 }, undefined, () => installedGames());
+// Game mode: the launcher's key reaches the game while it is in front.
+games.onForeground((busy) => launcher.followGameForeground(busy));
 
 /**
  * The same Polaris on a local address that proved it is this instance, while
@@ -879,6 +881,7 @@ function start(): void {
                     voiceWidgetGameOnly: settings.toggle("voiceWidgetGameOnly"),
                     launcher: settings.toggle("launcher"),
                     launcherClipboard: settings.toggle("launcherClipboard"),
+                    launcherGameMode: settings.toggle("launcherGameMode"),
                     launcherClipboardKeep: settings.launcherClipboardKeep(),
                     launcherClipboardPersists: launcher.clipboardPersists(),
                     launcherEngine: settings.launcherEngine(),
@@ -897,7 +900,7 @@ function start(): void {
             setToggle: (name, on) => {
                 settings.rememberToggle(name, on);
                 refreshVoiceWidget();
-                if (name === "launcher" || name === "launcherClipboard") launcher.followLauncherSettings();
+                if (name === "launcher" || name === "launcherClipboard" || name === "launcherGameMode") launcher.followLauncherSettings();
                 return true;
             },
             relaunch: () => {

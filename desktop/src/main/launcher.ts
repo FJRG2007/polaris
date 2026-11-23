@@ -471,11 +471,31 @@ function warmSoon(): void {
     warmTimer = setTimeout(warm, WARM_DELAY_MS);
 }
 
+/** Whether a game, or a full-screen window, was in front at the game watcher's last look. */
+let gameInFront = false;
+
+/** Game mode: the key is let go while a game is in front, so it reaches the game. */
+function pausedForGame(): boolean {
+    return gameInFront && settings.toggle("launcherGameMode");
+}
+
+/**
+ * The game watcher saw a game or a full-screen window come to the front, or
+ * leave it: the key is let go or taken back. Only the launcher's key - the
+ * call keys (push to talk, mute) are meant for while somebody plays and stay held.
+ */
+export function followGameForeground(busy: boolean): void {
+    if (busy === gameInFront) return;
+    gameInFront = busy;
+    if (recordingTimer) return;
+    holdKey();
+}
+
 function holdKey(): void {
     release?.();
     release = null;
     heldAccelerator = null;
-    if (!settings.toggle("launcher")) return;
+    if (!settings.toggle("launcher") || pausedForGame()) return;
     const accelerator = launcherAccelerator(settings.launcherBinding()) ?? launcherAccelerator(DEFAULT_LAUNCHER_BINDING);
     if (!accelerator) return;
     release = holdGlobalKey(accelerator, toggleLauncher);
@@ -502,7 +522,7 @@ function status(): LauncherStatus {
     const accelerator = launcherAccelerator(settings.launcherBinding()) ?? launcherAccelerator(DEFAULT_LAUNCHER_BINDING) ?? "Alt+Space";
     const key = displayAccelerator(accelerator, process.platform);
     const held = heldAccelerator === accelerator;
-    const problem = enabled && !held ? conflictSentence(key, likelyHolders(accelerator, launchersFound)) : null;
+    const problem = enabled && !held && !pausedForGame() ? conflictSentence(key, likelyHolders(accelerator, launchersFound)) : null;
     return { enabled, key, held, problem, others: launchersFound.map((found) => found.name) };
 }
 
@@ -516,7 +536,7 @@ export async function setLauncherBinding(binding: string): Promise<LauncherStatu
     const before = settings.launcherBinding();
     settings.rememberLauncherBinding(binding);
     holdKey();
-    if (settings.toggle("launcher") && !heldAccelerator) {
+    if (settings.toggle("launcher") && !heldAccelerator && !pausedForGame()) {
         await lookForLaunchers();
         const refused = status();
         settings.rememberLauncherBinding(before);

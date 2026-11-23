@@ -64,6 +64,9 @@ const settingsSchema = z.object({
     voiceWidget: z.boolean().catch(true),
     // Off unless somebody turned it on: the widget only while a game runs.
     voiceWidgetGameOnly: z.boolean().catch(false),
+    // On unless somebody turned it off: the launcher's key goes to the game
+    // while one, or anything full screen, is in front.
+    launcherGameMode: z.boolean().catch(true),
     // Where the widget was dragged to, or null for its corner.
     voiceWidgetPlace: z.object({ x: z.number().int(), y: z.number().int() }).nullable().catch(null),
     // The account's text size last seen in the Polaris window, or null before one was.
@@ -99,6 +102,7 @@ const EMPTY: Settings = {
     startMinimized: true,
     voiceWidget: true,
     voiceWidgetGameOnly: false,
+    launcherGameMode: true,
     voiceWidgetPlace: null,
     textSize: null,
     launcher: true,
@@ -204,7 +208,7 @@ export function rememberHardwareAcceleration(on: boolean): void {
 }
 
 /** The switches kept as they are and read when they matter. */
-export const TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly", "launcher", "launcherClipboard"] as const;
+export const TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly", "launcher", "launcherClipboard", "launcherGameMode"] as const;
 
 export type Toggle = (typeof TOGGLES)[number];
 
