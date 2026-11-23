@@ -658,6 +658,7 @@ const launcherKeep = picker(
     (value) => savedOrSay(window.polarisLocal.connect.setClipboardKeep(value as ClipboardKeep))
 );
 const launcherClear = byId<HTMLButtonElement>("launcher-clear");
+const launcherClearRow = byId<HTMLDivElement>("launcher-clear-row");
 let recordingKey = false;
 
 /** The search shortcut as the system left it, and who likely holds it when it is taken. */
@@ -733,7 +734,7 @@ byId("clear-clips-confirm").addEventListener("click", () => {
     clearClipsDialog.close();
     void window.polarisLocal.connect.clearClipboardHistory().then(() => {
         launcherClear.textContent = "Cleared";
-        setTimeout(() => (launcherClear.textContent = "Clear clipboard history"), 1500);
+        setTimeout(() => (launcherClear.textContent = "Clear"), 1500);
     });
 });
 /** The rows that only mean something with the history on, and the search on. */
@@ -746,7 +747,7 @@ function followLauncher(): void {
     launcherEngine.disabled = !searching;
     toggles.launcherClipboard.disabled = !searching;
     launcherKeepRow.hidden = !keeping;
-    launcherClear.hidden = !keeping;
+    launcherClearRow.hidden = !keeping;
 }
 void showLauncherStatus();
 /** "Only while a game is running" means nothing with the widget off. */

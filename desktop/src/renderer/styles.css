@@ -530,19 +530,38 @@ button.danger {
     color: var(--accent-text);
 }
 
-label.setting {
+/* Every list of settings: one gap between rows, whatever a row holds. The rows
+   never space themselves, so a row of another kind (a button, a dropdown, an
+   error) cannot end up touching the next one. */
+.settings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* One setting: its name and hint, and the control beside them - or under them
+   when the window is too narrow for both, as the dashboard's setting rows do.
+   A class of its own, never `label.setting`: a row with a button or a dropdown
+   is a div, and must look the same as a row with a switch. */
+.setting {
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
-    text-align: left;
     justify-content: space-between;
-    gap: 12px;
+    gap: 8px 16px;
     margin: 0 -10px;
     border-radius: 6px;
-    padding: 8px 10px;
+    padding: 6px 10px;
+    text-align: left;
     font-size: var(--text-body);
+    font-weight: 400;
     color: var(--text);
-    cursor: pointer;
+}
+
+.setting > :not(.setting-text) {
+    flex-shrink: 0;
+    max-width: 100%;
 }
 
 /* Rows of switches read as one list: no box around each, only a tint under
@@ -553,7 +572,9 @@ label.setting:hover {
 
 .setting-text {
     display: flex;
+    flex: 1 1 14rem;
     flex-direction: column;
+    gap: 2px;
     min-width: 0;
 }
 

@@ -70,79 +70,85 @@
             </form>
         </section>
         <section id="general-page" role="tabpanel" hidden>
-            <label class="setting">
-                <span class="setting-text">
-                    <span class="name">Open with the computer</span>
-                    <span class="hint">Polaris opens when you sign in.</span>
-                </span>
-                <input id="open-at-login" class="switch" type="checkbox" role="switch" />
-            </label>
-            <label class="setting">
-                <span class="setting-text">
-                    <span class="name">Start minimized</span>
-                    <span class="hint">Opened with the computer, Polaris waits in the tray.</span>
-                </span>
-                <input id="start-minimized" class="switch" type="checkbox" role="switch" />
-            </label>
-            <label class="setting">
-                <span class="setting-text">
-                    <span class="name">Minimize to tray</span>
-                    <span class="hint">Closing the window keeps Polaris running for calls and notifications.</span>
-                </span>
-                <input id="minimize-to-tray" class="switch" type="checkbox" role="switch" />
-            </label>
-            <label class="setting">
-                <span class="setting-text">
-                    <span class="name">Show voice widget during calls</span>
-                    <span class="hint">Who is in the call and who is talking, over your other windows. Shift+` in a game, or Ctrl+Shift+`, unlocks it.</span>
-                </span>
-                <input id="voice-widget" class="switch" type="checkbox" role="switch" />
-            </label>
-            <label class="setting">
-                <span class="setting-text">
-                    <span class="name">Only while a game is running</span>
-                    <span class="hint">Hides the voice widget until Polaris sees a game.</span>
-                </span>
-                <input id="voice-widget-game-only" class="switch" type="checkbox" role="switch" />
-            </label>
-            <label class="setting">
-                <span class="setting-text">
-                    <span id="launcher-name" class="name">Alt+Space search</span>
-                    <span id="launcher-on-hint" class="hint">Your shortcut opens Polaris search over any app.</span>
-                </span>
-                <input id="launcher" class="switch" type="checkbox" role="switch" />
-            </label>
-            <div class="setting">
-                <span class="setting-text">
-                    <span class="name">Search shortcut</span>
-                    <span id="launcher-key-hint" class="hint">Alt+Space</span>
-                </span>
-                <button id="launcher-record" class="ghost" type="button">Change</button>
-            </div>
-            <p id="launcher-problem" class="error" role="alert" hidden></p>
-            <div class="setting">
-                <span class="setting-text">
-                    <span class="name">Web search</span>
-                    <span class="hint">Where a web search from Polaris search goes.</span>
-                </span>
-                <div id="launcher-engine" aria-label="Web search"></div>
-            </div>
-            <label class="setting">
-                <span class="setting-text">
-                    <span class="name">Clipboard history</span>
-                    <span id="launcher-clipboard-hint" class="hint">Polaris search keeps what you copy on this computer, encrypted. Passwords from password managers are skipped. Type "clip" to see them.</span>
-                </span>
-                <input id="launcher-clipboard" class="switch" type="checkbox" role="switch" />
-            </label>
-            <div id="launcher-keep-row" class="setting">
-                <span class="setting-text">
-                    <span class="name">Keep history for</span>
-                    <span class="hint">Older copies are deleted.</span>
-                </span>
-                <div id="launcher-keep" aria-label="Keep history for"></div>
-            </div>
-            <div class="row end">
-                <button id="launcher-clear" class="ghost" type="button">Clear clipboard history</button>
+            <div class="settings-list">
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name">Open with the computer</span>
+                        <span class="hint">Polaris opens when you sign in.</span>
+                    </span>
+                    <input id="open-at-login" class="switch" type="checkbox" role="switch" />
+                </label>
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name">Start minimized</span>
+                        <span class="hint">Opened with the computer, Polaris waits in the tray.</span>
+                    </span>
+                    <input id="start-minimized" class="switch" type="checkbox" role="switch" />
+                </label>
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name">Minimize to tray</span>
+                        <span class="hint">Closing the window keeps Polaris running for calls and notifications.</span>
+                    </span>
+                    <input id="minimize-to-tray" class="switch" type="checkbox" role="switch" />
+                </label>
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name">Show voice widget during calls</span>
+                        <span class="hint">Who is in the call and who is talking, over your other windows. Shift+` in a game, or Ctrl+Shift+`, unlocks it.</span>
+                    </span>
+                    <input id="voice-widget" class="switch" type="checkbox" role="switch" />
+                </label>
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name">Only while a game is running</span>
+                        <span class="hint">Hides the voice widget until Polaris sees a game.</span>
+                    </span>
+                    <input id="voice-widget-game-only" class="switch" type="checkbox" role="switch" />
+                </label>
+                <label class="setting">
+                    <span class="setting-text">
+                        <span id="launcher-name" class="name">Alt+Space search</span>
+                        <span id="launcher-on-hint" class="hint">Your shortcut opens Polaris search over any app.</span>
+                    </span>
+                    <input id="launcher" class="switch" type="checkbox" role="switch" />
+                </label>
+                <div class="setting">
+                    <span class="setting-text">
+                        <span class="name">Search shortcut</span>
+                        <span id="launcher-key-hint" class="hint">Alt+Space</span>
+                    </span>
+                    <button id="launcher-record" class="ghost" type="button">Change</button>
+                </div>
+                <p id="launcher-problem" class="error" role="alert" hidden></p>
+                <div class="setting">
+                    <span class="setting-text">
+                        <span class="name">Web search</span>
+                        <span class="hint">Where a web search from Polaris search goes.</span>
+                    </span>
+                    <div id="launcher-engine" aria-label="Web search"></div>
+                </div>
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name">Clipboard history</span>
+                        <span id="launcher-clipboard-hint" class="hint">Polaris search keeps what you copy on this computer, encrypted. Passwords from password managers are skipped. Type "clip" to see them.</span>
+                    </span>
+                    <input id="launcher-clipboard" class="switch" type="checkbox" role="switch" />
+                </label>
+                <div id="launcher-keep-row" class="setting">
+                    <span class="setting-text">
+                        <span class="name">Keep history for</span>
+                        <span class="hint">Older copies are deleted.</span>
+                    </span>
+                    <div id="launcher-keep" aria-label="Keep history for"></div>
+                </div>
+                <div id="launcher-clear-row" class="setting">
+                    <span class="setting-text">
+                        <span class="name">Clear clipboard history</span>
+                        <span class="hint">Deletes every copy kept on this computer.</span>
+                    </span>
+                    <button id="launcher-clear" class="ghost" type="button">Clear</button>
+                </div>
             </div>
             <div class="row version-row">
                 <p id="version" class="hint version"></p>
@@ -153,13 +159,15 @@
             <p id="update-status" class="hint" role="status" aria-live="polite"></p>
         </section>
         <section id="advanced-page" role="tabpanel" hidden>
-            <label class="setting">
-                <span class="setting-text">
-                    <span class="name">Hardware acceleration</span>
-                    <span class="hint">Uses your graphics card to keep Polaris smooth. Turn it off if windows flicker or go blank.</span>
-                </span>
-                <input id="hardware-acceleration" class="switch" type="checkbox" role="switch" />
-            </label>
+            <div class="settings-list">
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name">Hardware acceleration</span>
+                        <span class="hint">Uses your graphics card to keep Polaris smooth. Turn it off if windows flicker or go blank.</span>
+                    </span>
+                    <input id="hardware-acceleration" class="switch" type="checkbox" role="switch" />
+                </label>
+            </div>
             <div id="restart-pending" class="row version-row" hidden>
                 <p class="hint">Applies when Polaris restarts.</p>
                 <button id="restart-pending-now" class="primary" type="button">Restart now</button>

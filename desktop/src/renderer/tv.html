@@ -69,11 +69,18 @@
                 </label>
             </fieldset>
 
-            <label class="row">
-                <input id="block-ads" class="switch" type="checkbox" role="switch" />
-                Let it block ads and trackers. Turn it on later in the TV's Launcher settings; it checks itself
-                and puts the TV's own DNS back if it does not work. Android 9 or newer.
-            </label>
+            <div class="settings-list">
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name">Let it block ads and trackers</span>
+                        <span class="hint">
+                            Turn it on later in the TV's Launcher settings; it checks itself and puts the TV's own DNS
+                            back if it does not work. Android 9 or newer.
+                        </span>
+                    </span>
+                    <input id="block-ads" class="switch" type="checkbox" role="switch" />
+                </label>
+            </div>
 
             <p class="hint">
                 A backup of the TV's settings, its DNS included, is saved here first. Nothing is uninstalled or disabled, and
