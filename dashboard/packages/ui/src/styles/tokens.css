@@ -590,6 +590,30 @@ html[data-input="touch"] :is(a, button, [role="button"], [role="tab"], [role="me
     }
 }
 
+/* The light sweeping along a progress bar's fill (`ProgressBar`). The band
+   starts fully left of the fill and ends fully right of it, so the loop restarts
+   off screen with no visible jump. With reduced motion the one remaining
+   iteration ends off the fill, which leaves a plain bar. */
+.progress-shimmer {
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent);
+    transform: translateX(-100%);
+    animation: progress-shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes progress-shimmer {
+    to {
+        transform: translateX(100%);
+    }
+}
+
 /* The bar of the install guide's "install" picture, filling and starting over. */
 @keyframes guide-fill {
     from {

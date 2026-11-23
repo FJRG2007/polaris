@@ -19,7 +19,7 @@
  */
 
 import Link from "next/link";
-import { Button, cn } from "@polaris/ui";
+import { Button, cn, ProgressBar } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { useState, type ComponentType, type ReactNode } from "react";
 import { useNow } from "@/components/presence";
@@ -323,16 +323,16 @@ function TrackBar({ activity }: { activity: core.ActivityView }) {
     const share = progress.totalMs > 0 ? (progress.elapsedMs / progress.totalMs) * 100 : 0;
     return (
         <div className="mt-2">
-            <div
-                className="h-1 w-full overflow-hidden rounded-full bg-border"
-                role="progressbar"
+            <ProgressBar
+                className="h-1 bg-border"
                 aria-label={t("activity.trackPosition")}
                 aria-valuemin={0}
                 aria-valuemax={Math.round(progress.totalMs / 1000)}
                 aria-valuenow={Math.round(progress.elapsedMs / 1000)}
-            >
-                <div className="h-full rounded-full bg-foreground" style={{ width: `${share}%` }} />
-            </div>
+                value={share}
+                tone="foreground"
+                animated={false}
+            />
             <div className="mt-1 flex justify-between text-[0.6875rem] tabular-nums text-muted-foreground">
                 <span>{core.formatElapsed(progress.elapsedMs)}</span>
                 <span>{core.formatElapsed(progress.totalMs)}</span>

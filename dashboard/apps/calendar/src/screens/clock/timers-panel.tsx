@@ -24,6 +24,7 @@ import {
     DialogTitle,
     EmptyState,
     Input,
+    ProgressBar,
     Skeleton,
     Switch,
     useToast
@@ -347,19 +348,15 @@ function TimerCard({
                 />
             </div>
 
-            <div
-                className="relative h-1.5 overflow-hidden rounded-full bg-muted"
-                role="progressbar"
+            <ProgressBar
+                className="h-1.5"
                 aria-label={title}
                 aria-valuemin={0}
                 aria-valuemax={Math.round(total / 1000)}
                 aria-valuenow={Math.round((total - left) / 1000)}
-            >
-                <div
-                    className="absolute inset-y-0 start-0 rounded-full bg-primary transition-[width] duration-200"
-                    style={{ width: `${total > 0 ? ((total - left) / total) * 100 : 100}%` }}
-                />
-            </div>
+                value={total > 0 ? ((total - left) / total) * 100 : 100}
+                animated={state === "running"}
+            />
 
             <p
                 className={cn(

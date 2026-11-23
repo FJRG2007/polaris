@@ -10,7 +10,7 @@
  */
 
 import { ArrowUpCircle } from "lucide-react";
-import { Button, Skeleton } from "@polaris/ui";
+import { Button, ProgressBar, Skeleton } from "@polaris/ui";
 import type { AppUpdateRow } from "@/lib/app-bundles/actions";
 import type { UpdateRefusal } from "@/lib/app-bundles/releases";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -69,19 +69,14 @@ export function CardUpdateNote({ state }: { state: CardUpdateState }) {
             ) : null}
             {busy ? (
                 <div className="flex min-w-0 flex-col gap-1" aria-live="polite">
-                    <div
-                        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                        role="progressbar"
+                    <ProgressBar
+                        className="h-1.5"
                         aria-label={t("appUpdates.updating")}
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={percent ?? undefined}
-                    >
-                        <div
-                            className="h-full bg-primary transition-[width]"
-                            style={{ width: `${percent ?? 10}%` }}
-                        />
-                    </div>
+                        value={percent ?? 10}
+                    />
                     <p className="truncate text-xs text-muted-foreground">
                         {t(`appUpdates.phase.${row.progress?.phase ?? "checking"}`)}
                     </p>

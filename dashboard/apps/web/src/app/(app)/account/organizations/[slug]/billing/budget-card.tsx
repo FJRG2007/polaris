@@ -20,7 +20,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { orgValidationMessage } from "@/app/(app)/account/organizations/org-validation";
-import { Button, Card, CardBody, Input, cn } from "@polaris/ui";
+import { Button, Card, CardBody, Input, cn, ProgressBar } from "@polaris/ui";
 import { clearOrgBudgetAction, saveOrgBudgetAction } from "./actions";
 import { useStatementFormat } from "@/components/billing/statement-parts";
 import { budgetLevel, BUDGET_THRESHOLDS, orgBudgetInputSchema, type CurrencyCode } from "@polaris/core";
@@ -161,22 +161,16 @@ export function BudgetCard({
 
                 {matches && share !== null ? (
                     <div className="flex flex-col gap-1">
-                        <div
-                            className="bg-muted h-2 overflow-hidden rounded-full"
-                            role="progressbar"
+                        <ProgressBar
+                            className="h-2"
                             aria-label={t("budget.used")}
                             aria-valuemin={0}
                             aria-valuemax={100}
                             aria-valuenow={Math.min(100, Math.round(share))}
-                        >
-                            <div
-                                className={cn(
-                                    "h-full rounded-full",
-                                    level >= 100 ? "bg-danger" : level >= 80 ? "bg-warning" : "bg-primary"
-                                )}
-                                style={{ width: `${Math.min(100, share)}%` }}
-                            />
-                        </div>
+                            value={share}
+                            tone={level >= 100 ? "danger" : level >= 80 ? "warning" : "primary"}
+                            animated={false}
+                        />
                         <p className="text-muted-foreground text-xs">
                             {monthLabel
                                 ? t("budget.usedShareIn", { share: Math.round(share), month: monthLabel })

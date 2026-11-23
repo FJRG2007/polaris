@@ -21,7 +21,8 @@ import {
     DialogContent,
     DialogDescription,
     DialogHeader,
-    DialogTitle
+    DialogTitle,
+    ProgressBar
 } from "@polaris/ui";
 import type { KeptPick } from "@/components/file-picker/as-files";
 import { DropZone } from "@/components/drop-zone";
@@ -431,18 +432,13 @@ export function ImportSiteButton({ allowed = true }: { allowed?: boolean }) {
                                     <span className="text-muted-foreground">
                                         {t("importSite.uploading", { percent: phase.percent })}
                                     </span>
-                                    <div
-                                        role="progressbar"
+                                    <ProgressBar
                                         aria-valuemin={0}
                                         aria-valuemax={100}
                                         aria-valuenow={phase.percent}
-                                        className="h-1.5 overflow-hidden rounded-full bg-muted"
-                                    >
-                                        <div
-                                            className="h-full bg-primary transition-[width]"
-                                            style={{ width: `${phase.percent}%` }}
-                                        />
-                                    </div>
+                                        className="h-1.5"
+                                        value={phase.percent}
+                                    />
                                 </div>
                             )}
                             {(phase.kind === "failed" || job?.status === "failed") && (

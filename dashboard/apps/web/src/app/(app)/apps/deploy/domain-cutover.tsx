@@ -43,6 +43,7 @@ import {
     DialogHeader,
     DialogTitle,
     DnsRecordTable,
+    ProgressBar,
     Skeleton
 } from "@polaris/ui";
 
@@ -471,19 +472,14 @@ function Propagation({
                             {share}%
                         </span>
                     </div>
-                    <div
-                        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                        role="progressbar"
+                    <ProgressBar
+                        className="h-1.5"
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={share}
                         aria-label={t("cutover.progressLabel")}
-                    >
-                        <div
-                            className="h-full bg-primary transition-all"
-                            style={{ width: `${share}%` }}
-                        />
-                    </div>
+                        value={share}
+                    />
                     {cutover.resolvers.length > 0 ? (
                         <ul className="flex min-w-0 flex-col gap-1">
                             {cutover.resolvers.map((resolver) => (

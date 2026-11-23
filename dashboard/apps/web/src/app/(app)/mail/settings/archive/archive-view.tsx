@@ -23,7 +23,7 @@ import type { MailFolderView } from "@/lib/mailbox/views";
 import { useCallback, useMemo, useState } from "react";
 import { useLiveRead } from "@/components/use-live-resource";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
-import { Button, EmptyState, Select, useToast } from "@polaris/ui";
+import { Button, EmptyState, ProgressBar, Select, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { exportSizeAction, importBatchAction, openImportAction } from "@/app/(app)/mail/actions";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
@@ -221,24 +221,16 @@ export function ArchiveView({
                     </Button>
                     {progress ? (
                         <div className="mt-3">
-                            <div
-                                className="h-1.5 w-full overflow-hidden rounded-full bg-surface"
-                                role="progressbar"
+                            <ProgressBar
+                                className="h-1.5 bg-surface"
                                 aria-valuenow={progress.done}
                                 aria-valuemin={0}
                                 aria-valuemax={progress.total}
-                            >
-                                <div
-                                    className="h-full rounded-full bg-primary transition-[width] duration-fast"
-                                    style={{
-                                        width: `${Math.round(
-                                            ((progress.done + progress.failed) /
-                                                Math.max(1, progress.total)) *
-                                                100
-                                        )}%`
-                                    }}
-                                />
-                            </div>
+                                value={
+                                    ((progress.done + progress.failed) / Math.max(1, progress.total)) * 100
+                                }
+                                fillClassName="duration-fast"
+                            />
                             <p className="mt-1 text-[12px] text-muted-foreground">
                                 {t("archive.progress", {
                                     finished: progress.finished ? "yes" : "no",

@@ -99,6 +99,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    ProgressBar,
     Skeleton,
     cn,
     Checkbox,
@@ -1250,21 +1251,15 @@ export function DriveExplorer({
                             {/* A bar with a number beside it. A spinner on its own
                                 is indistinguishable from a hang, which is why
                                 people press the button a second time. */}
-                            <div
-                                role="progressbar"
+                            <ProgressBar
                                 aria-label={job.label}
                                 aria-valuemin={0}
                                 aria-valuemax={job.total}
                                 aria-valuenow={job.done}
-                                className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                            >
-                                <div
-                                    className="h-full rounded-full bg-primary transition-[width] duration-500"
-                                    style={{
-                                        width: `${Math.round(driveJobFraction(job) * 100)}%`
-                                    }}
-                                />
-                            </div>
+                                className="h-1.5"
+                                value={driveJobFraction(job) * 100}
+                                fillClassName="duration-500"
+                            />
                             <p className="text-xs text-muted-foreground">
                                 {driveJobSummary({ ...job, startedAt: job.startedAt }, tick)}
                             </p>

@@ -17,7 +17,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    ProgressBar
 } from "@polaris/ui";
 import * as plan from "../lib/duplicate-plan";
 import { useGameText, useSchemaText } from "./game-text";
@@ -210,19 +211,14 @@ export function CopyStatus({ copy }: { copy: plan.DuplicateState }) {
                 {t("duplicate.from", { name: copy.fromName })}
             </span>
             {percent !== null && (
-                <div
-                    role="progressbar"
+                <ProgressBar
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={percent}
                     aria-label={t("duplicate.progress")}
-                    className="h-1 w-32 overflow-hidden rounded-full bg-muted"
-                >
-                    <div
-                        className="h-full bg-primary transition-[width]"
-                        style={{ width: `${percent}%` }}
-                    />
-                </div>
+                    className="h-1 w-32"
+                    value={percent}
+                />
             )}
         </div>
     );

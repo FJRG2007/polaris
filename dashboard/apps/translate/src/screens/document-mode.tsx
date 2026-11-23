@@ -10,7 +10,7 @@ import type { Translate } from "./run";
 import { ServerEngineError } from "./server-engine";
 import { useTranslateT } from "./i18n";
 import { FileText, FileUp } from "lucide-react";
-import { Button, cn } from "@polaris/ui";
+import { Button, cn, ProgressBar } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
 import { DOCUMENT_MAX_BYTES } from "../model/media";
 import { DocumentError, openDocument, translatedName, type DocumentFormat } from "./documents";
@@ -230,8 +230,7 @@ export function DocumentMode({
                             ? t("document.reading")
                             : t("document.progress", { done: phase.done, total: phase.total })}
                     </p>
-                    <div
-                        role="progressbar"
+                    <ProgressBar
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={Math.round(
@@ -239,15 +238,13 @@ export function DocumentMode({
                                 ? (phase.done / phase.total) * 100
                                 : 0
                         )}
-                        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                    >
-                        <div
-                            className="h-full rounded-full bg-primary transition-[width]"
-                            style={{
-                                width: `${phase.kind === "translating" && phase.total > 0 ? (phase.done / phase.total) * 100 : 0}%`
-                            }}
-                        />
-                    </div>
+                        className="h-1.5"
+                        value={
+                            phase.kind === "translating" && phase.total > 0
+                                ? (phase.done / phase.total) * 100
+                                : 0
+                        }
+                    />
                     <Button variant="outline" size="sm" className="self-end" onClick={cancel}>
                         {t("document.cancel")}
                     </Button>

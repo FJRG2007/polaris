@@ -17,7 +17,7 @@ import { runAction } from "@/lib/run-action";
 import { Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, Input, Skeleton, cn, useToast } from "@polaris/ui";
+import { Button, Card, CardBody, Input, ProgressBar, Skeleton, cn, useToast } from "@polaris/ui";
 import { loadOrgQuotaAction, saveOrgQuotaAction, type OrgQuotaView } from "./actions";
 
 type Drafts = Record<quotas.OrgQuotaDimension, string>;
@@ -208,26 +208,18 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
                                     </span>
                                 </div>
                                 {share !== null ? (
-                                    <div
-                                        className="bg-muted h-2 overflow-hidden rounded-full"
-                                        role="progressbar"
+                                    <ProgressBar
+                                        className="h-2"
                                         aria-label={label}
                                         aria-valuemin={0}
                                         aria-valuemax={100}
                                         aria-valuenow={Math.min(100, Math.round(share))}
-                                    >
-                                        <div
-                                            className={cn(
-                                                "h-full rounded-full",
-                                                over || share >= 100
-                                                    ? "bg-danger"
-                                                    : share >= 80
-                                                      ? "bg-warning"
-                                                      : "bg-primary"
-                                            )}
-                                            style={{ width: `${Math.min(100, share)}%` }}
-                                        />
-                                    </div>
+                                        value={share}
+                                        tone={
+                                            over || share >= 100 ? "danger" : share >= 80 ? "warning" : "primary"
+                                        }
+                                        animated={false}
+                                    />
                                 ) : null}
                                 {canEdit && drafts ? (
                                     <div className="flex flex-col gap-1">

@@ -66,6 +66,7 @@ export {
 } from "./components/dns-record-table";
 export { Card, CardHeader, CardTitle, CardBody } from "./components/card";
 export { Skeleton } from "./components/skeleton";
+export { ProgressBar, type ProgressBarProps, type ProgressTone } from "./components/progress-bar";
 export { EmptyState } from "./components/empty-state";
 export {
     arrangeFindings,

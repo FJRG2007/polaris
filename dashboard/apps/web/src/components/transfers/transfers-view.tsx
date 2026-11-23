@@ -18,7 +18,7 @@
  * the one thing that says "this is working, wait".
  */
 
-import { cn } from "@polaris/ui";
+import { cn, ProgressBar } from "@polaris/ui";
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Check, X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -139,24 +139,14 @@ function TransferRow({ transfer }: { transfer: Transfer }) {
                 to give: a bar that fills at a rate nobody chose says "this much is
                 left" and is guessing. */}
             {!failed && transfer.state !== "stopped" && (
-                <div
-                    role="progressbar"
+                <ProgressBar
                     aria-label={transfer.name}
                     aria-valuemin={0}
                     aria-valuemax={100}
                     {...(fraction === null ? {} : { "aria-valuenow": Math.round(fraction * 100) })}
-                    className="h-1 w-full overflow-hidden rounded-full bg-muted"
-                >
-                    <div
-                        className={cn(
-                            "h-full rounded-full bg-primary",
-                            fraction === null
-                                ? "w-1/3 animate-pulse"
-                                : "transition-[width] duration-200"
-                        )}
-                        style={fraction === null ? undefined : { width: `${fraction * 100}%` }}
-                    />
-                </div>
+                    className="h-1"
+                    value={fraction === null ? null : fraction * 100}
+                />
             )}
 
             <p className={cn("text-[0.6875rem]", failed ? "text-danger" : "text-muted-foreground")}>

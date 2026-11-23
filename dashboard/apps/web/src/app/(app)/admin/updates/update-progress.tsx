@@ -8,6 +8,7 @@
 
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { updateProgress } from "@/lib/update-timing";
+import { ProgressBar } from "@polaris/ui";
 
 export interface WatchedRun {
     readonly startedAt: number;
@@ -28,17 +29,15 @@ export function UpdateProgress({ run, now }: { run: WatchedRun; now: number }) {
           : t("settings.progress.left", { minutes });
     return (
         <div className="flex flex-col gap-1" aria-live="polite">
-            <div
-                className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                role="progressbar"
+            <ProgressBar
+                className="h-1.5"
                 aria-label={t("settings.progress.label")}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={percent}
                 aria-valuetext={label}
-            >
-                <div className="h-full bg-primary transition-[width]" style={{ width: `${percent}%` }} />
-            </div>
+                value={percent}
+            />
             <p className="text-xs text-muted-foreground">{label}</p>
         </div>
     );

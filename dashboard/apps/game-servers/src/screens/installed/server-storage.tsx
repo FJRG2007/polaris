@@ -29,6 +29,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    ProgressBar,
     Select,
     Skeleton,
     pollWhileVisible
@@ -293,18 +294,13 @@ export function ServerStorage({
                             {moveLine(t, view.move)}
                         </p>
                         {view.move.state === "copying" && view.move.percent !== null ? (
-                            <div
-                                className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                                role="progressbar"
+                            <ProgressBar
+                                className="h-1.5"
                                 aria-valuenow={view.move.percent}
                                 aria-valuemin={0}
                                 aria-valuemax={100}
-                            >
-                                <div
-                                    className="h-full bg-primary"
-                                    style={{ width: `${view.move.percent}%` }}
-                                />
-                            </div>
+                                value={view.move.percent}
+                            />
                         ) : null}
                         {view.move.error ? (
                             <p className="text-danger-ink">

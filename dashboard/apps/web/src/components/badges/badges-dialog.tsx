@@ -21,7 +21,8 @@ import {
     DialogContent,
     DialogDescription,
     DialogHeader,
-    DialogTitle
+    DialogTitle,
+    ProgressBar
 } from "@polaris/ui";
 
 type T = NamespaceTranslator<"badges">;
@@ -158,19 +159,14 @@ export function BadgeDetail({ badge, hidden = false }: { badge: BadgeView; hidde
             </dl>
             {badge.progress && (
                 <div className="flex flex-col gap-1">
-                    <div
-                        role="progressbar"
+                    <ProgressBar
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={Math.round(badge.progress.fraction * 100)}
                         aria-label={badgeName(t, badge)}
-                        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                    >
-                        <div
-                            className="h-full rounded-full bg-primary"
-                            style={{ width: `${Math.round(badge.progress.fraction * 100)}%` }}
-                        />
-                    </div>
+                        className="h-1.5"
+                        value={badge.progress.fraction * 100}
+                    />
                     <p className="text-xs text-muted-foreground">
                         {badge.progress.next === null
                             ? t("progressTop")

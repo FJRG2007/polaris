@@ -12,7 +12,7 @@ import { ArrowUpCircle, RotateCcw, RotateCw } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AppUpdateRow } from "@/lib/app-bundles/actions";
 import type { UpdateRefusal } from "@/lib/app-bundles/releases";
-import { Button, Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, ProgressBar, Skeleton } from "@polaris/ui";
 import { buildLabel, newerBuild, progressPercent, useAppUpdates } from "./use-app-updates";
 
 export function AppUpdatesCard() {
@@ -136,18 +136,13 @@ function AppRow({
             </div>
             {busy ? (
                 <div className="flex flex-col gap-1" aria-live="polite">
-                    <div
-                        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                        role="progressbar"
+                    <ProgressBar
+                        className="h-1.5"
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={percent ?? undefined}
-                    >
-                        <div
-                            className="h-full bg-primary transition-[width]"
-                            style={{ width: `${percent ?? 10}%` }}
-                        />
-                    </div>
+                        value={percent ?? 10}
+                    />
                     <p className="text-xs text-muted-foreground">
                         {t(`appUpdates.phase.${progress?.phase ?? "checking"}`)}
                     </p>
