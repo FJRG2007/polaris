@@ -17,6 +17,16 @@ describe("rows a search host hands the palette", () => {
         expect(readHostRows({ rows: "no" })).toEqual([]);
     });
 
+    it("keeps a system command only by an id the palette can name", () => {
+        const rows = readHostRows({
+            rows: [
+                { id: "0", kind: "system", title: "Restart", subtitle: "System", command: "restart" },
+                { id: "1", kind: "system", title: "Format disk", subtitle: "System", command: "format" }
+            ]
+        });
+        expect(rows).toEqual([{ id: "0", kind: "system", title: "Restart", subtitle: "System", command: "restart" }]);
+    });
+
     it("opens only paths of this instance", () => {
         expect(isInstancePath("/tasks/1")).toBe(true);
         expect(isInstancePath("//evil.test")).toBe(false);

@@ -13,7 +13,7 @@ import { createRoot } from "react-dom/client";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { LauncherRow, LauncherRowKind, PolarisLauncher } from "@/shared/launcher";
 import { groupRows, searchTerms, stepActive } from "../../../dashboard/packages/ui/src/search/search-match";
-import { AppWindow, Calculator, ClipboardList, Compass, Globe, Search, Sparkles, type LucideIcon } from "lucide-react";
+import { AppWindow, Calculator, ClipboardList, Compass, Globe, Power, Search, Sparkles, type LucideIcon } from "lucide-react";
 import { SearchGroup, SearchItem, SearchMessage, SearchOption, SearchSheet } from "../../../dashboard/packages/ui/src/search/search-panel";
 
 declare global {
@@ -27,6 +27,7 @@ const KINDS: Readonly<Record<LauncherRowKind, { label: string; icon: LucideIcon;
     answer: { label: "Answer", icon: Calculator },
     polaris: { label: "Polaris", icon: Search },
     page: { label: "Pages", icon: Compass },
+    system: { label: "System", icon: Power },
     app: { label: "Apps", icon: AppWindow },
     polar: { label: "Polar", icon: Sparkles },
     web: { label: "Web", icon: Globe },

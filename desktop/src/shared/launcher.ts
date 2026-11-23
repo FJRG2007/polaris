@@ -5,6 +5,8 @@
  * ask to open an arbitrary address or program.
  */
 
+import type { SystemCommandId } from "../../../dashboard/packages/core/src/launcher-commands";
+
 export const LAUNCHER_CHANNELS = {
     query: "launcher:query",
     run: "launcher:run",
@@ -14,7 +16,7 @@ export const LAUNCHER_CHANNELS = {
     open: "launcher:open"
 } as const;
 
-export type LauncherRowKind = "answer" | "polaris" | "page" | "app" | "polar" | "web" | "clip";
+export type LauncherRowKind = "answer" | "polaris" | "page" | "system" | "app" | "polar" | "web" | "clip";
 
 export interface LauncherRow {
     readonly id: string;
@@ -23,6 +25,8 @@ export interface LauncherRow {
     readonly subtitle: string;
     /** A program's own icon, as a PNG data URL. */
     readonly icon?: string | null;
+    /** A system command's id (`@polaris/core` `launcher-commands`), so a page draws its name in the reader's language. */
+    readonly command?: SystemCommandId;
 }
 
 export interface LauncherAnswer {

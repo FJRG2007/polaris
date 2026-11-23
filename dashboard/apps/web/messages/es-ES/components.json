@@ -307,7 +307,18 @@
             "webHint": "Se abre en tu navegador",
             "polarTitle": "Preguntar a Polar \"{query}\"",
             "polarHint": "Abre Polar con ello listo",
-            "clipHint": "Intro lo copia"
+            "clipHint": "Intro lo copia",
+            "system": "Sistema",
+            "systemHint": "Se ejecuta en este equipo",
+            "systemConfirmHint": "Pregunta antes de hacerlo",
+            "commands": {
+                "lock": "Bloquear pantalla",
+                "sleep": "Suspender",
+                "restart": "Reiniciar",
+                "shutdown": "Apagar",
+                "logout": "Cerrar sesión",
+                "empty-trash": "Vaciar papelera"
+            }
         },
         "calculationCopied": "{value} copiado al portapapeles",
         "calculationCopyFailed": "No se pudo copiar el resultado. Prueba otra vez.",

@@ -44,10 +44,13 @@ import { installedApps, installedAppsRead, openListedApp } from "./launcher-apps
 import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipEntry } from "@/shared/clipboard-history";
 import { DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator } from "@/shared/launcher-hotkey";
 import { conflictSentence, findLaunchers, likelyHolders, type FoundLauncher } from "@/shared/launcher-conflicts";
+import { execFile } from "node:child_process";
+import { showNotice } from "./notices";
 import { recordLauncherUse, usageScores } from "./launcher-usage";
+import { searchableCommand, systemCommands, type SystemCommand } from "@/shared/system-commands";
 import { byFrecency } from "../../../dashboard/packages/core/src/frecency";
 import { LAUNCHER_CHANNELS, rankedMatches, webSearchUrl, type LauncherAnswer, type LauncherRow } from "@/shared/launcher";
-import { app, BrowserWindow, clipboard, ipcMain, nativeImage, net, powerMonitor, safeStorage, screen, session, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, powerMonitor, safeStorage, screen, session, type IpcMainInvokeEvent } from "electron";
 
 /** How long after start the hidden window is made, so it does not compete with the main window's first load. */
 export const WARM_DELAY_MS = 4_000;
@@ -252,6 +255,15 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
             }
             for (const page of rankedMatches(query, PAGES.map((page) => ({ ...page, context: "Polaris" })), 3, pageKey, uses)) addPage(page);
         }
+        const commandKey = (command: SystemCommand) => `system:${command.id}`;
+        const commands = systemCommands(process.platform, process.env).map((command) => ({ ...command, ...searchableCommand(command) }));
+        for (const command of rankedMatches(query, commands, 3, commandKey, uses)) {
+            add(
+                { kind: "system", title: command.label, subtitle: command.confirm ? "System - asks before it runs" : "System", command: command.id },
+                () => void runSystemCommand(command),
+                commandKey(command)
+            );
+        }
         for (const app of rankedMatches(query, installedApps().map((app) => ({ ...app, context: "" })), PER_KIND, appKey, uses)) addApp(app);
         if (origin) {
             add({ kind: "polar", title: `Ask Polar "${query.slice(0, 120)}"`, subtitle: "Opens Polar with the question ready to send" }, () =>
@@ -272,6 +284,32 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
     appPaths = paths;
     useKeys = keys;
     return { rows, notice: origin ? indexNotice : "Connect to a Polaris to search it." };
+}
+
+/**
+ * Run a system command, asking first when it ends the session or cannot be
+ * undone. The question is the system's own message box: the launcher has just
+ * been put away, and Restart must not hang on a page that may not draw.
+ */
+async function runSystemCommand(command: SystemCommand): Promise<void> {
+    if (command.confirm) {
+        const { response } = await dialog.showMessageBox({
+            type: "warning",
+            title: command.label,
+            message: `${command.label} now?`,
+            detail: command.id === "empty-trash" ? "What is in it is deleted for good." : "Unsaved work in open programs may be lost.",
+            buttons: [command.label, "Cancel"],
+            defaultId: 1,
+            cancelId: 1,
+            noLink: true
+        });
+        if (response !== 0) return;
+    }
+    execFile(command.file, [...command.args], { windowsHide: true, timeout: 60_000 }, (failed) => {
+        if (!failed) return;
+        console.warn(`launcher: ${command.id} failed`, failed.message);
+        showNotice({ title: `${command.label} did not work`, body: "This computer refused it. Try it from the system's own menu.", tag: "launcher-system" });
+    });
 }
 
 function hide(): void {

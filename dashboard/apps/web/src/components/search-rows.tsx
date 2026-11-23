@@ -18,7 +18,8 @@ import { SearchItem } from "@polaris/ui/search-panel";
 import { Avatar } from "@/components/avatar";
 import type { LucideIcon } from "lucide-react";
 import type { ClockCommand, RecentSearch } from "@polaris/core";
-import { AlarmClock, AppWindow, Calculator, Clipboard, Clock, Copy, CornerDownLeft, Globe, Timer, Watch, X } from "lucide-react";
+import { LAUNCHER_COMMANDS } from "@polaris/core";
+import { AlarmClock, AppWindow, Calculator, Clipboard, Clock, Copy, CornerDownLeft, Globe, Power, Timer, Watch, X } from "lucide-react";
 import type { HostRow, HostRowKind } from "@/lib/search/search-host";
 import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
@@ -342,9 +343,13 @@ export function RecentRow({
 
 type Translate = ReturnType<typeof useTranslations>;
 
+/** The system commands that ask before they run. */
+const CONFIRMED = new Set<string>(LAUNCHER_COMMANDS.filter((command) => command.confirm).map((command) => command.id));
+
 /** The heading a host's row is listed under. */
 export function hostGroup(t: Translate, kind: HostRowKind): string {
     if (kind === "answer") return t("search.calculator");
+    if (kind === "system") return t("search.host.system");
     if (kind === "app") return t("search.host.apps");
     if (kind === "web") return t("search.host.web");
     if (kind === "polar") return t("search.host.polar");
@@ -362,7 +367,9 @@ export function HostResultRow({ row, query, ...props }: RowProps & { row: HostRo
             ? t("search.host.webTitle", { query: quoted })
             : row.kind === "polar"
               ? t("search.host.polarTitle", { query: quoted })
-              : row.title;
+              : row.kind === "system" && row.command
+                ? t(`search.host.commands.${row.command}`)
+                : row.title;
     const context =
         row.kind === "web"
             ? t("search.host.webHint")
@@ -372,9 +379,11 @@ export function HostResultRow({ row, query, ...props }: RowProps & { row: HostRo
                 ? t("search.host.app")
                 : row.kind === "clip"
                   ? t("search.host.clipHint")
-                  : row.subtitle;
+                  : row.kind === "system"
+                    ? t(row.command && CONFIRMED.has(row.command) ? "search.host.systemConfirmHint" : "search.host.systemHint")
+                    : row.subtitle;
     const fallback =
-        row.kind === "answer" ? Calculator : row.kind === "web" ? Globe : row.kind === "clip" ? Clipboard : AppWindow;
+        row.kind === "answer" ? Calculator : row.kind === "system" ? Power : row.kind === "web" ? Globe : row.kind === "clip" ? Clipboard : AppWindow;
     const Icon = fallback;
     const icon =
         row.kind === "polar" ? (

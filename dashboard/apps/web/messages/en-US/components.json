@@ -307,7 +307,18 @@
             "webHint": "Opens in your browser",
             "polarTitle": "Ask Polar \"{query}\"",
             "polarHint": "Opens Polar with it ready",
-            "clipHint": "Enter copies it"
+            "clipHint": "Enter copies it",
+            "system": "System",
+            "systemHint": "Runs on this computer",
+            "systemConfirmHint": "Asks before it runs",
+            "commands": {
+                "lock": "Lock screen",
+                "sleep": "Sleep",
+                "restart": "Restart",
+                "shutdown": "Shut down",
+                "logout": "Log out",
+                "empty-trash": "Empty bin"
+            }
         },
         "calculationCopied": "{value} copied to the clipboard",
         "calculationCopyFailed": "The result could not be copied. Try again.",
