@@ -36,7 +36,11 @@ const warm = read("dashboard-cache.yml");
 
 test("every workflow takes the built packages from the one shared action", () => {
     const uses = /uses:\s*\.\/\.github\/actions\/workspace-packages/g;
-    assert.equal(ci.match(uses)?.length, 3, "the checks job, the web test shards and the app build");
+    assert.equal(
+        ci.match(uses)?.length,
+        4,
+        "the checks job, the web test shards, the MLS devices job and the app build"
+    );
     assert.equal(warm.match(uses)?.length, 1, "the warming build");
     for (const name of readdirSync(workflows).filter((file) => file.endsWith(".yml")))
         assert.deepEqual(keys(read(name), "packages-"), [], `${name} writes its own packages key`);
