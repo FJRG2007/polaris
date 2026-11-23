@@ -29,6 +29,10 @@
             "types": "./dist/hybrid-envelope.d.ts",
             "import": "./dist/hybrid-envelope.js"
         },
+        "./message-content": {
+            "types": "./dist/message-content.d.ts",
+            "import": "./dist/message-content.js"
+        },
         "./qr-approval": {
             "types": "./dist/qr-approval.d.ts",
             "import": "./dist/qr-approval.js"
@@ -43,7 +47,7 @@
         }
     },
     "scripts": {
-        "build": "tsup src/account-key.ts src/locks.ts src/device-lock.ts src/password-lock.ts src/passkey-lock.ts src/hybrid-envelope.ts src/opaque-server.ts src/qr-approval.ts src/platform-store.ts --format esm --dts --clean",
+        "build": "tsup src/account-key.ts src/locks.ts src/device-lock.ts src/password-lock.ts src/passkey-lock.ts src/hybrid-envelope.ts src/message-content.ts src/opaque-server.ts src/qr-approval.ts src/platform-store.ts --format esm --dts --clean",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },
