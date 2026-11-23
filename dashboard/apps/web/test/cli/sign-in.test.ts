@@ -199,6 +199,85 @@ describe("a TV's request", () => {
     });
 });
 
+describe("Polaris Terminal's request", () => {
+    const TERMINAL = {
+        ...REQUEST,
+        deviceName: "ada-desktop",
+        clientVersion: "0.2026.11.23.10.00.oss_00",
+        scopes: ["polar.use", "polar.spend"] as const,
+        requestUserAgent: "polaris-terminal/0.2026.11.23 (win32; x64)",
+        kind: "terminal" as const
+    };
+
+    async function approved(scopes: readonly string[] = TERMINAL.scopes) {
+        const opened = await openCliSignIn({ ...TERMINAL, scopes: scopes as never }, fixedRandom);
+        await answerCliSignIn({
+            userId: ADA,
+            userCode: opened!.userCode,
+            approve: true,
+            kind: "terminal"
+        });
+        return claimCliSignIn(opened!.deviceCode);
+    }
+
+    it("mints a terminal key carrying the Polar scopes the account holds", async () => {
+        held = ["polar.use", "polar.spend", "deploy.read"];
+        expect(await approved()).toMatchObject({
+            status: "approved",
+            scopes: ["polar.use", "polar.spend"]
+        });
+        expect(minted[0]).toMatchObject({ userId: ADA, kind: "terminal" });
+        expect(minted[0]!.input).toMatchObject({
+            name: "Terminal - ada-desktop",
+            description: "Signed in from Polaris Terminal.",
+            environment: "production",
+            scopes: ["polar.use", "polar.spend"],
+            expiresInDays: 365
+        });
+        expect(minted[0]!.client).toMatchObject({ os: "Windows" });
+    });
+
+    it("narrows to what the account holds, and still signs in without polar.spend", async () => {
+        held = ["polar.use"];
+        expect(await approved()).toMatchObject({ status: "approved", scopes: ["polar.use"] });
+    });
+
+    it("hands over nothing to an account that cannot use Polar", async () => {
+        held = ["deploy.read", "deploy.manage"];
+        expect(await approved()).toEqual({ status: "denied" });
+        expect(minted).toHaveLength(0);
+    });
+
+    it("drops scopes that are not the terminal's, even if stored on the row", async () => {
+        held = ["polar.use", "deploy.manage"];
+        expect(await approved(["polar.use", "deploy.manage"])).toMatchObject({
+            status: "approved",
+            scopes: ["polar.use"]
+        });
+    });
+
+    it("is found only on the terminal's own screen, and answered only from it", async () => {
+        const opened = await openCliSignIn(TERMINAL, fixedRandom);
+        expect(await describeCliSignIn(opened!.userCode)).toBeNull();
+        expect(await describeCliSignIn(opened!.userCode, new Date(), "streamdeck")).toBeNull();
+        expect(await describeCliSignIn(opened!.userCode, new Date(), "terminal")).toMatchObject({
+            kind: "terminal",
+            os: "Windows",
+            scopes: ["polar.use", "polar.spend"]
+        });
+        expect(
+            await answerCliSignIn({ userId: ADA, userCode: opened!.userCode, approve: true })
+        ).toBe(false);
+    });
+
+    it("signs out only a terminal key, and a CLI sign-out leaves it alone", async () => {
+        const key = { keyId: "key-9", userId: ADA, kind: "terminal" };
+        expect(await endCliSignIn(key)).toBe(false);
+        expect(await endCliSignIn({ ...key, kind: "cli" }, "terminal")).toBe(false);
+        expect(await endCliSignIn(key, "terminal")).toBe(true);
+    });
+});
+
 describe("opening a request", () => {
     it("keeps only the hash of the CLI's secret and hands back a short code", async () => {
         const opened = await openCliSignIn(REQUEST, fixedRandom);

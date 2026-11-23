@@ -122,7 +122,12 @@ describe("a CLI sign-in on the sessions table", () => {
  * shared row, so a kind added to the registry cannot arrive with less.
  */
 describe.each(DEVICE_KINDS)("a %s sign-in has a session's controls", (kind) => {
-    const APP = { cli: "Command line", streamdeck: "Stream Deck", tv: "Polaris TV" }[kind];
+    const APP = {
+        cli: "Command line",
+        streamdeck: "Stream Deck",
+        tv: "Polaris TV",
+        terminal: "Polaris Terminal"
+    }[kind];
 
     it("names the app and the device, and links its activity, lock and sign-out", () => {
         const row = { ...SIGN_IN, kind, name: "DRAGON" };

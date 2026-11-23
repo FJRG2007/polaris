@@ -1905,7 +1905,9 @@
             "gamesModerate": "Kick, ban and message players on your game servers",
             "gamesManage": "Start, stop, restart and back up your game servers",
             "agentsRead": "See your agent sessions and what they are doing",
-            "agentsManage": "Start, answer and stop your agent sessions"
+            "agentsManage": "Start, answer and stop your agent sessions",
+            "polarUse": "Talk to Polar",
+            "polarSpend": "Run Polar on this deployment's provider keys"
         },
         "consent": "Saying yes gives this computer a key that acts for your account for a year, limited to what is listed above. It is listed under Sessions as this computer, where you can sign it out, and plr logout does too.",
         "working": "Working",
@@ -2340,5 +2342,37 @@
         "title": "Open links in the Polaris app",
         "body": "A Polaris link you open in a browser opens in the desktop or phone app instead, on devices where you've signed in to the app.",
         "failed": "Couldn't save that. Try again."
+    },
+    "terminal": {
+        "page": {
+            "title": "Sign in Polaris Terminal",
+            "intro": "Type the code Polaris Terminal is showing. Nothing is signed in until you say so."
+        },
+        "title": "Sign in {device}",
+        "code": "Code {code}",
+        "system": "System",
+        "version": "Terminal version",
+        "askedFrom": "Asked from",
+        "on": "On",
+        "unknown": "Unknown",
+        "asksTo": "It is asking to",
+        "consent": "Saying yes gives Polaris Terminal on this computer a key that acts for your account for a year, limited to what is listed above. It is listed under Sessions as this computer, where you can sign it out.",
+        "working": "Working",
+        "approve": "Sign it in",
+        "deny": "Turn it away",
+        "signedIn": "Signed in.",
+        "signedInHint": "Go back to Polaris Terminal; it carries on by itself. It is listed under <link>Sessions</link>.",
+        "turnedAway": "Turned away.",
+        "turnedAwayHint": "Nothing was handed over. The terminal says so and stops.",
+        "codeLabel": "The code the terminal is showing",
+        "looking": "Looking",
+        "find": "Find it",
+        "errors": {
+            "tooMany": "Too many codes tried. Wait a few minutes.",
+            "notACode": "That is not a code from Polaris Terminal.",
+            "nothingWaiting": "Nothing is waiting on that code. Sign in from the terminal again for a new one.",
+            "cannotAnswer": "That request cannot be answered.",
+            "noScopes": "Your account cannot use Polar, which is all Polaris Terminal asks for. Ask an administrator for access."
+        }
     }
 }

@@ -142,6 +142,7 @@ describe("listing", () => {
         keys.push(
             cliKey({ kind: "streamdeck", name: "Stream Deck - DRAGON", clientName: "DRAGON" }),
             cliKey({ kind: "tv", name: "TV - Living room", clientName: "Living room" }),
+            cliKey({ kind: "terminal", name: "Terminal - DRAGON", clientName: "DRAGON" }),
             cliKey({ kind: "key", name: "test" }),
             cliKey({ kind: "cli", clientName: "DRAGON" })
         );
@@ -150,6 +151,7 @@ describe("listing", () => {
             ["streamdeck", "DRAGON", "DRAGON"],
             // A TV's name is the set's own, never taken for a computer's.
             ["tv", "Living room", null],
+            ["terminal", "DRAGON", "DRAGON"],
             ["cli", "DRAGON", "DRAGON"]
         ]);
         expect(rows.map((row) => row.kind).sort()).toEqual([...DEVICE_KINDS].sort());

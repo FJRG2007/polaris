@@ -106,7 +106,7 @@ describe("the credential a device already holds", () => {
 
 describe("which keys are sessions", () => {
     it("is every registry kind and never an ordinary key", () => {
-        expect(DEVICE_KINDS).toEqual(["cli", "streamdeck", "tv"]);
+        expect(DEVICE_KINDS).toEqual(["cli", "streamdeck", "tv", "terminal"]);
         for (const kind of DEVICE_KINDS) expect(isDeviceSessionKind(kind)).toBe(true);
         expect(isDeviceSessionKind("key")).toBe(false);
         expect(isDeviceSessionKind("toString")).toBe(false);

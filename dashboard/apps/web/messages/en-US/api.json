@@ -112,7 +112,9 @@
         "tvUpdateMoved": "A newer TV update is available. Check for updates again.",
         "tvCatalogMissing": "This theme or add-on is not in the newest TV release.",
         "tvUpdateReport": "That is not an update report.",
-        "tvUpdateStale": "That update request is no longer current."
+        "tvUpdateStale": "That update request is no longer current.",
+        "terminalSignInAsk": "Send the computer's name, and only scopes Polaris Terminal may ask for.",
+        "terminalNotASignIn": "This key was not handed to Polaris Terminal by its sign-in, so it cannot sign itself out here. Revoke it on the API keys screen."
     },
     "refusals": {
         "session": {

@@ -18,7 +18,7 @@ import { useSearchParams } from "next/navigation";
 import { formatUserCode } from "@/lib/device-code";
 import type { PendingCliSignIn, SignInKind, SignInScope } from "@/lib/cli/sign-in";
 import { SystemMark } from "@/components/client-marks";
-import { Globe, Grid3x3, Info, Network, Tag, Terminal, Tv } from "lucide-react";
+import { Globe, Grid3x3, Info, Network, SquareTerminal, Tag, Terminal, Tv } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { answerCliSignInAction, describeCliSignInAction } from "./actions";
 import {
@@ -44,19 +44,28 @@ const SCOPE_WORDS = {
     "games.moderate": "cli.scope.gamesModerate",
     "games.manage": "cli.scope.gamesManage",
     "agents.read": "cli.scope.agentsRead",
-    "agents.manage": "cli.scope.agentsManage"
+    "agents.manage": "cli.scope.agentsManage",
+    "polar.use": "cli.scope.polarUse",
+    "polar.spend": "cli.scope.polarSpend"
 } as const satisfies Record<SignInScope, `cli.scope.${string}`>;
 
 /**
  * The approval for either client the device grant serves: `plr login`, or the
- * Stream Deck plugin (`kind="streamdeck"`), or Polaris TV (`kind="tv"`), each in
- * its own words and finding only its own requests.
+ * Stream Deck plugin (`kind="streamdeck"`), Polaris TV (`kind="tv"`), or Polaris
+ * Terminal (`kind="terminal"`), each in its own words and finding only its own requests.
  */
 export function CliApproveView({ account, kind = "cli" }: { account?: string; kind?: SignInKind }) {
     const asked = useSearchParams().get("code") ?? "";
     const t = useTranslations("account");
     const words = kind;
-    const Requester = kind === "tv" ? Tv : kind === "streamdeck" ? Grid3x3 : Terminal;
+    const Requester =
+        kind === "tv"
+            ? Tv
+            : kind === "streamdeck"
+              ? Grid3x3
+              : kind === "terminal"
+                ? SquareTerminal
+                : Terminal;
     const [typed, setTyped] = useState(asked);
     const [pending, setPending] = useState<PendingCliSignIn | null>(null);
     const [error, setError] = useState("");

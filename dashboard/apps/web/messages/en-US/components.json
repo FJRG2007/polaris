@@ -1077,7 +1077,8 @@
                 "cli": "Command line",
                 "streamdeck": "Stream Deck",
                 "companion": "Companion",
-                "tv": "Polaris TV"
+                "tv": "Polaris TV",
+                "terminal": "Polaris Terminal"
             },
             "lockedHint": "This sign-in only works from the address it was last used at",
             "signedIn": "Signed in <time></time>",

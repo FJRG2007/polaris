@@ -112,7 +112,9 @@
         "tvUpdateMoved": "Hay una actualización del TV más nueva. Vuelve a buscar actualizaciones.",
         "tvCatalogMissing": "Este tema o complemento no está en la versión más nueva del TV.",
         "tvUpdateReport": "Eso no es un informe de actualización.",
-        "tvUpdateStale": "Esa solicitud de actualización ya no está vigente."
+        "tvUpdateStale": "Esa solicitud de actualización ya no está vigente.",
+        "terminalSignInAsk": "Envía el nombre del ordenador y solo permisos que Polaris Terminal pueda pedir.",
+        "terminalNotASignIn": "Esta clave no se entregó a Polaris Terminal al iniciar sesión, así que no puede cerrarse desde aquí. Revócala en la pantalla de claves de API."
     },
     "refusals": {
         "session": {

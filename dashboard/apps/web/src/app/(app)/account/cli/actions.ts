@@ -32,7 +32,7 @@ const LOOKUP_WINDOW_MS = 10 * 60 * 1000;
 
 /** Which screen is asking: the CLI's or the Stream Deck's. Each finds only its
  *  own kind of request. */
-const kindSchema = z.enum(["cli", "streamdeck", "tv"]).default("cli");
+const kindSchema = z.enum(["cli", "streamdeck", "tv", "terminal"]).default("cli");
 
 const answerSchema = z.object({
     userCode: z.string().min(1).max(32),

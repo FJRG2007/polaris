@@ -1077,7 +1077,8 @@
                 "cli": "Terminal",
                 "streamdeck": "Stream Deck",
                 "companion": "Companion",
-                "tv": "Polaris TV"
+                "tv": "Polaris TV",
+                "terminal": "Polaris Terminal"
             },
             "lockedHint": "Esta sesión solo funciona desde la última dirección en que se usó",
             "signedIn": "Sesión iniciada <time></time>",

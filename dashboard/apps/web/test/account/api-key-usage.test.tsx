@@ -62,7 +62,11 @@ describe("a key's usage action", () => {
         expect(result).toEqual({ error: "notFound" });
         // A device's sign-in is a session, not a key: its id reads as unknown here too.
         expect(state.lookups).toEqual([
-            { id: OTHER_KEY, userId: "user-1", kind: { notIn: ["cli", "streamdeck", "tv"] } }
+            {
+                id: OTHER_KEY,
+                userId: "user-1",
+                kind: { notIn: ["cli", "streamdeck", "tv", "terminal"] }
+            }
         ]);
         expect(state.reports).toEqual([]);
     });

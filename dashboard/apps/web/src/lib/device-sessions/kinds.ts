@@ -13,7 +13,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import type { ApiKeyKind } from "@polaris/auth";
-import { Grid3x3, Terminal, Tv } from "lucide-react";
+import { Grid3x3, SquareTerminal, Terminal, Tv } from "lucide-react";
 
 interface DeviceSessionKindEntry {
     /** The mark drawn beside the row. */
@@ -33,7 +33,12 @@ export const DEVICE_SESSION_KINDS = {
         label: "sessionsTable.appSignIn.kinds.streamdeck",
         namesMachine: true
     },
-    tv: { icon: Tv, label: "sessionsTable.appSignIn.kinds.tv", namesMachine: false }
+    tv: { icon: Tv, label: "sessionsTable.appSignIn.kinds.tv", namesMachine: false },
+    terminal: {
+        icon: SquareTerminal,
+        label: "sessionsTable.appSignIn.kinds.terminal",
+        namesMachine: true
+    }
 } as const satisfies Partial<Record<ApiKeyKind, DeviceSessionKindEntry>>;
 
 export type DeviceSessionKind = keyof typeof DEVICE_SESSION_KINDS;

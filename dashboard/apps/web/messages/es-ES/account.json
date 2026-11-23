@@ -1905,7 +1905,9 @@
             "gamesModerate": "Expulsar, vetar y escribir a jugadores de tus servidores de juegos",
             "gamesManage": "Iniciar, detener, reiniciar y respaldar tus servidores de juegos",
             "agentsRead": "Ver tus sesiones de agentes y lo que están haciendo",
-            "agentsManage": "Iniciar, responder y detener tus sesiones de agentes"
+            "agentsManage": "Iniciar, responder y detener tus sesiones de agentes",
+            "polarUse": "Hablar con Polar",
+            "polarSpend": "Usar Polar con las claves de proveedor de este despliegue"
         },
         "consent": "Si dices que sí, este equipo recibe una clave que actúa en nombre de tu cuenta durante un año, limitada a lo que aparece arriba. Aparece en Sesiones como este equipo, donde puedes cerrarla, y plr logout también.",
         "working": "Procesando",
@@ -2340,5 +2342,37 @@
         "title": "Abrir enlaces en la app de Polaris",
         "body": "Un enlace de Polaris que abras en el navegador se abre en la app de escritorio o del móvil, en los dispositivos donde hayas iniciado sesión en la app.",
         "failed": "No se pudo guardar. Inténtalo de nuevo."
+    },
+    "terminal": {
+        "page": {
+            "title": "Entrar en Polaris Terminal",
+            "intro": "Escribe el código que muestra Polaris Terminal. No se inicia sesión hasta que lo digas."
+        },
+        "title": "Entrar en {device}",
+        "code": "Código {code}",
+        "system": "Sistema",
+        "version": "Versión del terminal",
+        "askedFrom": "Pedido desde",
+        "on": "En",
+        "unknown": "Sin datos",
+        "asksTo": "Pide poder",
+        "consent": "Si dices que sí, Polaris Terminal en este ordenador recibe una clave que actúa por tu cuenta durante un año, limitada a lo que aparece arriba. Aparece en Sesiones como este ordenador, donde puedes cerrarla.",
+        "working": "Procesando",
+        "approve": "Aceptar",
+        "deny": "Rechazar",
+        "signedIn": "Sesión iniciada.",
+        "signedInHint": "Vuelve a Polaris Terminal; sigue por sí solo. Aparece en <link>Sesiones</link>.",
+        "turnedAway": "Rechazado.",
+        "turnedAwayHint": "No se ha entregado nada. El terminal lo indica y se detiene.",
+        "codeLabel": "El código que muestra el terminal",
+        "looking": "Buscando",
+        "find": "Buscar",
+        "errors": {
+            "tooMany": "Demasiados códigos probados. Espera unos minutos.",
+            "notACode": "Ese no es un código de Polaris Terminal.",
+            "nothingWaiting": "No hay nada esperando con ese código. Vuelve a iniciar sesión desde el terminal para obtener uno nuevo.",
+            "cannotAnswer": "No se puede responder a esa solicitud.",
+            "noScopes": "Tu cuenta no puede usar Polar, que es lo único que pide Polaris Terminal. Pide acceso a un administrador."
+        }
     }
 }

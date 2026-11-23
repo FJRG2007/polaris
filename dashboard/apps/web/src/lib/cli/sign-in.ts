@@ -26,6 +26,7 @@ import { generateToken, hashToken } from "@polaris/core/tokens";
 import { CLI_TOKEN_DAYS, isCliScope, type CliScope } from "./scopes";
 import { TV_TOKEN_DAYS } from "@/lib/tv/scopes";
 import { DECK_TOKEN_DAYS, isDeckScope, type DeckScope } from "@/lib/deck/scopes";
+import { TERMINAL_TOKEN_DAYS, isTerminalScope, type TerminalScope } from "@/lib/terminal/scopes";
 import { createApiKey, scopesAvailableTo } from "@polaris/auth";
 import { revokeDeviceSession } from "@/lib/device-sessions/sessions";
 import { COMPANION_KEY_DESCRIPTION } from "@/lib/device-sessions/kinds";
@@ -36,12 +37,13 @@ import { createApiKeySchema, describeClient, parseStringList, stringifyList } fr
  * What is asking. The Stream Deck plugin connects through this same grant: the
  * same short code, the same approval and the same kind of key, with its own
  * closed list of scopes and its own approval screen. A request only ever turns
- * up on the screen of its own kind.
+ * up on the screen of its own kind. Polaris Terminal does the same with its own
+ * scopes and screen.
  */
-export type SignInKind = "cli" | "streamdeck" | "tv";
+export type SignInKind = "cli" | "streamdeck" | "tv" | "terminal";
 
-/** A scope either kind of client may ask for. */
-export type SignInScope = CliScope | DeckScope;
+/** A scope any kind of client may ask for. */
+export type SignInScope = CliScope | DeckScope | TerminalScope;
 
 /** What the CLI is handed when it asks. */
 export interface OpenedCliSignIn {
@@ -112,24 +114,54 @@ function isUniqueViolation(caught: unknown): boolean {
 function storedScopes(raw: string, kind: SignInKind = "cli"): SignInScope[] {
     const list = parseStringList(raw);
     if (kind === "tv") return [];
+    if (kind === "terminal") return list.filter(isTerminalScope);
     return kind === "streamdeck" ? list.filter(isDeckScope) : list.filter(isCliScope);
 }
 
+/**
+ * What a key minted for each kind is called and how long it lasts. The name and
+ * description are stored with the key and shown on the API keys screen as
+ * written, so they are not translated.
+ */
+const SIGN_IN_KEYS: Record<
+    SignInKind,
+    { readonly name: string; readonly description: string; readonly days: number }
+> = {
+    // i18n-ignore the name and description of a key, in the list its owner reads
+    cli: { name: "CLI", description: "Signed in with plr login.", days: CLI_TOKEN_DAYS },
+    streamdeck: {
+        // i18n-ignore the name of a key, in the list its owner reads
+        name: "Stream Deck",
+        // i18n-ignore stored with the key; the list shows it as written
+        description: "Connected from the Stream Deck plugin.",
+        days: DECK_TOKEN_DAYS
+    },
+    // i18n-ignore the name and description of a key, in the list its owner reads
+    tv: { name: "TV", description: "Connected from Polaris TV.", days: TV_TOKEN_DAYS },
+    terminal: {
+        // i18n-ignore the name of a key, in the list its owner reads
+        name: "Terminal",
+        // i18n-ignore stored with the key; the list shows it as written
+        description: "Signed in from Polaris Terminal.",
+        days: TERMINAL_TOKEN_DAYS
+    }
+};
+
 /** The kind a stored row names. A row from before the column read as "cli". */
 function storedKind(raw: unknown): SignInKind {
-    return raw === "streamdeck" || raw === "tv" ? raw : "cli";
+    return raw === "streamdeck" || raw === "tv" || raw === "terminal" ? raw : "cli";
 }
 
 /**
  * The OS a CLI's user-agent names. The CLI sends
  * `polaris-cli/<version> (<platform>; <arch>; node <version>)` - the Stream Deck
  * plugin says the same as `polaris-streamdeck/`, the Companion module as
- * `polaris-companion/` - which no browser
+ * `polaris-companion/`, Polaris Terminal as `polaris-terminal/` - which no browser
  * parser recognises, so it is read here; anything else goes to the shared parser.
  */
 export function cliOs(userAgent: string | null): string {
     const platform =
-        /^polaris-(?:cli|streamdeck|companion)\/\S+ \((win32|darwin|linux|freebsd|openbsd)\b/.exec(
+        /^polaris-(?:cli|streamdeck|companion|terminal)\/\S+ \((win32|darwin|linux|freebsd|openbsd)\b/.exec(
             userAgent ?? ""
         )?.[1];
     if (platform === "win32") return "Windows";
@@ -296,37 +328,15 @@ export async function claimCliSignIn(
     // widen them with what each one implies (deploy.manage implies the game
     // server scopes), and a key must not carry anything the person saying yes
     // was not shown.
+    const label = SIGN_IN_KEYS[kind];
     const input = {
         ...createApiKeySchema.parse({
-            name:
-                kind === "tv"
-                    ? // i18n-ignore the name of a key, in the list its owner reads
-                      `TV - ${row.deviceName}`.slice(0, 60)
-                    : kind === "streamdeck"
-                      ? // i18n-ignore the name of a key, in the list its owner reads
-                        `${companion ? "Companion" : "Stream Deck"} - ${row.deviceName}`.slice(0, 60)
-                      : // i18n-ignore the name of a key, in the list its owner reads
-                        `CLI - ${row.deviceName}`.slice(0, 60),
-            description:
-                kind === "tv"
-                    ? // i18n-ignore stored with the key; the list shows it as written
-                      "Connected from Polaris TV."
-                    : kind === "streamdeck"
-                      ? companion
-                          ? COMPANION_KEY_DESCRIPTION
-                          : // i18n-ignore stored with the key; the list shows it as written
-                            "Connected from the Stream Deck plugin."
-                      : // i18n-ignore stored with the key; the list shows it as written
-                        "Signed in with plr login.",
+            name: `${companion ? "Companion" : label.name} - ${row.deviceName}`.slice(0, 60),
+            description: companion ? COMPANION_KEY_DESCRIPTION : label.description,
             environment: kind === "cli" ? "development" : "production",
             // Only to pass the form's own rule; the line after this puts back the real list.
             scopes: kind === "tv" ? ["deploy.read"] : scopes,
-            expiresInDays:
-                kind === "tv"
-                    ? TV_TOKEN_DAYS
-                    : kind === "streamdeck"
-                      ? DECK_TOKEN_DAYS
-                      : CLI_TOKEN_DAYS
+            expiresInDays: label.days
         }),
         scopes
     };
@@ -355,15 +365,19 @@ export async function claimCliSignIn(
 /**
  * End the sign-in a CLI is presenting, which is what `plr logout` asks for.
  *
- * Only a key of kind "cli": a key made on the API keys screen and handed to the
- * CLI through `POLARIS_TOKEN` is very likely wired into something else as well,
- * and logging out of a terminal must not break a deploy pipeline.
+ * Only a key of the asking client's own kind ("cli" unless Polaris Terminal
+ * signs itself out): a key made on the API keys screen and handed to the CLI
+ * through `POLARIS_TOKEN` is very likely wired into something else as well, and
+ * logging out of a terminal must not break a deploy pipeline.
  */
-export async function endCliSignIn(principal: {
-    readonly keyId: string;
-    readonly userId: string;
-    readonly kind: string;
-}): Promise<boolean> {
-    if (principal.kind !== "cli") return false;
+export async function endCliSignIn(
+    principal: {
+        readonly keyId: string;
+        readonly userId: string;
+        readonly kind: string;
+    },
+    kind: "cli" | "terminal" = "cli"
+): Promise<boolean> {
+    if (principal.kind !== kind) return false;
     return revokeDeviceSession(principal.userId, principal.keyId);
 }
