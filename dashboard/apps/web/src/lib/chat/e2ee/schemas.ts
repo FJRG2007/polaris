@@ -75,3 +75,47 @@ export const keysBody = z.discriminatedUnion("op", [
     })
 ]);
 export type KeysBody = z.infer<typeof keysBody>;
+
+/** MLS wire objects: a key package or Welcome at 1,000 members stays far under 1 MiB. */
+const mlsBytes = base64Url(1, 1024 * 1024);
+/** The two suites polaris_core::mls speaks: hybrid 0x004F and RFC 9420's 0x0001. */
+const ciphersuite = z.union([z.literal(0x004f), z.literal(0x0001)]);
+/** A device id: what the device made for itself, never an address or a path. */
+const deviceId = z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/);
+const epoch = z.string().regex(/^\d{1,19}$/);
+const channelId = z.string().uuid();
+/** `${userId}/${device}`, as the delivery service addresses a device. */
+const deviceAddressText = z.string().max(110).regex(/^[0-9a-f-]{36}\/[A-Za-z0-9_-]{8,64}$/);
+
+export const mlsBody = z.discriminatedUnion("op", [
+    z.object({ op: z.literal("register-device"), device: deviceId, signatureKey: base64Url(32, 2048), e2eeVersion: z.number().int().min(1).max(1000) }),
+    z.object({
+        op: z.literal("publish-key-packages"),
+        device: deviceId,
+        ciphersuite,
+        keyPackages: z.array(mlsBytes).min(1).max(100),
+        lastResort: z.boolean().default(false)
+    }),
+    z.object({ op: z.literal("claim-key-packages"), channelId, userIds: z.array(z.string().uuid()).min(1).max(100), ciphersuite }),
+    z.object({ op: z.literal("group"), channelId }),
+    z.object({ op: z.literal("create-group"), channelId, groupId: base64Url(16, 256), ciphersuite, groupInfo: mlsBytes }),
+    z.object({
+        op: z.literal("commit"),
+        channelId,
+        device: deviceId,
+        epoch,
+        commit: mlsBytes,
+        groupInfo: mlsBytes,
+        welcomes: z.array(z.object({ recipient: deviceAddressText, welcome: mlsBytes })).max(100).default([])
+    }),
+    z.object({ op: z.literal("application"), channelId, device: deviceId, epoch, payload: mlsBytes }),
+    z.object({ op: z.literal("events"), channelId, device: deviceId, after: epoch.default("0") }),
+    z.object({
+        op: z.literal("put-history-keys"),
+        channelId,
+        epoch,
+        envelopes: z.array(z.object({ recipient: z.string().min(1).max(64), envelope: base64Url(64, 4096) })).min(1).max(1000)
+    }),
+    z.object({ op: z.literal("history-keys"), channelId, from: epoch.default("0") })
+]);
+export type MlsBody = z.infer<typeof mlsBody>;

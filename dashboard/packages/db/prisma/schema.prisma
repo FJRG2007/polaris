@@ -19124,3 +19124,79 @@ model MlsStoreEntry {
 
     @@id([device, key])
 }
+
+// One device's MLS identity in chat (docs/chat-e2ee-mls.md): a browser, an app
+// install, or a member the server runs ("service/polar"). `e2eeVersion` is
+// what the device declared it speaks (proposal 8.6); `lastSeenAt` decides which
+// devices count as active for a conversation's cut-over.
+model MlsDevice {
+    userId       String   @db.Uuid
+    device       String
+    signatureKey Bytes
+    e2eeVersion  Int
+    lastSeenAt   DateTime @default(now())
+    createdAt    DateTime @default(now())
+
+    @@id([userId, device])
+}
+
+// A device's published MLS key package, handed out once to whoever adds the
+// device to a group. `lastResort` is the one package a device keeps for when
+// its one-use packages ran out (RFC 9420 section 16.8): handed out, never
+// deleted.
+model MlsKeyPackage {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    userId      String   @db.Uuid
+    device      String
+    ciphersuite Int
+    keyPackage  Bytes
+    lastResort  Boolean  @default(false)
+    createdAt   DateTime @default(now())
+
+    @@index([userId, ciphersuite, lastResort, createdAt])
+    @@index([userId, device])
+}
+
+// The MLS group of one conversation. The server is the delivery service: it
+// orders commits by epoch (a commit is taken only for the epoch it was made
+// in), and keeps the latest public GroupInfo so a device that lost its state
+// rejoins by external commit.
+model MlsGroup {
+    channelId   String   @id @db.Uuid
+    groupId     Bytes    @unique
+    ciphersuite Int
+    epoch       BigInt   @default(0)
+    groupInfo   Bytes?
+    updatedAt   DateTime @updatedAt
+}
+
+// The delivery service's ordered log for a conversation's group: commits and
+// MLS application messages for every member, a Welcome for one device. Read
+// by sequence, so a device that was away catches up in order.
+model MlsGroupEvent {
+    seq       BigInt   @id @default(autoincrement())
+    channelId String   @db.Uuid
+    epoch     BigInt
+    // commit | welcome | application
+    kind      String
+    sender    String
+    recipient String?
+    payload   Bytes
+    createdAt DateTime @default(now())
+
+    @@index([channelId, seq])
+    @@index([recipient, seq])
+}
+
+// The conversation's history key for one epoch, sealed to one account's key
+// (or "org" for the organisation recovery key): what lets that account's next
+// device read the past (proposal 4.2 item 4). Opaque to the server.
+model ChatHistoryKey {
+    channelId String   @db.Uuid
+    epoch     BigInt
+    recipient String
+    envelope  Bytes
+    createdAt DateTime @default(now())
+
+    @@id([channelId, epoch, recipient])
+}
