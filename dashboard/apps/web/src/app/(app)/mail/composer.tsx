@@ -88,7 +88,8 @@ import {
     Select,
     cn,
     useToast,
-    DateInput
+    DateInput,
+    clearWindowControls
 } from "@polaris/ui";
 
 /** How long typing settles before a draft is written. */
@@ -570,16 +571,19 @@ export function Composer() {
 
     // On a phone, writing takes the whole screen, as it does in Gmail's app: a
     // panel docked to the bottom there was half a screen with the keyboard
-    // over the other half.
-    const shellClass =
+    // over the other half. Wherever it reaches the top of the window it starts
+    // below the desktop app's window buttons, the full posture's 2.5rem margin
+    // included.
+    const shellClass = clearWindowControls(
         posture === "full"
-            ? "inset-0 md:inset-10 md:rounded-lg md:border-b max-md:rounded-none max-md:border-0 max-md:pb-[var(--safe-bottom)] max-md:pt-[var(--safe-top)]"
+            ? "inset-0 md:inset-10 md:top-[calc(2.5rem+var(--window-controls-height))] md:rounded-lg md:border-b max-md:rounded-none max-md:border-0 max-md:pb-[var(--safe-bottom)] max-md:pt-[var(--safe-top)]"
             : posture === "minimized"
               ? "bottom-0 end-[calc(1.5rem+var(--safe-end))] w-[22rem] pb-[var(--safe-bottom)] max-md:inset-x-2 max-md:end-auto max-md:w-auto"
               : // Taller and wider than it was. A composer whose body is three
                 // lines is one people write three lines in, and the message
                 // being written is the whole point of the screen it covers.
-                "inset-0 mx-auto flex w-full max-w-3xl max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:pb-[var(--safe-bottom)] max-md:pt-[var(--safe-top)] md:inset-x-auto md:bottom-0 md:top-auto md:end-6 md:mx-0 md:h-[38rem] md:max-h-[85vh] md:w-[40rem]";
+                "inset-0 mx-auto flex w-full max-w-3xl max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:pb-[var(--safe-bottom)] max-md:pt-[var(--safe-top)] md:inset-x-auto md:bottom-0 md:top-auto md:end-6 md:mx-0 md:h-[38rem] md:max-h-[85vh] md:w-[40rem]"
+    );
 
     return (
         <>

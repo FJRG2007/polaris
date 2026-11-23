@@ -439,10 +439,10 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                                     aria-label={t(
                                                                                                         "shell.overview"
                                                                                                     )}
-                                                                                                    className="hidden shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:block"
+                                                                                                    className="hidden shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring tb-sm:block"
                                                                                                 >
                                                                                                     <span className="flex items-center gap-1.5">
-                                                                                                        <PolarisMark nameClassName="hidden sm:inline" />
+                                                                                                        <PolarisMark nameClassName="hidden tb-sm:inline" />
                                                                                                         <SeasonalBadge />
                                                                                                     </span>
                                                                                                 </Link>

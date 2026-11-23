@@ -672,7 +672,17 @@ html[data-input="touch"] :is(a, button, [role="button"], [role="tab"], [role="me
     app-region: no-drag;
 }
 
-/* On the header's last group, so it ends where the window buttons begin. */
+/* The app shell's bar sits in this frame. The frame keeps the window buttons'
+   width clear, so the bar ends where they begin, and it is the container the
+   bar's `tb-*` widths are measured on: the window less the buttons, which is
+   the whole window in a browser. */
+.app-titlebar-frame {
+    container: titlebar / inline-size;
+    padding-inline-end: var(--window-controls-width);
+}
+
+/* On the last group of a header that is not in a frame, so it ends where the
+   window buttons begin. */
 .app-titlebar-end {
     padding-inline-end: var(--window-controls-width);
 }

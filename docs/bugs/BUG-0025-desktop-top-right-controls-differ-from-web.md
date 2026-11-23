@@ -8,6 +8,8 @@ related:
   - dashboard/packages/ui/src/styles/tokens.css
   - dashboard/packages/ui/src/shell/app-shell.tsx
   - dashboard/packages/ui/src/components/dialog.tsx
+  - dashboard/packages/ui/src/tailwind-preset.ts
+  - dashboard/apps/web/src/app/(app)/mail/composer.tsx
   - dashboard/apps/web/src/app/(app)/apps/deploy/service-detail.tsx
   - desktop/src/main/windows.ts
 reported: 2026-11-23
@@ -60,6 +62,18 @@ nothing moves there.
   (`--window-controls-width`, now a token).
 - Every item in the bar (`.app-titlebar > * > *`) and anything with a `title`
   is `app-region: no-drag`; only the gaps between items move the window.
+- The bar picks what it shows by the room it has, not by the window: the shell's
+  header sits in `.app-titlebar-frame`, a size container (`titlebar`) that keeps
+  the window buttons' width clear, and its items switch on `tb-sm:`/`tb-lg:`/
+  `tb-xl:` (`packages/ui/src/tailwind-preset.ts`), container queries at the
+  screen breakpoints' own px widths. In a browser the frame is the whole window,
+  so they equal `sm:`/`lg:`; in the app a 1100 px window shows what a 962 px
+  browser shows. Switched: the header's gaps and padding, the search field
+  (`lg:flex-1`) and its trigger, the Polaris mark and name, the scope switcher's
+  name and chevron, Polar's label and shortcut.
+- The mail composer goes through `clearWindowControls` (it was missed by the
+  sweep: `fixed` and `inset-0` are in different strings there), and its full
+  posture's `md:inset-10` top is `2.5rem` plus the band.
 
 ## Verified
 
@@ -73,21 +87,31 @@ nothing moves there.
   see-through backdrop) that neither goes through `clearWindowControls` nor
   places itself against `--window-controls-height`. It found two more sites
   (arcade phone pad, audience show), now fixed.
-- `npm run build` of the dashboard.
+- `apps/web/test/ui/titlebar-widths.test.ts`: Tailwind with the preset emits
+  `@container titlebar (min-width: 640px)` and the rest for every screen width,
+  the same px as the `sm:` media query; the header's items use `tb-*`; the
+  composer's posture goes through `clearWindowControls`. The ui test asserts no
+  window-width variant is left anywhere inside the rendered shell frame.
+- Headless Chrome on the rendered `AppShell` (its real classes, Tailwind over
+  them, the palette trigger's classes from source), with the buttons' 138 px
+  simulated as the frame's end padding: at a 1078 px viewport the search shows
+  as a field with no buttons and as an icon with them; at 1178 px with them it
+  is a field again (bar 1040 px); at 978 and 1008 px with none it is an icon;
+  the account control ends 16 px before the simulated buttons.
+- `npm run build` of `apps/web` (after `npx prisma generate` in packages/db; the
+  first attempt on 2026-11-23 failed on a stale Prisma client, not on this
+  change).
 
 ## Not verified
 
 - The real desktop window was not run: the overlay geometry (138 x 47 px) is
   read from `desktop/src/main/windows.ts` and `desktop/src/shared/title-bar.ts`,
   not observed. No change in `desktop/` was needed.
-- The header still picks what it shows (labels, the search field) by window
-  width, not by the width left beside the buttons, so at a width where the bar
-  is full the app clips the left side sooner than a browser does. Moving the
-  header's breakpoints to a container query on the usable width is the
-  follow-up that would make the two identical at every width.
-- The mail composer's full posture (`md:inset-10`, 40 px from the top) still
-  overlaps the band by about 7 px at its top-right corner; its own buttons are
-  below that, so nothing is covered.
+- The real `env(titlebar-area-*)` values in Electron were not observed; the
+  frame's end padding was simulated in Chrome.
+- Controls a page portals into the header slot (Deploy's project and
+  environment pickers) keep their own window-width classes; the left group
+  still clips them where the bar is full.
 
 ## If it happens again
 

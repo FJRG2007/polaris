@@ -62,7 +62,10 @@ describe("the header in the desktop app", () => {
 
     it("keeps the account controls in the group that ends where the window buttons begin", () => {
         shell();
-        const end = document.querySelector(".app-titlebar-end");
+        const header = screen.getByRole("banner");
+        // The frame keeps the buttons' width clear; the last group ends at it.
+        expect(header.parentElement?.className).toContain("app-titlebar-frame");
+        const end = header.lastElementChild;
         expect(end).not.toBeNull();
         const names = within(end as HTMLElement)
             .getAllByRole("button")
@@ -75,13 +78,26 @@ describe("the header in the desktop app", () => {
         const left = screen.getByRole("banner").firstElementChild as HTMLElement;
         expect(left.className).toContain("min-w-0");
         expect(left.className).toContain("[overflow:clip]");
-        expect(document.querySelector(".app-titlebar-end")?.className).toContain("shrink-0");
+        expect(screen.getByRole("banner").lastElementChild?.className).toContain("shrink-0");
+    });
+
+    it("sizes the bar by the room beside the window buttons, not by the window", () => {
+        shell();
+        const frame = screen.getByRole("banner").parentElement as HTMLElement;
+        const classes = [frame, ...frame.querySelectorAll("*")].flatMap((node) => (node.getAttribute("class") ?? "").split(/\s+/));
+        // A window width (`sm:`, `lg:`) here would count the buttons' 138 px as
+        // room the bar has; `tb-*` is measured on the frame, which leaves them out.
+        expect(classes.filter((name) => /^(max-)?(sm|md|lg|xl|2xl):/.test(name))).toEqual([]);
+        expect(classes).toEqual(expect.arrayContaining(["tb-sm:gap-4", "tb-lg:flex-1", "hidden", "tb-sm:inline"]));
     });
 
     it("reserves the buttons' width and lets every item in the bar take the pointer", () => {
         const css = readFileSync(TOKENS, "utf8").replace(/\s+/g, " ");
         expect(css).toContain(
             "--window-controls-width: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));"
+        );
+        expect(css).toContain(
+            ".app-titlebar-frame { container: titlebar / inline-size; padding-inline-end: var(--window-controls-width); }"
         );
         expect(css).toContain(".app-titlebar-end { padding-inline-end: var(--window-controls-width); }");
         // Every item of every group, a non-interactive one with a tooltip too.
@@ -114,6 +130,12 @@ describe("clearWindowControls", () => {
         expect(classes).toContain("max-sm:h-[calc(100dvh-var(--window-controls-height))]");
         expect(classes).toContain("top-1/2");
         expect(classes).toContain("sm:top-1/2");
+    });
+
+    it("starts the mail composer's full posture below the band, margin included", () => {
+        const classes = clearWindowControls("inset-0 md:inset-10 md:top-[calc(2.5rem+var(--window-controls-height))]").split(" ");
+        expect(classes).toEqual(expect.arrayContaining(["inset-0", "md:inset-10", BAND]));
+        expect(classes).toContain("md:top-[calc(2.5rem+var(--window-controls-height))]");
     });
 
     it("takes the band off a base height at the width it is pinned at", () => {

@@ -51,36 +51,41 @@ export function AppShell({
         <div className="group/shell relative flex h-[calc(100dvh-var(--connection-banner-height,0px))] flex-col overflow-hidden bg-background print:block print:h-auto print:overflow-visible">
             {/* The bar's background runs under the notch and the status bar; its
                 controls start below them and inside the side insets of a phone
-                held sideways (see --safe-top in tokens.css). */}
-            <header className="app-titlebar z-40 flex h-[calc(var(--header-height)+var(--header-safe-top))] shrink-0 items-center justify-between gap-1 border-b border-border bg-surface pe-[calc(0.5rem+var(--safe-end))] ps-[calc(0.5rem+var(--safe-start))] pt-[var(--header-safe-top)] sm:gap-4 sm:pe-[calc(1rem+var(--safe-end))] sm:ps-[calc(1rem+var(--safe-start))]">
-                {/* When the bar runs out of room - the desktop app's window
-                    buttons take its right end at the same window width - this
-                    side gives way, cut at its own edge; it never runs on under
-                    the account controls, which always stay whole. */}
-                <div className="flex min-w-0 items-center gap-1 [overflow-clip-margin:0.5rem] [overflow:clip] sm:gap-3">
-                    {navButton}
-                    {mark ?? <PolarisMark className="shrink-0" nameClassName="hidden sm:inline" />}
-                    {switcher}
-                    {/* Pages portal contextual controls here (e.g. the Deploy project +
-                        environment selectors), to the right of the app switcher. */}
-                    <div
-                        id="polaris-header-slot"
-                        className="flex min-w-0 items-center gap-1 sm:gap-2"
-                    />
-                </div>
-                {/* The field only earns the middle of the bar once it renders as a
-                    field; below that it is an icon and sits with the account controls. */}
-                {search ? (
-                    <div className="flex min-w-0 shrink-0 justify-end px-0 lg:flex-1 lg:shrink lg:justify-center lg:px-2">
-                        {search}
+                held sideways (see --safe-top in tokens.css). The frame is what
+                the bar's `tb-*` widths measure: the window less the desktop
+                app's buttons, so the bar shows what a browser of that width
+                shows (see `.app-titlebar-frame`). */}
+            <div className="app-titlebar-frame z-40 h-[calc(var(--header-height)+var(--header-safe-top))] shrink-0 border-b border-border bg-surface pt-[var(--header-safe-top)]">
+                <header className="app-titlebar flex h-full items-center justify-between gap-1 pe-[calc(0.5rem+var(--safe-end))] ps-[calc(0.5rem+var(--safe-start))] tb-sm:gap-4 tb-sm:pe-[calc(1rem+var(--safe-end))] tb-sm:ps-[calc(1rem+var(--safe-start))]">
+                    {/* When the bar runs out of room - the desktop app's window
+                        buttons take its right end at the same window width - this
+                        side gives way, cut at its own edge; it never runs on under
+                        the account controls, which always stay whole. */}
+                    <div className="flex min-w-0 items-center gap-1 [overflow-clip-margin:0.5rem] [overflow:clip] tb-sm:gap-3">
+                        {navButton}
+                        {mark ?? <PolarisMark className="shrink-0" nameClassName="hidden tb-sm:inline" />}
+                        {switcher}
+                        {/* Pages portal contextual controls here (e.g. the Deploy project +
+                            environment selectors), to the right of the app switcher. */}
+                        <div
+                            id="polaris-header-slot"
+                            className="flex min-w-0 items-center gap-1 tb-sm:gap-2"
+                        />
                     </div>
-                ) : null}
-                {/* app-titlebar-end: room for the desktop app's window buttons,
-                    nothing in a browser. */}
-                <div className="app-titlebar-end flex shrink-0 items-center gap-0.5 sm:gap-2">
-                    {account}
-                </div>
-            </header>
+                    {/* The field only earns the middle of the bar once it renders as a
+                        field; below that it is an icon and sits with the account controls. */}
+                    {search ? (
+                        <div className="flex min-w-0 shrink-0 justify-end px-0 tb-lg:flex-1 tb-lg:shrink tb-lg:justify-center tb-lg:px-2">
+                            {search}
+                        </div>
+                    ) : null}
+                    {/* Ends where the desktop app's window buttons begin: the frame
+                        keeps their width clear. */}
+                    <div className="flex shrink-0 items-center gap-0.5 tb-sm:gap-2">
+                        {account}
+                    </div>
+                </header>
+            </div>
             {/* Clear of a cutout at either side in landscape and of the home
                 indicator below; the strips they leave are the page's own colour.
                 On a phone with a tab bar at the bottom - the shell's or a

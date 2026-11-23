@@ -114,7 +114,7 @@ export function ScopeSwitcher({
                         size="sm"
                         disabled={pending}
                         aria-label={t("scope.workingIn", { name: current?.name ?? personalName })}
-                        className="max-w-40 gap-1.5 px-1.5 sm:px-2"
+                        className="max-w-40 gap-1.5 px-1.5 tb-sm:px-2"
                     >
                         {current ? (
                             <OrgAvatar org={current} size={18} />
@@ -122,12 +122,12 @@ export function ScopeSwitcher({
                             <UserRound className="text-muted-foreground size-4 shrink-0" />
                         )}
                         <span
-                            className="hidden truncate text-sm sm:inline"
+                            className="hidden truncate text-sm tb-sm:inline"
                             title={current?.name ?? personalName}
                         >
                             {current?.name ?? personalName}
                         </span>
-                        <ChevronsUpDown className="text-muted-foreground hidden size-3.5 shrink-0 sm:block" />
+                        <ChevronsUpDown className="text-muted-foreground hidden size-3.5 shrink-0 tb-sm:block" />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="min-w-56">

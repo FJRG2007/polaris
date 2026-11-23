@@ -11,6 +11,7 @@
 import type { Config } from "tailwindcss";
 import plugin from "tailwindcss/plugin";
 import animate from "tailwindcss-animate";
+import defaultTheme from "tailwindcss/defaultTheme";
 
 /**
  * `safe-p-4`, `safe-px-6`, `safe-py-10`: the padding `p-4` and the rest would
@@ -34,6 +35,20 @@ const safePadding = plugin(({ matchUtilities, theme }) => {
         },
         { values: theme("spacing") }
     );
+});
+
+/**
+ * `tb-sm:`, `tb-lg:` and the rest: the screen widths, measured on the top bar
+ * instead of the window. The bar's frame (`.app-titlebar-frame`) is the window
+ * less the desktop app's window buttons, so in a browser these match `sm:` and
+ * `lg:` exactly and in the app the bar shows what a browser as wide as the room
+ * it has would show. The widths stay in px: the desktop's text size scales the
+ * root font, which a rem in a container query would follow.
+ */
+const titlebarWidths = plugin(({ addVariant }) => {
+    for (const [name, width] of Object.entries(defaultTheme.screens as Record<string, string>)) {
+        addVariant(`tb-${name}`, `@container titlebar (min-width: ${width})`);
+    }
 });
 
 const withAlpha = (variable: string) => `hsl(var(--${variable}) / <alpha-value>)`;
@@ -134,7 +149,7 @@ const preset: Omit<Config, "content"> = {
             }
         }
     },
-    plugins: [animate, safePadding]
+    plugins: [animate, safePadding, titlebarWidths]
 };
 
 export default preset;

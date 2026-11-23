@@ -919,15 +919,16 @@ export function CommandPalette({
                 aria-keyshortcuts={bindings.length > 0 ? bindings.map(ariaShortcut).join(" ") : undefined}
                 // Below lg the header is already carrying the switcher and a page's
                 // own controls, so the field collapses to its icon rather than
-                // squeezing them.
-                className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:size-9 sm:border sm:border-border sm:bg-surface lg:w-full lg:max-w-sm lg:justify-start lg:gap-2 lg:px-3"
+                // squeezing them. Measured on the bar (`tb-*`), so the desktop
+                // app's window buttons count against the room it has.
+                className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground tb-sm:size-9 tb-sm:border tb-sm:border-border tb-sm:bg-surface tb-lg:w-full tb-lg:max-w-sm tb-lg:justify-start tb-lg:gap-2 tb-lg:px-3"
             >
                 <Search className="size-4 shrink-0" aria-hidden="true" />
-                <span className="hidden flex-1 truncate text-start text-sm lg:block">
+                <span className="hidden flex-1 truncate text-start text-sm tb-lg:block">
                     {t("search.button")}
                 </span>
                 {hint ? (
-                    <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[0.625rem] leading-none lg:block">
+                    <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[0.625rem] leading-none tb-lg:block">
                         {hint}
                     </kbd>
                 ) : null}
