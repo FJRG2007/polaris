@@ -41,7 +41,14 @@ because a similar one worked.
 
 ## 3. Risk-based extra verification
 
-- [ ] Not started.
+- [x] A sign-in from a new device or an impossible trip asks for one more code
+      (any way the account can receive one, `{ anyReachable: true }`).
+- [x] A sign-in from a hosting provider counts as a risk signal only when the
+      Criminal IP integration is enabled and keyed (`is_hosting`, cached and
+      budgeted); otherwise it is not a signal (`lib/sign-in-risk.ts`).
+- [x] An email code is sent only after the whole address is typed back over a
+      masked hint (`f***@g***.com`), like the number before a WhatsApp or SMS
+      code. A risk check on an account without 2FA lists every reachable method.
 
 ## 4. Phone number + password sign-in, SMS second factor off by default
 
@@ -51,6 +58,13 @@ because a similar one worked.
 - [x] A number without its country code is read in the request's country
       (edge header or address), else the reader's language; an all-digit
       username still resolves when no verified number matches.
-- [x] SMS as a second factor: there is no SMS delivery method today
-      (email, WhatsApp, Telegram only), so it is off and hidden by construction.
-- [ ] An admin switch to add SMS as a method (off by default) - not started.
+- [x] SMS as a second factor, off by default: Integrations > Messaging has an
+      "SMS codes" switch that stores the SMS sender carrying codes
+      (`messaging.codeSender.sms`). It can only be switched on while an
+      administrator's SMS sender is connected; otherwise it is disabled with
+      the reason and a button to Integrations > Email & SMS. While it is off (or
+      the sender stops being connected) nobody is shown SMS as a method.
+- [x] A personal SMS alert sender never carries codes, and a number can be
+      confirmed by SMS when WhatsApp is not set up. SMS is a second factor
+      only; it never replaces the password.
+- [ ] Not exercised against a running instance or a real Twilio account.
