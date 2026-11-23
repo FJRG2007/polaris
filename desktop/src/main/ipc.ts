@@ -84,7 +84,7 @@ export interface IpcHost extends PushHost {
     readonly setCustomGames: (games: readonly CustomGameInput[]) => void;
     /** The address form's state: the address in use and why it failed to open. */
     readonly preferences: () => Preferences;
-    readonly setOpenAtLogin: (open: boolean) => boolean;
+    readonly setOpenAtLogin: (open: boolean) => Promise<boolean>;
     /** Keep whether the graphics card is used from the next start. */
     readonly setHardwareAcceleration: (on: boolean) => boolean;
     readonly setToggle: (name: PreferenceToggle, on: boolean) => boolean;
@@ -708,9 +708,9 @@ export function registerIpc(host: IpcHost): void {
             : REFUSED;
     });
     ipcMain.handle(CHANNELS.connectPreferences, (event) => (from(event, "connect") ? host.preferences() : null));
-    ipcMain.handle(CHANNELS.connectOpenAtLogin, (event, raw: unknown): boolean => {
+    ipcMain.handle(CHANNELS.connectOpenAtLogin, async (event, raw: unknown): Promise<boolean> => {
         const open = z.boolean().safeParse(raw);
-        return from(event, "connect") && open.success && host.setOpenAtLogin(open.data);
+        return from(event, "connect") && open.success && (await host.setOpenAtLogin(open.data));
     });
     ipcMain.handle(CHANNELS.connectHardwareAcceleration, (event, raw: unknown): boolean => {
         const on = z.boolean().safeParse(raw);

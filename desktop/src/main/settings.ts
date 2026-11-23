@@ -55,9 +55,10 @@ const settingsSchema = z.object({
     // On unless somebody turned it off: closing the window keeps Polaris in the
     // tray, so calls and notifications carry on.
     minimizeToTray: z.boolean().catch(true),
-    // Off unless somebody turned it on: opened with the computer, it stays in
-    // the tray instead of putting a window in front of everything.
-    startMinimized: z.boolean().catch(false),
+    // On unless somebody turned it off: opened with the computer, it stays in
+    // the tray and says so once, instead of putting a window in front of
+    // everything. A file that has the key keeps what it says.
+    startMinimized: z.boolean().catch(true),
     // On unless somebody turned it off: the call's people over every window
     // while a call is on.
     voiceWidget: z.boolean().catch(true),
@@ -95,7 +96,7 @@ const EMPTY: Settings = {
     openAtLogin: true,
     hardwareAcceleration: true,
     minimizeToTray: true,
-    startMinimized: false,
+    startMinimized: true,
     voiceWidget: true,
     voiceWidgetGameOnly: false,
     voiceWidgetPlace: null,

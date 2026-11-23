@@ -39,12 +39,11 @@ export function handledSquirrelEvent(): boolean {
         return true;
     }
     if (event === "--squirrel-uninstall") {
-        setOpenAtLogin(false);
         app.removeAsDefaultProtocolClient(DEEP_LINK_SCHEME);
         // The browser's store entry goes with the app; the extension stays
         // installed in the browser, where it is the user's to remove.
         // So do the browser manifests that let the extension start its native host.
-        void Promise.allSettled([removeStoreEntries(), unregisterMailHandler(), removeNativeHost()]).finally(() =>
+        void Promise.allSettled([setOpenAtLogin(false), removeStoreEntries(), unregisterMailHandler(), removeNativeHost()]).finally(() =>
             updateThenQuit([`--removeShortcut=${exe}`])
         );
         return true;

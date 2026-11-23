@@ -62,17 +62,22 @@ describe("hardware acceleration, read at start", () => {
 });
 
 describe("the tray", () => {
-    it("minimizes to it and starts in front by default, from a file written before either existed", () => {
+    it("minimizes to it and starts in it by default, from a file written before either existed", () => {
         writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ server: null, servers: [], pushes: {} }));
         expect(toggle("minimizeToTray")).toBe(true);
+        expect(toggle("startMinimized")).toBe(true);
+    });
+
+    it("keeps a window at sign-in for a file that already says so", () => {
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ startMinimized: false }));
         expect(toggle("startMinimized")).toBe(false);
     });
 
     it("keeps what was chosen", () => {
         rememberToggle("minimizeToTray", false);
-        rememberToggle("startMinimized", true);
+        rememberToggle("startMinimized", false);
         expect(toggle("minimizeToTray")).toBe(false);
-        expect(toggle("startMinimized")).toBe(true);
+        expect(toggle("startMinimized")).toBe(false);
     });
 });
 

@@ -337,7 +337,7 @@ async function failOver(window: BrowserWindow, failedUrl: string): Promise<"move
 /** Whether the app is on its way out, when closing a window must close it. */
 let quitting = false;
 
-/** Started by the computer with "Start minimized" on: the first window waits in
+/** Started by the computer with "Start in the tray" on: the first window waits in
  *  the tray. Read once. */
 let startHidden = false;
 
@@ -347,6 +347,17 @@ function openMain(url: string): void {
     const window = openPolarisWindow(url, server, { ...savedPlace(), hidden });
     main = window;
     rememberPlace(window);
+    // A start that shows no window says once that it happened, or it reads as
+    // Polaris not having opened with the computer at all.
+    if (hidden) {
+        showNotice({
+            title: "Polaris is running",
+            body: `It opened with the computer and waits in the ${process.platform === "darwin" ? "menu bar" : "tray"}. Click to open it.`,
+            tag: "opened-at-login",
+            silent: true,
+            onClick: () => showPolaris()
+        });
+    }
     // Closing the window somebody uses keeps Polaris in the tray, the way a chat
     // app does, so a call or a notification is not lost to a click on the X.
     // A window closed on purpose - leaving the server, giving up on it - is no
@@ -767,6 +778,31 @@ function start(): void {
     });
 
     app.whenReady().then(() => {
+        // The tray icon first: on a sign-in that is all a start in the tray shows, and
+        // nothing below needs to have run for its menu to work.
+        const menu: MenuActions = {
+            changeServer: openConnect,
+            switchServer: (origin) => void switchOrSayWhy(origin),
+            back: goBack,
+            reload: () => BrowserWindow.getFocusedWindow()?.webContents.reload(),
+            forgetApiKey: () => {
+                if (current) dropApiKey(current);
+                void dialog.showMessageBox({
+                    type: "info",
+                    message: "The saved API key was removed from this computer.",
+                    detail: "It still works until it is revoked in Polaris, under Account > API keys."
+                });
+            },
+            openApiKeys: () => showPolaris("/account/api-keys"),
+            // In the dashboard's own dialog when there is a Polaris to show it,
+            // in a window of its own when there is not.
+            installOnTv: () => (current && !loadError ? showPolaris("/account/downloads?tv=install") : openTvInstall()),
+            openInBrowser: () => {
+                if (current) openExternal(current);
+            }
+        };
+        menuActions = menu;
+        refreshMenu();
         // This computer runs Polar Code sessions for the Polaris in use, once paired.
         void runner().use(current);
         // Something that may mean the server can be reached now: ask at once rather
@@ -777,7 +813,7 @@ function start(): void {
         if (process.platform === "win32" && !app.isPackaged) app.setAppUserModelId(process.execPath);
         // Every start: the app's folder moves with each version, and the setting has
         // to reach installs from before it existed.
-        setOpenAtLogin(settings.openAtLogin());
+        void setOpenAtLogin(settings.openAtLogin());
         if (app.isPackaged) {
             app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
             // One of the apps Windows offers for mailto links; macOS and Linux
@@ -847,8 +883,8 @@ function start(): void {
                     version: app.getVersion()
                 };
             },
-            setOpenAtLogin: (open) => {
-                if (!setOpenAtLogin(open)) return false;
+            setOpenAtLogin: async (open) => {
+                if (!(await setOpenAtLogin(open))) return false;
                 settings.rememberOpenAtLogin(open);
                 return true;
             },
@@ -900,29 +936,6 @@ function start(): void {
         installScreenShare(server);
         games.start();
 
-        const menu: MenuActions = {
-            changeServer: openConnect,
-            switchServer: (origin) => void switchOrSayWhy(origin),
-            back: goBack,
-            reload: () => BrowserWindow.getFocusedWindow()?.webContents.reload(),
-            forgetApiKey: () => {
-                if (current) dropApiKey(current);
-                void dialog.showMessageBox({
-                    type: "info",
-                    message: "The saved API key was removed from this computer.",
-                    detail: "It still works until it is revoked in Polaris, under Account > API keys."
-                });
-            },
-            openApiKeys: () => showPolaris("/account/api-keys"),
-            // In the dashboard's own dialog when there is a Polaris to show it,
-            // in a window of its own when there is not.
-            installOnTv: () => (current && !loadError ? showPolaris("/account/downloads?tv=install") : openTvInstall()),
-            openInBrowser: () => {
-                if (current) openExternal(current);
-            }
-        };
-        menuActions = menu;
-        refreshMenu();
         const announce = (update: Update) => {
             const open = () => openExternal(update.page);
             // The window in front draws the restart button itself: no notice
