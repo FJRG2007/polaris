@@ -18,6 +18,7 @@
  * back is a press, not typing.
  */
 
+import { appSettingsTarget } from "@polaris/core/app-settings";
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
 import { runner } from "./runner";
@@ -77,6 +78,9 @@ let main: BrowserWindow | null = null;
 let connect: BrowserWindow | null = null;
 /** The settings laid over the Polaris window, when there is one to lay them on. */
 let sheet: LocalSheet | null = null;
+/** The page of the main window that said it draws the app's settings, by its
+ *  contents' id; cleared as that page navigates away, fails or dies. */
+let settingsPage: number | null = null;
 let loadError: string | null = null;
 
 /**
@@ -390,6 +394,16 @@ function openMain(url: string): void {
         reconnect();
     };
 
+    // A page that said it draws the settings stops counting the moment another
+    // document begins loading, so an older host, or none, gets the app's own page.
+    const forgetSettingsPage = () => {
+        if (settingsPage === window.webContents.id) settingsPage = null;
+    };
+    window.webContents.on("did-start-navigation", (details) => {
+        if (details.isMainFrame && !details.isSameDocument) forgetSettingsPage();
+    });
+    window.webContents.on("render-process-gone", forgetSettingsPage);
+    window.on("closed", forgetSettingsPage);
     window.webContents.on("did-fail-load", (_event, code, description, failedUrl, isMainFrame) => {
         const origin = server();
         if (!isMainFrame || !origin) return;
@@ -481,6 +495,28 @@ function openConnect(): void {
     window.on("closed", () => {
         if (connect === window) connect = null;
     });
+}
+
+/**
+ * Open the app's settings where somebody asked for them: the host's own
+ * Settings when the main window's page said it draws them ("This app"), else
+ * the page bundled with the app - offline, before any host, or on a host from
+ * before that screen existed.
+ */
+function openSettings(category = "general"): void {
+    const page = main && !main.isDestroyed() ? main : null;
+    const target = appSettingsTarget({
+        pageLoaded: Boolean(page && !page.webContents.isCrashed()),
+        pageAnnounced: page !== null && settingsPage === page.webContents.id
+    });
+    if (target === "local" || !page) {
+        openConnect();
+        return;
+    }
+    if (page.isMinimized()) page.restore();
+    page.show();
+    page.focus();
+    page.webContents.send(CHANNELS.appSettingsOpen, category);
 }
 
 /** Put the settings away, sheet or window. */
@@ -789,7 +825,7 @@ function start(): void {
         // The tray icon first: on a sign-in that is all a start in the tray shows, and
         // nothing below needs to have run for its menu to work.
         const menu: MenuActions = {
-            changeServer: openConnect,
+            changeServer: () => openSettings(),
             switchServer: (origin) => void switchOrSayWhy(origin),
             back: goBack,
             reload: () => BrowserWindow.getFocusedWindow()?.webContents.reload(),
@@ -929,6 +965,9 @@ function start(): void {
             },
             closeConnect,
             openServers: openConnect,
+            settingsAnnounced: (sender) => {
+                if (main && !main.isDestroyed() && sender.id === main.webContents.id) settingsPage = sender.id;
+            },
             updates,
             relaunched,
             holdCall,

@@ -1,0 +1,184 @@
+/**
+ * The settings an installed Polaris app keeps on the device itself - the
+ * desktop app today - described once for every screen that draws them.
+ *
+ * The app owns the values and their storage (`desktop/src/main/settings.ts`);
+ * this is only what a screen needs to draw them: the key, its kind, the value
+ * the app uses when nothing was chosen, and the category it is listed under.
+ * The dashboard's Settings draws its "This app" group from it, reading and
+ * writing through the app's bridge, and the desktop test suite holds the app's
+ * own defaults and choices to it, so the two cannot drift apart.
+ *
+ * Labels are not here: the dashboard reads `appSettings.items.<key>` from its
+ * catalogs, in the reader's language.
+ */
+
+import { z } from "zod";
+
+/** The categories of the group, in the order they are listed. */
+export const APP_SETTING_CATEGORIES = [
+    "general",
+    "window",
+    "search",
+    "clipboard",
+    "voice",
+    "hosts",
+    "advanced",
+    "updates"
+] as const;
+
+export type AppSettingCategory = (typeof APP_SETTING_CATEGORIES)[number];
+
+/** Where a web search from the launcher goes, the first the default. */
+export const APP_SEARCH_ENGINES = ["duckduckgo", "google", "bing", "brave", "startpage"] as const;
+
+/** How long the clipboard history keeps a copy. */
+export const APP_CLIPBOARD_KEEPS = ["day", "week", "month", "quarter"] as const;
+
+interface SettingBase<K extends string> {
+    readonly key: K;
+    readonly category: AppSettingCategory;
+    /** Shown under another switch and only while that one is on. */
+    readonly dependsOn?: string;
+    /** Takes effect once the app starts again. */
+    readonly restart?: boolean;
+}
+
+export type AppSettingEntry =
+    | (SettingBase<string> & { readonly kind: "toggle"; readonly default: boolean })
+    | (SettingBase<string> & { readonly kind: "choice"; readonly options: readonly string[]; readonly default: string })
+    | (SettingBase<string> & { readonly kind: "shortcut"; readonly default: string });
+
+/** Every setting, in the order each category lists them. */
+export const APP_SETTINGS = [
+    { key: "openAtLogin", kind: "toggle", category: "general", default: true },
+    { key: "startMinimized", kind: "toggle", category: "general", default: true, dependsOn: "openAtLogin" },
+    { key: "minimizeToTray", kind: "toggle", category: "window", default: true },
+    { key: "launcher", kind: "toggle", category: "search", default: true },
+    { key: "launcherBinding", kind: "shortcut", category: "search", default: "Alt+Space", dependsOn: "launcher" },
+    { key: "launcherGameMode", kind: "toggle", category: "search", default: true, dependsOn: "launcher" },
+    { key: "launcherEngine", kind: "choice", category: "search", default: "duckduckgo", options: APP_SEARCH_ENGINES },
+    { key: "launcherClipboard", kind: "toggle", category: "clipboard", default: true },
+    {
+        key: "launcherClipboardKeep",
+        kind: "choice",
+        category: "clipboard",
+        default: "week",
+        options: APP_CLIPBOARD_KEEPS,
+        dependsOn: "launcherClipboard"
+    },
+    { key: "voiceWidget", kind: "toggle", category: "voice", default: true },
+    { key: "voiceWidgetGameOnly", kind: "toggle", category: "voice", default: false, dependsOn: "voiceWidget" },
+    { key: "hardwareAcceleration", kind: "toggle", category: "advanced", default: true, restart: true }
+] as const satisfies readonly AppSettingEntry[];
+
+export type AppSettingKey = (typeof APP_SETTINGS)[number]["key"];
+
+/** The switches, which the app sets with one call each (the toggles of `APP_SETTINGS`). */
+export const APP_SETTING_TOGGLES = [
+    "openAtLogin",
+    "startMinimized",
+    "minimizeToTray",
+    "launcher",
+    "launcherGameMode",
+    "launcherClipboard",
+    "voiceWidget",
+    "voiceWidgetGameOnly",
+    "hardwareAcceleration"
+] as const;
+
+/** The settings of one category, in order. */
+export function appSettingsIn(category: AppSettingCategory): readonly AppSettingEntry[] {
+    return APP_SETTINGS.filter((entry) => entry.category === category);
+}
+
+/** A category named in an address, or null for one that does not exist. */
+export function readAppSettingCategory(raw: unknown): AppSettingCategory | null {
+    const parsed = z.enum(APP_SETTING_CATEGORIES).safeParse(raw);
+    return parsed.success ? parsed.data : null;
+}
+
+const savedHostSchema = z.object({
+    origin: z.string().max(2048),
+    name: z.string().max(200).nullable().catch(null)
+});
+
+/**
+ * What the app answers when asked for its settings: every value, plus the
+ * facts about this device a screen says beside them. Read through a schema
+ * because it crosses from another program, which may be an older or newer
+ * build: a value it does not send falls back to the default the app uses.
+ */
+const snapshotSchema = z.object({
+    openAtLogin: z.boolean().catch(true),
+    startMinimized: z.boolean().catch(true),
+    minimizeToTray: z.boolean().catch(true),
+    launcher: z.boolean().catch(true),
+    launcherBinding: z.string().max(40).catch("Alt+Space"),
+    launcherGameMode: z.boolean().catch(true),
+    launcherEngine: z.enum(APP_SEARCH_ENGINES).catch("duckduckgo"),
+    launcherClipboard: z.boolean().catch(true),
+    launcherClipboardKeep: z.enum(APP_CLIPBOARD_KEEPS).catch("week"),
+    voiceWidget: z.boolean().catch(true),
+    voiceWidgetGameOnly: z.boolean().catch(false),
+    hardwareAcceleration: z.boolean().catch(true),
+    /** The kept choice differs from the one this run started with. */
+    restartPending: z.boolean().catch(false),
+    /** The clipboard history outlives a restart (the system has a key store). */
+    launcherClipboardPersists: z.boolean().catch(true),
+    /** The launcher's key as a person reads it, and what stops it when it is not held. */
+    launcherKey: z.string().max(60).catch("Alt+Space"),
+    launcherProblem: z.string().max(500).nullable().catch(null),
+    version: z.string().max(64).catch(""),
+    /** The host this app opens, and every one it knows; changed only from the app's own page. */
+    server: z.string().max(2048).nullable().catch(null),
+    servers: z.array(savedHostSchema).max(200).catch([])
+});
+
+export type AppSettingsSnapshot = z.infer<typeof snapshotSchema>;
+
+/** The app's answer as a snapshot, or null for one that is not an object at all. */
+export function readAppSettings(raw: unknown): AppSettingsSnapshot | null {
+    if (!raw || typeof raw !== "object") return null;
+    const parsed = snapshotSchema.safeParse(raw);
+    return parsed.success ? parsed.data : null;
+}
+
+/** One change a screen asks for: a key and a value of that key's kind and choices. */
+export const appSettingChangeSchema = z.union([
+    z.object({ key: z.enum(APP_SETTING_TOGGLES), value: z.boolean() }).strict(),
+    z.object({ key: z.literal("launcherEngine"), value: z.enum(APP_SEARCH_ENGINES) }).strict(),
+    z.object({ key: z.literal("launcherClipboardKeep"), value: z.enum(APP_CLIPBOARD_KEEPS) }).strict()
+]);
+
+export type AppSettingChange = z.infer<typeof appSettingChangeSchema>;
+
+/** A change as the app accepts it, or null. */
+export function readAppSettingChange(raw: unknown): AppSettingChange | null {
+    const parsed = appSettingChangeSchema.safeParse(raw);
+    return parsed.success ? parsed.data : null;
+}
+
+/** A key press a screen hands over to become the launcher's shortcut. */
+export const appKeyPressSchema = z.object({
+    code: z.string().min(1).max(40),
+    ctrlKey: z.boolean(),
+    metaKey: z.boolean(),
+    altKey: z.boolean(),
+    shiftKey: z.boolean()
+});
+
+export type AppKeyPress = z.infer<typeof appKeyPressSchema>;
+
+/**
+ * Where the app's settings open when somebody asks for them (tray, menu, the
+ * button on the "can't connect" screen): the host's own Settings when its page
+ * is loaded and has said it draws them, else the page bundled with the app,
+ * which needs no network and no particular host version.
+ */
+export function appSettingsTarget(state: {
+    readonly pageLoaded: boolean;
+    readonly pageAnnounced: boolean;
+}): "host" | "local" {
+    return state.pageLoaded && state.pageAnnounced ? "host" : "local";
+}

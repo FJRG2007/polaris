@@ -16,7 +16,7 @@ import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
 import { strokeSchema } from "@/shared/annotate";
 import { setCallHotkeys } from "./call-hotkeys";
 import { followTextSize as followWidgetTextSize, setVoiceState, voiceWidgetAction } from "./voice-widget";
-import { rememberLauncherClipboardKeep, rememberLauncherEngine, rememberTextSize, textSize } from "./settings";
+import { launcherBinding, rememberLauncherClipboardKeep, rememberLauncherEngine, rememberTextSize, textSize } from "./settings";
 import { CLIPBOARD_KEEP_IDS } from "@/shared/clipboard-store";
 import { readTextSize } from "@/shared/text-size";
 import { voiceActionSchema, voiceStateSchema } from "@/shared/voice-widget";
@@ -76,6 +76,8 @@ import {
 import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
 import { SEARCH_ENGINE_IDS } from "@/shared/launcher";
 import { clearClipboardHistory, followClipboardKeep, launcherStatus, recordLauncherKey, setLauncherBinding } from "./launcher";
+import { appKeyPressSchema, readAppSettingChange, type AppSettingChange } from "@polaris/core/app-settings";
+import { bindingFromPress } from "@/shared/launcher-hotkey";
 
 export interface IpcHost extends PushHost {
     /** The game running now, as the watcher last saw it. */
@@ -122,6 +124,8 @@ export interface IpcHost extends PushHost {
     readonly updateDownloaded: () => Promise<UpdateCheck>;
     /** Open the download page of the version announced, if there is one. */
     readonly openUpdatePage: () => boolean;
+    /** This page draws the app's settings: the tray and the menus open them there. */
+    readonly settingsAnnounced: (sender: WebContents) => void;
 }
 
 /** A server named by the list: an address in the one stored form. */
@@ -776,6 +780,77 @@ export function registerIpc(host: IpcHost): void {
     });
     ipcMain.handle(CHANNELS.connectClipboardClear, (event) => {
         if (from(event, "connect")) clearClipboardHistory();
+    });
+
+    // The same settings, for the host's own Settings page ("This app"). The
+    // values are this computer's, so the page only reads and changes them
+    // through these calls, each validated here; the list of hosts is only read,
+    // since it decides which server this app trusts - it is changed from the
+    // app's own page alone (`manageHosts`).
+    const changed = (): void => {
+        for (const contents of webContents.getAllWebContents()) {
+            const kind = kindOf(contents);
+            if (kind === "polaris" || kind === "connect") contents.send(CHANNELS.appSettingsChanged);
+        }
+    };
+    const snapshot = async () => {
+        const status = await launcherStatus();
+        const state = host.connectState();
+        return {
+            ...host.preferences(),
+            launcherBinding: launcherBinding(),
+            launcherKey: status.key,
+            launcherProblem: status.problem,
+            server: state.address,
+            servers: state.servers.map((server) => ({ origin: server.origin, name: server.name }))
+        };
+    };
+    const applyChange = async (change: AppSettingChange): Promise<boolean> => {
+        switch (change.key) {
+            case "openAtLogin":
+                return host.setOpenAtLogin(change.value);
+            case "hardwareAcceleration":
+                return host.setHardwareAcceleration(change.value);
+            case "launcherEngine":
+                rememberLauncherEngine(change.value);
+                return true;
+            case "launcherClipboardKeep":
+                rememberLauncherClipboardKeep(change.value);
+                followClipboardKeep();
+                return true;
+            default:
+                return host.setToggle(change.key, change.value);
+        }
+    };
+    ipcMain.handle(CHANNELS.appSettingsGet, (event) => (fromPolaris(event) ? snapshot() : null));
+    ipcMain.handle(CHANNELS.appSettingsSet, async (event, raw: unknown) => {
+        const change = readAppSettingChange(raw);
+        if (!fromPolaris(event) || !change || !(await applyChange(change))) return null;
+        changed();
+        return snapshot();
+    });
+    ipcMain.handle(CHANNELS.appSettingsRecord, (event, raw: unknown) => {
+        const recording = z.boolean().safeParse(raw);
+        if (fromPolaris(event) && recording.success) recordLauncherKey(recording.data);
+    });
+    ipcMain.handle(CHANNELS.appSettingsShortcut, async (event, raw: unknown) => {
+        const press = appKeyPressSchema.safeParse(raw);
+        if (!fromPolaris(event) || !press.success) return null;
+        const binding = bindingFromPress(press.data, process.platform);
+        if (!binding) return null;
+        await setLauncherBinding(binding);
+        changed();
+        return snapshot();
+    });
+    ipcMain.handle(CHANNELS.appSettingsClearClipboard, (event) => {
+        if (fromPolaris(event)) clearClipboardHistory();
+    });
+    ipcMain.handle(CHANNELS.appSettingsRelaunch, (event) => (fromPolaris(event) ? host.relaunch() : REFUSED));
+    ipcMain.handle(CHANNELS.appSettingsHosts, (event) => {
+        if (fromPolaris(event)) host.openServers();
+    });
+    ipcMain.handle(CHANNELS.appSettingsAnnounce, (event) => {
+        if (fromPolaris(event)) host.settingsAnnounced(event.sender);
     });
     ipcMain.handle(CHANNELS.connectToggle, (event, raw: unknown): boolean => {
         const input = z

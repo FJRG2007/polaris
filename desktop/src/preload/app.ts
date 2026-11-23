@@ -108,6 +108,32 @@ const bridge: PolarisDesktop = {
         };
     },
     openServers: () => ipcRenderer.invoke(CHANNELS.openServers),
+    appSettings: {
+        get: () => ipcRenderer.invoke(CHANNELS.appSettingsGet),
+        set: (change) => ipcRenderer.invoke(CHANNELS.appSettingsSet, change),
+        record: (recording) => ipcRenderer.invoke(CHANNELS.appSettingsRecord, recording),
+        setShortcut: (press) => ipcRenderer.invoke(CHANNELS.appSettingsShortcut, press),
+        clearClipboard: () => ipcRenderer.invoke(CHANNELS.appSettingsClearClipboard),
+        relaunch: () => ipcRenderer.invoke(CHANNELS.appSettingsRelaunch),
+        manageHosts: () => ipcRenderer.invoke(CHANNELS.appSettingsHosts),
+        announce: () => ipcRenderer.invoke(CHANNELS.appSettingsAnnounce),
+        onChange: (listener) => {
+            const heard = () => listener();
+            ipcRenderer.on(CHANNELS.appSettingsChanged, heard);
+            return () => {
+                ipcRenderer.removeListener(CHANNELS.appSettingsChanged, heard);
+            };
+        },
+        onOpen: (listener) => {
+            const heard = (_event: unknown, category: unknown) => {
+                if (typeof category === "string") listener(category);
+            };
+            ipcRenderer.on(CHANNELS.appSettingsOpen, heard);
+            return () => {
+                ipcRenderer.removeListener(CHANNELS.appSettingsOpen, heard);
+            };
+        }
+    },
     openMailDefaults: () => ipcRenderer.invoke(CHANNELS.openMailDefaults),
     setAppBadge: (input) => ipcRenderer.invoke(CHANNELS.appBadge, input),
     setAppIcon: (input) => ipcRenderer.invoke(CHANNELS.appIcon, input),

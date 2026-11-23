@@ -117,6 +117,9 @@ const EMPTY: Settings = {
     launcherEngine: "duckduckgo"
 };
 
+/** What a missing or unreadable file comes to; `@polaris/core/app-settings` lists the same. */
+export const SETTING_DEFAULTS: Readonly<Settings> = EMPTY;
+
 function file(): string {
     return join(app.getPath("userData"), "settings.json");
 }

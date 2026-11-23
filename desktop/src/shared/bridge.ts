@@ -15,6 +15,7 @@
  * sentence anybody should be shown.
  */
 
+import type { AppKeyPress, AppSettingChange } from "@polaris/core/app-settings";
 import type { StrokeInput } from "./annotate";
 import type { ServerRow } from "./servers";
 import type { InstallRequest, InstallResult } from "./install-tools";
@@ -146,6 +147,33 @@ export interface PolarisDesktop {
     onVoiceAction(listener: (action: VoiceAction) => void): () => void;
     /** Open the app's window for adding and switching servers. */
     openServers(): Promise<void>;
+    /**
+     * The settings this app keeps on the computer, for the host's own Settings
+     * to draw (`@polaris/core/app-settings`). Every answer is read through that
+     * module's schema on the page's side; every input through it here.
+     */
+    appSettings: {
+        /** Every value and the facts beside them (`AppSettingsSnapshot`). */
+        get(): Promise<unknown>;
+        /** Change one; answers the snapshot after it, or null when refused. */
+        set(change: AppSettingChange): Promise<unknown>;
+        /** Start (true) or stop (false) taking a press as the launcher's key. */
+        record(recording: boolean): Promise<void>;
+        /** The press that becomes the launcher's key; answers the snapshot after it. */
+        setShortcut(press: AppKeyPress): Promise<unknown>;
+        /** Delete every copy the clipboard history kept. */
+        clearClipboard(): Promise<void>;
+        /** Start the app again, for a setting that applies then. */
+        relaunch(): Promise<void>;
+        /** Open the app's own page at its hosts, the only place they are changed. */
+        manageHosts(): Promise<void>;
+        /** Say this page draws the settings, so the tray and menus open them here. */
+        announce(): Promise<void>;
+        /** Hear that a value changed anywhere. Answers the way to stop. */
+        onChange(listener: () => void): () => void;
+        /** Hear the app asking to show a category. Answers the way to stop. */
+        onOpen(listener: (category: string) => void): () => void;
+    };
     /** Open Windows' Default apps at Polaris, where it can be picked for mailto
      *  links. False where there is no such screen to open (macOS, Linux). */
     openMailDefaults(): Promise<boolean>;
@@ -692,6 +720,16 @@ export const CHANNELS = {
     widgetView: "desktop:widget-view",
     widgetAction: "desktop:widget-action",
     openServers: "desktop:open-servers",
+    appSettingsGet: "desktop:app-settings-get",
+    appSettingsSet: "desktop:app-settings-set",
+    appSettingsRecord: "desktop:app-settings-record",
+    appSettingsShortcut: "desktop:app-settings-shortcut",
+    appSettingsClearClipboard: "desktop:app-settings-clear-clipboard",
+    appSettingsRelaunch: "desktop:app-settings-relaunch",
+    appSettingsHosts: "desktop:app-settings-hosts",
+    appSettingsAnnounce: "desktop:app-settings-announce",
+    appSettingsChanged: "desktop:app-settings-changed",
+    appSettingsOpen: "desktop:app-settings-open",
     openMailDefaults: "desktop:open-mail-defaults",
     appBadge: "desktop:app-badge",
     appIcon: "desktop:app-icon",
