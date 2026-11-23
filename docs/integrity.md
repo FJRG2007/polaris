@@ -84,7 +84,36 @@ The check runs on Chromium browsers (`dashboard/apps/extension/src/entrypoints/i
 registered on every saved server). Firefox's manifest v2 build cannot register a
 page script at runtime, so it does not check yet.
 
-**The desktop app.** The app's own code is protected by Electron fuses: `RunAsNode`, `NODE_OPTIONS` and the inspector are off, the app loads only
+**The desktop app.** The Polaris window runs the same check as the extension
+(`desktop/src/preload/integrity.ts`, `desktop/src/main/integrity.ts`, both on
+`@polaris/core/integrity` and `@polaris/core/integrity-guard`): the preload
+hashes what the page loaded, the main process fetches the manifest from GitHub
+through the window's own session (so a pinned local certificate still works)
+and judges it. A changed page gets the same warning and locked password fields,
+and the chat key's device lock (`keyWrap`) refuses it for as long as the window
+lives. Fields marked `data-polaris-secret` are locked with the password fields.
+
+**The server itself.** A minute after every start - every update is a new
+start - the dashboard hashes the files of code it serves on disk and compares
+them with its build's manifest from GitHub (`apps/web/src/lib/integrity/self-check.ts`).
+Management > Security shows the result, with Check again. It catches an image
+that was not built by Polaris' CI and files changed inside a running container.
+It cannot vouch for itself against someone who controls the server, who can
+change this check too; that is what the clients are for. It checks the files
+against the signed manifest, not the image digest's cosign signature: the
+container does not know the digest it was started from.
+
+**The browser, on its own.** Every page carries a strict script policy
+(`apps/web/src/lib/integrity/csp.ts`): a fresh nonce per response and
+`'strict-dynamic'`, so an injected script does not run. It is sent
+**report-only** for now; `/api/csp-report` logs what it would have blocked.
+It is enforced once those reports stop, since a page that writes its own
+inline script, or a prerendered page served without a nonce, would break.
+SRI is not added: the `integrity` attribute travels in the same HTML as the
+scripts, so it adds nothing against a changed server that the manifest check
+does not already catch, and Next.js' `experimental.sri` is not in use here.
+
+The desktop app's own code is protected by Electron fuses: `RunAsNode`, `NODE_OPTIONS` and the inspector are off, the app loads only
 from its archive, and the archive's integrity is checked against the hash embedded
 in the binary (`desktop/forge.config.js`). How an update is checked depends on the
 system (`desktop/src/main/updates.ts`):
@@ -119,19 +148,43 @@ from, not independently signed.
   builds, and anyone who strips the build stamp.
 - Trust rests on GitHub (the repository, its Actions identity, and serving the
   `integrity` branch over TLS) and on the Sigstore log for after-the-fact audit.
-  The extension does not yet verify the Sigstore bundle itself.
+  Neither the extension nor the desktop app verifies the Sigstore bundle itself.
+  The only browser verifier, `@freedomofpress/sigstore-browser`, is a 0.x
+  release of about 0.5 MB unpacked with two more packages of its own, and the
+  official `sigstore` package needs Node. Verifying in the client also needs the
+  Sigstore trusted root kept current through TUF, which is more code that runs
+  before the page is judged. Revisit when a 1.x browser verifier exists.
+
+## Mobile app attestation (designed, not built)
+
+The Android and iOS apps will prove to the server that a request comes from the
+genuine, unmodified app on a genuine device:
+
+1. The app asks the server for a one-time challenge (random, bound to the
+   session, valid for two minutes).
+2. Android requests a Play Integrity token with the challenge as its nonce; iOS
+   generates an App Attest key once, attests it with the challenge's hash, and
+   afterwards signs each sensitive request with an assertion.
+3. The server verifies: for Play Integrity, it decodes the token through
+   Google's `decodeIntegrityToken` and requires `PLAY_RECOGNIZED`,
+   `MEETS_DEVICE_INTEGRITY` and the challenge; for App Attest, it checks the
+   attestation's certificate chain to Apple's App Attest root, the app id, the
+   challenge, and a counter that only grows.
+4. The result is recorded on the session. Sensitive operations (OPAQUE sign-in
+   finishing, unwrapping an E2EE key) are refused only when the server's flag
+   is on and the app version is one that attests.
+
+It stays off until the app releases that attest ship, and it is never required
+of the browser or the desktop app. What blocks building the server check now:
+Play Integrity's server-side decode needs a Google Cloud project linked to the
+Play Console listing with a service account, and App Attest needs the Apple
+team id and bundle id of the published app; neither exists for these apps yet.
+Self-hosted servers will verify through a small relay run by Polaris, so the
+operator configures nothing.
 
 ## Not done yet
 
-- The desktop app running the same page check on the Polaris pages it opens
-  (`@polaris/core/integrity` is shared and ready for it).
-- The extension verifying the Sigstore bundle itself instead of trusting the
-  `integrity` branch over TLS.
-
-- Enforcing a strict CSP with nonces or hashes on every page, and SRI on Polaris'
-  own scripts. Next.js App Router pages carry per-request inline scripts, so this
-  starts report-only.
-- The server checking its own image signature on boot and on update, shown in
-  Settings > Security.
-- Android Play Integrity and iOS App Attest for the mobile apps, behind a flag
-  until those app releases ship.
+- Enforcing the strict script policy (report-only today, see above).
+- Verifying the Sigstore bundle in the clients (see Honest limits).
+- The server checking its image digest's cosign signature (see The server itself).
+- Mobile attestation (designed above).
