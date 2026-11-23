@@ -23,6 +23,7 @@
 import { cache } from "react";
 import { prisma } from "@polaris/db";
 import { getAuthMailStatus } from "@/lib/auth-mail";
+import { codeRouteFor } from "@/lib/messaging/code-senders";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { getUserSecurity, twoFactorEnabled } from "@polaris/auth";
 import {
@@ -102,6 +103,37 @@ export async function owesSecondFactor(userId: string): Promise<boolean> {
     const policy = await getInstanceSecurity();
     if (!policy.requireSecondFactor) return false;
     return !(await twoFactorEnabled(userId));
+}
+
+/**
+ * Whether this account has to confirm a phone number before it is let any further.
+ *
+ * Held only when a confirmation code can actually reach it: the instance asks for
+ * a phone, the account has no confirmed one, and there is a WhatsApp channel to
+ * send the code through - the deployment's sender, or the account's own. An
+ * account no code can reach is let through rather than stranded, and an
+ * administrator is never held, so whoever can turn the requirement off can always
+ * get to the screen that does.
+ *
+ * `known` carries what the caller has already read about the account, so the
+ * session guard does not pay for the same row twice.
+ */
+export async function owesPhone(
+    userId: string,
+    known?: { isAdmin: boolean; phoneVerified: boolean }
+): Promise<boolean> {
+    const { requirePhone } = await getInstanceSecurity();
+    if (!requirePhone) return false;
+    let account = known;
+    if (!account) {
+        const row = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { isAdmin: true, phone: { select: { verifiedAt: true } } }
+        });
+        account = { isAdmin: row?.isAdmin === true, phoneVerified: Boolean(row?.phone?.verifiedAt) };
+    }
+    if (account.isAdmin || account.phoneVerified) return false;
+    return (await codeRouteFor("whatsapp", userId)).channelId !== null;
 }
 
 /**

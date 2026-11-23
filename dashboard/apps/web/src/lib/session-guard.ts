@@ -39,7 +39,7 @@ import { describeOrigin } from "@/lib/session-directory";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { evaluateAccountRequest, listAccountRules } from "@/lib/account-rules";
 import { approvalDemanded } from "@/lib/login-approval";
-import { getInstanceSecurity, owesPhishingResistantSignIn } from "@/lib/instance-security";
+import { getInstanceSecurity, owesPhishingResistantSignIn, owesPhone } from "@/lib/instance-security";
 import { beginSignInStepUp, STEP_UP_PATH } from "@/lib/two-factor-policy-service";
 import { notifySessionOpened, notifySessionsClosed } from "@/lib/notifications/session-events";
 import {
@@ -222,6 +222,22 @@ async function secondFactorVerdict(hasFactor: boolean): Promise<SessionVerdict |
     return requireSecondFactor ? { ok: false, redirect: ENROLL_PATH } : null;
 }
 
+/**
+ * The instance's demand for a confirmed phone, as a verdict. Same step, same
+ * redirect and same retroactivity as the second factor: the enrollment screen
+ * asks for whichever is owed, the factor first. Free for an account that already
+ * has a confirmed number and for every instance that does not ask for one.
+ */
+async function phoneVerdict(
+    userId: string,
+    isAdmin: boolean,
+    phoneVerified: boolean
+): Promise<SessionVerdict | null> {
+    if (isAdmin || phoneVerified) return null;
+    if (!(await getInstanceSecurity()).requirePhone) return null;
+    return (await owesPhone(userId, { isAdmin, phoneVerified })) ? { ok: false, redirect: ENROLL_PATH } : null;
+}
+
 /** Where a session the instance wants opened with a passkey or security key is sent. */
 export const SECURITY_KEY_PATH = "/oauth/security-key";
 
@@ -270,6 +286,9 @@ export async function guardSession({
                 isAdmin: true,
                 // A temporary password an administrator handed out, still unreplaced.
                 passwordChangeRequired: true,
+                // Whether the number on the account is confirmed, for the
+                // instance's phone requirement.
+                phone: { select: { verifiedAt: true } },
                 security: {
                     select: {
                         idleLockMinutes: true,
@@ -484,6 +503,7 @@ export async function guardSession({
             // request through per sign-in, which is one more than none.
             return (
                 (await secondFactorVerdict(record.twoFactorEnabled === true)) ??
+                (await phoneVerdict(userId, record.isAdmin === true, Boolean(record.phone?.verifiedAt))) ??
                 (await phishingResistantVerdict(userId, sessionId, record.isAdmin === true)) ??
                 ALLOWED
             );
@@ -518,6 +538,10 @@ export async function guardSession({
     //    them to arm a factor through it would be asking the wrong question first.
     const owed = await secondFactorVerdict(record.twoFactorEnabled === true);
     if (owed) return owed;
+
+    // 6. (cont.) The instance's demand for a confirmed phone, on the same step.
+    const phoneOwed = await phoneVerdict(userId, record.isAdmin === true, Boolean(record.phone?.verifiedAt));
+    if (phoneOwed) return phoneOwed;
 
     // 6a. The instance's demand that this session was opened with a passkey or a
     //     security key. After the second factor, so an account that has neither

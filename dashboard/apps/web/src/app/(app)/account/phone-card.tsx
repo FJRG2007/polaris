@@ -34,6 +34,25 @@ import {
     setPhoneAction,
     verifyPhoneAction
 } from "./security/two-factor-actions";
+
+/**
+ * The server actions behind the card. Account > Details uses the account's own;
+ * the enrollment step passes its own set, which acts on the session the guard is
+ * holding rather than bouncing it back to the step.
+ */
+export interface PhoneActions {
+    setPhone: (input: { phone: string; password: string }) => Promise<{ error?: string }>;
+    removePhone: (password: string) => Promise<{ error?: string }>;
+    sendCode: () => Promise<{ error?: string }>;
+    verify: (code: string) => Promise<{ error?: string }>;
+}
+
+const ACCOUNT_PHONE_ACTIONS: PhoneActions = {
+    setPhone: setPhoneAction,
+    removePhone: removePhoneAction,
+    sendCode: sendPhoneCodeAction,
+    verify: verifyPhoneAction
+};
 import { Feedback } from "./security/setting-card";
 import { knownMessage } from "./security/known-sentences";
 import { CodeInput, isWholeCode } from "@/components/code-input";
@@ -51,7 +70,21 @@ export function phoneDraftToSave(draft: string, stored: string): string | null {
     return current.success && current.data === candidate.data ? null : candidate.data;
 }
 
-export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; canSend: boolean }) {
+export function PhoneCard({
+    phone,
+    canSend,
+    enforced = false,
+    actions = ACCOUNT_PHONE_ACTIONS,
+    onVerified
+}: {
+    phone: UserPhoneView | null;
+    canSend: boolean;
+    /** The instance requires a confirmed phone on this account, so it cannot be removed here. */
+    enforced?: boolean;
+    actions?: PhoneActions;
+    /** Called once the number is confirmed, instead of refreshing the page. */
+    onVerified?: () => void;
+}) {
     const router = useRouter();
     const t = useTranslations("account");
     const tc = useTranslations("common");
@@ -80,7 +113,7 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
 
     const toSave = busy ? null : phoneDraftToSave(draft, shown?.phone ?? "");
 
-    async function run(action: () => Promise<{ error?: string }>, ok?: string) {
+    async function run(action: () => Promise<{ error?: string }>, ok?: string, refresh = true) {
         setBusy(true);
         setError(null);
         setNotice(null);
@@ -91,7 +124,7 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
             return false;
         }
         if (ok) setNotice(ok);
-        router.refresh();
+        if (refresh) router.refresh();
         return true;
     }
 
@@ -112,7 +145,7 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
         setBusy(true);
         setError(null);
         setNotice(null);
-        const result = await setPhoneAction({ phone: next, password }).catch(() => ({
+        const result = await actions.setPhone({ phone: next, password }).catch(() => ({
             error: ts("errors.checkForm")
         }));
         setBusy(false);
@@ -135,7 +168,10 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
             setError(issue ? knownMessage(ts, tv, issue) : ts("errors.enterCode"));
             return;
         }
-        if (await run(() => verifyPhoneAction(parsed.data))) setCode("");
+        const typed = parsed.data;
+        if (!(await run(() => actions.verify(typed), undefined, !onVerified))) return;
+        setCode("");
+        onVerified?.();
     }
 
     return (
@@ -160,13 +196,17 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                             ) : null}
                         </div>
                         <p className="text-xs text-muted-foreground">{t("phone.description")}</p>
+                        {enforced ? (
+                            <p className="mt-1 text-xs text-muted-foreground">{t("phone.requiredByAdmin")}</p>
+                        ) : null}
                     </div>
                     {shown ? (
                         <Button
                             variant="ghost"
                             size="sm"
                             className="shrink-0"
-                            disabled={busy}
+                            disabled={busy || enforced}
+                            title={enforced ? t("phone.requiredByAdmin") : undefined}
                             onClick={() => setDialog("remove")}
                         >
                             {t("phone.remove")}
@@ -206,7 +246,7 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                                 variant="outline"
                                 disabled={busy || !canSend}
                                 title={canSend ? undefined : ts("errors.connectWhatsAppFirst")}
-                                onClick={() => void run(sendPhoneCodeAction, t("phone.codeSent"))}
+                                onClick={() => void run(actions.sendCode, t("phone.codeSent"))}
                             >
                                 {t("phone.sendCode")}
                             </Button>
@@ -225,6 +265,7 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                 onConfirm={(password) => void confirmSave(password)}
             />
             <RemovePhoneDialog
+                remove={actions.removePhone}
                 open={dialog === "remove"}
                 onOpenChange={(open) => !open && setDialog(null)}
                 onDone={() => {
@@ -299,10 +340,12 @@ function PasswordDialog({
 }
 
 function RemovePhoneDialog({
+    remove,
     open,
     onOpenChange,
     onDone
 }: {
+    remove: PhoneActions["removePhone"];
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onDone: () => void;
@@ -317,7 +360,7 @@ function RemovePhoneDialog({
         const password = String(new FormData(event.currentTarget).get("password") ?? "");
         setBusy(true);
         setError(null);
-        const result = await removePhoneAction(password);
+        const result = await remove(password);
         setBusy(false);
         if (result.error) {
             setError(result.error);

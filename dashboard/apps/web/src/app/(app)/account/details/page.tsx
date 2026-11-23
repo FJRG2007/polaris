@@ -19,13 +19,15 @@ import { requireUser } from "@/lib/session";
 import { AccountView } from "./account-view";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import { getUserPhone, listUserEmails } from "@polaris/auth";
+import { getInstanceSecurity } from "@/lib/instance-security";
+import { codeRouteFor } from "@/lib/messaging/code-senders";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountDetailsPage() {
     const session = await requireUser();
     const t = await getTranslations("account");
-    const [user, emails, mail, phone, whatsappChannel] = await Promise.all([
+    const [user, emails, mail, phone, whatsappRoute, instancePolicy] = await Promise.all([
         prisma.user.findUnique({
             where: { id: session.id },
             select: { firstName: true, lastName: true, secondLastName: true }
@@ -33,12 +35,13 @@ export default async function AccountDetailsPage() {
         listUserEmails(session.id),
         getAuthMailStatus(),
         getUserPhone(session.id),
-        // Confirming a number is sent the same way a sign-in code is, so the card
-        // needs to know whether there is anything to send with.
-        prisma.channel.findFirst({
-            where: { ownerId: session.id, platform: "whatsapp", status: "connected" },
-            select: { id: true }
-        })
+        // Confirming a number is sent the same way a sign-in code is - the
+        // deployment's sender or the account's own channel - so the card needs to
+        // know whether there is anything to send with.
+        codeRouteFor("whatsapp", session.id),
+        // Whether the instance requires a phone, which the card says and which
+        // keeps it from being removed. Administrators are never held by it.
+        getInstanceSecurity()
     ]);
 
     return (
@@ -54,7 +57,8 @@ export default async function AccountDetailsPage() {
                 emails={emails}
                 mailReady={mail.channelId !== null}
                 phone={phone}
-                canSendWhatsApp={whatsappChannel !== null}
+                canSendWhatsApp={whatsappRoute.channelId !== null}
+                phoneRequired={instancePolicy.requirePhone && !session.isAdmin}
             />
         </div>
     );

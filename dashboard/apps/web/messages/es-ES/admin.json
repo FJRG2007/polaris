@@ -3240,7 +3240,15 @@
         "require": {
             "title": "Exigir un segundo paso al entrar",
             "hint": "Cada cuenta añade uno antes de poder usar Polaris. A las cuentas que ya existen se les pide la próxima vez que inicien sesión.",
-            "off": "Desactivado, a una cuenta le basta con la contraseña. Cada persona puede activar un segundo paso en sus propios ajustes de seguridad."
+            "off": "Desactivado, a una cuenta le basta con la contraseña. Cada persona puede activar un segundo paso en sus propios ajustes de seguridad.",
+            "risk": {
+                "title": "¿Dejar entrar solo con contraseña?",
+                "description": "Las cuentas sin segundo paso son muy peligrosas: basta una contraseña filtrada o reutilizada para que cualquiera se quede con la cuenta y con todo lo que alcanza aquí.",
+                "accept": "Acepto el riesgo de cuentas que se abren solo con contraseña.",
+                "keep": "Seguir exigiéndolo",
+                "confirm": "Aceptar y guardar"
+            },
+            "riskStanding": "Aquí las cuentas pueden entrar solo con contraseña. Un administrador aceptó ese riesgo."
         },
         "factors": {
             "title": "Qué cuenta como segundo paso",
@@ -3257,8 +3265,9 @@
             }
         },
         "approval": {
-            "title": "Aprobar inicios nuevos desde una sesión abierta",
-            "hint": "Cada inicio de sesión nuevo espera hasta que una sesión abierta de la cuenta lo permita con el PIN de desbloqueo rápido, aunque haya app de autenticación. No se retiene a cuentas sin PIN ni sin otra sesión abierta."
+            "title": "Exigir aprobar inicios en cada cuenta",
+            "hint": "Cada inicio de sesión nuevo espera hasta que otra sesión abierta de la cuenta lo permita con el PIN de desbloqueo rápido, aunque haya app de autenticación. No se retiene a cuentas sin PIN ni sin otra sesión abierta.",
+            "off": "Desactivado, cada persona puede activarlo para sí en sus propios ajustes de seguridad."
         },
         "connection": {
             "title": "Volver a preguntar tras una cuenta conectada",
@@ -3272,7 +3281,8 @@
         "errors": {
             "checkForm": "Revisa el formulario.",
             "onOrOff": "Elige activado o desactivado.",
-            "saveFailed": "No se ha podido guardar. Inténtalo de nuevo."
+            "saveFailed": "No se ha podido guardar. Inténtalo de nuevo.",
+            "riskNotAccepted": "Para desactivarlo, acepta antes el riesgo."
         },
         "phishing": {
             "title": "Exigir llaves de acceso o de seguridad",
@@ -3281,6 +3291,12 @@
             "admins": "Administradores",
             "everyone": "Todos",
             "needOwnKey": "Añade una llave de acceso o de seguridad a tu propia cuenta antes de exigirlas, para poder seguir entrando."
+        },
+        "phone": {
+            "title": "Exigir un teléfono en cada cuenta",
+            "hint": "Las cuentas sin número confirmado añaden y confirman uno al volver a entrar. No se retiene a cuentas a las que no llega el código, ni nunca a administradores.",
+            "noChannel": "El número se confirma con un código de WhatsApp y no hay remitente de WhatsApp conectado.",
+            "fix": "Configurar WhatsApp"
         }
     },
     "uploads": {

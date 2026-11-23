@@ -1372,7 +1372,8 @@
         "setDescription": "It starts unconfirmed. Confirm it before it can carry a sign-in code.",
         "removeTitle": "Remove your number",
         "removeDescription": "Confirm your password. WhatsApp stops being one of your sign-in options.",
-        "removing": "Removing..."
+        "removing": "Removing...",
+        "requiredByAdmin": "Required by your administrator."
     },
     "aiKeys": {
         "page": {

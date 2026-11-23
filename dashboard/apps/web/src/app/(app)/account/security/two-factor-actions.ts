@@ -21,108 +21,45 @@ import { newDeviceRefusal } from "@/lib/device-grace";
 import { getTranslations } from "@/lib/i18n/request";
 import { methodLabel } from "./known-sentences";
 import { firstIssue, localized } from "./action-messages";
-import { normalizePeerId } from "@/lib/messaging-service";
-import { sendCodeThroughChannel } from "@/lib/messaging/channel-runtime";
-import { codeRouteFor } from "@/lib/messaging/code-senders";
+import {
+    CODE_CHECK_LIMIT,
+    CODE_CHECK_WINDOW_MS,
+    CODE_SEND_LIMIT,
+    CODE_SEND_WINDOW_MS,
+    removePhoneFor,
+    sendPhoneCodeFor,
+    setPhoneFor,
+    verifyPhoneFor
+} from "./phone-steps";
 import { checkTelegramLink, startTelegramLink, unlinkTelegram } from "@/lib/messaging/telegram-link";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 import { isStricter, twoFactorPolicySchema } from "@/lib/two-factor-policy";
 import { loadTwoFactorPolicy, saveTwoFactorPolicy } from "@/lib/two-factor-policy-store";
-import {
-    otpCodeField,
-    phoneField,
-    TWO_FACTOR_CODE_TTL_MINUTES,
-    twoFactorPreferencesSchema
-} from "@polaris/core";
-import {
-    issuePhoneCode,
-    regenerateBackupCodes,
-    removeUserPhone,
-    setTwoFactorPreferences,
-    setUserPhone,
-    verifyAccountPassword,
-    verifyPhoneCode
-} from "@polaris/auth";
+import { twoFactorPreferencesSchema } from "@polaris/core";
+import { regenerateBackupCodes, setTwoFactorPreferences, verifyAccountPassword } from "@polaris/auth";
 
 type ActionResult = { error?: string };
-
-/** How often one account may ask for a confirmation code, and how often it may
- *  guess at one. Both are per account rather than per address: the number is the
- *  thing being protected, and it does not change between attempts. */
-const CODE_SEND_LIMIT = 5;
-const CODE_SEND_WINDOW_MS = 15 * 60 * 1000;
-const CODE_CHECK_LIMIT = 10;
-const CODE_CHECK_WINDOW_MS = 15 * 60 * 1000;
-
-const setPhoneSchema = z.object({
-    phone: phoneField,
-    password: z.string().min(1, "Password is required")
-});
 
 export async function setPhoneAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
-    const parsed = setPhoneSchema.safeParse(input);
-    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
-    const result = await setUserPhone(auth, user.id, parsed.data.phone, parsed.data.password);
-    if (!result.error) {
-        await recordAudit({ actorId: user.id, action: "account.phone.set" });
-        revalidatePath("/account/security", "layout");
-    }
-    return localized(result);
+    return setPhoneFor(user.id, input);
 }
 
 export async function removePhoneAction(password: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
-    const result = await removeUserPhone(auth, user.id, String(password ?? ""));
-    if (!result.error) {
-        await recordAudit({ actorId: user.id, action: "account.phone.removed" });
-        revalidatePath("/account/security", "layout");
-    }
-    return localized(result);
+    return removePhoneFor(user.id, password);
 }
 
-/**
- * Send a confirmation code to the number on the account.
- *
- * It goes the way a second-factor code would - the deployment's WhatsApp code
- * sender, or the user's own connected channel on an older setup - so confirming
- * the number and confirming the route are the same act.
- */
+/** Send a confirmation code to the number on the account (see sendPhoneCodeFor). */
 export async function sendPhoneCodeAction(): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
-    const throttle = await rateLimit(`phone-code:${user.id}`, CODE_SEND_LIMIT, CODE_SEND_WINDOW_MS);
-    if (!throttle.ok) {
-        const t = await getTranslations("accountSecurity");
-        return { error: t("errors.tooManyCodes", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
-    }
-
-    const route = await codeRouteFor("whatsapp", user.id);
-    const t = await getTranslations("accountSecurity");
-    if (!route.channelId) return { error: t("errors.connectWhatsAppFirst") };
-
-    const issued = await issuePhoneCode(auth, user.id);
-    if (issued.error || !issued.code || !issued.phone) {
-        return issued.error ? localized({ error: issued.error }) : { error: t("known.addPhoneFirst") };
-    }
-
-    try {
-        await sendCodeThroughChannel(route.channelId, {
-            peerId: normalizePeerId("whatsapp", issued.phone),
-            code: issued.code,
-            // Sent to this same person, so in the language they are reading in.
-            text: t("phone.confirmationMessage", { code: issued.code, minutes: TWO_FACTOR_CODE_TTL_MINUTES })
-        });
-    } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : t("errors.messageNotSent") };
-    }
-    await recordAudit({ actorId: user.id, action: "account.phone.code-sent" });
-    return {};
+    return sendPhoneCodeFor(user.id);
 }
 
 /**
@@ -168,19 +105,7 @@ export async function verifyPhoneAction(code: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
-    const parsed = otpCodeField.safeParse(code);
-    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.enterCode");
-    const throttle = await rateLimit(`phone-check:${user.id}`, CODE_CHECK_LIMIT, CODE_CHECK_WINDOW_MS);
-    if (!throttle.ok) {
-        const t = await getTranslations("accountSecurity");
-        return { error: t("errors.tooManyAttempts", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
-    }
-    const result = await verifyPhoneCode(auth, user.id, parsed.data);
-    if (!result.error) {
-        await recordAudit({ actorId: user.id, action: "account.phone.verified" });
-        revalidatePath("/account/security", "layout");
-    }
-    return localized(result);
+    return verifyPhoneFor(user.id, code);
 }
 
 /** How often one account may mint a set of backup codes. The endpoint checks a

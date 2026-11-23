@@ -60,3 +60,18 @@ export async function codeRouteFor(platform: CodePlatform, userId: string): Prom
     ]);
     return resolveCodeRoute(platform, { adminSender, ownChannel });
 }
+
+/**
+ * Whether the deployment itself can carry a code on this platform to anybody: an
+ * administrator picked a sender and it is still connected. A person's own channel
+ * does not count, because it only reaches that one person.
+ */
+export async function codeSenderReady(platform: CodePlatform): Promise<boolean> {
+    const senderId = (await getCodeSenders())[platform];
+    if (!senderId) return false;
+    const adminSender = await prisma.channel.findUnique({
+        where: { id: senderId },
+        select: { id: true, platform: true, status: true }
+    });
+    return resolveCodeRoute(platform, { adminSender, ownChannel: null }).channelId !== null;
+}

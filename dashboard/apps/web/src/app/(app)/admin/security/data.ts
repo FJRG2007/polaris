@@ -4,14 +4,17 @@ import { requireAdmin } from "@/lib/session";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import { getInstanceSecurity } from "@/lib/instance-security";
 import { playerAddressesShared } from "@/lib/player-address-policy";
+import { codeSenderReady } from "@/lib/messaging/code-senders";
 
 /** The sign-in rules and what they depend on, asked for after the paint. */
 export async function loadSecurityAdminAction() {
     await requireAdmin();
-    const [policy, mail, addressesShared] = await Promise.all([
+    const [policy, mail, addressesShared, phoneReady] = await Promise.all([
         getInstanceSecurity(),
         getAuthMailStatus(),
-        playerAddressesShared()
+        playerAddressesShared(),
+        // A phone is confirmed with a WhatsApp code, so requiring one needs a sender.
+        codeSenderReady("whatsapp")
     ]);
-    return { policy, mailReady: mail.channelId !== null, addressesShared };
+    return { policy, mailReady: mail.channelId !== null, addressesShared, phoneReady };
 }

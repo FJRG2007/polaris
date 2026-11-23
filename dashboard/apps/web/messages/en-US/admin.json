@@ -3240,7 +3240,15 @@
         "require": {
             "title": "Require a second step to sign in",
             "hint": "Every account adds one before it can use Polaris. Accounts that already exist are asked the next time they sign in.",
-            "off": "With this off, a password is all an account needs. People can still turn on a second step for themselves under their own security settings."
+            "off": "With this off, a password is all an account needs. People can still turn on a second step for themselves under their own security settings.",
+            "risk": {
+                "title": "Let accounts in with only a password?",
+                "description": "Accounts without a second step are very dangerous: a leaked or reused password is enough for anyone to take the account and everything it can reach here.",
+                "accept": "I accept the risk of accounts that a password alone can open.",
+                "keep": "Keep requiring it",
+                "confirm": "Accept and save"
+            },
+            "riskStanding": "Accounts here can sign in with only a password. An administrator accepted that risk."
         },
         "factors": {
             "title": "What counts as a second step",
@@ -3257,8 +3265,9 @@
             }
         },
         "approval": {
-            "title": "Approve new sign-ins from an open session",
-            "hint": "Every new sign-in waits until one of the account's open sessions allows it with the quick unlock PIN, even with an authenticator app. Accounts without a PIN, or with no other open session, are not held."
+            "title": "Require sign-in approval on every account",
+            "hint": "Every new sign-in waits until another open session of the account allows it with the quick unlock PIN, even with an authenticator app. Accounts without a PIN, or with no other open session, are not held.",
+            "off": "With this off, people can still turn it on for themselves under their own security settings."
         },
         "connection": {
             "title": "Ask again after a connected account",
@@ -3272,7 +3281,8 @@
         "errors": {
             "checkForm": "Check the form.",
             "onOrOff": "Choose on or off.",
-            "saveFailed": "Could not save that. Try again."
+            "saveFailed": "Could not save that. Try again.",
+            "riskNotAccepted": "Turning this off needs the risk accepted first."
         },
         "phishing": {
             "title": "Require passkeys or security keys",
@@ -3281,6 +3291,12 @@
             "admins": "Administrators",
             "everyone": "Everyone",
             "needOwnKey": "Add a passkey or security key to your own account before requiring them, so you can still sign in."
+        },
+        "phone": {
+            "title": "Require a phone number on every account",
+            "hint": "Accounts without a confirmed number add and confirm one the next time they sign in. Accounts no code can reach are not held, and administrators never are.",
+            "noChannel": "The number is confirmed with a WhatsApp code, and no WhatsApp sender is connected.",
+            "fix": "Set up WhatsApp codes"
         }
     },
     "uploads": {

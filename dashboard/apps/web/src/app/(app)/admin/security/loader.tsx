@@ -24,7 +24,7 @@ export function SecurityAdminLoader({ revision }: { revision: number }) {
         >
             {(data) => (
                 <>
-                    <SecurityAdmin policy={data.policy} mailReady={data.mailReady} />
+                    <SecurityAdmin policy={data.policy} mailReady={data.mailReady} phoneReady={data.phoneReady} />
                     <div className="max-w-2xl">
                         <PlayerAddressesCard shared={data.addressesShared} />
                     </div>

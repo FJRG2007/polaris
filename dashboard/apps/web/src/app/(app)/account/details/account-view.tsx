@@ -66,7 +66,8 @@ export function AccountView({
     emails,
     mailReady,
     phone,
-    canSendWhatsApp
+    canSendWhatsApp,
+    phoneRequired = false
 }: {
     firstName: string;
     lastName: string;
@@ -78,6 +79,8 @@ export function AccountView({
     phone: UserPhoneView | null;
     /** Whether a WhatsApp channel is connected, which is what confirms a number. */
     canSendWhatsApp: boolean;
+    /** The instance requires a confirmed phone on this account. */
+    phoneRequired?: boolean;
 }) {
     const router = useRouter();
     const t = useTranslations("account");
@@ -202,7 +205,7 @@ export function AccountView({
                 <EmailsView emails={emails} mailReady={mailReady} />
             </SectionCard>
 
-            <PhoneCard phone={phone} canSend={canSendWhatsApp} />
+            <PhoneCard phone={phone} canSend={canSendWhatsApp} enforced={phoneRequired} />
         </div>
     );
 }

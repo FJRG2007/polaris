@@ -21,7 +21,8 @@ import { resolveSession } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { setTotpUnclaimed } from "@polaris/auth";
 import type { EnrollmentChoice } from "./enroll-view";
-import { enrollmentOptions, owesSecondFactor } from "@/lib/instance-security";
+import { enrollmentOptions, owesPhone, owesSecondFactor } from "@/lib/instance-security";
+import { removePhoneFor, sendPhoneCodeFor, setPhoneFor, verifyPhoneFor } from "@/app/(app)/account/security/phone-steps";
 import { armFactorByEmail, sendEnrollmentCode } from "@/lib/second-factor-enrollment";
 
 interface ActionResult {
@@ -93,4 +94,43 @@ export async function noteAuthenticatorArmedAction(): Promise<ActionResult> {
     if (!user) return { error: t("enroll.errors.signInAgain") };
     await setTotpUnclaimed(user.id, false);
     return { ok: t("enroll.armed") };
+}
+
+/**
+ * The phone the instance requires, written and confirmed from the enrollment step.
+ *
+ * The same steps Account > Details runs, with two differences that are what make
+ * this step completable. The session is resolved directly, because the guard is
+ * what sent the person here. And the new-device wait is not applied: this is a
+ * sign-in that has just happened, so it is always a new device, and the wait would
+ * hold the account on a step it is not allowed to finish. What bounds that is the
+ * first check - these act only for an account the requirement is holding right
+ * now, and writing the number still asks for the password.
+ */
+async function heldForPhone(): Promise<{ userId: string } | ActionResult> {
+    const t = await getTranslations("auth");
+    const user = await resolveSession();
+    if (!user) return { error: t("enroll.errors.signInAgain") };
+    if (!(await owesPhone(user.id))) return { error: t("enroll.phone.nothingOwed") };
+    return { userId: user.id };
+}
+
+export async function enrollSetPhoneAction(input: unknown): Promise<ActionResult> {
+    const held = await heldForPhone();
+    return "userId" in held ? setPhoneFor(held.userId, input) : held;
+}
+
+export async function enrollRemovePhoneAction(password: unknown): Promise<ActionResult> {
+    const held = await heldForPhone();
+    return "userId" in held ? removePhoneFor(held.userId, password) : held;
+}
+
+export async function enrollSendPhoneCodeAction(): Promise<ActionResult> {
+    const held = await heldForPhone();
+    return "userId" in held ? sendPhoneCodeFor(held.userId) : held;
+}
+
+export async function enrollVerifyPhoneAction(code: unknown): Promise<ActionResult> {
+    const held = await heldForPhone();
+    return "userId" in held ? verifyPhoneFor(held.userId, code) : held;
 }

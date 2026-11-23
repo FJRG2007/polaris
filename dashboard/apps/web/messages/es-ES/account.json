@@ -1372,7 +1372,8 @@
         "setDescription": "Empieza sin confirmar. Confírmalo antes de que pueda llevar un código de inicio de sesión.",
         "removeTitle": "Quitar tu número",
         "removeDescription": "Confirma tu contraseña. WhatsApp dejará de ser una de tus opciones de inicio de sesión.",
-        "removing": "Quitando..."
+        "removing": "Quitando...",
+        "requiredByAdmin": "Lo exige tu administrador."
     },
     "aiKeys": {
         "page": {
