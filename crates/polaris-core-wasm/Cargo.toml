@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-polaris-core = { path = "../polaris-core" }
+polaris-core = { path = "../polaris-core", default-features = false }
 # Must equal the installed wasm-bindgen-cli version exactly.
 wasm-bindgen = { version = "=0.2.130", default-features = false, features = ["std"] }
 js-sys = { version = "=0.3.107", default-features = false, features = ["std"] }

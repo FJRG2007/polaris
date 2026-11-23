@@ -6,3 +6,6 @@
 //! `polaris-core-wasm`; both bindings only convert types and map errors.
 
 pub mod probe;
+
+#[cfg(feature = "mls")]
+pub mod mls;

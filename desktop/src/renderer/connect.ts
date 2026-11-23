@@ -21,9 +21,7 @@ import { describeServer, normalizeServerName, SERVER_NAME_MAX, type ServerRow } 
 import { encodeHostList, HOST_LIST_PREFIX, hostListLink } from "../../../dashboard/packages/core/src/host-list";
 import { encodeQr, qrSvgPath } from "../../../dashboard/packages/core/src/qr";
 import type { HostImport, LauncherStatus } from "@/shared/bridge";
-import { picker } from "./picker";
-import { SEARCH_ENGINE_IDS, SEARCH_ENGINES, type SearchEngine } from "@/shared/launcher";
-import type { ClipboardKeep } from "@/shared/clipboard-store";
+import type { SearchEngine } from "@/shared/launcher";
 import { bindingFromPress } from "@/shared/launcher-hotkey";
 import jsQR from "jsqr";
 
@@ -625,38 +623,7 @@ openAtLogin.addEventListener("change", () => {
 const launcherRecord = byId<HTMLButtonElement>("launcher-record");
 const launcherKeyHint = byId<HTMLSpanElement>("launcher-key-hint");
 const launcherProblem = byId<HTMLParagraphElement>("launcher-problem");
-const launcherName = byId<HTMLSpanElement>("launcher-name");
-const launcherOnHint = byId<HTMLSpanElement>("launcher-on-hint");
-const launcherClipboardHint = byId<HTMLSpanElement>("launcher-clipboard-hint");
-const launcherKeepRow = byId<HTMLDivElement>("launcher-keep-row");
-const clearClipsDialog = byId<HTMLDialogElement>("confirm-clear-clips");
-/** Said under "Clipboard history": where the copies are kept, and for how long. */
-const CLIPBOARD_HINT = {
-    kept: 'Polaris search keeps what you copy on this computer, encrypted, for the time below. Passwords from password managers are skipped. Type "clip" to see them.',
-    memory: 'This computer has no system key store, so copies stay in memory and are gone when Polaris closes. Passwords from password managers are skipped. Type "clip" to see them.'
-} as const;
-/** Saving a choice from a dropdown; a refusal is said where the switches say theirs. */
-function savedOrSay(saving: Promise<boolean>): void {
-    say(failure, null);
-    void saving.catch(() => false).then((kept) => {
-        if (!kept) say(failure, "Polaris could not save this setting. Try again.");
-    });
-}
-const launcherEngine = picker(
-    byId("launcher-engine"),
-    SEARCH_ENGINE_IDS.map((id) => ({ value: id, label: SEARCH_ENGINES[id].name })),
-    (value) => savedOrSay(window.polarisLocal.connect.setLauncherEngine(value as SearchEngine))
-);
-const launcherKeep = picker(
-    byId("launcher-keep"),
-    [
-        { value: "day", label: "1 day" },
-        { value: "week", label: "1 week" },
-        { value: "month", label: "1 month" },
-        { value: "quarter", label: "3 months" }
-    ],
-    (value) => savedOrSay(window.polarisLocal.connect.setClipboardKeep(value as ClipboardKeep))
-);
+const launcherEngine = byId<HTMLSelectElement>("launcher-engine");
 const launcherClear = byId<HTMLButtonElement>("launcher-clear");
 let recordingKey = false;
 
@@ -665,8 +632,6 @@ function drawLauncherStatus(status: LauncherStatus): void {
     launcherKeyHint.textContent = status.others.length && status.held
         ? `${status.key} - also installed: ${status.others.join(", ")}`
         : status.key;
-    // The switch is named by the key it holds, as the extension's settings name theirs.
-    launcherName.textContent = `${status.key} search`;
     launcherProblem.hidden = !status.problem;
     launcherProblem.textContent = status.problem ?? "";
 }
@@ -727,33 +692,26 @@ launcherRecord.addEventListener("click", () => {
     void window.polarisLocal.connect.recordLauncherKey(true);
     document.addEventListener("keydown", recordKey, true);
 });
-launcherClear.addEventListener("click", () => clearClipsDialog.showModal());
-byId("clear-clips-cancel").addEventListener("click", () => clearClipsDialog.close());
-byId("clear-clips-confirm").addEventListener("click", () => {
-    clearClipsDialog.close();
+launcherEngine.addEventListener("change", () => {
+    say(failure, null);
+    void window.polarisLocal.connect
+        .setLauncherEngine(launcherEngine.value as SearchEngine)
+        .catch(() => false)
+        .then((kept) => {
+            if (!kept) say(failure, "Polaris could not save this setting. Try again.");
+        });
+});
+launcherClear.addEventListener("click", () => {
     void window.polarisLocal.connect.clearClipboardHistory().then(() => {
         launcherClear.textContent = "Cleared";
         setTimeout(() => (launcherClear.textContent = "Clear clipboard history"), 1500);
     });
 });
-/** The rows that only mean something with the history on, and the search on. */
-function followLauncher(): void {
-    const searching = toggles.launcher.checked;
-    const keeping = searching && toggles.launcherClipboard.checked;
-    launcherOnHint.textContent = searching
-        ? "Your shortcut opens Polaris search over any app."
-        : "The shortcut does nothing outside Polaris.";
-    launcherEngine.disabled = !searching;
-    toggles.launcherClipboard.disabled = !searching;
-    launcherKeepRow.hidden = !keeping;
-    launcherClear.hidden = !keeping;
-}
 void showLauncherStatus();
 /** "Only while a game is running" means nothing with the widget off. */
 function followVoiceWidget(): void {
     toggles.voiceWidgetGameOnly.disabled = !toggles.voiceWidget.checked;
     launcherRecord.disabled = !toggles.launcher.checked;
-    followLauncher();
 }
 for (const [name, input] of Object.entries(toggles) as [keyof typeof toggles, HTMLInputElement][]) {
     input.addEventListener("change", () => {
@@ -766,6 +724,7 @@ for (const [name, input] of Object.entries(toggles) as [keyof typeof toggles, HT
             .then((kept) => {
                 if (kept) {
                     if (name === "launcher") void showLauncherStatus();
+                    if (name === "launcherClipboard") launcherClear.hidden = !wanted;
                     return;
                 }
                 input.checked = !wanted;
@@ -820,9 +779,8 @@ const preferencesLoaded = window.polarisLocal.connect.preferences().catch(() => 
     toggles.voiceWidgetGameOnly.checked = preferences.voiceWidgetGameOnly;
     toggles.launcher.checked = preferences.launcher;
     toggles.launcherClipboard.checked = preferences.launcherClipboard;
+    launcherClear.hidden = !preferences.launcherClipboard;
     launcherEngine.value = preferences.launcherEngine;
-    launcherKeep.value = preferences.launcherClipboardKeep;
-    launcherClipboardHint.textContent = preferences.launcherClipboardPersists ? CLIPBOARD_HINT.kept : CLIPBOARD_HINT.memory;
     followVoiceWidget();
     restartPending.hidden = !preferences.restartPending;
     byId("version").textContent = `Polaris ${preferences.version}`;

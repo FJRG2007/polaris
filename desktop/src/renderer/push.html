@@ -24,11 +24,15 @@
                 <button id="choose" type="button">Choose folder</button>
             </div>
 
-            <div class="stack-field">
-                <span>Build for</span>
-                <div id="platform" aria-label="Build for"></div>
+            <label>
+                Build for
+                <select id="platform">
+                    <option value="">This computer's platform</option>
+                    <option value="linux/amd64">linux/amd64 - most servers</option>
+                    <option value="linux/arm64">linux/arm64 - Raspberry Pi and other ARM servers</option>
+                </select>
                 <span class="hint">The platform of the server the service runs on. An image built for another one does not start.</span>
-            </div>
+            </label>
 
             <ol id="steps" class="steps" aria-label="Progress">
                 <li data-phase="checking">Docker</li>

@@ -5,21 +5,14 @@
  * device and per browser, so the card reads this browser's own subscription
  * and says what it is; nothing here is stored on the account but the
  * subscription itself.
- *
- * Inside Polaris Desktop there is no push service to subscribe to (Electron
- * has none), and none is needed: the app raises these notices itself while it
- * runs, open or in the tray (`desktop-bridge`'s alert notices). The card says
- * so instead of offering a subscription that can only fail.
  */
 
 import { useEffect, useState, useTransition } from "react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { pushKeyAction, subscribePushAction, unsubscribePushAction } from "./actions";
-import { desktopBridge } from "@/lib/desktop-bridge";
-import { inPhoneApp } from "@/lib/mobile-bridge";
 
-type Standing = "unsupported" | "denied" | "off" | "on" | "desktop";
+type Standing = "unsupported" | "denied" | "off" | "on";
 
 function keyBytes(base64: string): Uint8Array<ArrayBuffer> {
     const padded = (base64 + "=".repeat((4 - (base64.length % 4)) % 4))
@@ -52,10 +45,6 @@ export function PushCard() {
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
-        if (desktopBridge()) {
-            setStanding("desktop");
-            return;
-        }
         if (!supported()) return;
         if (Notification.permission === "denied") {
             setStanding("denied");
@@ -132,11 +121,7 @@ export function PushCard() {
                 ) : null}
             </CardHeader>
             <CardBody className="space-y-1">
-                <p className="text-sm">
-                    {standing === "desktop"
-                        ? t("push.standing.desktop")
-                        : t(`push.standing.${standing}`, { clientKind: inPhoneApp() ? "phone" : "other" })}
-                </p>
+                <p className="text-sm">{t(`push.standing.${standing}`)}</p>
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
             </CardBody>
         </Card>

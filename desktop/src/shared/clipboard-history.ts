@@ -1,8 +1,8 @@
 /**
- * The launcher's clipboard history: on unless somebody turns it off, never sent
- * anywhere, kept on this computer encrypted (or in memory only where the system
- * has no key store - see `clipboard-store`), at most `CLIPBOARD_LIMIT` entries,
- * and blind to what a password manager marks as not for history.
+ * The launcher's clipboard history: off until somebody turns it on, kept in
+ * memory only (never written to disk, never sent anywhere), at most
+ * `CLIPBOARD_LIMIT` entries, and blind to what a password manager marks as
+ * not for history.
  *
  * The marks are the platforms' own conventions:
  * - Windows: a copy carrying `ExcludeClipboardContentFromMonitorProcessing`, or
@@ -14,7 +14,7 @@
  *   KeePassXC sets as well.
  */
 
-export const CLIPBOARD_LIMIT = 1_000;
+export const CLIPBOARD_LIMIT = 200;
 
 /** The longest copy kept, in characters; anything longer is a file's worth
  *  nobody pastes back from a launcher. */

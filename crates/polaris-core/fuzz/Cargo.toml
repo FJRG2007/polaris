@@ -15,6 +15,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "=0.4.13"
 polaris-core = { path = ".." }
+# Untrusted MLS input from the delivery service (plan 4.3).
 
 [workspace]
 members = ["."]
@@ -29,6 +30,34 @@ bench = false
 [[bin]]
 name = "fnv1a32"
 path = "fuzz_targets/fnv1a32.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mls_process"
+path = "fuzz_targets/mls_process.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mls_welcome"
+path = "fuzz_targets/mls_welcome.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mls_group_info"
+path = "fuzz_targets/mls_group_info.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mls_key_package"
+path = "fuzz_targets/mls_key_package.rs"
 test = false
 doc = false
 bench = false

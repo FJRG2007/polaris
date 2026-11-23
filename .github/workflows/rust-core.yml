@@ -346,7 +346,7 @@ jobs:
         run: |
           set -o pipefail
           cargo bench --locked -p polaris-core -- --quick | tee "$RUNNER_TEMP/criterion.txt"
-          { echo "### criterion (polaris-core, --quick)"; echo '```'; grep -E '^(probe/|[[:space:]]+(time|change):)' "$RUNNER_TEMP/criterion.txt" || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo "### criterion (polaris-core, --quick)"; echo '```'; grep -E '^(probe/|mls/|[[:space:]]+(time|change):)' "$RUNNER_TEMP/criterion.txt" || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - working-directory: dashboard
         run: $CORE_RS_INSTALL
       - working-directory: dashboard

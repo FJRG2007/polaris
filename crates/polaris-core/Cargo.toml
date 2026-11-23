@@ -14,14 +14,64 @@ path = "src/lib.rs"
 # `--quick` to every bench target, and only criterion (benches/) understands it.
 bench = false
 
+# The `mls` domain (docs/rust-core-plan.md, Phase 2) pulls in OpenMLS and its
+# crypto; it is a feature so the WebAssembly build of the other domains stays
+# small and the MLS build is its own lazily fetched module (plan 4.7).
+[features]
+default = ["mls"]
+mls = [
+    "dep:openmls",
+    "dep:openmls_traits",
+    "dep:openmls_rust_crypto",
+    "dep:openmls_basic_credential",
+    "dep:openmls_memory_storage",
+    "dep:rand_chacha",
+    "dep:rand_core",
+    "dep:ed25519-dalek",
+]
+
 [dependencies]
+# Pinned exactly: the stored group state and the wire format are tied to the
+# OpenMLS version (docs/chat-e2ee-phase0.md, "Formato del almacen").
+# `draft-ietf-mls-pq-ciphersuites` enables the ML-KEM-768 + X25519 hybrid suite
+# (src/mls/mod.rs explains the code point).
+openmls = { version = "=0.9.2", optional = true, default-features = false, features = ["draft-ietf-mls-pq-ciphersuites"] }
+openmls_traits = { version = "=0.6.0", optional = true, features = ["draft-ietf-mls-pq-ciphersuites"] }
+openmls_rust_crypto = { version = "=0.6.0", optional = true, features = ["draft-ietf-mls-pq-ciphersuites"] }
+openmls_basic_credential = { version = "=0.6.0", optional = true }
+openmls_memory_storage = { version = "=0.6.0", optional = true }
+rand_chacha = { version = "=0.3.1", optional = true }
+rand_core = { version = "=0.6.4", optional = true }
+# The Ed25519 key is derived from the injected seed, not from OpenMLS's own
+# entropy; same crate and major version openmls_rust_crypto signs with.
+ed25519-dalek = { version = "=2.2.0", optional = true }
+
+# Browsers: OpenMLS's crypto provider draws its HPKE and nonce entropy from the
+# platform (crypto.getRandomValues through getrandom), and its clock from
+# web-time; both need their wasm32 backends switched on.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+openmls = { version = "=0.9.2", optional = true, default-features = false, features = ["js"] }
+getrandom_02 = { package = "getrandom", version = "=0.2.17", features = ["js"] }
 
 [dev-dependencies]
 polaris-core-vectors = { path = "../polaris-core-vectors" }
 proptest = "1.7.0"
 criterion = { version = "=0.7.0", default-features = false, features = ["cargo_bench_support"] }
+# The RFC 9420 passive-client vectors hand over raw private keys, which only
+# OpenMLS's test API can place in a key package bundle; dev builds only.
+openmls = { version = "=0.9.2", default-features = false, features = ["draft-ietf-mls-pq-ciphersuites", "test-utils"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
 
 # Criterion over the golden vectors (plan 4.7): `cargo bench -p polaris-core`.
 [[bench]]
 name = "probe"
 harness = false
+
+[[bench]]
+name = "mls"
+harness = false
+required-features = ["mls"]

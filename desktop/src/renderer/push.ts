@@ -4,7 +4,6 @@
  */
 
 import { available, byId, say } from "./dom";
-import { picker } from "./picker";
 import type { PushPhase, PushState } from "@/shared/bridge";
 
 const ORDER: PushPhase[] = ["checking", "building", "saving", "sending", "deploying"];
@@ -16,15 +15,7 @@ const title = byId<HTMLHeadingElement>("title");
 const subtitle = byId<HTMLParagraphElement>("subtitle");
 const folder = byId<HTMLParagraphElement>("folder");
 const choose = byId<HTMLButtonElement>("choose");
-const platform = picker(
-    byId("platform"),
-    [
-        { value: "", label: "This computer's platform" },
-        { value: "linux/amd64", label: "linux/amd64 - most servers" },
-        { value: "linux/arm64", label: "linux/arm64 - Raspberry Pi and other ARM servers" }
-    ],
-    () => undefined
-);
+const platform = byId<HTMLSelectElement>("platform");
 const steps = byId<HTMLOListElement>("steps");
 const progress = byId<HTMLProgressElement>("progress");
 const result = byId<HTMLParagraphElement>("result");
@@ -46,7 +37,7 @@ function render(next: PushState): void {
         : "Built here with Docker, then deployed as the next release.";
     folder.textContent = next.folder || "None chosen";
     folder.title = next.folder;
-    if (document.activeElement !== platform.element) platform.value = next.platform;
+    if (document.activeElement !== platform) platform.value = next.platform;
     choose.disabled = running;
     platform.disabled = running;
     cancel.hidden = !running;
