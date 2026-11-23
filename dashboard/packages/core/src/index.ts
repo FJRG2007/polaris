@@ -70,6 +70,7 @@ export * from "./mail-prefs.js";
 export * from "./mail-keys.js";
 export * from "./shortcuts.js";
 export * from "./launcher.js";
+export * from "./frecency.js";
 export * from "./mail-body-window.js";
 export * from "./mailto.js";
 export * from "./mailbox-providers.js";

@@ -44,7 +44,9 @@ import { installedApps, installedAppsRead, openListedApp } from "./launcher-apps
 import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipEntry } from "@/shared/clipboard-history";
 import { DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator } from "@/shared/launcher-hotkey";
 import { conflictSentence, findLaunchers, likelyHolders, type FoundLauncher } from "@/shared/launcher-conflicts";
-import { LAUNCHER_CHANNELS, topMatches, webSearchUrl, type LauncherAnswer, type LauncherRow } from "@/shared/launcher";
+import { recordLauncherUse, usageScores } from "./launcher-usage";
+import { byFrecency } from "../../../dashboard/packages/core/src/frecency";
+import { LAUNCHER_CHANNELS, rankedMatches, webSearchUrl, type LauncherAnswer, type LauncherRow } from "@/shared/launcher";
 import { app, BrowserWindow, clipboard, ipcMain, nativeImage, net, powerMonitor, safeStorage, screen, session, type IpcMainInvokeEvent } from "electron";
 
 /** How long after start the hidden window is made, so it does not compete with the main window's first load. */
@@ -72,6 +74,8 @@ let heldAccelerator: string | null = null;
 let launchersFound: FoundLauncher[] = [];
 /** What each row listed last does, by its id. */
 let actions = new Map<string, () => void>();
+/** The usage key of each row listed last that is ranked by use (see `launcher-usage`), by its id. */
+let useKeys = new Map<string, string>();
 /** The program behind each app row listed last, for its icon. */
 let appPaths = new Map<string, string>();
 /** Program icons already asked of the system, by path. Bounded by the list of installed programs. */
@@ -213,13 +217,23 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
     const query = text.trim();
     const next = new Map<string, () => void>();
     const paths = new Map<string, string>();
+    const keys = new Map<string, string>();
     const rows: LauncherRow[] = [];
-    const add = (row: Omit<LauncherRow, "id">, action: () => void) => {
+    const add = (row: Omit<LauncherRow, "id">, action: () => void, useKey?: string) => {
         const id = String(rows.length);
         rows.push({ id, ...row });
         next.set(id, action);
+        if (useKey) keys.set(id, useKey);
     };
     const origin = host?.server() ?? null;
+    const uses = usageScores();
+    const pageKey = (page: { path: string; }) => `page:${page.path}`;
+    const appKey = (app: { path: string; }) => `app:${app.path}`;
+    const addApp = (app: ReturnType<typeof installedApps>[number]) => {
+        add({ kind: "app", title: app.label, subtitle: app.launch && app.launch.kind !== "open" ? appSource(app.path) : "Application" }, () => void openListedApp(app.path), appKey(app));
+        paths.set(String(rows.length - 1), app.icon ?? app.path);
+    };
+    const addPage = (page: { label: string; path: string; }) => add({ kind: "page", title: page.label, subtitle: "Open in Polaris" }, () => host?.showPolaris(page.path), pageKey(page));
 
     const answer = hostOnly && SUM.test(query) ? null : quickAnswer(query);
     if (answer) add({ kind: "answer", title: answer.value, subtitle: `${answer.label} - Enter copies it` }, () => void clipboard.writeText(answer.value));
@@ -232,17 +246,13 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
         }
     } else if (query) {
         if (origin && !hostOnly) {
-            for (const entry of topMatches(query, index?.server === origin ? index.entries : [], PER_KIND)) {
-                add({ kind: "polaris", title: entry.label, subtitle: entry.context }, () => host?.showPolaris(entry.href));
+            const entryKey = (entry: IndexEntry) => `polaris:${entry.href}`;
+            for (const entry of rankedMatches(query, index?.server === origin ? index.entries : [], PER_KIND, entryKey, uses)) {
+                add({ kind: "polaris", title: entry.label, subtitle: entry.context }, () => host?.showPolaris(entry.href), entryKey(entry));
             }
-            for (const page of topMatches(query, PAGES.map((page) => ({ ...page, context: "Polaris" })), 3)) {
-                add({ kind: "page", title: page.label, subtitle: "Open in Polaris" }, () => host?.showPolaris(page.path));
-            }
+            for (const page of rankedMatches(query, PAGES.map((page) => ({ ...page, context: "Polaris" })), 3, pageKey, uses)) addPage(page);
         }
-        for (const app of topMatches(query, installedApps().map((app) => ({ ...app, context: "" })), PER_KIND)) {
-            add({ kind: "app", title: app.label, subtitle: app.launch && app.launch.kind !== "open" ? appSource(app.path) : "Application" }, () => void openListedApp(app.path));
-            paths.set(String(rows.length - 1), app.icon ?? app.path);
-        }
+        for (const app of rankedMatches(query, installedApps().map((app) => ({ ...app, context: "" })), PER_KIND, appKey, uses)) addApp(app);
         if (origin) {
             add({ kind: "polar", title: `Ask Polar "${query.slice(0, 120)}"`, subtitle: "Opens Polar with the question ready to send" }, () =>
                 host?.showPolaris(`/polar?new=1&prompt=${encodeURIComponent(query.slice(0, 4000))}`)
@@ -253,11 +263,14 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
         if (settings.toggle("launcherClipboard") && clips.some((clip) => clip.text.toLowerCase().includes(query.toLowerCase()))) {
             add({ kind: "clip", title: "Search clipboard history", subtitle: `Type "clip ${query.slice(0, 40)}"` }, () => undefined);
         }
-    } else if (origin && !hostOnly) {
-        for (const page of PAGES.slice(0, 6)) add({ kind: "page", title: page.label, subtitle: "Open in Polaris" }, () => host?.showPolaris(page.path));
+    } else if (!hostOnly) {
+        // Nothing typed: what is used most and lately, as Raycast's root opens.
+        if (origin) for (const page of byFrecency(PAGES, pageKey, uses).slice(0, 6)) addPage(page);
+        for (const app of byFrecency(installedApps(), appKey, uses).filter((app) => uses.has(appKey(app))).slice(0, 4)) addApp(app);
     }
     actions = next;
     appPaths = paths;
+    useKeys = keys;
     return { rows, notice: origin ? indexNotice : "Connect to a Polaris to search it." };
 }
 
@@ -683,6 +696,8 @@ export function startLauncher(given: LauncherHost): void {
         const action = fromLauncher(event) && id.success ? actions.get(id.data) : undefined;
         if (!action) return false;
         hide();
+        const useKey = id.success ? useKeys.get(id.data) : undefined;
+        if (useKey) recordLauncherUse(useKey);
         action();
         return true;
     });

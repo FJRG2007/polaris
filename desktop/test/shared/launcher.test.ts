@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { convert, evaluate, quickAnswer } from "@/shared/quick-answer";
-import { matchScore, topMatches, webSearchUrl } from "@/shared/launcher";
+import { matchScore, rankedMatches, topMatches, useBoost, USE_BOOST_MAX, webSearchUrl } from "@/shared/launcher";
 import { conflictSentence, findLaunchers, likelyHolders } from "@/shared/launcher-conflicts";
 import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipboardProbe } from "@/shared/clipboard-history";
 import { bindingFromPress, DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator, type KeyPress } from "@/shared/launcher-hotkey";
@@ -173,5 +173,30 @@ describe("the launcher's list", () => {
 
     it("sends a web search with the query encoded", () => {
         expect(webSearchUrl("duckduckgo", " a&b c ")).toBe("https://duckduckgo.com/?q=a%26b%20c");
+    });
+});
+
+describe("ranking by use", () => {
+    const items = [
+        { label: "Slack", context: "" },
+        { label: "Slides", context: "" },
+        { label: "Sl", context: "" },
+        { label: "Notes", context: "" }
+    ];
+    const key = (item: { label: string; }) => item.label;
+
+    it("puts the more used first among matches of one kind", () => {
+        expect(rankedMatches("sl", items, 5, key, new Map()).map(key)).toEqual(["Sl", "Slack", "Slides"]);
+        expect(rankedMatches("sl", items, 5, key, new Map([["Slides", 3]])).map(key)).toEqual(["Sl", "Slides", "Slack"]);
+    });
+
+    it("never lifts a used row above a better match", () => {
+        expect(rankedMatches("sl", items, 5, key, new Map([["Slides", 1e9]])).map(key)[0]).toBe("Sl");
+        expect(useBoost(1e9)).toBe(USE_BOOST_MAX);
+    });
+
+    it("adds nothing for no use, and never lists what does not match", () => {
+        expect(useBoost(0)).toBe(0);
+        expect(rankedMatches("sl", items, 5, key, new Map([["Notes", 50]])).map(key)).not.toContain("Notes");
     });
 });

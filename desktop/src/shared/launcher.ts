@@ -79,6 +79,34 @@ export function topMatches<T extends Searchable>(query: string, items: readonly 
         .map((entry) => entry.item);
 }
 
+/** The most a row's use adds to its match: less than the step between two kinds of match, so use reorders within one and never above a better one. */
+export const USE_BOOST_MAX = 19;
+
+/** What a use score (`@polaris/core` `frecency`) adds to a match: grows with use, flattening out. */
+export function useBoost(score: number): number {
+    return score > 0 ? Math.min(USE_BOOST_MAX, 8 * Math.log2(1 + score)) : 0;
+}
+
+/**
+ * The best `limit` matches like `topMatches`, with what was chosen more often
+ * and lately first among matches of one kind. `keyOf` is the item's usage key.
+ */
+export function rankedMatches<T extends Searchable>(
+    query: string,
+    items: readonly T[],
+    limit: number,
+    keyOf: (item: T) => string,
+    uses: ReadonlyMap<string, number>
+): T[] {
+    return items
+        .map((item, index) => ({ item, index, match: matchScore(query, item) }))
+        .filter((entry) => entry.match > 0)
+        .map((entry) => ({ ...entry, score: entry.match + useBoost(uses.get(keyOf(entry.item)) ?? 0) }))
+        .sort((a, b) => b.score - a.score || a.index - b.index)
+        .slice(0, limit)
+        .map((entry) => entry.item);
+}
+
 /** The search engines a web search can go to, the first the default. */
 export const SEARCH_ENGINES = {
     duckduckgo: { name: "DuckDuckGo", url: "https://duckduckgo.com/?q=" },
