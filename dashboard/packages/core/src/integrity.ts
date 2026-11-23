@@ -13,13 +13,14 @@
  */
 
 import { z } from "zod";
+import type { CheckedFile } from "./integrity-paths";
+
+export { CODE_EXTENSIONS, checkedPath, sriDigest, type CheckedFile } from "./integrity-paths";
 
 /** Where CI publishes the manifests (`.github/workflows/dashboard-publish.yml`). */
 export const MANIFEST_BASE = "https://raw.githubusercontent.com/FJRG2007/polaris/integrity/manifests/";
 /** The most of a manifest that is read. A build lists a few thousand files. */
 export const MANIFEST_MAX_BYTES = 4 * 1024 * 1024;
-/** The extensions the manifest lists (CODE_EXTENSIONS in the script). */
-export const CODE_EXTENSIONS: readonly string[] = [".js", ".mjs", ".css", ".wasm"];
 
 const stampSchema = z.string().regex(/^[0-9a-f]{16}$/);
 const pathSchema = z.string().startsWith("/").max(1_024);
@@ -33,11 +34,6 @@ export const integrityManifestSchema = z.object({
 
 export type IntegrityManifest = z.infer<typeof integrityManifestSchema>;
 
-/** One file a page loaded, hashed by the checker. */
-export interface CheckedFile {
-    readonly path: string;
-    readonly digest: string;
-}
 
 export type IntegrityVerdict =
     | { readonly kind: "verified"; readonly build: string; readonly checked: number }
@@ -64,22 +60,6 @@ export function readManifest(text: string, stamp: string): IntegrityManifest | n
     }
     const parsed = integrityManifestSchema.safeParse(raw);
     return parsed.success && parsed.data.build === stamp ? parsed.data : null;
-}
-
-/**
- * The path a loaded resource is checked under, or null when it is not one this
- * checks: another origin, or not a file of code. The query is dropped (Next.js
- * adds `?dpl=` to some), the path kept exactly as served.
- */
-export function checkedPath(url: string, origin: string): string | null {
-    let parsed: URL;
-    try {
-        parsed = new URL(url, origin);
-    } catch {
-        return null;
-    }
-    if (parsed.origin !== origin) return null;
-    return CODE_EXTENSIONS.some((extension) => parsed.pathname.endsWith(extension)) ? parsed.pathname : null;
 }
 
 /** Whether a path has to be on the list: under a prefix the build owns whole,
@@ -111,11 +91,101 @@ export function judge(
         : { kind: "verified", build: stamp, checked: checked.length };
 }
 
-/** The SRI form of a SHA-256, as the manifest writes it. */
-export async function sriDigest(bytes: ArrayBuffer | Uint8Array): Promise<string> {
-    const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-    const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", view as Uint8Array<ArrayBuffer>));
-    let binary = "";
-    for (const byte of hash) binary += String.fromCharCode(byte);
-    return `sha256-${btoa(binary)}`;
+/** The most files one page may hand over: a dashboard page loads a few hundred. */
+export const MAX_FILES = 2_000;
+const TIMEOUT_MS = 10_000;
+/** A few servers, a few builds each, between restarts. */
+const CACHE_ENTRIES = 8;
+
+export type IntegrityFetch = (url: string, init: RequestInit) => Promise<Response>;
+
+async function readCapped(response: Response, max: number): Promise<string | null> {
+    const text = await response.text();
+    return text.length > max ? null : text;
+}
+
+/** What a page said it loaded, kept to what it is allowed to say. */
+export function readFiles(raw: unknown): CheckedFile[] | null {
+    if (!Array.isArray(raw) || raw.length > MAX_FILES) return null;
+    const files: CheckedFile[] = [];
+    for (const entry of raw) {
+        const path = (entry as { path?: unknown })?.path;
+        const digest = (entry as { digest?: unknown })?.digest;
+        if (typeof path !== "string" || typeof digest !== "string") return null;
+        if (!path.startsWith("/") || path.length > 1_024 || digest.length > 100) return null;
+        files.push({ path, digest });
+    }
+    return files;
+}
+
+export interface IntegrityChecker {
+    /** The build stamp `origin` answers, or null when it answers none. */
+    stamp(origin: string): Promise<string | null>;
+    /** The signed manifest of a build, from GitHub; null when there is none. */
+    manifest(stamp: string): Promise<IntegrityManifest | null>;
+    /** The verdict for files a page of `origin` loaded. */
+    check(origin: string, files: readonly CheckedFile[]): Promise<IntegrityVerdict>;
+    /** For tests: forget every manifest. */
+    forget(): void;
+}
+
+/**
+ * The checker the extension's worker and the desktop app's main process share.
+ * The stamp is asked of the server; the manifest is fetched from GitHub, never
+ * from the server, and kept per stamp because a build never changes. A server
+ * or GitHub that cannot be reached is "cannot verify" rather than an error: a
+ * page is not blocked for a network that failed, only for code that differs.
+ */
+export function createIntegrityChecker(fetcher: IntegrityFetch = (url, init) => fetch(url, init)): IntegrityChecker {
+    /** A manifest per stamp; null is "GitHub has none for it", kept like an answer. */
+    const manifests = new Map<string, IntegrityManifest | null>();
+    const remember = (stamp: string, manifest: IntegrityManifest | null): void => {
+        manifests.delete(stamp);
+        manifests.set(stamp, manifest);
+        while (manifests.size > CACHE_ENTRIES) manifests.delete(manifests.keys().next().value as string);
+    };
+    const stamp = async (origin: string): Promise<string | null> => {
+        const response = await fetcher(`${origin}/api/version`, {
+            credentials: "omit",
+            cache: "no-store",
+            referrerPolicy: "no-referrer",
+            signal: AbortSignal.timeout(TIMEOUT_MS)
+        });
+        if (!response.ok) return null;
+        const text = await readCapped(response, 4_096);
+        if (text === null) return null;
+        try {
+            return readStamp((JSON.parse(text) as { build?: unknown }).build);
+        } catch {
+            return null;
+        }
+    };
+    const manifest = async (build: string): Promise<IntegrityManifest | null> => {
+        if (manifests.has(build)) return manifests.get(build) ?? null;
+        const response = await fetcher(manifestUrl(build), {
+            credentials: "omit",
+            referrerPolicy: "no-referrer",
+            signal: AbortSignal.timeout(TIMEOUT_MS)
+        });
+        // Only a definite "there is none" is remembered; a failure is asked again.
+        if (response.status === 404) {
+            remember(build, null);
+            return null;
+        }
+        if (!response.ok) throw new Error(`manifest answered ${response.status}`);
+        const text = await readCapped(response, MANIFEST_MAX_BYTES);
+        const found = text === null ? null : readManifest(text, build);
+        remember(build, found);
+        return found;
+    };
+    return {
+        stamp,
+        manifest,
+        async check(origin, files) {
+            const build = await stamp(origin).catch(() => null);
+            if (!build) return judge(null, null, files);
+            return judge(build, await manifest(build).catch(() => null), files);
+        },
+        forget: () => manifests.clear()
+    };
 }
