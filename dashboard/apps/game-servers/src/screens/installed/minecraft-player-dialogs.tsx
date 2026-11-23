@@ -933,7 +933,7 @@ export function PlayerAccessDialog({
             }
             ready={ready || finished}
             unchanged={unchanged && !finished}
-            pending={pending || inviting || saving}
+            pending={pending || saving || (inviting && !finished)}
             error={error}
             onClose={onClose}
             onConfirm={() => {
