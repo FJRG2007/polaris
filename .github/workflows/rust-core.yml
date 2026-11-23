@@ -49,6 +49,10 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Reading this workflow's own past runs, to find the last green one.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       core: ${{ steps.diff.outputs.core }}
     steps:
@@ -59,19 +63,33 @@ jobs:
       - id: diff
         env:
           EVENT: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
           BASE: ${{ github.event.pull_request.base.sha }}
+          BRANCH: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # Everything the Rust core is built or checked from. A first push of a
-          # branch, a dispatch, or a base that is not in the history (a force
-          # push) has nothing safe to compare against, so it runs everything.
+          # Everything the Rust core is built or checked from.
           pattern='^(crates/polaris-core[^/]*/|dashboard/packages/core-rs/|dashboard/package(-lock)?\.json$|Cargo\.(toml|lock)$|rust-toolchain\.toml$|docs/rust-core-(plan|ledger)\.md$|\.github/workflows/rust-core\.yml$)'
+          # A push is compared with the last commit of this branch whose run went
+          # green, not with the commit before it: a run that failed, was
+          # cancelled, or is still going has checked nothing, and comparing with
+          # `before` would let the next push skip the crates it changed. Green
+          # means every job passed or the crates matched an earlier green commit,
+          # so nothing in between is left unchecked. A pull request is compared
+          # with its base. No green run yet, a dispatch, an unreadable run list,
+          # or a commit not in this history (a force push) runs everything.
+          from=""
           case "$EVENT" in
             pull_request) from="$BASE" ;;
-            push) from="$BEFORE" ;;
-            *) from="" ;;
+            push)
+              from=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/rust-core.yml/runs" \
+                -f branch="$BRANCH" -f status=success -f per_page=50 \
+                --jq '.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch") | .head_sha' 2>/dev/null \
+                | while read -r sha; do
+                    if git cat-file -e "$sha^{commit}" 2>/dev/null && git merge-base --is-ancestor "$sha" "$GITHUB_SHA"; then echo "$sha"; break; fi
+                  done) || from=""
+              ;;
           esac
-          if [ -z "$from" ] || [ "$from" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$from^{commit}" 2>/dev/null; then
+          if [ -z "$from" ] || ! git cat-file -e "$from^{commit}" 2>/dev/null; then
             core=true
           elif git diff --name-only "$from" "$GITHUB_SHA" | grep -Eq "$pattern"; then
             core=true
@@ -79,7 +97,7 @@ jobs:
             core=false
           fi
           echo "core=$core" >> "$GITHUB_OUTPUT"
-          echo "Rust core changed: $core"
+          echo "Compared with: ${from:-nothing}; Rust core changed: $core"
 
   rust:
     name: fmt, clippy, tests, guards

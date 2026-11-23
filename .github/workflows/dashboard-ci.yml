@@ -235,7 +235,10 @@ jobs:
   # the Node binding of @polaris/core-rs, which the shards above do not build, so
   # there those tests skip. Here the binding is built for this runner (glibc, a
   # cached cargo build) and the suite is told a missing one is a failure, so the
-  # tests that skip everywhere else cannot quietly skip here too.
+  # tests that skip everywhere else cannot quietly skip here too. The WebAssembly
+  # binding and Playwright's Chromium (free, from Playwright's own download) are
+  # here too, for the sealed chat driven in a real browser
+  # (test/chat/e2ee/sealed-browser.test.ts), held to the same rule.
   web-mls-native:
     name: web MLS devices (Node binding)
     runs-on: ubuntu-latest
@@ -255,15 +258,24 @@ jobs:
       - run: cargo --version
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          key: web-mls-native-x86_64-unknown-linux-gnu
+          key: web-mls-native-node-wasm
 
       - run: npm ci --prefer-offline || npm ci --prefer-offline || npm ci --prefer-offline
       - run: npm run db:generate
       - uses: ./.github/actions/workspace-packages
-      - run: npm run build:rust -w @polaris/core-rs -- --only node --node-target x86_64-unknown-linux-gnu
+      # Same tools and digests as rust-core.yml.
+      - uses: ./.github/actions/core-rs-bindings
+        with:
+          node-target: x86_64-unknown-linux-gnu
+          wasm: "true"
+      - run: node apps/web/scripts/copy-core-rs-assets.mjs
+        env:
+          POLARIS_CORE_RS_REQUIRED: "1"
+      - run: npx playwright install --with-deps chromium
       - name: MLS device tests against the route
         env:
           POLARIS_REQUIRE_CORE_RS_NATIVE: "1"
+          POLARIS_REQUIRE_SEALED_BROWSER: "1"
         run: npm run test -w @polaris/web -- test/chat/e2ee --maxWorkers=2
 
   # Proof that the app compiles, for branches and pull requests. The publish workflow

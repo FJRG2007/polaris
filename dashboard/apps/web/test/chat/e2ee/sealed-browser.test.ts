@@ -58,6 +58,9 @@ const web = fileURLToPath(new URL("../../../", import.meta.url));
 const assets = join(web, "public", "core-rs", "mls");
 const playwright = await import("playwright").catch(() => null);
 const runnable = Boolean(playwright && existsSync(join(assets, "manifest.json")) && existsSync(playwright.chromium.executablePath()));
+// CI installs both (dashboard-ci.yml, web-mls-native) and asks for them, so a
+// missing one fails there instead of skipping quietly.
+if (process.env.POLARIS_REQUIRE_SEALED_BROWSER && !runnable) throw new Error(`the sealed browser test needs the staged MLS binding in ${assets} and Playwright's Chromium`);
 
 type Sealed = typeof import("@/lib/chat/e2ee/sealed-chat");
 type Page = import("playwright").Page;
