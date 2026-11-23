@@ -45,6 +45,9 @@ import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
 import * as update from "@/lib/update";
 import * as devicePairing from "@/lib/device-pairing";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
+import { sriDigest } from "@polaris/core/integrity";
+import { checkPage, originPattern, readFiles } from "@/lib/integrity";
+import { INTEGRITY_CHECK, type IntegrityReply } from "@/lib/integrity-messages";
 import { BLOCKED_HOSTS_KEY, PAGE_FILLING_KEY } from "@/lib/page-filling";
 import * as launcherStore from "@/lib/launcher-settings";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
@@ -4819,6 +4822,79 @@ async function syncAutofill(): Promise<void> {
         .catch(() => undefined);
 }
 
+/** The id the page code check is registered under. */
+const INTEGRITY_ID = "polaris-integrity";
+
+/**
+ * Keep the page code check (`src/entrypoints/integrity.ts`) registered on every
+ * Polaris server somebody added, and only there. Always on: it is what stands
+ * between a changed page and a password typed into it (docs/integrity.md).
+ * Firefox has no runtime registration under manifest v2, as for filling.
+ */
+async function syncIntegrity(): Promise<void> {
+    if (!browser.scripting?.registerContentScripts) return;
+    const servers = await savedServers().catch(() => []);
+    const matches = [...new Set(servers.map((server) => originPattern(server.origin)).filter((p): p is string => p !== null))];
+    await browser.scripting.unregisterContentScripts({ ids: [INTEGRITY_ID] }).catch(() => undefined);
+    if (matches.length === 0) return;
+    await browser.scripting
+        .registerContentScripts([
+            { id: INTEGRITY_ID, js: ["integrity.js"], matches, runAt: "document_idle", persistAcrossSessions: true }
+        ])
+        .catch(() => undefined);
+}
+
+/**
+ * The page check's question. Answered only for a page whose own address - taken
+ * from the browser, not the message - is one of the saved servers, so no other
+ * site can use this to make the worker fetch anything.
+ */
+async function answerIntegrity(raw: unknown, senderUrl: string | undefined): Promise<IntegrityReply> {
+    let origin: string;
+    try {
+        origin = new URL(senderUrl ?? "").origin;
+    } catch {
+        return { ok: false };
+    }
+    const servers = await savedServers().catch(() => []);
+    if (!servers.some((server) => server.origin === origin)) return { ok: false };
+    const files = readFiles((raw as { files?: unknown }).files);
+    if (!files) return { ok: false };
+    // A page on plain http has no WebCrypto: its files are hashed here.
+    const hashed = await Promise.all(
+        files.map(async (file) => {
+            if (file.digest) return file;
+            try {
+                const response = await fetch(`${origin}${file.path}`, { credentials: "omit", cache: "force-cache" });
+                return { path: file.path, digest: response.ok ? await sriDigest(await response.arrayBuffer()) : "" };
+            } catch {
+                return file;
+            }
+        })
+    );
+    const verdict = await checkPage(
+        origin,
+        hashed.filter((file) => file.digest !== "")
+    );
+    return {
+        ok: true,
+        verdict,
+        words: {
+            title: await say("integrity.title"),
+            body: await say("integrity.body"),
+            files: await say("integrity.files"),
+            dismiss: await say("integrity.dismiss")
+        }
+    };
+}
+
+browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
+    if (sender.id !== browser.runtime.id || (raw as { kind?: unknown })?.kind !== INTEGRITY_CHECK) return false;
+    if (sender.tab?.id === undefined || sender.frameId !== 0) return false;
+    void answerIntegrity(raw, sender.url).then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+});
+
 /** The id the on-page launcher is registered under. */
 const LAUNCHER_ID = "polaris-launcher";
 
@@ -4919,6 +4995,10 @@ export default defineBackground(() => {
     // give and take access without this extension being asked.
     void syncAutofill();
     void syncLauncher();
+    void syncIntegrity();
+    browser.storage.onChanged.addListener((changes, area) => {
+        if (area === "local" && changes["servers.list"]) void syncIntegrity();
+    });
     browser.permissions.onAdded.addListener(() => void syncAutofill());
     browser.permissions.onAdded.addListener(() => void syncLauncher());
     browser.permissions.onRemoved.addListener(() => void syncLauncher());

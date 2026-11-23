@@ -556,5 +556,11 @@
         "hintMove": "Arriba y abajo para moverte, Intro para abrir",
         "hintClose": "Esc para cerrar",
         "close": "Cerrar"
+    },
+    "integrity": {
+        "title": "Esta página de Polaris fue modificada",
+        "body": "Parte del código que cargó no es el que Polaris compiló para la versión de este servidor. Sus campos de contraseña están bloqueados. No inicies sesión aquí: avisa a quien administra el servidor y cierra sesión en tus otros dispositivos.",
+        "files": "Archivos que difieren:",
+        "dismiss": "Cerrar"
     }
 }

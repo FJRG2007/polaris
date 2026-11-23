@@ -556,5 +556,11 @@
         "hintMove": "Up and down to move, Enter to open",
         "hintClose": "Esc to close",
         "close": "Close"
+    },
+    "integrity": {
+        "title": "This Polaris page was changed",
+        "body": "Some of the code this page loaded is not the code Polaris built for this server's version. Its password fields are blocked. Do not sign in here: tell whoever runs this server, and sign out of your other devices.",
+        "files": "Files that differ:",
+        "dismiss": "Close"
     }
 }

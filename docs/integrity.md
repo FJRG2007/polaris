@@ -33,7 +33,7 @@ They slow down the honest reader and stop no one who controls the machine.
 
 | Who | What they can do | Detected? |
 | --- | --- | --- |
-| Someone on the network path (rogue proxy, a TLS-terminating middlebox the operator did not set up) | Replace or add a script in a page | Yes, by the extension and the desktop app: a served file that differs from the signed manifest, or one the manifest does not list, is reported as changed |
+| Someone on the network path (rogue proxy, a TLS-terminating middlebox the operator did not set up) | Replace or add a script in a page | Yes, by the browser extension on Chromium: a served file that differs from the signed manifest, or one the manifest does not list, is reported as changed |
 | Someone with write access to the server's files or its image (a compromised host, a modified image pulled from elsewhere) | Serve changed scripts from the server itself | Yes, the same way - the manifest is not taken from the server |
 | A compromised build on GitHub Actions | Build, sign and publish changed code | No. The signature is genuine. The Rekor log makes it public and auditable after the fact |
 | Someone who controls the browser or the computer (malware, a hostile extension) | Anything | No. Nothing running inside a machine can prove that machine is honest |
@@ -77,12 +77,14 @@ loaded from its own origin, and compares. Three outcomes:
   manifest exists for it (a build from before manifests were published, or one not
   published by Polaris' CI). Nothing is blocked; the reason is shown on request.
 - **Changed** - a file differs from the manifest, or the page loaded one the
-  manifest does not list. The extension covers the page with a warning, refuses to
-  fill a password there, and stops keystrokes reaching its password fields.
+  manifest does not list. The extension covers the page with a warning, empties
+  its password fields, makes them read-only and stops keystrokes reaching them.
 
-**The desktop app.** The same check, run by the app on every Polaris page it
-opens, with the same three outcomes. The app's own code is protected by Electron
-fuses: `RunAsNode`, `NODE_OPTIONS` and the inspector are off, the app loads only
+The check runs on Chromium browsers (`dashboard/apps/extension/src/entrypoints/integrity.ts`,
+registered on every saved server). Firefox's manifest v2 build cannot register a
+page script at runtime, so it does not check yet.
+
+**The desktop app.** The app's own code is protected by Electron fuses: `RunAsNode`, `NODE_OPTIONS` and the inspector are off, the app loads only
 from its archive, and the archive's integrity is checked against the hash embedded
 in the binary (`desktop/forge.config.js`). How an update is checked depends on the
 system (`desktop/src/main/updates.ts`):
@@ -120,6 +122,11 @@ from, not independently signed.
   The extension does not yet verify the Sigstore bundle itself.
 
 ## Not done yet
+
+- The desktop app running the same page check on the Polaris pages it opens
+  (`@polaris/core/integrity` is shared and ready for it).
+- The extension verifying the Sigstore bundle itself instead of trusting the
+  `integrity` branch over TLS.
 
 - Enforcing a strict CSP with nonces or hashes on every page, and SRI on Polaris'
   own scripts. Next.js App Router pages carry per-request inline scripts, so this
