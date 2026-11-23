@@ -3056,11 +3056,11 @@
         "open": "Open",
         "spoilers": {
             "title": "Show spoilers without asking",
-            "body": "Pictures and messages somebody sent covered are drawn straight away instead of waiting for a press. This browser only."
+            "body": "{surface, select, app {Pictures and messages somebody sent covered are drawn straight away instead of waiting for a press. This app only.} other {Pictures and messages somebody sent covered are drawn straight away instead of waiting for a press. This browser only.}}"
         },
         "media": {
             "title": "Media auto-download",
-            "body": "Photos, videos and documents from recent messages are saved on this device ahead of time, so chats open without a connection. Anything not saved still loads when you open it. This browser only.",
+            "body": "{surface, select, app {Photos, videos and documents from recent messages are saved on this device ahead of time, so chats open without a connection. Anything not saved still loads when you open it. This app only.} other {Photos, videos and documents from recent messages are saved on this device ahead of time, so chats open without a connection. Anything not saved still loads when you open it. This browser only.}}",
             "whenHint": "Always saves on any connection, mobile data included. Wi-Fi only waits for Wi-Fi or a cable. Never saves nothing ahead of time.",
             "photos": "Photos",
             "photosHint": "Pictures sent in your chats.",

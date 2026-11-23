@@ -973,7 +973,7 @@
         "web/src/app/(app)/chat/share-stream-menu.tsx",
         "web/src/app/(app)/chat/speaker-device.ts",
         "web/src/app/(app)/chat/spoiler.tsx",
-        "web/src/app/(app)/chat/spoilers-card.tsx",
+        "web/src/app/(app)/chat/settings/spoilers-card.tsx",
         "web/src/app/(app)/chat/thread-panel.tsx",
         "web/src/app/(app)/chat/use-sfu-call.ts",
         "web/src/app/(app)/chat/voice-note.tsx",

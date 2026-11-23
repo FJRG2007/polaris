@@ -3056,11 +3056,11 @@
         "open": "Abrir",
         "spoilers": {
             "title": "Mostrar spoilers sin preguntar",
-            "body": "Las imágenes y los mensajes que alguien envió tapados se muestran directamente, sin esperar a que pulses. Solo en este navegador."
+            "body": "{surface, select, app {Las imágenes y los mensajes que alguien envió tapados se muestran directamente, sin esperar a que pulses. Solo en esta app.} other {Las imágenes y los mensajes que alguien envió tapados se muestran directamente, sin esperar a que pulses. Solo en este navegador.}}"
         },
         "media": {
             "title": "Descarga automática",
-            "body": "Las fotos, vídeos y documentos de los mensajes recientes se guardan antes en este dispositivo para abrir los chats sin conexión. Lo demás carga al abrirlo. Solo en este navegador.",
+            "body": "{surface, select, app {Las fotos, vídeos y documentos de los mensajes recientes se guardan antes en este dispositivo para abrir los chats sin conexión. Lo demás carga al abrirlo. Solo en esta app.} other {Las fotos, vídeos y documentos de los mensajes recientes se guardan antes en este dispositivo para abrir los chats sin conexión. Lo demás carga al abrirlo. Solo en este navegador.}}",
             "whenHint": "Siempre guarda con cualquier conexión, datos móviles incluidos. Solo wifi espera a wifi o cable. Nunca no guarda nada antes.",
             "photos": "Fotos",
             "photosHint": "Imágenes enviadas en tus chats.",
@@ -3073,7 +3073,7 @@
             "never": "Nunca",
             "cap": "Espacio máximo",
             "capHint": "Lo máximo que puede ocupar lo guardado. Al llenarse, se borra lo más antiguo.",
-            "usedTitle": "Espacio en uso",
+            "usedTitle": "En uso",
             "used": "{used} de {cap} en uso",
             "measuring": "Midiendo...",
             "clear": "Vaciar",
