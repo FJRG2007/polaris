@@ -243,7 +243,7 @@ through the Node binding and `mls-store.ts`:
 - Server-run members (Polar, webhooks): who they are, where they reach and the
   service device are built (`service-device.ts`: the Node binding's member
   through `nativeMlsMember`, its store, outbox, notes and history keys in
-  `MlsStoreEntry` under the reserved prefix ` polaris/`, a lease per device
+  `MlsStoreEntry` under the reserved prefix `\0polaris/`, a lease per device
   address, ops in-process through `answerMls`; a service's sealed message is
   stored with no author under Polar's or the webhook's name). Not built: the
   member list's "Add Polar", Polar reading a sealed question and answering it,
