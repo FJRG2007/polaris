@@ -254,8 +254,12 @@ describe("shadow mode", () => {
         expect(Object.keys(entry).sort()).toEqual(["at", "domain", "inputHash", "kind", "op", "rustHash", "tsHash"]);
         for (const hash of [entry.inputHash, entry.tsHash, entry.rustHash]) expect(hash).toMatch(/^[0-9a-f]{32}$/);
         expect(entry.tsHash).not.toBe(entry.rustHash);
-        const text = JSON.stringify(entry);
+        // The hashes are random hex and `at` is a clock reading, so either can hold "600" by chance; what
+        // must never carry the input or an output is everything else in the record.
+        const { inputHash: _input, tsHash: _ts, rustHash: _rust, at: _at, ...rest } = entry;
+        const text = JSON.stringify(rest);
         for (const leak of [secret, "600", String(twin.fnv1a32(secret))]) expect(text).not.toContain(leak);
+        for (const hash of [entry.inputHash, entry.tsHash, entry.rustHash]) expect(hash).not.toBe(String(twin.fnv1a32(secret)));
     });
 
     it("records an error on one side only as a difference", () => {
