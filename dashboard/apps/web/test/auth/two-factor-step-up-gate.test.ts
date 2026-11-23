@@ -90,6 +90,7 @@ beforeEach(() => {
         deletionRequestedAt: null,
         twoFactorEnabled: true,
         passwordChangeRequired: false,
+        phones: [],
         security: {
             idleLockMinutes: 0,
             sessionMaxMinutes: 0,
@@ -154,6 +155,7 @@ describe("a session that still owes factors", () => {
             deletionRequestedAt: null,
             twoFactorEnabled: false,
             passwordChangeRequired: false,
+            phones: [],
             security: {
                 idleLockMinutes: 0,
                 sessionMaxMinutes: 0,
@@ -196,6 +198,7 @@ describe("an instance that requires passkeys or security keys", () => {
             twoFactorEnabled: true,
             isAdmin: true,
             passwordChangeRequired: false,
+            phones: [],
             security: {
                 idleLockMinutes: 0,
                 sessionMaxMinutes: 0,
@@ -230,7 +233,7 @@ describe("an instance that requires a phone", () => {
             twoFactorEnabled: true,
             isAdmin: false,
             passwordChangeRequired: false,
-            phone: null,
+            phones: [],
             security: {
                 idleLockMinutes: 0,
                 sessionMaxMinutes: 0,
@@ -254,7 +257,7 @@ describe("an instance that requires a phone", () => {
 
     it("lets it through once the number is confirmed, without asking again", async () => {
         await requirePhone();
-        db.user.findUnique.mockResolvedValue(account({ phone: { verifiedAt: new Date() } }));
+        db.user.findUnique.mockResolvedValue(account({ phones: [{ id: "phone-1" }] }));
         db.sessionState.findUnique.mockResolvedValue(existingState());
         expect((await guardSession(input)).ok).toBe(true);
         expect(keys.owesPhone).not.toHaveBeenCalled();

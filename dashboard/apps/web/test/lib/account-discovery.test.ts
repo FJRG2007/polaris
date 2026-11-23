@@ -15,7 +15,7 @@ interface Account {
     username: string;
     bannedAt: Date | null;
     disabledAt: Date | null;
-    phone: { phone: string; verifiedAt: Date | null } | null;
+    phones: { phone: string; verifiedAt: Date | null }[];
 }
 
 function account(id: string, name: string): Account {
@@ -26,7 +26,7 @@ function account(id: string, name: string): Account {
         username: `fixture_${id}`,
         bannedAt: null,
         disabledAt: null,
-        phone: null
+        phones: []
     };
 }
 
@@ -78,9 +78,9 @@ function matches(person: Account, where: Record<string, unknown>): boolean {
             if (rule === null && person[field] !== null) return false;
         } else if (field === "emails") {
             return false;
-        } else if (field === "phone") {
-            const wanted = (rule as { is: { phone: string; verifiedAt: { not: null } } }).is;
-            if (person.phone?.phone !== wanted.phone || person.phone.verifiedAt === null)
+        } else if (field === "phones") {
+            const wanted = (rule as { some: { phone: string; verifiedAt: { not: null } } }).some;
+            if (!person.phones.some((row) => row.phone === wanted.phone && row.verifiedAt !== null))
                 return false;
         } else {
             throw new Error(`unhandled field ${field}`);
@@ -160,11 +160,10 @@ beforeEach(() => {
     blocked = new Set();
     showsEmail = new Set();
     hiddenByContact = new Map();
-    for (const person of accounts) person.phone = null;
-    accounts.find((person) => person.id === "stranger")!.phone = {
-        phone: "+34600111222",
-        verifiedAt: new Date(0)
-    };
+    for (const person of accounts) person.phones = [];
+    accounts.find((person) => person.id === "stranger")!.phones = [
+        { phone: "+34600111222", verifiedAt: new Date(0) }
+    ];
 });
 
 describe("an account field for somebody who is not an administrator", () => {
@@ -343,7 +342,7 @@ describe("finding somebody by email or phone", () => {
         expect(await search("+3460011")).toEqual([]);
         expect(await search("600111222")).toEqual([]);
         expect(await search("111222")).toEqual([]);
-        accounts.find((person) => person.id === "stranger")!.phone!.verifiedAt = null;
+        accounts.find((person) => person.id === "stranger")!.phones[0]!.verifiedAt = null;
         expect(await search("+34600111222")).toEqual([]);
     });
 });
