@@ -341,18 +341,29 @@ export class WindowsLister {
         const timeout = this.fresh ? FIRST_LIST_TIMEOUT_MS : LIST_TIMEOUT_MS;
         this.fresh = false;
         return new Promise((resolve, reject) => {
-            let text = "";
-            const done = (error: Error | null) => {
+            // Chunks are kept apart and only the seam is searched, so a long list is read once, not once per chunk.
+            const chunks: string[] = [];
+            let size = 0;
+            let tail = "";
+            const done = (error: Error | null, list = "") => {
                 clearTimeout(timer);
                 child.stdout.off("data", heard);
                 child.off("exit", gone);
                 if (error) reject(error);
-                else resolve(parseProcessList(text.slice(0, text.indexOf(LIST_END))));
+                else resolve(parseProcessList(list));
             };
-            const heard = (chunk: string) => {
-                text += chunk;
-                if (text.includes(LIST_END)) done(null);
-                else if (text.length > MAX_LIST_CHARS) done(new Error("The process list was too long."));
+            const heard = (data: string | Buffer) => {
+                const chunk = String(data);
+                const seam = tail + chunk;
+                const at = seam.indexOf(LIST_END);
+                if (at !== -1) {
+                    const text = chunks.join("") + chunk;
+                    return done(null, text.slice(0, size - tail.length + at));
+                }
+                chunks.push(chunk);
+                size += chunk.length;
+                tail = seam.slice(-LIST_END.length);
+                if (size > MAX_LIST_CHARS) done(new Error("The process list was too long."));
             };
             const gone = () => done(new Error("The process list stopped."));
             const timer = setTimeout(() => done(new Error("The process list did not answer.")), timeout);
