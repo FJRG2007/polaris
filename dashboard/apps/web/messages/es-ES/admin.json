@@ -3285,6 +3285,10 @@
             "hint": "Al iniciar sesión con GitHub o Google, primero responde ese servicio. Activado, Polaris pide también el segundo paso después.",
             "off": "Desactivado, el servicio que inició la sesión es todo el inicio de sesión. Quien quiera el paso extra puede activarlo en su propia cuenta."
         },
+        "passwordMigration": {
+            "title": "Contraseñas que no salen del navegador",
+            "summary": "{total, plural, =0 {Aún no hay cuentas que entren con contraseña.} other {{moved} de {shown} cuentas con contraseña entran sin enviarla. El resto pasa en su próximo inicio, sin hacer nada.}}"
+        },
         "playerAddresses": {
             "title": "Mostrar las direcciones de los jugadores a quienes gestionan servidores de juego",
             "hint": "Desactivado por defecto. Quienes gestionan siguen permitiendo, quitando y comparando direcciones, que ven como un código por servidor. Activado, ven las direcciones reales desde las que se conectan e inician sesión."

@@ -3285,6 +3285,10 @@
             "hint": "Signing in with GitHub or Google answers that service first. With this on, Polaris asks for the second step afterward as well.",
             "off": "With this off, the service that signed them in is the whole sign-in. Anyone who wants the extra step can still turn it on for their own account."
         },
+        "passwordMigration": {
+            "title": "Passwords that never leave the browser",
+            "summary": "{total, plural, =0 {No account signs in with a password yet.} other {{moved} of {shown} accounts with a password sign in without sending it. The rest move at their next sign-in, with nothing to do.}}"
+        },
         "playerAddresses": {
             "title": "Show player addresses to game server managers",
             "hint": "Off by default. Managers still allow, remove and compare addresses, shown as a code per server. Turned on, they see the real addresses players connect and sign in from."

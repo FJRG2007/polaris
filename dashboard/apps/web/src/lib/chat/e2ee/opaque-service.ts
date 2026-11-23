@@ -215,6 +215,21 @@ export async function adopted(userId: string): Promise<boolean> {
     return (await usableRecord(userId, "sign-in")) !== null;
 }
 
+/**
+ * How many accounts with a password have moved to OPAQUE, for the admin's
+ * security page. Moved = a verified record; a record a later password write
+ * made stale is deleted by that write, so it never counts. Two counts in the
+ * database, nothing read row by row.
+ */
+export async function passwordMigrationCounts(): Promise<{ moved: number; total: number }> {
+    const withPassword = { providerId: "credential", password: { not: null } };
+    const [total, moved] = await Promise.all([
+        prisma.account.count({ where: withPassword }),
+        prisma.account.count({ where: { ...withPassword, user: { opaqueRecord: { verifiedAt: { not: null } } } } })
+    ]);
+    return { moved, total };
+}
+
 /** The account an address names, or a stable stand-in id for one that names
  *  none - so the identity a start hands back cannot be used to probe addresses. */
 export async function identityFor(email: string): Promise<{ userId: string; known: boolean }> {

@@ -5,6 +5,7 @@ import { loadSecurityAdminAction } from "./data";
 import { CardSkeleton } from "../region-skeletons";
 import { AfterPaint } from "@/components/after-paint";
 import { PlayerAddressesCard } from "./player-addresses-card";
+import { PasswordMigrationCard } from "./password-migration-card";
 
 /** Sign-in rules are security settings, so they are never kept in the tab. */
 export function SecurityAdminLoader({ revision }: { revision: number }) {
@@ -19,6 +20,7 @@ export function SecurityAdminLoader({ revision }: { revision: number }) {
                     <CardSkeleton lines={4} />
                     <CardSkeleton lines={4} />
                     <CardSkeleton lines={1} className="max-w-2xl" />
+                    <CardSkeleton lines={1} className="max-w-2xl" />
                 </>
             }
         >
@@ -27,6 +29,9 @@ export function SecurityAdminLoader({ revision }: { revision: number }) {
                     <SecurityAdmin policy={data.policy} mailReady={data.mailReady} phoneReady={data.phoneReady} />
                     <div className="max-w-2xl">
                         <PlayerAddressesCard shared={data.addressesShared} />
+                    </div>
+                    <div className="max-w-2xl">
+                        <PasswordMigrationCard moved={data.passwords.moved} total={data.passwords.total} />
                     </div>
                 </>
             )}
