@@ -259,7 +259,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "apps",
-        notificationGroups: ["deploy", "agents"],
+        notificationGroups: ["deploy"],
         category: "infrastructure",
         label: "Apps", // i18n-ignore
         description: "Install & run apps: deploys, servers, assistants", // i18n-ignore
@@ -545,7 +545,8 @@ export const POLARIS_APPS: AppEntry[] = [
          * deployment's default for it under Management > Roles.
          */
         id: "polar",
-        notificationGroups: ["polar"],
+        // Agent sessions run in Polar Code and their notices open there.
+        notificationGroups: ["polar", "agents"],
         category: "work",
         label: "Polar", // i18n-ignore
         description: "Ask about any page, and have things done with your access", // i18n-ignore

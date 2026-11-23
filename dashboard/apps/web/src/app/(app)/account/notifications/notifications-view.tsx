@@ -30,6 +30,7 @@ import { NOTIFICATION_EVENTS } from "@polaris/core";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { NotificationFace } from "@/components/notifications/notification-face";
 import { describeAudience } from "@/components/notifications/notification-visuals";
+import { NotificationGroupMark } from "@/components/notification-group-mark";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import { Badge, Button, Card, CardBody, Checkbox, Input, Select, cn } from "@polaris/ui";
 import { Bell, Check, CheckCheck, ChevronDown, Loader2, Search, Trash2, X } from "lucide-react";
@@ -147,7 +148,8 @@ export function NotificationsView() {
         { value: ALL_EVENTS, label: t("history.allEvents") },
         ...NOTIFICATION_EVENTS.map((entry) => ({
             value: entry.id,
-            label: eventLabel(t, entry.id) ?? entry.label
+            label: eventLabel(t, entry.id) ?? entry.label,
+            icon: <NotificationGroupMark group={entry.group} />
         }))
     ];
 

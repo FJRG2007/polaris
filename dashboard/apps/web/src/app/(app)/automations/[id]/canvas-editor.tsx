@@ -92,8 +92,10 @@ import {
     Textarea,
     isDirty,
     shortcutPressed,
-    useToast
+    useToast,
+    hasAppLogo
 } from "@polaris/ui";
+import { aliasedAppId } from "@/lib/app-aliases";
 
 type Change = (
     update: (graph: core.AutomationGraph) => core.AutomationGraph,
@@ -834,24 +836,6 @@ const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
     send: Send
 };
 
-/**
- * The app whose own logo an app's group wears, as the sidebar draws it; the
- * icon above stays where that app has no logo, and on the groups that are not an app.
- */
-const GROUP_APP_LOGOS: Partial<Record<catalog.CatalogGroupId, string>> = {
-    automations: "automations",
-    places: catalog.PLACES_APP,
-    crm: "crm",
-    polar: "polar",
-    "game-servers": "games",
-    // The deploy group is the Apps app, as the sidebar names and draws it.
-    deploy: "apps",
-    chat: "chat",
-    tasks: "tasks",
-    mail: "mail",
-    drive: "drive",
-    calendar: "calendar"
-};
 
 /** The node picker: the shared add dialog, its groups from the catalog, each item with its icon. */
 export function Palette({
@@ -888,9 +872,12 @@ export function Palette({
                         icon:
                             group.id === "polaris" ? (
                                 <PolarisMark nameClassName="hidden" />
-                            ) : GROUP_APP_LOGOS[group.id] ? (
+                            ) : hasAppLogo(aliasedAppId(group.id)) ? (
+                                // The app a group is, through the one alias table
+                                // every screen draws app logos by; the icon stays on
+                                // the groups that are not an app.
                                 <AppLogo
-                                    appId={GROUP_APP_LOGOS[group.id]!}
+                                    appId={aliasedAppId(group.id)}
                                     size={16}
                                     fallback={<Icon aria-hidden="true" />}
                                 />

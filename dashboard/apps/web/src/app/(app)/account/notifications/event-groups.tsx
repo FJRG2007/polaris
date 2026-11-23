@@ -31,7 +31,6 @@ import {
 } from "lucide-react";
 import {
     ProductMark,
-    type PolarisProduct,
     Badge,
     Button,
     Card,
@@ -50,6 +49,7 @@ import {
     DateInput
 } from "@polaris/ui";
 import { WeekdayPicker } from "@/components/weekday-picker";
+import { NotificationGroupMark } from "@/components/notification-group-mark";
 import { useDisplayFormat } from "@/components/display-format";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -57,15 +57,6 @@ import type { DestinationView } from "@/lib/notifications/destinations";
 import { eventDescription, eventLabel, groupLabel } from "./event-names";
 
 type Translate = NamespaceTranslator<"accountNotifications">;
-
-/** Groups that are a Polaris product of their own, headed by its logo. */
-const PRODUCT_GROUPS: Partial<Record<core.NotificationGroup, PolarisProduct>> = {
-    tasks: "tasks",
-    calendar: "calendar",
-    drive: "drive",
-    mail: "mail",
-    polar: "polar"
-};
 
 /** Where this browser keeps which groups are open. */
 const OPEN_GROUPS_KEY = "polaris.notifications.openGroups";
@@ -132,8 +123,10 @@ export function EventGroups({
     // server's markup and the first client render agree.
     const [open, setOpen] = useState<Set<string>>(() => new Set());
     useEffect(() => setOpen(readOpenGroups()), []);
+    // A group with no rule handed in is one the account cannot open: the page
+    // leaves out the rules of apps it has no access to.
     const groups = core.NOTIFICATION_GROUPS.filter((group) =>
-        core.NOTIFICATION_EVENTS.some((entry) => entry.group === group)
+        core.NOTIFICATION_EVENTS.some((entry) => entry.group === group && state.has(entry.id))
     );
 
     function toggle(group: string) {
@@ -234,7 +227,7 @@ export function EventGroup({
                         )}
                         aria-hidden
                     />
-                    {PRODUCT_GROUPS[group] ? <ProductMark app={PRODUCT_GROUPS[group]} /> : null}
+                    <NotificationGroupMark group={group} label={label} />
                     <span className="truncate text-sm font-semibold" title={label}>
                         {label}
                     </span>

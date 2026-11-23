@@ -34,8 +34,10 @@ import {
     useShortcutText,
     useToast,
     writeDeviceShortcuts,
+    hasAppLogo,
     type ShortcutSheetGroup
 } from "@polaris/ui";
+import { aliasedAppId } from "@/lib/app-aliases";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PolarisAppIcon } from "@/components/polaris-app-icon";
@@ -60,23 +62,12 @@ function appTitle(t: T, app: string): string {
     return t.has(key) ? t(key) : app;
 }
 
-/** The Polaris app a shortcut set belongs to, for its logo. General shortcuts
- *  and Databases belong to no single app and draw none. */
-const SHORTCUT_APP_IDS: Partial<Record<core.ShortcutApp, string>> = {
-    mail: "mail",
-    tasks: "tasks",
-    calendar: "calendar",
-    drive: "drive",
-    viewer: "drive",
-    chat: "chat",
-    places: "home",
-    vault: "vault",
-    office: "office",
-    code: "polar"
-};
-
+/** The Polaris app a shortcut set belongs to, for its logo, through the one
+ *  alias table. General shortcuts and Databases belong to no single app and
+ *  draw none. */
 function appIcon(app: string) {
-    return <PolarisAppIcon appId={SHORTCUT_APP_IDS[app as core.ShortcutApp]} />;
+    const appId = aliasedAppId(app);
+    return <PolarisAppIcon appId={hasAppLogo(appId) ? appId : null} />;
 }
 
 const ICON = "size-7 shrink-0 p-0 text-muted-foreground hover:text-foreground";

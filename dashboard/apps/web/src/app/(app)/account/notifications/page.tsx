@@ -7,7 +7,10 @@
 
 import { doNotDisturbOf } from "@/lib/presence-service";
 import { getTranslations } from "@/lib/i18n/request";
-import { requireUser, sessionCan } from "@/lib/session";
+import { accessFor, requireUser, sessionCan } from "@/lib/session";
+import { reachableApps } from "@/lib/app-access";
+import { notificationEvent } from "@polaris/core";
+import { visibleNotificationGroups } from "@/lib/notifications/group-apps";
 import { listDeliveries } from "@/lib/notification-service";
 import {
     describeNotificationRules,
@@ -40,7 +43,8 @@ export default async function NotificationsPage() {
         display,
         paused,
         holds,
-        chatAllowed
+        chatAllowed,
+        apps
     ] = await Promise.all([
         describeNotificationRules(user.id),
         listDestinations(user.id),
@@ -61,8 +65,16 @@ export default async function NotificationsPage() {
         doNotDisturbOf(user.id).catch(() => null),
         // Optional on the page: unreadable, it only means none are drawn.
         getNotificationHolds(user.id).catch(() => undefined),
-        sessionCan(user, "chat.use").catch(() => false)
+        sessionCan(user, "chat.use").catch(() => false),
+        // The groups of apps this account cannot open are left out, the same
+        // check the switcher draws its apps by.
+        reachableApps(accessFor(user))
     ]);
+    const groups = new Set(visibleNotificationGroups(new Set(apps.map((app) => app.id))));
+    const shownRules = rules.filter((entry) => {
+        const group = notificationEvent(entry.event)?.group;
+        return group !== undefined && groups.has(group);
+    });
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -73,7 +85,7 @@ export default async function NotificationsPage() {
                 <p className="text-sm text-muted-foreground">{t("settings.page.intro")}</p>
             </div>
             <NotificationsPageView
-                rules={rules}
+                rules={shownRules}
                 destinations={destinations}
                 senders={senders}
                 deliveries={deliveries}

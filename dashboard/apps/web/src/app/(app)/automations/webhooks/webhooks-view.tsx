@@ -16,7 +16,8 @@ import { deliveryReason } from "./delivery-reason";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { OutboundHookView } from "@/lib/notifications/outbound-hooks";
-import { MAX_OUTBOUND_WEBHOOKS, outboundWebhookInputSchema } from "@polaris/core";
+import { MAX_OUTBOUND_WEBHOOKS, outboundWebhookInputSchema, type NotificationGroup } from "@polaris/core";
+import { NotificationGroupMark } from "@/components/notification-group-mark";
 import {
     KeyRound,
     ListChecks,
@@ -50,6 +51,8 @@ export interface EventOption {
     id: string;
     label: string;
     group: string;
+    /** The group's id, for the mark beside its name. */
+    groupId: NotificationGroup;
 }
 
 type Open =
@@ -361,6 +364,7 @@ function EndpointDialog({
     const [picked, setPicked] = useState<Set<string>>(new Set(hook?.events ?? []));
     const [error, setError] = useState<string | null>(null);
     const groups = [...new Set(events.map((event) => event.group))];
+    const groupIds = new Map(events.map((event) => [event.group, event.groupId]));
 
     const checked = outboundWebhookInputSchema.safeParse({
         name: hook ? hook.name : name,
@@ -483,8 +487,13 @@ function EndpointDialog({
                         <div className="max-h-64 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
                             {groups.map((group) => (
                                 <fieldset key={group} className="mb-2 last:mb-0">
-                                    <legend className="text-xs font-medium text-muted-foreground">
-                                        {group}
+                                    <legend className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                        {groupIds.get(group) ? (
+                                            <NotificationGroupMark group={groupIds.get(group)!} label={group} size={14} />
+                                        ) : null}
+                                        <span className="truncate" title={group}>
+                                            {group}
+                                        </span>
                                     </legend>
                                     {events
                                         .filter((event) => event.group === group)

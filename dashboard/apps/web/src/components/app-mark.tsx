@@ -30,6 +30,7 @@ import type { JSX, SVGProps } from "react";
 import { initialsInk, tintFor } from "@polaris/core";
 import type { AppManifest } from "@/lib/apps/catalog";
 import { SteamMark } from "@/components/brand-icons";
+import { aliasedAppId } from "@/lib/app-aliases";
 
 /**
  * The marks Polaris holds that belong to an app in the catalog.
@@ -47,34 +48,35 @@ const BRAND_MARKS: Record<string, (props: SVGProps<SVGSVGElement>) => JSX.Elemen
 };
 
 /**
- * Catalog entries that install one of Polaris's own apps, by the app id they
- * become. They wear that app's logo here too, so the card in the store is the
- * tile the launcher will show once it is installed.
+ * Catalog entries that install one of Polaris's own apps. They wear that app's
+ * logo here too, so the card in the store is the tile the launcher will show
+ * once it is installed. The app id a catalog id becomes comes from the shared
+ * alias table (`game-servers` is `games`).
  */
-const OWN_APPS: Readonly<Record<string, string>> = {
-    tools: "tools",
-    calendar: "calendar",
-    crm: "crm",
-    arcade: "arcade",
-    "status-pages": "status-pages",
-    analytics: "analytics",
-    telemetry: "telemetry",
-    translate: "translate",
-    "security-scans": "security-scans",
-    "cloud-servers": "cloud-servers",
-    "mail-server": "mail-server",
-    "dns-blocker": "dns-blocker",
-    vpn: "vpn",
-    home: "home",
-    "game-servers": "games"
-};
+const OWN_APPS: ReadonlySet<string> = new Set([
+    "tools",
+    "calendar",
+    "crm",
+    "arcade",
+    "status-pages",
+    "analytics",
+    "telemetry",
+    "translate",
+    "security-scans",
+    "cloud-servers",
+    "mail-server",
+    "dns-blocker",
+    "vpn",
+    "home",
+    "game-servers"
+]);
 
 /**
  * The Polaris app logo a catalog entry wears, by its `AppLogo` id, or null for
  * an entry that is not one of Polaris's own apps.
  */
 export function ownAppLogo(catalogId: string): string | null {
-    const own = Object.hasOwn(OWN_APPS, catalogId) ? OWN_APPS[catalogId]! : null;
+    const own = OWN_APPS.has(catalogId) ? aliasedAppId(catalogId) : null;
     return own && hasAppLogo(own) ? own : null;
 }
 

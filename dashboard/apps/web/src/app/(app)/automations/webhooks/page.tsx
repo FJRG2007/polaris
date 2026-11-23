@@ -5,7 +5,9 @@
  * redeploy, in Deploy.
  */
 
-import { requirePermission } from "@/lib/session";
+import { accessFor, requirePermission } from "@/lib/session";
+import { reachableApps } from "@/lib/app-access";
+import { visibleNotificationGroups } from "@/lib/notifications/group-apps";
 import { NOTIFICATION_EVENTS } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
@@ -18,12 +20,20 @@ export const dynamic = "force-dynamic";
 export default async function WebhooksPage() {
     const user = await requirePermission("automations.use");
     const t = await getTranslations("accountNotifications");
-    const hooks = await listOutboundHooks(user.id);
-    const events: EventOption[] = NOTIFICATION_EVENTS.map((event) => ({
-        id: event.id,
-        label: eventLabel(t, event.id) ?? event.label,
-        group: groupLabel(t, event.group)
-    }));
+    const [hooks, apps] = await Promise.all([
+        listOutboundHooks(user.id),
+        reachableApps(accessFor(user))
+    ]);
+    // Only the events of apps this account can open, as Account > Notifications.
+    const groups = new Set(visibleNotificationGroups(new Set(apps.map((app) => app.id))));
+    const events: EventOption[] = NOTIFICATION_EVENTS.filter((event) => groups.has(event.group)).map(
+        (event) => ({
+            id: event.id,
+            label: eventLabel(t, event.id) ?? event.label,
+            group: groupLabel(t, event.group),
+            groupId: event.group
+        })
+    );
 
     return (
         <Messages namespaces={["accountNotifications", "validation"]}>

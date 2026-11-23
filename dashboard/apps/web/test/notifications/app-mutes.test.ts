@@ -16,8 +16,9 @@ describe("the app to notification mapping", () => {
         expect(appMuteTargets("mail")).toEqual([{ kind: "group", id: "mail" }]);
         expect(appMuteTargets("tasks")).toEqual([{ kind: "group", id: "tasks" }]);
         expect(appMuteTargets("home")).toEqual([{ kind: "group", id: "places" }]);
-        expect(appMuteTargets("apps")).toEqual([
-            { kind: "group", id: "deploy" },
+        expect(appMuteTargets("apps")).toEqual([{ kind: "group", id: "deploy" }]);
+        expect(appMuteTargets("polar")).toEqual([
+            { kind: "group", id: "polar" },
             { kind: "group", id: "agents" }
         ]);
     });
@@ -46,10 +47,10 @@ describe("the app to notification mapping", () => {
 
 describe("muting and unmuting an app", () => {
     it("mutes every group the app owns until the same end", () => {
-        const holds = applyAppMute(EMPTY, "apps", "8h", NOW);
+        const holds = applyAppMute(EMPTY, "polar", "8h", NOW);
         const until = "2026-11-12T18:00:00.000Z";
-        expect(holds.mutes).toEqual({ "group:deploy": { until }, "group:agents": { until } });
-        expect(appMuteState(holds, "apps", NOW)).toEqual({ muted: true, until });
+        expect(holds.mutes).toEqual({ "group:polar": { until }, "group:agents": { until } });
+        expect(appMuteState(holds, "polar", NOW)).toEqual({ muted: true, until });
     });
 
     it("lasts until turned back on with off", () => {
@@ -71,8 +72,8 @@ describe("muting and unmuting an app", () => {
     it("reads as unmuted once the mute ran out, or when only part of it is muted", () => {
         const lapsed = applyAppMute(EMPTY, "mail", "1h", NOW);
         expect(appMuteState(lapsed, "mail", new Date(NOW.getTime() + 61 * 60_000)).muted).toBe(false);
-        const partly: core.NotificationHolds = { mutes: { "group:deploy": { until: null } }, schedules: {} };
-        expect(appMuteState(partly, "apps", NOW).muted).toBe(false);
+        const partly: core.NotificationHolds = { mutes: { "group:polar": { until: null } }, schedules: {} };
+        expect(appMuteState(partly, "polar", NOW).muted).toBe(false);
     });
 });
 

@@ -15,6 +15,7 @@
 
 import { installedChangelogAction, updateChangelogAction } from "./actions";
 import { AppLogo, Badge, Skeleton, cn, hasAppLogo } from "@polaris/ui";
+import { aliasedAppId } from "@/lib/app-aliases";
 import type { ChangelogEntry } from "@polaris/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -48,20 +49,9 @@ const GROUP_ICONS: Record<ChangelogGroup, LucideIcon> = {
     maintenance: Wrench
 };
 
-/** Scopes named differently from the app whose logo they stand for. */
-const SCOPE_APPS: Readonly<Record<string, string>> = {
-    agents: "polar",
-    places: "home",
-    "game-servers": "games",
-    servers: "cloud-servers",
-    "network-filter": "dns-blocker",
-    updates: "admin",
-    users: "admin"
-};
-
 /** The app logo a commit scope stands for, or null to show the scope as text. */
 export function scopeApp(scope: string): string | null {
-    const app = SCOPE_APPS[scope] ?? scope;
+    const app = aliasedAppId(scope);
     return hasAppLogo(app) ? app : null;
 }
 
