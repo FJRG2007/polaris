@@ -190,8 +190,11 @@ export async function verifyPhoneFor(userId: string, input: unknown): Promise<Ac
     const result = await verifyPhoneCode(auth, userId, parsed.data.code, parsed.data.id, {
         mayTakeFrom: (owner) => mayLosePhone(owner, phone?.phone ?? "")
     });
+    // Read through a local shape so a stale package build cannot fail the type
+    // check here; both lists are optional on the answer.
+    const { takenFrom = [], keptBy = [] }: { error?: string; takenFrom?: string[]; keptBy?: string[] } = result;
     const masked = phone ? maskPhone(phone.phone) : "";
-    for (const owner of result.takenFrom ?? []) {
+    for (const owner of takenFrom) {
         // Recorded against the account that lost it, with no actor: the history
         // of the one that proved the phone must not show that anybody had it.
         await recordAudit({ actorId: null, action: "account.phone.taken", targetType: "user", targetId: owner });
@@ -199,7 +202,7 @@ export async function verifyPhoneFor(userId: string, input: unknown): Promise<Ac
             console.error("polaris: could not tell an account its number moved:", error);
         });
     }
-    for (const owner of result.keptBy ?? []) {
+    for (const owner of keptBy) {
         await notifyPhoneClaimed(owner, masked, "kept").catch((error: unknown) => {
             console.error("polaris: could not tell an account somebody holds its number:", error);
         });
