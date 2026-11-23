@@ -18,7 +18,8 @@ import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { normalizePeerId } from "@/lib/messaging-service";
 import { sendCodeThroughChannel } from "@/lib/messaging/channel-runtime";
-import { codeRouteFor } from "@/lib/messaging/code-senders";
+import { sendSmsThroughChannel } from "@/lib/notifications/sms-service";
+import { codeRouteFor, codeSenderReady } from "@/lib/messaging/code-senders";
 import { telegramChatFor } from "@/lib/messaging/telegram-link";
 import { getAuthMailStatus, sendAuthEmail } from "@/lib/auth-mail";
 import { getUserPhone, getUserSecurity, noteSecondFactor, twoFactorEnabled } from "@polaris/auth";
@@ -93,7 +94,7 @@ export interface TwoFactorMethodStatus {
 interface Destination {
     /** The address or number, unmasked - only ever used to send. */
     address: string;
-    /** For WhatsApp and Telegram, the channel that carries it. */
+    /** For WhatsApp, SMS and Telegram, the channel that carries it. */
     channelId?: string;
 }
 
@@ -134,6 +135,18 @@ async function whatsappDestination(userId: string): Promise<Resolution> {
     return { destination: { address: phone.phone, channelId: route.channelId }, blocker: null };
 }
 
+/**
+ * Where a text-message code goes: the person's confirmed number, through the SMS
+ * sender an administrator picked. There is no personal fallback - a sender a
+ * person added for their own alerts is not a code sender (code-senders.ts).
+ */
+async function smsDestination(userId: string): Promise<Resolution> {
+    const [phone, route] = await Promise.all([getUserPhone(userId), codeRouteFor("sms", userId)]);
+    if (route.channelId === null) return { destination: null, blocker: route.blocker };
+    if (!phone?.verified) return { destination: null, blocker: "Confirm a phone number on your profile first." };
+    return { destination: { address: phone.phone, channelId: route.channelId }, blocker: null };
+}
+
 /** Where a Telegram code goes: the chat the person linked by pressing Start. */
 async function telegramDestination(userId: string): Promise<Resolution> {
     const [chatId, route] = await Promise.all([telegramChatFor(userId), codeRouteFor("telegram", userId)]);
@@ -149,6 +162,7 @@ export async function codeEmailAddress(userId: string): Promise<string | null> {
 
 function resolveDestination(userId: string, method: TwoFactorDeliveryMethod): Promise<Resolution> {
     if (method === "email") return emailDestination(userId);
+    if (method === "sms") return smsDestination(userId);
     return method === "telegram" ? telegramDestination(userId) : whatsappDestination(userId);
 }
 
@@ -162,15 +176,20 @@ function maskDestination(method: TwoFactorDeliveryMethod, address: string): stri
  * Every method with what it can do for this account, including the ones that are
  * off or broken - the settings page has to show why, and hiding a method the
  * owner deliberately turned on would just look like it was forgotten.
+ *
+ * The one exception is SMS: it is off unless an administrator turned it on with a
+ * working sender, and while it is off nobody is shown it at all - not even an
+ * account that turned it on while it was available, which falls back to its other
+ * ways in exactly as it would if the sender had been deleted.
  */
 export async function describeTwoFactorMethods(userId: string): Promise<TwoFactorMethodStatus[]> {
-    const [settings, hasAuthenticator] = await Promise.all([
+    const [settings, hasAuthenticator, smsOn] = await Promise.all([
         getUserSecurity(userId),
-        twoFactorEnabled(userId)
+        twoFactorEnabled(userId),
+        codeSenderReady("sms")
     ]);
-    const resolutions = await Promise.all(
-        TWO_FACTOR_DELIVERY_METHODS.map((method) => resolveDestination(userId, method))
-    );
+    const offered = TWO_FACTOR_DELIVERY_METHODS.filter((method) => method !== "sms" || smsOn);
+    const resolutions = await Promise.all(offered.map((method) => resolveDestination(userId, method)));
     // An account that met the instance's requirement with an email code has the
     // factor on and no authenticator behind it - better-auth minted the secret and
     // nobody was ever shown it. Offering it here would put a code field in front of
@@ -188,7 +207,7 @@ export async function describeTwoFactorMethods(userId: string): Promise<TwoFacto
                 : null
             : "Two-step verification is off."
     };
-    const delivery = TWO_FACTOR_DELIVERY_METHODS.map((method, index) => {
+    const delivery = offered.map((method, index) => {
         const { destination, blocker } = resolutions[index] ?? { destination: null, blocker: null };
         return {
             method,
@@ -352,12 +371,14 @@ export async function sendTwoFactorCode(input: {
  * uses its approved authentication template, the only way it may open a chat.
  */
 async function sendByChannel(
-    platform: "whatsapp" | "telegram",
+    platform: "whatsapp" | "sms" | "telegram",
     destination: Destination,
     text: string,
     code?: string
 ): Promise<{ error?: string }> {
     if (!destination.channelId) return { error: (await readerWords("api"))("refusals.twoFactor.noWhatsApp") };
+    // A text message goes straight to the provider; it never touches the bridge.
+    if (platform === "sms") return sendSmsThroughChannel(destination.channelId, destination.address, text);
     try {
         await sendCodeThroughChannel(destination.channelId, {
             peerId: normalizePeerId(platform, destination.address),

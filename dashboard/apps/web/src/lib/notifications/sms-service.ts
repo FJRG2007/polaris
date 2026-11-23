@@ -85,12 +85,15 @@ export async function listSmsSenders(ownerId: string): Promise<SmsSenderView[]> 
     return rows.map(toView).filter((view): view is SmsSenderView => view !== null);
 }
 
-/** The sender an alert goes out through: the account's first working one. */
+/** Which stored sender a text goes out through. */
+type SenderWhere = { ownerId: string } | { id: string };
+
+/** The first working sender matching `where`, with its credential decrypted. */
 async function activeSender(
-    ownerId: string
+    where: SenderWhere
 ): Promise<{ config: SmsConfig; secret: string } | { error: string }> {
     const row = await prisma.channel.findFirst({
-        where: { ownerId, platform: SMS_PLATFORM, status: "connected" },
+        where: { ...where, platform: SMS_PLATFORM, status: "connected" },
         orderBy: { createdAt: "asc" }
     });
     // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
@@ -187,7 +190,14 @@ async function verifySender(config: SmsConfig, secret: string): Promise<string |
 
 /** Send one text through this account's sender. */
 export async function sendSms(ownerId: string, to: string, text: string): Promise<{ error?: string }> {
-    const sender = await activeSender(ownerId);
+    const sender = await activeSender({ ownerId });
+    if ("error" in sender) return { error: sender.error };
+    return sendWithTwilio(sender.config, sender.secret, to, text);
+}
+
+/** Send one text through a specific sender - the one picked for verification codes. */
+export async function sendSmsThroughChannel(channelId: string, to: string, text: string): Promise<{ error?: string }> {
+    const sender = await activeSender({ id: channelId });
     if ("error" in sender) return { error: sender.error };
     return sendWithTwilio(sender.config, sender.secret, to, text);
 }

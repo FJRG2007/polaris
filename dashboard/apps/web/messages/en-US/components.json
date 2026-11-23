@@ -1008,6 +1008,7 @@
             "totp": "Authenticator app",
             "emailCode": "Emailed code",
             "whatsappCode": "WhatsApp code",
+            "smsCode": "Text message code",
             "telegramCode": "Telegram code",
             "code": "Sent code",
             "backupCode": "Backup code",
@@ -1373,6 +1374,7 @@
             "totp": "Authenticator code",
             "email": "Emailed code",
             "whatsapp": "WhatsApp code",
+            "sms": "Text message code",
             "telegram": "Telegram code",
             "password": "Your password"
         },

@@ -93,7 +93,10 @@ export function TwoFactorMethodsCard({
         )
     );
     const tc = useTranslations("common");
-    const [choice, setChoice] = useState<TwoFactorMethod>(preferred);
+    // A preferred method this Polaris no longer offers (SMS switched off) is not
+    // shown, so the choice starts where a sign-in would actually start.
+    const shownPreferred: TwoFactorMethod = statuses.some((status) => status.method === preferred) ? preferred : "totp";
+    const [choice, setChoice] = useState<TwoFactorMethod>(shownPreferred);
     const [approve, setApprove] = useState(approval.enabled);
     const [confirming, setConfirming] = useState(false);
     const locked = Boolean(lock);
@@ -106,7 +109,7 @@ export function TwoFactorMethodsCard({
         (method) => statuses.find((status) => status.method === method)?.enabled === true
     );
     const preferencesChanged =
-        choice !== preferred ||
+        choice !== shownPreferred ||
         methods.length !== savedMethods.length ||
         savedMethods.some((method) => !methods.includes(method));
     const policyChanged = acceptTotp !== totpAcceptedNow || strictness !== policy.strictness;
@@ -224,14 +227,17 @@ export function TwoFactorMethodsCard({
                 {twoFactorEnabled ? (
                     <label className="flex flex-col gap-1 text-sm">
                         {t("methods.offerFirst")}
-                        {/* Every method is listed, including the ones that are off: a list
-                            with one entry looks like the account has one way in, when what
-                            it means is that nothing else has been turned on yet. */}
+                        {/* Every offered method is listed, including the ones that are off: a
+                            list with one entry looks like the account has one way in, when
+                            what it means is that nothing else has been turned on yet. A method
+                            this Polaris does not offer (SMS while it is off) is not listed. */}
                         <Select
                             value={choice}
                             disabled={locked}
                             onValueChange={(value) => setChoice(value as TwoFactorMethod)}
-                            options={TWO_FACTOR_METHODS.map((method) => {
+                            options={TWO_FACTOR_METHODS.filter((method) =>
+                                statuses.some((status) => status.method === method)
+                            ).map((method) => {
                                 const off =
                                     method !== "totp" &&
                                     !methods.includes(method as TwoFactorDeliveryMethod);

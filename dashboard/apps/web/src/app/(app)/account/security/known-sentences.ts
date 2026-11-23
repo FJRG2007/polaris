@@ -64,6 +64,7 @@ const EXACT: ReadonlyMap<string, SecurityKey> = new Map<string, SecurityKey>([
     ["Confirm a phone number on your profile first.", "known.confirmPhoneFirst"],
     ["None of your WhatsApp channels is connected.", "known.noWhatsAppChannel"],
     ["WhatsApp codes are not set up. An administrator turns them on in Integrations > Messaging.", "known.noWhatsAppSender"],
+    ["SMS codes are not set up. An administrator turns them on in Integrations > Messaging.", "known.noSmsSender"],
     ["Telegram codes are not set up. An administrator turns them on in Integrations > Messaging.", "known.noTelegramSender"],
     ["Link your Telegram account first.", "known.linkTelegramFirst"],
     ["That link has expired. Start again.", "known.telegramLinkExpired"],
@@ -134,6 +135,7 @@ const METHOD_LABELS: Readonly<Record<core.TwoFactorMethod, SecurityKey>> = {
     totp: "methods.totp.label",
     email: "methods.email.label",
     whatsapp: "methods.whatsapp.label",
+    sms: "methods.sms.label",
     telegram: "methods.telegram.label"
 };
 

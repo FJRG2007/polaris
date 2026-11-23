@@ -34,7 +34,7 @@ describe("stored policy", () => {
 
     it("keeps a valid row", () => {
         // One unknown entry makes the stored list unreadable, which reads as none.
-        expect(policy.parsePolicy({ twoFactorRefused: '["totp","sms"]', twoFactorStrictness: "all" })).toEqual({
+        expect(policy.parsePolicy({ twoFactorRefused: '["totp","fax"]', twoFactorStrictness: "all" })).toEqual({
             refused: [],
             strictness: "all"
         });

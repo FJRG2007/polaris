@@ -36,7 +36,7 @@ import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 import { isStricter, twoFactorPolicySchema } from "@/lib/two-factor-policy";
 import { loadTwoFactorPolicy, saveTwoFactorPolicy } from "@/lib/two-factor-policy-store";
 import { twoFactorPreferencesSchema } from "@polaris/core";
-import { regenerateBackupCodes, setTwoFactorPreferences, verifyAccountPassword } from "@polaris/auth";
+import { getUserSecurity, regenerateBackupCodes, setTwoFactorPreferences, verifyAccountPassword } from "@polaris/auth";
 
 type ActionResult = { error?: string };
 
@@ -184,12 +184,18 @@ export async function saveTwoFactorPreferencesAction(input: unknown): Promise<Ac
         return { error: t("errors.methodCannotSend", { method: methodLabel(t, unusable) }) };
     }
 
-    const result = await setTwoFactorPreferences(
-        auth,
-        user.id,
-        parsed.data.preferences,
-        parsed.data.password
+    // A method this Polaris does not offer right now (SMS switched off) is not on
+    // the page, so it never comes back in the form - keep it as the account left
+    // it, so turning SMS back on brings the account's choice back with it.
+    const stored = await getUserSecurity(user.id);
+    const hidden = stored.twoFactorMethods.filter(
+        (method) => !statuses.some((status) => status.method === method)
     );
+    const preferences = {
+        ...parsed.data.preferences,
+        methods: [...parsed.data.preferences.methods, ...hidden.filter((method) => !parsed.data.preferences.methods.includes(method))]
+    };
+    const result = await setTwoFactorPreferences(auth, user.id, preferences, parsed.data.password);
     if (!result.error) {
         await recordAudit({
             actorId: user.id,

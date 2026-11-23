@@ -17,12 +17,12 @@ import { z } from "zod";
 import { toE164 } from "../phone.js";
 
 /** Every second-factor method, in the order the challenge screen offers them. */
-export const TWO_FACTOR_METHODS = ["totp", "email", "whatsapp", "telegram"] as const;
+export const TWO_FACTOR_METHODS = ["totp", "email", "whatsapp", "sms", "telegram"] as const;
 
 export type TwoFactorMethod = (typeof TWO_FACTOR_METHODS)[number];
 
 /** The methods that send a code, as opposed to the authenticator that shows one. */
-export const TWO_FACTOR_DELIVERY_METHODS = ["email", "whatsapp", "telegram"] as const;
+export const TWO_FACTOR_DELIVERY_METHODS = ["email", "whatsapp", "sms", "telegram"] as const;
 
 export type TwoFactorDeliveryMethod = (typeof TWO_FACTOR_DELIVERY_METHODS)[number];
 
@@ -54,6 +54,12 @@ export const TWO_FACTOR_METHOD_INFO: Record<TwoFactorMethod, TwoFactorMethodInfo
         label: "WhatsApp code",
         description: "A code sent to your confirmed number as a WhatsApp message.",
         requirement: "A confirmed phone number, and WhatsApp codes set up under Integrations > Messaging."
+    },
+    sms: {
+        id: "sms",
+        label: "Text message code",
+        description: "A code sent to your confirmed number as a text message.",
+        requirement: "A confirmed phone number, and SMS codes turned on under Integrations > Messaging."
     },
     telegram: {
         id: "telegram",
@@ -152,7 +158,7 @@ export const otpCodeField = z
  * is an account with no second factor being unable to delete anything it owns,
  * and a gate nobody can pass is a gate people route around.
  */
-export const STEP_UP_PROOFS = ["totp", "email", "whatsapp", "telegram", "password"] as const;
+export const STEP_UP_PROOFS = ["totp", "email", "whatsapp", "sms", "telegram", "password"] as const;
 
 export type StepUpProof = (typeof STEP_UP_PROOFS)[number];
 
@@ -163,6 +169,7 @@ export const stepUpProofSchema = z.discriminatedUnion("proof", [
     z.object({ proof: z.literal("totp"), code: otpCodeField }),
     z.object({ proof: z.literal("email"), code: otpCodeField }),
     z.object({ proof: z.literal("whatsapp"), code: otpCodeField }),
+    z.object({ proof: z.literal("sms"), code: otpCodeField }),
     z.object({ proof: z.literal("telegram"), code: otpCodeField }),
     z.object({ proof: z.literal("password"), password: z.string().min(1, "Enter your password") })
 ]);
@@ -174,6 +181,7 @@ export const STEP_UP_PROOF_LABELS: Record<StepUpProof, string> = {
     totp: "Authenticator code",
     email: "Emailed code",
     whatsapp: "WhatsApp code",
+    sms: "Text message code",
     telegram: "Telegram code",
     password: "Your password"
 };

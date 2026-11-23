@@ -16,7 +16,7 @@ import { authClient } from "@/lib/auth-client";
 import { abandonChallengeAction } from "./actions";
 import { dropHeldPassword, settleAfterSecondFactor } from "@/lib/chat/e2ee/held-password";
 import { landAfterSignIn } from "../login/post-login-target";
-import { KeyRound, Mail, Smartphone } from "lucide-react";
+import { KeyRound, Mail, MessageSquare, Smartphone } from "lucide-react";
 import { WhatsAppLogo } from "./whatsapp-logo";
 import { TelegramLogo } from "./telegram-logo";
 import type { ChallengeOptions } from "@/lib/two-factor-delivery";
@@ -48,6 +48,7 @@ const METHOD_ICON: Record<TwoFactorMethod, ComponentType<{ className?: string }>
     totp: Smartphone,
     email: Mail,
     whatsapp: WhatsAppLogo,
+    sms: MessageSquare,
     telegram: TelegramLogo
 };
 

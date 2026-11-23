@@ -11,12 +11,13 @@
  */
 
 /** The platforms a code can be sent on. */
-export type CodePlatform = "whatsapp" | "telegram";
+export type CodePlatform = "whatsapp" | "telegram" | "sms";
 
-/** The words shown when no channel can carry a code. Both name the page that fixes it. */
+/** The words shown when no channel can carry a code. Each names the page that fixes it. */
 export const NO_CODE_SENDER: Record<CodePlatform, string> = {
     whatsapp: "WhatsApp codes are not set up. An administrator turns them on in Integrations > Messaging.",
-    telegram: "Telegram codes are not set up. An administrator turns them on in Integrations > Messaging."
+    telegram: "Telegram codes are not set up. An administrator turns them on in Integrations > Messaging.",
+    sms: "SMS codes are not set up. An administrator turns them on in Integrations > Messaging."
 };
 
 export interface CodeRouteInput {

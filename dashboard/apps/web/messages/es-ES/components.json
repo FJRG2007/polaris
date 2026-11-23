@@ -1008,6 +1008,7 @@
             "totp": "App de autenticación",
             "emailCode": "Código por correo",
             "whatsappCode": "Código por WhatsApp",
+            "smsCode": "Código por SMS",
             "telegramCode": "Cód. Telegram",
             "code": "Código enviado",
             "backupCode": "Código de respaldo",
@@ -1373,6 +1374,7 @@
             "totp": "Código de autenticador",
             "email": "Código por correo",
             "whatsapp": "Código por WhatsApp",
+            "sms": "Código por SMS",
             "telegram": "Cód. Telegram",
             "password": "Tu contraseña"
         },

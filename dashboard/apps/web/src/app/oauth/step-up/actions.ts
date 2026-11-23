@@ -110,7 +110,7 @@ export async function sendStepUpFactorCodeAction(input: unknown): Promise<StepUp
     // Like Google asks before texting a code: the number has to be typed back
     // before a code is sent to it, so somebody holding only the password cannot
     // learn which number the account uses or make it ring.
-    if (method === "whatsapp" && !current.state.phoneConfirmed) {
+    if ((method === "whatsapp" || method === "sms") && !current.state.phoneConfirmed) {
         const throttle = await rateLimit(`step-up-phone:${current.userId}`, ATTEMPT_LIMIT, ATTEMPT_WINDOW_MS);
         if (!throttle.ok) return { error: t("stepUp.tooMany") };
         const known = await getUserPhone(current.userId);
@@ -159,8 +159,8 @@ export async function proveStepUpFactorAction(input: unknown): Promise<StepUpRes
     if (!parsed.success) return { error: t("twoFactor.codeInvalid") };
     const { method, code } = parsed.data;
     if (!stepUpRemaining(current.state).methods.includes(method)) return { error: t("stepUp.notOwed") };
-    // A WhatsApp code can only have been sent after the number was confirmed.
-    if (method === "whatsapp" && !current.state.phoneConfirmed) return { error: t("stepUp.notOwed") };
+    // A WhatsApp or text-message code can only have been sent after the number was confirmed.
+    if ((method === "whatsapp" || method === "sms") && !current.state.phoneConfirmed) return { error: t("stepUp.notOwed") };
     if (method === "email" && !current.state.emailConfirmed) return { error: t("stepUp.notOwed") };
 
     const proven = await proveStepUp(current.userId, purposeFor(method), { proof: method, code }, { anyReachable: true });

@@ -8,7 +8,7 @@
 
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
-import { Mail, Smartphone } from "lucide-react";
+import { Mail, MessageSquare, Smartphone } from "lucide-react";
 import { WhatsAppLogo } from "../2fa/whatsapp-logo";
 import { TelegramLogo } from "../2fa/telegram-logo";
 import type { TwoFactorMethod } from "@polaris/core";
@@ -29,6 +29,7 @@ const METHOD_ICON: Record<TwoFactorMethod, ComponentType<{ className?: string }>
     totp: Smartphone,
     email: Mail,
     whatsapp: WhatsAppLogo,
+    sms: MessageSquare,
     telegram: TelegramLogo
 };
 
@@ -68,7 +69,7 @@ export function StepUpView({
 
     // The questions come once the methods are done, so one step shows at a time.
     const askingQuestions = methods.length === 0 && questions.length > 0;
-    const needsPhone = method === "whatsapp" && !phoneConfirmed;
+    const needsPhone = (method === "whatsapp" || method === "sms") && !phoneConfirmed;
     const needsEmail = method === "email" && !emailConfirmed;
     const needsSending = method !== null && method !== "totp";
 

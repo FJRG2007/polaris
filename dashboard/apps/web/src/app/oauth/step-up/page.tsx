@@ -36,7 +36,7 @@ export default async function StepUpPage() {
         // - or try answers against them - on a password alone: only once every
         // code this sign-in owes has been entered.
         left.questionLeft && left.factorsLeft === 0 ? listSecurityQuestions(session.id) : Promise.resolve([]),
-        left.methods.includes("whatsapp") && !state.phoneConfirmed ? getUserPhone(session.id) : Promise.resolve(null),
+        (left.methods.includes("whatsapp") || left.methods.includes("sms")) && !state.phoneConfirmed ? getUserPhone(session.id) : Promise.resolve(null),
         left.methods.includes("email") && !state.emailConfirmed ? codeEmailAddress(session.id) : Promise.resolve(null)
     ]);
     // Only what can actually be answered right now: a state read back from a

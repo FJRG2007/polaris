@@ -96,7 +96,7 @@
         "approvalNeedsPin": "Primero desactiva la aprobación de inicios de sesión desde una sesión abierta: pide este PIN.",
         "authenticatorFirst": "Primero desactiva la app de autenticación: un inicio de sesión pide uno de los dos, no ambos.",
         "pinFirst": "Primero configura un PIN de desbloqueo rápido: aprobar un inicio de sesión lo pide.",
-        "connectWhatsAppFirst": "Los códigos por WhatsApp no están activos. Un administrador los activa en Integraciones > Mensajería.",
+        "connectWhatsAppFirst": "Los códigos por WhatsApp y SMS no están activos. Un administrador los activa en Integraciones > Mensajería.",
         "messageNotSent": "No se ha podido enviar el mensaje.",
         "methodCannotSend": "{method} todavía no puede enviar nada.",
         "unknownPasskey": "Llave de acceso desconocida.",
@@ -393,6 +393,10 @@
             "label": "Código WhatsApp",
             "description": "Un código enviado a tu número confirmado como mensaje de WhatsApp."
         },
+        "sms": {
+            "label": "Código por SMS",
+            "description": "Un código enviado a tu número confirmado como SMS."
+        },
         "telegram": {
             "label": "Cód. Telegram",
             "description": "Un código que el bot de Polaris envía a tu Telegram vinculado."
@@ -517,6 +521,7 @@
         "passwordMinLength": "La contraseña nueva debe tener al menos {count} caracteres.",
         "setQuestions": "Configura {count} preguntas",
         "noWhatsAppSender": "Los códigos por WhatsApp no están activos. Un administrador los activa en Integraciones > Mensajería.",
+        "noSmsSender": "Los códigos por SMS no están activos. Un administrador los activa en Integraciones > Mensajería.",
         "noTelegramSender": "Los códigos por Telegram no están activos. Un administrador los activa en Integraciones > Mensajería.",
         "linkTelegramFirst": "Vincula primero tu cuenta de Telegram.",
         "telegramLinkExpired": "Ese enlace ha caducado. Empieza de nuevo."

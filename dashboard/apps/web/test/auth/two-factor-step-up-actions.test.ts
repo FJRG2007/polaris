@@ -107,6 +107,28 @@ describe("confirming the address before an email code", () => {
     });
 });
 
+describe("confirming the number before a text-message code", () => {
+    beforeEach(() => stored({ ...owing, accepted: ["totp", "email", "sms"] }));
+
+    it("sends nothing to a number that was not typed back correctly", async () => {
+        expect(await actions.sendStepUpFactorCodeAction({ method: "sms", phone: "600111999" })).toEqual({
+            error: "stepUp.wrongPhone"
+        });
+        expect(stepUp.sendStepUpCode).not.toHaveBeenCalled();
+    });
+
+    it("sends once the number matches", async () => {
+        expect(await actions.sendStepUpFactorCodeAction({ method: "sms", phone: "+34 600 111 222" })).toEqual({});
+        expect(service.advanceStepUp.mock.calls[0]![2]).toMatchObject({ phoneConfirmed: true });
+        expect(stepUp.sendStepUpCode).toHaveBeenCalledWith("user-1", "sign-in-step-up:sms", "sms", { anyReachable: true });
+    });
+
+    it("refuses a text-message code before the number was confirmed", async () => {
+        expect(await actions.proveStepUpFactorAction({ method: "sms", code: "123456" })).toEqual({ error: "stepUp.notOwed" });
+        expect(stepUp.proveStepUp).not.toHaveBeenCalled();
+    });
+});
+
 describe("answering a factor", () => {
     it("refuses the method already answered", async () => {
         expect(await actions.proveStepUpFactorAction({ method: "totp", code: "123456" })).toEqual({ error: "stepUp.notOwed" });

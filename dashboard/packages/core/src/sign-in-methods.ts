@@ -51,6 +51,7 @@ export const SECOND_FACTORS = [
     "totp",
     "email-code",
     "whatsapp-code",
+    "sms-code",
     "telegram-code",
     "code",
     "backup-code",
@@ -78,6 +79,7 @@ export const SECOND_FACTOR_LABELS: Record<SecondFactor, string> = {
     totp: "Authenticator app",
     "email-code": "Emailed code",
     "whatsapp-code": "WhatsApp code",
+    "sms-code": "Text message code",
     "telegram-code": "Telegram code",
     code: "Sent code",
     "backup-code": "Backup code",
@@ -93,6 +95,7 @@ export const SECOND_FACTOR_LABELS: Record<SecondFactor, string> = {
 export const SECOND_FACTOR_BY_DELIVERY: Record<string, SecondFactor> = {
     email: "email-code",
     whatsapp: "whatsapp-code",
+    sms: "sms-code",
     telegram: "telegram-code"
 };
 
