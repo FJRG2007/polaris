@@ -32,7 +32,7 @@ import {
 import * as readMarks from "@/lib/chat/read-marks";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
-import { announcePresence } from "@/components/presence-store";
+import { announceCallSeats, announcePresence } from "@/components/presence-store";
 import { announceAppearance } from "@/components/profile-style-store";
 import { useShelfSeed } from "@/components/shelf-scope";
 
@@ -175,6 +175,13 @@ export function ChatUnreadProvider({
             // the presence store asks again for that face if it is drawn.
             if (kind === "activity") {
                 if (typeof frame.actorId === "string") announcePresence([frame.actorId]);
+                return;
+            }
+            // Somebody joined, hung up, or a call ended: the speaker beside
+            // their face is redrawn now, not at the next refresh. A mute or a
+            // moderator's mark (`voice`) moves nobody's seat.
+            if (kind === "call") {
+                if ((frame as { voice?: unknown }).voice !== true) announceCallSeats();
                 return;
             }
             if (typeof kind !== "string" || !COUNTED.has(kind)) return;

@@ -80,6 +80,24 @@ export function announcePresence(ids: readonly string[]): void {
     window.dispatchEvent(new CustomEvent(CHANGED, { detail: [...ids] }));
 }
 
+/**
+ * Tell the store that somebody's seat on a call changed - joined, hung up, a
+ * call ended - without saying whom, so every face on screen is asked about
+ * again now.
+ *
+ * A call frame names the call, not everybody whose seat changed in it: the one
+ * who hung up is exactly the one no longer listed. Waiting for the next refresh
+ * left the call's speaker beside a face for up to `REFRESH_MS` after hanging
+ * up - on that person's own screen too. One request for the faces drawn, and
+ * only on a seat change.
+ */
+export function announceCallSeats(): void {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent(CHANGED, { detail: EVERYBODY }));
+}
+
+const EVERYBODY = "*";
+
 /** How long before what is on screen is asked about again. */
 const REFRESH_MS = 45_000;
 
@@ -213,6 +231,10 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const heard = (event: Event) => {
             const ids = (event as CustomEvent<unknown>).detail;
+            if (ids === EVERYBODY) {
+                if (watched.current.size > 0) void ask([...watched.current]);
+                return;
+            }
             if (!Array.isArray(ids)) return;
             const drawn = ids.filter(
                 (id): id is string => typeof id === "string" && watched.current.has(id)
