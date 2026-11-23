@@ -2438,6 +2438,52 @@ function QuoteLine({
     onJumpTo?: (messageId: string) => void;
 }) {
     const t = useTranslations("chat");
+    // Their name opens their card, as it does on the message itself - a button
+    // of its own beside the way to the original rather than inside it.
+    const press = usePersonPress();
+    const author = quote.authorName ?? t("messageList.somebodyWhoHasLeft");
+    const pressable = press && quote.authorId ? quote.authorId : null;
+    const excerpt = (
+        <span className="min-w-0 truncate" title={quote.excerpt}>
+            {quote.deleted
+                ? t("messageList.messageDeleted")
+                : quote.excerpt ||
+                  (quote.notice ? t("messageList.systemMessage") : "attachment")}
+        </span>
+    );
+    const shape = "mb-0.5 flex items-center gap-1.5 text-xs text-muted-foreground";
+    if (pressable && press) {
+        return (
+            <p className={cn(shape, "max-w-full")}>
+                <CornerUpLeft className="size-3 shrink-0" />
+                <button
+                    type="button"
+                    title={t("messageList.viewProfile", { name: author })}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        press({ id: pressable, name: author }, event.currentTarget);
+                    }}
+                    className="shrink-0 rounded font-medium text-foreground underline-offset-2 hover:underline focus-visible:underline"
+                >
+                    <PersonName id={pressable} name={author} />
+                </button>
+                {quote.channelId ? (
+                    <MessageLink
+                        messageId={quote.id}
+                        channelId={quote.channelId}
+                        here={here}
+                        onJumpTo={onJumpTo}
+                        title={t("messageList.goToTheOriginalMessage")}
+                        className="flex min-w-0 rounded no-underline transition-colors hover:text-foreground focus-visible:text-foreground"
+                    >
+                        {excerpt}
+                    </MessageLink>
+                ) : (
+                    excerpt
+                )}
+            </p>
+        );
+    }
     const body = (
         <>
             <CornerUpLeft className="size-3 shrink-0" />
@@ -2447,19 +2493,11 @@ function QuoteLine({
             {/* A line Polaris wrote has nobody to name: the sentence is the
                 whole of it. */}
             {!quote.notice && (
-                <span className="shrink-0 font-medium text-foreground">
-                    {quote.authorName ?? t("messageList.somebodyWhoHasLeft")}
-                </span>
+                <span className="shrink-0 font-medium text-foreground">{author}</span>
             )}
-            <span className="min-w-0 truncate" title={quote.excerpt}>
-                {quote.deleted
-                    ? t("messageList.messageDeleted")
-                    : quote.excerpt ||
-                      (quote.notice ? t("messageList.systemMessage") : "attachment")}
-            </span>
+            {excerpt}
         </>
     );
-    const shape = "mb-0.5 flex items-center gap-1.5 text-xs text-muted-foreground";
     if (quote.deleted || !quote.channelId) return <p className={shape}>{body}</p>;
 
     return (

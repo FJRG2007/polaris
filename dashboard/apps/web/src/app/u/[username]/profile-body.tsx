@@ -11,9 +11,11 @@ import { ProfileCard } from "./profile-card";
 import type { SessionUser } from "@/lib/session";
 import { Messages } from "@/components/i18n/messages";
 import { NothingToShow } from "@/components/nothing-to-show";
-import { badgesFor } from "@/lib/badges/badge-service";
+import { badgesFor, type BadgesForViewer } from "@/lib/badges/badge-service";
 import { nameTagsFor } from "@/lib/name-tags/name-tag-service";
 import { publicProfile, profilesArePublic } from "@/lib/profile-service";
+
+const NO_BADGES: BadgesForViewer = { shown: [], available: [], arrangement: null };
 
 export async function ProfileBody({
     username,
@@ -33,9 +35,11 @@ export async function ProfileBody({
     }
 
     // The server decides which badges this viewer may see; the card only draws them.
+    // Outside the profile audience there are none, as in the chat profile: the
+    // restricted card is the name and the photo, and nothing they collected.
     const asking = viewer ? { id: viewer.id, isAdmin: viewer.isAdmin } : null;
     const [badges, tags] = await Promise.all([
-        badgesFor(profile.id, asking),
+        profile.restricted ? NO_BADGES : badgesFor(profile.id, asking),
         nameTagsFor(asking, [profile.id])
     ]);
 

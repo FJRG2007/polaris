@@ -33,6 +33,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { mutualsBetween } from "@/lib/mutuals";
+import { recentActivityFor, type RecentActivityView } from "@/lib/presence-activity/recent";
 import { areFriends } from "@/lib/friends-service";
 import { blockedBy, blockersOf } from "@/lib/blocks";
 import { getSetting, setSetting } from "@/lib/setting-store";
@@ -183,6 +184,16 @@ export interface PublicProfile {
      * only the name and the photo. Everything else above is empty.
      */
     readonly restricted: boolean;
+    /**
+     * What they did lately, as their activity setting lets this reader see it -
+     * the same answer the larger profile in chat draws (`recentActivityFor`).
+     * Empty for a reader with no account, outside the profile audience, and
+     * for anybody who shares nothing.
+     */
+    readonly recent: RecentActivityView[];
+    /** When the two of them became friends (ISO), or empty when they are not -
+     *  and always on your own page and for a reader with no account. */
+    readonly friendsSince: string;
 }
 
 /** A stored JSON list of strings, out of its own column. Anything unparseable
@@ -565,20 +576,29 @@ async function draw(
             : [];
 
     const full = core.composePersonName(user.firstName, user.lastName, user.secondLastName);
-    const [counts, standing, mutual, style] = await Promise.all([
+    const [counts, standing, mutual, style, recent, since] = await Promise.all([
         followCounts(user.id),
         standingOf(user.id, viewer, own),
         // Nothing to have in common with yourself, and a reader with no account
         // shares nothing with anybody.
         viewer && !own ? mutualsBetween(viewer.id, user.id) : Promise.resolve(null),
-        getProfileStyle(user.id)
+        getProfileStyle(user.id),
+        // The activity audience is applied inside; a reader with no account is
+        // in nobody's, so it is not asked at all.
+        viewer
+            ? recentActivityFor(viewer, user.id).catch((caught: unknown) => {
+                  console.error("polaris: could not read what somebody did lately:", caught);
+                  return [];
+              })
+            : Promise.resolve([]),
+        viewer && !own ? friendsSince(viewer.id, user.id) : Promise.resolve(null)
     ]);
     return {
         id: user.id,
         name: user.name,
         username: user.username ?? "",
         fullName: allowed.fullName ? full : "",
-        description: user.description,
+        description: user.description.trim(),
         showsAvatar: allowed.avatar,
         style,
         organizations,
@@ -591,8 +611,27 @@ async function draw(
         follows: { ...counts, showsNames: allowed.followers },
         standing,
         mutual,
-        restricted: false
+        restricted: false,
+        recent,
+        friendsSince: since?.toISOString() ?? ""
     };
+}
+
+/** When two people became friends, or null when they are not. Accepted is when
+ *  they became friends; a row from before that was recorded has only the
+ *  request's own date - the same answer the chat profile gives. */
+async function friendsSince(viewerId: string, personId: string): Promise<Date | null> {
+    const row = await prisma.friendship.findFirst({
+        where: {
+            status: "accepted",
+            OR: [
+                { requesterId: viewerId, addresseeId: personId },
+                { requesterId: personId, addresseeId: viewerId }
+            ]
+        },
+        select: { createdAt: true, respondedAt: true }
+    });
+    return row ? (row.respondedAt ?? row.createdAt) : null;
 }
 
 /**
@@ -628,7 +667,9 @@ async function restrictedProfile(
         follows: { followers: 0, following: 0, showsNames: false },
         standing: await standingOf(user.id, viewer, false),
         mutual: null,
-        restricted: true
+        restricted: true,
+        recent: [],
+        friendsSince: ""
     };
 }
 

@@ -16,6 +16,7 @@ import { Avatar } from "@/components/avatar";
 import { HeadphoneOff, MicOff } from "lucide-react";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { PersonName, PersonRow } from "@/components/person-name";
+import { usePersonPress } from "@/components/person-press";
 import { SeatMenu, type RosterModeration } from "./call-moderation-menu";
 
 type Seated = Pick<VoicePresence, "muted" | "deafened"> &
@@ -135,6 +136,10 @@ export function CallRosterList({
     /** A moderator's right-click on a row, for a room the reader is not in. */
     moderation?: RosterModeration;
 }) {
+    const t = useTranslations("chat");
+    // Pressing somebody in the room opens their card, as their name does on a
+    // message. A guest has no account and so no card: their row stays a row.
+    const press = usePersonPress();
     if (people.length === 0) return null;
     return (
         <ul aria-label={label} className="flex min-w-0 flex-col gap-0.5">
@@ -147,15 +152,36 @@ export function CallRosterList({
                         className="flex min-w-0 items-center gap-2 rounded px-1 py-0.5 text-sm"
                         title={person.name}
                     >
-                        <Avatar
-                            size={24}
-                            // A guest has no account, so no picture to ask for: the
-                            // initials of the name they gave.
-                            person={{ id: person.userId, name: person.name }}
-                        />
-                        <span className="min-w-0 flex-1 truncate">
-                            <PersonName id={person.userId} name={person.name} />
-                        </span>
+                        {press && person.userId ? (
+                            <button
+                                type="button"
+                                title={t("messageList.viewProfile", { name: person.name })}
+                                onClick={(event) =>
+                                    press(
+                                        { id: person.userId!, name: person.name },
+                                        event.currentTarget
+                                    )
+                                }
+                                className="flex min-w-0 flex-1 items-center gap-2 rounded text-start hover:underline focus-visible:underline"
+                            >
+                                <Avatar size={24} person={{ id: person.userId, name: person.name }} />
+                                <span className="min-w-0 flex-1 truncate">
+                                    <PersonName id={person.userId} name={person.name} />
+                                </span>
+                            </button>
+                        ) : (
+                            <>
+                                <Avatar
+                                    size={24}
+                                    // A guest has no account, so no picture to ask for: the
+                                    // initials of the name they gave.
+                                    person={{ id: person.userId, name: person.name }}
+                                />
+                                <span className="min-w-0 flex-1 truncate">
+                                    <PersonName id={person.userId} name={person.name} />
+                                </span>
+                            </>
+                        )}
                         {person.streaming && <LiveBadge />}
                         <VoiceStateIcons person={person} />
                     </PersonRow>

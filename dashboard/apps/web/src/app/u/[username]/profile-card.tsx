@@ -40,9 +40,9 @@ import { ProfileLink } from "@/components/profile-link";
 import { LastSeen } from "@/components/last-seen";
 import { usePresence } from "@/components/presence-store";
 import { ActivityCards } from "@/components/activity-card";
+import { ProfileSectionHeading, RecentActivityList, SinceRow } from "@/components/profile-sections";
 import type { PublicProfile } from "@/lib/profile-service";
 import { ProfileBanner } from "@/components/profile-banner";
-import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
 import { effectOf, linkLabel, nameLookOf } from "@polaris/core";
@@ -50,7 +50,6 @@ import {
     AtSign,
     BadgeCheck,
     Building2,
-    CalendarDays,
     LinkIcon,
     Lock,
     Mail,
@@ -81,7 +80,6 @@ export function ProfileCard({
     /** The name tag this viewer may see, decided on the server. */
     tag: NameTagView | null;
 }) {
-    const format = useDisplayFormat();
     const t = useTranslations("publicPages");
     const person = { id: profile.id, name: profile.name };
     // Where they are, and the line they are showing. The same two facts the panel
@@ -208,6 +206,9 @@ export function ProfileCard({
                     with this reader. Nothing for somebody signed out: presence
                     is not published to them, and this rides on it. */}
                 <ActivityCards personId={profile.id} />
+                {/* What they did lately, through their activity setting on the
+                    server - the list the larger profile in chat draws. */}
+                <RecentActivityList heading={t("profile.recentActivity")} recent={profile.recent} />
 
                 {!own && signedIn ? (
                     <ProfileActions
@@ -237,9 +238,37 @@ export function ProfileCard({
                 )}
 
                 {profile.description ? (
-                    <p className="text-sm leading-relaxed text-foreground/90">
-                        {profile.description}
-                    </p>
+                    <div className="w-full text-start">
+                        <ProfileSectionHeading>{t("profile.about")}</ProfileSectionHeading>
+                        <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+                            {profile.description}
+                        </p>
+                    </div>
+                ) : null}
+
+                {profile.joinedAt || profile.friendsSince ? (
+                    // The same two dates the chat profile carries, drawn by the
+                    // same row.
+                    <div className="flex flex-wrap gap-x-8 gap-y-3">
+                        {profile.joinedAt ? (
+                            <div>
+                                <SinceRow
+                                    label={t("profile.memberSince")}
+                                    iso={profile.joinedAt}
+                                    large
+                                />
+                            </div>
+                        ) : null}
+                        {profile.friendsSince ? (
+                            <div>
+                                <SinceRow
+                                    label={t("profile.friendsSince")}
+                                    iso={profile.friendsSince}
+                                    large
+                                />
+                            </div>
+                        ) : null}
+                    </div>
                 ) : null}
 
                 {profile.organizations.length > 0 || profile.companies.length > 0 ? (
@@ -306,7 +335,7 @@ export function ProfileCard({
                     </div>
                 ) : null}
 
-                {profile.email || profile.joinedAt ? (
+                {profile.email ? (
                     <div className="text-muted-foreground flex flex-col gap-1.5 border-t border-border pt-4 text-sm">
                         {profile.email ? (
                             <a
@@ -316,12 +345,6 @@ export function ProfileCard({
                                 <Mail className="size-3.5 shrink-0" />
                                 {profile.email}
                             </a>
-                        ) : null}
-                        {profile.joinedAt ? (
-                            <p className="flex items-center gap-1.5">
-                                <CalendarDays className="size-3.5 shrink-0" />
-                                {t("profile.hereSince", { date: format.date(profile.joinedAt) })}
-                            </p>
                         ) : null}
                     </div>
                 ) : null}

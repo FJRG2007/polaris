@@ -20,7 +20,7 @@
  */
 
 import Link from "next/link";
-import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AtSign, Lock } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
@@ -35,6 +35,7 @@ import { usePresence } from "@/components/presence-store";
 import { ActivityCards } from "@/components/activity-card";
 import { ProfileBanner } from "@/components/profile-banner";
 import { BadgeStrip } from "@/components/badges/badges-dialog";
+import { ProfileSectionHeading, SinceRow } from "@/components/profile-sections";
 import * as polls from "./chat-reads";
 
 /** Somebody, as far as the screen already knows them. */
@@ -265,9 +266,7 @@ export function ProfileDetails({
 
                 {profile?.description && (
                     <div className="w-full text-start">
-                        <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                            {t("profileDetails.about")}
-                        </p>
+                        <ProfileSectionHeading>{t("profileDetails.about")}</ProfileSectionHeading>
                         {panel ? (
                             <ClampedBio text={profile.description} />
                         ) : (
@@ -312,21 +311,6 @@ export function ProfileDetails({
 
                 {footer}
             </div>
-        </div>
-    );
-}
-
-/** A date under a small heading: when they joined, when you became friends. */
-function SinceRow({ label, iso, large }: { label: string; iso: string; large: boolean }) {
-    const locale = useLocale();
-    return (
-        <div className="w-full text-start">
-            <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                {label}
-            </p>
-            <p className={cn("mt-1 text-muted-foreground", large ? "text-sm" : "text-xs")}>
-                {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(iso))}
-            </p>
         </div>
     );
 }

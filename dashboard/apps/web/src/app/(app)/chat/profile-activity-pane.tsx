@@ -16,17 +16,13 @@
  */
 
 import { useState } from "react";
-import * as core from "@polaris/core";
-import { Gamepad2, Pickaxe } from "lucide-react";
-import { GameLogo } from "@/components/game-logo";
 import type { ChatProfile } from "@/lib/chat/profiles";
 import { usePresence } from "@/components/presence-store";
-import { RelativeTime } from "@/components/relative-time";
+import { ProfileSectionHeading, RecentActivityList } from "@/components/profile-sections";
 import { FriendRows, SpaceRows, type MutualTab } from "./profile-details";
 import { ActivityCards } from "@/components/activity-card";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { EmptyState, SegmentedControl, Skeleton } from "@polaris/ui";
-import type { RecentActivityView } from "@/lib/presence-activity/recent";
 
 type Tab = "activity" | MutualTab;
 
@@ -151,13 +147,13 @@ function ActivityTab({
         <div className="flex min-w-0 flex-col gap-4">
             {current.length > 0 ? (
                 <section className="flex min-w-0 flex-col gap-2">
-                    <Heading>{t("profilePane.current")}</Heading>
+                    <ProfileSectionHeading>{t("profilePane.current")}</ProfileSectionHeading>
                     <ActivityCards personId={personId} />
                 </section>
             ) : null}
             {waiting ? (
                 <section className="flex min-w-0 flex-col gap-2" aria-busy>
-                    <Heading>{t("profilePane.recent")}</Heading>
+                    <ProfileSectionHeading>{t("profilePane.recent")}</ProfileSectionHeading>
                     {[0, 1].map((index) => (
                         <div
                             key={index}
@@ -171,70 +167,10 @@ function ActivityTab({
                         </div>
                     ))}
                 </section>
-            ) : recent.length > 0 ? (
-                <section className="flex min-w-0 flex-col gap-2">
-                    <Heading>{t("profilePane.recent")}</Heading>
-                    <ul className="flex min-w-0 flex-col gap-2">
-                        {recent.map((entry) => (
-                            <RecentRow key={entry.key} entry={entry} />
-                        ))}
-                    </ul>
-                </section>
-            ) : null}
+            ) : (
+                <RecentActivityList heading={t("profilePane.recent")} recent={recent} />
+            )}
         </div>
-    );
-}
-
-function Heading({ children }: { children: React.ReactNode }) {
-    return (
-        <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-            {children}
-        </h3>
-    );
-}
-
-/** One thing they did lately: the game's mark or the server's picture, what it
- *  was, where, and how long ago it ended. */
-function RecentRow({ entry }: { entry: RecentActivityView }) {
-    const game = entry.gameId ? (core.findGame(entry.gameId) ?? null) : null;
-    const Icon = entry.source === "minecraft" ? Pickaxe : Gamepad2;
-    // A picture that did not load - a server with no icon, one since removed -
-    // falls back to the game's mark rather than a broken image.
-    const [broken, setBroken] = useState(false);
-    const picture = entry.imageUrl && !broken ? entry.imageUrl : null;
-    return (
-        <li className="flex min-w-0 items-center gap-3 rounded-lg bg-muted/40 p-3">
-            <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
-                {picture ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- a small icon the dashboard serves itself
-                    <img
-                        src={picture}
-                        alt=""
-                        aria-hidden
-                        className="size-full object-cover [image-rendering:pixelated]"
-                        onError={() => setBroken(true)}
-                    />
-                ) : game ? (
-                    <GameLogo game={game} className="size-9" />
-                ) : (
-                    <Icon aria-hidden className="size-6 shrink-0 text-muted-foreground" />
-                )}
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium" title={entry.name}>
-                    {entry.name}
-                </span>
-                {entry.details ? (
-                    <span className="truncate text-xs text-muted-foreground" title={entry.details}>
-                        {entry.details}
-                    </span>
-                ) : null}
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Gamepad2 aria-hidden className="size-3 shrink-0" />
-                    <RelativeTime iso={entry.endedAt} formatStyle="narrow" />
-                </span>
-            </span>
-        </li>
     );
 }
 

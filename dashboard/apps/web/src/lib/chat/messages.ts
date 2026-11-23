@@ -321,6 +321,13 @@ export interface ChatQuoteView {
      *  lives in a conversation the reader cannot open. */
     readonly channelId: string | null;
     readonly authorName: string | null;
+    /**
+     * Who wrote the quoted message, so pressing their name opens their card -
+     * only for a reply, whose author was in this conversation, about a message
+     * still here and written by a person. Absent for a forward: its author may
+     * never have been in this conversation, and the card is asked through it.
+     */
+    readonly authorId?: string;
     /** Trimmed to a line: a quote that repeats a paragraph is the paragraph
      *  twice. */
     readonly excerpt: string;
@@ -2987,6 +2994,16 @@ function quoteViewOf(
                 ? original.channelId
                 : null,
         authorName: authorNameOf(original, names),
+        ...(!row.forwarded &&
+        original.channelId === row.channelId &&
+        !hidden.has(original.id) &&
+        !original.deletedAt &&
+        original.kind !== "system" &&
+        original.authorId &&
+        !original.webhookId &&
+        !original.agent
+            ? { authorId: original.authorId }
+            : {}),
         // The words, not the Markdown they were written in. A quote that read
         // "```py print(1) ```" showed the reader the fence rather than the code.
         excerpt: original.deletedAt ? "" : quotedWords(original, names, viewerId),
