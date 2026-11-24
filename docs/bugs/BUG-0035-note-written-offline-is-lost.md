@@ -185,3 +185,13 @@ again and Drop. A folder opened with Polaris unreachable shows the last listing
 this tab read, however old, with the unreachable banner. Uploads and deleting
 for good are not kept: one needs the file on the host, the other cannot be
 undone, so it is put back and says Polaris could not be reached.
+
+## A long outage marked waiting writes as not sent
+
+Every flush that found no server counted an attempt, and five marked the write
+as not sent - so a few edits during one outage (each one flushes) failed
+everything waiting while Polaris was simply down. An attempt that gets no
+answer now counts only when Polaris answers a probe (`counts` in
+`lib/offline/outbox.ts`, `polarisAnswers` in `write-queue.ts`): then it is this
+write that does not get through. Already known unreachable, no extra probe is
+made; the probe's own backoff asks, and its recovery flushes.
