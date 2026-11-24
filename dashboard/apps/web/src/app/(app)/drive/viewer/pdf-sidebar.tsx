@@ -50,10 +50,10 @@ export function PdfSidebar({
             aria-hidden={!open}
             className={cn(
                 "shrink-0 overflow-hidden border-e border-border bg-surface transition-[width] duration-200",
-                open ? "w-[168px]" : "w-0"
+                open ? "w-60" : "w-0"
             )}
         >
-            <div className={cn("flex h-full w-[168px] flex-col", !open && "invisible")}>
+            <div className={cn("flex h-full w-60 flex-col", !open && "invisible")}>
                 <div className="border-b border-border p-2">
                     <SegmentedControl
                         size="sm"
