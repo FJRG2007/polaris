@@ -4,13 +4,16 @@
  * started again by the plug event.
  *
  * Linux reads sysfs and hears /dev/bus/usb change through inotify. Windows and
- * macOS have no way to list USB devices from Node without native code; until a
- * native watcher ships there, `watchUsb` answers null ("not known") and every
- * installed add-on runs as if its device were present, watching for it itself.
+ * macOS ask the Rust core's Node binding (crates/polaris-core-node/src/usb.rs,
+ * nusb), which sleeps on the operating system's own plug notification. Where
+ * that binding is missing or predates USB presence, `watchUsb` answers null
+ * ("not known") and every installed add-on runs as if its device were present.
  */
 
+import { z } from "zod";
 import { join } from "node:path";
 import type { UsbDevice } from "@polaris/core/device-addons";
+import { nativeUsb, type NativeUsb } from "@polaris/core-rs/native";
 import { readdirSync, readFileSync, watch, type FSWatcher } from "node:fs";
 
 const SYSFS = "/sys/bus/usb/devices";
@@ -48,9 +51,64 @@ export interface UsbWatch {
     readonly close: () => void;
 }
 
+const nativeListSchema = z
+    .array(z.object({ vendorId: z.number().int().min(0).max(0xffff), productId: z.number().int().min(0).max(0xffff) }))
+    .max(1024);
+
+/** The binding's list, checked; null when it fails or answers something else. */
+export function listNativeUsb(usb: Pick<NativeUsb, "usbDevicesJson">): UsbDevice[] | null {
+    try {
+        const parsed = nativeListSchema.safeParse(JSON.parse(usb.usbDevicesJson()));
+        return parsed.success ? parsed.data.map(({ vendorId, productId }) => ({ vendorId, productId })) : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Plugs and unplugs from the binding; a plug is several events at once, so the list is read once they settle. */
+export function watchNativeUsb(onChange: (devices: UsbDevice[]) => void, usb: NativeUsb): UsbWatch | null {
+    const first = listNativeUsb(usb);
+    if (!first) return null;
+    let last: UsbDevice[] = first;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let handle: { close(): void };
+    try {
+        handle = usb.watchUsb(() => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => {
+                const next = listNativeUsb(usb);
+                if (next) {
+                    last = next;
+                    onChange(next);
+                }
+            }, 300);
+        });
+    } catch {
+        return null;
+    }
+    return {
+        list: () => {
+            const next = listNativeUsb(usb);
+            if (next) last = next;
+            return last;
+        },
+        close: () => {
+            if (timer) clearTimeout(timer);
+            handle.close();
+        }
+    };
+}
+
 /** Watch for plugs and unplugs; null where devices cannot be listed (see above). */
-export function watchUsb(onChange: (devices: UsbDevice[]) => void, platform = process.platform): UsbWatch | null {
-    if (platform !== "linux") return null;
+export function watchUsb(
+    onChange: (devices: UsbDevice[]) => void,
+    platform = process.platform,
+    loadNative: () => NativeUsb | null = nativeUsb
+): UsbWatch | null {
+    if (platform !== "linux") {
+        const usb = loadNative();
+        return usb ? watchNativeUsb(onChange, usb) : null;
+    }
     let watcher: FSWatcher | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
     try {

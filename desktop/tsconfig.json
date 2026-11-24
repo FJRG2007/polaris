@@ -25,6 +25,7 @@
             // packages by name; they resolve here, from this app's own
             // node_modules, as esbuild resolves them (build/launcher-ui.mjs).
             "@polaris/core/*": ["../dashboard/packages/core/src/*"],
+            "@polaris/core-rs/native": ["../dashboard/packages/core-rs/src/native.ts"],
             "react": ["./node_modules/@types/react"],
             "react/*": ["./node_modules/@types/react/*"],
             "react-dom/*": ["./node_modules/@types/react-dom/*"],

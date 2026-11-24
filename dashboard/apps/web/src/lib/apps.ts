@@ -2496,16 +2496,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "accessibility"
             ]
         },
-        // Hardware support the desktop app installs on this computer only.
-        // Out of the rail: it does nothing in a browser, so only the app's own
-        // ways in (its "device found" notice) and search reach it.
-        {
-            label: "Device add-ons", // i18n-ignore
-            href: "/account/addons",
-            icon: Puzzle,
-            keywords: ["add-on", "addon", "plugin", "extension", "device", "usb", "hercules", "stream 100", "mixer"],
-            hidden: true
-        },
         {
             label: "Keyboard shortcuts", // i18n-ignore
             href: "/account/shortcuts",
@@ -2855,6 +2845,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/account/app/updates",
             icon: RefreshCw,
             keywords: ["version", "check for updates", "restart", "desktop app"],
+            group: THIS_APP_GROUP,
+            desktopOnly: true
+        },
+        // Hardware support the desktop app installs on this computer only.
+        {
+            label: "Device add-ons", // i18n-ignore
+            href: "/account/addons",
+            icon: Puzzle,
+            keywords: ["add-on", "addon", "plugin", "extension", "device", "usb", "hercules", "stream 100", "mixer"],
             group: THIS_APP_GROUP,
             desktopOnly: true
         }

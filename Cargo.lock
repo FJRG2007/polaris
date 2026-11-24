@@ -2471,10 +2471,13 @@ dependencies = [
 name = "polaris-core-node"
 version = "0.1.0"
 dependencies = [
+ "futures-core",
  "napi",
  "napi-build",
  "napi-derive",
+ "nusb",
  "polaris-core",
+ "serde_json",
 ]
 
 [[package]]

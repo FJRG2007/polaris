@@ -17,6 +17,11 @@ path = "src/lib.rs"
 polaris-core = { path = "../polaris-core", features = ["opaque"] }
 napi = { version = "=3.16.2", default-features = false, features = ["napi6"] }
 napi-derive = { version = "=3.7.0", default-features = false }
+# USB presence for the desktop's device add-ons (src/usb.rs): the same nusb as
+# crates/polaris-stream100, ids only, nothing opened.
+nusb = "=0.2.9"
+futures-core = "=0.3.34"
+serde_json = { workspace = true }
 
 [build-dependencies]
 napi-build = "=2.6.0"

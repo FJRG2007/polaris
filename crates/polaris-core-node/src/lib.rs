@@ -9,6 +9,8 @@
 //! aborting the process (built with the `release-node` profile, which
 //! unwinds).
 
+mod usb;
+
 use napi::bindgen_prelude::{BigInt, Uint8Array};
 use napi_derive::napi;
 

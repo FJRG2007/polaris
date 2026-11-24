@@ -79,3 +79,28 @@ export function nativeMlsMember<T>(directory?: string): T {
     if (typeof loaded.MlsMember !== "function") throw new BindingMissingError(`the Node binding at ${location.file} has no MlsMember`);
     return loaded.MlsMember as T;
 }
+
+/** USB presence from the Node binding (`crates/polaris-core-node/src/usb.rs`). */
+export interface NativeUsb {
+    /** `[{"vendorId": ..., "productId": ...}, ...]` for every plugged device. */
+    usbDevicesJson(): string;
+    /** Calls `onChange` after each plug or unplug until `close`; never keeps the process alive. */
+    watchUsb(onChange: (count: number) => void): { close(): void };
+}
+
+/**
+ * The binding's USB presence, for the desktop's device add-ons, or null when
+ * there is no binding here or it was built before USB presence (an older
+ * install's binding): the caller then treats devices as not known.
+ */
+export function nativeUsb(directory?: string): NativeUsb | null {
+    const location = nativeLocation(directory);
+    if (!location?.exists) return null;
+    try {
+        const loaded = location.load() as Partial<NativeUsb>;
+        if (typeof loaded.usbDevicesJson !== "function" || typeof loaded.watchUsb !== "function") return null;
+        return { usbDevicesJson: loaded.usbDevicesJson.bind(loaded), watchUsb: loaded.watchUsb.bind(loaded) };
+    } catch {
+        return null;
+    }
+}

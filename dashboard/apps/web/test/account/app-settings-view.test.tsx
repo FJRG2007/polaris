@@ -148,10 +148,11 @@ describe("the app's settings screen", () => {
 describe("the This app group", () => {
     const sections = (APP_SECTIONS.account ?? []).filter((section) => section.desktopOnly);
 
-    it("has one section per category", () => {
-        expect(sections.map((section) => section.href)).toEqual(
-            APP_SETTING_CATEGORIES.map((category) => `/account/app/${category}`)
-        );
+    it("has one section per category, then the device add-ons", () => {
+        expect(sections.map((section) => section.href)).toEqual([
+            ...APP_SETTING_CATEGORIES.map((category) => `/account/app/${category}`),
+            "/account/addons"
+        ]);
     });
 
     it("is offered only inside the desktop app", () => {
