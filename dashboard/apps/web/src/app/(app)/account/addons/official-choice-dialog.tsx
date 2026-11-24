@@ -50,7 +50,7 @@ function ImportSummary({ look, say }: { look: OfficialLook; say: Say }) {
     return (
         <div className="flex min-w-0 flex-col gap-2">
             <p className="text-sm">{say("official.importCounts", { mapped: count("mapped"), kept: count("kept"), dropped: count("dropped") })}</p>
-            <div className="flex max-h-56 min-w-0 flex-col gap-3 overflow-y-auto rounded-md border border-border p-3">
+            <div className="flex max-h-56 min-w-0 flex-col gap-3 overflow-y-auto overscroll-contain rounded-md border border-border p-3">
                 {controlsByPage(controls).map(([page, list]) => (
                     <section key={page} className="flex min-w-0 flex-col gap-1" aria-label={say("official.page", { number: page })}>
                         <h4 className="text-xs font-medium text-muted-foreground">{say("official.page", { number: page })}</h4>
