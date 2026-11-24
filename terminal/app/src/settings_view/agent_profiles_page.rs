@@ -2145,7 +2145,10 @@ impl SettingsWidget for UsageWidget {
                 }
             } else {
                 vec![
-                    FormattedTextFragment::hyperlink("Contact support", "mailto:support@example.com"),
+                    FormattedTextFragment::hyperlink(
+                        "Contact support",
+                        "mailto:support@example.com",
+                    ),
                     FormattedTextFragment::plain_text(" for more AI usage."),
                 ]
             }

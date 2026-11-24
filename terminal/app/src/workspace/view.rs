@@ -21068,7 +21068,9 @@ impl Workspace {
                 .finish()
             })
             .on_click(|ctx, _, _| {
-                ctx.dispatch_typed_action(WorkspaceAction::OpenLink("https://fjrg2007.github.io/polaris".to_owned()));
+                ctx.dispatch_typed_action(WorkspaceAction::OpenLink(
+                    "https://fjrg2007.github.io/polaris".to_owned(),
+                ));
             })
             .with_cursor(Cursor::PointingHand)
             .finish();

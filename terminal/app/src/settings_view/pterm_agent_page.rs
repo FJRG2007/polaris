@@ -5663,7 +5663,10 @@ impl SettingsWidget for ApiKeysWidget {
             {
                 if team.billing_metadata.customer_type == CustomerType::Enterprise {
                     vec![
-                        FormattedTextFragment::hyperlink("Contact sales", "mailto:sales@example.com"),
+                        FormattedTextFragment::hyperlink(
+                            "Contact sales",
+                            "mailto:sales@example.com",
+                        ),
                         FormattedTextFragment::plain_text(
                             " to enable bringing your own API keys on your Enterprise plan.",
                         ),

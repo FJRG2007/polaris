@@ -160,7 +160,10 @@ fn per_member_rows_cover_exactly_the_supplied_roster() {
     );
 
     let named: Vec<_> = rows.iter().map(|r| r.display_name.as_str()).collect();
-    assert_eq!(named, vec!["viewer-uid@example.com", "other-uid@example.com"]);
+    assert_eq!(
+        named,
+        vec!["viewer-uid@example.com", "other-uid@example.com"]
+    );
     assert_eq!(rows[0].total_credits, 10);
     assert_eq!(rows[1].total_credits, 0, "zero-usage roster member");
 

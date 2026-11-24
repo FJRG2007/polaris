@@ -763,10 +763,7 @@ impl CategoriesView {
                 .ui_builder()
                 .link(
                     "creating your own workflow".into(),
-                    Some(
-                        "https://github.com/FJRG2007/polaris/tree/main/terminal#readme"
-                            .into(),
-                    ),
+                    Some("https://github.com/FJRG2007/polaris/tree/main/terminal#readme".into()),
                     None,
                     self.link_mouse_state_handles
                         .documentation_link_handle

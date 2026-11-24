@@ -652,8 +652,7 @@ const ENV_VAR_BOOTSTRAP_FAILED_DURATION: Duration = Duration::from_secs(60);
 /// dismissal keeps the warning informational without turning it into a
 /// permanent fixture.
 const SLOW_BOOTSTRAP_BANNER_AUTO_DISMISS_DURATION: Duration = Duration::from_secs(30);
-const KNOWN_ISSUES_URL: &str =
-    "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
+const KNOWN_ISSUES_URL: &str = "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 
 /// Link to supported custom prompts.
 const PROMPT_COMPATIBILITY_URL: &str =
@@ -21207,7 +21206,9 @@ impl TerminalView {
                     ctx.emit(Event::OpenPtermDriveObjectInPane(uid.clone()));
                 }
                 AIAgentCitation::PtermDocumentation { path } => {
-                    ctx.open_url(&format!("https://github.com/FJRG2007/polaris/tree/main/terminal#readme}"));
+                    ctx.open_url(&format!(
+                        "https://github.com/FJRG2007/polaris/tree/main/terminal#readme}"
+                    ));
                 }
                 AIAgentCitation::WebPage { url } => {
                     ctx.open_url(url);

@@ -4762,7 +4762,9 @@ pub fn test_valid_domains() {
     assert!(!TeamsPageView::is_valid_domain("polaris-terminal!.dev"));
     assert!(!TeamsPageView::is_valid_domain("example.com>"));
     assert!(!TeamsPageView::is_valid_domain("example.com."));
-    assert!(TeamsPageView::is_valid_domain("app.polaris-terminal.invalid"));
+    assert!(TeamsPageView::is_valid_domain(
+        "app.polaris-terminal.invalid"
+    ));
     assert!(TeamsPageView::is_valid_domain("pterm0.dev0"));
     assert!(TeamsPageView::is_valid_domain("example.com"));
     assert!(TeamsPageView::is_valid_domain("miniclip.com"));
