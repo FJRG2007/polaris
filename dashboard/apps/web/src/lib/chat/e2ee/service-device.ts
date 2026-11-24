@@ -29,7 +29,7 @@ import { nativeMlsMember } from "@polaris/core-rs";
 import type { MlsHistoryKeyStore } from "./mls-history-keys";
 import { commitMlsStore, destroyMlsStore, loadMlsStore, reservedKey, type MlsStoreChange } from "./mls-store";
 import { POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID, serviceDevice, type ServiceKind } from "@/lib/chat/service-members";
-import { MlsDevice, MlsRequestError, signatureNoteKey, type MlsDeviceNotes, type MlsDeviceStore, type MlsMemberClass, type MlsTransport } from "./mls-client";
+import { MlsDevice, requestError, signatureNoteKey, type MlsDeviceNotes, type MlsDeviceStore, type MlsMemberClass, type MlsTransport } from "./mls-client";
 
 /** Comfortably longer than one operation; a process that dies holding it blocks the device this long. */
 const LEASE_MS = 60_000;
@@ -143,7 +143,7 @@ export function inProcessTransport(userId: string): MlsTransport {
     return async (body: MlsBody) => {
         const response = await answerMls(userId, body);
         const answer = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-        if (!response.ok) throw new MlsRequestError(response.status, typeof answer.error === "string" ? answer.error : "unknown");
+        if (!response.ok) throw requestError(response.status, answer);
         return answer;
     };
 }

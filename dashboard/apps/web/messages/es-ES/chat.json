@@ -16,7 +16,8 @@
         "directCannotBeLeft": "No puedes salir de un mensaje directo",
         "directHasNoName": "Un mensaje directo no tiene nombre que cambiar",
         "pollNotEditable": "Una encuesta no se puede reescribir. Bórrala y vuelve a preguntar.",
-        "sealedNotEditable": "Un mensaje cifrado aún no se puede editar. Bórralo y envíalo de nuevo.",
+        "sealedNotEditable": "Este mensaje está cifrado y no se puede editar aquí. Recarga la página e inténtalo de nuevo.",
+        "sealedEditFailed": "No se pudo guardar la edición. Tu mensaje sigue como estaba.",
         "pollQuestionRequired": "Pregunta algo antes",
         "pollAnswersRequired": "Añade al menos dos respuestas",
         "meetingNameRequired": "Ponle un nombre a la reunión",
@@ -1690,7 +1691,8 @@
         "now": "Ahora",
         "nothingEarlierWasRecordedFor": "No se registró nada anterior de este.",
         "earlierVersionsAreNotKept": "En este tipo de conversación no se guardan versiones anteriores.",
-        "until": "Hasta <time></time>"
+        "until": "Hasta <time></time>",
+        "notOpenedHere": "Esta versión no se pudo abrir en este dispositivo."
     },
     "directProfile": {
         "more": "Más",

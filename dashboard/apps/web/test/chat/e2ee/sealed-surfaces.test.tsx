@@ -6,8 +6,8 @@
  *
  * Pinned here: a sealed entry is opened on the device and drawn with what it
  * opened to, an unopened one says nothing (never "an attachment"), an entry
- * that is not sealed passes through untouched, and a sealed row is not offered
- * for rewriting.
+ * that is not sealed passes through untouched, an edited sealed row is opened
+ * again, and a sealed row is offered for rewriting only while sealed chat is on.
  */
 
 import { rewritable } from "@/app/(app)/chat/rewritable";
@@ -24,17 +24,21 @@ const sealed = vi.hoisted(() => ({
     calls: [] as { channelId: string; ids: readonly string[] }[]
 }));
 
+type Ref = string | { id: string; editedAt?: string };
+const refKey = (ref: Ref) => (typeof ref === "string" ? ref : ref.editedAt ? `${ref.id}@${ref.editedAt}` : ref.id);
+
 vi.mock("@/lib/chat/e2ee/sealed-chat", () => ({
     sealedChatActive: () => sealed.active,
-    openedContent: (id: string) => sealed.opened.get(id),
-    openSealed: async (channelId: string, ids: readonly string[]) => {
+    openedContent: (id: string, editedAt?: string) => sealed.opened.get(refKey({ id, editedAt })),
+    openSealed: async (channelId: string, refs: readonly Ref[]) => {
+        const ids = refs.map(refKey);
         sealed.calls.push({ channelId, ids });
         for (const id of ids) sealed.opened.set(id, sealed.pending.get(id) ?? null);
         return new Map(ids.map((id) => [id, sealed.opened.get(id) ?? null]));
     }
 }));
 
-const { useOpenedLast, useOpenedWithin, withOpened } = await import("@/app/(app)/chat/opened-sealed");
+const { unopened, useOpenedLast, useOpenedWithin, withOpened } = await import("@/app/(app)/chat/opened-sealed");
 
 function row(id: string, extra: Partial<ChatMessageView> = {}): ChatMessageView {
     return { id, channelId: "channel-1", kind: "text", body: "", sealed: true, ...extra } as ChatMessageView;
@@ -61,6 +65,17 @@ describe("withOpened", () => {
     it("returns the same list when nothing opened", () => {
         const list = [row("s1")];
         expect(withOpened(list, () => undefined)).toBe(list);
+    });
+
+    it("opens an edited row again and never draws it with the version before", () => {
+        const opened = new Map<string, { body: string }>([["s1", { body: "old" }]]);
+        const look = (id: string, editedAt?: string) => opened.get(editedAt ? `${id}@${editedAt}` : id);
+        const edited = row("s1", { sealedEditedAt: "2028-11-26T10:00:00.000Z" });
+        expect(unopened([row("s1")], look).size).toBe(0);
+        expect(unopened([edited], look).get("channel-1")).toEqual([{ id: "s1", editedAt: edited.sealedEditedAt }]);
+        expect(withOpened([edited], look)[0]!.body).toBe("");
+        opened.set(`s1@${edited.sealedEditedAt}`, { body: "new" });
+        expect(withOpened([edited], look)[0]!.body).toBe("new");
     });
 });
 
@@ -131,10 +146,14 @@ describe("previewText", () => {
 });
 
 describe("rewritable", () => {
-    it("offers the pencil on a plain message and not on a sealed one or a poll", () => {
+    it("offers the pencil on a plain message, on a sealed one only while sealed chat is on, and never on a poll", () => {
         expect(rewritable({ kind: "text", body: "hi", sealed: false })).toBe(true);
         expect(rewritable({ kind: "text", body: "hi" })).toBe(true);
+        sealed.active = true;
+        expect(rewritable({ kind: "text", body: "hi", sealed: true })).toBe(true);
+        sealed.active = false;
         expect(rewritable({ kind: "text", body: "hi", sealed: true })).toBe(false);
+        sealed.active = true;
         expect(rewritable({ kind: "poll", body: "Lunch?" })).toBe(false);
     });
 });

@@ -27,7 +27,7 @@ import * as delivery from "./mls-delivery";
 import * as sealed from "./sealed-messages";
 import { backgroundUser } from "@/lib/session";
 import { mlsBody, type MlsBody } from "./schemas";
-import { channelAccess, conversationAudience } from "@/lib/chat/access";
+import { channelAccess, conversationAudience, type ChatAccessError } from "@/lib/chat/access";
 import { rateLimit } from "@/lib/rate-limit-service";
 
 const WINDOW_MS = 15 * 60 * 1000;
@@ -97,9 +97,18 @@ export async function answerMls(userId: string, body: MlsBody): Promise<Response
         return await run(userId, body);
     } catch (caught) {
         if (caught instanceof delivery.MlsDeliveryRefusal || caught instanceof sealed.SealedRefusal) return json({ error: caught.reason }, 409);
+        // A chat rule (an edit past its window, somebody else's message) is an answer the reader is shown, in their language.
+        if (caught instanceof Error && (caught.name === "ChatAccessError" || caught.name === "ChatRuleError"))
+            return json({ error: "refused", text: await readerText(caught as ChatAccessError) }, 409);
         console.error("polaris: an MLS delivery step failed:", caught);
         return json(REFUSED, 400);
     }
+}
+
+/** A chat refusal in the reader's language; English where no request names one (a member the server runs). */
+async function readerText(refusal: ChatAccessError): Promise<string> {
+    const locale = await import("@/lib/i18n/request").then((i18n) => i18n.getLocale()).catch(() => null);
+    return locale ? refusal.textIn(locale) : refusal.message;
 }
 
 async function run(userId: string, body: MlsBody): Promise<Response> {
@@ -217,6 +226,18 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                 signature: bytes(body.signature)
             });
             return json({ id });
+        }
+        case "edit-sealed": {
+            const editedAt = await sealed.editSealed(userId, {
+                channelId: body.channelId,
+                device: body.device,
+                messageId: body.messageId,
+                epoch: BigInt(body.epoch),
+                senderLeaf: body.senderLeaf,
+                ciphertext: bytes(body.ciphertext),
+                signature: bytes(body.signature)
+            });
+            return json({ editedAt: editedAt.toISOString() });
         }
         case "read-sealed": {
             const rows = await sealed.readSealed(userId, body.channelId, body.messageIds);

@@ -99,6 +99,7 @@ export function memoryPrisma(state: MemoryTablesState) {
         chatHistoryKey: table("chatHistoryKey", ["channelId", "epoch", "recipient"]),
         chatAccountKey: table("chatAccountKey", ["userId"]),
         chatMessage: table("chatMessage", []),
+        chatMessageEdit: table("chatMessageEdit", []),
         chatChannel: table("chatChannel", ["id"]),
         chatWebhook: table("chatWebhook", ["id"]),
         mlsStoreEntry: table("mlsStoreEntry", ["device", "key"]),

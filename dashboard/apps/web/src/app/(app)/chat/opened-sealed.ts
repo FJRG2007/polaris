@@ -4,7 +4,8 @@
  * Sealed rows shown with their content: each message the server marks
  * `sealed` (its body empty) is opened on this device and drawn with the body
  * it opened to, in place - the same row, the same list. With sealed chat off
- * no row is sealed and the list is returned as it came.
+ * no row is sealed and the list is returned as it came. A row is opened per
+ * version (`sealedEditedAt`), so one edited since it was opened is opened again.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -15,24 +16,30 @@ import { plainExcerpt } from "@/components/rich-text/excerpt";
 /** As much of an opened body as a list row shows (as `last-messages.ts` cuts a plain one). */
 const PREVIEW_CHARS = 160;
 
-/** The ids of sealed rows this page has not opened yet, per conversation. */
-function unopened(messages: readonly ChatMessageView[]): Map<string, string[]> {
-    const out = new Map<string, string[]>();
+/** The sealed rows (as versions) this page has not opened yet, per conversation. */
+export function unopened(
+    messages: readonly ChatMessageView[],
+    opened: (id: string, editedAt?: string) => sealedChat.SealedContent | null | undefined = sealedChat.openedContent
+): Map<string, sealedChat.SealedRef[]> {
+    const out = new Map<string, sealedChat.SealedRef[]>();
     for (const message of messages) {
-        if (!message.sealed || sealedChat.openedContent(message.id) !== undefined) continue;
-        const ids = out.get(message.channelId) ?? [];
-        ids.push(message.id);
-        out.set(message.channelId, ids);
+        if (!message.sealed || opened(message.id, message.sealedEditedAt) !== undefined) continue;
+        const refs = out.get(message.channelId) ?? [];
+        refs.push({ id: message.id, editedAt: message.sealedEditedAt });
+        out.set(message.channelId, refs);
     }
     return out;
 }
 
-/** Draw a sealed row with what it opened to; one that did not open keeps its empty body. */
-export function withOpened(messages: readonly ChatMessageView[], opened: (id: string) => sealedChat.SealedContent | null | undefined): readonly ChatMessageView[] {
+/** Draw a sealed row with what its version opened to; one that did not open keeps its empty body. */
+export function withOpened(
+    messages: readonly ChatMessageView[],
+    opened: (id: string, editedAt?: string) => sealedChat.SealedContent | null | undefined
+): readonly ChatMessageView[] {
     let changed = false;
     const out = messages.map((message) => {
         if (!message.sealed) return message;
-        const content = opened(message.id);
+        const content = opened(message.id, message.sealedEditedAt);
         if (!content) return message;
         changed = true;
         return { ...message, body: content.body };
@@ -77,14 +84,18 @@ export function useOpenedWithin<T extends { readonly message: ChatMessageView }>
  * A conversation's last line with a sealed message opened on this device and
  * cut to one row; empty until it opens, and if it does not.
  */
-export function useOpenedLast<T extends { readonly body: string; readonly sealedId?: string }>(channelId: string, last: T | null): T | null {
+export function useOpenedLast<T extends { readonly body: string; readonly sealedId?: string; readonly sealedEditedAt?: string }>(
+    channelId: string,
+    last: T | null
+): T | null {
     const id = last?.sealedId;
+    const editedAt = last?.sealedEditedAt;
     const [version, setVersion] = useState(0);
     useEffect(() => {
-        if (!id || !sealedChat.sealedChatActive() || sealedChat.openedContent(id) !== undefined) return;
+        if (!id || !sealedChat.sealedChatActive() || sealedChat.openedContent(id, editedAt) !== undefined) return;
         let live = true;
         sealedChat
-            .openSealed(channelId, [id])
+            .openSealed(channelId, [{ id, editedAt }])
             .then(() => {
                 if (live) setVersion((current) => current + 1);
             })
@@ -92,10 +103,10 @@ export function useOpenedLast<T extends { readonly body: string; readonly sealed
         return () => {
             live = false;
         };
-    }, [channelId, id]);
+    }, [channelId, id, editedAt]);
     return useMemo(() => {
         if (!last || !id) return last;
-        const content = sealedChat.openedContent(id);
+        const content = sealedChat.openedContent(id, editedAt);
         return content ? { ...last, body: plainExcerpt(content.body, PREVIEW_CHARS) } : last;
-    }, [last, id, version]);
+    }, [last, id, editedAt, version]);
 }

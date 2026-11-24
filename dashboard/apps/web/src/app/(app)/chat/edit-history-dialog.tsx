@@ -15,6 +15,9 @@
  * An instance can turn the whole thing off, and then this says so rather than
  * showing an empty list - "no earlier versions are kept here" and "this was
  * edited once and we lost it" are very different sentences.
+ *
+ * A sealed message's earlier versions come sealed as they were stored, and are
+ * opened on this device the way the message is (docs/chat-e2ee-mls.md).
  */
 
 import { useEffect, useState } from "react";
@@ -22,13 +25,37 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { History, Loader2 } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
-import type { ChatEditHistory } from "@/lib/chat/messages";
+import type { ChatEditHistory, ChatMessageVersion } from "@/lib/chat/messages";
+import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 import { RichText } from "@/components/rich-text/rich-text";
 import type { CustomEmojiSet } from "@/components/rich-text/custom-emoji";
 import { useDisplayFormat } from "@/components/display-format";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
 import * as polls from "./chat-reads";
 import { unlockProofFor } from "./lock-session";
+
+/** A version as drawn: a sealed one that did not open on this device is marked so. */
+type ShownVersion = ChatMessageVersion & { readonly unopened?: boolean };
+type ShownHistory = Omit<ChatEditHistory, "versions"> & { readonly versions: readonly ShownVersion[] };
+
+/** A sealed message's earlier versions, opened on this device; a plain history is returned as it came. */
+export async function openedHistory(channelId: string, history: ChatEditHistory): Promise<ShownHistory> {
+    const sealed = history.versions.flatMap((version) => (version.sealed ? [version.sealed] : []));
+    if (!sealed.length) return history;
+    const opened = await sealedChat.openSealedVersions(channelId, sealed).catch((caught: unknown) => {
+        console.warn("polaris: earlier versions could not be opened here:", caught);
+        return sealed.map(() => null);
+    });
+    let next = 0;
+    return {
+        ...history,
+        versions: history.versions.map((version) => {
+            if (!version.sealed) return version;
+            const content = opened[next++];
+            return content ? { ...version, body: content.body } : { ...version, unopened: true };
+        })
+    };
+}
 
 export function EditHistoryDialog({
     message,
@@ -44,7 +71,7 @@ export function EditHistoryDialog({
 }) {
     const t = useTranslations("chat");
     const format = useDisplayFormat();
-    const [history, setHistory] = useState<ChatEditHistory | null>(null);
+    const [history, setHistory] = useState<ShownHistory | null>(null);
     const [error, setError] = useState("");
 
     // Fetched when it opens rather than with the message: a channel of two
@@ -57,10 +84,11 @@ export function EditHistoryDialog({
             return;
         }
         let current = true;
-        void polls.editHistory(message.id, unlockProofFor(message.channelId)).then((result) => {
+        void polls.editHistory(message.id, unlockProofFor(message.channelId)).then(async (result) => {
             if (!current) return;
-            if (result.error) setError(result.error);
-            else setHistory(result.history ?? null);
+            if (result.error) return setError(result.error);
+            const shown = result.history ? await openedHistory(message.channelId, result.history) : null;
+            if (current) setHistory(shown);
         });
         return () => {
             current = false;
@@ -117,11 +145,15 @@ export function EditHistoryDialog({
                                     })}
                                 </p>
                                 <div className="text-sm text-muted-foreground">
-                                    <RichText
-                                        value={version.body}
-                                        customEmoji={emoji}
-                                        flaggedLinks={message?.flaggedLinks}
-                                    />
+                                    {version.unopened ? (
+                                        <p className="italic">{t("editHistory.notOpenedHere")}</p>
+                                    ) : (
+                                        <RichText
+                                            value={version.body}
+                                            customEmoji={emoji}
+                                            flaggedLinks={message?.flaggedLinks}
+                                        />
+                                    )}
                                 </div>
                             </li>
                         ))}

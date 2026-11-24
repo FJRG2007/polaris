@@ -121,7 +121,9 @@ export interface MlsDeviceNotes {
 export class MlsRequestError extends Error {
     constructor(
         readonly status: number,
-        readonly reason: string
+        readonly reason: string,
+        /** The refusal in the reader's language, when the server answered one (a chat rule). */
+        readonly text?: string
     ) {
         super(`the MLS delivery service refused the request (${status} ${reason})`);
         this.name = "MlsRequestError";
@@ -135,9 +137,14 @@ export function fetchTransport(endpoint = "/api/e2ee/mls"): MlsTransport {
     return async (body) => {
         const response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
         const answer = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-        if (!response.ok) throw new MlsRequestError(response.status, typeof answer.error === "string" ? answer.error : "unknown");
+        if (!response.ok) throw requestError(response.status, answer);
         return answer;
     };
+}
+
+/** A refused answer as the error a caller reads its reason and its reader's sentence from. */
+export function requestError(status: number, answer: Record<string, unknown>): MlsRequestError {
+    return new MlsRequestError(status, typeof answer.error === "string" ? answer.error : "unknown", typeof answer.text === "string" ? answer.text : undefined);
 }
 
 /** A message another member sent to the group. */
@@ -160,11 +167,9 @@ export interface MlsSealedMessage {
     opened: Uint8Array | null;
 }
 
-interface SealedWire {
-    id: string;
-    authorId: string | null;
-    /** The account of the signing device when `authorId` is null (a member the server runs); absent from older servers. */
-    signer?: string | null;
+/** A sealed message's stored columns, as the server hands them back (bytes in base64url). */
+export interface SealedStored {
+    /** The message id the content is bound to. */
     clientKey: string;
     device: string;
     epoch: string;
@@ -172,6 +177,13 @@ interface SealedWire {
     ciphertext: string;
     signature: string;
     signatureKey: string;
+}
+
+interface SealedWire extends SealedStored {
+    id: string;
+    authorId: string | null;
+    /** The account of the signing device when `authorId` is null (a member the server runs); absent from older servers. */
+    signer?: string | null;
 }
 
 const encoder = new TextEncoder();
@@ -507,19 +519,67 @@ export class MlsDevice {
         const rows = answer.messages as SealedWire[];
         const out: MlsSealedMessage[] = [];
         for (const row of rows) {
-            const epoch = BigInt(row.epoch);
-            const binding = { conversationId: channelId, epoch, messageId: row.clientKey, senderLeaf: row.senderLeaf };
-            const ciphertext = fromText(row.ciphertext);
-            let opened: Uint8Array | null = null;
-            if (await content.verifyMessageSignature(fromText(row.signatureKey), binding, ciphertext, fromText(row.signature))) {
-                const key = await this.historyKey(channelId, epoch).catch(() => null);
-                if (key) opened = await content.openMessage(key, binding, ciphertext).catch(() => null);
-            }
             // A member the server runs stores no author; the account its device signs as comes beside it.
             const signer = row.authorId ?? row.signer ?? null;
-            out.push({ id: row.id, authorId: row.authorId, sender: signer ? `${signer}/${row.device}` : null, epoch, opened });
+            out.push({ id: row.id, authorId: row.authorId, sender: signer ? `${signer}/${row.device}` : null, epoch: BigInt(row.epoch), opened: await this.openStored(channelId, row) });
         }
         return out;
+    }
+
+    /**
+     * Open the earlier versions of a sealed message its edit history holds,
+     * checked as `readSealed` checks the message; null for one that does not
+     * check out or that no key here opens.
+     */
+    async openVersions(channelId: string, versions: readonly SealedStored[]): Promise<(Uint8Array | null)[]> {
+        const out: (Uint8Array | null)[] = [];
+        for (const version of versions) out.push(await this.openStored(channelId, version));
+        return out;
+    }
+
+    private async openStored(channelId: string, row: SealedStored): Promise<Uint8Array | null> {
+        const epoch = BigInt(row.epoch);
+        const binding = { conversationId: channelId, epoch, messageId: row.clientKey, senderLeaf: row.senderLeaf };
+        const ciphertext = fromText(row.ciphertext);
+        if (!(await content.verifyMessageSignature(fromText(row.signatureKey), binding, ciphertext, fromText(row.signature)))) return null;
+        const key = await this.historyKey(channelId, epoch).catch(() => null);
+        return key ? await content.openMessage(key, binding, ciphertext).catch(() => null) : null;
+    }
+
+    /**
+     * Seal a new version of one of this account's sealed messages under the
+     * group's current history key, bound to the same message id (`clientKey`,
+     * the one it was sent with) and signed by this device, and store it in
+     * place of the old one (`edit-sealed`). The group is brought up to date
+     * first, as for a send, so nobody who left can open the new words.
+     * Answers when the server stored it (the row's new edit time).
+     */
+    async editSealed(channelId: string, messageId: string, plaintext: Uint8Array): Promise<string> {
+        this.requireGroup(channelId);
+        const read = await this.send({ op: "read-sealed", channelId, messageIds: [messageId] });
+        const clientKey = (read.messages as SealedWire[]).find((row) => row.id === messageId)?.clientKey;
+        if (!clientKey) throw new MlsRequestError(404, "notSealed");
+        await this.pull(channelId);
+        await this.reconcile(channelId);
+        const groupId = this.requireGroup(channelId);
+        const epoch = this.member.epoch(groupId);
+        const key = await this.historyKey(channelId, epoch);
+        // Never sent in the clear instead: the caller puts the old text back.
+        if (!key) throw new Error("this device holds no history key for the conversation's current epoch");
+        const binding = { conversationId: channelId, epoch, messageId: clientKey, senderLeaf: this.member.ownLeaf(groupId) };
+        const ciphertext = await content.sealMessage(key, binding, plaintext);
+        const signature = this.member.signContent(await content.messageSignaturePayload(binding, ciphertext));
+        const answer = await this.send({
+            op: "edit-sealed",
+            channelId,
+            device: this.options.device,
+            messageId,
+            epoch: epoch.toString(),
+            senderLeaf: binding.senderLeaf,
+            ciphertext: toText(ciphertext),
+            signature: toText(signature)
+        });
+        return String(answer.editedAt);
     }
 
     /** Read the group's log from where this device left off; returns the application messages, in order. */

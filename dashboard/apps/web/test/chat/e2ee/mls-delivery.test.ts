@@ -22,7 +22,9 @@ const state = vi.hoisted(() => ({
     tables: {} as Record<string, Row[]>,
     user: { id: "11111111-1111-4111-8111-111111111111" } as { id: string } | null,
     members: new Set<string>(),
-    seq: 0n
+    seq: 0n,
+    keepEditHistory: true,
+    editWindowMinutes: null as number | null
 }));
 
 vi.mock("@/lib/session", () => ({ backgroundUser: async () => state.user }));
@@ -34,8 +36,18 @@ vi.mock("@/lib/chat/messages", () => ({
         const earlier = rows.find((r) => r.authorId === actor.id && r.clientKey === input.clientKey);
         if (earlier) return earlier.id;
         const id = crypto.randomUUID();
-        rows.push({ id, channelId: input.channelId, authorId: actor.id, clientKey: input.clientKey, body: input.body, deletedAt: null, expiresAt: null, audience: [], replyToId: (rest[1] as { messageId?: string } | null)?.messageId ?? null, ...(rest[5] as Row) });
+        rows.push({ id, channelId: input.channelId, authorId: actor.id, clientKey: input.clientKey, body: input.body, deletedAt: null, expiresAt: null, audience: [], createdAt: new Date(), editedAt: null, replyToId: (rest[1] as { messageId?: string } | null)?.messageId ?? null, ...(rest[5] as Row) });
         return id;
+    },
+    // The checks every edit makes, reduced to the ones a sealed edit is tested against here.
+    requireRewritable: async (actor: { id: string }, messageId: string) => {
+        const refuse = (key: string) => Object.assign(new Error(key), { name: "ChatRuleError", textIn: () => key });
+        const message = (state.tables.chatMessage ?? []).find((r) => r.id === messageId);
+        if (!message) throw refuse("errors.messageGone");
+        if (message.authorId !== actor.id) throw refuse("errors.editOwnOnly");
+        if (message.deletedAt) throw refuse("errors.messageDeleted");
+        if (state.editWindowMinutes !== null && Date.now() - (message.createdAt as Date).getTime() > state.editWindowMinutes * 60_000) throw refuse("errors.editWindowPassed");
+        return { message, rules: { keepEditHistory: state.keepEditHistory } };
     }
 }));
 vi.mock("@/lib/chat/access", () => ({
@@ -46,7 +58,7 @@ vi.mock("@/lib/chat/access", () => ({
             : null
 }));
 
-vi.mock("@polaris/db", async () => ({ prisma: (await import("./support/mls-tables")).memoryPrisma(state) }));
+vi.mock("@polaris/db", async () => ({ prisma: (await import("./support/mls-tables")).memoryPrisma(state), Prisma: { DbNull: null } }));
 
 const { handleMls } = await import("@/lib/chat/e2ee/mls-handler");
 const { MlsDevice, MlsRequestError } = await import("@/lib/chat/e2ee/mls-client");
@@ -79,6 +91,8 @@ beforeEach(() => {
     state.tables = {};
     state.seq = 0n;
     state.members = new Set([`${ALICE}:${CHANNEL}`, `${BOB}:${CHANNEL}`]);
+    state.keepEditHistory = true;
+    state.editWindowMinutes = null;
 });
 
 describe("/api/e2ee/mls", () => {
@@ -549,6 +563,97 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         const settled = commits();
         await alice.sendSealed(CHANNEL, new TextEncoder().encode("again"));
         expect(commits()).toBe(settled);
+    });
+
+    it("edits a sealed message: it opens to the new words, and the old version is kept sealed", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        const bob = await open(BOB, "bob-phone-1");
+        for (const device of [alice, bob]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB]);
+        await bob.sync(CHANNEL);
+        const id = await alice.sendSealed(CHANNEL, new TextEncoder().encode("first words"));
+        const row = state.tables.chatMessage!.find((r) => r.id === id)!;
+        const firstCiphertext = Buffer.from(row.e2eeCiphertext as Uint8Array);
+
+        const editedAt = await alice.editSealed(CHANNEL, id, new TextEncoder().encode("second words"));
+        expect((row.editedAt as Date).toISOString()).toBe(editedAt);
+        expect(row.body).toBe("");
+        expect(Buffer.from(row.e2eeCiphertext as Uint8Array).includes(Buffer.from("second words"))).toBe(false);
+        const [read] = await bob.readSealed(CHANNEL, [id]);
+        expect(new TextDecoder().decode(read!.opened!)).toBe("second words");
+        expect(read!.sender).toBe(`${ALICE}/alice-laptop`);
+
+        // The version replaced is kept as it was stored, and opens on a member's device.
+        const [kept] = state.tables.chatMessageEdit!;
+        expect(kept).toMatchObject({ messageId: id, body: "" });
+        expect(Buffer.from(kept!.e2eeCiphertext as Uint8Array)).toEqual(firstCiphertext);
+        const text = (value: unknown) => Buffer.from(value as Uint8Array).toString("base64url");
+        const version = {
+            clientKey: row.clientKey as string,
+            device: kept!.e2eeDevice as string,
+            epoch: String(kept!.e2eeEpoch),
+            senderLeaf: kept!.e2eeSenderLeaf as number,
+            ciphertext: text(kept!.e2eeCiphertext),
+            signature: text(kept!.e2eeSignature),
+            signatureKey: text(kept!.e2eeSignatureKey)
+        };
+        expect((await bob.openVersions(CHANNEL, [version])).map((v) => v && new TextDecoder().decode(v))).toEqual(["first words"]);
+        // Taken out of its place, it does not open as another message.
+        expect(await bob.openVersions(CHANNEL, [{ ...version, clientKey: crypto.randomUUID() }])).toEqual([null]);
+
+        // Where history is not kept, nothing earlier is written.
+        state.keepEditHistory = false;
+        await alice.editSealed(CHANNEL, id, new TextEncoder().encode("third words"));
+        expect(state.tables.chatMessageEdit).toHaveLength(1);
+        expect(new TextDecoder().decode((await bob.readSealed(CHANNEL, [id]))[0]!.opened!)).toBe("third words");
+    });
+
+    it("refuses a sealed edit of somebody else's message, with another device's signature, under an older epoch, or past the window", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        const bob = await open(BOB, "bob-phone-1");
+        for (const device of [alice, bob]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB]);
+        await bob.sync(CHANNEL);
+        const id = await alice.sendSealed(CHANNEL, new TextEncoder().encode("mine"));
+        const row = state.tables.chatMessage!.find((r) => r.id === id)!;
+        const stored = { ciphertext: Buffer.from(row.e2eeCiphertext as Uint8Array), epoch: row.e2eeEpoch };
+        const edit = (overrides: Record<string, unknown>, as = ALICE) =>
+            call(
+                {
+                    op: "edit-sealed",
+                    channelId: CHANNEL,
+                    device: "alice-laptop",
+                    messageId: id,
+                    epoch: String(row.e2eeEpoch),
+                    senderLeaf: 0,
+                    ciphertext: Buffer.alloc(40, 1).toString("base64url"),
+                    signature: Buffer.alloc(64, 2).toString("base64url"),
+                    ...overrides
+                },
+                as
+            );
+
+        await expect(bob.editSealed(CHANNEL, id, new TextEncoder().encode("not yours"))).rejects.toMatchObject({ status: 409 });
+        expect(await edit({ device: "bob-phone-1" }, BOB)).toMatchObject({ status: 409, body: { error: "refused", text: "errors.editOwnOnly" } });
+        expect(await edit({})).toMatchObject({ status: 409, body: { error: "badSignature" } });
+        expect(await edit({ epoch: "0" })).toMatchObject({ status: 409, body: { error: "olderEpoch" } });
+        expect(await edit({ epoch: "99" })).toMatchObject({ status: 409, body: { error: "futureEpoch" } });
+        // A plain message is not edited sealed.
+        state.tables.chatMessage!.push({ id: crypto.randomUUID(), channelId: CHANNEL, authorId: ALICE, clientKey: crypto.randomUUID(), body: "plain", deletedAt: null, createdAt: new Date(), e2eeEpoch: null });
+        expect(await edit({ messageId: state.tables.chatMessage!.at(-1)!.id })).toMatchObject({ status: 409, body: { error: "notSealed" } });
+        // Past the scope's edit window.
+        state.editWindowMinutes = 5;
+        row.createdAt = new Date(Date.now() - 10 * 60_000);
+        await expect(alice.editSealed(CHANNEL, id, new TextEncoder().encode("too late"))).rejects.toMatchObject({ status: 409 });
+        expect(await edit({})).toMatchObject({ status: 409, body: { text: "errors.editWindowPassed" } });
+
+        // Nothing of it landed.
+        expect(Buffer.from(row.e2eeCiphertext as Uint8Array)).toEqual(stored.ciphertext);
+        expect(row.e2eeEpoch).toBe(stored.epoch);
+        expect(row.editedAt).toBeNull();
+        expect(state.tables.chatMessageEdit ?? []).toEqual([]);
     });
 
     it("answers who left and who has no leaf to a member only", async () => {

@@ -23,6 +23,8 @@ export interface ChatLastMessage {
     /** The message's id when it is sealed (docs/chat-e2ee-mls.md): its body is
      *  empty here, and the row opens it on the device to show a line of it. */
     readonly sealedId?: string;
+    /** When that sealed message was last edited, so a line opened from the earlier version is opened again. */
+    readonly sealedEditedAt?: string;
 }
 
 interface Row {
@@ -36,6 +38,7 @@ interface Row {
     deleted: boolean;
     messageId: string;
     sealed: boolean;
+    editedAt: Date | null;
 }
 
 /** As much of a body as one row can show, with room to spare. */
@@ -73,10 +76,10 @@ export async function lastMessages(
                CASE WHEN m."deletedAt" IS NULL THEN left(m.body, ${SOURCE_CHARS}::int) ELSE '' END AS body,
                m."createdAt", m."deliveredAt" IS NOT NULL AS delivered,
                m."readAt" IS NOT NULL AS read, m."deletedAt" IS NOT NULL AS deleted,
-               m.id::text AS "messageId", m."e2eeEpoch" IS NOT NULL AS sealed
+               m.id::text AS "messageId", m."e2eeEpoch" IS NOT NULL AS sealed, m."editedAt"
         FROM unnest(${[...channelIds]}::uuid[]) AS c(id)
         CROSS JOIN LATERAL (
-            SELECT id, "authorId", kind, body, "createdAt", "deliveredAt", "readAt", "deletedAt", "e2eeEpoch"
+            SELECT id, "authorId", kind, body, "createdAt", "deliveredAt", "readAt", "deletedAt", "e2eeEpoch", "editedAt"
             FROM "ChatMessage"
             WHERE "channelId" = c.id AND "parentId" IS NULL
               AND cardinality("audience") = 0
@@ -104,7 +107,9 @@ export async function lastMessages(
                 delivered: row.delivered,
                 read: row.read,
                 deleted: row.deleted,
-                ...(row.sealed && !row.deleted ? { sealedId: row.messageId } : {})
+                ...(row.sealed && !row.deleted
+                    ? { sealedId: row.messageId, ...(row.editedAt ? { sealedEditedAt: row.editedAt.toISOString() } : {}) }
+                    : {})
             }
         ])
     );

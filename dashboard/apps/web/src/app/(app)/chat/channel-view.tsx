@@ -130,6 +130,7 @@ import { usePolarContext } from "@/components/polar/polar-panel";
 import * as polls from "./chat-reads";
 import * as chatCache from "@/lib/chat/offline/chat-cache";
 import * as outbox from "./outbox";
+import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 import * as readMarks from "@/lib/chat/read-marks";
 import { prefetchMedia } from "./media-download";
 import { newClientKey, type OutboxEntry } from "@/lib/chat/offline/outbox";
@@ -3001,6 +3002,28 @@ export function ChannelView({
                             }
                         }}
                         onSaveEdit={async (messageId, body) => {
+                            const target = editing?.id === messageId ? editing : messages?.find((entry) => entry.id === messageId);
+                            if (target?.sealed) {
+                                // Sealed again on this device and shown at once (its opened
+                                // copy, never the row's stored body); put back if refused.
+                                setEditing(null);
+                                const was = target.edited;
+                                patchMessage(messageId, { edited: true });
+                                try {
+                                    const sealedEditedAt = await sealedChat.editSealedMessage({
+                                        channelId,
+                                        messageId,
+                                        body,
+                                        ...(target.sealedEditedAt ? { editedAt: target.sealedEditedAt } : {})
+                                    });
+                                    patchMessage(messageId, { sealedEditedAt });
+                                } catch (caught) {
+                                    patchMessage(messageId, { edited: was });
+                                    const text = (caught as { text?: unknown } | null)?.text;
+                                    setError(typeof text === "string" ? text : t("errors.sealedEditFailed"));
+                                }
+                                return;
+                            }
                             const result = await runAction(
                                 () => actions.editAction({ messageId, body }),
                                 setError

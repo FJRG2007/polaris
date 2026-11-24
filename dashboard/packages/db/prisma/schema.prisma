@@ -12073,6 +12073,16 @@ model ChatMessageEdit {
     body       String
     // When it stopped being the current text.
     replacedAt DateTime @default(now())
+    // A sealed message's earlier version (docs/chat-e2ee-mls.md): its sealed
+    // columns as they stood, copied from the message, so the history opens on a
+    // reader's device the way the message does; `body` is empty then. All null
+    // for an edit of a message that is not sealed.
+    e2eeCiphertext   Bytes?
+    e2eeEpoch        BigInt?
+    e2eeSenderLeaf   Int?
+    e2eeDevice       String?
+    e2eeSignature    Bytes?
+    e2eeSignatureKey Bytes?
 
     message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 

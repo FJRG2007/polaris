@@ -41,6 +41,7 @@ the account to reach it, and so does every account the op names.
 | `application` | an MLS application message for the whole group |
 | `events` | the log after a sequence number: group-wide rows and this device's own Welcomes |
 | `put-history-keys` / `history-keys` | store envelopes (first write wins); read the ones sealed to the caller |
+| `edit-sealed` | a new version of one of the caller's own sealed messages: every plain-edit check, then the device, epoch and signature checks of a send; answers the edit time |
 | `account-keys` | the public account keys (signing, HPKE) of up to 100 named accounts that reach the conversation; an account outside it is left out exactly like one with no key, never refused, so the answer says nothing about accounts the caller shares no conversation with |
 
 Retention: the log keeps the last 256 epochs, pruned every 32 inside the commit
@@ -131,6 +132,36 @@ row the server's own member posted (no author), the service account it signs
 as (`signer` on the wire). Verifying needs WebCrypto Ed25519
 (Node 20+, current browsers).
 
+Editing (`editSealed`, op `edit-sealed`): the server first asks everything a
+plain edit asks (`messages.requireRewritable`: the author's own, a service
+row is never editable, not deleted, not a poll, readable this far back, inside
+the scope's edit window), then that the row is sealed, the device is the
+caller's own, the epoch is no newer than the group's and no older than the
+row's (`olderEpoch`: an older key may be held by somebody removed since), and
+that the signature verifies over the same binding as the send, with the row's
+`clientKey` as the message id. It writes the new sealed columns and
+`editedAt`, clears `translation`, and publishes the row as changed; no link is
+looked up. Where the scope keeps history, the version replaced goes into
+`ChatMessageEdit` with an empty `body` and its sealed columns as they were
+(migration `20281126000000_chat_sealed_edit_history`, additive, reverse in its
+header), and `editHistory` hands them back in base64url, so the history dialog
+opens each one on the reader's device (`openSealedVersions`) and marks one
+that does not open there. A chat refusal (`ChatAccessError`) comes back as
+`{ error: "refused", text }`, the sentence in the reader's language.
+
+The device (`MlsDevice.editSealed`) reads the row's `clientKey`, brings the
+group up to date (`pull`, `reconcile`) as a send does, and seals under the
+current epoch's history key. The screen (`editSealedMessage`) shows the new
+text at once from this page's opened copy, never by writing it into the row,
+and puts the old one back if the edit is refused. Opened copies are keyed by
+id and `sealedEditedAt` (the row's edit time, on the view and on the list's
+last line), so every device that opened the earlier version opens it again.
+
+Known limit: the signed binding carries no revision, so a server can hand back
+an earlier version of the same epoch in place of the latest, and a reader
+cannot tell. Adding one changes `@polaris/chat-crypto` message content (an
+extension bump) and is not built.
+
 Crash safety: an operation's state changes and its request are written in one
 transaction before the request is sent. A commit the server took while the
 device never heard the answer comes back `staleEpoch` on resend; the device then
@@ -193,12 +224,11 @@ on the device, through `openSealed`, with the same page cache.
   fetching the link, which would tell it what was sent. The link is still a
   link. A card the sender makes and seals beside the message is the way to
   have one, and is not built.
-- **Edits.** A plain edit of a sealed message is refused
-  (`errors.sealedNotEditable`), since it would put the new words in the clear,
-  and the pencil, the menu item and the edit key are not offered on a sealed
-  row (`rewritable.ts`), so nobody is shown an action only to be refused.
-  A sealed edit (re-sealing under the same message id at the current epoch) is
-  not built.
+- **Edits.** Sealed too (see "Editing" above), with the history kept sealed
+  where the scope keeps one. A plain edit of a sealed message is still refused
+  (`errors.sealedNotEditable`), since it would put the new words in the clear;
+  the pencil, the menu item and the edit key are offered on a sealed row only
+  while sealed chat is on in that browser (`rewritable.ts`).
 
 ## Server-run members: the design (decided; access built)
 
@@ -275,8 +305,8 @@ What is built on top of it:
 
 ## Not built yet
 
-- Searching sealed text, sealed link cards and sealed edits (see "Other
-  places a message is shown").
+- Searching sealed text and sealed link cards (see "Other places a message is
+  shown").
 - The `org` history-key envelope. The organisation recovery key (proposal 3.5)
   has no public key stored anywhere yet - its custodian setup is not built - so
   nothing can serve it and no `org` envelope can be sealed until it is.

@@ -17,12 +17,13 @@
  *
  * Opened bodies are kept in memory for the page (at most `OPENED_LIMIT`), and
  * the sender's own text is kept the moment the server takes it, so a row never
- * blinks empty between the draft and its stored copy.
+ * blinks empty between the draft and its stored copy. They are keyed by the id
+ * and the time of the row's last edit, so an edited row is opened again.
  */
 
 import { z } from "zod";
 import * as core from "@polaris/core";
-import type { MlsDevice } from "./mls-client";
+import type { MlsDevice, SealedStored } from "./mls-client";
 
 const SEALED_CONTENT_VERSION = 1;
 /** How many opened bodies this page keeps (oldest dropped first). */
@@ -61,8 +62,15 @@ export function decodeSealedContent(bytes: Uint8Array): SealedContent | null {
 
 let viewer: string | null = null;
 let opening: Promise<MlsDevice> | null = null;
-/** Message id -> its opened content, or null when it did not open here. */
+/** Message id (and last edit) -> its opened content, or null when it did not open here. */
 const opened = new Map<string, SealedContent | null>();
+
+/** One sealed row to open: its id, and when it was last edited (absent if never). */
+export type SealedRef = string | { readonly id: string; readonly editedAt?: string };
+
+const versionKey = (id: string, editedAt?: string): string => (editedAt ? `${id}@${editedAt}` : id);
+const refKey = (ref: SealedRef): string => (typeof ref === "string" ? ref : versionKey(ref.id, ref.editedAt));
+const refId = (ref: SealedRef): string => (typeof ref === "string" ? ref : ref.id);
 
 /** Sealed chat for this account, or off (`null`). Called by the chat provider. */
 export function configureSealedChat(viewerId: string | null): void {
@@ -95,9 +103,9 @@ function keep(id: string, content: SealedContent | null): void {
     while (opened.size > OPENED_LIMIT) opened.delete(opened.keys().next().value as string);
 }
 
-/** What this page already opened for `id`: content, null (did not open), or undefined (not tried). */
-export function openedContent(id: string): SealedContent | null | undefined {
-    return opened.get(id);
+/** What this page already opened for `id` as last edited at `editedAt`: content, null (did not open), or undefined (not tried). */
+export function openedContent(id: string, editedAt?: string): SealedContent | null | undefined {
+    return opened.get(versionKey(id, editedAt));
 }
 
 export interface SealedSendInput extends SealedContent {
@@ -136,31 +144,70 @@ export function sealedSendFailure(caught: unknown): "refused" | "unreachable" {
 
 /**
  * Open these sealed messages of one conversation; answers what each opened
- * to (null for one that did not). Ids already opened on this page are not
- * asked for again.
+ * to (null for one that did not), by id. Versions already opened on this page
+ * are not asked for again.
  */
-export async function openSealed(channelId: string, ids: readonly string[]): Promise<ReadonlyMap<string, SealedContent | null>> {
+export async function openSealed(channelId: string, refs: readonly SealedRef[]): Promise<ReadonlyMap<string, SealedContent | null>> {
     const out = new Map<string, SealedContent | null>();
-    const missing: string[] = [];
-    for (const id of new Set(ids)) {
-        const known = opened.get(id);
-        if (known !== undefined) out.set(id, known);
-        else missing.push(id);
+    const missing = new Map<string, string>();
+    for (const ref of refs) {
+        const known = opened.get(refKey(ref));
+        if (known !== undefined) out.set(refId(ref), known);
+        else missing.set(refId(ref), refKey(ref));
     }
-    if (!missing.length) return out;
+    if (!missing.size) return out;
     // Read without joining the group: the history keys sealed to this account open it.
     const mls = await device();
-    for (let start = 0; start < missing.length; start += READ_PAGE) {
-        const page = missing.slice(start, start + READ_PAGE);
+    const ids = [...missing.keys()];
+    for (let start = 0; start < ids.length; start += READ_PAGE) {
+        const page = ids.slice(start, start + READ_PAGE);
         const rows = await mls.readSealed(channelId, page);
         const byId = new Map(rows.map((row) => [row.id, row.opened ? decodeSealedContent(row.opened) : null]));
         for (const id of page) {
             const content = byId.get(id) ?? null;
-            keep(id, content);
+            keep(missing.get(id)!, content);
             out.set(id, content);
         }
     }
     return out;
+}
+
+export interface SealedEditInput extends SealedContent {
+    channelId: string;
+    messageId: string;
+    /** When the version being replaced was last edited (absent if never): the one the row shows now. */
+    editedAt?: string;
+}
+
+/**
+ * Seal and store a new version of one of this account's sealed messages. The
+ * row shows it at once and goes back to what it showed if it is refused;
+ * answers when the new version was stored (the row's new `sealedEditedAt`).
+ */
+export async function editSealedMessage(input: SealedEditInput): Promise<string> {
+    const shown = versionKey(input.messageId, input.editedAt);
+    const before = opened.get(shown);
+    const content: SealedContent = input.translation ? { body: input.body, translation: input.translation } : { body: input.body };
+    keep(shown, content);
+    try {
+        const mls = await device();
+        await mls.ensureGroup(input.channelId);
+        const editedAt = await mls.editSealed(input.channelId, input.messageId, encodeSealedContent(content));
+        keep(versionKey(input.messageId, editedAt), content);
+        return editedAt;
+    } catch (caught) {
+        if (before === undefined) opened.delete(shown);
+        else keep(shown, before);
+        throw caught;
+    }
+}
+
+/** Open the earlier versions of a sealed message its edit history holds; null for one that does not open here. */
+export async function openSealedVersions(channelId: string, versions: readonly SealedStored[]): Promise<(SealedContent | null)[]> {
+    if (!versions.length) return [];
+    const mls = await device();
+    const bytes = await mls.openVersions(channelId, versions);
+    return bytes.map((opened) => (opened ? decodeSealedContent(opened) : null));
 }
 
 /**

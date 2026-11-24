@@ -862,7 +862,7 @@ function useMessageKeys({
             // so a key can never do something the screen does not offer: your own
             // to rewrite, your own or anybody's here to take down, and anything
             // at all to answer - wherever answering is offered.
-            // A poll or a sealed row is not rewritten - see `rewritable`. The key
+            // A poll, or a sealed row where sealed chat is off, is not rewritten - see `rewritable`. The key
             // follows the pencil rather than reaching past it.
             if (wanted === "edit" && (!rewritable(message) || !mine || !shown.onEdit)) return;
             if (wanted === "delete" && !mine && !shown.canModerate) return;
@@ -1000,7 +1000,7 @@ const Message = memo(function Message({
      * the service refuses it and the pencil is not offered. Taking it down and
      * asking again is the way to change a poll.
      */
-    // A poll and a game invite are cards, and a sealed row is not rewritten yet - see `rewritable`.
+    // A poll and a game invite are cards, and a sealed row is rewritten only sealed - see `rewritable`.
     const rewrite = rewritable(message) ? onEdit : undefined;
     /** Who wrote it, when that is somebody other than the reader. Read out here
      *  so the name and the face can both ask about them without narrowing it

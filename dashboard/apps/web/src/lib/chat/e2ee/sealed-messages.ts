@@ -18,11 +18,19 @@
  * Polar's and a webhook's plain messages are - no author, Polar's name or the
  * webhook's - with the same sealed columns and the same checks.
  *
+ * Editing one: every check a plain edit makes (`messages.requireRewritable`:
+ * the author's own, not deleted, not a poll, inside the edit window), then the
+ * same device, epoch and signature checks as taking one, over the same message
+ * id - plus an epoch no older than the one it replaces. The version replaced is
+ * kept, sealed as it was, where the scope keeps history. What stays open: the
+ * signed binding names no revision, so a server could hand back an earlier
+ * version of the same epoch in place of the latest.
+ *
  * Reading: only messages the account may see - in a conversation it reaches,
  * not deleted, not past their expiry, not another reader's ephemeral answer.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, Prisma } from "@polaris/db";
 import { chatE2eeEnabled } from "./flag";
 import { publishChatChange } from "@/lib/chat/live";
 import { expiryForChannel } from "@/lib/chat/vanish";
@@ -50,7 +58,7 @@ export interface SealedSend {
 
 /** Why a sealed message was not taken; the route answers it as a refusal. */
 export class SealedRefusal extends Error {
-    constructor(readonly reason: "unknownDevice" | "unknownGroup" | "futureEpoch" | "badSignature") {
+    constructor(readonly reason: "unknownDevice" | "unknownGroup" | "futureEpoch" | "olderEpoch" | "notSealed" | "badSignature") {
         super(`the sealed message was refused (${reason})`);
         this.name = "SealedRefusal";
     }
@@ -96,6 +104,80 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
         )
         .catch((error: unknown) => console.error("chat: Polar could not be asked:", error));
     return id;
+}
+
+/** A new version of one of the caller's sealed messages (validated by `mlsBody`). */
+export interface SealedEdit {
+    channelId: string;
+    device: string;
+    messageId: string;
+    epoch: bigint;
+    senderLeaf: number;
+    ciphertext: Uint8Array;
+    signature: Uint8Array;
+}
+
+/** Replace the sealed content of one of `userId`'s messages, keeping the version it replaces where history is kept; answers the edit's time. */
+export async function editSealed(userId: string, input: SealedEdit): Promise<Date> {
+    const { message, rules } = await messages.requireRewritable({ id: userId }, input.messageId);
+    const [stored, device, group] = await Promise.all([
+        prisma.chatMessage.findUnique({
+            where: { id: input.messageId },
+            select: {
+                clientKey: true,
+                e2eeCiphertext: true,
+                e2eeEpoch: true,
+                e2eeSenderLeaf: true,
+                e2eeDevice: true,
+                e2eeSignature: true,
+                e2eeSignatureKey: true
+            }
+        }),
+        prisma.mlsDevice.findUnique({ where: { userId_device: { userId, device: input.device } }, select: { signatureKey: true } }),
+        prisma.mlsGroup.findUnique({ where: { channelId: input.channelId }, select: { epoch: true } })
+    ]);
+    // A plain message is edited in the clear, by `messages.edit`; one in another conversation is not this one's.
+    if (message.channelId !== input.channelId || !stored?.clientKey || stored.e2eeEpoch == null) throw new SealedRefusal("notSealed");
+    if (!device) throw new SealedRefusal("unknownDevice");
+    if (!group) throw new SealedRefusal("unknownGroup");
+    if (input.epoch > group.epoch) throw new SealedRefusal("futureEpoch");
+    // Never under a key older than the one it replaces: a member removed since could read that one.
+    if (input.epoch < stored.e2eeEpoch) throw new SealedRefusal("olderEpoch");
+    const binding = { conversationId: input.channelId, epoch: input.epoch, messageId: stored.clientKey, senderLeaf: input.senderLeaf };
+    const signatureKey = new Uint8Array(device.signatureKey);
+    if (!(await content.verifyMessageSignature(signatureKey, binding, input.ciphertext, input.signature))) throw new SealedRefusal("badSignature");
+    const editedAt = new Date();
+    await prisma.$transaction(async (tx) => {
+        if (rules.keepEditHistory)
+            await tx.chatMessageEdit.create({
+                data: {
+                    messageId: input.messageId,
+                    body: "",
+                    replacedAt: editedAt,
+                    e2eeCiphertext: stored.e2eeCiphertext,
+                    e2eeEpoch: stored.e2eeEpoch,
+                    e2eeSenderLeaf: stored.e2eeSenderLeaf,
+                    e2eeDevice: stored.e2eeDevice,
+                    e2eeSignature: stored.e2eeSignature,
+                    e2eeSignatureKey: stored.e2eeSignatureKey
+                }
+            });
+        await tx.chatMessage.update({
+            where: { id: input.messageId },
+            data: {
+                e2eeCiphertext: owned(input.ciphertext),
+                e2eeEpoch: input.epoch,
+                e2eeSenderLeaf: input.senderLeaf,
+                e2eeDevice: input.device,
+                e2eeSignature: owned(input.signature),
+                e2eeSignatureKey: owned(signatureKey),
+                editedAt,
+                translation: Prisma.DbNull
+            }
+        });
+    });
+    publishChatChange({ channelId: input.channelId, kind: "posted", actorId: userId, messageIds: [input.messageId] });
+    return editedAt;
 }
 
 /** Whether a conversation is sealed: sealed chat is on and its MLS group exists. */

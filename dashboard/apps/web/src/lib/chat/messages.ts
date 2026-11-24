@@ -123,6 +123,9 @@ export interface ChatMessageView {
     /** Sealed end to end: `body` is empty here and the reader's device opens
      *  the content (`useOpenedSealed`, docs/chat-e2ee-mls.md). */
     readonly sealed?: boolean;
+    /** When a sealed row was last edited, so a device that opened the earlier
+     *  version opens it again. Absent on a plain row, which carries its text. */
+    readonly sealedEditedAt?: string;
     readonly kind: core.ChatMessageKind;
     /** Empty for a deleted message - the tombstone carries no text. */
     readonly body: string;
@@ -1137,6 +1140,46 @@ async function requireSendable(
 }
 
 /**
+ * What every edit of a message asks, plain or sealed: it is there, in a
+ * conversation the actor may post in and may read this far back, theirs, not
+ * deleted, not a poll, and still inside the scope's edit window. Answers the
+ * row and what the edit goes on to need.
+ */
+export async function requireRewritable(actor: ChatActor, messageId: string) {
+    const message = await prisma.chatMessage.findUnique({
+        where: { id: messageId },
+        select: {
+            kind: true,
+            channelId: true,
+            authorId: true,
+            body: true,
+            deletedAt: true,
+            createdAt: true,
+            e2eeEpoch: true
+        }
+    });
+    if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
+    const editable = await requirePostable(actor, message.channelId);
+    await history.requireReadable(actor, message.channelId, messageId);
+    if (message.authorId !== actor.id) throw new ChatAccessError({ key: "errors.editOwnOnly" });
+    if (message.deletedAt) throw new ChatAccessError({ key: "errors.messageDeleted" });
+    // A poll's body is the question people answered. Changing it after the fact
+    // would leave every vote already cast standing behind something nobody
+    // agreed to - so it is taken back and asked again instead.
+    if (message.kind === "poll") {
+        throw new ChatRuleError({ key: "errors.pollNotEditable" });
+    }
+    const rules = await rulesForChannel(message.channelId);
+    if (!core.withinEditWindow(rules, message.createdAt)) {
+        throw new ChatRuleError({
+            key: "errors.editWindowPassed",
+            params: { window: spokenEditWindow(rules.editWindowMinutes) }
+        });
+    }
+    return { message, editable, rules };
+}
+
+/**
  * Rewrite one of your own.
  *
  * Nobody edits somebody else's, an admin included: a channel where what you said
@@ -1149,34 +1192,13 @@ async function requireSendable(
  * landed, and a history with a hole is worse than none.
  */
 export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise<void> {
-    const message = await prisma.chatMessage.findUnique({
-        where: { id: input.messageId },
-        select: {
-            kind: true,
-            channelId: true,
-            authorId: true,
-            body: true,
-            deletedAt: true,
-            createdAt: true,
-            e2eeEpoch: true
-        }
-    });
-    if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
+    const { message, editable, rules } = await requireRewritable(actor, input.messageId);
     // A sealed message's text is not the server's to rewrite: a plain edit would
-    // put the new words in the clear beside the ciphertext (docs/chat-e2ee-mls.md).
+    // put the new words in the clear beside the ciphertext. Its edit is sealed
+    // too (`editSealed` in lib/chat/e2ee/sealed-messages, docs/chat-e2ee-mls.md).
     if (message.e2eeEpoch != null) throw new ChatRuleError({ key: "errors.sealedNotEditable" });
-    const editable = await requirePostable(actor, message.channelId);
-    await history.requireReadable(actor, message.channelId, input.messageId);
-    if (message.authorId !== actor.id) throw new ChatAccessError({ key: "errors.editOwnOnly" });
     // Held to the space's emoji like a send is, or an edit would be the way in.
     input = { ...input, body: await confineCustomEmoji(input.body, editable.spaceId) };
-    if (message.deletedAt) throw new ChatAccessError({ key: "errors.messageDeleted" });
-    // A poll's body is the question people answered. Changing it after the fact
-    // would leave every vote already cast standing behind something nobody
-    // agreed to - so it is taken back and asked again instead.
-    if (message.kind === "poll") {
-        throw new ChatRuleError({ key: "errors.pollNotEditable" });
-    }
     // The length and the instance's own limit, but never the wait: slow mode is
     // about how often somebody speaks, and rewriting what you already said is
     // not speaking again.
@@ -1191,7 +1213,7 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
         // would be the way around it.
         if (!editable.mayModerate && channelMentions(input.body).size > 0) {
             await requireRoomMentionAllowed({
-                rules: await rulesForChannel(message.channelId),
+                rules,
                 channelId: message.channelId,
                 authorId: actor.id
             });
@@ -1199,14 +1221,6 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
     }
     // Emptying a message is deleting it, and there is a delete for that.
     if (isBlankMarkdown(input.body)) throw new ChatRuleError({ key: "errors.bodyRequired" });
-
-    const rules = await rulesForChannel(message.channelId);
-    if (!core.withinEditWindow(rules, message.createdAt)) {
-        throw new ChatRuleError({
-            key: "errors.editWindowPassed",
-            params: { window: spokenEditWindow(rules.editWindowMinutes) }
-        });
-    }
 
     const editedAt = new Date();
     await prisma.$transaction(async (tx) => {
@@ -1308,6 +1322,21 @@ export interface ChatMessageVersion {
     readonly body: string;
     /** When this text stopped being the current one. */
     readonly replacedAt: string;
+    /** A sealed message's earlier version: `body` is empty and the reader's
+     *  device opens this (`openSealedVersions`, docs/chat-e2ee-mls.md). */
+    readonly sealed?: SealedVersion;
+}
+
+/** A sealed version as it was stored, its bytes in base64url. */
+export interface SealedVersion {
+    /** The message id the content is bound to (the message's `clientKey`). */
+    readonly clientKey: string;
+    readonly device: string;
+    readonly epoch: string;
+    readonly senderLeaf: number;
+    readonly ciphertext: string;
+    readonly signature: string;
+    readonly signatureKey: string;
 }
 
 export interface ChatEditHistory {
@@ -1407,17 +1436,48 @@ export async function editHistory(
     // used to say would undo the deletion for anybody who asked.
     if (!rules.keepEditHistory || message.deletedAt) return { kept: false, versions: [] };
 
-    const rows = await prisma.chatMessageEdit.findMany({
-        where: { messageId },
-        orderBy: { replacedAt: "desc" },
-        select: { body: true, replacedAt: true }
-    });
+    const [rows, sealed] = await Promise.all([
+        prisma.chatMessageEdit.findMany({
+            where: { messageId },
+            orderBy: { replacedAt: "desc" },
+            select: {
+                body: true,
+                replacedAt: true,
+                e2eeCiphertext: true,
+                e2eeEpoch: true,
+                e2eeSenderLeaf: true,
+                e2eeDevice: true,
+                e2eeSignature: true,
+                e2eeSignatureKey: true
+            }
+        }),
+        prisma.chatMessage.findUnique({ where: { id: messageId }, select: { clientKey: true } })
+    ]);
+    const text = (value: Uint8Array) => Buffer.from(value).toString("base64url");
     return {
         kept: true,
-        versions: rows.map((row) => ({
-            body: row.body,
-            replacedAt: row.replacedAt.toISOString()
-        }))
+        versions: rows.map((row) => {
+            const { e2eeCiphertext, e2eeEpoch, e2eeSenderLeaf, e2eeDevice, e2eeSignature, e2eeSignatureKey } = row;
+            const clientKey = sealed?.clientKey;
+            const opens = clientKey && e2eeCiphertext && e2eeEpoch != null && e2eeSenderLeaf != null && e2eeDevice && e2eeSignature && e2eeSignatureKey;
+            return {
+                body: row.body,
+                replacedAt: row.replacedAt.toISOString(),
+                ...(opens
+                    ? {
+                          sealed: {
+                              clientKey,
+                              device: e2eeDevice,
+                              epoch: e2eeEpoch.toString(),
+                              senderLeaf: e2eeSenderLeaf,
+                              ciphertext: text(e2eeCiphertext),
+                              signature: text(e2eeSignature),
+                              signatureKey: text(e2eeSignatureKey)
+                          }
+                      }
+                    : {})
+            };
+        })
     };
 }
 
@@ -2753,7 +2813,9 @@ export async function decorateMessages(
             ...(row.agent ? { fromAgent: row.agent } : {}),
             ...componentsView(row),
             ...(isEphemeral(row.audience) ? { ephemeral: true } : {}),
-            ...(row.e2eeEpoch != null && !row.deletedAt ? { sealed: true } : {}),
+            ...(row.e2eeEpoch != null && !row.deletedAt
+                ? { sealed: true, ...(row.editedAt ? { sealedEditedAt: row.editedAt.toISOString() } : {}) }
+                : {}),
             kind: row.kind as core.ChatMessageKind,
             body: row.deletedAt ? "" : notice ? noticeString(notice) : row.body,
             ...(notice ? { notice } : {}),

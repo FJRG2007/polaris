@@ -153,6 +153,17 @@ export const mlsBody = z.discriminatedUnion("op", [
         ciphertext: base64Url(17, 256 * 1024),
         signature: base64Url(64, 64)
     }),
+    // A new version of one of the caller's sealed messages, sealed and signed the same way.
+    z.object({
+        op: z.literal("edit-sealed"),
+        channelId,
+        device: deviceId,
+        messageId: z.string().uuid(),
+        epoch,
+        senderLeaf: z.number().int().min(0).max(0xffffffff),
+        ciphertext: base64Url(17, 256 * 1024),
+        signature: base64Url(64, 64)
+    }),
     z.object({ op: z.literal("read-sealed"), channelId, messageIds: z.array(z.string().uuid()).min(1).max(100) })
 ]);
 export type MlsBody = z.infer<typeof mlsBody>;
