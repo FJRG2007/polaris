@@ -49,9 +49,9 @@ Surfaces: D desktop, W web palette, E extension, M mobile, T TV.
 | Fallback commands (when nothing matches) | have | D | "Ask Polar" and "Search the web" close every list; engine chosen in Settings |
 | Applications (launch, search) | have | D | `launcher-apps.ts` and store games (`launcher-stores.ts`), with icons |
 | Auto quit apps | missing | D | Would need a timer watching foreground apps; against "stays light". Not planned |
-| Calculator: arithmetic | have | D W | `quick-answer.ts` (desktop), `lib/search/calculate.ts` (web) |
+| Calculator: arithmetic | have | D W | One parser for both, `@polaris/core` `calculate.ts`; percentages read as Soulver and phone calculators do (`539 + 21%` is 652.19), amounts keep a typed currency (`539€ + 21%`) |
 | Calculator: units | have | D | Desktop quick answers; web palette lacks units |
-| Calculator: currency | missing | D W | Needs a rates source the instance serves; cached, never fetched per keystroke |
+| Calculator: currency conversion | missing | D W | Sums in one currency work; converting between two needs a rates source the instance serves, cached, never fetched per keystroke |
 | Calculator: time zones, dates | partial | W | Web palette clock rows; desktop missing |
 | Clipboard history | have | D | Encrypted store, retention in Settings, "clip" prefix, clear |
 | Clipboard: paste into the front app | missing | D | Needs a synthetic keystroke after hiding; per-OS |

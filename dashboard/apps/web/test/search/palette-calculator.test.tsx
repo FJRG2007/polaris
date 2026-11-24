@@ -146,6 +146,23 @@ describe("the search panel's calculator", () => {
         expect(screen.getByRole("combobox")).toBe(field);
     });
 
+    it("adds a percentage to an amount of money and shows it as money", async () => {
+        const field = await openField();
+        fireEvent.change(field, { target: { value: "539€ + 21%" } });
+        expect(ghost()?.textContent).toBe("539€ + 21% = €652.19");
+
+        fireEvent.click(screen.getByRole("button", { name: "Copy €652.19" }));
+        expect(writeText).toHaveBeenCalledWith("652.19");
+
+        fireEvent.keyDown(field, { key: "Tab" });
+        expect(field.value).toBe("652.19 EUR");
+        fireEvent.change(field, { target: { value: `${field.value} - 21%` } });
+        expect(ghost()?.textContent).toBe("652.19 EUR - 21% = €515.23");
+
+        fireEvent.change(field, { target: { value: "539€ + $10" } });
+        expect(ghost()).toBeNull();
+    });
+
     it("copies the answer on Ctrl+C when nothing in the field is selected", async () => {
         const field = await openField();
         fireEvent.change(field, { target: { value: "15% of 200" } });

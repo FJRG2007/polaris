@@ -54,6 +54,7 @@ export * from "./deploy-references.js";
 export * from "./variable-groups.js";
 export * from "./env-values.js";
 export * from "./cron.js";
+export * from "./calculate.js";
 export * from "./clock-commands.js";
 export * from "./scaling.js";
 export * from "./seasons.js";

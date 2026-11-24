@@ -211,9 +211,6 @@ export function followClipboardKeep(): void {
     clips = clipboardStore().save(clips, Date.now(), keepMs());
 }
 
-/** Arithmetic only: the palette works that out itself, so the window does not repeat it. */
-const SUM = /^[\d\s+\-*/().,^%]+$/;
-
 /**
  * The rows for `text`. `hostOnly` is the dashboard's palette asking: it has
  * Polaris's own rows already, so only what it cannot find is listed.
@@ -240,8 +237,12 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
     };
     const addPage = (page: { label: string; path: string; }) => add({ kind: "page", title: page.label, subtitle: "Open in Polaris" }, () => host?.showPolaris(page.path), pageKey(page));
 
-    const answer = hostOnly && SUM.test(query) ? null : quickAnswer(query);
-    if (answer) add({ kind: "answer", title: answer.value, subtitle: `${answer.label} - Enter copies it` }, () => void clipboard.writeText(answer.value));
+    // Answered even for the dashboard's palette: it drops this row whenever it
+    // works the sum out itself (the same `@polaris/core` calculator), so a sum is
+    // never listed twice, and a palette from an older Polaris that cannot work
+    // out "539€ + 21%" or a conversion still shows the answer from here.
+    const answer = quickAnswer(query);
+    if (answer) add({ kind: "answer", title: answer.value, subtitle: `${answer.label} - Enter copies it` }, () => void clipboard.writeText(answer.copy ?? answer.value));
 
     if (/^clip(\s|$)/i.test(query) && settings.toggle("launcherClipboard")) {
         const rest = query.slice(4).trim();
