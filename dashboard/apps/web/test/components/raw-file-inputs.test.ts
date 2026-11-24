@@ -27,6 +27,8 @@ const ALLOWED: Record<string, string> = {
         "a server pack or world .zip sent from this computer straight to the server with progress, the way Deploy's upload is",
     "apps/web/src/app/(app)/apps/deploy/upload-source.tsx":
         "a whole folder, which the picker cannot choose; the .zip button uses the picker",
+    "apps/web/src/components/polar/composer-plus-menu.tsx":
+        "Polar's Add a folder: a whole folder, which the picker cannot choose; Add files uses the picker",
     "apps/web/src/app/(app)/chat/media-editor.tsx":
         "Add more inside the photo editor: more from the phone's gallery, as the picker's own gallery button opens",
     "apps/web/src/app/(app)/chat/attach-sheet.tsx":

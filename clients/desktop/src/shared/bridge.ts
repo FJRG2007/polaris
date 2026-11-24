@@ -808,6 +808,7 @@ export const CHANNELS = {
     editCopyImage: "desktop:edit-copy-image",
     editSaveImage: "desktop:edit-save-image",
     openOutside: "desktop:open-outside",
+    linkNotice: "desktop:link-notice",
     windowShown: "desktop:window-shown",
     callHotkeys: "desktop:call-hotkeys",
     callHotkey: "desktop:call-hotkey",

@@ -38,7 +38,9 @@ vi.mock("@/lib/chat/messages", async () => {
         ) => {
             fake.calls.push(`read ${actor.id} ${input.channelId} ${input.messageId}`);
             if (fake.readFails) throw new Error("database gone");
-        }
+        },
+        // The sealed-chat translation never applies to a plain refusal, so it passes through.
+        refusalForPage: async <T>(_pageSeals: boolean, run: () => Promise<T>) => run()
     };
 });
 

@@ -6,9 +6,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 const openExternal = vi.fn();
-vi.mock("electron", () => ({ shell: { openExternal }, clipboard: { writeText: vi.fn() } }));
+vi.mock("electron", () => ({ shell: { openExternal }, clipboard: { writeText: vi.fn() }, BrowserWindow: {}, app: {} }));
 
-const { RouteUnavailable, openOutside, openOutsideOutcome, outsideAddress, routesFor } = await import("../../src/main/open-external");
+const { RouteUnavailable, linkNotice, openOutside, openOutsideOutcome, outsideAddress, routesFor } = await import("../../src/main/open-external");
+const { ShellUnavailable } = await import("../../src/main/default-browser");
 
 /** The log lines that record a failure; a working route logs with a null error. */
 const failures = (log: ReturnType<typeof vi.fn>) => log.mock.calls.filter(([, error]) => error !== null);
@@ -106,6 +107,7 @@ describe("routesFor", () => {
             key.endsWith("UserChoice") ? "BraveHTML" : key.startsWith("HKCR\\BraveHTML") ? `"${BRAVE}" --single-argument %1` : null
         ),
         launch: vi.fn(async (_file: string, _args: readonly string[]) => undefined),
+        shell: vi.fn(async (_url: string) => undefined),
         opener: vi.fn(async (_file: string, _url: string) => undefined)
     });
 
@@ -116,35 +118,56 @@ describe("routesFor", () => {
         const log = vi.fn();
         await expect(openOutside("https://example.com/a", { routes: routesFor("win32", fake), log })).resolves.toBe(true);
         expect(fake.launch).toHaveBeenCalledWith(BRAVE, ["--single-argument", "https://example.com/a"]);
+        expect(fake.shell).not.toHaveBeenCalled();
         expect(fake.open).not.toHaveBeenCalled();
         expect(failures(log)).toHaveLength(0);
     });
 
-    it("falls back to the system hand-over on Windows when the browser cannot be started", async () => {
+    it("hands the link to the Windows shell when the browser cannot be started", async () => {
         const fake = system();
         fake.launch.mockRejectedValueOnce(new Error("spawn ENOENT"));
         const log = vi.fn();
         await expect(openOutside("https://example.com/a", { routes: routesFor("win32", fake), log })).resolves.toBe(true);
-        expect(fake.open).toHaveBeenCalledWith("https://example.com/a");
+        expect(fake.shell).toHaveBeenCalledWith("https://example.com/a");
+        expect(fake.open).not.toHaveBeenCalled();
         expect(failures(log)).toHaveLength(1);
     });
 
-    // BUG-0020: the browser was started but the running copy never took the
-    // link, and that counted as opened - no other route, no dialog, no log.
-    it("does not call a refused hand-over opened: Windows is asked and the person is still shown the address", async () => {
+    // BUG-0020: Brave started by Polaris exited 1 with Brave already open, and
+    // the page never arrived; Explorer starts it the way any other click does.
+    it("hands a refused link to Explorer, and shows nothing for a route that raised no refusal", async () => {
         const fake = system();
-        fake.launch.mockRejectedValueOnce(new Error("brave.exe exited with code 21"));
+        fake.launch.mockRejectedValueOnce(new Error("brave.exe exited with code 1: the browser exited without taking the link"));
         const log = vi.fn();
         await expect(openOutsideOutcome("https://example.com/a", { routes: routesFor("win32", fake), log })).resolves.toBe("unconfirmed");
-        expect(fake.open).toHaveBeenCalledWith("https://example.com/a");
-        expect(String(failures(log)[0]?.[1])).toContain("code 21");
+        expect(fake.shell).toHaveBeenCalledWith("https://example.com/a");
+        expect(fake.open).not.toHaveBeenCalled();
+        expect(String(failures(log)[0]?.[1])).toContain("code 1");
+        expect(log.mock.calls.at(-1)?.[0]).toBe("Opened https://example.com through the Windows shell (Explorer) (not confirmed)");
     });
 
-    it("needs no dialog when a browser took the link, or when Windows was the only route there was", async () => {
+    it("asks Windows through shell.openExternal when Explorer cannot take the address", async () => {
+        const fake = system();
+        fake.launch.mockRejectedValueOnce(new Error("exited with code 1"));
+        fake.shell.mockRejectedValueOnce(new ShellUnavailable("Explorer would split this address at its comma"));
+        await expect(openOutsideOutcome("https://example.com/a,b", { routes: routesFor("win32", fake), log: vi.fn() })).resolves.toBe("unconfirmed");
+        expect(fake.open).toHaveBeenCalledWith("https://example.com/a,b");
+    });
+
+    it("is failed only when every Windows route refused the link", async () => {
+        const fake = system();
+        fake.launch.mockRejectedValue(new Error("a"));
+        fake.shell.mockRejectedValue(new Error("spawn EACCES"));
+        fake.open.mockRejectedValue(new Error("Failed to open: Application not found"));
+        await expect(openOutsideOutcome("https://example.com/", { routes: routesFor("win32", fake), log: vi.fn() })).resolves.toBe("failed");
+    });
+
+    it("is opened when a browser took the link, or when no earlier route refused it", async () => {
         await expect(openOutsideOutcome("https://example.com/a", { routes: routesFor("win32", system()), log: vi.fn() })).resolves.toBe("opened");
         const store = system();
         store.readRegistry.mockResolvedValue(null);
         await expect(openOutsideOutcome("https://example.com/a", { routes: routesFor("win32", store), log: vi.fn() })).resolves.toBe("opened");
+        expect(store.shell).toHaveBeenCalledTimes(1);
     });
 
     it("logs every attempt by host only, never the whole address", async () => {
@@ -165,12 +188,13 @@ describe("routesFor", () => {
         fake.readRegistry.mockResolvedValue(null);
         await expect(openOutside("https://example.com/", { routes: routesFor("win32", fake), log: vi.fn() })).resolves.toBe(true);
         expect(fake.launch).not.toHaveBeenCalled();
-        expect(fake.open).toHaveBeenCalledTimes(1);
+        expect(fake.shell).toHaveBeenCalledTimes(1);
     });
 
-    it("reports false when both Windows routes fail, so the dialog is shown", async () => {
+    it("reports false when every Windows route fails, so the person is told", async () => {
         const fake = system();
         fake.launch.mockRejectedValue(new Error("a"));
+        fake.shell.mockRejectedValue(new Error("c"));
         fake.open.mockRejectedValue(new Error("b"));
         await expect(openOutside("https://example.com/", { routes: routesFor("win32", fake), log: vi.fn() })).resolves.toBe(false);
     });
@@ -186,6 +210,24 @@ describe("routesFor", () => {
             await expect(openOutside("https://example.com/", { routes: routesFor(platform, fake), log: vi.fn() })).resolves.toBe(true);
             expect(fake.opener).toHaveBeenCalledWith(opener, "https://example.com/");
             expect(fake.launch).not.toHaveBeenCalled();
+            expect(fake.shell).not.toHaveBeenCalled();
         }
+    });
+});
+
+describe("linkNotice", () => {
+    it("names the browser or the mail app and carries the whole address", () => {
+        const long = `https://example.com/t?${"x".repeat(3000)}`;
+        expect(linkNotice(long)).toEqual({ url: long, title: "Couldn't open the link", body: "Your browser didn't open it. Copy it and paste it there." });
+        expect(linkNotice("mailto:a@example.com").body).toBe("Your mail app didn't open it. Copy it and paste it there.");
+    });
+});
+
+// BUG-0020: a link is never answered with the system's alert box.
+describe("no system alert for a link", () => {
+    it("open-external.ts has no dialog", async () => {
+        const { readFileSync } = await import("node:fs");
+        const source = readFileSync(new URL("../../src/main/open-external.ts", import.meta.url), "utf8");
+        expect(source).not.toMatch(/dialog|showMessageBox/);
     });
 });

@@ -11,6 +11,7 @@ import { contextBridge, ipcRenderer, webFrame } from "electron";
 import { followTitleBarColors } from "@/shared/title-bar";
 import { reportTextSize } from "./text-size";
 import { holdOutsideLinks } from "./outside-links";
+import { readLinkNotice, showLinkNotice } from "./link-notice";
 import { checkPageCode } from "./integrity";
 import { readRelaunch } from "@/shared/relaunch";
 import { readUpdateReady } from "@/shared/update-ready";
@@ -265,4 +266,8 @@ contextBridge.exposeInMainWorld("polarisDesktop", bridge);
 followTitleBarColors((colors) => void ipcRenderer.invoke(CHANNELS.titleBarColors, colors));
 reportTextSize((raw) => void ipcRenderer.invoke(CHANNELS.textSizeSeen, raw));
 holdOutsideLinks((url) => ipcRenderer.invoke(CHANNELS.openOutside, url));
+ipcRenderer.on(CHANNELS.linkNotice, (_event, raw: unknown) => {
+    const words = readLinkNotice(raw);
+    if (words) showLinkNotice(words, async (text) => (await ipcRenderer.invoke(CHANNELS.editWriteClipboard, text)) === true);
+});
 checkPageCode((files) => ipcRenderer.invoke(CHANNELS.integrityCheck, files));
