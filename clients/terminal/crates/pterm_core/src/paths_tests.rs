@@ -12,7 +12,7 @@ fn test_data_dir_path() {
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
             assert_eq!(data_dir(), home_dir.join(".local/share/polaris-terminal"));
         } else if #[cfg(windows)] {
-            assert_eq!(data_dir(), home_dir.join("AppData\\Roaming\\polaris-terminal\\PolarisTerminal\\data"));
+            assert_eq!(data_dir(), home_dir.join("AppData\\Roaming\\polaris\\PolarisTerminal\\data"));
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -29,7 +29,7 @@ fn test_config_local_dir_path() {
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
             assert_eq!(config_local_dir(), home_dir.join(".config/polaris-terminal"));
         } else if #[cfg(windows)] {
-            assert_eq!(config_local_dir(), home_dir.join("AppData\\Local\\polaris-terminal\\PolarisTerminal\\config"));
+            assert_eq!(config_local_dir(), home_dir.join("AppData\\Local\\polaris\\PolarisTerminal\\config"));
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -80,7 +80,7 @@ fn test_gui_config_and_mcp_paths_resolve_explicit_sources() {
         } else if #[cfg(windows)] {
             assert_eq!(
                 gui_config_dir,
-                home_dir.join("AppData\\Local\\polaris-terminal\\PolarisTerminal\\config")
+                home_dir.join("AppData\\Local\\polaris\\PolarisTerminal\\config")
             );
         } else {
             unimplemented!("Need to update tests for current platform!");
@@ -140,7 +140,7 @@ fn test_cache_dir_path() {
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
             assert_eq!(cache_dir(), home_dir.join(".cache/polaris-terminal"));
         } else if #[cfg(windows)] {
-            assert_eq!(cache_dir(), home_dir.join("AppData\\Local\\polaris-terminal\\PolarisTerminal\\cache"));
+            assert_eq!(cache_dir(), home_dir.join("AppData\\Local\\polaris\\PolarisTerminal\\cache"));
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -157,7 +157,7 @@ fn test_state_dir_path() {
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
             assert_eq!(state_dir(), home_dir.join(".local/state/polaris-terminal"));
         } else if #[cfg(windows)] {
-            assert_eq!(state_dir(), home_dir.join("AppData\\Local\\polaris-terminal\\PolarisTerminal\\data"));
+            assert_eq!(state_dir(), home_dir.join("AppData\\Local\\polaris\\PolarisTerminal\\data"));
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -188,7 +188,7 @@ fn test_project_path_for_pterm_app_id() {
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
             assert_eq!(project_dirs.project_path(), "polaris-terminal-stable");
         } else if #[cfg(windows)] {
-            assert_eq!(project_dirs.project_path(), "polaris-terminal\\Polaris Terminal");
+            assert_eq!(project_dirs.project_path(), "polaris\\Polaris Terminal");
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -206,7 +206,7 @@ fn test_project_path_for_pterm_dev_app_id() {
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
             assert_eq!(project_dirs.project_path(), "polaris-terminal-dev");
         } else if #[cfg(windows)] {
-            assert_eq!(project_dirs.project_path(), "polaris-terminal\\PolarisTerminalDev");
+            assert_eq!(project_dirs.project_path(), "polaris\\PolarisTerminalDev");
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -224,7 +224,7 @@ fn test_project_path_for_oss_app_id() {
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
             assert_eq!(project_dirs.project_path(), "polaris-terminal");
         } else if #[cfg(windows)] {
-            assert_eq!(project_dirs.project_path(), "polaris-terminal\\PolarisTerminal");
+            assert_eq!(project_dirs.project_path(), "polaris\\PolarisTerminal");
         } else {
             unimplemented!("Need to update tests for current platform!");
         }

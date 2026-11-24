@@ -3108,7 +3108,7 @@ fn test_vim_change_word_cge() {
         });
 
         editor.read(&app, |view, app_ctx| {
-            assert_eq!(view.buffer_text(app_ctx), "echo hello-hkev");
+            assert_eq!(view.buffer_text(app_ctx), "echo hello-hfev");
             assert_eq!(
                 view.selected_ranges(app_ctx),
                 vec![DisplayPoint::new(0, 12)..DisplayPoint::new(0, 12)]
@@ -3122,7 +3122,7 @@ fn test_vim_change_word_cge() {
         });
 
         editor.read(&app, |view, app_ctx| {
-            assert_eq!(view.buffer_text(app_ctx), "echhkev");
+            assert_eq!(view.buffer_text(app_ctx), "echhfev");
             assert_eq!(
                 view.selected_ranges(app_ctx),
                 vec![DisplayPoint::new(0, 3)..DisplayPoint::new(0, 3)]

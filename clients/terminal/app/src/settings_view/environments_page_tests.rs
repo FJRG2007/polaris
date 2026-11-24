@@ -1271,7 +1271,7 @@ fn test_environment_matches_search_query_is_case_insensitive() {
         "ubuntu:latest",
         vec![(
             "PtermDotDev".to_string(),
-            "PolarisTerminal-Internal".to_string(),
+            "Polaris-Terminal-Internal".to_string(),
         )],
         vec![],
     );

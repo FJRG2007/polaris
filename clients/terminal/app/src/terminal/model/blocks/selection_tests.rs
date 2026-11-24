@@ -863,7 +863,7 @@ fn test_smart_selection_in_multiple_blocks() {
     );
             block_list.clear_selection();
 
-            // Start a selection at "0" in the 2nd command to the "e" in "dev" in the
+            // Start a selection at "0" in the 2nd command to the "t" in "test" in the
             // 1st output (which has wrapped to the third line of the output grid).
             block_list.start_selection(
                 BlockListPoint::new(second_command_grid_offset, 5),
@@ -877,7 +877,7 @@ fn test_smart_selection_in_multiple_blocks() {
 
             assert_eq!(
                 block_list.selection_to_string(&semantic_selection, false, ctx),
-                Some("dev/about hello/world.js\necho 192.168.0.1".to_string())
+                Some("test/about hello/world.js\necho 192.168.0.1".to_string())
             );
             block_list.clear_selection();
         })

@@ -133,7 +133,7 @@ fn regex_left() {
 fn nested_regex() {
     #[rustfmt::skip]
     let blockgrid = mock_blockgrid("\
-        Ro -> Roof -> ok\r\n\
+        Ro -> Book -> ok\r\n\
         ok\
     ");
 
@@ -756,7 +756,7 @@ fn test_find_url_omits_trailing_periods() {
     assert_eq!(
         blockgrid
             .grid_handler
-            .url_at_point(Point { row: 0, col: 45 }),
+            .url_at_point(Point { row: 0, col: 48 }),
         None
     );
 
@@ -774,7 +774,7 @@ fn test_find_url_omits_trailing_periods() {
     assert_eq!(
         blockgrid
             .grid_handler
-            .url_at_point(Point { row: 0, col: 46 }),
+            .url_at_point(Point { row: 0, col: 49 }),
         None
     );
 
