@@ -398,8 +398,11 @@ function openMain(url: string): void {
 
     // A page that said it draws the settings stops counting the moment another
     // document begins loading, so an older host, or none, gets the app's own page.
+    // The id is read now: by the time "closed" fires the window's contents are
+    // destroyed, and reading them then throws in the main process.
+    const pageId = window.webContents.id;
     const forgetSettingsPage = () => {
-        if (settingsPage === window.webContents.id) settingsPage = null;
+        if (settingsPage === pageId) settingsPage = null;
     };
     window.webContents.on("did-start-navigation", (details) => {
         if (details.isMainFrame && !details.isSameDocument) forgetSettingsPage();
