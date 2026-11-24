@@ -19,7 +19,7 @@ of Tauri's updater (Ed25519 over the exact bytes, public key in the app).
 | One process per add-on, restart with backoff, permission gate | `clients/desktop/src/main/addons/supervisor.ts`, `clients/desktop/src/shared/addon-protocol.ts` |
 | USB presence (plug events, no polling) | `clients/desktop/src/main/addons/presence.ts`, `crates/polaris-core-usb` |
 | Electron wiring and the page bridge `window.polarisDesktop.addons` | `clients/desktop/src/main/addons/electron.ts` |
-| Build, sign, publish | `scripts/device-addons/publish.mjs`, `.github/workflows/device-addons.yml` |
+| Build, sign, publish | `clients/device-addons/scripts/publish.mjs`, `version-guard.mjs`, `json.mjs`, `.github/workflows/device-addons.yml` |
 | Listed beside the apps, marked Add-on, with an All / Apps / Add-ons switch: the dashboard Marketplace (installs in the desktop app, offers the app in a browser) and the public site (a page per add-on, read from the manifests at build time) | `apps/web/src/app/(app)/apps/marketplace/marketplace-view.tsx` (`AddonsShelf`), `dashboard/apps/site/src/views/addon-page.tsx` |
 
 ## Trust
