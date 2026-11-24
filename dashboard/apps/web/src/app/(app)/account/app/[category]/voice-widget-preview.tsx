@@ -224,7 +224,7 @@ export function OverlayGames({
                                     {game.name || game.key}
                                 </span>
                                 {game.running && (
-                                    <span className="shrink-0 rounded bg-success/15 px-1.5 py-0.5 text-xs text-success">
+                                    <span className="shrink-0 rounded bg-success-soft px-1.5 py-0.5 text-xs text-success">
                                         {t("overlay.running")}
                                     </span>
                                 )}
