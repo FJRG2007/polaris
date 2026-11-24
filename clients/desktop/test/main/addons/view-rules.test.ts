@@ -13,8 +13,8 @@ import { readAddonManifest, type AddonManifest } from "@polaris/core/device-addo
  * shows is in every language Polaris ships.
  */
 
-const repo = fileURLToPath(new URL("../../../../", import.meta.url));
-const addons = join(repo, "device-addons");
+const repo = fileURLToPath(new URL("../../../../../", import.meta.url));
+const addons = join(repo, "clients", "device-addons");
 const locales = readdirSync(join(repo, "dashboard/apps/web/messages")).filter((name) => statSync(join(repo, "dashboard/apps/web/messages", name)).isDirectory());
 
 /** A form control in markup, a script that makes one, or a role that stands in for one. */
