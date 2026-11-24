@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { HOST_UPDATE_ACCESS_PATH, HOST_UPDATE_PATH, readHostPath, readSettingsPlace, readSettingsProbe, readUpdateAccess, settingsPath, settingsRoute, type SettingsRouteState } from "@/shared/settings-route";
+import { APP_SETTING_CATEGORIES } from "@polaris/core/app-settings";
+import { HOST_UPDATE_ACCESS_PATH, HOST_UPDATE_PATH, readHostPath, readSettingsPlace, readSettingsProbe, readUpdateAccess, settingsPath, settingsRoute, type SettingsPlace, type SettingsRouteState } from "@/shared/settings-route";
 
 const HOST = "https://polaris.example.com";
 const loaded: SettingsRouteState = { origin: HOST, pageLoaded: true, pageAnnounced: false, probe: null };
@@ -25,17 +26,44 @@ describe("settingsRoute", () => {
         expect(settingsRoute("general", { ...loaded, probe: "missing" })).toEqual({ kind: "local", reason: "outdated" });
     });
 
-    it("opens the bundled page, saying Polaris is out of reach, when the host does not answer", () => {
-        expect(settingsRoute("general", { ...loaded, probe: "unreachable" })).toEqual({ kind: "local", reason: "offline" });
-        expect(settingsRoute("general", { ...loaded, pageLoaded: false })).toEqual({ kind: "local", reason: "offline" });
+    it("opens the host's Settings, not the bundled page, when the host does not answer", () => {
+        // Offline the window's worker draws the kept page: the same screen.
+        expect(settingsRoute("general", { ...loaded, probe: "unreachable" })).toEqual({ kind: "navigate", path: "/account/app/general" });
+    });
+
+    it("opens the host's Settings when the Polaris window was closed", () => {
+        const closed = { ...loaded, pageLoaded: false };
+        expect(settingsRoute("clipboard", closed)).toEqual({ kind: "probe", path: "/account/app/clipboard" });
+        expect(settingsRoute("clipboard", { ...closed, probe: "present" })).toEqual({ kind: "navigate", path: "/account/app/clipboard" });
+        expect(settingsRoute("clipboard", { ...closed, probe: "unreachable" })).toEqual({ kind: "navigate", path: "/account/app/clipboard" });
     });
 
     it("opens the bundled page with no notice before any host", () => {
         expect(settingsRoute("general", { ...loaded, origin: null, pageAnnounced: true })).toEqual({ kind: "local", reason: null });
+        expect(settingsRoute("general", { ...loaded, origin: null, probe: "unreachable" })).toEqual({ kind: "local", reason: null });
     });
 
-    it("never asks a page that crashed, even one that had announced", () => {
-        expect(settingsRoute("general", { ...loaded, pageLoaded: false, pageAnnounced: true }).kind).toBe("local");
+    it("never asks a page that crashed, even one that had announced, and loads the screen there instead", () => {
+        const crashed = { ...loaded, pageLoaded: false, pageAnnounced: true };
+        expect(settingsRoute("general", crashed)).toEqual({ kind: "probe", path: "/account/app/general" });
+        expect(settingsRoute("general", { ...crashed, probe: "present" })).toEqual({ kind: "navigate", path: "/account/app/general" });
+    });
+
+    it("opens the bundled page only for a host without the screen, or before any host", () => {
+        const places: SettingsPlace[] = [...APP_SETTING_CATEGORIES, "addons"];
+        const probes = [null, "present", "signed-out", "unreachable", "missing"] as const;
+        for (const place of places) {
+            for (const probe of probes) {
+                for (const pageLoaded of [true, false]) {
+                    for (const pageAnnounced of [true, false]) {
+                        const route = settingsRoute(place, { origin: HOST, pageLoaded, pageAnnounced, probe });
+                        const announced = pageLoaded && pageAnnounced;
+                        if (route.kind === "local") expect({ probe, announced, route }).toEqual({ probe: "missing", announced: false, route: { kind: "local", reason: "outdated" } });
+                        else expect(route).toHaveProperty("path", settingsPath(place));
+                    }
+                }
+            }
+        }
     });
 
     it("sends the device add-ons to their own page", () => {

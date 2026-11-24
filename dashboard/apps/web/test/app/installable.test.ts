@@ -154,14 +154,14 @@ describe("the service worker", () => {
         loaded.length = 0;
         await worker.message({
             type: "keep-pages",
-            paths: ["/account/app/general", "/account/app/voice", "/account/app/hosts", "/notes", "/vault", "https://elsewhere.example/account/app/x", 4]
+            paths: ["/account/app/general", "/account/app/voice", "/account/app/hosts", "/account/addons", "/account/addons/x", "/notes", "/vault", "https://elsewhere.example/account/app/x", 4]
         });
         // Already kept, a redirect, or not one of those pages: never loaded or never kept.
-        expect(loaded).toEqual(["/account/app/voice", "/account/app/hosts"]);
-        expect(worker.kept()).toEqual(["/account/app/general", "/account/app/voice"]);
+        expect(loaded).toEqual(["/account/app/voice", "/account/app/hosts", "/account/addons"]);
+        expect(worker.kept()).toEqual(["/account/app/general", "/account/app/voice", "/account/addons"]);
         await worker.message({ type: "something-else", paths: ["/account/app/updates"] });
         await worker.message(null);
-        expect(worker.kept()).toHaveLength(2);
+        expect(worker.kept()).toHaveLength(3);
         online = false;
         expect(await worker.request("/account/app/voice")).toBe(page);
     });

@@ -16,6 +16,8 @@ export interface OutboxEntry extends QueuedEntry {
     readonly body: string;
     readonly replyToId: string | null;
     readonly translation?: core.ChatSentTranslation;
+    /** Written while sealed chat was on: sent only by a page that has it open. */
+    readonly sealed?: boolean;
 }
 
 /**

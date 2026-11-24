@@ -212,3 +212,64 @@ the Stream 100 plugged in:
    and to check for MS OS descriptors.
 3. Turning each knob and pressing each button once while reports are logged,
    to settle the knob-press bit order.
+
+## The official software
+
+What Hercules installs on Windows (read from an installed Stream Control
+2.05.8, nothing changed):
+
+| Part | Where |
+| --- | --- |
+| App | "Hercules Stream Control", publisher `Hercules`, uninstall key `{4E736157-448C-4D22-BF3F-1C58BE6E9B9E}`, `Stream-control.exe` (Qt 6) |
+| Drivers | "HSM Series drivers", publisher `Hercules`, uninstall key `{B59074DF-80BE-4F30-AE11-6AB0B93EDE56}`, `oem*.inf` from `HercStreamMixDevice.inf`, provider Guillemot Corporation, 1.2.2.0 |
+| Uninstallers | InstallShield: `"<Program Files (x86)>\InstallShield Installation Information\<key>\setup.exe" -runfromtemp -l0x0409 -removeonly` (drivers add `-remove`) |
+| Start with Windows | `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`, value `Hercules-Stream-Control`, unquoted path, `-minimized`. Removing it needs administrator rights |
+| Service | `hercHsmInstall` (driver installer helper), start mode Disabled |
+| Settings | `%APPDATA%\Hercules\Stream Control\Stream Control.ini` (QSettings), icons beside it |
+| macOS | none: Hercules ships the Stream 100 software for Windows only |
+
+**The Stream 100 has no sound card.** It registers no audio endpoint and no
+kernel-streaming audio interface; the driver's `MEDIA` class is only the class
+its INF chose. Every sound on the machine goes through other devices, so
+removing the Hercules driver cannot take sound away. What it takes away is
+Stream Control itself, the display runtime and the firmware updater.
+
+The settings file is a QSettings ini. Each control is a `@Variant(...)`
+QVariantMap streamed with `QDataStream::Qt_4_0` (type id then value, no null
+flag), under `[Device_SN_<serial>]`, `pages\page_<n>\pageContent\<1-4>\`
+`knobDescriptor`/`knobCustomization`/`buttonDescriptor`/`buttonCustomization`.
+A descriptor's `nameHierarchy` is Stream Control's own menu path (`Apps >
+Multi-app volume`, `Discord > Mute`, `Actions > Next page`); a knob's
+customization holds its preset `name` and the app `sources` it follows. The
+same file holds the person's Discord, Spotify and OBS tokens: Polaris reads only
+the `pages\...` keys and never parses or keeps the rest.
+`clients/desktop/src/main/addons/hercules-official.ts` holds the detection, the
+uninstaller check and the importer; each is pure and tested on fixtures.
+
+### Feature parity with Stream Control 2.05
+
+| Stream Control | Polaris add-on today |
+| --- | --- |
+| Pages of 4 knobs + 4 buttons, Next/Previous page buttons | missing: one page |
+| Profiles (`profiles`, `LastProfileKey`) | missing |
+| Knob: multi-app volume with a chosen app list | have as categories (calls, music, games, browser, system, other); a hand-picked app list is missing |
+| Knob: one app, output device, microphone | output: have; one app and microphone: missing from the settings page |
+| Knob press: mute | have |
+| Button: Discord mute / deafen (Discord RPC) | missing (Polaris call mic/deafen exist instead) |
+| Button: media play/pause, next, previous | missing |
+| Buttons: OBS / Streamlabs scenes, Voicemeeter, soundboard, hotkeys | missing |
+| Button toggled / untoggled labels | missing |
+| Knob and button colors, LED brightness | missing |
+| Display: mixer, meters, icons, background image | display: only through the Hercules SDK, not built |
+| Broadcast / creator mode | missing |
+| Firmware update | not Polaris's |
+
+### The driver interface
+
+hercules-wave-link-bridge reads the knobs through the Hercules driver itself,
+with the official app closed and the driver left in place: it opens the device
+interface `{abee8c27-397b-409d-b6dc-6161ca409d8d}`, sends `DeviceIoControl`
+`0x001E200C`, `0x001E2008`, `0x001E2010` (4-byte answers), `0x001E2024` and
+`0x001E2034` (4 zero bytes in), then polls `0x001E2000` for a 64-byte input
+packet every few milliseconds. The display goes through `hsm_api_core_x64.dll`
+from `<Program Files>\Hercules\HSM Series\sdk`. Polaris does not do this yet.

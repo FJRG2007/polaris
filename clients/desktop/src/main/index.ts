@@ -512,18 +512,20 @@ function openConnect(settings: LocalSettingsState = { place: "hosts", reason: nu
 const SETTINGS_PROBE_MS = 4000;
 
 /**
- * Ask the host, in the Polaris window's own session (its sign-in), whether it
+ * Ask the host, in the Polaris windows' session (their sign-in), whether it
  * has the screen at `path`, without following the redirect a signed-out
- * visit gets.
+ * visit gets. Asked with no window open too: the session is the same.
  */
-async function probeSettings(window: BrowserWindow, origin: string, path: string): Promise<SettingsProbe> {
+async function probeSettings(window: BrowserWindow | null, origin: string, path: string): Promise<SettingsProbe> {
+    // No network at all: nothing to wait four seconds for.
+    if (!net.isOnline()) return "unreachable";
     return readSettingsProbe(await probeStatus(window, origin, path));
 }
 
-/** The status the host answers for `path` in the window's session; null when none came. */
-async function probeStatus(window: BrowserWindow, origin: string, path: string): Promise<number | null> {
+/** The status the host answers for `path` in the windows' session; null when none came. */
+async function probeStatus(window: BrowserWindow | null, origin: string, path: string): Promise<number | null> {
     try {
-        const answer = await window.webContents.session.fetch(`${origin}${path}`, {
+        const answer = await (window ? window.webContents.session : session.defaultSession).fetch(`${origin}${path}`, {
             method: "GET",
             redirect: "manual",
             credentials: "include",
@@ -536,50 +538,64 @@ async function probeStatus(window: BrowserWindow, origin: string, path: string):
     }
 }
 
+/** The hosts seen with Settings > This app since the app started: a host does
+ *  not lose a screen while it runs, so these are opened without asking again. */
+const settingsHosts = new Set<string>();
+
 /**
  * Whether the person signed in on the window may update the host: the host is
  * asked (`HOST_UPDATE_ACCESS_PATH`), so the answer is the check it enforces
  * itself. Only then does the bundled page offer the update.
  */
-async function canUpdateHost(window: BrowserWindow, origin: string): Promise<boolean> {
+async function canUpdateHost(window: BrowserWindow | null, origin: string): Promise<boolean> {
     return readUpdateAccess(await probeStatus(window, origin, HOST_UPDATE_ACCESS_PATH));
 }
 
 /**
- * Open the app's settings where somebody asked for them: the host's own
- * Settings > This app in the Polaris window, with its sidebar and search, as
- * long as the host has that screen (`settingsRoute`); the page bundled with the
- * app only offline, before any host, or on a host older than the screen - and
- * then it says which, with the button that fixes it.
+ * Open the app's settings where somebody asked for them - the tray, the app
+ * menu, the launcher: the host's own Settings > This app in the Polaris window,
+ * with its sidebar and search, whenever a host is known (`settingsRoute`),
+ * opening the window when it was closed. Offline it is the same screen, kept by
+ * the window's service worker. The page bundled with the app only on the first
+ * run, before any host, or on a host that answers that it has no such screen -
+ * and then it says which, with the button that fixes it.
  */
 async function openSettings(place: SettingsPlace = "general"): Promise<void> {
     const page = main && !main.isDestroyed() ? main : null;
+    const origin = current;
     const state = {
-        origin: current,
+        origin,
         pageLoaded: Boolean(page && !page.webContents.isCrashed()),
         pageAnnounced: page !== null && settingsPage === page.webContents.id,
-        probe: null as SettingsProbe | null
+        probe: origin && settingsHosts.has(origin) ? ("present" as const) : null
     };
     let route = settingsRoute(place, state);
-    if (route.kind === "probe" && page && current) {
-        const origin = current;
+    if (route.kind === "probe" && origin) {
         const probe = await probeSettings(page, origin, route.path);
         // The host was changed, or the window closed, while it was asked.
-        if (origin !== current || page.isDestroyed()) return;
+        if (origin !== current || (page && page.isDestroyed())) return;
+        if (probe === "present") settingsHosts.add(origin);
         route = settingsRoute(place, { ...state, probe });
     }
-    if (route.kind === "local" || route.kind === "probe" || !page || !current) {
-        const reason = route.kind === "local" ? route.reason : "offline";
-        const canUpdate = reason === "outdated" && page && current ? await canUpdateHost(page, current) : false;
+    if (route.kind === "probe" || !origin) route = { kind: "local", reason: null };
+    if (route.kind === "local") {
+        const reason = route.reason;
+        const canUpdate = reason === "outdated" && origin ? await canUpdateHost(page, origin) : false;
         openConnect({ place: reason === null ? "hosts" : place, reason, canUpdate });
         return;
     }
     closeConnect();
+    // No window - closed rather than kept in the tray: a new one opens there. A
+    // crashed page is never "page", and loading an address gives it a new renderer.
+    if (!page) {
+        showPolaris(route.path);
+        return;
+    }
     if (page.isMinimized()) page.restore();
     page.show();
     page.focus();
     if (route.kind === "page") page.webContents.send(CHANNELS.appSettingsOpen, place);
-    else void page.loadURL(`${current}${route.path}`);
+    else void page.loadURL(`${origin}${route.path}`);
 }
 
 /**
@@ -1065,7 +1081,9 @@ function start(): void {
             closeConnect,
             openServers: openConnect,
             settingsAnnounced: (sender) => {
-                if (main && !main.isDestroyed() && sender.id === main.webContents.id) settingsPage = sender.id;
+                if (!main || main.isDestroyed() || sender.id !== main.webContents.id) return;
+                settingsPage = sender.id;
+                if (current) settingsHosts.add(current);
             },
             updates,
             relaunched,

@@ -113,7 +113,9 @@ export async function readChanges(channelId: string): Promise<ChatChange[]> {
  *  store, a full disk, nowhere to seal it): the caller sends it at once
  *  instead, with the same key. */
 export async function enqueue(entry: Omit<OutboxEntry, "state" | "attempts" | "createdAt">): Promise<boolean> {
-    const kept = await sealed(entry as OutboxEntry).catch(() => null);
+    // Written under sealed chat: never sent in the clear by a page without it.
+    const marked = sealedChat.sealedChatActive() ? { ...entry, sealed: true } : entry;
+    const kept = await sealed(marked as OutboxEntry).catch(() => null);
     return kept ? queue.enqueue(kept as Omit<Kept, "state" | "attempts" | "createdAt">) : false;
 }
 
@@ -128,7 +130,7 @@ export function discard(key: string): Promise<void> {
 }
 
 /** A message on its way: an outbox entry, or a thread answer (`parentId`, no key of its own). */
-type Sendable = Pick<OutboxEntry, "channelId" | "body" | "replyToId" | "translation"> & { key?: string; parentId?: string | null };
+type Sendable = Pick<OutboxEntry, "channelId" | "body" | "replyToId" | "translation" | "sealed"> & { key?: string; parentId?: string | null };
 
 /**
  * The ordinary send, through its route (`/api/chat/send`) rather than as a
@@ -163,7 +165,7 @@ export async function sendNow(entry: Sendable): Promise<{ id?: string; error?: s
             ...(entry.key ? { clientKey: entry.key } : {})
         });
     const result = await deliver(entry);
-    if (result === "unreachable") throw new Error("the sealed message could not be sent");
+    if (result === "unreachable" || result === "held") throw new Error("the sealed message could not be sent");
     return "sent" in result ? { id: result.sent } : { error: result.refused };
 }
 
@@ -172,6 +174,7 @@ export async function sendNow(entry: Sendable): Promise<{ id?: string; error?: s
  * chat is on (never in the clear instead), else the ordinary send.
  */
 export async function deliver(entry: Sendable): Promise<OutboxSendResult> {
+    if (entry.sealed && !sealedChat.sealedChatActive()) return "held";
     if (sealedChat.sealedChatActive()) {
         try {
             const id = await sealedChat.sendSealedMessage({
@@ -255,6 +258,9 @@ async function sendChange(change: ChangeRequest): Promise<ChangeAnswer | { refus
 }
 
 async function deliverChange(change: ChatChange): Promise<QueueSendResult> {
+    // Sealed only by a page that has the device open: one that has not waits for
+    // the next page that does, rather than counting as a failed attempt.
+    if (change.op === "edit" && change.sealed && !sealedChat.sealedChatActive()) return "held";
     try {
         const answer = await sendChange(change);
         return "refused" in answer ? { refused: answer.refused } : { sent: change.messageId };

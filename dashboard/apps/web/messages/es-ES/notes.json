@@ -33,7 +33,9 @@
         "shareLink": "Compartir enlace...",
         "archive": "Archivar",
         "delete": "Borrar",
-        "templates": "Plantillas"
+        "templates": "Plantillas",
+        "waiting": "Por enviar",
+        "notSent": "No enviado"
     },
     "notebook": {
         "roles": {
@@ -83,7 +85,10 @@
         "retry": "Reintentar",
         "discard": "Descartar",
         "keptCopy": "La nota cambió en otro sitio mientras la tuya esperaba. Tu versión se guardó como <link>otra nota</link>.",
-        "conflictTitle": "{title} (copia sin conexión)"
+        "conflictTitle": "{title} (copia sin conexión)",
+        "notMade": "No se pudo añadir la nota a Polaris.",
+        "notMoved": "No se pudo mover la nota.",
+        "notDeleted": "No se pudo borrar la nota."
     },
     "view": {
         "sharedWithYou": "Compartido contigo",

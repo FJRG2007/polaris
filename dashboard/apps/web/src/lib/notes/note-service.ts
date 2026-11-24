@@ -201,10 +201,15 @@ export async function createNote(
     userId: string,
     input: core.NoteCreateInput & { spaceId?: string | null; folderId?: string | null }
 ): Promise<string> {
+    // A write replayed from a device that kept it offline: already made, so
+    // answered with what it is rather than made again.
+    const made = input.id ? await madeWithId(userId, input.id) : null;
+    if (made) return made;
     const shelf: Shelf = { userId, spaceId: input.spaceId ?? null };
     const parent = input.parentId ? await placeableUnder(shelf, input.parentId) : null;
-    const note = await prisma.note.create({
+    const create = prisma.note.create({
         data: {
+            ...(input.id ? { id: input.id } : {}),
             userId,
             title: input.title,
             body: input.body,
@@ -214,8 +219,28 @@ export async function createNote(
         },
         select: { id: true }
     });
+    let note: { id: string };
+    try {
+        note = await create;
+    } catch (caught) {
+        // The same replay arrived twice at once and the other one made it.
+        const raced = input.id && isUniqueViolation(caught) ? await madeWithId(userId, input.id) : null;
+        if (!raced) throw caught;
+        return raced;
+    }
     if (input.body) await syncNoteLinks(note.id, input.body);
     return note.id;
+}
+
+/** A note this account already made with that id. Somebody else's id is not
+ *  answered with: their create fails as a clash instead. */
+async function madeWithId(userId: string, id: string): Promise<string | null> {
+    const found = await prisma.note.findFirst({ where: { id, userId }, select: { id: true } });
+    return found?.id ?? null;
+}
+
+function isUniqueViolation(caught: unknown): boolean {
+    return typeof caught === "object" && caught !== null && (caught as { code?: unknown }).code === "P2002";
 }
 
 /** Writes only what was sent. The caller has already been allowed to write it. */
@@ -374,6 +399,11 @@ export async function moveNote(
         })
     ]);
     return null;
+}
+
+/** Whether a note is still there at all, archived or not. */
+export async function noteExists(noteId: string): Promise<boolean> {
+    return (await prisma.note.count({ where: { id: noteId } })) > 0;
 }
 
 export async function deleteNote(noteId: string): Promise<boolean> {

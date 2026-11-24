@@ -22,7 +22,14 @@ export interface QueuedEntry {
     readonly reason?: string;
 }
 
-export type QueueSendResult = { readonly sent: string } | { readonly refused: string } | "unreachable";
+/**
+ * - `sent` / `refused`: the server answered.
+ * - `unreachable`: no server; counted as an attempt.
+ * - `held`: this page cannot send it at all (a sealed message on a page where
+ *   sealed chat is not open) - not an attempt, nothing is wrong with it, and it
+ *   goes when a page that can send it flushes.
+ */
+export type QueueSendResult = { readonly sent: string } | { readonly refused: string } | "unreachable" | "held";
 
 export type QueueEvent<E extends QueuedEntry> =
     | { readonly entry: E; readonly sent: string }
@@ -45,6 +52,8 @@ export async function drainQueue<E extends QueuedEntry>(
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     for (const entry of queue) {
         const result = await io.send(entry);
+        // Not for this page: it and what comes after it wait, uncounted.
+        if (result === "held") return;
         if (result !== "unreachable" && "sent" in result) {
             await io.drop(entry.key);
             io.notify({ entry, sent: result.sent });

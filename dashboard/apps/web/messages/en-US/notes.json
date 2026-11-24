@@ -33,7 +33,9 @@
         "shareLink": "Share by link...",
         "archive": "Archive",
         "delete": "Delete",
-        "templates": "Templates"
+        "templates": "Templates",
+        "waiting": "Waiting to send",
+        "notSent": "Not sent"
     },
     "notebook": {
         "roles": {
@@ -83,7 +85,10 @@
         "retry": "Try again",
         "discard": "Discard mine",
         "keptCopy": "This note changed somewhere else while yours waited. Your version was kept as <link>a separate note</link>.",
-        "conflictTitle": "{title} (offline copy)"
+        "conflictTitle": "{title} (offline copy)",
+        "notMade": "This note could not be added to Polaris.",
+        "notMoved": "This note could not be moved.",
+        "notDeleted": "This note could not be deleted."
     },
     "view": {
         "sharedWithYou": "Shared with you",

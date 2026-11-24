@@ -108,3 +108,13 @@ Spreadsheets, slides and drawings now show the text editor's saving line
 ## Not fixed here
 
 - Creating, moving or deleting a note offline still needs the host.
+
+## Making, moving and deleting notes offline
+
+A note made, moved or deleted while Polaris cannot be reached is kept on the
+device (`notes/offline-writes.ts`, kinds `note.create`, `note.move`,
+`note.delete`) and sent in order when Polaris answers. A note made here carries
+its id (`noteCreateSchema.id`), so a replay after a lost answer makes it once; a
+replayed delete of a note already gone answers done. The tree draws the kept
+writes over what the server sent (`notes/offline-tree.ts`) with a clock, or an
+alert when Polaris refused one, and a note made offline opens from the device.

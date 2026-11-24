@@ -16,8 +16,9 @@
 
 import * as actions from "./actions";
 import { useEffect, useState } from "react";
-import { actionFailureText, runAction } from "@/lib/run-action";
-import { isNetworkFailure, noteRequestFailure } from "@/lib/reachability";
+import { actionFailureText } from "@/lib/run-action";
+import { noteRequestFailure } from "@/lib/reachability";
+import { tryNow, UNANSWERED } from "@/lib/offline/try-now";
 import { newClientKey, type QueueSendResult } from "@/lib/offline/outbox";
 import { appWrites, offlineStore, registerWriteKind, type AppWrite } from "@/lib/offline/app-writes";
 
@@ -112,20 +113,10 @@ export async function writeTask(
     const behind = (await taskWrites()).some((entry) => named.has(entry.target) && entry.state === "pending");
 
     if (!offline && !behind) {
-        let unanswered = false;
-        const answer = await runAction(
-            () =>
-                call[kind](input).catch((caught: unknown) => {
-                    // Not answered: kept below, and sent when Polaris is back. Anything
-                    // else (the server threw, a replaced build) fails as it always did.
-                    if (!isNetworkFailure(caught)) throw caught;
-                    noteRequestFailure(caught);
-                    unanswered = true;
-                    return null;
-                }),
-            onFailure
-        );
-        if (!unanswered) return answer;
+        // Not answered: kept below, and sent when Polaris is back. Anything else
+        // (the server threw, a replaced build) fails as it always did.
+        const answer = await tryNow(() => call[kind](input), onFailure);
+        if (answer !== UNANSWERED) return answer;
     }
     if (await keep(kind, target, input)) {
         appWrites.flush();

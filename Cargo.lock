@@ -2533,7 +2533,7 @@ dependencies = [
 
 [[package]]
 name = "polaris-stream100"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "nusb",
  "pulseaudio",

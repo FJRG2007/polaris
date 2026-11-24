@@ -257,9 +257,11 @@ export async function moveNoteAction(input: unknown): Promise<{ error?: string }
 export async function deleteNoteAction(noteId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
+        // Already gone is what was asked for: a delete kept offline and sent
+        // again after a lost answer, or one somebody else got to first.
+        if (!(await notes.noteExists(noteId))) return {};
         await access.requireNote(caller, noteId, "member");
-        if (!(await notes.deleteNote(noteId)))
-            return { error: (await getTranslations("notes"))("errors.noteGone") };
+        if (!(await notes.deleteNote(noteId))) return {};
         await dropGrantsFor("note.note", noteId);
         refresh();
         return {};

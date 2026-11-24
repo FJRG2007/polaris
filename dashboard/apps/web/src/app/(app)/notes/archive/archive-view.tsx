@@ -15,12 +15,17 @@ import { runAction } from "@/lib/run-action";
 import { RelativeTime } from "@/components/relative-time";
 import { Archive, RotateCcw, Trash2 } from "lucide-react";
 import type { ArchivedNote } from "@/lib/notes/note-service";
-import { deleteNoteAction, updateNoteAction } from "../actions";
+import { updateNoteAction } from "../actions";
+import { deletedHere } from "../offline-tree";
+import { NOTE_DELETE, useNoteWrites, writeNote } from "../offline-writes";
 import { Button, ConfirmDeleteDialog, EmptyState } from "@polaris/ui";
 
-export function ArchiveView({ notes }: { notes: readonly ArchivedNote[] }) {
+export function ArchiveView({ notes: served }: { notes: readonly ArchivedNote[] }) {
     const t = useTranslations("notes");
     const router = useRouter();
+    // A delete kept on this device while Polaris was away is gone from here already.
+    const writes = useNoteWrites(() => router.refresh());
+    const notes = served.filter((note) => !deletedHere(writes.entries, note.id));
     const [error, setError] = useState("");
     const [deleting, setDeleting] = useState<ArchivedNote | null>(null);
 
@@ -98,8 +103,12 @@ export function ArchiveView({ notes }: { notes: readonly ArchivedNote[] }) {
                 description={t("archive.deleteBody")}
                 confirmLabel={t("view.deleteTitle")}
                 onConfirm={async () => {
-                    if (deleting) await runAction(() => deleteNoteAction(deleting.id), setError);
-                    setDeleting(null);
+                    if (deleting) {
+                        const result = await writeNote(NOTE_DELETE, { noteId: deleting.id }, setError);
+                        if (result?.error) setError(result.error);
+                        setDeleting(null);
+                        if (result?.queued) return;
+                    } else setDeleting(null);
                     router.refresh();
                 }}
             />

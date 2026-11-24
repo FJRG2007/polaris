@@ -65,6 +65,9 @@ export const noteShelfSchema = z.object({
 export type NoteShelf = z.infer<typeof noteShelfSchema>;
 
 export const noteCreateSchema = z.object({
+    /** The id it is made with, chosen by a device that wrote it offline, so a
+     *  replay after a lost answer finds it made instead of making a second one. */
+    id: uuid.optional(),
     title: noteTitle.default("Untitled"),
     body: noteBody.default(""),
     /** The note this one goes under. Null, or absent, means the top level. */
