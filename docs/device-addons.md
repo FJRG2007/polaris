@@ -75,7 +75,11 @@ The add-on's page in Settings frames it with `sandbox="allow-scripts"` (no same
 origin) and speaks `postMessage` (`apps/web/src/lib/device-addon-view.ts`):
 
 - the view sends `{type: "ready"}`, and gets `{type: "hello", locale, theme, tokens}`
-  (the page's design tokens, e.g. `--background`, `--primary`, `--radius`);
+  (the page's design tokens, e.g. `--background`, `--primary`, `--radius`); the same
+  message comes again whenever the theme, a token or the language changes while the
+  view is open, so a view redraws on every `hello`, not only the first;
+- `{type: "settings", values}` comes after ready and whenever the add-on's settings change
+  outside the view (the list above it, another window);
 - `{type: "resize", height}` sets the frame's height (120 to 1600 px);
 - `{type: "call", id, method, params}` gets `{type: "reply", id, ok, value | error}`.
   The methods are the process's own (`settings.get`, `polaris.state`,

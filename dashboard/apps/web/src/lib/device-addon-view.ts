@@ -92,3 +92,29 @@ export function addonViewTokens(style: Pick<CSSStyleDeclaration, "getPropertyVal
     }
     return tokens;
 }
+
+/** What a view is told about the page: sent when it is ready, and again whenever any of it changes. */
+export type AddonViewHello = { readonly type: "hello"; readonly locale: string; readonly theme: "light" | "dark"; readonly tokens: Record<string, string> };
+
+/** The page as a view should draw it now. */
+export function addonViewHello(locale: string, dark: boolean, style: Pick<CSSStyleDeclaration, "getPropertyValue">): AddonViewHello {
+    return { type: "hello", locale, theme: dark ? "dark" : "light", tokens: addonViewTokens(style) };
+}
+
+/**
+ * Call `onChange` whenever the page's look may have moved: the root's class,
+ * `data-theme` or inline style (theme, accent, text size), or the system
+ * scheme under a page set to follow it. It reports possible changes; the
+ * caller compares what it would send with what it sent last.
+ */
+export function watchAddonViewLook(onChange: () => void): () => void {
+    if (typeof document === "undefined") return () => undefined;
+    const observer = typeof MutationObserver === "undefined" ? null : new MutationObserver(() => onChange());
+    observer?.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
+    const scheme = typeof matchMedia === "undefined" ? null : matchMedia("(prefers-color-scheme: dark)");
+    scheme?.addEventListener("change", onChange);
+    return () => {
+        observer?.disconnect();
+        scheme?.removeEventListener("change", onChange);
+    };
+}

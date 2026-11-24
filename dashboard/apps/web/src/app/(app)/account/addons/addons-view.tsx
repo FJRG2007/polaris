@@ -14,7 +14,7 @@ import { formatBytes } from "@polaris/core";
 import { Loader2, Package } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { StoreCard, StatusBadge } from "@polaris/ui/store-card";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { OverflowMenu, StoreFilters, StoreNoMatch, StoreSection } from "@polaris/ui/store-layout";
 import { Badge, Button, ControlSlider, SegmentedControl, Select, Skeleton, Switch, useToast } from "@polaris/ui";
@@ -41,7 +41,8 @@ import {
     type AddonsBridge,
     type AddonsState
 } from "@/lib/device-addons-client";
-import { addonViewHeight, addonViewTokens, addonViewUrl, readAddonViewMessage, readAddonViewReply, ADDON_VIEW_HEIGHT } from "@/lib/device-addon-view";
+import { pageIsDark } from "@/lib/page-theme";
+import { addonViewHeight, addonViewHello, addonViewUrl, readAddonViewMessage, readAddonViewReply, watchAddonViewLook, ADDON_VIEW_HEIGHT } from "@/lib/device-addon-view";
 
 type Words = ReturnType<typeof useTranslations<"account">>;
 type Tab = "browse" | "installed" | "updates";
@@ -399,15 +400,54 @@ function AddonSettings({ bridge, manifest }: { bridge: AddonsBridge; manifest: A
  * The add-on's own view, for what its declared settings cannot draw: a frame
  * with scripts and nothing else (no same origin, so it reaches neither this
  * page nor its storage), served by the app from the installed package. It gets
- * the page's tokens and locale, and every call it makes is read here and
+ * the page's tokens, theme and locale when it is ready and again whenever one
+ * of them changes while it is open, and every call it makes is read here and
  * judged by the app.
  */
-function AddonView({ bridge, manifest, view }: { bridge: AddonsBridge; manifest: AddonManifest; view: string }) {
+export function AddonView({ bridge, manifest, view }: { bridge: AddonsBridge; manifest: AddonManifest; view: string }) {
     const t = useTranslations("account");
     const locale = useLocale();
     const frame = useRef<HTMLIFrameElement>(null);
     const [height, setHeight] = useState<number>(ADDON_VIEW_HEIGHT.min * 2);
     const viewCall = bridge.viewCall;
+    // The hello is built from the latest locale, and sent again only when it differs
+    // from the last one the view got, so an unrelated class on the root reaches nobody.
+    const localeNow = useRef(locale);
+    const ready = useRef(false);
+    const lastHello = useRef("");
+    const sendHello = useCallback((force: boolean) => {
+        const target = frame.current?.contentWindow;
+        if (!target || !ready.current) return;
+        const hello = addonViewHello(localeNow.current, pageIsDark(), getComputedStyle(document.documentElement));
+        const said = JSON.stringify(hello);
+        if (!force && said === lastHello.current) return;
+        lastHello.current = said;
+        target.postMessage(hello, "*");
+    }, []);
+
+    useEffect(() => watchAddonViewLook(() => sendHello(false)), [sendHello]);
+    useEffect(() => {
+        localeNow.current = locale;
+        sendHello(false);
+    }, [locale, sendHello]);
+
+    // Settings changed elsewhere (the list above, another window) reach an open view:
+    // every change to the add-on brings a new manifest here, and the values are read again.
+    const lastSettings = useRef("");
+    const sendSettings = useCallback(() => {
+        void bridge
+            .settings(manifest.id)
+            .then((values) => {
+                const target = frame.current?.contentWindow;
+                if (!values || !target || !ready.current) return;
+                const said = JSON.stringify(values);
+                if (said === lastSettings.current) return;
+                lastSettings.current = said;
+                target.postMessage({ type: "settings", values }, "*");
+            })
+            .catch(() => undefined);
+    }, [bridge, manifest]);
+    useEffect(() => sendSettings(), [sendSettings]);
 
     useEffect(() => {
         if (!viewCall) return;
@@ -419,7 +459,11 @@ function AddonView({ bridge, manifest, view }: { bridge: AddonsBridge; manifest:
             const message = readAddonViewMessage(event.data);
             if (!message) return;
             if (message.type === "ready") {
-                post({ type: "hello", locale, tokens: addonViewTokens(getComputedStyle(document.documentElement)), theme: document.documentElement.classList.contains("light") ? "light" : "dark" });
+                // A view that reloads says ready again, and gets the whole hello again.
+                ready.current = true;
+                lastSettings.current = "";
+                sendHello(true);
+                sendSettings();
                 return;
             }
             if (message.type === "resize") {
@@ -432,7 +476,7 @@ function AddonView({ bridge, manifest, view }: { bridge: AddonsBridge; manifest:
         };
         window.addEventListener("message", heard);
         return () => window.removeEventListener("message", heard);
-    }, [viewCall, manifest.id, locale]);
+    }, [viewCall, manifest.id, sendHello, sendSettings]);
 
     if (!viewCall) return null;
     return (
