@@ -52,9 +52,9 @@ vocabulary, `XWarpPointer`) carries over unchanged.
 | `rookctrl` (the app binary run with `--rookctrl`) | `polaris terminal ...` (a CLI subcommand, see "CLI integration") | The app keeps a hidden `--control` flag for the bundled fallback. |
 | URL scheme `rook`, `rookoss`, `rookdev`, ... | `polaris-terminal`, `polaris-terminal-dev`, ... | Must not collide with `polaris://`, which Desktop owns. |
 | AppId `dev.rook.RookOss` | `dev.polaris.PolarisTerminal` | Changes the per-user data directories; see "User data". |
-| home config dir `~/.rook-oss` (`~/.rook` for stable/preview, `~/.rook-<channel>`) | `~/.polaris-terminal` (`~/.polaris-terminal-<channel>`) | |
+| home config dir `~/.rook-oss` (`~/.rook` for stable/preview, `~/.rook-<channel>`) | `~/.polaris-terminal-oss` (`~/.polaris-terminal` for stable/preview, `~/.polaris-terminal-<channel>`) | The released build is the OSS channel, so its home is `~/.polaris-terminal-oss` (`crates/pterm_core/src/paths.rs`). |
 | per-repository dir `./.rook/` (workflows, skills, attachments) | `./.polaris/terminal/` | Read the old one too; see "User data". |
-| `~/.rook/custom_model_routers/`, `~/.rook/skills/`, `~/.rook/.mcp.json` | under `~/.polaris-terminal/` | |
+| `~/.rook/custom_model_routers/`, `~/.rook/skills/`, `~/.rook/.mcp.json` | routers and skills under the channel's home dir; MCP config `~/.polaris-terminal/.mcp.json` on every channel | |
 | SQLite `rook.sqlite` | `polaris-terminal.sqlite` | |
 | env `ROOK_*` (162 distinct names, e.g. `ROOK_TERMINAL_SESSION_UUID`, `ROOK_FOCUS_URL`) | `POLARIS_TERMINAL_*` | Shell bootstrap scripts under `app/assets/bundled/bootstrap/` read them; rename in the same commit. Plugins under `plugins/` (Claude Code, Codex, OpenCode) read some of them too. |
 | User-Agent `Rook-MCP-Client/1.0` | `Polaris-Terminal-MCP-Client/1.0` | |
@@ -371,8 +371,9 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   per-repository `./.rook/` for workflows, skills and attachments; a
   `.rook` -> `.rook-preview` migration already exists
   (`app/src/preview_config_migration.rs`) and is the template.
-- **Step:** on first launch, if `~/.polaris-terminal` does not exist and a Rook
-  dir does (`~/.rook-oss`, then `~/.rook`), copy it (not move: a user can still
+- **Step:** on first launch, if the channel's home dir (`~/.polaris-terminal-oss`
+  for the released build) does not exist and a Rook dir does (`~/.rook-oss`, then
+  `~/.rook`), copy it (not move: a user can still
   run Rook side by side), then copy the data directory of `dev.rook.RookOss`
   into the new AppId's, renaming `rook.sqlite`. Keychain entries are re-read
   under the old service name once and written under the new one. Per-repository
@@ -401,6 +402,13 @@ vocabulary, `XWarpPointer`) carries over unchanged.
      a placeholder the user's own git identity replaces.
   A test greps the tree for `rook\.dev` and fails on any hit, so none return
   with an upstream port.
+- **Built:** swept in its own commit after the rename. Docs links in Markdown
+  keep their text; other docs links point at the terminal README; the site and
+  `www.` go to the Polaris site; addresses become `@example.com`; every server
+  host becomes `<name>.polaris-terminal.invalid`; tests and fixtures use
+  `example.com` so a bare domain, a subdomain and a suffix keep their shape. The
+  guard is the `No rook.dev under terminal/` step of the `changes` job in
+  `.github/workflows/terminal.yml`, which runs on every push, docs-only included.
 
 ## Built in Polaris for this
 

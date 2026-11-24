@@ -35,7 +35,7 @@ pub const POLARIS_TERMINAL_LOGS_DIR: &str = "logs";
 fn base_pterm_config_dir_name() -> String {
     match ChannelState::channel() {
         // Preview shares the same directory as Stable for backward
-        // compatibility — existing users already have config in `.polaris/terminal`.
+        // compatibility — existing users already have config in `.polaris-terminal`.
         Channel::Stable | Channel::Preview => POLARIS_TERMINAL_CONFIG_DIR.to_owned(),
         Channel::Oss => format!("{POLARIS_TERMINAL_CONFIG_DIR}-oss"),
         Channel::Dev => format!("{POLARIS_TERMINAL_CONFIG_DIR}-dev"),
@@ -46,7 +46,7 @@ fn base_pterm_config_dir_name() -> String {
 
 /// Returns the home-relative Polaris Terminal config directory name for the current channel and data profile.
 ///
-/// This preserves the historical `.polaris/terminal*` directory shape while still isolating dev, local,
+/// This preserves the historical `.polaris-terminal*` directory shape while still isolating dev, local,
 /// integration, oss, and optional development profiles.
 pub fn pterm_home_config_dir_name() -> String {
     let base_dir_name = base_pterm_config_dir_name();
