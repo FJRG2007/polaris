@@ -46,6 +46,27 @@ async function openAsPolar(channelId: string, ids: readonly string[]): Promise<M
     return out;
 }
 
+/** How Polar reads and writes in this sealed conversation, all through its own device there. */
+function sealedReply(question: SealedQuestion): polar.SealedReply {
+    const { channelId } = question;
+    return {
+        open: (ids) => openAsPolar(channelId, ids),
+        post: (answer) =>
+            withServiceDevice("polar", channelId, async (device) => {
+                await device.ensureGroup(channelId);
+                return device.sendSealed(channelId, encodeSealedContent({ body: answer }), {
+                    parentId: question.parentId,
+                    replyToId: question.messageId
+                });
+            }),
+        rewrite: (messageId, answer) =>
+            withServiceDevice("polar", channelId, async (device) => {
+                await device.ensureGroup(channelId);
+                await device.editSealed(channelId, messageId, encodeSealedContent({ body: answer }));
+            })
+    };
+}
+
 /** Answer a sealed message if it asks Polar: the id of Polar's answer, or null when it did not ask. */
 export async function answerSealedPolar(question: SealedQuestion): Promise<string | null> {
     if (!chatE2eeEnabled() || !(await polarAdded(question.channelId))) return null;
@@ -53,17 +74,20 @@ export async function answerSealedPolar(question: SealedQuestion): Promise<strin
     if (!body) return null;
     const replied = polarMentioned(body) ? false : await polar.repliesToPolar(question.channelId, question.replyToId);
     if (!polar.asksPolar(body, replied) || !polar.claimPolarAnswer(question.messageId)) return null;
-    return polar.answerPolarMention({ ...question, body }, null, [], {
-        open: (ids) => openAsPolar(question.channelId, ids),
-        post: (answer) =>
-            withServiceDevice("polar", question.channelId, async (device) => {
-                await device.ensureGroup(question.channelId);
-                return device.sendSealed(question.channelId, encodeSealedContent({ body: answer }), {
-                    parentId: question.parentId,
-                    replyToId: question.messageId
-                });
-            })
-    });
+    return polar.answerPolarMention({ ...question, body }, null, [], sealedReply(question));
+}
+
+/**
+ * "Try again" under Polar's sealed answer `answerId` to the sealed `question`:
+ * asked again, the new answer sealed over the old one. Null when Polar can no
+ * longer open the question (sealed chat off, Polar taken out, the question
+ * from before it was added), so the press is answered as gone.
+ */
+export async function retrySealedPolar(question: SealedQuestion, answerId: string): Promise<string | null> {
+    if (!chatE2eeEnabled() || !(await polarAdded(question.channelId))) return null;
+    const body = (await openAsPolar(question.channelId, [question.messageId])).get(question.messageId);
+    if (!body) return null;
+    return polar.answerPolarMention({ ...question, body }, answerId, [], sealedReply(question));
 }
 
 /** Called for every sealed message a person sends; never throws, never holds the send up. */

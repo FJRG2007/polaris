@@ -25,7 +25,8 @@
  * of the stored one (the revision is in what the device signed, so a reader
  * that has seen a version refuses any older one handed back as the latest).
  * The row only moves from the revision it was read at, so two edits racing
- * cannot both land on it. The version replaced is kept, sealed as it was,
+ * cannot both land on it. Polar's device writes over its own sealed answer
+ * the same way (its "Try again"), with no edit window, as its plain ones. The version replaced is kept, sealed as it was,
  * where the scope keeps history.
  *
  * Reading: only messages the account may see - in a conversation it reaches,
@@ -38,6 +39,7 @@ import { publishChatChange } from "@/lib/chat/live";
 import { expiryForChannel } from "@/lib/chat/vanish";
 import { unhideOnMessage } from "@/lib/chat/chat-lock";
 import * as messages from "@/lib/chat/messages";
+import { rulesForChannel } from "@/lib/chat/rules";
 import * as content from "@polaris/chat-crypto/message-content";
 import { POLAR_SERVICE, POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID, serviceDevice, serviceKind, type ServiceKind } from "@/lib/chat/service-members";
 
@@ -121,9 +123,29 @@ export interface SealedEdit {
     signature: Uint8Array;
 }
 
+/**
+ * Who may write over a sealed message: a person, every check a plain edit
+ * makes; Polar, only its own sealed answer, signed by the device that posted
+ * it, in its conversation - what its "Try again" rewrites. A webhook edits
+ * nothing.
+ */
+async function rewritableSealed(userId: string, input: SealedEdit): Promise<{ message: { channelId: string }; rules: { keepEditHistory: boolean } }> {
+    const service = serviceKind(userId);
+    if (!service) return messages.requireRewritable({ id: userId }, input.messageId);
+    const message =
+        service === "polar"
+            ? await prisma.chatMessage.findFirst({
+                  where: { id: input.messageId, channelId: input.channelId, authorId: null, agent: POLAR_SERVICE, e2eeDevice: input.device, deletedAt: null },
+                  select: { channelId: true }
+              })
+            : null;
+    if (!message) throw new SealedRefusal("notSealed");
+    return { message, rules: { keepEditHistory: Boolean((await rulesForChannel(message.channelId)).keepEditHistory) } };
+}
+
 /** Replace the sealed content of one of `userId`'s messages, keeping the version it replaces where history is kept; answers the edit's time. */
 export async function editSealed(userId: string, input: SealedEdit): Promise<Date> {
-    const { message, rules } = await messages.requireRewritable({ id: userId }, input.messageId);
+    const { message, rules } = await rewritableSealed(userId, input);
     const [stored, device, group] = await Promise.all([
         prisma.chatMessage.findUnique({
             where: { id: input.messageId },

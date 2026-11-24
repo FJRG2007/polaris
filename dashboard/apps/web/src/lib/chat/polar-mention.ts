@@ -69,6 +69,8 @@ export interface SealedReply {
     open(ids: readonly string[]): Promise<ReadonlyMap<string, string>>;
     /** Seal and post Polar's answer; answers its message id. */
     post(body: string): Promise<string>;
+    /** Seal a new version over Polar's own sealed answer `messageId` (its "Try again"). */
+    rewrite(messageId: string, body: string): Promise<void>;
 }
 
 /**
@@ -128,9 +130,12 @@ export function polarCommandQuestion(body: string): string {
  * mention, for Polar to report on.
  *
  * With `sealed`, the conversation is sealed: Polar reads it through its own
- * device and answers sealed, with no tools (a change waits under its message
- * for a button the sealed row does not carry), no buttons, and no draft
- * streamed in the clear while it writes.
+ * device and answers sealed, with no draft streamed in the clear while it
+ * writes and no tools: a change it offers waits, with what it would do, on
+ * the server until it is approved, which would keep words of a sealed
+ * conversation there in the clear. The way to fix an answer that is not one
+ * ("Try again", "Set up providers") goes under it as on a plain answer: those
+ * buttons say nothing of what was asked.
  */
 export async function answerPolarMention(
     mention: PolarMention,
@@ -183,8 +188,17 @@ export async function answerPolarMention(
     });
     const rules = await import("./rules").then((module) => module.rulesForChannel(mention.channelId));
     const fit = (text: string) => [...text].slice(0, rules.maxMessageLength).join("");
-    // The provider link stays in the text: a sealed row carries no button to move it to.
-    if (sealed) return sealed.post(fit(answer.text));
+    if (sealed) {
+        const body = fit(shownText(answer.text, answer.problem));
+        const components = problemComponents(answer.problem, words, mention.authorId);
+        if (replace) await sealed.rewrite(replace, body);
+        const messageId = replace ?? (await sealed.post(body));
+        // Posted first, then the buttons under it: a sealed answer's words go only through Polar's device.
+        // A rewrite takes off the "Try again" it came from.
+        if (replace || components.length)
+            await updateAgentMessage({ messageId, channelId: mention.channelId, agent: POLAR_AGENT, components, edited: false });
+        return messageId;
+    }
     const pending = answer.pending ?? null;
     if (pending) {
         // What it will do goes last and whole, so a long answer is what gets cut.

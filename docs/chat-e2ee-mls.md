@@ -311,8 +311,18 @@ What is built on top of it:
   (`@polar`, or a reply to Polar) is answered through `answerPolarMention` with
   a `SealedReply`: the conversation before it is opened by the same device, the
   answer is sealed and posted by it as a reply. Only the MLS work holds the
-  device's lease; the model's answer is written outside it. A sealed answer has
-  no tools, no buttons and no draft streamed in the clear.
+  device's lease; the model's answer is written outside it. A sealed answer
+  streams no draft in the clear and has no tools: a change Polar offers waits
+  on the server, with what it would do, until it is approved, and that would
+  keep words of the conversation there in the clear. An answer that is not one
+  gets the same way out as a plain one - "Set up providers" (the link moves out
+  of the sealed text to it) or "Try again" - put on the row after the sealed
+  post, not marked as an edit; the buttons say nothing of what was asked.
+  "Try again" (`retrySealedPolar`) has Polar's device open the question again
+  and seal the new answer over its own row as the next revision (`editSealed`
+  takes that from Polar only for its own sealed answer, signed by the device
+  that posted it, with no edit window), the old version kept sealed where the
+  scope keeps history, and the button taken off.
 - **A webhook posting** (`postThroughWebhook`): in a sealed conversation the
   webhook's device seals the post; the name and picture the call gave stay
   metadata beside it, and no link card is made.
