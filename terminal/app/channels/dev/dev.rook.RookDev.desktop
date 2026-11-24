@@ -1,0 +1,23 @@
+[Desktop Entry]
+# The version of the desktop entry spec this conforms to.
+Version=1.0
+
+Type=Application
+
+Name=RookDev
+GenericName=TerminalEmulator
+
+Exec=rook-terminal-dev %U
+StartupWMClass=dev.rook.RookDev
+
+Keywords=shell;prompt;command;commandline;cmd;
+
+Icon=dev.rook.RookDev
+
+Categories=System;TerminalEmulator;
+
+# Don't run this application within a terminal.
+Terminal=false
+
+# Register ourselves as the handler for rookdev:// URLs.
+MimeType=x-scheme-handler/rookdev;

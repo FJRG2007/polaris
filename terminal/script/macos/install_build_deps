@@ -1,0 +1,5 @@
+#!/bin/sh
+#
+# Installs macOS-specific build dependencies required to build Rook.
+
+xcodebuild -downloadComponent MetalToolchain

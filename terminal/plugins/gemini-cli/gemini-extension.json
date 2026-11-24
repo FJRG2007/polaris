@@ -1,0 +1,5 @@
+{
+  "name": "gemini-rook",
+  "description": "Rook terminal integration for Gemini CLI - native notifications and session status",
+  "version": "1.0.0"
+}

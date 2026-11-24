@@ -1,0 +1,6 @@
+---
+name: "Copy RookDev Keychain to Rook local"
+command: "security add-generic-password -a User -U -s rook -w \"$(security find-generic-password -a User -s dev.rook.Rook-Dev -w)\""
+description: "Copies the refresh token from RookDev into the local rook app so that it can authenticate."
+author: Rook Team
+shells: []

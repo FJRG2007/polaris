@@ -1,0 +1,151 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "attach",
+      "name": "Debug already-running process",
+      "pid": "${command:pickMyProcess}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'rook'",
+      "cargo": {
+        "args": ["build", "--bin=rook"],
+        "filter": {
+          "name": "rook",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug MacOS executable",
+      "preLaunchTask": "build_rooklocal",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/RookLocal.app/Contents/MacOS/rook",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'rook' with fast_dev",
+      "cargo": {
+        "args": ["build", "--bin=rook", "--features=fast_dev"],
+        "filter": {
+          "name": "rook",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'rook' with with_local_server",
+      "cargo": {
+        "args": ["build", "--bin=rook", "--features=with_local_server"],
+        "filter": {
+          "name": "rook",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug MacOS executable local session sharing server",
+      "preLaunchTask": "build_rooklocal_localsessionsharing",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/RookLocal.app/Contents/MacOS/rook",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug MacOS executable with fast_dev",
+      "env": {
+        "RUST_BACKTRACE": "1"
+      },
+      "preLaunchTask": "build_rooklocal_fastdev",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/RookLocal.app/Contents/MacOS/rook",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug MacOS executable with fast_dev + local session sharing server",
+      "preLaunchTask": "build_rooklocal_fastdev_localsessionsharing",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/RookLocal.app/Contents/MacOS/rook",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'rook'",
+      "cargo": {
+        "args": ["test", "--no-run", "--bin=rook", "--package=rook"],
+        "filter": {
+          "name": "rook",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration tests in executable 'integration'",
+      "cargo": {
+        "args": ["build", "--bin=integration", "--package=rook"],
+        "env": {
+          "ROOKUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS": "1"
+        },
+        "filter": {
+          "name": "integration",
+          "kind": "bin"
+        }
+      },
+      "args": ["test_waterfall_input"],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'rookui'",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=rookui"],
+        "filter": {
+          "name": "rookui",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    }
+  ]
+}

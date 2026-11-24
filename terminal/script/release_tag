@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+#
+# Prints the tag for a release cut right now.
+#
+# The shape is `v0.YYYY.MM.DD.HH.MM.channel_NN`, in UTC. It is not a choice made
+# here: `ParsedVersion` accepts nothing else, and `script/update_plist` reads the
+# same fields to build the numeric CFBundleVersion Apple asks for - both were
+# already written for it, and the `v0.1.x` tags this fork started with were the
+# thing making them fall back or warn.
+#
+# It also says something truer than a semver number would. There is no published
+# API here to promise compatibility about, so a major/minor bump would be a
+# number nobody could read a meaning into; a date says when the build is from,
+# which is the only question anyone asks of a terminal's version.
+#
+# The trailing counter separates two releases cut in the same minute, and is
+# raised past any tag that already exists for it.
+#
+# Usage:
+#   script/release_tag              # prints the tag
+#   git tag -a "$(script/release_tag)" -m "..." && git push origin "$(...)"
+
+set -euo pipefail
+
+CHANNEL="${1:-oss}"
+MINUTE="$(date -u +%Y.%m.%d.%H.%M)"
+
+counter=0
+while git rev-parse -q --verify \
+    "refs/tags/$(printf 'v0.%s.%s_%02d' "$MINUTE" "$CHANNEL" "$counter")" >/dev/null; do
+  counter=$((counter + 1))
+done
+
+printf 'v0.%s.%s_%02d\n' "$MINUTE" "$CHANNEL" "$counter"

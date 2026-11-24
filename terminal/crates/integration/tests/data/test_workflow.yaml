@@ -1,0 +1,18 @@
+---
+name: "Run Rook locally with shell"
+command: "ROOK_SHELL_PATH={{shell}} cargo run"
+description: "Runs rook with the particular shell so devs don't need to change their login shell to test a different shell locally"
+arguments:
+  - name: shell
+    description: path of shell to use
+author: Rook Team
+shells: []
+---
+name: "Run Rook locally with shell 2: Electric Boogaloo"
+command: "ROOK_SHELL_PATH={{shell}} cargo run"
+description: "Runs rook with the particular shell so devs don't need to change their login shell to test a different shell locally"
+arguments:
+  - name: shell
+    description: path of shell to use
+author: Rook Team
+shells: []

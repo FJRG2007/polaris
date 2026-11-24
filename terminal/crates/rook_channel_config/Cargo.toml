@@ -1,0 +1,12 @@
+[package]
+name = "rook_channel_config"
+edition = "2024"
+description = "Loads per-channel ChannelConfig for Rook's channel binaries"
+authors.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+command.workspace = true
+serde_json.workspace = true
+rook_core.workspace = true

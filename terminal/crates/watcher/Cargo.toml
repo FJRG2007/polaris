@@ -1,0 +1,16 @@
+[package]
+name = "watcher"
+version = "0.1.0"
+edition = "2024"
+authors = ["Rook Contributors"]
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+rook_errors.workspace = true
+async-channel.workspace = true
+rookui_core.workspace = true
+log.workspace = true
+anyhow.workspace = true
+notify-debouncer-full.workspace = true
+futures.workspace = true

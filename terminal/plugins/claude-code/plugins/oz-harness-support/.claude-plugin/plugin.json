@@ -1,0 +1,10 @@
+{
+  "name": "oz-harness-support",
+  "description": "Rook terminal integration for Claude Code in Oz cloud agent environments, including parent-message delivery hooks",
+  "version": "1.1.2",
+  "author": {
+    "name": "Rook",
+    "url": "https://rook.dev"
+  },
+  "homepage": "https://github.com/warpdotdev/claude-code-warp"
+}

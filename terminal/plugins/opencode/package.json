@@ -1,0 +1,50 @@
+{
+  "name": "@rook-dot-dev/opencode-rook",
+  "version": "0.1.7",
+  "description": "Rook terminal integration for OpenCode — native notifications and more",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "dev": "echo 'Add to your opencode.json: \"plugin\": [\"file://'$(pwd)'/src/index.ts\"]' && echo 'Then run: opencode'",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "rook",
+    "terminal",
+    "notifications"
+  ],
+  "author": "Rook (https://rook.dev)",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://github.com/warpdotdev/opencode-warp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/warpdotdev/opencode-warp.git"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.0.0",
+    "@types/node": "^25.5.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.0.0"
+  },
+  "directories": {
+    "test": "tests"
+  },
+  "dependencies": {
+    "undici-types": "^7.18.2",
+    "zod": "^4.1.8"
+  },
+  "bugs": {
+    "url": "https://github.com/warpdotdev/opencode-warp/issues"
+  }
+}

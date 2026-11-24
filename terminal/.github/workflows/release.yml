@@ -1,0 +1,263 @@
+name: Release
+
+# Rook has no release host of its own, so GitHub releases are the distribution
+# channel. Push a `v*` tag (or run this by hand) and the installers for each
+# platform are built and attached to the release for that tag.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build and publish (e.g. v0.1.0)
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 300
+    strategy:
+      # One platform failing should not deny the others their artifact.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows
+            name: Windows installer (x64)
+            runner: windows-latest
+            artifact: rook-windows-x64
+          - os: macos
+            name: macOS disk image
+            runner: macos-latest
+            artifact: rook-macos
+          - os: linux
+            name: Linux AppImage
+            runner: ubuntu-latest
+            artifact: rook-linux-x86_64
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: echo "value=${{ inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - uses: ./.github/actions/prepare_environment
+        with:
+          target_os: ${{ matrix.os }}
+          is_self_hosted: 'false'
+          install_release_deps: 'true'
+          # Kept to this workflow. CI's release-profile job only runs
+          # `cargo check`, so what it caches is metadata with no codegen behind
+          # it; a tag build sharing that key would restore artifacts it cannot
+          # link and then skip saving its own, and every release would compile
+          # from nothing. This way one tag build's output serves the next.
+          cache_key: ${{ matrix.os }}-rlto
+
+      - name: Install Inno Setup
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          # ISCC is not on PATH after install, and it lands in one of two places
+          # depending on whether the package installs per-machine or per-user.
+          $iscc = Get-ChildItem -Path @(
+              "${env:ProgramFiles(x86)}",
+              "$env:ProgramFiles",
+              "$env:LOCALAPPDATA\Programs"
+            ) -Filter ISCC.exe -Recurse -Depth 3 -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $iscc) { throw 'ISCC.exe not found after installing Inno Setup' }
+          $iscc.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install create-dmg (macOS)
+        if: matrix.os == 'macos'
+        shell: bash
+        run: |
+          # `script/macos/bundle` shells out to create-dmg to lay out the disk
+          # image. Upstream's runners have it; a hosted one does not, and nothing
+          # in the tree installs it.
+          brew install create-dmg
+
+      - name: Install linuxdeploy (Linux)
+        if: matrix.os == 'linux'
+        shell: bash
+        run: |
+          # `script/linux/bundle_appimage` shells out to linuxdeploy, and it is
+          # installed to ~/.local/bin, which is not on a runner's PATH. Upstream
+          # has both of these steps in its own release workflow; this one was
+          # rewritten to publish to GitHub releases and they did not come across.
+          ./script/linux/install_linuxdeploy
+          if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          fi
+
+      # Three release builds this repository has attempted died on a missing
+      # packaging tool - `cargo about`, `cargo bundle`, `linuxdeploy` - and every
+      # one of them died at the end, after twenty to thirty minutes of compiling,
+      # because that is when the bundling step first reaches for the tool. The
+      # build is the expensive part and it is entirely wasted when the packaging
+      # cannot run, so ask for every tool up front and fail in seconds instead.
+      - name: Check the packaging tools are present
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # A counter and not an array: the macOS runner's /bin/bash is 3.2, where
+          # expanding an empty array under `set -u` is an "unbound variable" error,
+          # which would make this check the thing that fails the macOS build.
+          missing=0
+
+          # A plain binary, reached through PATH.
+          require() {
+            if ! command -v "$1" >/dev/null 2>&1; then
+              echo "::error::missing packaging tool: $1 - $2"
+              missing=1
+            fi
+          }
+
+          # A cargo subcommand, which is NOT the same question. Cargo runs one by
+          # finding `cargo-<name>` in $CARGO_HOME/bin as well as on PATH, so on the
+          # Windows runner `cargo about` works with the binary in C:\cargo\bin and
+          # nothing putting that directory on PATH. Asking PATH alone reported a
+          # tool that was installed and working as missing, and failed the one
+          # platform that had been building fine.
+          #
+          # `cargo --list` was the second attempt and was worse: it came back
+          # without `about` on all three runners, including the Linux one that had
+          # just installed it to ~/.cargo/bin and generated the licence file with
+          # it minutes earlier. Whatever that output depends on, this does not need
+          # it - look where cargo looks.
+          require_cargo() {
+            home="${CARGO_HOME:-$HOME/.cargo}"
+            # Windows spells $CARGO_HOME with backslashes and this runs in bash.
+            home="${home//\\//}"
+            if command -v "cargo-$1" >/dev/null 2>&1 \
+              || [ -x "$home/bin/cargo-$1" ] \
+              || [ -x "$home/bin/cargo-$1.exe" ]; then
+              return
+            fi
+            echo "::error::missing packaging tool: cargo $1 - $2"
+            echo "::error::not on PATH as cargo-$1, and not in $home/bin"
+            missing=1
+          }
+
+          case "${{ matrix.os }}" in
+            windows)
+              require ISCC 'Inno Setup, builds the .exe installer'
+              require_cargo about 'generates THIRD_PARTY_LICENSES.txt'
+              ;;
+            macos)
+              require create-dmg 'lays out the .dmg'
+              require_cargo bundle 'packages the .app that becomes the .dmg'
+              require_cargo about 'generates THIRD_PARTY_LICENSES.txt'
+              ;;
+            linux)
+              require linuxdeploy 'builds the AppImage'
+              require_cargo about 'generates THIRD_PARTY_LICENSES.txt'
+              ;;
+          esac
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+      # Nothing here is code-signed: this repository holds no Apple certificate
+      # and no Windows one. Both platforms warn on first run as a result, and
+      # docs/INSTALL covers what to do about it.
+      - name: Build installer (Windows)
+        id: bundle_windows
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          .\script\windows\bundle.ps1 `
+            -CHANNEL oss `
+            -ARCH x64 `
+            -RELEASE_TAG ${{ steps.tag.outputs.value }}
+
+      - name: Build disk image (macOS)
+        if: matrix.os == 'macos'
+        shell: bash
+        env:
+          GIT_RELEASE_TAG: ${{ steps.tag.outputs.value }}
+        run: ./script/macos/bundle --channel oss --nosign
+
+      - name: Build AppImage (Linux)
+        if: matrix.os == 'linux'
+        shell: bash
+        env:
+          GIT_RELEASE_TAG: ${{ steps.tag.outputs.value }}
+        run: ./script/linux/bundle --channel oss --packages appimage
+
+      - name: Locate artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          # Spelled out rather than written with `**`, which only recurses when
+          # `globstar` is set - and that needs bash 4, where the macOS runner has
+          # 3.2. Two depths each because the bundle scripts insert the target
+          # triple into the path when asked to cross-compile, and do not otherwise.
+          case "${{ matrix.os }}" in
+            windows) pattern='script/windows/Output/*.exe' ;;
+            macos)   pattern='target/*/bundle/osx/*.dmg target/*/*/bundle/osx/*.dmg' ;;
+            linux)   pattern='target/*/bundle/linux/*.AppImage target/*/*/bundle/linux/*.AppImage' ;;
+          esac
+          # shellcheck disable=SC2086
+          found=$(ls -1 $pattern 2>/dev/null | head -1 || true)
+          if [ -z "$found" ]; then
+            echo "::error::no artifact matched $pattern"
+            find target script/windows/Output -maxdepth 6 \
+              \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \) 2>/dev/null || true
+            exit 1
+          fi
+          echo "path=$found" >> "$GITHUB_OUTPUT"
+          echo "Found $found"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ steps.artifacts.outputs.path }}
+          # One file per platform, so hand it over as-is rather than wrapping it
+          # in a zip the downloader has to unpack first.
+          archive: false
+
+      - name: Publish to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.value }}
+          files: ${{ steps.artifacts.outputs.path }}
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
+      # The symbols of the exact binary in the installer. Every release built
+      # them and threw them away, so a stack captured from a hang on a user's
+      # machine came back as bare offsets into rook-oss.exe. Kept as a workflow
+      # artifact, not a release asset: nobody installing Rook needs them.
+      #
+      # After the publish step and unable to fail the job, because the first
+      # version of this step ran before it with a wrong file name and kept the
+      # installer it had just built out of the release.
+      - name: Keep the Windows symbols
+        if: matrix.os == 'windows'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: rook-oss-pdb-${{ steps.tag.outputs.value }}
+          # The glob catches the PDB if bundle.ps1's idea of its name drifts
+          # from the linker's again.
+          path: |
+            ${{ steps.bundle_windows.outputs.pdb_file_path }}
+            target/x86_64-pc-windows-msvc/rlto/*.pdb
+          if-no-files-found: warn
+          retention-days: 90

@@ -1,0 +1,26 @@
+{
+  "name": "rook",
+  "description": "Rook terminal integrations for CLI coding agents",
+  "owner": {
+    "name": "Rook",
+    "url": "https://github.com/FJRG2007/rook"
+  },
+  "plugins": [
+    {
+      "name": "rook",
+      "description": "Native Rook notifications when Claude completes tasks or needs input",
+      "source": "./plugins/claude-code/plugins/rook",
+      "version": "2.2.0",
+      "category": "productivity",
+      "tags": ["notifications", "terminal", "rook"]
+    },
+    {
+      "name": "oz-harness-support",
+      "description": "Rook integration for Claude Code in cloud agent environments, including parent-message delivery hooks",
+      "source": "./plugins/claude-code/plugins/oz-harness-support",
+      "version": "1.1.2",
+      "category": "productivity",
+      "tags": ["terminal", "rook"]
+    }
+  ]
+}

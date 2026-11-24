@@ -1,0 +1,1 @@
+echo -e '\n# Auto-Rookify\nstatus --is-interactive; and printf '\''\eP$f{"hook": "SourcedRcFileForRook", "value": { "shell": "%", "uname": "'$(uname)'" }}\x1b\x5c'\'' ' >> %

@@ -1,0 +1,10 @@
+{
+  "name": "rook",
+  "description": "Rook terminal integration for Claude Code - native notifications, and more to come",
+  "version": "2.2.0",
+  "author": {
+    "name": "Rook",
+    "url": "https://github.com/FJRG2007/rook"
+  },
+  "homepage": "https://github.com/FJRG2007/rook"
+}

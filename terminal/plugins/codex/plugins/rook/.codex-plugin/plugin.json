@@ -1,0 +1,10 @@
+{
+  "name": "rook",
+  "description": "Rook terminal integration for Codex - native notifications, and more to come",
+  "version": "0.4.0",
+  "author": {
+    "name": "Rook",
+    "url": "https://rook.dev"
+  },
+  "homepage": "https://github.com/warpdotdev/codex-warp"
+}

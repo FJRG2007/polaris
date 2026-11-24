@@ -1,0 +1,26 @@
+{
+  "name": "claude-code-rook",
+  "description": "Official Rook terminal integrations for Claude Code",
+  "owner": {
+    "name": "Rook",
+    "url": "https://rook.dev"
+  },
+  "plugins": [
+    {
+      "name": "rook",
+      "description": "Native Rook notifications when Claude completes tasks or needs input",
+      "source": "./plugins/rook",
+      "version": "2.2.0",
+      "category": "productivity",
+      "tags": ["notifications", "terminal", "rook"]
+    },
+    {
+      "name": "oz-harness-support",
+      "description": "Rook integration for Claude Code in Oz cloud agent environments, including parent-message delivery hooks",
+      "source": "./plugins/oz-harness-support",
+      "version": "1.1.2",
+      "category": "productivity",
+      "tags": ["terminal", "rook", "oz"]
+    }
+  ]
+}

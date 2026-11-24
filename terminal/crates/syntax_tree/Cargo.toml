@@ -1,0 +1,25 @@
+[package]
+name = "syntax_tree"
+version = "0.1.0"
+edition = "2024"
+authors = ["Rook Contributors"]
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+rangemap.workspace = true
+arborium.workspace = true
+rookui_core.workspace = true
+rook_editor.workspace = true
+languages.workspace = true
+futures.workspace = true
+futures-lite.workspace = true
+parking_lot.workspace = true
+log.workspace = true
+string-offset.workspace = true
+streaming-iterator = "0.1.9"
+rook_util.workspace = true
+
+[dev-dependencies]
+rook_editor = { workspace = true, features = ["test-util"] }
+rookui = { workspace = true, features = ["test-util"] }

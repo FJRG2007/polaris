@@ -1,0 +1,10 @@
+*.pdb filter=lfs diff=lfs merge=lfs -text
+crates/input_classifier/models/** filter=lfs diff=lfs merge=lfs -text
+crates/input_classifier/models/**/*tokenizer.json -filter -diff -merge text linguist-generated=true
+
+# Terminal recordings and their reference grids are byte streams, not text.
+# Without this git normalised their CRLF on commit and dropped the carriage
+# returns the terminal acts on - 26 of them in sgr alone. Windows restored them
+# on checkout and the tests passed; macOS and Linux replayed a recording that
+# had lost them, and seven ref tests failed there and nowhere else.
+app/src/terminal/ref_tests/data/** -text
