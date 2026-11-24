@@ -1,24 +1,24 @@
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::external_product_icon::ExternalProductIcon;
-use rook_core::ui::icons::{ICON_DIMENSIONS, Icon};
-use rook_core::ui::theme::AnsiColorIdentifier;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_error;
-use rookui::accessibility::ActionAccessibilityContent;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::external_product_icon::ExternalProductIcon;
+use pterm_core::ui::icons::{ICON_DIMENSIONS, Icon};
+use pterm_core::ui::theme::AnsiColorIdentifier;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_error;
+use ptermui::accessibility::ActionAccessibilityContent;
+use ptermui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Expanded, Fill, Flex,
     FormattedTextElement, HighlightedHyperlink, Hoverable, MainAxisAlignment, MainAxisSize,
     MouseState, MouseStateHandle, Padding, ParentElement, Radius, Text, Wrap,
 };
-use rookui::fonts::Weight;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::chip::Chip;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::fonts::Weight;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::chip::Chip;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::ai::mcp::templatable::CloudTemplatableMCPServer;
 use crate::ai::mcp::{MCPServerState, TemplatableMCPServerManager};
@@ -507,7 +507,7 @@ impl ServerCardView {
                 .with_child(
                     Container::new(
                         ConstrainedBox::new(
-                            chevron_icon.to_rookui_icon(text_color.into()).finish(),
+                            chevron_icon.to_ptermui_icon(text_color.into()).finish(),
                         )
                         .with_width(chevron_dimensions)
                         .with_height(chevron_dimensions)
@@ -544,7 +544,7 @@ impl ServerCardView {
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_spacing(2.)
                 .with_child(
-                    ConstrainedBox::new(icon.to_rookui_icon(chip_color.into()).finish())
+                    ConstrainedBox::new(icon.to_ptermui_icon(chip_color.into()).finish())
                         .with_width(style::TITLE_CHIP_FONT_SIZE)
                         .with_height(style::TITLE_CHIP_FONT_SIZE)
                         .finish(),
@@ -854,7 +854,7 @@ impl ServerCardView {
         }
 
         if self.render_options.show_add_icon {
-            let add_icon = rookui::elements::Icon::new(
+            let add_icon = ptermui::elements::Icon::new(
                 Icon::Plus.into(),
                 blended_colors::text_main(appearance.theme(), appearance.theme().background()),
             );

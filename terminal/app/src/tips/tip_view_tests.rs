@@ -1,6 +1,6 @@
-use rookui::elements::{ChildView, Empty, SavePosition};
-use rookui::platform::WindowStyle;
-use rookui::{App, ViewHandle};
+use ptermui::elements::{ChildView, Empty, SavePosition};
+use ptermui::platform::WindowStyle;
+use ptermui::{App, ViewHandle};
 
 use super::*;
 

@@ -1,11 +1,11 @@
-use rookui::Element;
-use rookui::elements::{
+use ptermui::Element;
+use ptermui::elements::{
     Align, Border, ConstrainedBox, Container, CornerRadius, Flex, Highlight, ParentElement, Radius,
     Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::text::Span;
+use ptermui::fonts::{Properties, Weight};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::text::Span;
 
 use crate::appearance::Appearance;
 use crate::launch_configs::launch_config::LaunchConfig;

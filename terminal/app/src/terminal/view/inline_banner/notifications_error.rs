@@ -1,6 +1,6 @@
-use rookui::Element;
-use rookui::elements::MouseStateHandle;
-use rookui::notification::NotificationSendError;
+use ptermui::Element;
+use ptermui::elements::MouseStateHandle;
+use ptermui::notification::NotificationSendError;
 use serde::Serialize;
 
 use super::{

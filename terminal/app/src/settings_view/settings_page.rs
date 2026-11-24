@@ -5,13 +5,13 @@ use std::collections::HashMap;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::settings::SyncToCloud;
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::new_scrollable::{
+use pterm_core::settings::SyncToCloud;
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::new_scrollable::{
     ClippedAxisConfiguration, DualAxisConfig, SingleAxisConfig,
 };
-use rookui::elements::{
+use ptermui::elements::{
     Align, Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Element, Empty, Expanded, Flex, FormattedTextElement,
     HighlightedHyperlink, Hoverable, HyperlinkLens, MainAxisAlignment, MainAxisSize,
@@ -19,12 +19,12 @@ use rookui::elements::{
     ParentOffsetBounds, Radius, SavePosition, ScrollTarget, ScrollToPositionMode, Shrinkable,
     SizeConstraintCondition, SizeConstraintSwitch, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::ui_components::button::{Button, ButtonVariant};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::units::Pixels;
-use rookui::{Action, AppContext, SingletonEntity, ViewContext, ViewHandle};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::{Button, ButtonVariant};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::units::Pixels;
+use ptermui::{Action, AppContext, SingletonEntity, ViewContext, ViewHandle};
 use settings::Setting;
 
 use super::SettingsSection;
@@ -42,10 +42,10 @@ use super::knowledge_page::KnowledgePageView;
 use super::main_page::MainSettingsPageView;
 use super::mcp_servers_page::MCPServersSettingsPageView;
 use super::privacy_page::PrivacyPageView;
+use super::pterm_agent_page::PtermAgentPageView;
+use super::pterm_drive_page::PtermDriveSettingsPageView;
+use super::ptermify_page::PtermifyPageView;
 use super::referrals_page::ReferralsPageView;
-use super::rook_agent_page::RookAgentPageView;
-use super::rook_drive_page::RookDriveSettingsPageView;
-use super::rookify_page::RookifyPageView;
 use super::scripting_page::ScriptingSettingsPageView;
 use super::search::SearchQuery;
 use super::show_blocks_view::ShowBlocksView;
@@ -117,19 +117,19 @@ pub enum SettingsPageViewHandle {
     CodeIndexing(ViewHandle<CodeIndexingPageView>),
     EditorAndCodeReview(ViewHandle<EditorAndCodeReviewPageView>),
     Teams(ViewHandle<TeamsPageView>),
-    RookCloudAgentAPIKeys(ViewHandle<super::platform_page::PlatformPageView>),
+    PtermCloudAgentAPIKeys(ViewHandle<super::platform_page::PlatformPageView>),
     Privacy(ViewHandle<PrivacyPageView>),
-    Rookify(ViewHandle<RookifyPageView>),
+    Ptermify(ViewHandle<PtermifyPageView>),
     Referrals(ViewHandle<ReferralsPageView>),
     Scripting(ViewHandle<ScriptingSettingsPageView>),
-    RookAgent(ViewHandle<RookAgentPageView>),
+    PtermAgent(ViewHandle<PtermAgentPageView>),
     AgentProfiles(ViewHandle<AgentProfilesPageView>),
     Knowledge(ViewHandle<KnowledgePageView>),
     CLIAgents(ViewHandle<CLIAgentsPageView>),
     CloudEnvironments(ViewHandle<EnvironmentsPageView>),
     BillingAndUsage(ViewHandle<BillingAndUsageDispatchView>),
     MCPServers(ViewHandle<MCPServersSettingsPageView>),
-    RookDrive(ViewHandle<RookDriveSettingsPageView>),
+    PtermDrive(ViewHandle<PtermDriveSettingsPageView>),
 }
 
 impl SettingsPageViewHandle {
@@ -145,19 +145,19 @@ impl SettingsPageViewHandle {
             CodeIndexing(view_handle) => ChildView::new(view_handle).finish(),
             EditorAndCodeReview(view_handle) => ChildView::new(view_handle).finish(),
             Teams(view_handle) => ChildView::new(view_handle).finish(),
-            RookCloudAgentAPIKeys(view_handle) => ChildView::new(view_handle).finish(),
+            PtermCloudAgentAPIKeys(view_handle) => ChildView::new(view_handle).finish(),
             Privacy(view_handle) => ChildView::new(view_handle).finish(),
-            Rookify(view_handle) => ChildView::new(view_handle).finish(),
+            Ptermify(view_handle) => ChildView::new(view_handle).finish(),
             Referrals(view_handle) => ChildView::new(view_handle).finish(),
             Scripting(view_handle) => ChildView::new(view_handle).finish(),
-            RookAgent(view_handle) => ChildView::new(view_handle).finish(),
+            PtermAgent(view_handle) => ChildView::new(view_handle).finish(),
             AgentProfiles(view_handle) => ChildView::new(view_handle).finish(),
             Knowledge(view_handle) => ChildView::new(view_handle).finish(),
             CLIAgents(view_handle) => ChildView::new(view_handle).finish(),
             CloudEnvironments(view_handle) => ChildView::new(view_handle).finish(),
             BillingAndUsage(view_handle) => ChildView::new(view_handle).finish(),
             MCPServers(view_handle) => ChildView::new(view_handle).finish(),
-            RookDrive(view_handle) => ChildView::new(view_handle).finish(),
+            PtermDrive(view_handle) => ChildView::new(view_handle).finish(),
         }
     }
 }
@@ -458,7 +458,7 @@ pub fn render_banner(
 ) -> Box<dyn Element> {
     let theme = appearance.theme();
     let sub_text = theme.sub_text_color(theme.background());
-    let icon = ConstrainedBox::new(icon.to_rookui_icon(sub_text).finish())
+    let icon = ConstrainedBox::new(icon.to_ptermui_icon(sub_text).finish())
         .with_width(14.)
         .with_height(14.)
         .finish();
@@ -526,7 +526,7 @@ pub fn render_full_pane_width_ai_button(
                 .with_child(
                     ConstrainedBox::new(
                         Icon::ChevronRight
-                            .to_rookui_icon(appearance.theme().main_text_color(icon_bg))
+                            .to_ptermui_icon(appearance.theme().main_text_color(icon_bg))
                             .finish(),
                     )
                     .with_width(16.)
@@ -643,7 +643,7 @@ pub fn render_info_icon<T: Clone + Action>(
     let icon = Container::new(
         ConstrainedBox::new(
             Icon::Info
-                .to_rookui_icon(appearance.theme().active_ui_text_color())
+                .to_ptermui_icon(appearance.theme().active_ui_text_color())
                 .finish(),
         )
         .with_width(13.)
@@ -766,7 +766,7 @@ pub fn render_body_item_label_internal<T: Clone + Action>(
     if let Some(icon) = label_icon {
         label.add_child(
             Container::new(
-                ConstrainedBox::new(icon.to_rookui_icon(label_color).finish())
+                ConstrainedBox::new(icon.to_ptermui_icon(label_color).finish())
                     .with_width(16.)
                     .with_height(16.)
                     .finish(),
@@ -783,15 +783,15 @@ pub fn render_body_item_label_internal<T: Clone + Action>(
         // `additional_info` gets moved into `render_info_icon()`.
         let secondary_text_child =
             if let Some(secondary_text) = additional_info.secondary_text.clone() {
-                let rook_theme = appearance.theme();
+                let pterm_theme = appearance.theme();
                 Some(
                     appearance
                         .ui_builder()
                         .span(secondary_text)
                         .with_style(UiComponentStyles {
                             font_color: Some(
-                                rook_theme
-                                    .sub_text_color(rook_theme.surface_2())
+                                pterm_theme
+                                    .sub_text_color(pterm_theme.surface_2())
                                     .into_solid(),
                             ),
                             margin: Some(Coords {
@@ -961,14 +961,14 @@ pub fn render_dropdown_item_label(
         )
         .finish();
     let label = if let Some(secondary_text) = secondary_text {
-        let rook_theme = appearance.theme();
+        let pterm_theme = appearance.theme();
         let secondary_text_child = appearance
             .ui_builder()
             .span(secondary_text)
             .with_style(UiComponentStyles {
                 font_color: Some(
                     color_override
-                        .unwrap_or(rook_theme.sub_text_color(rook_theme.surface_2()))
+                        .unwrap_or(pterm_theme.sub_text_color(pterm_theme.surface_2()))
                         .into_solid(),
                 ),
                 margin: Some(Coords {
@@ -1099,7 +1099,7 @@ pub(crate) fn render_settings_info_banner(
     let icon = Container::new(
         ConstrainedBox::new(
             Icon::AlertCircle
-                .to_rookui_icon(appearance.theme().active_ui_text_color())
+                .to_ptermui_icon(appearance.theme().active_ui_text_color())
                 .finish(),
         )
         .with_width(16.)
@@ -1376,13 +1376,13 @@ where
     }
 }
 
-pub(super) struct PageTitle<V: rookui::View> {
+pub(super) struct PageTitle<V: ptermui::View> {
     text: &'static str,
     /// An optional accessory that renders alongside it whenever the title itself renders.
     pub(super) trailing_element: Option<TrailingElementRenderer<V>>,
 }
 
-impl<V: rookui::View> PageTitle<V> {
+impl<V: ptermui::View> PageTitle<V> {
     pub(super) fn new(text: &'static str) -> Self {
         Self {
             text,
@@ -1402,7 +1402,7 @@ impl<V: rookui::View> PageTitle<V> {
 
 /// Structured contents of a settings tab page. This type breaks all the content into
 /// [`SettingsWidget`]s.
-pub(super) enum PageType<V: rookui::View> {
+pub(super) enum PageType<V: ptermui::View> {
     /// A page where the contents cannot be separated for showing search results. If any part
     /// matches the search query, the whole page must show. The whole page is one big
     /// [`SettingsWidget`].
@@ -1484,7 +1484,7 @@ impl From<usize> for MatchData {
 
 /// Combines `header` with `trailing_element`, in a space-between row, when the accessory is
 /// present. Otherwise returns `header` unchanged.
-fn render_header_with_trailing_element<V: rookui::View>(
+fn render_header_with_trailing_element<V: ptermui::View>(
     header: Box<dyn Element>,
     trailing_element: Option<&TrailingElementRenderer<V>>,
     view: &V,
@@ -1504,7 +1504,7 @@ fn render_header_with_trailing_element<V: rookui::View>(
 
 /// Renders the page title with its optional trailing accessory (see
 /// [`PageTitle::with_trailing_element`]), preserving `render_page_title`'s margin.
-fn render_page_title_with_trailing<V: rookui::View>(
+fn render_page_title_with_trailing<V: ptermui::View>(
     title: &PageTitle<V>,
     size: f32,
     view: &V,
@@ -1524,7 +1524,7 @@ fn render_page_title_with_trailing<V: rookui::View>(
 }
 
 /// The indices of the `widgets` that can render and match `query`.
-fn matching_widget_indices<V: rookui::View>(
+fn matching_widget_indices<V: ptermui::View>(
     widgets: &[Box<dyn SettingsWidget<View = V>>],
     query: &SearchQuery,
     app: &AppContext,
@@ -1537,7 +1537,7 @@ fn matching_widget_indices<V: rookui::View>(
         .collect()
 }
 
-impl<V: rookui::View> PageType<V> {
+impl<V: ptermui::View> PageType<V> {
     /// A page where the contents cannot be separated for showing search results. If any part
     /// matches the search query, the whole page must show. The whole page is one big
     /// [`SettingsWidget`].
@@ -1956,7 +1956,7 @@ impl<V: rookui::View> PageType<V> {
                 },
                 theme.nonactive_ui_detail().into(),
                 theme.active_ui_detail().into(),
-                rookui::elements::Fill::None,
+                ptermui::elements::Fill::None,
             )
             .finish(),
             vec![(
@@ -1983,7 +1983,7 @@ impl<V: rookui::View> PageType<V> {
                     },
                     theme.nonactive_ui_detail().into(),
                     theme.active_ui_detail().into(),
-                    rookui::elements::Fill::None,
+                    ptermui::elements::Fill::None,
                 )
                 .finish(),
             )],
@@ -2006,7 +2006,7 @@ impl<V: rookui::View> PageType<V> {
 }
 
 /// The results from a [`PageType`] with only matching [`SettingsWidget`]s.
-pub(super) enum FilteredPageType<'a, V: rookui::View> {
+pub(super) enum FilteredPageType<'a, V: ptermui::View> {
     Monolith {
         widget: Option<&'a dyn SettingsWidget<View = V>>,
         title: Option<&'static str>,
@@ -2030,21 +2030,21 @@ pub(super) enum FilteredPageType<'a, V: rookui::View> {
 }
 
 /// A category header: title text with an optional subtitle and trailing accessory. Absent when
-/// the category draws no header row at all (e.g. Rookify's single-widget category, whose widget
+/// the category draws no header row at all (e.g. Ptermify's single-widget category, whose widget
 /// draws its own heading).
-pub(super) struct CategoryHeader<V: rookui::View> {
+pub(super) struct CategoryHeader<V: ptermui::View> {
     title: &'static str,
     subtitle: Option<&'static str>,
     trailing_element: Option<TrailingElementRenderer<V>>,
 }
 
 /// A grouping of related [`SettingsWidget`]s that fall under the same sub-header.
-pub(super) struct Category<V: rookui::View> {
+pub(super) struct Category<V: ptermui::View> {
     header: Option<CategoryHeader<V>>,
     widgets: Vec<Box<dyn SettingsWidget<View = V>>>,
 }
 
-impl<V: rookui::View> CategoryHeader<V> {
+impl<V: ptermui::View> CategoryHeader<V> {
     pub(super) fn new(title: &'static str) -> Self {
         Self {
             title,
@@ -2068,7 +2068,7 @@ impl<V: rookui::View> CategoryHeader<V> {
     }
 }
 
-impl<V: rookui::View> Category<V> {
+impl<V: ptermui::View> Category<V> {
     pub(super) fn new(
         title: &'static str,
         widgets: Vec<Box<dyn SettingsWidget<View = V>>>,
@@ -2094,14 +2094,14 @@ impl<V: rookui::View> Category<V> {
 }
 
 /// A [`Category`] with only the results which match a search query.
-pub(super) struct FilteredCategory<'a, V: rookui::View> {
+pub(super) struct FilteredCategory<'a, V: ptermui::View> {
     pub(super) title: &'static str,
     pub(super) subtitle: Option<&'static str>,
     pub(super) trailing_element: Option<&'a TrailingElementRenderer<V>>,
     pub(super) widgets: Vec<&'a dyn SettingsWidget<View = V>>,
 }
 
-pub(super) fn categories_with_visible_content<'a, V: rookui::View>(
+pub(super) fn categories_with_visible_content<'a, V: ptermui::View>(
     categories: Vec<FilteredCategory<'a, V>>,
     app: &AppContext,
 ) -> Vec<FilteredCategory<'a, V>> {
@@ -2120,7 +2120,7 @@ pub(super) fn categories_with_visible_content<'a, V: rookui::View>(
 /// content to match against.
 pub(super) trait SettingsWidget {
     /// Which View (settings page) this widget belongs to.
-    type View: rookui::View;
+    type View: ptermui::View;
 
     fn static_widget_id() -> &'static str
     where

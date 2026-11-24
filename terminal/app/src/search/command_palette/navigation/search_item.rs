@@ -1,6 +1,6 @@
 use ordered_float::OrderedFloat;
-use rookui::elements::Container;
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::elements::Container;
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::pane_group::PaneId;

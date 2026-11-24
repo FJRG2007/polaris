@@ -4,9 +4,9 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use session_sharing_protocol::common::{AgentAttachment, ParticipantId, ServerConversationToken};
 use warp_multi_agent_api::client_action::Action;
 use warp_multi_agent_api::message::Message;
@@ -536,7 +536,7 @@ impl BlocklistAIController {
                     warp_token_usage: conversation
                         .token_usage()
                         .iter()
-                        .filter_map(|u| u.to_proto_rook_usage())
+                        .filter_map(|u| u.to_proto_pterm_usage())
                         .collect(),
                     byok_token_usage: conversation
                         .token_usage()

@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use fuzzy_match::{FuzzyMatchResult, match_indices_case_insensitive};
-use rookui::keymap::{BindingId, DescriptionContext};
-use rookui::{AppContext, Entity, ModelContext, ModelHandle};
+use ptermui::keymap::{BindingId, DescriptionContext};
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle};
 
 use crate::search::action::search_item::MatchedBinding;
 use crate::search::binding_source::BindingSource;
@@ -21,7 +21,7 @@ pub struct CommandBindingDataSource {
 impl CommandBindingDataSource {
     #[cfg(not(target_family = "wasm"))]
     pub fn new(binding_source: ModelHandle<BindingSource>, ctx: &mut ModelContext<Self>) -> Self {
-        if rook_core::features::FeatureFlag::UseTantivySearch.is_enabled() {
+        if pterm_core::features::FeatureFlag::UseTantivySearch.is_enabled() {
             Self::new_full_text(binding_source, ctx)
         } else {
             Self::new_fuzzy(binding_source, ctx)
@@ -184,8 +184,8 @@ mod full_text_searcher {
     use std::sync::Arc;
 
     use fuzzy_match::FuzzyMatchResult;
-    use rook_search_core::define_search_schema;
-    use rookui::keymap::{BindingId, DescriptionContext};
+    use pterm_search_core::define_search_schema;
+    use ptermui::keymap::{BindingId, DescriptionContext};
 
     use crate::search::action::data_source::{ActionSearcher, SearcherAction, is_excluded_binding};
     use crate::search::action::search_item::MatchedBinding;
@@ -257,7 +257,7 @@ mod full_text_searcher {
 
         fn build_index(&mut self) {
             if self.rebuild_search_index().is_err() {
-                rook_errors::report_error!("Failed to create search index writer for actions");
+                pterm_errors::report_error!("Failed to create search index writer for actions");
                 self.clear_search_index();
             }
         }

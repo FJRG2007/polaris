@@ -4,7 +4,7 @@ use cloud_objects::cloud_object::{
     GenericCloudObject, GenericServerObject, GenericStringModel, JsonObjectType,
 };
 use cloud_objects::ids::GenericStringObjectId;
-use rook_cli::agent::Harness;
+use pterm_cli::agent::Harness;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::cloud_environment::SourceRepo;
@@ -39,7 +39,7 @@ pub struct AgentConfigSnapshot {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile_id: Option<String>,
     /// Self-hosted worker ID that should execute this task.
-    /// If None or Some("rook"), the task will be dispatched to Rook-hosted (Namespace) workers.
+    /// If None or Some("polaris-terminal"), the task will be dispatched to Polaris Terminal-hosted (Namespace) workers.
     /// Otherwise, the task will only be assigned to a connected self-hosted worker with matching ID.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub worker_host: Option<String>,
@@ -53,7 +53,7 @@ pub struct AgentConfigSnapshot {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub computer_use_enabled: Option<bool>,
     /// Execution harness for the agent run.
-    /// If None, we use Rook's default ("oz").
+    /// If None, we use Polaris Terminal's default ("oz").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub harness: Option<HarnessConfig>,
     /// Authentication secrets for third-party harnesses.

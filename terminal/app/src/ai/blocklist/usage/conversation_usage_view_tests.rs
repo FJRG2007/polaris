@@ -24,9 +24,9 @@
 
 use std::collections::HashMap;
 
-use rook_core::ui::appearance::Appearance;
-use rookui::App;
-use rookui::platform::WindowStyle;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::App;
+use ptermui::platform::WindowStyle;
 
 use super::*;
 use crate::persistence::model::{ModelTokenUsage, PRIMARY_AGENT_CATEGORY};
@@ -61,7 +61,7 @@ fn initialize_test_app(app: &mut App) {
     app.add_singleton_model(|_| Appearance::mock());
 }
 
-fn build_view(_ctx: &mut rookui::ViewContext<ConversationUsageView>) -> ConversationUsageView {
+fn build_view(_ctx: &mut ptermui::ViewContext<ConversationUsageView>) -> ConversationUsageView {
     ConversationUsageView::new(
         placeholder_usage_info(),
         DisplayMode::Footer,

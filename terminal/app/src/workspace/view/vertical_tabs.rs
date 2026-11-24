@@ -9,14 +9,14 @@ use languages::language_by_local_filename;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_core::context_flag::ContextFlag;
-use rook_core::telemetry::TelemetryEvent as _;
-use rook_core::ui::Icon as RookIcon;
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::color::coloru_with_opacity;
-use rook_core::ui::theme::color::internal_colors;
-use rook_core::ui::theme::{AnsiColorIdentifier, Fill as RookThemeFill, RookTheme};
-use rookui::elements::{
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::telemetry::TelemetryEvent as _;
+use pterm_core::ui::Icon as PtermIcon;
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::color::coloru_with_opacity;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_core::ui::theme::{AnsiColorIdentifier, Fill as PtermThemeFill, PtermTheme};
+use ptermui::elements::{
     Border, ChildAnchor, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, DragAxis, DragBarSide,
     Draggable, DropShadow, DropTarget, Element, Empty, EventHandler, Expanded, Fill as ElementFill,
@@ -26,13 +26,13 @@ use rookui::elements::{
     ResizableStateHandle, SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth,
     Shrinkable, Stack, Text, resizable_state_handle,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::prelude::Align;
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::ui_components::text_input::TextInput;
-use rookui::{AppContext, EntityId, SingletonEntity, ViewHandle, WindowId};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::prelude::Align;
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::ui_components::text_input::TextInput;
+use ptermui::{AppContext, EntityId, SingletonEntity, ViewHandle, WindowId};
 use settings::Setting as _;
 
 use super::{render_group_member_icon_collage, select_unique_pane_kinds};
@@ -48,7 +48,7 @@ use crate::code::icon_from_file_path;
 use crate::context_chips::display_chip::GitLineChanges;
 use crate::context_chips::github_pr_display_text_from_url;
 use crate::drive::DriveObjectType;
-use crate::drive::cloud_object_styling::rook_drive_icon_color;
+use crate::drive::cloud_object_styling::pterm_drive_icon_color;
 use crate::editor::EditorView;
 use crate::pane_group::pane::IPaneType;
 use crate::pane_group::{
@@ -275,7 +275,7 @@ enum TerminalPrimaryLineFont {
 
 fn render_pane_icon_with_status(
     variant: IconWithStatusVariant,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Box<dyn Element> {
     render_icon_with_status(
         variant,
@@ -344,7 +344,7 @@ fn pane_row_background(
     is_in_multi_selection: bool,
     is_hovered: bool,
     is_being_dragged: bool,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Option<ThemeFill> {
     if let Some(color) = pane_color {
         let opacity = if is_selected || is_hovered {
@@ -373,7 +373,7 @@ fn render_pane_row_element(
     padding: Padding,
     defer_events_to_children: bool,
     content: Box<dyn Element>,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Box<dyn Element> {
     let detail_target = supports_vertical_tabs_detail_sidecar(&props.typed).then(|| {
         detail_target_for_hovered_row(
@@ -451,8 +451,8 @@ fn render_pane_row_element(
         // is visible when the container is not hovered.
         if show_pin {
             let pin_icon = ConstrainedBox::new(
-                RookIcon::PinFilledDiagonal
-                    .to_rookui_icon(theme.sub_text_color(theme.background()))
+                PtermIcon::PinFilledDiagonal
+                    .to_ptermui_icon(theme.sub_text_color(theme.background()))
                     .finish(),
             )
             .with_width(PIN_INDICATOR_ICON_SIZE)
@@ -1060,7 +1060,7 @@ fn normalize_summary_text(text: &str) -> Option<String> {
 
 /// Returns the conversation status for a terminal pane, used to render the per-line status
 /// pill prefix in Summary mode. Mirrors the status sources used by `render_detail_status_pill`
-/// in the detail sidecar — CLI agent sessions with rich status, Rook Agent conversations, or
+/// in the detail sidecar — CLI agent sessions with rich status, Polaris Terminal Agent conversations, or
 /// ambient agent sessions. Returns `None` for plain terminals or conversations without status.
 fn summary_conversation_status_for_terminal(
     terminal_view: &TerminalView,
@@ -1326,7 +1326,7 @@ fn vertical_tabs_tab_bar_location(insert_index: usize, tab_count: usize) -> TabB
     }
 }
 
-fn render_vertical_tab_hover_indicator(theme: &RookTheme) -> Box<dyn Element> {
+fn render_vertical_tab_hover_indicator(theme: &PtermTheme) -> Box<dyn Element> {
     ConstrainedBox::new(
         Container::new(Empty::new().finish())
             .with_background(ThemeFill::Solid(theme.accent().into()))
@@ -1363,7 +1363,7 @@ pub(super) fn show_before_indicator(
 /// `DropTarget`s, with the insertion point resolved from cursor geometry.
 fn render_vertical_tab_insertion_target(
     group: Option<TabGroupId>,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Box<dyn Element> {
     let left_padding = if group.is_some() {
         GROUP_HORIZONTAL_PADDING + TAB_GROUP_MEMBER_INDENT
@@ -1388,7 +1388,7 @@ fn add_vertical_tab_insertion_target_overlay(
     group: Option<TabGroupId>,
     parent_anchor: ParentAnchor,
     child_anchor: ChildAnchor,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) {
     stack.add_positioned_overlay_child(
         render_vertical_tab_insertion_target(group, theme),
@@ -1411,7 +1411,7 @@ fn render_control_bar(
     let theme = appearance.theme();
     let sub_text = theme.sub_text_color(theme.background());
 
-    let search_icon = ConstrainedBox::new(RookIcon::Search.to_rookui_icon(sub_text).finish())
+    let search_icon = ConstrainedBox::new(PtermIcon::Search.to_ptermui_icon(sub_text).finish())
         .with_width(SEARCH_ICON_SIZE)
         .with_height(SEARCH_ICON_SIZE)
         .finish();
@@ -1471,44 +1471,44 @@ fn render_detail_kind_badge_icon(
             if let Some(icon) = cli_agent_session.and_then(|session| session.agent.icon()) {
                 let color = cli_agent_session
                     .and_then(|session| session.agent.brand_color())
-                    .map(RookThemeFill::Solid)
+                    .map(PtermThemeFill::Solid)
                     .unwrap_or_else(|| theme.accent());
-                return icon.to_rookui_icon(color).finish();
+                return icon.to_ptermui_icon(color).finish();
             }
 
             let icon = if terminal_view.is_ambient_agent_session(app) {
-                RookIcon::CloudFilled
+                PtermIcon::CloudFilled
             } else if terminal_view
                 .selected_conversation_display_title(app)
                 .is_some()
             {
-                // Local agent conversation: use the Rook agent logo glyph to
+                // Local agent conversation: use the Polaris Terminal agent logo glyph to
                 // match the icon-with-status rendering for the tab row.
-                RookIcon::Agent
+                PtermIcon::Agent
             } else {
-                RookIcon::Terminal
+                PtermIcon::Terminal
             };
             let color = match icon {
-                RookIcon::CloudFilled => theme.main_text_color(theme.background()),
+                PtermIcon::CloudFilled => theme.main_text_color(theme.background()),
                 // Theme-adaptive fill: no black chip behind this glyph in the
                 // sidecar context, so use the main text color to stay visible
                 // on both dark and light themes.
-                RookIcon::Agent => theme.main_text_color(theme.background()),
-                RookIcon::Terminal => disabled_text,
+                PtermIcon::Agent => theme.main_text_color(theme.background()),
+                PtermIcon::Terminal => disabled_text,
                 _ => sub_text,
             };
-            icon.to_rookui_icon(color).finish()
+            icon.to_ptermui_icon(color).finish()
         }
         TypedPane::Code(_) => icon_from_file_path(&props.title, appearance)
-            .unwrap_or_else(|| RookIcon::Code2.to_rookui_icon(sub_text).finish()),
+            .unwrap_or_else(|| PtermIcon::Code2.to_ptermui_icon(sub_text).finish()),
         typed => {
             let fill = typed
-                .rook_drive_object_type()
+                .pterm_drive_object_type()
                 .map(|object_type| {
-                    RookThemeFill::Solid(rook_drive_icon_color(appearance, object_type))
+                    PtermThemeFill::Solid(pterm_drive_icon_color(appearance, object_type))
                 })
                 .unwrap_or(sub_text);
-            typed.icon().to_rookui_icon(fill).finish()
+            typed.icon().to_ptermui_icon(fill).finish()
         }
     }
 }
@@ -1527,8 +1527,8 @@ fn render_settings_button(
         state.settings_button_mouse_state.clone(),
         move |hover_state| {
             let icon = ConstrainedBox::new(
-                RookIcon::Settings
-                    .to_rookui_icon(if is_popup_open { main_text } else { sub_text })
+                PtermIcon::Settings
+                    .to_ptermui_icon(if is_popup_open { main_text } else { sub_text })
                     .finish(),
             )
             .with_width(16.)
@@ -2635,13 +2635,13 @@ fn render_group_action_buttons(
     action_buttons_mouse_state: MouseStateHandle,
     kebab_mouse_state: MouseStateHandle,
     close_mouse_state: MouseStateHandle,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Box<dyn Element> {
     let meta_color = theme.sub_text_color(theme.background());
 
     let kebab_button = Hoverable::new(kebab_mouse_state, move |button_state| {
         let mut container = Container::new(
-            ConstrainedBox::new(RookIcon::DotsVertical.to_rookui_icon(meta_color).finish())
+            ConstrainedBox::new(PtermIcon::DotsVertical.to_ptermui_icon(meta_color).finish())
                 .with_width(GROUP_ACTION_BUTTON_ICON_SIZE)
                 .with_height(GROUP_ACTION_BUTTON_ICON_SIZE)
                 .finish(),
@@ -2664,7 +2664,7 @@ fn render_group_action_buttons(
 
     let close_button = Hoverable::new(close_mouse_state, move |button_state| {
         let mut container = Container::new(
-            ConstrainedBox::new(RookIcon::X.to_rookui_icon(meta_color).finish())
+            ConstrainedBox::new(PtermIcon::X.to_ptermui_icon(meta_color).finish())
                 .with_width(GROUP_ACTION_BUTTON_ICON_SIZE)
                 .with_height(GROUP_ACTION_BUTTON_ICON_SIZE)
                 .finish(),
@@ -2738,16 +2738,16 @@ pub(crate) fn render_tab_group_for_drag_ghost(
 
 /// Small icon button for the tab-group header; consumes clicks so they don't bubble.
 fn render_tab_group_header_icon_button(
-    icon: RookIcon,
+    icon: PtermIcon,
     icon_size: f32,
-    icon_color: RookThemeFill,
-    hover_background: RookThemeFill,
+    icon_color: PtermThemeFill,
+    hover_background: PtermThemeFill,
     mouse_state: MouseStateHandle,
     on_click_action: Option<WorkspaceAction>,
 ) -> Box<dyn Element> {
     Hoverable::new(mouse_state, move |button_state| {
         let mut container = Container::new(
-            ConstrainedBox::new(icon.to_rookui_icon(icon_color).finish())
+            ConstrainedBox::new(icon.to_ptermui_icon(icon_color).finish())
                 .with_width(icon_size)
                 .with_height(icon_size)
                 .finish(),
@@ -2805,7 +2805,7 @@ fn render_grouped_tabs_header(
         render_group_member_icon_collage(kinds, VERTICAL_TABS_ICON_SIZE, appearance)
     } else {
         let chevron_button = render_tab_group_header_icon_button(
-            RookIcon::ChevronDown,
+            PtermIcon::ChevronDown,
             TAB_GROUP_ICON_SIZE,
             main_text_color,
             internal_colors::fg_overlay_2(theme),
@@ -2861,7 +2861,7 @@ fn render_grouped_tabs_header(
     let action_buttons = if show_action_buttons {
         let kebab_button = SavePosition::new(
             render_tab_group_header_icon_button(
-                RookIcon::DotsVertical,
+                PtermIcon::DotsVertical,
                 TAB_GROUP_HEADER_ACTION_ICON_SIZE,
                 sub_text_color,
                 internal_colors::fg_overlay_2(theme),
@@ -2875,7 +2875,7 @@ fn render_grouped_tabs_header(
         )
         .finish();
         let close_button = render_tab_group_header_icon_button(
-            RookIcon::X,
+            PtermIcon::X,
             TAB_GROUP_HEADER_ACTION_ICON_SIZE,
             sub_text_color,
             internal_colors::fg_overlay_3(theme),
@@ -2924,7 +2924,7 @@ fn render_grouped_tabs_header(
         let border_fill = if is_header_selected {
             internal_colors::fg_overlay_3(theme)
         } else {
-            RookThemeFill::Solid(ColorU::transparent_black())
+            PtermThemeFill::Solid(ColorU::transparent_black())
         };
         let mut container = Container::new(row)
             .with_padding(Padding::uniform(GROUP_HORIZONTAL_PADDING))
@@ -2948,8 +2948,8 @@ fn render_grouped_tabs_header(
         // are visible so the two never overlap.
         if group_pinned && !show_action_buttons {
             let pin_icon = ConstrainedBox::new(
-                RookIcon::PinFilledDiagonal
-                    .to_rookui_icon(sub_text_color)
+                PtermIcon::PinFilledDiagonal
+                    .to_ptermui_icon(sub_text_color)
                     .finish(),
             )
             .with_width(PIN_INDICATOR_ICON_SIZE)
@@ -3346,8 +3346,8 @@ fn resolve_icon_with_status_variant(
     let main_text = theme.main_text_color(theme.background());
     let sub_text = theme.sub_text_color(theme.background());
 
-    let drive_color = |object_type: DriveObjectType| -> RookThemeFill {
-        RookThemeFill::Solid(rook_drive_icon_color(appearance, object_type))
+    let drive_color = |object_type: DriveObjectType| -> PtermThemeFill {
+        PtermThemeFill::Solid(pterm_drive_icon_color(appearance, object_type))
     };
 
     match typed {
@@ -3359,7 +3359,7 @@ fn resolve_icon_with_status_variant(
                 _ => {
                     // Plain terminal: use foreground color per design spec
                     IconWithStatusVariant::Neutral {
-                        icon: RookIcon::Terminal,
+                        icon: PtermIcon::Terminal,
                         icon_color: main_text,
                     }
                 }
@@ -3368,7 +3368,7 @@ fn resolve_icon_with_status_variant(
         TypedPane::Code(_) => match icon_from_file_path(title, appearance) {
             Some(icon_element) => IconWithStatusVariant::NeutralElement { icon_element },
             _ => IconWithStatusVariant::Neutral {
-                icon: RookIcon::Code2,
+                icon: PtermIcon::Code2,
                 icon_color: sub_text,
             },
         },
@@ -3377,7 +3377,7 @@ fn resolve_icon_with_status_variant(
             icon: typed.icon(),
             icon_color: main_text,
         },
-        // Rook Drive object types use their established index colors
+        // Polaris Terminal Drive object types use their established index colors
         TypedPane::Notebook { is_plan } => IconWithStatusVariant::Neutral {
             icon: typed.icon(),
             icon_color: drive_color(DriveObjectType::Notebook {
@@ -3426,10 +3426,10 @@ fn has_unread_activity_for_terminal_view(terminal_view_id: EntityId, app: &AppCo
 
 const INDICATOR_DOT_SIZE: f32 = 8.;
 
-fn render_title_indicator(theme: &RookTheme) -> Box<dyn Element> {
+fn render_title_indicator(theme: &PtermTheme) -> Box<dyn Element> {
     ConstrainedBox::new(
-        RookIcon::CircleFilled
-            .to_rookui_icon(theme.accent())
+        PtermIcon::CircleFilled
+            .to_ptermui_icon(theme.accent())
             .finish(),
     )
     .with_width(INDICATOR_DOT_SIZE)
@@ -3463,7 +3463,7 @@ fn row_shows_synced_inputs_indicator(props: &PaneProps<'_>, app: &AppContext) ->
 fn render_synced_inputs_indicator() -> Box<dyn Element> {
     ConstrainedBox::new(
         UiIcon::LinkHorizontal
-            .to_rookui_icon(ColorU::from_u32(TAB_INDICATOR_SYNCED_COLOR).into())
+            .to_ptermui_icon(ColorU::from_u32(TAB_INDICATOR_SYNCED_COLOR).into())
             .finish(),
     )
     .with_width(BADGE_ICON_SIZE)
@@ -3497,7 +3497,7 @@ fn render_row_title_line(
     shows_synced_inputs: bool,
     shows_activity_indicator: bool,
     shortcut_hint: Option<Box<dyn Element>>,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Box<dyn Element> {
     if !shows_synced_inputs && !shows_activity_indicator && shortcut_hint.is_none() {
         return title;
@@ -3686,13 +3686,13 @@ impl TypedPane<'_> {
         }
     }
 
-    fn rook_drive_object_type(&self) -> Option<DriveObjectType> {
-        typed_pane_rook_drive_object_type(self)
+    fn pterm_drive_object_type(&self) -> Option<DriveObjectType> {
+        typed_pane_pterm_drive_object_type(self)
     }
 
     fn supports_vertical_tabs_detail_sidecar(&self) -> bool {
         matches!(self, TypedPane::Terminal(_) | TypedPane::Code(_))
-            || self.rook_drive_object_type().is_some()
+            || self.pterm_drive_object_type().is_some()
     }
     fn kind_label(&self) -> &'static str {
         match self {
@@ -3734,24 +3734,24 @@ impl TypedPane<'_> {
         }
     }
 
-    fn icon(&self) -> RookIcon {
+    fn icon(&self) -> PtermIcon {
         match self {
-            TypedPane::Terminal(_) => RookIcon::Terminal,
-            TypedPane::Code(_) => RookIcon::Code2,
-            TypedPane::CodeDiff => RookIcon::Diff,
-            TypedPane::File => RookIcon::File,
-            TypedPane::Notebook { is_plan: true } => RookIcon::Compass,
-            TypedPane::Notebook { is_plan: false } => RookIcon::Notebook,
-            TypedPane::Workflow { is_ai_prompt: true } => RookIcon::Prompt,
+            TypedPane::Terminal(_) => PtermIcon::Terminal,
+            TypedPane::Code(_) => PtermIcon::Code2,
+            TypedPane::CodeDiff => PtermIcon::Diff,
+            TypedPane::File => PtermIcon::File,
+            TypedPane::Notebook { is_plan: true } => PtermIcon::Compass,
+            TypedPane::Notebook { is_plan: false } => PtermIcon::Notebook,
+            TypedPane::Workflow { is_ai_prompt: true } => PtermIcon::Prompt,
             TypedPane::Workflow {
                 is_ai_prompt: false,
-            } => RookIcon::Workflow,
-            TypedPane::Settings | TypedPane::EnvironmentManagement => RookIcon::Gear,
-            TypedPane::EnvVarCollection => RookIcon::EnvVarCollection,
-            TypedPane::AIFact => RookIcon::BookOpen,
-            TypedPane::AIDocument => RookIcon::Compass,
-            TypedPane::ExecutionProfileEditor => RookIcon::Lightning,
-            TypedPane::Other => RookIcon::File,
+            } => PtermIcon::Workflow,
+            TypedPane::Settings | TypedPane::EnvironmentManagement => PtermIcon::Gear,
+            TypedPane::EnvVarCollection => PtermIcon::EnvVarCollection,
+            TypedPane::AIFact => PtermIcon::BookOpen,
+            TypedPane::AIDocument => PtermIcon::Compass,
+            TypedPane::ExecutionProfileEditor => PtermIcon::Lightning,
+            TypedPane::Other => PtermIcon::File,
         }
     }
 }
@@ -3773,7 +3773,7 @@ fn pane_display_title_and_subtitle(
             .unwrap_or_default();
         let home_dir = dirs::home_dir();
         let home_str = home_dir.as_ref().and_then(|path| path.to_str());
-        let parent = rook_util::path::user_friendly_path(&parent_raw, home_str).to_string();
+        let parent = pterm_util::path::user_friendly_path(&parent_raw, home_str).to_string();
         (filename, parent)
     } else {
         (
@@ -4338,7 +4338,7 @@ fn terminal_kind_badge_label(is_oz_agent: bool, cli_agent: Option<CLIAgent>) -> 
     if let Some(cli_agent) = cli_agent {
         cli_agent.display_name().to_string()
     } else if is_oz_agent {
-        "Rook Agent".to_string()
+        "Polaris Terminal Agent".to_string()
     } else {
         "Terminal".to_string()
     }
@@ -4723,7 +4723,7 @@ fn compact_branch_subtitle_display(
 
 fn render_git_branch_text(
     branch: &str,
-    text_color: RookThemeFill,
+    text_color: PtermThemeFill,
     font_size: f32,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
@@ -4731,7 +4731,7 @@ fn render_git_branch_text(
         .with_cross_axis_alignment(CrossAxisAlignment::Center)
         .with_spacing(2.)
         .with_child(
-            ConstrainedBox::new(UiIcon::GitBranch.to_rookui_icon(text_color).finish())
+            ConstrainedBox::new(UiIcon::GitBranch.to_ptermui_icon(text_color).finish())
                 .with_width(font_size - 2.)
                 .with_height(font_size - 2.)
                 .finish(),
@@ -4756,7 +4756,7 @@ enum MetadataLeftContent {
 
 fn render_text_line(
     text: &str,
-    text_color: RookThemeFill,
+    text_color: PtermThemeFill,
     clip: ClipConfig,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
@@ -4789,7 +4789,7 @@ pub(crate) fn render_inline_tab_rename_editor(
 fn render_title_override(
     props: &PaneProps<'_>,
     font_size: f32,
-    text_color: RookThemeFill,
+    text_color: PtermThemeFill,
     clip: ClipConfig,
     appearance: &Appearance,
     app: &AppContext,
@@ -4824,7 +4824,7 @@ fn render_pane_title_slot(
     props: &PaneProps<'_>,
     generated_title: impl FnOnce() -> Box<dyn Element>,
     font_size: f32,
-    text_color: RookThemeFill,
+    text_color: PtermThemeFill,
     clip: ClipConfig,
     appearance: &Appearance,
     app: &AppContext,
@@ -5057,7 +5057,7 @@ fn render_summary_tab_item(
 fn render_summary_primary_label_line(
     label: &VerticalTabsSummaryPrimaryLabel,
     reserve_prefix_slot: bool,
-    text_color: RookThemeFill,
+    text_color: PtermThemeFill,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     // Reserve a slot wide enough for the status pill so non-conversation lines align with
@@ -5096,7 +5096,7 @@ fn render_summary_primary_label_line(
 
 fn render_summary_overflow_line(
     hidden_count: usize,
-    text_color: RookThemeFill,
+    text_color: PtermThemeFill,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     Text::new_inline(
@@ -5178,7 +5178,7 @@ pub(super) fn render_summary_pane_kind_icon_circle(
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let theme = appearance.theme();
-    // Route all Rook agent kinds, plus ambient CLI agents, through
+    // Route all Polaris Terminal agent kinds, plus ambient CLI agents, through
     // `render_icon_with_status` so their circle and cloud treatment stays consistent
     // with the pane row.
     if let Some(variant) = ambient_agent_variant(&kind) {
@@ -5193,12 +5193,12 @@ pub(super) fn render_summary_pane_kind_icon_circle(
             let icon_element = agent
                 .icon()
                 .map(|icon| {
-                    icon.to_rookui_icon(RookThemeFill::Solid(icon_color))
+                    icon.to_ptermui_icon(PtermThemeFill::Solid(icon_color))
                         .finish()
                 })
                 .unwrap_or_else(|| {
-                    RookIcon::Terminal
-                        .to_rookui_icon(theme.sub_text_color(theme.background()))
+                    PtermIcon::Terminal
+                        .to_ptermui_icon(theme.sub_text_color(theme.background()))
                         .finish()
                 });
             (
@@ -5213,8 +5213,8 @@ pub(super) fn render_summary_pane_kind_icon_circle(
         }
         SummaryPaneKind::Code { title } => (
             icon_from_file_path(&title, appearance).unwrap_or_else(|| {
-                RookIcon::Code2
-                    .to_rookui_icon(theme.sub_text_color(theme.background()))
+                PtermIcon::Code2
+                    .to_ptermui_icon(theme.sub_text_color(theme.background()))
                     .finish()
             }),
             internal_colors::fg_overlay_2(theme).into(),
@@ -5233,7 +5233,7 @@ pub(super) fn render_summary_pane_kind_icon_circle(
         | SummaryPaneKind::Other => {
             let (icon, icon_color) = summary_pane_kind_icon(kind, appearance);
             (
-                icon.to_rookui_icon(icon_color).finish(),
+                icon.to_ptermui_icon(icon_color).finish(),
                 internal_colors::fg_overlay_2(theme).into(),
             )
         }
@@ -5252,7 +5252,7 @@ pub(super) fn render_summary_pane_kind_icon_circle(
     .finish()
 }
 
-/// Maps Rook agents and ambient CLI agents to the shared icon-with-status renderer.
+/// Maps Polaris Terminal agents and ambient CLI agents to the shared icon-with-status renderer.
 /// Non-ambient CLI agents and non-agent kinds fall back to inline summary rendering.
 fn ambient_agent_variant(kind: &SummaryPaneKind) -> Option<IconWithStatusVariant> {
     match kind {
@@ -5275,34 +5275,34 @@ fn ambient_agent_variant(kind: &SummaryPaneKind) -> Option<IconWithStatusVariant
 fn summary_pane_kind_icon(
     kind: SummaryPaneKind,
     appearance: &Appearance,
-) -> (RookIcon, RookThemeFill) {
+) -> (PtermIcon, PtermThemeFill) {
     let theme = appearance.theme();
     let main_text = theme.main_text_color(theme.background());
     let sub_text = theme.sub_text_color(theme.background());
-    let drive_color = |object_type: DriveObjectType| -> RookThemeFill {
-        RookThemeFill::Solid(rook_drive_icon_color(appearance, object_type))
+    let drive_color = |object_type: DriveObjectType| -> PtermThemeFill {
+        PtermThemeFill::Solid(pterm_drive_icon_color(appearance, object_type))
     };
 
     match kind {
-        SummaryPaneKind::Terminal => (RookIcon::Terminal, main_text),
+        SummaryPaneKind::Terminal => (PtermIcon::Terminal, main_text),
         // Local agent: Agent-brand glyph with theme main-text color, consistent
         // with the tab row and summary circle.
         // Note: this arm is currently unreachable — OzAgent is matched by the dedicated arm in
         // render_summary_pane_kind_icon_circle before summary_pane_kind_icon is called.
         // Kept for completeness in case callers change.
-        SummaryPaneKind::OzAgent { .. } => (RookIcon::Agent, main_text),
+        SummaryPaneKind::OzAgent { .. } => (PtermIcon::Agent, main_text),
         SummaryPaneKind::CLIAgent { agent, .. } => (
-            agent.icon().unwrap_or(RookIcon::Terminal),
-            RookThemeFill::Solid(agent.brand_icon_color()),
+            agent.icon().unwrap_or(PtermIcon::Terminal),
+            PtermThemeFill::Solid(agent.brand_icon_color()),
         ),
-        SummaryPaneKind::Code { .. } => (RookIcon::Code2, sub_text),
-        SummaryPaneKind::CodeDiff => (RookIcon::Diff, sub_text),
-        SummaryPaneKind::File => (RookIcon::File, sub_text),
+        SummaryPaneKind::Code { .. } => (PtermIcon::Code2, sub_text),
+        SummaryPaneKind::CodeDiff => (PtermIcon::Diff, sub_text),
+        SummaryPaneKind::File => (PtermIcon::File, sub_text),
         SummaryPaneKind::Notebook { is_plan } => (
             if is_plan {
-                RookIcon::Compass
+                PtermIcon::Compass
             } else {
-                RookIcon::Notebook
+                PtermIcon::Notebook
             },
             drive_color(DriveObjectType::Notebook {
                 is_ai_document: is_plan,
@@ -5310,9 +5310,9 @@ fn summary_pane_kind_icon(
         ),
         SummaryPaneKind::Workflow { is_ai_prompt } => (
             if is_ai_prompt {
-                RookIcon::Prompt
+                PtermIcon::Prompt
             } else {
-                RookIcon::Workflow
+                PtermIcon::Workflow
             },
             if is_ai_prompt {
                 drive_color(DriveObjectType::AgentModeWorkflow)
@@ -5321,16 +5321,16 @@ fn summary_pane_kind_icon(
             },
         ),
         SummaryPaneKind::Settings | SummaryPaneKind::EnvironmentManagement => {
-            (RookIcon::Gear, main_text)
+            (PtermIcon::Gear, main_text)
         }
         SummaryPaneKind::EnvVarCollection => (
-            RookIcon::EnvVarCollection,
+            PtermIcon::EnvVarCollection,
             drive_color(DriveObjectType::EnvVarCollection),
         ),
-        SummaryPaneKind::AIFact => (RookIcon::BookOpen, drive_color(DriveObjectType::AIFact)),
-        SummaryPaneKind::AIDocument => (RookIcon::Compass, sub_text),
-        SummaryPaneKind::ExecutionProfileEditor => (RookIcon::Lightning, sub_text),
-        SummaryPaneKind::Other => (RookIcon::File, sub_text),
+        SummaryPaneKind::AIFact => (PtermIcon::BookOpen, drive_color(DriveObjectType::AIFact)),
+        SummaryPaneKind::AIDocument => (PtermIcon::Compass, sub_text),
+        SummaryPaneKind::ExecutionProfileEditor => (PtermIcon::Lightning, sub_text),
+        SummaryPaneKind::Other => (PtermIcon::File, sub_text),
     }
 }
 
@@ -5408,7 +5408,7 @@ fn render_summary_branch_line(
 fn render_terminal_primary_line_for_view(
     terminal_view: &TerminalView,
     appearance: &Appearance,
-    text_color: RookThemeFill,
+    text_color: PtermThemeFill,
     app: &AppContext,
 ) -> Box<dyn Element> {
     let title_text = terminal_view.terminal_title_from_shell();
@@ -5436,13 +5436,13 @@ fn render_terminal_primary_line_for_view(
 
 /// Primary line for terminal pane rows. Precedence:
 /// 1. CLI agent session with plugin data (query/summary) + status
-/// 2. Rook Agent conversation title + status
+/// 2. Polaris Terminal Agent conversation title + status
 /// 3. Terminal title
 fn render_terminal_primary_line(
     primary_line: TerminalPrimaryLineData,
     terminal_view: &TerminalView,
     appearance: &Appearance,
-    text_color: RookThemeFill,
+    text_color: PtermThemeFill,
 ) -> Box<dyn Element> {
     let theme = appearance.theme();
 
@@ -5460,7 +5460,7 @@ fn render_terminal_primary_line(
             .with_child(
                 ConstrainedBox::new(
                     UiIcon::AlertTriangle
-                        .to_rookui_icon(error_color.into())
+                        .to_ptermui_icon(error_color.into())
                         .finish(),
                 )
                 .with_width(BADGE_ICON_SIZE)
@@ -5740,7 +5740,7 @@ fn render_pull_request_badge_content(label: &str, appearance: &Appearance) -> Bo
         .with_cross_axis_alignment(CrossAxisAlignment::Center)
         .with_spacing(4.)
         .with_child(
-            ConstrainedBox::new(UiIcon::Github.to_rookui_icon(main_text_color).finish())
+            ConstrainedBox::new(UiIcon::Github.to_ptermui_icon(main_text_color).finish())
                 .with_width(BADGE_ICON_SIZE)
                 .with_height(BADGE_ICON_SIZE)
                 .finish(),
@@ -5762,7 +5762,7 @@ fn compute_tab_group_color_mode(
     tab: &TabData,
     pane_group: &PaneGroup,
     visible_pane_ids: &[PaneId],
-    theme: &RookTheme,
+    theme: &PtermTheme,
     app: &AppContext,
 ) -> TabGroupColorMode {
     // A manual color override applies to the whole tab.
@@ -5797,8 +5797,8 @@ fn compute_tab_group_color_mode(
                     match pane_group.code_view_from_pane_id(pane_id, app) {
                         Some(code_view) => {
                             // Code pane: determine color from the open file path using longest-prefix
-                            // matching against configured directories, so e.g. rook-internal/code.rs
-                            // inherits the color assigned to rook-internal.
+                            // matching against configured directories, so e.g. polaris-terminal-internal/code.rs
+                            // inherits the color assigned to polaris-terminal-internal.
                             code_view
                                 .as_ref(app)
                                 .local_path(app)
@@ -6069,7 +6069,7 @@ pub(super) fn render_settings_popup(
                 Expanded::new(
                     1.,
                     render_popup_segment(
-                        RookIcon::Menu01,
+                        PtermIcon::Menu01,
                         matches!(current_mode, VerticalTabsViewMode::Compact),
                         state.compact_segment_mouse_state.clone(),
                         VerticalTabsViewMode::Compact,
@@ -6083,7 +6083,7 @@ pub(super) fn render_settings_popup(
                 Expanded::new(
                     1.,
                     render_popup_segment(
-                        RookIcon::Grid,
+                        PtermIcon::Grid,
                         matches!(current_mode, VerticalTabsViewMode::Expanded),
                         state.expanded_segment_mouse_state.clone(),
                         VerticalTabsViewMode::Expanded,
@@ -6108,7 +6108,7 @@ pub(super) fn render_settings_popup(
         .finish();
 
     // Divider between toggle and "Pane title as" section
-    let make_divider = |theme: &RookTheme| {
+    let make_divider = |theme: &PtermTheme| {
         Container::new(
             ConstrainedBox::new(
                 Container::new(Empty::new().finish())
@@ -6309,7 +6309,7 @@ fn render_compact_subtitle_option(
     mouse_state: MouseStateHandle,
     value: VerticalTabsCompactSubtitle,
     appearance: &Appearance,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Box<dyn Element> {
     const ICON_SIZE: f32 = 16.;
     const FONT_SIZE: f32 = 12.;
@@ -6319,7 +6319,7 @@ fn render_compact_subtitle_option(
     let main_text = theme.main_text_color(theme.background());
     Hoverable::new(mouse_state, move |hover_state| {
         let check_icon: Box<dyn Element> = if is_selected {
-            ConstrainedBox::new(RookIcon::Check.to_rookui_icon(main_text).finish())
+            ConstrainedBox::new(PtermIcon::Check.to_ptermui_icon(main_text).finish())
                 .with_width(ICON_SIZE)
                 .with_height(ICON_SIZE)
                 .finish()
@@ -6362,7 +6362,7 @@ fn render_tab_item_mode_option(
     mouse_state: MouseStateHandle,
     value: VerticalTabsTabItemMode,
     appearance: &Appearance,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Box<dyn Element> {
     const ICON_SIZE: f32 = 16.;
     const FONT_SIZE: f32 = 12.;
@@ -6372,7 +6372,7 @@ fn render_tab_item_mode_option(
     let main_text = theme.main_text_color(theme.background());
     Hoverable::new(mouse_state, move |hover_state| {
         let check_icon: Box<dyn Element> = if is_selected {
-            ConstrainedBox::new(RookIcon::Check.to_rookui_icon(main_text).finish())
+            ConstrainedBox::new(PtermIcon::Check.to_ptermui_icon(main_text).finish())
                 .with_width(ICON_SIZE)
                 .with_height(ICON_SIZE)
                 .finish()
@@ -6415,7 +6415,7 @@ fn render_primary_info_option(
     mouse_state: MouseStateHandle,
     value: VerticalTabsPrimaryInfo,
     appearance: &Appearance,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Box<dyn Element> {
     const ICON_SIZE: f32 = 16.;
     const FONT_SIZE: f32 = 12.;
@@ -6425,7 +6425,7 @@ fn render_primary_info_option(
     let main_text = theme.main_text_color(theme.background());
     Hoverable::new(mouse_state, move |hover_state| {
         let check_icon: Box<dyn Element> = if is_selected {
-            ConstrainedBox::new(RookIcon::Check.to_rookui_icon(main_text).finish())
+            ConstrainedBox::new(PtermIcon::Check.to_ptermui_icon(main_text).finish())
                 .with_width(ICON_SIZE)
                 .with_height(ICON_SIZE)
                 .finish()
@@ -6474,7 +6474,7 @@ fn render_show_toggle_option(
     action: WorkspaceAction,
     info_tooltip: Option<ShowToggleInfoTooltip>,
     appearance: &Appearance,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Box<dyn Element> {
     const ICON_SIZE: f32 = 16.;
     const FONT_SIZE: f32 = 12.;
@@ -6492,7 +6492,7 @@ fn render_show_toggle_option(
 
     Hoverable::new(mouse_state, move |hover_state| {
         let check_icon: Box<dyn Element> = if is_enabled {
-            ConstrainedBox::new(RookIcon::Check.to_rookui_icon(main_text).finish())
+            ConstrainedBox::new(PtermIcon::Check.to_ptermui_icon(main_text).finish())
                 .with_width(ICON_SIZE)
                 .with_height(ICON_SIZE)
                 .finish()
@@ -6515,7 +6515,7 @@ fn render_show_toggle_option(
         {
             let builder = ui_builder.clone();
             let info_icon = Hoverable::new(info_ms, move |info_hover| {
-                let icon = ConstrainedBox::new(UiIcon::Info.to_rookui_icon(info_color).finish())
+                let icon = ConstrainedBox::new(UiIcon::Info.to_ptermui_icon(info_color).finish())
                     .with_width(INFO_ICON_SIZE)
                     .with_height(INFO_ICON_SIZE)
                     .finish();
@@ -6562,12 +6562,12 @@ fn render_show_toggle_option(
 }
 
 fn render_popup_segment(
-    icon: RookIcon,
+    icon: PtermIcon,
     is_selected: bool,
     mouse_state: MouseStateHandle,
     mode: VerticalTabsViewMode,
-    theme: &RookTheme,
-    icon_color: RookThemeFill,
+    theme: &PtermTheme,
+    icon_color: PtermThemeFill,
 ) -> Box<dyn Element> {
     Hoverable::new(mouse_state, move |hover_state| {
         let background = if is_selected {
@@ -6580,7 +6580,7 @@ fn render_popup_segment(
 
         Container::new(
             Align::new(
-                ConstrainedBox::new(icon.to_rookui_icon(icon_color).finish())
+                ConstrainedBox::new(icon.to_ptermui_icon(icon_color).finish())
                     .with_width(COMPACT_ICON_SIZE)
                     .with_height(COMPACT_ICON_SIZE)
                     .finish(),
@@ -6605,7 +6605,7 @@ fn render_popup_text_segment(
     mouse_state: MouseStateHandle,
     granularity: VerticalTabsDisplayGranularity,
     appearance: &Appearance,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Box<dyn Element> {
     let label = label.to_string();
     let main_text = theme.main_text_color(theme.background());
@@ -6773,25 +6773,25 @@ fn detail_sidecar_width_and_bounds(available_width: f32) -> (f32, PositionedElem
 }
 
 struct DetailSidecarTextColors {
-    main: RookThemeFill,
-    sub: RookThemeFill,
-    disabled: RookThemeFill,
+    main: PtermThemeFill,
+    sub: PtermThemeFill,
+    disabled: PtermThemeFill,
 }
 
-fn detail_sidecar_background(theme: &RookTheme) -> ColorU {
+fn detail_sidecar_background(theme: &PtermTheme) -> ColorU {
     theme
         .background()
         .blend(&internal_colors::fg_overlay_2(theme))
         .into_solid()
 }
 
-fn detail_sidecar_border_fill(theme: &RookTheme) -> ThemeFill {
+fn detail_sidecar_border_fill(theme: &PtermTheme) -> ThemeFill {
     theme
         .background()
         .blend(&internal_colors::fg_overlay_4(theme))
 }
 
-fn detail_sidecar_text_colors(theme: &RookTheme) -> DetailSidecarTextColors {
+fn detail_sidecar_text_colors(theme: &PtermTheme) -> DetailSidecarTextColors {
     let bg = ThemeFill::Solid(detail_sidecar_background(theme));
     DetailSidecarTextColors {
         main: theme.main_text_color(bg),
@@ -6804,7 +6804,7 @@ fn render_detail_badge(
     label: impl Into<String>,
     icon: Option<Box<dyn Element>>,
     background: Option<ThemeFill>,
-    text_color: RookThemeFill,
+    text_color: PtermThemeFill,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let mut content = Flex::row()
@@ -6847,14 +6847,14 @@ fn render_detail_status_pill(
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_spacing(4.)
             .with_child(
-                ConstrainedBox::new(icon.to_rookui_icon(RookThemeFill::Solid(color)).finish())
+                ConstrainedBox::new(icon.to_ptermui_icon(PtermThemeFill::Solid(color)).finish())
                     .with_width(12.)
                     .with_height(12.)
                     .finish(),
             )
             .with_child(
                 Text::new_inline(status.to_string(), appearance.ui_font_family(), 10.)
-                    .with_color(RookThemeFill::Solid(color).into())
+                    .with_color(PtermThemeFill::Solid(color).into())
                     .finish(),
             )
             .finish(),
@@ -6868,7 +6868,7 @@ fn render_detail_status_pill(
 fn render_detail_wrapping_text(
     text: impl Into<String>,
     font_size: f32,
-    color: RookThemeFill,
+    color: PtermThemeFill,
     style: Option<Properties>,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
@@ -6883,7 +6883,7 @@ fn render_detail_wrapping_text(
 
 fn render_terminal_detail_primary_line(
     primary_line: &TerminalPrimaryLineData,
-    color: RookThemeFill,
+    color: PtermThemeFill,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let font_family = match primary_line {
@@ -7131,7 +7131,7 @@ fn render_code_detail_section(
         .finish()
 }
 
-fn render_rook_drive_object_detail_section(
+fn render_pterm_drive_object_detail_section(
     props: &PaneProps<'_>,
     appearance: &Appearance,
     app: &AppContext,
@@ -7167,7 +7167,7 @@ fn code_detail_kind_label(file_name: &str) -> Option<String> {
         .map(|language| language.display_name().to_string())
 }
 
-fn typed_pane_rook_drive_object_type(typed: &TypedPane<'_>) -> Option<DriveObjectType> {
+fn typed_pane_pterm_drive_object_type(typed: &TypedPane<'_>) -> Option<DriveObjectType> {
     match typed {
         TypedPane::Notebook { is_plan } => Some(DriveObjectType::Notebook {
             is_ai_document: *is_plan,
@@ -7209,7 +7209,7 @@ fn render_detail_section(
         | TypedPane::Workflow { .. }
         | TypedPane::EnvVarCollection
         | TypedPane::AIFact
-        | TypedPane::AIDocument => render_rook_drive_object_detail_section(props, appearance, app),
+        | TypedPane::AIDocument => render_pterm_drive_object_detail_section(props, appearance, app),
         TypedPane::CodeDiff
         | TypedPane::File
         | TypedPane::Settings

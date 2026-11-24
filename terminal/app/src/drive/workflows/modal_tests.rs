@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use rook_core::ui::appearance::Appearance;
-use rookui::platform::WindowStyle;
-use rookui::{App, SingletonEntity, ViewHandle};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::platform::WindowStyle;
+use ptermui::{App, SingletonEntity, ViewHandle};
 
 use super::WorkflowModal;
 use crate::UserWorkspaces;

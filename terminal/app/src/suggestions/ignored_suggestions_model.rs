@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use rook_errors::report_error;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 
 use crate::GlobalResourceHandlesProvider;

@@ -157,7 +157,7 @@ impl WorkingDirectoryConfig {
     pub fn update_and_save_value<F>(
         &mut self,
         update_fn: F,
-        ctx: &mut rookui::ModelContext<<Self as Setting>::Group>,
+        ctx: &mut ptermui::ModelContext<<Self as Setting>::Group>,
     ) -> anyhow::Result<()>
     where
         F: FnOnce(&mut <Self as Setting>::Value),

@@ -1,20 +1,20 @@
-//! AI Assistant has since been renamed to "Rook AI" in the product.
+//! AI Assistant has since been renamed to "Polaris Terminal AI" in the product.
 use std::collections::HashSet;
 use std::sync::Arc;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use pathfinder_color::ColorU;
-use rook_core::command::ExitCode;
-use rook_graphql::ai::{
+use pterm_core::command::ExitCode;
+use pterm_graphql::ai::{
     RequestLimitInfo as RequestLimitInfoGraphql,
     RequestLimitRefreshDuration as RequestLimitRefreshDurationGraphql,
 };
-use rook_graphql::mutations::generate_commands::{GenerateCommandsFailureType, GeneratedCommand};
+use pterm_graphql::mutations::generate_commands::{GenerateCommandsFailureType, GeneratedCommand};
 use serde::{Deserialize, Serialize};
 
 use crate::ai::{RequestLimitInfo, RequestLimitRefreshDuration};
-use crate::server::telemetry::OpenedRookAISource;
+use crate::server::telemetry::OpenedPtermAISource;
 use crate::terminal::model::terminal_model::BlockIndex;
 use crate::workflows::workflow::{Argument, Workflow};
 
@@ -32,8 +32,8 @@ mod test_util;
 /// This is also roughly the limit at which the editor starts degrading.
 pub const PROMPT_CHARACTER_LIMIT: usize = 1000;
 
-pub const AI_ASSISTANT_FEATURE_NAME: &str = "Rook AI";
-pub const ASK_AI_ASSISTANT_TEXT: &str = "Ask Rook AI";
+pub const AI_ASSISTANT_FEATURE_NAME: &str = "Polaris Terminal AI";
+pub const ASK_AI_ASSISTANT_TEXT: &str = "Ask Polaris Terminal AI";
 
 pub const AI_ASSISTANT_SVG_PATH: &str = "bundled/svg/ai-assistant.svg";
 
@@ -67,14 +67,14 @@ pub enum AskAIType {
     },
 }
 
-impl From<&AskAIType> for OpenedRookAISource {
+impl From<&AskAIType> for OpenedPtermAISource {
     fn from(value: &AskAIType) -> Self {
         match value {
-            AskAIType::FromAICommandSearch { .. } => OpenedRookAISource::FromAICommandSearch,
+            AskAIType::FromAICommandSearch { .. } => OpenedPtermAISource::FromAICommandSearch,
             AskAIType::FromBlock { .. } | AskAIType::FromBlocks { .. } => {
-                OpenedRookAISource::HelpWithBlock
+                OpenedPtermAISource::HelpWithBlock
             }
-            AskAIType::FromTextSelection { .. } => OpenedRookAISource::HelpWithTextSelection,
+            AskAIType::FromTextSelection { .. } => OpenedPtermAISource::HelpWithTextSelection,
         }
     }
 }

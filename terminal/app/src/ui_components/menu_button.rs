@@ -1,11 +1,11 @@
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rookui::elements::{
+use ptermui::elements::{
     ChildAnchor, ChildView, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Stack,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, EventContext, View, ViewHandle};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, EventContext, View, ViewHandle};
 
 use super::buttons::{highlight, icon_button};
 use super::icons::Icon;
@@ -87,7 +87,7 @@ where
     button_with_menu
 }
 
-/// Variant with surface_1 hover background for Rook Drive items
+/// Variant with surface_1 hover background for Polaris Terminal Drive items
 #[allow(clippy::too_many_arguments)]
 pub fn icon_button_with_context_menu_drive<F, V: View>(
     icon: Icon,
@@ -104,7 +104,7 @@ where
 {
     let button = icon_button(appearance, icon, is_menu_open, mouse_state_handle)
         .with_hovered_styles(
-            rookui::ui_components::components::UiComponentStyles::default()
+            ptermui::ui_components::components::UiComponentStyles::default()
                 .set_background(appearance.theme().surface_1().into())
                 .set_border_color(appearance.theme().surface_3().into()),
         )
@@ -123,7 +123,7 @@ where
     button_with_menu
 }
 
-/// Variant with surface_1 hover background for Rook Drive items (highlighted)
+/// Variant with surface_1 hover background for Polaris Terminal Drive items (highlighted)
 pub fn highlight_icon_button_with_context_menu_drive<F, V: View>(
     icon: Icon,
     on_click_action: F,
@@ -141,7 +141,7 @@ where
         appearance,
     )
     .with_hovered_styles(
-        rookui::ui_components::components::UiComponentStyles::default()
+        ptermui::ui_components::components::UiComponentStyles::default()
             .set_background(appearance.theme().surface_1().into())
             .set_border_color(appearance.theme().surface_3().into()),
     );

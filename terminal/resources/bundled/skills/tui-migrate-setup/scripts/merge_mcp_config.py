@@ -19,11 +19,11 @@ from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
 MAX_CONFIG_BYTES = 8 * 1024 * 1024
-FINGERPRINT_VERSION = b"rook-tui-mcp-merge-v1\0"
+FINGERPRINT_VERSION = b"polaris-terminal-tui-mcp-merge-v1\0"
 PLACEHOLDER = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*\}|\{\{[^{}\r\n]+\}\}")
 MANAGED_MARKERS = frozenset(
     {
-        "rook_id",
+        "pterm_id",
         "installation_id",
         "installation_uuid",
         "gallery_data",
@@ -155,7 +155,7 @@ def _detect_wrapper(document: dict[str, Any]) -> tuple[tuple[str, ...], dict[str
     if matches:
         return matches[0]
 
-    # Rook accepts an unwrapped map. Require object-valued entries so unrelated
+    # Polaris Terminal accepts an unwrapped map. Require object-valued entries so unrelated
     # application JSON does not silently become an MCP config.
     if all(isinstance(value, dict) for value in document.values()):
         return (), document
@@ -500,7 +500,7 @@ def _summary(
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Redacted destination-wins merge for Rook global MCP configs."
+        description="Redacted destination-wins merge for Polaris Terminal global MCP configs."
     )
     parser.add_argument("--source", required=True)
     parser.add_argument("--destination", required=True)

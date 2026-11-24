@@ -6,21 +6,21 @@ Before cloud-to-cloud handoff, a cloud task with no active execution was permane
 ## Figma
 Figma: none provided. The current failure state is represented by the screenshot attached to the request.
 ## Behavior
-1. When a user opens a cloud agent conversation that has no active execution and cloud-to-cloud continuation is available, Rook opens a Cloud Mode pane seeded with the completed conversation history instead of starting a new blank task.
+1. When a user opens a cloud agent conversation that has no active execution and cloud-to-cloud continuation is available, Polaris Terminal opens a Cloud Mode pane seeded with the completed conversation history instead of starting a new blank task.
 2. The restored Cloud Mode pane preserves the existing completed-conversation presentation:
    - The prior conversation output remains visible.
    - The completed task tombstone remains visible at the end of the transcript.
    - Existing metadata, artifacts, error status, runtime, credits, source, skill, and working-directory details remain available wherever they are already shown.
 3. For a resumable cloud task, the tombstone shows a primary `Continue` action for continuing in cloud mode.
 4. The existing `Continue locally` action remains available where it is supported today. Adding cloud continuation must not remove the local fork path.
-5. If the task cannot be continued in cloud mode, Rook does not show a cloud `Continue` action. Users should not be offered an action that can only produce a generic “couldn't continue” failure.
+5. If the task cannot be continued in cloud mode, Polaris Terminal does not show a cloud `Continue` action. Users should not be offered an action that can only produce a generic “couldn't continue” failure.
 6. Clicking cloud `Continue` does not immediately create a new execution. It prepares the same Cloud Mode pane for a follow-up prompt and focuses the existing terminal input.
 7. While the pane is waiting for a follow-up prompt, the user can type, edit, or abandon the prompt using the normal terminal input behavior.
 8. Submitting a non-empty follow-up prompt starts a new execution for the same cloud task/run, not a new user-visible conversation.
 9. Submitting an empty follow-up prompt does not start a new execution. The pane stays usable and focused so the user can type a real prompt or leave the view.
 10. After the follow-up prompt is submitted, the restored pane transitions into Cloud Mode setup/progress UI in the same pane.
 11. During follow-up setup, the user sees their submitted prompt represented optimistically so the pane does not appear to ignore the input while the new cloud execution is starting.
-12. When the new execution starts, Rook attaches to the new cloud session in the same pane. It does not open a separate tab, split, or replacement conversation unless the user separately chooses another navigation action.
+12. When the new execution starts, Polaris Terminal attaches to the new cloud session in the same pane. It does not open a separate tab, split, or replacement conversation unless the user separately chooses another navigation action.
 13. The same logical conversation/run identity is preserved across the original transcript and every follow-up execution.
 14. New output from the follow-up appears after the existing transcript content in chronological order.
 15. Returning to the conversation list, agent management view, details panel, or another navigation surface should focus the already-open pane for this task while it is open.

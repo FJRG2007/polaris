@@ -1,15 +1,15 @@
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::color::internal_colors;
-use rookui_core::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui_core::elements::{
     ClippedScrollStateHandle, Container, CrossAxisAlignment, Flex, FormattedTextElement,
     MainAxisSize, MouseStateHandle, ParentElement,
 };
-use rookui_core::fonts::Weight;
-use rookui_core::keymap::Keystroke;
-use rookui_core::prelude::Align;
-use rookui_core::text_layout::TextAlignment;
-use rookui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
-use rookui_core::{
+use ptermui_core::fonts::Weight;
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::prelude::Align;
+use ptermui_core::text_layout::TextAlignment;
+use ptermui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui_core::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
     ViewContext,
 };
@@ -35,7 +35,7 @@ pub enum ToolsPanelSubSetting {
     ConversationHistory,
     ProjectExplorer,
     GlobalSearch,
-    RookDrive,
+    PtermDrive,
 }
 
 #[derive(Debug, Clone)]
@@ -71,7 +71,7 @@ pub struct CustomizeUISlide {
     chip_conversation_mouse: MouseStateHandle,
     chip_file_explorer_mouse: MouseStateHandle,
     chip_global_search_mouse: MouseStateHandle,
-    chip_rook_drive_mouse: MouseStateHandle,
+    chip_pterm_drive_mouse: MouseStateHandle,
     // Buttons
     back_button: button::Button,
     next_button: button::Button,
@@ -107,7 +107,7 @@ impl CustomizeUISlide {
             chip_conversation_mouse: MouseStateHandle::default(),
             chip_file_explorer_mouse: MouseStateHandle::default(),
             chip_global_search_mouse: MouseStateHandle::default(),
-            chip_rook_drive_mouse: MouseStateHandle::default(),
+            chip_pterm_drive_mouse: MouseStateHandle::default(),
             back_button: button::Button::default(),
             next_button: button::Button::default(),
             scroll_state: ClippedScrollStateHandle::new(),
@@ -145,7 +145,7 @@ impl CustomizeUISlide {
     fn render_header(&self, appearance: &Appearance) -> Box<dyn Element> {
         let title = appearance
             .ui_builder()
-            .paragraph("Customize your Rook")
+            .paragraph("Customize your Polaris Terminal")
             .with_style(UiComponentStyles {
                 font_size: Some(36.),
                 font_weight: Some(Weight::Medium),
@@ -314,18 +314,18 @@ impl CustomizeUISlide {
             });
 
             chips.push(ChipSpec {
-                label: "Rook Drive",
-                is_enabled: ui.show_rook_drive,
-                mouse_state: self.chip_rook_drive_mouse.clone(),
+                label: "Polaris Terminal Drive",
+                is_enabled: ui.show_pterm_drive,
+                mouse_state: self.chip_pterm_drive_mouse.clone(),
                 on_click: Box::new(|ctx, _, _| {
                     ctx.dispatch_typed_action(CustomizeSlideAction::ToggleToolsSubSetting {
-                        setting: ToolsPanelSubSetting::RookDrive,
+                        setting: ToolsPanelSubSetting::PtermDrive,
                     });
                 }),
                 on_hover: Some(Box::new(|is_hovered, ctx, _, _| {
                     if is_hovered {
                         ctx.dispatch_typed_action(CustomizeSlideAction::HoverToolsChip {
-                            setting: ToolsPanelSubSetting::RookDrive,
+                            setting: ToolsPanelSubSetting::PtermDrive,
                         });
                     }
                 })),
@@ -463,8 +463,8 @@ impl CustomizeUISlide {
         "async/png/onboarding/agent_intention/customize_fileexplorer_horizontal.png",
         "async/png/onboarding/agent_intention/customize_filesearch_vertical.png",
         "async/png/onboarding/agent_intention/customize_filesearch_horizontal.png",
-        "async/png/onboarding/agent_intention/customize_rookdrive_vertical.png",
-        "async/png/onboarding/agent_intention/customize_rookdrive_horizontal.png",
+        "async/png/onboarding/agent_intention/customize_ptermdrive_vertical.png",
+        "async/png/onboarding/agent_intention/customize_ptermdrive_horizontal.png",
         "async/png/onboarding/agent_intention/customize_codereview_enabled_vertical.png",
         "async/png/onboarding/agent_intention/customize_codereview_enabled_horizontal.png",
         "async/png/onboarding/agent_intention/customize_codereview_disabled_vertical.png",
@@ -476,8 +476,8 @@ impl CustomizeUISlide {
         "async/png/onboarding/terminal_intention/terminal_customize_fileexplorer_horizontal.png",
         "async/png/onboarding/terminal_intention/terminal_customize_filesearch_vertical.png",
         "async/png/onboarding/terminal_intention/terminal_customize_filesearch_horizontal.png",
-        "async/png/onboarding/terminal_intention/terminal_customize_rookdrive_vertical.png",
-        "async/png/onboarding/terminal_intention/terminal_customize_rookdrive_horizontal.png",
+        "async/png/onboarding/terminal_intention/terminal_customize_ptermdrive_vertical.png",
+        "async/png/onboarding/terminal_intention/terminal_customize_ptermdrive_horizontal.png",
         "async/png/onboarding/terminal_intention/terminal_codereview_enabled.png",
         "async/png/onboarding/terminal_intention/terminal_codereview_disabled.png",
     ];
@@ -556,11 +556,11 @@ impl CustomizeUISlide {
                             (ToolsPanelSubSetting::GlobalSearch, false) => {
                                 "async/png/onboarding/agent_intention/customize_filesearch_horizontal.png"
                             }
-                            (ToolsPanelSubSetting::RookDrive, true) => {
-                                "async/png/onboarding/agent_intention/customize_rookdrive_vertical.png"
+                            (ToolsPanelSubSetting::PtermDrive, true) => {
+                                "async/png/onboarding/agent_intention/customize_ptermdrive_vertical.png"
                             }
-                            (ToolsPanelSubSetting::RookDrive, false) => {
-                                "async/png/onboarding/agent_intention/customize_rookdrive_horizontal.png"
+                            (ToolsPanelSubSetting::PtermDrive, false) => {
+                                "async/png/onboarding/agent_intention/customize_ptermdrive_horizontal.png"
                             }
                         }
                     } else {
@@ -586,11 +586,11 @@ impl CustomizeUISlide {
                             (ToolsPanelSubSetting::GlobalSearch, false) => {
                                 "async/png/onboarding/terminal_intention/terminal_customize_filesearch_horizontal.png"
                             }
-                            (ToolsPanelSubSetting::RookDrive, true) => {
-                                "async/png/onboarding/terminal_intention/terminal_customize_rookdrive_vertical.png"
+                            (ToolsPanelSubSetting::PtermDrive, true) => {
+                                "async/png/onboarding/terminal_intention/terminal_customize_ptermdrive_vertical.png"
                             }
-                            (ToolsPanelSubSetting::RookDrive, false) => {
-                                "async/png/onboarding/terminal_intention/terminal_customize_rookdrive_horizontal.png"
+                            (ToolsPanelSubSetting::PtermDrive, false) => {
+                                "async/png/onboarding/terminal_intention/terminal_customize_ptermdrive_horizontal.png"
                             }
                         }
                     }
@@ -799,9 +799,9 @@ impl TypedActionView for CustomizeUISlide {
                             let current = model.ui_customization().show_global_search;
                             model.set_show_global_search(!current, ctx);
                         }
-                        ToolsPanelSubSetting::RookDrive => {
-                            let current = model.ui_customization().show_rook_drive;
-                            model.set_show_rook_drive(!current, ctx);
+                        ToolsPanelSubSetting::PtermDrive => {
+                            let current = model.ui_customization().show_pterm_drive;
+                            model.set_show_pterm_drive(!current, ctx);
                         }
                     });
                 ctx.notify();

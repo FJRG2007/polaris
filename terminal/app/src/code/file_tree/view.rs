@@ -7,21 +7,14 @@ use editing::sort_entries_for_file_tree;
 use itertools::Itertools;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
-use render::RenderState;
-use repo_metadata::file_tree_store::{
-    FileTreeDirectoryEntryState, FileTreeEntryState, FileTreeFileMetadata,
-};
-use repo_metadata::local_model::IndexedRepoState;
-use repo_metadata::repositories::DetectedRepositories;
-use repo_metadata::{FileTreeEntry, RepoMetadataModel};
-use rook_core::features::FeatureFlag;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rook_core::{HostId, send_telemetry_from_ctx};
-use rook_util::path::LineAndColumnArg;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_core::{HostId, send_telemetry_from_ctx};
+use pterm_util::path::LineAndColumnArg;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     AcceptedByDropTarget, Align, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container,
     CrossAxisAlignment, Dismiss, Draggable, DraggableState, Empty, Flex, FormattedTextElement,
     Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
@@ -29,14 +22,21 @@ use rookui::elements::{
     Scrollable, ScrollableElement, ScrollbarWidth, Shrinkable, Stack, Text, UniformList,
     UniformListState,
 };
-use rookui::fonts::{Properties, Style, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::platform::Cursor;
-use rookui::text_layout::TextAlignment;
-use rookui::{
+use ptermui::fonts::{Properties, Style, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::Cursor;
+use ptermui::text_layout::TextAlignment;
+use ptermui::{
     AppContext, BlurContext, Element, Entity, EventContext, ModelHandle, SingletonEntity as _,
     TypedActionView, View, ViewContext, ViewHandle, WeakViewHandle, id,
 };
+use render::RenderState;
+use repo_metadata::file_tree_store::{
+    FileTreeDirectoryEntryState, FileTreeEntryState, FileTreeFileMetadata,
+};
+use repo_metadata::local_model::IndexedRepoState;
+use repo_metadata::repositories::DetectedRepositories;
+use repo_metadata::{FileTreeEntry, RepoMetadataModel};
 
 use crate::appearance::Appearance;
 use crate::code::active_file::{ActiveFileEvent, ActiveFileModel};
@@ -58,7 +58,7 @@ use crate::util::openable_file_type::{
 };
 #[cfg(feature = "local_fs")]
 use crate::util::openable_file_type::{
-    resolve_file_target_to_open_in_rook, resolve_file_target_with_editor_choice,
+    resolve_file_target_to_open_in_pterm, resolve_file_target_with_editor_choice,
 };
 
 mod editing;
@@ -1015,8 +1015,8 @@ impl FileTreeView {
             .collect();
 
         // Ancestor-dedup only local inputs. Shared with `GlobalSearchView`
-        // via `rook_util::path::group_roots_by_common_ancestor`.
-        let grouping = rook_util::path::group_roots_by_common_ancestor(&local_inputs);
+        // via `pterm_util::path::group_roots_by_common_ancestor`.
+        let grouping = pterm_util::path::group_roots_by_common_ancestor(&local_inputs);
 
         // Final displayed order: local surviving roots (in input order),
         // followed by preserved remote roots (in their existing order).
@@ -1838,7 +1838,7 @@ impl FileTreeView {
         let expand_icon = match expand_icon {
             Some(icon) => {
                 let chevron_icon_color = item_highlight_state.text_and_icon_color(appearance);
-                icon.to_rookui_icon(chevron_icon_color.into()).finish()
+                icon.to_ptermui_icon(chevron_icon_color.into()).finish()
             }
             None => Empty::new().finish(),
         };
@@ -1857,7 +1857,7 @@ impl FileTreeView {
         // Add the icon for the item.
         let icon_color = item_highlight_state.text_and_icon_color(appearance);
         let icon = match render_state.icon {
-            ImageOrIcon::Icon(icon) => icon.to_rookui_icon(icon_color.into()).finish(),
+            ImageOrIcon::Icon(icon) => icon.to_ptermui_icon(icon_color.into()).finish(),
             ImageOrIcon::Image(image) => image,
         };
         header_row.add_child(
@@ -2214,7 +2214,7 @@ impl FileTreeView {
     ) {
         let settings = EditorSettings::as_ref(ctx);
         let target = if editor_layout.is_some() {
-            resolve_file_target_to_open_in_rook(path, settings, editor_layout)
+            resolve_file_target_to_open_in_pterm(path, settings, editor_layout)
         } else {
             resolve_file_target_with_editor_choice(
                 path,
@@ -2259,7 +2259,7 @@ impl FileTreeView {
                 if is_remote {
                     // Emit a remote open event if we have a host ID.
                     if let Some(host_id) = &root_dir.remote_host_id {
-                        let remote_path = rook_util::remote_path::RemotePath::new(
+                        let remote_path = pterm_util::remote_path::RemotePath::new(
                             host_id.clone(),
                             (*metadata.path).clone(),
                         );
@@ -2691,7 +2691,7 @@ impl FileTreeView {
                         ScrollbarWidth::Auto,
                         theme.nonactive_ui_detail().into(),
                         theme.active_ui_detail().into(),
-                        rookui::elements::Fill::None,
+                        ptermui::elements::Fill::None,
                     )
                     .with_overlayed_scrollbar()
                     .finish(),
@@ -2738,7 +2738,7 @@ impl FileTreeView {
                 Container::new(
                     ConstrainedBox::new(
                         Icon::AlertTriangle
-                            .to_rookui_icon(Fill::Solid(internal_colors::neutral_6(theme)))
+                            .to_ptermui_icon(Fill::Solid(internal_colors::neutral_6(theme)))
                             .finish(),
                     )
                     .with_width(24.)
@@ -2803,7 +2803,7 @@ impl FileTreeView {
 
         // Create loading icon
         let loading_icon = Icon::Loading
-            .to_rookui_icon(rook_core::ui::theme::Fill::Solid(
+            .to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(
                 internal_colors::neutral_6(theme),
             ))
             .finish();
@@ -2825,7 +2825,7 @@ impl FileTreeView {
         header_row.add_child(loading_icon);
 
         let folder_icon = Icon::Folder
-            .to_rookui_icon(rook_core::ui::theme::Fill::Solid(
+            .to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(
                 internal_colors::neutral_6(theme),
             ))
             .finish();
@@ -2957,7 +2957,7 @@ impl View for FileTreeView {
             if let CodingPanelEnablementState::RemoteSession { has_remote_server } = self.enablement
             {
                 // When the session has a remote server connection (Auto SSH
-                // Rookification / mode 1), show a loading state — the server
+                // Ptermification / mode 1), show a loading state — the server
                 // may push repo metadata momentarily. For other SSH modes
                 // (tmux, subshell) no data will arrive, so show the disabled
                 // error instead.

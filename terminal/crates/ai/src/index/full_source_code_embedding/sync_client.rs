@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
 use itertools::Itertools;
-use rook_core::sync_queue::{IsTransientError, SyncQueue, SyncQueueTaskTrait};
-use rook_errors::report_error;
+use pterm_core::sync_queue::{IsTransientError, SyncQueue, SyncQueueTaskTrait};
+use pterm_errors::report_error;
 
 use super::changed_files::ChangedFiles;
 use super::codebase_index::{SyncProgress, build_fragments_from_metadata};

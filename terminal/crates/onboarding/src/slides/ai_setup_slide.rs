@@ -1,19 +1,19 @@
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rookui_core::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui_core::elements::{
     Border, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Flex, FormattedTextElement, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     ParentElement, Radius,
 };
-use rookui_core::fonts::Weight;
-use rookui_core::keymap::Keystroke;
-use rookui_core::platform::Cursor;
-use rookui_core::prelude::Align;
-use rookui_core::text_layout::TextAlignment;
-use rookui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
-use rookui_core::{
+use ptermui_core::fonts::Weight;
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::platform::Cursor;
+use ptermui_core::prelude::Align;
+use ptermui_core::text_layout::TextAlignment;
+use ptermui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui_core::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
     ViewContext,
 };
@@ -23,8 +23,8 @@ use super::OnboardingSlide;
 use crate::model::{AiSetupChoice, OnboardingStateModel};
 use crate::slides::{bottom_nav, layout, slide_content};
 
-/// Checklist shown on the "Use Rook agent" card.
-const ROOK_AGENT_FEATURES: &[&str] = &[
+/// Checklist shown on the "Use Polaris Terminal agent" card.
+const POLARIS_TERMINAL_AGENT_FEATURES: &[&str] = &[
     "Best harness for terminal tasks and agentic coding",
     "Frontier models from OpenAI, Anthropic, and Google",
     "Model routing across frontier and open-weight models",
@@ -33,18 +33,18 @@ const ROOK_AGENT_FEATURES: &[&str] = &[
 
 #[derive(Debug, Clone)]
 pub enum AiSetupSlideAction {
-    SelectRookAgent,
+    SelectPtermAgent,
     SelectThirdParty,
     BackClicked,
     NextClicked,
 }
 
 /// The "Choose your AI setup" slide (DES-816 V3), shown on the AI-first path for
-/// users enrolled in the FREE_AI_REMOVAL experiment arm. Forks between the Rook
+/// users enrolled in the FREE_AI_REMOVAL experiment arm. Forks between the Polaris Terminal
 /// agent (paid-plan path) and third-party agents (works on Free).
 pub struct AiSetupSlide {
     onboarding_state: ModelHandle<OnboardingStateModel>,
-    rook_agent_mouse_state: MouseStateHandle,
+    pterm_agent_mouse_state: MouseStateHandle,
     third_party_mouse_state: MouseStateHandle,
     back_button: button::Button,
     next_button: button::Button,
@@ -55,7 +55,7 @@ impl AiSetupSlide {
     pub(crate) fn new(onboarding_state: ModelHandle<OnboardingStateModel>) -> Self {
         Self {
             onboarding_state,
-            rook_agent_mouse_state: MouseStateHandle::default(),
+            pterm_agent_mouse_state: MouseStateHandle::default(),
             third_party_mouse_state: MouseStateHandle::default(),
             back_button: button::Button::default(),
             next_button: button::Button::default(),
@@ -65,7 +65,7 @@ impl AiSetupSlide {
 
     // The final DES-816 visual exports have not landed yet, so the right panel
     // reuses existing bundled assets that match each choice: the agent
-    // experience for "Use Rook agent" and the CLI-agent toolbar for
+    // experience for "Use Polaris Terminal agent" and the CLI-agent toolbar for
     // "Use third party agents".
     pub(crate) const VISUAL_IMAGE_PATHS: &'static [&'static str] = &[
         "async/png/onboarding/welcome_agent.png",
@@ -99,7 +99,7 @@ impl AiSetupSlide {
         let theme = appearance.theme();
 
         let logo_fill = internal_colors::fg_overlay_4(theme);
-        let logo = ConstrainedBox::new(Icon::RookLogoLight.to_rookui_icon(logo_fill).finish())
+        let logo = ConstrainedBox::new(Icon::PtermLogoLight.to_ptermui_icon(logo_fill).finish())
             .with_width(64.)
             .with_height(64.)
             .finish();
@@ -116,7 +116,7 @@ impl AiSetupSlide {
             .finish();
 
         let subtitle = FormattedTextElement::from_str(
-            "Choose if you'd like to use Rook Agent or third party agents.",
+            "Choose if you'd like to use Polaris Terminal Agent or third party agents.",
             appearance.ui_font_family(),
             16.,
         )
@@ -140,10 +140,10 @@ impl AiSetupSlide {
     }
 
     fn render_options(&self, appearance: &Appearance, choice: AiSetupChoice) -> Box<dyn Element> {
-        let rook_agent_card = self.render_rook_agent_card(
+        let pterm_agent_card = self.render_pterm_agent_card(
             appearance,
-            matches!(choice, AiSetupChoice::RookAgent),
-            self.rook_agent_mouse_state.clone(),
+            matches!(choice, AiSetupChoice::PtermAgent),
+            self.pterm_agent_mouse_state.clone(),
         );
 
         let third_party_card = self.render_third_party_card(
@@ -157,7 +157,7 @@ impl AiSetupSlide {
                 .with_main_axis_size(MainAxisSize::Min)
                 .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
                 .with_child(
-                    Container::new(rook_agent_card)
+                    Container::new(pterm_agent_card)
                         .with_margin_bottom(12.)
                         .finish(),
                 )
@@ -209,7 +209,7 @@ impl AiSetupSlide {
         .finish()
     }
 
-    fn render_rook_agent_card(
+    fn render_pterm_agent_card(
         &self,
         appearance: &Appearance,
         is_selected: bool,
@@ -227,7 +227,7 @@ impl AiSetupSlide {
         let header_row = {
             let label = appearance
                 .ui_builder()
-                .paragraph("Use Rook Agent")
+                .paragraph("Use Polaris Terminal Agent")
                 .with_style(UiComponentStyles {
                     font_size: Some(16.),
                     font_weight: Some(Weight::Semibold),
@@ -289,8 +289,8 @@ impl AiSetupSlide {
             let mut col = Flex::column()
                 .with_main_axis_size(MainAxisSize::Min)
                 .with_cross_axis_alignment(CrossAxisAlignment::Start);
-            for &item in ROOK_AGENT_FEATURES {
-                let icon_el = ConstrainedBox::new(Icon::Check.to_rookui_icon(check_fill).finish())
+            for &item in POLARIS_TERMINAL_AGENT_FEATURES {
+                let icon_el = ConstrainedBox::new(Icon::Check.to_ptermui_icon(check_fill).finish())
                     .with_width(16.)
                     .with_height(16.)
                     .finish();
@@ -333,7 +333,7 @@ impl AiSetupSlide {
             appearance,
             is_selected,
             mouse_state,
-            AiSetupSlideAction::SelectRookAgent,
+            AiSetupSlideAction::SelectPtermAgent,
             content,
         )
     }
@@ -434,7 +434,7 @@ impl AiSetupSlide {
 
     fn render_visual(&self, choice: AiSetupChoice) -> Box<dyn Element> {
         match choice {
-            AiSetupChoice::RookAgent => layout::onboarding_right_panel_with_bg(
+            AiSetupChoice::PtermAgent => layout::onboarding_right_panel_with_bg(
                 Self::VISUAL_IMAGE_PATHS[0],
                 layout::FOREGROUND_LAYOUT_DEFAULT,
             ),
@@ -484,7 +484,7 @@ impl AiSetupSlide {
 
 impl OnboardingSlide for AiSetupSlide {
     fn on_up(&mut self, ctx: &mut ViewContext<Self>) {
-        self.select_choice(AiSetupChoice::RookAgent, ctx);
+        self.select_choice(AiSetupChoice::PtermAgent, ctx);
     }
 
     fn on_down(&mut self, ctx: &mut ViewContext<Self>) {
@@ -501,8 +501,8 @@ impl TypedActionView for AiSetupSlide {
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
-            AiSetupSlideAction::SelectRookAgent => {
-                self.select_choice(AiSetupChoice::RookAgent, ctx);
+            AiSetupSlideAction::SelectPtermAgent => {
+                self.select_choice(AiSetupChoice::PtermAgent, ctx);
             }
             AiSetupSlideAction::SelectThirdParty => {
                 self.select_choice(AiSetupChoice::ThirdParty, ctx);

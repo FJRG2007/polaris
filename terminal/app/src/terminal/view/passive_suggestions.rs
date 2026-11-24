@@ -1,4 +1,4 @@
-use rookui::ViewContext;
+use ptermui::ViewContext;
 
 use super::TerminalView;
 use crate::server::telemetry::InteractionSource;

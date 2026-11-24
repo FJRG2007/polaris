@@ -104,9 +104,9 @@ case "$PROFILE_MODE" in
 esac
 
 FEATURES="release_bundle,crash_reporting,standalone,agent_mode_debug,remote_codebase_indexing"
-ROOK_BIN="rook"
+POLARIS_TERMINAL_BIN="polaris-terminal"
 BINARY_NAME="oz-local"
-REMOTE_DIR=".rook-local/remote-server"
+REMOTE_DIR=".polaris-terminal-local/remote-server"
 # Global, version-independent resources location read by the daemon. Must
 # match BUNDLED_RESOURCES_DIR_NAME in crates/remote_server/src/setup.rs.
 BUNDLED_RESOURCES_DIR_NAME="bundled_resources"
@@ -121,17 +121,17 @@ case "$CARGO_PROFILE" in
     OUTPUT_DIR="$CARGO_TARGET_DIR/$TARGET/$CARGO_PROFILE"
     ;;
 esac
-BUILT_BINARY="$OUTPUT_DIR/$ROOK_BIN"
+BUILT_BINARY="$OUTPUT_DIR/$POLARIS_TERMINAL_BIN"
 LOCAL_RESOURCES_DIR="$OUTPUT_DIR/remote-server-resources"
 
 echo "==> Building Oz CLI for $TARGET (profile=$CARGO_PROFILE)"
-echo "    Binary: $ROOK_BIN -> $BINARY_NAME"
+echo "    Binary: $POLARIS_TERMINAL_BIN -> $BINARY_NAME"
 echo "    Features: $FEATURES"
 echo ""
 
 cargo build \
-    -p rook \
-    --bin "$ROOK_BIN" \
+    -p polaris-terminal \
+    --bin "$POLARIS_TERMINAL_BIN" \
     --target "$TARGET" \
     --profile "$CARGO_PROFILE" \
     --features "$FEATURES"
@@ -152,7 +152,7 @@ SKIP_SETTINGS_SCHEMA=1 "$WORKSPACE_ROOT/script/prepare_bundled_resources" \
   local
 
 # Resolve $HOME on the remote so our upload lands in the same directory the
-# Rook client checks. The client runs `test -x ~/.rook-local/...` and lets
+# Polaris Terminal client checks. The client runs `test -x ~/.polaris-terminal-local/...` and lets
 # the remote login shell expand `~` to $HOME, while rsync's remote path
 # expansion can differ (e.g. on Namespace devboxes, the initial directory
 # is /workspaces but $HOME is elsewhere). Using an absolute path derived
@@ -201,7 +201,7 @@ echo "==> Stopping stale remote-server daemons on $HOST"
 ssh "$HOST" bash <<'EOF'
 set -euo pipefail
 
-REMOTE_SERVER_ROOT="$HOME/.rook-local/remote-server"
+REMOTE_SERVER_ROOT="$HOME/.polaris-terminal-local/remote-server"
 shopt -s nullglob
 
 for pid_file in "$REMOTE_SERVER_ROOT"/*/server.pid; do

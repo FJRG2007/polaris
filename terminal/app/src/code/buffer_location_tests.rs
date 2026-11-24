@@ -1,13 +1,13 @@
 use lsp::LspManagerModel;
+use pterm_files::FileModel;
+use pterm_util::content_version::ContentVersion;
+use pterm_util::host_id::HostId;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::{App, ModelHandle, SingletonEntity};
 use remote_server::proto::TextEdit;
 use repo_metadata::RepoMetadataModel;
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::watcher::DirectoryWatcher;
-use rook_files::FileModel;
-use rook_util::content_version::ContentVersion;
-use rook_util::host_id::HostId;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::{App, ModelHandle, SingletonEntity};
 
 use crate::code::global_buffer_model::{CharOffsetEdit, GlobalBufferModel, GlobalBufferModelEvent};
 use crate::test_util::settings::initialize_settings_for_tests;
@@ -30,7 +30,7 @@ fn gbm(app: &App) -> ModelHandle<GlobalBufferModel> {
 }
 
 /// Reads the text content of a buffer tracked by `GlobalBufferModel`.
-fn content(app: &App, file_id: rook_util::file::FileId) -> String {
+fn content(app: &App, file_id: pterm_util::file::FileId) -> String {
     let handle = gbm(app);
     app.read(|ctx| {
         handle
@@ -41,7 +41,7 @@ fn content(app: &App, file_id: rook_util::file::FileId) -> String {
 }
 
 /// Returns the server_version from the ServerLocal sync clock.
-fn server_version(app: &App, file_id: rook_util::file::FileId) -> ContentVersion {
+fn server_version(app: &App, file_id: pterm_util::file::FileId) -> ContentVersion {
     let handle = gbm(app);
     app.read(|ctx| {
         handle
@@ -644,7 +644,7 @@ fn server_push_does_not_echo_back_as_client_edit() {
             // guard (origin.from_user()) failed.
             let tx = user_edit_tx.clone();
             ctx.subscribe_to_model(&state.buffer, move |_me, _, event, _ctx| {
-                use rook_editor::content::buffer::BufferEvent;
+                use pterm_editor::content::buffer::BufferEvent;
                 if let BufferEvent::ContentChanged { origin, .. } = event
                     && origin.from_user()
                 {

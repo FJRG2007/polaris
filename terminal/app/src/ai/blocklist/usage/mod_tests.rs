@@ -6,7 +6,7 @@
 //! circle and it counts down to an all-grey circle as the window fills up
 //! (100% used → 0% remaining).
 
-use rook_core::ui::Icon;
+use pterm_core::ui::Icon;
 
 use super::icon_for_context_window_usage;
 

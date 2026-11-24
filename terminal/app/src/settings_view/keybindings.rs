@@ -1,20 +1,20 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_error;
-use rookui::elements::{
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_error;
+use ptermui::elements::{
     Align, Border, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, DispatchEventResult, Empty, EventHandler, Fill, Flex,
     Hoverable, MouseState, MouseStateHandle, ParentElement, Radius, SavePosition, ScrollbarWidth,
     Shrinkable, Text, Wrap,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::{DescriptionContext, Keystroke, Trigger};
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::units::Pixels;
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::{DescriptionContext, Keystroke, Trigger};
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::units::Pixels;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -365,7 +365,7 @@ impl KeybindingRow {
                                 .with_margin_right(CLEAR_CANCEL_BUTTONS_SPACING)
                                 .finish(),
                         )
-                        .with_cross_axis_alignment(rookui::elements::CrossAxisAlignment::Center)
+                        .with_cross_axis_alignment(ptermui::elements::CrossAxisAlignment::Center)
                         .finish(),
                 )
                 .finish(),
@@ -597,7 +597,7 @@ impl KeybindingsView {
 
             self.conflict_map.update(&row.binding.trigger, None);
 
-            // Persist the keybinding into the `.rook` directory so that it will last beyond
+            // Persist the keybinding into the `.polaris/terminal` directory so that it will last beyond
             // this session
             write_custom_keybinding(row.binding.name.clone(), UserDefinedKeybinding::Removed);
             update_binding_list(&row.binding.name, None, &mut self.bindings);

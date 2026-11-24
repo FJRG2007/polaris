@@ -1,4 +1,4 @@
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::{Entity, ModelContext, SingletonEntity};
 use settings::Setting;
 
 use crate::settings::{AISettings, AISettingsChangedEvent};

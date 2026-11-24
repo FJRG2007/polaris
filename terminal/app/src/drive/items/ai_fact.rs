@@ -1,9 +1,9 @@
-use rookui::elements::{Container, Flex, MouseStateHandle, ParentElement};
-use rookui::fonts::Weight;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element};
+use ptermui::elements::{Container, Flex, MouseStateHandle, ParentElement};
+use ptermui::fonts::Weight;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element};
 
-use super::{RookDriveItem, RookDriveItemId};
+use super::{PtermDriveItem, PtermDriveItemId};
 use crate::ai::facts::{AIFact, AIMemory, CloudAIFact};
 use crate::appearance::Appearance;
 use crate::cloud_object::CloudObjectMetadata;
@@ -12,18 +12,18 @@ use crate::drive::{CloudObjectTypeAndId, DriveObjectType};
 use crate::themes::theme::Fill;
 
 #[derive(Clone)]
-pub struct RookDriveAIFact {
+pub struct PtermDriveAIFact {
     id: CloudObjectTypeAndId,
     ai_fact: CloudAIFact,
 }
 
-impl RookDriveAIFact {
+impl PtermDriveAIFact {
     pub fn new(id: CloudObjectTypeAndId, ai_fact: CloudAIFact) -> Self {
         Self { id, ai_fact }
     }
 }
 
-impl RookDriveItem for RookDriveAIFact {
+impl PtermDriveItem for PtermDriveAIFact {
     fn display_name(&self) -> Option<String> {
         match &self.ai_fact.model().string_model {
             AIFact::Memory(AIMemory { content, name, .. }) => {
@@ -84,8 +84,8 @@ impl RookDriveItem for RookDriveAIFact {
         )
     }
 
-    fn rook_drive_id(&self) -> RookDriveItemId {
-        RookDriveItemId::Object(self.id)
+    fn pterm_drive_id(&self) -> PtermDriveItemId {
+        PtermDriveItemId::Object(self.id)
     }
 
     fn sync_status_icon(
@@ -105,7 +105,7 @@ impl RookDriveItem for RookDriveAIFact {
         None
     }
 
-    fn clone_box(&self) -> Box<dyn RookDriveItem> {
+    fn clone_box(&self) -> Box<dyn PtermDriveItem> {
         Box::new(self.clone())
     }
 }

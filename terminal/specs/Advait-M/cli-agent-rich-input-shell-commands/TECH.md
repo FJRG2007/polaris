@@ -126,7 +126,7 @@ let is_cli_agent_shell_mode = self.is_locked_in_shell_mode(ctx)
 if (is_command_grid_active || is_cli_agent_shell_mode) && self.can_query_history(ctx) {
 ```
 
-Note this should NOT be allowed if we're in a Rookified remote host, where we cannot run in-band generators.
+Note this should NOT be allowed if we're in a Ptermified remote host, where we cannot run in-band generators.
 
 ### 8. Placeholder text
 

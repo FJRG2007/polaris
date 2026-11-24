@@ -1,7 +1,7 @@
-use rookui::elements::{Container, Flex, ParentElement};
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::ui_components::text::WrappableText;
-use rookui::{AppContext, Element, Entity, ModelContext, SingletonEntity};
+use ptermui::elements::{Container, Flex, ParentElement};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::ui_components::text::WrappableText;
+use ptermui::{AppContext, Element, Entity, ModelContext, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::search::command_palette::mixer::CommandPaletteItemAction;

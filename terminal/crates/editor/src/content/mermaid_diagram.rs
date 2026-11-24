@@ -2,12 +2,12 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 
 use bytes::Bytes;
-use rookui_core::assets::asset_cache::{
+use ptermui_core::assets::asset_cache::{
     AssetCache, AssetSource, AssetState, AsyncAssetId, AsyncAssetType,
 };
-use rookui_core::image_cache::ImageType;
-use rookui_core::units::{IntoPixels, Pixels};
-use rookui_core::{AppContext, SingletonEntity};
+use ptermui_core::image_cache::ImageType;
+use ptermui_core::units::{IntoPixels, Pixels};
+use ptermui_core::{AppContext, SingletonEntity};
 
 use crate::render::layout::TextLayout;
 use crate::render::model::{BlockSpacing, ImageBlockConfig};

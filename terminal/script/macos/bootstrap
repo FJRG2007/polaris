@@ -1,11 +1,11 @@
 #!/bin/sh
 #
-# Run this script once to prepare your machine to develop Rook. This script is
+# Run this script once to prepare your machine to develop Polaris Terminal. This script is
 # a work in progress, and may be incomplete.
 
 set -e
 
-. "$PWD/script/rook_sudo"
+. "$PWD/script/pterm_sudo"
 
 DEVELOPER_DIR="$(xcode-select -p 2>/dev/null || true)"
 if [ -z "$DEVELOPER_DIR" ] || [ ! -x "$DEVELOPER_DIR/usr/bin/xcodebuild" ] || [ "$DEVELOPER_DIR" = "/Library/Developer/CommandLineTools" ]; then
@@ -28,7 +28,7 @@ if [ -z "$DEVELOPER_DIR" ] || [ ! -x "$DEVELOPER_DIR/usr/bin/xcodebuild" ] || [ 
     fi
     echo "Selected Xcode at $XCODE_APP"
     echo "You may be prompted for your password so bootstrap can set Xcode as the active developer directory."
-    rook_sudo xcode-select --switch "$XCODE_APP/Contents/Developer"
+    pterm_sudo xcode-select --switch "$XCODE_APP/Contents/Developer"
 fi
 # Mimic actually launching XCode, which performs some necessary set-up of the
 # development environment.
@@ -89,7 +89,7 @@ if ! [ "$(command -v gcloud)" ]; then
     brew install google-cloud-sdk
 fi
 
-if [[ "${ROOK_SKIP_GCLOUD_AUTH:-0}" != "1" ]] && [[ -z $(gcloud auth print-identity-token) ]]; then
+if [[ "${POLARIS_TERMINAL_SKIP_GCLOUD_AUTH:-0}" != "1" ]] && [[ -z $(gcloud auth print-identity-token) ]]; then
     echo "gcloud CLI authentication missing.  Press enter to continue..."
     read var
     gcloud auth login

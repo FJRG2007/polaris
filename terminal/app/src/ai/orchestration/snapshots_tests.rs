@@ -1,4 +1,4 @@
-use rook_cli::agent::Harness;
+use pterm_cli::agent::Harness;
 
 use super::{
     AUTH_SECRET_INHERIT_LABEL, AuthSecretNamesInput, DEFAULT_MODEL_LABEL, HarnessEntryInput,
@@ -26,7 +26,7 @@ fn all_ready(_harness: Harness) -> LocalHarnessSetupState {
 #[test]
 fn harness_snapshot_excludes_gemini_and_selects_initial() {
     let entries = vec![
-        entry(Harness::Oz, "Rook", true),
+        entry(Harness::Oz, "Polaris Terminal", true),
         entry(Harness::Claude, "Claude Code", true),
         entry(Harness::Gemini, "Gemini", true),
     ];
@@ -43,7 +43,7 @@ fn harness_snapshot_excludes_gemini_and_selects_initial() {
 #[test]
 fn harness_snapshot_filters_product_disabled_local_harness() {
     let entries = vec![
-        entry(Harness::Oz, "Rook", true),
+        entry(Harness::Oz, "Polaris Terminal", true),
         entry(Harness::Codex, "Codex", true),
     ];
 
@@ -57,7 +57,7 @@ fn harness_snapshot_filters_product_disabled_local_harness() {
 #[test]
 fn harness_snapshot_keeps_cloud_opencode_selectable() {
     let entries = vec![
-        entry(Harness::Oz, "Rook", true),
+        entry(Harness::Oz, "Polaris Terminal", true),
         entry(Harness::OpenCode, "OpenCode", true),
     ];
 
@@ -76,7 +76,7 @@ fn harness_snapshot_keeps_cloud_opencode_selectable() {
 fn harness_snapshot_marks_missing_local_cli_disabled_and_sorts_last() {
     let entries = vec![
         entry(Harness::Claude, "Claude Code", true),
-        entry(Harness::Oz, "Rook", true),
+        entry(Harness::Oz, "Polaris Terminal", true),
     ];
     let setup = |harness: Harness| match harness {
         Harness::Claude => LocalHarnessSetupState::MissingHarness {
@@ -100,7 +100,7 @@ fn harness_snapshot_marks_missing_local_cli_disabled_and_sorts_last() {
 #[test]
 fn harness_snapshot_marks_server_disabled_entries() {
     let entries = vec![
-        entry(Harness::Oz, "Rook", true),
+        entry(Harness::Oz, "Polaris Terminal", true),
         entry(Harness::Claude, "Claude Code", false),
     ];
 
@@ -228,20 +228,28 @@ fn api_key_snapshot_maps_inherit_and_unset_selection() {
 // ── Host ────────────────────────────────────────────────────────────
 
 #[test]
-fn host_snapshot_orders_default_rook_connected_recent() {
+fn host_snapshot_orders_default_pterm_connected_recent() {
     let snapshot = build_host_snapshot(
         Some("team-default".to_string()),
         Some("recent-host".to_string()),
         vec!["worker-1".to_string()],
-        "rook",
+        "polaris-terminal",
     );
 
     let ids: Vec<&str> = snapshot.rows.iter().map(|r| r.id.as_str()).collect();
-    assert_eq!(ids, vec!["team-default", "rook", "worker-1", "recent-host"]);
+    assert_eq!(
+        ids,
+        vec![
+            "team-default",
+            "polaris-terminal",
+            "worker-1",
+            "recent-host"
+        ]
+    );
     assert_eq!(snapshot.rows[0].badge, Some(OptionBadge::Default));
     assert_eq!(snapshot.rows[2].badge, Some(OptionBadge::Connected));
     assert_eq!(snapshot.rows[3].badge, Some(OptionBadge::Recent));
-    assert_eq!(snapshot.selected_id.as_deref(), Some("rook"));
+    assert_eq!(snapshot.selected_id.as_deref(), Some("polaris-terminal"));
     assert!(matches!(
         snapshot.footer,
         Some(OptionFooter::CustomText { .. })
@@ -253,12 +261,12 @@ fn host_snapshot_dedupes_connected_and_recent_against_known_rows() {
     let snapshot = build_host_snapshot(
         Some("team-default".to_string()),
         Some("team-default".to_string()),
-        vec!["rook".to_string(), "team-default".to_string()],
+        vec!["polaris-terminal".to_string(), "team-default".to_string()],
         "team-default",
     );
 
     let ids: Vec<&str> = snapshot.rows.iter().map(|r| r.id.as_str()).collect();
-    assert_eq!(ids, vec!["team-default", "rook"]);
+    assert_eq!(ids, vec!["team-default", "polaris-terminal"]);
 }
 
 // ── Environment ─────────────────────────────────────────────────────

@@ -1,11 +1,11 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     Border, Container, CornerRadius, DispatchEventResult, EventHandler, Flex, MainAxisAlignment,
     MouseStateHandle, ParentElement as _, Radius, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::{
     AppContext, BlurContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -83,7 +83,7 @@ impl View for NewEnvironmentButtonView {
         let is_focused = self.is_focused(app);
 
         let trigger = {
-            rookui::elements::Hoverable::new(self.trigger_mouse_state.clone(), move |s| {
+            ptermui::elements::Hoverable::new(self.trigger_mouse_state.clone(), move |s| {
                 let is_hovered = s.is_hovered();
                 let background = if is_hovered || is_focused {
                     Some(theme.surface_3())

@@ -6,30 +6,30 @@ use std::rc::Rc;
 
 use ::settings::{Setting, SettingSection, ToggleableSetting};
 use enum_iterator::all;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::{report_error, report_if_error};
-use rook_util::path::user_friendly_path;
-use rookui::elements::{
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::{report_error, report_if_error};
+use pterm_util::path::user_friendly_path;
+use ptermui::elements::{
     Align, Border, ChildView, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DEFAULT_UI_LINE_HEIGHT_RATIO, Dismiss, Element, Empty, Fill, Flex, FormattedTextElement,
     Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius,
     Shrinkable, Text, Wrap,
 };
-use rookui::fonts::{FamilyId, FontInfo, Weight};
-use rookui::keymap::{ContextPredicate, FixedBinding};
-use rookui::platform::{
+use ptermui::fonts::{FamilyId, FontInfo, Weight};
+use ptermui::keymap::{ContextPredicate, FixedBinding};
+use ptermui::platform::{
     Cursor, FilePickerConfiguration, GraphicsBackend, SystemTheme, WindowBackdrop,
 };
-use rookui::rendering::ThinStrokes;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::radio_buttons::{
+use ptermui::rendering::ThinStrokes;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::radio_buttons::{
     RadioButtonItem, RadioButtonLayout, RadioButtonStateHandle,
 };
-use rookui::ui_components::slider::SliderStateHandle;
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::units::IntoPixels;
-use rookui::{
+use ptermui::ui_components::slider::SliderStateHandle;
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::units::IntoPixels;
+use ptermui::{
     Action, AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, UpdateModel, View,
     ViewContext, ViewHandle, WindowId,
 };
@@ -48,7 +48,7 @@ use crate::channel::{Channel, ChannelState};
 use crate::context_chips::ChipAvailability;
 use crate::context_chips::prompt::{Prompt, PromptEvent};
 use crate::context_chips::renderer::{ChipDragState, Renderer as ContextChipRenderer};
-use crate::drive::settings::RookDriveSettings;
+use crate::drive::settings::PtermDriveSettings;
 use crate::editor::{
     EditOrigin, EditorView, Event as EditorEvent, InteractionState, SingleLineEditorOptions,
     TextOptions,
@@ -78,11 +78,11 @@ use crate::terminal::settings::{
 use crate::terminal::{
     BlockListSettings, ShowBlockDividers, ShowJumpToBottomOfBlockButton, SizeInfo,
 };
-use crate::themes::theme::{self, RespectSystemTheme, RookTheme, SelectedSystemThemes, ThemeKind};
+use crate::themes::theme::{self, PtermTheme, RespectSystemTheme, SelectedSystemThemes, ThemeKind};
 use crate::themes::theme_chooser::ThemeChooserMode;
 use crate::ui_components::color_dot::{TAB_COLOR_OPTIONS, render_color_dot};
 use crate::ui_components::icons::Icon;
-use crate::user_config::RookConfig;
+use crate::user_config::PtermConfig;
 use crate::util::bindings;
 use crate::view_components::action_button::{ActionButton, ButtonSize, NakedTheme};
 use crate::view_components::{Dropdown, DropdownItem, FilterableDropdown};
@@ -246,10 +246,10 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         context.to_owned(),
     )]);
 
-    // Add command palette entry for toggling between Rook and Classic input modes
+    // Add command palette entry for toggling between Polaris Terminal and Classic input modes
     app.register_fixed_bindings(vec![
         FixedBinding::empty(
-            "Toggle Input Mode (Rook/Classic)".to_string(),
+            "Toggle Input Mode (Polaris Terminal/Classic)".to_string(),
             builder(SettingsAction::AppearancePageToggle(
                 AppearancePageAction::ToggleInputMode,
             )),
@@ -501,7 +501,7 @@ pub enum AppearancePageAction {
     ToggleLeftPanelVisibility,
     ToggleToolsPanelProjectExplorer,
     ToggleToolsPanelGlobalSearch,
-    ToggleToolsPanelRookDrive,
+    ToggleToolsPanelPtermDrive,
     ToggleToolsPanelConversationHistory,
     SetEnforceMinimumContrast(EnforceMinimumContrast),
     OpenUrl(String),
@@ -558,7 +558,7 @@ pub struct AppearanceSettingsPageView {
     header_toolbar_inline_editor: ViewHandle<HeaderToolbarInlineEditor>,
 
     /// The context chip renderers based on the most recently
-    /// selected Rook prompt configuration.
+    /// selected Polaris Terminal prompt configuration.
     context_chips: Vec<ContextChipRenderer>,
 
     /// The information we need to render the PS1 as a grid when we're
@@ -651,9 +651,9 @@ impl TypedActionView for AppearanceSettingsPageView {
                 });
                 ctx.notify();
             }
-            ToggleToolsPanelRookDrive => {
-                RookDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
-                    report_if_error!(settings.enable_rook_drive.toggle_and_save_value(ctx));
+            ToggleToolsPanelPtermDrive => {
+                PtermDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
+                    report_if_error!(settings.enable_pterm_drive.toggle_and_save_value(ctx));
                 });
                 ctx.notify();
             }
@@ -1114,7 +1114,7 @@ impl AppearanceSettingsPageView {
             // `all_system_fonts` API doesn't exist.
             #[cfg(not(target_family = "wasm"))]
             {
-                let all_system_fonts = rookui::fonts::Cache::handle(ctx)
+                let all_system_fonts = ptermui::fonts::Cache::handle(ctx)
                     .update(ctx, |font_cache, ctx| font_cache.all_system_fonts(ctx));
                 ctx.spawn(all_system_fonts, Self::set_system_fonts);
             }
@@ -1483,7 +1483,7 @@ impl AppearanceSettingsPageView {
         if cfg!(feature = "local_fs") && FeatureFlag::GlobalSearch.is_enabled() {
             tools_panel_widgets.push(Box::new(ToolsPanelGlobalSearchWidget::default()));
         }
-        tools_panel_widgets.push(Box::new(ToolsPanelRookDriveWidget::default()));
+        tools_panel_widgets.push(Box::new(ToolsPanelPtermDriveWidget::default()));
         if !tools_panel_widgets.is_empty() {
             categories.push(Category::new("Tools panel", tools_panel_widgets));
         }
@@ -1715,7 +1715,7 @@ impl AppearanceSettingsPageView {
 
     fn input_mode_dropdown_item_label(val: InputMode) -> &'static str {
         match val {
-            InputMode::PinnedToBottom => "Pin to the bottom (Rook mode)",
+            InputMode::PinnedToBottom => "Pin to the bottom (Polaris Terminal mode)",
             InputMode::PinnedToTop => "Pin to the top (Reverse mode)",
             InputMode::Waterfall => "Start at the top (Classic mode)",
         }
@@ -1739,7 +1739,7 @@ impl AppearanceSettingsPageView {
             AppIcon::Original => "Original",
             AppIcon::Starburst => "Starburst",
             AppIcon::Sticker => "Sticker",
-            AppIcon::RookOne => "Rook 1",
+            AppIcon::PtermOne => "Polaris Terminal 1",
         }
     }
 
@@ -2923,7 +2923,7 @@ impl ThemeSelectWidget {
         is_selected: bool,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let theme: RookTheme = RookConfig::as_ref(app).theme_config().theme(&theme_kind);
+        let theme: PtermTheme = PtermConfig::as_ref(app).theme_config().theme(&theme_kind);
         let mode_ui_label = match theme_chooser_mode {
             ThemeChooserMode::SystemLight => "Light",
             ThemeChooserMode::SystemDark => "Dark",
@@ -3136,7 +3136,7 @@ impl SettingsWidget for CustomAppIconWidget {
         );
 
         let show_dock_icon_toggle = render_body_item::<AppearancePageAction>(
-            "Show Rook in Dock".into(),
+            "Show Polaris Terminal in Dock".into(),
             None,
             LocalOnlyIconState::for_setting(
                 ShowDockIconState::storage_key(),
@@ -3176,7 +3176,7 @@ impl SettingsWidget for CustomAppIconWidget {
                     appearance
                         .ui_builder()
                         .wrappable_text(
-                            "You may need to restart Rook for MacOS to apply the preferred icon style.",
+                            "You may need to restart Polaris Terminal for MacOS to apply the preferred icon style.",
                             true,
                         )
                         .with_style(UiComponentStyles {
@@ -3586,7 +3586,7 @@ impl SettingsWidget for ToolsPanelStateScopeWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "left tools panel open closed across tabs file tree project explorer global search rook drive conversation list visibility"
+        "left tools panel open closed across tabs file tree project explorer global search polaris-terminal drive conversation list visibility"
     }
 
     fn render(
@@ -3747,15 +3747,15 @@ impl SettingsWidget for ToolsPanelGlobalSearchWidget {
 }
 
 #[derive(Default)]
-struct ToolsPanelRookDriveWidget {
+struct ToolsPanelPtermDriveWidget {
     switch_state: SwitchStateHandle,
 }
 
-impl SettingsWidget for ToolsPanelRookDriveWidget {
+impl SettingsWidget for ToolsPanelPtermDriveWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "tools panel tabs rook drive left panel visibility"
+        "tools panel tabs polaris-terminal drive left panel visibility"
     }
 
     fn render(
@@ -3765,7 +3765,7 @@ impl SettingsWidget for ToolsPanelRookDriveWidget {
         app: &AppContext,
     ) -> Box<dyn Element> {
         render_body_item::<AppearancePageAction>(
-            "Rook Drive".to_string(),
+            "Polaris Terminal Drive".to_string(),
             None,
             LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
@@ -3773,13 +3773,13 @@ impl SettingsWidget for ToolsPanelRookDriveWidget {
             appearance
                 .ui_builder()
                 .switch(self.switch_state.clone())
-                .check(*RookDriveSettings::as_ref(app).enable_rook_drive)
+                .check(*PtermDriveSettings::as_ref(app).enable_pterm_drive)
                 .build()
                 .on_click(|evt_ctx, _app, _v2f| {
-                    evt_ctx.dispatch_typed_action(AppearancePageAction::ToggleToolsPanelRookDrive);
+                    evt_ctx.dispatch_typed_action(AppearancePageAction::ToggleToolsPanelPtermDrive);
                 })
                 .finish(),
-            Some("Show the Rook Drive tab in the tools panel.".to_string()),
+            Some("Show the Polaris Terminal Drive tab in the tools panel.".to_string()),
         )
     }
 }
@@ -3800,7 +3800,7 @@ impl SettingsWidget for InputTypeWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "input type rook universal classic style prompt terminal ai developer mode interface shell chips ps1"
+        "input type polaris-terminal universal classic style prompt terminal ai developer mode interface shell chips ps1"
     }
 
     fn render(
@@ -3815,7 +3815,7 @@ impl SettingsWidget for InputTypeWidget {
             .radio_buttons(
                 self.radio_buttons_states.clone(),
                 vec![
-                    RadioButtonItem::text("Rook"),
+                    RadioButtonItem::text("Polaris Terminal"),
                     RadioButtonItem::text("Shell (PS1)"),
                 ],
                 view.input_type_radio_state.clone(),
@@ -3889,7 +3889,7 @@ impl SettingsWidget for PromptWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "prompt ps1 terminal rook shell custom"
+        "prompt ps1 terminal polaris-terminal shell custom"
     }
 
     fn render(
@@ -4012,7 +4012,7 @@ impl SettingsWidget for DimInactivePanesWidget {
 }
 
 /// The directory-to-name map has no control of its own: a map is not a switch,
-/// and no collection setting in Rook has an editor. What it does have is a
+/// and no collection setting in Polaris Terminal has an editor. What it does have is a
 /// place in the page that names it and shows what is set, so it can be found
 /// without knowing it exists. The footer's "Open settings file" is where it is
 /// edited, as with every other collection.

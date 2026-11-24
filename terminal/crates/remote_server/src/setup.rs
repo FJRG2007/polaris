@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 pub use glibc::{GlibcVersion, RemoteLibc};
-use rook_core::channel::{Channel, ChannelState};
+use pterm_core::channel::{Channel, ChannelState};
 pub const REMOTE_SERVER_ARTIFACT_VERSION_UNPINNED: &str = "unversioned";
 
 /// State machine for the remote server install → launch → initialize flow.
@@ -334,25 +334,25 @@ pub fn parse_uname_output(
 
 /// Returns the remote directory where the binary is installed, keyed by channel.
 ///
-/// - stable:      `~/.rook/remote-server`
-/// - preview:     `~/.rook-preview/remote-server`
-/// - dev:         `~/.rook-dev/remote-server`
-/// - local:       `~/.rook-local/remote-server`
-/// - integration: `~/.rook-dev/remote-server`
-/// - rook-oss:    `~/.rook-oss/remote-server`
+/// - stable:      `~/.polaris-terminal/remote-server`
+/// - preview:     `~/.polaris-terminal-preview/remote-server`
+/// - dev:         `~/.polaris-terminal-dev/remote-server`
+/// - local:       `~/.polaris-terminal-local/remote-server`
+/// - integration: `~/.polaris-terminal-dev/remote-server`
+/// - polaris-terminal:    `~/.polaris-terminal-oss/remote-server`
 pub fn remote_server_dir() -> String {
-    let rook_dir = match ChannelState::channel() {
-        Channel::Stable => ".rook",
-        Channel::Preview => ".rook-preview",
-        Channel::Dev | Channel::Integration => ".rook-dev",
-        Channel::Local => ".rook-local",
+    let pterm_dir = match ChannelState::channel() {
+        Channel::Stable => ".polaris-terminal",
+        Channel::Preview => ".polaris-terminal-preview",
+        Channel::Dev | Channel::Integration => ".polaris-terminal-dev",
+        Channel::Local => ".polaris-terminal-local",
         Channel::Oss => {
-            // TODO(alokedesai): need to figure out how remote server works with rook-oss
+            // TODO(alokedesai): need to figure out how remote server works with polaris-terminal
             // For now, return what Dev returns.
-            ".rook-dev"
+            ".polaris-terminal-dev"
         }
     };
-    format!("~/{rook_dir}/remote-server")
+    format!("~/{pterm_dir}/remote-server")
 }
 
 /// Returns a short, deterministic directory name for a remote-server
@@ -618,7 +618,7 @@ fn download_channel() -> &'static str {
         Channel::Preview => "preview",
         Channel::Dev | Channel::Local | Channel::Integration => "dev",
         Channel::Oss => {
-            // TODO(alokedesai): need to figure out how remote server works with rook-oss
+            // TODO(alokedesai): need to figure out how remote server works with polaris-terminal
             // For now, return what Dev returns.
             "dev"
         }

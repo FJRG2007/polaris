@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 
 #[cfg(not(target_family = "wasm"))]
 use diesel::{QueryDsl, RunQueryDsl, SqliteConnection};
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 #[cfg(not(target_family = "wasm"))]
@@ -22,8 +22,8 @@ use crate::cloud_object::{
     Revision,
 };
 use crate::drive::CloudObjectTypeAndId;
-use crate::drive::items::RookDriveItem;
-use crate::drive::items::mcp_server::RookDriveMCPServer;
+use crate::drive::items::PtermDriveItem;
+use crate::drive::items::mcp_server::PtermDriveMCPServer;
 #[cfg(not(target_family = "wasm"))]
 use crate::persistence::model::MCPEnvironmentVariables;
 use crate::server::ids::SyncId;
@@ -69,7 +69,7 @@ pub mod parsing;
 #[cfg(not(target_family = "wasm"))]
 pub use parsing::ParsedTemplatableMCPServerResult;
 #[cfg(not(target_family = "wasm"))]
-use rook_errors::report_error;
+use pterm_errors::report_error;
 #[cfg(not(target_family = "wasm"))]
 pub mod reconnecting_peer;
 
@@ -122,17 +122,17 @@ impl StringModel for MCPServer {
         None
     }
 
-    fn renders_in_rook_drive(&self) -> bool {
+    fn renders_in_pterm_drive(&self) -> bool {
         false
     }
 
-    fn to_rook_drive_item(
+    fn to_pterm_drive_item(
         &self,
         id: SyncId,
         _appearance: &Appearance,
         mcp_server: &CloudMCPServer,
-    ) -> Option<Box<dyn RookDriveItem>> {
-        Some(Box::new(RookDriveMCPServer::new(
+    ) -> Option<Box<dyn PtermDriveItem>> {
+        Some(Box::new(PtermDriveMCPServer::new(
             CloudObjectTypeAndId::GenericStringObject {
                 object_type: GenericStringObjectFormat::Json(JsonObjectType::MCPServer),
                 id,
@@ -492,7 +492,7 @@ pub enum MCPServerUpdate {
     },
 }
 
-/// The home directory that global (non-Rook) provider configs are resolved against. Tests
+/// The home directory that global (non-Polaris Terminal) provider configs are resolved against. Tests
 /// redirect it through `HOME`; `dirs::home_dir()` ignores that variable on Windows.
 pub(crate) fn home_dir() -> Option<PathBuf> {
     #[cfg(test)]
@@ -506,14 +506,14 @@ pub(crate) fn home_dir() -> Option<PathBuf> {
 
 pub(crate) fn home_config_file_path(provider: MCPProvider) -> Option<PathBuf> {
     match provider {
-        MCPProvider::Rook => rook_core::paths::rook_home_mcp_config_file_path(),
+        MCPProvider::Pterm => pterm_core::paths::pterm_home_mcp_config_file_path(),
         _ => home_dir().map(|home_dir| home_dir.join(provider.home_config_path())),
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
 pub enum MCPProvider {
-    Rook,
+    Pterm,
     Claude,
     Codex,
     Agents,
@@ -522,7 +522,7 @@ pub enum MCPProvider {
 impl MCPProvider {
     pub fn display_name(&self) -> &str {
         match self {
-            MCPProvider::Rook => "Rook",
+            MCPProvider::Pterm => "Polaris Terminal",
             MCPProvider::Claude => "Claude",
             MCPProvider::Codex => "Codex",
             MCPProvider::Agents => "Other Agents",
@@ -531,13 +531,13 @@ impl MCPProvider {
 
     pub fn icon(&self) -> Icon {
         match self {
-            // Rook's own agent MCP config — use the Rook agent brand mark.
-            MCPProvider::Rook => Icon::Agent,
+            // Polaris Terminal's own agent MCP config — use the Polaris Terminal agent brand mark.
+            MCPProvider::Pterm => Icon::Agent,
             MCPProvider::Claude => Icon::ClaudeLogo,
             MCPProvider::Codex => Icon::OpenAILogo,
             // "Other Agents" is the cross-tool .agents/.mcp.json convention for
-            // third-party agent tooling (not Rook-branded). Use a neutral AI
-            // icon so this row never carries the Rook agent mark, and the two
+            // third-party agent tooling (not Polaris Terminal-branded). Use a neutral AI
+            // icon so this row never carries the Polaris Terminal agent mark, and the two
             // rows remain visually distinct once Icon::Agent gets its own asset.
             MCPProvider::Agents => Icon::AiAssistant,
         }
@@ -546,7 +546,7 @@ impl MCPProvider {
     /// Returns the path of the provider's config file relative to the home directory.
     pub fn home_config_path(&self) -> &'static Path {
         match self {
-            MCPProvider::Rook => Path::new(".rook/.mcp.json"),
+            MCPProvider::Pterm => Path::new(".polaris-terminal/.mcp.json"),
             MCPProvider::Claude => Path::new(".claude.json"),
             MCPProvider::Codex => Path::new(".codex/config.toml"),
             MCPProvider::Agents => Path::new(".agents/.mcp.json"),
@@ -556,7 +556,7 @@ impl MCPProvider {
     /// Returns the path of the provider's config file relative to a project root.
     pub fn project_config_path(&self) -> &'static Path {
         match self {
-            MCPProvider::Rook => Path::new(".rook/.mcp.json"),
+            MCPProvider::Pterm => Path::new(".polaris/terminal/.mcp.json"),
             MCPProvider::Claude => Path::new(".mcp.json"),
             MCPProvider::Codex => Path::new(".codex/config.toml"),
             MCPProvider::Agents => Path::new(".agents/.mcp.json"),
@@ -580,7 +580,7 @@ pub fn mcp_provider_from_file_path(file_path: &Path) -> Option<MCPProvider> {
     }
     // Fall back to project-config suffix match, preferring the longest
     // (most-specific) suffix.
-    // This avoids `.mcp.json` shadowing `.rook/.mcp.json`, for example.
+    // This avoids `.mcp.json` shadowing `.polaris/terminal/.mcp.json`, for example.
     let mut best: Option<(MCPProvider, usize)> = None;
     for provider in MCPProvider::iter() {
         let cfg = provider.project_config_path();

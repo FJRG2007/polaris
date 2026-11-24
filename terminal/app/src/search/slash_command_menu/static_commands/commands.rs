@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-use rook_core::features::FeatureFlag;
+use pterm_core::features::FeatureFlag;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -15,7 +15,7 @@ pub static AGENT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     description: "Start a new conversation",
     kind: SlashCommandKind::Agent,
     supported_surfaces: SlashCommandSurfaces::GuiAndTui {
-        icon_path: "bundled/svg/rook-3.svg",
+        icon_path: "bundled/svg/polaris-terminal-3.svg",
     },
     availability: Availability::AI_ENABLED.union(Availability::NOT_CLOUD_AGENT),
     auto_enter_ai_mode: false,
@@ -27,7 +27,7 @@ pub static CLOUD_AGENT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand
     description: "Start a new cloud agent conversation",
     kind: SlashCommandKind::CloudAgent,
     supported_surfaces: SlashCommandSurfaces::GuiOnly {
-        icon_path: "bundled/svg/rook-3.svg",
+        icon_path: "bundled/svg/polaris-terminal-3.svg",
     },
     availability: Availability::AI_ENABLED.union(Availability::NOT_CLOUD_AGENT),
     auto_enter_ai_mode: false,
@@ -149,7 +149,7 @@ pub const MANAGE_BILLING: StaticCommand = StaticCommand {
 };
 pub const UPGRADE: StaticCommand = StaticCommand {
     name: "/upgrade",
-    description: "Open the Rook upgrade page in your browser",
+    description: "Open the Polaris Terminal upgrade page in your browser",
     kind: SlashCommandKind::Upgrade,
     supported_surfaces: SlashCommandSurfaces::TuiOnly,
     availability: Availability::ALWAYS,
@@ -172,7 +172,7 @@ pub const THEME: StaticCommand = StaticCommand {
 
 pub const EXIT: StaticCommand = StaticCommand {
     name: "/exit",
-    description: "Exit Rook",
+    description: "Exit Polaris Terminal",
     kind: SlashCommandKind::Exit,
     supported_surfaces: SlashCommandSurfaces::TuiOnly,
     availability: Availability::ALWAYS,
@@ -192,7 +192,7 @@ pub const STATUS: StaticCommand = StaticCommand {
 
 pub const LOGOUT: StaticCommand = StaticCommand {
     name: "/logout",
-    description: "Log out of Rook",
+    description: "Log out of Polaris Terminal",
     kind: SlashCommandKind::Logout,
     supported_surfaces: SlashCommandSurfaces::TuiOnly,
     availability: Availability::ALWAYS,
@@ -242,7 +242,7 @@ pub static CREATE_NEW_PROJECT: LazyLock<StaticCommand> = LazyLock::new(|| Static
 
 pub static EDIT_SKILL: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: "/open-skill",
-    description: "Open a skill's markdown file in Rook's built-in editor",
+    description: "Open a skill's markdown file in Polaris Terminal's built-in editor",
     kind: SlashCommandKind::EditSkill,
     supported_surfaces: SlashCommandSurfaces::GuiOnly {
         icon_path: "bundled/svg/file-code-02.svg",
@@ -294,7 +294,7 @@ pub const ADD_RULE: StaticCommand = StaticCommand {
 
 pub static EDIT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: "/open-file",
-    description: "Open a file in Rook's code editor",
+    description: "Open a file in Polaris Terminal's code editor",
     kind: SlashCommandKind::Edit,
     supported_surfaces: SlashCommandSurfaces::GuiOnly {
         icon_path: "bundled/svg/file-code-02.svg",
@@ -422,7 +422,7 @@ pub const INIT: StaticCommand = StaticCommand {
     description: "Index this codebase and generate an AGENTS.md file",
     kind: SlashCommandKind::Init,
     supported_surfaces: SlashCommandSurfaces::GuiOnly {
-        icon_path: "bundled/svg/rook-2.svg",
+        icon_path: "bundled/svg/polaris-terminal-2.svg",
     },
     availability: Availability::REPOSITORY
         .union(Availability::AGENT_VIEW)
@@ -553,7 +553,7 @@ pub static MODEL: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     description: "Switch the base agent model",
     kind: SlashCommandKind::Model,
     supported_surfaces: SlashCommandSurfaces::GuiAndTui {
-        icon_path: "bundled/svg/rook-3.svg",
+        icon_path: "bundled/svg/polaris-terminal-3.svg",
     },
     availability: Availability::AGENT_VIEW | Availability::AI_ENABLED,
     auto_enter_ai_mode: true,
@@ -578,7 +578,7 @@ pub static HOST: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     description: "Switch the cloud agent execution host",
     kind: SlashCommandKind::Host,
     supported_surfaces: SlashCommandSurfaces::GuiOnly {
-        icon_path: "bundled/svg/rook-3.svg",
+        icon_path: "bundled/svg/polaris-terminal-3.svg",
     },
     availability: Availability::AGENT_VIEW
         | Availability::AI_ENABLED
@@ -592,7 +592,7 @@ pub static HARNESS: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     description: "Switch the cloud agent harness",
     kind: SlashCommandKind::Harness,
     supported_surfaces: SlashCommandSurfaces::GuiOnly {
-        icon_path: "bundled/svg/rook-3.svg",
+        icon_path: "bundled/svg/polaris-terminal-3.svg",
     },
     availability: Availability::AGENT_VIEW
         | Availability::AI_ENABLED
@@ -650,7 +650,7 @@ pub static ORCHESTRATE: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand
     description: "Break a task into subtasks and run them in parallel with multiple agents",
     kind: SlashCommandKind::Orchestrate,
     supported_surfaces: SlashCommandSurfaces::GuiAndTui {
-        icon_path: "bundled/svg/rook-3.svg",
+        icon_path: "bundled/svg/polaris-terminal-3.svg",
     },
     availability: Availability::LOCAL | Availability::AI_ENABLED,
     auto_enter_ai_mode: true,

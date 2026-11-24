@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use rook_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
 use tempfile::TempDir;
 
 use super::*;

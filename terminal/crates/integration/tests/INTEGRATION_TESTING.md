@@ -1,5 +1,5 @@
-# Integration tests in Rook
-This is a short guide into writing integration tests in Rook.
+# Integration tests in Polaris Terminal
+This is a short guide into writing integration tests in Polaris Terminal.
 
 ## When to add a new integration test?
 Our general philosophy around how we see unit vs integration testing can be summarized as follows:
@@ -61,7 +61,7 @@ fn test_simple_example() -> TestDriver {
 }
 ```
 
-I find `with_keystrokes` and `with_input_string` most helpful methods, so far. You can check the implementation (and expand it!) in [rookui_core/src/integration/step.rs](../../rookui_core/src/integration/step.rs).
+I find `with_keystrokes` and `with_input_string` most helpful methods, so far. You can check the implementation (and expand it!) in [ptermui_core/src/integration/step.rs](../../ptermui_core/src/integration/step.rs).
 
 ## When to use `assert!` vs `async_assert!`
 The former will fail the test the first time it's false. The latter will fail the test if we don't ever see a success in the timeout. If you don't specify a timeout, the default timeout is used.
@@ -92,7 +92,7 @@ async_assert_eq!(
 Since many of our tests are async, I would recommend running in a loop locally before merging to avoid flakes e.g.
 ```sh
 for i in {0..100}; do
-    ROOKUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS=1 RUST_BACKTRACE=full ROOK_SHELL_PATH=/bin/bash cargo run -p integration -- test_simple_example
+    PTERMUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS=1 RUST_BACKTRACE=full POLARIS_TERMINAL_SHELL_PATH=/bin/bash cargo run -p integration -- test_simple_example
     if [ $? -ne 0 ]; then return; fi
 done
 ```
@@ -102,21 +102,21 @@ This has helped us catch a lot of existing bugs in the system.
 Note that for `async_assert` to actually work, the `set_assertion` needs to **return** with the `async_assert`.
 
 ## How to add a sqlite snapshot?
-* You can copy over a rook.sqlite file from ~/Library/Application\ Support/{rook, dev.rook.Rook-(Dev|Preview|Stable)} directly
+* You can copy over a polaris-terminal.sqlite file from ~/Library/Application\ Support/{polaris-terminal, dev.polaris.PolarisTerminal-(Dev|Preview|Stable)} directly
 * You may want to sanitize some info that is specific to you (i.e. cwd https://staging.rook.dev/block/FNBafyVtxvjmdNIx6HxUM5)
 
 
 ### How to run integration tests?
 To run a specific integration test you can use:
 ```
-  ROOKUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS="1" cargo run --bin integration -- test_simple_example
+  PTERMUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS="1" cargo run --bin integration -- test_simple_example
 ```
 
-The `ROOKUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS="1"` will force the new terminal window to open, which helps a lot when iterating on your integration test implementation!
+The `PTERMUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS="1"` will force the new terminal window to open, which helps a lot when iterating on your integration test implementation!
 
 ### Known issues / limitations
-* To determine (from the `TestStep`) which shell is used for the test, you can try checking `ROOK_SHELL_PATH` environment variable (that works within the CI on github) or check the passwd for the user (for local runs).
-* Similarly you can run the test with a specific shell by setting the `ROOK_SHELL_PATH` and then running the test. Note that if you're running with fish, you also need to pass in `--features fish_shell` until that feature flag is removed. For example: `ROOK_SHELL_PATH=/usr/local/bin/fish`, then `cargo run --bin integration --features fish_shell -- test_simple_example`
+* To determine (from the `TestStep`) which shell is used for the test, you can try checking `POLARIS_TERMINAL_SHELL_PATH` environment variable (that works within the CI on github) or check the passwd for the user (for local runs).
+* Similarly you can run the test with a specific shell by setting the `POLARIS_TERMINAL_SHELL_PATH` and then running the test. Note that if you're running with fish, you also need to pass in `--features fish_shell` until that feature flag is removed. For example: `POLARIS_TERMINAL_SHELL_PATH=/usr/local/bin/fish`, then `cargo run --bin integration --features fish_shell -- test_simple_example`
 * Bindings aren't exposed by default in integration tests, add them in the file of the original binding. Example from `editor/view.rs`:
 
 ```rust

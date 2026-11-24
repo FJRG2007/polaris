@@ -2,7 +2,7 @@ use std::io;
 use std::sync::Once;
 
 use base64::Engine;
-use rook_graphql::managed_secrets::ManagedSecretType;
+use pterm_graphql::managed_secrets::ManagedSecretType;
 
 use crate::secret_value::ManagedSecretValue;
 

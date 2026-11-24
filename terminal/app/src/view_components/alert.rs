@@ -1,11 +1,11 @@
 use pathfinder_color::ColorU;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::Element;
-use rookui::elements::{
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::Element;
+use ptermui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Icon, MainAxisSize,
     ParentElement, Radius, Shrinkable,
 };
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
 
 use crate::appearance::Appearance;
 use crate::themes::theme::Fill;

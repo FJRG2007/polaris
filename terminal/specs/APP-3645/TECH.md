@@ -31,7 +31,7 @@ Add three new boolean settings inside the `define_settings_group!(AISettings, ..
 
 Extend `CLIAgentWidget` to include two new `SwitchStateHandle` fields and render two new toggles inside the "Coding Agents" section, gated on `is_footer_enabled`:
 
-- **Setting 1 toggle**: Label "Auto show/hide composer based on agent status" with an `AdditionalInfo` info tooltip saying "Requires the Rook plugin for your coding agent".
+- **Setting 1 toggle**: Label "Auto show/hide composer based on agent status" with an `AdditionalInfo` info tooltip saying "Requires the Polaris Terminal plugin for your coding agent".
 - **Setting 2 toggle**: Label "Auto dismiss composer after prompt submission" with a description explaining the behavior.
 
 Add corresponding `AISettingsPageAction` variants (`ToggleAutoToggleComposer`, `ToggleAutoDismissComposerAfterSubmit`) and wire them to the settings.

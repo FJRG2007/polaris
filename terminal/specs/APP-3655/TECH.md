@@ -183,7 +183,7 @@ Remove the `SEARCH_BAR_HEIGHT` constraint on the search bar's `ConstrainedBox` i
 
 ## 6. Risks and Mitigations
 
-- **Performance**: `pane_matches_query` runs on every render for each visible pane. For realistic Rook usage (tens to low hundreds of tabs), this is O(n) with cheap string operations and is not a concern. The query is lowercased once before the loop; pane fields are lowercased per check on short strings. No caching is needed unless profiling shows otherwise.
+- **Performance**: `pane_matches_query` runs on every render for each visible pane. For realistic Polaris Terminal usage (tens to low hundreds of tabs), this is O(n) with cheap string operations and is not a concern. The query is lowercased once before the loop; pane fields are lowercased per check on short strings. No caching is needed unless profiling shows otherwise.
 - **`PaneProps::new` returns `Option`**: The filter must handle the `None` case (pane no longer exists) gracefully — consistent with how the existing render loop handles it via `continue`.
 - **Collapse state**: Collapsed tab groups still participate in filtering. A group whose header is collapsed but whose panes match should be shown with its header visible (collapsed state preserved). The group header is always rendered when `render_tab_group` is called; only the pane rows are hidden when collapsed. This is unchanged behavior.
 - **Query not cleared on new tab**: Creating a new tab appends to `self.tabs`; the query remains. The new tab group will appear only if one of its panes matches the query (it likely won't until it has content), which is acceptable. No special handling needed.

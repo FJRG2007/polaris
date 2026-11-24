@@ -3,7 +3,7 @@ use settings::{Setting, SupportedPlatforms, SyncToCloud};
 
 // Debug mode settings.
 //
-// If "shell debug mode" is enabled, the `ROOK_SHELL_DEBUG_MODE` environment variable is
+// If "shell debug mode" is enabled, the `POLARIS_TERMINAL_SHELL_DEBUG_MODE` environment variable is
 // set in subsequently spawned terminal sessions.
 //
 // If `are_in_band_generators_for_all_sessions_enabled` is `true`, then all new sessions employ
@@ -67,7 +67,7 @@ impl DebugSettings {
     pub fn should_show_memory_stats(&self) -> bool {
         // We only want to show memory stats in dogfood and not in tests.
         *self.show_memory_stats.value()
-            && rook_core::channel::ChannelState::enable_debug_features()
+            && pterm_core::channel::ChannelState::enable_debug_features()
             && !cfg!(test)
     }
 }

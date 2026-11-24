@@ -2,7 +2,7 @@
 
 #import "services.h"
 
-@implementation RookServicesProvider
+@implementation PtermServicesProvider
 
 // Opens a new tab for each file URL in the pasteboard, with the initial
 // directory set to the provided path (or parent directory, if the path
@@ -32,30 +32,30 @@
             [filePaths addObject:url.path];
         }
 
-        NSMutableArray<NSURL *> *rookUrls = [NSMutableArray array];
+        NSMutableArray<NSURL *> *ptermUrls = [NSMutableArray array];
         for (NSString *path in filePaths) {
             NSURLComponents *components = [[[NSURLComponents alloc] init] autorelease];
-            NSString *scheme = rook_services_provider_custom_url_scheme();
+            NSString *scheme = pterm_services_provider_custom_url_scheme();
             [components setScheme:scheme];
             [components setHost:@"action"];
             [components setPath:action];
             NSMutableArray *queryItems = [NSMutableArray array];
             [queryItems addObject:[NSURLQueryItem queryItemWithName:@"path" value:path]];
             [components setQueryItems:queryItems];
-            [rookUrls addObject:components.URL];
+            [ptermUrls addObject:components.URL];
         };
 
         NSApplication *app = [NSApplication sharedApplication];
-        rook_app_open_urls(app, rookUrls);
+        pterm_app_open_urls(app, ptermUrls);
     }
 }
 
 @end
 
-// Creates a new RookServicesProvider and registers it as the global services
+// Creates a new PtermServicesProvider and registers it as the global services
 // provider for the application
-void rook_register_services_provider() {
-    RookServicesProvider *provider = [[RookServicesProvider alloc] init];
+void pterm_register_services_provider() {
+    PtermServicesProvider *provider = [[PtermServicesProvider alloc] init];
 
     // Set the global NSServices provider for the application.  This holds a
     // strong reference to the provider, so we don't have to worry about it

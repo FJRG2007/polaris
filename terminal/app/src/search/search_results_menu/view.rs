@@ -2,12 +2,12 @@ use std::marker::PhantomData;
 use std::ops::Range;
 
 use itertools::Itertools;
-use rookui::elements::{
+use ptermui::elements::{
     ConstrainedBox, Container, Empty, Flex, ParentElement, SavePosition, ScrollStateHandle,
     Scrollable, ScrollableElement, ScrollbarWidth, Text, UniformList, UniformListState,
 };
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     Action, AppContext, Element, Entity, ModelHandle, SingletonEntity, View, ViewContext,
     ViewHandle, WeakViewHandle,
 };
@@ -177,7 +177,7 @@ impl<T: Action + Clone> SearchResultsMenuView<T> {
                 ScrollbarWidth::Auto,
                 theme.nonactive_ui_detail().into(),
                 theme.active_ui_detail().into(),
-                rookui::elements::Fill::None,
+                ptermui::elements::Fill::None,
             )
             .with_overlayed_scrollbar()
             .finish(),

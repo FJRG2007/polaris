@@ -1,6 +1,6 @@
 ---
 name: triage-vulnerabilities
-description: Triage and remediate security vulnerabilities across Rook infrastructure. Checks Dependabot alerts (GitHub), GCP Artifact Registry container scanning, and Docker Scout for public images. Use when the user asks to check for vulnerabilities, triage CVEs, fix dependency issues, update base images, or remediate security alerts.
+description: Triage and remediate security vulnerabilities across Polaris Terminal infrastructure. Checks Dependabot alerts (GitHub), GCP Artifact Registry container scanning, and Docker Scout for public images. Use when the user asks to check for vulnerabilities, triage CVEs, fix dependency issues, update base images, or remediate security alerts.
 ---
 
 # triage-vulnerabilities
@@ -11,7 +11,7 @@ Triage and remediate security vulnerabilities across four sources: GitHub Depend
 
 ### 1. Dependabot (GitHub)
 
-Repos with Dependabot enabled: `rook-internal`, `rook-server`, `rook-terraform`, `session-sharing-server`.
+Repos with Dependabot enabled: `polaris-terminal-internal`, `polaris-terminal-server`, `polaris-terminal-terraform`, `session-sharing-server`.
 
 Fetch open alerts:
 
@@ -33,8 +33,8 @@ gh api /repos/warpdotdev/<repo>/dependabot/alerts?state=open \
 ### 2. GCP Artifact Registry Scanning
 
 Internal service images in `us-east4` across two projects:
-- **Production** (`astral-field-294621`): `rook-server`, `rook-server-jobs`, `rook-server-migrations`, `session-sharing-server`, `pgbouncer-rtc`
-- **Staging** (`rook-server-staging`): same repos plus `cloud-run-source-deploy`
+- **Production** (`astral-field-294621`): `polaris-terminal-server`, `polaris-terminal-server-jobs`, `polaris-terminal-server-migrations`, `session-sharing-server`, `pgbouncer-rtc`
+- **Staging** (`polaris-terminal-server-staging`): same repos plus `cloud-run-source-deploy`
 
 Scan steps:
 
@@ -79,7 +79,7 @@ Find open security issues:
 
 # Useful fields per issue:
 #   - Issue ID/number (e.g., CLD-2726)
-#   - Title (usually contains CVE ID, e.g., "rook-server-GHSA-8r9q-7v3j-jr4g")
+#   - Title (usually contains CVE ID, e.g., "polaris-terminal-server-GHSA-8r9q-7v3j-jr4g")
 #   - URL (e.g., https://linear.app/warpdotdev/issue/CLD-2726/...)
 #   - Status (Backlog, Todo, In Progress, Done, Cancelled)
 #   - Description (contains CVE details and affected package info)

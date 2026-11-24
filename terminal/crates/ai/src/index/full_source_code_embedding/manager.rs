@@ -14,20 +14,20 @@ cfg_if::cfg_if! {
         use crate::index::{is_git_internal_path, matches_gitignores};
         use ignore::gitignore::Gitignore;
         use notify_debouncer_full::notify::{RecursiveMode, WatchFilter};
-        use rook_core::features::FeatureFlag;
+        use pterm_core::features::FeatureFlag;
         use watcher::{BulkFilesystemWatcher, BulkFilesystemWatcherEvent};
-        use rookui_core::r#async::Timer;
-        use rook_core::send_telemetry_from_ctx;
-        use rook_errors::report_if_error;
+        use ptermui_core::r#async::Timer;
+        use pterm_core::send_telemetry_from_ctx;
+        use pterm_errors::report_if_error;
         use crate::telemetry::AITelemetryEvent;
         use instant::Instant;
-        use rook_core::channel::ChannelState;
-        use rook_core::safe_warn;
+        use pterm_core::channel::ChannelState;
+        use pterm_core::safe_warn;
     }
 }
-use rook_core::safe_anyhow;
-use rook_errors::report_error;
-use rookui_core::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use pterm_core::safe_anyhow;
+use pterm_errors::report_error;
+use ptermui_core::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use super::codebase_index::{CodebaseIndexEvent, RetrievalID, SyncProgress};
 use super::fragment_metadata::FragmentMetadata;
@@ -909,7 +909,7 @@ impl CodebaseIndexManager {
         };
 
         let standardized_path =
-            match rook_util::standardized_path::StandardizedPath::from_local_canonicalized(
+            match pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
                 repo_path,
             ) {
                 Ok(path) => path,

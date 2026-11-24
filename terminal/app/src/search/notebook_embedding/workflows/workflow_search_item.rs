@@ -1,16 +1,16 @@
 use ordered_float::OrderedFloat;
-use rookui::elements::{
+use ptermui::elements::{
     Clipped, ConstrainedBox, Container, CrossAxisAlignment, Flex, Highlight, MainAxisAlignment,
     MainAxisSize, ParentElement, Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::cloud_object::CloudObject;
 use crate::drive::DriveObjectType;
-use crate::drive::cloud_object_styling::rook_drive_icon_color;
+use crate::drive::cloud_object_styling::pterm_drive_icon_color;
 use crate::search::item::{IconLocation, SearchItem};
 use crate::search::notebook_embedding::embedded_fuzzy_match::FuzzyMatchEmbeddedObjectResult;
 use crate::search::notebook_embedding::searcher::EmbeddingSearchItemAction;
@@ -46,17 +46,17 @@ impl SearchItem for WorkflowSearchItem {
         let (icon, icon_color) = if self.cloud_workflow.model().data.is_agent_mode_workflow() {
             (
                 Icon::Prompt,
-                rook_drive_icon_color(appearance, DriveObjectType::AgentModeWorkflow),
+                pterm_drive_icon_color(appearance, DriveObjectType::AgentModeWorkflow),
             )
         } else {
             (
                 Icon::Workflow,
-                rook_drive_icon_color(appearance, DriveObjectType::Workflow),
+                pterm_drive_icon_color(appearance, DriveObjectType::Workflow),
             )
         };
 
         Container::new(
-            ConstrainedBox::new(icon.to_rookui_icon(icon_color.into()).finish())
+            ConstrainedBox::new(icon.to_ptermui_icon(icon_color.into()).finish())
                 .with_width(ICON_SIZE)
                 .with_height(ICON_SIZE)
                 .finish(),
@@ -112,7 +112,7 @@ impl SearchItem for WorkflowSearchItem {
                 .finish();
             let warning_icon = ConstrainedBox::new(
                 Icon::Warning
-                    .to_rookui_icon(appearance.theme().ui_warning_color().into())
+                    .to_ptermui_icon(appearance.theme().ui_warning_color().into())
                     .finish(),
             )
             .with_width(warning_font_size)

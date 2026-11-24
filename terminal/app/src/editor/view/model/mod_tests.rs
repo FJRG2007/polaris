@@ -1,5 +1,5 @@
-use rookui::App;
-use rookui::text_layout::TextStyle;
+use ptermui::App;
+use ptermui::text_layout::TextStyle;
 use string_offset::{ByteOffset, CharOffset};
 use vec1::vec1;
 

@@ -1,9 +1,9 @@
 use std::fmt::Display;
 
-use rookui::Element;
-use rookui::elements::MouseStateHandle;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::Element;
+use ptermui::elements::MouseStateHandle;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
 
 use super::teams_page::TeamsPageAction;
 use crate::Appearance;

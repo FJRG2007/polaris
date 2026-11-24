@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use ptermui::r#async::BoxFuture;
 use remote_server::auth::RemoteServerAuthContext;
-use rookui::r#async::BoxFuture;
 
 use crate::auth::auth_state::AuthState;
 use crate::server::server_api::auth::AuthClient;

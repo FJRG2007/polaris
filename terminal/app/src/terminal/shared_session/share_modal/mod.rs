@@ -2,11 +2,11 @@ use std::default::Default;
 use std::sync::Arc;
 
 use parking_lot::FairMutex;
-use rook_core::ui::appearance::Appearance;
-use rookui::keymap::FixedBinding;
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::UiComponentStyles;
-use rookui::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::keymap::FixedBinding;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::UiComponentStyles;
+use ptermui::{
     AppContext, Element, Entity, EntityId, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -55,7 +55,7 @@ pub enum ShareSessionModalEvent {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",

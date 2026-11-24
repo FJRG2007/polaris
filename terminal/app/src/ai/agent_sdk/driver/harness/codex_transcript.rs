@@ -6,7 +6,7 @@
 //!   interoperate with Codex's own `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl`
 //!   layout (codex `rollout/src/recorder.rs`).
 //! - [`CodexResumeInfo`] — everything the harness runner needs to resume an existing
-//!   Codex conversation: the Rook server conversation id to reuse, the codex session
+//!   Codex conversation: the Polaris Terminal server conversation id to reuse, the codex session
 //!   uuid (`ThreadId`) to pass to `codex resume`, and the decoded envelope to rehydrate
 //!   onto disk.
 use std::fs;
@@ -76,7 +76,7 @@ pub(crate) struct CodexSessionMetadata {
 /// session and server conversation ids instead of minting fresh ones.
 #[derive(Debug)]
 pub(crate) struct CodexResumeInfo {
-    /// Rook server-side conversation id. Reused so subsequent transcript/block-snapshot
+    /// Polaris Terminal server-side conversation id. Reused so subsequent transcript/block-snapshot
     /// uploads overwrite the same GCS objects.
     pub(crate) conversation_id: AIConversationId,
     /// Codex session uuid passed to `codex resume <session_id>`. Matches `envelope.session_id`.

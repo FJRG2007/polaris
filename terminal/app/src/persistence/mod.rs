@@ -32,11 +32,11 @@ use lsp::supported_servers::LSPServerType;
 pub use sqlite::database_file_path_for_current_scope;
 // Only re-exported for integration tests (via `integration_testing::persistence`);
 // in-crate code should resolve paths through `database_file_path_for_current_scope`.
-use rook_core::command::ExitCode;
-use rook_errors::report_error;
-use rook_graphql::scalars::time::ServerTimestamp;
-use rookui::r#async::Timer;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use pterm_core::command::ExitCode;
+use pterm_errors::report_error;
+use pterm_graphql::scalars::time::ServerTimestamp;
+use ptermui::r#async::Timer;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 #[cfg(any(feature = "local_fs", feature = "integration_tests"))]
 #[cfg_attr(not(feature = "integration_tests"), expect(unused_imports))]
 pub use sqlite::database_file_path_for_scope;
@@ -72,7 +72,7 @@ use crate::workspaces::workspace::{Workspace as WorkspaceMetadata, WorkspaceUid}
 pub enum PersistenceScope {
     /// The GUI app (and other launch modes that share its database).
     App,
-    /// The `rook-tui` front-end, which keeps its own database so GUI/TUI
+    /// The `polaris-terminal-tui` front-end, which keeps its own database so GUI/TUI
     /// version skew can never migrate a shared database out from under the
     /// older binary. Cloud sync is the cross-front-end sharing mechanism.
     Tui,
@@ -110,7 +110,7 @@ pub enum PersistedDataScope {
     /// The GUI app: everything, including window/tab/block session
     /// restoration and command history.
     Full,
-    /// The `rook-tui` front-end: command history, cloud objects, user profiles,
+    /// The `polaris-terminal-tui` front-end: command history, cloud objects, user profiles,
     /// and agent/conversation state, but no GUI session restoration or pending
     /// object actions.
     TuiFrontend,

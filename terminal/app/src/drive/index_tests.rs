@@ -1,7 +1,7 @@
 use cloud_objects::cloud_object::ServerPermissions;
-use rook_core::ui::appearance::Appearance;
-use rookui::platform::WindowStyle;
-use rookui::{AddSingletonModel, App, SingletonEntity, TypedActionView, ViewHandle};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::platform::WindowStyle;
+use ptermui::{AddSingletonModel, App, SingletonEntity, TypedActionView, ViewHandle};
 
 use super::{DriveIndex, DriveIndexAction, SharedObjectLimitBannerKind};
 use crate::ASSETS;
@@ -15,7 +15,7 @@ use crate::cloud_object::{
     CloudObjectSyncStatus, ObjectIdType, ObjectType, Owner, ServerCreationInfo, Space,
 };
 use crate::drive::CloudObjectTypeAndId;
-use crate::drive::items::RookDriveItemId;
+use crate::drive::items::PtermDriveItemId;
 use crate::menu::MenuItem;
 use crate::network::NetworkStatus;
 use crate::notebooks::{CloudNotebook, CloudNotebookModel};
@@ -102,7 +102,7 @@ fn create_notebook(app: &mut App) -> SyncId {
 fn set_object_in_error(app: &mut App, cloud_object_type_and_id: &CloudObjectTypeAndId) {
     CloudModel::handle(app).update(
         app,
-        |cloud_model, _ctx: &mut rookui::ModelContext<'_, CloudModel>| {
+        |cloud_model, _ctx: &mut ptermui::ModelContext<'_, CloudModel>| {
             if let Some(object) = cloud_model.get_mut_by_uid(&cloud_object_type_and_id.uid()) {
                 object.set_pending_content_changes_status(CloudObjectSyncStatus::Errored);
             }
@@ -126,11 +126,11 @@ fn test_retry_menu_item_visibility() {
         let sync_id = create_workflow(&mut app);
         let cloud_object_type_and_id: CloudObjectTypeAndId =
             CloudObjectTypeAndId::from_id_and_type(sync_id, ObjectType::Workflow);
-        let rook_drive_item_id = RookDriveItemId::Object(cloud_object_type_and_id);
+        let pterm_drive_item_id = PtermDriveItemId::Object(cloud_object_type_and_id);
 
         // by default, it doesn't show up
         index.update(&mut app, |index, ctx| {
-            let menu_items = index.menu_items(&Space::Personal, &rook_drive_item_id, ctx);
+            let menu_items = index.menu_items(&Space::Personal, &pterm_drive_item_id, ctx);
             assert_eq!(menu_items.len(), 5);
             assert_eq!(label_for_menu_item(&menu_items[0]), "Edit");
             assert_eq!(label_for_menu_item(&menu_items[1]), "Copy workflow text");
@@ -142,7 +142,7 @@ fn test_retry_menu_item_visibility() {
         // when the object is in error, it should show up
         set_object_in_error(&mut app, &cloud_object_type_and_id);
         index.update(&mut app, |index, ctx| {
-            let menu_items = index.menu_items(&Space::Personal, &rook_drive_item_id, ctx);
+            let menu_items = index.menu_items(&Space::Personal, &pterm_drive_item_id, ctx);
             assert_eq!(menu_items.len(), 6);
             assert_eq!(label_for_menu_item(&menu_items[0]), "Retry");
             assert_eq!(label_for_menu_item(&menu_items[1]), "Edit");
@@ -157,7 +157,7 @@ fn test_retry_menu_item_visibility() {
             network_status.reachability_changed(false, ctx);
         });
         index.update(&mut app, |index, ctx| {
-            let menu_items = index.menu_items(&Space::Personal, &rook_drive_item_id, ctx);
+            let menu_items = index.menu_items(&Space::Personal, &pterm_drive_item_id, ctx);
             assert_eq!(menu_items.len(), 5);
             assert_eq!(label_for_menu_item(&menu_items[0]), "Edit");
             assert_eq!(label_for_menu_item(&menu_items[1]), "Copy workflow text");
@@ -244,7 +244,7 @@ fn test_retry_menu_item_logic() {
 }
 
 #[test]
-fn test_rook_drive_navigation_states() {
+fn test_pterm_drive_navigation_states() {
     use crate::drive::index::DriveIndexAction;
     App::test((), |mut app| async move {
         initialize_app(&mut app);
@@ -269,7 +269,7 @@ fn test_rook_drive_navigation_states() {
         index.read(&app, |index, _| {
             assert_eq!(
                 index.selected,
-                Some(RookDriveItemId::Object(cloud_object_type_and_id)),
+                Some(PtermDriveItemId::Object(cloud_object_type_and_id)),
                 "Expect selected to have correct value"
             );
         });

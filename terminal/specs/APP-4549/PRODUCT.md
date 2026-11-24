@@ -2,11 +2,11 @@
 Linear: [APP-4549](https://linear.app/warpdotdev/issue/APP-4549/add-setting-to-disable-the-feedback-skill)
 Figma: none provided
 ## Summary
-Add a user-visible setting that controls whether Rook’s built-in `feedback` bundled skill is available to Oz in the app. The setting should default to enabled so existing behavior is unchanged, while giving users a clear opt-out when they do not want Oz to use Rook’s in-app feedback filing workflow.
+Add a user-visible setting that controls whether Polaris Terminal’s built-in `feedback` bundled skill is available to Oz in the app. The setting should default to enabled so existing behavior is unchanged, while giving users a clear opt-out when they do not want Oz to use Polaris Terminal’s in-app feedback filing workflow.
 ## Problem
-The bundled `feedback` skill is useful for turning rough Rook product feedback into filed GitHub issues, but it is not appropriate for every user or workspace. Users need a way to disable that built-in skill without disabling all bundled skills, all skills, or Oz entirely.
+The bundled `feedback` skill is useful for turning rough Polaris Terminal product feedback into filed GitHub issues, but it is not appropriate for every user or workspace. Users need a way to disable that built-in skill without disabling all bundled skills, all skills, or Oz entirely.
 ## Goals
-- Let users disable only Rook’s built-in `feedback` bundled skill.
+- Let users disable only Polaris Terminal’s built-in `feedback` bundled skill.
 - Preserve current behavior by default.
 - Make the setting discoverable from the existing Agent settings surface.
 - Ensure disabling the skill prevents Oz from discovering or using that built-in skill in future app interactions.
@@ -17,7 +17,7 @@ The bundled `feedback` skill is useful for turning rough Rook product feedback i
 - Changing the feedback skill’s instructions, issue filing behavior, or target repository.
 - Adding organization-level policy controls for bundled skills.
 ## Behavior
-1. Rook exposes a setting for the built-in `feedback` bundled skill in the existing Agent settings UI.
+1. Polaris Terminal exposes a setting for the built-in `feedback` bundled skill in the existing Agent settings UI.
 2. The setting defaults to enabled for all users. Existing users should see no behavior change until they turn it off.
 3. When enabled, the built-in `feedback` bundled skill is available exactly as it is today:
    - It can appear in skill selection surfaces that include bundled skills.
@@ -26,9 +26,9 @@ The bundled `feedback` skill is useful for turning rough Rook product feedback i
 4. When disabled, the built-in `feedback` bundled skill is unavailable in the app:
    - It does not appear in skill selection surfaces that include bundled skills.
    - It is not advertised to Oz in the available-skills context.
-   - If a stale or explicit reference attempts to read the bundled `feedback` skill, Rook treats it as unavailable and does not expose the skill content.
-5. Toggling the setting affects subsequent skill discovery and subsequent Oz requests. A user should not need to restart Rook for future requests to stop including the built-in `feedback` skill.
-6. The setting controls only Rook’s built-in bundled skill with the bundled ID `feedback`.
+   - If a stale or explicit reference attempts to read the bundled `feedback` skill, Polaris Terminal treats it as unavailable and does not expose the skill content.
+5. Toggling the setting affects subsequent skill discovery and subsequent Oz requests. A user should not need to restart Polaris Terminal for future requests to stop including the built-in `feedback` skill.
+6. The setting controls only Polaris Terminal’s built-in bundled skill with the bundled ID `feedback`.
 7. User-created skills are unaffected:
    - A home skill named `feedback` remains available according to normal home-skill rules.
    - A project skill named `feedback` remains available according to normal project-skill rules.
@@ -40,7 +40,7 @@ The bundled `feedback` skill is useful for turning rough Rook product feedback i
    - Re-enabling global AI restores the feedback skill according to the stored setting value.
 10. The setting should be represented in user-editable settings using a stable, descriptive key so users can configure it outside the UI when settings-file support is enabled.
 11. The setting should follow existing settings sync behavior for user-level Agent preferences, so a user’s choice can carry across devices when settings sync is enabled.
-12. The UI label and description should make the scope clear: the toggle controls Rook’s built-in feedback skill, not all feedback mechanisms and not all skills.
+12. The UI label and description should make the scope clear: the toggle controls Polaris Terminal’s built-in feedback skill, not all feedback mechanisms and not all skills.
 13. Search within settings should find the toggle with terms like “feedback,” “skill,” “bundled skill,” and “agent.”
 14. Turning the setting off should not delete any app resource, modify any user skill files, or change git state.
-15. If the setting cannot be read, Rook should fall back to the default enabled behavior rather than unexpectedly removing the skill.
+15. If the setting cannot be read, Polaris Terminal should fall back to the default enabled behavior rather than unexpectedly removing the skill.

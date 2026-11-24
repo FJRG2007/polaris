@@ -4,13 +4,13 @@ use std::time::Duration;
 use futures::FutureExt;
 use futures::future::{Either, select};
 use instant::Instant;
+use ptermui::r#async::Timer;
 use rmcp::model::{
     CallToolRequest, CallToolRequestParams, CallToolResult, CancelledNotificationParam,
     ClientRequest, ErrorData, RequestId, ServerResult,
 };
 use rmcp::service::PeerRequestOptions;
 use rmcp::{Peer, RoleClient, ServiceError};
-use rookui::r#async::Timer;
 use uuid::Uuid;
 
 /// Total connection, dispatch, and response budget for one tool call.
@@ -100,7 +100,7 @@ where
     if let Some((peer, request_id)) = cancellation {
         let cancel = peer.notify_cancelled(CancelledNotificationParam::new(
             Some(request_id),
-            Some("Rook MCP tool call deadline exceeded".to_owned()),
+            Some("Polaris Terminal MCP tool call deadline exceeded".to_owned()),
         ));
         let cancellation_outcome =
             match select(Box::pin(cancel), Box::pin(cancellation_deadline())).await {

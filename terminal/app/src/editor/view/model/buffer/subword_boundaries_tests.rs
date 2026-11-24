@@ -1,4 +1,4 @@
-use rookui::text::point::Point;
+use ptermui::text::point::Point;
 
 use super::super::Buffer;
 

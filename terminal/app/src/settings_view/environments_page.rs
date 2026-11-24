@@ -2,23 +2,23 @@ use std::collections::HashMap;
 
 use instant::Instant;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::editor::NavigationKey;
-use rook_graphql::scalars::time::ServerTimestamp;
-use rookui::elements::{
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::editor::NavigationKey;
+use pterm_graphql::scalars::time::ServerTimestamp;
+use ptermui::elements::{
     Align, Border, ChildAnchor, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Element, Empty, Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius,
     Shrinkable, SizeConstraintCondition, SizeConstraintSwitch, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::prelude::ChildView;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::windowing::state::ApplicationStage;
-use rookui::windowing::{self, WindowManager};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::prelude::ChildView;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::windowing::state::ApplicationStage;
+use ptermui::windowing::{self, WindowManager};
+use ptermui::{
     AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -77,11 +77,11 @@ use new_environment_button::NewEnvironmentButtonView;
 #[allow(unused_imports)] // IntegrationsClient trait is used in fetch_github_repos
 use {
     crate::server::server_api::{ServerApiProvider, integrations::IntegrationsClient},
-    rook_graphql::queries::user_github_info::UserGithubInfoResult,
+    pterm_graphql::queries::user_github_info::UserGithubInfoResult,
 };
 
 const PAGE_TITLE_TEXT: &str = "Environments";
-const PAGE_DESCRIPTION_TEXT: &str = "Environments define where your ambient agents run. Set one up in minutes via GitHub (recommended), Rook-assisted setup, or manual configuration.";
+const PAGE_DESCRIPTION_TEXT: &str = "Environments define where your ambient agents run. Set one up in minutes via GitHub (recommended), Polaris Terminal-assisted setup, or manual configuration.";
 const CARD_BORDER_WIDTH: f32 = 1.;
 const CARD_PADDING: f32 = 16.;
 const CARD_SPACING: f32 = 12.;
@@ -921,7 +921,7 @@ impl TypedActionView for EnvironmentsPageView {
             }
             EnvironmentsPageAction::CopyEnvId(sync_id, env_id_string) => {
                 ctx.clipboard()
-                    .write(rookui::clipboard::ClipboardContent::plain_text(
+                    .write(ptermui::clipboard::ClipboardContent::plain_text(
                         env_id_string.clone(),
                     ));
                 // Track when this was copied for feedback
@@ -930,7 +930,7 @@ impl TypedActionView for EnvironmentsPageView {
                 let duration = COPY_FEEDBACK_DURATION;
                 ctx.spawn(
                     async move {
-                        rookui::r#async::Timer::after(duration).await;
+                        ptermui::r#async::Timer::after(duration).await;
                     },
                     |me, _, ctx| {
                         ctx.notify();
@@ -994,8 +994,8 @@ impl TypedActionView for EnvironmentsPageView {
         &mut self,
         _action: &Self::Action,
         _ctx: &mut ViewContext<Self>,
-    ) -> rookui::accessibility::ActionAccessibilityContent {
-        rookui::accessibility::ActionAccessibilityContent::default()
+    ) -> ptermui::accessibility::ActionAccessibilityContent {
+        ptermui::accessibility::ActionAccessibilityContent::default()
     }
 }
 
@@ -1036,7 +1036,7 @@ impl SettingsWidget for EnvironmentsPageWidget {
     type View = EnvironmentsPageView;
 
     fn search_terms(&self) -> &str {
-        "environments environment ambient agents github rook assisted manual configuration"
+        "environments environment ambient agents github polaris-terminal assisted manual configuration"
     }
 
     fn render(
@@ -1243,7 +1243,7 @@ impl EnvironmentsPageWidget {
 
         let search_icon = ConstrainedBox::new(
             Icon::Search
-                .to_rookui_icon(blended_colors::text_sub(theme, theme.surface_2()).into())
+                .to_ptermui_icon(blended_colors::text_sub(theme, theme.surface_2()).into())
                 .finish(),
         )
         .with_width(icon_size)
@@ -1318,8 +1318,8 @@ impl EnvironmentsPageWidget {
             EnvironmentListScope::Personal => Self::render_overline_header("Personal", appearance),
             EnvironmentListScope::Team => {
                 let shared_by_text = team_name
-                    .map(|team_name| format!("Shared by Rook and {team_name}"))
-                    .unwrap_or_else(|| "Shared by Rook and your team".to_string());
+                    .map(|team_name| format!("Shared by Polaris Terminal and {team_name}"))
+                    .unwrap_or_else(|| "Shared by Polaris Terminal and your team".to_string());
                 Self::render_overline_header(&shared_by_text, appearance)
             }
         };
@@ -1543,7 +1543,7 @@ impl EnvironmentsPageWidget {
         let theme = appearance.theme();
         let build_icon = || {
             Container::new(
-                ConstrainedBox::new(icon.to_rookui_icon(theme.active_ui_text_color()).finish())
+                ConstrainedBox::new(icon.to_ptermui_icon(theme.active_ui_text_color()).finish())
                     .with_width(icon_size)
                     .with_height(icon_size)
                     .finish(),
@@ -1919,7 +1919,7 @@ impl EnvironmentsPageWidget {
             let icon_color: ThemeFill = if is_card_hovered {
                 theme.foreground()
             } else {
-                ThemeFill::Solid(rookui::color::ColorU::transparent_black())
+                ThemeFill::Solid(ptermui::color::ColorU::transparent_black())
             };
 
             let should_render_share_button = list_scope == EnvironmentListScope::Personal

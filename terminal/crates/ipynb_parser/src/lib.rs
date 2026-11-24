@@ -1,5 +1,5 @@
 //! Parses `.ipynb` (Jupyter) notebooks directly into the [`FormattedText`]
-//! representation that Rook's rich-text/notebook renderer consumes.
+//! representation that Polaris Terminal's rich-text/notebook renderer consumes.
 //!
 //! This is **render-only**: it produces a read-only view of the notebook's
 //! existing content (markdown cells, code cells, and saved outputs). It does

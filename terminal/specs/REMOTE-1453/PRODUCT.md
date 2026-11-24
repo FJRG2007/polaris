@@ -13,7 +13,7 @@ Before this work, an `oz agent run` only saw skills that were already present on
 - Keep behavior unchanged for user principals and runs with no global skills.
 ## Non-goals
 - A general plugin or skill registry mechanism beyond startup-time resolution.
-- A Rook-managed cache directory for cloned skill repositories.
+- A Polaris Terminal-managed cache directory for cloned skill repositories.
 - Periodic or background refresh of the global skill list during a run.
 - Changing CLI `--skill` resolution semantics.
 - Adding global-skill loading to non-Oz harnesses in this iteration.

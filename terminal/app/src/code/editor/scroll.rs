@@ -1,5 +1,5 @@
-use rook_editor::content::version::BufferVersion;
-use rook_util::path::LineAndColumnArg;
+use pterm_editor::content::version::BufferVersion;
+use pterm_util::path::LineAndColumnArg;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ScrollWheelBehavior {

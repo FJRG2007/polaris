@@ -1,8 +1,8 @@
 // Diff state protocol messages for communication between
-// the Rook client and the remote server binary.
+// the Polaris Terminal client and the remote server binary.
 //
 // These messages are used by the diff state subsystem to synchronize
-// code review diff data between a remote daemon and the Rook client.
+// code review diff data between a remote daemon and the Polaris Terminal client.
 
 syntax = "proto3";
 
@@ -429,7 +429,7 @@ message GitGetCommittedBranchFilesSuccess {
 }
 
 // Client → server: generate a commit message via AI on the remote host.
-// The daemon computes the working-tree diff locally and calls the Rook
+// The daemon computes the working-tree diff locally and calls the Polaris Terminal
 // server's code-review content endpoint, returning the message string. Sent
 // at commit-dialog open time, mirroring the local open-time autogen.
 message GitGenerateCommitMessageRequest {

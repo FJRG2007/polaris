@@ -1,5 +1,5 @@
-use rookui::AppContext;
-use rookui::keymap::Keystroke;
+use ptermui::AppContext;
+use ptermui::keymap::Keystroke;
 use serde::{Deserialize, Serialize};
 
 pub mod tip_view;

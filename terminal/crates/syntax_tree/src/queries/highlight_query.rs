@@ -2,10 +2,10 @@ use std::iter;
 use std::ops::Range;
 
 use arborium::tree_sitter::{Node, Query, QueryCursor, TextProvider, Tree};
+use pterm_editor::content::buffer::{Buffer, ToBufferByteOffset, ToBufferCharOffset};
+use pterm_editor::content::text::Bytes;
+use ptermui_core::color::ColorU;
 use rangemap::RangeMap;
-use rook_editor::content::buffer::{Buffer, ToBufferByteOffset, ToBufferCharOffset};
-use rook_editor::content::text::Bytes;
-use rookui_core::color::ColorU;
 use streaming_iterator::StreamingIterator;
 use string_offset::{ByteOffset, CharOffset};
 

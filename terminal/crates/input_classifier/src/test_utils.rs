@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use rook_completer::completer::{GeneratorContext, PathCompletionContext};
-use rook_completer::signatures::CommandRegistry;
+use pterm_completer::completer::{GeneratorContext, PathCompletionContext};
+use pterm_completer::signatures::CommandRegistry;
 use smol_str::SmolStr;
 
 /// An implementation of `CompletionContext` for testing purposes.
@@ -19,7 +19,7 @@ impl CompletionContext {
     }
 }
 
-impl rook_completer::completer::CompletionContext for CompletionContext {
+impl pterm_completer::completer::CompletionContext for CompletionContext {
     fn top_level_commands(&self) -> Box<dyn Iterator<Item = &str> + '_> {
         Box::new(self.command_registry.registered_commands())
     }

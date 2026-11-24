@@ -18,9 +18,9 @@ Param (
     [String]$RELEASE_TAG = '',
     [String]$FEATURES = 'release_bundle,crash_reporting,gui',
 
-    # Builds only the Rook binary, skips the installer.
+    # Builds only the Polaris Terminal binary, skips the installer.
     [Switch]$SKIP_BUILD_INSTALLER = $False,
-    # Builds only the installer, skips the Rook binary. Use this if the Rook
+    # Builds only the installer, skips the Polaris Terminal binary. Use this if the Polaris Terminal
     # binary has already been built.
     [Switch]$SKIP_BUILD_BINARY = $False,
 
@@ -55,7 +55,7 @@ if ($ARCH -eq 'arm64') {
     $FILE_ENDING = 'Setup-arm64'
     $PLATFORM_TARGET = 'aarch64-pc-windows-msvc'
 } else {
-    # If x64, then we just use the filename "RookSetup.exe" for example
+    # If x64, then we just use the filename "PtermSetup.exe" for example
     $FILE_ENDING = 'Setup'
     $PLATFORM_TARGET = 'x86_64-pc-windows-msvc'
 }
@@ -127,62 +127,62 @@ if ($CARGO_PROFILE -eq 'dev') {
 } else {
     $CARGO_TARGET_OUTPUT_DIR = "$CARGO_TARGET_DIR" + '\' + $PLATFORM_TARGET + '\' + "$CARGO_PROFILE"
 }
-$BUNDLE_ID = "dev.rook.$app_name"
+$BUNDLE_ID = "dev.polaris.$app_name"
 
 # Update parameters based on the target release channel.
 #
 # APP_NAME here must match the value used in Rust as the
 # application name; see app/src/channel.rs.
 #
-# ROOK_BIN is the name of the binary produced by cargo;
+# POLARIS_TERMINAL_BIN is the name of the binary produced by cargo;
 # BINARY_NAME is the desired name of the binary in the final package.
 if ("$CHANNEL" -eq 'local') {
-    $ROOK_BIN = 'rook'
-    $BINARY_NAME = 'rook.exe'
-    $APP_NAME = 'RookLocal'
+    $POLARIS_TERMINAL_BIN = 'polaris-terminal'
+    $BINARY_NAME = 'polaris-terminal.exe'
+    $APP_NAME = 'PolarisTerminalLocal'
 } elseif ("$CHANNEL" -eq 'dev') {
-    $ROOK_BIN = 'dev'
+    $POLARIS_TERMINAL_BIN = 'dev'
     $BINARY_NAME = 'dev.exe'
-    $APP_NAME = 'RookDev'
+    $APP_NAME = 'PolarisTerminalDev'
     $FEATURES = "$FEATURES,agent_mode_debug"
 } elseif ("$CHANNEL" -eq 'preview') {
-    $ROOK_BIN = 'preview'
+    $POLARIS_TERMINAL_BIN = 'preview'
     $BINARY_NAME = 'preview.exe'
-    $APP_NAME = 'RookPreview'
+    $APP_NAME = 'PolarisTerminalPreview'
     $FEATURES = "$FEATURES,preview_channel"
 } elseif ("$CHANNEL" -eq 'stable') {
-    $ROOK_BIN = 'stable'
-    $BINARY_NAME = 'rook.exe'
-    $APP_NAME = 'Rook'
+    $POLARIS_TERMINAL_BIN = 'stable'
+    $BINARY_NAME = 'polaris-terminal.exe'
+    $APP_NAME = 'Polaris Terminal'
 } elseif ("$CHANNEL" -eq 'oss') {
-    $ROOK_BIN = 'rook-oss'
-    $BINARY_NAME = 'rook-oss.exe'
-    $APP_NAME = 'RookOss'
+    $POLARIS_TERMINAL_BIN = 'polaris-terminal'
+    $BINARY_NAME = 'polaris-terminal.exe'
+    $APP_NAME = 'PolarisTerminal'
     # The OSS channel does not ship Sentry, so drop the crash_reporting feature
     # (which would otherwise pull in the Sentry SDK as a dependency).
     $FEATURES = 'release_bundle,gui'
 }
 
 if ($IS_TUI) {
-    $ROOK_BIN = switch ($CHANNEL) {
-        'local' { 'rook-tui' }
-        'oss' { 'rook-tui-oss' }
-        Default { "rook-tui-$CHANNEL" }
+    $POLARIS_TERMINAL_BIN = switch ($CHANNEL) {
+        'local' { 'polaris-terminal-tui' }
+        'oss' { 'polaris-terminal-tui-oss' }
+        Default { "polaris-terminal-tui-$CHANNEL" }
     }
-    $BINARY_NAME = "$ROOK_BIN.exe"
+    $BINARY_NAME = "$POLARIS_TERMINAL_BIN.exe"
     $APP_NAME = switch ($CHANNEL) {
-        'local' { 'RookAgentCLI' }
-        'dev' { 'RookAgentCLIDev' }
-        'preview' { 'RookAgentCLIPreview' }
-        'stable' { 'RookAgentCLI' }
-        'oss' { 'RookAgentCLIOss' }
+        'local' { 'PtermAgentCLI' }
+        'dev' { 'PtermAgentCLIDev' }
+        'preview' { 'PtermAgentCLIPreview' }
+        'stable' { 'PtermAgentCLI' }
+        'oss' { 'PtermAgentCLIOss' }
     }
     $CLI_NAME = switch ($CHANNEL) {
-        'local' { 'rook' }
-        'dev' { 'rook-dev' }
-        'preview' { 'rook-preview' }
-        'stable' { 'rook' }
-        'oss' { 'rook-oss' }
+        'local' { 'polaris-terminal' }
+        'dev' { 'polaris-terminal-dev' }
+        'preview' { 'polaris-terminal-preview' }
+        'stable' { 'polaris-terminal' }
+        'oss' { 'polaris-terminal' }
     }
     $INSTALL_DIR_NAME = switch ($CHANNEL) {
         'local' { 'tui-local' }
@@ -197,12 +197,12 @@ if ($IS_TUI) {
     }
 } elseif ($IS_CLI) {
     # The CLI ships the same channel binary target as the app (no separate bin), so keep
-    # $ROOK_BIN and the channel-scoped $FEATURES set above (crash_reporting, preview_channel,
+    # $POLARIS_TERMINAL_BIN and the channel-scoped $FEATURES set above (crash_reporting, preview_channel,
     # agent_mode_debug, etc.) but swap the app's `gui` feature for `standalone`, mirroring the
     # macOS and Linux `--artifact cli` builds. Filtering (rather than overwriting) $FEATURES is
     # required so per-channel additions above -- e.g. preview_channel, required by the `preview`
     # cargo target -- survive into the CLI build.
-    $BINARY_NAME = "$ROOK_BIN.exe"
+    $BINARY_NAME = "$POLARIS_TERMINAL_BIN.exe"
     $FEATURES = (($FEATURES -split ',') | Where-Object { $_ -ne 'gui' }) -join ','
     $FEATURES = "$FEATURES,standalone"
 } else {
@@ -215,22 +215,22 @@ if ($IS_TUI) {
 # per-user data directories, all of which have to keep matching what the Rust
 # side derives from the channel. The oss channel is the only one that ships
 # under a different name, because in this fork it is not one channel among
-# several - it is the product, and users look for it as Rook.
-$APP_DISPLAY_NAME = if (-not $IS_TUI -and "$CHANNEL" -eq 'oss') { 'Rook' } else { $APP_NAME }
+# several - it is the product, and users look for it as Polaris Terminal.
+$APP_DISPLAY_NAME = if (-not $IS_TUI -and "$CHANNEL" -eq 'oss') { 'Polaris Terminal' } else { $APP_NAME }
 
 $BINARY_PATH = "$CARGO_TARGET_OUTPUT_DIR\$BINARY_NAME"
-$BUNDLE_ID = "dev.rook.$APP_NAME"
+$BUNDLE_ID = "dev.polaris.$APP_NAME"
 $INSTALLER_OUTPUT_DIR = "$WINDOWS_INSTALLER_DIR\Output"
 $INSTALLER_NAME = "$($APP_NAME)$($FILE_ENDING)"
 $INSTALLER_PATH = "$($INSTALLER_OUTPUT_DIR)\$($INSTALLER_NAME).exe"
 # rustc normalizes hyphens to underscores in crate names, and MSVC uses that
 # normalized crate name for the PDB even though Cargo exposes the executable
 # under its original hyphenated target name. That holds for the GUI binary as
-# much as the TUI one: the OSS channel builds `rook-oss.exe` with
-# `rook_oss.pdb`, and a path built from the hyphenated name pointed at nothing.
-$PDB_BASENAME = $ROOK_BIN.Replace('-', '_')
+# much as the TUI one: the OSS channel builds `polaris-terminal.exe` with
+# `pterm_oss.pdb`, and a path built from the hyphenated name pointed at nothing.
+$PDB_BASENAME = $POLARIS_TERMINAL_BIN.Replace('-', '_')
 $PDB_PATH = "$CARGO_TARGET_OUTPUT_DIR\$PDB_BASENAME.pdb"
-$CARGO_PACKAGE = if ($IS_TUI) { 'rook_tui' } else { 'rook' }
+$CARGO_PACKAGE = if ($IS_TUI) { 'pterm_tui' } else { 'polaris-terminal' }
 $INSTALLER_SCRIPT = if ($IS_TUI) {
     "$WINDOWS_INSTALLER_DIR\tui-installer.iss"
 } else {
@@ -249,28 +249,28 @@ if ($DEBUG_BUILD) {
 # then exit.  We use this script to invoke `cargo check` to ensure that we are
 # using the same feature flags and profile that we would be using in production.
 if ($CHECK_ONLY) {
-    cargo check -p $CARGO_PACKAGE --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --features "$FEATURES" --target $PLATFORM_TARGET
+    cargo check -p $CARGO_PACKAGE --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --features "$FEATURES" --target $PLATFORM_TARGET
     if (-Not $?) {
-        Write-Error "Failed to verify Rook $ROOK_BIN compilation with profile $CARGO_PROFILE"
+        Write-Error "Failed to verify Polaris Terminal $POLARIS_TERMINAL_BIN compilation with profile $CARGO_PROFILE"
         exit 1
     }
     exit 0
 }
 
 if (-Not $SKIP_BUILD_BINARY) {
-    Write-Output "Building Rook for channel $CHANNEL and bundle id $BUNDLE_ID"
+    Write-Output "Building Polaris Terminal for channel $CHANNEL and bundle id $BUNDLE_ID"
     $env:CARGO_BIN_NAME = $CHANNEL
-    $env:ROOK_APP_NAME = $APP_NAME
-    cargo build -p $CARGO_PACKAGE --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --features "$FEATURES" --target $PLATFORM_TARGET
+    $env:POLARIS_TERMINAL_APP_NAME = $APP_NAME
+    cargo build -p $CARGO_PACKAGE --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --features "$FEATURES" --target $PLATFORM_TARGET
     if (-Not $?) {
-        Write-Error "Failed to build Rook $ROOK_BIN binary with profile $CARGO_PROFILE"
+        Write-Error "Failed to build Polaris Terminal $POLARIS_TERMINAL_BIN binary with profile $CARGO_PROFILE"
         exit 1
     }
 
     # If we desire an executable name different from the cargo bin, rename it.
-    if ("$ROOK_BIN.exe" -ne $BINARY_NAME) {
-        $binarySource = "$CARGO_TARGET_OUTPUT_DIR\$ROOK_BIN.exe"
-        Write-Output "Renaming executable $ROOK_BIN.exe to $BINARY_NAME"
+    if ("$POLARIS_TERMINAL_BIN.exe" -ne $BINARY_NAME) {
+        $binarySource = "$CARGO_TARGET_OUTPUT_DIR\$POLARIS_TERMINAL_BIN.exe"
+        Write-Output "Renaming executable $POLARIS_TERMINAL_BIN.exe to $BINARY_NAME"
         Move-Item -Path "$binarySource" -Destination "$BINARY_PATH" -Force
     }
 }
@@ -328,7 +328,7 @@ if ($IS_TUI -or $IS_CLI) {
     )
     foreach ($requiredFile in $requiredPayloadFiles) {
         if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
-            throw "Required Rook Agent CLI payload file does not exist: $requiredFile"
+            throw "Required Polaris Terminal Agent CLI payload file does not exist: $requiredFile"
         }
         if ($REQUIRE_SIGNATURES) {
             Assert-ValidSignature -Path $requiredFile
@@ -349,7 +349,7 @@ if ($IS_CLI) {
     exit 0
 }
 
-Write-Output 'Building Rook installer'
+Write-Output 'Building Polaris Terminal installer'
 $ISCC_ARGS = @(
     "$INSTALLER_SCRIPT",
     "/DReleaseChannel=$CHANNEL",

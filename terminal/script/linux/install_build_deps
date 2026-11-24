@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# Install all dependencies required to build Rook on Linux.
+# Install all dependencies required to build Polaris Terminal on Linux.
 
 set -e
 
-. "$PWD/script/rook_sudo"
+. "$PWD/script/pterm_sudo"
 
 # Define some control sequences for text formatting.
 red="\033[0;31m"
@@ -35,7 +35,7 @@ if [[ "$(source /etc/os-release; echo $ID $ID_LIKE)" = *"debian"* ]]; then
     brotli
     # Needed for voice input
     libasound2-dev
-    # Needed by bindgen (used by minimp4-sys, pulled in by rookui_core's
+    # Needed by bindgen (used by minimp4-sys, pulled in by ptermui_core's
     # integration_tests feature) — pulls in libclang-common-*-dev which
     # provides clang's resource-dir builtin headers.
     libclang-dev
@@ -44,7 +44,7 @@ if [[ "$(source /etc/os-release; echo $ID $ID_LIKE)" = *"debian"* ]]; then
     # Required to build statically-linked binaries for Linux.
     musl-tools
   )
-  rook_sudo apt-get install -y "${PACKAGES[@]}"
+  pterm_sudo apt-get install -y "${PACKAGES[@]}"
 
   # Install a modern version of protoc. The apt 'protobuf-compiler' package on
   # Ubuntu 20.04 ships protoc 3.6.1, which is too old for proto3 'optional'
@@ -57,7 +57,7 @@ if [[ "$(source /etc/os-release; echo $ID $ID_LIKE)" = *"debian"* ]]; then
   esac
   curl -fsSL -o /tmp/protoc.zip \
     "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/${PROTOC_ZIP}"
-  rook_sudo unzip -o /tmp/protoc.zip -d /usr/local bin/protoc 'include/*'
+  pterm_sudo unzip -o /tmp/protoc.zip -d /usr/local bin/protoc 'include/*'
   rm /tmp/protoc.zip
 else
   echo -e "⚠️  ${red}Unknown Linux distribution; necessary build dependencies may not be installed!${reset}"

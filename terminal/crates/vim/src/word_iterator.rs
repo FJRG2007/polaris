@@ -2,8 +2,8 @@ use std::iter::Peekable;
 
 use anyhow::Result;
 use itertools::{Either, PeekNth, peek_nth};
-use rookui_core::text::TextBuffer;
-use rookui_core::text::words::is_default_word_boundary;
+use ptermui_core::text::TextBuffer;
+use ptermui_core::text::words::is_default_word_boundary;
 use string_offset::CharOffset;
 
 use crate::vim::{Direction, WordBound, WordType};

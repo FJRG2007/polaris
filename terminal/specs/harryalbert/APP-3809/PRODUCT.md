@@ -4,11 +4,11 @@ Linear: APP-3809
 
 ## Summary
 
-A guided onboarding flow that introduces existing Rook users to House of Agents (HOA) features: vertical tabs, agent inbox, and default tab config creation. The flow is shown once, behind a feature flag (`HOAOnboardingFlow`), and is only shown to users who did not go through the new-user onboarding (i.e. existing users who update to the HOA release).
+A guided onboarding flow that introduces existing Polaris Terminal users to House of Agents (HOA) features: vertical tabs, agent inbox, and default tab config creation. The flow is shown once, behind a feature flag (`HOAOnboardingFlow`), and is only shown to users who did not go through the new-user onboarding (i.e. existing users who update to the HOA release).
 
 ## Problem
 
-Existing Rook users will receive a major update with HOA features (vertical tabs, agent inbox/notifications, native code review, CLI agent integrations) but have no guided introduction to these changes. Without a targeted onboarding flow, users may not discover or understand the new capabilities, leading to lower adoption of key features.
+Existing Polaris Terminal users will receive a major update with HOA features (vertical tabs, agent inbox/notifications, native code review, CLI agent integrations) but have no guided introduction to these changes. Without a targeted onboarding flow, users may not discover or understand the new capabilities, leading to lower adoption of key features.
 
 ## Goals
 
@@ -57,8 +57,8 @@ The flow has 4 sequential steps. The user progresses forward only (no back navig
 - 4 feature bullet points, each with an icon:
   1. **Vertical tabs** (layout-left icon): "Rich tab-titles and customizable content, so you can keep an eye on your agents how you want."
   2. **Agent inbox and notifications** (inbox-01 icon): "Get notified when agents need approval or feedback, so nothing blocks progress."
-  3. **Native code review** (message-check-square icon): "Review and refine code with your CLI agent without leaving Rook."
-  4. **Rook's input bar** (text-input icon): "Move faster with a smarter input. Attach images, use voice, and trigger actions - all from one place."
+  3. **Native code review** (message-check-square icon): "Review and refine code with your CLI agent without leaving Polaris Terminal."
+  4. **Polaris Terminal's input bar** (text-input icon): "Move faster with a smarter input. Attach images, use voice, and trigger actions - all from one place."
 - Primary CTA button: "See what's new" (light text on dark background, full width within the card).
 
 **Behavior**:
@@ -109,9 +109,9 @@ The flow has 4 sequential steps. The user progresses forward only (no back navig
 
 **Content**:
 - Title: "Create your default tab config"
-- Description: "A tab config defines what opens when you create a new tab. Select a repo, choose a session type (terminal, Rook agent, or third-party agents like Claude or Codex), and optionally attach a worktree. This setup is used for every new tab."
+- Description: "A tab config defines what opens when you create a new tab. Select a repo, choose a session type (terminal, Polaris Terminal agent, or third-party agents like Claude or Codex), and optionally attach a worktree. This setup is used for every new tab."
 - **Session type** selector: pill/chip buttons matching the existing session config modal (reuse the same rendering code and logic, including dynamic filtering of session types based on whether Oz/AI is enabled).
-- **Select directory** button: opens the native file picker. Displays the selected path in user-friendly form (e.g. `~/rook-internal`). Defaults to the user's home directory.
+- **Select directory** button: opens the native file picker. Displays the selected path in user-friendly form (e.g. `~/polaris-terminal-internal`). Defaults to the user's home directory.
 - **Enable worktree support** checkbox with description: "Work on multiple branches at once. Worktrees give each tab its own copy of the repo, so you don't need to switch branches or stash changes." Disabled when the selected directory is not a git repo, with a tooltip explaining why.
 - Progress indicator: 3 dots, dot 3 active.
 - "Finish" button (primary, right-aligned in footer).

@@ -57,11 +57,11 @@ pub enum CommandSearchItemAction {
     /// The user requested to run the AI query search item with this query text.
     RunAIQuery(String),
 
-    /// The user accepted the search item to open Rook AI.
-    OpenRookAI,
+    /// The user accepted the search item to open Polaris Terminal AI.
+    OpenPtermAI,
 
-    /// The user accepted the search item to translate the query to a command using Rook AI.
-    TranslateUsingRookAI,
+    /// The user accepted the search item to translate the query to a command using Polaris Terminal AI.
+    TranslateUsingPtermAI,
 }
 
 #[cfg(test)]

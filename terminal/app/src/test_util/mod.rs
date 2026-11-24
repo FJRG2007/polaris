@@ -3,7 +3,7 @@ pub mod settings;
 pub mod terminal;
 mod virtual_fs;
 
-pub use rook_terminal::test_util::mock_blockgrid;
+pub use pterm_terminal::test_util::mock_blockgrid;
 pub use terminal::add_window_with_terminal;
 pub use virtual_fs::{Stub, VirtualFS};
 
@@ -20,7 +20,7 @@ macro_rules! assert_eventually {
                 pass = true;
                 break;
             }
-            rookui::r#async::Timer::after(std::time::Duration::from_millis(5)).await;
+            ptermui::r#async::Timer::after(std::time::Duration::from_millis(5)).await;
         }
         if !pass {
             panic!("{}", format_args!($($arg)+));

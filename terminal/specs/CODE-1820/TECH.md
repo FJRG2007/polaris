@@ -1,4 +1,4 @@
-# TECH: Rook TUI Conversation Resume and Restoration (CODE-1820)
+# TECH: Polaris Terminal TUI Conversation Resume and Restoration (CODE-1820)
 
 Implements the behavior in [`PRODUCT.md`](./PRODUCT.md). Historical context links remain pinned to commit `1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0`; implementation references below use current branch paths.
 
@@ -6,23 +6,23 @@ Implements the behavior in [`PRODUCT.md`](./PRODUCT.md). Historical context link
 
 The TUI boots the main `app` crate and reuses the same agent conversation, history, action, controller, persistence, terminal model, and blocklist implementations as the GUI. CODE-1820 adds token-based resume, frontend-neutral command/exchange restoration planning, TUI historical block materialization, and post-teardown resume hints.
 
-The TUI is modeled as always presenting one conversation. `TuiConversationSelection` eagerly creates and selects an empty conversation when the session starts, marks it active in `BlocklistAIHistoryModel`, and associates subsequent shell blocks with it. The first prompt must target this eager conversation; it cannot create another conversation as a fallback. `TranscriptScope::Unfiltered` makes the TUI blocklist independent of GUI Agent View lifecycle while preserving the serialized conversation membership used for restoration and cleanup (`app/src/terminal/model/block.rs:85-109`, `app/src/terminal/model/blocks.rs:1661-1741`, `crates/rook_tui/src/conversation_selection.rs:20-310`).
+The TUI is modeled as always presenting one conversation. `TuiConversationSelection` eagerly creates and selects an empty conversation when the session starts, marks it active in `BlocklistAIHistoryModel`, and associates subsequent shell blocks with it. The first prompt must target this eager conversation; it cannot create another conversation as a fallback. `TranscriptScope::Unfiltered` makes the TUI blocklist independent of GUI Agent View lifecycle while preserving the serialized conversation membership used for restoration and cleanup (`app/src/terminal/model/block.rs:85-109`, `app/src/terminal/model/blocks.rs:1661-1741`, `crates/pterm_tui/src/conversation_selection.rs:20-310`).
 
-Startup resume loads and validates the requested conversation before replacing the provisional eager conversation. Clearing provisional history emits `ClearedConversationsForTerminalSurface`, whose delivery can occur after the restored conversation is selected and materialized. Selection and transcript subscribers therefore consume the event's `active_conversation_id` and `cleared_conversation_ids`; they never clear whichever conversation happens to be current at delivery time (`crates/rook_tui/src/conversation_selection.rs:263-291`, `crates/rook_tui/src/transcript_view.rs:84-166`).
+Startup resume loads and validates the requested conversation before replacing the provisional eager conversation. Clearing provisional history emits `ClearedConversationsForTerminalSurface`, whose delivery can occur after the restored conversation is selected and materialized. Selection and transcript subscribers therefore consume the event's `active_conversation_id` and `cleared_conversation_ids`; they never clear whichever conversation happens to be current at delivery time (`crates/pterm_tui/src/conversation_selection.rs:263-291`, `crates/pterm_tui/src/transcript_view.rs:84-166`).
 
 The relevant existing paths are:
 
-- [`crates/rook_tui/src/session.rs (42-157)`](https://github.com/FJRG2007/rook/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/crates/rook_tui/src/session.rs#L42-L157) — dispatches TUI worker re-execs, starts `rook::run_tui`, gates terminal-session creation on login, and exposes the `post_wire` callback after the surface is connected.
-- [`app/src/ai/blocklist/history_model/conversation_loader.rs (233-366)`](https://github.com/FJRG2007/rook/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/app/src/ai/blocklist/history_model/conversation_loader.rs#L233-L366) — loads conversations from memory, local SQLite, or the server. `load_conversation_by_server_token` resolves a canonical local ID, reuses local data when present, and falls back to the server.
-- [`app/src/ai/blocklist/history_model.rs (1058-1169)`](https://github.com/FJRG2007/rook/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/app/src/ai/blocklist/history_model.rs#L1058-L1169) — `restore_conversations` registers a loaded conversation on a terminal surface and rebuilds the server-token and parent/child indexes; `set_active_conversation_id` establishes active-surface state.
-- [`app/src/terminal/view/load_ai_conversation.rs (439-637)`](https://github.com/FJRG2007/rook/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/app/src/terminal/view/load_ai_conversation.rs#L439-L637) — GUI historical restoration: restore action results and documents, register conversations, reconstruct command blocks, compute AI-block placement, and create GUI views.
-- [`app/src/terminal/view/load_ai_conversation.rs (1196-1272)`](https://github.com/FJRG2007/rook/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/app/src/terminal/view/load_ai_conversation.rs#L1196-L1272) — computes where restored agent exchanges belong relative to command blocks.
-- [`app/src/ai/agent/conversation.rs (4003-4086)`](https://github.com/FJRG2007/rook/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/app/src/ai/agent/conversation.rs#L4003-L4086) — reconstructs `SerializedBlockListItem::Command` values from conversation task messages.
-- [`app/src/ai/blocklist/action_model.rs (606-671)`](https://github.com/FJRG2007/rook/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/app/src/ai/blocklist/action_model.rs#L606-L671) — historical blocks read action status from `BlocklistAIActionModel`; `restore_action_results_from_exchanges` populates the past-results map they require.
+- [`crates/pterm_tui/src/session.rs (42-157)`](https://github.com/FJRG2007/polaris/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/terminal/crates/pterm_tui/src/session.rs#L42-L157) — dispatches TUI worker re-execs, starts `polaris_terminal::run_tui`, gates terminal-session creation on login, and exposes the `post_wire` callback after the surface is connected.
+- [`app/src/ai/blocklist/history_model/conversation_loader.rs (233-366)`](https://github.com/FJRG2007/polaris/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/terminal/app/src/ai/blocklist/history_model/conversation_loader.rs#L233-L366) — loads conversations from memory, local SQLite, or the server. `load_conversation_by_server_token` resolves a canonical local ID, reuses local data when present, and falls back to the server.
+- [`app/src/ai/blocklist/history_model.rs (1058-1169)`](https://github.com/FJRG2007/polaris/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/terminal/app/src/ai/blocklist/history_model.rs#L1058-L1169) — `restore_conversations` registers a loaded conversation on a terminal surface and rebuilds the server-token and parent/child indexes; `set_active_conversation_id` establishes active-surface state.
+- [`app/src/terminal/view/load_ai_conversation.rs (439-637)`](https://github.com/FJRG2007/polaris/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/terminal/app/src/terminal/view/load_ai_conversation.rs#L439-L637) — GUI historical restoration: restore action results and documents, register conversations, reconstruct command blocks, compute AI-block placement, and create GUI views.
+- [`app/src/terminal/view/load_ai_conversation.rs (1196-1272)`](https://github.com/FJRG2007/polaris/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/terminal/app/src/terminal/view/load_ai_conversation.rs#L1196-L1272) — computes where restored agent exchanges belong relative to command blocks.
+- [`app/src/ai/agent/conversation.rs (4003-4086)`](https://github.com/FJRG2007/polaris/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/terminal/app/src/ai/agent/conversation.rs#L4003-L4086) — reconstructs `SerializedBlockListItem::Command` values from conversation task messages.
+- [`app/src/ai/blocklist/action_model.rs (606-671)`](https://github.com/FJRG2007/polaris/blob/1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0/terminal/app/src/ai/blocklist/action_model.rs#L606-L671) — historical blocks read action status from `BlocklistAIActionModel`; `restore_action_results_from_exchanges` populates the past-results map they require.
 - `app/src/terminal/conversation_restoration.rs:55-97` — frontend-neutral command restoration and exchange placement plan consumed by GUI and TUI surfaces.
-- `crates/rook_tui/src/terminal_session_view.rs:444-535` — token load, provisional-state replacement, action restoration, transcript materialization, active-history update, and restored selection.
-- `crates/rook_tui/src/transcript_view.rs:84-166, 251-286` — live/restored `TuiAIBlock` materialization and conversation-ID-scoped cleanup of rich content.
-- `crates/rook_tui/src/conversation_selection.rs:20-310` — eager conversation ownership, strict prompt target, `/new` replacement, and history-event reconciliation.
+- `crates/pterm_tui/src/terminal_session_view.rs:444-535` — token load, provisional-state replacement, action restoration, transcript materialization, active-history update, and restored selection.
+- `crates/pterm_tui/src/transcript_view.rs:84-166, 251-286` — live/restored `TuiAIBlock` materialization and conversation-ID-scoped cleanup of rich content.
+- `crates/pterm_tui/src/conversation_selection.rs:20-310` — eager conversation ownership, strict prompt target, `/new` replacement, and history-event reconciliation.
 
 `RestoredAgentConversations` is not the interactive loader for this feature. It supports GUI startup by handing local-ID records to recreated panes at most once. Token-based interactive restoration already has the correct local-first/server-fallback behavior in `BlocklistAIHistoryModel::load_conversation_by_server_token`.
 
@@ -64,7 +64,7 @@ sequenceDiagram
 
 ### 1. Parse and carry `--resume`
 
-`crates/rook_tui/src/session.rs` parses optional `--resume <token>` input and validates its UUID shape before launching the app. `run_tui_worker_if_requested` remains the first operation so terminal-server and other internal re-execs retain their current behavior.
+`crates/pterm_tui/src/session.rs` parses optional `--resume <token>` input and validates its UUID shape before launching the app. `run_tui_worker_if_requested` remains the first operation so terminal-server and other internal re-execs retain their current behavior.
 
 `Option<ServerConversationToken>` is carried through the mount closure and login gate. Restoration starts from the terminal manager's `post_wire` callback, where the `TuiTerminalSessionView` and all of its controller/model dependencies have been created and connected. Startup without a token follows the eager-conversation path without entering restoration state.
 
@@ -113,7 +113,7 @@ The GUI and TUI share `AIConversation`, `TerminalModel`, and `BlockList`; only t
 - Computes exchange placement with the existing timestamp algorithm from `command_block_indices_for_exchanges`.
 - Returns frontend-neutral exchange data and placement; it does not construct views, manage focus, or apply Agent View policy.
 
-Filtering and placement helpers are exposed at the narrowest visibility that supports both `app` and `rook_tui`. New functions and types have concise doc comments, and imports remain at file scope.
+Filtering and placement helpers are exposed at the narrowest visibility that supports both `app` and `pterm_tui`. New functions and types have concise doc comments, and imports remain at file scope.
 
 The GUI historical path consumes the plan without changing its behavior. It continues to own `AIBlockCreationParams`, document restoration, Agent View entry blocks, directory hints, pixel sizing, mouse state, and restored appearance.
 
@@ -175,7 +175,7 @@ Use the GUI loader's generic failure semantics rather than adding a second error
 
 ### 8. Capture and print the selected server token
 
-Printing must happen after `rook::run_tui` returns so raw mode and the alternate screen have been restored. At that point the `App` and its models have been dropped.
+Printing must happen after `polaris_terminal::run_tui` returns so raw mode and the alternate screen have been restored. At that point the `App` and its models have been dropped.
 
 `TuiExitSummaryHandle` is backed by run-scoped shared storage and retained by `session::run`. It updates from the live source of truth whenever:
 
@@ -208,7 +208,7 @@ This run-scoped bridge avoids changing the shared `TerminationResult`, which car
 
 ### TUI unit and view tests
 
-Use existing `App::test` fixtures under `crates/rook_tui` to verify:
+Use existing `App::test` fixtures under `crates/pterm_tui` to verify:
 
 - Startup restoration transitions from loading to the restored transcript without showing an interactive zero state. (PRODUCT 5-6)
 - TUI startup eagerly creates one selected and history-active conversation; shell commands before the first prompt belong to it, and prompt submission cannot create a different fallback conversation.
@@ -233,7 +233,7 @@ Use existing `App::test` fixtures under `crates/rook_tui` to verify:
 
 Run the TUI, complete a conversation, exit, and relaunch with the emitted token. Verify transcript order, command-block content, input focus, and same-lineage follow-up. Repeat once with local persisted data available offline and once with a token that requires a server fetch. Verify a failed token never enters a new conversation.
 
-Run `cargo nextest run -p rook_tui`, the focused `rook` restoration/history tests, `./script/format`, and the presubmit clippy invocation before opening the PR.
+Run `cargo nextest run -p pterm_tui`, the focused `polaris-terminal` restoration/history tests, `./script/format`, and the presubmit clippy invocation before opening the PR.
 
 ## Risks and mitigations
 

@@ -1,10 +1,10 @@
 ---
 name: terminal-remove-feature-flag
-description: Remove a feature flag after it has been rolled out and stabilized in the Rook codebase.
+description: Remove a feature flag after it has been rolled out and stabilized in the Polaris Terminal codebase.
 ---
 
 # terminal-remove-feature-flag
-Remove a feature flag after it has been rolled out and stabilized in the Rook codebase.
+Remove a feature flag after it has been rolled out and stabilized in the Polaris Terminal codebase.
 
 ## Overview
 
@@ -34,7 +34,7 @@ default = [
 ```
 
 ### 2. Remove from FeatureFlag enum
-Remove the variant from the `FeatureFlag` enum in `rook_core/src/features.rs`:
+Remove the variant from the `FeatureFlag` enum in `pterm_core/src/features.rs`:
 
 ```rust
 #[derive(Sequence)]
@@ -78,9 +78,9 @@ if FeatureFlag::YourFeatureName.is_enabled() {
 // new behavior (unconditionally enabled)
 ```
 
-Use ripgrep to find all occurrences. The shared `FeatureFlag` may be used from the headless TUI, so search `crates/rook_tui/` (and other non-`app/` crates), not just `app/` and `rook_core/`:
+Use ripgrep to find all occurrences. The shared `FeatureFlag` may be used from the headless TUI, so search `crates/pterm_tui/` (and other non-`app/` crates), not just `app/` and `pterm_core/`:
 ```bash
-rg "YourFeatureName" app/ rook_core/ crates/rook_tui/
+rg "YourFeatureName" app/ pterm_core/ crates/pterm_tui/
 ```
 
 ### 6. Remove keybinding predicates
@@ -140,10 +140,10 @@ cargo run
 
 ```bash
 # Find all occurrences of the flag name (include the TUI and other non-app crates)
-rg "YourFeatureName" app/ rook_core/ crates/rook_tui/
+rg "YourFeatureName" app/ pterm_core/ crates/pterm_tui/
 
 # Find feature flag checks
-rg "FeatureFlag::YourFeatureName" app/ crates/rook_tui/
+rg "FeatureFlag::YourFeatureName" app/ crates/pterm_tui/
 
 # Find cfg attributes
 rg 'cfg\(feature = "your_feature_name"\)' app/

@@ -1,15 +1,15 @@
 use std::time::Duration;
 
-use rook_completer::completer::MatchType;
-use rook_core::command::ExitCode;
-use rook_core::interval_timer::TimingDataPoint;
-use rook_core::telemetry::{
+use pterm_completer::completer::MatchType;
+use pterm_core::command::ExitCode;
+use pterm_core::interval_timer::TimingDataPoint;
+use pterm_core::telemetry::{
     EnablementState, TelemetryEvent as TelemetryEventTrait, TelemetryEventDesc,
 };
-pub use rook_terminal::ImageProtocol;
-use rookui::keymap::Keystroke;
-use rookui::notification::{NotificationSendError, RequestPermissionsOutcome};
-use rookui::rendering::ThinStrokes;
+pub use pterm_terminal::ImageProtocol;
+use ptermui::keymap::Keystroke;
+use ptermui::notification::{NotificationSendError, RequestPermissionsOutcome};
+use ptermui::rendering::ThinStrokes;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use session_sharing_protocol::common::{ParticipantId, Role, SessionId as SharedSessionId};
@@ -104,7 +104,7 @@ pub struct BootstrappingInfo {
     /// time, which roughly equals the time cost of running our bootstrap
     /// script.  Will be None if `bootstrap_duration_seconds` or
     /// `rcfiles_duration_seconds` is None.
-    pub rook_attributed_bootstrap_duration_seconds: Option<f64>,
+    pub pterm_attributed_bootstrap_duration_seconds: Option<f64>,
     pub shell_version: Option<String>,
     pub terminal_session_id: Option<SessionId>,
 }
@@ -181,7 +181,7 @@ impl From<Space> for TelemetrySpace {
     }
 }
 
-/// Common metadata to include in all Rook Drive telemetry events that act on a specific object.
+/// Common metadata to include in all Polaris Terminal Drive telemetry events that act on a specific object.
 /// Events that only apply to a single object type may use specific metadata like [`WorkflowTelemetryMetadata`],
 /// [`NotebookTelemetryMetadata`], or [`EnvVarTelemetryMetadata`] instead.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -353,7 +353,7 @@ impl From<rmcp::RmcpError> for MCPServerTelemetryError {
 pub struct OpenedSharingDialogEvent {
     pub source: SharingDialogSource,
 
-    /// Metadata for the object being shared, if it's a Rook Drive object.
+    /// Metadata for the object being shared, if it's a Polaris Terminal Drive object.
     #[serde(flatten)]
     pub object_metadata: Option<CloudObjectTelemetryMetadata>,
 
@@ -361,18 +361,18 @@ pub struct OpenedSharingDialogEvent {
     pub session_id: Option<SharedSessionId>,
 }
 
-/// How the user opened the Rook Drive sharing dialog.
+/// How the user opened the Polaris Terminal Drive sharing dialog.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum SharingDialogSource {
     /// The sharing button in the pane header.
     PaneHeader,
     /// The per-pane command palette entry (includes keybindings).
     CommandPalette,
-    /// The Rook Drive index context menu.
+    /// The Polaris Terminal Drive index context menu.
     DriveIndex,
     /// The sharing dialog was auto-opened from shared session creation.
     StartedSessionShare,
-    /// The user intented into Rook with an email address to invite.
+    /// The user intented into Polaris Terminal with an email address to invite.
     InviteeRequest,
     /// The user jumped from an inherited ACL to its definition on a parent object.
     InheritedPermission,
@@ -418,7 +418,7 @@ pub enum PaletteSource {
     PrefixChange,
     Keybinding,
     CtrlTab { shift_pressed_initially: bool },
-    RookDrive,
+    PtermDrive,
     QuitModal,
     LogOutModal,
     IntegrationTest,
@@ -438,7 +438,7 @@ pub enum FileTreeSource {
     ForceOpened,
     /// Opened from the CLI agent view footer (e.g., Claude Code).
     CLIAgentView,
-    /// Opened from the File explorer chip in Rook's own agent input toolbelt.
+    /// Opened from the File explorer chip in Polaris Terminal's own agent input toolbelt.
     AgentToolbelt,
 }
 
@@ -470,8 +470,8 @@ pub enum CLIAgentType {
     Vibe,
     Antigravity,
     Grok,
-    /// Rook's own headless TUI, targeted by the code review panel as a CLI-agent-equivalent destination.
-    RookTui,
+    /// Polaris Terminal's own headless TUI, targeted by the code review panel as a CLI-agent-equivalent destination.
+    PtermTui,
     Unknown,
 }
 
@@ -487,7 +487,7 @@ pub enum PluginChipTelemetryKind {
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationAgentVariant {
-    /// Rook's built-in agent (Oz).
+    /// Polaris Terminal's built-in agent (Oz).
     Oz,
     /// A CLI agent (e.g., Claude Code, Gemini CLI, etc.).
     CLIAgent(CLIAgentType),
@@ -517,7 +517,7 @@ pub enum PluginChipTelemetryAction {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub enum RookDriveSource {
+pub enum PtermDriveSource {
     Legacy,
     LeftPanelToolbelt,
     ForceOpened,
@@ -527,10 +527,10 @@ pub enum RookDriveSource {
 pub enum CommandSearchResultType {
     History,
     Workflow,
-    OpenRookAI,
-    TranslateUsingRookAI,
+    OpenPtermAI,
+    TranslateUsingPtermAI,
     EnvVarCollection,
-    ViewInRookDrive,
+    ViewInPtermDrive,
     AIQuery,
     Project,
 }
@@ -542,8 +542,8 @@ impl From<&CommandSearchItemAction> for CommandSearchResultType {
             AcceptHistory(_) | ExecuteHistory(_) => Self::History,
             AcceptWorkflow(_) => Self::Workflow,
             AcceptEnvVarCollection(_) => Self::EnvVarCollection,
-            OpenRookAI => Self::OpenRookAI,
-            TranslateUsingRookAI => Self::TranslateUsingRookAI,
+            OpenPtermAI => Self::OpenPtermAI,
+            TranslateUsingPtermAI => Self::TranslateUsingPtermAI,
             AcceptAIQuery(_) | RunAIQuery(_) => Self::AIQuery,
         }
     }
@@ -571,7 +571,7 @@ pub enum PtySpawnMode {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub enum OpenedRookAISource {
+pub enum OpenedPtermAISource {
     GlobalEntryButton,
     HelpWithBlock,
     HelpWithTextSelection,
@@ -580,14 +580,14 @@ pub enum OpenedRookAISource {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub enum RookAIRequestResult {
+pub enum PtermAIRequestResult {
     Succeeded { latency_ms: i64, truncated: bool },
     OutOfRequests,
     Failed,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub enum RookAIActionType {
+pub enum PtermAIActionType {
     CopyTranscript,
     Restart,
     CopyAnswer,
@@ -599,8 +599,8 @@ pub enum RookAIActionType {
 pub enum SaveAsWorkflowModalSource {
     Block,
     Input,
-    RookAIWorkflowCard,
-    RookAIPanel,
+    PtermAIWorkflowCard,
+    PtermAIPanel,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -670,8 +670,8 @@ pub enum KnowledgePaneEntrypoint {
     #[serde(rename = "settings")]
     Settings,
 
-    #[serde(rename = "rook_drive")]
-    RookDrive,
+    #[serde(rename = "pterm_drive")]
+    PtermDrive,
 
     #[serde(rename = "ai_blocklist")]
     AIBlocklist,
@@ -689,8 +689,8 @@ pub enum MCPServerCollectionPaneEntrypoint {
     #[serde(rename = "settings")]
     Settings,
 
-    #[serde(rename = "rook_drive")]
-    RookDrive,
+    #[serde(rename = "pterm_drive")]
+    PtermDrive,
 
     #[serde(rename = "slash_command")]
     SlashCommand,
@@ -831,12 +831,12 @@ pub enum PromptSuggestionFallbackReason {
 pub enum AgentModeSetupProjectScopedRulesActionType {
     #[serde(rename = "link_from_existing")]
     LinkFromExisting(String),
-    #[serde(rename = "generate_rook_md")]
-    GenerateRookMd,
+    #[serde(rename = "generate_pterm_md")]
+    GeneratePtermMd,
     #[serde(rename = "skip_rules")]
     SkipRules,
-    #[serde(rename = "regenerate_rook_md")]
-    RegenerateRookMd,
+    #[serde(rename = "regenerate_pterm_md")]
+    RegeneratePtermMd,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -952,11 +952,11 @@ pub enum CodeContextDestination {
 
 #[derive(Clone, Debug, Serialize)]
 pub enum AgentModeCitation {
-    RookDriveObject {
+    PtermDriveObject {
         object_type: ObjectType,
         uid: ObjectUid,
     },
-    RookDocs {
+    PtermDocs {
         page: String,
     },
     WebPage {
@@ -1353,7 +1353,7 @@ pub enum TelemetryEvent {
     DatabaseReadError(String),
     DatabaseWriteError(String),
     AppStartup(AppStartupInfo),
-    /// The native app was opened while logged out. Since Rook requires login,
+    /// The native app was opened while logged out. Since Polaris Terminal requires login,
     /// this usually means a new user.
     LoggedOutStartup,
     /// The download source, if it can be determined. Will only be sent when
@@ -1599,25 +1599,25 @@ pub enum TelemetryEvent {
     InitialWorkingDirectoryConfigurationChanged {
         advanced_mode_enabled: bool,
     },
-    /// Opened legacy Rook AI.
-    OpenedRookAI {
-        source: OpenedRookAISource,
+    /// Opened legacy Polaris Terminal AI.
+    OpenedPtermAI {
+        source: OpenedPtermAISource,
     },
-    /// Issued legacy Rook AI request.
-    RookAIRequestIssued {
-        result: RookAIRequestResult,
+    /// Issued legacy Polaris Terminal AI request.
+    PtermAIRequestIssued {
+        result: PtermAIRequestResult,
     },
-    RookAIAction {
-        action_type: RookAIActionType,
+    PtermAIAction {
+        action_type: PtermAIActionType,
     },
     /// This is purely for static prompts! Do not send user-written prompts with this event.
-    UsedRookAIPreparedPrompt {
+    UsedPtermAIPreparedPrompt {
         prompt: &'static str,
     },
     ToggleFocusPaneOnHover {
         enabled: bool,
     },
-    RookAICharacterLimitExceeded,
+    PtermAICharacterLimitExceeded,
     OpenInputContextMenu,
     InputCutSelectedText,
     InputCopySelectedText,
@@ -1625,7 +1625,7 @@ pub enum TelemetryEvent {
     InputPaste,
     InputCommandSearch,
     InputAICommandSearch,
-    InputAskRookAI,
+    InputAskPtermAI,
     SaveAsWorkflowModal {
         source: SaveAsWorkflowModalSource,
     },
@@ -1666,7 +1666,7 @@ pub enum TelemetryEvent {
     AddAddedSubshellCommand,
     RemoveAddedSubshellCommand,
     ReceivedSubshellRcFileDcs,
-    ToggleSshRookification {
+    ToggleSshPtermification {
         enabled: bool,
     },
     /// User changed the SSH extension install mode.
@@ -1678,11 +1678,11 @@ pub enum TelemetryEvent {
     SshRemoteServerChoiceDoNotAskAgainToggled {
         checked: bool,
     },
-    RookifyFooterShown {
+    PtermifyFooterShown {
         is_ssh: bool,
     },
     AgentToolbarDismissed,
-    RookifyFooterAcceptedRookify {
+    PtermifyFooterAcceptedPtermify {
         is_ssh: bool,
     },
     ShowAliasExpansionBanner,
@@ -1702,12 +1702,12 @@ pub enum TelemetryEvent {
     },
     AnonymousUserHitCloudObjectLimit,
     NeedsReauth,
-    RookDriveOpened {
-        source: RookDriveSource,
+    PtermDriveOpened {
+        source: PtermDriveSource,
         is_code_mode_v2: bool,
     },
-    // Toggled the legacy Rook AI side panel.
-    ToggleRookAI {
+    // Toggled the legacy Polaris Terminal AI side panel.
+    TogglePtermAI {
         opened: bool,
     },
     ToggleSecretRedaction {
@@ -1729,7 +1729,7 @@ pub enum TelemetryEvent {
         item_type: UndoCloseItemType,
     },
     /// This event is used to measure PTY throughput.
-    /// NOTE: this event is only meant to be used for RookDev.
+    /// NOTE: this event is only meant to be used for PolarisTerminalDev.
     PtyThroughput {
         /// The maximum PTY throughput in bytes/sec, aggregated over a 10 minute period.
         max_bytes_per_second: usize,
@@ -1788,7 +1788,7 @@ pub enum TelemetryEvent {
         team_uid: ServerId,
     },
     CopyObjectToClipboard(TelemetryCloudObjectType),
-    OpenAndRookifyDockerSubshell {
+    OpenAndPtermifyDockerSubshell {
         /// Some variant if we support this shell type, and None otherwise.
         shell_type: Option<ShellType>,
     },
@@ -1949,7 +1949,7 @@ pub enum TelemetryEvent {
     /// language auto-detection false-positive.
     AgentModePotentialAutoDetectionFalsePositive(AgentModeAutoDetectionFalsePositivePayload),
 
-    /// This is a telemetry event used to help track performance of Agent Predict in Rook,
+    /// This is a telemetry event used to help track performance of Agent Predict in Polaris Terminal,
     /// by keeping track of the context given and the predictions generated.
     AgentModePrediction {
         was_suggestion_accepted: bool,
@@ -2328,7 +2328,7 @@ pub enum TelemetryEvent {
     AutoupdateMinidumpCleanupFailed {
         exit_code: i32,
     },
-    ExecutedRookDrivePrompt {
+    ExecutedPtermDrivePrompt {
         id: Option<WorkflowId>,
         selection_source: WorkflowSelectionSource,
     },
@@ -2607,9 +2607,9 @@ pub enum TelemetryEvent {
     AgentManagementViewOpenedSession,
     /// Emitted when the user copies a session link from the Agent Management View.
     AgentManagementViewCopiedSessionLink,
-    /// Detected that Rook is running in an isolated sandbox.
+    /// Detected that Polaris Terminal is running in an isolated sandbox.
     DetectedIsolationPlatform {
-        platform: rook_isolation_platform::IsolationPlatformType,
+        platform: pterm_isolation_platform::IsolationPlatformType,
     },
 
     AgentTipShown {
@@ -2760,7 +2760,7 @@ pub enum TelemetryEvent {
         server_conversation_id: Option<String>,
         ambient_agent_task_id: Option<AmbientAgentTaskId>,
     },
-    /// Emitted when a rook://linear deeplink is opened.
+    /// Emitted when a polaris-terminal://linear deeplink is opened.
     LinearIssueLinkOpened,
     /// Emitted when the remote server binary check completes.
     RemoteServerBinaryCheck {
@@ -2847,7 +2847,7 @@ pub enum TelemetryEvent {
     /// daemon process on the remote host.  Only emitted on success — if
     /// the daemon crashes before binding, no event is sent.
     RemoteServerDaemonStartup {
-        timing_data: Vec<rook_core::interval_timer::TimingDataPoint>,
+        timing_data: Vec<pterm_core::interval_timer::TimingDataPoint>,
     },
     /// Emitted when all reconnection attempts are exhausted.
     RemoteServerReconnectExhausted {
@@ -2927,7 +2927,7 @@ impl TelemetryEventTrait for TelemetryEvent {
     }
 
     fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        rook_core::telemetry::enum_events::<Self>()
+        pterm_core::telemetry::enum_events::<Self>()
     }
 }
 
@@ -3211,9 +3211,9 @@ impl TelemetryEvent {
             TelemetryEvent::InitialWorkingDirectoryConfigurationChanged {
                 advanced_mode_enabled,
             } => Some(json!({ "advanced_mode_enabled": advanced_mode_enabled })),
-            TelemetryEvent::OpenedRookAI { source } => Some(json!({ "source": source })),
-            TelemetryEvent::RookAIRequestIssued { result } => Some(json!({ "result": result })),
-            TelemetryEvent::RookAIAction { action_type } => {
+            TelemetryEvent::OpenedPtermAI { source } => Some(json!({ "source": source })),
+            TelemetryEvent::PtermAIRequestIssued { result } => Some(json!({ "result": result })),
+            TelemetryEvent::PtermAIAction { action_type } => {
                 Some(json!({ "action_type": action_type }))
             }
             TelemetryEvent::MCPServerCollectionPaneOpened { entrypoint } => {
@@ -3269,9 +3269,9 @@ impl TelemetryEvent {
             TelemetryEvent::CodePanelsFileOpened { entrypoint, target } => {
                 let (target, layout, editor) = match target {
                     FileTarget::MarkdownViewer(layout) => {
-                        ("rook_markdown_viewer", Some(*layout), None)
+                        ("pterm_markdown_viewer", Some(*layout), None)
                     }
-                    FileTarget::CodeEditor(layout) => ("rook_code_editor", Some(*layout), None),
+                    FileTarget::CodeEditor(layout) => ("pterm_code_editor", Some(*layout), None),
                     FileTarget::EnvEditor => ("env_editor", None, None),
                     FileTarget::SystemDefault => ("system_default", None, None),
                     FileTarget::SystemGeneric => ("system_generic", None, None),
@@ -3297,7 +3297,7 @@ impl TelemetryEvent {
             TelemetryEvent::AISuggestedRuleContentChanged { rule_id, is_saved } => {
                 Some(json!({ "rule_id": rule_id, "is_saved": is_saved }))
             }
-            TelemetryEvent::UsedRookAIPreparedPrompt { prompt } => {
+            TelemetryEvent::UsedPtermAIPreparedPrompt { prompt } => {
                 Some(json!({ "prompt": prompt }))
             }
             TelemetryEvent::ExperimentTriggered {
@@ -3321,8 +3321,8 @@ impl TelemetryEvent {
                 Some(json!({ "remember": remember }))
             }
             TelemetryEvent::AgentToolbarDismissed => None,
-            TelemetryEvent::RookifyFooterShown { is_ssh }
-            | TelemetryEvent::RookifyFooterAcceptedRookify { is_ssh } => {
+            TelemetryEvent::PtermifyFooterShown { is_ssh }
+            | TelemetryEvent::PtermifyFooterAcceptedPtermify { is_ssh } => {
                 Some(json!({ "is_ssh": is_ssh }))
             }
             TelemetryEvent::ToggleSameLinePrompt { enabled } => Some(json!({ "enabled": enabled })),
@@ -3337,7 +3337,7 @@ impl TelemetryEvent {
             } => Some(
                 json!({ "ui_location": ui_location, "open_in_active_window": open_in_active_window }),
             ),
-            TelemetryEvent::ToggleRookAI { opened } => Some(json!({ "opened": opened })),
+            TelemetryEvent::TogglePtermAI { opened } => Some(json!({ "opened": opened })),
             TelemetryEvent::ToggleSecretRedaction { enabled } => {
                 Some(json!({ "enabled": enabled }))
             }
@@ -3395,7 +3395,7 @@ impl TelemetryEvent {
             TelemetryEvent::CopyObjectToClipboard(object_type) => {
                 Some(json!({ "object_type": object_type }))
             }
-            TelemetryEvent::OpenAndRookifyDockerSubshell { shell_type } => {
+            TelemetryEvent::OpenAndPtermifyDockerSubshell { shell_type } => {
                 Some(json!({ "shell_type": shell_type }))
             }
             TelemetryEvent::ToggleBlockFilterQuery { enabled, source } => {
@@ -3419,7 +3419,9 @@ impl TelemetryEvent {
             TelemetryEvent::ToggleNewWindowsAtCustomSize { enabled } => {
                 Some(json!({"enabled": enabled}))
             }
-            TelemetryEvent::ToggleSshRookification { enabled } => Some(json!({"enabled": enabled})),
+            TelemetryEvent::ToggleSshPtermification { enabled } => {
+                Some(json!({"enabled": enabled}))
+            }
             TelemetryEvent::SetSshExtensionInstallMode { mode } => Some(json!({"mode": mode})),
             TelemetryEvent::SshRemoteServerChoiceDoNotAskAgainToggled { checked } => {
                 Some(json!({"checked": checked}))
@@ -3880,7 +3882,7 @@ impl TelemetryEvent {
                 "conversation_id": conversation_id,
                 "rating": rating,
             })),
-            TelemetryEvent::ExecutedRookDrivePrompt {
+            TelemetryEvent::ExecutedPtermDrivePrompt {
                 id,
                 selection_source,
             } => Some(json!({
@@ -4061,7 +4063,7 @@ impl TelemetryEvent {
             | TelemetryEvent::QuitModalDisabled
             | TelemetryEvent::UserInitiatedLogOut
             | TelemetryEvent::LogOutModalShown
-            | TelemetryEvent::RookAICharacterLimitExceeded
+            | TelemetryEvent::PtermAICharacterLimitExceeded
             | TelemetryEvent::OpenInputContextMenu
             | TelemetryEvent::InputCutSelectedText
             | TelemetryEvent::InputCopySelectedText
@@ -4069,7 +4071,7 @@ impl TelemetryEvent {
             | TelemetryEvent::InputPaste
             | TelemetryEvent::InputCommandSearch
             | TelemetryEvent::InputAICommandSearch
-            | TelemetryEvent::InputAskRookAI
+            | TelemetryEvent::InputAskPtermAI
             | TelemetryEvent::SetNewWindowsAtCustomSize
             | TelemetryEvent::DisableInputSync
             | TelemetryEvent::ShowSubshellBanner
@@ -4469,7 +4471,7 @@ impl TelemetryEvent {
                 "banner_toggle_flag_enabled": banner_toggle_flag_enabled,
                 "post_purchase_modal_flag_enabled": post_purchase_modal_flag_enabled,
             })),
-            TelemetryEvent::RookDriveOpened {
+            TelemetryEvent::PtermDriveOpened {
                 source,
                 is_code_mode_v2,
             } => Some(json!({
@@ -4864,12 +4866,12 @@ impl TelemetryEvent {
             | TelemetryEvent::InputModeChanged { .. }
             | TelemetryEvent::PtySpawned { .. }
             | TelemetryEvent::InitialWorkingDirectoryConfigurationChanged { .. }
-            | TelemetryEvent::OpenedRookAI { .. }
-            | TelemetryEvent::RookAIRequestIssued { .. }
-            | TelemetryEvent::RookAIAction { .. }
-            | TelemetryEvent::UsedRookAIPreparedPrompt { .. }
+            | TelemetryEvent::OpenedPtermAI { .. }
+            | TelemetryEvent::PtermAIRequestIssued { .. }
+            | TelemetryEvent::PtermAIAction { .. }
+            | TelemetryEvent::UsedPtermAIPreparedPrompt { .. }
             | TelemetryEvent::ToggleFocusPaneOnHover { .. }
-            | TelemetryEvent::RookAICharacterLimitExceeded
+            | TelemetryEvent::PtermAICharacterLimitExceeded
             | TelemetryEvent::OpenInputContextMenu
             | TelemetryEvent::InputCutSelectedText
             | TelemetryEvent::InputCopySelectedText
@@ -4877,7 +4879,7 @@ impl TelemetryEvent {
             | TelemetryEvent::InputPaste
             | TelemetryEvent::InputCommandSearch
             | TelemetryEvent::InputAICommandSearch
-            | TelemetryEvent::InputAskRookAI
+            | TelemetryEvent::InputAskPtermAI
             | TelemetryEvent::SaveAsWorkflowModal { .. }
             | TelemetryEvent::ExperimentTriggered { .. }
             | TelemetryEvent::ToggleSyncAllPanesInAllTabs { .. }
@@ -4896,9 +4898,9 @@ impl TelemetryEvent {
             | TelemetryEvent::AddAddedSubshellCommand
             | TelemetryEvent::RemoveAddedSubshellCommand
             | TelemetryEvent::ReceivedSubshellRcFileDcs
-            | TelemetryEvent::RookifyFooterShown { .. }
+            | TelemetryEvent::PtermifyFooterShown { .. }
             | TelemetryEvent::AgentToolbarDismissed
-            | TelemetryEvent::RookifyFooterAcceptedRookify { .. }
+            | TelemetryEvent::PtermifyFooterAcceptedPtermify { .. }
             | TelemetryEvent::ShowAliasExpansionBanner
             | TelemetryEvent::EnableAliasExpansionFromBanner
             | TelemetryEvent::DismissAliasExpansionBanner
@@ -4912,8 +4914,8 @@ impl TelemetryEvent {
             | TelemetryEvent::AnonymousUserAttemptLoginGatedFeature { .. }
             | TelemetryEvent::AnonymousUserHitCloudObjectLimit
             | TelemetryEvent::NeedsReauth
-            | TelemetryEvent::RookDriveOpened { .. }
-            | TelemetryEvent::ToggleRookAI { .. }
+            | TelemetryEvent::PtermDriveOpened { .. }
+            | TelemetryEvent::TogglePtermAI { .. }
             | TelemetryEvent::ToggleSecretRedaction { .. }
             | TelemetryEvent::CustomSecretRegexAdded
             | TelemetryEvent::ToggleObfuscateSecret { .. }
@@ -4942,7 +4944,7 @@ impl TelemetryEvent {
             | TelemetryEvent::LogOut
             | TelemetryEvent::InviteTeammates { .. }
             | TelemetryEvent::CopyObjectToClipboard(_)
-            | TelemetryEvent::OpenAndRookifyDockerSubshell { .. }
+            | TelemetryEvent::OpenAndPtermifyDockerSubshell { .. }
             | TelemetryEvent::UpdateBlockFilterQuery
             | TelemetryEvent::UpdateBlockFilterQueryContextLines { .. }
             | TelemetryEvent::ToggleBlockFilterQuery { .. }
@@ -5015,8 +5017,8 @@ impl TelemetryEvent {
             | TelemetryEvent::MCPTemplateShared
             | TelemetryEvent::MCPServerSpawned { .. }
             | TelemetryEvent::MCPToolCallAccepted { .. }
-            | TelemetryEvent::ExecutedRookDrivePrompt { .. }
-            | TelemetryEvent::ToggleSshRookification { .. }
+            | TelemetryEvent::ExecutedPtermDrivePrompt { .. }
+            | TelemetryEvent::ToggleSshPtermification { .. }
             | TelemetryEvent::SetSshExtensionInstallMode { .. }
             | TelemetryEvent::SshRemoteServerChoiceDoNotAskAgainToggled { .. }
             | TelemetryEvent::SettingsImportInitiated
@@ -5156,7 +5158,7 @@ impl TelemetryEvent {
         // We initialize the feature flags so that we can determine which telemetry events to print.
         crate::features::init_feature_flags();
 
-        let events: serde_json::Map<String, Value> = rook_core::telemetry::all_events()
+        let events: serde_json::Map<String, Value> = pterm_core::telemetry::all_events()
             .filter_map(|event| {
                 if !event.enablement_state().is_enabled() {
                     return None;
@@ -5400,11 +5402,11 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::InputModeChanged => EnablementState::Always,
             Self::PtySpawned => EnablementState::Always,
             Self::InitialWorkingDirectoryConfigurationChanged => EnablementState::Always,
-            Self::OpenedRookAI => EnablementState::Always,
-            Self::RookAIRequestIssued => EnablementState::Always,
-            Self::RookAIAction => EnablementState::Always,
-            Self::UsedRookAIPreparedPrompt => EnablementState::Always,
-            Self::RookAICharacterLimitExceeded => EnablementState::Always,
+            Self::OpenedPtermAI => EnablementState::Always,
+            Self::PtermAIRequestIssued => EnablementState::Always,
+            Self::PtermAIAction => EnablementState::Always,
+            Self::UsedPtermAIPreparedPrompt => EnablementState::Always,
+            Self::PtermAICharacterLimitExceeded => EnablementState::Always,
             Self::OpenInputContextMenu => EnablementState::Always,
             Self::InputCutSelectedText => EnablementState::Always,
             Self::InputCopySelectedText => EnablementState::Always,
@@ -5412,7 +5414,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::InputPaste => EnablementState::Always,
             Self::InputCommandSearch => EnablementState::Always,
             Self::InputAICommandSearch => EnablementState::Always,
-            Self::InputAskRookAI => EnablementState::Always,
+            Self::InputAskPtermAI => EnablementState::Always,
             Self::SaveAsWorkflowModal => EnablementState::Always,
             Self::ExperimentTriggered => EnablementState::Always,
             Self::ToggleSyncAllPanesInAllTabs => EnablementState::Always,
@@ -5428,12 +5430,12 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::TriggerSubshellBootstrap => EnablementState::Always,
             Self::AddDenylistedSubshellCommand => EnablementState::Always,
             Self::RemoveDenylistedSubshellCommand => EnablementState::Always,
-            Self::ToggleSshRookification => EnablementState::Always,
+            Self::ToggleSshPtermification => EnablementState::Always,
             Self::SetSshExtensionInstallMode => EnablementState::Always,
             Self::SshRemoteServerChoiceDoNotAskAgainToggled => EnablementState::Always,
-            Self::RookifyFooterShown
+            Self::PtermifyFooterShown
             | Self::AgentToolbarDismissed
-            | Self::RookifyFooterAcceptedRookify => EnablementState::Always,
+            | Self::PtermifyFooterAcceptedPtermify => EnablementState::Always,
             Self::AddAddedSubshellCommand => EnablementState::Always,
             Self::RemoveAddedSubshellCommand => EnablementState::Always,
             Self::ReceivedSubshellRcFileDcs => EnablementState::Always,
@@ -5445,8 +5447,8 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::DismissVimKeybindingsBanner => EnablementState::Always,
             Self::InitiateReauth => EnablementState::Always,
             Self::NeedsReauth => EnablementState::Always,
-            Self::RookDriveOpened => EnablementState::Always,
-            Self::ToggleRookAI => EnablementState::Always,
+            Self::PtermDriveOpened => EnablementState::Always,
+            Self::TogglePtermAI => EnablementState::Always,
             Self::ToggleSecretRedaction => EnablementState::Always,
             Self::CustomSecretRegexAdded => EnablementState::Always,
             Self::ToggleObfuscateSecret => EnablementState::Always,
@@ -5464,7 +5466,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::SettingsImportInitiated => EnablementState::Always,
             Self::InviteTeammates => EnablementState::Always,
             Self::CopyObjectToClipboard => EnablementState::Always,
-            Self::OpenAndRookifyDockerSubshell => EnablementState::Always,
+            Self::OpenAndPtermifyDockerSubshell => EnablementState::Always,
             Self::UpdateBlockFilterQuery => EnablementState::Always,
             Self::UpdateBlockFilterQueryContextLines => EnablementState::Always,
             Self::ToggleBlockFilterQuery => EnablementState::Always,
@@ -5577,7 +5579,9 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::AgentModeRatedResponse => {
                 EnablementState::Flag(FeatureFlag::GlobalAIAnalyticsBanner)
             }
-            Self::ExecutedRookDrivePrompt => EnablementState::Flag(FeatureFlag::AgentModeWorkflows),
+            Self::ExecutedPtermDrivePrompt => {
+                EnablementState::Flag(FeatureFlag::AgentModeWorkflows)
+            }
             Self::FileExceededContextLimit => EnablementState::Always,
             Self::AgentModeError => EnablementState::Always,
             Self::AgentModeRequestRetrySucceeded => EnablementState::Always,
@@ -5884,11 +5888,11 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
                 "InitialWorkingDirectoryConfigurationChanged"
             }
             Self::InputModeChanged => "Input Mode Changed",
-            Self::OpenedRookAI => "Opened Rook AI",
-            Self::RookAIRequestIssued => "Rook AI Request Issued",
-            Self::RookAIAction => "Rook AI Action",
-            Self::UsedRookAIPreparedPrompt => "Used Rook AI Prepared Prompt",
-            Self::RookAICharacterLimitExceeded => "Rook AI Character Limit Exceeded",
+            Self::OpenedPtermAI => "Opened Polaris Terminal AI",
+            Self::PtermAIRequestIssued => "Polaris Terminal AI Request Issued",
+            Self::PtermAIAction => "Polaris Terminal AI Action",
+            Self::UsedPtermAIPreparedPrompt => "Used Polaris Terminal AI Prepared Prompt",
+            Self::PtermAICharacterLimitExceeded => "Polaris Terminal AI Character Limit Exceeded",
             Self::OpenInputContextMenu => "OpenInputBoxContextMenu",
             Self::InputCutSelectedText => "InputBoxCutSelectedText",
             Self::InputCopySelectedText => "InputBoxCutSelectedText",
@@ -5896,7 +5900,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::InputPaste => "InputBoxPaste",
             Self::InputCommandSearch => "InputBoxCommandSearch",
             Self::InputAICommandSearch => "InputBoxAICommandSearch",
-            Self::InputAskRookAI => "InputBoxAskRookAI",
+            Self::InputAskPtermAI => "InputBoxAskPtermAI",
             Self::SaveAsWorkflowModal => "Opened Save As Workflow Modal",
             Self::ExperimentTriggered => "experiments.client.enroll_client",
             Self::ToggleSyncAllPanesInAllTabs => "Toggle Sync Inputs Across All Panes in All Tabs",
@@ -5913,21 +5917,21 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::AddAddedSubshellCommand => "Add Added Subshell Command",
             Self::RemoveAddedSubshellCommand => "Remove Added Subshell Command",
             Self::ReceivedSubshellRcFileDcs => "Received Subshell RC File DCS",
-            Self::ToggleSshRookification => "Toggle SSH Rookification",
+            Self::ToggleSshPtermification => "Toggle SSH Ptermification",
             Self::SetSshExtensionInstallMode => "Set SSH Extension Install Mode",
             Self::SshRemoteServerChoiceDoNotAskAgainToggled => {
                 "SSH Remote Server Choice Do Not Ask Again Toggled"
             }
-            Self::RookifyFooterShown => "Rookify Footer Shown",
+            Self::PtermifyFooterShown => "Ptermify Footer Shown",
             Self::AgentToolbarDismissed => "Agent Toolbar Dismissed",
-            Self::RookifyFooterAcceptedRookify => "Rookify Footer Accepted Rookify",
+            Self::PtermifyFooterAcceptedPtermify => "Ptermify Footer Accepted Ptermify",
             Self::ShowAliasExpansionBanner => "Show Alias Expansion Banner",
             Self::DismissAliasExpansionBanner => "Dismiss Alias Expansion Banner",
             Self::EnableAliasExpansionFromBanner => "Enable Alias Expansion From Banner",
             Self::InitiateReauth => "Initiate Reauth",
             Self::NeedsReauth => "Needs Reauth",
-            Self::RookDriveOpened => "Rook Drive Opened",
-            Self::ToggleRookAI => "Toggle Rook AI",
+            Self::PtermDriveOpened => "Polaris Terminal Drive Opened",
+            Self::TogglePtermAI => "Toggle Polaris Terminal AI",
             Self::ToggleSecretRedaction => "Toggle Secret Redaction",
             Self::CustomSecretRegexAdded => "Custom Secret Regex Added",
             Self::ToggleObfuscateSecret => "Toggle Obfuscate Secret",
@@ -5952,13 +5956,17 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::JumpToSharedSessionParticipant { .. } => "Jumped to Shared Session Participant",
             Self::CopiedSharedSessionLink { .. } => "Copied Shared Session Link",
             Self::WebSessionOpenedOnDesktop { .. } => "Web session opened on desktop",
-            Self::WebCloudObjectOpenedOnDesktop { .. } => "Rook Drive object opened on desktop",
-            Self::DriveSharingOnboardingBlockShown => "Rook Drive Sharing onboarding block shown",
+            Self::WebCloudObjectOpenedOnDesktop { .. } => {
+                "Polaris Terminal Drive object opened on desktop"
+            }
+            Self::DriveSharingOnboardingBlockShown => {
+                "Polaris Terminal Drive Sharing onboarding block shown"
+            }
             Self::UnsupportedShell => "Unsupported Shell",
             Self::SettingsImportInitiated => "Settings Import Initiated",
             Self::InviteTeammates => "Invited Teammates",
             Self::CopyObjectToClipboard => "Copy Object To Clipboard",
-            Self::OpenAndRookifyDockerSubshell => "OpenAndRookifyDockerSubshell",
+            Self::OpenAndPtermifyDockerSubshell => "OpenAndPtermifyDockerSubshell",
             Self::UpdateBlockFilterQuery => "Update Block Filter Query",
             Self::ToggleBlockFilterQuery => "Toggle Block Filter Query",
             Self::ToggleBlockFilterCaseSensitivity => "Toggle Block Filter Case Sensitivity",
@@ -6103,7 +6111,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::ToggleAutoIndexing => "Toggle Codebase Context Autoindexing",
             Self::AttachedImagesToAgentModeQuery => "AgentMode.AttachedImages",
             Self::AgentModeRatedResponse => "AgentMode.RatedResponse",
-            Self::ExecutedRookDrivePrompt => "AgentMode.ExecutedRookDrivePrompt",
+            Self::ExecutedPtermDrivePrompt => "AgentMode.ExecutedPtermDrivePrompt",
             Self::FileExceededContextLimit => "AgentMode.Code.FileExceededContextLimit",
             Self::AgentModeError => "AgentMode.Error",
             Self::AgentModeRequestRetrySucceeded => "AgentMode.RequestRetrySucceeded",
@@ -6250,7 +6258,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             }
             Self::InitiateAnonymousUserSignup => "An anonymous user initiated the sign up flow",
             Self::AnonymousUserExpirationLockout => {
-                "An anonymous user opened Rook after their conversion deadline and was locked out"
+                "An anonymous user opened Polaris Terminal after their conversion deadline and was locked out"
             }
             Self::AnonymousUserLinkedFromBrowser => {
                 "Received an auth payload from anonymous user after linking in browser"
@@ -6262,7 +6270,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
                 "Anonymous user attempted to create a cloud object past their personal object limit"
             }
             Self::BackgroundBlockStarted => {
-                "Rook created a background-output Block (whenever a processes has been backgrounded and yields some output)"
+                "Polaris Terminal created a background-output Block (whenever a processes has been backgrounded and yields some output)"
             }
             Self::SessionCreation => "Created a tab",
             Self::MCPServerCollectionPaneOpened { .. } => "MCP Server Collection Pane Opened",
@@ -6351,9 +6359,11 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
                 "Database write error when trying to write app state for session restoration"
             }
             Self::AppStartup => "App is launched",
-            Self::LoggedOutStartup => "Started Rook in the logged-out / signed-out state",
+            Self::LoggedOutStartup => {
+                "Started Polaris Terminal in the logged-out / signed-out state"
+            }
             Self::DownloadSource => {
-                "Whether the Rook was installed from the home page or through homebrew"
+                "Whether the Polaris Terminal was installed from the home page or through homebrew"
             }
             Self::SSHBootstrapAttempt => "Attempted bootstrapping for an SSH session",
             Self::SSHControlMasterError => {
@@ -6388,13 +6398,13 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             }
             Self::NotificationSent => "Sent desktop notification",
             Self::NotificationFailedToSend => "Failed to send desktop notification",
-            Self::NotificationClicked => "Clicked desktop notification sent from Rook",
+            Self::NotificationClicked => "Clicked desktop notification sent from Polaris Terminal",
             Self::ToggleShowAgentTips => "Toggled the Show Agent Tips setting in AI settings",
             Self::ToggleFindOption => "Changed settings in Find Toggle",
             Self::SignUpButtonClicked => "Clicked \"Sign Up\" button",
             Self::LoginButtonClicked => "Clicked on \"Log in\" button",
             Self::OpenNewSessionFromFilePath => {
-                "Dragged a file, folder, etc. into Rook to start a session"
+                "Dragged a file, folder, etc. into Polaris Terminal to start a session"
             }
             Self::OpenTeamFromURI => {
                 "Showed settings view of their newly joined team within the app"
@@ -6443,16 +6453,16 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
                 "Opened the launch config YAML file from modal once saved successfully"
             }
             Self::OpenLaunchConfig => "Opened launch config for a session",
-            Self::TeamCreated => "Created a Rook Drive team",
-            Self::TeamJoined => "Joined a Rook Drive team",
-            Self::TeamLeft => "Left a Rook Drive team",
-            Self::TeamLinkCopied => "Copied a Rook Drive team link",
-            Self::RemovedUserFromTeam => "Remove user from Rook Drive team",
-            Self::DeletedWorkflow => "Deleted workflow from Rook Drive team",
-            Self::DeletedNotebook => "Deleted notebook from Rook Drive team",
+            Self::TeamCreated => "Created a Polaris Terminal Drive team",
+            Self::TeamJoined => "Joined a Polaris Terminal Drive team",
+            Self::TeamLeft => "Left a Polaris Terminal Drive team",
+            Self::TeamLinkCopied => "Copied a Polaris Terminal Drive team link",
+            Self::RemovedUserFromTeam => "Remove user from Polaris Terminal Drive team",
+            Self::DeletedWorkflow => "Deleted workflow from Polaris Terminal Drive team",
+            Self::DeletedNotebook => "Deleted notebook from Polaris Terminal Drive team",
             Self::ToggleApprovalsModal => "Opened or closed teams modal",
             Self::ChangedInviteViewOption => "Toggled between link and invite for invite",
-            Self::SendEmailInvites => "Sent email invites for Rook Drive team",
+            Self::SendEmailInvites => "Sent email invites for Polaris Terminal Drive team",
             Self::SetLineHeight => "Set line height through Settings -> Appearance",
             Self::ResourceCenterOpened => "Opened Resource Center pane",
             Self::ResourceCenterTipsCompleted => "Completed resource center tips",
@@ -6478,7 +6488,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             }
             Self::QuitModalCancel => "`Cancel` button on the alert modal was pressed",
             Self::QuitModalDisabled => {
-                "The quit modal dialog has been disabled and will not popup when a user closes Rook while a session is running"
+                "The quit modal dialog has been disabled and will not popup when a user closes Polaris Terminal while a session is running"
             }
             Self::UserInitiatedLogOut => {
                 "Confirms a user has explicitly logged out of the application"
@@ -6503,14 +6513,16 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::InitialWorkingDirectoryConfigurationChanged => {
                 "Replaced the default working directory with a different path"
             }
-            Self::OpenedRookAI => "Activated Rook AI",
-            Self::RookAIRequestIssued => "Issued a question to Rook AI",
-            Self::RookAIAction => "Executed a Rook AI action: Restart, Copy, Insert into terminal",
-            Self::UsedRookAIPreparedPrompt => {
-                "Used one of the Rook-provided prompts, like \"Show examples\""
+            Self::OpenedPtermAI => "Activated Polaris Terminal AI",
+            Self::PtermAIRequestIssued => "Issued a question to Polaris Terminal AI",
+            Self::PtermAIAction => {
+                "Executed a Polaris Terminal AI action: Restart, Copy, Insert into terminal"
             }
-            Self::RookAICharacterLimitExceeded => {
-                "Attempted to ask a question longer than 1k chars to Rook AI"
+            Self::UsedPtermAIPreparedPrompt => {
+                "Used one of the Polaris Terminal-provided prompts, like \"Show examples\""
+            }
+            Self::PtermAICharacterLimitExceeded => {
+                "Attempted to ask a question longer than 1k chars to Polaris Terminal AI"
             }
             Self::OpenInputContextMenu => "Opened the Input Editor's context menu",
             Self::InputCutSelectedText => {
@@ -6529,7 +6541,9 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::InputAICommandSearch => {
                 "Opened AI Command Search via the Input Editor's context menu (right clicking the buffer)"
             }
-            Self::InputAskRookAI => "Clicked \"Ask Rook AI\" from the Input Editor's context menu",
+            Self::InputAskPtermAI => {
+                "Clicked \"Ask Polaris Terminal AI\" from the Input Editor's context menu"
+            }
             Self::SaveAsWorkflowModal => {
                 "Opened the modal to create a new workflow using a Block's context--command, etc."
             }
@@ -6560,28 +6574,28 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
                 "Enabled or disabled preserving the active tab color"
             }
             Self::ShowSubshellBanner => {
-                "Displayed the banner asking whether Rook should Rookify the current session via Rook's subshell wrapper"
+                "Displayed the banner asking whether Polaris Terminal should Ptermify the current session via Polaris Terminal's subshell wrapper"
             }
             Self::DeclineSubshellBootstrap => {
-                "Developer declined the Rook banner to Rookify the current session"
+                "Developer declined the Polaris Terminal banner to Ptermify the current session"
             }
             Self::TriggerSubshellBootstrap => {
-                "Attempted to Rookify the current session via Rook's subshell wrapper"
+                "Attempted to Ptermify the current session via Polaris Terminal's subshell wrapper"
             }
             Self::AddDenylistedSubshellCommand => {
-                "Explicitly prevent a command from being Rookified via Rook's subshell wrapper"
+                "Explicitly prevent a command from being Ptermified via Polaris Terminal's subshell wrapper"
             }
             Self::RemoveDenylistedSubshellCommand => {
-                "Removed a command from the list of commands to IGNORE when trying to Rookify via Rook's subshell wrapper"
+                "Removed a command from the list of commands to IGNORE when trying to Ptermify via Polaris Terminal's subshell wrapper"
             }
             Self::AddAddedSubshellCommand => {
-                "Added a command to be automatically Rookified via Rook's subshell wrapper"
+                "Added a command to be automatically Ptermified via Polaris Terminal's subshell wrapper"
             }
             Self::RemoveAddedSubshellCommand => {
-                "Removed a command from the list of commands to automatically Rookify via Rook's subshell wrapper"
+                "Removed a command from the list of commands to automatically Ptermify via Polaris Terminal's subshell wrapper"
             }
-            Self::ReceivedSubshellRcFileDcs => "Spawned a subshell to be automatically Rookified",
-            Self::ToggleSshRookification => "Changed the setting for SSH sessions to be warified",
+            Self::ReceivedSubshellRcFileDcs => "Spawned a subshell to be automatically Ptermified",
+            Self::ToggleSshPtermification => "Changed the setting for SSH sessions to be warified",
             Self::SetSshExtensionInstallMode => {
                 "Changed the SSH extension install mode (always ask / always allow / always skip)"
             }
@@ -6589,13 +6603,13 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
                 "Toggled the 'Don't ask me this again' checkbox on the SSH remote-server choice block"
             }
             Self::AgentModeRatedResponse => "User rated an Agent Mode response",
-            Self::RookifyFooterShown => {
-                "Displayed the rookify footer for a detected subshell or SSH session"
+            Self::PtermifyFooterShown => {
+                "Displayed the ptermify footer for a detected subshell or SSH session"
             }
             Self::AgentToolbarDismissed => "User dismissed the use-agent toolbar",
-            Self::RookifyFooterAcceptedRookify => "User clicked Rookify in the rookify footer",
+            Self::PtermifyFooterAcceptedPtermify => "User clicked Ptermify in the ptermify footer",
             Self::ShowAliasExpansionBanner => {
-                "Displayed the banner asking whether Rook should automatically expand aliases within the Input Editor"
+                "Displayed the banner asking whether Polaris Terminal should automatically expand aliases within the Input Editor"
             }
             Self::EnableAliasExpansionFromBanner => {
                 "Enabled automatic alias expansion within the Input Editor from the banner"
@@ -6604,7 +6618,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
                 "Dismissed the banner to enable automatic alias expansion within the Input Editor"
             }
             Self::ShowVimKeybindingsBanner => {
-                "Displayed the banner asking whether Rook should enable Vim keybindings in the Input Editor"
+                "Displayed the banner asking whether Polaris Terminal should enable Vim keybindings in the Input Editor"
             }
             Self::EnableVimKeybindingsFromBanner => {
                 "Enabled Vim keybindings in the Input Editor from the banner"
@@ -6614,9 +6628,9 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             }
             Self::InitiateReauth => "Started the flow to re-authenticate the client",
             Self::NeedsReauth => "User needs to re-authenticate",
-            Self::RookDriveOpened => "Opened Rook Drive panel",
-            Self::ToggleRookAI => {
-                "Toggled Rook AI--an AI assistant to help you debug errors, look up forgotten commands and more"
+            Self::PtermDriveOpened => "Opened Polaris Terminal Drive panel",
+            Self::TogglePtermAI => {
+                "Toggled Polaris Terminal AI--an AI assistant to help you debug errors, look up forgotten commands and more"
             }
             Self::ToggleSecretRedaction => {
                 "Toggled on/off the setting for Secret Redaction - attempts to redact secrets and sensitive information"
@@ -6625,18 +6639,20 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::ToggleObfuscateSecret => "Revealed or hid a secret",
             Self::CopySecret => "Copied a secret's obfuscated contents to clipboard",
             Self::AutoGenerateMetadataSuccess => {
-                "Successfully generated metadata for a workflow using Rook AI"
+                "Successfully generated metadata for a workflow using Polaris Terminal AI"
             }
             Self::AutoGenerateMetadataError => {
-                "Failed to generate metadata for a workflow using Rook AI"
+                "Failed to generate metadata for a workflow using Polaris Terminal AI"
             }
-            Self::UpdateSortingChoice => "Modified the sorting scheme for Rook Drive objects",
+            Self::UpdateSortingChoice => {
+                "Modified the sorting scheme for Polaris Terminal Drive objects"
+            }
             Self::UndoClose => "Re-opened a closed tab or window (undo closing a tab or window)",
             Self::PtyThroughput => "A sample of the max PTY throughput in bytes/sec",
-            Self::DuplicateObject => "Cloned a Rook Drive object",
-            Self::ExportObject => "Exported a Rook Drive object",
+            Self::DuplicateObject => "Cloned a Polaris Terminal Drive object",
+            Self::ExportObject => "Exported a Polaris Terminal Drive object",
             Self::CommandFileRun => {
-                "Opened a .cmd or unix executable file and ran it directly in Rook"
+                "Opened a .cmd or unix executable file and ran it directly in Polaris Terminal"
             }
             Self::PageUpDownInEditorPressed => {
                 "Pressed `PAGE-UP` or `PAGE-DOWN` within the Input Editor"
@@ -6644,7 +6660,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::StartedSharingCurrentSession => "Started sharing the current session",
             Self::StoppedSharingCurrentSession => "Halted sharing the current session",
             Self::JoinedSharedSession => {
-                "When you join another instance of Rook using shared sessions"
+                "When you join another instance of Polaris Terminal using shared sessions"
             }
             Self::SharedSessionModalUpgradePressed => {
                 "Pressed upgrade after reaching max session sharing limit"
@@ -6663,18 +6679,20 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
                 "Shared session viewed on the web was opened on the desktop"
             }
             Self::WebCloudObjectOpenedOnDesktop => {
-                "Rook Drive object on the web was opened on the desktop"
+                "Polaris Terminal Drive object on the web was opened on the desktop"
             }
             Self::DriveSharingOnboardingBlockShown => {
-                "Showed onboarding block for Rook Drive sharing"
+                "Showed onboarding block for Polaris Terminal Drive sharing"
             }
-            Self::UnsupportedShell => "Booted Rook with a shell that isn't supported",
-            Self::LogOut => "Logged out of the Rook client",
+            Self::UnsupportedShell => "Booted Polaris Terminal with a shell that isn't supported",
+            Self::LogOut => "Logged out of the Polaris Terminal client",
             Self::SettingsImportInitiated => "Started the import settings flow for new users",
-            Self::InviteTeammates => "Sent emails to invite teammates to join Rook Drive team",
+            Self::InviteTeammates => {
+                "Sent emails to invite teammates to join Polaris Terminal Drive team"
+            }
             Self::CopyObjectToClipboard => "Copied an object to the user's keyboard",
-            Self::OpenAndRookifyDockerSubshell => {
-                "Rookifying a docker subshell from using the docker extension"
+            Self::OpenAndPtermifyDockerSubshell => {
+                "Ptermifying a docker subshell from using the docker extension"
             }
             Self::UpdateBlockFilterQuery => "When a new filter is applied to a block",
             Self::UpdateBlockFilterQueryContextLines => {
@@ -6759,7 +6777,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::ObjectLinkCopied => "The web link to an object has been copied.",
             Self::FileTreeToggled => "Opened the file tree/project explorer",
             Self::GlobalSearchOpened => "Opened the global search view",
-            Self::GlobalSearchQueryStarted => "Started a global search (rook_ripgrep) search",
+            Self::GlobalSearchQueryStarted => "Started a global search (pterm_ripgrep) search",
             Self::GlobalSearchQueryCompleted => {
                 "Completed a global search across local and remote sources"
             }
@@ -6821,7 +6839,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             }
             Self::AgentModeOpenedCitation => "Opened a citation that was surfaced in agent mode",
             Self::OpenedSharingDialog => {
-                "Opened the sharing settings dialog for a session or Rook Drive object"
+                "Opened the sharing settings dialog for a session or Polaris Terminal Drive object"
             }
             Self::ToggleGlobalAI => "Toggled global AI enablement.",
             Self::SuperGrokSubscriptionConnectInitiated => {
@@ -6832,13 +6850,13 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             }
             Self::ToggleActiveAI => "Toggled active AI enablement.",
             Self::ToggleLigatureRendering => "Toggled ligature rendering",
-            Self::WorkflowAliasAdded => "Added an alias to a Rook Drive workflow",
-            Self::WorkflowAliasRemoved => "Removed an alias from a Rook Drive workflow",
+            Self::WorkflowAliasAdded => "Added an alias to a Polaris Terminal Drive workflow",
+            Self::WorkflowAliasRemoved => "Removed an alias from a Polaris Terminal Drive workflow",
             Self::WorkflowAliasArgumentEdited => {
-                "Edited an argument in a Rook Drive workflow alias"
+                "Edited an argument in a Polaris Terminal Drive workflow alias"
             }
             Self::WorkflowAliasEnvVarsAttached => {
-                "Added or removed environment variables for a Rook Drive workflow alias"
+                "Added or removed environment variables for a Polaris Terminal Drive workflow alias"
             }
             Self::ToggledAgentModeAutoexecuteReadonlyCommandsSetting => {
                 "Toggled setting to autoexecute readonly Agent Mode requested commands"
@@ -6867,11 +6885,11 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             }
             #[cfg(windows)]
             Self::AutoupdateMutexTimeout => {
-                "The Windows auto-update installer timed out waiting for Rook to release its mutex; a force-kill was attempted"
+                "The Windows auto-update installer timed out waiting for Polaris Terminal to release its mutex; a force-kill was attempted"
             }
             #[cfg(windows)]
             Self::AutoupdateForcekillFailed { .. } => {
-                "The Windows auto-update installer failed to force-kill Rook after the mutex timeout"
+                "The Windows auto-update installer failed to force-kill Polaris Terminal after the mutex timeout"
             }
             #[cfg(windows)]
             Self::AutoupdateMinidumpCleanupFailed { .. } => {
@@ -6883,7 +6901,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::ToggleAutoIndexing => {
                 "Toggled on/off the enablement of autoindexing for codebase context."
             }
-            Self::ExecutedRookDrivePrompt => "Executed a saved prompt.",
+            Self::ExecutedPtermDrivePrompt => "Executed a saved prompt.",
             Self::FileExceededContextLimit => "File from AI exceeded context limit",
             Self::AgentModeError => "Received an error when getting Agent Mode response",
             Self::AgentModeRequestRetrySucceeded => {
@@ -6988,7 +7006,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
                 "User copied a session link from the Agent Management View"
             }
             Self::DetectedIsolationPlatform { .. } => {
-                "Detected that Rook is running in an isolated sandbox"
+                "Detected that Polaris Terminal is running in an isolated sandbox"
             }
             Self::AgentTipShown => "Selected an Agent Tip to show in the Agent Mode status bar",
             Self::AgentTipClicked => "User clicked a link or action in an Agent Tip",
@@ -7032,7 +7050,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::CodexModalOpened => "User opened the Codex modal",
             Self::CodexModalUseCodexClicked => "User clicked 'Use Codex' in the Codex modal",
             Self::LinearIssueLinkOpened => {
-                "User opened a rook://linear deeplink to work on an issue"
+                "User opened a polaris-terminal://linear deeplink to work on an issue"
             }
             Self::CloudAgentCapacityModalOpened => "User opened the cloud agent capacity modal",
             Self::CloudAgentCapacityModalDismissed => {
@@ -7094,7 +7112,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
     }
 }
 
-rook_core::register_telemetry_event!(TelemetryEvent);
+pterm_core::register_telemetry_event!(TelemetryEvent);
 
 #[cfg(test)]
 #[path = "events_tests.rs"]

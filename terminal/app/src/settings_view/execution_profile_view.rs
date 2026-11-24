@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
-use rook_core::features::FeatureFlag;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use ptermui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
     ParentElement, Shrinkable, Text, Wrap,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
     WeakViewHandle,
 };
@@ -388,8 +388,8 @@ impl View for ExecutionProfileView {
                         permissions_column.add_child(with_standard_vertical_margin(
                             render_bool_permission_line_with_icon(
                                 Icon::Compass,
-                                "Auto-sync plans to Rook Drive:",
-                                profile.autosync_plans_to_rook_drive,
+                                "Auto-sync plans to Polaris Terminal Drive:",
+                                profile.autosync_plans_to_pterm_drive,
                                 appearance,
                                 is_any_ai_enabled,
                             ),
@@ -405,10 +405,10 @@ impl View for ExecutionProfileView {
         )
         .with_background(appearance.theme().surface_2())
         .with_border(
-            rookui::elements::Border::new(1.).with_border_fill(appearance.theme().outline()),
+            ptermui::elements::Border::new(1.).with_border_fill(appearance.theme().outline()),
         )
-        .with_corner_radius(rookui::elements::CornerRadius::with_all(
-            rookui::elements::Radius::Pixels(4.),
+        .with_corner_radius(ptermui::elements::CornerRadius::with_all(
+            ptermui::elements::Radius::Pixels(4.),
         ))
         .with_horizontal_padding(16.)
         .with_vertical_padding(12.)
@@ -464,11 +464,11 @@ where
                         )
                         .with_background(appearance.theme().surface_2())
                         .with_border(
-                            rookui::elements::Border::all(1.)
+                            ptermui::elements::Border::all(1.)
                                 .with_border_fill(appearance.theme().outline()),
                         )
-                        .with_corner_radius(rookui::elements::CornerRadius::with_all(
-                            rookui::elements::Radius::Pixels(3.),
+                        .with_corner_radius(ptermui::elements::CornerRadius::with_all(
+                            ptermui::elements::Radius::Pixels(3.),
                         ))
                         .with_horizontal_padding(6.)
                         .with_vertical_padding(2.)
@@ -495,7 +495,7 @@ fn render_allowlist_denylist_row(
             .with_child(
                 Container::new(
                     ConstrainedBox::new(
-                        icon.to_rookui_icon(if is_ai_enabled {
+                        icon.to_ptermui_icon(if is_ai_enabled {
                             appearance
                                 .theme()
                                 .sub_text_color(appearance.theme().surface_1())
@@ -533,7 +533,7 @@ fn render_allowlist_denylist_row(
             .finish(),
     )
     .with_margin_left(8.)
-    .with_border(rookui::elements::Border::left(1.).with_border_fill(appearance.theme().outline()))
+    .with_border(ptermui::elements::Border::left(1.).with_border_fill(appearance.theme().outline()))
     .with_padding_left(8.)
     .finish()
 }
@@ -598,7 +598,7 @@ fn render_model_line_with_icon(
             .with_child(
                 Container::new(
                     ConstrainedBox::new(
-                        icon.to_rookui_icon(if is_ai_enabled {
+                        icon.to_ptermui_icon(if is_ai_enabled {
                             appearance
                                 .theme()
                                 .sub_text_color(appearance.theme().surface_1())
@@ -659,7 +659,7 @@ fn render_permission_line_with_icon(
         .with_child(
             Container::new(
                 ConstrainedBox::new(
-                    icon.to_rookui_icon(if is_ai_enabled {
+                    icon.to_ptermui_icon(if is_ai_enabled {
                         appearance
                             .theme()
                             .sub_text_color(appearance.theme().surface_1())

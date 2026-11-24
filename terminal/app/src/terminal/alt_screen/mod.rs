@@ -1,4 +1,4 @@
-use rookui::{AppContext, SingletonEntity};
+use ptermui::{AppContext, SingletonEntity};
 use settings::Setting as _;
 
 use super::TerminalModel;

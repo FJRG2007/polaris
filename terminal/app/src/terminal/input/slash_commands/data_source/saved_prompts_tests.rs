@@ -7,7 +7,7 @@ use crate::server::ids::{ClientId, SyncId};
 use crate::workflows::CloudWorkflowModel;
 use crate::workflows::workflow::Workflow;
 
-const TEST_FONT_FAMILY: rookui::fonts::FamilyId = rookui::fonts::FamilyId(0);
+const TEST_FONT_FAMILY: ptermui::fonts::FamilyId = ptermui::fonts::FamilyId(0);
 
 fn test_candidate(name: &str, query: &str) -> SavedPromptCandidate {
     SavedPromptCandidate {

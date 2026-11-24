@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use channel_versions::{Changelog, ChannelVersions};
+use pterm_errors::report_error;
 use rand::distributions::Alphanumeric;
 use rand::{Rng as _, thread_rng};
-use rook_errors::report_error;
 
 use super::channel_versions::fetch_channel_versions;
 use super::release_assets_directory_url;

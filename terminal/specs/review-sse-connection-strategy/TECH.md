@@ -23,7 +23,7 @@ There is also a related state-leak: `register_watched_run_id` (line 138) only in
 - `app/src/ai/active_agent_views_model.rs` — already tracks "is this conversation expanded in any pane?" via `agent_view_handles`. Emits `ActiveAgentViewsEvent::ConversationClosed { conversation_id }` on `ExitedAgentView` (line 167-169) and on `unregister_agent_view_controller` from the pane-close path (line 200-202; see `pane_group/pane/terminal_pane.rs:383-385`). Helper `is_conversation_open(conversation_id, ctx)` (line 354) gives the cross-pane "open anywhere?" check.
 - `app/src/ai/agent/conversation.rs:781-792` — `parent_conversation_id()` and `is_child_agent_conversation()` classify a conversation as child or non-child; combined with the poller's own `watched_run_ids` set these classify a conversation as parent/child/solo.
 - `app/src/ai/agent_events/driver.rs (38-50, 177-199)` — `AgentEventDriverConfig::run_ids` is forwarded to `ServerApi::stream_agent_events` and is the server-side filter for which events come back. A run watching its own run_id is using that subscription as its inbox.
-- `app/src/ai/agent_sdk/driver.rs` — drives Oz conversations headlessly via the Rook CLI (locally for `start_agent` with `execution_mode: local` + Oz harness, and on cloud workers for cloud Oz runs). The same `OrchestrationEventStreamer` singleton is registered here (`lib.rs:1564-1566` is unconditional aside from the `OrchestrationV2` feature flag), so the streamer must serve a CLI/cloud process where there are no `AgentViewController` registrations at all.
+- `app/src/ai/agent_sdk/driver.rs` — drives Oz conversations headlessly via the Polaris Terminal CLI (locally for `start_agent` with `execution_mode: local` + Oz harness, and on cloud workers for cloud Oz runs). The same `OrchestrationEventStreamer` singleton is registered here (`lib.rs:1564-1566` is unconditional aside from the `OrchestrationV2` feature flag), so the streamer must serve a CLI/cloud process where there are no `AgentViewController` registrations at all.
 
 ## Proposed changes
 
@@ -175,7 +175,7 @@ Add unit tests in `orchestration_event_streamer_tests.rs` covering the new invar
 
 Manual validation:
 
-Observation setup. Each test below names the process where SSE state should appear: either the user's GUI Rook app (a desktop binary) or a driver process (a local CLI subagent subprocess, or a cloud Oz worker). The relevant log lines are the same in either process; the difference is which log file you tail.
+Observation setup. Each test below names the process where SSE state should appear: either the user's GUI Polaris Terminal app (a desktop binary) or a driver process (a local CLI subagent subprocess, or a cloud Oz worker). The relevant log lines are the same in either process; the difference is which log file you tail.
 
 Log lines to watch for, all at info level unless noted:
 
@@ -187,10 +187,10 @@ Log lines to watch for, all at info level unless noted:
 
 Where to tail:
 
-- GUI process: the Rook app log for the active build flavor (e.g. `~/Library/Logs/dev.rook.Rook-Stable/rook.log` on macOS).
-- Local CLI driver subprocess: the subprocess's stderr or its dedicated log file. `start_agent` with `execution_mode: local` runs `rook_cli` as a subprocess; tail wherever that subprocess writes logs.
+- GUI process: the Polaris Terminal app log for the active build flavor (e.g. `~/Library/Logs/dev.polaris.PolarisTerminal-Stable/polaris-terminal.log` on macOS).
+- Local CLI driver subprocess: the subprocess's stderr or its dedicated log file. `start_agent` with `execution_mode: local` runs `pterm_cli` as a subprocess; tail wherever that subprocess writes logs.
 - Cloud Oz worker: the worker logs surfaced by the Oz UI / cloud logging tool for the run.
-- Server-side: `stream_agent_events` requests in the dev `rook-server` access log — one request per active SSE; new requests on reconnect; disconnects when the client closes the stream.
+- Server-side: `stream_agent_events` requests in the dev `polaris-terminal-server` access log — one request per active SSE; new requests on reconnect; disconnects when the client closes the stream.
 
 ### A. Solo conversation
 

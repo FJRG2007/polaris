@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
-use rookui::elements::{
+use ptermui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, Highlight, Icon, MainAxisAlignment,
     MainAxisSize, ParentElement, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::env_vars::CloudEnvVarCollection;

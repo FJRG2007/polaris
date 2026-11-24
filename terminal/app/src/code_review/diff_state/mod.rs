@@ -10,10 +10,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
-use rook_core::SessionId;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::{AppContext, ModelContext, ModelHandle};
+use pterm_core::SessionId;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::{AppContext, ModelContext, ModelHandle};
 use serde::{Deserialize, Serialize};
 
 use crate::code_review::diff_size_limits::DiffSize;
@@ -441,7 +441,7 @@ pub enum DiffStateModel {
     Remote(ModelHandle<RemoteDiffStateModel>),
 }
 
-impl rookui::Entity for DiffStateModel {
+impl ptermui::Entity for DiffStateModel {
     type Event = DiffStateModelEvent;
 }
 

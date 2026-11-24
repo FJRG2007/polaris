@@ -1,4 +1,4 @@
-use rook_graphql::ai::{AgentTaskState, PlatformErrorCode};
+use pterm_graphql::ai::{AgentTaskState, PlatformErrorCode};
 
 use super::AgentDriverError;
 use super::terminal::ShareSessionError;
@@ -9,7 +9,7 @@ use crate::server::server_api::ai::TaskStatusUpdate;
 /// suitable for reporting via `update_agent_task`.
 pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskStatusUpdate) {
     match error {
-        // --- Rook-side errors (task → ERROR) ---
+        // --- Polaris Terminal-side errors (task → ERROR) ---
         AgentDriverError::TerminalUnavailable | AgentDriverError::InvalidRuntimeState => (
             AgentTaskState::Error,
             TaskStatusUpdate::with_error_code(
@@ -63,20 +63,20 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
                 ),
             )
         }
-        AgentDriverError::RookDriveSyncFailed => (
+        AgentDriverError::PtermDriveSyncFailed => (
             AgentTaskState::Error,
             TaskStatusUpdate::with_error_code(
-                "Rook Drive failed to sync. Please check your network connection and try again.",
+                "Polaris Terminal Drive failed to sync. Please check your network connection and try again.",
                 PlatformErrorCode::InternalError,
             ),
         ),
         AgentDriverError::NotLoggedIn => {
-            let bin = rook_cli::binary_name().unwrap_or_else(|| "rook".to_string());
+            let bin = pterm_cli::binary_name().unwrap_or_else(|| "polaris-terminal".to_string());
             (
                 AgentTaskState::Error,
                 TaskStatusUpdate::with_error_code(
                     format!(
-                        "Authentication required. Log in via '{bin} login', provide an API key via '--api-key', or set the ROOK_API_KEY environment variable."
+                        "Authentication required. Log in via '{bin} login', provide an API key via '--api-key', or set the POLARIS_TERMINAL_API_KEY environment variable."
                     ),
                     PlatformErrorCode::AuthenticationRequired,
                 ),
@@ -95,7 +95,7 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
             AgentTaskState::Failed,
             TaskStatusUpdate::with_error_code(
                 format!(
-                    "MCP server {uuid} was not found. Verify the server exists in your Rook Drive and the UUID is correct."
+                    "MCP server {uuid} was not found. Verify the server exists in your Polaris Terminal Drive and the UUID is correct."
                 ),
                 PlatformErrorCode::EnvironmentSetupFailed,
             ),
@@ -154,7 +154,7 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
             AgentTaskState::Failed,
             TaskStatusUpdate::with_error_code(
                 format!(
-                    "Agent profile \"{name}\" not found. Check the profile ID and ensure it exists in your team's Rook Drive."
+                    "Agent profile \"{name}\" not found. Check the profile ID and ensure it exists in your team's Polaris Terminal Drive."
                 ),
                 PlatformErrorCode::ResourceNotFound,
             ),
@@ -163,7 +163,7 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
             AgentTaskState::Failed,
             TaskStatusUpdate::with_error_code(
                 format!(
-                    "Saved prompt not found for ID {id}. Verify the prompt exists in your Rook Drive."
+                    "Saved prompt not found for ID {id}. Verify the prompt exists in your Polaris Terminal Drive."
                 ),
                 PlatformErrorCode::ResourceNotFound,
             ),
@@ -391,7 +391,7 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
         }
 
         // The harness didn't respond to any graceful exit attempt and had to
-        // be forcibly killed. This is a Rook/CLI interaction gap rather than
+        // be forcibly killed. This is a Polaris Terminal/CLI interaction gap rather than
         // something the user misconfigured, but the run's own outcome was
         // already decided before shutdown, so classify like other harness
         // command-failure variants (FAILED) rather than an internal ERROR.
@@ -415,7 +415,7 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
         // SIGTERM reaches the client from externally-originating shutdowns —
         // server-initiated instance teardown, container-runtime stops, self-hosted
         // worker termination — and the client cannot distinguish which initiated
-        // it. Not a Rook-side defect the user can act on, so report FAILED.
+        // it. Not a Polaris Terminal-side defect the user can act on, so report FAILED.
         AgentDriverError::TerminatedBySignal => (
             AgentTaskState::Failed,
             TaskStatusUpdate::message(error.to_string()),

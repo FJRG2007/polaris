@@ -13,13 +13,13 @@ use super::{
 use crate::terminal::model::session::LocalCommandExecutor;
 use crate::terminal::shell::ShellType;
 
-const PLUGIN_KEY: &str = "rook@rook";
-const PLATFORM_PLUGIN_KEY: &str = "oz-harness-support@rook";
+const PLUGIN_KEY: &str = "polaris-terminal@polaris-terminal";
+const PLATFORM_PLUGIN_KEY: &str = "oz-harness-support@polaris-terminal";
 
-const MARKETPLACE_REPO: &str = "FJRG2007/rook";
-const MARKETPLACE_NAME: &str = "rook";
+const MARKETPLACE_REPO: &str = "FJRG2007/polaris";
+const MARKETPLACE_NAME: &str = "polaris-terminal";
 
-// Keep in sync with plugins/claude-code/plugins/rook/.claude-plugin/plugin.json,
+// Keep in sync with plugins/claude-code/plugins/polaris-terminal/.claude-plugin/plugin.json,
 // which this repository now ships.
 const MINIMUM_PLUGIN_VERSION: &str = "2.1.0";
 // Keep in sync with the oz-harness-support plugin version in warpdotdev/claude-code-warp.
@@ -145,11 +145,11 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
     }
 
     fn install_success_message(&self) -> &'static str {
-        "Rook plugin installed. Please run /reload-plugins to activate."
+        "Polaris Terminal plugin installed. Please run /reload-plugins to activate."
     }
 
     fn update_success_message(&self) -> &'static str {
-        "Rook plugin updated. Please run /reload-plugins to activate."
+        "Polaris Terminal plugin updated. Please run /reload-plugins to activate."
     }
 
     fn install_instructions(&self) -> &'static PluginInstructions {
@@ -217,22 +217,22 @@ fn leaked(command: String) -> &'static str {
 }
 
 static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| PluginInstructions {
-    title: "Install Rook Plugin for Claude Code",
+    title: "Install Polaris Terminal Plugin for Claude Code",
     subtitle: "Ensure that jq is installed on your machine. Then, run these commands.",
     // Built from the constants above rather than spelled out, because these are
     // the commands the user is told to run by hand. Spelled out, they drifted:
     // they still named upstream's marketplace and the plugin key this fork used
     // before its plugins moved into this repository, so following them
-    // installed Warp's plugin instead of Rook's.
+    // installed Warp's plugin instead of Polaris Terminal's.
     steps: Box::leak(Box::new([
         PluginInstructionStep {
-            description: "Add the Rook plugin marketplace repository",
+            description: "Add the Polaris Terminal plugin marketplace repository",
             command: leaked(format!("claude plugin marketplace add {MARKETPLACE_REPO}")),
             executable: true,
             link: None,
         },
         PluginInstructionStep {
-            description: "Install the Rook plugin",
+            description: "Install the Polaris Terminal plugin",
             command: leaked(format!("claude plugin install {PLUGIN_KEY}")),
             executable: true,
             link: None,
@@ -246,7 +246,7 @@ static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| Plu
 });
 
 static UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| PluginInstructions {
-    title: "Update Rook Plugin for Claude Code",
+    title: "Update Polaris Terminal Plugin for Claude Code",
     subtitle: "Run the following commands.",
     steps: Box::leak(Box::new([
         PluginInstructionStep {
@@ -297,7 +297,7 @@ fn check_plugin_installed(claude_dir: &Path, plugin_key: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Reads the installed version string for the Rook plugin, if present.
+/// Reads the installed version string for the Polaris Terminal plugin, if present.
 fn installed_version(claude_dir: &Path) -> Option<String> {
     installed_plugin_version(claude_dir, PLUGIN_KEY)
 }

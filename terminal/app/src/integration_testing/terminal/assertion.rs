@@ -1,10 +1,10 @@
 use pathfinder_geometry::rect::RectF;
+use pterm_util::path::user_friendly_path;
+use ptermui::integration::{AssertionCallback, AssertionOutcome};
+use ptermui::units::Lines;
+use ptermui::windowing::WindowManager;
+use ptermui::{App, SingletonEntity, ViewHandle, WindowId, async_assert, async_assert_eq};
 use regex::Regex;
-use rook_util::path::user_friendly_path;
-use rookui::integration::{AssertionCallback, AssertionOutcome};
-use rookui::units::Lines;
-use rookui::windowing::WindowManager;
-use rookui::{App, SingletonEntity, ViewHandle, WindowId, async_assert, async_assert_eq};
 use settings::Setting as _;
 
 use super::util::ExpectedOutput;
@@ -768,8 +768,8 @@ pub fn assert_scroll_position(
 pub fn validate_git_branch(
     expected_git_branch: Option<String>,
     tab_idx: usize,
-    window_id: rookui::WindowId,
-    app: &rookui::App,
+    window_id: ptermui::WindowId,
+    app: &ptermui::App,
 ) -> AssertionOutcome {
     let terminal_view = single_terminal_view_for_tab(app, window_id, tab_idx);
     terminal_view.read(app, |view, _ctx| {

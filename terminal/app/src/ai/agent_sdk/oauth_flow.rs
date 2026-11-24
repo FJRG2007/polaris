@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Result, anyhow};
-use rook_graphql::queries::get_oauth_connect_tx_status::OauthConnectTxStatus;
-use rookui::r#async::Timer;
+use pterm_graphql::queries::get_oauth_connect_tx_status::OauthConnectTxStatus;
+use ptermui::r#async::Timer;
 
 use crate::server::server_api::integrations::IntegrationsClient;
 

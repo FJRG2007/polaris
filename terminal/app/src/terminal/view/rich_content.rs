@@ -1,5 +1,5 @@
-use rookui::prelude::ChildView;
-use rookui::{Element, EntityId, View, ViewContext, ViewHandle};
+use ptermui::prelude::ChildView;
+use ptermui::{Element, EntityId, View, ViewContext, ViewHandle};
 
 use super::{InitStepBlock, InitStepKind};
 use crate::ai::agent::AIAgentExchangeId;
@@ -14,7 +14,7 @@ use crate::terminal::block_list_viewport::ScrollPositionUpdate;
 use crate::terminal::model::blocks::{RemovableBlocklistItem, RichContentItem};
 use crate::terminal::model::rich_content::RichContentType;
 use crate::terminal::model::terminal_model::BlockIndex;
-use crate::terminal::rookify::success_block::RookifySuccessBlock;
+use crate::terminal::ptermify::success_block::PtermifySuccessBlock;
 use crate::terminal::view::ambient_agent::AmbientAgentEntryBlock;
 use crate::terminal::view::init_environment::InitEnvironmentBlock;
 use crate::terminal::view::ssh_remote_server_choice_view::SshRemoteServerChoiceView;
@@ -249,8 +249,8 @@ pub enum RichContentMetadata {
     SshTmuxDeprecationBanner {
         handle: ViewHandle<SshTmuxDeprecationBanner>,
     },
-    RookifySuccessBlock {
-        bootstrap_success_block_handle: ViewHandle<RookifySuccessBlock>,
+    PtermifySuccessBlock {
+        bootstrap_success_block_handle: ViewHandle<PtermifySuccessBlock>,
     },
     TelemetryBanner {
         telemetry_banner_handle: ViewHandle<TelemetryBanner>,

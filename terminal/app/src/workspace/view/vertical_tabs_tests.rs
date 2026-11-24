@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
-use rookui::EntityId;
-use rookui::elements::PositionedElementOffsetBounds;
+use ptermui::EntityId;
+use ptermui::elements::PositionedElementOffsetBounds;
 
 use super::{
     AgentTabTextPreference, SummaryPaneKind, SummaryPaneKindIcons, TerminalAgentText,
@@ -159,8 +159,8 @@ fn summary_pane_kind_icons_distinguish_ambient_claude_from_local_claude() {
 #[test]
 fn preferred_agent_tab_titles_default_to_title_like_text() {
     let agent_text = TerminalAgentText {
-        conversation_display_title: Some("Generated Rook Agent title".to_string()),
-        conversation_latest_user_prompt: Some("Latest Rook Agent prompt".to_string()),
+        conversation_display_title: Some("Generated Polaris Terminal Agent title".to_string()),
+        conversation_latest_user_prompt: Some("Latest Polaris Terminal Agent prompt".to_string()),
         cli_agent_title: Some("CLI summary".to_string()),
         cli_agent_latest_user_prompt: Some("Latest CLI prompt".to_string()),
         is_oz_agent: true,
@@ -170,7 +170,7 @@ fn preferred_agent_tab_titles_default_to_title_like_text() {
     assert_eq!(
         preferred_agent_tab_titles(&agent_text, AgentTabTextPreference::ConversationTitle),
         (
-            Some("Generated Rook Agent title".to_string()),
+            Some("Generated Polaris Terminal Agent title".to_string()),
             Some("CLI summary".to_string())
         )
     );
@@ -211,7 +211,7 @@ fn terminal_primary_line_uses_terminal_title_when_disabled_cli_has_only_prompt()
         conversation_title,
         cli_title,
         "Generated Claude Code title",
-        "~/rook",
+        "~/polaris-terminal",
         terminal_title_fallback_font(&agent_text),
         Some("claude".to_string()),
     );
@@ -229,8 +229,8 @@ fn terminal_primary_line_uses_terminal_title_when_disabled_cli_has_only_prompt()
 #[test]
 fn preferred_agent_tab_titles_use_latest_prompt_when_enabled() {
     let agent_text = TerminalAgentText {
-        conversation_display_title: Some("Generated Rook Agent title".to_string()),
-        conversation_latest_user_prompt: Some("Latest Rook Agent prompt".to_string()),
+        conversation_display_title: Some("Generated Polaris Terminal Agent title".to_string()),
+        conversation_latest_user_prompt: Some("Latest Polaris Terminal Agent prompt".to_string()),
         cli_agent_title: Some("CLI summary".to_string()),
         cli_agent_latest_user_prompt: Some("Latest CLI prompt".to_string()),
         is_oz_agent: true,
@@ -240,7 +240,7 @@ fn preferred_agent_tab_titles_use_latest_prompt_when_enabled() {
     assert_eq!(
         preferred_agent_tab_titles(&agent_text, AgentTabTextPreference::LatestUserPrompt),
         (
-            Some("Latest Rook Agent prompt".to_string()),
+            Some("Latest Polaris Terminal Agent prompt".to_string()),
             Some("Latest CLI prompt".to_string())
         )
     );
@@ -264,7 +264,7 @@ fn terminal_primary_line_uses_cli_prompt_when_enabled_cli_has_prompt() {
         conversation_title,
         cli_title,
         "Generated Claude Code title",
-        "~/rook",
+        "~/polaris-terminal",
         terminal_title_fallback_font(&agent_text),
         Some("claude".to_string()),
     );
@@ -290,7 +290,7 @@ fn terminal_primary_line_uses_cli_prompt_when_enabled_cli_is_long_running() {
         conversation_title,
         cli_title,
         "Generated Claude Code title",
-        "~/rook",
+        "~/polaris-terminal",
         terminal_title_fallback_font(&agent_text),
         Some("claude".to_string()),
     );
@@ -301,7 +301,7 @@ fn terminal_primary_line_uses_cli_prompt_when_enabled_cli_is_long_running() {
 #[test]
 fn preferred_agent_tab_titles_fall_back_when_preferred_text_is_missing() {
     let agent_text = TerminalAgentText {
-        conversation_display_title: Some("Generated Rook Agent title".to_string()),
+        conversation_display_title: Some("Generated Polaris Terminal Agent title".to_string()),
         conversation_latest_user_prompt: None,
         cli_agent_title: None,
         cli_agent_latest_user_prompt: Some("Latest CLI prompt".to_string()),
@@ -312,7 +312,7 @@ fn preferred_agent_tab_titles_fall_back_when_preferred_text_is_missing() {
     assert_eq!(
         preferred_agent_tab_titles(&agent_text, AgentTabTextPreference::LatestUserPrompt),
         (
-            Some("Generated Rook Agent title".to_string()),
+            Some("Generated Polaris Terminal Agent title".to_string()),
             Some("Latest CLI prompt".to_string())
         )
     );
@@ -353,7 +353,7 @@ fn collect_normalized_unique_summary_texts(
 }
 
 #[test]
-fn detail_sidecar_supports_terminal_code_and_rook_drive_object_panes() {
+fn detail_sidecar_supports_terminal_code_and_pterm_drive_object_panes() {
     assert!(pane_type_supports_vertical_tabs_detail_sidecar(
         IPaneType::Terminal
     ));
@@ -704,8 +704,8 @@ fn terminal_primary_line_prefers_cli_agent_display_title() {
         false,
         None,
         Some("Review the failing tests".to_string()),
-        "~/rook",
-        "~/rook",
+        "~/polaris-terminal",
+        "~/polaris-terminal",
         TerminalPrimaryLineFont::Monospace,
         Some("cargo nextest run".to_string()),
     );
@@ -719,8 +719,8 @@ fn terminal_primary_line_prefers_cli_agent_display_title_over_conversation_title
         false,
         Some("Review the failing tests".to_string()),
         Some("Summarize the failures".to_string()),
-        "~/rook",
-        "~/rook",
+        "~/polaris-terminal",
+        "~/polaris-terminal",
         TerminalPrimaryLineFont::Monospace,
         Some("cargo nextest run".to_string()),
     );
@@ -734,13 +734,13 @@ fn terminal_primary_line_falls_through_to_terminal_title_when_cli_agent_has_no_p
         false,
         None,
         None,
-        "codex - ~/rook",
-        "~/rook",
+        "codex - ~/polaris-terminal",
+        "~/polaris-terminal",
         TerminalPrimaryLineFont::Monospace,
         Some("cargo nextest run".to_string()),
     );
 
-    assert_eq!(line.text(), "codex - ~/rook");
+    assert_eq!(line.text(), "codex - ~/polaris-terminal");
 }
 
 #[test]
@@ -750,7 +750,7 @@ fn terminal_primary_line_uses_terminal_title_as_fallback() {
         None,
         None,
         "nvim src/workspace/view/vertical_tabs.rs",
-        "~/rook",
+        "~/polaris-terminal",
         TerminalPrimaryLineFont::Monospace,
         Some("cargo nextest run".to_string()),
     );
@@ -764,8 +764,8 @@ fn terminal_primary_line_uses_last_completed_command_when_shell_title_matches_wo
         false,
         None,
         None,
-        "~/rook",
-        "~/rook",
+        "~/polaris-terminal",
+        "~/polaris-terminal",
         TerminalPrimaryLineFont::Monospace,
         Some("cargo nextest run".to_string()),
     );
@@ -779,8 +779,8 @@ fn terminal_primary_line_falls_back_to_new_session() {
         false,
         None,
         None,
-        "~/rook",
-        "~/rook",
+        "~/polaris-terminal",
+        "~/polaris-terminal",
         TerminalPrimaryLineFont::Monospace,
         None,
     );
@@ -801,8 +801,8 @@ fn terminal_primary_line_uses_monospace_for_last_completed_command() {
         false,
         None,
         None,
-        "~/rook",
-        "~/rook",
+        "~/polaris-terminal",
+        "~/polaris-terminal",
         TerminalPrimaryLineFont::Monospace,
         Some("cargo nextest run".to_string()),
     );
@@ -820,7 +820,7 @@ fn terminal_primary_line_uses_monospace_for_last_completed_command() {
 fn terminal_search_fragments_include_rendered_terminal_badges() {
     let fragments = terminal_search_text_fragments(
         "Review the failing tests".to_string(),
-        "~/rook".to_string(),
+        "~/polaris-terminal".to_string(),
         Some("main".to_string()),
         terminal_kind_badge_label(false, Some(CLIAgent::Claude)),
         Some(terminal_pull_request_badge_label(
@@ -849,7 +849,7 @@ fn pane_search_fragments_prepend_custom_title_and_keep_generated_metadata() {
         Some("Production API"),
         vec![
             "cargo nextest run".to_string(),
-            "~/rook".to_string(),
+            "~/polaris-terminal".to_string(),
             "Claude".to_string(),
         ],
     );
@@ -857,7 +857,10 @@ fn pane_search_fragments_prepend_custom_title_and_keep_generated_metadata() {
     assert_eq!(fragments[0], "Production API");
     assert!(search_fragments_contain_query(&fragments, "production api"));
     assert!(search_fragments_contain_query(&fragments, "cargo nextest"));
-    assert!(search_fragments_contain_query(&fragments, "~/rook"));
+    assert!(search_fragments_contain_query(
+        &fragments,
+        "~/polaris-terminal"
+    ));
     assert!(search_fragments_contain_query(&fragments, "claude"));
 }
 
@@ -868,11 +871,14 @@ fn pane_search_fragments_dedupe_custom_title_against_generated_text() {
             Some("  Production   API  "),
             vec![
                 "Production API".to_string(),
-                "~/rook".to_string(),
-                "~/rook".to_string(),
+                "~/polaris-terminal".to_string(),
+                "~/polaris-terminal".to_string(),
             ],
         ),
-        vec!["Production API".to_string(), "~/rook".to_string()]
+        vec![
+            "Production API".to_string(),
+            "~/polaris-terminal".to_string()
+        ]
     );
 }
 
@@ -909,15 +915,15 @@ fn diff_stats_text_matches_rendered_badge_text() {
 #[test]
 fn branch_label_display_falls_back_without_branch_icon() {
     assert_eq!(
-        branch_label_display(None, "~/rook"),
-        ("~/rook".to_string(), false)
+        branch_label_display(None, "~/polaris-terminal"),
+        ("~/polaris-terminal".to_string(), false)
     );
     assert_eq!(
-        branch_label_display(Some(""), "~/rook"),
-        ("~/rook".to_string(), false)
+        branch_label_display(Some(""), "~/polaris-terminal"),
+        ("~/polaris-terminal".to_string(), false)
     );
     assert_eq!(
-        branch_label_display(Some("main"), "~/rook"),
+        branch_label_display(Some("main"), "~/polaris-terminal"),
         ("main".to_string(), true)
     );
 }
@@ -925,15 +931,15 @@ fn branch_label_display_falls_back_without_branch_icon() {
 #[test]
 fn compact_branch_subtitle_falls_back_to_working_directory_without_branch_icon() {
     assert_eq!(
-        compact_branch_subtitle_display(None, Some("~/rook")),
-        Some(("~/rook".to_string(), false))
+        compact_branch_subtitle_display(None, Some("~/polaris-terminal")),
+        Some(("~/polaris-terminal".to_string(), false))
     );
     assert_eq!(
-        compact_branch_subtitle_display(Some(""), Some("~/rook")),
-        Some(("~/rook".to_string(), false))
+        compact_branch_subtitle_display(Some(""), Some("~/polaris-terminal")),
+        Some(("~/polaris-terminal".to_string(), false))
     );
     assert_eq!(
-        compact_branch_subtitle_display(Some("main"), Some("~/rook")),
+        compact_branch_subtitle_display(Some("main"), Some("~/polaris-terminal")),
         Some(("main".to_string(), true))
     );
 }
@@ -955,15 +961,15 @@ fn collect_normalized_unique_summary_texts_dedupes_after_whitespace_normalizatio
 fn collect_normalized_unique_summary_texts_preserves_first_seen_order() {
     assert_eq!(
         collect_normalized_unique_summary_texts([
-            "~/rook-internal",
-            "~/rook-server",
-            "~/rook-internal",
-            "~/rook-terraform",
+            "~/polaris-terminal-internal",
+            "~/polaris-terminal-server",
+            "~/polaris-terminal-internal",
+            "~/polaris-terminal-terraform",
         ]),
         vec![
-            "~/rook-internal".to_string(),
-            "~/rook-server".to_string(),
-            "~/rook-terraform".to_string(),
+            "~/polaris-terminal-internal".to_string(),
+            "~/polaris-terminal-server".to_string(),
+            "~/polaris-terminal-terraform".to_string(),
         ]
     );
 }
@@ -1192,12 +1198,15 @@ fn summary_search_fragments_include_hidden_overflow_values() {
                 text: "Claude".to_string(),
                 status: Some(ConversationStatus::InProgress),
             },
-            label("Rook Agent"),
+            label("Polaris Terminal Agent"),
             label("cargo"),
             label("code review"),
             label("hidden work"),
         ],
-        working_directories: vec!["~/rook-internal".to_string(), "~/rook-server".to_string()],
+        working_directories: vec![
+            "~/polaris-terminal-internal".to_string(),
+            "~/polaris-terminal-server".to_string(),
+        ],
         branch_entries: vec![
             VerticalTabsSummaryBranchEntry {
                 repo_path: PathBuf::from("/tmp/repo-a"),

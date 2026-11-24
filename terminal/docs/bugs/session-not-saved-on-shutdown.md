@@ -124,11 +124,11 @@ going to be another save path.
 Csrss ends a session one process at a time, in descending order of shutdown
 level (*Windows Internals*, "Shutdown"). A GUI process is sent
 `WM_QUERYENDSESSION` and `WM_ENDSESSION`; a console process gets
-`CTRL_LOGOFF_EVENT`. Every process starts at level 0x280, so Rook and the
+`CTRL_LOGOFF_EVENT`. Every process starts at level 0x280, so Polaris Terminal and the
 shells in its tabs were in no particular order. `conhost` opts out entirely
 (level 0) and exits with its clients.
 
-Rook would not have noticed its turn anyway. Winit does not handle
+Polaris Terminal would not have noticed its turn anyway. Winit does not handle
 `WM_QUERYENDSESSION` or `WM_ENDSESSION`, and `TerminationRequestSource::System`
 was only ever produced on macOS; on Windows the default window procedure
 approved the shutdown and nothing reached the app.
@@ -138,12 +138,12 @@ approved the shutdown and nothing reached the app.
 What Windows Terminal does - `WindowEmperor.cpp` handles both messages on a
 hidden top-level window - plus a place in the shutdown order:
 
-- At startup Rook calls `SetProcessShutdownParameters(0x300, 0)`, the bottom
+- At startup Polaris Terminal calls `SetProcessShutdownParameters(0x300, 0)`, the bottom
   of the range reserved for applications that go first. Csrss now reaches
-  Rook before any shell.
+  Polaris Terminal before any shell.
 - Each window is subclassed (`SetWindowSubclass`) for the two messages winit
   drops. `WM_QUERYENDSESSION` sets a process-wide flag,
-  `rookui::windowing::is_os_session_ending()`, and approves;
+  `ptermui::windowing::is_os_session_ending()`, and approves;
   `WM_ENDSESSION` with `FALSE` - another application refused - clears it.
   `WM_ENDSESSION` with `TRUE` posts `CustomEvent::SessionEnded`, which the
   event loop turns into `should_terminate_app(TerminationRequestSource::System)`:
@@ -153,12 +153,12 @@ hidden top-level window - plus a place in the shutdown order:
   `exit`, `Ctrl+D` and a crashed shell close the tab exactly as upstream does.
 
 Windows may end the process as soon as `WM_ENDSESSION` returns, so the posted
-event is a courtesy: Rook saves once more and stops the writer cleanly if it
+event is a courtesy: Polaris Terminal saves once more and stops the writer cleanly if it
 gets the time. The fix does not depend on it. The shells are still alive when
-Rook is reached, no tab has closed, and the autosave already holds all of them.
+Polaris Terminal is reached, no tab has closed, and the autosave already holds all of them.
 
-`crates/rookui/src/windowing/winit/windows/session_end.rs`,
-`crates/rookui_core/src/windowing/session.rs`,
+`crates/ptermui/src/windowing/winit/windows/session_end.rs`,
+`crates/ptermui_core/src/windowing/session.rs`,
 `app/src/pane_group/pane/terminal_pane.rs`.
 
 ### The first attempt at this cause
@@ -199,7 +199,7 @@ happen here rather than being hypothetical.
 Anything changed in the last 15 seconds before an abrupt stop is still lost.
 
 A shutdown that skips the messages - a forced one, or power lost - still
-kills the shells and Rook together. Whatever the last autosave held is what
+kills the shells and Polaris Terminal together. Whatever the last autosave held is what
 comes back; a tab closed in the second between them is not.
 
 A text scan cannot tell the two dispatch methods apart, so there is no test

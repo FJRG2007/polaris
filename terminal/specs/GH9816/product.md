@@ -1,8 +1,8 @@
 # GH9816: Configurable code editor line number modes
 ## Summary
-Add a configurable line numbering mode for Rook code editors so users can choose Absolute or Relative line numbers. The setting is independent of Vim mode, defaults to today’s absolute numbering, and makes Vim-style vertical motion counts easier to read when users choose relative numbering.
+Add a configurable line numbering mode for Polaris Terminal code editors so users can choose Absolute or Relative line numbers. The setting is independent of Vim mode, defaults to today’s absolute numbering, and makes Vim-style vertical motion counts easier to read when users choose relative numbering.
 ## Problem
-Rook code editors currently show only absolute line numbers. Vim users commonly rely on relative-style line numbers to choose motions like `5j` and `12k` without mentally subtracting the current line from nearby line numbers. Because the existing input editor surfaces do not show line-number gutters, this feature should improve the code editor without implying a new gutter in command input.
+Polaris Terminal code editors currently show only absolute line numbers. Vim users commonly rely on relative-style line numbers to choose motions like `5j` and `12k` without mentally subtracting the current line from nearby line numbers. Because the existing input editor surfaces do not show line-number gutters, this feature should improve the code editor without implying a new gutter in command input.
 ## Goals
 1. Let users choose how line numbers are displayed in code editor gutters.
 2. Preserve the current absolute numbering behavior by default.
@@ -18,12 +18,12 @@ Rook code editors currently show only absolute line numbers. Vim users commonly 
 ## Figma
 Figma: none provided. The feature reuses the existing code editor gutter and settings UI patterns.
 ## Behavior
-1. Rook exposes a line numbering mode setting for code editors with exactly two choices:
+1. Polaris Terminal exposes a line numbering mode setting for code editors with exactly two choices:
    - **Absolute**: each line shows its absolute, one-based line number. This is the current behavior and the default for all users.
-   - **Relative**: the active cursor line shows its absolute, one-based line number; every other visible line shows the absolute distance in lines from the active cursor line. Rook does not expose any additional line-number option in this iteration.
+   - **Relative**: the active cursor line shows its absolute, one-based line number; every other visible line shows the absolute distance in lines from the active cursor line. Polaris Terminal does not expose any additional line-number option in this iteration.
 2. The setting is available from Settings under the Text Editing area, near the existing code/text editing controls. It is not nested under the Vim-mode toggle and remains visible whether Vim keybindings are enabled or disabled.
-3. The setting persists like other public editor settings and is restored for future Rook windows and sessions. If the user has not chosen a value, Rook behaves exactly as it does today: Absolute mode.
-4. Changing the setting updates all currently open code editor gutters without requiring the user to reopen files, restart Rook, toggle Vim mode, or refocus the editor.
+3. The setting persists like other public editor settings and is restored for future Polaris Terminal windows and sessions. If the user has not chosen a value, Polaris Terminal behaves exactly as it does today: Absolute mode.
+4. Changing the setting updates all currently open code editor gutters without requiring the user to reopen files, restart Polaris Terminal, toggle Vim mode, or refocus the editor.
 5. Absolute mode is behaviorally identical to the current code editor gutter:
    - The first file line displays `1`, the second displays `2`, and so on.
    - Code editor surfaces that start numbering from a caller-provided starting line continue to use that starting line.
@@ -52,7 +52,7 @@ Figma: none provided. The feature reuses the existing code editor gutter and set
     - Relative must fit both the active line’s absolute number and the largest visible relative distance where practical, and must never overlap editor text or gutter controls.
 15. Command input editors, terminal prompt editors, AI input editors, and rich-text notebook editors do not show line numbers after this change. Their Vim status indicators and Vim keybindings continue to work as they do today.
 16. The settings UI is searchable with terms such as `line number`, `relative line`, `vim`, and `gutter`.
-17. If a settings file contains an invalid line numbering value, Rook falls back to Absolute mode using the existing settings validation/error behavior rather than failing to render editors.
+17. If a settings file contains an invalid line numbering value, Polaris Terminal falls back to Absolute mode using the existing settings validation/error behavior rather than failing to render editors.
 ## Success criteria
 1. A new user or upgraded user with no explicit setting sees the same absolute code editor line numbers as before.
 2. Selecting Relative mode shows the active cursor line’s absolute number and distances on surrounding numbered code editor lines.
@@ -64,7 +64,7 @@ Figma: none provided. The feature reuses the existing code editor gutter and set
 ## Validation
 1. Manually verify a multi-line file in the code editor with Absolute and Relative modes selected.
 2. In Relative mode, move the cursor above and below visible lines using mouse, arrow keys, goto-line, and Vim motions; verify displayed values update correctly.
-3. Verify the setting persists after closing and reopening Rook or reloading settings.
+3. Verify the setting persists after closing and reopening Polaris Terminal or reloading settings.
 4. Verify the setting remains visible when Vim mode is disabled and that toggling Vim mode does not reset it.
 5. Verify terminal command input, AI input, and rich-text notebook editors do not gain line-number gutters.
 6. Verify code review/diff editors still show diff decorations and gutter buttons correctly in both modes, show absolute line numbers while the diff/review editor is not focused, and apply Relative numbering across the focused editor.

@@ -176,9 +176,9 @@ fn artifact_round_trips_all_variants() {
             title: None,
         },
         Artifact::PullRequest {
-            url: "https://github.com/FJRG2007/rook/pull/123".to_string(),
+            url: "https://github.com/FJRG2007/polaris/pull/123".to_string(),
             branch: "feature-branch".to_string(),
-            repo: Some("rook".to_string()),
+            repo: Some("polaris-terminal".to_string()),
             number: Some(123),
         },
         Artifact::ExternalReference {
@@ -217,15 +217,15 @@ fn artifact_round_trips_all_variants() {
 #[test]
 fn artifact_pull_request_derives_repo_and_number_on_deserialize() {
     let artifact: Artifact = serde_json::from_str(
-        r#"{"artifact_type":"PULL_REQUEST","data":{"url":"https://github.com/FJRG2007/rook/pull/456","branch":"main"}}"#,
+        r#"{"artifact_type":"PULL_REQUEST","data":{"url":"https://github.com/FJRG2007/polaris/pull/456","branch":"main"}}"#,
     )
     .unwrap();
     assert_eq!(
         artifact,
         Artifact::PullRequest {
-            url: "https://github.com/FJRG2007/rook/pull/456".to_string(),
+            url: "https://github.com/FJRG2007/polaris/pull/456".to_string(),
             branch: "main".to_string(),
-            repo: Some("rook".to_string()),
+            repo: Some("polaris-terminal".to_string()),
             number: Some(456),
         }
     );
@@ -256,8 +256,8 @@ fn artifact_rejects_unknown_artifact_type() {
 
 #[test]
 fn converts_graphql_file_artifact() {
-    let artifact = Artifact::try_from(rook_graphql::ai::AIConversationArtifact::FileArtifact(
-        rook_graphql::ai::FileArtifact {
+    let artifact = Artifact::try_from(pterm_graphql::ai::AIConversationArtifact::FileArtifact(
+        pterm_graphql::ai::FileArtifact {
             artifact_uid: "artifact-file-1".into(),
             filepath: "outputs/report.txt".to_string(),
             mime_type: "text/plain".to_string(),

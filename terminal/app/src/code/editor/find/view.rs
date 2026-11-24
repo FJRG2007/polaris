@@ -2,22 +2,22 @@
 // Adding this file level gate as some of the code around editability is not used in WASM yet.
 
 use pathfinder_color::ColorU;
-use rook_editor::editor::NavigationKey;
-use rook_editor::search::{SearchEvent, Searcher};
-pub use rookui::AppContext;
-pub use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::elements::{
+use pterm_editor::editor::NavigationKey;
+use pterm_editor::search::{SearchEvent, Searcher};
+pub use ptermui::AppContext;
+pub use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::elements::{
     Align, Border, ChildAnchor, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DropShadow, Element, Flex, Hoverable, MainAxisAlignment, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentOffsetBounds, Radius, Rect, SavePosition, Shrinkable,
     Text,
 };
-pub use rookui::elements::{ParentElement as _, Stack};
-pub use rookui::geometry::vector::vec2f;
-use rookui::keymap::EditableBinding;
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+pub use ptermui::elements::{ParentElement as _, Stack};
+pub use ptermui::geometry::vector::vec2f;
+use ptermui::keymap::EditableBinding;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -109,7 +109,7 @@ pub enum FindAction {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
     app.register_editable_bindings([
         EditableBinding::new(
             "find:find_next_occurrence",
@@ -396,10 +396,10 @@ impl CodeEditorFind {
                     self.searcher.as_ref(ctx).match_count()
                 ),
                 "Use enter and shift-enter to navigate between matches. Escape to quit.",
-                RookA11yRole::UserAction,
+                PtermA11yRole::UserAction,
             )
         } else {
-            AccessibilityContent::new_without_help("No results.", RookA11yRole::UserAction)
+            AccessibilityContent::new_without_help("No results.", PtermA11yRole::UserAction)
         };
         ctx.emit_a11y_content(content);
     }
@@ -414,12 +414,12 @@ impl CodeEditorFind {
                     "Successfully replaced match. Selected match is {match_index} of {remaining_matches}"
                 ),
                 "Continue pressing Enter to replace more matches, or use up/down arrows to navigate.",
-                RookA11yRole::UserAction,
+                PtermA11yRole::UserAction,
             )
         } else {
             AccessibilityContent::new_without_help(
                 "Successfully replaced the last match.",
-                RookA11yRole::UserAction,
+                PtermA11yRole::UserAction,
             )
         };
         ctx.emit_a11y_content(content);
@@ -508,7 +508,7 @@ impl CodeEditorFind {
             };
             let icon = Container::new(
                 ConstrainedBox::new(
-                    icon.to_rookui_icon(appearance.theme().active_ui_text_color())
+                    icon.to_ptermui_icon(appearance.theme().active_ui_text_color())
                         .finish(),
                 )
                 .with_height(size)
@@ -572,7 +572,7 @@ impl CodeEditorFind {
             appearance.theme().active_ui_text_color()
         };
         Container::new(
-            ConstrainedBox::new(match_icon.to_rookui_icon(icon_color).finish())
+            ConstrainedBox::new(match_icon.to_ptermui_icon(icon_color).finish())
                 .with_height(height)
                 .with_width(height)
                 .finish(),
@@ -599,7 +599,7 @@ impl CodeEditorFind {
             appearance.theme().active_ui_text_color()
         };
         Container::new(
-            ConstrainedBox::new(Icon::Search.to_rookui_icon(icon_color).finish())
+            ConstrainedBox::new(Icon::Search.to_ptermui_icon(icon_color).finish())
                 .with_height(height)
                 .with_width(height)
                 .finish(),
@@ -626,7 +626,7 @@ impl CodeEditorFind {
         };
         Container::new(
             ConstrainedBox::new(
-                icon.to_rookui_icon(appearance.theme().active_ui_text_color())
+                icon.to_ptermui_icon(appearance.theme().active_ui_text_color())
                     .finish(),
             )
             .with_height(height)
@@ -990,7 +990,7 @@ impl View for CodeEditorFind {
         Some(AccessibilityContent::new(
             description,
             help_text,
-            RookA11yRole::TextareaRole,
+            PtermA11yRole::TextareaRole,
         ))
     }
 
@@ -1003,7 +1003,7 @@ impl View for CodeEditorFind {
         }
     }
 
-    fn on_blur(&mut self, _blur_ctx: &rookui::BlurContext, ctx: &mut ViewContext<Self>) {
+    fn on_blur(&mut self, _blur_ctx: &ptermui::BlurContext, ctx: &mut ViewContext<Self>) {
         // Check if the currently focused view is one of our child components
         let focused_view_id = ctx.focused_view_id(ctx.window_id());
         let is_focus_within_find_bar = [

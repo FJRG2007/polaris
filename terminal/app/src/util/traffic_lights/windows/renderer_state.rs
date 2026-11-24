@@ -1,7 +1,7 @@
 //! Module containing the definition of [`RendererState`].
 
-use rookui::fonts::FamilyId;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use ptermui::fonts::FamilyId;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 /// Helper singleton model that stores the icon font used to render native window controls on
 /// Windows. Using a symbol font (as opposed to SVGs) produces windows controls that are better
@@ -33,7 +33,7 @@ impl RendererState {
     }
 
     fn load_symbol_font(symbol_font_to_load: &str, ctx: &mut AppContext) -> Option<FamilyId> {
-        rookui::fonts::Cache::handle(ctx).update(ctx, |font_cache, _| {
+        ptermui::fonts::Cache::handle(ctx).update(ctx, |font_cache, _| {
             match font_cache.get_or_load_system_font(symbol_font_to_load) {
                 Ok(family) => Some(family),
                 Err(err) => {

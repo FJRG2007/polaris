@@ -4,7 +4,7 @@
 The CLI agent footer's "Share session" button opens the share modal, which is an unnecessary step for the primary use case (quick mobile handoff). We need to make it a one-click action that starts sharing without scrollback, auto-copies the link, and shows a stop button while active.
 
 ## Relevant Code
-- `crates/rook_core/src/ui/icons.rs (10-296)` — `Icon` enum; needs `Phone01` variant
+- `crates/pterm_core/src/ui/icons.rs (10-296)` — `Icon` enum; needs `Phone01` variant
 - `app/assets/bundled/svg/phone-01.svg` — phone icon for start-state (on branch)
 - `Icon::StopFilled` — existing icon reused for stop-state
 - `app/src/search/slash_command_menu/static_commands/commands.rs` — slash command definitions
@@ -36,7 +36,7 @@ The CLI agent footer's "Share session" button opens the share modal, which is an
 ## Proposed Changes
 
 ### 1. Add icon variant
-In `crates/rook_core/src/ui/icons.rs`, add one variant:
+In `crates/pterm_core/src/ui/icons.rs`, add one variant:
 - `Phone01` → `"bundled/svg/phone-01.svg"`
 
 The stop state reuses the existing `Icon::StopFilled`.

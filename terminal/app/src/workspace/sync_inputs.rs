@@ -1,13 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
-use rookui::keymap::EditableBinding;
-use rookui::{AppContext, Entity, EntityId, SingletonEntity, WindowId};
+use ptermui::keymap::EditableBinding;
+use ptermui::{AppContext, Entity, EntityId, SingletonEntity, WindowId};
 
 use super::WorkspaceAction;
 use crate::util::bindings::{BindingGroup, CustomAction};
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_editable_bindings(vec![
         EditableBinding::new(

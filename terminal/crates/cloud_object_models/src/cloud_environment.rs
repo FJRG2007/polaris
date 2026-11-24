@@ -63,7 +63,7 @@ impl fmt::Display for CodeForge {
 pub struct GithubRepo {
     /// Repository owner (e.g. "warpdotdev")
     pub owner: String,
-    /// Repository name (e.g. "rook-internal")
+    /// Repository name (e.g. "polaris-terminal-internal")
     pub repo: String,
 }
 
@@ -210,7 +210,7 @@ pub struct EnvironmentSecretRef {
     pub name: String,
 }
 
-/// An AmbientAgentEnvironment represents an environment that we would run a Rook agent in.
+/// An AmbientAgentEnvironment represents an environment that we would run a Polaris Terminal agent in.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct AmbientAgentEnvironment {
     /// Environment name

@@ -17,9 +17,9 @@ All of the data already flows through production-shaped models the TUI consumes:
 
 On the TUI side:
 
-- `crates/rook_tui/src/agent_block.rs:325` — `TuiAIBlock::sections` walks `output.messages` in order and currently drops `TodoOperation` (line 385) in the unsupported-message arm.
-- `crates/rook_tui/src/agent_block.rs (54-102)` — `ThinkingBlockStates` is the existing per-message collapse/hover state pattern (manual override map + owned `MouseStateHandle`s keyed by `MessageId`).
-- `crates/rook_tui/src/agent_block_sections.rs` — pure per-section render functions; `render_thinking_section` already composes `TuiUiBuilder::collapsible` for a toggleable header + indented body, and `render_fallback_tool_call_section` establishes the glyph-gutter row style (colored state glyph, then label).
+- `crates/pterm_tui/src/agent_block.rs:325` — `TuiAIBlock::sections` walks `output.messages` in order and currently drops `TodoOperation` (line 385) in the unsupported-message arm.
+- `crates/pterm_tui/src/agent_block.rs (54-102)` — `ThinkingBlockStates` is the existing per-message collapse/hover state pattern (manual override map + owned `MouseStateHandle`s keyed by `MessageId`).
+- `crates/pterm_tui/src/agent_block_sections.rs` — pure per-section render functions; `render_thinking_section` already composes `TuiUiBuilder::collapsible` for a toggleable header + indented body, and `render_fallback_tool_call_section` establishes the glyph-gutter row style (colored state glyph, then label).
 - `app/src/tui_export.rs` — the narrow export boundary; `BlocklistAIHistoryModel` is already exported, but none of the todo types are.
 
 Per the design review: mirror the GUI's full `TodoStatus` taxonomy (not just the two states visible in the Figma frame); default expanded with manual-toggle-only collapse, matching the GUI. `MarkAsCompleted` progress rows are included (matching the GUI). The GUI's "Outdated" badge is deferred — superseded lists just show cancelled-styled items.
@@ -28,7 +28,7 @@ Per the design review: mirror the GUI's full `TodoStatus` taxonomy (not just the
 
 ### tui_export additions
 
-Export the todo data types `rook_tui` must name: `TodoOperation`, `AIAgentTodo`, `AIAgentTodoId`, `AIAgentTodoList`, and `TodoStatus`.
+Export the todo data types `pterm_tui` must name: `TodoOperation`, `AIAgentTodo`, `AIAgentTodoId`, `AIAgentTodoList`, and `TodoStatus`.
 
 Do not export `AIConversation`. Instead, add two narrow projections on the already-exported `BlocklistAIHistoryModel`, following the `ConversationUsageTotals` precedent of keeping conversation internals out of the boundary:
 
@@ -72,7 +72,7 @@ Rename `ThinkingBlockStates` to a shared `CollapsibleSectionStates` and reuse th
 
 ### Renderers
 
-Add to `crates/rook_tui/src/agent_block_sections.rs`:
+Add to `crates/pterm_tui/src/agent_block_sections.rs`:
 
 `render_todo_list_section(states, message_id, todos, conversation_id, app)`:
 - Header: `☰ Tasks {todos.len()}` rendered through `TuiUiBuilder::collapsible` with the block's persistent hover state, bold/primary styling per the Figma. The collapsible helper owns the `▾`/`▸` affordance and toggle callback (record override, `event_ctx.notify()`), exactly like the thinking section.
@@ -83,7 +83,7 @@ Add to `crates/rook_tui/src/agent_block_sections.rs`:
   - `Cancelled` — cancelled glyph from the tool-call glyph conventions, title in `muted_text_style` with the crossed-out modifier if `TuiText` styling supports it; otherwise muted color alone.
   - `Stopped` — stop glyph, `muted_text_style`.
 
-  Reuse/extend the glyph table in `crates/rook_tui/src/tool_call_labels.rs` rather than introducing a second glyph vocabulary.
+  Reuse/extend the glyph table in `crates/pterm_tui/src/tool_call_labels.rs` rather than introducing a second glyph vocabulary.
 
 `render_completed_todos_section(completed, active_list, app)`:
 - A single muted row: `✓ Completed <title> (n/m)`, joining multiple completions with commas, using `active_todo_list` for index/length and omitting `(n/m)` when the item is not in the active list — a direct port of the GUI's `render_completed_todo_items` text logic. Returns nothing when the text would be empty.
@@ -98,7 +98,7 @@ Add to `crates/rook_tui/src/agent_block_sections.rs`:
 
 ## Testing and validation
 
-Unit tests in `crates/rook_tui/src/agent_block_tests.rs`:
+Unit tests in `crates/pterm_tui/src/agent_block_tests.rs`:
 - `UpdateTodos` produces a `TodoList` section in message order between adjacent text/tool-call sections; empty `UpdateTodos` is ignored.
 - `MarkAsCompleted` produces a `CompletedTodos` section; the rendered text includes `(n/m)` when the item is in the active list and omits it otherwise.
 - Glyph/style mapping per `TodoStatus`, including the `Cancelled` fallback for ids missing from the conversation.
@@ -107,11 +107,11 @@ Unit tests in `crates/rook_tui/src/agent_block_tests.rs`:
 
 App-side test for the two `BlocklistAIHistoryModel` projections (status delegation and active-list lookup) next to existing history-model tests.
 
-Manual validation: run `cargo run -p rook_tui`, prompt the agent into a multi-step task that creates todos, and verify the Tasks block matches the Figma (header count, glyphs, indentation), updates as items complete, and collapses/expands on header click.
+Manual validation: run `cargo run -p pterm_tui`, prompt the agent into a multi-step task that creates todos, and verify the Tasks block matches the Figma (header count, glyphs, indentation), updates as items complete, and collapses/expands on header click.
 
 Run:
-- `cargo nextest run -p rook_tui`
-- `cargo nextest run -p rook history_model`
+- `cargo nextest run -p pterm_tui`
+- `cargo nextest run -p polaris-terminal history_model`
 - `./script/format`
 - `cargo clippy --workspace --all-targets --all-features --tests -- -D warnings`
 

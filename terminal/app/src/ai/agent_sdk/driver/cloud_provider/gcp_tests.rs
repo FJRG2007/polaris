@@ -28,7 +28,7 @@ fn best_effort_command_is_killed_on_timeout() {
     let mut command = command::r#async::Command::new("sh");
     command.arg("-c").arg(script);
 
-    let outcome = rookui::r#async::block_on(async {
+    let outcome = ptermui::r#async::block_on(async {
         run_best_effort_with_timeout(command, Duration::from_millis(500)).await
     });
     assert!(
@@ -56,7 +56,7 @@ fn best_effort_command_is_killed_on_timeout() {
 #[cfg(unix)]
 #[test]
 fn best_effort_command_completes_within_timeout() {
-    let outcome = rookui::r#async::block_on(async {
+    let outcome = ptermui::r#async::block_on(async {
         run_best_effort_with_timeout(
             command::r#async::Command::new("true"),
             Duration::from_secs(5),
@@ -73,7 +73,7 @@ fn best_effort_command_completes_within_timeout() {
 /// failure, so the caller can treat "not installed" as expected.
 #[test]
 fn best_effort_command_missing_binary_is_not_found() {
-    let outcome = rookui::r#async::block_on(async {
+    let outcome = ptermui::r#async::block_on(async {
         run_best_effort_with_timeout(
             command::r#async::Command::new("definitely-not-a-real-binary-xyz"),
             Duration::from_secs(5),

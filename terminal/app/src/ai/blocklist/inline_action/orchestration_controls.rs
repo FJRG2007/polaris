@@ -9,19 +9,19 @@
 use ai::agent::action::RunAgentsExecutionMode;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_cli::agent::Harness;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_cli::agent::Harness;
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement,
     Point, Radius, Text,
 };
-use rookui::event::DispatchedEvent;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponentStyles};
-use rookui::{
+use ptermui::event::DispatchedEvent;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponentStyles};
+use ptermui::{
     AfterLayoutContext, AppContext, Element, EventContext, LayoutContext, PaintContext,
     SingletonEntity, SizeConstraint, View, ViewContext, ViewHandle,
 };
@@ -39,7 +39,7 @@ use crate::ai::orchestration::{
     harness_snapshot, host_snapshot, model_snapshot, persist_auth_secret_selection,
 };
 pub use crate::ai::orchestration::{
-    AuthSecretSelection, ORCHESTRATION_ROOK_WORKER_HOST, OrchestrationConfigState,
+    AuthSecretSelection, ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST, OrchestrationConfigState,
     OrchestrationEditState, accept_disabled_reason_with_auth, empty_env_recommendation_message,
     persist_environment_selection, persist_host_selection,
     resolve_auth_secret_selection_for_harness, resolve_default_environment_id,
@@ -157,7 +157,7 @@ pub fn picker_styles(appearance: &Appearance) -> (UiComponentStyles, PickerColor
     // card background in the config block shows through, and so that
     // gradient-background themes render correctly.
     let background_fill: Fill = theme.surface_overlay_1();
-    let background: rookui::elements::Fill = background_fill.into();
+    let background: ptermui::elements::Fill = background_fill.into();
     // Border and font colors are intentionally left to the dropdown's
     // default ButtonVariant::Secondary styling, which uses
     // theme.outline() and theme.main_text_color() — both are
@@ -184,7 +184,7 @@ pub fn picker_styles(appearance: &Appearance) -> (UiComponentStyles, PickerColor
 pub struct PickerColors {
     pub padding: Coords,
     pub corner_radius: CornerRadius,
-    pub background: rookui::elements::Fill,
+    pub background: ptermui::elements::Fill,
 }
 
 // ── Picker creation (generic over action type) ──────────────────────
@@ -298,7 +298,7 @@ fn oz_model_menu_items<A: OrchestrationControlAction, V: View>(
 }
 
 /// Populates the model picker from [`model_snapshot`] for the active
-/// harness (Rook LLM catalog for Oz, "Default model" for local Codex,
+/// harness (Polaris Terminal LLM catalog for Oz, "Default model" for local Codex,
 /// "Default model" plus the server-provided catalog otherwise).
 pub fn populate_model_picker_for_harness<A: OrchestrationControlAction, V: View>(
     dropdown: &ViewHandle<FilterableDropdown<A>>,
@@ -534,7 +534,7 @@ fn render_new_environment_footer<A: OrchestrationControlAction>(
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_spacing(8.)
                 .with_child(
-                    ConstrainedBox::new(Icon::Plus.to_rookui_icon(text_color).finish())
+                    ConstrainedBox::new(Icon::Plus.to_ptermui_icon(text_color).finish())
                         .with_width(icon_size)
                         .with_height(icon_size)
                         .finish(),
@@ -580,7 +580,7 @@ pub fn populate_host_picker<V: View>(
     let snapshot = host_snapshot(&state, &scope, ctx);
     let selected = snapshot
         .selected_id
-        .unwrap_or_else(|| ORCHESTRATION_ROOK_WORKER_HOST.to_string());
+        .unwrap_or_else(|| ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST.to_string());
     let mut default_host = None;
     let mut recent_host = None;
     let mut connected_hosts = Vec::new();
@@ -589,7 +589,7 @@ pub fn populate_host_picker<V: View>(
             Some(OptionBadge::Default) => default_host = Some(row.id),
             Some(OptionBadge::Recent) => recent_host = Some(row.id),
             Some(OptionBadge::Connected) => connected_hosts.push(row.id),
-            // The unbadged "rook" row is built into the HostPicker itself.
+            // The unbadged "polaris-terminal" row is built into the HostPicker itself.
             // Recommended is not applicable to host rows.
             Some(OptionBadge::Recommended) | None => {}
         }
@@ -717,11 +717,11 @@ pub fn apply_created_auth_secret_if_matches<V: View>(
 // ── Shared action helpers ───────────────────────────────────
 
 /// Worker host to display for the current execution mode (Local always
-/// shows the Rook host).
+/// shows the Polaris Terminal host).
 fn current_worker_host(state: &OrchestrationConfigState) -> &str {
     match &state.execution_mode {
         RunAgentsExecutionMode::Remote { worker_host, .. } => worker_host.as_str(),
-        RunAgentsExecutionMode::Local => ORCHESTRATION_ROOK_WORKER_HOST,
+        RunAgentsExecutionMode::Local => ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST,
     }
 }
 
@@ -1061,7 +1061,7 @@ pub fn render_mode_toggle<A: OrchestrationControlAction>(
         active_segment_bg,
     );
 
-    let segment_outer_bg = rook_core::ui::theme::color::internal_colors::fg_overlay_2(theme);
+    let segment_outer_bg = pterm_core::ui::theme::color::internal_colors::fg_overlay_2(theme);
     let segments_row = Flex::row()
         .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
         .with_main_axis_alignment(MainAxisAlignment::Start)
@@ -1114,7 +1114,7 @@ fn render_segment_button<A: OrchestrationControlAction>(
     let active_text_color = blended_colors::text_main(theme, theme.surface_1());
     let inactive_text_color = blended_colors::text_disabled(theme, theme.surface_1());
     let segment_active_bg = active_bg_override
-        .unwrap_or_else(|| rook_core::ui::theme::color::internal_colors::fg_overlay_4(theme));
+        .unwrap_or_else(|| pterm_core::ui::theme::color::internal_colors::fg_overlay_4(theme));
     Hoverable::new(mouse_state, move |_| {
         let text = Text::new(label_owned.clone(), font_family, font_size)
             .with_color(if is_active {
@@ -1123,7 +1123,7 @@ fn render_segment_button<A: OrchestrationControlAction>(
                 inactive_text_color
             })
             .finish();
-        let centered = rookui::elements::Align::new(text).finish();
+        let centered = ptermui::elements::Align::new(text).finish();
         let mut container = Container::new(centered)
             .with_vertical_padding(ORCHESTRATION_SEGMENT_VERTICAL_PADDING)
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));

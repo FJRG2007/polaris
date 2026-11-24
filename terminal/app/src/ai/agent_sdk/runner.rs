@@ -1,22 +1,22 @@
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
 use comfy_table::Cell;
-use rook_cli::GlobalOptions;
-use rook_cli::agent::OutputFormat;
-use rook_cli::runner::{
+use pterm_cli::GlobalOptions;
+use pterm_cli::agent::OutputFormat;
+use pterm_cli::runner::{
     CreateRunnerArgs, DeleteRunnerArgs, ListRunnersArgs, RunnerArchArg, RunnerCommand,
     RunnerMacosVersionArg, RunnerOsArg, RunnerSortByArg, UpdateRunnerArgs, validate_os_config,
 };
-use rook_graphql::mutations::upsert_runner::{
+use pterm_graphql::mutations::upsert_runner::{
     LinuxConfigInput, MacOsConfigInput, RunnerInput, RunnerInstanceShapeInput, UpsertRunnerInput,
 };
-use rook_graphql::object::SpaceType;
-use rook_graphql::object_permissions::Owner as GqlOwner;
-use rook_graphql::queries::get_runners::{
+use pterm_graphql::object::SpaceType;
+use pterm_graphql::object_permissions::Owner as GqlOwner;
+use pterm_graphql::queries::get_runners::{
     Runner, RunnerArch, RunnerConfig, RunnerMacOsVersion, RunnerOs, RunnerSortBy,
 };
-use rookui::platform::TerminationMode;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use ptermui::platform::TerminationMode;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use serde::Serialize;
 
 use super::output::{self, TableFormat};
@@ -197,7 +197,7 @@ impl RunnerCommandRunner {
     }
 }
 
-impl rookui::Entity for RunnerCommandRunner {
+impl ptermui::Entity for RunnerCommandRunner {
     type Event = ();
 }
 impl SingletonEntity for RunnerCommandRunner {}

@@ -1,7 +1,7 @@
 use pathfinder_color::ColorU;
-use rook_core::ui::theme::Fill;
-use rookui::Element;
-use rookui::elements::{Align, ConstrainedBox, Container, Empty};
+use pterm_core::ui::theme::Fill;
+use ptermui::Element;
+use ptermui::elements::{Align, ConstrainedBox, Container, Empty};
 
 use crate::appearance::Appearance;
 use crate::search::result_renderer::ItemHighlightState;
@@ -26,7 +26,7 @@ pub fn render_search_item_icon(
         background_color.into_solid(),
         MinimumAllowedContrast::NonText,
     );
-    let icon_element = icon.to_rookui_icon(Fill::Solid(icon_color)).finish();
+    let icon_element = icon.to_ptermui_icon(Fill::Solid(icon_color)).finish();
     render_search_item_icon_inner(appearance, icon_element)
 }
 
@@ -50,5 +50,5 @@ fn render_search_item_icon_inner(
 }
 
 pub mod colors {
-    pub const ROOK_AI: u32 = 0xF3B911FF;
+    pub const POLARIS_TERMINAL_AI: u32 = 0xF3B911FF;
 }

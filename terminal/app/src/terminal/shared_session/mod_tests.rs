@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use rook_core::command::ExitCode;
-use rook_core::features::FeatureFlag;
-use rookui::r#async::executor::Background;
-use rookui::units::Lines;
+use pterm_core::command::ExitCode;
+use pterm_core::features::FeatureFlag;
+use ptermui::r#async::executor::Background;
+use ptermui::units::Lines;
 use serde_json::Value;
 use session_sharing_protocol::common::{Scrollback, ScrollbackBlock};
 use url::Url;

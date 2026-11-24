@@ -6,7 +6,7 @@ This branch builds the diff viewer on top of the core TUI editor element introdu
 
 ## Context
 
-Diff data already reaches the TUI. `RequestFileEditsExecutor::preprocess_action` (`app/src/ai/blocklist/action_model/execute/request_file_edits.rs`) resolves the tool args once, atomically, into `Vec<FileDiff>` (`app/src/ai/blocklist/diff_types.rs:27`) — full pre-edit content (`DiffBase`) plus line-range `DiffDelta`s per file (`Create`/`Update{rename}`/`Delete`) — and delivers them to the surface-registered storage. In the TUI that is `TuiDiffStorage` (`crates/rook_tui/src/tui_diff_storage.rs`), owned by `TuiFileEditsView` (`crates/rook_tui/src/tui_file_edits_view.rs`), created per `RequestFileEdits` action by `TuiAIBlock::sync_action_views` (`crates/rook_tui/src/agent_block.rs`). Resolution is one-shot at preprocess time, so the body appears fully formed when diffs land; streaming diffs during arg generation is out of scope (PRODUCT non-goal).
+Diff data already reaches the TUI. `RequestFileEditsExecutor::preprocess_action` (`app/src/ai/blocklist/action_model/execute/request_file_edits.rs`) resolves the tool args once, atomically, into `Vec<FileDiff>` (`app/src/ai/blocklist/diff_types.rs:27`) — full pre-edit content (`DiffBase`) plus line-range `DiffDelta`s per file (`Create`/`Update{rename}`/`Delete`) — and delivers them to the surface-registered storage. In the TUI that is `TuiDiffStorage` (`crates/pterm_tui/src/tui_diff_storage.rs`), owned by `TuiFileEditsView` (`crates/pterm_tui/src/tui_file_edits_view.rs`), created per `RequestFileEdits` action by `TuiAIBlock::sync_action_views` (`crates/pterm_tui/src/agent_block.rs`). Resolution is one-shot at preprocess time, so the body appears fully formed when diffs land; streaming diffs during arg generation is out of scope (PRODUCT non-goal).
 
 Before this branch, `TuiFileEditsView` rendered a one-line aggregate summary ("Edited N file(s) (+a −r)").
 
@@ -37,7 +37,7 @@ The TUI is the first consumer combining delta-seeded content with `DiffModel`-dr
 
 The `delay_rendering` interplay is validated end-to-end by `test_char_cell_diff_pipeline_populates_ghosts_and_hidden_ranges` (`app/src/code/editor/model_tests.rs`): the exact wrapper sequence, asserting ghosts and hidden ranges land with no consumer calls after setup.
 
-### The view (`crates/rook_tui/src/tui_file_edits_view.rs`)
+### The view (`crates/pterm_tui/src/tui_file_edits_view.rs`)
 
 - Renders the core element per file: no `.editable()`/`.on_action` (read-only, PRODUCT 18), `.with_gutter(...)` (new-file numbers, PRODUCT 9/11), `.hide_trailing_empty_line()` (PRODUCT 7), and diff styles — context dim, added green via line classification from `DiffModel::added_or_changed_lines`, ghost red, gap dim (PRODUCT 10; styles from `tui_builder.rs`'s new `diff_added_style`/`diff_removed_style`).
 - Owns chrome: header row (state glyph per `tool_call_labels.rs` conventions, verb from `DiffType`, `+a −r` from `diff_status().get_diff_lines()` so header and body derive from the same computed diff — PRODUCT 2-6), per-file collapse (`MouseStateHandle` + click, caret `▾`/`▸`, PRODUCT 15-16), blank-row spacing between files.
@@ -56,7 +56,7 @@ Per-file bodies must measure and refresh correctly as ordinary transcript conten
 - `app/src/code/editor/model_tests.rs`: the fully-automatic char-cell pipeline test and the symmetric hidden-lines window regression test (both above).
 - `tui_file_edits_view_tests.rs`: header verb/name per `DiffType` incl. renames (PRODUCT 1-3), delta extraction per op, end-to-end pipeline (seed → apply → diff → expand → assert added ranges + ghost blocks), fallback states (PRODUCT 14/19).
 - Transcript/viewport tests: presenter-cache resolution of agent blocks, height re-measurement, invalidation routing.
-- Suites: `cargo nextest run -p rook_tui -p rook_editor` plus `cargo nextest run -p rook code::editor code_review`; `./script/format` and the presubmit clippy invocation before PR.
+- Suites: `cargo nextest run -p pterm_tui -p pterm_editor` plus `cargo nextest run -p polaris-terminal code::editor code_review`; `./script/format` and the presubmit clippy invocation before PR.
 - Manual verification in the TUI binary: single/multi-file edits, multi-hunk separators, long wrapped lines, create/delete/rename, collapse toggling, failed edit, theme switch (PRODUCT 17-20).
 
 ## Risks and mitigations

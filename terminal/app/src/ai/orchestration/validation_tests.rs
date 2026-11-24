@@ -1,5 +1,5 @@
 use ai::agent::action::RunAgentsExecutionMode;
-use rookui::{App, AppContext, Entity};
+use ptermui::{App, AppContext, Entity};
 
 use super::accept_disabled_reason_with_auth;
 use crate::ai::orchestration::config_state::{AuthSecretSelection, OrchestrationConfigState};
@@ -33,7 +33,7 @@ fn state(
 fn cloud() -> RunAgentsExecutionMode {
     RunAgentsExecutionMode::Remote {
         environment_id: "env-1".to_string(),
-        worker_host: "rook".to_string(),
+        worker_host: "polaris-terminal".to_string(),
         computer_use_enabled: false,
         runner_id: String::new(),
     }

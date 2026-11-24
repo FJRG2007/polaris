@@ -2,7 +2,7 @@
 //! a concrete model per task.
 //!
 //! This module holds the portable definition for **local** (YAML-authored) custom
-//! auto models: each file under `~/.rook/custom_model_routers/` defines exactly
+//! auto models: each file under `~/.polaris-terminal/custom_model_routers/` defines exactly
 //! one router (see [`parse_model_config_yaml`]), surfaced in the model picker as
 //! synthetic [`LLMInfo`] entries, and serialized inline into outbound agent
 //! requests (`Request.Settings.custom_model_routers`).
@@ -37,7 +37,7 @@ pub const CLOUD_CUSTOM_ROUTER_PREFIX: &str = "custom-router:cloud:";
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CustomModelRouting {
-    /// Route by Rook-determined task complexity.
+    /// Route by Polaris Terminal-determined task complexity.
     Complexity(ComplexityRouting),
     /// Route by classifying the prompt against user-authored categories.
     Prompt(PromptRouting),
@@ -116,7 +116,7 @@ impl CustomModelRouter {
             Some(path) => {
                 format!(
                     "{routing_kind} · {}",
-                    rook_core::paths::home_relative_path(path)
+                    pterm_core::paths::home_relative_path(path)
                 )
             }
             None => routing_kind.to_owned(),

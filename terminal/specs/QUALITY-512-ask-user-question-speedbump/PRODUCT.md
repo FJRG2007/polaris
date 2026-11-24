@@ -29,7 +29,7 @@ The speedbump is seeded when all of the following are true:
 
 The trigger intentionally includes auto-approve conversations. If Ask Question is skipped because auto-approve is active, the first skipped Ask Question card can still show the footer so the user can discover and adjust the setting.
 ### One-shot semantics
-The one-shot flag is local-only and is not synced through Rook Drive. The flag is consumed once the footer is successfully attached to an Ask-User-Question view. If the agent output is processed before the view exists, the flag remains `true` and is consumed later when the matching view is created and the footer can actually be installed.
+The one-shot flag is local-only and is not synced through Polaris Terminal Drive. The flag is consumed once the footer is successfully attached to an Ask-User-Question view. If the agent output is processed before the view exists, the flag remains `true` and is consumed later when the matching view is created and the footer can actually be installed.
 
 The flag is consumed even if the user does not interact with the footer. This keeps the behavior to a single first-use display: if the user notices it and changes the setting, great; if they ignore it, the nudge is still considered displayed and will not reappear on future cards.
 ### Card placement and layout
@@ -63,9 +63,9 @@ The dropdown menu renders above surrounding block content. Its options are click
 - Collapsed and expanded cards with the footer render as one attached card with no double-rounded seam.
 ## 7. Validation
 Automated validation:
-- `cargo check -p rook`
-- `cargo check --all-targets -p rook`
-- `cargo nextest run --no-fail-fast -p rook ask_user_question`
+- `cargo check -p polaris-terminal`
+- `cargo check --all-targets -p polaris-terminal`
+- `cargo nextest run --no-fail-fast -p polaris-terminal ask_user_question`
 - `cargo fmt --all`
 - `cargo clippy --workspace --all-targets --all-features --tests -- -D warnings`
 - `git --no-pager diff --check`

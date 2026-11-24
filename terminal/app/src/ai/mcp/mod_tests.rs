@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rook_managed_secrets::ManagedSecretValue;
+use pterm_managed_secrets::ManagedSecretValue;
 use serde_json;
 
 #[cfg(not(target_family = "wasm"))]
@@ -14,12 +14,13 @@ use crate::ai::mcp::{
 };
 
 #[test]
-fn mcp_provider_from_file_path_recognizes_rook_home_path() {
-    if let Some(rook_home_mcp_config_file_path) = rook_core::paths::rook_home_mcp_config_file_path()
+fn mcp_provider_from_file_path_recognizes_pterm_home_path() {
+    if let Some(pterm_home_mcp_config_file_path) =
+        pterm_core::paths::pterm_home_mcp_config_file_path()
     {
         assert_eq!(
-            mcp_provider_from_file_path(&rook_home_mcp_config_file_path),
-            Some(MCPProvider::Rook)
+            mcp_provider_from_file_path(&pterm_home_mcp_config_file_path),
+            Some(MCPProvider::Pterm)
         );
     }
 }

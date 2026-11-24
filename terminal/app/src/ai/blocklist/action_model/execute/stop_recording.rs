@@ -3,8 +3,8 @@ use ai::agent::action_result::{RecordingStopped, StopRecordingResult};
 use futures::FutureExt;
 use futures::future::BoxFuture;
 #[cfg(not(target_family = "wasm"))]
-use rookui::SingletonEntity;
-use rookui::{Entity, ModelContext};
+use ptermui::SingletonEntity;
+use ptermui::{Entity, ModelContext};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 use crate::ai::agent::AIAgentActionType;
@@ -38,7 +38,7 @@ impl StopRecordingExecutor {
     ) -> bool {
         let ExecuteActionInput { action, .. } = input;
         matches!(action.action, AIAgentActionType::StopRecording { .. })
-            && rook_core::features::FeatureFlag::VideoRecording.is_enabled()
+            && pterm_core::features::FeatureFlag::VideoRecording.is_enabled()
     }
 
     #[cfg_attr(target_family = "wasm", allow(unused_variables))]

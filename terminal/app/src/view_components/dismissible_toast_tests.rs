@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use rook_core::ui::appearance::Appearance;
-use rookui::keymap::Keystroke;
-use rookui::platform::WindowStyle;
-use rookui::{App, TypedActionView, ViewHandle};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::keymap::Keystroke;
+use ptermui::platform::WindowStyle;
+use ptermui::{App, TypedActionView, ViewHandle};
 
 use super::{
     COLLAPSED_MAX_CHARS, COLLAPSED_MAX_LINES, DismissibleToast, DismissibleToastAction,

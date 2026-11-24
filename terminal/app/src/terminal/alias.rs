@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rook_completer::parsers::simple::all_parsed_commands;
+use pterm_completer::parsers::simple::all_parsed_commands;
 use smol_str::SmolStr;
 
 use crate::terminal::model::session::Session;
@@ -14,7 +14,7 @@ pub struct AliasedCommand {
     pub alias_value: String,
 }
 
-/// Returns whether the alias can be expanded by Rook given its value.
+/// Returns whether the alias can be expanded by Polaris Terminal given its value.
 ///
 /// We don't expand on any alias that starts with itself, as it leads to
 /// cases where the alias is expanded twice: once as the user types in the

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rookui::{AppContext, SingletonEntity};
+use ptermui::{AppContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 use settings::Setting as _;
 /// TODO: move alias_expansion setting into this group.
@@ -65,15 +65,15 @@ define_settings_group!(InputSettings,
             toml_path: "terminal.input.completions_open_while_typing",
             description: "Whether the completions menu opens automatically while typing.",
         },
-        rook_completions_enabled: RookCompletionsEnabled {
+        pterm_completions_enabled: PtermCompletionsEnabled {
             type: bool,
             default: true,
             supported_platforms: SupportedPlatforms::ALL,
             sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
             surface: settings::SettingSurfaces::GUI,
             private: false,
-            toml_path: "terminal.input.rook_completions_enabled",
-            description: "Whether Rook's built-in completions are shown for shell commands.",
+            toml_path: "terminal.input.pterm_completions_enabled",
+            description: "Whether Polaris Terminal's built-in completions are shown for shell commands.",
         },
         native_shell_completions_enabled: NativeShellCompletionsEnabled {
             type: bool,
@@ -205,7 +205,7 @@ define_settings_group!(InputSettings,
             sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
             surface: settings::SettingSurfaces::GUI,
             private: false,
-            toml_path: "agents.rook_agent.input.show_agent_tips",
+            toml_path: "agents.pterm_agent.input.show_agent_tips",
             description: "Whether agent tips are displayed in the input.",
         },
         // Whether to show the terminal input message bar (contextual hints at the bottom of terminal input).
@@ -257,7 +257,7 @@ impl InputSettings {
         };
 
         // PS1 input is only valid when honor_ps1 is active. If the user has PS1 selected
-        // but the shell has not signalled PS1 support, fall back to Rook input.
+        // but the shell has not signalled PS1 support, fall back to Polaris Terminal input.
         let is_ps1_enabled = *SessionSettings::as_ref(app).honor_ps1
             && computed_input_type_value == InputBoxType::Classic;
         if is_ps1_enabled {

@@ -8,9 +8,9 @@
 #[cfg(feature = "local_fs")]
 use std::path::Path;
 
-use rook_core::HostId;
-use rook_util::standardized_path::StandardizedPath;
-use rookui_core::{AppContext, ModelContext, ModelHandle, SingletonEntity};
+use pterm_core::HostId;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui_core::{AppContext, ModelContext, ModelHandle, SingletonEntity};
 
 use crate::file_tree_store::FileTreeState;
 use crate::file_tree_update::{MetadataUpdateType, RepoMetadataUpdate};
@@ -484,7 +484,7 @@ impl RepoMetadataModel {
     }
 }
 
-impl rookui_core::Entity for RepoMetadataModel {
+impl ptermui_core::Entity for RepoMetadataModel {
     type Event = RepoMetadataEvent;
 }
 

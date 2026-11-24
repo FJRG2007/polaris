@@ -1,0 +1,6 @@
+---
+name: "Copy PolarisTerminalDev Keychain to Polaris Terminal local"
+command: "security add-generic-password -a User -U -s polaris-terminal -w \"$(security find-generic-password -a User -s dev.polaris.PolarisTerminal-Dev -w)\""
+description: "Copies the refresh token from PolarisTerminalDev into the local polaris-terminal app so that it can authenticate."
+author: Polaris Terminal Team
+shells: []

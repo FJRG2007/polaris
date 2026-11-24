@@ -1,8 +1,8 @@
+use pterm_util::host_id::HostId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
 use remote_server::proto::{FileContextProto, file_context_proto};
-use rook_util::host_id::HostId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
 
 use super::*;
 
@@ -29,7 +29,7 @@ fn text_context(path: &LocalOrRemotePath, content: &str) -> FileContextProto {
 #[test]
 fn remote_text_file_read_request_preserves_paths_and_limits() {
     let host_id = HostId::new("test-host".to_string());
-    let first_path = remote_path(&host_id, "/repo/ROOK.md");
+    let first_path = remote_path(&host_id, "/repo/POLARIS_TERMINAL.md");
     let second_path = remote_path(&host_id, "/repo/.agents/skills/test/SKILL.md");
 
     let request = remote_text_file_read_request(
@@ -65,7 +65,7 @@ fn remote_text_file_read_request_preserves_paths_and_limits() {
 #[test]
 fn remote_text_file_contents_match_reordered_partial_responses_by_path() {
     let host_id = HostId::new("test-host".to_string());
-    let first_path = remote_path(&host_id, "/repo/ROOK.md");
+    let first_path = remote_path(&host_id, "/repo/POLARIS_TERMINAL.md");
     let missing_path = remote_path(&host_id, "/repo/AGENTS.md");
     let third_path = remote_path(&host_id, "/repo/.agents/skills/test/SKILL.md");
 
@@ -107,8 +107,8 @@ fn remote_text_file_contents_reject_mixed_locations() {
     let first_host = HostId::new("first-host".to_string());
     let second_host = HostId::new("second-host".to_string());
     let mixed_host_error = remote_context_host_id(&[
-        remote_path(&first_host, "/repo/ROOK.md"),
-        remote_path(&second_host, "/repo/ROOK.md"),
+        remote_path(&first_host, "/repo/POLARIS_TERMINAL.md"),
+        remote_path(&second_host, "/repo/POLARIS_TERMINAL.md"),
     ])
     .unwrap_err();
     assert_eq!(
@@ -117,7 +117,7 @@ fn remote_text_file_contents_reject_mixed_locations() {
     );
 
     let mixed_local_remote_error = remote_context_host_id(&[
-        remote_path(&first_host, "/repo/ROOK.md"),
+        remote_path(&first_host, "/repo/POLARIS_TERMINAL.md"),
         LocalOrRemotePath::Local("/repo/AGENTS.md".into()),
     ])
     .unwrap_err();

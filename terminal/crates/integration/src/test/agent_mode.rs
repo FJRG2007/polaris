@@ -7,19 +7,19 @@ use std::time::Duration;
 
 use lazy_static::lazy_static;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook::cmd_or_ctrl_shift;
-use rook::features::FeatureFlag;
-use rook::integration_testing::clipboard::assert_clipboard_contains_string;
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::{
+use polaris_terminal::cmd_or_ctrl_shift;
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::clipboard::assert_clipboard_contains_string;
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::{
     assert_view_has_text_selection, clear_blocklist_to_remove_bootstrapped_blocks,
     execute_echo_str, wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::view_getters::single_terminal_view_for_tab;
-use rook::settings::SelectionSettings;
-use rookui_core::integration::TestStep;
-use rookui_core::text::SelectionType;
-use rookui_core::{Event, SingletonEntity, async_assert};
+use polaris_terminal::integration_testing::view_getters::single_terminal_view_for_tab;
+use polaris_terminal::settings::SelectionSettings;
+use ptermui_core::integration::TestStep;
+use ptermui_core::text::SelectionType;
+use ptermui_core::{Event, SingletonEntity, async_assert};
 use settings::ToggleableSetting;
 use warp_multi_agent_api as api;
 
@@ -106,7 +106,7 @@ fn builder_with_setup() -> Builder {
 }
 
 fn markdown_visuals_fixture_directory() -> String {
-    let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../rookui_core/test_data");
+    let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../ptermui_core/test_data");
     fixture_dir
         .canonicalize()
         .unwrap_or(fixture_dir)

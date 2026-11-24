@@ -1,8 +1,8 @@
 import { writeFileSync } from "fs"
 
 /**
- * Send a Rook notification via OSC 777 escape sequence.
- * Only emits when Rook declares cli-agent protocol support,
+ * Send a Polaris Terminal notification via OSC 777 escape sequence.
+ * Only emits when Polaris Terminal declares cli-agent protocol support,
  * avoiding garbled output in other terminals (and working over SSH).
  *
  * On Unix we write to /dev/tty so the sequence bypasses any
@@ -11,8 +11,8 @@ import { writeFileSync } from "fs"
  * process.stdout which works because OpenCode plugins run
  * in-process (sharing the same ConPTY-connected stdout).
  */
-function rookNotify(title: string, body: string): void {
-  if (!process.env.ROOK_CLI_AGENT_PROTOCOL_VERSION) return
+function ptermNotify(title: string, body: string): void {
+  if (!process.env.POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION) return
 
   const sequence = `\x1b]777;notify;${title};${body}\x07`
 
@@ -28,4 +28,4 @@ function rookNotify(title: string, body: string): void {
   }
 }
 
-export { rookNotify }
+export { ptermNotify }

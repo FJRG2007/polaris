@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use cynic::QueryBuilder;
 #[cfg(test)]
 use mockall::automock;
-use rook_graphql::queries::tui_onboarding_markers::{
+use pterm_graphql::queries::tui_onboarding_markers::{
     TuiOnboardingMarkers, TuiOnboardingMarkersResult, TuiOnboardingMarkersVariables,
 };
 

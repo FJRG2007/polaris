@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use rook_errors::report_error;
-use rookui::{Entity, ModelContext, ModelHandle, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
 use crate::ai::agent::{LifecycleEventType, StartAgentExecutionMode};

@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use rook_graphql::queries::get_runners::{
+use pterm_graphql::queries::get_runners::{
     Runner, RunnerArch, RunnerConfig, RunnerMacOsVersion, RunnerOs,
 };
 
@@ -93,7 +93,7 @@ pub fn platforms_by_uid(runners: &[Runner]) -> HashMap<String, RunnerPlatform> {
 pub enum RunPlatform {
     /// A stored runner supplies the run's compute.
     Runner(RunnerPlatform),
-    /// Nothing references a runner, so the run gets Rook's default compute.
+    /// Nothing references a runner, so the run gets Polaris Terminal's default compute.
     /// This mirrors the server synthesizing x86-64 Linux from an environment's
     /// inline image.
     Default,
@@ -144,7 +144,7 @@ impl RunPlatform {
 
 /// Resolves the compute a run executes on, by the same precedence the server
 /// uses: the runner the run names, then its environment's default runner, then
-/// Rook's default compute.
+/// Polaris Terminal's default compute.
 ///
 /// Returns `None` when a runner is referenced but absent from `platforms` —
 /// the runner may be inaccessible, deleted, or still loading, and guessing a

@@ -6,21 +6,21 @@ The GUI's multi-agent (`run_agents`) approval surfaces — the confirmation card
 plan-card config block — share a run-wide edit state (model, harness, execution mode,
 auth-secret selection) plus the transition/validation logic that keeps that state
 consistent as the user edits it. Before this change, all of it lived inline in the GUI
-controls module, entangled with `rookui` rendering types:
+controls module, entangled with `ptermui` rendering types:
 
-- [`app/src/ai/blocklist/inline_action/orchestration_controls.rs @ f4bdf422`](https://github.com/FJRG2007/rook/blob/f4bdf4227/app/src/ai/blocklist/inline_action/orchestration_controls.rs)
+- [`app/src/ai/blocklist/inline_action/orchestration_controls.rs @ f4bdf422`](https://github.com/FJRG2007/polaris/blob/f4bdf4227/terminal/app/src/ai/blocklist/inline_action/orchestration_controls.rs)
   — the config-fields struct (then named `OrchestrationEditState`, renamed here to
   `OrchestrationConfigState`), `AuthSecretSelection`, catalog lookups
   (`get_base_model_choices`, `is_model_in_filtered_choices`, `first_filtered_model_id`),
   persistence helpers (`persist_*`), default resolution (`resolve_*`), validation
   predicates (`should_show_auth_secret_picker`, `accept_disabled_reason_with_auth`,
   `harness_is_selectable`), and the picker populate/sync functions, all in one GUI file.
-- [`app/src/ai/blocklist/inline_action/run_agents_card_view.rs @ f4bdf422`](https://github.com/FJRG2007/rook/blob/f4bdf4227/app/src/ai/blocklist/inline_action/run_agents_card_view.rs)
+- [`app/src/ai/blocklist/inline_action/run_agents_card_view.rs @ f4bdf422`](https://github.com/FJRG2007/polaris/blob/f4bdf4227/terminal/app/src/ai/blocklist/inline_action/run_agents_card_view.rs)
   — confirmation-card view; owns a per-view `saved_model_per_harness` map and calls the
   controls helpers with closure-based fallbacks.
-- [`app/src/ai/document/orchestration_config_block.rs @ f4bdf422`](https://github.com/FJRG2007/rook/blob/f4bdf4227/app/src/ai/document/orchestration_config_block.rs)
+- [`app/src/ai/document/orchestration_config_block.rs @ f4bdf422`](https://github.com/FJRG2007/polaris/blob/f4bdf4227/terminal/app/src/ai/document/orchestration_config_block.rs)
   — plan-card config block; duplicates the same state-handling patterns.
-- [`app/src/ai/blocklist/action_model/execute/run_agents.rs @ f4bdf422`](https://github.com/FJRG2007/rook/blob/f4bdf4227/app/src/ai/blocklist/action_model/execute/run_agents.rs)
+- [`app/src/ai/blocklist/action_model/execute/run_agents.rs @ f4bdf422`](https://github.com/FJRG2007/polaris/blob/f4bdf4227/terminal/app/src/ai/blocklist/action_model/execute/run_agents.rs)
   — the `RunAgentsExecutor`; imports auth-secret execution helpers
   (`can_execute_with_auth_secret`, `populate_default_auth_secret_for_execution`) from the
   GUI controls module.
@@ -34,7 +34,7 @@ splitting the frontend-neutral logic out of `orchestration_controls.rs`.
 
 Create `app/src/ai/orchestration/`, a frontend-neutral domain module registered as
 `pub(crate) mod orchestration;` in `app/src/ai/mod.rs`. Nothing in the module may depend
-on `rookui::elements` or other GUI rendering types; it only reads/writes app singletons
+on `ptermui::elements` or other GUI rendering types; it only reads/writes app singletons
 through `AppContext`.
 
 - `config_state.rs` — `OrchestrationConfigState` (model_id, harness_type, execution_mode,
@@ -63,7 +63,7 @@ through `AppContext`.
   `resolve_auth_secret_selection_for_harness`, `persist_environment_selection`,
   `persist_host_selection`, `persist_auth_secret_selection`,
   `can_execute_with_auth_secret`, `populate_default_auth_secret_for_execution`, and the
-  `ORCHESTRATION_ROOK_WORKER_HOST` / `ORCHESTRATION_ENV_NONE_LABEL` constants.
+  `ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST` / `ORCHESTRATION_ENV_NONE_LABEL` constants.
 
 GUI adaptation:
 
@@ -100,8 +100,8 @@ GUI adaptation:
 - Pre-existing GUI tests (`run_agents_card_view_tests.rs`, `run_agents_tests.rs`,
   `orchestration_config_block` coverage) must pass unchanged apart from import paths;
   the GUI tests that only exercised moved state math now live in the domain test files.
-- Commands: `cargo check -p rook` and
-  `cargo nextest run -p rook -E 'test(orchestration) + test(run_agents) + test(run_agents_card_view) + test(orchestration_config_block)'`,
+- Commands: `cargo check -p polaris-terminal` and
+  `cargo nextest run -p polaris-terminal -E 'test(orchestration) + test(run_agents) + test(run_agents_card_view) + test(orchestration_config_block)'`,
   plus `./script/format`.
 - Manual: the confirmation card and plan-card config block behave identically to before —
   harness switching preserves per-harness model choices, Local/Cloud toggling pre-fills

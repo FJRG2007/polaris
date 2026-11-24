@@ -15,7 +15,7 @@ Users at companies like Uber wrap CLI agents behind custom scripts (e.g. `aifx a
    - Agent-specific skill providers are not available in the slash menu.
    - Notifications lack the agent's display name and icon.
 
-Users can already add regex patterns to enable the toolbar, but there is no way to tell Rook which agent a pattern represents.
+Users can already add regex patterns to enable the toolbar, but there is no way to tell Polaris Terminal which agent a pattern represents.
 
 ## Goals
 
@@ -109,6 +109,6 @@ When a user-configured regex matches a running command AND the pattern has a spe
    - Notifications show "Claude Code" as the agent name.
 2. **aifx test**: Verify that `aifx agent run claude` continues to be detected as Claude for Uber team members (no regression).
 3. **Default behavior**: Add a command pattern with "CLI Agent" and verify it shows the generic toolbar (same as today).
-4. **Persistence**: Change an agent selection, restart Rook, and verify the selection is preserved.
+4. **Persistence**: Change an agent selection, restart Polaris Terminal, and verify the selection is preserved.
 5. **Removal**: Remove a command and verify its agent mapping is gone (re-add the same command and confirm it defaults to "CLI Agent").
 

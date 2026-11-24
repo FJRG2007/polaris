@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use rook_util::host_id::HostId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
+use pterm_util::host_id::HostId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
 
 fn local_path(path: &str) -> LocalOrRemotePath {
     LocalOrRemotePath::Local(PathBuf::from(path))
@@ -45,7 +45,10 @@ fn test_find_applicable_rules_empty_rules() {
 fn test_find_applicable_rules_no_matching_rules() {
     let mut rules = ProjectRules::default();
 
-    rules.upsert_rule(&local_path("/x/y/ROOK.md"), "content1".to_string());
+    rules.upsert_rule(
+        &local_path("/x/y/POLARIS_TERMINAL.md"),
+        "content1".to_string(),
+    );
     rules.upsert_rule(&local_path("/z/AGENTS.md"), "content2".to_string());
 
     let path = local_path("/a/b/c/file.rs");
@@ -58,35 +61,47 @@ fn test_find_applicable_rules_no_matching_rules() {
 fn test_find_applicable_rules_single_matching_rule() {
     let mut rules = ProjectRules::default();
 
-    rules.upsert_rule(&local_path("/a/ROOK.md"), "content1".to_string());
+    rules.upsert_rule(
+        &local_path("/a/POLARIS_TERMINAL.md"),
+        "content1".to_string(),
+    );
     rules.upsert_rule(&local_path("/x/AGENTS.md"), "content2".to_string());
 
     let path = local_path("/a/b/c/file.rs");
 
     let result = rules.find_active_or_applicable_rules(&path).active_rules;
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0].path, local_path("/a/ROOK.md"));
+    assert_eq!(result[0].path, local_path("/a/POLARIS_TERMINAL.md"));
 }
 
 #[test]
 fn test_find_applicable_rules_includes_all_ancestor_rules() {
     let mut rules = ProjectRules::default();
 
-    rules.upsert_rule(&local_path("/a/ROOK.md"), "root_rook".to_string());
-    rules.upsert_rule(&local_path("/a/b/ROOK.md"), "nested_rook".to_string());
-    rules.upsert_rule(&local_path("/a/b/c/ROOK.md"), "deep_rook".to_string());
+    rules.upsert_rule(
+        &local_path("/a/POLARIS_TERMINAL.md"),
+        "root_pterm".to_string(),
+    );
+    rules.upsert_rule(
+        &local_path("/a/b/POLARIS_TERMINAL.md"),
+        "nested_pterm".to_string(),
+    );
+    rules.upsert_rule(
+        &local_path("/a/b/c/POLARIS_TERMINAL.md"),
+        "deep_pterm".to_string(),
+    );
 
     let path = local_path("/a/b/c/d/file.rs");
 
     let result = rules.find_active_or_applicable_rules(&path).active_rules;
     assert_eq!(result.len(), 3);
 
-    // All should be ROOK.md files (same priority), order is not specified by depth
+    // All should be POLARIS_TERMINAL.md files (same priority), order is not specified by depth
     // Just verify all expected rules are present
     let paths: Vec<LocalOrRemotePath> = result.iter().map(|r| r.path.clone()).collect();
-    assert!(paths.contains(&local_path("/a/ROOK.md")));
-    assert!(paths.contains(&local_path("/a/b/ROOK.md")));
-    assert!(paths.contains(&local_path("/a/b/c/ROOK.md")));
+    assert!(paths.contains(&local_path("/a/POLARIS_TERMINAL.md")));
+    assert!(paths.contains(&local_path("/a/b/POLARIS_TERMINAL.md")));
+    assert!(paths.contains(&local_path("/a/b/c/POLARIS_TERMINAL.md")));
 }
 
 #[test]
@@ -94,7 +109,10 @@ fn test_find_applicable_rules_multiple_patterns() {
     let mut rules = ProjectRules::default();
 
     rules.upsert_rule(&local_path("/a/b/AGENTS.md"), "agents_content".to_string());
-    rules.upsert_rule(&local_path("/a/ROOK.md"), "rook_content".to_string());
+    rules.upsert_rule(
+        &local_path("/a/POLARIS_TERMINAL.md"),
+        "pterm_content".to_string(),
+    );
 
     let path = local_path("/a/b/file.rs");
 
@@ -103,21 +121,24 @@ fn test_find_applicable_rules_multiple_patterns() {
 
     assert_eq!(result[0].path, local_path("/a/b/AGENTS.md"));
     assert_eq!(result[0].content, "agents_content");
-    assert_eq!(result[1].path, local_path("/a/ROOK.md"));
-    assert_eq!(result[1].content, "rook_content");
+    assert_eq!(result[1].path, local_path("/a/POLARIS_TERMINAL.md"));
+    assert_eq!(result[1].content, "pterm_content");
 }
 
 #[test]
 fn test_find_applicable_rules_exact_path_match() {
     let mut rules = ProjectRules::default();
 
-    rules.upsert_rule(&local_path("/a/b/ROOK.md"), "exact_match".to_string());
+    rules.upsert_rule(
+        &local_path("/a/b/POLARIS_TERMINAL.md"),
+        "exact_match".to_string(),
+    );
 
     let path = local_path("/a/b/file.rs");
 
     let result = rules.find_active_or_applicable_rules(&path).active_rules;
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0].path, local_path("/a/b/ROOK.md"));
+    assert_eq!(result[0].path, local_path("/a/b/POLARIS_TERMINAL.md"));
     assert_eq!(result[0].content, "exact_match");
 }
 
@@ -125,14 +146,20 @@ fn test_find_applicable_rules_exact_path_match() {
 fn test_find_applicable_rules_ignores_deeper_paths() {
     let mut rules = ProjectRules::default();
 
-    rules.upsert_rule(&local_path("/a/ROOK.md"), "applicable".to_string());
-    rules.upsert_rule(&local_path("/a/b/c/d/e/ROOK.md"), "too_deep".to_string()); // Path doesn't contain /a/b
+    rules.upsert_rule(
+        &local_path("/a/POLARIS_TERMINAL.md"),
+        "applicable".to_string(),
+    );
+    rules.upsert_rule(
+        &local_path("/a/b/c/d/e/POLARIS_TERMINAL.md"),
+        "too_deep".to_string(),
+    ); // Path doesn't contain /a/b
 
     let path = local_path("/a/b/file.rs");
 
     let result = rules.find_active_or_applicable_rules(&path).active_rules;
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0].path, local_path("/a/ROOK.md"));
+    assert_eq!(result[0].path, local_path("/a/POLARIS_TERMINAL.md"));
     assert_eq!(result[0].content, "applicable");
 }
 
@@ -140,13 +167,13 @@ fn test_find_applicable_rules_ignores_deeper_paths() {
 fn test_find_applicable_rules_handles_root_path() {
     let mut rules = ProjectRules::default();
 
-    rules.upsert_rule(&local_path("/ROOK.md"), "root_rule".to_string());
+    rules.upsert_rule(&local_path("/POLARIS_TERMINAL.md"), "root_rule".to_string());
 
     let path = local_path("/a/b/file.rs");
 
     let result = rules.find_active_or_applicable_rules(&path).active_rules;
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0].path, local_path("/ROOK.md"));
+    assert_eq!(result[0].path, local_path("/POLARIS_TERMINAL.md"));
     assert_eq!(result[0].content, "root_rule");
 }
 
@@ -154,42 +181,51 @@ fn test_find_applicable_rules_handles_root_path() {
 fn test_find_applicable_rules_complex_scenario() {
     // This test covers the example from the original request:
     // For path /a/b/c/file.rs with rules:
-    // - /a/ROOK.md
+    // - /a/POLARIS_TERMINAL.md
     // - /a/AGENTS.md
-    // - /a/b/ROOK.md
+    // - /a/b/POLARIS_TERMINAL.md
     // - /a/b/AGENTS.md
     let mut rules = ProjectRules::default();
 
-    rules.upsert_rule(&local_path("/a/ROOK.md"), "a_rook".to_string());
+    rules.upsert_rule(&local_path("/a/POLARIS_TERMINAL.md"), "a_pterm".to_string());
     rules.upsert_rule(&local_path("/a/AGENTS.md"), "a_agents".to_string());
-    rules.upsert_rule(&local_path("/a/b/ROOK.md"), "ab_rook".to_string());
+    rules.upsert_rule(
+        &local_path("/a/b/POLARIS_TERMINAL.md"),
+        "ab_pterm".to_string(),
+    );
     rules.upsert_rule(&local_path("/a/b/AGENTS.md"), "ab_agents".to_string());
-    rules.upsert_rule(&local_path("/x/ROOK.md"), "irrelevant".to_string()); // Should be ignored
+    rules.upsert_rule(
+        &local_path("/x/POLARIS_TERMINAL.md"),
+        "irrelevant".to_string(),
+    ); // Should be ignored
 
     let path = local_path("/a/b/c/file.rs");
 
     let result = rules.find_active_or_applicable_rules(&path).active_rules;
     assert_eq!(result.len(), 2);
 
-    // Expect only ROOK.md files to be included as they have higher priority.
-    assert_eq!(result[0].path, local_path("/a/ROOK.md"));
-    assert_eq!(result[0].content, "a_rook");
-    assert_eq!(result[1].path, local_path("/a/b/ROOK.md"));
-    assert_eq!(result[1].content, "ab_rook");
+    // Expect only POLARIS_TERMINAL.md files to be included as they have higher priority.
+    assert_eq!(result[0].path, local_path("/a/POLARIS_TERMINAL.md"));
+    assert_eq!(result[0].content, "a_pterm");
+    assert_eq!(result[1].path, local_path("/a/b/POLARIS_TERMINAL.md"));
+    assert_eq!(result[1].content, "ab_pterm");
 }
 
 #[test]
 fn test_find_applicable_rules_handles_unknown_file_patterns() {
     let mut rules = ProjectRules::default();
 
-    rules.upsert_rule(&local_path("/a/ROOK.md"), "known_pattern".to_string());
+    rules.upsert_rule(
+        &local_path("/a/POLARIS_TERMINAL.md"),
+        "known_pattern".to_string(),
+    );
     rules.upsert_rule(&local_path("/a/UNKNOWN.md"), "unknown_pattern".to_string());
     let path = local_path("/a/file.rs");
 
     let result = rules.find_active_or_applicable_rules(&path).active_rules;
     assert_eq!(result.len(), 1);
 
-    assert_eq!(result[0].path, local_path("/a/ROOK.md"));
+    assert_eq!(result[0].path, local_path("/a/POLARIS_TERMINAL.md"));
     assert_eq!(result[0].content, "known_pattern");
 }
 
@@ -197,10 +233,13 @@ fn test_find_applicable_rules_handles_unknown_file_patterns() {
 fn test_find_applicable_rules_with_relative_paths() {
     let mut rules = ProjectRules::default();
 
-    rules.upsert_rule(&local_path("src/ROOK.md"), "src_rook".to_string());
     rules.upsert_rule(
-        &local_path("src/components/ROOK.md"),
-        "components_rook".to_string(),
+        &local_path("src/POLARIS_TERMINAL.md"),
+        "src_pterm".to_string(),
+    );
+    rules.upsert_rule(
+        &local_path("src/components/POLARIS_TERMINAL.md"),
+        "components_pterm".to_string(),
     );
 
     let path = local_path("src/components/Button.tsx");
@@ -208,11 +247,11 @@ fn test_find_applicable_rules_with_relative_paths() {
     let result = rules.find_active_or_applicable_rules(&path).active_rules;
     assert_eq!(result.len(), 2);
 
-    // Both are ROOK.md files (same priority), order within same priority is not guaranteed
+    // Both are POLARIS_TERMINAL.md files (same priority), order within same priority is not guaranteed
     // Just verify both rules are present
     let paths: Vec<LocalOrRemotePath> = result.iter().map(|r| r.path.clone()).collect();
-    assert!(paths.contains(&local_path("src/ROOK.md")));
-    assert!(paths.contains(&local_path("src/components/ROOK.md")));
+    assert!(paths.contains(&local_path("src/POLARIS_TERMINAL.md")));
+    assert!(paths.contains(&local_path("src/components/POLARIS_TERMINAL.md")));
 }
 
 fn make_rule_path(path: &str) -> ProjectRulePath {
@@ -225,47 +264,59 @@ fn make_rule_path(path: &str) -> ProjectRulePath {
 #[test]
 fn test_merge_independent_deltas() {
     let mut delta = RulesDelta {
-        discovered_rules: vec![make_rule_path("/a/ROOK.md")],
+        discovered_rules: vec![make_rule_path("/a/POLARIS_TERMINAL.md")],
         deleted_rules: vec![],
     };
     delta.merge(RulesDelta {
         discovered_rules: vec![],
-        deleted_rules: vec![PathBuf::from("/b/ROOK.md")],
+        deleted_rules: vec![PathBuf::from("/b/POLARIS_TERMINAL.md")],
     });
 
     assert_eq!(delta.discovered_rules.len(), 1);
-    assert_eq!(delta.discovered_rules[0].path, PathBuf::from("/a/ROOK.md"));
-    assert_eq!(delta.deleted_rules, vec![PathBuf::from("/b/ROOK.md")]);
+    assert_eq!(
+        delta.discovered_rules[0].path,
+        PathBuf::from("/a/POLARIS_TERMINAL.md")
+    );
+    assert_eq!(
+        delta.deleted_rules,
+        vec![PathBuf::from("/b/POLARIS_TERMINAL.md")]
+    );
 }
 
 #[test]
 fn test_merge_add_then_delete_yields_delete() {
     let mut delta = RulesDelta {
-        discovered_rules: vec![make_rule_path("/a/ROOK.md")],
+        discovered_rules: vec![make_rule_path("/a/POLARIS_TERMINAL.md")],
         deleted_rules: vec![],
     };
     delta.merge(RulesDelta {
         discovered_rules: vec![],
-        deleted_rules: vec![PathBuf::from("/a/ROOK.md")],
+        deleted_rules: vec![PathBuf::from("/a/POLARIS_TERMINAL.md")],
     });
 
     assert!(delta.discovered_rules.is_empty());
-    assert_eq!(delta.deleted_rules, vec![PathBuf::from("/a/ROOK.md")]);
+    assert_eq!(
+        delta.deleted_rules,
+        vec![PathBuf::from("/a/POLARIS_TERMINAL.md")]
+    );
 }
 
 #[test]
 fn test_merge_delete_then_add_yields_add() {
     let mut delta = RulesDelta {
         discovered_rules: vec![],
-        deleted_rules: vec![PathBuf::from("/a/ROOK.md")],
+        deleted_rules: vec![PathBuf::from("/a/POLARIS_TERMINAL.md")],
     };
     delta.merge(RulesDelta {
-        discovered_rules: vec![make_rule_path("/a/ROOK.md")],
+        discovered_rules: vec![make_rule_path("/a/POLARIS_TERMINAL.md")],
         deleted_rules: vec![],
     });
 
     assert_eq!(delta.discovered_rules.len(), 1);
-    assert_eq!(delta.discovered_rules[0].path, PathBuf::from("/a/ROOK.md"));
+    assert_eq!(
+        delta.discovered_rules[0].path,
+        PathBuf::from("/a/POLARIS_TERMINAL.md")
+    );
     assert!(delta.deleted_rules.is_empty());
 }
 
@@ -273,20 +324,23 @@ fn test_merge_delete_then_add_yields_add() {
 fn test_merge_add_delete_add_yields_add() {
     let mut delta = RulesDelta::default();
     delta.merge(RulesDelta {
-        discovered_rules: vec![make_rule_path("/a/ROOK.md")],
+        discovered_rules: vec![make_rule_path("/a/POLARIS_TERMINAL.md")],
         deleted_rules: vec![],
     });
     delta.merge(RulesDelta {
         discovered_rules: vec![],
-        deleted_rules: vec![PathBuf::from("/a/ROOK.md")],
+        deleted_rules: vec![PathBuf::from("/a/POLARIS_TERMINAL.md")],
     });
     delta.merge(RulesDelta {
-        discovered_rules: vec![make_rule_path("/a/ROOK.md")],
+        discovered_rules: vec![make_rule_path("/a/POLARIS_TERMINAL.md")],
         deleted_rules: vec![],
     });
 
     assert_eq!(delta.discovered_rules.len(), 1);
-    assert_eq!(delta.discovered_rules[0].path, PathBuf::from("/a/ROOK.md"));
+    assert_eq!(
+        delta.discovered_rules[0].path,
+        PathBuf::from("/a/POLARIS_TERMINAL.md")
+    );
     assert!(delta.deleted_rules.is_empty());
 }
 
@@ -295,30 +349,33 @@ fn test_merge_delete_add_delete_yields_delete() {
     let mut delta = RulesDelta::default();
     delta.merge(RulesDelta {
         discovered_rules: vec![],
-        deleted_rules: vec![PathBuf::from("/a/ROOK.md")],
+        deleted_rules: vec![PathBuf::from("/a/POLARIS_TERMINAL.md")],
     });
     delta.merge(RulesDelta {
-        discovered_rules: vec![make_rule_path("/a/ROOK.md")],
+        discovered_rules: vec![make_rule_path("/a/POLARIS_TERMINAL.md")],
         deleted_rules: vec![],
     });
     delta.merge(RulesDelta {
         discovered_rules: vec![],
-        deleted_rules: vec![PathBuf::from("/a/ROOK.md")],
+        deleted_rules: vec![PathBuf::from("/a/POLARIS_TERMINAL.md")],
     });
 
     assert!(delta.discovered_rules.is_empty());
-    assert_eq!(delta.deleted_rules, vec![PathBuf::from("/a/ROOK.md")]);
+    assert_eq!(
+        delta.deleted_rules,
+        vec![PathBuf::from("/a/POLARIS_TERMINAL.md")]
+    );
 }
 
 #[test]
 fn test_merge_rediscovery_keeps_latest() {
     let mut delta = RulesDelta {
-        discovered_rules: vec![make_rule_path("/a/ROOK.md")],
+        discovered_rules: vec![make_rule_path("/a/POLARIS_TERMINAL.md")],
         deleted_rules: vec![],
     };
     // A second discovery of the same path (content update) should deduplicate.
     delta.merge(RulesDelta {
-        discovered_rules: vec![make_rule_path("/a/ROOK.md")],
+        discovered_rules: vec![make_rule_path("/a/POLARIS_TERMINAL.md")],
         deleted_rules: vec![],
     });
 
@@ -328,7 +385,7 @@ fn test_merge_rediscovery_keeps_latest() {
 
 #[test]
 fn test_missing_rule_content_preserves_cached_content_while_path_is_standing() {
-    let rule_path = local_path("/unavailable/project/ROOK.md");
+    let rule_path = local_path("/unavailable/project/POLARIS_TERMINAL.md");
     let mut existing_rules = ProjectRules::default();
     existing_rules.upsert_rule(&rule_path, "cached content".to_string());
 
@@ -346,7 +403,7 @@ fn test_missing_rule_content_preserves_cached_content_while_path_is_standing() {
 
 #[test]
 fn test_rule_missing_from_standing_results_is_removed_from_cached_content() {
-    let rule_path = local_path("/unavailable/project/ROOK.md");
+    let rule_path = local_path("/unavailable/project/POLARIS_TERMINAL.md");
     let mut existing_rules = ProjectRules::default();
     existing_rules.upsert_rule(&rule_path, "cached content".to_string());
 
@@ -357,7 +414,7 @@ fn test_rule_missing_from_standing_results_is_removed_from_cached_content() {
 
 #[test]
 fn test_reconcile_project_rules_hydrates_local_and_remote_paths() {
-    let local_rule_path = local_path("/local/ROOK.md");
+    let local_rule_path = local_path("/local/POLARIS_TERMINAL.md");
     let remote_rule_path = remote_path("host-a", "/remote/AGENTS.md");
 
     let rules = ProjectContextModel::reconcile_project_rules(
@@ -389,7 +446,7 @@ fn test_remote_standing_results_preserve_host_qualified_rule_paths() {
         host.clone(),
         StandardizedPath::try_new("/repo").unwrap(),
     ));
-    let rule_path = StandardizedPath::try_new("/repo/nested/ROOK.md").unwrap();
+    let rule_path = StandardizedPath::try_new("/repo/nested/POLARIS_TERMINAL.md").unwrap();
     let contents = [
         StandingQueryContent::file(rule_path.clone()),
         StandingQueryContent::directory(StandardizedPath::try_new("/repo/nested").unwrap()),
@@ -402,7 +459,7 @@ fn test_remote_standing_results_preserve_host_qualified_rule_paths() {
 }
 
 // Helper for global-rules tests: inserts a synthetic global rule directly into
-// the model. Bypasses the watcher infrastructure (which requires the rookui
+// the model. Bypasses the watcher infrastructure (which requires the ptermui
 // runtime) so we can exercise `find_applicable_rules`'s layering logic.
 fn insert_global_rule(model: &mut ProjectContextModel, path: &Path, content: &str) {
     model.global_rules.rules.insert(
@@ -437,7 +494,7 @@ fn test_remote_project_rules_require_matching_host() {
         &mut model,
         "host-a",
         "/repo",
-        "/repo/ROOK.md",
+        "/repo/POLARIS_TERMINAL.md",
         "remote_project_rule",
     );
 
@@ -476,14 +533,14 @@ fn test_global_rule_alone_no_project_rules() {
 }
 
 #[test]
-fn test_global_rule_layered_with_project_rook() {
+fn test_global_rule_layered_with_project_pterm() {
     let mut model = ProjectContextModel::default();
     insert_global_rule(&mut model, Path::new("/home/u/.agents/AGENTS.md"), "global");
     insert_project_rule(
         &mut model,
         Path::new("/repo"),
-        Path::new("/repo/ROOK.md"),
-        "project_rook",
+        Path::new("/repo/POLARIS_TERMINAL.md"),
+        "project_pterm",
     );
 
     let result = model
@@ -493,21 +550,21 @@ fn test_global_rule_layered_with_project_rook() {
     // Layered precedence: global first, then project rules.
     assert_eq!(result.active_rules.len(), 2);
     assert_eq!(result.active_rules[0].content, "global");
-    assert_eq!(result.active_rules[1].content, "project_rook");
+    assert_eq!(result.active_rules[1].content, "project_pterm");
     assert_eq!(result.root_path, local_path("/repo"));
 }
 
 #[test]
-fn test_in_dir_rook_shadows_agents_with_global() {
+fn test_in_dir_pterm_shadows_agents_with_global() {
     let mut model = ProjectContextModel::default();
     insert_global_rule(&mut model, Path::new("/home/u/.agents/AGENTS.md"), "global");
-    // Both ROOK.md and AGENTS.md in the same project directory: ROOK.md should
+    // Both POLARIS_TERMINAL.md and AGENTS.md in the same project directory: POLARIS_TERMINAL.md should
     // shadow AGENTS.md (existing in-directory behavior preserved).
     insert_project_rule(
         &mut model,
         Path::new("/repo"),
-        Path::new("/repo/ROOK.md"),
-        "project_rook",
+        Path::new("/repo/POLARIS_TERMINAL.md"),
+        "project_pterm",
     );
     insert_project_rule(
         &mut model,
@@ -520,10 +577,10 @@ fn test_in_dir_rook_shadows_agents_with_global() {
         .find_applicable_rules(&local_path("/repo/src/main.rs"))
         .expect("layered rules should produce a result");
 
-    // Expect: [global, project ROOK.md]. project AGENTS.md is shadowed.
+    // Expect: [global, project POLARIS_TERMINAL.md]. project AGENTS.md is shadowed.
     assert_eq!(result.active_rules.len(), 2);
     assert_eq!(result.active_rules[0].content, "global");
-    assert_eq!(result.active_rules[1].content, "project_rook");
+    assert_eq!(result.active_rules[1].content, "project_pterm");
 }
 
 #[test]
@@ -556,8 +613,8 @@ fn test_multiple_global_rules_all_contribute() {
     );
     insert_global_rule(
         &mut model,
-        Path::new("/home/u/.rook/ROOK.md"),
-        "rook_global",
+        Path::new("/home/u/.polaris/terminal/POLARIS_TERMINAL.md"),
+        "pterm_global",
     );
 
     let result = model
@@ -571,7 +628,7 @@ fn test_multiple_global_rules_all_contribute() {
         .map(|r| r.content.as_str())
         .collect();
     assert!(contents.contains(&"agents_global"));
-    assert!(contents.contains(&"rook_global"));
+    assert!(contents.contains(&"pterm_global"));
 }
 
 #[test]
@@ -586,7 +643,7 @@ fn test_remote_global_rules_only_layer_for_matching_remote_host() {
         &mut model,
         "host-a",
         "/repo",
-        "/repo/ROOK.md",
+        "/repo/POLARIS_TERMINAL.md",
         "remote_project",
     );
     let host_a = HostId::new("host-a".to_string());
@@ -661,9 +718,9 @@ fn test_superseding_refresh_coalesces_without_overlapping_reads() {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::time::Duration;
 
+    use ptermui_core::App;
+    use ptermui_core::r#async::Timer;
     use repo_metadata::repositories::DetectedRepositories;
-    use rookui_core::App;
-    use rookui_core::r#async::Timer;
 
     /// Coordinates a background reader that blocks until released, so the test can observe a
     /// read that is genuinely in flight (rather than one that resolves before the next
@@ -714,7 +771,10 @@ fn test_superseding_refresh_coalesces_without_overlapping_reads() {
             coordinator.active_readers.fetch_sub(1, Ordering::SeqCst);
             let round = coordinator.completed_rounds.fetch_add(1, Ordering::SeqCst);
             let contents = if round == 0 {
-                vec![(path_in_repo("ROOK.md"), "stale-round".to_string())]
+                vec![(
+                    path_in_repo("POLARIS_TERMINAL.md"),
+                    "stale-round".to_string(),
+                )]
             } else {
                 Vec::new()
             };

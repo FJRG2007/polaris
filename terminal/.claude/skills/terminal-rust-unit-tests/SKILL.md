@@ -1,9 +1,9 @@
 ---
 name: terminal-rust-unit-tests
-description: Write, improve, and run Rust unit tests in the rook Rust codebase.
+description: Write, improve, and run Rust unit tests in the polaris-terminal Rust codebase.
 ---
 
-# Rust Unit Tests in rook
+# Rust Unit Tests in polaris-terminal
 
 ## Scope
 - This skill focuses on crate-level unit tests.
@@ -24,7 +24,7 @@ Prefer unit tests for anything that fits: they are fast, deterministic, and poin
 
 ## When a unit test is the wrong level
 
-Be honest about this codebase. Rook is a terminal emulator with a GPU renderer, PTY and shell integration, and IPC. The common "80% unit tests" heuristic assumes a business-logic-heavy system where units exchange messages and transform data. Large parts of this repo are not that, and forcing them under a unit test usually means mocking away the only thing that could actually break.
+Be honest about this codebase. Polaris Terminal is a terminal emulator with a GPU renderer, PTY and shell integration, and IPC. The common "80% unit tests" heuristic assumes a business-logic-heavy system where units exchange messages and transform data. Large parts of this repo are not that, and forcing them under a unit test usually means mocking away the only thing that could actually break.
 
 Escalate to a higher level when any of these hold:
 
@@ -130,7 +130,7 @@ No conditionals, loops, arithmetic, or string concatenation to compute an expect
 Work down this list and stop at the first option that is fast and deterministic:
 
 1. **The real implementation.** The default for value types and pure logic. Running real collaborator code is what makes a test meaningful, and a failure caused by a real dependency's bug is a true positive worth having.
-2. **A fake the repo already provides.** These are maintained alongside the real thing, so they don't drift the way hand-rolled doubles do: `rookui::App::test`, `VirtualFS`, `TerminalModel::mock(..)`, `TestBlockListBuilder`/`TestBlockBuilder`, `Appearance::mock()`, and `FeatureFlag::X.override_enabled(..)`. See "Common helpers to use" below for usage.
+2. **A fake the repo already provides.** These are maintained alongside the real thing, so they don't drift the way hand-rolled doubles do: `ptermui::App::test`, `VirtualFS`, `TerminalModel::mock(..)`, `TestBlockListBuilder`/`TestBlockBuilder`, `Appearance::mock()`, and `FeatureFlag::X.override_enabled(..)`. See "Common helpers to use" below for usage.
 3. **A stubbed return value**, only to push the unit into a state you cannot otherwise reach, such as a rare error branch. Each stub should map to an assertion in the same test. Needing many stubs is a signal the unit does too much.
 4. **Asserting that a call happened**, as a last resort, and only for state-changing effects (a write, a send, a spawn) whose result you cannot observe any other way. Never assert on calls to pure getters — the return value is already covered by whatever you assert next.
 
@@ -150,13 +150,13 @@ If you can't make a test deterministic quickly, quarantine it (`#[ignore]` with 
 - Prefer runtime feature checks (e.g., `FeatureFlag::X.is_enabled()`) over `#[cfg(...)]` so tests don’t require recompilation to toggle behavior.
 
 ## Quickstart harness (UI/model tests)
-- Prefer `rookui::App::test` for deterministic unit tests around views/models.
+- Prefer `ptermui::App::test` for deterministic unit tests around views/models.
 - Initialize app models once, then mutate via `update` and assert via `read`.
 
 ```rust
-use rookui::App;
-// In app crate tests prefer `crate::test_util::...`; from other crates use `rook::test_util::...`.
-use rook::test_util::{terminal::initialize_app_for_terminal_view, add_window_with_terminal};
+use ptermui::App;
+// In app crate tests prefer `crate::test_util::...`; from other crates use `polaris_terminal::test_util::...`.
+use polaris_terminal::test_util::{terminal::initialize_app_for_terminal_view, add_window_with_terminal};
 
 #[test]
 fn example() {
@@ -179,7 +179,7 @@ fn example() {
 ```
 
 ## TUI element tests
-Tests for the headless TUI render an element tree to text lines rather than drawing pixels. Use `rookui_core::elements::tui::test_support::render_to_lines` and `TuiBuffer::to_lines`, and keep them in `*_tests.rs` files next to the source in `crates/rook_tui` and `crates/rookui_core/src/elements/tui`. They are plain unit tests and do NOT use the GUI integration / real-display / `computer_use` framework. See the `terminal-tui-testing` skill for details. The `rookui::App::test` harness above still applies to shared model logic that both front-ends use.
+Tests for the headless TUI render an element tree to text lines rather than drawing pixels. Use `ptermui_core::elements::tui::test_support::render_to_lines` and `TuiBuffer::to_lines`, and keep them in `*_tests.rs` files next to the source in `crates/pterm_tui` and `crates/ptermui_core/src/elements/tui`. They are plain unit tests and do NOT use the GUI integration / real-display / `computer_use` framework. See the `terminal-tui-testing` skill for details. The `ptermui::App::test` harness above still applies to shared model logic that both front-ends use.
 
 ## Common helpers to use
 - Terminal model shortcuts: `TerminalModel::mock(..)`, `.simulate_block(..)`, `.finish_block()`, `.simulate_cmd(..)`.
@@ -194,7 +194,7 @@ VirtualFS::test("case", |_dirs, mut fs| {
 ```
 - Feature flags (scoped):
 ```rust
-use rook::features::FeatureFlag; // or `use crate::features::FeatureFlag;` inside the app crate
+use polaris_terminal::features::FeatureFlag; // or `use crate::features::FeatureFlag;` inside the app crate
 let _flag = FeatureFlag::CreatingSharedSessions.override_enabled(true);
 ```
 - UI numeric assertions (lines):

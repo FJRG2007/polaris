@@ -297,7 +297,7 @@ impl LocalCommandExecutor {
 
         // This sets then environment variables, including the PATH var.
         // We need to run the command with the PATH var set because if the
-        // user opened Rook through a parent process that didn't have the PATH var set
+        // user opened Polaris Terminal through a parent process that didn't have the PATH var set
         // (i.e. outside of a shell, for example opening the app via Finder),
         // the subshell won't inherit the PATH var, but we need the PATH var
         // to reference executables we might run as part of generators.

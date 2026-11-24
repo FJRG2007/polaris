@@ -1,4 +1,4 @@
-use rookui::units::IntoLines as _;
+use ptermui::units::IntoLines as _;
 
 use super::*;
 use crate::terminal::SizeUpdateReason;

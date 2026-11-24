@@ -1,9 +1,9 @@
-use rookui::elements::{
+use ptermui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable, MouseStateHandle,
     ParentElement, Radius, Text,
 };
-use rookui::platform::Cursor;
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::platform::Cursor;
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::appearance::Appearance;
 use crate::ui_components::icons::Icon;
@@ -75,7 +75,7 @@ impl FeaturePopup {
             FeaturePopupBadge::AlertIcon => Container::new(
                 ConstrainedBox::new(
                     Icon::AlertCircle
-                        .to_rookui_icon(appearance.theme().main_text_color(
+                        .to_ptermui_icon(appearance.theme().main_text_color(
                             appearance.theme().terminal_colors().normal.green.into(),
                         ))
                         .finish(),
@@ -125,7 +125,7 @@ impl View for FeaturePopup {
                         Hoverable::new(self.dismiss_mouse_state.clone(), |_| {
                             ConstrainedBox::new(
                                 Icon::X
-                                    .to_rookui_icon(appearance.theme().sub_text_color(
+                                    .to_ptermui_icon(appearance.theme().sub_text_color(
                                         appearance.theme().main_text_color(background),
                                     ))
                                     .finish(),

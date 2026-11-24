@@ -2,7 +2,7 @@
 name = "remote_server"
 version = "0.1.0"
 edition = "2024"
-authors = ["Rook Contributors"]
+authors = ["Polaris Terminal Contributors"]
 publish.workspace = true
 license.workspace = true
 
@@ -20,10 +20,10 @@ repo_metadata.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
-rook_core.workspace = true
-rook_errors.workspace = true
-rook_util.workspace = true
-rookui_core.workspace = true
+pterm_core.workspace = true
+pterm_errors.workspace = true
+pterm_util.workspace = true
+ptermui_core.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 async-io.workspace = true

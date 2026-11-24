@@ -1,5 +1,5 @@
 use float_cmp::assert_approx_eq;
-use rookui::App;
+use ptermui::App;
 
 use super::*;
 use crate::terminal::event_listener::ChannelEventListener;
@@ -733,7 +733,7 @@ fn test_smart_selection_in_single_block() {
             );
             block_list.clear_selection();
 
-            // Start a selection at the "p" in "rook", which has wrapped to the third
+            // Start a selection at the "p" in "polaris-terminal", which has wrapped to the third
             // line of the command grid.
             block_list.start_selection(
                 BlockListPoint::new(command_grid_offset + 2.0, 2),
@@ -943,7 +943,7 @@ fn test_smart_selection_override() {
 
             let semantic_selection = SemanticSelection::mock(true, "");
 
-            // Start a selection at the "w" in "rook"
+            // Start a selection at the "w" in "polaris-terminal"
             // TODO(vorporeal): this comment doesn't seem to match the code
             block_list.start_selection(
                 BlockListPoint::new(2.0, 6),

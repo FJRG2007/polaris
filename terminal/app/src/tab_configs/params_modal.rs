@@ -1,21 +1,21 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use rook_core::ui::Icon;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::editor::NavigationKey;
-use rookui::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::editor::NavigationKey;
+use ptermui::elements::{
     Border, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Fill, Flex, Hoverable, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, Padding, ParentElement, Radius, SavePosition, ScrollTarget,
     ScrollToPositionMode, ScrollbarWidth, Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::macros::*;
-use rookui::keymap::{FixedBinding, Keystroke};
-use rookui::platform::Cursor;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::macros::*;
+use ptermui::keymap::{FixedBinding, Keystroke};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -508,7 +508,7 @@ impl View for TabConfigParamsModal {
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
             .finish();
 
-            let close_icon = ConstrainedBox::new(Icon::X.to_rookui_icon(sub_text).finish())
+            let close_icon = ConstrainedBox::new(Icon::X.to_ptermui_icon(sub_text).finish())
                 .with_width(14.)
                 .with_height(14.)
                 .finish();

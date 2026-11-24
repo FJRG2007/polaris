@@ -1,16 +1,16 @@
-use regex::Regex;
-use rook::integration_testing::goto_line::{
+use polaris_terminal::integration_testing::goto_line::{
     assert_code_editor_line_numbers, assert_cursor_at_line, assert_cursor_at_line_and_column,
     assert_goto_line_dialog_is_open, goto_line_confirm, open_goto_line_dialog,
     set_code_editor_line_number_mode,
 };
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::tab::assert_pane_title;
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use rook::integration_testing::view_getters::{pane_group_view, workspace_view};
-use rook::settings::CodeEditorLineNumberMode;
-use rook::workspace::WorkspaceAction;
-use rookui_core::{App, async_assert_eq};
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::tab::assert_pane_title;
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::integration_testing::view_getters::{pane_group_view, workspace_view};
+use polaris_terminal::settings::CodeEditorLineNumberMode;
+use polaris_terminal::workspace::WorkspaceAction;
+use ptermui_core::{App, async_assert_eq};
+use regex::Regex;
 
 use super::{Builder, new_builder};
 use crate::util::write_all_rc_files_for_test;

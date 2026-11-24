@@ -11,13 +11,13 @@ use chrono::Utc;
 use cloud_object_models::CodeForge;
 use futures::channel::oneshot;
 use futures::future::join_all;
+use pterm_cli::agent::{Harness, RepositoryForge, RepositoryHeadOverride, RepositoryHeadRef};
+use pterm_completer::completer::{CommandExitStatus, CommandOutput};
+use pterm_core::command::ExitCode;
+use pterm_core::{safe_info, safe_warn};
+use ptermui::r#async::FutureExt;
+use ptermui::{ModelContext, ModelSpawner, SingletonEntity};
 use repo_metadata::repositories::{DetectedRepositories, RepoDetectionSource};
-use rook_cli::agent::{Harness, RepositoryForge, RepositoryHeadOverride, RepositoryHeadRef};
-use rook_completer::completer::{CommandExitStatus, CommandOutput};
-use rook_core::command::ExitCode;
-use rook_core::{safe_info, safe_warn};
-use rookui::r#async::FutureExt;
-use rookui::{ModelContext, ModelSpawner, SingletonEntity};
 
 #[cfg(feature = "local_fs")]
 use super::cache_setup;
@@ -62,7 +62,7 @@ pub enum PrepareEnvironmentError {
         second_owner: String,
     },
     #[error(
-        "Repository {repo_name} has a code forge this client build doesn't support; update Rook to a version that does"
+        "Repository {repo_name} has a code forge this client build doesn't support; update Polaris Terminal to a version that does"
     )]
     UnsupportedRepositoryForge { repo_name: String },
     #[error("Terminal driver error while preparing environment: {source}")]
@@ -325,12 +325,12 @@ pub(crate) fn merge_repos_deduped(
 
 /// Environment variable carrying the authenticated remote URL of a Factory's
 /// definition repository. Dispatch attaches it only to runs that execute as a
-/// Factory agent whose Factory definition lives in a Rook-managed repository.
-const FACTORY_REPO_CLONE_URL_ENV_VAR: &str = "ROOK_FACTORY_REPO_CLONE_URL";
+/// Factory agent whose Factory definition lives in a Polaris Terminal-managed repository.
+const FACTORY_REPO_CLONE_URL_ENV_VAR: &str = "POLARIS_TERMINAL_FACTORY_REPO_CLONE_URL";
 
 /// Environment variable carrying the directory, relative to the working
 /// directory, that the Factory definition repository is cloned into.
-const FACTORY_REPO_DIR_ENV_VAR: &str = "ROOK_FACTORY_REPO_DIR";
+const FACTORY_REPO_DIR_ENV_VAR: &str = "POLARIS_TERMINAL_FACTORY_REPO_DIR";
 
 /// Prepends the setup command that clones a Factory's definition repository
 /// when the dispatch attached the clone variables to this run, so the checkout
@@ -693,7 +693,7 @@ fn build_parallel_clone_command(repos: &[RepositoryCloneRequest], shell_type: Sh
         r#"set +e
 failed=0
 pids=""
-tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/rook-clone-logs.XXXXXX")"
+tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/polaris-terminal-clone-logs.XXXXXX")"
 cleanup_clone_logs() {
   rm -rf "$tmp_dir"
 }

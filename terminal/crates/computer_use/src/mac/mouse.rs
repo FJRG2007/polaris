@@ -8,7 +8,7 @@ use objc2_core_graphics::{
     CGScrollEventUnit,
 };
 use pathfinder_geometry::vector::Vector2I;
-use rookui_core::r#async::Timer;
+use ptermui_core::r#async::Timer;
 
 use super::post::PostTarget;
 use super::util::main_display_scale_factor;

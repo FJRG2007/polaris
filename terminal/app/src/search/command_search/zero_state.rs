@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 
 use lazy_static::lazy_static;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     Container, CornerRadius, Flex, Hoverable, MouseStateHandle, ParentElement, Radius, Text, Wrap,
 };
-use rookui::platform::Cursor;
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::platform::Cursor;
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::appearance::Appearance;
-use crate::drive::settings::{RookDriveSettings, RookDriveSettingsChangedEvent};
+use crate::drive::settings::{PtermDriveSettings, PtermDriveSettingsChangedEvent};
 use crate::search::{FilterChipRenderer, QueryFilter};
 use crate::settings::{AISettings, AISettingsChangedEvent};
 
@@ -52,8 +52,8 @@ impl CommandSearchZeroStateView {
             }
         });
 
-        ctx.subscribe_to_model(&RookDriveSettings::handle(ctx), |_, _, event, ctx| {
-            if let RookDriveSettingsChangedEvent::EnableRookDrive { .. } = event {
+        ctx.subscribe_to_model(&PtermDriveSettings::handle(ctx), |_, _, event, ctx| {
+            if let PtermDriveSettingsChangedEvent::EnablePtermDrive { .. } = event {
                 ctx.notify();
             }
         });
@@ -183,7 +183,7 @@ impl View for CommandSearchZeroStateView {
         "CommandSearchZeroStateView"
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
 
         let command_search_text = Container::new(
@@ -289,7 +289,7 @@ fn valid_query_filters(app: &AppContext) -> Vec<QueryFilter> {
         filters.push(QueryFilter::PromptHistory);
     }
 
-    if RookDriveSettings::is_rook_drive_enabled(app) {
+    if PtermDriveSettings::is_pterm_drive_enabled(app) {
         filters.push(QueryFilter::Workflows);
         filters.push(QueryFilter::EnvironmentVariables);
     }

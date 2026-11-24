@@ -3,17 +3,17 @@ use std::collections::{HashMap, HashSet};
 use itertools::Itertools as _;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::channel::ChannelState;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::channel::ChannelState;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DropShadow,
     Empty, Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Shrinkable, Stack,
     Text,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::components::UiComponent;
-use rookui::{AppContext, Element, EventContext, SingletonEntity};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{AppContext, Element, EventContext, SingletonEntity};
 
 use crate::ai::AIRequestUsageModel;
 use crate::auth::AuthStateProvider;
@@ -554,7 +554,7 @@ fn render_row_card(
             let info_color = appearance
                 .theme()
                 .sub_text_color(appearance.theme().background());
-            let icon = ConstrainedBox::new(Icon::Info.to_rookui_icon(info_color).finish())
+            let icon = ConstrainedBox::new(Icon::Info.to_ptermui_icon(info_color).finish())
                 .with_width(ROW_ICON_SIZE)
                 .with_height(ROW_ICON_SIZE)
                 .finish();
@@ -612,11 +612,11 @@ fn render_row_card(
     .with_color(main)
     .finish();
     let icon_color = theme.sub_text_color(theme.background());
-    let coin_icon = ConstrainedBox::new(Icon::Credits.to_rookui_icon(icon_color).finish())
+    let coin_icon = ConstrainedBox::new(Icon::Credits.to_ptermui_icon(icon_color).finish())
         .with_width(ROW_ICON_SIZE)
         .with_height(ROW_ICON_SIZE)
         .finish();
-    let card_icon = ConstrainedBox::new(Icon::CreditCard.to_rookui_icon(icon_color).finish())
+    let card_icon = ConstrainedBox::new(Icon::CreditCard.to_ptermui_icon(icon_color).finish())
         .with_width(ROW_ICON_SIZE)
         .with_height(ROW_ICON_SIZE)
         .finish();

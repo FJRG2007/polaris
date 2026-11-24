@@ -7,7 +7,7 @@ use std::time::Duration;
 use dashmap::DashMap;
 use futures::channel::oneshot;
 use futures::io::{AsyncRead, AsyncWrite};
-use rookui_core::r#async::{FutureExt as _, executor};
+use ptermui_core::r#async::{FutureExt as _, executor};
 
 use crate::codebase_index_proto::{
     RemoteCodebaseIndexStatus, proto_to_codebase_index_status_updated,
@@ -26,12 +26,12 @@ use crate::repo_metadata_proto::{proto_snapshot_to_update, proto_to_repo_metadat
 
 #[cfg(not(target_family = "wasm"))]
 mod remote_server_log;
+use pterm_core::{SessionId, safe_error, safe_warn};
+use pterm_errors::report_error;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui_core::r#async::TransportStream;
 #[cfg(not(target_family = "wasm"))]
 pub use remote_server_log::RemoteServerLog;
-use rook_core::{SessionId, safe_error, safe_warn};
-use rook_errors::report_error;
-use rook_util::standardized_path::StandardizedPath;
-use rookui_core::r#async::TransportStream;
 
 use crate::protocol::{self, ProtocolError, RequestId};
 
@@ -182,7 +182,7 @@ pub struct RequestFailedEvent {
 /// This type does **not** own the child subprocess whose stdio backs it.
 /// For transports that spawn a subprocess (e.g. SSH), the caller is
 /// responsible for holding the `Child` for the lifetime of the session
-/// so that `kill_on_drop` fires when teardown occurs. In Rook this is
+/// so that `kill_on_drop` fires when teardown occurs. In Polaris Terminal this is
 /// the `RemoteServerManager`, which stores the child in
 /// `RemoteSessionState` alongside the `Arc<RemoteServerClient>`. That
 /// way the child's lifetime is gated by the manager's session map
@@ -237,7 +237,7 @@ impl RemoteServerClient {
     /// The caller retains ownership of the `Child` itself. Typically the
     /// caller spawns the `Command` with `kill_on_drop(true)` and stashes
     /// the returned `Child` somewhere whose lifetime matches the
-    /// session's (in Rook, on the `RemoteServerManager`'s
+    /// session's (in Polaris Terminal, on the `RemoteServerManager`'s
     /// `RemoteSessionState`). Dropping the `Child` there triggers
     /// SIGKILL on the subprocess, regardless of how many
     /// `Arc<RemoteServerClient>` clones are still alive.

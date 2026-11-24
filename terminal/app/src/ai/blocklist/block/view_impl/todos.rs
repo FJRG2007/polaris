@@ -1,12 +1,12 @@
 //! Rendering logic for todo list components in AI blocks.
 
-use rookui::elements::{
+use ptermui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty, Flex, Highlight,
     ParentElement, Radius, Shrinkable, Text,
 };
-use rookui::fonts::Properties;
-use rookui::text_layout::TextStyle;
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::fonts::Properties;
+use ptermui::text_layout::TextStyle;
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use super::WithContentItemSpacing;
 use crate::ai::agent::conversation::{AIConversation, TodoStatus};
@@ -159,9 +159,9 @@ pub(super) fn render_completed_todo_items(
     // Create a check mark icon
     let check_icon = Container::new(
         ConstrainedBox::new(
-            rookui::elements::Icon::new(
+            ptermui::elements::Icon::new(
                 Icon::Check.into(),
-                rook_core::ui::theme::Fill::Solid(sub_text_color),
+                pterm_core::ui::theme::Fill::Solid(sub_text_color),
             )
             .finish(),
         )

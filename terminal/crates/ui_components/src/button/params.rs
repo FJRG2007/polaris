@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rookui_core::fonts;
-use rookui_core::keymap::Keystroke;
-use rookui_core::prelude::stack;
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use ptermui_core::fonts;
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::prelude::stack;
 
 use super::Theme;
 use crate::{keyboard_shortcut, tooltip};

@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use rook_core::safe_debug;
+use pterm_core::safe_debug;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tempfile::NamedTempFile;
@@ -44,7 +44,7 @@ pub struct GcpFederationConfig {
 pub struct GcpCredentials {
     /// Temporary file holding the GCP credentials configuration file.
     config_file: NamedTempFile,
-    /// Temporary file where Rook OIDC tokens are cached.
+    /// Temporary file where Polaris Terminal OIDC tokens are cached.
     output_file: NamedTempFile,
 }
 

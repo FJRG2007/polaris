@@ -7,7 +7,7 @@ mod aws_bedrock_login;
 mod aws_cli_not_installed;
 mod notifications_discovery;
 mod notifications_error;
-mod open_in_rook;
+mod open_in_pterm;
 mod passive_code_diff;
 pub(crate) mod prompt_suggestions;
 mod session_state;
@@ -21,18 +21,18 @@ pub use aws_bedrock_login::*;
 pub use aws_cli_not_installed::*;
 pub use notifications_discovery::*;
 pub use notifications_error::*;
-pub use open_in_rook::*;
+pub use open_in_pterm::*;
 pub use passive_code_diff::*;
 use pathfinder_color::ColorU;
-use rookui::Element;
-use rookui::elements::{
+use ptermui::Element;
+use ptermui::elements::{
     Align, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Icon,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, SavePosition,
     Shrinkable, Text,
 };
-use rookui::fonts::{FamilyId, Properties, Weight};
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::fonts::{FamilyId, Properties, Weight};
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 pub use session_state::*;
 pub use shared_sessions::*;
 pub use shell_process_terminated::*;
@@ -173,7 +173,7 @@ fn render_inline_block_list_banner(
     let theme = appearance.theme();
     let title_font_size = appearance.ui_font_size() + 1.;
     let button_text_size = title_font_size;
-    let hover_background_fill = rookui::elements::Fill::from(
+    let hover_background_fill = ptermui::elements::Fill::from(
         theme
             .active_ui_text_color()
             .with_opacity(INLINE_BANNER_BUTTON_HOVER_OPACITY),
@@ -399,7 +399,7 @@ fn render_inline_banner_text_button(
             font_color: Some(coloru_with_opacity(button_info.text_color, text_opacity)),
             font_family_id: button_info.font.family,
             font_weight: button_info.font.weight,
-            border_color: Some(rookui::elements::Fill::Solid(coloru_with_opacity(
+            border_color: Some(ptermui::elements::Fill::Solid(coloru_with_opacity(
                 button_info.text_color,
                 text_opacity,
             ))),

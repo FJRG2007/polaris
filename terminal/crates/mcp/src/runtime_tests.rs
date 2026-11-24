@@ -67,7 +67,7 @@ fn test_resource(uri: &str) -> Resource {
     .expect("Resource deserialization")
 }
 
-/// Regression test for FJRG2007/rook#6798: each capability is queried
+/// Regression test for FJRG2007/polaris#6798: each capability is queried
 /// independently. Previously, asymmetric handling could cause `tools/list`
 /// to be skipped when a server advertised both `tools` and `resources`,
 /// resulting in "No tools available" even though the server had tools.
@@ -455,7 +455,7 @@ async fn start_http_server(
         .register(
             "mcp-tests",
             std::env::temp_dir().join(format!("mcp-{}.log", uuid::Uuid::new_v4())),
-            Arc::new(rookui::r#async::executor::Background::default()),
+            Arc::new(ptermui::r#async::executor::Background::default()),
         )
         .expect("test logger");
     tokio::time::timeout(
@@ -470,7 +470,7 @@ async fn start_http_server(
         ),
     )
     .await
-    .expect("Rook startup should complete")
+    .expect("Polaris Terminal startup should complete")
 }
 
 async fn assert_http_startup(
@@ -602,7 +602,7 @@ async fn assert_http_startup(
         Vec::new()
     };
     let info = start_http_server(url, headers).await;
-    let info = info.expect("Rook startup should succeed");
+    let info = info.expect("Polaris Terminal startup should succeed");
     assert_eq!(info.tools, vec![test_tool("query_metrics")]);
     assert_eq!(
         info.service
@@ -1252,7 +1252,7 @@ async fn http_client_sends_default_user_agent_unless_configured() {
     let [Some(default), Some(configured)] = user_agents.as_slice() else {
         panic!("expected a User-Agent on every request, got {user_agents:?}");
     };
-    // Must stay identical to rook-server's `managedMCPOutboundUserAgent`.
-    assert_eq!(default, "Rook-MCP-Client/1.0");
+    // Must stay identical to polaris-terminal-server's `managedMCPOutboundUserAgent`.
+    assert_eq!(default, "PolarisTerminal-MCP-Client/1.0");
     assert_eq!(configured, "custom-agent/1.0");
 }

@@ -1,5 +1,5 @@
-use rook_core::register_telemetry_event;
-use rook_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
+use pterm_core::register_telemetry_event;
+use pterm_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
 use serde_json::{Value, json};
 use strum_macros::{EnumDiscriminants, EnumIter};
 
@@ -37,7 +37,7 @@ impl TelemetryEvent for RepoMetadataTelemetryEvent {
     }
 
     fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        rook_core::telemetry::enum_events::<Self>()
+        pterm_core::telemetry::enum_events::<Self>()
     }
 }
 

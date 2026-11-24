@@ -2,25 +2,25 @@
 
 ## Problem
 
-The server is adding `POST /harness-support/notify-user` and `POST /harness-support/finish-task` endpoints (see `rook-server` spec). Third-party harnesses invoke server APIs through the `oz` CLI, not directly. We need:
+The server is adding `POST /harness-support/notify-user` and `POST /harness-support/finish-task` endpoints (see `polaris-terminal-server` spec). Third-party harnesses invoke server APIs through the `oz` CLI, not directly. We need:
 
 1. Two new `oz harness-support` subcommands that call these endpoints.
-2. API client methods in the Rook client to make the HTTP calls.
+2. API client methods in the Polaris Terminal client to make the HTTP calls.
 3. Claude Code plugin skills so the harness can invoke the commands at the right time.
 
 ## Relevant Code
 
-- `crates/rook_cli/src/harness_support.rs` — CLI arg definitions (`HarnessSupportCommand` enum)
+- `crates/pterm_cli/src/harness_support.rs` — CLI arg definitions (`HarnessSupportCommand` enum)
 - `app/src/ai/agent_sdk/harness_support.rs` — command dispatch + async runners
 - `app/src/server/server_api/harness_support.rs` — `HarnessSupportClient` trait + `ServerApi` impl
 - `app/src/ai/agent_sdk/telemetry.rs` — `CliTelemetryEvent` enum
 - `app/src/ai/agent_sdk/mod.rs (1193-1202)` — telemetry mapping for harness-support commands
-- `../claude-code-rook-internal/plugins/oz-harness-support/` — existing plugin (skills, hooks)
+- `../claude-code-polaris-terminal-internal/plugins/oz-harness-support/` — existing plugin (skills, hooks)
 
 ## Current State
 
 `oz harness-support` has two subcommands: `ping` and `report-artifact`. Each follows the same pattern:
-1. **CLI layer** (`rook_cli`): clap `Args`/`Subcommand` structs define the command shape.
+1. **CLI layer** (`pterm_cli`): clap `Args`/`Subcommand` structs define the command shape.
 2. **Handler layer** (`agent_sdk/harness_support.rs`): match on the command, get the `HarnessSupportClient`, spawn an async task, print result / terminate.
 3. **API client layer** (`server_api/harness_support.rs`): `HarnessSupportClient` trait method + `ServerApi` impl calling `self.post_public_api(path, body)`.
 4. **Telemetry**: each command has a `CliTelemetryEvent` variant.
@@ -29,7 +29,7 @@ The Claude Code plugin currently has three skills (`oz-report-pr`, `oz-report-ar
 
 ## Proposed Changes
 
-### 1. CLI layer (`crates/rook_cli/src/harness_support.rs`)
+### 1. CLI layer (`crates/pterm_cli/src/harness_support.rs`)
 
 Add two variants to `HarnessSupportCommand`:
 
@@ -91,7 +91,7 @@ HarnessSupportFinishTask { success: bool },
 
 Wire into `command_to_telemetry_event` in `mod.rs` and the `TelemetryEventDesc` impl.
 
-### 5. Claude Code plugin (`../claude-code-rook-internal/plugins/oz-harness-support/`)
+### 5. Claude Code plugin (`../claude-code-polaris-terminal-internal/plugins/oz-harness-support/`)
 
 **New skill: `oz-notify-user`**
 
@@ -119,7 +119,7 @@ sequenceDiagram
     participant CC as Claude Code (harness)
     participant OZ as oz CLI
     participant SA as ServerApi (client)
-    participant WS as rook-server
+    participant WS as polaris-terminal-server
 
     Note over CC,WS: Progress update
     CC->>OZ: oz harness-support notify-user --message "..."

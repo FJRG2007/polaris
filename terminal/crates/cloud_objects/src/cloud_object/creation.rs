@@ -1,4 +1,4 @@
-use rook_graphql::scalars::time::ServerTimestamp;
+use pterm_graphql::scalars::time::ServerTimestamp;
 
 use super::{
     CloudObjectEventEntrypoint, GenericStringObjectFormat, GenericStringObjectUniqueKey, Owner,

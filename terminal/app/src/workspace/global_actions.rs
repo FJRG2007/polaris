@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
 use ::settings::ToggleableSetting;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_errors::report_error;
-use rook_graphql::mutations::create_anonymous_user::AnonymousUserType;
-use rookui::windowing::WindowManager;
-use rookui::windowing::state::ApplicationStage;
-use rookui::{AppContext, SingletonEntity, TypedActionView};
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_errors::report_error;
+use pterm_graphql::mutations::create_anonymous_user::AnonymousUserType;
+use ptermui::windowing::WindowManager;
+use ptermui::windowing::state::ApplicationStage;
+use ptermui::{AppContext, SingletonEntity, TypedActionView};
 
 use crate::ai::agent::AIAgentExchangeId;
 use crate::ai::agent::conversation::AIConversationId;
@@ -252,7 +252,7 @@ fn create_anonymous_user(_: &(), ctx: &mut AppContext) {
     let auth_client =
         ServerApiProvider::handle(ctx).read(ctx, |provider, _ctx| provider.get_auth_client());
     let result =
-        rookui::r#async::block_on(auth_client.create_anonymous_user(None, anonymous_user_type));
+        ptermui::r#async::block_on(auth_client.create_anonymous_user(None, anonymous_user_type));
     match result {
         Ok(user) => log::info!("Successfully created anonymous user {user:?}"),
         Err(err) => report_error!(err.context("Failed to create anonymous user")),

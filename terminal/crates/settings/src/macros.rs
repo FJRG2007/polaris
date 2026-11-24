@@ -1,5 +1,5 @@
 //! This module defines a set of macros to standardize and simplify the process
-//! of defining new settings within Rook.
+//! of defining new settings within Polaris Terminal.
 //!
 //! Settings are defined as enums or structs that implement [`Setting`], and are
 //! organized into groups in singleton models which contain one or more settings
@@ -115,9 +115,9 @@
 //! # use settings::macros::*;
 //! # use settings::manager::SettingsManager;
 //! # use settings::*;
-//! # use rookui_core::prelude::*;
-//! # use rookui_core::{elements, App};
-//! # use rookui_extras::user_preferences;
+//! # use ptermui_core::prelude::*;
+//! # use ptermui_core::{elements, App};
+//! # use ptermui_extras::user_preferences;
 //! define_settings_group!(ExampleGroup, settings: [
 //!     bool_setting: BoolSetting {
 //!         type: bool,
@@ -317,7 +317,7 @@ macro_rules! define_setting {
 
             fn clear_value(
                 &mut self,
-                ctx: &mut $crate::rookui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::ptermui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 Self::clear_from_preferences(Self::preferences_for_setting(ctx))?;
                 self.inner = self.validate(Self::default_value());
@@ -331,7 +331,7 @@ macro_rules! define_setting {
             fn set_value_from_cloud_sync(
                 &mut self,
                 new_value: Self::Value,
-                ctx: &mut $crate::rookui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::ptermui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 let changed_in_storage =
                     Self::write_to_preferences(&new_value, Self::preferences_for_setting(ctx))?;
@@ -348,7 +348,7 @@ macro_rules! define_setting {
             fn set_value(
                 &mut self,
                 new_value: Self::Value,
-                ctx: &mut $crate::rookui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::ptermui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 let changed_in_storage =
                     Self::write_to_preferences(&new_value, Self::preferences_for_setting(ctx))?;
@@ -366,7 +366,7 @@ macro_rules! define_setting {
                 &mut self,
                 new_value: Self::Value,
                 explicitly_set: bool,
-                ctx: &mut $crate::rookui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::ptermui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 let validated = self.validate(new_value);
                 if self.value() != &validated || self.is_explicitly_set != explicitly_set {
@@ -600,7 +600,7 @@ macro_rules! implement_setting_for_enum {
 
             fn clear_value(
                 &mut self,
-                ctx: &mut $crate::rookui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::ptermui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 Self::clear_from_preferences(Self::preferences_for_setting(ctx))?;
                 *self = self.validate(Self::default_value());
@@ -613,7 +613,7 @@ macro_rules! implement_setting_for_enum {
             fn set_value_from_cloud_sync(
                 &mut self,
                 new_value: Self::Value,
-                ctx: &mut $crate::rookui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::ptermui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 let changed_in_storage =
                     Self::write_to_preferences(&new_value, Self::preferences_for_setting(ctx))?;
@@ -629,7 +629,7 @@ macro_rules! implement_setting_for_enum {
             fn set_value(
                 &mut self,
                 new_value: Self::Value,
-                ctx: &mut $crate::rookui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::ptermui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 let changed_in_storage =
                     Self::write_to_preferences(&new_value, Self::preferences_for_setting(ctx))?;
@@ -646,7 +646,7 @@ macro_rules! implement_setting_for_enum {
                 &mut self,
                 new_value: Self::Value,
                 _explicitly_set: bool,
-                ctx: &mut $crate::rookui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::ptermui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 let validated = self.validate(new_value);
                 if self.value() != &validated {
@@ -739,7 +739,7 @@ macro_rules! define_settings_group {
 
         impl $group {
             #[allow(dead_code)]
-            fn new_from_storage(ctx: &mut $crate::rookui_core::ModelContext<Self>) -> Self {
+            fn new_from_storage(ctx: &mut $crate::ptermui_core::ModelContext<Self>) -> Self {
                 use $crate::Setting;
                 Self {
                     $(
@@ -750,7 +750,7 @@ macro_rules! define_settings_group {
 
             #[cfg(any(test, feature = "integration_tests"))]
             #[allow(dead_code)]
-            pub fn new_with_defaults(_ctx: &mut $crate::rookui_core::ModelContext<Self>) -> Self {
+            pub fn new_with_defaults(_ctx: &mut $crate::ptermui_core::ModelContext<Self>) -> Self {
                 use $crate::Setting;
                 Self {
                     $(
@@ -760,7 +760,7 @@ macro_rules! define_settings_group {
             }
 
             #[allow(dead_code)]
-            pub fn register(ctx: &mut (impl $crate::rookui_core::GetSingletonModelHandle + $crate::rookui_core::AddSingletonModel + $crate::rookui_core::UpdateModel)) -> $crate::rookui_core::ModelHandle<Self> {
+            pub fn register(ctx: &mut (impl $crate::ptermui_core::GetSingletonModelHandle + $crate::ptermui_core::AddSingletonModel + $crate::ptermui_core::UpdateModel)) -> $crate::ptermui_core::ModelHandle<Self> {
                 let settings_group = ctx.add_singleton_model(|ctx| {
                     Self::new_from_storage(ctx)
                 });
@@ -806,12 +806,12 @@ macro_rules! define_settings_group {
                 )*
             }
 
-            impl $crate::rookui_core::Entity for $group {
+            impl $crate::ptermui_core::Entity for $group {
                 type Event = EventName;
             }
         });
 
-        impl $crate::rookui_core::SingletonEntity for $group {}
+        impl $crate::ptermui_core::SingletonEntity for $group {}
     };
 }
 pub use define_settings_group;

@@ -10,27 +10,27 @@ use enum_iterator::Sequence;
 use itertools::Itertools;
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
-use rook_core::semantic_selection::SemanticSelection;
-use rook_core::ui::builder::UiBuilder;
-use rook_core::ui::theme::AnsiColorIdentifier;
-use rook_util::user_input::UserInput;
-use rookui::elements::new_scrollable::{NewScrollableElement, ScrollableAxis};
-use rookui::elements::{
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_core::ui::builder::UiBuilder;
+use pterm_core::ui::theme::AnsiColorIdentifier;
+use pterm_util::user_input::UserInput;
+use ptermui::elements::new_scrollable::{NewScrollableElement, ScrollableAxis};
+use ptermui::elements::{
     Axis, Border, ChildAnchor, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius,
     Hoverable, Icon, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Point, Radius, SavePosition, ScrollData, ScrollableElement, Stack, Text,
     ZIndex,
 };
-use rookui::event::{DispatchedEvent, KeyState, ModifiersState};
-use rookui::fonts::{FamilyId, Properties, Weight};
-use rookui::geometry::rect::RectF;
-use rookui::geometry::vector::{Vector2F, vec2f};
-use rookui::platform::Cursor;
-use rookui::platform::keyboard::KeyCode;
-use rookui::text::SelectionType;
-use rookui::ui_components::components::UiComponent;
-use rookui::units::{IntoLines, IntoPixels, Lines, Pixels};
-use rookui::{
+use ptermui::event::{DispatchedEvent, KeyState, ModifiersState};
+use ptermui::fonts::{FamilyId, Properties, Weight};
+use ptermui::geometry::rect::RectF;
+use ptermui::geometry::vector::{Vector2F, vec2f};
+use ptermui::platform::Cursor;
+use ptermui::platform::keyboard::KeyCode;
+use ptermui::text::SelectionType;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::units::{IntoLines, IntoPixels, Lines, Pixels};
+use ptermui::{
     AfterLayoutContext, AppContext, ClipBounds, Element, EntityId, Event, EventContext,
     LayoutContext, ModelHandle, PaintContext, SingletonEntity as _, SizeConstraint,
 };
@@ -51,7 +51,7 @@ use super::model::image_map::StoredImageMetadata;
 use super::model::mouse::{MouseAction, MouseButton, MouseState};
 use super::model::session::SessionId;
 use super::model::terminal_model::{SelectedBlocks, WithinBlock, WithinModel};
-use super::rookify::render::{draw_flag_pole, render_subshell_flag};
+use super::ptermify::render::{draw_flag_pole, render_subshell_flag};
 use super::shared_session::presence_manager::{
     MUTED_PARTICIPANT_COLOR, PresenceManager, text_selection_color,
 };
@@ -64,7 +64,7 @@ use super::{HEIGHT_FUDGE_FACTOR_LINES, TerminalModel, heights_approx_eq};
 use crate::ai::blocklist::{ATTACH_AS_AGENT_MODE_CONTEXT_TEXT, ai_brand_color};
 use crate::ai_assistant::{AI_ASSISTANT_SVG_PATH, ASK_AI_ASSISTANT_TEXT};
 use crate::appearance::Appearance;
-use crate::drive::settings::RookDriveSettings;
+use crate::drive::settings::PtermDriveSettings;
 use crate::features::FeatureFlag;
 use crate::pane_group::SplitPaneState;
 use crate::settings::{
@@ -84,11 +84,11 @@ use crate::terminal::model::escape_sequences::{
 use crate::terminal::model::index::Point as IndexPoint;
 use crate::terminal::model::selection::{SelectAction, SelectionPoint};
 use crate::terminal::model::terminal_model::BlockIndex;
-use crate::terminal::rookify::SubshellSource;
+use crate::terminal::ptermify::SubshellSource;
 use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
 use crate::terminal::view::TerminalAction;
 use crate::terminal::{SizeInfo, grid_renderer, should_right_click_paste};
-use crate::themes::theme::{Fill, RookTheme};
+use crate::themes::theme::{Fill, PtermTheme};
 use crate::ui_components::{self, icons as UIIcon};
 use crate::util::color::Opacity;
 
@@ -631,7 +631,7 @@ pub struct BlockListElement {
     font_size: f32,
     font_weight: Weight,
     line_height_ratio: f32,
-    rook_theme: RookTheme,
+    pterm_theme: PtermTheme,
     ui_builder: UiBuilder,
     block_borders_enabled: bool,
     overflow_offset: f32,
@@ -713,7 +713,7 @@ pub struct BlockListElement {
     use_ligature_rendering: bool,
 
     /// When true, suppresses cursor rendering for CLI agents when rich input is open. For agents that draw their own cursor (SHOW_CURSOR off),
-    /// the cursor cell is skipped. For agents that let Rook draw the cursor
+    /// the cursor cell is skipped. For agents that let Polaris Terminal draw the cursor
     /// (SHOW_CURSOR on), the `draw_cursor` call and cursor contrast colouring
     /// are suppressed instead.
     hide_cursor_cell: bool,
@@ -922,7 +922,7 @@ impl BlockListElement {
             font_size: appearance.monospace_font_size(),
             font_weight: appearance.monospace_font_weight(),
             line_height_ratio: appearance.ui_builder().line_height_ratio(),
-            rook_theme: appearance.theme().clone(),
+            pterm_theme: appearance.theme().clone(),
             ui_builder: appearance.ui_builder().clone(),
             block_borders_enabled: terminal_spacing.block_borders_enabled,
             overflow_offset: terminal_spacing.overflow_offset,
@@ -1064,8 +1064,8 @@ impl BlockListElement {
     ) -> Self {
         self.hovered_block_index = Some(block_index);
         let icon_color = self
-            .rook_theme
-            .sub_text_color(self.rook_theme.surface_2())
+            .pterm_theme
+            .sub_text_color(self.pterm_theme.surface_2())
             .into_solid();
 
         let icon = Container::new(
@@ -1083,7 +1083,7 @@ impl BlockListElement {
                     false,
                     true,
                     self.mouse_states.overflow_menu_button_mouse_state.clone(),
-                    &self.rook_theme,
+                    &self.pterm_theme,
                     &self.ui_builder,
                     move |ctx, _, _| {
                         ctx.dispatch_typed_action(TerminalAction::BlockListContextMenu(
@@ -1119,9 +1119,9 @@ impl BlockListElement {
                 self.mouse_states.snackbar_toggle_button_mouse_state.clone(),
                 |state| {
                     let background = if state.is_clicked() || state.is_hovered() {
-                        self.rook_theme.surface_2()
+                        self.pterm_theme.surface_2()
                     } else {
-                        self.rook_theme.surface_1()
+                        self.pterm_theme.surface_1()
                     };
                     icon.with_corner_radius(rounded_corners)
                         .with_background(background)
@@ -1138,11 +1138,11 @@ impl BlockListElement {
             let icon = Container::new(
                 ConstrainedBox::new(if FeatureFlag::AgentView.is_enabled() {
                     UIIcon::Icon::Paperclip
-                        .to_rookui_icon(icon_color.into())
+                        .to_ptermui_icon(icon_color.into())
                         .finish()
                 } else if FeatureFlag::AgentMode.is_enabled() {
                     UIIcon::Icon::Stars
-                        .to_rookui_icon(icon_color.into())
+                        .to_ptermui_icon(icon_color.into())
                         .finish()
                 } else {
                     Icon::new(AI_ASSISTANT_SVG_PATH, icon_color).finish()
@@ -1188,7 +1188,7 @@ impl BlockListElement {
                 false,
                 true,
                 self.mouse_states.ai_assistant_button_mouse_state.clone(),
-                &self.rook_theme,
+                &self.pterm_theme,
                 &self.ui_builder,
                 move |ctx: &mut EventContext, _, _| {
                     if let Some(action) = ai_button_action.clone() {
@@ -1199,11 +1199,11 @@ impl BlockListElement {
             self.ask_ai_assistant_button = Some(element);
         }
 
-        if RookDriveSettings::is_rook_drive_enabled(app) {
+        if PtermDriveSettings::is_pterm_drive_enabled(app) {
             let icon = Container::new(
                 ConstrainedBox::new(
                     ui_components::icons::Icon::Save
-                        .to_rookui_icon(icon_color.into())
+                        .to_ptermui_icon(icon_color.into())
                         .finish(),
                 )
                 .with_height(16.)
@@ -1231,7 +1231,7 @@ impl BlockListElement {
                     self.mouse_states
                         .save_as_workflow_button_mouse_state
                         .clone(),
-                    &self.rook_theme,
+                    &self.pterm_theme,
                     &self.ui_builder,
                     move |ctx: &mut EventContext, _, _| {
                         ctx.dispatch_typed_action(TerminalAction::OpenWorkflowModalForBlock(
@@ -1251,7 +1251,7 @@ impl BlockListElement {
                     self.mouse_states
                         .save_as_workflow_button_mouse_state
                         .clone(),
-                    &self.rook_theme,
+                    &self.pterm_theme,
                     &self.ui_builder,
                     move |ctx: &mut EventContext, _, _| {
                         ctx.dispatch_typed_action(TerminalAction::OpenWorkflowModalForBlock(
@@ -1278,7 +1278,7 @@ impl BlockListElement {
     }
 
     /// We only want to process control characters here and return `false` for everything else.
-    /// That way, we'll receive a `rookui::Event::TypedCharacters` event for printable characters.
+    /// That way, we'll receive a `ptermui::Event::TypedCharacters` event for printable characters.
     /// So `TerminalAction::KeyDown` is for control characters only while
     /// `TerminalAction::TypedCharacters` is for characters that can go into the editor.
     fn key_down(&mut self, chars: &str, ctx: &mut EventContext) -> bool {
@@ -1613,7 +1613,7 @@ impl BlockListElement {
                                 .is_some_and(|block| block.is_active_and_long_running());
 
                             // On mobile, request soft keyboard so users can input
-                            if rookui::platform::is_mobile_device() && on_long_running_block {
+                            if ptermui::platform::is_mobile_device() && on_long_running_block {
                                 ctx.request_soft_keyboard();
                             }
 
@@ -2400,7 +2400,7 @@ impl BlockListElement {
         block: &Block,
         is_selected_by_anyone: bool,
         bounds: RectF,
-        rook_theme: &RookTheme,
+        pterm_theme: &PtermTheme,
         block_borders_enabled: bool,
         snackbar_header: &Option<SnackbarHeader>,
         ai_render_context: &BlocklistAIRenderContext,
@@ -2416,13 +2416,13 @@ impl BlockListElement {
                     grid_origin,
                     Vector2F::new(bounds.width(), block_height),
                 ))
-                .with_background(rook_theme.restored_blocks_overlay());
+                .with_background(pterm_theme.restored_blocks_overlay());
         }
 
         let mut did_render_ai_stripe = false;
         if !FeatureFlag::AgentView.is_enabled()
             && let Some(ai_context_stripe_color) =
-                ai_render_context.context_color_for_block(block, rook_theme)
+                ai_render_context.context_color_for_block(block, pterm_theme)
         {
             draw_flag_pole(grid_origin, block_height, ai_context_stripe_color, ctx);
             did_render_ai_stripe = true;
@@ -2434,13 +2434,13 @@ impl BlockListElement {
                     grid_origin,
                     Vector2F::new(bounds.width(), block_height),
                 ))
-                .with_background(rook_theme.failed_block_color().with_opacity(10));
+                .with_background(pterm_theme.failed_block_color().with_opacity(10));
 
             if !is_selected_by_anyone && !did_render_ai_stripe {
                 draw_flag_pole(
                     grid_origin,
                     block_height,
-                    rook_theme.failed_block_color(),
+                    pterm_theme.failed_block_color(),
                     ctx,
                 );
             }
@@ -2454,7 +2454,7 @@ impl BlockListElement {
                 ctx.scene
                     .draw_rect_with_hit_recording(header_rect)
                     .with_background(
-                        rook_theme
+                        pterm_theme
                             .accent_overlay()
                             .with_opacity(SNACKBAR_HOVER_OPACITY),
                     );
@@ -2468,7 +2468,7 @@ impl BlockListElement {
                         vec2f(header_rect.min_x(), header_rect.max_y() - 1.0),
                         vec2f(header_rect.width(), 1.0),
                     ))
-                    .with_background(rook_theme.outline());
+                    .with_background(pterm_theme.outline());
             }
         }
     }
@@ -2483,7 +2483,7 @@ impl BlockListElement {
             vec2f(block_grid_params.bounds.width(), 1.),
         ));
 
-        rect.with_background(block_grid_params.grid_render_params.rook_theme.outline());
+        rect.with_background(block_grid_params.grid_render_params.pterm_theme.outline());
     }
 
     // TODO(alokedesai): Clean this up even more by pulling out parameters into various structs.
@@ -2519,7 +2519,7 @@ impl BlockListElement {
             block,
             is_current_block_selected_by_anyone,
             block_grid_params.bounds,
-            &block_grid_params.grid_render_params.rook_theme,
+            &block_grid_params.grid_render_params.pterm_theme,
             block_borders_enabled,
             snackbar_header,
             ai_render_context,
@@ -2577,7 +2577,7 @@ impl BlockListElement {
                 }
             }
 
-            // If Rook prompt (non-PS1) is being used, the command is drawn below the prompt,
+            // If Polaris Terminal prompt (non-PS1) is being used, the command is drawn below the prompt,
             // hence we account for the prompt's vertical offset.
             let prompt_vertical_offset_px = if !block.honor_ps1() {
                 cell_size_height
@@ -2641,7 +2641,7 @@ impl BlockListElement {
                     None,
                     block_grid_params
                         .grid_render_params
-                        .rook_theme
+                        .pterm_theme
                         .cursor()
                         .into(),
                     app,
@@ -2729,9 +2729,9 @@ impl BlockListElement {
             );
 
             if block.is_output_cursor_visible()
-            // Don't draw the Rook cursor when rich input is hiding
+            // Don't draw the Polaris Terminal cursor when rich input is hiding
             // the CLI agent's cursor cell — agents like OpenCode and Codex
-            // rely on Rook's cursor, so we suppress it here too.
+            // rely on Polaris Terminal's cursor, so we suppress it here too.
             && !block_grid_params.grid_render_params.hide_cursor_cell
             {
                 block.output_grid().draw_cursor(
@@ -2745,17 +2745,17 @@ impl BlockListElement {
                             .to_ansi_color(
                                 &block_grid_params
                                     .grid_render_params
-                                    .rook_theme
+                                    .pterm_theme
                                     .terminal_colors()
                                     .normal,
                             )
                             .into()
                     } else if block.is_agent_in_control() {
-                        ai_brand_color(&block_grid_params.grid_render_params.rook_theme)
+                        ai_brand_color(&block_grid_params.grid_render_params.pterm_theme)
                     } else {
                         block_grid_params
                             .grid_render_params
-                            .rook_theme
+                            .pterm_theme
                             .cursor()
                             .into()
                     },
@@ -3378,7 +3378,7 @@ impl Element for BlockListElement {
                                             command,
                                             self.font_family,
                                             self.font_size,
-                                            &self.rook_theme,
+                                            &self.pterm_theme,
                                         );
                                         flag_element.layout(constraint, ctx, app);
                                         subshell_flags.insert(block_index, flag_element);
@@ -3464,8 +3464,8 @@ impl Element for BlockListElement {
                         )
                         .with_style(Properties::default().weight(self.font_weight))
                         .with_color(
-                            self.rook_theme
-                                .main_text_color(self.rook_theme.background())
+                            self.pterm_theme
+                                .main_text_color(self.pterm_theme.background())
                                 .into_solid(),
                         )
                         .finish(),
@@ -3617,8 +3617,8 @@ impl Element for BlockListElement {
                     let mut element = Text::new_inline(text, self.ui_font_family, self.font_size)
                         .with_style(Properties::default().weight(self.font_weight))
                         .with_color(
-                            self.rook_theme
-                                .sub_text_color(self.rook_theme.background())
+                            self.pterm_theme
+                                .sub_text_color(self.pterm_theme.background())
                                 .into(),
                         )
                         .finish();
@@ -3765,7 +3765,7 @@ impl Element for BlockListElement {
         let obfuscate_secrets = get_secret_obfuscation_mode(app);
 
         let grid_render_params = GridRenderParams {
-            rook_theme: self.rook_theme.clone(),
+            pterm_theme: self.pterm_theme.clone(),
             font_family: self.font_family,
             font_size: self.font_size,
             font_weight: self.font_weight,
@@ -3908,10 +3908,10 @@ impl Element for BlockListElement {
                                 ),
                             ))
                             .with_background(if can_be_ai_context {
-                                self.rook_theme
+                                self.pterm_theme
                                     .block_selection_as_context_background_color()
                             } else {
-                                self.rook_theme.block_selection_color()
+                                self.pterm_theme.block_selection_color()
                             })
                             .with_border(
                                 Border::new(border_info.border_width)
@@ -3922,9 +3922,9 @@ impl Element for BlockListElement {
                                         true,
                                     )
                                     .with_border_fill(if can_be_ai_context {
-                                        self.rook_theme.block_selection_as_context_border_color()
+                                        self.pterm_theme.block_selection_as_context_border_color()
                                     } else {
-                                        self.rook_theme.accent()
+                                        self.pterm_theme.accent()
                                     }),
                             );
                     }
@@ -4024,7 +4024,7 @@ impl Element for BlockListElement {
                         draw_flag_pole(
                             header_origin.min(grid_origin),
                             block_pixel_height,
-                            self.rook_theme.subshell_background(),
+                            self.pterm_theme.subshell_background(),
                             ctx,
                         );
                     }
@@ -4155,7 +4155,7 @@ impl Element for BlockListElement {
                                 None => 0.,
                             },
                             // Otherwise, we need to measure the prompt grid(s). Grids
-                            // aren't rookui::Elements, and hence their width isn't
+                            // aren't ptermui::Elements, and hence their width isn't
                             // straightforward to measure. We'll use the column index of the
                             // right-most non-empty cell as a proxy for width.
                             None => {
@@ -4182,7 +4182,7 @@ impl Element for BlockListElement {
                                     block_menu_rect_origin,
                                     block_menu_rect_size,
                                 ))
-                                .with_background(self.rook_theme.surface_1())
+                                .with_background(self.pterm_theme.surface_1())
                                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
                         } else if prompt_max_x > bookmark_button_origin.x()
                             || prompt_max_x > filter_button_origin.x()
@@ -4209,7 +4209,7 @@ impl Element for BlockListElement {
                                     background_origin,
                                     background_rect_size,
                                 ))
-                                .with_background(self.rook_theme.surface_1())
+                                .with_background(self.pterm_theme.surface_1())
                                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
                         }
                     }
@@ -4274,7 +4274,7 @@ impl Element for BlockListElement {
                         vec2f(self.bounds.unwrap().width(), 1.),
                     ));
                     if self.block_borders_enabled {
-                        rect.with_background(self.rook_theme.outline());
+                        rect.with_background(self.pterm_theme.outline());
                     }
 
                     draw_border_above_block = true;
@@ -4291,13 +4291,13 @@ impl Element for BlockListElement {
                         grid_origin,
                         vec2f(bounds.width(), 1.),
                     ));
-                    border.with_background(self.rook_theme.outline());
+                    border.with_background(self.pterm_theme.outline());
 
                     let rect = ctx.scene.draw_rect_with_hit_recording(RectF::new(
                         grid_origin,
                         vec2f(bounds.width(), *height),
                     ));
-                    rect.with_background(self.rook_theme.restored_blocks_overlay());
+                    rect.with_background(self.pterm_theme.restored_blocks_overlay());
 
                     // Offset the text by the half of the remaining space between the separator height
                     // and the font line height to center it vertically.
@@ -4367,7 +4367,7 @@ impl Element for BlockListElement {
                             .get(view_id)
                             .and_then(|metadata| {
                                 ai_render_context
-                                    .context_color_for_rich_content(metadata, &self.rook_theme)
+                                    .context_color_for_rich_content(metadata, &self.pterm_theme)
                             })
                         {
                             ctx.scene.start_layer(ClipBounds::ActiveLayer);
@@ -4405,11 +4405,11 @@ impl Element for BlockListElement {
                 .borrow()
                 .has_pending_context_selected_text
             {
-                self.rook_theme
+                self.pterm_theme
                     .text_selection_as_context_color()
                     .into_solid()
             } else {
-                self.rook_theme.text_selection_color().into_solid()
+                self.pterm_theme.text_selection_color().into_solid()
             };
 
             for current_range in selection_ranges {
@@ -4858,7 +4858,7 @@ pub fn render_hoverable_block_button<F>(
     should_ignore_mouse_events: bool,
     should_allow_action: bool,
     mouse_state: MouseStateHandle,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     ui_builder: &UiBuilder,
     on_click: F,
 ) -> Box<dyn Element>

@@ -5,17 +5,17 @@ use std::time::Duration;
 
 use chrono::Utc;
 #[cfg(feature = "local_fs")]
-use repo_metadata::Repository;
+use ptermui_core::ModelHandle;
 #[cfg(feature = "local_fs")]
-use rookui_core::ModelHandle;
+use repo_metadata::Repository;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {
         use super::Error as CodebaseIndexError;
         use std::sync::Arc;
-        use rookui_core::ModelContext;
+        use ptermui_core::ModelContext;
         use anyhow::Context;
-        use rook_core::safe_info;
+        use pterm_core::safe_info;
         use super::{store_client::StoreClient, CodebaseIndex, EmbeddingConfig};
     }
 }
@@ -214,8 +214,8 @@ pub(super) fn snapshot_dir() -> Option<PathBuf> {
 
 #[cfg(feature = "local_fs")]
 fn default_snapshot_dir_path() -> PathBuf {
-    rook_core::paths::secure_state_dir()
-        .unwrap_or_else(rook_core::paths::state_dir)
+    pterm_core::paths::secure_state_dir()
+        .unwrap_or_else(pterm_core::paths::state_dir)
         .join(REPO_SNAPSHOT_SUBDIR_NAME)
 }
 /// Constructs a snapshot path given a base directory and the codebase index's root path.
@@ -234,12 +234,12 @@ mod tests;
 #[cfg(feature = "local_fs")]
 pub(super) fn migrate_snapshots_to_secure_dir_if_needed() -> anyhow::Result<()> {
     // Only perform migration if a secure state directory is available.
-    let Some(secure_base) = rook_core::paths::secure_state_dir() else {
+    let Some(secure_base) = pterm_core::paths::secure_state_dir() else {
         return Ok(());
     };
 
     let new_dir = secure_base.join(REPO_SNAPSHOT_SUBDIR_NAME);
-    let old_dir = rook_core::paths::state_dir().join(REPO_SNAPSHOT_SUBDIR_NAME);
+    let old_dir = pterm_core::paths::state_dir().join(REPO_SNAPSHOT_SUBDIR_NAME);
 
     if new_dir == old_dir {
         return Ok(());

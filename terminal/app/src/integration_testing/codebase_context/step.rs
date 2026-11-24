@@ -2,8 +2,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
-use rookui::integration::{AssertionOutcome, StepData, TestStep};
-use rookui::{App, ReadModel, SingletonEntity, UpdateModel, WindowId, async_assert};
+use ptermui::integration::{AssertionOutcome, StepData, TestStep};
+use ptermui::{App, ReadModel, SingletonEntity, UpdateModel, WindowId, async_assert};
 use settings::Setting;
 
 use crate::integration_testing::step::new_step_with_default_assertions;

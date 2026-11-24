@@ -7,7 +7,7 @@ use fuzzy_match::{
     FuzzyMatchResult, contains_wildcards, match_indices_case_insensitive,
     match_wildcard_pattern_case_insensitive,
 };
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {
@@ -20,7 +20,7 @@ cfg_if::cfg_if! {
         use repo_metadata::repositories::DetectedRepositories;
         use std::cell::RefCell;
         use std::collections::HashMap;
-        use rook_util::local_or_remote_path::LocalOrRemotePath;
+        use pterm_util::local_or_remote_path::LocalOrRemotePath;
     }
 }
 
@@ -85,7 +85,7 @@ impl FileSearchModel {
     pub fn repo_root_location(
         &self,
         _app: &AppContext,
-    ) -> Option<rook_util::local_or_remote_path::LocalOrRemotePath> {
+    ) -> Option<pterm_util::local_or_remote_path::LocalOrRemotePath> {
         None
     }
 

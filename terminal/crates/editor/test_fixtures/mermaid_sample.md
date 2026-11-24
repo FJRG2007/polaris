@@ -1,5 +1,5 @@
 # Mermaid Render Test
-This file is meant to exercise a broad variety of Mermaid diagram types in Rook.
+This file is meant to exercise a broad variety of Mermaid diagram types in Polaris Terminal.
 Most of the examples below are adapted from `crates/mermaid_to_svg/samples`.
 
 ## Flowchart: shapes

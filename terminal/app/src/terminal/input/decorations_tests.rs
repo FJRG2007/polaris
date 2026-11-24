@@ -1,6 +1,6 @@
-use rook_completer::completer::SuggestionTypeName;
-use rookui::App;
-use rookui::text_layout::TextStyle;
+use pterm_completer::completer::SuggestionTypeName;
+use ptermui::App;
+use ptermui::text_layout::TextStyle;
 
 use crate::appearance::Appearance;
 use crate::terminal::input::decorations::InputBackgroundJobOptions;
@@ -39,7 +39,7 @@ fn test_decorations_with_multibyte_chars() {
                 .update(ctx, |sessions, _ctx| {
                     // Wait until external commands have been loaded.
                     let session = sessions.get(session_id).expect("session should exist");
-                    rookui::r#async::block_on(session.load_external_commands());
+                    ptermui::r#async::block_on(session.load_external_commands());
                 });
             session_id
         });

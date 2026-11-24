@@ -8,12 +8,12 @@ use markdown_parser::{
     parse_markdown,
 };
 use pathfinder_color::ColorU;
+use pterm_util::content_version::ContentVersion;
+use ptermui_core::elements::ListIndentLevel;
+use ptermui_core::text::point::Point;
+use ptermui_core::{App, AppContext, ModelContext, ModelHandle, ReadModel};
 use rand::SeedableRng;
 use rand::rngs::StdRng;
-use rook_util::content_version::ContentVersion;
-use rookui_core::elements::ListIndentLevel;
-use rookui_core::text::point::Point;
-use rookui_core::{App, AppContext, ModelContext, ModelHandle, ReadModel};
 use serde_yaml::{Mapping, Value};
 use string_offset::{ByteOffset, CharOffset};
 use vec1::{Vec1, vec1};
@@ -3195,8 +3195,7 @@ fn test_inline_markdown_roundtrips() {
 
 #[test]
 fn test_export_markdown_blocks() {
-    let markdown =
-        "A `styled`\n***range** of text* and\n```rook-runnable-command\ncode\nblock\n```\n";
+    let markdown = "A `styled`\n***range** of text* and\n```polaris-terminal-runnable-command\ncode\nblock\n```\n";
     let formatted = parse_markdown(markdown).unwrap();
     assert_eq!(
         Buffer::export_to_markdown(formatted, None, MarkdownStyle::Internal),
@@ -3435,7 +3434,7 @@ fn test_markdown_escapes() {
             // // Punctuation in code blocks should not be escaped.
             assert_eq!(
                 buffer.markdown(),
-                "This is \\*not\\* markdown\n```rook-runnable-command\nThis is $code*!*\n```\n"
+                "This is \\*not\\* markdown\n```polaris-terminal-runnable-command\nThis is $code*!*\n```\n"
             );
         });
 
@@ -3459,8 +3458,7 @@ fn test_markdown_escapes() {
 #[test]
 fn test_import_markdown() {
     App::test((), |mut app| async move {
-        let markdown_string =
-            "test\n```rook-runnable-command\nparagragh\n```\nSome text\nSome ***bold and italic***";
+        let markdown_string = "test\n```polaris-terminal-runnable-command\nparagragh\n```\nSome text\nSome ***bold and italic***";
         let (buffer, _selection) = Buffer::mock_from_markdown(
             markdown_string,
             None,
@@ -3503,7 +3501,7 @@ fn test_import_markdown() {
             assert_eq!(buffer.markdown(), markdown_string);
         });
 
-        let markdown_string = "aaa\n```rook-runnable-command\nafb\n```\n*b**b***\n```rook-runnable-command\nb\nlll\n```\n";
+        let markdown_string = "aaa\n```polaris-terminal-runnable-command\nafb\n```\n*b**b***\n```polaris-terminal-runnable-command\nb\nlll\n```\n";
         let (buffer, _selection) = Buffer::mock_from_markdown(
             markdown_string,
             None,
@@ -3518,7 +3516,7 @@ fn test_import_markdown() {
             assert_eq!(buffer.markdown(), markdown_string);
         });
 
-        let markdown_string = "```rook-runnable-command\ntest\nblock\n```\n";
+        let markdown_string = "```polaris-terminal-runnable-command\ntest\nblock\n```\n";
         let (buffer, _selection) = Buffer::mock_from_markdown(
             markdown_string,
             None,
@@ -3647,8 +3645,8 @@ sh code
 ```rust
 rust code
 ```
-```rook-runnable-command
-rook code
+```polaris-terminal-runnable-command
+polaris-terminal code
 ```"#,
             None,
             Box::new(|_, _| IndentBehavior::Ignore),
@@ -3656,7 +3654,7 @@ rook code
         );
 
         buffer.read(&app, |buffer, _| {
-            assert_eq!(buffer.debug(), "<code:Shell>default code<code:Shell>sh code<code:Rust>rust code<code:Shell>rook code<text>");
+            assert_eq!(buffer.debug(), "<code:Shell>default code<code:Shell>sh code<code:Rust>rust code<code:Shell>polaris-terminal code<text>");
         });
         buffer.read(&app, |buffer, _| {
             selection.read(&app, |selection, _| {
@@ -3673,10 +3671,10 @@ fn test_import_markdown_embedded() {
             r#"```
 default code
 ```
-```rook-embedded-object
+```polaris-terminal-embedded-object
 id: workflow-123
 ```
-```rook-embedded-object
+```polaris-terminal-embedded-object
 id: workflow-123
 type: workflow
 author: kevin
@@ -5290,21 +5288,21 @@ fn test_read_html() {
             assert_eq!(
                 buffer.selected_text_as_html(selection.clone(), ctx),
                 Some(
-                    "<pre><code class=\"language-rook-runnable-command\">Blo</code></pre>".to_string()
+                    "<pre><code class=\"language-polaris-terminal-runnable-command\">Blo</code></pre>".to_string()
                 )
             );
 
             buffer.set_selection(CharOffset::from(4)..CharOffset::from(11), selection.clone(), ctx);
             assert_eq!(
                 buffer.selected_text_as_html(selection.clone(), ctx),
-                Some("<p><strong>ore</strong></p><pre><code class=\"language-rook-runnable-command\">Blo</code></pre>".to_string())
+                Some("<p><strong>ore</strong></p><pre><code class=\"language-polaris-terminal-runnable-command\">Blo</code></pre>".to_string())
             );
 
             buffer.set_selection(CharOffset::from(11)..CharOffset::from(16), selection.clone(), ctx);
             assert_eq!(
                 buffer.selected_text_as_html(selection.clone(), ctx),
                 Some(
-                    "<pre><code class=\"language-rook-runnable-command\">ck</code></pre><p>Af</p>"
+                    "<pre><code class=\"language-polaris-terminal-runnable-command\">ck</code></pre><p>Af</p>"
                         .to_string()
                 )
             );
@@ -5328,7 +5326,7 @@ fn test_read_html() {
             assert_eq!(
                 buffer.selected_text_as_html(selection.clone(), ctx),
                 Some(
-                    "<pre><code class=\"language-rook-runnable-command\">ck</code></pre><h1>After</h1>"
+                    "<pre><code class=\"language-polaris-terminal-runnable-command\">ck</code></pre><h1>After</h1>"
                         .to_string()
                 )
             );
@@ -12894,7 +12892,7 @@ fn test_multiselect_copy_blocks() {
                 buffer.selected_text_as_plain_text(selection.clone(), ctx).as_str(),
                 "Hey\nYo\next\nThis"
             );
-            assert_eq!(buffer.selected_text_as_html(selection.clone(), ctx), Some("<ul><li>Hey</li><li>Yo</li></ul><p>ext</p><pre><code class=\"language-rook-runnable-command\">This</code></pre>".to_string()));
+            assert_eq!(buffer.selected_text_as_html(selection.clone(), ctx), Some("<ul><li>Hey</li><li>Yo</li></ul><p>ext</p><pre><code class=\"language-polaris-terminal-runnable-command\">This</code></pre>".to_string()));
         })
     });
 }
@@ -14304,7 +14302,7 @@ fn test_insert_at_offsets() {
     });
 }
 
-/// Regression test for ROOK-CLIENT-DEV-NYY: panic "Invalid edit range 4042..3982".
+/// Regression test for POLARIS_TERMINAL-CLIENT-DEV-NYY: panic "Invalid edit range 4042..3982".
 ///
 /// Root cause: `fuzzy_match_v4a_diffs` produces `DiffDelta`s with overlapping
 /// `replacement_line_range` values when multiple V4A hunks target the same

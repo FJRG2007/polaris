@@ -137,20 +137,20 @@ pub(crate) async fn run_cli_command_logged(
     }
 }
 
-/// Manages the Rook notification plugin for a specific CLI agent.
+/// Manages the Polaris Terminal notification plugin for a specific CLI agent.
 ///
 /// Each supported CLI agent has its own implementation that knows how to
 /// check installation state and perform install/update operations.
 #[async_trait]
 pub(crate) trait CliAgentPluginManager: Send + Sync {
-    /// The minimum plugin version required by this Rook build.
+    /// The minimum plugin version required by this Polaris Terminal build.
     fn minimum_plugin_version(&self) -> &'static str;
 
     /// Whether this agent supports one-click auto-install/update.
     /// When `false`, the footer always opens the manual instructions modal.
     fn can_auto_install(&self) -> bool;
 
-    /// Whether the Rook notification plugin is installed.
+    /// Whether the Polaris Terminal notification plugin is installed.
     /// Default returns `false` (no filesystem check).
     fn is_installed(&self) -> bool {
         false
@@ -180,7 +180,7 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
     fn has_local_marketplace_override(&self) -> bool {
         false
     }
-    /// Install the Rook notification plugin.
+    /// Install the Polaris Terminal notification plugin.
     /// Default returns an error — only agents with `can_auto_install() == true` should override.
     async fn install(&self) -> Result<(), PluginInstallError> {
         Err(PluginInstallError {
@@ -189,7 +189,7 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
         })
     }
 
-    /// Update the Rook notification plugin to the latest version.
+    /// Update the Polaris Terminal notification plugin to the latest version.
     /// Default returns an error — only agents with `can_auto_install() == true` should override.
     async fn update(&self) -> Result<(), PluginInstallError> {
         Err(PluginInstallError {
@@ -200,12 +200,12 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
 
     /// Toast message shown after a successful auto-install.
     fn install_success_message(&self) -> &'static str {
-        "Rook plugin installed. Please restart the session to activate."
+        "Polaris Terminal plugin installed. Please restart the session to activate."
     }
 
     /// Toast message shown after a successful auto-update.
     fn update_success_message(&self) -> &'static str {
-        "Rook plugin updated. Please restart the session to activate."
+        "Polaris Terminal plugin updated. Please restart the session to activate."
     }
 
     /// Manual installation instructions for the modal UI.
@@ -237,12 +237,12 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
 }
 
 /// Returns a plugin manager for the given CLI agent, or `None` if the agent
-/// doesn't have Rook notification plugin support.
+/// doesn't have Polaris Terminal notification plugin support.
 pub(crate) fn plugin_manager_for(agent: CLIAgent) -> Option<Box<dyn CliAgentPluginManager>> {
     plugin_manager_for_with_shell(agent, None, None, None)
 }
 /// Returns a plugin manager for the given CLI agent, or `None` if the agent
-/// doesn't have Rook notification plugin support.
+/// doesn't have Polaris Terminal notification plugin support.
 ///
 /// When a shell path and type are provided, plugin commands run through that shell.
 /// When `path_env_var` is provided, it is set as the PATH for plugin commands
@@ -302,7 +302,7 @@ pub(crate) fn plugin_manager_for_with_shell(
         | CLIAgent::Goose
         | CLIAgent::Vibe
         | CLIAgent::Antigravity
-        | CLIAgent::RookTui
+        | CLIAgent::PtermTui
         | CLIAgent::Unknown => None,
     }
 }

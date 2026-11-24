@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rookui::AppContext;
+use ptermui::AppContext;
 
 use super::{DisplayMap, DisplayPoint};
 

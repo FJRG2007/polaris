@@ -3,10 +3,10 @@ use std::rc::Rc;
 use std::sync::MutexGuard;
 
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::features::FeatureFlag;
-use rookui::elements::ClippedScrollStateHandle;
-use rookui::units::{IntoLines, IntoPixels, Lines, Pixels};
-use rookui::{AppContext, ModelHandle};
+use pterm_core::features::FeatureFlag;
+use ptermui::elements::ClippedScrollStateHandle;
+use ptermui::units::{IntoLines, IntoPixels, Lines, Pixels};
+use ptermui::{AppContext, ModelHandle};
 use serde::{Deserialize, Serialize};
 use sum_tree::{Cursor, SeekBias};
 

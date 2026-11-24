@@ -260,7 +260,7 @@ ensure_last_sequence_file() {
     [ -f "$path" ] || : >"$path"
 }
 
-# Set by the Rook Rust driver when it owns the parent-bridge listener and
+# Set by the Polaris Terminal Rust driver when it owns the parent-bridge listener and
 # surfaces hook output itself. In that mode the shell hooks should reuse the
 # driver's state directory instead of starting or cleaning up their own
 # listener lifecycle.

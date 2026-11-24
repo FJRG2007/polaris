@@ -1,4 +1,4 @@
-//! Bridge between protocol-level control requests and Rook application models.
+//! Bridge between protocol-level control requests and Polaris Terminal application models.
 //!
 //! The bridge validates protocol version, selectors, credentials, and settings
 //! before routing each supported action to an app-side handler.
@@ -7,7 +7,7 @@ use ::local_control::auth::CredentialGrant;
 use ::local_control::{
     Action, ActionKind, ControlError, ErrorCode, InstanceId, RequestEnvelope, ResponseEnvelope,
 };
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 use crate::local_control::handlers::{
     app_state, close, metadata, metadata_config, settings_surfaces,
@@ -17,7 +17,7 @@ use crate::local_control::permissions::{
 };
 use crate::local_control::resolver::{validate_action_params, validate_action_target};
 
-/// RookUI model that executes already-authenticated local-control actions.
+/// PtermUI model that executes already-authenticated local-control actions.
 pub struct LocalControlBridge {
     instance_id: Option<InstanceId>,
 }
@@ -105,8 +105,8 @@ impl LocalControlBridge {
             | ActionKind::SurfaceCommandSearchOpen
             | ActionKind::SurfaceThemePickerOpen
             | ActionKind::SurfaceKeybindingsOpen
-            | ActionKind::SurfaceRookDriveOpen
-            | ActionKind::SurfaceRookDriveToggle
+            | ActionKind::SurfacePtermDriveOpen
+            | ActionKind::SurfacePtermDriveToggle
             | ActionKind::SurfaceResourceCenterToggle
             | ActionKind::SurfaceAiAssistantToggle
             | ActionKind::SurfaceCodeReviewOpen

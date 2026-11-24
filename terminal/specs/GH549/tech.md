@@ -169,7 +169,7 @@ Language → icon mapping (using existing bundled SVG assets via the `Icon` enum
 | Kotlin | new `Icon::KotlinLang` (`kotlin.svg`) |
 | C#, Java, Ruby, YAML, Lua, Swift, Elixir, Scala, text | `Icon::Code1` fallback |
 
-Add the new variants (`GoLang`, `CppLang`, etc.) to the `Icon` enum in `crates/rook_core/src/ui/icons.rs` with the corresponding SVG paths.
+Add the new variants (`GoLang`, `CppLang`, etc.) to the `Icon` enum in `crates/pterm_core/src/ui/icons.rs` with the corresponding SVG paths.
 
 Also increase the dropdown button width (`set_top_bar_max_width`) and menu width (`set_menu_width`) so language names and icons render without truncation.
 

@@ -1,10 +1,10 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::Element;
-use rookui::elements::{Container, MouseStateHandle};
-use rookui::fonts::Weight;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::Element;
+use ptermui::elements::{Container, MouseStateHandle};
+use ptermui::fonts::Weight;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 
 use super::env_var_collection::{EnvVarCollectionAction, EnvVarCollectionView};
 use crate::ui_components::dialog::{Dialog, dialog_styles};

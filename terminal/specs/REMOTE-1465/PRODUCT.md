@@ -36,7 +36,7 @@ After a cloud → cloud handoff, the next execution never sees those files, so a
    - The run was started with `--no-snapshot`.
    In these cases, no declarations are written and no file-edit observations have any user-visible effect.
 
-10. The hook only runs for the Rook Oz SDK driver. Third-party harnesses (e.g. Claude Code) do not participate in this mechanism; their file writes go through their own tools and are not observed (this can and will be fixed in follow-up PRs, using each agent's hook system to track file edits).
+10. The hook only runs for the Polaris Terminal Oz SDK driver. Third-party harnesses (e.g. Claude Code) do not participate in this mechanism; their file writes go through their own tools and are not observed (this can and will be fixed in follow-up PRs, using each agent's hook system to track file edits).
 
 11. Writer failures (declarations file not writable, path normalization error, file system I/O error) are logged at WARN level and absorbed. The agent run, the current tool call, and the end-of-run snapshot upload all continue as if no file entry were recorded for that call.
 

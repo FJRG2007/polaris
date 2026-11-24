@@ -8,7 +8,7 @@ Define the expected user-facing behavior for dragging tabs within a window, deta
 
 Tab drag-and-drop crosses several user-visible states: in-window reordering, detach into a standalone window, attach into an existing window, continued dragging after attach, and final drop. If any transition behaves inconsistently the interaction feels broken: tabs can appear duplicated, windows can flash transparent, close-confirmation dialogs can appear during harmless transfers, or the drag can feel like it unexpectedly ends mid-gesture.
 
-Rook needs one coherent product definition for this interaction so implementers and reviewers can preserve the same mental model across all drag states. From the user's perspective, dragging a tab should feel like one uninterrupted gesture even when the tab changes windows multiple times before mouse-up.
+Polaris Terminal needs one coherent product definition for this interaction so implementers and reviewers can preserve the same mental model across all drag states. From the user's perspective, dragging a tab should feel like one uninterrupted gesture even when the tab changes windows multiple times before mouse-up.
 
 ## Goals
 
@@ -100,7 +100,7 @@ Once a dragged tab is attached into a target window (or into the source window's
 
 ### No close confirmation during transfer
 
-If a window closes as part of the tab drag lifecycle, Rook must not show the "Close window?" confirmation dialog during that transfer. This applies when:
+If a window closes as part of the tab drag lifecycle, Polaris Terminal must not show the "Close window?" confirmation dialog during that transfer. This applies when:
 
 - a source window loses its last tab
 - a temporary preview or transfer window is cleaned up after a handoff
@@ -157,7 +157,7 @@ While any tab drag is in progress, hover-only overlays inside tabs must not appe
 6. After an attach, the user can keep dragging without releasing and can reorder, detach, or attach the same tab again in one continuous gesture.
 7. After a successful drop into a target tab bar, that target window now hosts the real tab in the final position; the floating chip and insertion slot disappear with no visible jump.
 8. Hovering over a target window's tab bar with the drag in progress does not visibly slow the target window (no terminal lag, no animation hitches) — the visual feedback is rendered by the target without involving the dragged tab's pane group.
-9. During tab transfer, Rook never shows a close-confirmation dialog for windows that close only because the tab changed host windows.
+9. During tab transfer, Polaris Terminal never shows a close-confirmation dialog for windows that close only because the tab changed host windows.
 10. Single-tab-origin drags behave continuously across attach and detach cycles without interruption or duplicate windows.
 11. No hover-only tab overlays appear while a drag is active.
 12. Drop targeting respects z-order: an occluded window cannot receive the drop through a window in front of it.

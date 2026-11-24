@@ -12,26 +12,24 @@ use itertools::Itertools;
 use num_traits::SaturatingSub;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rand::Rng;
-use rand::distributions::Alphanumeric;
-use rook_core::channel::{Channel, ChannelState};
-use rook_core::features::FeatureFlag;
-use rook_core::ui::theme::color::internal_colors;
-use rook_core::{SessionId, safe_error, safe_info};
-use rook_editor::content::buffer::{AutoScrollBehavior, InitialBufferState, SelectionOffsets};
-use rook_editor::model::CoreEditorModel;
-use rook_editor::render::element::VerticalExpansionBehavior;
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_core::{SessionId, safe_error, safe_info};
+use pterm_editor::content::buffer::{AutoScrollBehavior, InitialBufferState, SelectionOffsets};
+use pterm_editor::model::CoreEditorModel;
+use pterm_editor::render::element::VerticalExpansionBehavior;
 #[cfg(not(target_family = "wasm"))]
-use rook_editor::render::model::AutoScrollMode;
-use rook_editor::render::model::LineCount;
-use rook_util::content_version::ContentVersion;
-use rook_util::path::LineAndColumnArg;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::new_scrollable::{
+use pterm_editor::render::model::AutoScrollMode;
+use pterm_editor::render::model::LineCount;
+use pterm_util::content_version::ContentVersion;
+use pterm_util::path::LineAndColumnArg;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::new_scrollable::{
     NewScrollable, NewScrollableElement, ScrollableAppearance, SingleAxisConfig,
 };
-use rookui::elements::{
+use ptermui::elements::{
     Align, Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, DEFAULT_UI_LINE_HEIGHT_RATIO, DispatchEventResult,
     DragBarSide, Element, Empty, EventHandler, Flex, Hoverable, List, ListState, MainAxisAlignment,
@@ -40,17 +38,19 @@ use rookui::elements::{
     Rect, Resizable, ResizableStateHandle, SavePosition, ScrollOffset, ScrollStateHandle,
     ScrollbarWidth, Shrinkable, Stack, Text, resizable_state_handle,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::Keystroke;
-use rookui::platform::Cursor;
-use rookui::text_layout::{ClipConfig, default_compute_baseline_position};
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::units::Pixels;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::Keystroke;
+use ptermui::platform::Cursor;
+use ptermui::text_layout::{ClipConfig, default_compute_baseline_position};
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::units::Pixels;
+use ptermui::{
     AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle, WindowId,
 };
+use rand::Rng;
+use rand::distributions::Alphanumeric;
 use string_offset::CharOffset;
 use vec1::Vec1;
 
@@ -127,7 +127,7 @@ use crate::terminal::cli_agent::{
 };
 use crate::terminal::input::MenuPositioning;
 use crate::terminal::view::{CliAgentRouting, InitProjectModel, TerminalAction, TerminalView};
-use crate::themes::theme::RookTheme;
+use crate::themes::theme::PtermTheme;
 use crate::ui_components::blended_colors::{neutral_2, neutral_3};
 use crate::ui_components::buttons::icon_button_with_color;
 use crate::ui_components::dialog::{Dialog, dialog_styles};
@@ -184,7 +184,7 @@ pub fn render_file_navigation_button<F>(
     on_click: F,
 ) -> Box<dyn Element>
 where
-    F: Fn(&mut rookui::EventContext<'_>) + 'static,
+    F: Fn(&mut ptermui::EventContext<'_>) + 'static,
 {
     let ui_builder = appearance.ui_builder().clone();
     let icon_color = appearance
@@ -211,9 +211,9 @@ where
             .build()
             .finish()
     })
-    .with_tooltip_position(rookui::ui_components::button::ButtonTooltipPosition::BelowLeft)
+    .with_tooltip_position(ptermui::ui_components::button::ButtonTooltipPosition::BelowLeft)
     .build()
-    .on_click(move |ctx: &mut rookui::EventContext<'_>, _, _| {
+    .on_click(move |ctx: &mut ptermui::EventContext<'_>, _, _| {
         on_click(ctx);
     });
 
@@ -888,7 +888,7 @@ impl CodeReviewView {
             .map(|p| p.to_path_buf())
             .or_else(|| {
                 repo_metadata::repositories::DetectedRepositories::as_ref(ctx)
-                    .get_root_for_path(&rook_util::local_or_remote_path::LocalOrRemotePath::Local(
+                    .get_root_for_path(&pterm_util::local_or_remote_path::LocalOrRemotePath::Local(
                         path.to_path_buf(),
                     ))
                     .and_then(|r| r.to_local_path().map(std::path::Path::to_path_buf))
@@ -933,7 +933,7 @@ impl CodeReviewView {
             .map(|p| p.to_path_buf())
             .or_else(|| {
                 repo_metadata::repositories::DetectedRepositories::as_ref(ctx)
-                    .get_root_for_path(&rook_util::local_or_remote_path::LocalOrRemotePath::Local(
+                    .get_root_for_path(&pterm_util::local_or_remote_path::LocalOrRemotePath::Local(
                         path.to_path_buf(),
                     ))
                     .and_then(|r| r.to_local_path().map(std::path::Path::to_path_buf))
@@ -1297,7 +1297,7 @@ impl CodeReviewView {
         let init_project_button = ctx.add_typed_action_view(|_ctx| {
             ActionButton::new("Initialize codebase", NakedTheme)
                 .with_size(ButtonSize::Small)
-                .with_tooltip("Enables codebase indexing and ROOK.md")
+                .with_tooltip("Enables codebase indexing and POLARIS_TERMINAL.md")
                 .with_tooltip_alignment(TooltipAlignment::Center)
                 .on_click(|ctx| {
                     ctx.dispatch_typed_action(CodeReviewAction::InitProjectForCurrentDirectory)
@@ -3687,7 +3687,7 @@ impl CodeReviewView {
 
         let header_text = "Loading open changes...";
         let loading_icon = Icon::Loading
-            .to_rookui_icon(rook_core::ui::theme::Fill::Solid(
+            .to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(
                 internal_colors::neutral_6(theme),
             ))
             .finish();
@@ -3825,7 +3825,7 @@ impl CodeReviewView {
                 Container::new(
                     ConstrainedBox::new(
                         Icon::AlertTriangle
-                            .to_rookui_icon(rook_core::ui::theme::Fill::Solid(
+                            .to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(
                                 internal_colors::neutral_6(theme),
                             ))
                             .finish(),
@@ -3883,7 +3883,7 @@ impl CodeReviewView {
                         .with_text_and_icon_label(TextAndIcon::new(
                             TextAndIconAlignment::IconFirst,
                             " Retry".to_string(),
-                            Icon::Refresh.to_rookui_icon(rook_core::ui::theme::Fill::Solid(
+                            Icon::Refresh.to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(
                                 theme.main_text_color(theme.background()).into(),
                             )),
                             MainAxisSize::Min,
@@ -3933,7 +3933,7 @@ impl CodeReviewView {
                 Container::new(
                     ConstrainedBox::new(
                         Icon::FolderClosed
-                            .to_rookui_icon(rook_core::ui::theme::Fill::Solid(
+                            .to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(
                                 internal_colors::neutral_6(theme),
                             ))
                             .finish(),
@@ -4010,7 +4010,7 @@ impl CodeReviewView {
         state: &LoadedState,
         appearance: &Appearance,
         is_in_split_pane: bool,
-        app: &rookui::AppContext,
+        app: &ptermui::AppContext,
     ) -> Box<dyn Element> {
         let top_section = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
@@ -4075,7 +4075,7 @@ impl CodeReviewView {
                 Container::new(
                     ConstrainedBox::new(
                         Icon::Diff
-                            .to_rookui_icon(rook_core::ui::theme::Fill::Solid(
+                            .to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(
                                 internal_colors::neutral_6(theme),
                             ))
                             .finish(),
@@ -4410,7 +4410,7 @@ impl CodeReviewView {
 
         // Add file icon
         let file_icon = Icon::File
-            .to_rookui_icon(rook_core::ui::theme::Fill::Solid(
+            .to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(
                 internal_colors::neutral_6(theme),
             ))
             .finish();
@@ -4434,7 +4434,7 @@ impl CodeReviewView {
                     appearance.ui_font_size(),
                 )
                 .with_color(
-                    rook_core::ui::theme::Fill::Solid(internal_colors::neutral_6(theme)).into(),
+                    pterm_core::ui::theme::Fill::Solid(internal_colors::neutral_6(theme)).into(),
                 )
                 .with_line_height_ratio(appearance.line_height_ratio())
                 .with_style(Properties::default().weight(Weight::Semibold))
@@ -4458,7 +4458,7 @@ impl CodeReviewView {
                 )
                 .with_style(Properties::default().weight(Weight::Bold))
                 .with_color(
-                    rook_core::ui::theme::Fill::Solid(internal_colors::neutral_6(theme)).into(),
+                    pterm_core::ui::theme::Fill::Solid(internal_colors::neutral_6(theme)).into(),
                 )
                 .finish(),
             )
@@ -4513,7 +4513,7 @@ impl CodeReviewView {
             axis_config,
             appearance.theme().nonactive_ui_detail().into(),
             appearance.theme().active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .with_vertical_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Auto, false))
         .with_propagate_mousewheel_if_not_handled(true)
@@ -4572,7 +4572,7 @@ impl CodeReviewView {
                         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
 
                     if mouse_state.is_hovered() {
-                        container = container.with_background(rook_core::ui::theme::Fill::Solid(
+                        container = container.with_background(pterm_core::ui::theme::Fill::Solid(
                             internal_colors::neutral_3(appearance.theme()),
                         ))
                     }
@@ -4593,7 +4593,7 @@ impl CodeReviewView {
             },
             appearance.theme().nonactive_ui_detail().into(),
             appearance.theme().active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .with_vertical_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Auto, false))
         .finish();
@@ -4850,9 +4850,9 @@ impl CodeReviewView {
                     // We effectively make this an absolutely positioned header.
                     OffsetPositioning::offset_from_parent(
                         vec2f(0., scroll_offset_from_top.offset_from_start().as_f32()),
-                        rookui::elements::ParentOffsetBounds::ParentByPosition,
-                        rookui::elements::ParentAnchor::TopMiddle,
-                        rookui::elements::ChildAnchor::TopMiddle,
+                        ptermui::elements::ParentOffsetBounds::ParentByPosition,
+                        ptermui::elements::ParentAnchor::TopMiddle,
+                        ptermui::elements::ChildAnchor::TopMiddle,
                     ),
                 );
             }
@@ -5150,7 +5150,7 @@ impl CodeReviewView {
                     Text::new("•", appearance.ui_font_family(), appearance.ui_font_size())
                         .with_style(Properties::default().weight(Weight::Bold))
                         .with_color(
-                            rook_core::ui::theme::Fill::Solid(internal_colors::neutral_6(
+                            pterm_core::ui::theme::Fill::Solid(internal_colors::neutral_6(
                                 appearance.theme(),
                             ))
                             .into(),
@@ -5178,7 +5178,7 @@ impl CodeReviewView {
             .with_horizontal_padding(8.)
             .with_vertical_padding(4.)
             .with_border(
-                Border::all(1.).with_border_fill(rook_core::ui::theme::Fill::Solid(
+                Border::all(1.).with_border_fill(pterm_core::ui::theme::Fill::Solid(
                     internal_colors::neutral_4(appearance.theme()),
                 )),
             )
@@ -5187,7 +5187,7 @@ impl CodeReviewView {
 
     fn styled_file_content_container(
         content: Box<dyn Element>,
-        theme: &RookTheme,
+        theme: &PtermTheme,
     ) -> Box<dyn Element> {
         Container::new(
             Flex::row()
@@ -5475,7 +5475,7 @@ impl CodeReviewView {
             },
             appearance.theme().nonactive_ui_detail().into(),
             appearance.theme().active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .with_vertical_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Auto, false))
         .finish();
@@ -6024,7 +6024,7 @@ impl CodeReviewView {
     fn insert_diff_hunk_as_context(
         &mut self,
         file_path: String,
-        line_range: Range<rook_editor::render::model::LineCount>,
+        line_range: Range<pterm_editor::render::model::LineCount>,
         ctx: &mut ViewContext<Self>,
     ) {
         let Some(repo_path) = self.repo_path().map(LocalOrRemotePath::path_component) else {
@@ -6190,7 +6190,7 @@ impl CodeReviewView {
     fn extract_diff_hunk_data(
         &self,
         repo_relative_path: &str,
-        line_range: &Range<rook_editor::render::model::LineCount>,
+        line_range: &Range<pterm_editor::render::model::LineCount>,
     ) -> Option<(DiffHunk, u32, u32)> {
         if let CodeReviewViewState::Loaded(state) = self.state() {
             // Find the file state that matches the given file path
@@ -6337,7 +6337,7 @@ impl CodeReviewView {
     fn restore_cursor_position(
         editor: &CodeEditorView,
         selections: Vec<SelectionOffsets>,
-        ctx: &mut rookui::ViewContext<CodeEditorView>,
+        ctx: &mut ptermui::ViewContext<CodeEditorView>,
     ) {
         if let Ok(selections_vec1) = Vec1::try_from_vec(selections) {
             editor.model.update(ctx, |model, ctx| {
@@ -7150,7 +7150,7 @@ impl View for CodeReviewView {
         "CodeReviewView"
     }
 
-    fn keymap_context(&self, ctx: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, ctx: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         // Suppress pane-level shortcuts (e.g. `F`) when a descendant text editor
@@ -7679,7 +7679,7 @@ impl BackingView for CodeReviewView {
                     target_os = "windows"
                 )
             )) {
-                // Find the workspace to show the Rook-native modal
+                // Find the workspace to show the Polaris Terminal-native modal
                 if let Some(workspace) = ctx
                     .views_of_type::<Workspace>(ctx.window_id())
                     .and_then(|workspaces| workspaces.first().cloned())
@@ -7751,7 +7751,7 @@ mod code_review_view_integration;
 
 #[cfg(feature = "integration_tests")]
 pub use code_review_view_integration::CodeReviewVisibleAnchorForTest;
-use rook_errors::report_error;
+use pterm_errors::report_error;
 
 #[cfg(test)]
 #[path = "code_review_view_tests.rs"]

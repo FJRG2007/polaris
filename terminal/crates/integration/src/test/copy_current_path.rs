@@ -1,13 +1,13 @@
+use polaris_terminal::integration_testing::clipboard::assert_clipboard_contains_string;
+use polaris_terminal::integration_testing::command_palette::open_command_palette_and_run_action;
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::tab::assert_pane_title;
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::integration_testing::view_getters::{pane_group_view, workspace_view};
+use polaris_terminal::workspace::WorkspaceAction;
+use ptermui_core::integration::{AssertionOutcome, TestStep};
+use ptermui_core::{App, async_assert_eq};
 use regex::Regex;
-use rook::integration_testing::clipboard::assert_clipboard_contains_string;
-use rook::integration_testing::command_palette::open_command_palette_and_run_action;
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::tab::assert_pane_title;
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use rook::integration_testing::view_getters::{pane_group_view, workspace_view};
-use rook::workspace::WorkspaceAction;
-use rookui_core::integration::{AssertionOutcome, TestStep};
-use rookui_core::{App, async_assert_eq};
 
 use super::{Builder, new_builder};
 use crate::util::write_all_rc_files_for_test;

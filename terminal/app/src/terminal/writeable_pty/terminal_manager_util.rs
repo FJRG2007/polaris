@@ -3,7 +3,7 @@ use std::sync::mpsc::SyncSender;
 
 use async_channel::Receiver;
 use parking_lot::FairMutex;
-use rookui::{AppContext, Entity, ModelHandle, ViewHandle};
+use ptermui::{AppContext, Entity, ModelHandle, ViewHandle};
 
 use crate::persistence::ModelEvent;
 use crate::terminal::line_editor_status::LineEditorStatus;

@@ -8,14 +8,14 @@ use ai::skills::{
 };
 use async_channel::Sender;
 use futures::future::BoxFuture;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::repository::{Repository, SubscriberId};
 use repo_metadata::{
     DirectoryWatcher, RepoMetadataModel, RepositoryIdentifier, RepositoryUpdate,
     RepositoryWatchMode,
 };
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 use watcher::{BulkFilesystemWatcherEvent, HomeDirectoryWatcher, HomeDirectoryWatcherEvent};
 
 use super::subscribers::{
@@ -29,9 +29,9 @@ use super::utils::{
 use crate::ai::remote_context_files::{
     REMOTE_CONTEXT_MAX_BATCH_BYTES, REMOTE_CONTEXT_MAX_FILE_BYTES, read_remote_text_file_contents,
 };
-use crate::rook_managed_paths_watcher::{
-    RookManagedPathsWatcher, RookManagedPathsWatcherEvent, filter_repository_update_by_prefix,
-    rook_managed_skill_dirs,
+use crate::pterm_managed_paths_watcher::{
+    PtermManagedPathsWatcher, PtermManagedPathsWatcherEvent, filter_repository_update_by_prefix,
+    pterm_managed_skill_dirs,
 };
 
 #[derive(Debug, PartialEq)]
@@ -136,9 +136,9 @@ impl SkillWatcher {
                 }
             });
             ctx.subscribe_to_model(
-                &RookManagedPathsWatcher::handle(ctx),
+                &PtermManagedPathsWatcher::handle(ctx),
                 |me, _, event, ctx| {
-                    me.handle_rook_managed_paths_event(event, ctx);
+                    me.handle_pterm_managed_paths_event(event, ctx);
                 },
             );
         }
@@ -158,10 +158,10 @@ impl SkillWatcher {
         // We use a separate HomeDirectoryWatcher to detect when those are created and start watching them after they are created.
         let mut home_provider_watchers = HashMap::new();
         if let Some(home_path) = home_dir {
-            Self::spawn_read_skills_from_directories(rook_managed_skill_dirs(), ctx);
+            Self::spawn_read_skills_from_directories(pterm_managed_skill_dirs(), ctx);
             let skills_parent_paths: HashSet<PathBuf> = SKILL_PROVIDER_DEFINITIONS
                 .iter()
-                .filter(|provider| provider.provider != SkillProvider::Rook)
+                .filter(|provider| provider.provider != SkillProvider::Pterm)
                 .filter_map(|provider| {
                     home_skills_path(provider.provider)
                         .and_then(|skills_path| skills_path.parent().map(Path::to_path_buf))
@@ -754,7 +754,7 @@ impl SkillWatcher {
             }
 
             let Ok(std_dir_path) =
-                rook_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
                     &canonical_dir,
                 )
             else {
@@ -895,7 +895,7 @@ impl SkillWatcher {
 
         let provider_root_paths: HashSet<String> = SKILL_PROVIDER_DEFINITIONS
             .iter()
-            .filter(|provider| provider.provider != SkillProvider::Rook)
+            .filter(|provider| provider.provider != SkillProvider::Pterm)
             .filter_map(|provider| {
                 let component = provider.skills_path.components().next();
                 component.map(|component| component.as_os_str().to_string_lossy().to_string())
@@ -980,13 +980,13 @@ impl SkillWatcher {
         }
     }
 
-    fn handle_rook_managed_paths_event(
+    fn handle_pterm_managed_paths_event(
         &mut self,
-        event: &RookManagedPathsWatcherEvent,
+        event: &PtermManagedPathsWatcherEvent,
         ctx: &mut ModelContext<Self>,
     ) {
-        let RookManagedPathsWatcherEvent::FilesChanged(update) = event;
-        for skill_dir in rook_managed_skill_dirs() {
+        let PtermManagedPathsWatcherEvent::FilesChanged(update) = event;
+        for skill_dir in pterm_managed_skill_dirs() {
             if let Some(filtered_update) = filter_repository_update_by_prefix(update, &skill_dir) {
                 self.handle_repository_update(&filtered_update, ctx);
             }
@@ -1003,7 +1003,7 @@ impl SkillWatcher {
         ctx: &mut ModelContext<Self>,
     ) {
         let Ok(std_path) =
-            rook_util::standardized_path::StandardizedPath::from_local_canonicalized(path)
+            pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(path)
         else {
             return;
         };

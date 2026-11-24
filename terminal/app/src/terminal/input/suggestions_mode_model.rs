@@ -1,4 +1,4 @@
-use rookui::{Entity, ModelContext, ModelHandle};
+use ptermui::{Entity, ModelContext, ModelHandle};
 
 use super::{BufferState, DynamicEnumSuggestionStatus, InputConfig, InputSuggestionsMode};
 use crate::ai::agent::conversation::AIConversationId;

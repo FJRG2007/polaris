@@ -1,13 +1,13 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::Fill;
-use rook_errors::report_error;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use pterm_errors::report_error;
+use ptermui::elements::{
     Align, ChildAnchor, ChildView, Container, OffsetPositioning, ParentAnchor, ParentOffsetBounds,
     Stack,
 };
-use rookui::keymap::{FixedBinding, Keystroke};
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::keymap::{FixedBinding, Keystroke};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -19,7 +19,7 @@ use crate::view_components::action_button::{
 };
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -41,7 +41,7 @@ const DIALOG_WIDTH: f32 = 460.;
 pub struct DeleteConversationDialogSource {
     pub conversation_id: AIConversationId,
     pub conversation_title: String,
-    pub terminal_view_id: Option<rookui::EntityId>,
+    pub terminal_view_id: Option<ptermui::EntityId>,
 }
 
 pub struct DeleteConversationConfirmationDialog {
@@ -88,7 +88,7 @@ impl View for DeleteConversationConfirmationDialog {
         "DeleteConversationConfirmationDialog"
     }
 
-    fn on_focus(&mut self, _focus_ctx: &rookui::FocusContext, ctx: &mut ViewContext<Self>) {
+    fn on_focus(&mut self, _focus_ctx: &ptermui::FocusContext, ctx: &mut ViewContext<Self>) {
         ctx.focus_self();
     }
 

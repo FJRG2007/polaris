@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use futures::future::Either;
 use instant::Instant;
-use rook_errors::{AnyhowErrorExt as _, report_error};
-use rookui::r#async::Timer;
+use pterm_errors::{AnyhowErrorExt as _, report_error};
+use ptermui::r#async::Timer;
 
 use crate::server::retry_strategies::{is_auth_error, is_transient_http_error};
 use crate::server::server_api::ServerApi;

@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::ParentElement;
-use rookui::prelude::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::ParentElement;
+use ptermui::prelude::{
     ConstrainedBox, Container, CrossAxisAlignment, Cursor, Flex, Hoverable, MouseStateHandle, Text,
 };
-use rookui::{
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
@@ -197,7 +197,7 @@ impl View for CloudModeSetupTextBlock {
                 .with_child(
                     Container::new(
                         ConstrainedBox::new(
-                            chevron_icon.to_rookui_icon(text_color.into()).finish(),
+                            chevron_icon.to_ptermui_icon(text_color.into()).finish(),
                         )
                         .with_width(icon_size)
                         .with_height(icon_size)

@@ -3,9 +3,9 @@ use std::pin::Pin;
 use ai::skills::{ParsedSkill, SKILL_PROVIDER_DEFINITIONS, read_skills};
 use async_channel::Sender;
 use futures::Future;
+use ptermui::ModelContext;
 use repo_metadata::repository::RepositorySubscriber;
 use repo_metadata::{Repository, RepositoryUpdate};
-use rookui::ModelContext;
 
 /// Messages sent from [`RepositorySubscriber`]s to [`SkillManager`].
 pub enum SkillRepositoryMessage {

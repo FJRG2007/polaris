@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use rookui_core::AppContext;
-use rookui_core::geometry::vector::{Vector2F, vec2f};
-use rookui_core::text_layout::{LayoutCache, Line};
+use ptermui_core::AppContext;
+use ptermui_core::geometry::vector::{Vector2F, vec2f};
+use ptermui_core::text_layout::{LayoutCache, Line};
 
 use super::{CursorData, RenderContext};
 use crate::content::text::BufferBlockStyle;

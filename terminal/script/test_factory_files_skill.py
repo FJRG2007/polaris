@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Behavioral and packaging checks for the bundled factory-files skill.
 
-The skill no longer carries a copy of the Factory file format. rook-server owns
+The skill no longer carries a copy of the Factory file format. polaris-terminal-server owns
 the format and decides whether a tree is valid, so there is nothing here that
 asserts which documents the format accepts - those cases live beside the parser
-in rook-server (logic/factoryfile).
+in polaris-terminal-server (logic/factoryfile).
 
 What is left to check is everything the client is still responsible for:
 
@@ -41,14 +41,14 @@ EXIT_VALID = 0
 EXIT_DIAGNOSTICS = 1
 EXIT_NOT_VALIDATED = 2
 
-DISCLOSURE = "Validated with the rook-server parser"
+DISCLOSURE = "Validated with the polaris-terminal-server parser"
 NOT_VALIDATED = "was NOT validated"
 
 FACTORY = """schemaVersion: v1alpha1
 name: demo
 repositories:
   - owner: warpdotdev
-    name: rook
+    name: polaris-terminal
 agentDefaults:
   model: auto
 """
@@ -59,7 +59,7 @@ CLEAN_RESPONSE = {"schema_version": "v1alpha1", "valid": True, "diagnostics": []
 
 
 class _FakeServer:
-    """A rook-server stand-in.
+    """A polaris-terminal-server stand-in.
 
     Records what the validator submitted so a test can assert the tree it sent,
     not just the verdict it printed.
@@ -128,7 +128,7 @@ def fake_server(
         thread.join(timeout=5)
 
 
-SERVER_ROOT_VARIABLES = ("ROOK_SERVER_ROOT", "ROOK_SERVER_ROOT_URL")
+SERVER_ROOT_VARIABLES = ("POLARIS_TERMINAL_SERVER_ROOT", "POLARIS_TERMINAL_SERVER_ROOT_URL")
 
 
 def run_validator(
@@ -151,11 +151,11 @@ def run_validator(
             "variable in extra_env; otherwise the validator reaches production"
         )
     environment = os.environ.copy()
-    environment.pop("ROOK_API_KEY", None)
+    environment.pop("POLARIS_TERMINAL_API_KEY", None)
     for variable in SERVER_ROOT_VARIABLES:
         environment.pop(variable, None)
     if api_key:
-        environment["ROOK_API_KEY"] = api_key
+        environment["POLARIS_TERMINAL_API_KEY"] = api_key
     if extra_env:
         environment.update(extra_env)
     args = [sys.executable, str(VALIDATOR), str(root)]
@@ -353,7 +353,7 @@ def assert_credentials_are_optional_but_forwarded() -> None:
     """The endpoint needs no key; one is forwarded when the environment has it.
 
     Requiring a key would disable validation for local authoring agents, whose
-    shell cannot see the Rook client's session.
+    shell cannot see the Polaris Terminal client's session.
     """
     with factory_tree() as root:
         with fake_server(CLEAN_RESPONSE) as server:
@@ -372,7 +372,7 @@ def assert_credentials_are_optional_but_forwarded() -> None:
 
 
 def assert_401_is_retried_without_the_credential() -> None:
-    """A stale or mismatched ROOK_API_KEY must not be able to block validation.
+    """A stale or mismatched POLARIS_TERMINAL_API_KEY must not be able to block validation.
 
     The endpoint needs no credential. When a forwarded key draws a 401 or 403,
     the request is retried once, without it, before giving up. The drop is
@@ -389,7 +389,7 @@ def assert_401_is_retried_without_the_credential() -> None:
                 )
             if server.authorization():
                 raise RuntimeError("the retry still carried an Authorization header")
-            if "ROOK_API_KEY was rejected" not in result.stderr:
+            if "POLARIS_TERMINAL_API_KEY was rejected" not in result.stderr:
                 raise RuntimeError(f"the dropped credential was not reported: {result.stderr!r}")
             if DISCLOSURE not in result.stdout:
                 raise RuntimeError("the note displaced the verdict the agent must repeat")
@@ -420,31 +420,31 @@ def assert_401_is_retried_without_the_credential() -> None:
 
 
 def assert_server_root_falls_back_to_the_sandbox_url() -> None:
-    """ROOK_SERVER_ROOT_URL is used when ROOK_SERVER_ROOT is unset.
+    """POLARIS_TERMINAL_SERVER_ROOT_URL is used when POLARIS_TERMINAL_SERVER_ROOT is unset.
 
     An Oz sandbox exports the server root under this name, not the older
-    ROOK_SERVER_ROOT. Without this fallback the validator silently targets
+    POLARIS_TERMINAL_SERVER_ROOT. Without this fallback the validator silently targets
     production instead of the server the sandbox actually belongs to.
     """
     with factory_tree() as root:
         with fake_server(CLEAN_RESPONSE) as server:
-            result = run_validator(root, extra_env={"ROOK_SERVER_ROOT_URL": server.url})
+            result = run_validator(root, extra_env={"POLARIS_TERMINAL_SERVER_ROOT_URL": server.url})
         if result.returncode != EXIT_VALID:
             raise RuntimeError(
-                f"ROOK_SERVER_ROOT_URL was not honored: {result.stdout}{result.stderr}"
+                f"POLARIS_TERMINAL_SERVER_ROOT_URL was not honored: {result.stdout}{result.stderr}"
             )
 
-        # ROOK_SERVER_ROOT still wins when both are set.
+        # POLARIS_TERMINAL_SERVER_ROOT still wins when both are set.
         with fake_server(CLEAN_RESPONSE) as server:
             result = run_validator(
                 root,
                 extra_env={
-                    "ROOK_SERVER_ROOT": server.url,
-                    "ROOK_SERVER_ROOT_URL": "http://127.0.0.1:9",
+                    "POLARIS_TERMINAL_SERVER_ROOT": server.url,
+                    "POLARIS_TERMINAL_SERVER_ROOT_URL": "http://127.0.0.1:9",
                 },
             )
         if result.returncode != EXIT_VALID:
-            raise RuntimeError("ROOK_SERVER_ROOT should take precedence over ROOK_SERVER_ROOT_URL")
+            raise RuntimeError("POLARIS_TERMINAL_SERVER_ROOT should take precedence over POLARIS_TERMINAL_SERVER_ROOT_URL")
 
         # --server-root still wins over both environment variables.
         with fake_server(CLEAN_RESPONSE) as server:
@@ -452,8 +452,8 @@ def assert_server_root_falls_back_to_the_sandbox_url() -> None:
                 root,
                 server.url,
                 extra_env={
-                    "ROOK_SERVER_ROOT": "http://127.0.0.1:9",
-                    "ROOK_SERVER_ROOT_URL": "http://127.0.0.1:9",
+                    "POLARIS_TERMINAL_SERVER_ROOT": "http://127.0.0.1:9",
+                    "POLARIS_TERMINAL_SERVER_ROOT_URL": "http://127.0.0.1:9",
                 },
             )
         if result.returncode != EXIT_VALID:
@@ -548,7 +548,7 @@ def assert_json_output_never_implies_a_verdict() -> None:
 def assert_no_format_copy_remains() -> None:
     """The skill must not regrow a local copy of the Factory file format.
 
-    A bundled copy ships inside a Rook release and goes stale against the
+    A bundled copy ships inside a Polaris Terminal release and goes stale against the
     server, which is what produced confidently wrong diagnostics before. If a
     future change needs the format, fetch it from the server.
     """
@@ -603,7 +603,7 @@ CHECKS = (
     ("credentials are optional but forwarded", assert_credentials_are_optional_but_forwarded),
     ("a 401/403 is retried without the credential", assert_401_is_retried_without_the_credential),
     (
-        "ROOK_SERVER_ROOT_URL is a fallback server root",
+        "POLARIS_TERMINAL_SERVER_ROOT_URL is a fallback server root",
         assert_server_root_falls_back_to_the_sandbox_url,
     ),
     ("symlinked resources are refused", assert_symlinked_resources_are_refused),

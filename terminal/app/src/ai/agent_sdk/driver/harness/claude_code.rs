@@ -7,10 +7,10 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use parking_lot::Mutex;
-use rook_cli::agent::Harness;
-use rook_core::safe_info;
-use rook_managed_secrets::ManagedSecretValue;
-use rookui::{ModelHandle, ModelSpawner};
+use pterm_cli::agent::Harness;
+use pterm_core::safe_info;
+use pterm_managed_secrets::ManagedSecretValue;
+use ptermui::{ModelHandle, ModelSpawner};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tempfile::NamedTempFile;
@@ -55,7 +55,7 @@ use parent_bridge::{
     write_parent_bridge_event_cursor,
 };
 use parent_bridge::{MessageBridge, MessageBridgeCleanupDisposition};
-use rook_errors::report_error;
+use pterm_errors::report_error;
 #[cfg(test)]
 use shell_words::quote as shell_quote;
 #[cfg(test)]
@@ -696,7 +696,7 @@ pub(crate) fn prepare_claude_environment_config(
     Ok(())
 }
 
-/// Publish `ROOK_SKILL_DIRS` and eligible bundled skills under
+/// Publish `POLARIS_TERMINAL_SKILL_DIRS` and eligible bundled skills under
 /// `<harness_working_dir>/.claude/skills`.
 ///
 /// Relative source directories are resolved from the workspace root, matching
@@ -708,10 +708,10 @@ pub(crate) fn prepare_claude_environment_config(
 /// existing entry with the same name (see
 /// `skill_dirs_publish::publish_skill`), with the conflict-resolution behavior
 /// depending on whether this run is sandboxed (see
-/// `rook_isolation_platform::detect`).
+/// `pterm_isolation_platform::detect`).
 fn publish_skills_for_claude(workspace_root: &Path, harness_working_dir: &Path) {
     let skill_root = harness_working_dir.join(".claude").join("skills");
-    let is_sandbox = rook_isolation_platform::detect().is_some();
+    let is_sandbox = pterm_isolation_platform::detect().is_some();
     let published = super::skill_dirs_publish::publish_skills_for_harness(
         &skill_root,
         workspace_root,

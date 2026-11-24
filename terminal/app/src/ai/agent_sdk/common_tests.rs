@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use rookui::App;
+use ptermui::App;
 
 use super::{
     classify_agent_mode_base_model_id, parse_ambient_task_id, validate_agent_mode_base_model_id,

@@ -1,22 +1,24 @@
 use std::collections::HashMap;
 
-use rook_completer::ParsedTokensSnapshot;
-use rook_completer::signatures::CommandRegistry;
-use rook_completer::util::parse_current_commands_and_tokens;
-use rook_core::ui::theme::{AnsiColorIdentifier, AnsiColors};
-use rook_errors::report_error;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::new_scrollable::{ClippedAxisConfiguration, DualAxisConfig, NewScrollable};
-use rookui::elements::{
+use pterm_completer::ParsedTokensSnapshot;
+use pterm_completer::signatures::CommandRegistry;
+use pterm_completer::util::parse_current_commands_and_tokens;
+use pterm_core::ui::theme::{AnsiColorIdentifier, AnsiColors};
+use pterm_errors::report_error;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::new_scrollable::{ClippedAxisConfiguration, DualAxisConfig, NewScrollable};
+use ptermui::elements::{
     Align, Border, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Element, Empty, Expanded, Flex, Highlight, HighlightedRange,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::prelude::ChildView;
-use rookui::text_layout::TextStyle;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::prelude::ChildView;
+use ptermui::text_layout::TextStyle;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
+    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 use serde::Serialize;
 use string_offset::CharCounter;
 
@@ -156,7 +158,7 @@ impl CloudSetupGuideView {
         header_container.add_child(title);
 
         let subtitle = Text::new(
-            "Start Oz cloud agents directly in Rook from an integration (Linear, Slack), with an event (GitHub, built-in schedule), or programmatically with the Oz SDK or CLI.",
+            "Start Oz cloud agents directly in Polaris Terminal from an integration (Linear, Slack), with an event (GitHub, built-in schedule), or programmatically with the Oz SDK or CLI.",
             appearance.ui_font_family(),
             subtitle_font_size,
         )
@@ -291,7 +293,7 @@ impl CloudSetupGuideView {
     }
 
     /// Render a description that includes a link at the end
-    /// (e.g. "Use rook's environment setup command to have an agent help you through it. LINK[Visit docs]")
+    /// (e.g. "Use polaris-terminal's environment setup command to have an agent help you through it. LINK[Visit docs]")
     fn render_description_with_link(
         prefix: &'static str,
         link_text: &'static str,
@@ -459,7 +461,7 @@ impl CloudSetupGuideView {
         .finish();
 
         let sub_description = Container::new(Self::render_description_with_link(
-            "Use Rook's environment setup command to have an agent help you through it. ",
+            "Use Polaris Terminal's environment setup command to have an agent help you through it. ",
             "Visit docs",
             self.env_docs_link_mouse_state.clone(),
             SetupGuideDocs::Environment,
@@ -532,7 +534,7 @@ impl CloudSetupGuideView {
             .finish();
 
         let sub_description = Container::new(Self::render_description_with_link(
-            "Integrate Slack or Linear to assign Rook's Agent tasks with @Rook. ",
+            "Integrate Slack or Linear to assign Polaris Terminal's Agent tasks with @Polaris Terminal. ",
             "Visit docs",
             self.integration_docs_link_mouse_state.clone(),
             SetupGuideDocs::Integration,
@@ -624,7 +626,7 @@ impl View for CloudSetupGuideView {
             },
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .finish();
 

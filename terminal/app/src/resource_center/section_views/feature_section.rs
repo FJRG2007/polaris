@@ -1,11 +1,11 @@
-use rookui::elements::{
+use ptermui::elements::{
     Align, ConstrainedBox, Container, CrossAxisAlignment, Element, Flex, Hoverable, Icon,
     MouseState, MouseStateHandle, ParentElement, Shrinkable,
 };
-use rookui::fonts::Weight;
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     Action, AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, WindowId,
 };
@@ -29,7 +29,7 @@ use crate::themes::theme::Fill;
 pub enum FeatureSection {
     WhatsNew,
     GettingStarted,
-    MaximizeRook,
+    MaximizePterm,
     AdvancedSetup,
 }
 
@@ -38,7 +38,7 @@ impl FeatureSection {
         match self {
             FeatureSection::WhatsNew => "What's New?",
             FeatureSection::GettingStarted => "Getting Started",
-            FeatureSection::MaximizeRook => "Maximize Rook",
+            FeatureSection::MaximizePterm => "Maximize Polaris Terminal",
             FeatureSection::AdvancedSetup => "Advanced Setup",
         }
     }

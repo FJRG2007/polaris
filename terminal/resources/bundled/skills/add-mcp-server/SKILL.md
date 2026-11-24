@@ -1,19 +1,19 @@
 ---
 name: agent-add-mcp
-description: Use this skill when helping users add MCP servers to their Rook configuration.
+description: Use this skill when helping users add MCP servers to their Polaris Terminal configuration.
 ---
 
-# Adding MCP Servers to Rook
+# Adding MCP Servers to Polaris Terminal
 
-Rook supports MCP servers via native config files. Follow these steps when helping a user add an MCP server.
+Polaris Terminal supports MCP servers via native config files. Follow these steps when helping a user add an MCP server.
 
 ## Step 1: Determine Scope
 
 If the user hasn't specified, ask whether they want to configure the server **globally** (for all projects) or **project-scoped** (for a specific repository only).
 
 Config file paths:
-- **Global (user-scoped):** `~/.rook/.mcp.json`
-- **Project-scoped:** `{repo_root}/.rook/.mcp.json`
+- **Global (user-scoped):** `~/.polaris-terminal/.mcp.json`
+- **Project-scoped:** `{repo_root}/.polaris/terminal/.mcp.json`
 
 ## Step 2: Gather Server Details
 
@@ -61,9 +61,9 @@ Check whether the target config file exists.
 }
 ```
 
-By default, Rook spawns stdio servers from the directory the config was discovered in:
-- Project-scoped configs (`{repo_root}/.rook/.mcp.json`) run from the repo root.
-- Global configs (`~/.rook/.mcp.json`, `~/.claude.json`, etc.) run from the home directory.
+By default, Polaris Terminal spawns stdio servers from the directory the config was discovered in:
+- Project-scoped configs (`{repo_root}/.polaris/terminal/.mcp.json`) run from the repo root.
+- Global configs (`~/.polaris-terminal/.mcp.json`, `~/.claude.json`, etc.) run from the home directory.
 
 If the server's `command` or `args` are relative paths (e.g. `./tooling/mcp/server.js`) or the server expects a specific cwd, set `working_directory` to override the default:
 
@@ -94,10 +94,10 @@ If the server's `command` or `args` are relative paths (e.g. `./tooling/mcp/serv
 }
 ```
 
-For environment variables containing secrets, use `${VAR_NAME}` syntax — Rook will substitute the value from the user's environment at runtime.
+For environment variables containing secrets, use `${VAR_NAME}` syntax — Polaris Terminal will substitute the value from the user's environment at runtime.
 
 ## Notes
 
-- Rook auto-detects changes to `.mcp.json` files on save — no restart required.
-- Configured servers appear in Rook's Settings under MCP, labeled **"Detected from Rook"**.
+- Polaris Terminal auto-detects changes to `.mcp.json` files on save — no restart required.
+- Configured servers appear in Polaris Terminal's Settings under MCP, labeled **"Detected from Polaris Terminal"**.
 - Global config applies across all sessions; project config only applies when working inside that repository.

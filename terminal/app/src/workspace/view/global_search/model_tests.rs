@@ -1,6 +1,6 @@
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
 use remote_server::HostId;
 use remote_server::proto::{RipgrepSearchMatch, RipgrepSearchSubmatch, RipgrepSearchSuccess};
-use rook_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::GlobalSearch;
 

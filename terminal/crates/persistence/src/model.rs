@@ -36,9 +36,9 @@ pub struct Window {
     pub origin_y: Option<f32>,
     pub quake_mode: bool,
     pub universal_search_width: Option<f32>,
-    pub rook_ai_width: Option<f32>,
+    pub pterm_ai_width: Option<f32>,
     pub voltron_width: Option<f32>,
-    pub rook_drive_index_width: Option<f32>,
+    pub pterm_drive_index_width: Option<f32>,
     pub fullscreen_state: i32,
     pub agent_management_filters: Option<String>,
     pub left_panel_open: Option<bool>,
@@ -93,7 +93,7 @@ pub struct Folder {
     pub id: i32,
     pub name: String,
     pub is_open: bool,
-    pub is_rook_pack: bool,
+    pub is_pterm_pack: bool,
 }
 
 #[derive(Insertable)]
@@ -101,7 +101,7 @@ pub struct Folder {
 pub struct NewFolder {
     pub name: String,
     pub is_open: bool,
-    pub is_rook_pack: bool,
+    pub is_pterm_pack: bool,
 }
 
 #[derive(Identifiable, Insertable, Queryable)]
@@ -340,9 +340,9 @@ pub struct NewWindow {
     pub origin_y: Option<f32>,
     pub quake_mode: bool,
     pub universal_search_width: Option<f32>,
-    pub rook_ai_width: Option<f32>,
+    pub pterm_ai_width: Option<f32>,
     pub voltron_width: Option<f32>,
-    pub rook_drive_index_width: Option<f32>,
+    pub pterm_drive_index_width: Option<f32>,
     pub fullscreen_state: i32,
     pub agent_management_filters: Option<String>,
     pub left_panel_open: Option<bool>,
@@ -770,7 +770,7 @@ pub struct Block {
     pub host: Option<String>,
     pub is_background: bool,
     pub rprompt: Option<String>,
-    /// JSON-serialized representation of the Rook prompt snapshot (Context Chips). Note that this
+    /// JSON-serialized representation of the Polaris Terminal prompt snapshot (Context Chips). Note that this
     /// is different from PS1 and RPROMPT1
     pub prompt_snapshot: Option<String>,
     pub block_id: String,
@@ -1265,20 +1265,20 @@ pub fn token_usage_category_display_name(category: &str) -> String {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ModelTokenUsage {
-    /// Identifier used for both display and replay. For rook/byok rows this is the
+    /// Identifier used for both display and replay. For polaris-terminal/byok rows this is the
     /// server-known model id; for custom endpoint rows this is the resolved alias
     /// (or fallback label) — the upstream `config_key` is translated into this
     /// label once at ingestion time and is not retained separately.
     pub model_id: String,
-    /// Alias for backward compat: old persisted data used `total_tokens` for rook usage.
+    /// Alias for backward compat: old persisted data used `total_tokens` for polaris-terminal usage.
     #[serde(default, alias = "total_tokens")]
-    pub rook_tokens: u32,
+    pub pterm_tokens: u32,
     #[serde(default)]
     pub byok_tokens: u32,
     #[serde(default)]
     pub custom_endpoint_tokens: u32,
     #[serde(default)]
-    pub rook_token_usage_by_category: HashMap<TokenUsageCategory, u32>,
+    pub pterm_token_usage_by_category: HashMap<TokenUsageCategory, u32>,
     #[serde(default)]
     pub byok_token_usage_by_category: HashMap<TokenUsageCategory, u32>,
     #[serde(default)]
@@ -1308,8 +1308,8 @@ impl ModelTokenUsage {
         ))
     }
 
-    pub fn to_proto_rook_usage(&self) -> Option<(String, stream_finished::ModelTokenUsage)> {
-        self.to_proto_usage(self.rook_tokens, &self.rook_token_usage_by_category)
+    pub fn to_proto_pterm_usage(&self) -> Option<(String, stream_finished::ModelTokenUsage)> {
+        self.to_proto_usage(self.pterm_tokens, &self.pterm_token_usage_by_category)
     }
 
     pub fn to_proto_byok_usage(&self) -> Option<(String, stream_finished::ModelTokenUsage)> {
@@ -1340,11 +1340,11 @@ impl ModelTokenUsage {
     pub fn to_proto_combined(&self) -> stream_finished::ModelTokenUsage {
         stream_finished::ModelTokenUsage {
             model_id: self.model_id.clone(),
-            total_tokens: u64::from(self.rook_tokens)
+            total_tokens: u64::from(self.pterm_tokens)
                 + u64::from(self.byok_tokens)
                 + u64::from(self.custom_endpoint_tokens),
             token_usage_by_category: self
-                .rook_token_usage_by_category
+                .pterm_token_usage_by_category
                 .iter()
                 .chain(self.byok_token_usage_by_category.iter())
                 .chain(self.custom_endpoint_token_usage_by_category.iter())
@@ -1628,7 +1628,7 @@ impl From<&ContextWindowSegment> for stream_finished::ContextWindowSegment {
 /// A flat breakdown of charged usage — input/output/cache-read/cache-write
 /// inference cost (in US cents) plus platform cost, and the matching token
 /// counts — summed across every usage category and model. Mirrors the Go
-/// `SumChargedUsage` helper (`rook-server` `logic/ai/multi_agent/usage`);
+/// `SumChargedUsage` helper (`polaris-terminal-server` `logic/ai/multi_agent/usage`);
 /// computed client-side from the wire's category/model-keyed
 /// `RequestCharges` map so downstream displays don't need to walk the map
 /// themselves.
@@ -1650,7 +1650,7 @@ pub struct ChargedUsageTotals {
     pub web_search_count: u32,
     /// Cumulative cost of web searches performed, in US cents. Included in
     /// [`Self::total_cost_in_cents`] since it's part of the real, actually-
-    /// charged dollar total (see `rook-proto-apis` PR #363).
+    /// charged dollar total (see `polaris-terminal-proto-apis` PR #363).
     #[serde(default)]
     pub web_search_cost_in_cents: f32,
 }
@@ -1713,7 +1713,7 @@ impl From<&stream_finished::RequestCharges> for ChargedUsageTotals {
     /// into a single flat breakdown, mirroring the Go `SumChargedUsage`
     /// helper. Categories and models are summed together; per-category/
     /// per-model detail is discarded, matching the single
-    /// pricing-breakdown-section display convention (`rook` PR #15015).
+    /// pricing-breakdown-section display convention (`polaris-terminal` PR #15015).
     fn from(charges: &stream_finished::RequestCharges) -> Self {
         let mut totals = Self::default();
         for usage in charges.usage_by_category.values() {

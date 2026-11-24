@@ -3,21 +3,21 @@ use std::time::Duration;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::builder::UiBuilder;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::accessibility::{AccessibilityContent, ActionAccessibilityContent, RookA11yRole};
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::elements::{
+use pterm_core::ui::builder::UiBuilder;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::accessibility::{AccessibilityContent, ActionAccessibilityContent, PtermA11yRole};
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DispatchEventResult, EventHandler, Flex, Hoverable, Icon, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, OffsetPositioning, ParentElement, PositionedElementAnchor,
     PositionedElementOffsetBounds, Radius, SavePosition, Shrinkable, Stack,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::Keystroke;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::Keystroke;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     Action, AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -305,7 +305,7 @@ impl<A: Action + Clone> TypedActionView for DismissibleToastStack<A> {
                 );
                 Some(AccessibilityContent::new_without_help(
                     label,
-                    RookA11yRole::ButtonRole,
+                    PtermA11yRole::ButtonRole,
                 ))
                 .into()
             }
@@ -599,14 +599,14 @@ impl<A: Action + Clone> DismissibleToast<A> {
 
         let is_clickable = self.is_clickable();
         // On mobile devices, always show close button since hover effects don't work with touch
-        let is_mobile = rookui::platform::is_mobile_device();
+        let is_mobile = ptermui::platform::is_mobile_device();
 
         Hoverable::new(self.close_button_hover_state.clone(), move |mouse_state| {
             let toast_container = Container::new(row.finish())
                 .with_vertical_padding(VERTICAL_PADDING)
                 .with_horizontal_padding(HORIZONTAL_PADDING)
                 .with_background(self.flavor.bg_color(appearance))
-                .with_corner_radius(rookui::elements::CornerRadius::with_all(Radius::Pixels(
+                .with_corner_radius(ptermui::elements::CornerRadius::with_all(Radius::Pixels(
                     TOAST_CORNER_RADIUS,
                 )))
                 .with_border(Border::all(1.).with_border_fill(self.flavor.border_color(appearance)))

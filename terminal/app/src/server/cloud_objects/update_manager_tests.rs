@@ -6,10 +6,10 @@ use chrono::{DateTime, Utc};
 use cloud_object_client::MockObjectClient;
 use cloud_object_models::JsonSerializer;
 use futures_lite::future;
-use rook_core::features::FeatureFlag;
-use rook_graphql::object_permissions::AccessLevel;
-use rook_graphql::scalars::time::ServerTimestamp;
-use rookui::{App, ModelHandle, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_graphql::object_permissions::AccessLevel;
+use pterm_graphql::scalars::time::ServerTimestamp;
+use ptermui::{App, ModelHandle, SingletonEntity};
 use settings::{RespectUserSyncSetting, SyncToCloud};
 
 use super::{GetCloudObjectResponse, InitialLoadResponse, UpdateManager};
@@ -318,7 +318,7 @@ fn mock_server_folder(id: FolderId, owner: Owner, metadata: ServerMetadata) -> S
         CloudFolderModel {
             name: format!("f{id}"),
             is_open: false,
-            is_rook_pack: false,
+            is_pterm_pack: false,
         },
         metadata,
         mock_server_permissions(owner),
@@ -1661,7 +1661,7 @@ fn test_sync_state_after_creation_failure_item_not_in_sync_queue() {
             .await;
 
         // await long enough that all the sync queue retries are exhausted
-        rookui::r#async::Timer::after(Duration::from_secs(10)).await;
+        ptermui::r#async::Timer::after(Duration::from_secs(10)).await;
 
         // because there aren't any items in the sync queue left for this object,
         // it should be marked as errored
@@ -1753,7 +1753,7 @@ fn test_sync_state_after_update_failure_item_in_sync_queue() {
             .await;
 
         // await long enough that all the sync queue retries are exhausted
-        rookui::r#async::Timer::after(Duration::from_secs(10)).await;
+        ptermui::r#async::Timer::after(Duration::from_secs(10)).await;
 
         // because notebook updates are dependent on one another, all should have registered
         // as failed and there should be no updates left in the sync queue.
@@ -2575,7 +2575,7 @@ fn test_metadata_after_trash_item_failure() {
             .await;
 
         // await long enough that all the trash object retries are exhausted
-        rookui::r#async::Timer::after(Duration::from_secs(10)).await;
+        ptermui::r#async::Timer::after(Duration::from_secs(10)).await;
 
         assert_trashed_status_for_object(&mut app, &sync_id.uid(), false);
         assert_pending_status_for_object(&mut app, &sync_id.uid(), false);
@@ -5764,7 +5764,7 @@ fn test_move_object_personal_to_team_failure() {
             .await;
 
         // await long enough that all the move object retries are exhausted
-        rookui::r#async::Timer::after(Duration::from_secs(10)).await;
+        ptermui::r#async::Timer::after(Duration::from_secs(10)).await;
 
         assert_pending_online_only_change_for_object(&mut app, &sync_id.uid(), false);
 
@@ -6099,7 +6099,7 @@ fn test_move_workflow_with_enums_personal_to_team_failure() {
             .await;
 
         // await long enough that all the move object retries are exhausted
-        rookui::r#async::Timer::after(Duration::from_secs(10)).await;
+        ptermui::r#async::Timer::after(Duration::from_secs(10)).await;
 
         // The workflow and enum should remain in the personal space
         assert_pending_online_only_change_for_object(&mut app, &workflow_sync_id.uid(), false);
@@ -6344,7 +6344,7 @@ fn test_move_object_root_to_folder_failure() {
             .await;
 
         // await long enough that all the move object retries are exhausted
-        rookui::r#async::Timer::after(Duration::from_secs(10)).await;
+        ptermui::r#async::Timer::after(Duration::from_secs(10)).await;
 
         assert_pending_online_only_change_for_object(&mut app, &sync_id.uid(), false);
 
@@ -6536,7 +6536,7 @@ fn test_move_object_folder_to_root_failure() {
             .await;
 
         // await long enough that all the move object retries are exhausted
-        rookui::r#async::Timer::after(Duration::from_secs(10)).await;
+        ptermui::r#async::Timer::after(Duration::from_secs(10)).await;
 
         assert_pending_online_only_change_for_object(&mut app, &sync_id.uid(), false);
 
@@ -6732,7 +6732,7 @@ fn test_move_object_folder_to_folder_failure() {
             .await;
 
         // await long enough that all the move object retries are exhausted
-        rookui::r#async::Timer::after(Duration::from_secs(10)).await;
+        ptermui::r#async::Timer::after(Duration::from_secs(10)).await;
 
         assert_pending_online_only_change_for_object(&mut app, &sync_id.uid(), false);
 
@@ -7163,7 +7163,7 @@ fn test_permissions_update_grants_access() {
         let guest_user_id = UserUid::new("abc123");
         let other_guests = vec![UserProfileWithUID {
             firebase_uid: guest_user_id,
-            display_name: Some("Rook User".to_string()),
+            display_name: Some("Polaris Terminal User".to_string()),
             email: "user@rook.dev".to_string(),
             photo_url: String::new(),
         }];
@@ -7497,7 +7497,7 @@ fn test_add_guest_failure() {
                 ctx.await_spawned_future(update_manager.spawned_futures[0])
             })
             .await;
-        rookui::r#async::Timer::after(Duration::from_secs(10)).await;
+        ptermui::r#async::Timer::after(Duration::from_secs(10)).await;
 
         assert_pending_online_only_change_for_object(&mut app, &uid, false);
 

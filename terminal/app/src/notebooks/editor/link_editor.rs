@@ -1,14 +1,14 @@
-use rook_editor::editor::NavigationKey;
-use rook_editor::model::RichTextEditorModel;
-use rook_editor::render::model::RenderState;
-use rookui::elements::{
+use pterm_editor::editor::NavigationKey;
+use pterm_editor::model::RichTextEditorModel;
+use pterm_editor::render::model::RenderState;
+use ptermui::elements::{
     AnchorPair, Container, Flex, MouseStateHandle, OffsetPositioning, OffsetType, ParentElement,
     PositionedElementOffsetBounds, PositioningAxis, XAxisAnchor, YAxisAnchor,
 };
-use rookui::fonts::Weight;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, BlurContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -198,7 +198,7 @@ impl View for LinkEditor {
         }
     }
 
-    fn render(&self, app: &rookui::AppContext) -> Box<dyn Element> {
+    fn render(&self, app: &ptermui::AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let mut editors = Flex::column();
 

@@ -1,12 +1,12 @@
 use enum_iterator::Sequence;
-use rook_core::channel::{Channel, ChannelState};
-use rook_core::settings::macros::define_settings_group;
-use rook_core::settings::{SupportedPlatforms, SyncToCloud};
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_core::settings::macros::define_settings_group;
+use pterm_core::settings::{SupportedPlatforms, SyncToCloud};
 use serde::{Deserialize, Serialize};
 
 /// The app icon to use (mac-only).
 ///
-/// IMPORTANT NOTE: If you add a new icon, you will need to update the logic in RookDockTilePlugin.m
+/// IMPORTANT NOTE: If you add a new icon, you will need to update the logic in PtermDockTilePlugin.m
 /// to read the new icon and also add the icon to app/DockTilePlugin/Resources.
 #[derive(
     Default,
@@ -39,7 +39,7 @@ pub enum AppIcon {
     Classic3,
     #[schemars(description = "Comets")]
     Comets,
-    /// Cow icon, for Code on Rook launch.
+    /// Cow icon, for Code on Polaris Terminal launch.
     #[schemars(description = "Cow")]
     Cow,
     #[schemars(description = "Glass Sky")]
@@ -63,8 +63,8 @@ pub enum AppIcon {
     #[schemars(description = "Sticker")]
     Sticker,
     /// Previous default icon with solid blue background.
-    #[schemars(description = "Rook 1")]
-    RookOne,
+    #[schemars(description = "Polaris Terminal 1")]
+    PtermOne,
 }
 
 impl std::fmt::Display for AppIcon {
@@ -86,7 +86,7 @@ impl std::fmt::Display for AppIcon {
             AppIcon::Original => "Original",
             AppIcon::Starburst => "Starburst",
             AppIcon::Sticker => "Sticker",
-            AppIcon::RookOne => "Rook 1",
+            AppIcon::PtermOne => "Polaris Terminal 1",
         };
         write!(f, "{value}")
     }
@@ -100,7 +100,7 @@ impl AppIconSettings {
                 Channel::Dev => "dev",
                 Channel::Preview => "preview",
                 Channel::Local => "local",
-                _ => "rook_2",
+                _ => "pterm_2",
             },
             AppIcon::Classic1 => "classic_1",
             AppIcon::Classic2 => "classic_2",
@@ -116,7 +116,7 @@ impl AppIconSettings {
             AppIcon::Original => "original",
             AppIcon::Starburst => "starburst",
             AppIcon::Sticker => "sticker",
-            AppIcon::RookOne => "blue",
+            AppIcon::PtermOne => "blue",
         }
     }
 }
@@ -142,6 +142,6 @@ define_settings_group!(AppIconSettings, settings: [
         private: false,
         storage_key: "ShowDockIcon",
         toml_path: "appearance.icon.show_dock_icon",
-        description: "Whether Rook is shown in the macOS Dock and Cmd-Tab switcher.",
+        description: "Whether Polaris Terminal is shown in the macOS Dock and Cmd-Tab switcher.",
     },
 ]);

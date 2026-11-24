@@ -22,8 +22,8 @@ impl From<ProfileData> for UserProfileWithUID {
     }
 }
 
-impl From<rook_graphql::user::PublicUserProfile> for UserProfileWithUID {
-    fn from(value: rook_graphql::user::PublicUserProfile) -> Self {
+impl From<pterm_graphql::user::PublicUserProfile> for UserProfileWithUID {
+    fn from(value: pterm_graphql::user::PublicUserProfile) -> Self {
         UserProfileWithUID {
             firebase_uid: UserUid::new(&value.uid),
             display_name: value.display_name,

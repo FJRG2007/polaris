@@ -1,5 +1,5 @@
 use ai::skills::{ParsedSkill, SkillProvider, SkillScope};
-use rook_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
 use tempfile::TempDir;
 
 use super::*;
@@ -11,7 +11,7 @@ fn daemon_skill(id: &str, content: &str) -> ParsedSkill {
         path: LocalOrRemotePath::Local(format!("/daemon/bundled/skills/{id}/SKILL.md").into()),
         content: content.to_string(),
         line_range: None,
-        provider: SkillProvider::Rook,
+        provider: SkillProvider::Pterm,
         scope: SkillScope::Bundled,
     }
 }

@@ -32,7 +32,8 @@ pub async fn construct_test_merkle_tree(
     ]);
 
     let mut root_dir_entry = DirectoryEntry {
-        path: rook_util::standardized_path::StandardizedPath::try_from_local(dirs.tests()).unwrap(),
+        path: pterm_util::standardized_path::StandardizedPath::try_from_local(dirs.tests())
+            .unwrap(),
         children: vec![],
         ignored: false,
         loaded: true,
@@ -42,7 +43,7 @@ pub async fn construct_test_merkle_tree(
         .expect("Should be able to insert root file");
 
     let mut top_dir_entry = DirectoryEntry {
-        path: rook_util::standardized_path::StandardizedPath::try_from_local(
+        path: pterm_util::standardized_path::StandardizedPath::try_from_local(
             &dirs.tests().join("top_dir"),
         )
         .unwrap(),
@@ -55,7 +56,7 @@ pub async fn construct_test_merkle_tree(
         .expect("Should be able to insert file1");
 
     let mut subdir_a_entry = DirectoryEntry {
-        path: rook_util::standardized_path::StandardizedPath::try_from_local(
+        path: pterm_util::standardized_path::StandardizedPath::try_from_local(
             &dirs.tests().join("top_dir/subdir_a"),
         )
         .unwrap(),
@@ -71,7 +72,7 @@ pub async fn construct_test_merkle_tree(
         .expect("Should be able to insert file3");
 
     let mut subdir_b_entry = DirectoryEntry {
-        path: rook_util::standardized_path::StandardizedPath::try_from_local(
+        path: pterm_util::standardized_path::StandardizedPath::try_from_local(
             &dirs.tests().join("top_dir/subdir_b"),
         )
         .unwrap(),

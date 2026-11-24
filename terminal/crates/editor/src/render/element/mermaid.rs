@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use rookui_core::elements::{Align, CacheOption, CornerRadius, Empty, Image, Radius, Text};
-use rookui_core::geometry::vector::vec2f;
-use rookui_core::{AppContext, Element, SizeConstraint};
+use ptermui_core::elements::{Align, CacheOption, CornerRadius, Empty, Image, Radius, Text};
+use ptermui_core::geometry::vector::vec2f;
+use ptermui_core::{AppContext, Element, SizeConstraint};
 
 use super::{RenderContext, RenderableBlock};
 use crate::editor::RunnableCommandModel;
@@ -46,7 +46,7 @@ impl RenderableBlock for RenderableMermaidDiagram {
     fn layout(
         &mut self,
         model: &RenderState,
-        ctx: &mut rookui_core::LayoutContext,
+        ctx: &mut ptermui_core::LayoutContext,
         app: &AppContext,
     ) {
         let content = model.content();
@@ -167,7 +167,7 @@ impl RenderableBlock for RenderableMermaidDiagram {
         }
         ctx.paint
             .scene
-            .start_layer(rookui_core::ClipBounds::ActiveLayer);
+            .start_layer(ptermui_core::ClipBounds::ActiveLayer);
         let button_origin = content_rect.lower_right()
             - vec2f(
                 self.footer.size().expect("Footer should be laid out").x(),
@@ -179,8 +179,8 @@ impl RenderableBlock for RenderableMermaidDiagram {
 
     fn after_layout(
         &mut self,
-        ctx: &mut rookui_core::AfterLayoutContext,
-        app: &rookui_core::AppContext,
+        ctx: &mut ptermui_core::AfterLayoutContext,
+        app: &ptermui_core::AppContext,
     ) {
         if let Some(ref mut image_element) = self.image_element {
             image_element.after_layout(ctx, app);
@@ -191,8 +191,8 @@ impl RenderableBlock for RenderableMermaidDiagram {
     fn dispatch_event(
         &mut self,
         _model: &RenderState,
-        event: &rookui_core::event::DispatchedEvent,
-        ctx: &mut rookui_core::EventContext,
+        event: &ptermui_core::event::DispatchedEvent,
+        ctx: &mut ptermui_core::EventContext,
         app: &AppContext,
     ) -> bool {
         self.footer.dispatch_event(event, ctx, app)

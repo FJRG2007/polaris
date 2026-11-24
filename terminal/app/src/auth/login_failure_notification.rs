@@ -1,10 +1,10 @@
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use rookui::elements::{
+use ptermui::elements::{
     Border, ConstrainedBox, Container, CrossAxisAlignment, Flex, FormattedTextElement,
     HighlightedHyperlink, Icon, MouseStateHandle, ParentElement, Shrinkable,
 };
-use rookui::ui_components::components::UiComponent;
-use rookui::{Action, AppContext, Element, SingletonEntity};
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{Action, AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 
@@ -149,7 +149,7 @@ pub fn render<A: Action + Clone>(
 }
 
 mod styles {
-    use rookui::elements::{CornerRadius, Radius};
+    use ptermui::elements::{CornerRadius, Radius};
 
     pub const NOTIFICATION_CONTAINER_PADDING: f32 = 8.;
     pub const NOTIFICATION_CONTAINER_CORNER_RADIUS: CornerRadius =

@@ -5,8 +5,8 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::str::FromStr;
 
 use ai::skills::{ParsedSkill, provider_rank};
-use rook_cli::skill::SkillSpec;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_cli::skill::SkillSpec;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
 
 use crate::ai::cloud_environments::GithubRepo;
 

@@ -10,8 +10,8 @@ that directory already exists, it is assumed that the fonts have previously been
 downloaded and skips downloading them again.
 
 Assumptions:
-- The fallback fonts in the prod `rook-static-assets` bucket are identical to the
-  ones stored in the staging `rook-server-staging-static-assets` bucket.
+- The fallback fonts in the prod `polaris-terminal-static-assets` bucket are identical to the
+  ones stored in the staging `polaris-terminal-server-staging-static-assets` bucket.
 - For each font family in the bucket, there is a variant that contains "Regular"
   in the filename.
 
@@ -68,7 +68,7 @@ ROBOTO_FONT_FILEPATH = "../../app/assets/bundled/fonts/roboto/Roboto-Regular.ttf
 FONT_DOWNLOAD_DIR = "./downloaded_fonts"
 
 # Code points that Hack Nerd Font must not claim even though its cmap covers them.
-# Rook renders these glyphs next to mac modifier glyphs (e.g. ⌘ U+2318, ⌥ U+2325)
+# Polaris Terminal renders these glyphs next to mac modifier glyphs (e.g. ⌘ U+2318, ⌥ U+2325)
 # that resolve to Noto Sans Symbols 2 because Hack Nerd Font doesn't cover them. Hack
 # Nerd Font is a monospace icon font with different metrics and weight than Noto Sans
 # Symbols 2, so when it wins one glyph out of a set that's meant to render consistently
@@ -86,7 +86,7 @@ def download_fallback_fonts():
         return
 
     os.mkdir(FONT_DOWNLOAD_DIR)
-    command = f"gcloud storage cp 'gs://rook-static-assets/fallback-fonts/**/*Regular*.ttf' '{FONT_DOWNLOAD_DIR}'"
+    command = f"gcloud storage cp 'gs://polaris-terminal-static-assets/fallback-fonts/**/*Regular*.ttf' '{FONT_DOWNLOAD_DIR}'"
     return_code = subprocess.call(command, shell=True)
     if return_code != 0:
         sys.exit("Failed to download fonts from GCP")

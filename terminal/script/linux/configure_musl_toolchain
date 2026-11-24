@@ -46,19 +46,19 @@ configure_musl_toolchain() {
   fi
 
   local default_musl_cross_root
-  if [[ -z "${ROOK_MUSL_CROSS_ROOT:-}" && "${GITHUB_ACTIONS:-}" == "true" && -n "${RUNNER_TEMP:-}" ]]; then
-    default_musl_cross_root="$RUNNER_TEMP/rook-musl-cross"
+  if [[ -z "${POLARIS_TERMINAL_MUSL_CROSS_ROOT:-}" && "${GITHUB_ACTIONS:-}" == "true" && -n "${RUNNER_TEMP:-}" ]]; then
+    default_musl_cross_root="$RUNNER_TEMP/polaris-terminal-musl-cross"
   elif [[ -n "${HOME:-}" ]]; then
-    default_musl_cross_root="${XDG_CACHE_HOME:-$HOME/.cache}/rook-musl-cross"
+    default_musl_cross_root="${XDG_CACHE_HOME:-$HOME/.cache}/polaris-terminal-musl-cross"
   else
-    default_musl_cross_root="${TMPDIR:-/tmp}/rook-musl-cross-${UID:-$(id -u)}"
+    default_musl_cross_root="${TMPDIR:-/tmp}/polaris-terminal-musl-cross-${UID:-$(id -u)}"
   fi
 
-  local musl_cross_root="${ROOK_MUSL_CROSS_ROOT:-$default_musl_cross_root}"
+  local musl_cross_root="${POLARIS_TERMINAL_MUSL_CROSS_ROOT:-$default_musl_cross_root}"
   local install_root="$musl_cross_root/$musl_cross_tag"
   local toolchain_dir="$install_root/$target"
   local toolchain_bin="$toolchain_dir/bin"
-  local verified_marker="$toolchain_dir/.rook-musl-cross-verified"
+  local verified_marker="$toolchain_dir/.polaris-terminal-musl-cross-verified"
   local verified_marker_contents="$musl_cross_tag $target $musl_cross_sha256"
 
   ensure_private_cache_dir() {
@@ -175,7 +175,7 @@ configure_musl_toolchain() {
       fi
 
       chmod -R u+w,go-w "$download_dir/$target" || exit 1
-      printf '%s\n' "$verified_marker_contents" > "$download_dir/$target/.rook-musl-cross-verified" || exit 1
+      printf '%s\n' "$verified_marker_contents" > "$download_dir/$target/.polaris-terminal-musl-cross-verified" || exit 1
       if [[ -x "$toolchain_bin/$target-gcc" \
         && -x "$toolchain_bin/$target-g++" \
         && -x "$toolchain_bin/$target-strip" \
@@ -216,10 +216,10 @@ configure_musl_toolchain() {
   export "CC_$target_env=$musl_cc"
   export "CXX_$target_env=$musl_cxx"
   export "CARGO_TARGET_${cargo_target_env}_LINKER=$musl_cc"
-  export ROOK_MUSL_TARGET="$target"
-  export ROOK_MUSL_CC="$musl_cc"
-  export ROOK_MUSL_CXX="$musl_cxx"
-  export ROOK_MUSL_STRIP="$musl_strip"
+  export POLARIS_TERMINAL_MUSL_TARGET="$target"
+  export POLARIS_TERMINAL_MUSL_CC="$musl_cc"
+  export POLARIS_TERMINAL_MUSL_CXX="$musl_cxx"
+  export POLARIS_TERMINAL_MUSL_STRIP="$musl_strip"
 
   echo "Configured the $target toolchain with $musl_cc, $musl_cxx, and $musl_strip"
 }

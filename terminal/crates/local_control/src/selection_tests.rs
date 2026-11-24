@@ -10,7 +10,7 @@ fn record(id: &str, pid: u32) -> InstanceRecord {
         instance_id: InstanceId(id.to_owned()),
         pid,
         channel: "local".to_owned(),
-        app_id: "dev.rook.RookLocal".to_owned(),
+        app_id: "dev.polaris.PolarisTerminalLocal".to_owned(),
         app_version: None,
         started_at: Utc::now(),
         executable_path: None,

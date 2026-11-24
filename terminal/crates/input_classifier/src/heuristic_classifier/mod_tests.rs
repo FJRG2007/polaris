@@ -1,13 +1,13 @@
-use rook_completer::meta::SpannedItem;
-use rook_completer::util::parse_current_commands_and_tokens;
-use rook_completer::{ParsedTokenData, ParsedTokensSnapshot};
+use pterm_completer::meta::SpannedItem;
+use pterm_completer::util::parse_current_commands_and_tokens;
+use pterm_completer::{ParsedTokenData, ParsedTokensSnapshot};
 
 use super::*;
 use crate::Context;
 use crate::test_utils::CompletionContext;
 
 async fn mock_parsed_input_token(buffer_text: String) -> ParsedTokensSnapshot {
-    rook_features::mark_initialized();
+    pterm_features::mark_initialized();
     let completion_context = CompletionContext::new();
     parse_current_commands_and_tokens(buffer_text, &completion_context).await
 }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use futures_util::StreamExt;
-use rook_core::features::FeatureFlag;
+use pterm_core::features::FeatureFlag;
 use warp_multi_agent_api as api;
 
 use super::convert_to::convert_input;
@@ -55,7 +55,7 @@ pub async fn generate_multi_agent_output(
         redaction::redact_inputs(&mut params.input);
     }
 
-    let api_keys = api_keys_with_rook_credit_fallback_setting(
+    let api_keys = api_keys_with_pterm_credit_fallback_setting(
         params.api_keys,
         params.allow_use_of_warp_credits,
     );
@@ -74,7 +74,7 @@ pub async fn generate_multi_agent_output(
                 ..Default::default()
             }),
             rules_enabled: params.is_memory_enabled,
-            warp_drive_context_enabled: params.rook_drive_context_enabled,
+            warp_drive_context_enabled: params.pterm_drive_context_enabled,
             web_context_retrieval_enabled: true,
             supports_parallel_tool_calls: true,
             use_anthropic_text_editor_tools: false,
@@ -142,7 +142,7 @@ pub async fn generate_multi_agent_output(
         mcp_context: params.mcp_context.map(Into::into),
     };
 
-    let response_stream = rook_multi_agent_client::generate_multi_agent_output(
+    let response_stream = pterm_multi_agent_client::generate_multi_agent_output(
         server_api.as_ref(),
         &request,
         team_scope.team_uid().map(|uid| uid.uid()),
@@ -171,25 +171,25 @@ pub async fn generate_multi_agent_output(
 }
 
 async fn convert_multi_agent_client_error(
-    error: rook_multi_agent_client::Error,
+    error: pterm_multi_agent_client::Error,
 ) -> Arc<AIApiError> {
     let error = match error {
-        rook_multi_agent_client::Error::Authentication(error)
-        | rook_multi_agent_client::Error::AmbientHeaders(error) => AIApiError::Other(error),
-        rook_multi_agent_client::Error::Base64Decode(error) => {
+        pterm_multi_agent_client::Error::Authentication(error)
+        | pterm_multi_agent_client::Error::AmbientHeaders(error) => AIApiError::Other(error),
+        pterm_multi_agent_client::Error::Base64Decode(error) => {
             AIApiError::Other(anyhow::Error::from(error))
         }
-        rook_multi_agent_client::Error::ProtobufDecode(error) => {
+        pterm_multi_agent_client::Error::ProtobufDecode(error) => {
             AIApiError::Other(anyhow::Error::from(error))
         }
-        rook_multi_agent_client::Error::EventSource(error) => {
+        pterm_multi_agent_client::Error::EventSource(error) => {
             AIApiError::from_stream_error("GenerateMultiAgentOutput", *error).await
         }
     };
     Arc::new(error)
 }
 
-fn api_keys_with_rook_credit_fallback_setting(
+fn api_keys_with_pterm_credit_fallback_setting(
     api_keys: Option<api::request::settings::ApiKeys>,
     allow_use_of_warp_credits: bool,
 ) -> Option<api::request::settings::ApiKeys> {
@@ -246,7 +246,7 @@ fn get_supported_tools(params: &RequestParams) -> Vec<api::ToolType> {
                 supported_tools.push(api::ToolType::UploadFileArtifact);
             }
         }
-        Some(SessionType::RookifiedRemote { host_id: Some(_) }) => {
+        Some(SessionType::PtermifiedRemote { host_id: Some(_) }) => {
             // Remote session with a known host — enable tools that route
             // through RemoteServerClient. The host_id is only populated
             // after a successful connection handshake, so its presence is a
@@ -256,7 +256,7 @@ fn get_supported_tools(params: &RequestParams) -> Vec<api::ToolType> {
                 supported_tools.push(api::ToolType::SearchCodebase);
             }
         }
-        Some(SessionType::RookifiedRemote { host_id: None }) => {
+        Some(SessionType::PtermifiedRemote { host_id: None }) => {
             // Feature flag off or not yet connected — no remote tools.
         }
     }
@@ -308,13 +308,13 @@ fn get_supported_cli_agent_tools(params: &RequestParams) -> Vec<api::ToolType> {
             supported_cli_agent_tools
                 .extend(&[api::ToolType::ReadFiles, api::ToolType::SearchCodebase]);
         }
-        Some(SessionType::RookifiedRemote { host_id: Some(_) }) => {
+        Some(SessionType::PtermifiedRemote { host_id: Some(_) }) => {
             supported_cli_agent_tools.push(api::ToolType::ReadFiles);
             if FeatureFlag::RemoteCodebaseIndexing.is_enabled() {
                 supported_cli_agent_tools.push(api::ToolType::SearchCodebase);
             }
         }
-        Some(SessionType::RookifiedRemote { host_id: None }) => {}
+        Some(SessionType::PtermifiedRemote { host_id: None }) => {}
     }
 
     supported_cli_agent_tools

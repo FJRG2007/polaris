@@ -1,18 +1,18 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::color::coloru_with_opacity;
-use rook_core::ui::theme::Fill;
-use rook_errors::report_error;
-use rookui::elements::{
+use pterm_core::ui::color::coloru_with_opacity;
+use pterm_core::ui::theme::Fill;
+use pterm_errors::report_error;
+use ptermui::elements::{
     Align, ChildAnchor, ConstrainedBox, Container, CrossAxisAlignment, Flex, Hoverable,
     MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
     Text,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::{FixedBinding, Keystroke};
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::{FixedBinding, Keystroke};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, EntityId, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
@@ -23,7 +23,7 @@ use crate::ui_components::dialog::{Dialog, dialog_styles};
 use crate::ui_components::icons::Icon;
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -85,7 +85,7 @@ impl View for RewindConfirmationDialog {
         "RewindConfirmationDialog"
     }
 
-    fn on_focus(&mut self, _focus_ctx: &rookui::FocusContext, ctx: &mut ViewContext<Self>) {
+    fn on_focus(&mut self, _focus_ctx: &ptermui::FocusContext, ctx: &mut ViewContext<Self>) {
         ctx.focus_self();
     }
 
@@ -177,7 +177,7 @@ impl View for RewindConfirmationDialog {
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(
                 Container::new(
-                    ConstrainedBox::new(Icon::Info.to_rookui_icon(info_color).finish())
+                    ConstrainedBox::new(Icon::Info.to_ptermui_icon(info_color).finish())
                         .with_height(14.)
                         .with_width(14.)
                         .finish(),

@@ -16,7 +16,7 @@ The current flow is implemented as a small model/view state machine in the onboa
 - `app/src/terminal/view.rs (13942-14117)` owns callout lifecycle side effects: submitting prompts, entering agent view on `EnterAgentModality`, applying natural language detection changes, clearing input, and exiting agent view.
 - `app/src/workspace/view/onboarding.rs (178-195)` chooses `AgentOnboardingVersion::AgentModality` when `FeatureFlag::AgentView` is enabled.
 - `app/src/terminal/view/init.rs (876-948)` registers debug keybindings that launch Agent Modality onboarding with project, without project, and with terminal intention.
-- `app/src/root_view.rs:3258` starts a pending tutorial after onboarding/auth. In the `OpenRookNewSettingsModes && TabConfigs` path, Agent Driven Development previously set a pending onboarding intention and opened the session config modal before the tutorial.
+- `app/src/root_view.rs:3258` starts a pending tutorial after onboarding/auth. In the `OpenPtermNewSettingsModes && TabConfigs` path, Agent Driven Development previously set a pending onboarding intention and opened the session config modal before the tutorial.
 - `app/src/workspace/view.rs (2022-2106)` handles the session config modal completion/dismissal and queued onboarding tutorial when that modal was used as the FTUE handoff.
 The existing design already has the right separation of responsibilities:
 - The onboarding model decides which state comes next and emits semantic events.
@@ -27,7 +27,7 @@ The implementation should keep that boundary and only shorten the Agent Driven D
 ### 1. Collapse the four visible Agent Driven Development states into two rendered steps
 Keep two product concepts:
 - Terminal input with natural language support.
-- Rook's agent experience.
+- Polaris Terminal's agent experience.
 There are two reasonable implementation approaches:
 1. Remove the unused enum variants entirely.
 2. Keep the enum variants but skip the obsolete states.
@@ -115,7 +115,7 @@ so they no longer describe a four-step Agent Modality flow.
 The debug keybindings in `app/src/terminal/view/init.rs` can stay, but their launched flows should now show only two callouts for Agent Driven Development.
 Update `crates/onboarding/examples/callout_flow.rs` only if its demo text or assumptions mention the old four-step sequence.
 ### 11. Bypass the FTUE session config modal before the callout tutorial
-Update `RootView::start_pending_tutorial` so the `OpenRookNewSettingsModes && TabConfigs` Agent Driven Development branch no longer calls `set_pending_onboarding_intention` or `show_session_config_modal`.
+Update `RootView::start_pending_tutorial` so the `OpenPtermNewSettingsModes && TabConfigs` Agent Driven Development branch no longer calls `set_pending_onboarding_intention` or `show_session_config_modal`.
 Instead:
 - Keep `open_vertical_tabs_panel_if_enabled` so the user's onboarding UI customization is still reflected.
 - Call `Workspace::start_agent_onboarding_tutorial(tutorial, ctx)` directly for Agent Driven Development.
@@ -185,4 +185,4 @@ Risk: Removing two callouts changes telemetry volume and may surprise dashboards
 Mitigation: Preserve the two retained callout names and intentionally stop emitting display events for removed callouts. Call out the expected telemetry change in the PR description.
 ## Parallelization
 Parallel sub-agents are not recommended for this implementation. The change is small and tightly coupled across one state machine, one view mapping, and one parent event consumer. Splitting it would create more coordination overhead than wall-clock savings.
-If this expands into visual redesign or new tests, a second local agent could independently add validation coverage in a separate worktree such as `../rook-gh11107-tests` on branch `agent/gh11107-tests`, while the main implementation remains on the feature branch. For the scoped two-callout change, a single branch and single PR is the simplest strategy.
+If this expands into visual redesign or new tests, a second local agent could independently add validation coverage in a separate worktree such as `../polaris-terminal-gh11107-tests` on branch `agent/gh11107-tests`, while the main implementation remains on the feature branch. For the scoped two-callout change, a single branch and single PR is the simplest strategy.

@@ -67,7 +67,7 @@ pub use native_preference::*;
 pub(crate) use onboarding::*;
 pub use pane::*;
 pub use privacy::*;
-use rook_core::user_preferences::GetUserPreferences as _;
+use pterm_core::user_preferences::GetUserPreferences as _;
 pub use same_line_prompt_block::*;
 #[cfg(not(target_family = "wasm"))]
 pub use schema_generation::dump_settings_schema;
@@ -138,18 +138,18 @@ use std::path::PathBuf;
 use lazy_static::lazy_static;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::features::FeatureFlag;
-use rookui::elements::DEFAULT_UI_LINE_HEIGHT_RATIO;
-use rookui::keymap::Keystroke;
-use rookui::{AppContext, DisplayIdx, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::elements::DEFAULT_UI_LINE_HEIGHT_RATIO;
+use ptermui::keymap::Keystroke;
+use ptermui::{AppContext, DisplayIdx, SingletonEntity};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use settings::Setting as _;
 
 use crate::root_view::QuakeModePinPosition;
 use crate::terminal::{BlockListSettings, BlockPadding};
-use crate::themes::theme::{RookTheme, ThemeKind};
-use crate::user_config::RookConfig;
+use crate::themes::theme::{PtermTheme, ThemeKind};
+use crate::user_config::PtermConfig;
 
 // The following are user preferences keys.
 pub const CHANGELOG_VERSIONS: &str = "ChangelogVersions";
@@ -157,7 +157,7 @@ pub const RESTORE_SESSION: &str = "RestoreSession";
 pub const INPUT_MODE: &str = "InputMode";
 pub const ACTIVATION_HOTKEY_ENABLED: &str = "ActivationHotkeyEnabled";
 pub const ACTIVATION_HOTKEY_KEYBINDING: &str = "ActivationHotkeyKeybinding";
-pub const DISMISSED_AI_ASSISTANT_WELCOME_KEY: &str = "DismissedRookAIWarmWelcome";
+pub const DISMISSED_AI_ASSISTANT_WELCOME_KEY: &str = "DismissedPtermAIWarmWelcome";
 
 pub const TIMES_TO_SHOW_AUTOSUGGESTION_HINT: i8 = 2;
 pub const QUAKE_WINDOW_AUTOHIDE_SUPPORTED: bool = cfg!(any(target_os = "macos", windows));
@@ -357,7 +357,7 @@ pub struct QuakeModeSettings {
     #[schemars(description = "Display to pin the hotkey window to.")]
     pub pin_screen: Option<DisplayIdx>,
     /// Whether we should hide quake mode window when it loses focus, this could happen either when
-    /// user focuses on another rook window or another app.
+    /// user focuses on another polaris-terminal window or another app.
     #[schemars(description = "Whether to hide the hotkey window when it loses focus.")]
     pub hide_window_when_unfocused: bool,
 }
@@ -536,10 +536,10 @@ impl Settings {
             })
     }
 
-    pub fn theme_for_theme_kind(theme_kind: &ThemeKind, ctx: &mut AppContext) -> RookTheme {
+    pub fn theme_for_theme_kind(theme_kind: &ThemeKind, ctx: &mut AppContext) -> PtermTheme {
         match theme_kind {
             ThemeKind::InMemory(in_memory_theme) => in_memory_theme.theme(),
-            _ => RookConfig::as_ref(ctx).theme_config().theme(theme_kind),
+            _ => PtermConfig::as_ref(ctx).theme_config().theme(theme_kind),
         }
     }
 }
@@ -603,19 +603,19 @@ pub struct ExtraMetaKeysChangedArg {
 
 /// Returns the path to the user preferences file.
 pub fn user_preferences_file_path() -> PathBuf {
-    rook_core::paths::config_local_dir().join("user_preferences.json")
+    pterm_core::paths::config_local_dir().join("user_preferences.json")
 }
 
 /// Returns the path to the TOML settings file for the active settings surface.
 ///
 /// Both surfaces use the same `settings.toml` file name but live in different
-/// config directories (the GUI under [`rook_core::paths::config_local_dir`], the
-/// TUI under [`rook_core::paths::tui_config_local_dir`]) so an installed GUI and
+/// config directories (the GUI under [`pterm_core::paths::config_local_dir`], the
+/// TUI under [`pterm_core::paths::tui_config_local_dir`]) so an installed GUI and
 /// TUI never share (and clobber) one file.
 pub fn user_preferences_toml_file_path() -> PathBuf {
     let config_dir = match settings::settings_mode() {
-        settings::SettingsMode::Gui => rook_core::paths::config_local_dir(),
-        settings::SettingsMode::Tui => rook_core::paths::tui_config_local_dir(),
+        settings::SettingsMode::Gui => pterm_core::paths::config_local_dir(),
+        settings::SettingsMode::Tui => pterm_core::paths::tui_config_local_dir(),
     };
     config_dir.join("settings.toml")
 }

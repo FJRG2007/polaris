@@ -5,40 +5,40 @@ Linear: [REMOTE-1973](https://linear.app/warpdotdev/issue/REMOTE-1973)
 ## Behavioral guarantees
 
 - Correctly ordered lifecycle events retain their existing user-visible behavior, block sequence, prompt rendering, exit-code semantics, and downstream notifications.
-- Missing, duplicated, stale, or out-of-order lifecycle evidence must not panic, corrupt a finished block or prompt grid, lose preserved command/output, create phantom blocks, repeat once-per-block side effects, or leave Rook permanently stuck in an executing state.
-- When completion metadata supplied by `Precmd` permits recovery, Rook preserves the shell-provided exit code and exact next-block identity while applying prompt metadata only to the corresponding fresh prompt block.
-- A novel completion is treated as evidence that the active command executed, even when Rook missed submission or `Preexec` evidence.
+- Missing, duplicated, stale, or out-of-order lifecycle evidence must not panic, corrupt a finished block or prompt grid, lose preserved command/output, create phantom blocks, repeat once-per-block side effects, or leave Polaris Terminal permanently stuck in an executing state.
+- When completion metadata supplied by `Precmd` permits recovery, Polaris Terminal preserves the shell-provided exit code and exact next-block identity while applying prompt metadata only to the corresponding fresh prompt block.
+- A novel completion is treated as evidence that the active command executed, even when Polaris Terminal missed submission or `Preexec` evidence.
 - Duplicate, colliding, malformed, or otherwise unsupported lifecycle evidence is handled conservatively without overwriting trustworthy state or fabricating completion evidence. In particular, any correlated or prompt-only `Precmd` received after the active block has already reached `AtPrompt` is ignored with diagnostics.
 - Version-skewed shared sessions preserve normal prompt flow when possible; a prompt-only or malformed `Precmd` must never complete or advance a block or fall through to the existing unsafe mutation path.
 
 ## Context
 
-Rook currently validates that lifecycle hooks come from registered shell sessions, then immediately dispatches them to `TerminalModel`. `TerminalModel` performs model-wide cleanup and delegates block mutations through `BlockList` to the active `Block`. There is no central transition check before a hook mutates the active block or prompt grid:
+Polaris Terminal currently validates that lifecycle hooks come from registered shell sessions, then immediately dispatches them to `TerminalModel`. `TerminalModel` performs model-wide cleanup and delegates block mutations through `BlockList` to the active `Block`. There is no central transition check before a hook mutates the active block or prompt grid:
 
-- [`app/src/terminal/model/ansi/mod.rs (552-609) @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/src/terminal/model/ansi/mod.rs#L552-L609) validates registered sessions and directly dispatches decoded hooks.
-- [`app/src/terminal/model/terminal_model.rs (2700-2780) @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/src/terminal/model/terminal_model.rs#L2700-L2780) handles completion, prompt-ready, and execution-start hooks, including alt-screen/controller-facing side effects.
-- [`app/src/terminal/model/blocks.rs (3715-3795) @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/src/terminal/model/blocks.rs#L3715-L3795) finalizes/advances blocks and applies prompt metadata.
-- [`app/src/terminal/model/block.rs (3329-3400) @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/src/terminal/model/block.rs#L3329-L3400) reparses prompt grids and mutates block lifecycle state.
+- [`app/src/terminal/model/ansi/mod.rs (552-609) @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/src/terminal/model/ansi/mod.rs#L552-L609) validates registered sessions and directly dispatches decoded hooks.
+- [`app/src/terminal/model/terminal_model.rs (2700-2780) @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/src/terminal/model/terminal_model.rs#L2700-L2780) handles completion, prompt-ready, and execution-start hooks, including alt-screen/controller-facing side effects.
+- [`app/src/terminal/model/blocks.rs (3715-3795) @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/src/terminal/model/blocks.rs#L3715-L3795) finalizes/advances blocks and applies prompt metadata.
+- [`app/src/terminal/model/block.rs (3329-3400) @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/src/terminal/model/block.rs#L3329-L3400) reparses prompt grids and mutates block lifecycle state.
 
 Command starts enter the model through a separate path:
 
-- [`app/src/terminal/model/terminal_model.rs (1639-1695) @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/src/terminal/model/terminal_model.rs#L1639-L1695) starts local, shared-session, environment-collection, and AI-associated commands without returning an acceptance disposition.
-- [`app/src/terminal/model/blocks.rs (2801-2840) @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/src/terminal/model/blocks.rs#L2801-L2840) caches prompt state and starts normal/in-band blocks.
-- [`app/src/terminal/writeable_pty/pty_controller.rs (492-610) @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/src/terminal/writeable_pty/pty_controller.rs#L492-L610) attaches start state and writes queued commands.
+- [`app/src/terminal/model/terminal_model.rs (1639-1695) @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/src/terminal/model/terminal_model.rs#L1639-L1695) starts local, shared-session, environment-collection, and AI-associated commands without returning an acceptance disposition.
+- [`app/src/terminal/model/blocks.rs (2801-2840) @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/src/terminal/model/blocks.rs#L2801-L2840) caches prompt state and starts normal/in-band blocks.
+- [`app/src/terminal/writeable_pty/pty_controller.rs (492-610) @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/src/terminal/writeable_pty/pty_controller.rs#L492-L610) attaches start state and writes queued commands.
 
 Completion is currently represented as an always-present exit code. `Block::finish` seals grids, stores the exit code, changes block state, and emits `BlockCompleted`; `BlockList` separately advances to the next block and later emits `AfterBlockCompleted` from `Precmd`:
 
-- [`app/src/terminal/model/block.rs (1560-1620) @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/src/terminal/model/block.rs#L1560-L1620) stores a concrete exit code and emits completion.
-- [`app/src/terminal/model/blocks.rs (2975-3055) @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/src/terminal/model/blocks.rs#L2975-L3055) advances the block list and handles background/bootstrap state.
-- [`app/src/terminal/model/block/serialized_block.rs (160-365) @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/src/terminal/model/block/serialized_block.rs#L160-L365) serializes completed block state.
+- [`app/src/terminal/model/block.rs (1560-1620) @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/src/terminal/model/block.rs#L1560-L1620) stores a concrete exit code and emits completion.
+- [`app/src/terminal/model/blocks.rs (2975-3055) @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/src/terminal/model/blocks.rs#L2975-L3055) advances the block list and handles background/bootstrap state.
+- [`app/src/terminal/model/block/serialized_block.rs (160-365) @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/src/terminal/model/block/serialized_block.rs#L160-L365) serializes completed block state.
 
 Shared sessions send ordered lifecycle events separately from raw PTY bytes. The sharer emits the completion's next-block identity while parsing the hook and sends the raw PTY chunk afterward, but the viewer currently does not use the ordered completion event to coordinate raw-hook recovery:
 
-- [`app/src/terminal/model/terminal_model.rs (3010-3050) @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/src/terminal/model/terminal_model.rs#L3010-L3050) sends raw PTY bytes after processing a chunk.
-- [`app/src/terminal/shared_session/sharer/network.rs (1518-1595) @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/src/terminal/shared_session/sharer/network.rs#L1518-L1595) preserves ordered event delivery.
-- [`app/src/terminal/shared_session/viewer/event_loop.rs (180-305) @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/src/terminal/shared_session/viewer/event_loop.rs#L180-L305) applies shared events and PTY bytes.
+- [`app/src/terminal/model/terminal_model.rs (3010-3050) @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/src/terminal/model/terminal_model.rs#L3010-L3050) sends raw PTY bytes after processing a chunk.
+- [`app/src/terminal/shared_session/sharer/network.rs (1518-1595) @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/src/terminal/shared_session/sharer/network.rs#L1518-L1595) preserves ordered event delivery.
+- [`app/src/terminal/shared_session/viewer/event_loop.rs (180-305) @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/src/terminal/shared_session/viewer/event_loop.rs#L180-L305) applies shared events and PTY bytes.
 
-Every supported shell already captures the previous command's exit code at the beginning of the same shell function that emits `CommandFinished` and then `Precmd`: [`zsh_body.sh:301 @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/assets/bundled/bootstrap/zsh_body.sh#L301), [`bash_body.sh:432 @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/assets/bundled/bootstrap/bash_body.sh#L432), [`fish.sh:267 @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/assets/bundled/bootstrap/fish.sh#L267), and [`pwsh.ps1:442 @ 73858e86`](https://github.com/FJRG2007/rook/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/app/assets/bundled/bootstrap/pwsh.ps1#L442). The same function also allocates the next block ID. Repeating both values in `Precmd` lets it reconcile a lost `CommandFinished` without inventing an exit code or block identity.
+Every supported shell already captures the previous command's exit code at the beginning of the same shell function that emits `CommandFinished` and then `Precmd`: [`zsh_body.sh:301 @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/assets/bundled/bootstrap/zsh_body.sh#L301), [`bash_body.sh:432 @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/assets/bundled/bootstrap/bash_body.sh#L432), [`fish.sh:267 @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/assets/bundled/bootstrap/fish.sh#L267), and [`pwsh.ps1:442 @ 73858e86`](https://github.com/FJRG2007/polaris/blob/73858e86d5aa813907d7f076c14ceb485bcc2c35/terminal/app/assets/bundled/bootstrap/pwsh.ps1#L442). The same function also allocates the next block ID. Repeating both values in `Precmd` lets it reconcile a lost `CommandFinished` without inventing an exit code or block identity.
 
 The existing cursor-clamping changes remain defense in depth. This spec adds completion metadata shared by `CommandFinished` and `Precmd` to the existing shell protocol; a fuller prompt-cycle identity, enforceable frozen-grid semantics, and PTY-reader teardown remain follow-ups.
 
@@ -46,7 +46,7 @@ The existing cursor-clamping changes remain defense in depth. This spec adds com
 
 ### 1. Add a private block-lifecycle module owned by `TerminalModel`
 
-Declare a private `mod lifecycle;` from `app/src/terminal/model/mod.rs`. This is an ordinary Rust helper module, not a RookUI entity or model. Keep its API private to `terminal::model`, exposing only the `pub(super)` types and entry points needed by `TerminalModel`.
+Declare a private `mod lifecycle;` from `app/src/terminal/model/mod.rs`. This is an ordinary Rust helper module, not a PtermUI entity or model. Keep its API private to `terminal::model`, exposing only the `pub(super)` types and entry points needed by `TerminalModel`.
 
 Organize new lifecycle code under `app/src/terminal/model/lifecycle/`:
 
@@ -80,7 +80,7 @@ Completion identity is evaluated before the phase-specific matrix:
 - `CommandFinished` with a next block ID equal to the active block is a duplicate and is ignored.
 - `Precmd` with a next block ID equal to the active block applies prompt metadata only when the block is fresh and awaiting its first prompt. If the active block already received `Precmd`, ignore the repeated evidence. If its exit code disagrees with the already-completed previous block, record the mismatch without re-finishing or overwriting the block.
 - Completion metadata whose next block ID belongs to a non-active existing block is stale/colliding and is ignored.
-- Completion metadata with a novel next block ID treats an unfinished active block as having executed and completes it using the provided exit code, or advances past an already-finished active block without re-finishing it. Completion evidence is sufficient to choose `DoneWithExecution` even when Rook did not observe submission or `Preexec`. It creates that exact next block and—when the evidence came from `Precmd`—applies prompt metadata to it.
+- Completion metadata with a novel next block ID treats an unfinished active block as having executed and completes it using the provided exit code, or advances past an already-finished active block without re-finishing it. Completion evidence is sufficient to choose `DoneWithExecution` even when Polaris Terminal did not observe submission or `Preexec`. It creates that exact next block and—when the evidence came from `Precmd`—applies prompt metadata to it.
 
 The remaining phase-specific policy is:
 
@@ -229,11 +229,11 @@ Record phase, input kind, recovery action, active/hook session IDs, active and s
 
 ### 7. Use one lifecycle pipeline and feature-flag only abnormal recovery
 
-Add `FeatureFlag::TerminalLifecycleRecovery` in `crates/rook_features/src/lib.rs`. Enable it only for dev/dogfood during the two-release compatibility soak; leave it disabled in production.
+Add `FeatureFlag::TerminalLifecycleRecovery` in `crates/pterm_features/src/lib.rs`. Enable it only for dev/dogfood during the two-release compatibility soak; leave it disabled in production.
 
 Do not maintain separate old and new lifecycle-mutation pipelines. Route every lifecycle input through `BlockLifecycleCoordinator` and the shared completion/prompt application helpers unconditionally. Normal transitions, duplicate/collision rejection, and the rule that unsupported evidence never reaches the old unsafe mutation path are always enabled.
 
-Use `TerminalLifecycleRecovery` only when the coordinator selects a non-normal recovery action that would mutate state for a sequence Rook previously mishandled, such as completing from a `Precmd` with completion metadata. When the flag is disabled, keep the same coordinator and diagnostics but conservatively ignore that recovery action. This keeps the flag localized to action selection rather than duplicating lifecycle logic. Ship the protocol-only first slice to stable as soon as possible. The remaining implementation and dev/dogfood enablement may merge during the compatibility soak, but production recovery remains disabled until two additional stable releases have shipped with `Precmd` completion metadata. Leave recovery actions dogfood-only for at least one full week before the human DRI considers production enablement; production promotion and eventual flag removal are not implementation slices in this spec.
+Use `TerminalLifecycleRecovery` only when the coordinator selects a non-normal recovery action that would mutate state for a sequence Polaris Terminal previously mishandled, such as completing from a `Precmd` with completion metadata. When the flag is disabled, keep the same coordinator and diagnostics but conservatively ignore that recovery action. This keeps the flag localized to action selection rather than duplicating lifecycle logic. Ship the protocol-only first slice to stable as soon as possible. The remaining implementation and dev/dogfood enablement may merge during the compatibility soak, but production recovery remains disabled until two additional stable releases have shipped with `Precmd` completion metadata. Leave recovery actions dogfood-only for at least one full week before the human DRI considers production enablement; production promotion and eventual flag removal are not implementation slices in this spec.
 
 Deliver in sequential reviewable slices:
 
@@ -302,13 +302,13 @@ Capture terminal and handler events to assert exact side effects: one `BlockComp
 ### Repository validation
 
 - Run focused `cargo nextest` filters for DCS hooks, block-lifecycle coordinator, terminal model, controller, and shared-session viewer tests.
-- Run `cargo check -p rook --lib`.
+- Run `cargo check -p polaris-terminal --lib`.
 - Run `./script/format`, then the relevant clippy command from `./script/presubmit`, and `git diff --check` before review.
 - Ask the user to manually validate normal/empty/syntax-error commands, an alt-screen command, an in-band command, prompt repaint, subshell/SSH return, shared-session viewing, and an injected missing-`CommandFinished` sequence. Do not use `cargo run` on the user's behalf.
 
 ## Parallelization
 
-Do not parallelize the Rook implementation across child agents. The shared hook schema, shell emitters, transition coordinator, common completion pipeline, and handler events must evolve together; parallel worktrees would make it easy for the duplicated shell payloads and Rust reconciliation contract to drift before either path can be validated end to end.
+Do not parallelize the Polaris Terminal implementation across child agents. The shared hook schema, shell emitters, transition coordinator, common completion pipeline, and handler events must evolve together; parallel worktrees would make it easy for the duplicated shell payloads and Rust reconciliation contract to drift before either path can be validated end to end.
 
 Implement the slices sequentially. Reviewers can still review the protocol/schema foundation separately from recovery behavior through dependent commits, but one owner should integrate and validate the lifecycle semantics end to end.
 
@@ -323,7 +323,7 @@ Implement the slices sequentially. Reviewers can still review the protocol/schem
 - **Incomplete key-value hooks could appear valid through defaults.** Never treat defaulted `CompletionMetadata` as evidence; the decoder/builder must require both completion fields together.
 - **Sharer/viewer block sequences could diverge.** Both parse the same raw shell-generated next block ID from `Precmd` completion metadata; neither generates a recovery ID.
 - **Client-version skew could still diverge during an exceptional sequence.** Preserve normal prompt application for a new viewer of an old sharer, but never let prompt-only evidence complete or advance a block. Accept the rare exceptional divergence rather than emulating unsafe old behavior.
-- **Too many old sharers could limit recovery from `Precmd` completion metadata.** Ship the protocol-only change to stable first and wait through two additional stable releases before enabling recovery actions in production, reducing the active old-sharer population before production Rook relies on the new evidence.
+- **Too many old sharers could limit recovery from `Precmd` completion metadata.** Ship the protocol-only change to stable first and wait through two additional stable releases before enabling recovery actions in production, reducing the active old-sharer population before production Polaris Terminal relies on the new evidence.
 - **Unexpected transition volume could hide a producer regression.** Dogfood rollout and rate-limited structured telemetry provide visibility before broader enablement.
 
 ## Follow-ups

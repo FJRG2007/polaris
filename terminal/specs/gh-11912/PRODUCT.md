@@ -1,6 +1,6 @@
 # Queue terminal commands alongside prompts
 
-GitHub: [FJRG2007/rook#11912](https://github.com/FJRG2007/rook/issues/11912). Builds on the v2 queued-prompts panel from [`specs/REMOTE-1543/PRODUCT.md`](../REMOTE-1543/PRODUCT.md) and [`specs/APP-4562/PRODUCT.md`](../APP-4562/PRODUCT.md).
+GitHub: [FJRG2007/polaris#11912](https://github.com/FJRG2007/polaris/issues/11912). Builds on the v2 queued-prompts panel from [`specs/REMOTE-1543/PRODUCT.md`](../REMOTE-1543/PRODUCT.md) and [`specs/APP-4562/PRODUCT.md`](../APP-4562/PRODUCT.md).
 
 Figma: none provided (the only new visual is a shell-mode `!` prefix on command rows).
 

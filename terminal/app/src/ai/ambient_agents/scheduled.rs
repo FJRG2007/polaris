@@ -6,8 +6,8 @@ pub use cloud_object_models::{
 };
 use futures::FutureExt;
 use futures::channel::oneshot;
-use rook_graphql::queries::get_scheduled_agent_history::ScheduledAgentHistory;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use pterm_graphql::queries::get_scheduled_agent_history::ScheduledAgentHistory;
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 use serde_json::{Map, Value};
 
 use crate::cloud_object::model::generic_string_model::StringModel;
@@ -108,7 +108,7 @@ pub struct UpdateScheduleParams {
     pub skill_spec: Option<Option<String>>,
     /// The new worker host for the scheduled agent.
     /// If not provided, the worker host will not be updated.
-    /// Setting to "rook" or empty string reverts to Rook-hosted.
+    /// Setting to "polaris-terminal" or empty string reverts to Polaris Terminal-hosted.
     pub worker_host: Option<String>,
 }
 
@@ -141,7 +141,7 @@ impl ScheduledAgentManager {
         &self,
         schedule_id: SyncId,
         app: &AppContext,
-    ) -> impl rookui::r#async::Spawnable<Output = anyhow::Result<Option<ScheduledAgentHistory>>> + use<>
+    ) -> impl ptermui::r#async::Spawnable<Output = anyhow::Result<Option<ScheduledAgentHistory>>> + use<>
     {
         let ai_client = ServerApiProvider::as_ref(app).get_ai_client();
 

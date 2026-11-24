@@ -10,19 +10,19 @@ use onboarding::{
     SelectedSettings,
 };
 use pathfinder_color::ColorU;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::icons::Icon;
-use rook_core::ui::theme::{
-    AnsiColor, AnsiColors, Details, Fill, Image, RookTheme, TerminalColors,
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::icons::Icon;
+use pterm_core::ui::theme::{
+    AnsiColor, AnsiColors, Details, Fill, Image, PtermTheme, TerminalColors,
 };
-use rookui_core::assets::asset_cache::AssetSource;
-use rookui_core::elements::{
+use ptermui_core::assets::asset_cache::AssetSource;
+use ptermui_core::elements::{
     Container, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize, ParentElement,
 };
-use rookui_core::fonts::{Cache, FamilyId, Weight};
-use rookui_core::presenter::ChildView;
-use rookui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
-use rookui_core::{
+use ptermui_core::fonts::{Cache, FamilyId, Weight};
+use ptermui_core::presenter::ChildView;
+use ptermui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui_core::{
     AddWindowOptions, AppContext, AssetProvider, Element, Entity, SingletonEntity as _,
     TypedActionView, View, ViewContext, ViewHandle, platform,
 };
@@ -60,7 +60,7 @@ fn demo_offer_variant() -> Option<OfferVariant> {
 
 fn main() -> Result<()> {
     // Initialize logging for the onboarding binary.
-    rook_logging::init(rook_logging::LogConfig {
+    pterm_logging::init(pterm_logging::LogConfig {
         log_destination: None,
         ..Default::default()
     })?;
@@ -72,11 +72,11 @@ fn main() -> Result<()> {
     // channel; this demo has no channel, so it previews the flag defaults.
     if demo_offer_variant().is_some() {
         // Except for this one, which the offer slides live behind.
-        rook_core::features::FeatureFlag::AccountFirstOnboarding.set_enabled(true);
+        pterm_core::features::FeatureFlag::AccountFirstOnboarding.set_enabled(true);
     }
-    rook_core::features::mark_initialized();
+    pterm_core::features::mark_initialized();
 
-    let app_builder = rookui::platform::AppBuilder::new(
+    let app_builder = ptermui::platform::AppBuilder::new(
         platform::AppCallbacks::default(),
         Box::new(ASSETS),
         None,
@@ -302,7 +302,7 @@ impl View for OnboardingMainView {
         }
     }
 
-    fn on_focus(&mut self, focus_ctx: &rookui_core::FocusContext, ctx: &mut ViewContext<Self>) {
+    fn on_focus(&mut self, focus_ctx: &ptermui_core::FocusContext, ctx: &mut ViewContext<Self>) {
         if let OnboardingMainState::Onboarding(view) = &self.state
             && focus_ctx.is_self_focused()
         {
@@ -421,8 +421,8 @@ fn adeberry_colors() -> TerminalColors {
     TerminalColors::new(ADEBERRY_NORMAL_COLORS, ADEBERRY_BRIGHT_COLORS)
 }
 
-fn dark_theme() -> RookTheme {
-    RookTheme::new(
+fn dark_theme() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x000000FF)),
         ColorU::from_u32(0xffffffff),
         Fill::Solid(ColorU::from_u32(0x19AAD8FF)),
@@ -434,8 +434,8 @@ fn dark_theme() -> RookTheme {
     )
 }
 
-fn light_theme() -> RookTheme {
-    RookTheme::new(
+fn light_theme() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::white()),
         ColorU::new(17, 17, 17, 0xFF),
         Fill::Solid(ColorU::from_u32(0x00c2ffff)),
@@ -447,8 +447,8 @@ fn light_theme() -> RookTheme {
     )
 }
 
-fn phenomenon() -> RookTheme {
-    RookTheme::new(
+fn phenomenon() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x121212FF)),
         ColorU::from_u32(0xFAF9F6FF),
         Fill::Solid(ColorU::from_u32(0x2E5D9EFF)),
@@ -466,8 +466,8 @@ fn phenomenon() -> RookTheme {
     )
 }
 
-fn adeberry() -> RookTheme {
-    RookTheme::new(
+fn adeberry() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x1D2022FF)),
         ColorU::from_u32(0xE4EEF5FF),
         Fill::Solid(ColorU::from_u32(0x6C96B4FF)),
@@ -479,7 +479,7 @@ fn adeberry() -> RookTheme {
     )
 }
 
-fn build_appearance(theme: RookTheme, ctx: &mut AppContext) -> Appearance {
+fn build_appearance(theme: PtermTheme, ctx: &mut AppContext) -> Appearance {
     let ui_font_family =
         load_default_ui_font_family(ctx).expect("unable to load default ui font family");
 

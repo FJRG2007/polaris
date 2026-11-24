@@ -94,7 +94,7 @@ impl ScopedCredential {
     }
 }
 
-/// Authorization grant issued by the localhost server running inside Rook for a
+/// Authorization grant issued by the localhost server running inside Polaris Terminal for a
 /// single action.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CredentialGrant {
@@ -135,7 +135,7 @@ impl CredentialGrant {
         if &self.instance_id != instance_id {
             return Err(ControlError::new(
                 ErrorCode::UnauthorizedLocalClient,
-                "local-control credential belongs to a different Rook instance",
+                "local-control credential belongs to a different Polaris Terminal instance",
             ));
         }
         if self.action != action {

@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-pub use ai_types::{RookAiExecutionContext, RookAiOsContext};
+pub use ai_types::{PtermAiExecutionContext, PtermAiOsContext};
 
 use crate::terminal::model::session::Session;
 
 /// Build the execution context that describes the given session.
-pub fn execution_context_for_session(session: &Arc<Session>) -> RookAiExecutionContext {
-    RookAiExecutionContext {
-        os: RookAiOsContext {
+pub fn execution_context_for_session(session: &Arc<Session>) -> PtermAiExecutionContext {
+    PtermAiExecutionContext {
+        os: PtermAiOsContext {
             category: session.host_info().os_category.clone(),
             distribution: session.host_info().linux_distribution.clone(),
         },

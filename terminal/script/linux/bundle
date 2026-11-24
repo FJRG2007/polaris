@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Builds a Rook binary and bundles it up for distribution.
+# Builds a Polaris Terminal binary and bundles it up for distribution.
 
 set -e
 
@@ -85,8 +85,8 @@ while (( "$#" )); do
       ;;
     --artifact)
       if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
-        if [[ "$2" != "app" && "$2" != "cli" && "$2" != "rookctrl" && "$2" != "tui" ]]; then
-          echo "Error: --artifact must be 'app', 'cli', 'rookctrl', or 'tui', got '$2'" >&2
+        if [[ "$2" != "app" && "$2" != "cli" && "$2" != "ptermctrl" && "$2" != "tui" ]]; then
+          echo "Error: --artifact must be 'app', 'cli', 'ptermctrl', or 'tui', got '$2'" >&2
           exit 1
         fi
         ARTIFACT="$2"
@@ -143,8 +143,8 @@ if [[ "$ARTIFACT" == "tui" && "$BUILD" == "true" && "$BUILD_ARCH" != "$HOST_ARCH
   exit 1
 fi
 
-# Statically compile the CLI and rookctrl artifacts so they can run on older Linux distros.
-if [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "rookctrl" ]]; then
+# Statically compile the CLI and ptermctrl artifacts so they can run on older Linux distros.
+if [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "ptermctrl" ]]; then
   TARGET_TRIPLE="${BUILD_ARCH}-unknown-linux-musl"
   # Only configure the musl toolchain when we are actually compiling.  Packaging-only
   # runs (--skip-build) just need TARGET_TRIPLE to locate the prebuilt binary, and
@@ -167,13 +167,13 @@ elif [[ $RELEASE_CHANNEL = "local" || $RELEASE_CHANNEL = "dev" ]]; then
   # For dev bundles, we want to enable debug assertions to
   # catch violations that would otherwise silently pass in
   # a normal release build (e.g. in stable).
-  if [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "rookctrl" || "$ARTIFACT" == "tui" ]]; then
+  if [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "ptermctrl" || "$ARTIFACT" == "tui" ]]; then
     CARGO_PROFILE="release-cli-debug_assertions"
   else
     CARGO_PROFILE="release-lto-debug_assertions"
   fi
 else
-  if [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "rookctrl" || "$ARTIFACT" == "tui" ]]; then
+  if [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "ptermctrl" || "$ARTIFACT" == "tui" ]]; then
     CARGO_PROFILE="release-cli"
   else
     CARGO_PROFILE="release-lto"
@@ -196,37 +196,37 @@ mkdir -p "$OUT_DIR"
 # APP_NAME here must match the value used in Rust as the
 # application name; see app/src/channel.rs.
 #
-# ROOK_BIN is the name of the binary produced by cargo;
+# POLARIS_TERMINAL_BIN is the name of the binary produced by cargo;
 # BINARY_NAME is the desired name of the binary in the final package.
 if [[ $RELEASE_CHANNEL = "local" ]]; then
-  ROOK_BIN="rook"
-  BINARY_NAME="rook-local"
-  APP_NAME="RookLocal"
+  POLARIS_TERMINAL_BIN="polaris-terminal"
+  BINARY_NAME="polaris-terminal-local"
+  APP_NAME="PolarisTerminalLocal"
   FEATURES="$FEATURES,agent_mode_debug"
   export HANDLE_MARKDOWN=1
 elif [[ $RELEASE_CHANNEL = "dev" ]]; then
-  ROOK_BIN="dev"
-  BINARY_NAME="rook-dev"
-  APP_NAME="RookDev"
+  POLARIS_TERMINAL_BIN="dev"
+  BINARY_NAME="polaris-terminal-dev"
+  APP_NAME="PolarisTerminalDev"
   FEATURES="$FEATURES,agent_mode_debug"
   # Enable heap usage tracking & profiling using jemalloc through pprof.
   FEATURES="$FEATURES,jemalloc_pprof,heap_usage_tracking"
   export HANDLE_MARKDOWN=1
 elif [[ $RELEASE_CHANNEL = "preview" ]]; then
-  ROOK_BIN="preview"
-  BINARY_NAME="rook-preview"
-  APP_NAME="RookPreview"
+  POLARIS_TERMINAL_BIN="preview"
+  BINARY_NAME="polaris-terminal-preview"
+  APP_NAME="PolarisTerminalPreview"
   FEATURES="$FEATURES,preview_channel"
   # Enable heap usage tracking & profiling using jemalloc through pprof.
   FEATURES="$FEATURES,jemalloc_pprof,heap_usage_tracking"
 elif [[ $RELEASE_CHANNEL = "stable" ]]; then
-  ROOK_BIN="stable"
-  BINARY_NAME="rook"
-  APP_NAME="Rook"
+  POLARIS_TERMINAL_BIN="stable"
+  BINARY_NAME="polaris-terminal"
+  APP_NAME="Polaris Terminal"
 elif [[ $RELEASE_CHANNEL = "oss" ]]; then
-  ROOK_BIN="rook-oss"
-  BINARY_NAME="rook-oss"
-  APP_NAME="RookOss"
+  POLARIS_TERMINAL_BIN="polaris-terminal"
+  BINARY_NAME="polaris-terminal"
+  APP_NAME="PolarisTerminal"
   # The OSS channel does not ship Sentry, so drop the crash_reporting feature
   # (which would otherwise pull in the Sentry SDK as a dependency).
   FEATURES="release_bundle"
@@ -234,39 +234,39 @@ fi
 
 # Artifact-specific binary naming
 if [[ "$ARTIFACT" == "cli" ]]; then
-  # For CLI artifacts, use oz instead of rook as the binary name.  The OSS
-  # channel is an exception: its CLI command name is `rook-oss`, matching
+  # For CLI artifacts, use oz instead of polaris-terminal as the binary name.  The OSS
+  # channel is an exception: its CLI command name is `polaris-terminal`, matching
   # `Channel::cli_command_name` in the Rust source.
   if [[ $RELEASE_CHANNEL != "oss" ]]; then
-    BINARY_NAME="${BINARY_NAME/rook/oz}"
+    BINARY_NAME="${BINARY_NAME/polaris-terminal/oz}"
   fi
-elif [[ "$ARTIFACT" == "rookctrl" ]]; then
-  BINARY_NAME="rookctrl"
+elif [[ "$ARTIFACT" == "ptermctrl" ]]; then
+  BINARY_NAME="ptermctrl"
   PACKAGES=()
 elif [[ "$ARTIFACT" == "tui" ]]; then
   case "$RELEASE_CHANNEL" in
-    local) ROOK_BIN="rook-tui" ;;
-    oss) ROOK_BIN="rook-tui-oss" ;;
-    *) ROOK_BIN="rook-tui-$RELEASE_CHANNEL" ;;
+    local) POLARIS_TERMINAL_BIN="polaris-terminal-tui" ;;
+    oss) POLARIS_TERMINAL_BIN="polaris-terminal-tui-oss" ;;
+    *) POLARIS_TERMINAL_BIN="polaris-terminal-tui-$RELEASE_CHANNEL" ;;
   esac
-  BINARY_NAME="$ROOK_BIN"
+  BINARY_NAME="$POLARIS_TERMINAL_BIN"
   PACKAGES=()
 fi
 
 # Artifact-specific configuration
-if [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "rookctrl" ]]; then
+if [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "ptermctrl" ]]; then
   FEATURES="$FEATURES,standalone"
-  if [[ "$ARTIFACT" == "rookctrl" ]]; then
-    FEATURES="$FEATURES,rook_control_cli"
+  if [[ "$ARTIFACT" == "ptermctrl" ]]; then
+    FEATURES="$FEATURES,pterm_control_cli"
   fi
 elif [[ "$ARTIFACT" == "tui" ]]; then
   # The TUI is a separate console crate with its own per-channel bins and a
   # minimal feature set. It uses the native GNU target so the Linux clipboard
   # backends can link against the host's Wayland/X11 libraries. Deliberately
   # omit `voice_input` so portable bundles do not require the host ALSA runtime.
-  ROOK_TUI_FEATURES="release_bundle,standalone"
+  POLARIS_TERMINAL_TUI_FEATURES="release_bundle,standalone"
   if [[ "$RELEASE_CHANNEL" != "oss" ]]; then
-    ROOK_TUI_FEATURES="$ROOK_TUI_FEATURES,crash_reporting"
+    POLARIS_TERMINAL_TUI_FEATURES="$POLARIS_TERMINAL_TUI_FEATURES,crash_reporting"
   fi
 elif [[ "$ARTIFACT" == "app" ]]; then
   # All channels ship the v3 classifier and v2 heuristic.
@@ -274,14 +274,14 @@ elif [[ "$ARTIFACT" == "app" ]]; then
 fi
 if [[ -n "$EXTRA_FEATURES" ]]; then
   if [[ "$ARTIFACT" == "tui" ]]; then
-    ROOK_TUI_FEATURES="$ROOK_TUI_FEATURES,$EXTRA_FEATURES"
+    POLARIS_TERMINAL_TUI_FEATURES="$POLARIS_TERMINAL_TUI_FEATURES,$EXTRA_FEATURES"
   else
     FEATURES="$FEATURES,$EXTRA_FEATURES"
   fi
 fi
 
-BUNDLE_ID="dev.rook.$APP_NAME"
-EXECUTABLE_PATH="$CARGO_TARGET_OUTPUT_DIR/$ROOK_BIN"
+BUNDLE_ID="dev.polaris.$APP_NAME"
+EXECUTABLE_PATH="$CARGO_TARGET_OUTPUT_DIR/$POLARIS_TERMINAL_BIN"
 DEBUG_EXECUTABLE_PATH="$EXECUTABLE_PATH.debug"
 
 # Note that this variable must be set (and exported!) before we compile the
@@ -294,20 +294,20 @@ export APPIMAGE_NAME="$APP_NAME-$BUILD_ARCH.AppImage"
 # using the same feature flags and profile that we would be using in production.
 if [[ "$CHECK_ONLY" == "true" ]]; then
   if [[ "$ARTIFACT" == "tui" ]]; then
-    cargo check -p rook_tui --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --features "$ROOK_TUI_FEATURES"
+    cargo check -p pterm_tui --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --features "$POLARIS_TERMINAL_TUI_FEATURES"
   else
-    cargo check -p rook --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --features "$FEATURES" ${TARGET_TRIPLE:+--target $TARGET_TRIPLE}
+    cargo check -p polaris-terminal --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --features "$FEATURES" ${TARGET_TRIPLE:+--target $TARGET_TRIPLE}
   fi
   exit 0
 fi
 
 # Build the binary.
 if [[ "$BUILD" == "true" ]]; then
-  echo "Building and bundling Rook for channel $RELEASE_CHANNEL and bundle id $BUNDLE_ID"
+  echo "Building and bundling Polaris Terminal for channel $RELEASE_CHANNEL and bundle id $BUNDLE_ID"
   if [[ "$ARTIFACT" == "tui" ]]; then
-    cargo build -p rook_tui --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --features "$ROOK_TUI_FEATURES"
+    cargo build -p pterm_tui --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --features "$POLARIS_TERMINAL_TUI_FEATURES"
   else
-    cargo build -p rook --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --features "$FEATURES" ${TARGET_TRIPLE:+--target $TARGET_TRIPLE}
+    cargo build -p polaris-terminal --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --features "$FEATURES" ${TARGET_TRIPLE:+--target $TARGET_TRIPLE}
   fi
 
   echo "Making debug copy of '$EXECUTABLE_PATH' at '$DEBUG_EXECUTABLE_PATH'"
@@ -317,35 +317,35 @@ if [[ "$BUILD" == "true" ]]; then
   if [[ $RELEASE_CHANNEL = "dev" ]]; then
     # For dev builds, only strip debug symbols, as we want to keep some
     # symbols for profiling purposes.
-    "${ROOK_MUSL_STRIP:-strip}" --strip-debug "$EXECUTABLE_PATH"
+    "${POLARIS_TERMINAL_MUSL_STRIP:-strip}" --strip-debug "$EXECUTABLE_PATH"
   else
     # For production builds, strip all symbols, to keep the binary size
     # smaller.
-    "${ROOK_MUSL_STRIP:-strip}" --strip-all "$EXECUTABLE_PATH"
+    "${POLARIS_TERMINAL_MUSL_STRIP:-strip}" --strip-all "$EXECUTABLE_PATH"
   fi
 else
   echo 'Skipping `cargo build` step due to --skip-build argument'
 fi
 
-if [[ "$ARTIFACT" == "rookctrl" ]]; then
-  echo "Copying control-mode binary into $OUT_DIR/$ROOK_BIN"
-  cp "$EXECUTABLE_PATH" "$OUT_DIR/$ROOK_BIN"
-  ROOKCTRL_SCRIPT_PATH="$OUT_DIR/rookctrl"
-  echo "Creating rookctrl wrapper script at $ROOKCTRL_SCRIPT_PATH"
-  cat > "$ROOKCTRL_SCRIPT_PATH" << EOF
+if [[ "$ARTIFACT" == "ptermctrl" ]]; then
+  echo "Copying control-mode binary into $OUT_DIR/$POLARIS_TERMINAL_BIN"
+  cp "$EXECUTABLE_PATH" "$OUT_DIR/$POLARIS_TERMINAL_BIN"
+  POLARIS_TERMINALCTRL_SCRIPT_PATH="$OUT_DIR/ptermctrl"
+  echo "Creating ptermctrl wrapper script at $POLARIS_TERMINALCTRL_SCRIPT_PATH"
+  cat > "$POLARIS_TERMINALCTRL_SCRIPT_PATH" << EOF
 #!/usr/bin/env bash
 script_dir="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-exec "\$script_dir/$ROOK_BIN" --rookctrl "\$@"
+exec "\$script_dir/$POLARIS_TERMINAL_BIN" --ptermctrl "\$@"
 EOF
-  chmod +x "$ROOKCTRL_SCRIPT_PATH"
+  chmod +x "$POLARIS_TERMINALCTRL_SCRIPT_PATH"
 fi
 BINARY_PATH="$EXECUTABLE_PATH"
-if [[ "$ARTIFACT" == "rookctrl" ]]; then
-  BINARY_PATH="$ROOKCTRL_SCRIPT_PATH"
+if [[ "$ARTIFACT" == "ptermctrl" ]]; then
+  BINARY_PATH="$POLARIS_TERMINALCTRL_SCRIPT_PATH"
 elif [[ "$ARTIFACT" == "tui" ]]; then
-  echo "Copying TUI binary into $OUT_DIR/$ROOK_BIN"
-  cp "$EXECUTABLE_PATH" "$OUT_DIR/$ROOK_BIN"
-  BINARY_PATH="$OUT_DIR/$ROOK_BIN"
+  echo "Copying TUI binary into $OUT_DIR/$POLARIS_TERMINAL_BIN"
+  cp "$EXECUTABLE_PATH" "$OUT_DIR/$POLARIS_TERMINAL_BIN"
+  BINARY_PATH="$OUT_DIR/$POLARIS_TERMINAL_BIN"
 fi
 
 if [[ "${SKIP_SETTINGS_SCHEMA:-}" != "1" && -z "${SETTINGS_SCHEMA_EXECUTABLE:-}" && -z "${SETTINGS_SCHEMA_SOURCE:-}" ]]; then
@@ -356,7 +356,7 @@ if [[ "${SKIP_SETTINGS_SCHEMA:-}" != "1" && -z "${SETTINGS_SCHEMA_EXECUTABLE:-}"
     echo "Error: --skip-build requires SETTINGS_SCHEMA_SOURCE or SETTINGS_SCHEMA_EXECUTABLE." >&2
     exit 1
   elif [[ "$BUILD_ARCH" != "$HOST_ARCH" ]]; then
-    # The CLI/rookctrl artifacts can be cross-compiled (see the musl toolchain
+    # The CLI/ptermctrl artifacts can be cross-compiled (see the musl toolchain
     # setup above); the resulting binary cannot then be executed on this host
     # to generate a schema, so require the caller to supply one explicitly
     # instead of failing later with an opaque exec format error.
@@ -381,7 +381,7 @@ if [[ "${SKIP_SETTINGS_SCHEMA:-}" != "1" && -n "${SETTINGS_SCHEMA_EXECUTABLE:-}"
 fi
 
 # Prepare bundled resources for standalone builds.
-if [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "rookctrl" || "$ARTIFACT" == "tui" ]]; then
+if [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "ptermctrl" || "$ARTIFACT" == "tui" ]]; then
   echo "Preparing standalone resources directory"
   BUNDLED_RESOURCES_DIR="$OUT_DIR/resources"
   "$WORKSPACE_ROOT_DIR/script/prepare_bundled_resources" "$BUNDLED_RESOURCES_DIR" "$RELEASE_CHANNEL"

@@ -8,9 +8,9 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "local_fs")]
-use rookui::SingletonEntity;
-use rookui::elements::ChildView;
-use rookui::{Element, Entity, ModelHandle, View, ViewContext, ViewHandle};
+use ptermui::SingletonEntity;
+use ptermui::elements::ChildView;
+use ptermui::{Element, Entity, ModelHandle, View, ViewContext, ViewHandle};
 
 use crate::ai::blocklist::agent_view::AgentViewController;
 #[cfg(feature = "local_fs")]
@@ -224,7 +224,7 @@ impl View for InlineReposMenuView {
         "InlineReposMenuView"
     }
 
-    fn render(&self, _app: &rookui::AppContext) -> Box<dyn Element> {
+    fn render(&self, _app: &ptermui::AppContext) -> Box<dyn Element> {
         ChildView::new(&self.menu_view).finish()
     }
 }

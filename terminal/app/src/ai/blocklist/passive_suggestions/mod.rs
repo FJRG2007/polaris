@@ -10,7 +10,7 @@ pub use maa::{
     PassiveSuggestionsEvent as MaaPassiveSuggestionsEvent,
     PassiveSuggestionsModel as MaaPassiveSuggestionsModel,
 };
-use rookui::ModelHandle;
+use ptermui::ModelHandle;
 
 #[derive(Clone)]
 pub struct PassiveSuggestionsModels {

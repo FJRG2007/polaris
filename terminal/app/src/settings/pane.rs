@@ -40,7 +40,7 @@ define_settings_group!(PaneSettings, settings: [
 ///
 /// Keys match as directory prefixes, so a name set on a repository root also
 /// covers everything inside it, and the longest key wins: a name on
-/// `.../rook/app` takes precedence over one on `.../rook`. The prefix has to
+/// `.../polaris-terminal/app` takes precedence over one on `.../polaris-terminal`. The prefix has to
 /// end on a path component, so `/src/foo` is not covered by a key of `/src/f`.
 pub fn default_pane_name_for_path<'a>(
     names_by_path: &'a HashMap<String, String>,

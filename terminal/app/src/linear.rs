@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use url::Url;
 
-/// Actions that can be performed via the `rook://linear/...` deeplink.
+/// Actions that can be performed via the `polaris-terminal://linear/...` deeplink.
 #[derive(Debug, PartialEq, Eq)]
 pub enum LinearAction {
     /// Open a new agent view tab to work on a Linear issue.

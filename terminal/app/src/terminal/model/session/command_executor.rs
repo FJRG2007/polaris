@@ -27,12 +27,12 @@ pub use in_band_command_executor::{
 #[cfg(feature = "local_tty")]
 pub use local_command_executor::LocalCommandExecutor;
 pub use noop_command_executor::NoOpCommandExecutor;
+use pterm_completer::completer::CommandOutput;
+#[cfg(feature = "local_tty")]
+use pterm_errors::report_error;
+use ptermui::ModelContext;
 #[cfg(feature = "local_tty")]
 pub use remote_command_executor::RemoteCommandExecutor;
-use rook_completer::completer::CommandOutput;
-#[cfg(feature = "local_tty")]
-use rook_errors::report_error;
-use rookui::ModelContext;
 pub use shared::{ExecutorCommandEvent, shell_escape_single_quotes, shell_quote_arg};
 
 use super::SessionInfo;
@@ -149,8 +149,8 @@ fn new_command_executor_for_local_tty_session(
     ctx: &mut ModelContext<Sessions>,
 ) -> Arc<dyn CommandExecutor> {
     use msys2_command_executor::MSYS2CommandExecutor;
+    use ptermui::SingletonEntity as _;
     use remote_server_executor::RemoteServerCommandExecutor;
-    use rookui::SingletonEntity as _;
     use settings::Setting as _;
     use wsl_command_executor::WslCommandExecutor;
 
@@ -211,7 +211,7 @@ fn new_command_executor_for_local_tty_session(
     //
     // TODO(advait): For production this should be a dedicated
     // `SandboxCommandExecutor` that runs generators via
-    // `sbx exec rook-sandbox-<id> -- sh -c "<cmd>"` (analogous to
+    // `sbx exec polaris-terminal-sandbox-<id> -- sh -c "<cmd>"` (analogous to
     // how `LocalCommandExecutor` spawns fresh subprocesses for the
     // host-shell path). That would avoid serializing generators
     // through the user's live PTY (slower, blocked by long-running
@@ -291,7 +291,7 @@ fn new_command_executor_for_local_tty_session(
                 }
             }
         }
-        BootstrapSessionType::RookifiedRemote
+        BootstrapSessionType::PtermifiedRemote
             if is_ssh_wrapper_session
                 && !FeatureFlag::InBandGeneratorsForSSH.is_enabled()
                 && !force_use_in_band_generators =>
@@ -318,7 +318,7 @@ fn new_command_executor_for_local_tty_session(
                 // This code path exists as a fail-safe for disabling in-band
                 // generators if some unforeseen severe issue surfaces during or
                 // shortly after subshells launch. The setting that triggers this
-                // codepath is only accessible via a user defaults command that a Rook
+                // codepath is only accessible via a user defaults command that a Polaris Terminal
                 // engineer would have given to the user via some first-hand
                 // correspondence (e.g. GitHub issues).
                 log::info!("creating a no-op executor!");
@@ -353,7 +353,7 @@ fn new_command_executor_for_local_tty_session(
 pub mod testing {
     use anyhow::anyhow;
     use command::r#async::Command;
-    use rook_completer::completer::CommandOutput;
+    use pterm_completer::completer::CommandOutput;
 
     use super::*;
     use crate::terminal::shell::ShellType;

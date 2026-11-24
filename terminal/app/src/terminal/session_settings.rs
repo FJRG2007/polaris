@@ -5,8 +5,8 @@ pub mod working_directory_config;
 use instant::Duration;
 use lazy_static::lazy_static;
 pub use new_session_shell::*;
-use rook_core::settings::macros::define_settings_group;
-use rook_core::settings::{RespectUserSyncSetting, SupportedPlatforms, SyncToCloud};
+use pterm_core::settings::macros::define_settings_group;
+use pterm_core::settings::{RespectUserSyncSetting, SupportedPlatforms, SyncToCloud};
 use serde::{Deserialize, Serialize};
 pub use startup_shell::*;
 pub use working_directory_config::*;
@@ -284,7 +284,7 @@ define_settings_group!(SessionSettings, settings: [
         surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "session.startup_shell_override",
-        description: "The shell to use when Rook starts up.",
+        description: "The shell to use when Polaris Terminal starts up.",
     },
     new_session_shell_override: NewSessionShellOverride {
         type: Option<NewSessionShell>,
@@ -304,7 +304,7 @@ define_settings_group!(SessionSettings, settings: [
         surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "terminal.input.honor_ps1",
-        description: "Whether to use your shell's PS1 prompt instead of the Rook prompt.",
+        description: "Whether to use your shell's PS1 prompt instead of the Polaris Terminal prompt.",
     },
     saved_prompt: SavedPrompt {
         type: PromptSelection,
@@ -374,7 +374,7 @@ define_settings_group!(SessionSettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.input.show_model_selectors_in_prompt",
+        toml_path: "agents.pterm_agent.input.show_model_selectors_in_prompt",
         description: "Whether to show AI model selectors in the input prompt.",
     },
     agent_footer_chip_selection: AgentToolbarChipSelectionSetting {
@@ -384,7 +384,7 @@ define_settings_group!(SessionSettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.input.agent_toolbar_chip_selection_setting",
+        toml_path: "agents.pterm_agent.input.agent_toolbar_chip_selection_setting",
         description: "Controls the layout of context chips in the Agent Mode toolbar.",
     },
     cli_agent_footer_chip_selection: CLIAgentToolbarChipSelectionSetting {

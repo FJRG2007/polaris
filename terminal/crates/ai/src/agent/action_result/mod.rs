@@ -6,8 +6,8 @@ use std::time::{Duration, SystemTime};
 
 use chrono::{DateTime, Local};
 use itertools::Itertools as _;
-use rook_core::command::ExitCode;
-use rook_terminal::model::BlockId;
+use pterm_core::command::ExitCode;
+use pterm_terminal::model::BlockId;
 use serde::{Deserialize, Serialize};
 use warp_multi_agent_api::StoredScreenshotRef;
 use warp_multi_agent_api::apply_file_diffs_result::success::UpdatedFileContent;
@@ -1228,7 +1228,7 @@ pub enum UseComputerResult {
 pub enum ScreenshotSource {
     /// The bytes are inline on the client.
     Inline(computer_use::Screenshot),
-    /// The bytes live in Rook-managed object storage and must be fetched via a
+    /// The bytes live in Polaris Terminal-managed object storage and must be fetched via a
     /// signed URL.
     Stored {
         stored_ref: StoredScreenshotRef,

@@ -2,7 +2,7 @@
 
 ## Summary
 
-When the user's `settings.toml` file contains errors — either the entire file is syntactically invalid TOML, or individual setting values cannot be deserialized into their expected types — Rook shows a dismissible warning banner at the top of the workspace. The banner tells the user what went wrong and provides a button to open the file in Rook's editor so they can fix it.
+When the user's `settings.toml` file contains errors — either the entire file is syntactically invalid TOML, or individual setting values cannot be deserialized into their expected types — Polaris Terminal shows a dismissible warning banner at the top of the workspace. The banner tells the user what went wrong and provides a button to open the file in Polaris Terminal's editor so they can fix it.
 
 ## Problem
 
@@ -45,7 +45,7 @@ The settings error banner sits just below the reauth banner in priority. If the 
 
 ### "Open settings file" button
 
-The banner includes an "Open settings file" button styled consistently with other workspace banner buttons. Clicking it opens `settings.toml` in a new editor pane (using Rook's built-in code editor, same as opening any other file).
+The banner includes an "Open settings file" button styled consistently with other workspace banner buttons. Clicking it opens `settings.toml` in a new editor pane (using Polaris Terminal's built-in code editor, same as opening any other file).
 
 ### Dismiss behavior
 
@@ -70,10 +70,10 @@ The banner includes an "Open settings file" button styled consistently with othe
 
 1. When `settings.toml` contains invalid TOML syntax on startup, a warning banner is visible after the workspace loads.
 2. When `settings.toml` contains a valid TOML structure but with an invalid value for a known setting on startup, a warning banner is visible.
-3. When a running Rook instance detects a file change that introduces a TOML syntax error, the banner appears within a few seconds.
-4. When a running Rook instance detects a file change that introduces an invalid setting value, the banner appears within a few seconds.
+3. When a running Polaris Terminal instance detects a file change that introduces a TOML syntax error, the banner appears within a few seconds.
+4. When a running Polaris Terminal instance detects a file change that introduces an invalid setting value, the banner appears within a few seconds.
 5. When the user fixes the file and the watcher picks up the change, the banner disappears automatically.
-6. The "Open settings file" button opens `settings.toml` in Rook's code editor.
+6. The "Open settings file" button opens `settings.toml` in Polaris Terminal's code editor.
 7. The close (✕) button dismisses the banner until a new error event arrives.
 8. The banner does not appear when there are no errors in the settings file.
 
@@ -81,7 +81,7 @@ The banner includes an "Open settings file" button styled consistently with othe
 
 - **Unit tests**: Verify `reload_all_public_settings` returns failed keys for invalid values and empty for valid values. Verify `validate_all_public_settings` detects invalid stored values without modifying state.
 - **Integration tests**: Four integration tests covering the startup × reload and whole-file × individual-value error matrix. Each test asserts the banner is visible (or not) by checking `has_settings_file_error_banner()` on the workspace view. The reload-with-fix test also verifies the banner clears.
-- **Manual validation**: Break `settings.toml` with a syntax error, launch Rook, confirm the banner is visible with the correct message and button. Fix the file, confirm the banner clears. Repeat with an invalid value (e.g. `font_size = "abc"`).
+- **Manual validation**: Break `settings.toml` with a syntax error, launch Polaris Terminal, confirm the banner is visible with the correct message and button. Fix the file, confirm the banner clears. Repeat with an invalid value (e.g. `font_size = "abc"`).
 
 ## Follow-ups
 

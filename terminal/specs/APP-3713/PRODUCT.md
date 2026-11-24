@@ -141,7 +141,7 @@ The search input already indexes both the primary text and the working directory
 - **Expanded mode**: With "Directory / Branch" selected, verify the primary line shows the working directory (start-clipped) + git branch in main-text color, and the secondary line shows the terminal title or agent info in sub-text color.
 - **Compact mode**: Switch to compact mode with "Directory / Branch" selected. Verify the single-line row shows terminal icon + working directory.
 - **Agent panes**: Start an agent conversation. With "Directory / Branch" selected, verify the expanded secondary line shows the status indicator + conversation title. In compact mode, verify the status icon + working directory.
-- **Persistence**: Select "Directory / Branch", quit Rook, relaunch, and verify the setting is preserved.
+- **Persistence**: Select "Directory / Branch", quit Polaris Terminal, relaunch, and verify the setting is preserved.
 - **Non-terminal panes**: Open a code pane or notebook. Verify changing the primary info setting has no effect on these rows.
 - **Search**: With "Directory / Branch" as primary, search for a terminal title string. Verify it still matches (search indexes both fields regardless of display order).
 

@@ -5,12 +5,12 @@
 
 use std::collections::HashMap;
 
-use rook::features::FeatureFlag;
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use rook::settings::{CodeSettings, DebugSettings, FontSettings};
-use rookui_core::integration::TestStep;
-use rookui_core::{SingletonEntity, async_assert, async_assert_eq};
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::settings::{CodeSettings, DebugSettings, FontSettings};
+use ptermui_core::integration::TestStep;
+use ptermui_core::{SingletonEntity, async_assert, async_assert_eq};
 use settings::Setting as _;
 
 use super::{Builder, new_builder};
@@ -18,14 +18,14 @@ use super::{Builder, new_builder};
 /// Helper: read the TOML settings file from disk and return its contents.
 /// Returns an empty string if the file does not exist.
 fn read_toml_file() -> String {
-    let path = rook::settings::user_preferences_toml_file_path();
+    let path = polaris_terminal::settings::user_preferences_toml_file_path();
     std::fs::read_to_string(path).unwrap_or_default()
 }
 
 /// Helper: read the JSON user preferences file from disk and return its contents.
 /// Returns an empty string if the file does not exist.
 fn read_json_prefs_file() -> String {
-    let path = rook::settings::user_preferences_file_path();
+    let path = polaris_terminal::settings::user_preferences_file_path();
     std::fs::read_to_string(path).unwrap_or_default()
 }
 
@@ -109,7 +109,7 @@ pub fn test_private_public_settings_routing_with_flag_enabled() -> Builder {
                 .add_named_assertion("CodeAsDefaultEditor in TOML", |_, _| {
                     let toml = read_toml_file();
                     async_assert!(
-                        toml.contains("use_rook_as_default_editor"),
+                        toml.contains("use_pterm_as_default_editor"),
                         "TOML should contain CodeAsDefaultEditor"
                     )
                 })

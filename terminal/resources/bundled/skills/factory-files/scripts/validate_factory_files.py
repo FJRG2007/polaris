@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Validate a Factory file tree against rook-server.
+"""Validate a Factory file tree against polaris-terminal-server.
 
 Usage:
     python3 validate_factory_files.py [FACTORY_ROOT] [--json] [--server-root URL]
 
 FACTORY_ROOT defaults to the current directory and must contain factory.yaml.
 
-rook-server owns the Factory file format, so it is the only thing that decides
+polaris-terminal-server owns the Factory file format, so it is the only thing that decides
 whether a tree is valid. This script collects the tree's resource files and
 submits them to the validation endpoint, which runs the real parser plus the
 state-independent checks the apply path would run next.
@@ -238,7 +238,7 @@ class Outcome:
     def disclosure(self) -> str:
         """The sentence the agent must repeat. Never claim more than ran."""
         return (
-            f"Validated with the rook-server parser for {self.schema_version}; "
+            f"Validated with the polaris-terminal-server parser for {self.schema_version}; "
             "state-dependent apply checks were not run."
         )
 
@@ -246,14 +246,14 @@ class Outcome:
 def server_root(argument: Optional[str]) -> str:
     """Resolve the server to ask, so a local or staging root needs no code change.
 
-    ROOK_SERVER_ROOT_URL is the name an Oz sandbox exports; without it here, a
-    sandbox that never sets the older ROOK_SERVER_ROOT silently validates
+    POLARIS_TERMINAL_SERVER_ROOT_URL is the name an Oz sandbox exports; without it here, a
+    sandbox that never sets the older POLARIS_TERMINAL_SERVER_ROOT silently validates
     against production instead of the server it actually belongs to.
     """
     chosen = (
         argument
-        or os.environ.get("ROOK_SERVER_ROOT")
-        or os.environ.get("ROOK_SERVER_ROOT_URL")
+        or os.environ.get("POLARIS_TERMINAL_SERVER_ROOT")
+        or os.environ.get("POLARIS_TERMINAL_SERVER_ROOT_URL")
         or DEFAULT_SERVER_ROOT
     )
     return chosen.rstrip("/")
@@ -275,7 +275,7 @@ def _request_json(url: str, token: Optional[str] = None, payload: Optional[Any] 
     """Post or fetch JSON, turning every failure class into NotValidated.
 
     A 401 or 403 drawn by a forwarded token is retried once without it: the
-    endpoint needs no credential, so a stale or mismatched ROOK_API_KEY must
+    endpoint needs no credential, so a stale or mismatched POLARIS_TERMINAL_API_KEY must
     not be able to block validation. The drop is reported, because a key the
     server rejects is worth knowing about even when validation then succeeds.
     """
@@ -285,7 +285,7 @@ def _request_json(url: str, token: Optional[str] = None, payload: Optional[Any] 
     except urllib.error.HTTPError as error:
         if token and error.code in (401, 403):
             print(
-                f"ROOK_API_KEY was rejected with HTTP {error.code}; retrying without it, "
+                f"POLARIS_TERMINAL_API_KEY was rejected with HTTP {error.code}; retrying without it, "
                 "since this endpoint needs no credential.",
                 file=sys.stderr,
             )
@@ -316,14 +316,14 @@ def validate(root: Path, base_url: str) -> Outcome:
     unrecognized one as a diagnostic, so there is nothing to pre-flight and no
     reason for this script to read the tree's YAML.
 
-    The endpoint needs no credential. ROOK_API_KEY is forwarded when the
+    The endpoint needs no credential. POLARIS_TERMINAL_API_KEY is forwarded when the
     environment already carries one, as an Oz sandbox does, so the request is
     attributable there; nothing requires it, because a local authoring agent
-    runs in a shell that cannot see the Rook client's session. A stale or
+    runs in a shell that cannot see the Polaris Terminal client's session. A stale or
     mismatched key is retried without itself, in _request_json, rather than
     blocking validation.
     """
-    token = os.environ.get("ROOK_API_KEY")
+    token = os.environ.get("POLARIS_TERMINAL_API_KEY")
     files, problems = collect_tree(root)
     response = _request_json(base_url + VALIDATE_PATH, token=token, payload={"files": files})
     if not isinstance(response, dict) or not isinstance(response.get("diagnostics"), list):
@@ -360,8 +360,8 @@ def main() -> int:
     parser.add_argument(
         "--server-root",
         default=None,
-        help="rook-server root to validate against; defaults to $ROOK_SERVER_ROOT, then "
-        "$ROOK_SERVER_ROOT_URL, then " + DEFAULT_SERVER_ROOT,
+        help="polaris-terminal-server root to validate against; defaults to $POLARIS_TERMINAL_SERVER_ROOT, then "
+        "$POLARIS_TERMINAL_SERVER_ROOT_URL, then " + DEFAULT_SERVER_ROOT,
     )
     args = parser.parse_args()
 
@@ -371,7 +371,7 @@ def main() -> int:
     except NotValidated as reason:
         report = (
             f"This tree was NOT validated: {reason}. Nothing here says the files are "
-            "correct or incorrect. Validate against a reachable rook-server, and say "
+            "correct or incorrect. Validate against a reachable polaris-terminal-server, and say "
             "plainly that validation did not run."
         )
         if args.json:

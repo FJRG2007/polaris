@@ -1,4 +1,4 @@
-use rook_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
+use pterm_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
 use serde::Serialize;
 use serde_json::json;
 use strum_macros::{EnumDiscriminants, EnumIter};
@@ -116,9 +116,9 @@ pub enum AgentManagementTelemetryEvent {
     /// User invoked the /continue-locally slash command
     #[cfg(not(target_family = "wasm"))]
     SlashCommandContinueLocally,
-    /// User clicked "Open in Rook" in the tombstone (wasm)
+    /// User clicked "Open in Polaris Terminal" in the tombstone (wasm)
     #[cfg(target_family = "wasm")]
-    TombstoneOpenInRook,
+    TombstoneOpenInPterm,
     /// User cancelled a cloud run
     CloudRunCancelled { task_id: String },
     /// User forked a conversation
@@ -203,7 +203,7 @@ impl TelemetryEvent for AgentManagementTelemetryEvent {
             #[cfg(not(target_family = "wasm"))]
             AgentManagementTelemetryEvent::SlashCommandContinueLocally => None,
             #[cfg(target_family = "wasm")]
-            AgentManagementTelemetryEvent::TombstoneOpenInRook => None,
+            AgentManagementTelemetryEvent::TombstoneOpenInPterm => None,
             AgentManagementTelemetryEvent::CloudRunCancelled { task_id } => {
                 Some(json!({ "task_id": task_id }))
             }
@@ -226,7 +226,7 @@ impl TelemetryEvent for AgentManagementTelemetryEvent {
     }
 
     fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        rook_core::telemetry::enum_events::<Self>()
+        pterm_core::telemetry::enum_events::<Self>()
     }
 }
 
@@ -258,7 +258,7 @@ impl TelemetryEventDesc for AgentManagementTelemetryEventDiscriminants {
             #[cfg(not(target_family = "wasm"))]
             Self::SlashCommandContinueLocally => "AgentManagement.SlashCommandContinueLocally",
             #[cfg(target_family = "wasm")]
-            Self::TombstoneOpenInRook => "AgentManagement.TombstoneOpenInRook",
+            Self::TombstoneOpenInPterm => "AgentManagement.TombstoneOpenInPterm",
             Self::CloudRunCancelled => "AgentManagement.CloudRunCancelled",
             Self::ConversationForked => "AgentManagement.ConversationForked",
         }
@@ -299,7 +299,7 @@ impl TelemetryEventDesc for AgentManagementTelemetryEventDiscriminants {
                 "User invoked /continue-locally to fork a cloud conversation locally"
             }
             #[cfg(target_family = "wasm")]
-            Self::TombstoneOpenInRook => "User clicked Open in Rook in the tombstone",
+            Self::TombstoneOpenInPterm => "User clicked Open in Polaris Terminal in the tombstone",
             Self::CloudRunCancelled => "User cancelled a cloud run",
             Self::ConversationForked => "User forked a conversation",
         }
@@ -310,4 +310,4 @@ impl TelemetryEventDesc for AgentManagementTelemetryEventDiscriminants {
     }
 }
 
-rook_core::register_telemetry_event!(AgentManagementTelemetryEvent);
+pterm_core::register_telemetry_event!(AgentManagementTelemetryEvent);

@@ -3,13 +3,13 @@ use std::future::Future;
 use std::path::{Path, PathBuf};
 
 use futures::future::{Either, ready};
-use rook_util::host_id::HostId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::{RemoteNavigationResult, RemotePath};
-use rook_util::standardized_path::StandardizedPath;
+use pterm_util::host_id::HostId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::{RemoteNavigationResult, RemotePath};
+use pterm_util::standardized_path::StandardizedPath;
 #[cfg(test)]
-use rookui_core::r#async::FutureId;
-use rookui_core::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use ptermui_core::r#async::FutureId;
+use ptermui_core::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 #[cfg(test)]
 use virtual_fs::{Stub, VirtualFS};
 

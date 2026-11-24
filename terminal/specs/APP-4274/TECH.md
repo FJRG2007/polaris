@@ -96,9 +96,9 @@ Resolved by removing `CloudAgentNavigation` and `TerminalView.cloud_agent_naviga
 Root/nested state now comes from the owning `PaneStack`.
 ## Testing and validation
 Focused validation passed:
-- `cargo test -p rook root_cloud_mode_pane_sets_root_cloud_mode_context_key --features local_tty,local_fs`
-- `cargo test -p rook set_input_mode_agent_does_not_enter_local_agent_from_root_cloud_mode_pane --features local_tty,local_fs`
-- `cargo check -p rook --features local_tty,local_fs`
+- `cargo test -p polaris-terminal root_cloud_mode_pane_sets_root_cloud_mode_context_key --features local_tty,local_fs`
+- `cargo test -p polaris-terminal set_input_mode_agent_does_not_enter_local_agent_from_root_cloud_mode_pane --features local_tty,local_fs`
+- `cargo check -p polaris-terminal --features local_tty,local_fs`
 The key regression test is `root_cloud_mode_pane_sets_root_cloud_mode_context_key` in `app/src/terminal/view_test.rs:338`.
 It verifies:
 1. A standalone cloud-mode terminal gets `ROOT_CLOUD_MODE_PANE_KEY`.

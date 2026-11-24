@@ -1,11 +1,11 @@
 //! The rendering logic for shared session banners.
 use chrono::{DateTime, Datelike, Local};
-use rookui::Element;
-use rookui::elements::{
+use ptermui::Element;
+use ptermui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, MainAxisSize,
     ParentElement, Radius, Rect, Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
+use ptermui::fonts::{Properties, Weight};
 
 use crate::appearance::Appearance;
 

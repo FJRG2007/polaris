@@ -9,7 +9,7 @@ use ai::skills::{
     SkillPathOrigin, skill_reference_from_api_skill_ref, skill_reference_from_read_skill_ref,
 };
 use api::ask_user_question::question::QuestionType;
-use rook_core::channel::ChannelState;
+use pterm_core::channel::ChannelState;
 use warp_multi_agent_api as api;
 
 use crate::ai::agent::api::convert_conversation::{
@@ -753,7 +753,7 @@ impl ConvertAPIToolCallToAIAgentAction for api::message::ToolCall {
                         }
                     }
                     Some(Metadata::WarpDocumentationSearch(_)) => {
-                        SubagentType::RookDocumentationSearch
+                        SubagentType::PtermDocumentationSearch
                     }
                     None => SubagentType::Unknown,
                 };

@@ -3,24 +3,24 @@ use std::time::Duration;
 
 use chrono::Local;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_editor::editor::NavigationKey;
-use rook_errors::report_error;
-use rookui::r#async::Timer;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_editor::editor::NavigationKey;
+use pterm_errors::report_error;
+use ptermui::r#async::Timer;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DispatchEventResult, DragBarSide, Element, Empty, EventHandler, Fill, Flex, HyperlinkUrl, Icon,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, PositionedElementAnchor, PositionedElementOffsetBounds, Radius, Resizable,
     ResizableStateHandle, SavePosition, Shrinkable, Stack, Text, resizable_state_handle,
 };
-use rookui::fonts::Properties;
-use rookui::keymap::{EditableBinding, FixedBinding};
-use rookui::platform::Cursor;
-use rookui::presenter::ChildView;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Properties;
+use ptermui::keymap::{EditableBinding, FixedBinding};
+use ptermui::platform::Cursor;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -42,8 +42,10 @@ use crate::input_suggestions::{Event as InputSuggestionsEvent, InputSuggestions}
 use crate::send_telemetry_from_ctx;
 use crate::server::server_api::ServerApi;
 use crate::server::server_api::ai::AIClient;
-use crate::server::telemetry::{RookAIActionType, TelemetryEvent};
-use crate::terminal::resizable_data::{DEFAULT_ROOK_AI_WIDTH, ModalType, ResizableData};
+use crate::server::telemetry::{PtermAIActionType, TelemetryEvent};
+use crate::terminal::resizable_data::{
+    DEFAULT_POLARIS_TERMINAL_AI_WIDTH, ModalType, ResizableData,
+};
 use crate::ui_components::blended_colors;
 use crate::ui_components::buttons::icon_button;
 use crate::util::bindings::{CustomAction, cmd_or_ctrl_shift};
@@ -70,7 +72,8 @@ const BODY_FONT_SIZE: f32 = 13.;
 const TITLE_FONT_SIZE: f32 = 16.;
 const ZERO_STATE_HELP_TEXT_FONT_SIZE: f32 = 12.;
 
-const ZERO_STATE_HELP_TEXT: &str = "Shift + ctrl + space a block or text selection to ask Rook AI.";
+const ZERO_STATE_HELP_TEXT: &str =
+    "Shift + ctrl + space a block or text selection to ask Polaris Terminal AI.";
 const SCRIPT_ZERO_STATE_PROMPT: &str = "Write a script to connect to an AWS EC2 instance.";
 const GIT_ZERO_STATE_PROMPT: &str = "How do I undo the most recent commits in git?";
 const FILES_ZERO_STATE_PROMPT: &str = "How do I find all files containing specific text?";
@@ -142,33 +145,33 @@ pub enum AIAssistantAction {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::custom(
         CustomAction::CloseCurrentSession,
         AIAssistantAction::ClosePanel,
-        "Close Rook AI",
+        "Close Polaris Terminal AI",
         id!("AIAssistantPanel"),
     )]);
 
     app.register_editable_bindings([
         EditableBinding::new(
             "ai_assistant_panel:focus_terminal_input",
-            "Focus Terminal Input From Rook AI",
+            "Focus Terminal Input From Polaris Terminal AI",
             AIAssistantAction::FocusTerminalInput,
         )
         .with_context_predicate(id!("AIAssistantPanel"))
         .with_key_binding(cmd_or_ctrl_shift("l")),
         EditableBinding::new(
             "ai_assistant_panel:reset_context",
-            "Restart Rook AI",
+            "Restart Polaris Terminal AI",
             AIAssistantAction::ResetContext,
         )
         .with_context_predicate(id!("AIAssistantPanel"))
         .with_key_binding("ctrl-l"),
         EditableBinding::new(
             "ai_assistant_panel:reset_context",
-            "Restart Rook AI",
+            "Restart Polaris Terminal AI",
             AIAssistantAction::ResetContext,
         )
         .with_context_predicate(id!("AIAssistantPanel"))
@@ -229,12 +232,12 @@ impl AIAssistantPanelView {
         let resizable_data_handle = ResizableData::handle(ctx);
         let resizable_state_handle = match resizable_data_handle
             .as_ref(ctx)
-            .get_handle(ctx.window_id(), ModalType::RookAIWidth)
+            .get_handle(ctx.window_id(), ModalType::PtermAIWidth)
         {
             Some(handle) => handle,
             None => {
-                report_error!("Couldn't retrieve rook ai resizable state handle.");
-                resizable_state_handle(DEFAULT_ROOK_AI_WIDTH)
+                report_error!("Couldn't retrieve polaris-terminal ai resizable state handle.");
+                resizable_state_handle(DEFAULT_POLARIS_TERMINAL_AI_WIDTH)
             }
         };
 
@@ -289,7 +292,7 @@ impl AIAssistantPanelView {
     fn format_as_code_block(&self, content: &str) -> String {
         // Intentionally choose a language that won't be interpreted as a shell language
         // i.e. (*sh)
-        format!("```rook\n{}\n```", content.trim())
+        format!("```polaris-terminal\n{}\n```", content.trim())
     }
 
     // TODO: reconsider if we should be doing all the formatting in here as opposed
@@ -421,7 +424,7 @@ impl AIAssistantPanelView {
         }
 
         send_telemetry_from_ctx!(
-            TelemetryEvent::OpenedRookAI {
+            TelemetryEvent::OpenedPtermAI {
                 source: ask_type.into()
             },
             ctx
@@ -447,7 +450,7 @@ impl AIAssistantPanelView {
                     self.issue_request(buffer_text, ctx);
                 } else {
                     // Only send this event if the user tried to execute with a longer than permitted prompt.
-                    send_telemetry_from_ctx!(TelemetryEvent::RookAICharacterLimitExceeded, ctx);
+                    send_telemetry_from_ctx!(TelemetryEvent::PtermAICharacterLimitExceeded, ctx);
                 }
                 ctx.notify();
             }
@@ -660,14 +663,14 @@ impl AIAssistantPanelView {
         let time_now = Local::now();
 
         result.push_str(&format!(
-            "## Rook AI Transcript ({})\n\n",
+            "## Polaris Terminal AI Transcript ({})\n\n",
             time_now.format("%x %l:%M %p")
         ));
 
         for part in transcript {
             result.push_str(&format!("Prompt: {}\n\n", part.raw_user_prompt().trim()));
             result.push_str(&format!(
-                "Rook AI: {}\n\n",
+                "Polaris Terminal AI: {}\n\n",
                 part.raw_assistant_answer().trim()
             ));
         }
@@ -720,7 +723,7 @@ impl AIAssistantPanelView {
                         .with_style(UiComponentStyles {
                             font_family_id: Some(appearance.ui_font_family()),
                             font_size: Some(TITLE_FONT_SIZE),
-                            font_weight: Some(rookui::fonts::Weight::Semibold),
+                            font_weight: Some(ptermui::fonts::Weight::Semibold),
                             font_color: Some(appearance.theme().active_ui_text_color().into()),
                             ..Default::default()
                         })
@@ -846,7 +849,7 @@ impl AIAssistantPanelView {
                         BODY_FONT_SIZE,
                     )
                     .with_style(Properties {
-                        weight: rookui::fonts::Weight::Bold,
+                        weight: ptermui::fonts::Weight::Bold,
                         ..Default::default()
                     })
                     .with_color(appearance.theme().ui_error_color())
@@ -1026,8 +1029,8 @@ impl TypedActionView for AIAssistantPanelView {
             ResetContext => {
                 self.reset_context(ctx);
                 send_telemetry_from_ctx!(
-                    TelemetryEvent::RookAIAction {
-                        action_type: RookAIActionType::Restart
+                    TelemetryEvent::PtermAIAction {
+                        action_type: PtermAIActionType::Restart
                     },
                     ctx
                 );
@@ -1035,8 +1038,8 @@ impl TypedActionView for AIAssistantPanelView {
             CopyTranscript => {
                 self.copy_transcript(ctx);
                 send_telemetry_from_ctx!(
-                    TelemetryEvent::RookAIAction {
-                        action_type: RookAIActionType::CopyTranscript
+                    TelemetryEvent::PtermAIAction {
+                        action_type: PtermAIActionType::CopyTranscript
                     },
                     ctx
                 );
@@ -1046,7 +1049,7 @@ impl TypedActionView for AIAssistantPanelView {
             }
             PreparedPrompt(prompt) => {
                 self.issue_request(prompt.to_string(), ctx);
-                send_telemetry_from_ctx!(TelemetryEvent::UsedRookAIPreparedPrompt { prompt }, ctx);
+                send_telemetry_from_ctx!(TelemetryEvent::UsedPtermAIPreparedPrompt { prompt }, ctx);
             }
             ClickedUrl(url) => {
                 ctx.open_url(&url.url);
@@ -1055,8 +1058,8 @@ impl TypedActionView for AIAssistantPanelView {
                 ctx.clipboard()
                     .write(ClipboardContent::plain_text(content.to_string()));
                 send_telemetry_from_ctx!(
-                    TelemetryEvent::RookAIAction {
-                        action_type: RookAIActionType::CopyAnswer
+                    TelemetryEvent::PtermAIAction {
+                        action_type: PtermAIActionType::CopyAnswer
                     },
                     ctx
                 );
@@ -1140,7 +1143,7 @@ impl View for AIAssistantPanelView {
             .finish(),
             OffsetPositioning::offset_from_parent(
                 vec2f(0., HEADER_HEIGHT),
-                rookui::elements::ParentOffsetBounds::Unbounded,
+                ptermui::elements::ParentOffsetBounds::Unbounded,
                 ParentAnchor::TopLeft,
                 ChildAnchor::BottomLeft,
             ),

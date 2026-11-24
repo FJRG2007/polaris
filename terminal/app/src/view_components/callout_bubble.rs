@@ -1,13 +1,13 @@
 use pathfinder_color::ColorU;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::phenomenon::PhenomenonStyle;
-use rookui::Element;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::phenomenon::PhenomenonStyle;
+use ptermui::Element;
+use ptermui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, MainAxisSize,
     MouseStateHandle, ParentElement, Radius, Stack,
 };
-use rookui::ui_components::checkbox::Checkbox;
-use rookui::ui_components::components::UiComponentStyles;
+use ptermui::ui_components::checkbox::Checkbox;
+use ptermui::ui_components::components::UiComponentStyles;
 
 use crate::appearance::Appearance;
 use crate::ui_components::icons::Icon;
@@ -115,7 +115,7 @@ pub fn render_callout_bubble(
         .with_child(
             ConstrainedBox::new(
                 border_icon
-                    .to_rookui_icon(Fill::Solid(border_color))
+                    .to_ptermui_icon(Fill::Solid(border_color))
                     .finish(),
             )
             .with_width(24.)
@@ -123,7 +123,7 @@ pub fn render_callout_bubble(
             .finish(),
         )
         .with_child(
-            ConstrainedBox::new(fill_icon.to_rookui_icon(background).finish())
+            ConstrainedBox::new(fill_icon.to_ptermui_icon(background).finish())
                 .with_width(24.)
                 .with_height(24.)
                 .finish(),

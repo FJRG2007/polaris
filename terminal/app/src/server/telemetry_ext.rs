@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
-use rook_core::channel::{Channel, ChannelState};
-use rook_core::execution_mode;
-use rookui::telemetry::EventPayload;
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_core::execution_mode;
+use ptermui::telemetry::EventPayload;
 use serde_json::{Value, json};
 
 use super::telemetry::rudder_message::{
@@ -16,7 +16,7 @@ pub trait TelemetryExt {
     fn to_rudder_batch_message(self) -> RudderBatchMessage;
 }
 
-impl TelemetryExt for rookui::telemetry::Event {
+impl TelemetryExt for ptermui::telemetry::Event {
     fn to_rudder_batch_message(self) -> RudderBatchMessage {
         let message = match self.payload {
             EventPayload::IdentifyUser {

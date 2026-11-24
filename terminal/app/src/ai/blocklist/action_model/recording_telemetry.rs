@@ -1,4 +1,4 @@
-use rook_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
+use pterm_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
 use serde::Serialize;
 use serde_json::json;
 use strum_macros::{EnumDiscriminants, EnumIter};
@@ -91,7 +91,7 @@ impl TelemetryEvent for RecordingTelemetryEvent {
     }
 
     fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        rook_core::telemetry::enum_events::<Self>()
+        pterm_core::telemetry::enum_events::<Self>()
     }
 }
 
@@ -118,7 +118,7 @@ impl TelemetryEventDesc for RecordingTelemetryEventDiscriminants {
     }
 }
 
-rook_core::register_telemetry_event!(RecordingTelemetryEvent);
+pterm_core::register_telemetry_event!(RecordingTelemetryEvent);
 
 #[cfg(test)]
 #[path = "recording_telemetry_tests.rs"]

@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use rook_core::features::FeatureFlag;
-use rookui_core::assets::asset_cache::AssetSource;
-use rookui_core::text::word_boundaries::WordBoundariesPolicy;
-use rookui_core::units::IntoPixels;
-use rookui_core::{App, ModelAsRef};
+use pterm_core::features::FeatureFlag;
+use ptermui_core::assets::asset_cache::AssetSource;
+use ptermui_core::text::word_boundaries::WordBoundariesPolicy;
+use ptermui_core::units::IntoPixels;
+use ptermui_core::{App, ModelAsRef};
 use serde_yaml::Value;
 use string_offset::CharOffset;
 use sum_tree::SumTree;
@@ -34,7 +34,7 @@ impl SelectionModel {
 
 fn selection_model_with_rendered_mermaid(
     app: &mut App,
-) -> rookui_core::ModelHandle<SelectionModel> {
+) -> ptermui_core::ModelHandle<SelectionModel> {
     app.add_model(|ctx| {
         let buffer = ctx.add_model(|_| Buffer::new(Box::new(|_, _| IndentBehavior::Ignore)));
         let buffer_selection = ctx.add_model(|_| BufferSelectionModel::new(buffer.clone()));
@@ -351,10 +351,10 @@ fn test_word_and_line_boundary_movement_with_block_item() {
             buffer.update(ctx, |buffer, ctx| {
                 *buffer = Buffer::from_markdown(
                     r#"text
-```rook-embedded-object
+```polaris-terminal-embedded-object
 id: workflow-123
 ```
-```rook-embedded-object
+```polaris-terminal-embedded-object
 id: workflow-123
 type: workflow
 author: kevin

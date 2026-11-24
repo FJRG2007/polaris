@@ -1,9 +1,9 @@
 use std::sync::LazyLock;
 
-use rook_core::ui::appearance::Appearance;
-use rookui_core::elements::{MouseStateHandle, Rect};
-use rookui_core::prelude::stack::*;
-use rookui_core::prelude::*;
+use pterm_core::ui::appearance::Appearance;
+use ptermui_core::elements::{MouseStateHandle, Rect};
+use ptermui_core::prelude::stack::*;
+use ptermui_core::prelude::*;
 
 use crate::{Component, MouseEventHandler, Renderable};
 

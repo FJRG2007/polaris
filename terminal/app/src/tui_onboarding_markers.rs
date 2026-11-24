@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cloud_object_models::JsonSerializer;
-use rookui::r#async::Timer;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::r#async::Timer;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 use settings::{RespectUserSyncSetting, SyncToCloud};
 
 use crate::cloud_object::CloudObjectEventEntrypoint;

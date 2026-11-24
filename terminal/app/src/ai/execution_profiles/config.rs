@@ -478,8 +478,8 @@ struct ExecutionProfileFile {
         description = "Optional context window limit in tokens. The valid range is model-dependent and determined server-side; the value is automatically clamped to the selected model's supported context window. Consult the selected model's documentation for its actual supported range."
     )]
     context_window_limit: Option<u32>,
-    #[schemars(description = "Whether plans are automatically synced to Rook Drive.")]
-    autosync_plans_to_rook_drive: bool,
+    #[schemars(description = "Whether plans are automatically synced to Polaris Terminal Drive.")]
+    autosync_plans_to_pterm_drive: bool,
     #[schemars(description = "Whether the web-search tool is available.")]
     web_search_enabled: bool,
 }
@@ -528,7 +528,7 @@ impl From<&AIExecutionProfile> for ExecutionProfileFile {
             cli_agent_model: profile.cli_agent_model.clone().map(Into::into),
             computer_use_model: profile.computer_use_model.clone().map(Into::into),
             context_window_limit: profile.context_window_limit,
-            autosync_plans_to_rook_drive: profile.autosync_plans_to_rook_drive,
+            autosync_plans_to_pterm_drive: profile.autosync_plans_to_pterm_drive,
             web_search_enabled: profile.web_search_enabled,
         }
     }
@@ -579,7 +579,7 @@ impl TryFrom<ExecutionProfileFile> for AIExecutionProfile {
             cli_agent_model: file.cli_agent_model.map(LLMId::from),
             computer_use_model: file.computer_use_model.map(LLMId::from),
             context_window_limit: file.context_window_limit,
-            autosync_plans_to_rook_drive: file.autosync_plans_to_rook_drive,
+            autosync_plans_to_pterm_drive: file.autosync_plans_to_pterm_drive,
             web_search_enabled: file.web_search_enabled,
         })
     }

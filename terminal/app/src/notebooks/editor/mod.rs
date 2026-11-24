@@ -4,19 +4,19 @@ use std::sync::Arc;
 
 use markdown_parser::markdown_parser::CODE_BLOCK_DEFAULT_MARKDOWN_LANG;
 use pathfinder_color::ColorU;
-use rook_core::ui::builder::CHECK_SVG_PATH;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::content::text::{
+use pterm_core::ui::builder::CHECK_SVG_PATH;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::content::text::{
     BlockHeaderSize, BlockType as ContentBlockType, BufferBlockStyle, CodeBlockType,
 };
-use rook_editor::render::model::{
+use pterm_editor::render::model::{
     BrokenLinkStyle, CheckBoxStyle, EmbeddedItem, HorizontalRuleStyle, InlineCodeStyle,
     ParagraphStyles, RichTextStyles, TableStyle,
 };
-use rook_util::user_input::UserInput;
-use rookui::elements::{Border, ListIndentLevel};
-use rookui::fonts::FamilyId;
-use rookui::ui_components::checkbox::HOVER_BACKGROUND_COLOR;
+use pterm_util::user_input::UserInput;
+use ptermui::elements::{Border, ListIndentLevel};
+use ptermui::fonts::FamilyId;
+use ptermui::ui_components::checkbox::HOVER_BACKGROUND_COLOR;
 
 use crate::appearance::Appearance;
 use crate::notebooks::editor::embedded_item::EmbeddedWorkflow;
@@ -332,7 +332,7 @@ impl<'a> From<&'a BufferBlockStyle> for BlockType {
 /// Wrapper around the shared [`Workflow`] type with additional context for workflows contained
 /// within a notebook.
 ///
-/// This may be a command block that's part of the notebook text, or an embedded Rook Drive workflow.
+/// This may be a command block that's part of the notebook text, or an embedded Polaris Terminal Drive workflow.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NotebookWorkflow {
     /// Definition of the workflow itself.

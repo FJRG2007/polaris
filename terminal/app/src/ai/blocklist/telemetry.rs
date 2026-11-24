@@ -5,9 +5,9 @@ use ai::agent::action_result::{
 use ai::agent::orchestration_config::{
     OrchestrationConfig, OrchestrationConfigStatus, OrchestrationExecutionMode,
 };
-use rook_core::send_telemetry_from_app_ctx;
-use rook_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
-use rookui::AppContext;
+use pterm_core::send_telemetry_from_app_ctx;
+use pterm_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
+use ptermui::AppContext;
 use serde::Serialize;
 use serde_json::{Value, json};
 use strum_macros::{EnumDiscriminants, EnumIter};
@@ -566,7 +566,7 @@ impl TelemetryEvent for BlocklistOrchestrationTelemetryEvent {
     }
 
     fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        rook_core::telemetry::enum_events::<Self>()
+        pterm_core::telemetry::enum_events::<Self>()
     }
 }
 
@@ -616,7 +616,7 @@ impl TelemetryEventDesc for BlocklistOrchestrationTelemetryEventDiscriminants {
     }
 }
 
-rook_core::register_telemetry_event!(BlocklistOrchestrationTelemetryEvent);
+pterm_core::register_telemetry_event!(BlocklistOrchestrationTelemetryEvent);
 
 #[cfg(test)]
 #[path = "telemetry_tests.rs"]

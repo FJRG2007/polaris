@@ -1,14 +1,14 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::Fill;
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::{
     Border, CacheOption, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Empty, Expanded, Flex, Image, MainAxisAlignment, MainAxisSize,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -73,12 +73,12 @@ pub const FEATURE_INTROS: &[FeatureIntro] = &[FeatureIntro {
     id: FeatureIntroId::CustomModelRouter,
     hero_image_path: "async/png/onboarding/custom_model_router_intro_banner.png",
     badge: Some("NEW"),
-    title: "Build a custom model router for the Rook Agent.",
+    title: "Build a custom model router for the Polaris Terminal Agent.",
     description: "Custom routers can be complexity-based, where tasks are routed based on how difficult they are, or rule-based, where they are routed based on a set of natural language prompts.",
     description_icon: Some(Icon::Compass),
     cta_label: "Get started",
     cta_target: Some(FeatureIntroCtaTarget::SettingsWidget {
-        page: SettingsSection::RookAgent,
+        page: SettingsSection::PtermAgent,
         widget_id: custom_model_routers_widget_id,
     }),
 }];
@@ -255,7 +255,7 @@ impl FeatureIntroModal {
                 .with_child(
                     Container::new(
                         ConstrainedBox::new(
-                            icon.to_rookui_icon(Fill::Solid(modal_text_sub(appearance)))
+                            icon.to_ptermui_icon(Fill::Solid(modal_text_sub(appearance)))
                                 .finish(),
                         )
                         .with_width(16.)

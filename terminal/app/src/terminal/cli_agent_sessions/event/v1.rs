@@ -1,4 +1,4 @@
-use rook_core::cli_agent_protocol::CLIAgentNotification;
+use pterm_core::cli_agent_protocol::CLIAgentNotification;
 
 use super::{CLIAgentEvent, CLIAgentEventPayload, CLIAgentEventSource, CLIAgentEventType};
 use crate::terminal::CLIAgent;

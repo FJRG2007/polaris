@@ -10,12 +10,12 @@ per-window screenshots — without moving the user's cursor, stealing the user's
 or perturbing the user's modifier state. The cross-platform contract predates this work and is
 platform-neutral:
 
-- [`Target` @ 1af88ebc](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/lib.rs#L143) — per-action `Screen` vs `Window { window_id, pid }` targets; [`Options.background_enabled`](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/lib.rs#L445) forces the byte-identical legacy full-screen path when off.
-- [`ActionResult`](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/lib.rs#L469) — returns a refreshed [`WindowInfo`](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/lib.rs#L184) list (so the model can pick targets) and [`CapturedWindow`](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/lib.rs#L198) metadata mapping window-local coordinates onto window screenshots.
-- Capability gate: [`background_supported()` @ 1af88ebc](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/lib.rs#L87) (which also documents the per-platform limitations) feeds [`supports_background_computer_use` in the agent request settings](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/app/src/ai/agent/api/impl.rs#L104); execution is additionally gated by [`FeatureFlag::BackgroundComputerUse`](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/app/src/ai/blocklist/action_model/execute/request_computer_use.rs#L95).
+- [`Target` @ 1af88ebc](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/lib.rs#L143) — per-action `Screen` vs `Window { window_id, pid }` targets; [`Options.background_enabled`](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/lib.rs#L445) forces the byte-identical legacy full-screen path when off.
+- [`ActionResult`](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/lib.rs#L469) — returns a refreshed [`WindowInfo`](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/lib.rs#L184) list (so the model can pick targets) and [`CapturedWindow`](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/lib.rs#L198) metadata mapping window-local coordinates onto window screenshots.
+- Capability gate: [`background_supported()` @ 1af88ebc](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/lib.rs#L87) (which also documents the per-platform limitations) feeds [`supports_background_computer_use` in the agent request settings](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/app/src/ai/agent/api/impl.rs#L104); execution is additionally gated by [`FeatureFlag::BackgroundComputerUse`](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/app/src/ai/blocklist/action_model/execute/request_computer_use.rs#L95).
 
 macOS implements this by posting Quartz events directly to the owning process
-([`PostTarget::Pid` / `CGEventPostToPid` @ 1af88ebc](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/mac/post.rs#L9)
+([`PostTarget::Pid` / `CGEventPostToPid` @ 1af88ebc](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/mac/post.rs#L9)
 plus private window-addressing fields), so it can drive fully covered windows with zero visible
 side effects. X11 has no process- or window-addressed delivery that applications honor: the only
 window-addressed primitive, `XSendEvent`, marks events `send_event=true`, which GTK, Qt,
@@ -29,13 +29,13 @@ different primitives, and its trade-offs differ from macOS.
 X11 (XInput2 ≥ 2.0, any server since 2009, including Xvfb) supports multiple independent master
 pointer/keyboard pairs (Multi-Pointer X). Each master pair has its own on-screen cursor and its
 own keyboard focus, and the server creates matching XTEST slave devices for every pair. The X
-server routes a client's *core* input requests — XTEST fake input, `RookPointer`,
+server routes a client's *core* input requests — XTEST fake input, `PtermPointer`,
 `QueryPointer`, `SetInputFocus` — through that client's "ClientPointer" master pair
 (`PickPointer`/`PickKeyboard` in the server's `Xext/xtest.c`).
 
-[`seat.rs::AgentSeat::new` @ 1af88ebc](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/x11/seat.rs#L61)
+[`seat.rs::AgentSeat::new` @ 1af88ebc](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/x11/seat.rs#L61)
 exploits exactly that: it opens a dedicated connection, creates a private master pair named
-`rook-agent-cu-<pid>-<seq>` via `XIChangeHierarchy(AddMaster)`, and points the connection's
+`polaris-terminal-agent-cu-<pid>-<seq>` via `XIChangeHierarchy(AddMaster)`, and points the connection's
 ClientPointer at it via `XISetClientPointer`. The pre-existing XTEST mouse/keyboard code then
 drives the agent seat completely unchanged. Consequences:
 
@@ -61,35 +61,35 @@ actually background).
 ### Seat lifecycle and leak safety
 
 Master devices are server-global and outlive the creating connection, so
-[`seat.rs`](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/x11/seat.rs)
+[`seat.rs`](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/x11/seat.rs)
 treats leaks as a first-class concern:
 
-- `Drop` removes the pair ([`impl Drop` @ L155](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/x11/seat.rs#L155)); every construction failure path after `AddMaster` either removes the pair or unregisters it so the next creation reaps it.
-- A process-local live-seat registry ([`live_seats` @ L177](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/x11/seat.rs#L177)) reserves names before `AddMaster` so concurrent creations cannot reap an in-construction pair.
-- [`remove_stale_seats` @ L271](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/x11/seat.rs#L271) runs at every creation: same-pid seats absent from the registry (leaked by failed constructions) and seats of dead pids (crashed processes, parsed from the seat name) are removed. Foreign pid reuse can delay reaping until the reusing process exits — a bounded, accepted residual.
+- `Drop` removes the pair ([`impl Drop` @ L155](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/x11/seat.rs#L155)); every construction failure path after `AddMaster` either removes the pair or unregisters it so the next creation reaps it.
+- A process-local live-seat registry ([`live_seats` @ L177](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/x11/seat.rs#L177)) reserves names before `AddMaster` so concurrent creations cannot reap an in-construction pair.
+- [`remove_stale_seats` @ L271](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/x11/seat.rs#L271) runs at every creation: same-pid seats absent from the registry (leaked by failed constructions) and seats of dead pids (crashed processes, parsed from the seat name) are removed. Foreign pid reuse can delay reaping until the reusing process exits — a bounded, accepted residual.
 - The `use_computer` CLI returns `ExitCode` instead of calling `process::exit`, so `Drop` always
   runs on error exits.
 
 ### Per-target action routing
 
-[`x11/mod.rs::perform_actions` @ 1af88ebc](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/x11/mod.rs#L171):
+[`x11/mod.rs::perform_actions` @ 1af88ebc](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/x11/mod.rs#L171):
 
 - Prevalidates the batch (rejects the `window_id: 0` sentinel, macOS parity) and creates the
   seat up front so failures cannot half-apply a batch. `Screen` actions keep the legacy path on
   the user's core pointer/keyboard; with `background_enabled == false` behavior is identical to
   the pre-existing implementation.
 - Window coordinates are window-local pixels, translated to root coordinates with bounds
-  validation ([`windows.rs::window_local_to_root` @ L265](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/x11/windows.rs#L265)) — an out-of-bounds point would otherwise land on an unrelated window.
+  validation ([`windows.rs::window_local_to_root` @ L265](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/x11/windows.rs#L265)) — an out-of-bounds point would otherwise land on an unrelated window.
 - X11 delivers pointer events to the topmost window under the pointer, so clicks and scrolls
-  first hit-test the target at the point ([`window_hit_at_point` @ L298](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/x11/windows.rs#L298) walks the same root-down `TranslateCoordinates` chain the server uses for event picking, which also handles WM reparenting frames). A covered target is raised *without focus* via `ConfigureWindow(Above)` and re-checked with a 500 ms poll ([`ensure_window_clickable_at` @ L135](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/x11/mod.rs#L135)); the action fails with an actionable error if the raise does not take effect.
+  first hit-test the target at the point ([`window_hit_at_point` @ L298](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/x11/windows.rs#L298) walks the same root-down `TranslateCoordinates` chain the server uses for event picking, which also handles WM reparenting frames). A covered target is raised *without focus* via `ConfigureWindow(Above)` and re-checked with a 500 ms poll ([`ensure_window_clickable_at` @ L135](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/x11/mod.rs#L135)); the action fails with an actionable error if the raise does not take effect.
 - Key/type actions set the agent keyboard's focus to the target first; clicks do the same to
   mirror a real click's focus effect on the agent seat only.
 
 ### Window enumeration and screenshots
 
-- [`windows.rs::enumerate_windows` @ L74](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/x11/windows.rs#L74): EWMH `_NET_CLIENT_LIST_STACKING` (reversed to front-to-back) with `_NET_CLIENT_LIST` and a `QueryTree` fallback for WM-less servers (bare Xvfb in cloud environments); titles from `_NET_WM_NAME`/`WM_NAME`, pid from `_NET_WM_PID`, app name from `WM_CLASS`. On X11 the `pid` is informational — delivery is addressed by window id.
-- [`screenshot.rs::take_window` @ L72](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/x11/screenshot.rs#L72): Composite-extension capture ([`capture_via_composite` @ L161](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/x11/screenshot.rs#L161): per-client `RedirectWindow(Automatic)` — auto-released at disconnect — plus `NameWindowPixmap`, honoring `border_width`) sees full contents of covered windows; falls back to direct `GetImage` on the window drawable. Native capture size is capped at [`MAX_WINDOW_CAPTURE_PIXELS` @ L18](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/x11/screenshot.rs#L18) (32 Mi px, covers 8K) since the reply and RGB buffers are allocated at native size before downscaling limits apply.
-- Capability probing: [`linux/mod.rs::background_supported` @ L34](https://github.com/FJRG2007/rook/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/crates/computer_use/src/linux/mod.rs#L34) requires X11 (not Wayland — the portal path has no per-window targeting) plus a `OnceLock`-cached XI 2.x probe.
+- [`windows.rs::enumerate_windows` @ L74](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/x11/windows.rs#L74): EWMH `_NET_CLIENT_LIST_STACKING` (reversed to front-to-back) with `_NET_CLIENT_LIST` and a `QueryTree` fallback for WM-less servers (bare Xvfb in cloud environments); titles from `_NET_WM_NAME`/`WM_NAME`, pid from `_NET_WM_PID`, app name from `WM_CLASS`. On X11 the `pid` is informational — delivery is addressed by window id.
+- [`screenshot.rs::take_window` @ L72](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/x11/screenshot.rs#L72): Composite-extension capture ([`capture_via_composite` @ L161](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/x11/screenshot.rs#L161): per-client `RedirectWindow(Automatic)` — auto-released at disconnect — plus `NameWindowPixmap`, honoring `border_width`) sees full contents of covered windows; falls back to direct `GetImage` on the window drawable. Native capture size is capped at [`MAX_WINDOW_CAPTURE_PIXELS` @ L18](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/x11/screenshot.rs#L18) (32 Mi px, covers 8K) since the reply and RGB buffers are allocated at native size before downscaling limits apply.
+- Capability probing: [`linux/mod.rs::background_supported` @ L34](https://github.com/FJRG2007/polaris/blob/1af88ebc4f77304eecd17b3ff5d47e85301afa7a/terminal/crates/computer_use/src/linux/mod.rs#L34) requires X11 (not Wayland — the portal path has no per-window targeting) plus a `OnceLock`-cached XI 2.x probe.
 
 ## Testing and validation
 

@@ -8,10 +8,10 @@ use chrono::{DateTime, Local};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_core::ui::color::blend::Blend;
-use rookui::accessibility::{AccessibilityContent, ActionAccessibilityContent, RookA11yRole};
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::{
+use pterm_core::ui::color::blend::Blend;
+use ptermui::accessibility::{AccessibilityContent, ActionAccessibilityContent, PtermA11yRole};
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::{
     Align, Border, CacheOption, ChildAnchor, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, DispatchEventResult,
     DropShadow, Element, EventHandler, Expanded, Flex, Hoverable, Icon, Image, MainAxisAlignment,
@@ -20,12 +20,12 @@ use rookui::elements::{
     Radius, Rect, SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Shrinkable,
     Stack, Text,
 };
-use rookui::fonts::{FamilyId, Properties};
-use rookui::keymap::FixedBinding;
-use rookui::platform::Cursor;
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::fonts::{FamilyId, Properties};
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::Cursor;
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     Action, AppContext, Entity, EventContext, SingletonEntity, TypedActionView, View, ViewContext,
     WindowId,
 };
@@ -926,7 +926,7 @@ impl AnyMenuItemFields {
                 Shrinkable::new(
                     1.,
                     Container::new(
-                        ConstrainedBox::new(icon.to_rookui_icon(icon_color).finish())
+                        ConstrainedBox::new(icon.to_ptermui_icon(icon_color).finish())
                             .with_width(icon_size)
                             .with_height(icon_size)
                             .finish(),
@@ -1042,7 +1042,7 @@ impl AnyMenuItemFields {
                 .finish();
             return Some(Shrinkable::new(1., Align::new(element).right().finish()).finish());
         }
-        let icon_element = ConstrainedBox::new(config.icon.to_rookui_icon(icon_color).finish())
+        let icon_element = ConstrainedBox::new(config.icon.to_ptermui_icon(icon_color).finish())
             .with_width(icon_size)
             .with_height(icon_size)
             .finish();
@@ -1773,7 +1773,7 @@ pub enum MenuAction {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -2251,7 +2251,7 @@ impl AnySubMenu {
                             ScrollbarWidth::Auto,
                             appearance.theme().nonactive_ui_detail().into(),
                             appearance.theme().active_ui_detail().into(),
-                            rookui::elements::Fill::None,
+                            ptermui::elements::Fill::None,
                         )
                         .with_overlayed_scrollbar()
                         .finish(),
@@ -2683,28 +2683,28 @@ impl AnySubMenu {
                 Custom(AccessibilityContent::new(
                     menu_item,
                     instructions,
-                    RookA11yRole::TextRole,
+                    PtermA11yRole::TextRole,
                 ))
             }
             OpenSubmenu => Custom(AccessibilityContent::new(
                 String::from("Submenu Expanded"),
                 "Press the right key to open the selected submenu",
-                RookA11yRole::TextRole,
+                PtermA11yRole::TextRole,
             )),
             CloseSubmenu(_) => Custom(AccessibilityContent::new(
                 String::from("Submenu Closed"),
                 "Removing focus from a submenu will close the submenu",
-                RookA11yRole::TextRole,
+                PtermA11yRole::TextRole,
             )),
             Close(_) => Custom(AccessibilityContent::new(
                 String::from("Menu Closed"),
                 "Press the escape key to close the menu",
-                RookA11yRole::TextRole,
+                PtermA11yRole::TextRole,
             )),
             Enter => Custom(AccessibilityContent::new(
                 String::from("Action Selected"),
                 "Press the enter key to execute the selected menu item action",
-                RookA11yRole::TextRole,
+                PtermA11yRole::TextRole,
             )),
             HoverSubmenuLeafNode { .. }
             | UnhoverSubmenuParent(_)

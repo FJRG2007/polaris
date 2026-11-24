@@ -1,7 +1,7 @@
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::context_flag::ContextFlag;
-use rookui::keymap::Trigger;
-use rookui::{SingletonEntity, ViewContext, ViewHandle};
+use pterm_core::context_flag::ContextFlag;
+use ptermui::keymap::Trigger;
+use ptermui::{SingletonEntity, ViewContext, ViewHandle};
 
 use super::env_var_collection::{EnvVarCollectionAction, EnvVarCollectionView, VariableRowIndex};
 use crate::cloud_object::{CloudObject, GenericStringObjectFormat, Space};

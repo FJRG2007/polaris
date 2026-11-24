@@ -104,7 +104,7 @@ flowchart TD
 - Manual validation:
   - disconnect network in a GitHub repo with an authenticated `gh`
   - trigger the PR chip and confirm the chip disappears or stays empty without suppressing the default
-  - restore network and confirm the chip can re-run and show the PR without changing branches, directories, prompt settings, or restarting Rook
+  - restore network and confirm the chip can re-run and show the PR without changing branches, directories, prompt settings, or restarting Polaris Terminal
 ## Follow-ups
 - Consider bounded retry backoff for repeated retryable PR chip failures if periodic command execution is too noisy while offline.
 - Consider surfacing a lightweight transient error state in debug logs or prompt-chip logs if this is hard to diagnose manually.

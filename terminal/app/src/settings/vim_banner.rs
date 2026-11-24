@@ -1,4 +1,4 @@
-use rook_core::define_settings_group;
+use pterm_core::define_settings_group;
 use settings::{RespectUserSyncSetting, SupportedPlatforms, SyncToCloud};
 
 use crate::banner::BannerState;

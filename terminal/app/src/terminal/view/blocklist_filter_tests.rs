@@ -34,15 +34,15 @@ fn create_restored_conversation(
 }
 
 #[test]
-fn test_should_show_task_in_blocklist_hides_rook_docs_subagent_task() {
+fn test_should_show_task_in_blocklist_hides_pterm_docs_subagent_task() {
     let conversation = create_restored_conversation(
         api::message::tool_call::subagent::Metadata::WarpDocumentationSearch(()),
     );
 
     let subtask = conversation
         .all_tasks()
-        .find(|task| task.is_rook_documentation_search_subagent())
-        .expect("rook docs subagent task should exist");
+        .find(|task| task.is_pterm_documentation_search_subagent())
+        .expect("polaris-terminal docs subagent task should exist");
 
     assert!(!should_show_task_in_blocklist(subtask));
 }
@@ -62,7 +62,7 @@ fn test_should_show_task_in_blocklist_hides_conversation_search_subagent_task() 
 }
 
 #[test]
-fn test_exchanges_for_blocklist_excludes_rook_docs_subagent_exchanges() {
+fn test_exchanges_for_blocklist_excludes_pterm_docs_subagent_exchanges() {
     let conversation = create_restored_conversation(
         api::message::tool_call::subagent::Metadata::WarpDocumentationSearch(()),
     );

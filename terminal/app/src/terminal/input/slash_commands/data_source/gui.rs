@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[cfg(not(target_family = "wasm"))]
-use rook_cli::agent::Harness;
-use rook_core::features::FeatureFlag;
-use rookui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use pterm_cli::agent::Harness;
+use pterm_core::features::FeatureFlag;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::core::subscribe_to_shared_dependencies;
 use super::{
@@ -289,7 +289,7 @@ impl GuiSlashCommandDataSource {
 
     /// Returns true when the active conversation is associated with a cloud Oz
     /// `AmbientAgentTask`. Used to gate `/continue-locally` to runs that can
-    /// actually be forked into a local Rook conversation.
+    /// actually be forked into a local Polaris Terminal conversation.
     ///
     /// Permissive when the harness is not yet known: we consider an absent task or
     /// missing `agent_config_snapshot.harness` to be Oz, matching the existing

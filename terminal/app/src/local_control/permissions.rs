@@ -1,13 +1,13 @@
 //! Permission checks for local control.
 use ::local_control::{ActionKind, ControlError, ErrorCode, PROTOCOL_VERSION};
-use rookui::{ModelContext, SingletonEntity};
+use ptermui::{ModelContext, SingletonEntity};
 
 use crate::features::FeatureFlag;
 use crate::local_control::LocalControlBridge;
 use crate::settings::LocalControlSettings;
 
-pub(super) fn rook_control_cli_enabled() -> bool {
-    FeatureFlag::RookControlCli.is_enabled()
+pub(super) fn pterm_control_cli_enabled() -> bool {
+    FeatureFlag::PtermControlCli.is_enabled()
 }
 
 pub(super) fn ensure_protocol_version(protocol_version: u32) -> Result<(), ControlError> {
@@ -21,12 +21,12 @@ pub(super) fn ensure_protocol_version(protocol_version: u32) -> Result<(), Contr
 }
 
 pub(super) fn ensure_feature_enabled() -> Result<(), ControlError> {
-    if rook_control_cli_enabled() {
+    if pterm_control_cli_enabled() {
         return Ok(());
     }
     Err(ControlError::new(
         ErrorCode::LocalControlDisabled,
-        "Rook control CLI is disabled by feature flag",
+        "Polaris Terminal control CLI is disabled by feature flag",
     ))
 }
 

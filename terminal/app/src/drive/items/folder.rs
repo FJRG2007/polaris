@@ -1,11 +1,11 @@
-use rook_core::features::FeatureFlag;
-use rookui::elements::MouseStateHandle;
-use rookui::{AppContext, Element};
+use pterm_core::features::FeatureFlag;
+use ptermui::elements::MouseStateHandle;
+use ptermui::{AppContext, Element};
 
-use super::{RookDriveItem, RookDriveItemId};
+use super::{PtermDriveItem, PtermDriveItemId};
 use crate::appearance::Appearance;
 use crate::cloud_object::CloudObjectMetadata;
-use crate::drive::cloud_object_styling::rook_drive_icon_color;
+use crate::drive::cloud_object_styling::pterm_drive_icon_color;
 use crate::drive::folders::CloudFolder;
 use crate::drive::index::DriveIndexAction;
 use crate::drive::{CloudObjectTypeAndId, DriveObjectType};
@@ -13,18 +13,18 @@ use crate::themes::theme::Fill;
 use crate::ui_components::icons::Icon;
 
 #[derive(Clone)]
-pub struct RookDriveFolder {
+pub struct PtermDriveFolder {
     id: CloudObjectTypeAndId,
     folder: CloudFolder,
 }
 
-impl RookDriveFolder {
+impl PtermDriveFolder {
     pub fn new(id: CloudObjectTypeAndId, folder: CloudFolder) -> Self {
         Self { id, folder }
     }
 }
 
-impl RookDriveItem for RookDriveFolder {
+impl PtermDriveItem for PtermDriveFolder {
     fn display_name(&self) -> Option<String> {
         if self.folder.model().name.is_empty() {
             None
@@ -43,14 +43,14 @@ impl RookDriveItem for RookDriveFolder {
 
     fn icon(&self, appearance: &Appearance, color: Option<Fill>) -> Option<Box<dyn Element>> {
         let icon_fill =
-            color.unwrap_or(rook_drive_icon_color(appearance, DriveObjectType::Folder).into());
-        let icon = if FeatureFlag::RookPacks.is_enabled() && self.folder.model().is_rook_pack {
+            color.unwrap_or(pterm_drive_icon_color(appearance, DriveObjectType::Folder).into());
+        let icon = if FeatureFlag::PtermPacks.is_enabled() && self.folder.model().is_pterm_pack {
             Icon::PackageCheck
         } else {
             Icon::from(DriveObjectType::Folder)
         };
 
-        Some(icon.to_rookui_icon(icon_fill).finish())
+        Some(icon.to_ptermui_icon(icon_fill).finish())
     }
 
     fn secondary_icon(&self, _color: Option<Fill>) -> Option<Box<dyn Element>> {
@@ -69,8 +69,8 @@ impl RookDriveItem for RookDriveFolder {
         None
     }
 
-    fn rook_drive_id(&self) -> RookDriveItemId {
-        RookDriveItemId::Object(self.id)
+    fn pterm_drive_id(&self) -> PtermDriveItemId {
+        PtermDriveItemId::Object(self.id)
     }
 
     fn sync_status_icon(
@@ -90,7 +90,7 @@ impl RookDriveItem for RookDriveFolder {
         None
     }
 
-    fn clone_box(&self) -> Box<dyn RookDriveItem> {
+    fn clone_box(&self) -> Box<dyn PtermDriveItem> {
         Box::new(self.clone())
     }
 }

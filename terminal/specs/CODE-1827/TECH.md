@@ -10,14 +10,14 @@ This top PR implements [`PRODUCT.md`](PRODUCT.md) using three downstack foundati
 
 This PR leaves the GUI handoff pipeline and existing blocker architecture intact. It moves the GUI compose surface onto the same repository-aware environment suggestion helper used by the TUI, so both frontends share that policy.
 
-Relevant TUI references at rook commit `c4cc7be9477897c75c34bdc75c1a324c25b12f27`:
+Relevant TUI references at polaris-terminal commit `c4cc7be9477897c75c34bdc75c1a324c25b12f27`:
 
-- [`app/src/terminal/input/slash_commands/mod.rs (103-186)`](https://github.com/FJRG2007/rook/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/app/src/terminal/input/slash_commands/mod.rs#L103-L186) owns TUI command selection/allowlisting.
-- [`crates/rook_tui/src/terminal_session_view.rs (2569-2810)`](https://github.com/FJRG2007/rook/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/crates/rook_tui/src/terminal_session_view.rs#L2569-L2810) dispatches TUI slash commands.
-- [`crates/rook_tui/src/orchestration_block/configuration.rs (47-207)`](https://github.com/FJRG2007/rook/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/crates/rook_tui/src/orchestration_block/configuration.rs#L47-L207) shows selector integration.
-- [`crates/rook_tui/src/orchestration_block/render.rs (85-267)`](https://github.com/FJRG2007/rook/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/crates/rook_tui/src/orchestration_block/render.rs#L85-L267) is the card structure/copy reference.
-- [`crates/rook_tui/src/attachment_bar/model.rs (52-443)`](https://github.com/FJRG2007/rook/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/crates/rook_tui/src/attachment_bar/model.rs#L52-L443) projects pending images from shared input context.
-- [`crates/rook_tui/src/orchestration_model.rs (316-440)`](https://github.com/FJRG2007/rook/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/crates/rook_tui/src/orchestration_model.rs#L316-L440) demonstrates direct cloud-run creation and static URL state.
+- [`app/src/terminal/input/slash_commands/mod.rs (103-186)`](https://github.com/FJRG2007/polaris/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/terminal/app/src/terminal/input/slash_commands/mod.rs#L103-L186) owns TUI command selection/allowlisting.
+- [`crates/pterm_tui/src/terminal_session_view.rs (2569-2810)`](https://github.com/FJRG2007/polaris/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/terminal/crates/pterm_tui/src/terminal_session_view.rs#L2569-L2810) dispatches TUI slash commands.
+- [`crates/pterm_tui/src/orchestration_block/configuration.rs (47-207)`](https://github.com/FJRG2007/polaris/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/terminal/crates/pterm_tui/src/orchestration_block/configuration.rs#L47-L207) shows selector integration.
+- [`crates/pterm_tui/src/orchestration_block/render.rs (85-267)`](https://github.com/FJRG2007/polaris/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/terminal/crates/pterm_tui/src/orchestration_block/render.rs#L85-L267) is the card structure/copy reference.
+- [`crates/pterm_tui/src/attachment_bar/model.rs (52-443)`](https://github.com/FJRG2007/polaris/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/terminal/crates/pterm_tui/src/attachment_bar/model.rs#L52-L443) projects pending images from shared input context.
+- [`crates/pterm_tui/src/orchestration_model.rs (316-440)`](https://github.com/FJRG2007/polaris/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/terminal/crates/pterm_tui/src/orchestration_model.rs#L316-L440) demonstrates direct cloud-run creation and static URL state.
 
 ## Proposed changes
 
@@ -49,7 +49,7 @@ Keep repository-overlap suggestion in the shared handoff domain. `suggest_handof
 
 ### Handoff card
 
-Keep the TUI handoff feature under `crates/rook_tui/src/handoff/`:
+Keep the TUI handoff feature under `crates/pterm_tui/src/handoff/`:
 
 - `model.rs` owns handoff state and execution.
 - `block.rs` owns presentation and input handling.
@@ -168,9 +168,9 @@ Use real `App::dispatch_keystroke` paths and render-to-lines assertions.
 Run:
 
 - `./script/format`
-- Focused `cargo nextest run -p rook_tui` tests.
+- Focused `cargo nextest run -p pterm_tui` tests.
 - Focused downstack shared-pipeline regression tests if integration changes require them.
-- The applicable `rook_tui` clippy command from `./script/presubmit`.
+- The applicable `pterm_tui` clippy command from `./script/presubmit`.
 
 Run `./script/run-tui` in a real terminal and verify:
 

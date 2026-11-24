@@ -1,6 +1,6 @@
 # Watch remote refs for updates — Tech Spec
 Product spec: `specs/GH10090/product.md`
-GitHub issue: https://github.com/FJRG2007/rook/issues/10090
+GitHub issue: https://github.com/FJRG2007/polaris/issues/10090
 
 ## Problem
 `repo_metadata` already watches repository roots and selected Git internals, but remote-tracking refs under `.git/refs/remotes/*` are filtered out. Code review metadata computes unpushed commits from the current branch's upstream ref, so a push or fetch that updates a loose remote-tracking ref can leave `DiffStateModel` and the Git operations UI stale until another invalidation happens.
@@ -112,7 +112,7 @@ Preferred registration for linked worktrees:
 - `common_git_dir/refs`, when it exists, so shared local branch refs and remote-tracking refs are visible.
 - `common_git_dir/config`, if the watcher can register a file path; otherwise `common_git_dir` with the existing allowlist filter.
 
-This lets a linked worktree observe both existing remote refs and first-time creation under `refs/remotes` without having to create Git directories from Rook. It also lets upstream tracking additions/removals in common config update the cached `tracked_remote_ref`.
+This lets a linked worktree observe both existing remote refs and first-time creation under `refs/remotes` without having to create Git directories from Polaris Terminal. It also lets upstream tracking additions/removals in common config update the cached `tracked_remote_ref`.
 
 Update `Repository::stop_watching` to unregister the same shared paths when the last subscriber is removed. Keep start/stop symmetric, preferably by sharing a helper that computes the optional watch paths.
 
@@ -213,8 +213,8 @@ Add and update unit tests in `crates/repo_metadata`:
 Update app-level tests only if repo-metadata tests cannot prove the end-to-end invalidation contract. The key app-level assertion is that `DiffStateModel::handle_file_update` treats `remote_ref_updated` as full metadata invalidation, matching `commit_updated`.
 
 ### 10. Manual validation
-1. Open Rook code review on a branch tracking `origin/<branch>` with one or more unpushed commits.
-2. Push the branch from Rook or an external terminal.
+1. Open Polaris Terminal code review on a branch tracking `origin/<branch>` with one or more unpushed commits.
+2. Push the branch from Polaris Terminal or an external terminal.
 3. Confirm the loose ref `.git/refs/remotes/origin/<branch>` updates.
 4. Confirm the unpushed commit list clears and the primary Git action updates without reopening code review.
 5. Run `git branch --unset-upstream`, then `git branch --set-upstream-to=origin/<branch>`, and confirm metadata refreshes when tracked remote ref state is removed and restored.

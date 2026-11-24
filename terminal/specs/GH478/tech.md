@@ -1,14 +1,14 @@
 # TECH.md — Per-tab theme overrides driven by directory and launch configurations
 
-Issue: https://github.com/FJRG2007/rook/issues/478
-Related: https://github.com/FJRG2007/rook/issues/2618
+Issue: https://github.com/FJRG2007/polaris/issues/478
+Related: https://github.com/FJRG2007/polaris/issues/2618
 Product spec: `specs/GH478/product.md`
 
 ## Context
 
-The Rook theme is currently a single global value derived from
+The Polaris Terminal theme is currently a single global value derived from
 `ThemeSettings`. The renderer reads it through the global `Appearance`
-singleton, which today owns exactly one resolved `RookTheme`. Per-tab
+singleton, which today owns exactly one resolved `PtermTheme`. Per-tab
 overrides therefore require changes in four layers — the launch
 configuration schema, a new directory-pattern settings group, the
 persisted tab snapshot (with override-source semantics), and the
@@ -49,10 +49,10 @@ All file references are at HEAD on `master`.
 ### Renderer entry point
 
 - `app/src/appearance.rs:34` re-exports `Appearance` from
-  `rook_core::ui::appearance`.
+  `pterm_core::ui::appearance`.
 - `app/src/appearance.rs:40–47` — `AppearanceManager`; subscribes to
   `ThemeSettings` (line 51) and pushes changes into `Appearance`.
-- `Appearance` today owns one `RookTheme`. Per-tab overrides require
+- `Appearance` today owns one `PtermTheme`. Per-tab overrides require
   it to own a *catalog* (see *Proposed changes* §5).
 
 ### Tab and window state
@@ -328,7 +328,7 @@ define_settings_group!(DirectoryThemeOverrides, settings: [
                       active pane's cwd is matched against keys (longest \
                       prefix wins); the matched theme overrides the global \
                       theme for that tab. Stored locally; never synced to \
-                      Rook's cloud because path keys can leak employer or \
+                      Polaris Terminal's cloud because path keys can leak employer or \
                       project names.",
     },
 ]);
@@ -351,7 +351,7 @@ and `private`; the design rule applied here is:
   never logs path keys or theme names to remote telemetry pipelines.
 - **Local logs are also redacted.** Diagnostic output is routinely
   shared in bug reports and support sessions, so even the local
-  Rook log must not contain raw `directory_overrides` keys. The
+  Polaris Terminal log must not contain raw `directory_overrides` keys. The
   redaction rule and helper are specced in *Diagnostic redaction* below.
 - **No round-tripping into shareable artifacts.** A saved launch
   configuration does not emit `directory_overrides` entries (product
@@ -372,7 +372,7 @@ the raw key is dictionary-guessable — an adversary with a shared log
 can hash a list of plausible candidate paths and recover the key by
 collision. The fix is a **per-installation keyed hash**: a 32-byte
 random salt is generated on first launch, stored in a local-only,
-non-synced file (`~/.rook/redaction_salt`, mode `0600`), and never
+non-synced file (`~/.polaris-terminal/redaction_salt`, mode `0600`), and never
 leaves the machine.
 
 ```rust
@@ -382,7 +382,7 @@ leaves the machine.
 ///
 /// Implementation: HMAC-SHA256(installation_salt, raw_key), truncated
 /// to 6 hex chars (24 bits). The installation salt is read from
-/// `~/.rook/redaction_salt` (generated on first launch, mode 0600,
+/// `~/.polaris-terminal/redaction_salt` (generated on first launch, mode 0600,
 /// never synced). Because the salt is per-installation and never
 /// shared, an identifier leaked in a log file cannot be reversed by
 /// a dictionary attack against candidate paths — the attacker would
@@ -408,7 +408,7 @@ subsystem at startup and passed into `redacted_key_id` as a borrow;
 no global static is required.
 
 If the salt file is missing or unreadable at runtime — for example
-the user deleted it, or Rook is running in a container without write
+the user deleted it, or Polaris Terminal is running in a container without write
 access — the redaction helper emits `directory_overrides[unsalted]:
 ...` with no derived identifier from the path at all, which is the
 safest fallback and surfaces the configuration error to the user.
@@ -416,7 +416,7 @@ safest fallback and surfaces the configuration error to the user.
 **Even-stronger alternative considered and rejected**: storing an
 opaque local ID alongside each entry (e.g. a sidecar file mapping
 `key → uuid`). That removes the hash entirely but requires every
-settings edit to round-trip through Rook's runtime to allocate IDs
+settings edit to round-trip through Polaris Terminal's runtime to allocate IDs
 for new keys; users editing `settings.toml` directly in a text
 editor would not get an ID until next launch, so the diagnostic for
 a freshly-typed bad theme value would be
@@ -439,7 +439,7 @@ directory_overrides[id=8a3f9c]: unknown theme "Drakula" — matching this entry 
 ```
 
 The identifier is stable for a given key on a given machine, so the
-same warning recurs with the same id across Rook restarts and helps
+same warning recurs with the same id across Polaris Terminal restarts and helps
 the user correlate multiple diagnostics about the same entry. The
 identifier does **not** match between machines (different salts), so
 correlation across users in a shared bug-report channel is impossible
@@ -523,10 +523,10 @@ the value re-trigger this validation.
 ### 5. Renderer: `Appearance` gains a theme catalog
 
 This addresses Oz concern 3 (`Appearance::theme_for` cannot return
-`&RookTheme` for arbitrary overrides because `Appearance` only owns the
-global `RookTheme` today).
+`&PtermTheme` for arbitrary overrides because `Appearance` only owns the
+global `PtermTheme` today).
 
-`Appearance` is extended in `rook_core::ui::appearance`:
+`Appearance` is extended in `pterm_core::ui::appearance`:
 
 ```rust
 pub struct Appearance {
@@ -534,18 +534,18 @@ pub struct Appearance {
 
     /// Currently-active global theme. Always present in the catalog
     /// below, but tracked separately so `theme()` is O(1).
-    global_theme: Arc<RookTheme>,
+    global_theme: Arc<PtermTheme>,
 
     /// Lazy cache of all themes referenced by per-tab overrides.
     /// Keyed by `ThemeKind` so custom themes get their own entries.
     /// Wrapped in `RwLock` because lookup is on the hot rendering path
     /// while population happens on the (much rarer) settings-change path.
-    theme_cache: parking_lot::RwLock<HashMap<ThemeKind, Arc<RookTheme>>>,
+    theme_cache: parking_lot::RwLock<HashMap<ThemeKind, Arc<PtermTheme>>>,
 }
 
 impl Appearance {
     /// Active global theme. Unchanged contract.
-    pub fn theme(&self) -> Arc<RookTheme> {
+    pub fn theme(&self) -> Arc<PtermTheme> {
         self.global_theme.clone()
     }
 
@@ -553,7 +553,7 @@ impl Appearance {
     /// `tab.theme_state.effective(global_kind)` (or `None` for the
     /// global theme).
     /// Returns the global theme when `override` is `None`.
-    pub fn theme_for(&self, override_kind: Option<&ThemeKind>) -> Arc<RookTheme> {
+    pub fn theme_for(&self, override_kind: Option<&ThemeKind>) -> Arc<PtermTheme> {
         match override_kind {
             None => self.global_theme.clone(),
             Some(kind) if *kind == self.global_theme.kind() => {
@@ -568,7 +568,7 @@ impl Appearance {
         }
     }
 
-    fn load_and_cache(&self, kind: &ThemeKind) -> Arc<RookTheme> {
+    fn load_and_cache(&self, kind: &ThemeKind) -> Arc<PtermTheme> {
         // Load via the same path the global theme loader uses.
         // On failure, log warning and return self.global_theme.clone()
         // (callers see a fall-through to global theme; per behavior #11).
@@ -607,7 +607,7 @@ global `theme()` form. Concretely:
 | --- | --- | --- |
 | `app/src/terminal/view/**` | per-tab | terminal grid, blocks, in-tab modals over the grid |
 | `app/src/terminal/input/**` | per-tab | input bar, inline menus, slash commands inside the tab |
-| `app/src/terminal/{view.rs, block_filter.rs, rich_history.rs, terminal_manager.rs, universal_developer_input.rs, ssh/**, rookify/**, shared_session/**}` | per-tab | terminal-pane content |
+| `app/src/terminal/{view.rs, block_filter.rs, rich_history.rs, terminal_manager.rs, universal_developer_input.rs, ssh/**, ptermify/**, shared_session/**}` | per-tab | terminal-pane content |
 | `app/src/terminal/{share_block_modal.rs, profile_model_selector.rs}` | per-tab | scoped to a specific tab's content |
 | `app/src/{tab.rs, root_view.rs, voltron.rs, modal.rs, menu.rs, search_bar.rs, input_suggestions.rs}` | global | window chrome, command palette, top-level modals |
 | `app/src/settings/**` | global | settings UI |
@@ -643,7 +643,7 @@ CI hook: `./script/presubmit` gains
 after the existing `cargo clippy` step. The lint runs in parallel
 with clippy and adds well under a minute to presubmit time.
 
-**Fallback** if the Rook team would rather not introduce `dylint` as
+**Fallback** if the Polaris Terminal team would rather not introduce `dylint` as
 a new dependency: replace the lint library with a `ripgrep` check in
 `./script/presubmit` that matches `Appearance::*::theme()` calls
 under per-tab paths and exits non-zero on hit. This gives 90% of the
@@ -695,7 +695,7 @@ existing tab-menu telemetry conventions). No new event schema.
 Per Zach's v4 review, the entire feature ships behind a feature flag
 `appearance.themes.per_tab_overrides`. The flag is added through the
 existing feature-flag system (the same mechanism that gates other
-in-development features like `OpenRookNewSettingsModes`).
+in-development features like `OpenPtermNewSettingsModes`).
 
 **Default values:**
 
@@ -839,11 +839,11 @@ name to avoid typos.
 - `TabSnapshot::color()` returns the same value with and without
   `theme_state` populated (color and theme are independent — #19).
 
-`app/src/appearance.rs` (or `rook_core` tests):
+`app/src/appearance.rs` (or `pterm_core` tests):
 
 - `Appearance::theme_for(None)` returns the same `Arc` as
   `Appearance::theme()`.
-- `Appearance::theme_for(Some(&ThemeKind::Light))` returns a `RookTheme`
+- `Appearance::theme_for(Some(&ThemeKind::Light))` returns a `PtermTheme`
   whose kind is `Light` regardless of the active global theme.
 - `Appearance::theme_for(Some(&ThemeKind::Custom(missing)))` falls back
   to the global theme and increments the existing missing-custom-theme
@@ -968,7 +968,7 @@ name to avoid typos.
 - `DirectoryThemeOverrides` settings group has `private == true` and
   `sync_to_cloud == SyncToCloud::Never`. Pinned by a settings-system
   test analogous to the existing tests that gate which settings sync.
-- The redaction-salt file (`~/.rook/redaction_salt`) is created with
+- The redaction-salt file (`~/.polaris-terminal/redaction_salt`) is created with
   mode `0600` on first launch and is **not** included in any
   cloud-synced settings payload (verified by the same serializer test
   that asserts no path keys leak).
@@ -1011,7 +1011,7 @@ name to avoid typos.
   hit when the override resolves to a non-global cached theme. The
   existing per-tab indicator color path runs on the same frame and has
   not been a bottleneck. If profiling flags it post-merge, cache the
-  `Arc<RookTheme>` directly on `TabData` and invalidate on
+  `Arc<PtermTheme>` directly on `TabData` and invalidate on
   override-change; the change is local.
 
 - **Cache stampedes when the user changes the global theme with many
@@ -1068,7 +1068,7 @@ name to avoid typos.
 - **Concern 1 / Concern 2 / Concern 3 from Oz's first-pass review.**
   Addressed in §1 (Option<String> + apply-time resolver), §2
   (`resolve_theme_ref` returns `Option<ThemeKind>`), and §5 (theme
-  catalog, `Arc<RookTheme>` ownership) respectively. Each concern has
+  catalog, `Arc<PtermTheme>` ownership) respectively. Each concern has
   a corresponding unit test above.
 
 - **Per-pane theme creep.** Override slots live on the tab, not the

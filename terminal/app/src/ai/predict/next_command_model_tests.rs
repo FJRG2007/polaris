@@ -1,7 +1,7 @@
-use rook_completer::meta::SpannedItem;
-use rook_completer::parsers::ParsedToken;
-use rook_completer::signatures::CommandRegistry;
-use rookui::App;
+use pterm_completer::meta::SpannedItem;
+use pterm_completer::parsers::ParsedToken;
+use pterm_completer::signatures::CommandRegistry;
+use ptermui::App;
 use typed_path::TypedPathBuf;
 
 use super::*;

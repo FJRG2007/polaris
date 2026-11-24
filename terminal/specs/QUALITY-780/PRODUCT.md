@@ -1,7 +1,7 @@
 # Client Awareness of `wait_for_events` Yields
 
 ## Summary
-When an Oz cloud agent calls the server-side `wait_for_events` tool, the agent has not finished its work — it has yielded the turn and is waiting on an inbound message or lifecycle event. The Rook client must observe this yield, keep the run alive, suppress completion-shaped UI (notifications, success badges), and surface a distinct "waiting for events" presentation in the orchestration UI.
+When an Oz cloud agent calls the server-side `wait_for_events` tool, the agent has not finished its work — it has yielded the turn and is waiting on an inbound message or lifecycle event. The Polaris Terminal client must observe this yield, keep the run alive, suppress completion-shaped UI (notifications, success badges), and surface a distinct "waiting for events" presentation in the orchestration UI.
 
 ## Problem
 Today the client cannot tell a `wait_for_events` yield apart from real completion. The model turn ends cleanly, the local conversation status flips to `Success`, and two things go wrong as a result:
@@ -83,7 +83,7 @@ Figma: none provided. The new badge should reuse the existing `render_avatar_wit
 31. The waiting state must not survive across distinct agent runs. Starting a new conversation never inherits `WaitingForEvents` from a prior conversation.
 
 ### Backwards compatibility and rollout
-This fix requires a coordinated release across the proto contract (`rook-proto-apis`), the server (`rook-server`), and the client (`rook`). The user-visible behavior during the rollout is bounded by the following invariants.
+This fix requires a coordinated release across the proto contract (`polaris-terminal-proto-apis`), the server (`polaris-terminal-server`), and the client (`polaris-terminal`). The user-visible behavior during the rollout is bounded by the following invariants.
 
 32. The fix is gated by a server-side feature flag. When the flag is **off** for a `wait_for_events` call, the legacy behavior is unchanged: the client treats the conversation as `Success`, the CLI driver exits per `--idle-on-complete`, and the existing server-side preservation (`shouldPreserveInProgressOnClientSuccess`, `ExtendTaskIdleTimeout`) keeps the task `IN_PROGRESS` on the server. This is the pre-fix bug and is acceptable during rollout.
 33. When the server flag is **on** and the client build includes the new `WaitingForEvents` support, all behavior in this spec applies. The flag flips per `wait_for_events` call (not per conversation), so an individual call's behavior is determined by the flag state at yield time.

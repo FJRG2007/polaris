@@ -18,104 +18,104 @@ use itertools::Itertools;
 #[cfg(test)]
 use mockall::automock;
 use prost::Message;
-use rook_core::channel::ChannelState;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rook_graphql::ai::{AgentTaskState, PlatformErrorCode};
-use rook_graphql::client::Operation;
-use rook_graphql::mutations::confirm_file_artifact_upload::{
+use pterm_core::channel::ChannelState;
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use pterm_graphql::ai::{AgentTaskState, PlatformErrorCode};
+use pterm_graphql::client::Operation;
+use pterm_graphql::mutations::confirm_file_artifact_upload::{
     ConfirmFileArtifactUpload, ConfirmFileArtifactUploadInput, ConfirmFileArtifactUploadResult,
     ConfirmFileArtifactUploadVariables,
 };
-use rook_graphql::mutations::create_agent_task::{
+use pterm_graphql::mutations::create_agent_task::{
     CreateAgentTask, CreateAgentTaskInput, CreateAgentTaskResult, CreateAgentTaskVariables,
 };
-use rook_graphql::mutations::create_file_artifact_upload_target::{
+use pterm_graphql::mutations::create_file_artifact_upload_target::{
     CreateFileArtifactUploadTarget, CreateFileArtifactUploadTargetInput,
     CreateFileArtifactUploadTargetResult, CreateFileArtifactUploadTargetVariables,
 };
-use rook_graphql::mutations::delete_ai_conversation::{
+use pterm_graphql::mutations::delete_ai_conversation::{
     DeleteAIConversation, DeleteAIConversationVariables, DeleteConversationInput,
     DeleteConversationResult,
 };
-use rook_graphql::mutations::generate_code_embeddings::{
+use pterm_graphql::mutations::generate_code_embeddings::{
     GenerateCodeEmbeddings, GenerateCodeEmbeddingsInput, GenerateCodeEmbeddingsResult,
     GenerateCodeEmbeddingsVariables,
 };
-use rook_graphql::mutations::generate_commands::{
+use pterm_graphql::mutations::generate_commands::{
     GenerateCommands, GenerateCommandsInput, GenerateCommandsResult, GenerateCommandsStatus,
     GenerateCommandsVariables,
 };
-use rook_graphql::mutations::generate_dialogue::{
+use pterm_graphql::mutations::generate_dialogue::{
     GenerateDialogue, GenerateDialogueInput,
     GenerateDialogueResult as GenerateDialogueResultGraphql, GenerateDialogueStatus,
     GenerateDialogueVariables, TranscriptPart as TranscriptPartGraphql,
 };
-use rook_graphql::mutations::generate_metadata_for_command::{
+use pterm_graphql::mutations::generate_metadata_for_command::{
     GenerateMetadataForCommand, GenerateMetadataForCommandInput, GenerateMetadataForCommandResult,
     GenerateMetadataForCommandStatus, GenerateMetadataForCommandVariables,
 };
-use rook_graphql::mutations::populate_merkle_tree_cache::{
+use pterm_graphql::mutations::populate_merkle_tree_cache::{
     PopulateMerkleTreeCache, PopulateMerkleTreeCacheResult, PopulateMerkleTreeCacheVariables,
 };
-use rook_graphql::mutations::request_bonus::{
+use pterm_graphql::mutations::request_bonus::{
     ProvideNegativeFeedbackResponseForAiConversation,
     ProvideNegativeFeedbackResponseForAiConversationInput,
     ProvideNegativeFeedbackResponseForAiConversationVariables, RequestsRefundedResult,
 };
-use rook_graphql::mutations::update_agent_task::{
+use pterm_graphql::mutations::update_agent_task::{
     AgentTaskStatusMessageInput, UpdateAgentTask, UpdateAgentTaskInput, UpdateAgentTaskResult,
     UpdateAgentTaskVariables,
 };
-use rook_graphql::mutations::update_merkle_tree::{
+use pterm_graphql::mutations::update_merkle_tree::{
     MerkleTreeNode, UpdateMerkleTree, UpdateMerkleTreeInput, UpdateMerkleTreeResult,
     UpdateMerkleTreeVariables,
 };
-use rook_graphql::queries::codebase_context_config::{
+use pterm_graphql::queries::codebase_context_config::{
     CodebaseContextConfigQuery, CodebaseContextConfigResult, CodebaseContextConfigVariables,
 };
-use rook_graphql::queries::free_available_models::{
+use pterm_graphql::queries::free_available_models::{
     FreeAvailableModels, FreeAvailableModelsInput, FreeAvailableModelsResult,
     FreeAvailableModelsVariables,
 };
 #[cfg(not(feature = "agent_mode_evals"))]
-use rook_graphql::queries::get_ai_credit_availability::{
+use pterm_graphql::queries::get_ai_credit_availability::{
     GetAICreditAvailability, GetAICreditAvailabilityVariables,
 };
-use rook_graphql::queries::get_available_harnesses::{
+use pterm_graphql::queries::get_available_harnesses::{
     GetAvailableHarnesses, GetAvailableHarnessesVariables,
 };
-use rook_graphql::queries::get_conversation_usage::{
+use pterm_graphql::queries::get_conversation_usage::{
     ConversationUsage, GetConversationUsage, GetConversationUsageVariables, UserResult,
 };
-use rook_graphql::queries::get_feature_model_choices::{
+use pterm_graphql::queries::get_feature_model_choices::{
     GetFeatureModelChoices, GetFeatureModelChoicesVariables,
 };
-use rook_graphql::queries::get_relevant_fragments::{
+use pterm_graphql::queries::get_relevant_fragments::{
     GetRelevantFragmentsQuery, GetRelevantFragmentsResult, GetRelevantFragmentsVariables,
 };
 #[cfg(not(feature = "agent_mode_evals"))]
-use rook_graphql::queries::get_request_limit_info::{
+use pterm_graphql::queries::get_request_limit_info::{
     GetRequestLimitInfo, GetRequestLimitInfoVariables,
 };
-use rook_graphql::queries::get_scheduled_agent_history::{
+use pterm_graphql::queries::get_scheduled_agent_history::{
     GetScheduledAgentHistory, GetScheduledAgentHistoryVariables, ScheduledAgentHistory,
     ScheduledAgentHistoryInput, ScheduledAgentHistoryResult,
 };
-use rook_graphql::queries::rerank_fragments::{
+use pterm_graphql::queries::rerank_fragments::{
     RerankFragments, RerankFragmentsResult, RerankFragmentsVariables,
 };
-use rook_graphql::queries::setup_failure_debug_authorization::{
+use pterm_graphql::queries::setup_failure_debug_authorization::{
     SetupFailureDebugAuthorization, SetupFailureDebugAuthorizationInput,
     SetupFailureDebugAuthorizationResult, SetupFailureDebugAuthorizationVariables,
 };
-use rook_graphql::queries::sync_merkle_tree::{
+use pterm_graphql::queries::sync_merkle_tree::{
     SyncMerkleTree, SyncMerkleTreeInput, SyncMerkleTreeResult, SyncMerkleTreeVariables,
 };
-use rook_graphql::queries::task_attachments::{
+use pterm_graphql::queries::task_attachments::{
     Task as TaskAttachmentsQuery, TaskInput, TaskResult, TaskVariables,
 };
-use rook_graphql::queries::task_git_credentials::{
+use pterm_graphql::queries::task_git_credentials::{
     TaskGitCredentials, TaskGitCredentialsInput, TaskGitCredentialsLegacy,
     TaskGitCredentialsLegacyInput, TaskGitCredentialsLegacyResult,
     TaskGitCredentialsLegacyVariables, TaskGitCredentialsResult, TaskGitCredentialsVariables,
@@ -153,7 +153,7 @@ use crate::ai::llms::{
 #[cfg(feature = "agent_mode_evals")]
 use crate::ai::request_usage_model::RequestLimitInfo;
 use crate::ai::{AICreditAvailability, RequestUsageInfo};
-use crate::ai_assistant::execution_context::RookAiExecutionContext;
+use crate::ai_assistant::execution_context::PtermAiExecutionContext;
 use crate::ai_assistant::requests::GenerateDialogueResult;
 use crate::ai_assistant::utils::TranscriptPart;
 use crate::ai_assistant::{AIGeneratedCommand, GenerateCommandsFromNaturalLanguageError};
@@ -243,10 +243,10 @@ pub struct SpawnAgentRequest {
     /// Not yet wired through the local start_agent flow.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_run_id: Option<String>,
-    /// Base64-encoded `rook.multi_agent.v1.Skill` payloads to restore as runtime skills.
+    /// Base64-encoded `polaris-terminal.multi_agent.v1.Skill` payloads to restore as runtime skills.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub runtime_skills: Vec<String>,
-    /// Base64-encoded `rook.multi_agent.v1.Attachment` payloads to restore as referenced attachments.
+    /// Base64-encoded `polaris-terminal.multi_agent.v1.Attachment` payloads to restore as referenced attachments.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub referenced_attachments: Vec<String>,
     /// Server-side conversation id to resume against (sets `task.AgentConversationID`).
@@ -1019,7 +1019,7 @@ pub struct CreateAgentRequest {
 /// Each field uses the public API's PATCH semantics: `None` omits the field
 /// (leave unchanged), while `Some(String::new())` sends an empty value to clear
 /// it. See `CreateAgentRequest`/`UpdateAgentRequest` in
-/// `rook-server/public_api/openapi.yaml`.
+/// `polaris-terminal-server/public_api/openapi.yaml`.
 #[derive(Clone, Default, serde::Serialize, Debug, PartialEq, Eq)]
 pub struct UpdateAgentRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1191,14 +1191,14 @@ pub trait AIClient: 'static + Send + Sync {
     async fn generate_commands_from_natural_language(
         &self,
         prompt: String,
-        ai_execution_context: Option<RookAiExecutionContext>,
+        ai_execution_context: Option<PtermAiExecutionContext>,
     ) -> Result<Vec<AIGeneratedCommand>, GenerateCommandsFromNaturalLanguageError>;
 
     async fn generate_dialogue_answer(
         &self,
         transcript: Vec<TranscriptPart>,
         prompt: String,
-        ai_execution_context: Option<RookAiExecutionContext>,
+        ai_execution_context: Option<PtermAiExecutionContext>,
     ) -> anyhow::Result<GenerateDialogueResult>;
 
     async fn generate_metadata_for_command(
@@ -1219,7 +1219,7 @@ pub trait AIClient: 'static + Send + Sync {
         &self,
         days: Option<i32>,
         limit: Option<i32>,
-        last_updated_end_timestamp: Option<rook_graphql::scalars::Time>,
+        last_updated_end_timestamp: Option<pterm_graphql::scalars::Time>,
     ) -> Result<Vec<ConversationUsage>, anyhow::Error>;
 
     async fn get_feature_model_choices(&self) -> Result<ModelsByFeature, anyhow::Error>;
@@ -1524,7 +1524,7 @@ pub trait AIClient: 'static + Send + Sync {
         artifact_uid: &str,
     ) -> anyhow::Result<ArtifactDownloadResponse, anyhow::Error>;
 
-    /// Downloads the bytes of a computer-use screenshot stored in Rook-managed
+    /// Downloads the bytes of a computer-use screenshot stored in Polaris Terminal-managed
     /// object storage. Requires view access to the conversation.
     async fn download_stored_screenshot(
         &self,
@@ -1617,7 +1617,7 @@ pub trait AIClient: 'static + Send + Sync {
 }
 
 fn into_file_artifact_record(
-    artifact: rook_graphql::mutations::create_file_artifact_upload_target::FileArtifact,
+    artifact: pterm_graphql::mutations::create_file_artifact_upload_target::FileArtifact,
 ) -> FileArtifactRecord {
     FileArtifactRecord {
         artifact_uid: artifact.artifact_uid.into_inner(),
@@ -1768,7 +1768,7 @@ impl ServerApi {
 }
 
 fn into_git_credential(
-    credential: rook_graphql::queries::task_git_credentials::TaskGitCredential,
+    credential: pterm_graphql::queries::task_git_credentials::TaskGitCredential,
 ) -> GitCredential {
     GitCredential {
         token: credential.token,
@@ -1793,9 +1793,9 @@ fn is_unknown_git_credential_schema_error(error: &anyhow::Error) -> bool {
 /// dropped, because a server-provided field we can't represent will almost certainly
 /// cause the upload to fail.
 fn convert_upload_field(
-    field: rook_graphql::mutations::create_file_artifact_upload_target::FileArtifactUploadField,
+    field: pterm_graphql::mutations::create_file_artifact_upload_target::FileArtifactUploadField,
 ) -> anyhow::Result<UploadField> {
-    use rook_graphql::mutations::create_file_artifact_upload_target::FileArtifactUploadFieldValue;
+    use pterm_graphql::mutations::create_file_artifact_upload_target::FileArtifactUploadFieldValue;
 
     let value = match field.value {
         FileArtifactUploadFieldValue::StaticUploadFieldValue(v) => {
@@ -1823,7 +1823,7 @@ impl AIClient for ServerApi {
         &self,
         prompt: String,
         // TODO: use relevant context from RequestContext and deprecate usage of ai_execution_context
-        _ai_execution_context: Option<RookAiExecutionContext>,
+        _ai_execution_context: Option<PtermAiExecutionContext>,
     ) -> Result<Vec<AIGeneratedCommand>, GenerateCommandsFromNaturalLanguageError> {
         let default_err = GenerateCommandsFromNaturalLanguageError::Other;
 
@@ -1862,7 +1862,7 @@ impl AIClient for ServerApi {
         transcript: Vec<TranscriptPart>,
         prompt: String,
         // TODO: use relevant context from RequestContext and deprecate usage of ai_execution_context
-        _ai_execution_context: Option<RookAiExecutionContext>,
+        _ai_execution_context: Option<PtermAiExecutionContext>,
     ) -> anyhow::Result<GenerateDialogueResult> {
         let graphql_transcript: Vec<TranscriptPartGraphql> = transcript
             .into_iter()
@@ -1966,7 +1966,7 @@ impl AIClient for ServerApi {
         let response = self.send_graphql_request(operation, None).await?;
 
         match response.user {
-            rook_graphql::queries::get_request_limit_info::UserResult::UserOutput(user_output) => {
+            pterm_graphql::queries::get_request_limit_info::UserResult::UserOutput(user_output) => {
                 let request_limit_info = user_output.user.request_limit_info.into();
 
                 let workspace_and_team_bonus_grants = user_output
@@ -2002,10 +2002,10 @@ impl AIClient for ServerApi {
                     bonus_grants,
                 })
             }
-            rook_graphql::queries::get_request_limit_info::UserResult::UserFacingError(e) => {
+            pterm_graphql::queries::get_request_limit_info::UserResult::UserFacingError(e) => {
                 Err(anyhow!(get_user_facing_error_message(e)))
             }
-            rook_graphql::queries::get_request_limit_info::UserResult::Unknown => {
+            pterm_graphql::queries::get_request_limit_info::UserResult::Unknown => {
                 Err(anyhow!("failed to get request limit info"))
             }
         }
@@ -2027,13 +2027,13 @@ impl AIClient for ServerApi {
         let response = self.send_graphql_request(operation, None).await?;
 
         match response.user {
-            rook_graphql::queries::get_ai_credit_availability::UserResult::UserOutput(output) => {
+            pterm_graphql::queries::get_ai_credit_availability::UserResult::UserOutput(output) => {
                 Ok(output.user.ai_credit_availability.into())
             }
-            rook_graphql::queries::get_ai_credit_availability::UserResult::UserFacingError(e) => {
+            pterm_graphql::queries::get_ai_credit_availability::UserResult::UserFacingError(e) => {
                 Err(anyhow!(get_user_facing_error_message(e)))
             }
-            rook_graphql::queries::get_ai_credit_availability::UserResult::Unknown => {
+            pterm_graphql::queries::get_ai_credit_availability::UserResult::Unknown => {
                 Err(anyhow!("failed to get AI credit availability"))
             }
         }
@@ -2043,7 +2043,7 @@ impl AIClient for ServerApi {
         &self,
         days: Option<i32>,
         limit: Option<i32>,
-        last_updated_end_timestamp: Option<rook_graphql::scalars::Time>,
+        last_updated_end_timestamp: Option<pterm_graphql::scalars::Time>,
     ) -> Result<Vec<ConversationUsage>, anyhow::Error> {
         let operation = GetConversationUsage::build(GetConversationUsageVariables {
             request_context: get_request_context(),
@@ -2066,9 +2066,9 @@ impl AIClient for ServerApi {
         let response = self.send_graphql_request(operation, None).await?;
 
         match response.user {
-            rook_graphql::queries::get_feature_model_choices::UserResult::UserOutput(
-                rook_graphql::queries::get_feature_model_choices::UserOutput {
-                    user: rook_graphql::queries::get_feature_model_choices::User { mut workspaces },
+            pterm_graphql::queries::get_feature_model_choices::UserResult::UserOutput(
+                pterm_graphql::queries::get_feature_model_choices::UserOutput {
+                    user: pterm_graphql::queries::get_feature_model_choices::User { mut workspaces },
                 },
             ) if !workspaces.is_empty() => {
                 // This is safe (`remove()` can panic) because we ensure workspaces is non-empty
@@ -2087,7 +2087,7 @@ impl AIClient for ServerApi {
         let response = self.send_graphql_request(operation, None).await?;
 
         match response.user {
-            rook_graphql::queries::get_available_harnesses::UserResult::UserOutput(output) => {
+            pterm_graphql::queries::get_available_harnesses::UserResult::UserOutput(output) => {
                 Ok(output
                     .user
                     .available_harnesses
@@ -2109,7 +2109,7 @@ impl AIClient for ServerApi {
                     })
                     .collect())
             }
-            rook_graphql::queries::get_available_harnesses::UserResult::Unknown => {
+            pterm_graphql::queries::get_available_harnesses::UserResult::Unknown => {
                 Err(anyhow!("Failed to get available harnesses"))
             }
         }
@@ -2497,7 +2497,7 @@ impl AIClient for ServerApi {
         &self,
         server_conversation_token: ServerConversationToken,
     ) -> anyhow::Result<(ConversationData, ServerAIConversationMetadata), anyhow::Error> {
-        use rook_graphql::queries::list_ai_conversations::{
+        use pterm_graphql::queries::list_ai_conversations::{
             ListAIConversations, ListAIConversationsInput, ListAIConversationsResult,
             ListAIConversationsVariables,
         };
@@ -2545,7 +2545,7 @@ impl AIClient for ServerApi {
         if !FeatureFlag::CloudConversations.is_enabled() {
             return Ok(vec![]);
         }
-        use rook_graphql::queries::list_ai_conversations::{
+        use pterm_graphql::queries::list_ai_conversations::{
             ListAIConversationMetadata, ListAIConversationMetadataResult,
             ListAIConversationMetadataVariables, ListAIConversationsInput,
         };
@@ -2585,11 +2585,11 @@ impl AIClient for ServerApi {
         &self,
         server_conversation_token: ServerConversationToken,
     ) -> anyhow::Result<AIAgentConversationFormat, anyhow::Error> {
-        use rook_graphql::queries::get_ai_conversation_format::{
+        use pterm_graphql::queries::get_ai_conversation_format::{
             GetAIConversationFormat, GetAIConversationFormatResult,
             GetAIConversationFormatVariables,
         };
-        use rook_graphql::queries::list_ai_conversations::ListAIConversationsInput;
+        use pterm_graphql::queries::list_ai_conversations::ListAIConversationsInput;
 
         let conversation_id = server_conversation_token.as_str().to_string();
         let operation = GetAIConversationFormat::build(GetAIConversationFormatVariables {
@@ -3286,13 +3286,13 @@ impl AIClient for ServerApi {
     }
 }
 
-impl TryFrom<rook_graphql::queries::get_feature_model_choices::FeatureModelChoice>
+impl TryFrom<pterm_graphql::queries::get_feature_model_choices::FeatureModelChoice>
     for ModelsByFeature
 {
     type Error = anyhow::Error;
 
     fn try_from(
-        value: rook_graphql::queries::get_feature_model_choices::FeatureModelChoice,
+        value: pterm_graphql::queries::get_feature_model_choices::FeatureModelChoice,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             agent_mode: value.agent_mode.try_into()?,
@@ -3303,10 +3303,10 @@ impl TryFrom<rook_graphql::queries::get_feature_model_choices::FeatureModelChoic
     }
 }
 
-impl TryFrom<rook_graphql::workspace::FeatureModelChoice> for ModelsByFeature {
+impl TryFrom<pterm_graphql::workspace::FeatureModelChoice> for ModelsByFeature {
     type Error = anyhow::Error;
 
-    fn try_from(value: rook_graphql::workspace::FeatureModelChoice) -> Result<Self, Self::Error> {
+    fn try_from(value: pterm_graphql::workspace::FeatureModelChoice) -> Result<Self, Self::Error> {
         Ok(Self {
             agent_mode: value.agent_mode.try_into()?,
             coding: value.coding.try_into()?,
@@ -3316,11 +3316,11 @@ impl TryFrom<rook_graphql::workspace::FeatureModelChoice> for ModelsByFeature {
     }
 }
 
-impl TryFrom<rook_graphql::queries::get_feature_model_choices::AvailableLlms> for AvailableLLMs {
+impl TryFrom<pterm_graphql::queries::get_feature_model_choices::AvailableLlms> for AvailableLLMs {
     type Error = anyhow::Error;
 
     fn try_from(
-        value: rook_graphql::queries::get_feature_model_choices::AvailableLlms,
+        value: pterm_graphql::queries::get_feature_model_choices::AvailableLlms,
     ) -> Result<Self, Self::Error> {
         Self::new(
             value.default_id.into(),
@@ -3330,10 +3330,10 @@ impl TryFrom<rook_graphql::queries::get_feature_model_choices::AvailableLlms> fo
     }
 }
 
-impl TryFrom<rook_graphql::workspace::AvailableLlms> for AvailableLLMs {
+impl TryFrom<pterm_graphql::workspace::AvailableLlms> for AvailableLLMs {
     type Error = anyhow::Error;
 
-    fn try_from(value: rook_graphql::workspace::AvailableLlms) -> Result<Self, Self::Error> {
+    fn try_from(value: pterm_graphql::workspace::AvailableLlms) -> Result<Self, Self::Error> {
         Self::new(
             value.default_id.into(),
             value.choices.into_iter().map(LLMInfo::from),
@@ -3342,8 +3342,8 @@ impl TryFrom<rook_graphql::workspace::AvailableLlms> for AvailableLLMs {
     }
 }
 
-impl From<rook_graphql::queries::get_feature_model_choices::LlmInfo> for LLMInfo {
-    fn from(value: rook_graphql::queries::get_feature_model_choices::LlmInfo) -> Self {
+impl From<pterm_graphql::queries::get_feature_model_choices::LlmInfo> for LLMInfo {
+    fn from(value: pterm_graphql::queries::get_feature_model_choices::LlmInfo) -> Self {
         let host_configs = {
             let mut map = std::collections::HashMap::new();
             for config in value.host_configs {
@@ -3381,8 +3381,8 @@ impl From<rook_graphql::queries::get_feature_model_choices::LlmInfo> for LLMInfo
     }
 }
 
-impl From<rook_graphql::workspace::LlmInfo> for LLMInfo {
-    fn from(value: rook_graphql::workspace::LlmInfo) -> Self {
+impl From<pterm_graphql::workspace::LlmInfo> for LLMInfo {
+    fn from(value: pterm_graphql::workspace::LlmInfo) -> Self {
         let host_configs = {
             let mut map = std::collections::HashMap::new();
             for config in value.host_configs {
@@ -3420,10 +3420,10 @@ impl From<rook_graphql::workspace::LlmInfo> for LLMInfo {
     }
 }
 
-impl From<rook_graphql::queries::get_feature_model_choices::RoutingHostConfig>
+impl From<pterm_graphql::queries::get_feature_model_choices::RoutingHostConfig>
     for RoutingHostConfig
 {
-    fn from(value: rook_graphql::queries::get_feature_model_choices::RoutingHostConfig) -> Self {
+    fn from(value: pterm_graphql::queries::get_feature_model_choices::RoutingHostConfig) -> Self {
         Self {
             enabled: value.enabled,
             model_routing_host: value.model_routing_host.into(),
@@ -3431,8 +3431,8 @@ impl From<rook_graphql::queries::get_feature_model_choices::RoutingHostConfig>
     }
 }
 
-impl From<rook_graphql::workspace::RoutingHostConfig> for RoutingHostConfig {
-    fn from(value: rook_graphql::workspace::RoutingHostConfig) -> Self {
+impl From<pterm_graphql::workspace::RoutingHostConfig> for RoutingHostConfig {
+    fn from(value: pterm_graphql::workspace::RoutingHostConfig) -> Self {
         Self {
             enabled: value.enabled,
             model_routing_host: value.model_routing_host.into(),
@@ -3440,22 +3440,22 @@ impl From<rook_graphql::workspace::RoutingHostConfig> for RoutingHostConfig {
     }
 }
 
-impl From<rook_graphql::queries::get_feature_model_choices::LlmModelHost> for LLMModelHost {
-    fn from(value: rook_graphql::queries::get_feature_model_choices::LlmModelHost) -> Self {
+impl From<pterm_graphql::queries::get_feature_model_choices::LlmModelHost> for LLMModelHost {
+    fn from(value: pterm_graphql::queries::get_feature_model_choices::LlmModelHost) -> Self {
         match value {
-            rook_graphql::queries::get_feature_model_choices::LlmModelHost::DirectApi => {
+            pterm_graphql::queries::get_feature_model_choices::LlmModelHost::DirectApi => {
                 LLMModelHost::DirectApi
             }
-            rook_graphql::queries::get_feature_model_choices::LlmModelHost::AwsBedrock => {
+            pterm_graphql::queries::get_feature_model_choices::LlmModelHost::AwsBedrock => {
                 LLMModelHost::AwsBedrock
             }
-            rook_graphql::queries::get_feature_model_choices::LlmModelHost::CustomEndpoint => {
+            pterm_graphql::queries::get_feature_model_choices::LlmModelHost::CustomEndpoint => {
                 LLMModelHost::CustomEndpoint
             }
-            rook_graphql::queries::get_feature_model_choices::LlmModelHost::GeminiEnterprise => {
+            pterm_graphql::queries::get_feature_model_choices::LlmModelHost::GeminiEnterprise => {
                 LLMModelHost::GeminiEnterprise
             }
-            rook_graphql::queries::get_feature_model_choices::LlmModelHost::Other(value) => {
+            pterm_graphql::queries::get_feature_model_choices::LlmModelHost::Other(value) => {
                 log::warn!(
                     "Unknown LlmModelHost '{value}'. Make sure to update client GraphQL types!"
                 );
@@ -3465,8 +3465,8 @@ impl From<rook_graphql::queries::get_feature_model_choices::LlmModelHost> for LL
     }
 }
 
-impl From<rook_graphql::queries::get_feature_model_choices::LlmSpec> for LLMSpec {
-    fn from(value: rook_graphql::queries::get_feature_model_choices::LlmSpec) -> Self {
+impl From<pterm_graphql::queries::get_feature_model_choices::LlmSpec> for LLMSpec {
+    fn from(value: pterm_graphql::queries::get_feature_model_choices::LlmSpec) -> Self {
         Self {
             cost: value.cost as f32,
             quality: value.quality as f32,
@@ -3475,8 +3475,8 @@ impl From<rook_graphql::queries::get_feature_model_choices::LlmSpec> for LLMSpec
     }
 }
 
-impl From<rook_graphql::workspace::LlmSpec> for LLMSpec {
-    fn from(value: rook_graphql::workspace::LlmSpec) -> Self {
+impl From<pterm_graphql::workspace::LlmSpec> for LLMSpec {
+    fn from(value: pterm_graphql::workspace::LlmSpec) -> Self {
         Self {
             cost: value.cost as f32,
             quality: value.quality as f32,
@@ -3485,8 +3485,10 @@ impl From<rook_graphql::workspace::LlmSpec> for LLMSpec {
     }
 }
 
-impl From<rook_graphql::queries::get_feature_model_choices::LlmUsageMetadata> for LLMUsageMetadata {
-    fn from(value: rook_graphql::queries::get_feature_model_choices::LlmUsageMetadata) -> Self {
+impl From<pterm_graphql::queries::get_feature_model_choices::LlmUsageMetadata>
+    for LLMUsageMetadata
+{
+    fn from(value: pterm_graphql::queries::get_feature_model_choices::LlmUsageMetadata) -> Self {
         Self {
             request_multiplier: value.request_multiplier.max(1) as usize,
             credit_multiplier: value.credit_multiplier.map(|v| v as f32),
@@ -3494,8 +3496,8 @@ impl From<rook_graphql::queries::get_feature_model_choices::LlmUsageMetadata> fo
     }
 }
 
-impl From<rook_graphql::workspace::LlmUsageMetadata> for LLMUsageMetadata {
-    fn from(value: rook_graphql::workspace::LlmUsageMetadata) -> Self {
+impl From<pterm_graphql::workspace::LlmUsageMetadata> for LLMUsageMetadata {
+    fn from(value: pterm_graphql::workspace::LlmUsageMetadata) -> Self {
         Self {
             request_multiplier: value.request_multiplier.max(1) as usize,
             credit_multiplier: value.credit_multiplier.map(|v| v as f32),
@@ -3503,55 +3505,57 @@ impl From<rook_graphql::workspace::LlmUsageMetadata> for LLMUsageMetadata {
     }
 }
 
-impl From<rook_graphql::queries::get_feature_model_choices::DisableReason> for DisableReason {
-    fn from(value: rook_graphql::queries::get_feature_model_choices::DisableReason) -> Self {
+impl From<pterm_graphql::queries::get_feature_model_choices::DisableReason> for DisableReason {
+    fn from(value: pterm_graphql::queries::get_feature_model_choices::DisableReason) -> Self {
         match value {
-            rook_graphql::queries::get_feature_model_choices::DisableReason::AdminDisabled => {
+            pterm_graphql::queries::get_feature_model_choices::DisableReason::AdminDisabled => {
                 DisableReason::AdminDisabled
             }
-            rook_graphql::queries::get_feature_model_choices::DisableReason::OutOfRequests => {
+            pterm_graphql::queries::get_feature_model_choices::DisableReason::OutOfRequests => {
                 DisableReason::OutOfRequests
             }
-            rook_graphql::queries::get_feature_model_choices::DisableReason::ProviderOutage => {
+            pterm_graphql::queries::get_feature_model_choices::DisableReason::ProviderOutage => {
                 DisableReason::ProviderOutage
             }
-            rook_graphql::queries::get_feature_model_choices::DisableReason::RequiresUpgrade => {
+            pterm_graphql::queries::get_feature_model_choices::DisableReason::RequiresUpgrade => {
                 DisableReason::RequiresUpgrade
             }
-            rook_graphql::queries::get_feature_model_choices::DisableReason::Other(_) => {
+            pterm_graphql::queries::get_feature_model_choices::DisableReason::Other(_) => {
                 DisableReason::Unavailable
             }
         }
     }
 }
 
-impl From<rook_graphql::workspace::DisableReason> for DisableReason {
-    fn from(value: rook_graphql::workspace::DisableReason) -> Self {
+impl From<pterm_graphql::workspace::DisableReason> for DisableReason {
+    fn from(value: pterm_graphql::workspace::DisableReason) -> Self {
         match value {
-            rook_graphql::workspace::DisableReason::AdminDisabled => DisableReason::AdminDisabled,
-            rook_graphql::workspace::DisableReason::OutOfRequests => DisableReason::OutOfRequests,
-            rook_graphql::workspace::DisableReason::ProviderOutage => DisableReason::ProviderOutage,
-            rook_graphql::workspace::DisableReason::RequiresUpgrade => {
+            pterm_graphql::workspace::DisableReason::AdminDisabled => DisableReason::AdminDisabled,
+            pterm_graphql::workspace::DisableReason::OutOfRequests => DisableReason::OutOfRequests,
+            pterm_graphql::workspace::DisableReason::ProviderOutage => {
+                DisableReason::ProviderOutage
+            }
+            pterm_graphql::workspace::DisableReason::RequiresUpgrade => {
                 DisableReason::RequiresUpgrade
             }
-            rook_graphql::workspace::DisableReason::Other(_) => DisableReason::Unavailable,
+            pterm_graphql::workspace::DisableReason::Other(_) => DisableReason::Unavailable,
         }
     }
 }
 
 // Conversions for AIConversationMetadata from GraphQL types
 
-fn convert_harness(harness: rook_graphql::ai::AgentHarness) -> AIAgentHarness {
+fn convert_harness(harness: pterm_graphql::ai::AgentHarness) -> AIAgentHarness {
     match harness {
-        rook_graphql::ai::AgentHarness::Oz => AIAgentHarness::Oz,
-        rook_graphql::ai::AgentHarness::ClaudeCode => AIAgentHarness::ClaudeCode,
-        rook_graphql::ai::AgentHarness::Gemini => AIAgentHarness::Gemini,
-        rook_graphql::ai::AgentHarness::Codex => AIAgentHarness::Codex,
-        rook_graphql::ai::AgentHarness::Other(value) => {
+        pterm_graphql::ai::AgentHarness::Oz => AIAgentHarness::Oz,
+        pterm_graphql::ai::AgentHarness::ClaudeCode => AIAgentHarness::ClaudeCode,
+        pterm_graphql::ai::AgentHarness::Gemini => AIAgentHarness::Gemini,
+        pterm_graphql::ai::AgentHarness::Codex => AIAgentHarness::Codex,
+        pterm_graphql::ai::AgentHarness::Other(value) => {
             report_error!(
                 "Invalid AgentHarness; update client GraphQL types",
                 extra: { "harness" => %value },
-                rook_errors::ReportErrorLogMode::OncePerRun
+                pterm_errors::ReportErrorLogMode::OncePerRun
             );
             AIAgentHarness::Unknown
         }
@@ -3559,15 +3563,15 @@ fn convert_harness(harness: rook_graphql::ai::AgentHarness) -> AIAgentHarness {
 }
 
 fn convert_block_snapshot_format(
-    format: rook_graphql::ai::SerializedBlockFormat,
+    format: pterm_graphql::ai::SerializedBlockFormat,
 ) -> AIAgentSerializedBlockFormat {
     match format {
-        rook_graphql::ai::SerializedBlockFormat::JsonV1 => AIAgentSerializedBlockFormat::JsonV1,
+        pterm_graphql::ai::SerializedBlockFormat::JsonV1 => AIAgentSerializedBlockFormat::JsonV1,
     }
 }
 
 fn convert_conversation_format(
-    format: rook_graphql::ai::AIConversationFormat,
+    format: pterm_graphql::ai::AIConversationFormat,
 ) -> AIAgentConversationFormat {
     AIAgentConversationFormat {
         has_task_list: format.has_task_list,
@@ -3575,10 +3579,10 @@ fn convert_conversation_format(
     }
 }
 
-impl TryFrom<rook_graphql::ai::AIConversation> for ServerAIConversationMetadata {
+impl TryFrom<pterm_graphql::ai::AIConversation> for ServerAIConversationMetadata {
     type Error = anyhow::Error;
 
-    fn try_from(value: rook_graphql::ai::AIConversation) -> Result<Self, Self::Error> {
+    fn try_from(value: pterm_graphql::ai::AIConversation) -> Result<Self, Self::Error> {
         // Full conversion including per-model token usage and tool usage
         // stats, so restored conversations render the same usage details
         // (e.g. the credits-expansion "Models" rows) as live ones.
@@ -3615,13 +3619,13 @@ impl TryFrom<rook_graphql::ai::AIConversation> for ServerAIConversationMetadata 
     }
 }
 
-impl TryFrom<rook_graphql::queries::list_ai_conversations::AIConversationMetadata>
+impl TryFrom<pterm_graphql::queries::list_ai_conversations::AIConversationMetadata>
     for ServerAIConversationMetadata
 {
     type Error = anyhow::Error;
 
     fn try_from(
-        value: rook_graphql::queries::list_ai_conversations::AIConversationMetadata,
+        value: pterm_graphql::queries::list_ai_conversations::AIConversationMetadata,
     ) -> Result<Self, Self::Error> {
         let usage: ConversationUsageMetadata = (&value.usage.usage_metadata).into();
         let metadata = value.metadata.try_into()?;

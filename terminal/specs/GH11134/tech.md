@@ -1,10 +1,10 @@
 # Tech Spec: Boolean parameters for tab configs
 
-**Issue:** [FJRG2007/rook#11134](https://github.com/FJRG2007/rook/issues/11134)
+**Issue:** [FJRG2007/polaris#11134](https://github.com/FJRG2007/polaris/issues/11134)
 
 **Product spec:** [`specs/GH11134/product.md`](product.md)
 
-**Code researched at:** [`9e19f0741e3224c1bf8311c0223fd5f4d4a2e260`](https://github.com/FJRG2007/rook/tree/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260)
+**Code researched at:** [`9e19f0741e3224c1bf8311c0223fd5f4d4a2e260`](https://github.com/FJRG2007/polaris/tree/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260)
 
 ## Context
 
@@ -16,41 +16,41 @@ pipeline.
 
 Relevant current code:
 
-- [`app/src/tab_configs/tab_config.rs:61-92 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/app/src/tab_configs/tab_config.rs#L61-L92)
+- [`app/src/tab_configs/tab_config.rs:61-92 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/app/src/tab_configs/tab_config.rs#L61-L92)
   defines `TabConfigParamType::{Text, Branch, Repo}` and stores every default as
   `Option<String>`.
-- [`app/src/tab_configs/tab_config.rs:166-177 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/app/src/tab_configs/tab_config.rs#L166-L177)
+- [`app/src/tab_configs/tab_config.rs:166-177 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/app/src/tab_configs/tab_config.rs#L166-L177)
   converts missing defaults to empty strings for the direct-open fallback.
-- [`app/src/tab_configs/tab_config.rs:206-265 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/app/src/tab_configs/tab_config.rs#L206-L265)
+- [`app/src/tab_configs/tab_config.rs:206-265 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/app/src/tab_configs/tab_config.rs#L206-L265)
   builds raw title/directory and shell-quoted command contexts from a
   `HashMap<String, String>`.
-- [`app/src/tab_configs/params_modal.rs:60-105 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/app/src/tab_configs/params_modal.rs#L60-L105)
+- [`app/src/tab_configs/params_modal.rs:60-105 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/app/src/tab_configs/params_modal.rs#L60-L105)
   resolves blank values and models modal fields as an editor, branch picker, or
   repository picker.
-- [`app/src/tab_configs/params_modal.rs:183-329 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/app/src/tab_configs/params_modal.rs#L183-L329)
+- [`app/src/tab_configs/params_modal.rs:183-329 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/app/src/tab_configs/params_modal.rs#L183-L329)
   sorts fields, constructs the appropriate child view, seeds it from the string
   default, and chooses initial focus.
-- [`app/src/tab_configs/params_modal.rs:394-453 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/app/src/tab_configs/params_modal.rs#L394-L453)
+- [`app/src/tab_configs/params_modal.rs:394-453 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/app/src/tab_configs/params_modal.rs#L394-L453)
   owns focus traversal and emits submitted values as
   `HashMap<String, String>`.
-- [`app/src/tab_configs/params_modal.rs:480-625 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/app/src/tab_configs/params_modal.rs#L480-L625)
+- [`app/src/tab_configs/params_modal.rs:480-625 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/app/src/tab_configs/params_modal.rs#L480-L625)
   computes submit availability and renders labels, descriptions, default hints,
   and child fields.
-- [`app/src/workspace/view.rs:6862-6903 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/app/src/workspace/view.rs#L6862-L6903)
+- [`app/src/workspace/view.rs:6862-6903 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/app/src/workspace/view.rs#L6862-L6903)
   consumes the string map and renders the config; no workspace API needs a
   boolean-specific value.
-- [`app/src/user_config/util.rs:170-189 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/app/src/user_config/util.rs#L170-L189)
+- [`app/src/user_config/util.rs:170-189 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/app/src/user_config/util.rs#L170-L189)
   turns TOML failures into `TabConfigError`, while
-  [`app/src/user_config/native.rs:130-140 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/app/src/user_config/native.rs#L130-L140)
+  [`app/src/user_config/native.rs:130-140 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/app/src/user_config/native.rs#L130-L140)
   emits those errors after a watched file changes.
-- [`crates/rookui_core/src/ui_components/checkbox.rs:25-120 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/crates/rookui_core/src/ui_components/checkbox.rs#L25-L120)
+- [`crates/ptermui_core/src/ui_components/checkbox.rs:25-120 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/crates/ptermui_core/src/ui_components/checkbox.rs#L25-L120)
   provides the themed checkbox primitive. It is stateless and expects its caller
   to retain the checked value and `MouseStateHandle`.
-- [`crates/rookui_core/src/core/view/mod.rs:62-83 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/crates/rookui_core/src/core/view/mod.rs#L62-L83)
-  and [`crates/rookui_core/src/accessibility.rs:150-224 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/crates/rookui_core/src/accessibility.rs#L150-L224)
+- [`crates/ptermui_core/src/core/view/mod.rs:62-83 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/crates/ptermui_core/src/core/view/mod.rs#L62-L83)
+  and [`crates/ptermui_core/src/accessibility.rs:150-224 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/crates/ptermui_core/src/accessibility.rs#L150-L224)
   provide focus announcements and a `CheckboxRole`; action-specific
   announcements are available through `TypedActionView`.
-- [`resources/bundled/skills/tab-configs/SKILL.md:70-89 @ 9e19f07`](https://github.com/FJRG2007/rook/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/resources/bundled/skills/tab-configs/SKILL.md#L70-L89)
+- [`resources/bundled/skills/tab-configs/SKILL.md:70-89 @ 9e19f07`](https://github.com/FJRG2007/polaris/blob/9e19f0741e3224c1bf8311c0223fd5f4d4a2e260/terminal/resources/bundled/skills/tab-configs/SKILL.md#L70-L89)
   is the bundled canonical schema reference and currently documents only the
   three string-valued parameter types.
 
@@ -106,11 +106,11 @@ params modal:
   action when the boolean field is focused. Emit navigation events for `Tab` and
   `Shift-Tab` so the parent can reuse its indexed field traversal; allow `Enter`
   and `Escape` to continue to the modal's existing bindings.
-- Implement `View::accessibility_contents` with `RookA11yRole::CheckboxRole`.
+- Implement `View::accessibility_contents` with `PtermA11yRole::CheckboxRole`.
   Include the parameter name and checked state in `value`, the description plus
   `Space` instruction in `help`, and announce the resulting state from
   `TypedActionView::action_accessibility_contents` after a toggle. The state is
-  part of the announcement because Rook's current role enum has no separate
+  part of the announcement because Polaris Terminal's current role enum has no separate
   checked-state property.
 
 Keeping boolean interaction in a child view matches the editor/picker ownership
@@ -153,7 +153,7 @@ Update `resources/bundled/skills/tab-configs/SKILL.md` to:
 - State that its default is an unquoted TOML boolean and defaults to `false` when
   omitted, while the other parameter defaults remain strings.
 - Document lowercase `true`/`false` interpolation and show a shell comparison
-  example rather than implying Rook conditionally skips commands.
+  example rather than implying Polaris Terminal conditionally skips commands.
 
 The new-config and default-worktree templates do not need a boolean parameter,
 so they remain unchanged.
@@ -202,8 +202,8 @@ the repository's separate-test-file convention:
 Run at minimum:
 
 ```sh
-cargo nextest run -p rook --lib tab_configs::tab_config::tests
-cargo nextest run -p rook --lib tab_configs::params_modal::tests
+cargo nextest run -p polaris-terminal --lib tab_configs::tab_config::tests
+cargo nextest run -p polaris-terminal --lib tab_configs::params_modal::tests
 ./script/format
 cargo clippy --workspace --all-targets --all-features --tests -- -D warnings
 ```

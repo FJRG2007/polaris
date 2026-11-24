@@ -1,13 +1,13 @@
 use pathfinder_color::ColorU;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::color::ContrastingColor;
-use rook_core::ui::color::contrast::MinimumAllowedContrast;
-use rook_core::ui::theme::Fill;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::color::ContrastingColor;
+use pterm_core::ui::color::contrast::MinimumAllowedContrast;
+use pterm_core::ui::theme::Fill;
 
 use super::DriveObjectType;
 use crate::ui_components::blended_colors;
 
-pub fn rook_drive_icon_color(
+pub fn pterm_drive_icon_color(
     appearance: &Appearance,
     cloud_object_type: DriveObjectType,
 ) -> ColorU {

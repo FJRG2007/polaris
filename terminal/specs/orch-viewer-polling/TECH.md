@@ -3,7 +3,7 @@
 `OrchestrationViewerModel` (`app/src/terminal/shared_session/viewer/orchestration_viewer_model.rs`) drives the orchestration pill bar in the shared-session viewer. It is the only steady-cadence REST poller in the orchestration code paths and the only orchestration delivery path that has not migrated to SSE.
 ### How it works today
 - Created lazily on the root viewer pane's `NetworkEvent::JoinedSuccessfully` (`viewer/terminal_manager.rs:797-816`). Per-child viewer panes are constructed with `enable_orchestration_polling = false`, so the model is not nested.
-- Endpoint: `GET /agent/runs?ancestor_run_id={parent_task_id}` with `CHILD_DISCOVERY_FETCH_LIMIT = 100`. Despite the parameter name, the server filter is `WHERE parent_run_id = $1` (`rook-server/model/ai_tasks.go:1814-1818`, confirmed by `test/integration/public_api_run_parent_run_id_test.go:298-321`) — direct children only. The response is a snapshot of those children's task records.
+- Endpoint: `GET /agent/runs?ancestor_run_id={parent_task_id}` with `CHILD_DISCOVERY_FETCH_LIMIT = 100`. Despite the parameter name, the server filter is `WHERE parent_run_id = $1` (`polaris-terminal-server/model/ai_tasks.go:1814-1818`, confirmed by `test/integration/public_api_run_parent_run_id_test.go:298-321`) — direct children only. The response is a snapshot of those children's task records.
 - Cadence: `STATUS_POLL_INTERVAL = 5s` while at least one tracked child is non-terminal, `STATUS_POLL_INTERVAL_IDLE = 30s` once all are terminal. Idle polling never stops.
 - Stale-fetch guard: `fetch_generation` is bumped before each dispatch; older callbacks are dropped.
 - Kick: subscribes to `BlocklistAIHistoryEvent::AppendedExchange` and, only during the idle phase, issues an immediate fetch when an exchange lands on the orchestrator or a tracked child.
@@ -20,7 +20,7 @@ Specific defects:
 7. Full descendant snapshot every cycle — no `since` cursor on the endpoint.
 ### Other orchestration delivery for reference
 - `OrchestrationEventStreamer` (`app/src/ai/blocklist/orchestration_event_streamer.rs`) is SSE-based for the orchestrator-owner side. It currently excludes `is_viewing_shared_session()` and `is_remote_child()` conversations via `is_remote_run_view`, so viewer placeholders are not served. Reconnect, cursor, proactive recycle, and consumer registration are well-tested there.
-- `AgentConversationsModel` has a 30s `POLLING_INTERVAL` for the agent-management view, disabled when `AmbientAgentsRTC` is enabled. Under RTC it refreshes via `UpdateManagerEvent::AmbientTaskUpdated` pushed through Rook Drive RTC, throttled at 5s (see `specs/ambient-agent-rtc-refresh-throttle/TECH.md`). The RTC push is owner-scoped on the server (`rook-server/pubsub/subscriber/cloud_drive_subscriber_v2.go:581-596`), so it does not cover viewers of user-owned orchestrations.
+- `AgentConversationsModel` has a 30s `POLLING_INTERVAL` for the agent-management view, disabled when `AmbientAgentsRTC` is enabled. Under RTC it refreshes via `UpdateManagerEvent::AmbientTaskUpdated` pushed through Polaris Terminal Drive RTC, throttled at 5s (see `specs/ambient-agent-rtc-refresh-throttle/TECH.md`). The RTC push is owner-scoped on the server (`polaris-terminal-server/pubsub/subscriber/cloud_drive_subscriber_v2.go:581-596`), so it does not cover viewers of user-owned orchestrations.
 ## Goals
 1. Replace `OrchestrationViewerModel`'s REST polling loop with event-driven delivery.
 2. Real-time child discovery and per-child `ConversationStatus` updates.
@@ -38,9 +38,9 @@ Server adds `GET /api/v1/agent/events/stream?ancestor_run_id={id}&since={cursor}
 Net steady-state cost for one viewer pane on an orchestrator with N children: one long-lived SSE per orchestrator, one REST snapshot on viewer open (to seed the child set and the SSE cursor), one REST fetch per newly-discovered child after open (for pill metadata), and no periodic polling.
 Cross-pane dedupe falls out automatically because the streamer is a singleton: multiple viewer panes on the same `parent_task_id` share the same SSE. Each viewer pane still maintains its own placeholder conversations and `run_id → conversation_id` map — they can't be shared because each pane has its own `BlocklistAIController` and conversation tree.
 ## Server design
-Sketched briefly; a paired `rook-server/specs/...` should land first with the full server-side details.
+Sketched briefly; a paired `polaris-terminal-server/specs/...` should land first with the full server-side details.
 ### Endpoint
-`GET /api/v1/agent/events/stream?ancestor_run_id={id}&since={cursor}` served by `rook-server-rtc`, sibling to the existing `?run_ids[]=` stream. The parameter name `ancestor_run_id` mirrors the existing REST endpoint and is kept for naming consistency; under today's single-level orchestration model, the semantic scope is "direct children only" (same as the REST endpoint).
+`GET /api/v1/agent/events/stream?ancestor_run_id={id}&since={cursor}` served by `polaris-terminal-server-rtc`, sibling to the existing `?run_ids[]=` stream. The parameter name `ancestor_run_id` mirrors the existing REST endpoint and is kept for naming consistency; under today's single-level orchestration model, the semantic scope is "direct children only" (same as the REST endpoint).
 ### Filter semantics
 - An event is included iff `event.run_id`'s `parent_run_id` equals the given run. **Direct children only.** Matches the existing `?ancestor_run_id=` REST endpoint's scope on the server; no new recursive-descendant infrastructure required.
 - The endpoint emits the same event types as the existing per-run stream — lifecycle (`run_in_progress`, `run_succeeded`, `run_failed`, `run_errored`, `run_cancelled`, `run_blocked`) and `new_message` — applied across the child set.
@@ -173,15 +173,15 @@ After PR 2 + flag on:
 - **`Drop` refcount race.** `OrchestrationViewerModel`'s `Drop` impl runs while the streamer may still be iterating its ancestor consumer. Standard reference-counting hazard. Mitigation: `unregister_viewer_mode_consumer` is idempotent and safe to call after the streamer has already torn down its entry (e.g., logout flow). Add a test fixture for the drop-during-iteration case.
 - **Restore order for orchestrator vs child placeholders.** On app startup, `restore_conversations` loads orchestrator and child placeholders in an unspecified order. If the streamer subscribes for the orchestrator before child placeholders are restored, replayed `ChildSpawned` events would refer to children not yet in the history model. The existing `update_conversation_status` no-ops on missing conversations, so the worst case is a missed status flicker that the next event corrects. Mitigation: add a restored-state test fixture; if the missed-flicker behaviour is unacceptable, defer SSE registration until restore completes.
 ## Parallelization
-The implementation spans two repositories (rook client and rook-server) with no overlapping code, so the bulk of the work can be delegated to parallel agents working on sibling worktrees. Three phases, three agents.
+The implementation spans two repositories (polaris-terminal client and polaris-terminal-server) with no overlapping code, so the bulk of the work can be delegated to parallel agents working on sibling worktrees. Three phases, three agents.
 ### Phase A — server endpoint and client wiring in parallel
 Two agents run concurrently against a frozen wire contract (this spec).
-- **Server endpoint agent.** Worktree `/Users/matthew/src/orch-polling/rook-server`, branch `matthew/orch-polling`. Owns: the `GET /api/v1/agent/events/stream?ancestor_run_id=` endpoint plus the paired `rook-server/specs/...` spec. Includes the per-parent pubsub fan-out (so new children appear without a re-subscription). Coordinates only at the wire contract; needs no client knowledge. Outputs a server PR ready for review.
-- **Client wiring agent (PR 1).** Worktree `/Users/matthew/src/orch-polling/rook`, branch `matthew/orch-polling`. Owns: streamer viewer-mode plumbing per PR 1 — feature flag, `register_viewer_mode_consumer` / `unregister_viewer_mode_consumer` API, `is_remote_run_view` relaxation, `LifecycleEventType → ConversationStatus` mapping, `ChildSpawned` / `ChildStatusChanged` event variants, `is_known_child` helper. Pure additive; no behaviour change with the flag in either state. Outputs a client PR ready for review.
+- **Server endpoint agent.** Worktree `/Users/matthew/src/orch-polling/polaris-terminal-server`, branch `matthew/orch-polling`. Owns: the `GET /api/v1/agent/events/stream?ancestor_run_id=` endpoint plus the paired `polaris-terminal-server/specs/...` spec. Includes the per-parent pubsub fan-out (so new children appear without a re-subscription). Coordinates only at the wire contract; needs no client knowledge. Outputs a server PR ready for review.
+- **Client wiring agent (PR 1).** Worktree `/Users/matthew/src/orch-polling/polaris-terminal`, branch `matthew/orch-polling`. Owns: streamer viewer-mode plumbing per PR 1 — feature flag, `register_viewer_mode_consumer` / `unregister_viewer_mode_consumer` API, `is_remote_run_view` relaxation, `LifecycleEventType → ConversationStatus` mapping, `ChildSpawned` / `ChildStatusChanged` event variants, `is_known_child` helper. Pure additive; no behaviour change with the flag in either state. Outputs a client PR ready for review.
 Both agents work in separate git repositories, so there are no merge conflicts between them. They coordinate only through this spec.
 ### Phase B — consumer + migration (after Phase A merges)
 One agent picks up where Phase A left off, once both Phase A PRs are merged (or at least mergeable) and the server endpoint is reachable from staging.
-- **Consumer + migration agent (PR 2).** Worktree `/Users/matthew/src/orch-polling/rook`, same branch (continuing from PR 1). Owns: the `AncestorConsumer`, the SSE driver wiring, the cold-start REST seed, the viewer-model rewrite, the test fixture migration, and the comment fix at `orchestration_viewer_model.rs:243-245`. Validates against staging via the manual checklist before opening the PR. Outputs a client PR ready for review.
+- **Consumer + migration agent (PR 2).** Worktree `/Users/matthew/src/orch-polling/polaris-terminal`, same branch (continuing from PR 1). Owns: the `AncestorConsumer`, the SSE driver wiring, the cold-start REST seed, the viewer-model rewrite, the test fixture migration, and the comment fix at `orchestration_viewer_model.rs:243-245`. Validates against staging via the manual checklist before opening the PR. Outputs a client PR ready for review.
 This agent benefits from holding both halves of the change in one head: the streamer-side event emission and the viewer-model-side consumption are interlocked enough that splitting them across two agents would create unnecessary coordination overhead.
 ### Phase C — cleanup (post-rollout)
 Manual, not delegated. After the feature flag has been at stable for long enough to confirm no regressions:
@@ -192,16 +192,16 @@ Manual, not delegated. After the feature flag has been at stable for long enough
 Before launching the Phase A agents:
 1. Final approval of this spec.
 2. Decide the feature flag name (suggested: `FeatureFlag::OrchestrationViewerStreamer`).
-3. Confirm the rook-server worktree is on `matthew/orch-polling` and clean.
-4. Confirm the rook worktree is on `matthew/orch-polling` and clean.
+3. Confirm the polaris-terminal-server worktree is on `matthew/orch-polling` and clean.
+4. Confirm the polaris-terminal worktree is on `matthew/orch-polling` and clean.
 5. Draft the agent prompts: each prompt should include this spec's section references and the explicit scope above.
 ### Coordination model
 - All three agents share this spec as their source of truth. No agent-to-agent messaging required for normal operation.
 - If the wire contract needs to change mid-work, the spec is updated first, then the agents are re-prompted from the new spec. Avoid out-of-band coordination.
 - Each agent is expected to surface uncertainty by stopping and asking, not by deciding unilaterally. The orchestrator monitors for blocked status.
 ## Environment
-- Client worktree: `/Users/matthew/src/orch-polling/rook`, branch `matthew/orch-polling`.
-- Server worktree (sibling): `/Users/matthew/src/orch-polling/rook-server`, branch to match.
+- Client worktree: `/Users/matthew/src/orch-polling/polaris-terminal`, branch `matthew/orch-polling`.
+- Server worktree (sibling): `/Users/matthew/src/orch-polling/polaris-terminal-server`, branch to match.
 - Touched files on the client (Phase 1):
   - `app/src/ai/blocklist/orchestration_event_streamer.rs` — viewer-mode plumbing, ancestor consumer, broadcast events.
   - `app/src/ai/blocklist/orchestration_event_streamer_tests.rs` — new tests.
@@ -209,6 +209,6 @@ Before launching the Phase A agents:
   - `app/src/terminal/shared_session/viewer/orchestration_viewer_model_tests.rs` — fixture rewrite.
   - `app/src/server/server_api.rs` — new ancestor-scoped stream helper alongside `stream_agent_events`.
   - `app/src/ai/agent_events/driver.rs` — extend the `AgentEventSource` trait with a filter enum (or add a sibling method for the ancestor endpoint).
-  - `crates/rook_core/src/features.rs` — new feature flag.
+  - `crates/pterm_core/src/features.rs` — new feature flag.
 - Touched files on the server: TBD pending the paired server spec.
 - No other client files should need to change.

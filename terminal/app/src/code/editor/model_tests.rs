@@ -1,10 +1,10 @@
 use std::path::Path;
 
 use futures::channel::oneshot;
-use rook_editor::content::buffer::{InitialBufferState, SelectionOffsets};
-use rook_editor::multiline::MultilineString;
-use rook_util::content_version::ContentVersion;
-use rookui::App;
+use pterm_editor::content::buffer::{InitialBufferState, SelectionOffsets};
+use pterm_editor::multiline::MultilineString;
+use pterm_util::content_version::ContentVersion;
+use ptermui::App;
 use vec1::vec1;
 
 use super::*;

@@ -1,17 +1,17 @@
 use ai::skills::{SkillProvider, SkillReference, SkillScope};
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_core::ui::icons::Icon;
-use rook_core::ui::theme::Fill;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::elements::{
+use pterm_core::ui::icons::Icon;
+use pterm_core::ui::theme::Fill;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, Highlight, ParentElement, Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::Keystroke;
-use rookui::scene::{CornerRadius, Radius};
-use rookui::text_layout::ClipConfig;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::Keystroke;
+use ptermui::scene::{CornerRadius, Radius};
+use ptermui::text_layout::ClipConfig;
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity as _,
 };
 
@@ -217,11 +217,11 @@ impl SearchItem for SkillSearchItem {
 
         // Use icon_override if set (e.g. Figma skills), otherwise derive from provider.
         let icon = if let Some(override_icon) = self.icon_override {
-            override_icon.to_rookui_icon(icon_color).finish()
+            override_icon.to_ptermui_icon(icon_color).finish()
         } else {
             self.provider
                 .icon()
-                .to_rookui_icon(self.provider.icon_fill(icon_color))
+                .to_ptermui_icon(self.provider.icon_fill(icon_color))
                 .finish()
         };
 

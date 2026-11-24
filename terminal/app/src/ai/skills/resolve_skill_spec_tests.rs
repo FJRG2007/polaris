@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context as _, Result};
-use rook_cli::skill::SkillSpec;
+use pterm_cli::skill::SkillSpec;
 
 use super::*;
 
@@ -22,14 +22,14 @@ fn write_skill_file(path: &Path, name: &str, description: &str, body: &str) -> R
 #[test]
 fn resolve_from_skill_dirs_by_directory_scan_resolves_home_skill_dir() -> Result<()> {
     let temp_dir = tempfile::TempDir::new().context("Failed to create temp dir")?;
-    let skill_dir = temp_dir.path().join(".rook").join("skills");
+    let skill_dir = temp_dir.path().join(".polaris/terminal").join("skills");
     let skill_path = skill_dir.join("my-skill").join("SKILL.md");
 
     write_skill_file(
         &skill_path,
         "my-skill",
         "desc",
-        "# Global Rook skill\n\nUse this one.",
+        "# Global Polaris Terminal skill\n\nUse this one.",
     )?;
 
     let spec = SkillSpec::without_repo("my-skill".to_string());
@@ -37,7 +37,11 @@ fn resolve_from_skill_dirs_by_directory_scan_resolves_home_skill_dir() -> Result
         .context("Expected to resolve skill from explicit home skill dir")?;
 
     assert_eq!(resolved.skill_path, skill_path);
-    assert!(resolved.instructions.contains("Global Rook skill"));
+    assert!(
+        resolved
+            .instructions
+            .contains("Global Polaris Terminal skill")
+    );
 
     Ok(())
 }
@@ -49,7 +53,7 @@ fn resolve_from_root_path_by_directory_scan_respects_directory_precedence() -> R
 
     let spec = SkillSpec::without_repo("my-skill".to_string());
     let agents_skill = root.join(".agents/skills/my-skill/SKILL.md");
-    let rook_skill = root.join(".rook/skills/my-skill/SKILL.md");
+    let pterm_skill = root.join(".polaris/terminal/skills/my-skill/SKILL.md");
 
     let claude_skill = root.join(".claude/skills/my-skill/SKILL.md");
     let codex_skill = root.join(".codex/skills/my-skill/SKILL.md");
@@ -61,16 +65,16 @@ fn resolve_from_root_path_by_directory_scan_respects_directory_precedence() -> R
         "# Agents version\n\nUse this one.",
     )?;
     write_skill_file(
-        &rook_skill,
+        &pterm_skill,
         "my-skill",
         "desc",
-        "# Rook version\n\nDo not pick this when .agents exists.",
+        "# Polaris Terminal version\n\nDo not pick this when .agents exists.",
     )?;
     write_skill_file(
         &claude_skill,
         "my-skill",
         "desc",
-        "# Claude version\n\nDo not pick this when .rook exists.",
+        "# Claude version\n\nDo not pick this when .polaris/terminal exists.",
     )?;
     write_skill_file(
         &codex_skill,
@@ -84,7 +88,7 @@ fn resolve_from_root_path_by_directory_scan_respects_directory_precedence() -> R
 
     assert_eq!(resolved.skill_path, agents_skill);
     assert!(resolved.instructions.contains("Agents version"));
-    assert!(!resolved.instructions.contains("Rook version"));
+    assert!(!resolved.instructions.contains("Polaris Terminal version"));
     assert!(!resolved.instructions.contains("Claude version"));
     assert!(!resolved.instructions.contains("Codex version"));
     assert!(!resolved.instructions.contains("name:"));
@@ -188,7 +192,7 @@ fn resolve_simple_name_uses_directory_precedence() -> Result<()> {
     let root = temp_dir.path();
 
     // Create skills with same name in different directories
-    // Note: .agents/skills has highest precedence, followed by .rook, then .claude.
+    // Note: .agents/skills has highest precedence, followed by .polaris/terminal, then .claude.
     let agents_skill = root.join(".agents/skills/my-skill/SKILL.md");
     write_skill_file(
         &agents_skill,
@@ -197,12 +201,12 @@ fn resolve_simple_name_uses_directory_precedence() -> Result<()> {
         "# Agents version\n\nThis should be picked by precedence.",
     )?;
 
-    let rook_skill = root.join(".rook/skills/my-skill/SKILL.md");
+    let pterm_skill = root.join(".polaris/terminal/skills/my-skill/SKILL.md");
     write_skill_file(
-        &rook_skill,
+        &pterm_skill,
         "my-skill",
         "desc",
-        "# Rook version\n\nThis should lose to .agents but beat .claude.",
+        "# Polaris Terminal version\n\nThis should lose to .agents but beat .claude.",
     )?;
 
     let claude_skill = root.join(".claude/skills/my-skill/SKILL.md");
@@ -219,7 +223,7 @@ fn resolve_simple_name_uses_directory_precedence() -> Result<()> {
         .context("Expected to resolve skill by name")?;
     assert_eq!(resolved.skill_path, agents_skill);
     assert!(resolved.instructions.contains("Agents version"));
-    assert!(!resolved.instructions.contains("Rook version"));
+    assert!(!resolved.instructions.contains("Polaris Terminal version"));
     assert!(!resolved.instructions.contains("Claude version"));
 
     Ok(())

@@ -1,6 +1,6 @@
 use ordered_float::OrderedFloat;
-use rookui::elements::{Empty, Text};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::elements::{Empty, Text};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::search::command_palette::mixer::CommandPaletteItemAction;

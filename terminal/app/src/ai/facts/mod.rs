@@ -1,5 +1,5 @@
 pub use cloud_object_models::{AIFact, AIMemory, CloudAIFact, CloudAIFactModel};
-use rook_core::ui::appearance::Appearance;
+use pterm_core::ui::appearance::Appearance;
 
 use crate::cloud_object::model::generic_string_model::StringModel;
 use crate::cloud_object::model::json_model::JsonModel;
@@ -7,8 +7,8 @@ use crate::cloud_object::{
     GenericStringObjectFormat, GenericStringObjectUniqueKey, JsonObjectType, Revision,
 };
 use crate::drive::CloudObjectTypeAndId;
-use crate::drive::items::RookDriveItem;
-use crate::drive::items::ai_fact::RookDriveAIFact;
+use crate::drive::items::PtermDriveItem;
+use crate::drive::items::ai_fact::PtermDriveAIFact;
 use crate::server::ids::SyncId;
 use crate::server::sync_queue::QueueItem;
 
@@ -62,17 +62,17 @@ impl StringModel for AIFact {
         None
     }
 
-    fn renders_in_rook_drive(&self) -> bool {
+    fn renders_in_pterm_drive(&self) -> bool {
         false
     }
 
-    fn to_rook_drive_item(
+    fn to_pterm_drive_item(
         &self,
         id: SyncId,
         _appearance: &Appearance,
         ai_fact: &CloudAIFact,
-    ) -> Option<Box<dyn RookDriveItem>> {
-        Some(Box::new(RookDriveAIFact::new(
+    ) -> Option<Box<dyn PtermDriveItem>> {
+        Some(Box::new(PtermDriveAIFact::new(
             CloudObjectTypeAndId::GenericStringObject {
                 object_type: GenericStringObjectFormat::Json(JsonObjectType::AIFact),
                 id,

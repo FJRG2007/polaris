@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 
 use ai::diff_validation::DiffDelta;
-use rook_util::path::LineAndColumnArg;
-use rookui::elements::{DraggableState, Empty, MouseStateHandle};
-use rookui::{
+use pterm_util::path::LineAndColumnArg;
+use ptermui::elements::{DraggableState, Empty, MouseStateHandle};
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, TypedActionView, View, ViewContext, ViewHandle,
 };
 

@@ -1,6 +1,6 @@
 use ai::skills::SkillReference;
-use rookui::elements::ChildView;
-use rookui::{AppContext, Element, Entity, ModelHandle, View, ViewContext, ViewHandle};
+use ptermui::elements::ChildView;
+use ptermui::{AppContext, Element, Entity, ModelHandle, View, ViewContext, ViewHandle};
 
 use crate::ai::blocklist::agent_view::AgentViewController;
 use crate::search::slash_command_menu::SlashCommandId;
@@ -231,7 +231,7 @@ impl View for InlineSlashCommandView {
         "InlineSlashCommandView"
     }
 
-    fn render(&self, _app: &rookui::AppContext) -> Box<dyn Element> {
+    fn render(&self, _app: &ptermui::AppContext) -> Box<dyn Element> {
         ChildView::new(&self.menu_view).finish()
     }
 }

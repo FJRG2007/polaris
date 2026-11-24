@@ -1,10 +1,10 @@
 use std::fmt;
 use std::ops::{Index, IndexMut};
 
-use rookui::color::ColorU;
+use ptermui::color::ColorU;
 
 use crate::terminal::model::ansi::color_index;
-use crate::themes::theme::{AnsiColors, RookTheme};
+use crate::themes::theme::{AnsiColors, PtermTheme};
 
 pub const COUNT: usize = 269;
 
@@ -43,8 +43,8 @@ impl Colors {
     }
 }
 
-impl From<RookTheme> for Colors {
-    fn from(theme: RookTheme) -> Self {
+impl From<PtermTheme> for Colors {
+    fn from(theme: PtermTheme) -> Self {
         let colors = theme.terminal_colors();
         Colors::new(
             PrimaryColors::new(

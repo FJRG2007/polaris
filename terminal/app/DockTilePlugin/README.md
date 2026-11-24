@@ -1,11 +1,11 @@
-Implements a dock tile plugin for Rook.
+Implements a dock tile plugin for Polaris Terminal.
 
 The plugin is used to update the dock tile icon when the app icon changes and allows for app icon changes to be persisted across app restarts. Without the plugin, the icon state reverts to the default upon the first time the app quits (although for some reason after the first quit the icon state is preserved).
 
 The plugin is implemented in Objective-C and is built using the `clang` compiler
 with the `-bundle` flag.  See the Makefile for more details.
 
-The plugin is installed into the app bundle at `Contents/PlugIns/RookDockTilePlugin.docktileplugin` and is bundled using the script/mac/bundle script.  It is built as a universal binary for both arm64 and x86_64.
+The plugin is installed into the app bundle at `Contents/PlugIns/PtermDockTilePlugin.docktileplugin` and is bundled using the script/mac/bundle script.  It is built as a universal binary for both arm64 and x86_64.
 
 The plugin is a simple Objective-C program that listens for notifications from the main application when the app icon changes. When it receives a notification, it updates the dock tile icon.
 

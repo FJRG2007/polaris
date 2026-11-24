@@ -1,4 +1,4 @@
-use rook_core::telemetry::TelemetryEvent as _;
+use pterm_core::telemetry::TelemetryEvent as _;
 
 use super::*;
 

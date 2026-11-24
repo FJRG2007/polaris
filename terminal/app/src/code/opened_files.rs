@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 
 use instant::Instant;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 /// Tracks opened files within a single repository.
 /// Keys are repo-relative file paths (e.g. `src/main.rs`).

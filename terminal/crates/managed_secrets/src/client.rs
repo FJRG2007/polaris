@@ -4,8 +4,8 @@ use std::time::Duration;
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use rook_graphql::managed_secrets::{ManagedSecret, ManagedSecretConfig, ManagedSecretType};
-pub use rook_graphql::queries::task_secrets::ManagedSecretValue;
+use pterm_graphql::managed_secrets::{ManagedSecret, ManagedSecretConfig, ManagedSecretType};
+pub use pterm_graphql::queries::task_secrets::ManagedSecretValue;
 use vec1::Vec1;
 
 /// An OIDC identity token issued for a task workload.
@@ -75,7 +75,7 @@ pub trait ManagedSecretsClient: 'static + Send + Sync {
     /// Returns an empty list for harnesses that do not use auth secrets (e.g. Oz).
     async fn list_harness_auth_secrets(
         &self,
-        harness: rook_graphql::ai::AgentHarness,
+        harness: pterm_graphql::ai::AgentHarness,
     ) -> Result<Vec<ManagedSecret>>;
 
     async fn get_task_secrets(

@@ -1,11 +1,11 @@
 use std::path::Path;
 
-use rookui::elements::{
+use ptermui::elements::{
     Container, CrossAxisAlignment, Flex, MouseStateHandle, ParentElement, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::geometry::vector::Vector2F;
-use rookui::{Element, EventContext};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::geometry::vector::Vector2F;
+use ptermui::{Element, EventContext};
 
 use crate::appearance::Appearance;
 use crate::tab_configs::session_config::SessionType;

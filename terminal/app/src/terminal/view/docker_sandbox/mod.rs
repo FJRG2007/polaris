@@ -6,23 +6,23 @@ use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
 
 #[cfg(not(target_family = "wasm"))]
-use rook_cli::agent::Harness;
+use pterm_cli::agent::Harness;
 #[cfg(any(feature = "local_tty", not(target_family = "wasm")))]
-use rook_errors::report_error;
+use pterm_errors::report_error;
 #[cfg(feature = "local_tty")]
-use rookui::ModelHandle;
-use rookui::ViewContext;
+use ptermui::ModelHandle;
+use ptermui::ViewContext;
 #[cfg(not(target_family = "wasm"))]
-use rookui::r#async::FutureExt;
+use ptermui::r#async::FutureExt;
 #[cfg(feature = "local_tty")]
-use rookui::geometry::vector::Vector2F;
+use ptermui::geometry::vector::Vector2F;
 #[cfg(not(target_family = "wasm"))]
-use rookui::{SingletonEntity, View, ViewHandle};
+use ptermui::{SingletonEntity, View, ViewHandle};
 
 use super::TerminalView;
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::agent_sdk::driver::{
-    ROOK_DRIVE_SYNC_TIMEOUT,
+    POLARIS_TERMINAL_DRIVE_SYNC_TIMEOUT,
     environment::{RepositoryPreparationOptions, prepare_environment},
     terminal::TerminalDriver,
 };
@@ -258,14 +258,16 @@ impl TerminalView {
         let sync_future = UpdateManager::as_ref(ctx).initial_load_complete();
         ctx.spawn(
             async move {
-                // Wait for Rook Drive initial sync so environment lookup succeeds.
+                // Wait for Polaris Terminal Drive initial sync so environment lookup succeeds.
 
                 if sync_future
-                    .with_timeout(ROOK_DRIVE_SYNC_TIMEOUT)
+                    .with_timeout(POLARIS_TERMINAL_DRIVE_SYNC_TIMEOUT)
                     .await
                     .is_err()
                 {
-                    return Err("Timed out waiting for Rook Drive to sync for docker sandbox");
+                    return Err(
+                        "Timed out waiting for Polaris Terminal Drive to sync for docker sandbox",
+                    );
                 }
 
                 // Wait for the terminal session to bootstrap.

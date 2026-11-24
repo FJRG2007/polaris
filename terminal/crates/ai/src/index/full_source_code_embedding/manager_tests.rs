@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 #[cfg(feature = "local_fs")]
 use chrono::Utc;
+use ptermui_core::App;
 #[cfg(feature = "local_fs")]
 use repo_metadata::DirectoryWatcher;
-use rookui_core::App;
 
 use super::{
     BuildSource, CodebaseIndexFinishedStatus, CodebaseIndexManager, CodebaseIndexManagerConfig,

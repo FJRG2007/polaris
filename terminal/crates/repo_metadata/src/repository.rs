@@ -9,11 +9,11 @@ use std::time::Duration;
 use futures::future::ready;
 #[cfg(feature = "local_fs")]
 use ignore::gitignore::Gitignore;
-use rook_util::standardized_path::StandardizedPath;
+use pterm_util::standardized_path::StandardizedPath;
 #[cfg(feature = "local_fs")]
-use rookui_core::SingletonEntity;
-use rookui_core::r#async::{BoxFuture, SpawnedFutureHandle};
-use rookui_core::{Entity, ModelContext, ModelHandle};
+use ptermui_core::SingletonEntity;
+use ptermui_core::r#async::{BoxFuture, SpawnedFutureHandle};
+use ptermui_core::{Entity, ModelContext, ModelHandle};
 
 #[cfg(feature = "local_fs")]
 use crate::watcher::DirectoryWatcher;
@@ -68,7 +68,7 @@ struct RepositorySubscription {
     subscriber: Box<dyn RepositorySubscriber>,
 }
 
-/// Model for tracking a code repository that Rook is aware of.
+/// Model for tracking a code repository that Polaris Terminal is aware of.
 pub struct Repository {
     /// The root directory of the repository.
     root_dir: StandardizedPath,
@@ -274,7 +274,7 @@ impl Repository {
 
     #[cfg(feature = "local_fs")]
     pub(crate) async fn resolve_tracked_remote_ref(root_dir: PathBuf) -> Option<TrackedRemoteRef> {
-        let output = rook_util::git::run_git_command(
+        let output = pterm_util::git::run_git_command(
             &root_dir,
             &["rev-parse", "--symbolic-full-name", "@{u}"],
         )
@@ -698,7 +698,7 @@ where
                                 let st = state.lock().unwrap();
                                 st.version
                             };
-                            rookui_core::r#async::Timer::after(wait).await;
+                            ptermui_core::r#async::Timer::after(wait).await;
 
                             // If version unchanged, we're quiet; flush pending and exit loop.
                             let maybe_merged = {

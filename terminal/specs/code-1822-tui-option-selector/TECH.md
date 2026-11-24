@@ -6,7 +6,7 @@ This slice builds on the frontend-neutral orchestration option snapshots
 (base commit `d6da3b23`; see `specs/code-1822-option-snapshots/TECH.md` for the data
 contract). At that base, `app/src/tui_export.rs` re-exports `OptionSnapshot`,
 `OptionRow`, `OptionBadge`, `OptionSourceStatus`, and `OptionFooter`, but nothing in
-`crates/rook_tui` renders them: the TUI has no single-select list primitive.
+`crates/pterm_tui` renders them: the TUI has no single-select list primitive.
 
 This PR adds that primitive — `TuiOptionSelector` — on top of the generic
 `TuiEditorView::single_line` supplied by the preceding stack branch. The next slice
@@ -17,7 +17,7 @@ nothing about orchestration edit state.
 
 ## Proposed changes
 
-### `crates/rook_tui/src/option_selector.rs`
+### `crates/pterm_tui/src/option_selector.rs`
 
 A `TuiView` + `TypedActionView` (`TuiOptionSelector`) rendering one page:
 
@@ -25,7 +25,7 @@ A `TuiView` + `TypedActionView` (`TuiOptionSelector`) rendering one page:
   label, sequence position, full prompt, option snapshot, and search opt-in. The
   header renders the field label on the left, right-aligned `← n of m →` navigation
   state (boundary arrows muted), a blank separator row, and the bold prompt.
-- Option list rendered from an `OptionSnapshot` (`rook::tui_export`): up to
+- Option list rendered from an `OptionSnapshot` (`polaris_terminal::tui_export`): up to
   `MAX_VISIBLE_OPTION_ROWS` (6) rows visible at once with `↑` / `↓` overflow markers.
   Rows show a viewport-relative `(1)`-style number, the label, an optional badge
   suffix (`(default)` / `(recent)` / `(connected)`), and — for disabled rows — the
@@ -106,7 +106,7 @@ while the selector is rendered as the blocking interaction):
   Escape binding; the embedding card's keymap normally consumes Escape first.
 
 Selection reuses `InlineMenuSelection` and `keep_selected_visible` from
-`crates/rook_tui/src/inline_menu.rs`.
+`crates/pterm_tui/src/inline_menu.rs`.
 
 ### Generic editor dependency
 
@@ -115,21 +115,21 @@ interaction layer documented in
 `specs/code-1822-tui-generic-editor-view/TECH.md`. The generic field owns focus,
 single-line insertion/replacement policy, selection, kill/yank state, model-backed
 editing, one-row cursor following, and stale-viewport clamping
-(`crates/rook_tui/src/editor_view.rs` (37-202);
-`crates/rook_tui/src/editor_interaction.rs` (15-559)).
+(`crates/pterm_tui/src/editor_view.rs` (37-202);
+`crates/pterm_tui/src/editor_interaction.rs` (15-559)).
 
 This selector owns the surrounding search/custom-text labels, validation,
 filtering, Enter/Escape behavior, and vertical navigation. The generic editor does
 not register Up/Down or Shift-Up/Shift-Down bindings, so those keys propagate to
 the selector's list/focus cycle instead of being consumed by the embedded field.
 
-### `crates/rook_tui/src/tui_builder.rs`
+### `crates/pterm_tui/src/tui_builder.rs`
 
 Adds `option_selector_selected_style()`: bold, full-strength magenta text for the
 selected option. The card slice adds its orchestration surface background and
 remaining recipes (title glyph, selected metadata values, identity palette) itself.
 
-### `crates/rook_tui/src/lib.rs`
+### `crates/pterm_tui/src/lib.rs`
 
 Declares `mod option_selector` with a narrowly-scoped, commented
 `#[allow(dead_code)]` on the module declaration, since nothing consumes the selector
@@ -137,7 +137,7 @@ until the card slice; that slice removes the allow.
 
 ## Testing and validation
 
-- `crates/rook_tui/src/option_selector_tests.rs` covers: field label/position/prompt
+- `crates/pterm_tui/src/option_selector_tests.rs` covers: field label/position/prompt
   rendering and initial selection from `selected_id`; Up/Down + Enter confirmation;
   selector-element handling for Enter and Numpad Enter;
   digit confirmation, including viewport-relative digits in scrolled lists; scrolling
@@ -158,9 +158,9 @@ until the card slice; that slice removes the allow.
 - Tests host the selector under `test_fixtures::TestHostView` in a headless TUI
   window and render to lines (see the `tui-testing` conventions).
 - Commands: `./script/format`,
-  `cargo nextest run -p rook_tui -E 'test(option_selector)'`,
-  `cargo nextest run -p rook_tui`, and
-  `cargo clippy -p rook_tui --tests -- -D warnings`.
+  `cargo nextest run -p pterm_tui -E 'test(option_selector)'`,
+  `cargo nextest run -p pterm_tui`, and
+  `cargo clippy -p pterm_tui --tests -- -D warnings`.
 
 ## Follow-ups
 

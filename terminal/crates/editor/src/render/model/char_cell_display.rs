@@ -33,7 +33,7 @@
 use std::cell::Ref;
 use std::ops::Range;
 
-use rookui_core::text::TuiGridPoint;
+use ptermui_core::text::TuiGridPoint;
 use string_offset::CharOffset;
 
 use super::{CharCellTemporaryBlock, CharCellTextIndex};

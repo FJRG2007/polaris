@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use rookui::r#async::executor::Background;
+use ptermui::r#async::executor::Background;
 
 use crate::auth::auth_state::AuthState;
 use crate::send_telemetry_on_executor;
 use crate::server::telemetry::{DownloadSource, TelemetryEvent};
 
-/// Determine the Rook download method (if possible) and send a telemetry event reporting that
+/// Determine the Polaris Terminal download method (if possible) and send a telemetry event reporting that
 /// method
 pub fn determine_and_report(auth_state: Arc<AuthState>, executor: Arc<Background>) {
     let telemetry_executor = executor.clone();
@@ -23,16 +23,16 @@ pub fn determine_and_report(auth_state: Arc<AuthState>, executor: Arc<Background
         .detach();
 }
 
-/// Try to determine what method was used to download Rook. Currently, on macOS, we only support
+/// Try to determine what method was used to download Polaris Terminal. Currently, on macOS, we only support
 /// two download methods:
 ///
 /// 1. The default download from our website.
 /// 2. Via `homebrew`
 ///
-/// To determine if Rook was installed with Homebrew, we run `brew list --cask rook`. That command
-/// will return an failure error code if Rook was not installed with Homebrew. It will also fail
+/// To determine if Polaris Terminal was installed with Homebrew, we run `brew list --cask polaris-terminal`. That command
+/// will return an failure error code if Polaris Terminal was not installed with Homebrew. It will also fail
 /// to launch entirely if Homebrew isn't installed. In either of those cases, we treat the download
-/// as being from the Rook website.
+/// as being from the Polaris Terminal website.
 #[cfg(target_os = "macos")]
 async fn check_download_source() -> DownloadSource {
     use std::env;
@@ -54,7 +54,7 @@ async fn check_download_source() -> DownloadSource {
     }
 
     let result = command::r#async::Command::new("brew")
-        .args(["list", "--cask", "rook"])
+        .args(["list", "--cask", "polaris-terminal"])
         .env("HOMEBREW_NO_AUTO_UPDATE", "1")
         .env("PATH", new_path)
         .stdin(Stdio::null())

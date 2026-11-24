@@ -1,7 +1,7 @@
 # Conversation renaming client spec
 ## Context
-This spec covers the `rook-4` client side of GitHub issue #8642. User-facing behavior is defined in `PRODUCT.md`. The server-side rename API, metadata persistence, `title_is_user_provided`, generated-title guards, task-title sync, and stored `ConversationData` updates are documented in `../rook-server-4/specs/gh-8642/TECH.md`.
-On the client, a Rook-native conversation title is derived from the root task description. The client should keep that model: an accepted rename updates the local root task description rather than creating a parallel display-title override. The local update should happen before the server rename request completes. If that server request fails, the client should revert the local title to the previous title for that failed request.
+This spec covers the `polaris-terminal-4` client side of GitHub issue #8642. User-facing behavior is defined in `PRODUCT.md`. The server-side rename API, metadata persistence, `title_is_user_provided`, generated-title guards, task-title sync, and stored `ConversationData` updates are documented in `../polaris-terminal-server-4/specs/gh-8642/TECH.md`.
+On the client, a Polaris Terminal-native conversation title is derived from the root task description. The client should keep that model: an accepted rename updates the local root task description rather than creating a parallel display-title override. The local update should happen before the server rename request completes. If that server request fails, the client should revert the local title to the previous title for that failed request.
 Relevant client code:
 - `app/src/search/slash_command_menu/static_commands/commands.rs` registers static slash commands.
 - `app/src/terminal/input/slash_commands/mod.rs` handles slash command execution and toasts.
@@ -63,8 +63,8 @@ Client tests should cover:
 11. Pane title refreshes immediately after `UpdatedConversationTitle`.
 Validation commands:
 - `./script/format`.
-- `cargo check -p rook`.
-- `cargo check -p rook --tests`.
-- `cargo clippy -p rook --tests -- -D warnings`.
+- `cargo check -p polaris-terminal`.
+- `cargo check -p polaris-terminal --tests`.
+- `cargo clippy -p polaris-terminal --tests -- -D warnings`.
 - `git diff --check`.
 Do not run nextest or presubmit for this client validation pass.

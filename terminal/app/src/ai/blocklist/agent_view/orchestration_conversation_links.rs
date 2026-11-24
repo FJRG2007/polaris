@@ -1,16 +1,16 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty, Expanded, Flex, Hoverable,
     MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable, Text,
 };
-use rookui::fonts::Properties;
-use rookui::fonts::Weight::Bold;
-use rookui::platform::Cursor;
-use rookui::text_layout::ClipConfig;
-use rookui::{AppContext, Element, EntityId, EventContext, SingletonEntity};
+use ptermui::fonts::Properties;
+use ptermui::fonts::Weight::Bold;
+use ptermui::platform::Cursor;
+use ptermui::text_layout::ClipConfig;
+use ptermui::{AppContext, Element, EntityId, EventContext, SingletonEntity};
 
 use crate::ai::agent::conversation::{AIConversation, AIConversationId};
 use crate::ai::agent_conversations_model::entry::AgentConversationEntryId;
@@ -227,7 +227,7 @@ pub(crate) fn conversation_navigation_card_with_icon(
         if let Some((icon, color)) = icon {
             row.add_child(
                 Container::new(
-                    ConstrainedBox::new(icon.to_rookui_icon(Fill::Solid(color)).finish())
+                    ConstrainedBox::new(icon.to_ptermui_icon(Fill::Solid(color)).finish())
                         .with_width(16.)
                         .with_height(16.)
                         .finish(),
@@ -247,7 +247,7 @@ pub(crate) fn conversation_navigation_card_with_icon(
             Container::new(
                 ConstrainedBox::new(
                     Icon::ChevronRight
-                        .to_rookui_icon(blended_colors::text_sub(theme, theme.background()).into())
+                        .to_ptermui_icon(blended_colors::text_sub(theme, theme.background()).into())
                         .finish(),
                 )
                 .with_height(20.)

@@ -1,17 +1,17 @@
-# OpenCode + Rook
+# OpenCode + Polaris Terminal
 
-Official [Rook](https://rook.dev) terminal integration for [OpenCode](https://opencode.ai).
+Official [Polaris Terminal](https://rook.dev) terminal integration for [OpenCode](https://opencode.ai).
 
 ## Features
 
 ### 🔔 Native Notifications
 
-Get native Rook notifications when OpenCode:
+Get native Polaris Terminal notifications when OpenCode:
 - **Completes a task** — with a summary showing your prompt and the response
 - **Needs your input** — when a permission request is pending
 - **Runs a tool** — status updates as tools execute
 
-Notifications appear in Rook's notification center and as system notifications, so you can context-switch while OpenCode works and get alerted when attention is needed.
+Notifications appear in Polaris Terminal's notification center and as system notifications, so you can context-switch while OpenCode works and get alerted when attention is needed.
 
 ## Installation
 
@@ -22,7 +22,7 @@ Add the plugin to your `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@rook-dot-dev/opencode-rook"]
+  "plugin": ["@polaris-terminal-dot-dev/opencode-polaris-terminal"]
 }
 ```
 
@@ -32,24 +32,24 @@ Copy or symlink the built plugin into your OpenCode plugins directory:
 
 ```bash
 # Global
-cp dist/index.js ~/.config/opencode/plugins/opencode-rook.js
+cp dist/index.js ~/.config/opencode/plugins/opencode-polaris-terminal.js
 
 # Or project-level
-cp dist/index.js .opencode/plugins/opencode-rook.js
+cp dist/index.js .opencode/plugins/opencode-polaris-terminal.js
 ```
 
 ## Requirements
 
-- [Rook terminal](https://rook.dev) (macOS, Linux, or Windows)
+- [Polaris Terminal terminal](https://rook.dev) (macOS, Linux, or Windows)
 - [OpenCode](https://opencode.ai) CLI
 
 ## How It Works
 
-This plugin uses Rook's [pluggable notifications](https://docs.rook.dev/features/notifications) feature via OSC escape sequences. When OpenCode triggers an event, the plugin:
+This plugin uses Polaris Terminal's [pluggable notifications](https://docs.rook.dev/features/notifications) feature via OSC escape sequences. When OpenCode triggers an event, the plugin:
 
 1. Reads event data from OpenCode's plugin API
 2. Formats a concise notification payload
-3. Sends an OSC 777 escape sequence to Rook, which displays a native notification
+3. Sends an OSC 777 escape sequence to Polaris Terminal, which displays a native notification
 
 The plugin hooks into these OpenCode events:
 - **session.created** — confirms the plugin is active
@@ -60,7 +60,7 @@ The plugin hooks into these OpenCode events:
 
 ## Configuration
 
-Notifications work out of the box. To customize Rook's notification behavior (sounds, system notifications, etc.), see [Rook's notification settings](https://docs.rook.dev/features/notifications).
+Notifications work out of the box. To customize Polaris Terminal's notification behavior (sounds, system notifications, etc.), see [Polaris Terminal's notification settings](https://docs.rook.dev/features/notifications).
 
 ## Development
 
@@ -80,7 +80,7 @@ bun run build
 
 ## Uninstall
 
-Remove `"@rook-dot-dev/opencode-rook"` from the `plugin` array in your `opencode.json`.
+Remove `"@polaris-terminal-dot-dev/opencode-polaris-terminal"` from the `plugin` array in your `opencode.json`.
 
 ## Contributing
 

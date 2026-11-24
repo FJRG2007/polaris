@@ -1,18 +1,18 @@
 use std::rc::Rc;
 
 use pathfinder_geometry::vector::vec2f;
-use rook_core::channel::ChannelState;
-use rook_core::ui::theme::color::internal_colors::{neutral_2, neutral_3};
-use rookui::elements::{
+use pterm_core::channel::ChannelState;
+use pterm_core::ui::theme::color::internal_colors::{neutral_2, neutral_3};
+use ptermui::elements::{
     ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Fill, Flex, HighlightedHyperlink, Hoverable, Icon, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius,
     Shrinkable, Stack, Text,
 };
-use rookui::keymap::Keystroke;
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::keymap::Keystroke;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, EventContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -34,7 +34,7 @@ use crate::settings::InputSettings;
 use crate::terminal::view::passive_suggestions::PromptSuggestionResolution;
 use crate::terminal::view::{ContextMenuAction, InputType, PromptSuggestion, TerminalAction};
 use crate::ui_components::blended_colors;
-use crate::ui_components::icons::Icon as RookUIIcon;
+use crate::ui_components::icons::Icon as PtermUIIcon;
 use crate::util::bindings::keybinding_name_to_keystroke;
 use crate::workspace::WorkspaceAction;
 use crate::workspaces::user_workspaces::UserWorkspaces;
@@ -123,7 +123,7 @@ pub struct PromptSuggestionBannerState {
 #[allow(clippy::too_many_arguments)]
 fn render_button(
     text: String,
-    icon: RookUIIcon,
+    icon: PtermUIIcon,
     button_index: usize,
     keystroke: Option<Keystroke>,
     mouse_state: MouseStateHandle,
@@ -313,7 +313,7 @@ fn get_tooltip_text_for_alert_state(alert_state: &PromptAlertState) -> Option<St
     }
 }
 
-/// Free-plan users who run out of Rook-provided AI credits should get a modal
+/// Free-plan users who run out of Polaris Terminal-provided AI credits should get a modal
 /// offering BYO/upgrade instead of a disabled button. Other disabled states
 /// (offline, payment issues, team overage gates) keep the disabled treatment.
 fn should_open_unavailable_modal(state: &PromptAlertState, app: &AppContext) -> bool {
@@ -420,11 +420,11 @@ impl View for PromptSuggestionsView {
                 1.0,
                 render_button(
                     prompt_suggestion.label().clone(),
-                    RookUIIcon::Agent,
+                    PtermUIIcon::Agent,
                     0,
                     keybinding_name_to_keystroke(ACCEPT_PROMPT_SUGGESTION_KEYBINDING, app),
                     banner_state.accept_button_mouse_state.clone(),
-                    Rc::new(move |ctx: &mut rookui::EventContext<'_>| {
+                    Rc::new(move |ctx: &mut ptermui::EventContext<'_>| {
                         if open_unavailable_modal {
                             ctx.dispatch_typed_action(
                                 WorkspaceAction::OpenPromptSuggestionsUnavailableModal,

@@ -1,9 +1,9 @@
-use rook::integration_testing::assertions::{
+use polaris_terminal::integration_testing::assertions::{
     assert_websocket_has_not_started, assert_websocket_has_started, create_a_personal_workflow,
     join_a_workspace,
 };
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use rook::integration_testing::{self};
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::integration_testing::{self};
 
 use super::{TEST_ONLY_ASSETS, new_builder};
 use crate::Builder;

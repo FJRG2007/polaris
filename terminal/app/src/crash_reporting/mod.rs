@@ -13,14 +13,14 @@ use std::sync::Arc;
 
 use lazy_static::lazy_static;
 use parking_lot::{Mutex, RwLock};
+use pterm_core::channel::Channel;
+use pterm_server_auth::anonymous_id::get_or_create_anonymous_id;
+use ptermui::r#async::block_on;
+use ptermui::rendering::GPUDeviceInfo;
+use ptermui::windowing::state::ApplicationStage;
+use ptermui::windowing::{self, StateEvent, WindowManager};
+use ptermui::{AppContext, SingletonEntity};
 use regex::Regex;
-use rook_core::channel::Channel;
-use rook_server_auth::anonymous_id::get_or_create_anonymous_id;
-use rookui::r#async::block_on;
-use rookui::rendering::GPUDeviceInfo;
-use rookui::windowing::state::ApplicationStage;
-use rookui::windowing::{self, StateEvent, WindowManager};
-use rookui::{AppContext, SingletonEntity};
 use sentry::{ClientInitGuard, IntoDsn, SessionMode};
 #[cfg(linux_or_windows)]
 pub use sentry_minidump::run_server as run_minidump_server;
@@ -47,7 +47,7 @@ lazy_static! {
     ];
 
     /// The current [`ApplicationStage`] of the application. Used when reporting the
-    /// `rook.application_stage` tag to Sentry.
+    /// `polaris-terminal.application_stage` tag to Sentry.
     static ref APPLICATION_LIFECYCLE_STAGE: RwLock<ApplicationStage> = RwLock::new(ApplicationStage::Starting);
 
     /// The set of tags that we want to attach to all Sentry reports.
@@ -163,11 +163,11 @@ impl ToSentryTags for CrashRecoveryMetadata {
 
             [
                 (
-                    "rook.crash_recovery_process.running",
+                    "polaris-terminal.crash_recovery_process.running",
                     bool_to_sentry_value(self.is_crash_recovery_process_running),
                 ),
                 (
-                    "rook.handled_by_crash_recovery_process",
+                    "polaris-terminal.handled_by_crash_recovery_process",
                     bool_to_sentry_value(self.was_unhandled_event),
                 ),
             ]
@@ -476,7 +476,7 @@ fn set_optional_user_information(
         let anonymous_id = get_or_create_anonymous_id(ctx);
         format!("anon.{anonymous_id}")
     });
-    // Only send along emails if we're on RookDev.
+    // Only send along emails if we're on PolarisTerminalDev.
     // We try to keep PII out of Sentry as much as possible.
     let email = if ChannelState::channel() == Channel::Dev {
         email
@@ -518,12 +518,12 @@ fn release_version() -> &'static str {
     ChannelState::app_version().unwrap_or("<no tag>")
 }
 
-/// Sets the rook.client_type Sentry tag.
+/// Sets the polaris-terminal.client_type Sentry tag.
 pub fn set_client_type_tag(client_id: &str) {
-    set_tag("rook.client_type", client_id);
+    set_tag("polaris-terminal.client_type", client_id);
 }
 
-/// Initializes the rook.virtual_env Sentry tag group.
+/// Initializes the polaris-terminal.virtual_env Sentry tag group.
 fn init_virtual_environment_tag(ctx: &mut AppContext) {
     let (tx, rx) = async_channel::unbounded();
 
@@ -570,18 +570,30 @@ trait ToSentryTags {
 
 impl ToSentryTags for ApplicationStage {
     fn to_sentry_tags(&self) -> impl IntoIterator<Item = (&str, String)> {
-        [("rook.application_stage", self.to_string())]
+        [("polaris-terminal.application_stage", self.to_string())]
     }
 }
 
 impl ToSentryTags for GPUDeviceInfo {
     fn to_sentry_tags(&self) -> impl IntoIterator<Item = (&str, String)> {
         [
-            ("rook.gpu.device.name", self.device_name.to_string()),
-            ("rook.gpu.device.type", self.device_type.to_string()),
-            ("rook.gpu.backend", self.backend.to_string()),
-            ("rook.gpu.driver.name", self.driver_name.to_string()),
-            ("rook.gpu.driver.info", self.driver_info.to_string()),
+            (
+                "polaris-terminal.gpu.device.name",
+                self.device_name.to_string(),
+            ),
+            (
+                "polaris-terminal.gpu.device.type",
+                self.device_type.to_string(),
+            ),
+            ("polaris-terminal.gpu.backend", self.backend.to_string()),
+            (
+                "polaris-terminal.gpu.driver.name",
+                self.driver_name.to_string(),
+            ),
+            (
+                "polaris-terminal.gpu.driver.info",
+                self.driver_info.to_string(),
+            ),
         ]
     }
 }
@@ -590,7 +602,7 @@ impl ToSentryTags for Option<VirtualEnvironment> {
     fn to_sentry_tags(&self) -> impl IntoIterator<Item = (&str, String)> {
         let env = self.clone();
         [(
-            "rook.virtual_env.name",
+            "polaris-terminal.virtual_env.name",
             env.map(|env| env.name).unwrap_or_else(|| "none".to_owned()),
         )]
     }
@@ -599,7 +611,7 @@ impl ToSentryTags for Option<VirtualEnvironment> {
 impl ToSentryTags for Option<windowing::System> {
     fn to_sentry_tags(&self) -> impl IntoIterator<Item = (&str, String)> {
         [(
-            "rook.window.system",
+            "polaris-terminal.window.system",
             self.as_ref()
                 .map(|windowing_system| windowing_system.to_string())
                 .unwrap_or_else(|| "unknown".to_owned()),
@@ -610,7 +622,7 @@ impl ToSentryTags for Option<windowing::System> {
 impl ToSentryTags for &AntivirusInfo {
     fn to_sentry_tags(&self) -> impl IntoIterator<Item = (&str, String)> {
         [(
-            "rook.window.antivirus.name",
+            "polaris-terminal.window.antivirus.name",
             self.get().unwrap_or("none").into(),
         )]
     }

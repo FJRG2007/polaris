@@ -1,16 +1,16 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::builder::UiBuilder;
-use rook_core::ui::theme::RookTheme;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::*;
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::UiComponent as _;
-use rookui::{Entity, SingletonEntity as _, TypedActionView, View, ViewContext};
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::builder::UiBuilder;
+use pterm_core::ui::theme::PtermTheme;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::*;
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::UiComponent as _;
+use ptermui::{Entity, SingletonEntity as _, TypedActionView, View, ViewContext};
 
 use crate::terminal::model::terminal_model::ExitReason;
 use crate::ui_components;
@@ -152,7 +152,7 @@ impl TerminationType {
         Container::new(
             ConstrainedBox::new(
                 icon_type
-                    .to_rookui_icon(appearance.theme().background())
+                    .to_ptermui_icon(appearance.theme().background())
                     .finish(),
             )
             .with_width(ICON_SIZE)
@@ -183,8 +183,8 @@ impl TerminationType {
                 format!("{pty_spawn_error:#}").into()
             }
             TerminationType::Premature { shell_detail, .. } => format!(
-                "Something went wrong while starting {shell_detail} and Rookifying it, causing the \
-                process to terminate. Rookify script output is displayed here, which may point at \
+                "Something went wrong while starting {shell_detail} and Ptermifying it, causing the \
+                process to terminate. Ptermify script output is displayed here, which may point at \
                 a cause."
             )
             .into(),
@@ -216,7 +216,7 @@ impl TerminationType {
                         .build()
                         .on_click(|ctx, _, _| {
                             ctx.dispatch_typed_action(Action::OpenUrl(
-                                "https://github.com/FJRG2007/rook/issues/new/choose".to_string(),
+                                "https://github.com/FJRG2007/polaris/issues/new/choose".to_string(),
                             ));
                         })
                         .finish(),
@@ -254,7 +254,7 @@ impl TerminationType {
                         .build()
                         .on_click(|ctx, _, _| {
                             ctx.dispatch_typed_action(Action::OpenUrl(
-                                "https://github.com/FJRG2007/rook/issues/new/choose".to_string(),
+                                "https://github.com/FJRG2007/polaris/issues/new/choose".to_string(),
                             ));
                         })
                         .finish(),
@@ -276,7 +276,7 @@ impl TerminationType {
 
 fn inverted_color_ui_builder(appearance: &Appearance) -> UiBuilder {
     let theme = appearance.theme();
-    let theme = RookTheme::new(
+    let theme = PtermTheme::new(
         theme.foreground(),
         theme.background().into_solid(),
         theme.background(),

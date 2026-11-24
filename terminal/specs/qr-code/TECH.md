@@ -19,8 +19,8 @@ The relevant current code paths are:
 - `app/src/drive/sharing/dialog/mod.rs:2372` renders the footer link and `Copy link` button in `render_object_link`.
 - `app/src/drive/sharing/dialog/mod.rs:2505` composes the full dialog in `render`.
 - `app/src/drive/sharing/style.rs:15` contains sharing-dialog layout constants and color helpers.
-- `crates/rookui_core/src/platform/file_picker.rs:127` defines `SaveFilePickerConfiguration`, and `crates/rookui_core/src/core/view/context.rs:311` exposes `open_save_file_picker` for save-file flows.
-- `crates/rookui_core/src/clipboard.rs:29` defines `ClipboardContent`, which the existing link-copy action already uses for plain-text URLs.
+- `crates/ptermui_core/src/platform/file_picker.rs:127` defines `SaveFilePickerConfiguration`, and `crates/ptermui_core/src/core/view/context.rs:311` exposes `open_save_file_picker` for save-file flows.
+- `crates/ptermui_core/src/clipboard.rs:29` defines `ClipboardContent`, which the existing link-copy action already uses for plain-text URLs.
 The app icon inventory now exposes the QR flow controls used by this surface, including `Icon::Download`, `Icon::Copy`, and `Icon::QrCode`, with the QR asset mapped alongside the other share/link icons.
 ## Proposed changes
 ### 1. Add the toast entry point shown in the mocks
@@ -78,7 +78,7 @@ Add a small QR helper module, for example `app/src/drive/sharing/qr_code.rs`, wi
 - `qr_png_for_url(url: &str, pixel_size: u32) -> Result<Vec<u8>, QrCodeError>`
 Add a workspace dependency on a QR encoder crate such as `qrcode` in the root `Cargo.toml` and `app/Cargo.toml`. Prefer a dependency that can produce a boolean module matrix without pulling in a large image stack; use the existing workspace `image` crate for PNG encoding because it is already present.
 Use the same QR helper for on-screen rendering and PNG generation so scanning behavior cannot drift between the two paths.
-For on-screen rendering, prefer drawing the QR matrix directly with Rook UI rectangles rather than feeding a generated PNG back through the image cache. This keeps the view deterministic, avoids temporary files, and makes sizing straightforward. The helper should expose module count and module values; the view computes cell size and quiet-zone padding inside the 160px visual target.
+For on-screen rendering, prefer drawing the QR matrix directly with Polaris Terminal UI rectangles rather than feeding a generated PNG back through the image cache. This keeps the view deterministic, avoids temporary files, and makes sizing straightforward. The helper should expose module count and module values; the view computes cell size and quiet-zone padding inside the 160px visual target.
 For PNG export, generate a black-on-white PNG with a quiet zone. Use a larger export size than the on-screen display, such as 512px or 1024px, so downloaded images remain scannable when printed or projected.
 ### 6. Copy the session link from QR mode
 Wire the QR dialog's copy button to the existing `SharingDialogAction::CopyLink` behavior so it:
@@ -94,7 +94,7 @@ Implement `SharingDialogAction::DownloadQrCode` by:
 - showing a success toast when the file is written;
 - showing a failure toast on write or generation errors;
 - doing nothing when the picker returns `None`.
-Default filename suggestion: `rook-session-qr-code-<session-id>.png` for session targets. If the session id is unavailable in a future target shape, fall back to `rook-session-qr-code.png`.
+Default filename suggestion: `polaris-terminal-session-qr-code-<session-id>.png` for session targets. If the session id is unavailable in a future target shape, fall back to `polaris-terminal-session-qr-code.png`.
 The download action can be compiled only for local filesystem builds if needed. If save-file picker or filesystem writes are unavailable for a target platform, disable or hide the download button there rather than showing a broken control.
 ### 8. Preserve existing sharing behavior
 Do not change:

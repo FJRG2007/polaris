@@ -22,7 +22,7 @@ The recursive `[layout]` / `[[layout.panes]]` TOML format becomes unreadable at 
 
 ## Current state
 
-Tab configs are TOML files in `~/.rook/tab_configs/`. They previously used a recursive `TabConfigLayout` struct with nested `panes: Vec<TabConfigLayout>` for child splits, which became impractical at depth 3+.
+Tab configs are TOML files in `~/.polaris-terminal/tab_configs/`. They previously used a recursive `TabConfigLayout` struct with nested `panes: Vec<TabConfigLayout>` for child splits, which became impractical at depth 3+.
 
 There is no `color` field on `TabConfig` — launch configs support color via `TabTemplate.color` but tab configs don't.
 
@@ -81,8 +81,8 @@ After `add_tab_with_pane_layout`, apply `tab_config.color` to the new tab's `sel
 
 ## End-to-end flow
 
-1. User creates/edits a `.toml` file in `~/.rook/tab_configs/`.
-2. Filesystem watcher in `RookConfig` detects the change and calls `load_tab_configs`.
+1. User creates/edits a `.toml` file in `~/.polaris-terminal/tab_configs/`.
+2. Filesystem watcher in `PtermConfig` detects the change and calls `load_tab_configs`.
 3. `parse_tab_config_dir_entry` calls `toml::from_str::<TabConfig>()`. The `panes` field deserializes from `[[panes]]` entries.
 4. User selects the config from the `+` menu → `open_tab_config` is called.
 5. If params exist, the param-fill modal opens. Otherwise `open_tab_config_with_params` is called directly.
@@ -107,7 +107,7 @@ After `add_tab_with_pane_layout`, apply `tab_config.color` to the new tab's `sel
   - Invalid flat pane tree (missing child ref) returns error.
   - Duplicate IDs rejected.
   - Tab color deserialized correctly.
-- Manual: build and run Rook, create tab configs, verify pane layouts open correctly.
+- Manual: build and run Polaris Terminal, create tab configs, verify pane layouts open correctly.
 - Manual: invoke the `tab-configs` skill, confirm it generates a working config.
 
 ## Follow-ups

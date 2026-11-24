@@ -1,10 +1,10 @@
-# Note that ROOK_SESSION_ID is expected to have been set when executing commands to
+# Note that POLARIS_TERMINAL_SESSION_ID is expected to have been set when executing commands to
 # emit the InitShell payload, which includes the session ID.
 #
 # Throughout, command -p is used to call external binaries. command -p resolves the
 # given command using the system default $PATH, which ensures the shells can locate
 # the corresponding binaries even if the user has a clobbered value of $PATH.
-if [[ -z $ROOK_BOOTSTRAPPED ]]; then
+if [[ -z $POLARIS_TERMINAL_BOOTSTRAPPED ]]; then
   # Return PS2 to its original value.  We set this to an empty string in zsh.sh,
   # and want to reset it now that we've received the bootstrap script and started
   # to eval it.
@@ -46,9 +46,9 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
 
   # Attempt to cd to the desired initial working directory, swallowing any
   # errors.  If this fails, the user will end up in their home directory.
-  if [[ ! -z "$ROOK_INITIAL_WORKING_DIR" ]]; then
-    cd "$ROOK_INITIAL_WORKING_DIR" >/dev/null 2>&1
-    unset ROOK_INITIAL_WORKING_DIR
+  if [[ ! -z "$POLARIS_TERMINAL_INITIAL_WORKING_DIR" ]]; then
+    cd "$POLARIS_TERMINAL_INITIAL_WORKING_DIR" >/dev/null 2>&1
+    unset POLARIS_TERMINAL_INITIAL_WORKING_DIR
   fi
 
   # We configure history to ignore commands starting with space to avoid leaking
@@ -59,64 +59,64 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
 
   # The temporary files used to track generator PIDs.  We'll fill these in later,
   # if we execute any generator commands.
-  _ROOK_GENERATOR_PIDS_STARTED_TMP_FILE=""
-  _ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE=""
+  _POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE=""
+  _POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE=""
   # Flag to indicate whether the current command is a generator command.
   # We use an empty string as the sentinel value (rather than unsetting) for
   # compatibility with `setopt nounset`.
-  _ROOK_GENERATOR_COMMAND=""
+  _POLARIS_TERMINAL_GENERATOR_COMMAND=""
   # Make sure we delete generator PID files when the shell exits, if they exist.
-  __rook_generator_pid_file_cleanup() {
-    if [[ -f $_ROOK_GENERATOR_PIDS_STARTED_TMP_FILE ]]; then
-      command -p rm $_ROOK_GENERATOR_PIDS_STARTED_TMP_FILE
+  __pterm_generator_pid_file_cleanup() {
+    if [[ -f $_POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE ]]; then
+      command -p rm $_POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE
     fi
-    if [[ -f $_ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE ]]; then
-      command -p rm $_ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE
+    if [[ -f $_POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE ]]; then
+      command -p rm $_POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE
     fi
   }
-  trap __rook_generator_pid_file_cleanup EXIT
+  trap __pterm_generator_pid_file_cleanup EXIT
 
   # Writes a hex-encoded JSON message to the pty.
-  rook_send_json_message () {
+  pterm_send_json_message () {
       # Sends a message to the controlling terminal as a DCS control sequence.
       # Note that because the JSON string may contain characters that we don't control (including
       # unicode), we encode it as hexadecimal string to avoid prematurely calling unhook if
       # one of the bytes in JSON is 9c (ST) or other (CAN, SUB, ESC).
-      local msg=$(rook_hex_encode_string "$1")
+      local msg=$(pterm_hex_encode_string "$1")
       # We send the InitShell hook via OSCs when on WSL and via DCSs otherwise.
-      if [ "$ROOK_USING_WINDOWS_CON_PTY" = true ]; then
+      if [ "$POLARIS_TERMINAL_USING_WINDOWS_CON_PTY" = true ]; then
         printf $OSC_START$DCS_JSON_MARKER$OSC_PARAM_SEPARATOR$msg$OSC_END
       else
         printf "%b%b%s%b" $DCS_START $DCS_JSON_MARKER $msg $DCS_END
       fi
   }
 
-  # Emit the ExitShell hook right before the remote shell exits so the Rook
+  # Emit the ExitShell hook right before the remote shell exits so the Polaris Terminal
   # client can drop per-session resources (specifically the
   # `ssh … remote-server-proxy` child that holds a multiplexed channel on
   # the foreground ssh ControlMaster). This avoids a hang where the master
   # waits on orphaned slave channels when the user ends their interactive
   # session.
   #
-  # Only relevant for remote SSH shells. ROOK_IS_SSH is exported to "1"
-  # by `rook_ssh_helper` on the remote side of a Rook-managed SSH session
+  # Only relevant for remote SSH shells. POLARIS_TERMINAL_IS_SSH is exported to "1"
+  # by `pterm_ssh_helper` on the remote side of a Polaris Terminal-managed SSH session
   # and is unset everywhere else (local shells, subshells, docker
   # sandboxes, etc.), so the hook only fires where a remote-server-proxy
   # actually needs tearing down.
   #
-  # Installed after rook_send_json_message is defined so the handler is
+  # Installed after pterm_send_json_message is defined so the handler is
   # callable the moment the hook is registered.
-  if [[ "$ROOK_IS_SSH" == "1" ]]; then
-      __rook_emit_exit_shell() {
-          if [[ -n "$ROOK_SESSION_ID" ]]; then
-              rook_send_json_message \
-                  "{\"hook\": \"ExitShell\", \"value\": {\"session_id\": $ROOK_SESSION_ID}}"
+  if [[ "$POLARIS_TERMINAL_IS_SSH" == "1" ]]; then
+      __pterm_emit_exit_shell() {
+          if [[ -n "$POLARIS_TERMINAL_SESSION_ID" ]]; then
+              pterm_send_json_message \
+                  "{\"hook\": \"ExitShell\", \"value\": {\"session_id\": $POLARIS_TERMINAL_SESSION_ID}}"
           fi
       }
       # zshexit_functions is zsh's idiomatic exit-hook mechanism. We prefer
       # it over `trap ... EXIT` for a few reasons:
       #   1. It is additive: appending to the array composes with the
-      #      existing `trap __rook_generator_pid_file_cleanup EXIT` above.
+      #      existing `trap __pterm_generator_pid_file_cleanup EXIT` above.
       #      Using `trap ... EXIT` here would replace that handler (zsh, like
       #      bash, only allows one trap per signal) and we would have to
       #      manually re-invoke the generator cleanup.
@@ -127,11 +127,11 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
       #   3. It also fires on SIGHUP-triggered exits, so a single
       #      registration covers both normal exit (exit, logout, Ctrl-D) and
       #      connection-drop cases.
-      zshexit_functions+=(__rook_emit_exit_shell)
+      zshexit_functions+=(__pterm_emit_exit_shell)
   fi
 
-  rook_maybe_send_reset_grid_osc() {
-      if [ "$ROOK_USING_WINDOWS_CON_PTY" = true ]; then
+  pterm_maybe_send_reset_grid_osc() {
+      if [ "$POLARIS_TERMINAL_USING_WINDOWS_CON_PTY" = true ]; then
           printf $OSC_RESET_GRID
       fi
   }
@@ -140,17 +140,17 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
   # sequences for generator output.
   #
   # Usage:
-  #   rook_send_generator_output_osc $my_output
+  #   pterm_send_generator_output_osc $my_output
   #
   # The payload of the OSC is "<content_length>;<hex-encoded content>".
   #
   # Note: If we're on windows, we send a reset grid to erase any cursor mutations caused by
   # the in-band command.
-  rook_send_generator_output_osc() {
-      local hex_encoded_message=$(rook_hex_encode_string "$1")
+  pterm_send_generator_output_osc() {
+      local hex_encoded_message=$(pterm_hex_encode_string "$1")
       local byte_count=$(LC_ALL="C"; printf "${#hex_encoded_message}")
       printf "%b%i;%s%b" $OSC_START_GENERATOR_OUTPUT $byte_count $hex_encoded_message $OSC_END_GENERATOR_OUTPUT
-      rook_maybe_send_reset_grid_osc
+      pterm_maybe_send_reset_grid_osc
   }
 
   # Executes the given command and writes its output to the pty wrapped in a
@@ -159,7 +159,7 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
   # where command_id is the ID given as the first argument to this function,
   # exit_code is the exit code of the executed command, and command_output is
   # the output itself.
-  _rook_execute_command() {
+  _pterm_execute_command() {
     local command_id=$1
     # This is shorthand to slice the 2nd-nth arguments of this function (i.e.
     # the command array) into its own array. The first argument is the
@@ -179,34 +179,34 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
     # handling.
     raw_output=$(eval "$command" 2>&1)
     local exit_code=$?
-    rook_send_generator_output_osc "$command_id;$raw_output;$exit_code"
+    pterm_send_generator_output_osc "$command_id;$raw_output;$exit_code"
   }
 
   # Runs the given command in the background, records its PID in
-  # _ROOK_GENERATOR_PIDS_STARTED_TMP_FILE, and adds its PID from the file when
+  # _POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE, and adds its PID from the file when
   # the job is completed.
-  _rook_run_generator_command_internal() {
-    _rook_execute_command "$@" &
+  _pterm_run_generator_command_internal() {
+    _pterm_execute_command "$@" &
     # $! contains the PID of the most recently backgrounded command.
     local pid=$!
-    echo $pid >> $_ROOK_GENERATOR_PIDS_STARTED_TMP_FILE
+    echo $pid >> $_POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE
     wait $pid 2> /dev/null
 
-    # If the exit code of the backgrounded _rook_execute_command process is non-zero,
+    # If the exit code of the backgrounded _pterm_execute_command process is non-zero,
     # the call to send the generator output failed (most likely because this is being
     # executed in an old zsh version that doesn't support some syntax in
-    # _rook_execute_command function itself). In this case, send empty output with
+    # _pterm_execute_command function itself). In this case, send empty output with
     # exit code 1 to indicate generator execution failed.
     if [[ $? -ne 0 ]]; then
-        rook_send_generator_output_osc "$1;;1"
+        pterm_send_generator_output_osc "$1;;1"
     fi
 
     # Add the PID to the completed generators PID file.
     #
     # The completed generator PIDs file may not exist if this generator was (by
-    # error) left running/not cancelled properly in rook_preexec.
-    if [[ -f $_ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE ]]; then
-      echo $pid >> $_ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE
+    # error) left running/not cancelled properly in pterm_preexec.
+    if [[ -f $_POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE ]]; then
+      echo $pid >> $_POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE
     fi
   }
 
@@ -218,61 +218,61 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
   # not substituted until the command string is actually evaluated.
   #
   # Usage:
-  #   rook_run_generator_command <command_id> '<command> <arg1> ... <argn>'
-  rook_run_generator_command() {
-    # Setting this environment variable prevents rook_precmd from emitting the
+  #   pterm_run_generator_command <command_id> '<command> <arg1> ... <argn>'
+  pterm_run_generator_command() {
+    # Setting this environment variable prevents pterm_precmd from emitting the
     # 'Block started' hook to the Rust app.
-    _ROOK_GENERATOR_COMMAND=1
+    _POLARIS_TERMINAL_GENERATOR_COMMAND=1
 
     # Ensure the started and completed generator PID files exist.
-    if [[ -z $_ROOK_GENERATOR_PIDS_STARTED_TMP_FILE || ! -f $_ROOK_GENERATOR_PIDS_STARTED_TMP_FILE ]]; then
-      _ROOK_GENERATOR_PIDS_STARTED_TMP_FILE="$(command -p mktemp)"
+    if [[ -z $_POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE || ! -f $_POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE ]]; then
+      _POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE="$(command -p mktemp)"
     fi
-    if [[ -z $_ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE || ! -f $_ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE ]]; then
-      _ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE="$(command -p mktemp)"
+    if [[ -z $_POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE || ! -f $_POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE ]]; then
+      _POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE="$(command -p mktemp)"
     fi
 
     # To minimize latency and prevent the user from being blocked from entering a command,
-    # cache the user's precmd_functions and only register rook_precmd. In the rook_precmd
+    # cache the user's precmd_functions and only register pterm_precmd. In the pterm_precmd
     # execution following this generator command, the user's precmd_functions are restored.
     _USER_PRECMD_FUNCTIONS=($precmd_functions)
     # Remove all precmd functions other than ones defined by us or p10k.  If we remove the
     # p10k precmd functions, p10k will see that we started running an in-band command but
     # not know when it finishes, which causes a variety of undesirable side-effects.
-    precmd_functions=(${(M)precmd_functions:#*(rook|p9k)*})
+    precmd_functions=(${(M)precmd_functions:#*(polaris-terminal|p9k)*})
 
-    (_rook_run_generator_command_internal "$@" &)
+    (_pterm_run_generator_command_internal "$@" &)
   }
 
-  # Returns exit code 1 if the given argument starts with 'rook_run_generator_command'.
-  _is_rook_generator_command() {
-    [[ "$1" != *"rook_run_generator_command"* ]]
+  # Returns exit code 1 if the given argument starts with 'pterm_run_generator_command'.
+  _is_pterm_generator_command() {
+    [[ "$1" != *"pterm_run_generator_command"* ]]
   }
 
   # Note that this is very performance sensitive code, so try not to
   # invoke any external commands in here.
-  rook_preexec () {
-      local rook_escaped_command="$(rook_escape_json $1)"
-      rook_send_json_message "{\"hook\": \"Preexec\", \"value\": {\"command\": \"$rook_escaped_command\", \"session_id\": $ROOK_SESSION_ID}}"
-      rook_maybe_send_reset_grid_osc
+  pterm_preexec () {
+      local pterm_escaped_command="$(pterm_escape_json $1)"
+      pterm_send_json_message "{\"hook\": \"Preexec\", \"value\": {\"command\": \"$pterm_escaped_command\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID}}"
+      pterm_maybe_send_reset_grid_osc
 
       # If this preexec is called for user command, kill ongoing generator command jobs and clean
       # up the bookkeeping temp files used to bookkeep.
-      if _is_rook_generator_command "$1" && [[ -f $_ROOK_GENERATOR_PIDS_STARTED_TMP_FILE ]] && [[ -f $_ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE ]]
+      if _is_pterm_generator_command "$1" && [[ -f $_POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE ]] && [[ -f $_POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE ]]
         then
         # Read PIDs from the started generators tmp file that are not present in
         # the completed generators tmp file into a zsh array.
         #
         # The logic used to be the following:
         #
-        # pids=($(command -p comm -23 $_ROOK_GENERATOR_PIDS_STARTED_TMP_FILE $_ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE))
+        # pids=($(command -p comm -23 $_POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE $_POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE))
         #
         # However, that requires that the files are sorted, which we do not enforce (the OS can assign PIDs
         # in any order).  While we could sort the files and then compare them, the files are expected to be
         # small, so we avoid the overhead of spawning multiple processes and instead do the comparison
         # manually.
-        completed_pids=(${(f)"$(<$_ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE)"})
-        spawned_pids=(${(f)"$(<$_ROOK_GENERATOR_PIDS_STARTED_TMP_FILE)"})
+        completed_pids=(${(f)"$(<$_POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE)"})
+        spawned_pids=(${(f)"$(<$_POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE)"})
         pids=(${spawned_pids:|completed_pids})
 
         # If the array is not empty, kill the ongoing pids.
@@ -292,23 +292,23 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
   #
   # We wrap in a local function instead of exporting the variable directly in
   # order to avoid interfering with manually-run git commands by the user.
-  rook_git () {
+  pterm_git () {
     GIT_OPTIONAL_LOCKS=0 command git "$@"
   }
 
   # Clears the line editor's buffer and, if the active keymap is "vicmd" (vi command/normal
   # mode), switches back to "viins" (its insert companion).
-  function rook_kill_buffer_and_reset_insert_mode () {
+  function pterm_kill_buffer_and_reset_insert_mode () {
     zle kill-buffer
     if [[ $KEYMAP == vicmd ]]; then
       zle -K viins
     fi
   }
-  zle -N rook_kill_buffer_and_reset_insert_mode
+  zle -N pterm_kill_buffer_and_reset_insert_mode
 
   # Note that this is very performance sensitive code, so try not to
   # invoke any external commands in here.
-  rook_precmd () {
+  pterm_precmd () {
       # $? is the exit code of the last command executed in this process, which
       # includes commands run within function definitions. So we capture the
       # exit code from $? in precmd first, prior to executing any other
@@ -316,21 +316,21 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
       # previously run user command (as opposed to any of the commands executed
       # in this function below).
       local exit_code=$?
-      local next_block_id="precmd-$ROOK_SESSION_ID-$((block_id++))"
+      local next_block_id="precmd-$POLARIS_TERMINAL_SESSION_ID-$((block_id++))"
 
-      rook_send_json_message "{\"hook\": \"CommandFinished\", \"value\": {\"exit_code\": $exit_code, \"next_block_id\": \"$next_block_id\", \"session_id\": $ROOK_SESSION_ID}}"
-      rook_maybe_send_reset_grid_osc
+      pterm_send_json_message "{\"hook\": \"CommandFinished\", \"value\": {\"exit_code\": $exit_code, \"next_block_id\": \"$next_block_id\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID}}"
+      pterm_maybe_send_reset_grid_osc
 
       # If this is being called for a generator command, short circuit and send an unpopulated
       # precmd payload (except for pwd), since we don't re-render the prompt after generator commands
       # are run.
-      if [ -n "$_ROOK_GENERATOR_COMMAND" ]; then
+      if [ -n "$_POLARIS_TERMINAL_GENERATOR_COMMAND" ]; then
         # Restore the user's precmd_functions, since they were un-registered prior to executing
         # the generator.
         precmd_functions=($_USER_PRECMD_FUNCTIONS)
 
-        _ROOK_GENERATOR_COMMAND=""
-        rook_send_json_message "{\"hook\": \"Precmd\", \"value\": {
+        _POLARIS_TERMINAL_GENERATOR_COMMAND=""
+        pterm_send_json_message "{\"hook\": \"Precmd\", \"value\": {
         \"exit_code\": $exit_code,
         \"next_block_id\": \"$next_block_id\",
         \"pwd\": \"\",
@@ -340,35 +340,35 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
         \"virtual_env\": \"\",
         \"conda_env\": \"\",
         \"node_version\": \"\",
-        \"session_id\": $ROOK_SESSION_ID,
+        \"session_id\": $POLARIS_TERMINAL_SESSION_ID,
         \"is_after_in_band_command\": true
         }}"
         return 0
       fi
 
       # If the files for tracking generator PIDs exist, clear them.
-      if [[ -n $_ROOK_GENERATOR_PIDS_STARTED_TMP_FILE && -f $_ROOK_GENERATOR_PIDS_STARTED_TMP_FILE ]]; then
-          echo "" > $_ROOK_GENERATOR_PIDS_STARTED_TMP_FILE
+      if [[ -n $_POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE && -f $_POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE ]]; then
+          echo "" > $_POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE
         fi
-        if [[ -n $_ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE && -f $_ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE ]]; then
-          echo "" > $_ROOK_GENERATOR_PIDS_COMPLETED_TMP_FILE
+        if [[ -n $_POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE && -f $_POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE ]]; then
+          echo "" > $_POLARIS_TERMINAL_GENERATOR_PIDS_COMPLETED_TMP_FILE
         fi
 
-      # Reset the custom kill-buffer binding as the user's zshrc (which is sourced after zshrc_rook)
+      # Reset the custom kill-buffer binding as the user's zshrc (which is sourced after zshrc_pterm)
       # could have added a bindkey. This won't have any user-impact because these shortcuts are only run
-      # in the context of the zsh line editor, which isn't displayed in Rook.
+      # in the context of the zsh line editor, which isn't displayed in Polaris Terminal.
       #
       # We explicitly rebind on every standard keymap (not just "main", which is only a link to
       # whichever of emacs/viins is currently selected) because a user's rc file can switch editing
       # modes after we've bound "main" (e.g. `bindkey -v`, as used by the "cursor_mode" zsh function
       # and by prezto). `bindkey -v` re-links "main" to "viins" and leaves "vicmd" (vi command mode)
-      # bound to its default of up-history. If the active keymap when Rook sends its pre-command ^P
+      # bound to its default of up-history. If the active keymap when Polaris Terminal sends its pre-command ^P
       # ends up being one we didn't rebind, the clear becomes a no-op and any leftover bootstrap bytes
       # still sitting in the line editor's buffer get echoed alongside the next command.
-      # See https://github.com/FJRG2007/rook/issues/7099.
-      local rook_keymap
-      for rook_keymap in main emacs viins vicmd; do
-        bindkey -M "$rook_keymap" '^P' rook_kill_buffer_and_reset_insert_mode 2>/dev/null || :
+      # See https://github.com/FJRG2007/polaris/issues/7099.
+      local pterm_keymap
+      for pterm_keymap in main emacs viins vicmd; do
+        bindkey -M "$pterm_keymap" '^P' pterm_kill_buffer_and_reset_insert_mode 2>/dev/null || :
       done
 
       # Reset the custom input-reporting binding as well, in case it was overridden
@@ -376,26 +376,26 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
       # This is arbitrarily bound to ESC-i in all supported shells ("i" for input).
       # Binding to ESC-1 caused bootstrap failures with vi keybindings.
       bindkey -r '\ei'
-      bindkey '\ei' rook_report_input
+      bindkey '\ei' pterm_report_input
 
-      # Introduce keybinding to switch prompt modes (PS1 vs built-in Rook prompt).
+      # Introduce keybinding to switch prompt modes (PS1 vs built-in Polaris Terminal prompt).
       # This is arbitrarily bound to ESC-p in all supported shells ("p" for PS1),
       # and we can change it to any other keybinding if needed.
       bindkey -r '\ep'
-      bindkey '\ep' rook_change_prompt_modes_to_ps1
+      bindkey '\ep' pterm_change_prompt_modes_to_ps1
 
-      # Introduce keybinding to switch prompt modes (PS1 vs built-in Rook prompt).
-      # This is arbitrarily bound to ESC-w in all supported shells ("w" for Rook prompt),
+      # Introduce keybinding to switch prompt modes (PS1 vs built-in Polaris Terminal prompt).
+      # This is arbitrarily bound to ESC-w in all supported shells ("w" for Polaris Terminal prompt),
       # and we can change it to any other keybinding if needed.
       bindkey -r '\ew'
-      bindkey '\ew' rook_change_prompt_modes_to_rook_prompt
+      bindkey '\ew' pterm_change_prompt_modes_to_pterm_prompt
 
       local escaped_pwd
       if [ -n "${WSL_DISTRO_NAME:-}" ]; then
         # In WSL, avoid symlinks b/c on Windows `std::fs` is unable to resolve symlink inside WSL containers.
-        escaped_pwd=$(rook_escape_json "$(pwd -P)")
+        escaped_pwd=$(pterm_escape_json "$(pwd -P)")
       else
-        escaped_pwd=$(rook_escape_json "$PWD")
+        escaped_pwd=$(pterm_escape_json "$PWD")
       fi
 
       local escaped_virtual_env=""
@@ -409,20 +409,20 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
       # blocks created during the bootstrap process don't have visible
       # prompts, and we don't want to invoke `git` before we've sourced the
       # user's rcfiles and have a fully-populated PATH.
-      if [[ -n $ROOK_BOOTSTRAPPED ]]; then
+      if [[ -n $POLARIS_TERMINAL_BOOTSTRAPPED ]]; then
         if [[ -n ${VIRTUAL_ENV:-} ]]; then
-          escaped_virtual_env=$(rook_escape_json $VIRTUAL_ENV)
+          escaped_virtual_env=$(pterm_escape_json $VIRTUAL_ENV)
         fi
 
         if [[ -n ${CONDA_DEFAULT_ENV:-} ]]; then
-          escaped_conda_env=$(rook_escape_json $CONDA_DEFAULT_ENV)
+          escaped_conda_env=$(pterm_escape_json $CONDA_DEFAULT_ENV)
         fi
 
           # Get the Node.js version, but only when the Node.js Version chip is enabled.
-          # Rook sets ROOK_PROMPT_NODE_VERSION_ENABLED to "0" when the chip is not in the
+          # Polaris Terminal sets POLARIS_TERMINAL_PROMPT_NODE_VERSION_ENABLED to "0" when the chip is not in the
           # prompt (defaulting to enabled when unset), so we avoid spawning `node` on
           # every prompt when the chip is not shown.
-          if [[ "$ROOK_PROMPT_NODE_VERSION_ENABLED" != "0" ]] && command -v node > /dev/null 2>&1; then
+          if [[ "$POLARIS_TERMINAL_PROMPT_NODE_VERSION_ENABLED" != "0" ]] && command -v node > /dev/null 2>&1; then
               # Check for package.json in current directory and parent directories
               local current_dir="$PWD"
               local found_package_json=false
@@ -459,22 +459,22 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
                       # on `nvm use`). The cache vars are global (no `local`) so they
                       # persist across precmd invocations.
                       local node_cache_key="$PWD:$PATH"
-                      if [[ "$node_cache_key" == "$_ROOK_NODE_VERSION_CACHE_KEY" ]]; then
-                          escaped_node_version="$_ROOK_NODE_VERSION_CACHE_VALUE"
+                      if [[ "$node_cache_key" == "$_POLARIS_TERMINAL_NODE_VERSION_CACHE_KEY" ]]; then
+                          escaped_node_version="$_POLARIS_TERMINAL_NODE_VERSION_CACHE_VALUE"
                       else
                           local node_version=$(node --version 2>/dev/null)
                           if [[ -n "$node_version" ]]; then
-                              escaped_node_version=$(rook_escape_json "$node_version")
+                              escaped_node_version=$(pterm_escape_json "$node_version")
                           fi
-                          _ROOK_NODE_VERSION_CACHE_KEY="$node_cache_key"
-                          _ROOK_NODE_VERSION_CACHE_VALUE="$escaped_node_version"
+                          _POLARIS_TERMINAL_NODE_VERSION_CACHE_KEY="$node_cache_key"
+                          _POLARIS_TERMINAL_NODE_VERSION_CACHE_VALUE="$escaped_node_version"
                       fi
                   fi
               fi
           fi
 
         if [[ -n ${KUBECONFIG:-} ]]; then
-          escaped_kube_config=$(rook_escape_json $KUBECONFIG)
+          escaped_kube_config=$(pterm_escape_json $KUBECONFIG)
         fi
 
         # Note: We explicitly do _not_ use command -p here, as `git` is a command that can be
@@ -485,19 +485,19 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
         local git_branch=""
         local git_head=""
         if command -v git >/dev/null 2>&1; then
-          git_branch=$(rook_git symbolic-ref --short HEAD 2> /dev/null)
+          git_branch=$(pterm_git symbolic-ref --short HEAD 2> /dev/null)
           # The git branch the user is on, or the git commit hash if they're not on a branch.
-          git_head="${git_branch:-$(rook_git rev-parse --short HEAD 2> /dev/null)}"
+          git_head="${git_branch:-$(pterm_git rev-parse --short HEAD 2> /dev/null)}"
         fi
-        escaped_git_head=$(rook_escape_json "$git_head")
-        escaped_git_branch=$(rook_escape_json "$git_branch")
+        escaped_git_head=$(pterm_escape_json "$git_head")
+        escaped_git_branch=$(pterm_escape_json "$git_branch")
       fi
 
 
-      # We also pass the shell's notion of `honor_ps1` to ensure it's synced correctly on the Rook-side for prompt handling.
+      # We also pass the shell's notion of `honor_ps1` to ensure it's synced correctly on the Polaris Terminal-side for prompt handling.
       # This is passed as a "real boolean" via the JSON payload (string interpolated into JSON string below).
       local honor_ps1
-      if [[ "$ROOK_HONOR_PS1" == "1" ]]; then
+      if [[ "$POLARIS_TERMINAL_HONOR_PS1" == "1" ]]; then
         honor_ps1="true"
       else
         honor_ps1="false"
@@ -516,18 +516,18 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
       \"conda_env\": \"$escaped_conda_env\",
       \"node_version\": \"$escaped_node_version\",
       \"kube_config\": \"$escaped_kube_config\",
-      \"session_id\": $ROOK_SESSION_ID
+      \"session_id\": $POLARIS_TERMINAL_SESSION_ID
       }}"
-      rook_send_json_message "$escaped_json"
+      pterm_send_json_message "$escaped_json"
   }
 
-  rook_clear_on_next_block () {
-      rook_send_json_message '{"hook": "ClearOnNextBlock"}'
+  pterm_clear_on_next_block () {
+      pterm_send_json_message '{"hook": "ClearOnNextBlock"}'
   }
 
 
   # Format a string value according to JSON syntax.
-  rook_escape_json () {
+  pterm_escape_json () {
       # Explanation of the sed replacements (each command is separated by a `;`):
       # s/(["\\])/\\\1/g - Replace all double-quote (") and backslash (\) characters with the escaped versions (\" and \\)
       # s/\b/\\b/g - Replace all backspace characters with \b
@@ -549,13 +549,13 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
       command -p sed -E 's/(["\\])/\\\1/g; s/'$'\b''/\\b/g; s/'$'\t''/\\t/g; s/'$'\f''/\\f/g; s/'$'\r''/\\r/g; $!s/$/\\n/' <<<"$*" | command -p tr -d '\n'
   }
 
-  rook_escape_ps1 () {
+  pterm_escape_ps1 () {
       # Turns out that the processed prompt is a complicated data structure that includes lots of
       # information that's passed to the shell (including the actual shell, version, working directory
       # and, well, the prompt itself). What is more, prompt can also include emojis - unicode characters
       # that sometimes contain special bytes (ie. ST, CAN or SUB) that are otherwise used as unhook
       # triggers for the precmd. Instead of escaping those and extracting the value of the prompt itself,
-      # we simply convert the entire data structure into a single line hex string, which Rook
+      # we simply convert the entire data structure into a single line hex string, which Polaris Terminal
       # later decodes and sends to the grid to show the prompt.
       # Note: before converting the prompt to a hex string, we remove the multi-line newlines and replace
       # them with a single space (to avoid prompts that span multiple empty lines).
@@ -563,39 +563,39 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
 
   }
 
-  # rook_hex_encode_string encodes the entire DCS string (JSON) with od making it essentially
+  # pterm_hex_encode_string encodes the entire DCS string (JSON) with od making it essentially
   # a very long hexadecimal string.
   # Afterwards it's decoded in rust and parsed as usual.
   # Accepts one argument: DCS JSON string
-  rook_hex_encode_string () {
+  pterm_hex_encode_string () {
     printf '%s' "$1" | command -p od -An -v -tx1 | command -p tr -d ' \n'
   }
 
-  rook_completions_hex_encode_into () {
+  pterm_completions_hex_encode_into () {
     setopt localoptions nomultibyte
     # `LC_ALL=C` keeps indexing byte-wise, so a multibyte character encodes as its UTF-8 bytes rather than its code point.
     local LC_ALL=C
-    local __rook_hex_var="$1"
-    local __rook_hex_in="$2"
+    local __pterm_hex_var="$1"
+    local __pterm_hex_in="$2"
     # This branch is faster for longer values.
-    if (( ${#__rook_hex_in} > 256 )); then
-      typeset -g "$__rook_hex_var=$(printf '%s' "$__rook_hex_in" \
+    if (( ${#__pterm_hex_in} > 256 )); then
+      typeset -g "$__pterm_hex_var=$(printf '%s' "$__pterm_hex_in" \
         | command -p od -An -v -tx1 | command -p tr -d ' \n')"
       return
     fi
     # This branch is faster for shorter values. The "for" loop is O(n²) which is fine for short
     # values, bad for long values. The case above avoids that at the cost of using piping into
     # subprocesses instead.
-    local __rook_hex_i __rook_hex_char __rook_hex_byte __rook_hex_acc=""
-    for (( __rook_hex_i = 1; __rook_hex_i <= ${#__rook_hex_in}; __rook_hex_i++ )); do
-      __rook_hex_char=${__rook_hex_in[__rook_hex_i]}
-      __rook_hex_byte=$(( [##16] #__rook_hex_char ))
-      __rook_hex_acc+=${(l:2::0:)${(L)__rook_hex_byte}}
+    local __pterm_hex_i __pterm_hex_char __pterm_hex_byte __pterm_hex_acc=""
+    for (( __pterm_hex_i = 1; __pterm_hex_i <= ${#__pterm_hex_in}; __pterm_hex_i++ )); do
+      __pterm_hex_char=${__pterm_hex_in[__pterm_hex_i]}
+      __pterm_hex_byte=$(( [##16] #__pterm_hex_char ))
+      __pterm_hex_acc+=${(l:2::0:)${(L)__pterm_hex_byte}}
     done
-    typeset -g "$__rook_hex_var=$__rook_hex_acc"
+    typeset -g "$__pterm_hex_var=$__pterm_hex_acc"
   }
 
-  rook_hex_decode_string () {
+  pterm_hex_decode_string () {
     if command -pv xxd >/dev/null 2>&1; then
       printf '%s' "$1" | command -p xxd -p -r
     else
@@ -613,11 +613,11 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
   #
   # If another shell script also has precmd/preexec hooks to set the title,
   # we won't be clobbering them because our hooks will run first.
-  # If the ROOK_DISABLE_AUTO_TITLE variable is set, we won't set the title at all.
+  # If the POLARIS_TERMINAL_DISABLE_AUTO_TITLE variable is set, we won't set the title at all.
   # This way, setting the terminal title in a echo command and escape
   # sequences will work (a single command to set the title normally will get
   # clobbered by a precmd hook)."
-  function rook_title {
+  function pterm_title {
     # Disable oh-my-zsh default title otherwise.
     DISABLE_AUTO_TITLE="true"
 
@@ -627,33 +627,33 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
     [[ -n "${INSIDE_EMACS:-}" && "${INSIDE_EMACS:-}" != vterm ]] && return
 
     title="%25<..<$1" # shorten the tab_title to 25 characters
-    print -Pn "\e]0;${title:q}\a" # set tab & window name (they're the same in Rook)
+    print -Pn "\e]0;${title:q}\a" # set tab & window name (they're the same in Polaris Terminal)
   }
 
   ZSH_THEME_TERM_TITLE_IDLE="%~"
   ZSH_THEME_TERM_TAB_TITLE_IDLE_REMOTE="%m:%~"
 
   # Runs before showing the prompt
-  function rook_set_title_idle_on_precmd {
+  function pterm_set_title_idle_on_precmd {
     # If the user wants to set the title using oh-my-zsh, they can
-    # set the ROOK_DISABLE_AUTO_TITLE flag.
-    [[ "${ROOK_DISABLE_AUTO_TITLE:-}" != true ]] || return
+    # set the POLARIS_TERMINAL_DISABLE_AUTO_TITLE flag.
+    [[ "${POLARIS_TERMINAL_DISABLE_AUTO_TITLE:-}" != true ]] || return
 
-    if [[ $ROOK_IS_LOCAL_SHELL_SESSION == "1" ]]; then
-      rook_title "$ZSH_THEME_TERM_TITLE_IDLE"
+    if [[ $POLARIS_TERMINAL_IS_LOCAL_SHELL_SESSION == "1" ]]; then
+      pterm_title "$ZSH_THEME_TERM_TITLE_IDLE"
     else
-      rook_title "$ZSH_THEME_TERM_TAB_TITLE_IDLE_REMOTE"
+      pterm_title "$ZSH_THEME_TERM_TAB_TITLE_IDLE_REMOTE"
     fi
 
   }
 
   # Runs before executing the command
-  function rook_set_title_active_on_preexec {
+  function pterm_set_title_active_on_preexec {
     # If the user wants to set the title using oh-my-zsh, they can
-    # set the ROOK_DISABLE_AUTO_TITLE flag.
-    [[ "${ROOK_DISABLE_AUTO_TITLE:-}" != true ]] || return
+    # set the POLARIS_TERMINAL_DISABLE_AUTO_TITLE flag.
+    [[ "${POLARIS_TERMINAL_DISABLE_AUTO_TITLE:-}" != true ]] || return
 
-    _is_rook_generator_command "$1" || return
+    _is_pterm_generator_command "$1" || return
 
     emulate -L zsh
     setopt extended_glob
@@ -699,25 +699,25 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
     local CMD="${1[(wr)^(*=*|sudo|ssh|mosh|rake|-*)]:gs/%/%%}"
     local LINE="${2:gs/%/%%}"
 
-    rook_title "$CMD"
+    pterm_title "$CMD"
   }
 
-  function rook_report_input {
-    local escaped_input="$(rook_escape_json "$BUFFER")"
-    rook_send_json_message "{ \"hook\": \"InputBuffer\", \"value\": { \"buffer\": \"$escaped_input\", \"session_id\": $ROOK_SESSION_ID } }"
+  function pterm_report_input {
+    local escaped_input="$(pterm_escape_json "$BUFFER")"
+    pterm_send_json_message "{ \"hook\": \"InputBuffer\", \"value\": { \"buffer\": \"$escaped_input\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID } }"
     # This prevents zsh from printing typeahead as background output after we've fetched it.
     BUFFER=""
   }
-  zle -N rook_report_input
+  zle -N pterm_report_input
 
   # Runs the shell's own ctrl-r history widget as a foreground command.
-  function rook_run_external_ctrl_r_widget () {
+  function pterm_run_external_ctrl_r_widget () {
     local result=""
-    case "$_ROOK_EXTERNAL_CTRL_R_WIDGET" in
+    case "$_POLARIS_TERMINAL_EXTERNAL_CTRL_R_WIDGET" in
       fzf-history-widget)
         local cursor_and_line="${1:-0:}"
         local char_cursor="${cursor_and_line%%:*}"
-        local original_line="$(rook_hex_decode_string "${cursor_and_line#*:}")"
+        local original_line="$(pterm_hex_decode_string "${cursor_and_line#*:}")"
         local query="${original_line[1,$char_cursor]}"
         local fzf_default_opts
         if (( $+functions[__fzf_defaults] )); then
@@ -743,23 +743,23 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
         result="${result#__atuin_accept__:}"
         ;;
     esac
-    local rook_escaped_selection="$(rook_escape_json "$result")"
-    rook_send_json_message "{ \"hook\": \"ExternalShellWidgetSelection\", \"value\": { \"buffer\": \"$rook_escaped_selection\", \"session_id\": $ROOK_SESSION_ID } }"
+    local pterm_escaped_selection="$(pterm_escape_json "$result")"
+    pterm_send_json_message "{ \"hook\": \"ExternalShellWidgetSelection\", \"value\": { \"buffer\": \"$pterm_escaped_selection\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID } }"
   }
 
   # Runs fzf's ctrl-t file-search widget as a foreground command.
-  function rook_run_external_ctrl_t_widget () {
+  function pterm_run_external_ctrl_t_widget () {
     local result=""
     if (( $+functions[__fzf_select] )); then
       result="$(__fzf_select)"
     else  # fzf < 0.48
       result="$(__fsel)"
     fi
-    local rook_escaped_selection="$(rook_escape_json "$result")"
-    rook_send_json_message "{ \"hook\": \"ExternalShellWidgetSelection\", \"value\": { \"buffer\": \"$rook_escaped_selection\", \"session_id\": $ROOK_SESSION_ID } }"
+    local pterm_escaped_selection="$(pterm_escape_json "$result")"
+    pterm_send_json_message "{ \"hook\": \"ExternalShellWidgetSelection\", \"value\": { \"buffer\": \"$pterm_escaped_selection\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID } }"
   }
 
-  function rook_run_external_alt_c_widget () {
+  function pterm_run_external_alt_c_widget () {
     setopt localoptions pipefail no_aliases 2>/dev/null
     local dir="$(
       FZF_DEFAULT_COMMAND=${FZF_ALT_C_COMMAND:-} \
@@ -772,22 +772,22 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
   }
 
   function clear() {
-      rook_send_json_message "{\"hook\": \"Clear\", \"value\": {\"session_id\": $ROOK_SESSION_ID}}"
+      pterm_send_json_message "{\"hook\": \"Clear\", \"value\": {\"session_id\": $POLARIS_TERMINAL_SESSION_ID}}"
   }
 
-  function rook_finish_update {
+  function pterm_finish_update {
     local update_id="$1"
-    rook_send_json_message "{ \"hook\": \"FinishUpdate\", \"value\": { \"update_id\": \"$update_id\", \"session_id\": $ROOK_SESSION_ID} }"
+    pterm_send_json_message "{ \"hook\": \"FinishUpdate\", \"value\": { \"update_id\": \"$update_id\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID} }"
   }
 
-  # Check if the rook apt source file has been renamed to `warpdotdev.list.distUpgrade` due to an ubuntu version update.
+  # Check if the polaris-terminal apt source file has been renamed to `warpdotdev.list.distUpgrade` due to an ubuntu version update.
   # If this occurred, we want to rename the source file back to `warpdotdev.list` to ensure updates can proceed.
   # We purposefully skip this if either the `warpdotdev.list` file already exists (indicating that the user has already
   # done this themselves) _or_ if a `warpdotdev.sources` file exists (which is the new Deb822 format for source files).
   # The `.sources` file could only exist if a user manually created it; Ubuntu doesn't create one automatically for the
-  # rook source file due to a bug in its update flow where it considers our source file to be "invalid" because it
+  # polaris-terminal source file due to a bug in its update flow where it considers our source file to be "invalid" because it
   # contains a `signed-by` key.
-  function rook_handle_dist_upgrade {
+  function pterm_handle_dist_upgrade {
       local source_file_name="$1"
 
       eval "$(command apt-config shell APT_SOURCESDIR 'Dir::Etc::sourceparts/d')"
@@ -812,7 +812,7 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
   # width accounting. Literal %% escapes are matched first so that they cannot
   # form false positives (e.g. %%1{ renders as literal text and must be left
   # alone).
-  function rook_strip_glitch_width_constructs() {
+  function pterm_strip_glitch_width_constructs() {
     setopt localoptions extendedglob
     local match mbegin mend
     REPLY=${1:-}
@@ -820,15 +820,15 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
   }
 
   # Called live via PROMPT_SUBST on every prompt render. Uses ${(e)...} to recursively evaluate
-  # _ROOK_RAW_PROMPT — expanding any embedded subshells like $(git_prompt_info) so their output
+  # _POLARIS_TERMINAL_RAW_PROMPT — expanding any embedded subshells like $(git_prompt_info) so their output
   # (which may contain %n{...%} glitch constructs) is visible before stripping. The stripped output
   # is returned for use inside %{...%} so that zsh's countprompt() sees zero glitch columns, keeping
   # its cursor-column model in sync with the physical cursor. Async prompt updates (zle reset-prompt)
   # re-invoke this automatically.
-  function _rook_stripped_prompt() {
-    [[ -z "${_ROOK_RAW_PROMPT:-}" ]] && return
+  function _pterm_stripped_prompt() {
+    [[ -z "${_POLARIS_TERMINAL_RAW_PROMPT:-}" ]] && return
     local REPLY
-    rook_strip_glitch_width_constructs "${(e)_ROOK_RAW_PROMPT}"
+    pterm_strip_glitch_width_constructs "${(e)_POLARIS_TERMINAL_RAW_PROMPT}"
     # Append %{%} (a zero-width no-op in zsh prompt syntax) so that command
     # substitution does not strip any trailing newlines from the prompt content.
     # %{%} is harmless: it outputs nothing and has no effect on width counting.
@@ -838,14 +838,14 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
   # Check whether the prompt-related variables have OSC prompt marker sequences,
   # and if not, wrap them with the appropriate markers so that we can direct the
   # prompt bytes to the appropriate grids.
-  function rook_update_prompt_vars() {
+  function pterm_update_prompt_vars() {
     # 133;A and 133;B are standard prompt marker OSCs. We also follow the standard for the rprompt OSC below.
     # See https://learn.microsoft.com/en-us/windows/terminal/tutorials/shell-integration and
     # https://gitlab.freedesktop.org/terminal-wg/specifications/-/merge_requests/6/diffs for details.
     local prompt_prefix=$'\e]133;A\a'
     local rprompt_prefix=$'\e]133;P;k=r\a'
     local prompt_suffix=$'\e]133;B\a'
-    if [[ "$ROOK_HONOR_PS1" != "1" ]] && [ "$ROOK_USING_WINDOWS_CON_PTY" = true ]; then
+    if [[ "$POLARIS_TERMINAL_HONOR_PS1" != "1" ]] && [ "$POLARIS_TERMINAL_USING_WINDOWS_CON_PTY" = true ]; then
         local suffix="$prompt_suffix$OSC_RESET_GRID"
     else
         local suffix="$prompt_suffix"
@@ -856,15 +856,15 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
     local prompt_prefix_with_cursor_marker_surrounded="%{$prompt_prefix%}"
     local suffix_with_cursor_marker_surrounded="%{$suffix%}"
 
-    # Clear the user-defined prompt again, if using Rook's built-in prompt, before the command 
+    # Clear the user-defined prompt again, if using Polaris Terminal's built-in prompt, before the command 
     # is rendered as it could have been reset by the user's zshrc or by setting 
     # the variable on the command line. This is used for same-line prompt and leads to the temporary
-    # product behavior of Rook prompt switches only taking effect in new sessions.
+    # product behavior of Polaris Terminal prompt switches only taking effect in new sessions.
     # Certain prompt plugins like p10k can reset the prompt to a non-empty value, after we've initially unset it.
-    # Confirm that it is unset, if using built-in Rook prompt (update prompt vars is forced to run as the last precmd fn).
-    if [[ "$ROOK_HONOR_PS1" != "1" ]]; then
+    # Confirm that it is unset, if using built-in Polaris Terminal prompt (update prompt vars is forced to run as the last precmd fn).
+    if [[ "$POLARIS_TERMINAL_HONOR_PS1" != "1" ]]; then
       # If the PROMPT has its original value (i.e. we haven't modified it yet), we save it to SAVED_PROMPT
-      # so we can recover it, via bindkey, if we switch back from Rook prompt to PS1 (intra-session).
+      # so we can recover it, via bindkey, if we switch back from Polaris Terminal prompt to PS1 (intra-session).
       if [[ "$PROMPT" != "%{$prompt_prefix"*"%}" ]]; then
         SAVED_PROMPT=$PROMPT
       fi
@@ -885,7 +885,7 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
       # We may have previously modified the prompt to add prompt and cursor
       # markers. If they exist, we remove the first occurrence of the prefix
       # and the last occurrence of the suffix, which should be the ones that
-      # Rook has added, to avoid duplicating the prefix and suffix. Shell
+      # Polaris Terminal has added, to avoid duplicating the prefix and suffix. Shell
       # parameter expansion is used to remove the first and last occurrences.
       # Specifically note that virtualenvs can add content to the prompt, so we need to 
       # remove the markers before re-adding them.
@@ -916,28 +916,28 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
         PROMPT=$preceding_suffix$following_suffix
       fi
 
-      # Update _ROOK_RAW_PROMPT — the user's true raw prompt content that
-      # _rook_stripped_prompt evaluates at render time.
+      # Update _POLARIS_TERMINAL_RAW_PROMPT — the user's true raw prompt content that
+      # _pterm_stripped_prompt evaluates at render time.
       #
       # After the marker-stripping above, $PROMPT is the inner content:
-      #  - Exactly '$(_rook_stripped_prompt)': our placeholder from a previous
-      #    run — _ROOK_RAW_PROMPT is already correct, leave it alone.
-      #  - Contains '$(_rook_stripped_prompt)' but isn't exactly it (e.g. a
+      #  - Exactly '$(_pterm_stripped_prompt)': our placeholder from a previous
+      #    run — _POLARIS_TERMINAL_RAW_PROMPT is already correct, leave it alone.
+      #  - Contains '$(_pterm_stripped_prompt)' but isn't exactly it (e.g. a
       #    plugin prepended or appended content around the placeholder):
-      #    extract the prefix and suffix, strip them from _ROOK_RAW_PROMPT to
+      #    extract the prefix and suffix, strip them from _POLARIS_TERMINAL_RAW_PROMPT to
       #    get the base, then reassemble. This is idempotent.
       #  - Anything else: a genuine new prompt from the user.
-      if [[ "$PROMPT" == '$(_rook_stripped_prompt)' ]]; then
-        : # _ROOK_RAW_PROMPT is already correct
-      elif [[ "$PROMPT" == *'$(_rook_stripped_prompt)'* ]]; then
-        local _rook_extra_pfx="${PROMPT%%'$(_rook_stripped_prompt)'*}"
-        local _rook_extra_sfx="${PROMPT#*'$(_rook_stripped_prompt)'}"
-        local _rook_base="${_ROOK_RAW_PROMPT:-}"
-        [[ -n "$_rook_extra_pfx" ]] && _rook_base="${_rook_base#"$_rook_extra_pfx"}"
-        [[ -n "$_rook_extra_sfx" ]] && _rook_base="${_rook_base%"$_rook_extra_sfx"}"
-        _ROOK_RAW_PROMPT="${_rook_extra_pfx}${_rook_base}${_rook_extra_sfx}"
+      if [[ "$PROMPT" == '$(_pterm_stripped_prompt)' ]]; then
+        : # _POLARIS_TERMINAL_RAW_PROMPT is already correct
+      elif [[ "$PROMPT" == *'$(_pterm_stripped_prompt)'* ]]; then
+        local _pterm_extra_pfx="${PROMPT%%'$(_pterm_stripped_prompt)'*}"
+        local _pterm_extra_sfx="${PROMPT#*'$(_pterm_stripped_prompt)'}"
+        local _pterm_base="${_POLARIS_TERMINAL_RAW_PROMPT:-}"
+        [[ -n "$_pterm_extra_pfx" ]] && _pterm_base="${_pterm_base#"$_pterm_extra_pfx"}"
+        [[ -n "$_pterm_extra_sfx" ]] && _pterm_base="${_pterm_base%"$_pterm_extra_sfx"}"
+        _POLARIS_TERMINAL_RAW_PROMPT="${_pterm_extra_pfx}${_pterm_base}${_pterm_extra_sfx}"
       else
-        _ROOK_RAW_PROMPT="$PROMPT"
+        _POLARIS_TERMINAL_RAW_PROMPT="$PROMPT"
       fi
       ORIGINAL_PROMPT=$PROMPT
       PROMPT="$prompt_prefix$PROMPT$suffix"
@@ -955,28 +955,28 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
     # columns leads to undesired artifacts in the command grid.
     # Note that we only need cursor markers for the prefix/suffix when using a combined prompt &
     # command grid.
-    # If we are using the Rook prompt, we pass a "hidden left prompt" to the prompt
+    # If we are using the Polaris Terminal prompt, we pass a "hidden left prompt" to the prompt
     # preview grid (the hidden prompt grid) with cursor markers surrounding the entire prompt.
-    if [[ "$ROOK_HONOR_PS1" != "1" ]]; then
+    if [[ "$POLARIS_TERMINAL_HONOR_PS1" != "1" ]]; then
       # We purposefully surround this entire prompt with cursor markers to prevent
       # the shell from moving its internal state of the cursor position, for purposes
-      # of printing the command with the Rook prompt.
-      # Note that the Rook prompt is always ABOVE the combined grid in finished blocks
-      # (same line prompt only affects the input editor with Rook prompt, not
+      # of printing the command with the Polaris Terminal prompt.
+      # Note that the Polaris Terminal prompt is always ABOVE the combined grid in finished blocks
+      # (same line prompt only affects the input editor with Polaris Terminal prompt, not
       # finished blocks).
       if [[ -o promptsubst ]]; then
         # PROMPT_SUBST is on: subshells in PROMPT are evaluated at render time, so
         # dynamic glitch constructs (e.g. from $(git_prompt_info)) can appear. Use
         # the live-stripping wrapper to catch and strip them on every render.
-        if [[ "$PROMPT" != "%{$prompt_prefix\$(_rook_stripped_prompt)$suffix%}" ]]; then
-          PROMPT="%{$prompt_prefix\$(_rook_stripped_prompt)$suffix%}"
+        if [[ "$PROMPT" != "%{$prompt_prefix\$(_pterm_stripped_prompt)$suffix%}" ]]; then
+          PROMPT="%{$prompt_prefix\$(_pterm_stripped_prompt)$suffix%}"
         fi
       else
         # PROMPT_SUBST is off: subshells are never evaluated in PROMPT, so glitch
         # constructs can only come from static content. Strip them now at precmd
         # time and embed the result directly, honoring the user's setting.
         local REPLY
-        rook_strip_glitch_width_constructs "${_ROOK_RAW_PROMPT:-}"
+        pterm_strip_glitch_width_constructs "${_POLARIS_TERMINAL_RAW_PROMPT:-}"
         if [[ "$PROMPT" != "%{$prompt_prefix$REPLY$suffix%}" ]]; then
           PROMPT="%{$prompt_prefix$REPLY$suffix%}"
         fi
@@ -999,45 +999,45 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
     # Ensure that this is always the last precmd hook. This prevents any other precmd hook, which might
     # modify $PROMPT, from interfering with our prompt-escaping logic.
     #
-    # Remove rook_update_prompt_vars from the precmd_functions list and then re-append it to ensure it's
+    # Remove pterm_update_prompt_vars from the precmd_functions list and then re-append it to ensure it's
     # ordered last.
-    precmd_functions=("${(@)precmd_functions[@]:#rook_update_prompt_vars}")
-    precmd_functions+=(rook_update_prompt_vars)
+    precmd_functions=("${(@)precmd_functions[@]:#pterm_update_prompt_vars}")
+    precmd_functions+=(pterm_update_prompt_vars)
   }
 
   # Switches to PS1 prompt by restoring the prompt/rprompt to their original values and flipping
-  # ROOK_HONOR_PS1 to "1" (they had originally been unset for the Rook prompt). Resets the prompt,
+  # POLARIS_TERMINAL_HONOR_PS1 to "1" (they had originally been unset for the Polaris Terminal prompt). Resets the prompt,
   # forcing a re-print.
-  function rook_change_prompt_modes_to_ps1() {
+  function pterm_change_prompt_modes_to_ps1() {
     PROMPT="$SAVED_PROMPT"
     RPROMPT="$SAVED_RPROMPT"
-    ROOK_HONOR_PS1=1
+    POLARIS_TERMINAL_HONOR_PS1=1
 
-    rook_update_prompt_vars
+    pterm_update_prompt_vars
     zle .reset-prompt
   }
 
   # The following line creates a new widget with ZLE (the Zsh line editor) with the custom function above,
   # so we can reference this when we register it with a bindkey.
-  zle -N rook_change_prompt_modes_to_ps1
+  zle -N pterm_change_prompt_modes_to_ps1
 
-  # Switches to Rook prompt by flipping ROOK_HONOR_PS1 to "0", which will result
+  # Switches to Polaris Terminal prompt by flipping POLARIS_TERMINAL_HONOR_PS1 to "0", which will result
   # in unsetting the PROMPT variables to avoid a double prompt. Resets the prompt, forcing
   # a re-print.
-  function rook_change_prompt_modes_to_rook_prompt() {
-    ROOK_HONOR_PS1=0
+  function pterm_change_prompt_modes_to_pterm_prompt() {
+    POLARIS_TERMINAL_HONOR_PS1=0
 
-    rook_update_prompt_vars
+    pterm_update_prompt_vars
     zle .reset-prompt
   }
 
   # The following line creates a new widget with ZLE (the Zsh line editor) with the custom function above,
   # so we can reference this when we register it with a bindkey.
-  zle -N rook_change_prompt_modes_to_rook_prompt
+  zle -N pterm_change_prompt_modes_to_pterm_prompt
 
   # The SSH logic only applies to local sessions, because we don't yet have support for bootstrapping
   # recursive SSH sessions.
-  if [[ $ROOK_IS_LOCAL_SHELL_SESSION == "1" ]]; then
+  if [[ $POLARIS_TERMINAL_IS_LOCAL_SHELL_SESSION == "1" ]]; then
       # This helper function determines whether the user's ssh arguments imply
       # creation of a non-interactive session or otherwise would conflict with
       # our SSH wrapper.  Returns 0 for an interactive session; >0 otherwise.
@@ -1075,7 +1075,7 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
           fi
       }
 
-      function rook_ssh_helper() {
+      function pterm_ssh_helper() {
           local remote_session_id=$(command -p od -An -N8 -tu8 /dev/urandom 2>/dev/null | command -p tr -d ' \n')
           if [[ -z "$remote_session_id" || "$remote_session_id" == "0" ]]; then
               # If we cannot generate a non-zero random token, run plain SSH instead.
@@ -1086,7 +1086,7 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
           # If the user's SSH config sets a RemoteCommand for this destination,
           # OpenSSH refuses to also run our bootstrap as a command-line remote
           # command, aborting with "Cannot execute command-line and remote
-          # command." Rookification is structurally impossible there, so fall
+          # command." Ptermification is structurally impossible there, so fall
           # back to plain SSH. `ssh -G` prints `remotecommand none` when unset.
           local user_remote_command=$(command ssh -G "${@:1}" 2>/dev/null | command -p sed -n 's/^remotecommand //p')
           if [[ -n "$user_remote_command" && "$user_remote_command" != "none" ]]; then
@@ -1097,19 +1097,19 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
           # Hex-encode the ZSH environment script we use to bootstrap remote zsh b/c it contains control characters
           # We decode on the SSH server using xxd if its available, otherwise fall back to a for-loop over each byte
           # and use printf to convert back to plaintext
-          local zsh_env_script=$(printf '%s' 'unsetopt ZLE RCS GLOBAL_RCS; ROOK_SESSION_ID='$remote_session_id'; ROOK_USING_WINDOWS_CON_PTY=@@USING_CON_PTY_BOOLEAN@@; _hostname=$(command -pv hostname >/dev/null 2>&1 && command -p hostname 2>/dev/null || command -p uname -n); _user=$(command -pv whoami >/dev/null 2>&1 && command -p whoami 2>/dev/null || echo $USER); _msg=$(printf "{\"hook\": \"InitShell\", \"value\": {\"session_id\": $ROOK_SESSION_ID, \"shell\": \"zsh\", \"user\": \"%s\", \"hostname\": \"%s\"}}" "$_user" "$_hostname" | command -p od -An -v -tx1 | command -p tr -d '"'"' \n'"'"'); printf '"'"'\e]9278;d;%s\x07'"'"' $_msg; unset _hostname _user _msg' | command -p od -An -v -tx1 | command -p tr -d ' \n')
+          local zsh_env_script=$(printf '%s' 'unsetopt ZLE RCS GLOBAL_RCS; POLARIS_TERMINAL_SESSION_ID='$remote_session_id'; POLARIS_TERMINAL_USING_WINDOWS_CON_PTY=@@USING_CON_PTY_BOOLEAN@@; _hostname=$(command -pv hostname >/dev/null 2>&1 && command -p hostname 2>/dev/null || command -p uname -n); _user=$(command -pv whoami >/dev/null 2>&1 && command -p whoami 2>/dev/null || echo $USER); _msg=$(printf "{\"hook\": \"InitShell\", \"value\": {\"session_id\": $POLARIS_TERMINAL_SESSION_ID, \"shell\": \"zsh\", \"user\": \"%s\", \"hostname\": \"%s\"}}" "$_user" "$_hostname" | command -p od -An -v -tx1 | command -p tr -d '"'"' \n'"'"'); printf '"'"'\e]9278;d;%s\x07'"'"' $_msg; unset _hostname _user _msg' | command -p od -An -v -tx1 | command -p tr -d ' \n')
 
           # Optionally attach to an existing ControlMaster the user already
           # runs for this destination instead of creating our own. Resolve
           # the user's configured ControlPath with `ssh -G` (which expands
           # tokens like %h/%p/%r/%C into a literal path), then verify the
           # master is alive with `ssh -O check`. Both probes are local-only
-          # commands. On any failure we fall back to creating a Rook-owned
+          # commands. On any failure we fall back to creating a Polaris Terminal-owned
           # master, preserving the existing behavior.
-          local control_path="$SSH_SOCKET_DIR/$ROOK_SESSION_ID"
+          local control_path="$SSH_SOCKET_DIR/$POLARIS_TERMINAL_SESSION_ID"
           local control_master_mode="yes"
           local external_control_master="false"
-          if [[ "$ROOK_SSH_REUSE_CONTROL_MASTER" == "1" ]]; then
+          if [[ "$POLARIS_TERMINAL_SSH_REUSE_CONTROL_MASTER" == "1" ]]; then
               local user_control_path=$(command ssh -G "${@:1}" 2>/dev/null | command -p sed -n 's/^controlpath //p')
               case "$user_control_path" in
                   "" | none)
@@ -1119,12 +1119,12 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
                       # The resolved path contains characters we cannot safely
                       # embed in the SSH hook JSON below (e.g. an unexpanded %
                       # token, quotes, or whitespace); fall back to a
-                      # Rook-owned master.
+                      # Polaris Terminal-owned master.
                       ;;
                   *)
                       if command ssh -O check -o ControlPath="$user_control_path" "${@:1}" >/dev/null 2>&1; then
                           # A live master exists: multiplex through it and let
-                          # the client know Rook does not own it.
+                          # the client know Polaris Terminal does not own it.
                           control_path="$user_control_path"
                           control_master_mode="no"
                           external_control_master="true"
@@ -1143,19 +1143,19 @@ if [[ -z $ROOK_BOOTSTRAPPED ]]; then
           command ssh -o ControlMaster=$control_master_mode -o ControlPath="$control_path" \
           -t "${@:1}" \
 "
-export TERM_PROGRAM='RookTerminal'
-# Mark the remote side of a Rook-managed SSH session so the bootstrap
+export TERM_PROGRAM='PtermTerminal'
+# Mark the remote side of a Polaris Terminal-managed SSH session so the bootstrap
 # body can distinguish it from local shells. Used to gate the ExitShell
 # hook which tears down the remote-server-proxy subprocess.
-export ROOK_IS_SSH='1'
-test -n '$ROOK_CLIENT_VERSION' && export ROOK_CLIENT_VERSION='$ROOK_CLIENT_VERSION'
+export POLARIS_TERMINAL_IS_SSH='1'
+test -n '$POLARIS_TERMINAL_CLIENT_VERSION' && export POLARIS_TERMINAL_CLIENT_VERSION='$POLARIS_TERMINAL_CLIENT_VERSION'
 # Only forward the protocol version if it was set locally (i.e. the HOANotifications feature flag is on).
-test -n '$ROOK_CLI_AGENT_PROTOCOL_VERSION' && export ROOK_CLI_AGENT_PROTOCOL_VERSION='$ROOK_CLI_AGENT_PROTOCOL_VERSION'
-hook="'$(printf "{\"hook\": \"SSH\", \"value\": {\"socket_path\": \"'$control_path'\", \"remote_shell\": \"%s\", \"session_id\": '"$ROOK_SESSION_ID"', \"remote_session_id\": '"$remote_session_id"', \"external_control_master\": '"$external_control_master"'}}" "${SHELL##*/}" | command -p od -An -v -tx1 | command -p tr -d " \n")'"
+test -n '$POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION' && export POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION='$POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION'
+hook="'$(printf "{\"hook\": \"SSH\", \"value\": {\"socket_path\": \"'$control_path'\", \"remote_shell\": \"%s\", \"session_id\": '"$POLARIS_TERMINAL_SESSION_ID"', \"remote_session_id\": '"$remote_session_id"', \"external_control_master\": '"$external_control_master"'}}" "${SHELL##*/}" | command -p od -An -v -tx1 | command -p tr -d " \n")'"
 printf '$OSC_START$DCS_JSON_MARKER$OSC_PARAM_SEPARATOR%s$OSC_END' "'$hook'"
 
 if test "'"${SHELL##*/}" != "bash" -a "${SHELL##*/}" != "zsh"'"; then
-  # Emulate the SSHD logic to print the MotD. Because the Rook SSH wrapper passes
+  # Emulate the SSHD logic to print the MotD. Because the Polaris Terminal SSH wrapper passes
   # a command to run, SSHD does a quiet login, updating utmp and other login
   # state, but not printing the MotD. For bash and zsh, this is instead handled
   # by our bootstrap script.
@@ -1186,32 +1186,32 @@ case "'${SHELL##*/}'" in
       command -p stty raw
       HISTCONTROL=ignorespace
       HISTIGNORE=" *"
-      ROOK_SESSION_ID='$remote_session_id'
-      ROOK_HONOR_PS1="'$ROOK_HONOR_PS1'"
+      POLARIS_TERMINAL_SESSION_ID='$remote_session_id'
+      POLARIS_TERMINAL_HONOR_PS1="'$POLARIS_TERMINAL_HONOR_PS1'"
       _hostname=$(command -pv hostname >/dev/null 2>&1 && command -p hostname 2>/dev/null || command -p uname -n)
       _user=$(command -pv whoami >/dev/null 2>&1 && command -p whoami 2>/dev/null || echo $USER)
-      _msg=$(printf "{\"hook\": \"InitShell\", \"value\": {\"session_id\": $ROOK_SESSION_ID, \"shell\": \"bash\", \"user\": \"%s\", \"hostname\": \"%s\"}}" "$_user" "$_hostname" | command -p od -An -v -tx1 | command -p tr -d " \n")'"
-      ROOK_USING_WINDOWS_CON_PTY=@@USING_CON_PTY_BOOLEAN@@
-      if [[ "'$OS'" == Windows_NT ]]; then ROOK_IN_MSYS2=true; else ROOK_IN_MSYS2=false; fi
+      _msg=$(printf "{\"hook\": \"InitShell\", \"value\": {\"session_id\": $POLARIS_TERMINAL_SESSION_ID, \"shell\": \"bash\", \"user\": \"%s\", \"hostname\": \"%s\"}}" "$_user" "$_hostname" | command -p od -An -v -tx1 | command -p tr -d " \n")'"
+      POLARIS_TERMINAL_USING_WINDOWS_CON_PTY=@@USING_CON_PTY_BOOLEAN@@
+      if [[ "'$OS'" == Windows_NT ]]; then POLARIS_TERMINAL_IN_MSYS2=true; else POLARIS_TERMINAL_IN_MSYS2=false; fi
       printf '\''"'\e]9278;d;%s\x07'"'\'' \""'$_msg'"\"'
       unset _hostname _user _msg
     )
       ;;
-  zsh) ROOK_TMP_DIR="'$(command -p mktemp -d rooktmp.XXXXXX)'"
+  zsh) POLARIS_TERMINAL_TMP_DIR="'$(command -p mktemp -d ptermtmp.XXXXXX)'"
     local ZSH_ENV_SCRIPT='$zsh_env_script'
-    local ROOK_HONOR_PS1='$ROOK_HONOR_PS1'
+    local POLARIS_TERMINAL_HONOR_PS1='$POLARIS_TERMINAL_HONOR_PS1'
     if [[ "'$?'" == 0 ]]; then
       if command -pv xxd >/dev/null 2>&1; then
-        echo "'$ZSH_ENV_SCRIPT'" | command -p xxd -p -r > "'$ROOK_TMP_DIR'"/.zshenv
+        echo "'$ZSH_ENV_SCRIPT'" | command -p xxd -p -r > "'$POLARIS_TERMINAL_TMP_DIR'"/.zshenv
       else
         for i in {0..\$((\${#ZSH_ENV_SCRIPT} - 1))..2}; do
           builtin printf "'"\x${ZSH_ENV_SCRIPT:$i:2}"'"
-        done > "'$ROOK_TMP_DIR'"/.zshenv
+        done > "'$POLARIS_TERMINAL_TMP_DIR'"/.zshenv
       fi
     else
-      echo \"Failed to bootstrap rook. Continuing with a non-bootstrapped shell.\"
+      echo \"Failed to bootstrap polaris-terminal. Continuing with a non-bootstrapped shell.\"
     fi
-    TMPPREFIX="'$HOME/.zshtmp-'" ROOK_SSH_RCFILES="'${ZDOTDIR:-$HOME}'" ROOK_HONOR_PS1="'$ROOK_HONOR_PS1'" ZDOTDIR="'$ROOK_TMP_DIR'" exec -l zsh -g $TRACE_FLAG_IF_ROOK_SHELL_DEBUG_MODE
+    TMPPREFIX="'$HOME/.zshtmp-'" POLARIS_TERMINAL_SSH_RCFILES="'${ZDOTDIR:-$HOME}'" POLARIS_TERMINAL_HONOR_PS1="'$POLARIS_TERMINAL_HONOR_PS1'" ZDOTDIR="'$POLARIS_TERMINAL_TMP_DIR'" exec -l zsh -g $TRACE_FLAG_IF_POLARIS_TERMINAL_SHELL_DEBUG_MODE
       ;;
 esac
 "
@@ -1219,15 +1219,15 @@ esac
 
       function ssh() {
           if is_interactive_ssh_session "$@"; then
-              rook_send_json_message "{\"hook\": \"PreInteractiveSSHSession\", \"value\": {\"session_id\": $ROOK_SESSION_ID}}"
+              pterm_send_json_message "{\"hook\": \"PreInteractiveSSHSession\", \"value\": {\"session_id\": $POLARIS_TERMINAL_SESSION_ID}}"
 
               # If the SSH wrapper is not enabled for this session, don't use it.
-              if [ "$ROOK_USE_SSH_WRAPPER" = "1" ]; then
-                local TRACE_FLAG_IF_ROOK_SHELL_DEBUG_MODE=""
-                if [[ "$ROOK_SHELL_DEBUG_MODE" == "1" ]]; then
-                    TRACE_FLAG_IF_ROOK_SHELL_DEBUG_MODE="-x"
+              if [ "$POLARIS_TERMINAL_USE_SSH_WRAPPER" = "1" ]; then
+                local TRACE_FLAG_IF_POLARIS_TERMINAL_SHELL_DEBUG_MODE=""
+                if [[ "$POLARIS_TERMINAL_SHELL_DEBUG_MODE" == "1" ]]; then
+                    TRACE_FLAG_IF_POLARIS_TERMINAL_SHELL_DEBUG_MODE="-x"
                 fi
-                rook_ssh_helper "$@"
+                pterm_ssh_helper "$@"
               else
                 command ssh "$@"
               fi
@@ -1237,12 +1237,12 @@ esac
       }
   fi
 
-  # Send a precmd message to the terminal to differentiate between the rook
+  # Send a precmd message to the terminal to differentiate between the polaris-terminal
   # bootstrap logic pasted into the PTY and the output of shell startup files.
-  rook_precmd
+  pterm_precmd
 
   # Before calling rcfiles, print the MotD if this is a login shell. Normally,
-  # login(1) or pam_motd(8) would do this. However, Rook does not use login(1)
+  # login(1) or pam_motd(8) would do this. However, Polaris Terminal does not use login(1)
   # for local sessions and for remote sessions, SSHD thinks it is starting a
   # non-interactive session, so it does not print PAM messages.
   if [[ -o login && ! -e "$HOME/.hushlogin" ]]; then
@@ -1259,26 +1259,26 @@ esac
   setopt ZLE
 
   # If powerlevel instant prompt is on, we need to disable it because it
-  # interferes with rook bootstrapping. The functionality is part of rook anyways.
+  # interferes with polaris-terminal bootstrapping. The functionality is part of polaris-terminal anyways.
   typeset -g POWERLEVEL9K_INSTANT_PROMPT=off
 
-  # Add the Rook title precmd functions before the bootstrap sequence is sourced so that a user's custom tab title
-  # behavior is respected over Rook's.
-  precmd_functions+=(rook_set_title_idle_on_precmd)
-  preexec_functions+=(rook_set_title_active_on_preexec)
+  # Add the Polaris Terminal title precmd functions before the bootstrap sequence is sourced so that a user's custom tab title
+  # behavior is respected over Polaris Terminal's.
+  precmd_functions+=(pterm_set_title_idle_on_precmd)
+  preexec_functions+=(pterm_set_title_active_on_preexec)
 
   # Clean up after ourselves, restore ZDOTDIR, and remove the temporary directory in the ssh case.
   # We need to do this before the rcfiles are sourced, since rcfiles can reference ZDOTDIR.
   # In this case, we created a temp dir that starts with our template prefix and set the ZDOTDIR
   # to that dir.
   # Note that when called with a template, mktemp will work in the local directory, not the tmp filesystem.
-  TEMPLATE_PREFIX="rooktmp."
+  TEMPLATE_PREFIX="ptermtmp."
   if [[ -n $ZDOTDIR ]]; then
       if [[ ${ZDOTDIR:0:${#TEMPLATE_PREFIX}} == $TEMPLATE_PREFIX ]]; then
             command -p rm -r "$ZDOTDIR"
 
             # Restore ZDOTDIR. Note that if it was originally unset, it'd be home instead of unset.
-            ZDOTDIR=$ROOK_SSH_RCFILES
+            ZDOTDIR=$POLARIS_TERMINAL_SSH_RCFILES
       fi
   fi
 
@@ -1291,10 +1291,10 @@ esac
   local rcfiles_start_time="$(LC_ALL="C"; echo $EPOCHREALTIME)"
 
   # This reflects the bootstrap sequence in a login shell. We want to
-  # Do other shell startup first so we can ensure Rook goes last.
+  # Do other shell startup first so we can ensure Polaris Terminal goes last.
 
   # If this is a subshell, the user and system RC files have already been sourced.
-  if [[ -z $ROOK_IS_SUBSHELL ]]; then
+  if [[ -z $POLARIS_TERMINAL_IS_SUBSHELL ]]; then
       if [[ -e "${ZDOTDIR:-$HOME}/.zshenv" ]]; then
           source "${ZDOTDIR:-$HOME}/.zshenv";
       fi
@@ -1322,16 +1322,16 @@ esac
 
   # If the user is running powerlevel10k and they selected "sparse" for the "Prompt Spacing"
   # option, this var will be true. It tells p10k to output an extra newline in its precmd function
-  # which visually separates commands. These are generally undesired in Rook, since blocks provide
+  # which visually separates commands. These are generally undesired in Polaris Terminal, since blocks provide
   # enough visual separation. Although generally benign, this causes an issue on Windows when
-  # ConPTY is involved. The extra newline is output by p10k's precmd which runs after Rook's
-  # precmd, i.e. after the "reset grid" sequence. It ends up causing Rook's grid content to be out
+  # ConPTY is involved. The extra newline is output by p10k's precmd which runs after Polaris Terminal's
+  # precmd, i.e. after the "reset grid" sequence. It ends up causing Polaris Terminal's grid content to be out
   # of sync with ConPTY, causing cursor positioning problems.
   if [[ ${POWERLEVEL9K_PROMPT_ADD_NEWLINE:-} == true ]]; then
     POWERLEVEL9K_PROMPT_ADD_NEWLINE=false
   fi
 
-  # Returns exit code 1 if the command starts with 'rook_run_generator_command'.
+  # Returns exit code 1 if the command starts with 'pterm_run_generator_command'.
   #
   # This is intended to be used as a zshaddhistory function to prevent in-band
   # generators from being added to the zsh history file.
@@ -1339,29 +1339,29 @@ esac
   #
   # See https://zsh.sourceforge.io/Doc/Release/Functions.html for more context
   # on the zshaddhistory hook.
-  _rook_zshaddhistory() {
-    _is_rook_generator_command "$1" && [[ "$1" != *"rook_run_external_ctrl_r_widget"* ]] && \
-      [[ "$1" != *"rook_run_external_ctrl_t_widget"* ]] && \
-      [[ "$1" != *"rook_run_external_alt_c_widget"* ]]
+  _pterm_zshaddhistory() {
+    _is_pterm_generator_command "$1" && [[ "$1" != *"pterm_run_external_ctrl_r_widget"* ]] && \
+      [[ "$1" != *"pterm_run_external_ctrl_t_widget"* ]] && \
+      [[ "$1" != *"pterm_run_external_alt_c_widget"* ]]
   }
 
   # Register this zshaddhistory hook after the user's RC files have been sourced,
   # to ensure that it gets added (the user's RC files could entirely reset the
   # hook function array).
-  zshaddhistory_functions+=(_rook_zshaddhistory)
+  zshaddhistory_functions+=(_pterm_zshaddhistory)
 
-  # Append additional PATH entries if provided via ROOK_PATH_APPEND. This is after the user's RC
+  # Append additional PATH entries if provided via POLARIS_TERMINAL_PATH_APPEND. This is after the user's RC
   # files are sourced in case they reset PATH (/etc/profile on Debian does this, for example).
-  if [[ -n "${ROOK_PATH_APPEND:-}" ]]; then
-    export PATH="$PATH:$ROOK_PATH_APPEND"
-    unset ROOK_PATH_APPEND
+  if [[ -n "${POLARIS_TERMINAL_PATH_APPEND:-}" ]]; then
+    export PATH="$PATH:$POLARIS_TERMINAL_PATH_APPEND"
+    unset POLARIS_TERMINAL_PATH_APPEND
   fi
 
   local -a shell_plugins
 
   if [[ ${precmd_functions[(I)_p9k_precmd]} != 0 ]]; then
     # The variable P9K_VERSION was added in the first version of p10k that
-    # supports Rook, so if it is non-empty, the user is on a supported version.
+    # supports Polaris Terminal, so if it is non-empty, the user is on a supported version.
     if [[ -z "${P9K_VERSION:-}" ]]; then
       # If the user is running an unsupported version of p10k, remove the precmd
       # hook entirely to prevent the p10k prompt from appearing in typeahead and
@@ -1417,17 +1417,17 @@ esac
   fi
 
   # Detect whether ctrl-r has been rebound to fzf's or atuin's history widget.
-  _ROOK_EXTERNAL_CTRL_R_WIDGET=""
-  rook_ctrl_r_binding="$(bindkey -M main '^R' 2>/dev/null)"
-  if [[ "$rook_ctrl_r_binding" == '"^R" '* ]]; then
-    rook_ctrl_r_widget="${rook_ctrl_r_binding#\"^R\" }"
-    case "$rook_ctrl_r_widget" in
+  _POLARIS_TERMINAL_EXTERNAL_CTRL_R_WIDGET=""
+  pterm_ctrl_r_binding="$(bindkey -M main '^R' 2>/dev/null)"
+  if [[ "$pterm_ctrl_r_binding" == '"^R" '* ]]; then
+    pterm_ctrl_r_widget="${pterm_ctrl_r_binding#\"^R\" }"
+    case "$pterm_ctrl_r_widget" in
       fzf-history-widget)
-        _ROOK_EXTERNAL_CTRL_R_WIDGET="$rook_ctrl_r_widget"
+        _POLARIS_TERMINAL_EXTERNAL_CTRL_R_WIDGET="$pterm_ctrl_r_widget"
         shell_plugins+=(fzf)
         ;;
       atuin-search|atuin-search-viins|atuin-search-vicmd|_atuin_search_widget)
-        _ROOK_EXTERNAL_CTRL_R_WIDGET="$rook_ctrl_r_widget"
+        _POLARIS_TERMINAL_EXTERNAL_CTRL_R_WIDGET="$pterm_ctrl_r_widget"
         shell_plugins+=(atuin)
         ;;
     esac
@@ -1454,21 +1454,21 @@ esac
 
   # Restore the built-in bracketed-paste widget. This works around a buggy interaction we observed
   # with the bracketed-paste-magic plugin (included in oh-my-zsh by default), zsh's "allexport"
-  # option (set -a), and Rook's bootstrapping code.
-  # https://github.com/FJRG2007/rook/issues/11520
+  # option (set -a), and Polaris Terminal's bootstrapping code.
+  # https://github.com/FJRG2007/polaris/issues/11520
   zle -A .bracketed-paste bracketed-paste
 
-  precmd_functions+=(rook_precmd rook_update_prompt_vars)
-  preexec_functions+=(rook_preexec)
+  precmd_functions+=(pterm_precmd pterm_update_prompt_vars)
+  preexec_functions+=(pterm_preexec)
 
-  ROOK_BOOTSTRAPPED=1
+  POLARIS_TERMINAL_BOOTSTRAPPED=1
 
-  # Unset the prompt environment variable: Rook doesn't render the user's default prompt.
+  # Unset the prompt environment variable: Polaris Terminal doesn't render the user's default prompt.
   # We explicitly unset this for performance optimizations and so that the we can read the
   # command directly from the command grid without having to parse the prompt.
   export CONDA_CHANGEPS1=false
 
-  rook_update_prompt_vars
+  pterm_update_prompt_vars
 
   # Set history to flush after every command
   setopt share_history
@@ -1559,9 +1559,9 @@ esac
     # makes it count bytes; nothing later in this function counts characters, so scoping it here is
     # fine.
     local LC_ALL=C
-    local __span_start=$(( ${#_ROOK_NATIVE_COMPLETIONS_LINE} - ${#__replaced_prefix} ))
+    local __span_start=$(( ${#_POLARIS_TERMINAL_NATIVE_COMPLETIONS_LINE} - ${#__replaced_prefix} ))
     local __span_len=${#__replaced_prefix}
-    rook_mark_replacement_span_for_compadd_override $__span_start $__span_len
+    pterm_mark_replacement_span_for_compadd_override $__span_start $__span_len
 
     # display all matches
     #
@@ -1570,7 +1570,7 @@ esac
     # only $asuf belongs in the inserted text. Without it, `--color` for `ls --col` loses its `=`.
     local asuf_str="${(v)asuf}"
     local dsuf dscr
-    local __rook_hex_match __rook_hex_dscr
+    local __pterm_hex_match __pterm_hex_dscr
     for i in {1..$#__hits}; do
         # Add a dir suffix? Test the real path, not the bare basename: $__hits[$i] is a basename
         # only when $__hint_prefix is non-empty, so testing it alone resolves against $PWD and
@@ -1590,45 +1590,45 @@ esac
         # collapse, while a same-name/different-description pair survives (keying on the name alone
         # would drop the latter -- the silent loss a dedup must avoid).
         local __dedup_key="${__span_start},${__span_len}"$'\x1f'"${match}"$'\x1f'"${dscr}"
-        if (( ${+_ROOK_SEEN_COMPLETIONS[$__dedup_key]} )); then
+        if (( ${+_POLARIS_TERMINAL_SEEN_COMPLETIONS[$__dedup_key]} )); then
             continue
         fi
-        _ROOK_SEEN_COMPLETIONS[$__dedup_key]=1
+        _POLARIS_TERMINAL_SEEN_COMPLETIONS[$__dedup_key]=1
 
-        rook_completions_hex_encode_into __rook_hex_match "$match"
-        print -n "\e]9280;C"$OSC_PARAM_SEPARATOR$__rook_hex_match$OSC_END
+        pterm_completions_hex_encode_into __pterm_hex_match "$match"
+        print -n "\e]9280;C"$OSC_PARAM_SEPARATOR$__pterm_hex_match$OSC_END
         if [[ -n "$dscr" ]]; then
-            rook_completions_hex_encode_into __rook_hex_dscr "$dscr"
-            print -n "\e]9280;D?description"$OSC_PARAM_SEPARATOR$__rook_hex_dscr$OSC_END
+            pterm_completions_hex_encode_into __pterm_hex_dscr "$dscr"
+            print -n "\e]9280;D?description"$OSC_PARAM_SEPARATOR$__pterm_hex_dscr$OSC_END
         fi
     done
   }
 
   # Marks the start of completions generation using a custom OSC.
-  function rook_mark_start_of_completions () {
+  function pterm_mark_start_of_completions () {
     printf '\e]9280;A\a'
   }
 
-  function rook_mark_start_of_completions_for_compadd_override () {
-    rook_mark_start_of_completions
+  function pterm_mark_start_of_completions_for_compadd_override () {
+    pterm_mark_start_of_completions
     # Start of a completion request: reset the per-request dedup set consulted in the compadd
     # override, so candidates are only deduped within a single request.
-    typeset -gA _ROOK_SEEN_COMPLETIONS
-    _ROOK_SEEN_COMPLETIONS=()
+    typeset -gA _POLARIS_TERMINAL_SEEN_COMPLETIONS
+    _POLARIS_TERMINAL_SEEN_COMPLETIONS=()
   }
 
   # Reports the byte-offset range of the line that the matches replace.
-  function rook_mark_replacement_span_for_compadd_override () {
+  function pterm_mark_replacement_span_for_compadd_override () {
     printf '\e]9280;S;%s,%s\a' $1 $2
   }
 
   # Marks the end of completions generation using a custom OSC.
-  function rook_mark_end_of_completions () {
+  function pterm_mark_end_of_completions () {
     printf '\e]9280;B\a'
   }
 
   # The main logic for generating completions.
-  function rook_main_completer () {
+  function pterm_main_completer () {
     (( ${+functions[_generic]} )) || return 0
     # We want all the results listed.
     compstate[list_max]=-1
@@ -1641,7 +1641,7 @@ esac
   }
 
   # Registers the custom completion widget and hooks it up to the main logic for completing.
-  zle -C rook_complete_via_compadd_override_internal list-choices rook_main_completer
+  zle -C pterm_complete_via_compadd_override_internal list-choices pterm_main_completer
 
   # Avoid grouping, which can print options after the compostfunc hook runs.
   #
@@ -1673,33 +1673,33 @@ esac
   # without a guard can alias it to itself and recurse. It always chains to whatever was bound
   # before, so it is transparent on ordinary prompt reads. The reentrancy guard below makes this
   # safe regardless of the order in which deferred plugin loaders rebind the hook.
-  function _rook_native_completions_zle_line_init () {
-    if (( _ROOK_NATIVE_COMPLETIONS_ZLE_LINE_INIT_RUNNING )); then
+  function _pterm_native_completions_zle_line_init () {
+    if (( _POLARIS_TERMINAL_NATIVE_COMPLETIONS_ZLE_LINE_INIT_RUNNING )); then
       return 0
     fi
-    _ROOK_NATIVE_COMPLETIONS_ZLE_LINE_INIT_RUNNING=1
+    _POLARIS_TERMINAL_NATIVE_COMPLETIONS_ZLE_LINE_INIT_RUNNING=1
     {
       # zle-line-init can fire more than once while we own the widget
-      if (( ! _ROOK_NATIVE_COMPLETIONS_ARMED )); then
-        (( ${+widgets[_rook_saved_zle_line_init]} )) && zle _rook_saved_zle_line_init
+      if (( ! _POLARIS_TERMINAL_NATIVE_COMPLETIONS_ARMED )); then
+        (( ${+widgets[_pterm_saved_zle_line_init]} )) && zle _pterm_saved_zle_line_init
         return 0
       fi
-      _ROOK_NATIVE_COMPLETIONS_ARMED=0
+      _POLARIS_TERMINAL_NATIVE_COMPLETIONS_ARMED=0
       # Completion pre/post hooks may never run when the completion system is missing or fails.
-      rook_mark_start_of_completions_for_compadd_override
+      pterm_mark_start_of_completions_for_compadd_override
       {
-        BUFFER=$_ROOK_NATIVE_COMPLETIONS_LINE
+        BUFFER=$_POLARIS_TERMINAL_NATIVE_COMPLETIONS_LINE
         CURSOR=${#BUFFER}
 
         # Chain to whatever was bound to zle-line-init before we took it over, if anything.
-        (( ${+widgets[_rook_saved_zle_line_init]} )) && zle _rook_saved_zle_line_init
+        (( ${+widgets[_pterm_saved_zle_line_init]} )) && zle _pterm_saved_zle_line_init
 
         local -a compprefuncs=() comppostfuncs=()
         COMPADD_OVERRIDE=true
-        zle rook_complete_via_compadd_override_internal
+        zle pterm_complete_via_compadd_override_internal
       } always {
         unset COMPADD_OVERRIDE
-        rook_mark_end_of_completions
+        pterm_mark_end_of_completions
 
         # A single-space throwaway buffer (rather than an empty one) is what `select`
         # reliably accepts as ending its one read iteration without re-prompting.
@@ -1708,22 +1708,22 @@ esac
         zle accept-line
       }
     } always {
-      _ROOK_NATIVE_COMPLETIONS_ZLE_LINE_INIT_RUNNING=0
+      _POLARIS_TERMINAL_NATIVE_COMPLETIONS_ZLE_LINE_INIT_RUNNING=0
     }
   }
 
   # Native shell completions generator command for zsh; the only argument is the hex-encoded
   # command line to complete. Emits the same OSC 9280 protocol as the compadd shim above. Unlike
-  # `rook_run_generator_command`, this must run in the foreground in the main shell (never
+  # `pterm_run_generator_command`, this must run in the foreground in the main shell (never
   # backgrounded or in command substitution) so a `select` can reach a real ZLE completion
   # context, and so it cannot be cancelled by PID. See the "Native shell completions: foreground
-  # generator" comment above `_rook_native_completions_zle_line_init`.
-  rook_run_generator_command_native_completions() {
-    _ROOK_GENERATOR_COMMAND=1
+  # generator" comment above `_pterm_native_completions_zle_line_init`.
+  pterm_run_generator_command_native_completions() {
+    _POLARIS_TERMINAL_GENERATOR_COMMAND=1
     _USER_PRECMD_FUNCTIONS=($precmd_functions)
-    precmd_functions=(${(M)precmd_functions:#*(rook|p9k)*})
+    precmd_functions=(${(M)precmd_functions:#*(polaris-terminal|p9k)*})
 
-    local line=$(rook_hex_decode_string "$1")
+    local line=$(pterm_hex_decode_string "$1")
 
     if [[ -z ${line//[[:space:]]/} ]] || ! { [[ -o zle ]] && [[ -o interactive ]] && [[ "$TERM" != emacs ]] }; then
       printf '\e]9280;A\a'
@@ -1731,22 +1731,22 @@ esac
       return
     fi
 
-    _ROOK_NATIVE_COMPLETIONS_LINE=$line
-    _ROOK_NATIVE_COMPLETIONS_ARMED=1
+    _POLARIS_TERMINAL_NATIVE_COMPLETIONS_LINE=$line
+    _POLARIS_TERMINAL_NATIVE_COMPLETIONS_ARMED=1
 
     # Take over zle-line-init for this select, saving whatever was bound to it under a private
     # widget name so it can be chained. Skip if it's already our own capture widget (left from a
     # prior request, since it is never torn down) -- there'd be nothing new to save.
-    if [[ "${widgets[zle-line-init]:-}" != user:_rook_native_completions_zle_line_init ]]; then
+    if [[ "${widgets[zle-line-init]:-}" != user:_pterm_native_completions_zle_line_init ]]; then
       if (( ${+widgets[zle-line-init]} )); then
-        zle -A zle-line-init _rook_saved_zle_line_init
+        zle -A zle-line-init _pterm_saved_zle_line_init
       fi
-      zle -N zle-line-init _rook_native_completions_zle_line_init
+      zle -N zle-line-init _pterm_native_completions_zle_line_init
     fi
 
     local PS3='' REPLY
     # Swallow the line editor redraw the `select` causes with the same DCS bracketing
-    # `rook_read_completion_buffer` uses above. A byte sequence starting with ESC ends DCS
+    # `pterm_read_completion_buffer` uses above. A byte sequence starting with ESC ends DCS
     # passthrough, so this only swallows what precedes the first one.
     echo -n "${DCS_START}a"
     { select _ in 1; do break; done } 2>/dev/null
@@ -1755,37 +1755,37 @@ esac
     # Fail safe: if the capture widget never ran (some other zle-line-init fired, or `select`
     # never entered ZLE), the armed flag would hijack the next real prompt read. Clear it and
     # answer with zero matches so the client always gets a response.
-    if (( _ROOK_NATIVE_COMPLETIONS_ARMED )); then
-      _ROOK_NATIVE_COMPLETIONS_ARMED=0
+    if (( _POLARIS_TERMINAL_NATIVE_COMPLETIONS_ARMED )); then
+      _POLARIS_TERMINAL_NATIVE_COMPLETIONS_ARMED=0
       printf '\e]9280;A\a'
       printf '\e]9280;B\a'
     fi
   }
 
-  function rook_bootstrapped () {
+  function pterm_bootstrapped () {
     # Note that for now we don't support dynamically changing HISTFILE within a session.
-    local escaped_histfile="$(rook_escape_json $HISTFILE)"
+    local escaped_histfile="$(pterm_escape_json $HISTFILE)"
 
     # The output of `alias` can include control characters that need to be escaped.
-    local escaped_aliases="$(rook_escape_json "`alias`")"
+    local escaped_aliases="$(pterm_escape_json "`alias`")"
     local escaped_abbrs=""
-    local env_var_names="$(rook_escape_json "`echo ${(k)parameters[(R)*export*]}`")"
-    local function_names="$(rook_escape_json "`builtin print -l -- ${(ok)functions}`")"
-    local escaped_builtins="$(rook_escape_json "`builtin print -l -- ${(ok)builtins}`")"
-    local escaped_keywords="$(rook_escape_json "`builtin print -l -- ${(ok)reswords}`")"
+    local env_var_names="$(pterm_escape_json "`echo ${(k)parameters[(R)*export*]}`")"
+    local function_names="$(pterm_escape_json "`builtin print -l -- ${(ok)functions}`")"
+    local escaped_builtins="$(pterm_escape_json "`builtin print -l -- ${(ok)builtins}`")"
+    local escaped_keywords="$(pterm_escape_json "`builtin print -l -- ${(ok)reswords}`")"
 
-    local escaped_path="$(rook_escape_json "$PATH")"
+    local escaped_path="$(pterm_escape_json "$PATH")"
 
-    local escaped_shell_plugins="$(rook_escape_json "`builtin print -l -- ${shell_plugins}`")"
+    local escaped_shell_plugins="$(pterm_escape_json "`builtin print -l -- ${shell_plugins}`")"
 
     # The list of options enabled for the current shell.
-    local shell_options="$(rook_escape_json "`setopt`")"
+    local shell_options="$(pterm_escape_json "`setopt`")"
 
-    local escaped_editor="$(rook_escape_json "$EDITOR")"
-    local escaped_shell_path="$(rook_escape_json "${commands[zsh]}")"
-    local escaped_cdpath="$(rook_escape_json "$CDPATH")"
-    local escaped_json="{\"hook\": \"Bootstrapped\", \"value\": {\"histfile\": \"$escaped_histfile\", \"session_id\": $ROOK_SESSION_ID, \"shell\": \"zsh\", \"home_dir\": \"$HOME\", \"path\": \"$escaped_path\", \"cdpath\": \"$escaped_cdpath\", \"editor\": \"$escaped_editor\", \"env_var_names\":  \"$env_var_names\", \"abbreviations\": \"$escaped_abbrs\", \"aliases\": \"$escaped_aliases\", \"function_names\": \"$function_names\",  \"builtins\": \"$escaped_builtins\",  \"keywords\": \"$escaped_keywords\", \"shell_version\": \"$ZSH_VERSION\", \"shell_options\": \"$shell_options\", \"rcfiles_start_time\": \"$rcfiles_start_time\", \"rcfiles_end_time\": \"$rcfiles_end_time\", \"shell_plugins\": \"$escaped_shell_plugins\", \"os_category\": \"$os_category\", \"linux_distribution\": \"$linux_distribution\", \"wsl_name\": \"${WSL_DISTRO_NAME:-}\", \"shell_path\": \"$escaped_shell_path\"}}"
-    rook_send_json_message "$escaped_json"
+    local escaped_editor="$(pterm_escape_json "$EDITOR")"
+    local escaped_shell_path="$(pterm_escape_json "${commands[zsh]}")"
+    local escaped_cdpath="$(pterm_escape_json "$CDPATH")"
+    local escaped_json="{\"hook\": \"Bootstrapped\", \"value\": {\"histfile\": \"$escaped_histfile\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID, \"shell\": \"zsh\", \"home_dir\": \"$HOME\", \"path\": \"$escaped_path\", \"cdpath\": \"$escaped_cdpath\", \"editor\": \"$escaped_editor\", \"env_var_names\":  \"$env_var_names\", \"abbreviations\": \"$escaped_abbrs\", \"aliases\": \"$escaped_aliases\", \"function_names\": \"$function_names\",  \"builtins\": \"$escaped_builtins\",  \"keywords\": \"$escaped_keywords\", \"shell_version\": \"$ZSH_VERSION\", \"shell_options\": \"$shell_options\", \"rcfiles_start_time\": \"$rcfiles_start_time\", \"rcfiles_end_time\": \"$rcfiles_end_time\", \"shell_plugins\": \"$escaped_shell_plugins\", \"os_category\": \"$os_category\", \"linux_distribution\": \"$linux_distribution\", \"wsl_name\": \"${WSL_DISTRO_NAME:-}\", \"shell_path\": \"$escaped_shell_path\"}}"
+    pterm_send_json_message "$escaped_json"
   }
-  rook_bootstrapped
+  pterm_bootstrapped
 fi

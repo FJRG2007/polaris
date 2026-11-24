@@ -1,24 +1,24 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
-use rook_core::features::FeatureFlag;
-use rook_core::settings::Setting;
-use rook_errors::report_error;
-use rookui::color::ColorU;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::settings::Setting;
+use pterm_errors::report_error;
+use ptermui::color::ColorU;
+use ptermui::elements::{
     self, Align, Border, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, DropShadow, Flex, Highlight, Icon,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Rect, Shrinkable,
     Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::geometry::vector::Vector2F;
-use rookui::keymap::Keystroke;
-use rookui::presenter::ChildView;
-use rookui::text_layout::{ClipConfig, TextStyle};
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::geometry::vector::Vector2F;
+use ptermui::keymap::Keystroke;
+use ptermui::presenter::ChildView;
+use ptermui::text_layout::{ClipConfig, TextStyle};
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, EventContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -261,7 +261,7 @@ impl WorkflowsMoreInfoView {
             icons::Icon::Rename,
             Some(label.to_owned()),
             self.button_mouse_states.edit_cloud_workflow.clone(),
-            move |ctx: &mut rookui::EventContext<'_>, _, _| {
+            move |ctx: &mut ptermui::EventContext<'_>, _, _| {
                 ctx.dispatch_typed_action(TerminalAction::OpenWorkflowModalWithCloudWorkflow(
                     workflow.id,
                 ))
@@ -421,7 +421,7 @@ impl WorkflowsMoreInfoView {
                 Container::new(
                     ConstrainedBox::new(
                         icons::Icon::AlertCircle
-                            .to_rookui_icon(
+                            .to_ptermui_icon(
                                 appearance
                                     .theme()
                                     .sub_text_color(appearance.theme().surface_2()),

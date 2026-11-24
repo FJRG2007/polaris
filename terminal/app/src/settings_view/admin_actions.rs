@@ -1,4 +1,4 @@
-use rookui::AppContext;
+use ptermui::AppContext;
 
 use crate::channel::ChannelState;
 use crate::server::ids::ServerId;

@@ -1,6 +1,6 @@
 use futures::FutureExt;
-use rook_core::features::FeatureFlag;
-use rookui::{App, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::{App, SingletonEntity};
 
 use super::{
     AISettings, AuthManager, AuthManagerEvent, AuthStateProvider, FEATURE_INTROS, FeatureIntroId,
@@ -51,7 +51,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
     struct Case {
         name: &'static str,
         customer_type: Option<CustomerType>,
-        is_rook_ai_enabled: bool,
+        is_pterm_ai_enabled: bool,
         has_byok_or_byoe: bool,
         completed_new_onboarding: bool,
         has_zero_base_credits: bool,
@@ -63,7 +63,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "free user with AI enabled and no base credits sees the modal",
             customer_type: Some(CustomerType::Free),
-            is_rook_ai_enabled: true,
+            is_pterm_ai_enabled: true,
             has_byok_or_byoe: false,
             completed_new_onboarding: false,
             has_zero_base_credits: true,
@@ -73,7 +73,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "free user who still receives base credits defers (ICP)",
             customer_type: Some(CustomerType::Free),
-            is_rook_ai_enabled: true,
+            is_pterm_ai_enabled: true,
             has_byok_or_byoe: false,
             completed_new_onboarding: false,
             has_zero_base_credits: false,
@@ -83,7 +83,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "free user with AI disabled is marked seen silently",
             customer_type: Some(CustomerType::Free),
-            is_rook_ai_enabled: false,
+            is_pterm_ai_enabled: false,
             has_byok_or_byoe: false,
             completed_new_onboarding: false,
             has_zero_base_credits: true,
@@ -93,7 +93,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "free user with a BYO key or endpoint is marked seen silently",
             customer_type: Some(CustomerType::Free),
-            is_rook_ai_enabled: true,
+            is_pterm_ai_enabled: true,
             has_byok_or_byoe: true,
             completed_new_onboarding: false,
             has_zero_base_credits: true,
@@ -103,7 +103,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "free user who completed the new onboarding is marked seen silently",
             customer_type: Some(CustomerType::Free),
-            is_rook_ai_enabled: true,
+            is_pterm_ai_enabled: true,
             has_byok_or_byoe: false,
             completed_new_onboarding: true,
             has_zero_base_credits: true,
@@ -113,7 +113,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "paid (Build) user is marked seen silently",
             customer_type: Some(CustomerType::Build),
-            is_rook_ai_enabled: true,
+            is_pterm_ai_enabled: true,
             has_byok_or_byoe: false,
             completed_new_onboarding: false,
             has_zero_base_credits: true,
@@ -123,7 +123,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "paid (BuildMax) user is marked seen silently",
             customer_type: Some(CustomerType::BuildMax),
-            is_rook_ai_enabled: true,
+            is_pterm_ai_enabled: true,
             has_byok_or_byoe: false,
             completed_new_onboarding: false,
             has_zero_base_credits: true,
@@ -133,7 +133,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "enterprise user is marked seen silently",
             customer_type: Some(CustomerType::Enterprise),
-            is_rook_ai_enabled: true,
+            is_pterm_ai_enabled: true,
             has_byok_or_byoe: false,
             completed_new_onboarding: false,
             has_zero_base_credits: true,
@@ -143,7 +143,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "legacy paid (Prosumer) user is marked seen silently",
             customer_type: Some(CustomerType::Prosumer),
-            is_rook_ai_enabled: true,
+            is_pterm_ai_enabled: true,
             has_byok_or_byoe: false,
             completed_new_onboarding: false,
             has_zero_base_credits: true,
@@ -153,7 +153,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "unknown customer type defers until billing data resolves",
             customer_type: Some(CustomerType::Unknown),
-            is_rook_ai_enabled: true,
+            is_pterm_ai_enabled: true,
             has_byok_or_byoe: false,
             completed_new_onboarding: false,
             has_zero_base_credits: true,
@@ -163,7 +163,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "missing workspace defers before the first server fetch",
             customer_type: None,
-            is_rook_ai_enabled: true,
+            is_pterm_ai_enabled: true,
             has_byok_or_byoe: false,
             completed_new_onboarding: false,
             has_zero_base_credits: true,
@@ -173,7 +173,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "missing workspace after a server fetch with no base credits is a solo free user",
             customer_type: None,
-            is_rook_ai_enabled: true,
+            is_pterm_ai_enabled: true,
             has_byok_or_byoe: false,
             completed_new_onboarding: false,
             has_zero_base_credits: true,
@@ -183,7 +183,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "solo user who still receives base credits defers (ICP)",
             customer_type: None,
-            is_rook_ai_enabled: true,
+            is_pterm_ai_enabled: true,
             has_byok_or_byoe: false,
             completed_new_onboarding: false,
             has_zero_base_credits: false,
@@ -193,7 +193,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         Case {
             name: "missing workspace with AI disabled is marked seen silently",
             customer_type: None,
-            is_rook_ai_enabled: false,
+            is_pterm_ai_enabled: false,
             has_byok_or_byoe: false,
             completed_new_onboarding: false,
             has_zero_base_credits: true,
@@ -206,7 +206,7 @@ fn test_free_ai_removal_modal_decision_matrix() {
         assert_eq!(
             free_ai_removal_modal_decision(
                 case.customer_type,
-                case.is_rook_ai_enabled,
+                case.is_pterm_ai_enabled,
                 case.has_byok_or_byoe,
                 case.completed_new_onboarding,
                 case.has_zero_base_credits,

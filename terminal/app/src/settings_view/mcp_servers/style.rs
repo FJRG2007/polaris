@@ -1,6 +1,6 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::fonts::Weight;
-use rookui::ui_components::components::{Coords, UiComponentStyles};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::fonts::Weight;
+use ptermui::ui_components::components::{Coords, UiComponentStyles};
 
 pub const ICON_MARGIN: f32 = 8.;
 pub const HEADER_FONT_SIZE: f32 = 18.;

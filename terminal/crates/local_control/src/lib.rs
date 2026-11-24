@@ -1,7 +1,7 @@
-//! Shared protocol, discovery, authentication, and client types for local Rook control.
+//! Shared protocol, discovery, authentication, and client types for local Polaris Terminal control.
 //!
-//! The `local_control` crate is intentionally UI-agnostic so the Rook app and
-//! `rookctrl` CLI can share the same wire envelopes, action catalog, discovery
+//! The `local_control` crate is intentionally UI-agnostic so the Polaris Terminal app and
+//! `ptermctrl` CLI can share the same wire envelopes, action catalog, discovery
 //! records, selectors, and credential validation rules.
 pub mod auth;
 pub mod catalog;

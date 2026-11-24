@@ -2,7 +2,7 @@
 //! (`User.aiCreditAvailability`). The server evaluates the same credit
 //! waterfall used to authorize AI requests, so these values are the source of
 //! truth for whether the user can start an interactive AI request.
-use rook_graphql::ai::{
+use pterm_graphql::ai::{
     AICreditAvailability as GqlAICreditAvailability,
     AICreditAvailabilityDenialReason as GqlAICreditAvailabilityDenialReason,
     AICreditAvailabilitySource as GqlAICreditAvailabilitySource,

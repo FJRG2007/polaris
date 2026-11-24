@@ -1,6 +1,6 @@
 //! Utilities for terminal keybindings.
 
-use rookui::{Entity, ModelContext, ModelHandle, SingletonEntity};
+use ptermui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier};
 use crate::terminal::input::{

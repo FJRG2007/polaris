@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Run a local `rook_tui` build.
+# Run a local `pterm_tui` build.
 #
-# Selects the internal `local` channel when the `rook-channel-config` generator
+# Selects the internal `local` channel when the `polaris-terminal-channel-config` generator
 # is available (mirroring `./script/run`), otherwise falls back to the OSS
 # channel so contributors without repo access can still run the TUI. Unlike the
 # GUI `./script/run`, the TUI is a console binary, so there is no `.app` bundle
@@ -24,11 +24,11 @@ cd "${REPO_ROOT}"
 
 ./script/install_channel_config || echo "Skipping internal channel config installation (no repo access)."
 
-if command -v rook-channel-config &>/dev/null; then
-    BIN="rook-tui"
+if command -v polaris-terminal-channel-config &>/dev/null; then
+    BIN="polaris-terminal-tui"
     CHANNEL="local"
 else
-    BIN="rook-tui-oss"
+    BIN="polaris-terminal-tui-oss"
     CHANNEL="oss"
 fi
 
@@ -124,8 +124,8 @@ prepare_tui_bundled_resources() {
 }
 
 if [[ "$(uname -s)" = "Darwin" ]]; then
-  echo "Building cargo build -p rook_tui --bin ${BIN} (channel: ${CHANNEL})"
-  cargo build -p rook_tui --bin "${BIN}" "${CARGO_ARGS[@]}"
+  echo "Building cargo build -p pterm_tui --bin ${BIN} (channel: ${CHANNEL})"
+  cargo build -p pterm_tui --bin "${BIN}" "${CARGO_ARGS[@]}"
 
   prepare_tui_bundled_resources
 
@@ -141,8 +141,8 @@ if [[ "$(uname -s)" = "Darwin" ]]; then
 
   exec "$TUI_BIN_PATH" "${BIN_ARGS[@]}"
 else
-  echo "Building cargo build -p rook_tui --bin ${BIN} (channel: ${CHANNEL})"
-  cargo build -p rook_tui --bin "${BIN}" "${CARGO_ARGS[@]}"
+  echo "Building cargo build -p pterm_tui --bin ${BIN} (channel: ${CHANNEL})"
+  cargo build -p pterm_tui --bin "${BIN}" "${CARGO_ARGS[@]}"
 
   prepare_tui_bundled_resources
 

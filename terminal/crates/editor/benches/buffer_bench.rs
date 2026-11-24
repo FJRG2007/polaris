@@ -1,12 +1,12 @@
 use std::fs;
 
 use criterion::{Criterion, criterion_group, criterion_main};
+use pterm_editor::content::buffer::Buffer;
+use pterm_editor::content::selection_model::BufferSelectionModel;
+use pterm_editor::content::text::IndentBehavior;
+use ptermui_core::{App, ModelHandle};
 use rand::SeedableRng;
 use rand::rngs::StdRng;
-use rook_editor::content::buffer::Buffer;
-use rook_editor::content::selection_model::BufferSelectionModel;
-use rook_editor::content::text::IndentBehavior;
-use rookui_core::{App, ModelHandle};
 
 const EDIT_SAMPLE_SIZE: usize = 10;
 const MAX_EDIT_REPLACEMENT_LENGTH: usize = 20;

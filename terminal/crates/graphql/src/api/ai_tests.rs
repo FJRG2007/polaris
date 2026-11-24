@@ -47,7 +47,7 @@ fn conversion_populates_token_usage_and_tool_usage_metadata() {
         platform_credits_spent: 2.5,
         total_provider_cost_in_cents: Some(3.2),
         summarized: true,
-        rook_token_usage: vec![TokenUsage {
+        pterm_token_usage: vec![TokenUsage {
             model_id: "claude-4-7-opus-high".to_string(),
             total_tokens: 900,
             token_usage_by_category: vec![
@@ -81,24 +81,26 @@ fn conversion_populates_token_usage_and_tool_usage_metadata() {
     assert_eq!(converted.total_provider_cost_in_cents, Some(3.2));
     assert_eq!(converted.credits_spent_for_last_block, None);
 
-    // Token usage is sorted by model id, with rook and byok rows kept in
+    // Token usage is sorted by model id, with polaris-terminal and byok rows kept in
     // their respective buckets alongside per-category breakdowns.
     assert_eq!(converted.token_usage.len(), 2);
     let claude = &converted.token_usage[0];
     assert_eq!(claude.model_id, "claude-4-7-opus-high");
-    assert_eq!(claude.rook_tokens, 900);
+    assert_eq!(claude.pterm_tokens, 900);
     assert_eq!(claude.byok_tokens, 0);
     assert_eq!(
-        claude.rook_token_usage_by_category.get("primary_agent"),
+        claude.pterm_token_usage_by_category.get("primary_agent"),
         Some(&700)
     );
     assert_eq!(
-        claude.rook_token_usage_by_category.get("full_terminal_use"),
+        claude
+            .pterm_token_usage_by_category
+            .get("full_terminal_use"),
         Some(&200)
     );
     let gpt = &converted.token_usage[1];
     assert_eq!(gpt.model_id, "gpt-5-4-high");
-    assert_eq!(gpt.rook_tokens, 0);
+    assert_eq!(gpt.pterm_tokens, 0);
     assert_eq!(gpt.byok_tokens, 300);
     assert_eq!(
         gpt.byok_token_usage_by_category.get("primary_agent"),
@@ -119,10 +121,10 @@ fn conversion_populates_token_usage_and_tool_usage_metadata() {
     assert_eq!(converted.context_window_segments[0].token_count, 1000);
 }
 
-/// A single model used through both the Rook API key and a user's own key
+/// A single model used through both the Polaris Terminal API key and a user's own key
 /// merges into one row with both buckets populated.
 #[test]
-fn conversion_merges_rook_and_byok_usage_for_same_model() {
+fn conversion_merges_pterm_and_byok_usage_for_same_model() {
     let gql = ConversationUsageMetadata {
         context_window_usage: 0.0,
         context_window_segments: vec![],
@@ -130,7 +132,7 @@ fn conversion_merges_rook_and_byok_usage_for_same_model() {
         platform_credits_spent: 0.0,
         total_provider_cost_in_cents: None,
         summarized: false,
-        rook_token_usage: vec![TokenUsage {
+        pterm_token_usage: vec![TokenUsage {
             model_id: "claude-4-7-opus-high".to_string(),
             total_tokens: 100,
             token_usage_by_category: vec![],
@@ -148,7 +150,7 @@ fn conversion_merges_rook_and_byok_usage_for_same_model() {
     assert_eq!(converted.token_usage.len(), 1);
     let usage = &converted.token_usage[0];
     assert_eq!(usage.model_id, "claude-4-7-opus-high");
-    assert_eq!(usage.rook_tokens, 100);
+    assert_eq!(usage.pterm_tokens, 100);
     assert_eq!(usage.byok_tokens, 50);
 }
 
@@ -180,7 +182,7 @@ fn list_ai_conversations_query_selects_token_usage_fields() {
     });
 
     for field in [
-        "rookTokenUsage",
+        "ptermTokenUsage",
         "byokTokenUsage",
         "toolUsageMetadata",
         "tokenUsageByCategory",

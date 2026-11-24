@@ -2,7 +2,7 @@
 
 ## Summary
 
-MCP tool calls that include integer-typed parameters fail on strict MCP servers because Rook serializes those values as floats (e.g. `5.0`) instead of integers (e.g. `5`) in JSON. The fix coerces float-valued arguments back to integers at the client before dispatching, using the tool's own [JSON Schema `"type"` keyword](https://json-schema.org/understanding-json-schema/reference/type) to decide which fields need coercion.
+MCP tool calls that include integer-typed parameters fail on strict MCP servers because Polaris Terminal serializes those values as floats (e.g. `5.0`) instead of integers (e.g. `5`) in JSON. The fix coerces float-valued arguments back to integers at the client before dispatching, using the tool's own [JSON Schema `"type"` keyword](https://json-schema.org/understanding-json-schema/reference/type) to decide which fields need coercion.
 
 ## Problem
 
@@ -12,7 +12,7 @@ When a user invokes an MCP tool that has integer parameters (e.g. `line` and `co
 Failed to parse literal '5.0' as an int value
 ```
 
-This makes those tools completely unusable from Rook, even though the model generates semantically correct arguments. The failure is invisible to the user: the tool call is dispatched, but the MCP server returns an error.
+This makes those tools completely unusable from Polaris Terminal, even though the model generates semantically correct arguments. The failure is invisible to the user: the tool call is dispatched, but the MCP server returns an error.
 
 The root cause is that the LLM's original JSON string (e.g. `{"line": 5}`) is parsed into a `google.protobuf.Struct` on the server. `Struct`'s `NumberValue` stores all numbers as `float64`, erasing the integer/float distinction. When the Rust client re-serializes to JSON via `serde_json::Number::from_f64`, whole-number floats become `5.0` on the wire instead of `5`. JSON Schema deserializers in strict-typed languages (Kotlin/Java, strict Python, Rust with `i64`) reject `5.0` for integer-typed fields.
 
@@ -80,7 +80,7 @@ The same coercion step that runs at dispatch time also runs when building the bl
 
 ## Validation
 
-1. **Manual**: Connect the GoLand MCP server to Rook and invoke `get_symbol_info` at a valid line/column. Confirm a valid result is returned rather than a `Failed to parse literal '5.0'` error.
+1. **Manual**: Connect the GoLand MCP server to Polaris Terminal and invoke `get_symbol_info` at a valid line/column. Confirm a valid result is returned rather than a `Failed to parse literal '5.0'` error.
 2. **Unit tests** on the coercion helper:
    - `integer`-typed field with whole-number float value → coerced to integer
    - `integer`-typed field with non-whole float value → unchanged

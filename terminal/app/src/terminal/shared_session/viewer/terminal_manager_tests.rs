@@ -11,7 +11,7 @@
 //! `HiddenForClose` (undo-close grace window) and `Moved`.
 
 use async_broadcast::broadcast;
-use rookui::App;
+use ptermui::App;
 
 use super::*;
 use crate::ai::blocklist::QueuedQueryModel;
@@ -81,7 +81,7 @@ fn build_manager_with_registered_ovm(app: &mut App) -> (TerminalManager, Ambient
     let model_events =
         app.add_model(|ctx| ModelEventDispatcher::new(events_rx, sessions.clone(), ctx));
     let prompt_type =
-        app.add_model(|_| PromptType::new_static(vec![], false, RookPromptSeparator::None));
+        app.add_model(|_| PromptType::new_static(vec![], false, PtermPromptSeparator::None));
 
     let manager = TerminalManager {
         model,

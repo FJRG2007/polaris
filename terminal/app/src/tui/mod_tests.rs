@@ -1,9 +1,9 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use rook_core::channel::ChannelState;
-use rook_core::telemetry::testing::MockTelemetryContextProvider;
-use rookui::{App, SingletonEntity};
+use pterm_core::channel::ChannelState;
+use pterm_core::telemetry::testing::MockTelemetryContextProvider;
+use ptermui::{App, SingletonEntity};
 
 use super::telemetry::TuiOnboardingTelemetry;
 use super::{
@@ -77,7 +77,7 @@ fn tags_tui_verification_url_without_losing_existing_query_parameters() {
         vec![
             ("user_code".into(), "ABCD-EFGH".into()),
             ("existing".into(), "value".into()),
-            ("source".into(), "rook-agent-cli".into()),
+            ("source".into(), "polaris-terminal-agent-cli".into()),
         ]
     );
 }
@@ -208,7 +208,8 @@ fn stores_device_fallback_before_opening_browser() {
 fn opens_only_the_current_retained_url() {
     App::test((), |mut app| async move {
         let browser_url =
-            "https://app.rook.dev/device?user_code=ABCD-EFGH&source=rook-agent-cli".to_owned();
+            "https://app.rook.dev/device?user_code=ABCD-EFGH&source=polaris-terminal-agent-cli"
+                .to_owned();
         app.add_singleton_model({
             let browser_url = browser_url.clone();
             move |_| login_model(TuiLoginPhase::BrowserOpenFailed { browser_url })
@@ -263,7 +264,7 @@ fn post_logout_device_auth_opens_logout_with_device_continuation() {
                         .query_pairs()
                         .find(|(key, _)| key == "source")
                         .map(|(_, value)| value.into_owned()),
-                    Some("rook-agent-cli".to_owned())
+                    Some("polaris-terminal-agent-cli".to_owned())
                 );
                 assert!(matches!(
                     TuiLoginModel::as_ref(ctx).browser_flow,

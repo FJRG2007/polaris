@@ -3,13 +3,13 @@ use std::time::{Duration, SystemTime};
 use ai::agent::action::{UploadArtifactRequest, UseComputerRequest};
 use ai::skills::{ParsedSkill, SkillProvider, SkillReference, SkillScope};
 use computer_use::{Action, ScreenshotParams, Target, TargetedAction};
+use pterm_util::host_id::HostId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::App;
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::{DirectoryWatcher, RepoMetadataModel};
-use rook_util::host_id::HostId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::App;
 use watcher::HomeDirectoryWatcher;
 
 use super::{
@@ -22,7 +22,7 @@ use crate::ai::agent::{
     UploadArtifactResult,
 };
 use crate::ai::skills::SkillManager;
-use crate::rook_managed_paths_watcher::RookManagedPathsWatcher;
+use crate::pterm_managed_paths_watcher::PtermManagedPathsWatcher;
 use crate::settings::AISettings;
 
 #[test]
@@ -218,7 +218,7 @@ fn read_skill_display_text_no_double_slash_when_skill_not_found_with_path_refere
     // which for a path reference is an absolute path starting with '/'.  The display
     // text must NOT prepend an extra '/' — doing so would produce '//home/…'.
     let path = LocalOrRemotePath::Local(std::path::PathBuf::from(
-        "/home/devbox/.rook-local/skills/hello-world/SKILL.md",
+        "/home/devbox/.polaris-terminal-local/skills/hello-world/SKILL.md",
     ));
     let reference = SkillReference::Path(path);
     let display = read_skill_display_text(None, &reference);
@@ -235,7 +235,7 @@ fn read_skill_display_text_no_double_slash_when_skill_not_found_with_path_refere
 #[test]
 fn read_skill_display_text_bundled_id_fallback_when_skill_not_found() {
     // The fallback uses the user-facing label (the bare id), not the canonical
-    // `@rook-skill:<id>` reference form, so bundled-skill copy reads the same
+    // `@polaris-terminal-skill:<id>` reference form, so bundled-skill copy reads the same
     // way as path-based skill copy.
     let reference = SkillReference::BundledSkillId("create-pr".to_string());
     let display = read_skill_display_text(None, &reference);
@@ -272,7 +272,7 @@ fn parsed_skill_for_common_locations_resolves_cached_remote_skill() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let manager = app.add_singleton_model(SkillManager::new);
         manager.update(&mut app, |manager, _| {
             manager.add_skill_for_testing(skill.clone());
@@ -309,7 +309,7 @@ fn parsed_skill_for_common_locations_does_not_mix_remote_hosts() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let manager = app.add_singleton_model(SkillManager::new);
         manager.update(&mut app, |manager, _| {
             manager.add_skill_for_testing(skill);

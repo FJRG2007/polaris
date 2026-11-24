@@ -3,10 +3,10 @@ use std::time::Duration;
 
 use instant::Instant;
 use parking_lot::FairMutex;
-use rook_core::ui::appearance::Appearance;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::keymap::Keystroke;
-use rookui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::keymap::Keystroke;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::{DismissalStrategy, EphemeralMessage, EphemeralMessageModel};
 use crate::BlocklistAIHistoryModel;
@@ -73,11 +73,11 @@ impl AgentViewDisplayMode {
 /// on Windows and nowhere else.
 ///
 /// What this does not cover, stated rather than implied. `cfg(test)` holds only
-/// while `rook` is itself the test target, so a crate that links `rook` as a
-/// library - `rook_tui`, `integration` - still sees one second and can still
+/// while `polaris-terminal` is itself the test target, so a crate that links `polaris-terminal` as a
+/// library - `pterm_tui`, `integration` - still sees one second and can still
 /// race. And no test can reach the expiry path at all now, so a regression
 /// leaving a confirmation armed forever would pass. The fix for both is to
-/// take `now` as an argument the way `rook_tui`'s `exit_confirmation` threads
+/// take `now` as an argument the way `pterm_tui`'s `exit_confirmation` threads
 /// it through `arm`/`should_exit`/`disarm_expired`; it needs the two call
 /// sites in `input.rs` and `slash_commands/mod.rs` to supply it and the
 /// end-to-end test rewritten to drive the clock, because passing
@@ -157,7 +157,7 @@ pub enum AgentViewEntryOrigin {
     /// Entered agent view by opening an existing non-Oz cloud agent run (live shared-session
     /// viewer or transcript viewer).
     ThirdPartyCloudAgent,
-    /// Entered agent view via the CLI (e.g. `rook agent run`).
+    /// Entered agent view via the CLI (e.g. `polaris-terminal agent run`).
     Cli,
     /// Entered agent view via the headless TUI frontend.
     Tui,
@@ -537,7 +537,7 @@ impl AgentViewController {
         self.pending_confirmation = Some(pending_confirmation);
 
         let abort_handle = ctx.spawn_abortable(
-            async move { rookui::r#async::Timer::after(ENTER_OR_EXIT_CONFIRMATION_WINDOW).await },
+            async move { ptermui::r#async::Timer::after(ENTER_OR_EXIT_CONFIRMATION_WINDOW).await },
             move |me, _, _ctx| {
                 me.pending_confirmation = None;
                 me.pending_confirmation_abort_handle = None;
@@ -1063,7 +1063,7 @@ fn exit_confirmation_message(
     should_stop_and_exit: bool,
     app: &AppContext,
 ) -> Message {
-    use rookui::SingletonEntity;
+    use ptermui::SingletonEntity;
 
     use crate::terminal::input::message_bar::{Message, MessageItem};
 

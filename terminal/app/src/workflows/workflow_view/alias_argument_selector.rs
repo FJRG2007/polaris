@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use rook_core::ui::appearance::Appearance;
-use rook_editor::editor::NavigationKey;
-use rookui::elements::ChildView;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_editor::editor::NavigationKey;
+use ptermui::elements::ChildView;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };

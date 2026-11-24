@@ -8,7 +8,7 @@
 #   - OUT_DIR: The directory into which we should place the final package.
 #   - CARGO_TARGET_OUTPUT_DIR: The cargo target directory containing build output.
 #   - RELEASE_CHANNEL: The release channel we're bundling (e.g.: "dev").
-#   - BUNDLE_ID: The app ID for the bundle (e.g.: "dev.rook.RookDev").
+#   - BUNDLE_ID: The app ID for the bundle (e.g.: "dev.polaris.PolarisTerminalDev").
 #   - EXECUTABLE_PATH: The path to the compiled executable we want to install.
 #   - BINARY_NAME: The name that the compiled executable should have on the target machine.
 #   - ARTIFACT: Which artifact to build: app or cli.
@@ -19,7 +19,7 @@ set -e
 if [ "$ARTIFACT" = "cli" ]; then
   CHANNEL_SUFFIX="${BINARY_NAME#oz}"
 else
-  CHANNEL_SUFFIX="${BINARY_NAME#rook}"
+  CHANNEL_SUFFIX="${BINARY_NAME#polaris-terminal}"
 fi
 REPO_NAME="warpdotdev$CHANNEL_SUFFIX"
 
@@ -31,7 +31,7 @@ fi
 
 ARTIFACT="${ARTIFACT:-app}"
 if [ "$ARTIFACT" = "app" ]; then
-  PACKAGE_NAME="rook-terminal$CHANNEL_SUFFIX"
+  PACKAGE_NAME="polaris-terminal-stable$CHANNEL_SUFFIX"
 elif [ "$ARTIFACT" = "cli" ]; then
   PACKAGE_NAME="oz$CHANNEL_SUFFIX"
 else
@@ -78,11 +78,11 @@ sed \
      s#@@BUNDLEID@@#$BUNDLE_ID#g; \
      s#@@REPO_NAME@@#$REPO_NAME#g; \
      s#@@RELEASE_CHANNEL@@#$RELEASE_CHANNEL#g" \
-    < "$WORKSPACE_ROOT_DIR/resources/linux/rpm/$ARTIFACT/rook.spec.template" \
-    > "$RPMBUILD_DIR/SPEC/rook.spec"
+    < "$WORKSPACE_ROOT_DIR/resources/linux/rpm/$ARTIFACT/polaris-terminal.spec.template" \
+    > "$RPMBUILD_DIR/SPEC/polaris-terminal.spec"
 
 # Build the actual package.
-fakeroot rpmbuild -v -bb "$RPMBUILD_DIR/SPEC/rook.spec" --target="$ARCH" --define "_topdir $RPMBUILD_DIR"
+fakeroot rpmbuild -v -bb "$RPMBUILD_DIR/SPEC/polaris-terminal.spec" --target="$ARCH" --define "_topdir $RPMBUILD_DIR"
 
 # Copy the package to the output directory.
 RPM_NAME="$PACKAGE_NAME-$VERSION-$RELEASE.$ARCH.rpm"
@@ -93,7 +93,7 @@ cp "$RPMBUILD_DIR/RPMS/$ARCH/$RPM_NAME" "$OUT_DIR"
 if [ "${GITHUB_ACTIONS}" == "true" ]; then
   # Import our signing key's public key into rpm so the signature can be
   # verified.
-  sudo rpm --import https://releases.rook.dev/linux/keys/rook.asc
+  sudo rpm --import https://releases.rook.dev/linux/keys/polaris-terminal.asc
 
   # We use batch mode with tty-based pin entry to ensure that the build doesn't
   # hang waiting on user input if, for some reason, we failed to preset the

@@ -2,7 +2,7 @@
 
 ## Summary
 
-When a user is working with an orchestrator agent that has spawned one or more child agents, Rook shows a horizontal "pill bar" above the agent view header listing the orchestrator and each child. Clicking a pill switches the active pane in place to that agent's conversation. When viewing a child agent, the pane title is replaced with a `[Parent] › [Child]` breadcrumb path so the user can navigate back to the orchestrator from the same pane.
+When a user is working with an orchestrator agent that has spawned one or more child agents, Polaris Terminal shows a horizontal "pill bar" above the agent view header listing the orchestrator and each child. Clicking a pill switches the active pane in place to that agent's conversation. When viewing a child agent, the pane title is replaced with a `[Parent] › [Child]` breadcrumb path so the user can navigate back to the orchestrator from the same pane.
 
 ## Figma
 
@@ -38,7 +38,7 @@ Figma: https://www.figma.com/design/AsF5uAM6L5tUmc11vm9YSi (nodes `4073-19833`, 
    - Internal padding: 4px left of the avatar, 10px right of the label, 6px between avatar and label.
    - Pills are 22px tall with a half-stadium corner radius (radius = height/2). Adjacent pills are spaced 6px apart.
 
-6. The orchestrator pill uses the Rook `Oz` glyph on a cyan disc and is labelled with the orchestrator conversation's agent name, falling back to `"Orchestrator"` if no name is set.
+6. The orchestrator pill uses the Polaris Terminal `Oz` glyph on a cyan disc and is labelled with the orchestrator conversation's agent name, falling back to `"Orchestrator"` if no name is set.
 
 7. Each child pill uses:
    - A colored disc whose color is deterministic from the agent's name (hash → 6-color palette of `ansi_fg_blue/magenta/cyan/green/yellow/red`).

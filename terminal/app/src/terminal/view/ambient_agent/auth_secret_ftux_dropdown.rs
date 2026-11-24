@@ -1,14 +1,14 @@
-use rook_cli::agent::Harness;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::editor::NavigationKey;
-use rookui::elements::{
+use pterm_cli::agent::Harness;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::editor::NavigationKey;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Empty, Expanded, Flex, Hoverable, MainAxisSize, MouseStateHandle, OffsetPositioning,
     ParentAnchor, ParentElement as _, ParentOffsetBounds, Radius, Stack, Text,
 };
-use rookui::{
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -439,13 +439,13 @@ impl AuthSecretFtuxDropdown {
 
         let icon_color: Fill = internal_colors::text_sub(theme, theme.surface_1()).into();
 
-        let search_icon = ConstrainedBox::new(Icon::Search.to_rookui_icon(icon_color).finish())
+        let search_icon = ConstrainedBox::new(Icon::Search.to_ptermui_icon(icon_color).finish())
             .with_height(SELECT_ICON_SIZE)
             .with_width(SELECT_ICON_SIZE)
             .finish();
 
         let right_icon_element =
-            ConstrainedBox::new(right_icon.to_rookui_icon(icon_color).finish())
+            ConstrainedBox::new(right_icon.to_ptermui_icon(icon_color).finish())
                 .with_height(SELECT_ICON_SIZE)
                 .with_width(SELECT_ICON_SIZE)
                 .finish();
@@ -481,7 +481,7 @@ impl AuthSecretFtuxDropdown {
 
         if self.display_label.is_some() {
             Hoverable::new(self.label_mouse_state.clone(), move |_| container)
-                .with_cursor(rookui::platform::Cursor::PointingHand)
+                .with_cursor(ptermui::platform::Cursor::PointingHand)
                 .on_click(|ctx, _, _| {
                     ctx.dispatch_typed_action(FtuxDropdownAction::ClearDisplayLabel);
                 })
@@ -511,7 +511,7 @@ impl AuthSecretFtuxDropdown {
 
     fn menu_positioning(&self) -> OffsetPositioning {
         OffsetPositioning::offset_from_parent(
-            rookui::geometry::vector::vec2f(0., 0.),
+            ptermui::geometry::vector::vec2f(0., 0.),
             ParentOffsetBounds::WindowByPosition,
             ParentAnchor::BottomLeft,
             ChildAnchor::TopLeft,

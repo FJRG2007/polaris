@@ -12,6 +12,7 @@ use std::time::Duration;
 use cfg_if::cfg_if;
 use cloud_object_models::{StaticEnvVar, TransportType};
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
+use pterm_errors::report_error;
 use rmcp::ServiceExt as _;
 use rmcp::model::{
     ClientConfig, ClientJsonRpcMessage, ClientRequest, DiscoverRequest, DiscoverRequestParams,
@@ -22,7 +23,6 @@ use rmcp::service::{
     ClientInitializeError, ClientLifecycleMode, ClientServiceExt as _, select_protocol_version,
 };
 use rmcp::transport::ConfigureCommandExt as _;
-use rook_errors::report_error;
 use simple_logger::SimpleLogger;
 use tokio::io::AsyncBufReadExt as _;
 use uuid::Uuid;
@@ -86,7 +86,7 @@ fn build_header_map(headers: &HashMap<String, String>) -> reqwest::header::Heade
     headers.try_into().unwrap_or_default()
 }
 
-/// Header names whose value Rook treats as a caller-supplied credential when
+/// Header names whose value Polaris Terminal treats as a caller-supplied credential when
 /// deciding whether a `401` means "authenticate me" or "your token was
 /// rejected".
 ///
@@ -174,12 +174,12 @@ fn challenge_parameter_names(www_authenticate: &str) -> Vec<&str> {
     names
 }
 
-/// The `User-Agent` sent to remote MCP servers, so servers and WAF allowlists see one Rook MCP
+/// The `User-Agent` sent to remote MCP servers, so servers and WAF allowlists see one Polaris Terminal MCP
 /// client identity.
 ///
 /// reqwest sends no `User-Agent` by default, and some servers (e.g. Snowflake's managed MCP
 /// servers) reject such requests with a `400`.
-const MCP_USER_AGENT: &str = "Rook-MCP-Client/1.0";
+const MCP_USER_AGENT: &str = "PolarisTerminal-MCP-Client/1.0";
 
 /// Builds a reqwest client with custom headers for MCP HTTP/SSE connections.
 #[allow(clippy::result_large_err)]
@@ -268,7 +268,7 @@ pub async fn spawn_server(
                 if err.kind() == std::io::ErrorKind::NotFound {
                     let cwd_display = cwd_for_log
                         .as_deref()
-                        .unwrap_or("<inherited from Rook's process cwd>");
+                        .unwrap_or("<inherited from Polaris Terminal's process cwd>");
                     logger.log(format!(
                         "[error] MCP: Failed to spawn '{server_name}': command '{command_for_log}' \
                          not found (cwd: {cwd_display}). If your MCP server depends on a specific \
@@ -849,8 +849,8 @@ fn make_client_info() -> ClientConfig {
     ClientConfig::new(
         Default::default(),
         Implementation::new(
-            rook_core::channel::ChannelState::app_id().to_string(),
-            rook_core::channel::ChannelState::app_version()
+            pterm_core::channel::ChannelState::app_id().to_string(),
+            pterm_core::channel::ChannelState::app_version()
                 .map(|v| v.to_string())
                 .unwrap_or_default(),
         ),

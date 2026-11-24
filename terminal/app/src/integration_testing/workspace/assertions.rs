@@ -1,5 +1,5 @@
-use rookui::integration::AssertionCallback;
-use rookui::{async_assert, async_assert_eq};
+use ptermui::integration::AssertionCallback;
+use ptermui::{async_assert, async_assert_eq};
 
 use crate::integration_testing::view_getters::workspace_view;
 use crate::tab::SelectedTabColor;

@@ -1,16 +1,16 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::icons::Icon;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rookui_core::Element;
-use rookui_core::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::icons::Icon;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui_core::Element;
+use ptermui_core::elements::{
     Align, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex,
     Hoverable, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, Stack, Text,
 };
-use rookui_core::fonts::{Properties, Weight};
-use rookui_core::platform::Cursor;
+use ptermui_core::fonts::{Properties, Weight};
+use ptermui_core::platform::Cursor;
 
 use super::agent_slide::AgentSlideAction;
 
@@ -95,7 +95,7 @@ pub(super) fn render_two_line_button(
         // Build title row with optional icon
         let title_el: Box<dyn Element> = if let Some(icon) = icon {
             const ICON_SIZE: f32 = 14.;
-            let icon_el = ConstrainedBox::new(Box::new(icon.to_rookui_icon(title_fill)))
+            let icon_el = ConstrainedBox::new(Box::new(icon.to_ptermui_icon(title_fill)))
                 .with_width(ICON_SIZE)
                 .with_height(ICON_SIZE)
                 .finish();

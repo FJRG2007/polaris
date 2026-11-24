@@ -1,7 +1,7 @@
 //! GUI implementation of [`InputModePolicy`].
 
-use rook_core::features::FeatureFlag;
-use rookui::{AppContext, EntityId, ModelHandle, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::{AppContext, EntityId, ModelHandle, SingletonEntity};
 
 use super::super::conversation_selection::ConversationSelectionEvent;
 use super::super::input_mode_policy::{InputModePolicy, PolicyConfigUpdate};

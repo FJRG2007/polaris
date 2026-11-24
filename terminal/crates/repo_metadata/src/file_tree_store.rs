@@ -3,8 +3,8 @@ mod file_tree_state;
 use std::sync::Arc;
 
 use ignore::gitignore::Gitignore;
-use rook_util::standardized_path::StandardizedPath;
-use rookui_core::ModelHandle;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui_core::ModelHandle;
 
 use crate::file_tree_store::file_tree_state::FileTreeMapStore;
 use crate::{BuildTreeError, Entry, FileId, FileMetadata, Repository};

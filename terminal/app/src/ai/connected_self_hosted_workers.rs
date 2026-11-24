@@ -1,5 +1,5 @@
-use rook_errors::report_error;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 use crate::auth::AuthStateProvider;
 use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
@@ -7,7 +7,7 @@ use crate::network::{NetworkStatus, NetworkStatusEvent, NetworkStatusKind};
 use crate::server::server_api::ServerApiProvider;
 use crate::server::server_api::ai::ConnectedSelfHostedWorker;
 use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
-pub const ROOK_WORKER_HOST: &str = "rook";
+pub const POLARIS_TERMINAL_WORKER_HOST: &str = "polaris-terminal";
 
 pub enum ConnectedSelfHostedWorkersEvent {
     Changed,
@@ -63,7 +63,7 @@ impl ConnectedSelfHostedWorkersModel {
             .iter()
             .map(|worker| worker.worker_host.clone())
             .filter(|host| !host.trim().is_empty())
-            .filter(|host| !host.eq_ignore_ascii_case(ROOK_WORKER_HOST))
+            .filter(|host| !host.eq_ignore_ascii_case(POLARIS_TERMINAL_WORKER_HOST))
             .filter(|host| match excluded {
                 Some(excluded) => !host.eq_ignore_ascii_case(excluded),
                 None => true,

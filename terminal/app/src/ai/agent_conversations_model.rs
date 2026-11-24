@@ -15,20 +15,20 @@ use futures::stream::AbortHandle;
 use fuzzy_match::FuzzyMatchResult;
 use instant::Instant;
 use itertools::Itertools;
-pub use query::query_conversation_entries;
-use rook_cli::agent::Harness;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::theme::RookTheme;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_error;
-use rookui::r#async::Timer;
-use rookui::color::ColorU;
-use rookui::windowing::{StateEvent, WindowManager};
-use rookui::{
+use pterm_cli::agent::Harness;
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::theme::PtermTheme;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_error;
+use ptermui::r#async::Timer;
+use ptermui::color::ColorU;
+use ptermui::windowing::{StateEvent, WindowManager};
+use ptermui::{
     AppContext, Entity, EntityId, ModelContext, ModelHandle, RequestState, SingletonEntity,
     WindowId, duration_with_jitter,
 };
+pub use query::query_conversation_entries;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
@@ -536,7 +536,7 @@ impl AgentRunDisplayStatus {
         )
     }
 
-    pub fn status_icon_and_color(&self, theme: &RookTheme) -> (Icon, ColorU) {
+    pub fn status_icon_and_color(&self, theme: &PtermTheme) -> (Icon, ColorU) {
         match self {
             AgentRunDisplayStatus::TaskQueued
             | AgentRunDisplayStatus::TaskPending

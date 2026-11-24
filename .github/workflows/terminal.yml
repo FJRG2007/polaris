@@ -53,8 +53,8 @@ jobs:
           BEFORE: ${{ github.event.before }}
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          linux='{"os":"linux","name":"Linux","runner":"ubuntu-latest","clippy_excludes":"--exclude rook_completer"}'
-          macos='{"os":"macos","name":"macOS","runner":"macos-latest","clippy_excludes":"--exclude rook_completer"}'
+          linux='{"os":"linux","name":"Linux","runner":"ubuntu-latest","clippy_excludes":"--exclude pterm_completer"}'
+          macos='{"os":"macos","name":"macOS","runner":"macos-latest","clippy_excludes":"--exclude pterm_completer"}'
           windows='{"os":"windows","name":"Windows","runner":"windows-latest","clippy_excludes":""}'
           if [ "$EVENT" = "push" ]; then
             echo "matrix=[$linux]" >> "$GITHUB_OUTPUT"
@@ -242,8 +242,8 @@ jobs:
       - name: Check release compilation (Unix)
         if: matrix.os != 'windows'
         run: |
-          cargo check --locked -p rook --profile rlto \
-            --bin rook-oss --features release_bundle,gui
+          cargo check --locked -p polaris-terminal --profile rlto \
+            --bin polaris-terminal --features release_bundle,gui
 
   # The one check to require: it always reports, and it is green only when every
   # job above passed, or was skipped because nothing it checks changed.

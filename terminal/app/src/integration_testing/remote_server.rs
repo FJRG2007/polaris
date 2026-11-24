@@ -3,12 +3,12 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::time::Duration;
 
-use rook_core::{HostId, SessionId};
-use rook_errors::report_error;
-use rookui::integration::{
+use pterm_core::{HostId, SessionId};
+use pterm_errors::report_error;
+use ptermui::integration::{
     AssertionCallback, AssertionOutcome, AssertionWithDataCallback, StepDataMap, TestStep,
 };
-use rookui::{App, SingletonEntity, WindowId, async_assert, async_assert_eq};
+use ptermui::{App, SingletonEntity, WindowId, async_assert, async_assert_eq};
 
 use crate::integration_testing::view_getters::single_terminal_view_for_tab;
 use crate::remote_server::manager::{

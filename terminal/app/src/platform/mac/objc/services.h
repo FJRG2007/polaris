@@ -1,7 +1,7 @@
 // Our class for handling NSServices messages.
-@interface RookServicesProvider : NSObject
+@interface PtermServicesProvider : NSObject
 @end
 
 // Functions implemented in Rust.
-id rook_services_provider_custom_url_scheme();
-void rook_app_open_urls(id app, id urls);
+id pterm_services_provider_custom_url_scheme();
+void pterm_app_open_urls(id app, id urls);

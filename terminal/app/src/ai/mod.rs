@@ -1,7 +1,7 @@
 //! This module should houses all horizontal/cross-cutting AI functionality throughout
-//! Rook (including Agent Mode).
+//! Polaris Terminal (including Agent Mode).
 //!
-//! The side panel Rook AI implementation lives in `super::ai_assistant`.
+//! The side panel Polaris Terminal AI implementation lives in `super::ai_assistant`.
 pub(crate) mod active_agent_views_model;
 pub(crate) mod agent;
 pub(crate) mod agent_conversations_model;
@@ -61,8 +61,8 @@ pub(crate) mod tui_api_keys;
 pub(crate) mod voice;
 pub use agent_tips::*;
 pub use credit_availability::*;
+use ptermui::AppContext;
 pub use request_usage_model::*;
-use rookui::AppContext;
 #[cfg(not(target_family = "wasm"))]
 pub mod agent_sdk;
 pub mod cloud_agent_config;

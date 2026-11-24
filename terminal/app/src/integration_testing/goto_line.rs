@@ -1,6 +1,6 @@
-use rook_editor::content::buffer::ToBufferPoint;
-use rookui::integration::AssertionCallback;
-use rookui::{App, SingletonEntity, ViewHandle, WindowId, async_assert, async_assert_eq};
+use pterm_editor::content::buffer::ToBufferPoint;
+use ptermui::integration::AssertionCallback;
+use ptermui::{App, SingletonEntity, ViewHandle, WindowId, async_assert, async_assert_eq};
 use settings::Setting as _;
 
 use crate::code::editor::goto_line::view::GoToLineView;

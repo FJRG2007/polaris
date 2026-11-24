@@ -1,5 +1,5 @@
 use chrono::{DateTime, Duration, Local, TimeZone as _};
-use rook_core::command::ExitCode;
+use pterm_core::command::ExitCode;
 
 use super::*;
 use crate::terminal::HistoryEntry;

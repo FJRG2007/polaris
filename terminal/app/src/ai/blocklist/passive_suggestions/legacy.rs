@@ -8,10 +8,10 @@ use chrono::Utc;
 #[cfg(not(target_family = "wasm"))]
 use command::r#async::Command;
 use parking_lot::FairMutex;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rookui::r#async::{FutureExt as AsyncFutureExt, SpawnedFutureHandle, Timer};
-use rookui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use ptermui::r#async::{FutureExt as AsyncFutureExt, SpawnedFutureHandle, Timer};
+use ptermui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 use serde_json::json;
 
 use super::static_prompt_suggestions::static_suggested_query;
@@ -27,7 +27,7 @@ use crate::ai::paths::host_native_absolute_path;
 use crate::ai::predict::generate_am_query_suggestions::{
     GenerateAMQuerySuggestionsRequest, GenerateAMQuerySuggestionsResponse, Suggestion,
 };
-use crate::ai_assistant::execution_context::RookAiExecutionContext;
+use crate::ai_assistant::execution_context::PtermAiExecutionContext;
 use crate::network::NetworkStatus;
 use crate::safe_warn;
 use crate::server::server_api::ServerApiProvider;
@@ -432,7 +432,7 @@ impl PassiveSuggestionsModel {
             .active_session
             .as_ref(ctx)
             .session_type(ctx)
-            .map(|session_type| matches!(session_type, SessionType::RookifiedRemote { .. }))
+            .map(|session_type| matches!(session_type, SessionType::PtermifiedRemote { .. }))
             .unwrap_or(true);
         if !can_read_file || should_skip_for_remote {
             let reason = if !can_read_file {
@@ -676,7 +676,7 @@ fn fetch_static_prompt_suggestion(
 
 fn build_prompt_suggestions_request(
     block: &UserBlockCompleted,
-    execution_context: RookAiExecutionContext,
+    execution_context: PtermAiExecutionContext,
     terminal_model: &FairMutex<TerminalModel>,
 ) -> Option<GenerateAMQuerySuggestionsRequest> {
     let serialized_block = block.serialized_block.get_with(|compute| {

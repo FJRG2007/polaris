@@ -3,10 +3,10 @@ use std::sync::{Arc, Mutex};
 
 use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
 use instant::Instant;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::Empty;
-use rookui::platform::WindowStyle;
-use rookui::{App, AppContext, Element, Entity, TypedActionView, View, WindowId};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::Empty;
+use ptermui::platform::WindowStyle;
+use ptermui::{App, AppContext, Element, Entity, TypedActionView, View, WindowId};
 
 use super::*;
 use crate::ai::ambient_agents::github_auth_notifier::GitHubAuthNotifier;
@@ -48,8 +48,8 @@ fn make_test_environment_with_timestamps(
     docker_image: &str,
     github_repos: Vec<(String, String)>,
     setup_commands: Vec<String>,
-    last_edited_ts: Option<rook_graphql::scalars::time::ServerTimestamp>,
-    last_used_ts: Option<rook_graphql::scalars::time::ServerTimestamp>,
+    last_edited_ts: Option<pterm_graphql::scalars::time::ServerTimestamp>,
+    last_used_ts: Option<pterm_graphql::scalars::time::ServerTimestamp>,
 ) -> EnvironmentDisplayData {
     EnvironmentDisplayData {
         id: SyncId::ClientId(ClientId::new()),
@@ -691,7 +691,7 @@ fn test_render_list_page_with_personal_and_team_environments_shows_section_heade
 
         app.update(|ctx| {
             // Ensure UserWorkspaces has a current team name so the "Team" section renders with the
-            // shared header copy ("Shared by Rook and <team>").
+            // shared header copy ("Shared by Polaris Terminal and <team>").
             UserWorkspaces::handle(ctx).update(ctx, |user_workspaces, ctx| {
                 user_workspaces.setup_test_workspace(ctx);
                 user_workspaces.update_current_workspace(
@@ -759,7 +759,7 @@ fn test_render_list_page_with_personal_and_team_environments_shows_section_heade
                 "Expected 'Personal' section header in rendered content: {text_content}"
             );
             assert!(
-                text_content.contains("SHARED BY ROOK AND KATARINA'S TEAM"),
+                text_content.contains("SHARED BY POLARIS_TERMINAL AND KATARINA'S TEAM"),
                 "Expected shared section header in rendered content: {text_content}"
             );
         });
@@ -1183,15 +1183,21 @@ fn test_environments_page_edit_variant() {
 
 #[test]
 fn test_github_repo_new() {
-    let repo = GithubRepo::new("warpdotdev".to_string(), "rook-internal".to_string());
+    let repo = GithubRepo::new(
+        "warpdotdev".to_string(),
+        "polaris-terminal-internal".to_string(),
+    );
     assert_eq!(repo.owner, "warpdotdev");
-    assert_eq!(repo.repo, "rook-internal");
+    assert_eq!(repo.repo, "polaris-terminal-internal");
 }
 
 #[test]
 fn test_github_repo_display() {
-    let repo = GithubRepo::new("warpdotdev".to_string(), "rook-internal".to_string());
-    assert_eq!(repo.to_string(), "warpdotdev/rook-internal");
+    let repo = GithubRepo::new(
+        "warpdotdev".to_string(),
+        "polaris-terminal-internal".to_string(),
+    );
+    assert_eq!(repo.to_string(), "warpdotdev/polaris-terminal-internal");
 }
 
 #[test]
@@ -1213,7 +1219,10 @@ fn test_environment_matches_search_query_empty_query_matches_all() {
     let environment = make_test_environment(
         "Searchable Environment",
         "ubuntu:latest",
-        vec![("warpdotdev".to_string(), "rook-internal".to_string())],
+        vec![(
+            "warpdotdev".to_string(),
+            "polaris-terminal-internal".to_string(),
+        )],
         vec![],
     );
 
@@ -1224,19 +1233,22 @@ fn test_environment_matches_search_query_empty_query_matches_all() {
 #[test]
 fn test_environment_matches_search_query_name_description_image_repos() {
     let mut environment = make_test_environment(
-        "Rook Env",
+        "Polaris Terminal Env",
         "node:20-alpine",
-        vec![("warpdotdev".to_string(), "rook-internal".to_string())],
+        vec![(
+            "warpdotdev".to_string(),
+            "polaris-terminal-internal".to_string(),
+        )],
         vec![],
     );
     environment.description = Some("Front end focused agents".to_string());
 
-    assert!(environment.matches_search_query("rook"));
+    assert!(environment.matches_search_query("polaris-terminal"));
     assert!(environment.matches_search_query("Front end"));
     assert!(environment.matches_search_query("node:20"));
-    assert!(environment.matches_search_query("rook-internal"));
+    assert!(environment.matches_search_query("polaris-terminal-internal"));
     assert!(environment.matches_search_query("warpdotdev"));
-    assert!(environment.matches_search_query("warpdotdev/rook-internal"));
+    assert!(environment.matches_search_query("warpdotdev/polaris-terminal-internal"));
 
     assert!(!environment.matches_search_query("definitely-not-present"));
 }
@@ -1255,16 +1267,19 @@ fn test_environment_matches_search_query_env_id_substring() {
 #[test]
 fn test_environment_matches_search_query_is_case_insensitive() {
     let mut environment = make_test_environment(
-        "rook-env",
+        "polaris-terminal-env",
         "ubuntu:latest",
-        vec![("RookDotDev".to_string(), "Rook-Internal".to_string())],
+        vec![(
+            "PtermDotDev".to_string(),
+            "PolarisTerminal-Internal".to_string(),
+        )],
         vec![],
     );
     environment.description = Some("Some Description".to_string());
 
-    assert!(environment.matches_search_query("ROOK"));
+    assert!(environment.matches_search_query("POLARIS_TERMINAL"));
     assert!(environment.matches_search_query("description"));
-    assert!(environment.matches_search_query("rook-internal"));
+    assert!(environment.matches_search_query("polaris-terminal-internal"));
 }
 
 #[test]
@@ -1334,7 +1349,7 @@ fn test_toolbar_renders_search_editor_view() {
 #[test]
 fn test_render_environment_card_with_last_used_never() {
     use chrono::{Duration, Utc};
-    use rook_graphql::scalars::time::ServerTimestamp;
+    use pterm_graphql::scalars::time::ServerTimestamp;
 
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
@@ -1405,7 +1420,7 @@ fn test_render_environment_card_with_last_used_never() {
 #[test]
 fn test_render_environment_card_with_last_used_timestamp() {
     use chrono::{Duration, Utc};
-    use rook_graphql::scalars::time::ServerTimestamp;
+    use pterm_graphql::scalars::time::ServerTimestamp;
 
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());

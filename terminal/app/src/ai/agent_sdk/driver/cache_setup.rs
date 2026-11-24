@@ -5,16 +5,16 @@ use std::time::Duration;
 
 use build_cache::{CacheSetupError, CacheSetupReport, RepoIdentity, RepositoryCacheSource};
 use cloud_object_models::SourceRepo;
-use rook_completer::completer::CommandExitStatus;
-use rook_errors::report_error;
-use rook_isolation_platform::IsolationPlatformType;
-use rookui::ModelSpawner;
+use pterm_completer::completer::CommandExitStatus;
+use pterm_errors::report_error;
+use pterm_isolation_platform::IsolationPlatformType;
+use ptermui::ModelSpawner;
 
 use super::terminal::TerminalDriver;
 use crate::terminal::model::session::command_executor::shell_escape_single_quotes;
 use crate::terminal::shell::ShellType;
 
-const BUILD_CACHE_ROOT_ENV: &str = "ROOK_BUILD_CACHE_ROOT";
+const BUILD_CACHE_ROOT_ENV: &str = "POLARIS_TERMINAL_BUILD_CACHE_ROOT";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
 #[error("build cache setup completed with degraded results")]
@@ -33,7 +33,7 @@ pub(crate) fn should_setup_cache(
 /// Returns the persistent cache location, if enabled.
 pub(crate) fn enabled_cache_root() -> Option<PathBuf> {
     let root = std::env::var_os(BUILD_CACHE_ROOT_ENV);
-    if should_setup_cache(rook_isolation_platform::detect(), root.as_deref()) {
+    if should_setup_cache(pterm_isolation_platform::detect(), root.as_deref()) {
         root.map(Into::into)
     } else {
         None

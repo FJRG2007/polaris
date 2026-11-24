@@ -4,7 +4,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use mockall::predicate::eq;
-use rook_cli::{OZ_HARNESS_ENV, OZ_PARENT_RUN_ID_ENV, OZ_RUN_ID_ENV};
+use pterm_cli::{OZ_HARNESS_ENV, OZ_PARENT_RUN_ID_ENV, OZ_RUN_ID_ENV};
 use tempfile::TempDir;
 use uuid::Uuid;
 
@@ -261,7 +261,7 @@ fn serialize_claude_mcp_config_cli_server_omits_cwd_when_none() {
 #[test]
 fn serialize_claude_mcp_config_preserves_factory_mcp_auth() {
     let servers = HashMap::from([(
-        "rook-factory".to_string(),
+        "polaris-terminal-factory".to_string(),
         JSONMCPServer {
             transport_type: JSONTransportType::SSEServer {
                 url: "https://app.rook.dev/api/v1/mcp/factory".to_string(),
@@ -274,7 +274,7 @@ fn serialize_claude_mcp_config_preserves_factory_mcp_auth() {
     )]);
     let json = serialize_claude_mcp_config(&servers).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-    let server = &parsed["mcpServers"]["rook-factory"];
+    let server = &parsed["mcpServers"]["polaris-terminal-factory"];
     assert_eq!(server["type"], "http");
     assert_eq!(server["url"], "https://app.rook.dev/api/v1/mcp/factory");
     assert_eq!(server["headers"]["Authorization"], "Bearer wk-test-key");
@@ -921,9 +921,9 @@ fn prepare_local_wake_command_rehydrates_transcript_with_self_managed_listener()
     assert!(command.contains(&format!("{OZ_HARNESS_ENV}={}", shell_quote("claude"))));
     assert!(!command.contains(OZ_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV));
     assert!(!command.contains("OZ_PARENT_LISTENER_MANAGED_EXTERNALLY"));
-    // The ROOK_ aliases are injected alongside the OZ_ names, so they must be dropped with them.
-    assert!(!command.contains("ROOK_MESSAGE_LISTENER_MANAGED_EXTERNALLY"));
-    assert!(!command.contains("ROOK_PARENT_LISTENER_MANAGED_EXTERNALLY"));
+    // The POLARIS_TERMINAL_ aliases are injected alongside the OZ_ names, so they must be dropped with them.
+    assert!(!command.contains("POLARIS_TERMINAL_MESSAGE_LISTENER_MANAGED_EXTERNALLY"));
+    assert!(!command.contains("POLARIS_TERMINAL_PARENT_LISTENER_MANAGED_EXTERNALLY"));
     assert_eq!(
         fs::read_to_string(&prompt_path).unwrap(),
         "resume prompt\n\nwake prompt"

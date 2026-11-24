@@ -1,6 +1,6 @@
-use rookui::elements::{ChildView, Container, Dismiss, Empty};
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::elements::{ChildView, Container, Dismiss, Empty};
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -64,13 +64,13 @@ impl From<&DestructiveMCPConfirmationDialogVariant>
             ),
             DestructiveMCPConfirmationDialogVariant::DeleteShared => DestructiveMCPConfirmationDialogDisplayOptions::new(
                 "Delete shared MCP server?".to_string(),
-                "This will not only delete this MCP server for yourself, but also uninstall and remove this MCP server from Rook and across all of your teammates' devices.".to_string(),
+                "This will not only delete this MCP server for yourself, but also uninstall and remove this MCP server from Polaris Terminal and across all of your teammates' devices.".to_string(),
                 "Delete MCP".to_string(),
                 "Cancel".to_string(),
             ),
             DestructiveMCPConfirmationDialogVariant::Unshare => DestructiveMCPConfirmationDialogDisplayOptions::new(
                 "Remove shared MCP server from team?".to_string(),
-                "This will uninstall and remove this MCP server from Rook and across all of your teammates' devices.".to_string(),
+                "This will uninstall and remove this MCP server from Polaris Terminal and across all of your teammates' devices.".to_string(),
                 "Remove from team".to_string(),
                 "Cancel".to_string(),
             ),

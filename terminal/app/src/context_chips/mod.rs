@@ -21,12 +21,12 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use context_chip::PromptGenerator;
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::color::contrast::{MinimumAllowedContrast, high_enough_contrast};
-use rook_core::ui::theme::{Fill, RookTheme};
-use rookui::color::ColorU;
-use rookui::elements::Text;
-use rookui::fonts::{Properties, Weight};
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::color::contrast::{MinimumAllowedContrast, high_enough_contrast};
+use pterm_core::ui::theme::{Fill, PtermTheme};
+use ptermui::color::ColorU;
+use ptermui::elements::Text;
+use ptermui::fonts::{Properties, Weight};
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
@@ -661,7 +661,7 @@ pub(crate) fn agent_view_chip_color(appearance: &Appearance) -> ColorU {
 /// making chip labels hard to read. So we keep the muted look wherever it is
 /// still legible (e.g. dark themes) and only fall back to the fully-opaque,
 /// contrast-enforced `font_color` where the muted color would be sub-AA.
-pub(crate) fn readable_chip_label_color(theme: &RookTheme, background: Fill) -> ColorU {
+pub(crate) fn readable_chip_label_color(theme: &PtermTheme, background: Fill) -> ColorU {
     let muted = theme.sub_text_color(background).into_solid();
     let solid_background = background.into_solid();
     if high_enough_contrast(

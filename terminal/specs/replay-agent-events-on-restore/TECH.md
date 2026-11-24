@@ -36,7 +36,7 @@ The in-memory cursor is advanced in one place in this repo: `handle_poll_result`
 Note: The WIP branch `katarina/quality-503-driver-owned-parent-bridge` in `wc-pine` refactors this path to introduce an `SseForwardingConsumer` type with a `persist_cursor` callback. If that branch merges before this one, the call site moves to that callback instead. If this feature lands first, the inline write at `handle_poll_result` is sufficient and the WIP migration can adapt it.
 
 **Server-side persistence (both Oz and non-Oz)**
-Add `last_event_sequence: Option<i64>` to `Task` in rook-server (on `ai_tasks`). This field is part of this feature's scope; the companion rook-server change adds it to `GET /agent/runs/:run_id` and a new `PATCH /agent/runs/:run_id/event-sequence` endpoint. When `update_event_sequence` fires, call this endpoint fire-and-forget (log on failure). Losing a cursor update is recoverable — next best cursor is used on restore.
+Add `last_event_sequence: Option<i64>` to `Task` in polaris-terminal-server (on `ai_tasks`). This field is part of this feature's scope; the companion polaris-terminal-server change adds it to `GET /agent/runs/:run_id` and a new `PATCH /agent/runs/:run_id/event-sequence` endpoint. When `update_event_sequence` fires, call this endpoint fire-and-forget (log on failure). Losing a cursor update is recoverable — next best cursor is used on restore.
 
 **Restore initialization**
 In the `RestoredConversations` handler in the poller, initialize the cursor for each conversation by taking `max` of all available sources:
@@ -110,7 +110,7 @@ There are two separate entry points for event delivery; both must work after thi
 
 ```
 [Entry point 1 — restore-time, new]
-Rook restarts
+Polaris Terminal restarts
   → BlocklistAIHistoryModel::restore_conversations()
       → conversations inserted into conversations_by_id
       → RestoredConversations { conversation_ids } emitted
@@ -174,9 +174,9 @@ Reference `PRODUCT.md` for invariant numbers.
 - **Invariant 15** (orphan child restored standalone): Unit test — emit `RestoredConversations` for a child whose `parent_conversation_id` points at an id not present in `conversations_by_id`; verify no lifecycle subscription is registered and no error is surfaced.
 - **Invariant 16** (cleanup on delete): Unit test — populate `watched_run_ids` and `event_cursor` for a conversation; emit `DeletedConversation`; verify both are removed.
 - **Invariant 9** (transient failures retried): Covered by existing SSE failure/backoff tests in `orchestration_event_poller_tests.rs`; verify those tests still pass.
-- **Manual (local child, OrchestrationV2 on)**: Run parent + local child with V2 enabled, quit Rook mid-run, restart; confirm child's final status is shown and no previously seen messages are re-delivered.
+- **Manual (local child, OrchestrationV2 on)**: Run parent + local child with V2 enabled, quit Polaris Terminal mid-run, restart; confirm child's final status is shown and no previously seen messages are re-delivered.
 - **Manual (local child, OrchestrationV2 off)**: Same scenario with V2 disabled; confirm V1 lifecycle subscriptions propagate the child's status after restart.
-- **Manual (driver/remote child)**: `rook agent run --conversation <parent-id>` where children ran on remote workers; confirm child run_ids are discovered from task messages and events are delivered from the correct resume point.
+- **Manual (driver/remote child)**: `polaris-terminal agent run --conversation <parent-id>` where children ran on remote workers; confirm child run_ids are discovered from task messages and events are delivered from the correct resume point.
 
 ## Non-Oz harness considerations
 
@@ -186,7 +186,7 @@ The WIP branch `katarina/quality-503-driver-owned-parent-bridge` in `wc-pine` in
 
 When non-Oz parents become supported, they can reuse the server-side `last_event_sequence` field on `ai_tasks` added by change 1 above: wiring their `persist_cursor` callback to also call `PATCH /agent/runs/{run_id}/event-sequence` gives cloud/driver restore without any harness-specific logic.
 
-**Why `AgentConversationData` alone is insufficient for cloud/driver non-Oz**: `AgentConversationData` is exclusively local SQLite (never sent to server). The non-Oz parent bridge state directory (`last-sequence` file) is session-scoped, so a new `rook agent run --conversation` invocation won't find the previous session's file. The server-side field is the only path that works for driver restarts.
+**Why `AgentConversationData` alone is insufficient for cloud/driver non-Oz**: `AgentConversationData` is exclusively local SQLite (never sent to server). The non-Oz parent bridge state directory (`last-sequence` file) is session-scoped, so a new `polaris-terminal agent run --conversation` invocation won't find the previous session's file. The server-side field is the only path that works for driver restarts.
 
 **Child run_id discovery for non-Oz parents**: The two synchronous fallback sources used today (`children_by_parent` DB index and `child_run_ids_from_task_messages`) both depend on Oz's structured task messages and will not apply to non-Oz parents. The primary path — `GET /agent/runs/{parent_run_id}/children` — is already harness-agnostic (the `ai_tasks` table stores `parent_run_id` regardless of harness) and will cover non-Oz parents without any additional changes.
 

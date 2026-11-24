@@ -1,5 +1,5 @@
 #!/bin/sh
 #
-# Installs macOS-specific build dependencies required to build Rook.
+# Installs macOS-specific build dependencies required to build Polaris Terminal.
 
 xcodebuild -downloadComponent MetalToolchain

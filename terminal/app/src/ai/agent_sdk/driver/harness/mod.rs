@@ -8,23 +8,24 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use rook_cli::agent::Harness;
-use rook_cli::{
-    OZ_CLI_ENV, OZ_HARNESS_ENV, OZ_PARENT_RUN_ID_ENV, OZ_RUN_ID_ENV, ROOK_CLI_ENV,
-    ROOK_HARNESS_ENV, ROOK_PARENT_RUN_ID_ENV, ROOK_RUN_ID_ENV, SERVER_ROOT_URL_OVERRIDE_ENV,
-    SESSION_SHARING_SERVER_URL_OVERRIDE_ENV, WS_SERVER_URL_OVERRIDE_ENV,
+use pterm_cli::agent::Harness;
+use pterm_cli::{
+    OZ_CLI_ENV, OZ_HARNESS_ENV, OZ_PARENT_RUN_ID_ENV, OZ_RUN_ID_ENV, POLARIS_TERMINAL_CLI_ENV,
+    POLARIS_TERMINAL_HARNESS_ENV, POLARIS_TERMINAL_PARENT_RUN_ID_ENV, POLARIS_TERMINAL_RUN_ID_ENV,
+    SERVER_ROOT_URL_OVERRIDE_ENV, SESSION_SHARING_SERVER_URL_OVERRIDE_ENV,
+    WS_SERVER_URL_OVERRIDE_ENV,
 };
-use rook_core::channel::ChannelState;
-use rook_managed_secrets::ManagedSecretValue;
-use rookui::{ModelHandle, ModelSpawner, SingletonEntity};
+use pterm_core::channel::ChannelState;
+use pterm_managed_secrets::ManagedSecretValue;
+use ptermui::{ModelHandle, ModelSpawner, SingletonEntity};
 use tempfile::NamedTempFile;
 
 use super::terminal::{CommandHandle, TerminalDriver};
 use super::{
     AgentDriver, AgentDriverError, LEGACY_OZ_PARENT_LISTENER_MANAGED_EXTERNALLY_ENV,
     LEGACY_OZ_PARENT_STATE_ROOT_ENV, OZ_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV,
-    OZ_MESSAGE_LISTENER_STATE_ROOT_ENV, ROOK_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV,
-    ROOK_MESSAGE_LISTENER_STATE_ROOT_ENV,
+    OZ_MESSAGE_LISTENER_STATE_ROOT_ENV, POLARIS_TERMINAL_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV,
+    POLARIS_TERMINAL_MESSAGE_LISTENER_STATE_ROOT_ENV,
 };
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_sdk::setup_observability::SetupClientEventReporter;
@@ -164,7 +165,7 @@ pub(crate) trait ThirdPartyHarness: Send + Sync {
     /// Whether this harness must verify its Oz platform plugin before launch.
     /// Codex opts into this because its unattended launch command bypasses hook
     /// trust globally, so we should fail setup instead of running without the
-    /// Rook-installed orchestration hooks at the required version.
+    /// Polaris Terminal-installed orchestration hooks at the required version.
     fn requires_verified_platform_plugin(&self) -> bool {
         false
     }
@@ -317,8 +318,8 @@ fn insert_non_empty_task_env_var(
 
 /// Writes `value` under every name in `keys`.
 ///
-/// Gives a variable both its `OZ_` and its `ROOK_` name from a single value, so the two cannot
-/// carry different ones. `task_env_vars_mirror_every_oz_var_to_a_rook_name` fails if a name is
+/// Gives a variable both its `OZ_` and its `POLARIS_TERMINAL_` name from a single value, so the two cannot
+/// carry different ones. `task_env_vars_mirror_every_oz_var_to_a_pterm_name` fails if a name is
 /// listed here under only one of the two spellings.
 ///
 /// Takes `AsRef<OsStr>` rather than `&str` so a path-valued variable stays byte-exact: `OZ_CLI`
@@ -349,13 +350,13 @@ fn task_env_vars_for_harness_name(
     parent_run_id: Option<&str>,
     selected_harness: Harness,
 ) -> HashMap<OsString, OsString> {
-    // Sized for the OZ_/ROOK_ pairs written below.
+    // Sized for the OZ_/POLARIS_TERMINAL_ pairs written below.
     let mut env_vars = HashMap::with_capacity(14);
 
     if let Some(id) = task_id {
         insert_task_env_var_names(
             &mut env_vars,
-            &[OZ_RUN_ID_ENV, ROOK_RUN_ID_ENV],
+            &[OZ_RUN_ID_ENV, POLARIS_TERMINAL_RUN_ID_ENV],
             id.to_string(),
         );
     }
@@ -363,19 +364,23 @@ fn task_env_vars_for_harness_name(
     if let Some(parent_run_id) = parent_run_id.filter(|id| !id.is_empty()) {
         insert_task_env_var_names(
             &mut env_vars,
-            &[OZ_PARENT_RUN_ID_ENV, ROOK_PARENT_RUN_ID_ENV],
+            &[OZ_PARENT_RUN_ID_ENV, POLARIS_TERMINAL_PARENT_RUN_ID_ENV],
             parent_run_id,
         );
     }
 
     let cli_path = std::env::current_exe()
         .unwrap_or_else(|_| ChannelState::channel().cli_command_name().into());
-    insert_task_env_var_names(&mut env_vars, &[OZ_CLI_ENV, ROOK_CLI_ENV], &cli_path);
+    insert_task_env_var_names(
+        &mut env_vars,
+        &[OZ_CLI_ENV, POLARIS_TERMINAL_CLI_ENV],
+        &cli_path,
+    );
     // The harness name is only consumed by child orchestration telemetry when the child
     // CLI emits `run message *` events.
     insert_task_env_var_names(
         &mut env_vars,
-        &[OZ_HARNESS_ENV, ROOK_HARNESS_ENV],
+        &[OZ_HARNESS_ENV, POLARIS_TERMINAL_HARNESS_ENV],
         selected_harness.to_string(),
     );
     if selected_harness == Harness::Claude && task_id.is_some() {
@@ -383,7 +388,7 @@ fn task_env_vars_for_harness_name(
             &mut env_vars,
             &[
                 OZ_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV,
-                ROOK_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV,
+                POLARIS_TERMINAL_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV,
                 LEGACY_OZ_PARENT_LISTENER_MANAGED_EXTERNALLY_ENV,
             ],
             "1",
@@ -393,7 +398,7 @@ fn task_env_vars_for_harness_name(
                 &mut env_vars,
                 &[
                     OZ_MESSAGE_LISTENER_STATE_ROOT_ENV,
-                    ROOK_MESSAGE_LISTENER_STATE_ROOT_ENV,
+                    POLARIS_TERMINAL_MESSAGE_LISTENER_STATE_ROOT_ENV,
                     LEGACY_OZ_PARENT_STATE_ROOT_ENV,
                 ],
                 &state_root,
@@ -430,7 +435,7 @@ fn task_env_vars_for_harness_name(
 /// Drops every name under which the externally-managed-listener signal is injected.
 ///
 /// The list must stay in step with the one `task_env_vars_for_harness_name` writes: leaving
-/// one name behind would tell the Claude plugin that Rook owns the listener when it does not.
+/// one name behind would tell the Claude plugin that Polaris Terminal owns the listener when it does not.
 /// `prepare_local_wake_command_rehydrates_transcript_with_self_managed_listener` asserts none
 /// of them survive.
 pub(crate) fn remove_claude_externally_managed_listener_env_vars(
@@ -438,7 +443,7 @@ pub(crate) fn remove_claude_externally_managed_listener_env_vars(
 ) {
     for env_name in [
         OZ_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV,
-        ROOK_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV,
+        POLARIS_TERMINAL_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV,
         LEGACY_OZ_PARENT_LISTENER_MANAGED_EXTERNALLY_ENV,
     ] {
         env_vars.remove(OsStr::new(env_name));

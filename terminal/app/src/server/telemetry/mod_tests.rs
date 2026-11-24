@@ -15,22 +15,22 @@ fn test_persist_events_doesnt_include_ugc_events() {
             let user_id = Some("user".into());
             let anonymous_id = "anonymous_id".to_owned();
 
-            rookui::telemetry::record_event(
+            ptermui::telemetry::record_event(
                 user_id.clone(),
                 anonymous_id.clone(),
                 "non UGC event name".into(),
                 None,  /* payload */
                 false, /* contains_ugc  */
-                rookui::time::get_current_time(),
+                ptermui::time::get_current_time(),
             );
 
-            rookui::telemetry::record_event(
+            ptermui::telemetry::record_event(
                 user_id.clone(),
                 anonymous_id.clone(),
                 "UGC event name".into(),
                 None, /* payload */
                 true, /* contains_ugc  */
-                rookui::time::get_current_time(),
+                ptermui::time::get_current_time(),
             );
 
             let file_path = dirs.root().join("rudderstack");

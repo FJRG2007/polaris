@@ -28,7 +28,7 @@ Expected behavior:
 - `app/src/workspace/view.rs:19774` — workspace-root rendering path that hosts the detail sidecar overlay
 - `app/src/workspace/view.rs:20406` — workspace-wide `EventHandler` wrapper around the rendered workspace tree
 - `app/src/safe_triangle.rs:1` — safe-triangle logic used to keep hover sidecars stable while the pointer moves toward them
-- `crates/rookui_core/src/elements/hoverable.rs:405` — current per-element hover state transitions and coverage behavior
+- `crates/ptermui_core/src/elements/hoverable.rs:405` — current per-element hover state transitions and coverage behavior
 - `app/src/workspace/view/vertical_tabs_tests.rs:1` — helper test coverage for vertical-tabs sidecar logic
 
 ## Current state

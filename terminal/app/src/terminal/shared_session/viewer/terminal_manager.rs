@@ -4,8 +4,8 @@ use std::sync::Arc;
 use async_broadcast::InactiveReceiver;
 use parking_lot::FairMutex;
 use pathfinder_geometry::vector::Vector2F;
-use rook_errors::report_error;
-use rookui::{
+use pterm_errors::report_error;
+use ptermui::{
     AppContext, ModelContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle,
     WeakViewHandle, WindowId,
 };
@@ -43,7 +43,7 @@ use crate::features::FeatureFlag;
 use crate::network::{NetworkStatus, NetworkStatusEvent, NetworkStatusKind};
 use crate::pane_group::TerminalViewResources;
 use crate::pane_group::pane::DetachType;
-use crate::settings::{InputModeSettings, RookPromptSeparator};
+use crate::settings::{InputModeSettings, PtermPromptSeparator};
 use crate::terminal::cli_agent_sessions::{
     CLIAgentInputState, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
@@ -317,7 +317,7 @@ impl TerminalManager {
             ctx.add_model(|ctx| ModelEventDispatcher::new(events_rx, sessions.clone(), ctx));
         // The prompt is initially empty until we receive the update from the server.
         let prompt_type =
-            ctx.add_model(|_| PromptType::new_static(vec![], false, RookPromptSeparator::None));
+            ctx.add_model(|_| PromptType::new_static(vec![], false, PtermPromptSeparator::None));
 
         let view = ctx.add_typed_action_view(window_id, |ctx| {
             let size_info = cloned_model.lock().block_list().size().to_owned();
@@ -959,7 +959,7 @@ impl TerminalManager {
                 });
 
                 #[cfg(target_family = "wasm")]
-                crate::platform::wasm::emit_event(crate::platform::wasm::RookEvent::SessionJoined);
+                crate::platform::wasm::emit_event(crate::platform::wasm::PtermEvent::SessionJoined);
             }
             NetworkEvent::SessionEnded { reason } => {
                 let Some(view) = weak_view_handle.upgrade(ctx) else {
@@ -1450,7 +1450,7 @@ impl TerminalManager {
                     view.update(ctx, |terminal_view, ctx| {
                         let reason_string = match reason {
                             session_sharing_protocol::common::FailedToAddGuestsReason::NotWarpUsers => {
-                                "One or more of the emails are not Rook users.".to_owned()
+                                "One or more of the emails are not Polaris Terminal users.".to_owned()
                             }
                             session_sharing_protocol::common::FailedToAddGuestsReason::GuestAlreadyAdded => {
                                 "One or more of the guests has already been added.".to_owned()

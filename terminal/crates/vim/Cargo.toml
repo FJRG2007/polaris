@@ -6,8 +6,8 @@ publish.workspace = true
 license.workspace = true
 
 [dependencies]
-rook_core.workspace = true
-rookui_core.workspace = true
+pterm_core.workspace = true
+ptermui_core.workspace = true
 log.workspace = true
 itertools.workspace = true
 string-offset.workspace = true

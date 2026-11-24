@@ -25,8 +25,8 @@ pub(crate) mod diff_selector;
 pub(crate) mod file_invalidation_queue;
 
 use code_review_view::CodeReviewAction;
-use rookui::keymap::{EditableBinding, FixedBinding};
-use rookui::{
+use ptermui::keymap::{EditableBinding, FixedBinding};
+use ptermui::{
     AppContext, Entity, EntityId, ModelContext, SingletonEntity, WeakViewHandle, WindowId, id,
 };
 

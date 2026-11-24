@@ -13,8 +13,8 @@ id = "main"
 type = "terminal"
 directory = "{{repo}}"
 commands = [
-  "git worktree add -b {{worktree_branch_name}} $HOME/.rook/worktrees/$(basename {{repo}})/{{worktree_branch_name}} {{branch}}",
-  "cd $HOME/.rook/worktrees/$(basename {{repo}})/{{worktree_branch_name}}",
+  "git worktree add -b {{worktree_branch_name}} $HOME/.polaris-terminal/worktrees/$(basename {{repo}})/{{worktree_branch_name}} {{branch}}",
+  "cd $HOME/.polaris-terminal/worktrees/$(basename {{repo}})/{{worktree_branch_name}}",
 ]
 
 [params.repo]
@@ -65,7 +65,7 @@ fn test_generated_worktree_path_uses_repo_name_directory() {
 
     assert_eq!(
         repo_dir,
-        rook_core::paths::data_dir()
+        pterm_core::paths::data_dir()
             .join("worktrees")
             .join("backend")
     );
@@ -87,8 +87,8 @@ fn test_parse_worktree_toml() {
     assert_eq!(
         config.panes[0].commands.as_deref().unwrap(),
         &[
-            "git worktree add -b {{worktree_branch_name}} $HOME/.rook/worktrees/$(basename {{repo}})/{{worktree_branch_name}} {{branch}}",
-            "cd $HOME/.rook/worktrees/$(basename {{repo}})/{{worktree_branch_name}}"
+            "git worktree add -b {{worktree_branch_name}} $HOME/.polaris-terminal/worktrees/$(basename {{repo}})/{{worktree_branch_name}} {{branch}}",
+            "cd $HOME/.polaris-terminal/worktrees/$(basename {{repo}})/{{worktree_branch_name}}"
         ]
     );
     assert_eq!(config.params.len(), 3);
@@ -188,11 +188,11 @@ fn test_render_tab_config_substitutes_values() {
         // Commands should have shell-quoted values.
         assert_eq!(
             commands[0].exec,
-            "git worktree add -b my-feature $HOME/.rook/worktrees/$(basename /Users/me/repo)/my-feature main"
+            "git worktree add -b my-feature $HOME/.polaris-terminal/worktrees/$(basename /Users/me/repo)/my-feature main"
         );
         assert_eq!(
             commands[1].exec,
-            "cd $HOME/.rook/worktrees/$(basename /Users/me/repo)/my-feature"
+            "cd $HOME/.polaris-terminal/worktrees/$(basename /Users/me/repo)/my-feature"
         );
     } else {
         panic!("Expected PaneTemplate variant");
@@ -240,8 +240,8 @@ id = "left"
 type = "terminal"
 directory = "{{repo}}"
 commands = [
-  "git worktree add -b {{worktree_branch_name}} $HOME/.rook/worktrees/$(basename {{repo}})/{{worktree_branch_name}} {{branch}}",
-  "cd $HOME/.rook/worktrees/$(basename {{repo}})/{{worktree_branch_name}}",
+  "git worktree add -b {{worktree_branch_name}} $HOME/.polaris-terminal/worktrees/$(basename {{repo}})/{{worktree_branch_name}} {{branch}}",
+  "cd $HOME/.polaris-terminal/worktrees/$(basename {{repo}})/{{worktree_branch_name}}",
 ]
 
 [[panes]]
@@ -292,11 +292,11 @@ description = "New worktree branch name"
             assert_eq!(commands.len(), 2);
             assert_eq!(
                 commands[0].exec,
-                "git worktree add -b my-feature $HOME/.rook/worktrees/$(basename /Users/me/repo)/my-feature main"
+                "git worktree add -b my-feature $HOME/.polaris-terminal/worktrees/$(basename /Users/me/repo)/my-feature main"
             );
             assert_eq!(
                 commands[1].exec,
-                "cd $HOME/.rook/worktrees/$(basename /Users/me/repo)/my-feature"
+                "cd $HOME/.polaris-terminal/worktrees/$(basename /Users/me/repo)/my-feature"
             );
             assert_eq!(*is_focused, Some(true));
         } else {

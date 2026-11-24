@@ -1,21 +1,21 @@
 use pathfinder_color::ColorU;
-use rook_editor::editor::NavigationKey;
-use rook_errors::report_if_error;
-use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::elements::{
+use pterm_editor::editor::NavigationKey;
+use pterm_errors::report_if_error;
+use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::elements::{
     Align, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DispatchEventResult, Element, Empty, EventHandler, Fill, Flex, Hoverable, Icon,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, Rect, SavePosition, ScrollStateHandle, Scrollable,
     ScrollableElement, ScrollbarWidth, Shrinkable, Stack, Text, UniformList, UniformListState,
 };
-use rookui::fonts::{FamilyId, Weight};
-use rookui::geometry::vector::vec2f;
-use rookui::keymap::FixedBinding;
-use rookui::platform::{Cursor, SystemTheme};
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::windowing::{StateEvent, WindowManager};
-use rookui::{
+use ptermui::fonts::{FamilyId, Weight};
+use ptermui::geometry::vector::vec2f;
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::{Cursor, SystemTheme};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::windowing::{StateEvent, WindowManager};
+use ptermui::{
     AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, Tracked, TypedActionView,
     UpdateModel, View, ViewContext, ViewHandle,
 };
@@ -35,12 +35,12 @@ use crate::send_telemetry_from_ctx;
 use crate::server::telemetry::TelemetryEvent;
 use crate::settings::{ThemeSettings, respect_system_theme};
 use crate::themes::theme::{
-    RespectSystemTheme, RookTheme, RookThemeConfig, SelectedSystemThemes, ThemeKind,
+    PtermTheme, PtermThemeConfig, RespectSystemTheme, SelectedSystemThemes, ThemeKind,
 };
 use crate::ui_components::buttons::{close_button, icon_button};
 use crate::ui_components::icons;
 use crate::ui_components::window_focus_dimming::WindowFocusDimming;
-use crate::user_config::{RookConfig, RookConfigUpdateEvent, load_theme_configs, themes_dir};
+use crate::user_config::{PtermConfig, PtermConfigUpdateEvent, load_theme_configs, themes_dir};
 use crate::util::traffic_lights::{TrafficLightData, TrafficLightSide, traffic_light_data};
 use crate::window_settings::WindowSettings;
 use crate::workspace::PANEL_HEADER_HEIGHT;
@@ -144,7 +144,7 @@ pub struct ThemeChooser {
     search_editor: ViewHandle<EditorView>,
     referral_theme_status: ModelHandle<ReferralThemeStatus>,
     tips_completed: ModelHandle<TipsCompleted>,
-    window_id: rookui::WindowId,
+    window_id: ptermui::WindowId,
 }
 
 #[derive(Debug)]
@@ -159,7 +159,7 @@ pub enum ThemeChooserAction {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings(vec![
         FixedBinding::new("up", ThemeChooserAction::Up, id!("ThemeChooser")),
@@ -171,7 +171,7 @@ pub fn init(app: &mut AppContext) {
 
 fn theme_chooser_items(
     referral_theme_status: &ReferralThemeStatus,
-    theme_config: &RookThemeConfig,
+    theme_config: &PtermThemeConfig,
 ) -> Vec<ThemeChooserItem> {
     let sent_referral_theme_active = referral_theme_status.sent_referral_theme_active();
     let received_referral_theme_active = referral_theme_status.received_referral_theme_active();
@@ -218,9 +218,9 @@ impl ThemeChooser {
             me.update_themes(ctx);
         });
 
-        let rook_config_handle = RookConfig::handle(ctx);
-        ctx.subscribe_to_model(&rook_config_handle, |me, _, event, ctx| {
-            if let RookConfigUpdateEvent::Themes = event {
+        let pterm_config_handle = PtermConfig::handle(ctx);
+        ctx.subscribe_to_model(&pterm_config_handle, |me, _, event, ctx| {
+            if let PtermConfigUpdateEvent::Themes = event {
                 me.update_themes(ctx);
                 ctx.notify();
             }
@@ -241,7 +241,7 @@ impl ThemeChooser {
 
         let themes = theme_chooser_items(
             referral_theme_status.as_ref(ctx),
-            RookConfig::as_ref(ctx).theme_config(),
+            PtermConfig::as_ref(ctx).theme_config(),
         );
 
         Self {
@@ -305,8 +305,8 @@ impl ThemeChooser {
         ctx.spawn(
             async move { load_theme_configs(&themes_dir()) },
             move |theme_chooser, loaded_themes, ctx| {
-                ctx.update_model(&RookConfig::handle(ctx), move |rook_config, ctx| {
-                    rook_config.update_theme_config(loaded_themes, ctx);
+                ctx.update_model(&PtermConfig::handle(ctx), move |pterm_config, ctx| {
+                    pterm_config.update_theme_config(loaded_themes, ctx);
                 });
                 theme_chooser.update_themes(ctx);
                 theme_chooser.select_and_save_theme(&theme, ctx);
@@ -318,8 +318,8 @@ impl ThemeChooser {
         ctx.spawn(
             async move { load_theme_configs(&themes_dir()) },
             move |theme_chooser, loaded_themes, ctx| {
-                ctx.update_model(&RookConfig::handle(ctx), move |rook_config, ctx| {
-                    rook_config.update_theme_config(loaded_themes, ctx);
+                ctx.update_model(&PtermConfig::handle(ctx), move |pterm_config, ctx| {
+                    pterm_config.update_theme_config(loaded_themes, ctx);
                 });
                 theme_chooser.update_themes(ctx);
                 theme_chooser.select_latest_theme(ctx);
@@ -514,7 +514,7 @@ impl ThemeChooser {
     fn update_themes(&mut self, ctx: &mut ViewContext<Self>) {
         *self.themes = theme_chooser_items(
             self.referral_theme_status.as_ref(ctx),
-            RookConfig::as_ref(ctx).theme_config(),
+            PtermConfig::as_ref(ctx).theme_config(),
         );
     }
 
@@ -790,16 +790,16 @@ impl ThemeChooser {
                     .collect::<Vec<_>>()
                     .into_iter()
             });
-            let rook_theme = appearance.theme();
+            let pterm_theme = appearance.theme();
 
             Scrollable::vertical(
                 self.scroll_state.clone(),
                 list.finish_scrollable(),
                 SCROLLBAR_WIDTH,
-                rook_theme
-                    .disabled_text_color(rook_theme.surface_2())
+                pterm_theme
+                    .disabled_text_color(pterm_theme.surface_2())
                     .into(),
-                rook_theme.main_text_color(rook_theme.surface_2()).into(),
+                pterm_theme.main_text_color(pterm_theme.surface_2()).into(),
                 Fill::None,
             )
             .finish()
@@ -844,7 +844,7 @@ impl View for ThemeChooser {
         Some(AccessibilityContent::new(
             "Theme chooser. Unfortunately, theme chooser window isn't compatible with screen readers yet.",
             "Press escape to close.",
-            RookA11yRole::WindowRole,
+            PtermA11yRole::WindowRole,
         ))
     }
 
@@ -874,21 +874,21 @@ impl View for ThemeChooser {
 #[derive(Clone)]
 struct ThemeChooserItem {
     pub kind: ThemeKind,
-    rook_theme: RookTheme,
+    pterm_theme: PtermTheme,
     mouse_state: MouseStateHandle,
 }
 
 impl ThemeChooserItem {
-    pub fn new(kind: ThemeKind, rook_theme: RookTheme) -> Self {
+    pub fn new(kind: ThemeKind, pterm_theme: PtermTheme) -> Self {
         Self {
             kind,
-            rook_theme,
+            pterm_theme,
             mouse_state: MouseStateHandle::default(),
         }
     }
 
     fn render_thumbnail(&self, font_family: FamilyId) -> Box<dyn Element> {
-        theme::render_preview(&self.rook_theme, font_family, None)
+        theme::render_preview(&self.pterm_theme, font_family, None)
     }
 
     pub fn render(

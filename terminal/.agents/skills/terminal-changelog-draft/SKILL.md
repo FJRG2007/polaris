@@ -36,11 +36,11 @@ Record the range as `previous_cut_tag..release_tag`.
 
 ### Step 2 — Fetch PR data
 
-Run the `fetch_prs.py` script to collect all public-release PRs merged in the release range and extract explicit changelog markers. Pass the repository that the workflow checked out, not necessarily the public repository. Release workflows run from `warpdotdev/warp-internal`, and the script deterministically resolves `rook-repo-sync[bot]` PRs back to their original public `FJRG2007/rook` PR metadata before emitting JSON. When running from `warpdotdev/warp-internal`, the script intentionally omits PRs that were not authored by the repo-sync bot, because those are private internal changes that must not be exposed to the changelog agent or generated artifacts.
+Run the `fetch_prs.py` script to collect all public-release PRs merged in the release range and extract explicit changelog markers. Pass the repository that the workflow checked out, not necessarily the public repository. Release workflows run from `warpdotdev/warp-internal`, and the script deterministically resolves `polaris-terminal-repo-sync[bot]` PRs back to their original public `FJRG2007/polaris` PR metadata before emitting JSON. When running from `warpdotdev/warp-internal`, the script intentionally omits PRs that were not authored by the repo-sync bot, because those are private internal changes that must not be exposed to the changelog agent or generated artifacts.
 
 ```bash
 python3 .agents/skills/terminal-changelog-draft/scripts/fetch_prs.py \
-  --repo "${GITHUB_REPOSITORY:-FJRG2007/rook}" \
+  --repo "${GITHUB_REPOSITORY:-FJRG2007/polaris}" \
   --base-ref <previous_tag> \
   --head-ref <release_tag>
 ```
@@ -52,7 +52,7 @@ The script outputs JSON to stdout with this structure:
   "prs": [
     {
       "number": 1234,
-      "url": "https://github.com/FJRG2007/rook/pull/1234",
+      "url": "https://github.com/FJRG2007/polaris/pull/1234",
       "title": "...",
       "commit_subject": "... (#1234)",
       "author": "username",
@@ -63,12 +63,12 @@ The script outputs JSON to stdout with this structure:
         { "category": "NEW-FEATURE", "text": "Added dark mode" }
       ],
       "linked_issues": [5678],
-      "changed_files": ["app/src/ai/agent.rs", "crates/rook_features/src/lib.rs"],
-      "source_repo": "FJRG2007/rook",
+      "changed_files": ["app/src/ai/agent.rs", "crates/pterm_features/src/lib.rs"],
+      "source_repo": "FJRG2007/polaris",
       "internal_pr": {
         "number": 25712,
         "url": "https://github.com/warpdotdev/warp-internal/pull/25712",
-        "author": "rook-repo-sync[bot]",
+        "author": "polaris-terminal-repo-sync[bot]",
         "title": "...",
         "repo": "warpdotdev/warp-internal"
       }
@@ -105,7 +105,7 @@ Run the `extract_feature_flags.py` script to get the current flag gate lists:
 
 ```bash
 python3 .agents/skills/terminal-changelog-draft/scripts/extract_feature_flags.py \
-  --file crates/rook_features/src/lib.rs
+  --file crates/pterm_features/src/lib.rs
 ```
 
 Output JSON:
@@ -123,7 +123,7 @@ Collect all unique `linked_issues` from Step 2 and fetch the original reporter f
 
 ```bash
 python3 .agents/skills/terminal-changelog-draft/scripts/fetch_issue_reporters.py \
-  --repo FJRG2007/rook \
+  --repo FJRG2007/polaris \
   --org warpdotdev \
   --issues 5678,9012
 ```
@@ -137,7 +137,7 @@ Output JSON (only external reporters are included):
       "title": "Crash when opening large file",
       "reporter": "community-user",
       "reporter_url": "https://github.com/community-user",
-      "url": "https://github.com/FJRG2007/rook/issues/5678"
+      "url": "https://github.com/FJRG2007/polaris/issues/5678"
     }
   ]
 }
@@ -172,11 +172,11 @@ For each unmarked PR, produce a classification:
 - PRs that only touch CI, tests, docs, or internal tooling → `include: false`
 - PRs behind dogfood-only feature flags → `include: false` for stable channel
 - PRs behind preview flags → `include: false` for stable, `include: true` for preview
-- Set `impacts_tui: true` when Rook Agent CLI users observe the change, including shared Agent capabilities such as tool-call or edit-file behavior
+- Set `impacts_tui: true` when Polaris Terminal Agent CLI users observe the change, including shared Agent capabilities such as tool-call or edit-file behavior
 - When in doubt, set `needs_review: true` and `confidence: "low"`
 - Bot PRs (dependabot, renovate, etc.) → `include: false`
 
-**Feature-flag detection:** Use the `changed_files` list from Step 2 to check if any PR touches `crates/rook_features/src/lib.rs` or references a `FeatureFlag` variant in its title/body. Cross-reference with the flag lists from Step 4 to determine channel visibility.
+**Feature-flag detection:** Use the `changed_files` list from Step 2 to check if any PR touches `crates/pterm_features/src/lib.rs` or references a `FeatureFlag` variant in its title/body. Cross-reference with the flag lists from Step 4 to determine channel visibility.
 
 **Unknown contributors:** Authors in the `unknown` bucket (org membership check failed due to auth) should be treated conservatively — do not attribute them as external. Note them in the output for manual verification.
 
@@ -209,27 +209,27 @@ Write two files to `output_dir`:
 **Generated:** 2026-05-06T15:00:00Z
 
 ## New Features
-- Added dark mode ([#1234](https://github.com/FJRG2007/rook/pull/1234)) — [@external-contributor](https://github.com/external-contributor) ✨
+- Added dark mode ([#1234](https://github.com/FJRG2007/polaris/pull/1234)) — [@external-contributor](https://github.com/external-contributor) ✨
 
 ## Improvements
-- Faster tab switching ([#1235](https://github.com/FJRG2007/rook/pull/1235))
+- Faster tab switching ([#1235](https://github.com/FJRG2007/polaris/pull/1235))
 
 ## Bug Fixes
-- Fixed crash on startup ([#1236](https://github.com/FJRG2007/rook/pull/1236))
+- Fixed crash on startup ([#1236](https://github.com/FJRG2007/polaris/pull/1236))
 
 ## TUI Updates
-- Added inline command menus to Rook Agent CLI ([#1238](https://github.com/FJRG2007/rook/pull/1238))
+- Added inline command menus to Polaris Terminal Agent CLI ([#1238](https://github.com/FJRG2007/polaris/pull/1238))
 
 ## Oz Updates
-- Improved agent memory ([#1237](https://github.com/FJRG2007/rook/pull/1237))
+- Improved agent memory ([#1237](https://github.com/FJRG2007/polaris/pull/1237))
 
 ## Community
 ### Contributors
-- [@contributor1](https://github.com/contributor1) — [#1234](https://github.com/FJRG2007/rook/pull/1234)  ✨
+- [@contributor1](https://github.com/contributor1) — [#1234](https://github.com/FJRG2007/polaris/pull/1234)  ✨
 
 ### Issue Reporters
 Thanks to the community members who reported issues fixed in this release:
-- [@reporter1](https://github.com/reporter1) — [#5678](https://github.com/FJRG2007/rook/issues/5678) "Crash when opening large file"
+- [@reporter1](https://github.com/reporter1) — [#5678](https://github.com/FJRG2007/polaris/issues/5678) "Crash when opening large file"
 ```
 
 The markdown draft must **not** include "Needs Review" or "Skipped PRs" sections — those are internal details that belong only in the JSON audit artifact.
@@ -244,7 +244,7 @@ The markdown draft must **not** include "Needs Review" or "Skipped PRs" sections
   "entries": [
     {
       "pr_number": 1234,
-      "url": "https://github.com/FJRG2007/rook/pull/1234",
+      "url": "https://github.com/FJRG2007/polaris/pull/1234",
       "category": "NEW-FEATURE",
       "text": "Added dark mode",
       "source": "explicit",
@@ -253,7 +253,7 @@ The markdown draft must **not** include "Needs Review" or "Skipped PRs" sections
       "confidence": "high",
       "rationale": null,
       "feature_flag": null,
-      "source_repo": "FJRG2007/rook",
+      "source_repo": "FJRG2007/polaris",
       "internal_pr": null
     }
   ],

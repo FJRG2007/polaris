@@ -1,5 +1,5 @@
 #[cfg(feature = "tui")]
-use rookui_core::platform::keyboard::KeyCode;
+use ptermui_core::platform::keyboard::KeyCode;
 use settings::macros::define_settings_group;
 use settings::{SupportedPlatforms, SyncToCloud};
 
@@ -55,7 +55,7 @@ define_settings_group!(TuiVoiceSettings, settings: [
         surface: settings::SettingSurfaces::TUI,
         private: false,
         toml_path: "agents.voice.voice_input_hold_key",
-        description: "The modifier key held to record voice input in Rook Agent CLI. Configuring a modifier enables enhanced terminal key reporting, which may interfere with AltGr, dead-key composition, some international keyboard layouts, and shortcuts that use punctuation keys. Ctrl+S remains available without a modifier. Defaults to none. Super may be unavailable in some terminals.",
+        description: "The modifier key held to record voice input in Polaris Terminal Agent CLI. Configuring a modifier enables enhanced terminal key reporting, which may interfere with AltGr, dead-key composition, some international keyboard layouts, and shortcuts that use punctuation keys. Ctrl+S remains available without a modifier. Defaults to none. Super may be unavailable in some terminals.",
     },
 ]);
 

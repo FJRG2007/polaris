@@ -1,14 +1,14 @@
-//! Built-in Rook-hosted MCP servers.
+//! Built-in Polaris Terminal-hosted MCP servers.
 //!
 //! Built-in servers are attached automatically for logged-in users: their
 //! definitions are constructed in code and authenticated with the user's
-//! existing session credentials (rook-server accepts both session ID tokens
+//! existing session credentials (polaris-terminal-server accepts both session ID tokens
 //! and API keys as `Bearer` credentials), so they require no MCP
 //! configuration and no manually minted API key.
 //!
 //! Lifecycle is owned by [`TemplatableMCPServerManager::sync_builtin_servers`]
 //! (attach on login, re-attach on token rotation, detach on logout), gated by
-//! [`rook_core::features::FeatureFlag::FactoryMcp`].
+//! [`pterm_core::features::FeatureFlag::FactoryMcp`].
 //!
 //! CLI agent runs (`oz agent run`, including the cloud workers behind
 //! `oz agent run-cloud`) bypass that manager path; the agent driver attaches
@@ -20,7 +20,7 @@
 
 use std::collections::HashMap;
 
-use rook_core::channel::ChannelState;
+use pterm_core::channel::ChannelState;
 use uuid::Uuid;
 
 use super::templatable::{JsonTemplate, TemplatableMCPServer};
@@ -38,7 +38,7 @@ pub const FACTORY_MCP_INSTALLATION_UUID: Uuid =
 const FACTORY_MCP_TEMPLATE_UUID: Uuid = Uuid::from_u128(0xfac70a11_a55e_4bde_9c3a_1c0ffee0f002);
 
 /// The server name under which the Factory MCP's tools are grouped.
-pub const FACTORY_MCP_SERVER_NAME: &str = "rook-factory";
+pub const FACTORY_MCP_SERVER_NAME: &str = "polaris-terminal-factory";
 
 /// Returns the bearer token built-in servers should authenticate with, or
 /// `None` when the current credentials cannot be used for one.
@@ -60,7 +60,7 @@ pub fn builtin_bearer_token(credentials: &Credentials) -> Option<String> {
 }
 
 /// Builds the ephemeral installation for the built-in Factory MCP server: a
-/// streamable-HTTP MCP server hosted by rook-server at `/api/v1/mcp/factory`,
+/// streamable-HTTP MCP server hosted by polaris-terminal-server at `/api/v1/mcp/factory`,
 /// pre-authenticated via the `Authorization` header.
 pub fn factory_mcp_installation(bearer_token: &str) -> TemplatableMCPServerInstallation {
     factory_mcp_installation_for_server_root(&ChannelState::server_root_url(), bearer_token)
@@ -85,7 +85,7 @@ fn factory_mcp_installation_for_server_root(
         uuid: FACTORY_MCP_TEMPLATE_UUID,
         name: FACTORY_MCP_SERVER_NAME.to_string(),
         description: Some(
-            "Rook's hosted Factory MCP server. Work with your team's software factories: \
+            "Polaris Terminal's hosted Factory MCP server. Work with your team's software factories: \
              list factories and their tasks, inspect a task's status and outputs, and send \
              work in or hand it back."
                 .to_string(),

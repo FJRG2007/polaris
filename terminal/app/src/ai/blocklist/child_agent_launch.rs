@@ -2,7 +2,7 @@
 #[cfg(not(target_family = "wasm"))]
 use std::future::Future;
 
-use rookui::{AppContext, EntityId, SingletonEntity as _};
+use ptermui::{AppContext, EntityId, SingletonEntity as _};
 #[cfg(not(target_family = "wasm"))]
 use {
     crate::ai::agent::conversation::AIConversationId,

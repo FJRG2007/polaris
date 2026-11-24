@@ -5,11 +5,11 @@ use std::time::Duration;
 use chrono::Local;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
-use rook_core::command::ExitCode;
-use rook_core::features::FeatureFlag;
-use rookui::r#async::Timer;
-use rookui::elements::Empty;
-use rookui::{App, AppContext, Element, SingletonEntity};
+use pterm_core::command::ExitCode;
+use pterm_core::features::FeatureFlag;
+use ptermui::r#async::Timer;
+use ptermui::elements::Empty;
+use ptermui::{App, AppContext, Element, SingletonEntity};
 
 use super::*;
 use crate::ai::blocklist::AIQueryHistoryOutputStatus;
@@ -919,7 +919,7 @@ fn test_history_search_disabled_flag_scores_raw_skim_with_no_priors() {
 
         let mut old_entry = HistoryEntry::command_only(command.clone());
         old_entry.start_ts = Some(Local::now() - chrono::Duration::days(365));
-        old_entry.exit_code = Some(rook_core::command::ExitCode::from(1));
+        old_entry.exit_code = Some(pterm_core::command::ExitCode::from(1));
 
         let mixer = app.add_model(|_| CommandSearchMixer::new());
         mixer.update(&mut app, |mixer, ctx| {

@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 
 use comfy_table::Cell;
-use rook_cli::GlobalOptions;
-use rook_cli::model::{ListModelsArgs, ModelCommand};
-use rookui::platform::TerminationMode;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_cli::GlobalOptions;
+use pterm_cli::model::{ListModelsArgs, ModelCommand};
+use ptermui::platform::TerminationMode;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use serde::Serialize;
 
 use crate::ai::agent_sdk::output::{self, TableFormat};
@@ -74,7 +74,7 @@ impl ModelCommandRunner {
     }
 }
 
-impl rookui::Entity for ModelCommandRunner {
+impl ptermui::Entity for ModelCommandRunner {
     type Event = ();
 }
 

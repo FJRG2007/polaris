@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
-use rook_cli::agent::Harness;
-use rook_graphql::managed_secrets::ManagedSecretType;
-use rook_managed_secrets::ManagedSecretValue;
+use pterm_cli::agent::Harness;
+use pterm_graphql::managed_secrets::ManagedSecretType;
+use pterm_managed_secrets::ManagedSecretValue;
 
 pub struct AuthSecretTypeField {
     pub label: &'static str,

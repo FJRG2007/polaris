@@ -9,12 +9,12 @@ use std::str::FromStr;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use prost::Message as _;
-use rook_cli::agent::Harness;
+use pterm_cli::agent::Harness;
 #[cfg(not(target_family = "wasm"))]
-use rook_cli::skill::SkillSpec;
+use pterm_cli::skill::SkillSpec;
 #[cfg(not(target_family = "wasm"))]
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::{AppContext, SingletonEntity as _};
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::{AppContext, SingletonEntity as _};
 use warp_multi_agent_api as multi_agent_api;
 
 use crate::ChannelState;

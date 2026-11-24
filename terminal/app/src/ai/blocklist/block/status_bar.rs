@@ -6,17 +6,17 @@ use instant::Instant;
 use markdown_parser::FormattedTextFragment;
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
-use rook_core::channel::{Channel, ChannelState};
-use rook_core::features::FeatureFlag;
-use rook_core::ui::Icon as CoreIcon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::elements::shimmering_text::ShimmeringTextStateHandle;
-use rookui::elements::{Border, Container, Empty, Flex, MouseStateHandle, ParentElement, Text};
-use rookui::keymap::Keystroke;
-use rookui::presenter::ChildView;
-use rookui::{
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::Icon as CoreIcon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::elements::shimmering_text::ShimmeringTextStateHandle;
+use ptermui::elements::{Border, Container, Empty, Flex, MouseStateHandle, ParentElement, Text};
+use ptermui::keymap::Keystroke;
+use ptermui::presenter::ChildView;
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -25,8 +25,8 @@ use super::cli_controller::{CLISubagentController, CLISubagentEvent, UserTakeOve
 use super::model::{AIBlockModel, AIBlockModelImpl, AIBlockOutputStatus};
 use super::view_impl::common::{
     AutoExecuteButtonProps, ButtonProps, ForceRefreshButtonProps, LOAD_OUTPUT_MESSAGE,
-    MaybeShimmeringText, RookingIndicatorProps, RookingProps, STATUS_MESSAGE_ELLIPSIS,
-    WAITING_FOR_USER_INPUT_MESSAGE, render_rooking_indicator, render_rooking_indicator_base,
+    MaybeShimmeringText, PtermingIndicatorProps, PtermingProps, STATUS_MESSAGE_ELLIPSIS,
+    WAITING_FOR_USER_INPUT_MESSAGE, render_pterming_indicator, render_pterming_indicator_base,
     render_switch_control_to_user_button, status_message_naming_model,
 };
 use crate::ai::AgentTip;
@@ -61,7 +61,7 @@ use crate::terminal::input::suggestions_mode_model::InputSuggestionsModeModel;
 use crate::terminal::input::{HandoffComposeState, SET_INPUT_MODE_TERMINAL_ACTION_NAME};
 use crate::terminal::model::block::LONG_RUNNING_COMMAND_DURATION_MS;
 use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
-use crate::terminal::rookify::render::LEFT_STRIPE_WIDTH;
+use crate::terminal::ptermify::render::LEFT_STRIPE_WIDTH;
 use crate::terminal::view::ambient_agent::{
     AmbientAgentViewModel, AmbientAgentViewModelEvent, is_cloud_agent_pre_first_exchange,
 };
@@ -115,12 +115,12 @@ pub struct BlocklistAIStatusBar {
     summarization_timer_handle: Option<SpawnedFutureHandle>,
     summarization_start_time: Option<Instant>,
     /// Handle for the 1-second periodic timer that refreshes the "Last read …" suffix in
-    /// the rooking indicator while the active block has a recorded LRC snapshot.
+    /// the pterming indicator while the active block has a recorded LRC snapshot.
     last_read_refresh_handle: Option<SpawnedFutureHandle>,
 
     latest_response_stream_id: Option<ResponseStreamId>,
 
-    /// Agent tip to display below the rooking indicator.
+    /// Agent tip to display below the pterming indicator.
     current_tip: Option<AgentTip>,
 
     ephemeral_message_model: ModelHandle<EphemeralMessageModel>,
@@ -784,7 +784,7 @@ impl BlocklistAIStatusBar {
         }
     }
 
-    fn render_rooking_indicator_for_latest_exchange(
+    fn render_pterming_indicator_for_latest_exchange(
         &self,
         app: &AppContext,
     ) -> Option<Box<dyn Element>> {
@@ -799,12 +799,12 @@ impl BlocklistAIStatusBar {
                 .is_some_and(|metadata| {
                     !metadata.should_hide_block() && metadata.long_running_control_state().is_none()
                 });
-        let should_render_rooking = !model.request_type(app).is_passive()
+        let should_render_pterming = !model.request_type(app).is_passive()
             && !has_expanded_requested_command_with_no_subagent
             && (conversation.status().is_in_progress()
                 || (active_block.is_agent_in_control() && !active_block.is_agent_blocked()));
 
-        if !should_render_rooking {
+        if !should_render_pterming {
             return None;
         }
 
@@ -835,24 +835,24 @@ impl BlocklistAIStatusBar {
             output.model_info.as_ref().map(ModelInUse::from)
         });
 
-        let model_rooking_message =
-            resolve_rooking_model_message(current_model_in_use, model.as_ref(), app);
-        let default_rooking_text = model_rooking_message.as_ref().map_or_else(
+        let model_pterming_message =
+            resolve_pterming_model_message(current_model_in_use, model.as_ref(), app);
+        let default_pterming_text = model_pterming_message.as_ref().map_or_else(
             || LOAD_OUTPUT_MESSAGE.to_owned(),
             |message| message.text.clone(),
         );
-        let model_in_use_name = model_rooking_message
+        let model_in_use_name = model_pterming_message
             .as_ref()
             .and_then(|message| message.model_display_name.clone());
-        let secondary_element = match &model_rooking_message {
+        let secondary_element = match &model_pterming_message {
             Some(message) if message.show_fallback_explanation => {
                 Some(render_fallback_explanation(model.as_ref(), app))
             }
             _ => self.render_tip(app),
         };
 
-        Some(render_rooking_indicator(
-            RookingProps {
+        Some(render_pterming_indicator(
+            PtermingProps {
                 model: model.as_ref(),
                 terminal_model: &terminal_model,
                 action_model: self.action_model.as_ref(app),
@@ -900,7 +900,7 @@ impl BlocklistAIStatusBar {
                     should_hide_responses,
                 )),
                 force_refresh_button,
-                default_rooking_text,
+                default_pterming_text,
                 secondary_element,
                 last_snapshot_at,
             },
@@ -928,10 +928,10 @@ impl BlocklistAIStatusBar {
 
         let progress = ambient_agent_model.agent_progress()?;
         let progress_text = progress.setup_status_text();
-        Some(render_rooking_indicator_base(
-            RookingIndicatorProps {
+        Some(render_pterming_indicator_base(
+            PtermingIndicatorProps {
                 icon: None,
-                rooking_indicator_text: MaybeShimmeringText::Shimmering {
+                pterming_indicator_text: MaybeShimmeringText::Shimmering {
                     text: progress_text.into(),
                     shimmering_text_handle: self.shimmering_text_handle.clone(),
                 },
@@ -1042,7 +1042,7 @@ fn latest_model_used_before_exchange<V: View>(
 
 fn render_agent_tip(tip: &AgentTip, app: &AppContext) -> Box<dyn Element> {
     use markdown_parser::{FormattedTextFragment, FormattedTextLine};
-    use rookui::text_layout::ClipConfig;
+    use ptermui::text_layout::ClipConfig;
 
     use crate::ai::agent_tips::AITip;
 
@@ -1069,7 +1069,7 @@ fn render_agent_tip(tip: &AgentTip, app: &AppContext) -> Box<dyn Element> {
 
     let formatted_text =
         markdown_parser::FormattedText::new(vec![FormattedTextLine::Line(fragments)]);
-    rookui::elements::FormattedTextElement::new(
+    ptermui::elements::FormattedTextElement::new(
         formatted_text,
         appearance.monospace_font_size() - 3.,
         appearance.ui_font_family(),
@@ -1081,7 +1081,7 @@ fn render_agent_tip(tip: &AgentTip, app: &AppContext) -> Box<dyn Element> {
     .set_selectable(true)
     .with_clip(ClipConfig::ellipsis())
     .register_default_click_handlers_with_action_support(move |link, evt, app| {
-        use rookui::elements::HyperlinkLens;
+        use ptermui::elements::HyperlinkLens;
         match link {
             HyperlinkLens::Url(url) => {
                 send_telemetry_from_app_ctx!(
@@ -1140,11 +1140,11 @@ fn render_fallback_explanation<V: View>(
     .finish()
 }
 
-/// Rooking text naming the model in use, the name itself so the row's other
+/// Pterming text naming the model in use, the name itself so the row's other
 /// status messages can name it too, and whether the row should carry the
 /// fallback explanation line beneath it.
 #[derive(Debug, PartialEq)]
-struct RookingModelMessage {
+struct PtermingModelMessage {
     text: String,
     /// `None` for a fallback whose model arrived without a display name: the text
     /// can still say something useful, but there is no name to put in a message.
@@ -1152,8 +1152,8 @@ struct RookingModelMessage {
     show_fallback_explanation: bool,
 }
 
-/// What the rooking row knows about the model when it renders.
-struct RookingModelInputs {
+/// What the pterming row knows about the model when it renders.
+struct PtermingModelInputs {
     /// The model reported for the exchange being rendered.
     current: Option<ModelInUse>,
     /// The model reported for the exchange before it.
@@ -1162,7 +1162,7 @@ struct RookingModelInputs {
     is_new_user_query: bool,
 }
 
-const UNNAMED_FALLBACK_MODEL_ROOKING_TEXT: &str = "Rooking with another model.";
+const UNNAMED_FALLBACK_MODEL_POLARIS_TERMINALING_TEXT: &str = "Pterming with another model.";
 
 /// The fallback message's copy. It shipped before model naming existed and keeps
 /// its full stop, where everything named since ends in the row's ellipsis. The
@@ -1171,29 +1171,29 @@ const UNNAMED_FALLBACK_MODEL_ROOKING_TEXT: &str = "Rooking with another model.";
 /// When `FallbackModelLoadOutputMessaging` is eventually removed, keep this branch
 /// live. Cleaning the flag up in the "treat as false" direction would silently
 /// flip every fallback message to the ellipsis copy and drop its explanation line.
-fn fallback_rooking_text(display_name: &str) -> String {
+fn fallback_pterming_text(display_name: &str) -> String {
     let stem = LOAD_OUTPUT_MESSAGE
         .strip_suffix(STATUS_MESSAGE_ELLIPSIS)
         .unwrap_or(LOAD_OUTPUT_MESSAGE);
     format!("{stem} with {display_name}.")
 }
 
-/// Rooking text for the model a response is running on, e.g. "Rooking with Claude
+/// Pterming text for the model a response is running on, e.g. "Pterming with Claude
 /// Sonnet 4.5...". `None` keeps the row on its generic copy, which is what `auto`
 /// and custom routers get until routing picks a model and the server reports it.
 ///
-/// Naming the model is `RookingModelName`'s. `FallbackModelLoadOutputMessaging`
+/// Naming the model is `PtermingModelName`'s. `FallbackModelLoadOutputMessaging`
 /// owns the two things specific to a fallback attempt: the explanation line, and
 /// naming the previous exchange's model when this one has not reported yet. That
-/// lookback avoids a flicker from "Rooking..." on agent-initiated follow-ups,
+/// lookback avoids a flicker from "Pterming..." on agent-initiated follow-ups,
 /// since a conversation that fell back once is likely to again, and is skipped
 /// after a new user query because the primary model may have recovered by then.
 /// Nothing else borrows another exchange's model: naming one the response may not
 /// be using is worse than naming none.
 ///
 /// The fallback message shipped before model naming did, so it still names its
-/// model on its own flag alone; every other naming needs `RookingModelName`.
-fn rooking_model_message(inputs: RookingModelInputs) -> Option<RookingModelMessage> {
+/// model on its own flag alone; every other naming needs `PtermingModelName`.
+fn pterming_model_message(inputs: PtermingModelInputs) -> Option<PtermingModelMessage> {
     let fallback_messaging_enabled = FeatureFlag::FallbackModelLoadOutputMessaging.is_enabled();
     let (model_in_use, is_current_exchange) = match inputs.current {
         Some(current) => (current, true),
@@ -1210,15 +1210,15 @@ fn rooking_model_message(inputs: RookingModelInputs) -> Option<RookingModelMessa
     };
 
     let is_fallback_message = model_in_use.is_fallback && fallback_messaging_enabled;
-    let naming_enabled = FeatureFlag::RookingModelName.is_enabled();
+    let naming_enabled = FeatureFlag::PtermingModelName.is_enabled();
     if !naming_enabled && !is_fallback_message {
         return None;
     }
 
     let text = match (model_in_use.display_name.as_deref(), is_fallback_message) {
-        (Some(display_name), true) => fallback_rooking_text(display_name),
+        (Some(display_name), true) => fallback_pterming_text(display_name),
         // An unnamed fallback still has something to say.
-        (None, true) => UNNAMED_FALLBACK_MODEL_ROOKING_TEXT.to_owned(),
+        (None, true) => UNNAMED_FALLBACK_MODEL_POLARIS_TERMINALING_TEXT.to_owned(),
         (Some(display_name), false) => {
             status_message_naming_model(LOAD_OUTPUT_MESSAGE, display_name)
         }
@@ -1226,7 +1226,7 @@ fn rooking_model_message(inputs: RookingModelInputs) -> Option<RookingModelMessa
         (None, false) => return None,
     };
 
-    Some(RookingModelMessage {
+    Some(PtermingModelMessage {
         text,
         // The row's other messages get a name only under the naming flag, and only
         // for this exchange's own model. The fallback message's flag must not
@@ -1240,12 +1240,12 @@ fn rooking_model_message(inputs: RookingModelInputs) -> Option<RookingModelMessa
     })
 }
 
-/// Collects the exchange state [`rooking_model_message`] decides on.
-fn resolve_rooking_model_message<V: View>(
+/// Collects the exchange state [`pterming_model_message`] decides on.
+fn resolve_pterming_model_message<V: View>(
     current: Option<ModelInUse>,
     model: &dyn AIBlockModel<View = V>,
     app: &AppContext,
-) -> Option<RookingModelMessage> {
+) -> Option<PtermingModelMessage> {
     // Both only feed the fallback lookback, which cannot apply once the exchange
     // being rendered has reported a model of its own.
     let (previous, is_new_user_query) = if current.is_none() {
@@ -1263,7 +1263,7 @@ fn resolve_rooking_model_message<V: View>(
         (None, false)
     };
 
-    rooking_model_message(RookingModelInputs {
+    pterming_model_message(PtermingModelInputs {
         current,
         previous,
         is_new_user_query,
@@ -1309,7 +1309,7 @@ impl View for BlocklistAIStatusBar {
         "BlocklistAIStatusBar"
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
         let agent_view_controller = self.agent_view_controller.as_ref(app);
         if let Some(cloud_mode_setup_terminal_message) =
@@ -1333,10 +1333,10 @@ impl View for BlocklistAIStatusBar {
                         },
                     )
                 {
-                    render_rooking_indicator_base(
-                        RookingIndicatorProps {
+                    render_pterming_indicator_base(
+                        PtermingIndicatorProps {
                             icon: None,
-                            rooking_indicator_text: MaybeShimmeringText::Shimmering {
+                            pterming_indicator_text: MaybeShimmeringText::Shimmering {
                                 text: "Setting up environment".into(),
                                 shimmering_text_handle: self.shimmering_text_handle.clone(),
                             },
@@ -1360,10 +1360,10 @@ impl View for BlocklistAIStatusBar {
                         .current_message()
                         .is_none()
                 {
-                    render_rooking_indicator_base(
-                        RookingIndicatorProps {
+                    render_pterming_indicator_base(
+                        PtermingIndicatorProps {
                             icon: Some(icons::gray_clock_icon(appearance).finish()),
-                            rooking_indicator_text: MaybeShimmeringText::Static(
+                            pterming_indicator_text: MaybeShimmeringText::Static(
                                 WAITING_FOR_USER_INPUT_MESSAGE.into(),
                             ),
                             non_shimmering_text: None,
@@ -1385,13 +1385,13 @@ impl View for BlocklistAIStatusBar {
                     )
                 } else {
                     match (
-                        self.render_rooking_indicator_for_latest_exchange(app),
+                        self.render_pterming_indicator_for_latest_exchange(app),
                         self.ephemeral_message_model
                             .as_ref(app)
                             .current_message()
                             .is_none(),
                     ) {
-                        (Some(rooking_indicator), true) => rooking_indicator,
+                        (Some(pterming_indicator), true) => pterming_indicator,
                         _ => {
                             if self.ambient_agent_view_model.as_ref().is_some_and(
                                 |ambient_agent_view_model| {
@@ -1400,7 +1400,7 @@ impl View for BlocklistAIStatusBar {
                                         .is_waiting_for_session()
                                 },
                             ) {
-                                // Don't render rooking indicator - the loading screen is shown in the main view
+                                // Don't render pterming indicator - the loading screen is shown in the main view
                                 return Empty::new().finish();
                             } else if agent_view_controller.is_active() {
                                 // The orchestration pill bar in the agent view header
@@ -1496,7 +1496,7 @@ pub enum BlocklistAIStatusBarAction {
     Stop,
     /// Force the agent's pending poll for a long-running command to resolve
     /// immediately with a fresh snapshot, bypassing its agent-set timer. Dispatched
-    /// by the inline `Check now` affordance in the rooking indicator.
+    /// by the inline `Check now` affordance in the pterming indicator.
     ForceRefreshAgentView {
         block_id: crate::terminal::model::block::BlockId,
     },

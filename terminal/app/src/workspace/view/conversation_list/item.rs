@@ -1,8 +1,8 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::color::coloru_with_opacity;
-use rook_core::ui::theme::color::internal_colors;
-use rook_util::path::user_friendly_path;
-use rookui::elements::{
+use pterm_core::ui::color::coloru_with_opacity;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_util::path::user_friendly_path;
+use ptermui::elements::{
     AnchorPair, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DispatchEventResult, Element, EventHandler, Fill as ElementFill, Flex,
     Highlight, Hoverable, MainAxisAlignment, MainAxisSize, MouseInBehavior, MouseStateHandle,
@@ -10,12 +10,12 @@ use rookui::elements::{
     PositionedElementOffsetBounds, PositioningAxis, Radius, SavePosition, Shrinkable, Stack, Text,
     XAxisAnchor, YAxisAnchor,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::text_layout::TextStyle;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::ui_components::text_input::TextInput;
-use rookui::{AppContext, SingletonEntity, ViewHandle};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::text_layout::TextStyle;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::ui_components::text_input::TextInput;
+use ptermui::{AppContext, SingletonEntity, ViewHandle};
 
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent_conversations_model::{
@@ -120,7 +120,7 @@ pub fn render_static_item(props: StaticItemProps<'_>, app: &AppContext) -> Box<d
 
     let icon_color = theme.main_text_color(theme.background());
     let icon = Container::new(
-        ConstrainedBox::new(Icon::Plus.to_rookui_icon(icon_color).finish())
+        ConstrainedBox::new(Icon::Plus.to_ptermui_icon(icon_color).finish())
             .with_width(appearance.ui_font_size())
             .with_height(appearance.ui_font_size())
             .finish(),

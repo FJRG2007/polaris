@@ -1,19 +1,19 @@
 use ordered_float::OrderedFloat;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::color::coloru_with_opacity;
-use rook_core::ui::icons::Icon;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::color::coloru_with_opacity;
+use pterm_core::ui::icons::Icon;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     AnchorPair, Container, CrossAxisAlignment, Expanded, Fill, Flex, Highlight, MainAxisSize,
     MouseStateHandle, OffsetPositioning, OffsetType, ParentElement, ParentOffsetBounds,
     PositioningAxis, Stack, Text, XAxisAnchor, YAxisAnchor,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::ui_components::button::ButtonTooltipPosition;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, Gradient, SingletonEntity};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::ui_components::button::ButtonTooltipPosition;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, Gradient, SingletonEntity};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;

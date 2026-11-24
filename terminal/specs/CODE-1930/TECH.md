@@ -6,35 +6,35 @@ Implements [`PRODUCT.md`](./PRODUCT.md) for [CODE-1930](https://linear.app/warpd
 
 The current TUI provider-key UX is split between public one-shot CLI flags, two slash commands that invoke those flags through the active PTY, and a separate in-process Grok card:
 
-- [`crates/rook_tui/src/session.rs` (36-177) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/rook_tui/src/session.rs#L36-L177) defines `--set-provider-api-key` and `--clear-provider-api-key`, reads masked or piped input, writes through `ApiKeyManager::persist_provider_key`, and notifies live TUI processes.
-- [`app/src/search/slash_command_menu/static_commands/commands.rs` (112-145) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/app/src/search/slash_command_menu/static_commands/commands.rs#L112-L145) registers `/add-api-key` and `/clear-provider-api-key`.
-- [`crates/rook_tui/src/terminal_session_view.rs` (3514-3607) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/rook_tui/src/terminal_session_view.rs#L3514-L3607) turns standard-provider slash commands into nested TUI shell commands, while Grok remains in-process.
-- [`app/src/ai/tui_api_keys.rs` (1-46) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/app/src/ai/tui_api_keys.rs#L1-L46) preserves coherence when a one-shot CLI process changes the TUI secure-storage namespace.
+- [`crates/pterm_tui/src/session.rs` (36-177) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/pterm_tui/src/session.rs#L36-L177) defines `--set-provider-api-key` and `--clear-provider-api-key`, reads masked or piped input, writes through `ApiKeyManager::persist_provider_key`, and notifies live TUI processes.
+- [`app/src/search/slash_command_menu/static_commands/commands.rs` (112-145) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/app/src/search/slash_command_menu/static_commands/commands.rs#L112-L145) registers `/add-api-key` and `/clear-provider-api-key`.
+- [`crates/pterm_tui/src/terminal_session_view.rs` (3514-3607) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/pterm_tui/src/terminal_session_view.rs#L3514-L3607) turns standard-provider slash commands into nested TUI shell commands, while Grok remains in-process.
+- [`app/src/ai/tui_api_keys.rs` (1-46) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/app/src/ai/tui_api_keys.rs#L1-L46) preserves coherence when a one-shot CLI process changes the TUI secure-storage namespace.
 
 Credential ownership is already centralized:
 
-- [`crates/ai/src/llm_provider.rs` (7-93) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/ai/src/llm_provider.rs#L7-L93) defines provider slugs, labels, and which providers accept pasted keys.
-- [`crates/ai/src/api_keys.rs` (213-411) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/ai/src/api_keys.rs#L213-L411) owns in-memory credentials, secure-storage loading, durable pasted-key writes, Grok-token state, and change events.
-- [`crates/ai/src/api_keys.rs` (540-655) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/ai/src/api_keys.rs#L540-L655) injects eligible pasted keys and Grok OAuth tokens into subsequent requests.
+- [`crates/ai/src/llm_provider.rs` (7-93) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/ai/src/llm_provider.rs#L7-L93) defines provider slugs, labels, and which providers accept pasted keys.
+- [`crates/ai/src/api_keys.rs` (213-411) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/ai/src/api_keys.rs#L213-L411) owns in-memory credentials, secure-storage loading, durable pasted-key writes, Grok-token state, and change events.
+- [`crates/ai/src/api_keys.rs` (540-655) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/ai/src/api_keys.rs#L540-L655) injects eligible pasted keys and Grok OAuth tokens into subsequent requests.
 
 The TUI already has the required interaction primitives, but no secret mode:
 
-- [`crates/rook_tui/src/conversation_menu.rs` (46-292) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/rook_tui/src/conversation_menu.rs#L46-L292) is the closest searchable menu lifecycle: it clears slash text, owns a live query, reconciles selection, and leaves acceptance-time work to its session.
-- [`crates/rook_tui/src/inline_menu.rs` (35-343) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/rook_tui/src/inline_menu.rs#L35-L343) provides row snapshots, selection, scrolling, and mouse routing.
-- [`crates/rook_tui/src/input/view.rs` (330-589) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/rook_tui/src/input/view.rs#L330-L589) owns the normal composer and already lets active inline menus reuse its editor buffer for query input.
-- [`crates/rook_tui/src/editor_element.rs` (108-379) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/rook_tui/src/editor_element.rs#L108-L379) is the reusable char-cell editor element used by both the main input and generic TUI editor views, but it currently paints backing text verbatim.
-- [`crates/rook_tui/src/editor_interaction.rs` (420-585) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/rook_tui/src/editor_interaction.rs#L420-L585) shows why masking alone is insufficient: keyboard Copy and Cut read the selected plaintext from `CodeEditorModel`.
-- [`crates/rook_tui/src/slash_commands.rs` (299-342) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/rook_tui/src/slash_commands.rs#L299-L342) and [`crates/rook_tui/src/inline_menu.rs` (1232-1268) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/rook_tui/src/inline_menu.rs#L1232-L1268) provide the canonical NLD `(currently on|off)` state-suffix content and selected/unselected styling.
+- [`crates/pterm_tui/src/conversation_menu.rs` (46-292) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/pterm_tui/src/conversation_menu.rs#L46-L292) is the closest searchable menu lifecycle: it clears slash text, owns a live query, reconciles selection, and leaves acceptance-time work to its session.
+- [`crates/pterm_tui/src/inline_menu.rs` (35-343) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/pterm_tui/src/inline_menu.rs#L35-L343) provides row snapshots, selection, scrolling, and mouse routing.
+- [`crates/pterm_tui/src/input/view.rs` (330-589) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/pterm_tui/src/input/view.rs#L330-L589) owns the normal composer and already lets active inline menus reuse its editor buffer for query input.
+- [`crates/pterm_tui/src/editor_element.rs` (108-379) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/pterm_tui/src/editor_element.rs#L108-L379) is the reusable char-cell editor element used by both the main input and generic TUI editor views, but it currently paints backing text verbatim.
+- [`crates/pterm_tui/src/editor_interaction.rs` (420-585) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/pterm_tui/src/editor_interaction.rs#L420-L585) shows why masking alone is insufficient: keyboard Copy and Cut read the selected plaintext from `CodeEditorModel`.
+- [`crates/pterm_tui/src/slash_commands.rs` (299-342) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/pterm_tui/src/slash_commands.rs#L299-L342) and [`crates/pterm_tui/src/inline_menu.rs` (1232-1268) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/pterm_tui/src/inline_menu.rs#L1232-L1268) provide the canonical NLD `(currently on|off)` state-suffix content and selected/unselected styling.
 
 The existing Grok view combines protocol state with the card presentation that this change removes:
 
-- [`crates/rook_tui/src/grok_oauth/mod.rs` (27-243) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/rook_tui/src/grok_oauth/mod.rs#L27-L243) owns browser launch, callback/manual-exchange arbitration, cancellation, retryable/fatal phases, and token storage.
-- [`crates/rook_tui/src/grok_oauth/session.rs` (17-127) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/crates/rook_tui/src/grok_oauth/session.rs#L17-L127) owns policy checks and installs the OAuth view as a blocking input source.
+- [`crates/pterm_tui/src/grok_oauth/mod.rs` (27-243) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/pterm_tui/src/grok_oauth/mod.rs#L27-L243) owns browser launch, callback/manual-exchange arbitration, cancellation, retryable/fatal phases, and token storage.
+- [`crates/pterm_tui/src/grok_oauth/session.rs` (17-127) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/crates/pterm_tui/src/grok_oauth/session.rs#L17-L127) owns policy checks and installs the OAuth view as a blocking input source.
 
-Rook credit fallback is already a shared typed setting and shared request input:
+Polaris Terminal credit fallback is already a shared typed setting and shared request input:
 
-- [`app/src/settings/ai.rs` (1774-1787) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/app/src/settings/ai.rs#L1774-L1787) defines `CanUseRookCreditsForFallback`; only its surface metadata is GUI-only.
-- [`app/src/ai/agent/api.rs` (288-304) @ fd16dceb](https://github.com/FJRG2007/rook/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/app/src/ai/agent/api.rs#L288-L304) reads it for requests shared by both frontends.
+- [`app/src/settings/ai.rs` (1774-1787) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/app/src/settings/ai.rs#L1774-L1787) defines `CanUsePtermCreditsForFallback`; only its surface metadata is GUI-only.
+- [`app/src/ai/agent/api.rs` (288-304) @ fd16dceb](https://github.com/FJRG2007/polaris/blob/fd16dceb3f2a9e5e106f19010aa964265ac4f02c/terminal/app/src/ai/agent/api.rs#L288-L304) reads it for requests shared by both frontends.
 
 ## Proposed changes
 
@@ -47,14 +47,14 @@ Replace `SlashCommandKind::{AddApiKey, ClearApiKey}` and their two static comman
 Retain all one-shot infrastructure:
 
 - `TuiArgs::{set_provider_api_key, clear_provider_api_key}`.
-- `ProviderApiKeyCommand`, `read_provider_api_key`, and `rook::run_tui_cli_command`.
+- `ProviderApiKeyCommand`, `read_provider_api_key`, and `polaris_terminal::run_tui_cli_command`.
 - `notify_tui_api_keys_changed`, `TuiApiKeyRefresher`, and the revision-file watcher.
 
 Update only the Grok-specific CLI rejection text to direct users to `/api-keys`. This preserves external scripts and lets a live menu refresh when another TUI process uses a public flag.
 
 ### Add one stateful API-key inline-menu model
 
-Add `crates/rook_tui/src/api_keys_menu.rs` with a `TuiApiKeysMenuModel` and an exhaustive interaction state:
+Add `crates/pterm_tui/src/api_keys_menu.rs` with a `TuiApiKeysMenuModel` and an exhaustive interaction state:
 
 - `Closed`.
 - `Browsing`, with provider filter, `TuiInlineMenuListState`, and the selected row.
@@ -105,11 +105,11 @@ Ctrl-X in `Browsing` uses the same durable method with `None` for OpenAI, Anthro
 
 ### Share the fallback setting definition, not its persisted value
 
-Change `CanUseRookCreditsForFallback.surface` from `SettingSurfaces::GUI` to `SettingSurfaces::ALL`. Do not add a new TUI setting, shared local store, cloud-sync exception, migration, or cross-process setting bus.
+Change `CanUsePtermCreditsForFallback.surface` from `SettingSurfaces::GUI` to `SettingSurfaces::ALL`. Do not add a new TUI setting, shared local store, cloud-sync exception, migration, or cross-process setting bus.
 
-The existing settings-mode path selection continues to give GUI and TUI separate `settings.toml` values, matching other `ALL` settings. `TuiApiKeysMenuModel` reads `AISettings::can_use_rook_credits_for_fallback` and toggles it through the generated `ToggleableSetting::toggle_and_save_value` API.
+The existing settings-mode path selection continues to give GUI and TUI separate `settings.toml` values, matching other `ALL` settings. `TuiApiKeysMenuModel` reads `AISettings::can_use_pterm_credits_for_fallback` and toggles it through the generated `ToggleableSetting::toggle_and_save_value` API.
 
-Subscribe to the generated `AISettingsChangedEvent::CanUseRookCreditsForFallback` while the interaction is open. This keeps the row current when the TUI-local settings file changes without introducing GUI/TUI value synchronization.
+Subscribe to the generated `AISettingsChangedEvent::CanUsePtermCreditsForFallback` while the interaction is open. This keeps the row current when the TUI-local settings file changes without introducing GUI/TUI value synchronization.
 
 ### Extract Grok OAuth state from the deleted card
 
@@ -132,7 +132,7 @@ Delete the old Grok card rendering, `TuiGrokOAuthBlock` focus/keymap registratio
 
 Reuse `TuiInlineMenuRow::state_suffix` and the existing NLD selected/unselected suffix styles for `(Connected)`, `(Not connected)`, `(on)`, and `(off)`. Extend the generic row renderer only as needed to support a state suffix when a row has no description; do not add API-key-specific status colors.
 
-Add semantic helpers to `TuiUiBuilder` only for the designed credential-entry border and connecting-row treatment. Derive them from active Rook theme and terminal colors; do not copy Figma hex values into TUI views.
+Add semantic helpers to `TuiUiBuilder` only for the designed credential-entry border and connecting-row treatment. Derive them from active Polaris Terminal theme and terminal colors; do not copy Figma hex values into TUI views.
 
 The standard-key state renders only the provider title above the credential field. The Grok state keeps the provider/fallback list visible, marks the Grok row as connecting, and renders the code field below it. The main and nested states replace the generic status footer with their product-defined state-specific hints.
 
@@ -157,18 +157,18 @@ stateDiagram-v2
 Map tests directly to `PRODUCT.md` behavior:
 
 - `app/src/search/slash_command_menu/static_commands/commands_tests.rs`: `/api-keys` is TUI-only; old provider-key slash commands are absent; the exhaustive kind registry remains valid (Behavior 1-3).
-- `crates/rook_tui/src/session_tests.rs`: both public flags retain standard-provider parsing, set/clear behavior, masked/piped input contracts, and revised Grok guidance (Behavior 4-5).
-- `crates/rook_tui/src/editor_element_tests.rs` and `crates/rook_tui/src/input/view_tests.rs`: managed secret input renders only mask glyphs in the normal input, retains editing and selection, blocks Copy/Cut from reaching a test clipboard, suppresses prompt-only input behavior, returns to normal plaintext behavior after dismissal, and never paints plaintext at narrow or wide widths (Behavior 27-30, 47-50).
-- New `crates/rook_tui/src/api_keys_menu_tests.rs`: open/input clearing, provider order and connection labels, selection, pinned fallback filtering, zero provider matches, all footer variants, local setting toggle and persistence failure, preloaded masked keys, save/clear success, secure-storage failure rollback, cancellation, mouse activation, and live `KeysUpdated` refresh (Behavior 7-35, 47-50).
-- Refactored `crates/rook_tui/src/grok_oauth/tests.rs`: browser-attempt start, empty/manual code, retryable and fatal failures, callback/manual race, stale-result suppression, success, Escape, drop cancellation, policy gates, already-connected behavior, and inline render snapshots (Behavior 36-46).
-- `crates/rook_tui/src/terminal_session_view_tests.rs`: `/api-keys` opens in-process without PTY execution, shell history mutation, or conversation cancellation; closing restores the normal composer/footer; external revision reload updates an open menu (Behavior 2, 6, 9).
-- Settings metadata tests assert `CanUseRookCreditsForFallback` supports both surfaces while GUI and TUI settings modes still resolve separate values (Behavior 20-25).
+- `crates/pterm_tui/src/session_tests.rs`: both public flags retain standard-provider parsing, set/clear behavior, masked/piped input contracts, and revised Grok guidance (Behavior 4-5).
+- `crates/pterm_tui/src/editor_element_tests.rs` and `crates/pterm_tui/src/input/view_tests.rs`: managed secret input renders only mask glyphs in the normal input, retains editing and selection, blocks Copy/Cut from reaching a test clipboard, suppresses prompt-only input behavior, returns to normal plaintext behavior after dismissal, and never paints plaintext at narrow or wide widths (Behavior 27-30, 47-50).
+- New `crates/pterm_tui/src/api_keys_menu_tests.rs`: open/input clearing, provider order and connection labels, selection, pinned fallback filtering, zero provider matches, all footer variants, local setting toggle and persistence failure, preloaded masked keys, save/clear success, secure-storage failure rollback, cancellation, mouse activation, and live `KeysUpdated` refresh (Behavior 7-35, 47-50).
+- Refactored `crates/pterm_tui/src/grok_oauth/tests.rs`: browser-attempt start, empty/manual code, retryable and fatal failures, callback/manual race, stale-result suppression, success, Escape, drop cancellation, policy gates, already-connected behavior, and inline render snapshots (Behavior 36-46).
+- `crates/pterm_tui/src/terminal_session_view_tests.rs`: `/api-keys` opens in-process without PTY execution, shell history mutation, or conversation cancellation; closing restores the normal composer/footer; external revision reload updates an open menu (Behavior 2, 6, 9).
+- Settings metadata tests assert `CanUsePtermCreditsForFallback` supports both surfaces while GUI and TUI settings modes still resolve separate values (Behavior 20-25).
 - Render-to-lines tests cover main, filtered, fallback-selected, standard-key, Grok connecting, retryable-error, and fatal-error states under dark and light themes.
 
 Run:
 
 - Focused new and changed unit tests while iterating.
-- `cargo nextest run -p rook_tui`.
+- `cargo nextest run -p pterm_tui`.
 - Focused `ai` and settings tests changed by the refactor.
 - `./script/format`.
 - The clippy invocation used by `./script/presubmit`.

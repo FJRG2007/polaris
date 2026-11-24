@@ -1,6 +1,6 @@
-use rook_errors::report_if_error;
-use rookui::platform::WindowBackdrop;
-use rookui::{AppContext, SingletonEntity, WindowId};
+use pterm_errors::report_if_error;
+use ptermui::platform::WindowBackdrop;
+use ptermui::{AppContext, SingletonEntity, WindowId};
 use settings::macros::define_settings_group;
 use settings::{RespectUserSyncSetting, Setting as _, SupportedPlatforms, SyncToCloud};
 

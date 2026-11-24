@@ -44,7 +44,7 @@ use x11rb::rust_connection::RustConnection;
 /// The prefix of agent seat device names. A seat is named `{PREFIX}{pid}-{sequence}` and the
 /// server derives the individual device names from it (e.g. "… pointer", "… keyboard",
 /// "… XTEST pointer"). The embedded pid identifies the owning process for stale-seat reaping.
-const SEAT_NAME_PREFIX: &str = "rook-agent-cu-";
+const SEAT_NAME_PREFIX: &str = "polaris-terminal-agent-cu-";
 
 /// The XI2 device id wildcard meaning "all devices" in `XIQueryDevice`.
 const ALL_DEVICES: u16 = 0;
@@ -340,7 +340,7 @@ fn remove_stale_seats(conn: &RustConnection) {
     let _ = conn.flush();
 }
 
-/// Parses the owning pid out of a seat name like "rook-agent-cu-1234-0".
+/// Parses the owning pid out of a seat name like "polaris-terminal-agent-cu-1234-0".
 fn seat_pid(seat_name: &str) -> Option<u32> {
     let rest = seat_name.strip_prefix(SEAT_NAME_PREFIX)?;
     rest.split('-').next()?.parse().ok()

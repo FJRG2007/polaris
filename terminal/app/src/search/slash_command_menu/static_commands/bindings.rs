@@ -1,4 +1,4 @@
-use rookui::keymap::{BindingDescription, PerPlatformKeystroke};
+use ptermui::keymap::{BindingDescription, PerPlatformKeystroke};
 
 use super::StaticCommand;
 

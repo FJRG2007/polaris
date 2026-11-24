@@ -1,12 +1,12 @@
 use ai::skills::SkillProvider;
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_core::ui::icons::Icon;
-use rookui::elements::{
+use pterm_core::ui::icons::Icon;
+use ptermui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, Highlight, ParentElement, Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::search::ai_context_menu::mixer::AIContextMenuSearchableAction;
@@ -36,11 +36,11 @@ impl SearchItem for SkillSearchItem {
         let icon_color = highlight_state.icon_fill(appearance).into_solid();
 
         let icon_element = if let Some(override_icon) = self.icon_override {
-            override_icon.to_rookui_icon(icon_color.into()).finish()
+            override_icon.to_ptermui_icon(icon_color.into()).finish()
         } else {
             self.provider
                 .icon()
-                .to_rookui_icon(self.provider.icon_fill(icon_color.into()))
+                .to_ptermui_icon(self.provider.icon_fill(icon_color.into()))
                 .finish()
         };
 

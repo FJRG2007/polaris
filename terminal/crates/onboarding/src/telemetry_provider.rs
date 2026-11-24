@@ -1,5 +1,5 @@
-use rook_core::telemetry::{TelemetryContextModel, TelemetryContextProvider};
-use rookui_core::{AppContext, ModelContext};
+use pterm_core::telemetry::{TelemetryContextModel, TelemetryContextProvider};
+use ptermui_core::{AppContext, ModelContext};
 
 /// A mock telemetry context provider for the onboarding binary that logs events
 /// instead of sending them to a server.

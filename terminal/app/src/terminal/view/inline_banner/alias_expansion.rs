@@ -1,5 +1,5 @@
-use rookui::Element;
-use rookui::elements::{MouseStateHandle, Text};
+use ptermui::Element;
+use ptermui::elements::{MouseStateHandle, Text};
 
 use super::{
     InlineBannerButtonState, InlineBannerCloseButton, InlineBannerContent, InlineBannerStyle,
@@ -88,7 +88,7 @@ pub fn render_alias_expansion_banner(
         InlineBannerStyle::VeryLowPriority,
         appearance,
         InlineBannerContent {
-            title: "Rook can auto-expand aliases.".into(),
+            title: "Polaris Terminal can auto-expand aliases.".into(),
             buttons,
             content: Some(content),
             close_button: Some(close_button),

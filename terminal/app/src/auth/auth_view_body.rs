@@ -1,20 +1,20 @@
 use anyhow::anyhow;
 use lazy_static::lazy_static;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::DEFAULT_COMMAND_PALETTE_FONT_SIZE;
-use rook_core::ui::builder::UiBuilder;
-use rook_errors::report_error;
-use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::clipboard::ClipboardContent;
-use rookui::color::ColorU;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::DEFAULT_COMMAND_PALETTE_FONT_SIZE;
+use pterm_core::ui::builder::UiBuilder;
+use pterm_errors::report_error;
+use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::clipboard::ClipboardContent;
+use ptermui::color::ColorU;
+use ptermui::elements::{
     Align, Border, Container, CornerRadius, CrossAxisAlignment, Dismiss, Fill, Flex,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Stack,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::FixedBinding;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::FixedBinding;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, UpdateModel, View,
     ViewContext, ViewHandle,
 };
@@ -62,7 +62,7 @@ lazy_static! {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "enter",
@@ -329,7 +329,7 @@ impl AuthViewBody {
             Flex::row()
                 .with_child(
                     ui_builder
-                        .span("By continuing, you agree to Rook's ")
+                        .span("By continuing, you agree to Polaris Terminal's ")
                         .with_style(disclaimer_styles)
                         .build()
                         .finish(),
@@ -605,10 +605,10 @@ impl AuthViewBody {
 
         let text = match self.variant {
             AuthViewVariant::RequireLoginCloseable => {
-                "In order to use Rook’s AI features or collaborate with others, please create an account."
+                "In order to use Polaris Terminal’s AI features or collaborate with others, please create an account."
             }
             AuthViewVariant::HitDriveObjectLimitCloseable => {
-                "In order to create more objects in Rook Drive, please create an account."
+                "In order to create more objects in Polaris Terminal Drive, please create an account."
             }
             AuthViewVariant::ShareRequirementCloseable => {
                 "In order to share, please create an account."
@@ -637,10 +637,10 @@ impl AuthViewBody {
         };
 
         let text = match self.variant {
-            AuthViewVariant::Initial => "Welcome to Rook!",
+            AuthViewVariant::Initial => "Welcome to Polaris Terminal!",
             AuthViewVariant::RequireLoginCloseable
             | AuthViewVariant::HitDriveObjectLimitCloseable
-            | AuthViewVariant::ShareRequirementCloseable => "Sign up for Rook",
+            | AuthViewVariant::ShareRequirementCloseable => "Sign up for Polaris Terminal",
         };
 
         ui_builder
@@ -992,9 +992,9 @@ impl View for AuthViewBody {
 
     fn accessibility_contents(&self, _: &AppContext) -> Option<AccessibilityContent> {
         Some(AccessibilityContent::new(
-            "Welcome to Rook!",
+            "Welcome to Polaris Terminal!",
             "Press enter to open your browser to Sign Up or Sign In.",
-            RookA11yRole::HelpRole,
+            PtermA11yRole::HelpRole,
         ))
     }
 

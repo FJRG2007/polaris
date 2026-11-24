@@ -5,9 +5,9 @@ use std::time::Duration;
 
 use chrono::{DateTime, Local, TimeDelta};
 use futures::channel::oneshot;
-use rook_errors::report_error;
-use rookui::r#async::Timer;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui::r#async::Timer;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 use uuid::Uuid;
 #[cfg(not(target_family = "wasm"))]
 use warp_multi_agent_api as maa_api;
@@ -548,7 +548,7 @@ impl ResponseStream {
         #[cfg(not(target_family = "wasm"))]
         {
             use ::ai::api_keys::{ApiKeyManager, GeapRefreshOutcome, GrokRefreshOutcome};
-            use rookui::r#async::FutureExt as _;
+            use ptermui::r#async::FutureExt as _;
 
             use crate::ai::llms::{LLMModelHost, LLMPreferences, LLMProvider};
             use crate::workspaces::user_workspaces::UserWorkspaces;

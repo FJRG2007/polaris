@@ -3,9 +3,9 @@
 //! Uses the shared [`ChipConfigurator`] with `LeftRightZones` layout to let users
 //! drag/drop chips between left, right, and unused banks.
 
-use rook_errors::report_if_error;
-use rookui::keymap::FixedBinding;
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use pterm_errors::report_if_error;
+use ptermui::keymap::FixedBinding;
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 use settings::Setting as _;
 
 use super::toolbar_item::AgentToolbarItemKind;
@@ -264,7 +264,7 @@ impl View for AgentToolbarInlineEditor {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",

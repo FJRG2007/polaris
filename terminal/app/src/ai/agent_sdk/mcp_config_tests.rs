@@ -1,5 +1,5 @@
-use rook_cli::mcp::MCPSpec;
-use rook_core::features::FeatureFlag;
+use pterm_cli::mcp::MCPSpec;
+use pterm_core::features::FeatureFlag;
 use serde_json::{Map, Value, json};
 
 use super::build_mcp_servers_from_specs;
@@ -16,44 +16,44 @@ fn empty_specs_returns_none() {
 }
 
 #[test]
-fn uuid_spec_is_coerced_to_rook_id() {
+fn uuid_spec_is_coerced_to_pterm_id() {
     let uuid = uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
     let servers = build(vec![MCPSpec::Uuid(uuid)]);
 
     let entry = servers.get(&uuid.to_string()).unwrap();
     assert_eq!(
-        entry["rook_id"].as_str(),
+        entry["pterm_id"].as_str(),
         Some("550e8400-e29b-41d4-a716-446655440000")
     );
 }
 
 #[test]
-fn well_known_spec_is_coerced_to_rook_id() {
+fn well_known_spec_is_coerced_to_pterm_id() {
     let _flag = FeatureFlag::WellKnownMcpIds.override_enabled(true);
     let servers = build(vec![MCPSpec::WellKnown("linear".to_string())]);
 
     let entry = servers.get("linear").unwrap();
-    assert_eq!(entry["rook_id"].as_str(), Some("linear"));
+    assert_eq!(entry["pterm_id"].as_str(), Some("linear"));
 }
 
 #[test]
-fn well_known_rook_id_passes_validation() {
-    // Non-UUID rook_ids resolve via the same managed MCP GraphQL; the server
+fn well_known_pterm_id_passes_validation() {
+    // Non-UUID pterm_ids resolve via the same managed MCP GraphQL; the server
     // owns the set of recognized ids, so validation accepts any non-empty id.
     let _flag = FeatureFlag::WellKnownMcpIds.override_enabled(true);
-    let spec = json!({ "mcpServers": { "linear": { "rook_id": "linear" } } }).to_string();
+    let spec = json!({ "mcpServers": { "linear": { "pterm_id": "linear" } } }).to_string();
     let servers = build(vec![MCPSpec::Json(spec)]);
 
-    assert_eq!(servers["linear"]["rook_id"].as_str(), Some("linear"));
+    assert_eq!(servers["linear"]["pterm_id"].as_str(), Some("linear"));
 }
 
 #[test]
-fn non_uuid_rook_id_fails_validation_when_flag_disabled() {
+fn non_uuid_pterm_id_fails_validation_when_flag_disabled() {
     let _flag = FeatureFlag::WellKnownMcpIds.override_enabled(false);
-    let spec = json!({ "mcpServers": { "linear": { "rook_id": "linear" } } }).to_string();
+    let spec = json!({ "mcpServers": { "linear": { "pterm_id": "linear" } } }).to_string();
     let err = build_mcp_servers_from_specs(&[MCPSpec::Json(spec)]).unwrap_err();
 
-    assert!(err.to_string().contains("field 'rook_id' must be a UUID"));
+    assert!(err.to_string().contains("field 'pterm_id' must be a UUID"));
 }
 
 #[test]
@@ -249,19 +249,19 @@ fn validation_rejects_invalid_entries() {
     let err = build_mcp_servers_from_specs(&[MCPSpec::Json(spec)]).unwrap_err();
     assert!(
         err.to_string()
-            .contains("must have exactly one of: 'rook_id', 'command', or 'url'")
+            .contains("must have exactly one of: 'pterm_id', 'command', or 'url'")
     );
 
-    // rook_id must be a non-empty string (UUID or, behind WellKnownMcpIds,
+    // pterm_id must be a non-empty string (UUID or, behind WellKnownMcpIds,
     // a well-known id — the server owns the set of recognized non-UUID ids).
-    let spec = json!({ "mcpServers": { "bad": { "rook_id": "" } } }).to_string();
+    let spec = json!({ "mcpServers": { "bad": { "pterm_id": "" } } }).to_string();
     let err = {
         let _flag = FeatureFlag::WellKnownMcpIds.override_enabled(true);
         build_mcp_servers_from_specs(&[MCPSpec::Json(spec)]).unwrap_err()
     };
     assert!(
         err.to_string()
-            .contains("field 'rook_id' must be non-empty")
+            .contains("field 'pterm_id' must be non-empty")
     );
 
     // args must be array.
@@ -339,7 +339,7 @@ fn serializes_mcp_servers_as_object_not_string() {
 
     let server = mcp_servers.get(uuid.to_string()).unwrap();
     assert_eq!(
-        server.get("rook_id").unwrap(),
+        server.get("pterm_id").unwrap(),
         &Value::String(uuid.to_string())
     );
 }

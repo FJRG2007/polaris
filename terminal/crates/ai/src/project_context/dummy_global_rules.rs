@@ -1,5 +1,5 @@
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui_core::ModelContext;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui_core::ModelContext;
 
 use super::model::{ProjectContextModel, ProjectRule};
 

@@ -1,5 +1,5 @@
 use chrono::{DateTime, FixedOffset, Utc};
-use rook_graphql::mutations::share_block::DisplaySetting as GqlDisplaySetting;
+use pterm_graphql::mutations::share_block::DisplaySetting as GqlDisplaySetting;
 use serde::{Deserialize, Serialize};
 
 use crate::terminal::model::ObfuscateSecrets;

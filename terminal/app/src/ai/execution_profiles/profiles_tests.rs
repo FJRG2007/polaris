@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
-use rook_core::features::FeatureFlag;
-use rook_graphql::object_permissions::AccessLevel;
-use rook_util::path::EscapeChar;
-use rookui::{App, EntityId, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_graphql::object_permissions::AccessLevel;
+use pterm_util::path::EscapeChar;
+use ptermui::{App, EntityId, SingletonEntity};
 use settings::Setting as _;
 
 use crate::ai::agent::conversation::AIConversationId;
@@ -1328,8 +1328,8 @@ fn profile_sources_preserve_state_across_migration_and_rollout() {
             app.add_model(|ctx| {
                 AIExecutionProfilesModel::new(
                     &LaunchMode::CommandLine {
-                        command: rook_cli::CliCommand::Whoami,
-                        global_options: rook_cli::GlobalOptions::default(),
+                        command: pterm_cli::CliCommand::Whoami,
+                        global_options: pterm_cli::GlobalOptions::default(),
                         debug: false,
                         is_sandboxed: true,
                         computer_use_override: None,

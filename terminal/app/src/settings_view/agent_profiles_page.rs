@@ -12,22 +12,22 @@ use std::path::{Path, PathBuf};
 use ::ai::api_keys::ApiKeyManager;
 use itertools::Itertools;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use regex::Regex;
-use rook_core::features::FeatureFlag;
-use rook_errors::{report_error, report_if_error};
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_errors::{report_error, report_if_error};
+use ptermui::elements::{
     ChildView, ConstrainedBox, Container, CrossAxisAlignment, Dismiss, Element, Flex,
     FormattedTextElement, HighlightedHyperlink, HyperlinkLens, HyperlinkUrl, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, ParentElement, Shrinkable, Text,
 };
-use rookui::keymap::ContextPredicate;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::slider::SliderStateHandle;
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{
+use ptermui::keymap::ContextPredicate;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::slider::SliderStateHandle;
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{
     Action, AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
     WeakViewHandle, id,
 };
+use regex::Regex;
 use settings::{Setting, ToggleableSetting};
 use strum::IntoEnumIterator;
 
@@ -1853,7 +1853,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 &(context.clone() & id!(flags::IS_ANY_AI_ENABLED)),
                 flags::SHOW_BASE_MODEL_PICKER_IN_PROMPT_FLAG,
             )
-            .with_group(bindings::BindingGroup::RookAi),
+            .with_group(bindings::BindingGroup::PtermAi),
         ],
         app,
     );
@@ -1919,13 +1919,13 @@ impl UsageWidget {
         is_unlimited: bool,
         workspace_is_delinquent_due_to_payment_issue: bool,
         appearance: &Appearance,
-    ) -> Box<dyn rookui::Element> {
+    ) -> Box<dyn ptermui::Element> {
         let mut row = Flex::row();
         if used >= limit || workspace_is_delinquent_due_to_payment_issue {
             row.add_child(
                 ConstrainedBox::new(
                     Icon::AlertTriangle
-                        .to_rookui_icon(appearance.theme().ui_error_color().into())
+                        .to_ptermui_icon(appearance.theme().ui_error_color().into())
                         .finish(),
                 )
                 .with_height(16.)
@@ -1984,7 +1984,7 @@ impl UsageWidget {
         is_unlimited: bool,
         workspace_is_delinquent_due_to_payment_issue: bool,
         appearance: &Appearance,
-    ) -> Box<dyn rookui::Element> {
+    ) -> Box<dyn ptermui::Element> {
         let request_usage_details = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::End)
             .with_child(self.render_request_usage_count(
@@ -2659,7 +2659,7 @@ impl AgentsWidget {
         dropdown_menu: &ViewHandle<Dropdown<AgentProfilesPageAction>>,
         ai_settings: &AISettings,
         appearance: &Appearance,
-        app: &rookui::AppContext,
+        app: &ptermui::AppContext,
     ) -> Box<dyn Element> {
         let header = Container::new(render_body_item_label_with_icon::<AgentProfilesPageAction>(
             header_text.into(),
@@ -2679,7 +2679,7 @@ impl AgentsWidget {
         let alert_icon = Container::new(
             ConstrainedBox::new(
                 Icon::AlertCircle
-                    .to_rookui_icon(
+                    .to_ptermui_icon(
                         appearance
                             .theme()
                             .sub_text_color(appearance.theme().surface_2()),
@@ -2758,7 +2758,7 @@ impl AgentsWidget {
         );
         render_ai_list(
             "Command denylist",
-            "Regular expressions to match commands that the Rook Agent should always ask permission to execute.",
+            "Regular expressions to match commands that the Polaris Terminal Agent should always ask permission to execute.",
             list,
             view,
             ai_settings,
@@ -2796,7 +2796,7 @@ impl AgentsWidget {
 
         render_ai_list(
             "Command allowlist",
-            "Regular expressions to match commands that can be automatically executed by the Rook Agent.",
+            "Regular expressions to match commands that can be automatically executed by the Polaris Terminal Agent.",
             list,
             view,
             ai_settings,
@@ -2899,7 +2899,7 @@ impl AgentsWidget {
             appearance,
             "Base model",
             Some(
-                "This model serves as the primary engine behind the Rook Agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. Rook may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.",
+                "This model serves as the primary engine behind the Polaris Terminal Agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. Polaris Terminal may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.",
             ),
             Some(show_in_prompt_checkbox),
             LocalOnlyIconState::Hidden,
@@ -2915,7 +2915,7 @@ impl AgentsWidget {
         view: &AgentProfilesPageView,
         ai_settings: &AISettings,
         appearance: &Appearance,
-        app: &rookui::AppContext,
+        app: &ptermui::AppContext,
     ) -> Box<dyn Element> {
         let code_settings = CodeSettings::as_ref(app);
         let toggle = render_ai_setting_toggle::<CodebaseContextEnabled>(
@@ -2930,7 +2930,7 @@ impl AgentsWidget {
 
         let codebase_context_description = vec![
             FormattedTextFragment::plain_text(
-                "Allow the Rook Agent to generate an outline of your codebase that can be used for context. No code is ever stored on our servers. ",
+                "Allow the Polaris Terminal Agent to generate an outline of your codebase that can be used for context. No code is ever stored on our servers. ",
             ),
             FormattedTextFragment::hyperlink(
                 "Learn more",
@@ -3003,7 +3003,7 @@ impl AgentsWidget {
         let subtext = {
             let subtext_fragments = vec![
                 FormattedTextFragment::plain_text(
-                    "You haven't added any MCP servers yet. Once you do, you'll be able to control how much autonomy the Rook Agent has when interacting with them. ",
+                    "You haven't added any MCP servers yet. Once you do, you'll be able to control how much autonomy the Polaris Terminal Agent has when interacting with them. ",
                 ),
                 FormattedTextFragment::hyperlink_action(
                     "Add a server",
@@ -3085,7 +3085,7 @@ impl AgentsWidget {
         {
             let allowlist = self.render_mcp_list(
                 "MCP allowlist",
-                "Allow the Rook Agent to call these MCP servers.",
+                "Allow the Polaris Terminal Agent to call these MCP servers.",
                 &view.mcp_allowlist_dropdown,
                 BlocklistAIPermissions::as_ref(app).get_mcp_allowlist(app, None),
                 view.mcp_allowlist_mouse_state_handles.clone(),
@@ -3102,7 +3102,7 @@ impl AgentsWidget {
         {
             let denylist = self.render_mcp_list(
                 "MCP denylist",
-                "The Rook Agent will always ask for permission before calling any MCP servers on this list.",
+                "The Polaris Terminal Agent will always ask for permission before calling any MCP servers on this list.",
                 &view.mcp_denylist_dropdown,
                 BlocklistAIPermissions::as_ref(app).get_mcp_denylist(app, None),
                 view.mcp_denylist_mouse_state_handles.clone(),

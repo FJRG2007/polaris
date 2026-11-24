@@ -3,9 +3,9 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use instant::Instant;
-use rook_errors::report_error;
-use rookui::r#async::Timer;
-use rookui::{SingletonEntity, ViewContext};
+use pterm_errors::report_error;
+use ptermui::r#async::Timer;
+use ptermui::{SingletonEntity, ViewContext};
 use session_sharing_protocol::common::SessionId;
 use uuid::Uuid;
 

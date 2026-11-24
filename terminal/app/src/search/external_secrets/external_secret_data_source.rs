@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rookui::AppContext;
+use ptermui::AppContext;
 
 use super::external_secret_fuzzy_match::FuzzyMatchExternalSecretResult;
 use super::external_secret_search_item::ExternalSecretSearchItem;

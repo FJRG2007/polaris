@@ -1,12 +1,12 @@
-use rook_core::ui::color::ContrastingColor;
-use rook_core::ui::color::contrast::MinimumAllowedContrast;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::ui::color::ContrastingColor;
+use pterm_core::ui::color::contrast::MinimumAllowedContrast;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     Border, Clipped, ConstrainedBox, Container, DispatchEventResult, DropTarget, Element,
     EventHandler, Flex, Hoverable, ParentElement, SavePosition, Stack,
 };
-use rookui::presenter::ChildView;
-use rookui::{AppContext, SingletonEntity as _, ViewContext};
+use ptermui::presenter::ChildView;
+use ptermui::{AppContext, SingletonEntity as _, ViewContext};
 
 use super::common::{
     add_input_suggestions_overlays, wrap_input_with_terminal_padding_and_focus_handler,
@@ -152,7 +152,7 @@ impl Input {
 
     /// Keep the rich input editor's text colors legible when it's rendered on
     /// top of an alt-screen CLI agent's inferred background (e.g. OpenCode),
-    /// which does not respect the Rook theme. When no alt-screen-backed CLI
+    /// which does not respect the Polaris Terminal theme. When no alt-screen-backed CLI
     /// agent rich input is active, restores the theme default text colors.
     ///
     /// This mirrors the contrast-adjustment pattern used for the use-agent

@@ -3,7 +3,7 @@ Linear: [CODE-1822 — Orchestration](https://linear.app/warpdotdev/issue/CODE-1
 Depends on: [specs/code-1822-tui-local-children/TECH.md](../code-1822-tui-local-children/TECH.md)
 
 ## Summary
-The Rook TUI can launch cloud child agents from an accepted orchestration request and represent each child as a retained, navigable cloud session. Before cloud session viewing is available, the child surface is read-only and shows the cloud run's status plus an actionable link to view the run in Oz.
+The Polaris Terminal TUI can launch cloud child agents from an accepted orchestration request and represent each child as a retained, navigable cloud session. Before cloud session viewing is available, the child surface is read-only and shows the cloud run's status plus an actionable link to view the run in Oz.
 
 ## Figma
 Figma: none provided.
@@ -26,7 +26,7 @@ Figma: none provided.
 
 ## Behavior
 ### Launch and navigation
-1. When the user accepts a valid remote `run_agents` request in the TUI, Rook starts each requested cloud child using the approved run-wide execution configuration and that child's name, title, and prompt.
+1. When the user accepts a valid remote `run_agents` request in the TUI, Polaris Terminal starts each requested cloud child using the approved run-wide execution configuration and that child's name, title, and prompt.
 2. Each cloud child gets a retained TUI session as soon as its launch is dispatched. The session is created before the server assigns a cloud run ID, allowing startup progress and actionable startup blockers to remain visible.
 3. A newly created cloud child appears in the existing orchestration tab bar as soon as it is a navigable retained session. Creating it does not steal focus from the orchestrator or another selected child.
 4. Selecting the cloud child's orchestration tab focuses the same retained session for that child's lifetime. Status updates never replace the session, change its identity, reset orchestration paging, or steal focus.
@@ -48,7 +48,7 @@ Figma: none provided.
 13. From session creation until a run ID or startup issue is received, the cloud session shows a running/attention glyph and a message equivalent to `Starting cloud run…`.
 14. A successful server response associates the returned task ID and run ID with the existing child session and resolves that child as launched in the parent `run_agents` result.
 15. Once the run ID is available, the cloud session displays `Click the link or hit Enter to view cloud run here:` followed by the run's Oz URL.
-16. The Oz URL targets the current Rook channel's Oz web application and the assigned run ID. The link never waits for a shared terminal session to become available.
+16. The Oz URL targets the current Polaris Terminal channel's Oz web application and the assigned run ID. The link never waits for a shared terminal session to become available.
 17. The visible URL is selectable and copyable as text.
 18. Clicking the link opens it in the user's configured browser.
 19. Pressing Enter while the read-only cloud child or its orchestration tab bar is focused opens its current primary link. For a launched child this is the Oz run URL; for an authentication-blocked child this is the authentication URL.

@@ -1,5 +1,5 @@
-use rook_util::standardized_path::StandardizedPath;
-use rookui_core::App;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui_core::App;
 
 use super::*;
 use crate::StandingQueryContent;
@@ -15,7 +15,7 @@ fn snapshot_and_incremental_update_maintain_remote_standing_results() {
         let host = HostId::new("remote-host".to_string());
         let repo_path = path("/repo");
         let skill = StandingQueryContent::file(path("/repo/.agents/skills/review/SKILL.md"));
-        let rule = StandingQueryContent::file(path("/repo/ROOK.md"));
+        let rule = StandingQueryContent::file(path("/repo/POLARIS_TERMINAL.md"));
         let id = RemoteRepositoryIdentifier::new(host.clone(), repo_path.clone());
         let snapshot = RepoMetadataUpdate {
             repo_path: repo_path.clone(),

@@ -44,7 +44,7 @@ running, so the save path works:
 | --- | --- |
 | 1 | `<dev>/polaris` |
 | 3 | `<dev>/ByteHide` |
-| 6 | `<dev>/rook` |
+| 6 | `<dev>/polaris-terminal` |
 
 The `blocks` table records the directory each command ran in. After the launch
 at 08:32:40, the panes above ran their next commands here:
@@ -59,7 +59,7 @@ The launch before it explains why they had nothing to restore. It was a
 three-second session, ended by an update:
 
 ```
-02:45:33Z Starting rook ...
+02:45:33Z Starting polaris-terminal ...
 02:45:33Z dispatching global action for root_view:open_from_restored
 02:45:33Z Creating terminal model with 4 restored blocks      (x6)
 02:45:34Z Starting direct shell process: powershell.exe       (x6)
@@ -102,7 +102,7 @@ directory was only safe there because it was read first.
 
 - A shell killed after the user has changed directory, where the pane is
   snapshotted with no live session: the startup path is restored rather than
-  the last directory. On Windows this is not the shutdown path - Rook saves on
+  the last directory. On Windows this is not the shutdown path - Polaris Terminal saves on
   `WM_ENDSESSION` while the shells are still alive - so what it affects is a
   shell that crashes and a pane left behind it.
 - A WSL pane whose startup path was stored in its unix form rather than the

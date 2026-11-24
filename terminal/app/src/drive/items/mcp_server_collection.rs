@@ -1,7 +1,7 @@
-use rookui::elements::MouseStateHandle;
-use rookui::{AppContext, Element};
+use ptermui::elements::MouseStateHandle;
+use ptermui::{AppContext, Element};
 
-use super::{RookDriveItem, RookDriveItemId};
+use super::{PtermDriveItem, PtermDriveItemId};
 use crate::appearance::Appearance;
 use crate::cloud_object::CloudObjectMetadata;
 use crate::drive::DriveObjectType;
@@ -10,11 +10,11 @@ use crate::server::ids::ClientId;
 use crate::themes::theme::Fill;
 
 #[derive(Clone)]
-pub struct RookDriveMCPServerCollection {
+pub struct PtermDriveMCPServerCollection {
     id: ClientId,
 }
 
-impl RookDriveMCPServerCollection {
+impl PtermDriveMCPServerCollection {
     pub fn new(id: ClientId) -> Self {
         Self { id }
     }
@@ -24,7 +24,7 @@ impl RookDriveMCPServerCollection {
     }
 }
 
-impl RookDriveItem for RookDriveMCPServerCollection {
+impl PtermDriveItem for PtermDriveMCPServerCollection {
     fn display_name(&self) -> Option<String> {
         Some("MCP Servers".to_string())
     }
@@ -49,8 +49,8 @@ impl RookDriveItem for RookDriveMCPServerCollection {
         None
     }
 
-    fn rook_drive_id(&self) -> RookDriveItemId {
-        RookDriveItemId::MCPServerCollection
+    fn pterm_drive_id(&self) -> PtermDriveItemId {
+        PtermDriveItemId::MCPServerCollection
     }
 
     fn sync_status_icon(
@@ -66,7 +66,7 @@ impl RookDriveItem for RookDriveMCPServerCollection {
         None
     }
 
-    fn clone_box(&self) -> Box<dyn RookDriveItem> {
+    fn clone_box(&self) -> Box<dyn PtermDriveItem> {
         Box::new(self.clone())
     }
 }

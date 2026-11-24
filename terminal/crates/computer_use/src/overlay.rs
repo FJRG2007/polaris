@@ -49,7 +49,7 @@ pub enum PointerEventKind {
     Down,
     Move,
     Up,
-    /// A pointer-position sample taken when a scroll rooks the pointer before
+    /// A pointer-position sample taken when a scroll pterms the pointer before
     /// wheeling. It never participates in click/drag gesture classification;
     /// it only keeps the synthetic cursor (and a later release's coordinate)
     /// tracking the pointer.
@@ -1092,7 +1092,7 @@ fn append_motion_dialogues(
 /// never the background agent seat's — so this pass is what makes the
 /// artifact's pointer visible, identically for screen and window scopes.
 ///
-/// Raw XTEST dispatch rooks the pointer instantly between action points, so a
+/// Raw XTEST dispatch pterms the pointer instantly between action points, so a
 /// faithful piecewise-constant cursor teleports, which reads as choppy.
 /// Instead the glyph holds at each event's position and then glides into the
 /// next event with an eased approach (see [`build_motion_spans`]) that

@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use rook_core::ui::appearance::Appearance;
-use rookui::Element;
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::{CacheOption, Icon, Image};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::Element;
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::{CacheOption, Icon, Image};
 
 /// Returns a special icon for the given file path, if any.
 pub fn icon_from_file_path(path: &str, appearance: &Appearance) -> Option<Box<dyn Element>> {

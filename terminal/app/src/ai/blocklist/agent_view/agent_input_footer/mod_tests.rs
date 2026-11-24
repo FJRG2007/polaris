@@ -1,6 +1,6 @@
 use chrono::Utc;
 use persistence::model::ConversationUsageMetadata;
-use rookui::{App, SingletonEntity};
+use ptermui::{App, SingletonEntity};
 
 use super::*;
 use crate::ai::agent::api::ServerConversationToken;

@@ -1,12 +1,12 @@
 use pathfinder_geometry::vector::vec2f;
-use rookui::elements::{
+use ptermui::elements::{
     Align, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Highlight,
     ParentElement, Radius, Shrinkable, Wrap,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::units::IntoPixels;
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::units::IntoPixels;
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::context_chips::display_chip::{

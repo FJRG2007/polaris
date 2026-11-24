@@ -5,11 +5,11 @@ use ai::api_keys::{
     GeapMintBinding, GeapRefreshOutcome, LoadGeapCredentialsError,
 };
 use futures::channel::oneshot;
-use rook_errors::report_error;
-use rook_managed_secrets::ManagedSecretManager;
-use rook_managed_secrets::client::{IdentityTokenOptions, TaskIdentityToken};
-use rookui::r#async::Timer;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_errors::report_error;
+use pterm_managed_secrets::ManagedSecretManager;
+use pterm_managed_secrets::client::{IdentityTokenOptions, TaskIdentityToken};
+use ptermui::r#async::Timer;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 use vec1::vec1;
 
@@ -281,7 +281,7 @@ fn refresh_geap_credentials_with_options(
     manager.set_geap_credentials_state(GeapCredentialsState::Refreshing { previous }, ctx);
 
     // Leg 1: every mint — initial or re-mint, timer/trigger/forced — starts
-    // with a brand-new Rook OIDC JWT, consumed exactly once by the STS
+    // with a brand-new Polaris Terminal OIDC JWT, consumed exactly once by the STS
     // exchange below and never cached across mints.
     let token_future = ManagedSecretManager::handle(ctx)
         .as_ref(ctx)
@@ -498,7 +498,7 @@ struct GenerateAccessTokenResponse {
     expire_time: String,
 }
 
-/// Legs 2 and 3 of the mint: exchanges the Rook OIDC JWT at Google STS for a
+/// Legs 2 and 3 of the mint: exchanges the Polaris Terminal OIDC JWT at Google STS for a
 /// federated token, then (when configured) impersonates the workspace's
 /// service account for the final ~1h access token.
 async fn exchange_identity_token_for_geap_credentials(

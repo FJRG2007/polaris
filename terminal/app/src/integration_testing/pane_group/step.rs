@@ -1,4 +1,4 @@
-use rookui::integration::TestStep;
+use ptermui::integration::TestStep;
 
 use crate::integration_testing::view_getters::pane_group_view;
 use crate::pane_group::tree::Direction;

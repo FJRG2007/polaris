@@ -1,6 +1,6 @@
-use rook_core::send_telemetry_from_ctx;
-use rookui::elements::{ChildView, Flex, ParentElement as _};
-use rookui::{
+use pterm_core::send_telemetry_from_ctx;
+use ptermui::elements::{ChildView, Flex, ParentElement as _};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, TypedActionView, View, ViewContext, ViewHandle,
 };
 

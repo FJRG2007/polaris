@@ -1,7 +1,7 @@
 // Hard coded constants to divide keybindings into their respective categories/sections.
 // This should always align with documentation: https://docs.rook.dev/getting-started/keyboard-shortcuts
 
-use rookui::keymap::Keystroke;
+use ptermui::keymap::Keystroke;
 
 use crate::util::bindings::CommandBinding;
 
@@ -107,9 +107,9 @@ pub const TERMINAL_KEYBINDINGS: &[&str] = &[
 
 pub const FUNDAMENTALS_KEYBINDINGS: &[&str] = &[
     "workspace:new_window",
-    "workspace:hide_rook",
+    "workspace:hide_pterm",
     "workspace:hide_others",
-    "workspace:quit_rook",
+    "workspace:quit_pterm",
     "workspace:minimize",
 ];
 
@@ -118,8 +118,8 @@ pub const FUNDAMENTALS_KEYBINDINGS: &[&str] = &[
 pub fn get_additional_keybindings() -> Vec<CommandBinding> {
     vec![
         CommandBinding::new(
-            "workspace:hide_rook".into(),
-            "Hide Rook".into(),
+            "workspace:hide_pterm".into(),
+            "Hide Polaris Terminal".into(),
             Some(Keystroke::parse("cmd-h").expect("Valid keystroke")),
         ),
         CommandBinding::new(
@@ -128,8 +128,8 @@ pub fn get_additional_keybindings() -> Vec<CommandBinding> {
             Some(Keystroke::parse("alt-cmd-h").expect("Valid keystroke")),
         ),
         CommandBinding::new(
-            "workspace:quit_rook".into(),
-            "Quit Rook".into(),
+            "workspace:quit_pterm".into(),
+            "Quit Polaris Terminal".into(),
             Some(Keystroke::parse("cmd-q").expect("Valid keystroke")),
         ),
         CommandBinding::new(

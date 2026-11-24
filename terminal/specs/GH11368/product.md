@@ -1,19 +1,19 @@
-# Product Spec: Support 'agy' (Antigravity) CLI Agent in Rook
+# Product Spec: Support 'agy' (Antigravity) CLI Agent in Polaris Terminal
 
-**Issue:** [FJRG2007/rook#11368](https://github.com/FJRG2007/rook/issues/11368)
+**Issue:** [FJRG2007/polaris#11368](https://github.com/FJRG2007/polaris/issues/11368)
 **Figma:** none provided
 
 ## Summary
 
-Add native support for the `agy` (Antigravity) CLI agent in Rook. This enables the terminal to automatically identify `agy` command executions and transition the active pane into "Agent Mode" (with dedicated layouts, toolbars, and branding).
+Add native support for the `agy` (Antigravity) CLI agent in Polaris Terminal. This enables the terminal to automatically identify `agy` command executions and transition the active pane into "Agent Mode" (with dedicated layouts, toolbars, and branding).
 
 ## Problem
 
-The Antigravity CLI agent (`agy`) is an autonomous developer tool. While users can run it in Rook today, Rook currently lacks native support for it as a recognized agent:
+The Antigravity CLI agent (`agy`) is an autonomous developer tool. While users can run it in Polaris Terminal today, Polaris Terminal currently lacks native support for it as a recognized agent:
 1. Running `agy` does not trigger the terminal's Agent Mode layout or toolbar.
 2. The UI does not brand the session with the Antigravity logo or colors.
 
-Note: Richer notifications (OSC 777) and plugin installation are deferred until an official Antigravity plugin for Rook exists.
+Note: Richer notifications (OSC 777) and plugin installation are deferred until an official Antigravity plugin for Polaris Terminal exists.
 
 ## Goals
 
@@ -28,7 +28,7 @@ Note: Richer notifications (OSC 777) and plugin installation are deferred until 
 
 ## Success Criteria
 
-1. Running `agy` in Rook launches Agent Mode and styles the pane with Antigravity branding.
+1. Running `agy` in Polaris Terminal launches Agent Mode and styles the pane with Antigravity branding.
 2. The command is properly classified as a one-off shell command.
 
 ## Validation

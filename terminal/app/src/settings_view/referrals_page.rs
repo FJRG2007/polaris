@@ -5,17 +5,17 @@ use lazy_static::lazy_static;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-use rook_errors::report_error;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_errors::report_error;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Align, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Element, Fill,
     Flex, FormattedTextElement, HighlightedHyperlink, Icon, MainAxisSize, MouseStateHandle,
     ParentElement, Radius, Rect, Shrinkable,
 };
-use rookui::fonts::Weight;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Entity, EventContext, FocusContext, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -38,8 +38,9 @@ use crate::{safe_info, send_telemetry_from_ctx};
 
 const HEADER_FONT_SIZE: f32 = 18.;
 const HEADER_MARGIN_BOTTOM: f32 = 32.;
-const HEADER_TEXT: &str = "Invite a friend to Rook";
-const ANONYMOUS_USER_HEADER_TEXT: &str = "Sign up to participate in Rook's referral program";
+const HEADER_TEXT: &str = "Invite a friend to Polaris Terminal";
+const ANONYMOUS_USER_HEADER_TEXT: &str =
+    "Sign up to participate in Polaris Terminal's referral program";
 
 const INVITE_FIELD_LABEL_BOTTOM_MARGIN: f32 = 8.;
 
@@ -61,7 +62,7 @@ const LINK_COPIED_TOAST: &str = "Link copied.";
 const EMAIL_SUCCESS_TOAST: &str = "Successfully sent emails.";
 const EMAIL_FAILURE_TOAST: &str = "Failed to send emails. Please try again.";
 
-const REWARD_INTRO: &str = "Get exclusive Rook goodies when you refer someone*";
+const REWARD_INTRO: &str = "Get exclusive Polaris Terminal goodies when you refer someone*";
 const REWARD_INTRO_FONT_SIZE: f32 = 14.;
 const REWARD_SECTION_VERTICAL_SPACING: f32 = 24.;
 

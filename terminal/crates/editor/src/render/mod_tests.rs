@@ -1,7 +1,7 @@
 //! End-to-end editor tests.
 
-use rook_core::features::FeatureFlag;
-use rookui_core::{App, ModelHandle, ReadModel};
+use pterm_core::features::FeatureFlag;
+use ptermui_core::{App, ModelHandle, ReadModel};
 use string_offset::CharOffset;
 
 use super::model::test_utils::{TEST_STYLES, init_logging};

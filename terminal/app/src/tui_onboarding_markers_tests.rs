@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use async_trait::async_trait;
-use rookui::App;
+use ptermui::App;
 
 use super::{
     MarkerLoadResult, MarkerPersistenceAction, TuiOnboardingMarker, TuiOnboardingMarkers,

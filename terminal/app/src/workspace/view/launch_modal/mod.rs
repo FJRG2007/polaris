@@ -8,22 +8,22 @@ use markdown_parser::{FormattedText, FormattedTextLine, parse_markdown};
 // Re-export slide types for convenience
 pub use oz_launch::OzLaunchSlide;
 use pathfinder_color::ColorU;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::{
     Align, Border, CacheOption, ChildAnchor, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DropShadow, Empty, Expanded, Flex, FormattedTextElement,
     HighlightedHyperlink, Hoverable, HyperlinkLens, Image, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius,
     Shrinkable, SizeConstraintCondition, SizeConstraintSwitch, Stack,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::FixedBinding;
-use rookui::platform::Cursor;
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::Cursor;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -34,7 +34,7 @@ use crate::view_components::action_button::{ActionButton, PrimaryTheme, Secondar
 use crate::workspace::view::launch_modal::cta_button::{CTAButton, CTAButtonAction};
 
 pub fn init<S: Slide>(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new("escape", LaunchModalAction::<S>::Close, id!("LaunchModal")),
@@ -372,7 +372,7 @@ impl<S: Slide> LaunchModal<S> {
                                         .with_child(
                                             Container::new(
                                                 ConstrainedBox::new(
-                                                    icon.to_rookui_icon(Fill::Solid(
+                                                    icon.to_ptermui_icon(Fill::Solid(
                                                         blended_colors::text_main(
                                                             theme,
                                                             blended_colors::neutral_2(theme),

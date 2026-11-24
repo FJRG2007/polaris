@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use rook_util::path::user_friendly_path;
-use rookui::elements::{Border, ChildView, Container, Hoverable, MouseStateHandle, Text};
-use rookui::platform::Cursor;
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::components::UiComponentStyles;
-use rookui::{
+use pterm_util::path::user_friendly_path;
+use ptermui::elements::{Border, ChildView, Container, Hoverable, MouseStateHandle, Text};
+use ptermui::platform::Cursor;
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::components::UiComponentStyles;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 

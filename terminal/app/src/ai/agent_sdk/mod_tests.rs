@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use clap::Parser;
-use rook_cli::agent::{AgentCommand, Harness, RunAgentArgs};
-use rook_cli::artifact::{
+use pterm_cli::agent::{AgentCommand, Harness, RunAgentArgs};
+use pterm_cli::artifact::{
     ArtifactCommand, DownloadArtifactArgs, GetArtifactArgs, UploadArtifactArgs,
 };
-use rook_cli::task::{MessageCommand, MessageSendArgs, MessageWatchArgs, TaskCommand};
-use rook_cli::{Args, CliCommand, Command};
-use rook_core::telemetry::TelemetryEvent;
-use rookui::{App, SingletonEntity, WindowId};
+use pterm_cli::task::{MessageCommand, MessageSendArgs, MessageWatchArgs, TaskCommand};
+use pterm_cli::{Args, CliCommand, Command};
+use pterm_core::telemetry::TelemetryEvent;
+use ptermui::{App, SingletonEntity, WindowId};
 use serde_json::json;
 
 use super::{
@@ -29,8 +29,9 @@ use crate::workspaces::workspace::{Workspace, WorkspaceUid};
 const TASK_ID: &str = "00000000-0000-0000-0000-000000000001";
 
 fn parse_run_agent_args(args: &[&str]) -> RunAgentArgs {
-    let parsed = Args::try_parse_from(std::iter::once("rook").chain(args.iter().copied()))
-        .expect("agent run args should parse");
+    let parsed =
+        Args::try_parse_from(std::iter::once("polaris-terminal").chain(args.iter().copied()))
+            .expect("agent run args should parse");
     let Some(Command::CommandLine(command)) = parsed.command() else {
         panic!("expected a CLI command");
     };

@@ -1,10 +1,10 @@
 ---
 name: terminal-gui-settings-ui
-description: GUI desktop app only. How to build a Settings page in the Rook client (app/src/settings_view) so its widgets and settings search behave correctly — picking a PageType, deciding whether a heading belongs in the page-title slot or inside a widget, gating a widget, and scoping search_terms per widget. Use when adding or editing a settings page, a SettingsWidget, or anything that affects settings search.
+description: GUI desktop app only. How to build a Settings page in the Polaris Terminal client (app/src/settings_view) so its widgets and settings search behave correctly — picking a PageType, deciding whether a heading belongs in the page-title slot or inside a widget, gating a widget, and scoping search_terms per widget. Use when adding or editing a settings page, a SettingsWidget, or anything that affects settings search.
 ---
 
 # terminal-gui-settings-ui
-**Scope — GUI desktop app only.** This skill covers the settings modal in `app/src/settings_view/`, part of Rook's **GUI** desktop front-end. It does not apply to the headless TUI (`crates/rook_tui`). For general UI conventions see `terminal-gui-ui-guidelines`.
+**Scope — GUI desktop app only.** This skill covers the settings modal in `app/src/settings_view/`, part of Polaris Terminal's **GUI** desktop front-end. It does not apply to the headless TUI (`crates/pterm_tui`). For general UI conventions see `terminal-gui-ui-guidelines`.
 
 Settings pages look simple, so they get written by pattern-matching the nearest neighbor — and the nearest neighbor is often wrong. The same two mistakes have produced five Linear tickets (APP-5060, APP-5058, APP-4910, APP-4922, APP-5059, one of which turned out to be a false positive). Read this before writing a settings page so the sixth doesn't happen.
 
@@ -93,7 +93,7 @@ if cfg!(feature = "voice_input")
 
 The reason is *when each is evaluated*. The build-time `if` runs once, when the page is constructed, and its result is frozen until something rebuilds the page (for AI/Code subpages, only switching subpages does — see below). `should_render` is re-evaluated on every filter and render pass, so it tracks a value that changes while the settings page is open. Gate a runtime-changing value with a build-time `if` and the page goes stale; gate a static flag with `should_render` and you carry a widget around for nothing.
 
-The real `should_render` users are all the runtime kind: `SettingsSyncWidget` (`main_page.rs`) on auth state, `RookDriveToggleWidget` (`rook_drive_page.rs`) on `RookDriveSettings::is_rook_drive_available`, and the CLI-agent rich-input widgets (`ai_page.rs`) on the user-toggleable footer setting, via `should_render_cli_agent_rich_input`.
+The real `should_render` users are all the runtime kind: `SettingsSyncWidget` (`main_page.rs`) on auth state, `PtermDriveToggleWidget` (`pterm_drive_page.rs`) on `PtermDriveSettings::is_pterm_drive_available`, and the CLI-agent rich-input widgets (`ai_page.rs`) on the user-toggleable footer setting, via `should_render_cli_agent_rich_input`.
 
 Either mechanism keeps search honest: an uncreated widget isn't in the list, and `update_filter` already skips a widget whose `should_render` is false. What you must never do is hide rows inside `render` while `search_terms` still advertises them — that makes the page match a query and then show nothing for it.
 
@@ -111,12 +111,12 @@ Getting this wrong in the first direction is bug class 1 below. Getting it wrong
 Classify the page before you write it:
 
 - **Single-topic page** — one heading names everything on it, but the content is still made of separately-matchable widgets. Knowledge, Third party CLI agents, Editor and Code Review, Account, Scripting. → **Title in the `PageType` slot.**
-- **Multi-section page** — several independent sections, each with its own heading. Rook Agent, Agent profiles, Appearance, Features. → **Per-section headings live in widgets/categories** and correctly disappear with their rows. (For `Categorized`, `get_filtered` drops categories whose widgets all filtered out, so their subheaders vanish automatically — that's the behavior you want.)
+- **Multi-section page** — several independent sections, each with its own heading. Polaris Terminal Agent, Agent profiles, Appearance, Features. → **Per-section headings live in widgets/categories** and correctly disappear with their rows. (For `Categorized`, `get_filtered` drops categories whose widgets all filtered out, so their subheaders vanish automatically — that's the behavior you want.)
 - **Monolith page** — Keybindings, Teams, About, Environments, Codebase Indexing. There is no partial-match state: the sole widget either matches, and the whole page renders, or it doesn't, and the whole page renders empty and drops out of the sidebar. So a monolith can never strand an orphaned setting under a missing heading — it is **not** affected by bug class 1, but for that reason, *not* because its title is protected. Passing the title through the slot is still the tidier structure (Billing and Usage and Referrals do), just don't expect it to keep the title on screen during a non-matching search; on a monolith it will not. Codebase Indexing looks single-topic but is really one unfilterable widget covering the whole page (`CodePageWidget`, wrapped by `CodeIndexingPageWidget`) — building it as `Uncategorized` instead of `Monolith` made the sidebar show a permanent, misleading "(1)" on any match ([APP-5530]).
 
 The two are not mutually exclusive: a page can name itself in the title slot **and** have per-section subheaders inside its widgets. Privacy does exactly that — `PageType::new_uncategorized(widgets, Some("Privacy"))` plus `render_sub_header` calls inside individual widgets. The rule is per heading, not per page.
 
-Worked positive example: **Scripting** (`scripting_page.rs`) is a small page done right — two focused widgets (`RookControlCliInstallWidget`, `LocalControlModeWidget`) with their own `search_terms`, and `PageType::new_uncategorized(widgets, Some("Scripting"))`. A ticket was once filed claiming Scripting needed splitting; it was canceled because the premise was wrong. A small page is not automatically a mega-widget.
+Worked positive example: **Scripting** (`scripting_page.rs`) is a small page done right — two focused widgets (`PtermControlCliInstallWidget`, `LocalControlModeWidget`) with their own `search_terms`, and `PageType::new_uncategorized(widgets, Some("Scripting"))`. A ticket was once filed claiming Scripting needed splitting; it was canceled because the premise was wrong. A small page is not automatically a mega-widget.
 
 ## Bug class 1 — the vanishing title
 
@@ -137,7 +137,7 @@ After, the heading moved to page chrome and the rows became focused widgets:
 let title = match subpage {
     AISubpage::Knowledge => Some("Knowledge"),
     AISubpage::ThirdPartyCLIAgents => Some("Third party CLI agents"),
-    AISubpage::RookAgent | AISubpage::Profiles => None,
+    AISubpage::PtermAgent | AISubpage::Profiles => None,
 };
 PageType::new_uncategorized(widgets, title)
 ```
@@ -183,7 +183,7 @@ Rules of thumb when splitting:
 - **Scope `search_terms` to that widget only.** Keep enough shared context that a page-level query still matches (each CLI-agent widget above keeps `"third party cli coding agent"`), then add the terms unique to the row.
 - **Give each row the right gating mechanism** (see "Two ways to gate a widget"). A row that used to sit behind an `if … { … }` inside a mega-`render` becomes its own widget: if its condition is a static feature flag or platform check, gate it with an `if` in the page's build function and never create it; if it can change at runtime, give it `should_render`. The CLI-agent rich-input rows are the runtime case — they hang off the user-toggleable footer setting — so they use `should_render` and share the predicate through a small free function (`should_render_cli_agent_rich_input(app)`) rather than duplicating the condition.
 - **Move per-row state with the row.** Each `SwitchStateHandle` / `MouseStateHandle` moves to the widget that owns its control. Never create one inline while rendering (see `terminal-gui-ui-guidelines` and the AGENTS.md note on `MouseStateHandle`).
-- **Watch the widget ids.** `widget_id()` is `std::any::type_name::<Self>()`, so splitting a widget changes ids. `settings_widget_deeplink_target` in `app/src/settings_view/mod.rs` maps stable public slugs (`rook://settings?widget=<slug>`) onto them. The CLI-agent split deliberately kept `CLIAgentWidget` as the first widget so `cli_agent_settings_widget_id()` — the target of the `cli_agents` deeplink — stayed valid. If you rename or remove a widget that backs a deeplink, re-point the accessor.
+- **Watch the widget ids.** `widget_id()` is `std::any::type_name::<Self>()`, so splitting a widget changes ids. `settings_widget_deeplink_target` in `app/src/settings_view/mod.rs` maps stable public slugs (`polaris-terminal://settings?widget=<slug>`) onto them. The CLI-agent split deliberately kept `CLIAgentWidget` as the first widget so `cli_agent_settings_widget_id()` — the target of the `cli_agents` deeplink — stayed valid. If you rename or remove a widget that backs a deeplink, re-point the accessor.
 
 ## Subpages rebuild their `PageType` — reapply the filter
 
@@ -194,14 +194,14 @@ The Code umbrella no longer works this way: `CodeIndexing` and `EditorAndCodeRev
 
 Useful to read, not to copy:
 
-- **Rookify** (`rookify_page.rs`) — `PageType::new_categorized(categories, None)` where the first category is `Category::new("", vec![Box::new(TitleWidget::default())])` and `TitleWidget::render` calls `render_page_title("Rookify", …)`. Single-topic page, title inside a widget: bug class 1.
-- **Rook Drive** (`rook_drive_page.rs`) — `PageType::new_uncategorized([RookDriveHeaderWidget, RookDriveToggleWidget], None)` with no title slot at all. `RookDriveHeaderWidget` is a conditional sign-up banner, so a signed-in user sees only a bare toggle row and no page heading.
+- **Ptermify** (`ptermify_page.rs`) — `PageType::new_categorized(categories, None)` where the first category is `Category::new("", vec![Box::new(TitleWidget::default())])` and `TitleWidget::render` calls `render_page_title("Ptermify", …)`. Single-topic page, title inside a widget: bug class 1.
+- **Polaris Terminal Drive** (`pterm_drive_page.rs`) — `PageType::new_uncategorized([PtermDriveHeaderWidget, PtermDriveToggleWidget], None)` with no title slot at all. `PtermDriveHeaderWidget` is a conditional sign-up banner, so a signed-in user sees only a bare toggle row and no page heading.
 
 ## How to verify a settings-page change
 
 Verification is cheap here; do both.
 
-1. **Unit-test the filter.** Word matching itself is covered in `app/src/settings_view/search_tests.rs`. `app/src/settings_view/mod_tests.rs` has the page harness — `StubWidget`, `stub_widgets_page`, and `visible_widget_count` (which reads `PageType::get_filtered`), and `exact` to build the query. Assert that a term unique to one widget yields exactly one visible widget, and that clearing the query restores all of them. Follow the `${filename}_tests.rs` convention from AGENTS.md; run with `cargo nextest run -p rook settings_view`.
+1. **Unit-test the filter.** Word matching itself is covered in `app/src/settings_view/search_tests.rs`. `app/src/settings_view/mod_tests.rs` has the page harness — `StubWidget`, `stub_widgets_page`, and `visible_widget_count` (which reads `PageType::get_filtered`), and `exact` to build the query. Assert that a term unique to one widget yields exactly one visible widget, and that clearing the query restores all of them. Follow the `${filename}_tests.rs` convention from AGENTS.md; run with `cargo nextest run -p polaris-terminal settings_view`.
 2. **Exercise the real search.** Open Settings, go to the page, and check three things:
    - a term matching exactly one row leaves **only** that row,
    - the **page title is still visible** while that filter is active — expect this on an `Uncategorized` / `Categorized` page; a monolith correctly disappears whole instead,

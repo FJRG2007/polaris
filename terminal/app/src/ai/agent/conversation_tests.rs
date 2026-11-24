@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use ai::api_keys::{ApiKeyManager, CustomEndpointParams, CustomEndpointSchema};
-use rook_core::features::FeatureFlag;
-use rookui::{App, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::{App, SingletonEntity};
 use warp_multi_agent_api as api;
 
 use super::{
@@ -1097,8 +1097,8 @@ fn footer_model_token_usage_keeps_custom_endpoint_usage_distinct_from_same_label
                 .get(&category),
             Some(&6)
         );
-        assert_eq!(byok_usage.rook_tokens, 0);
-        assert_eq!(custom_usage.rook_tokens, 0);
+        assert_eq!(byok_usage.pterm_tokens, 0);
+        assert_eq!(custom_usage.pterm_tokens, 0);
         assert_eq!(custom_usage.byok_tokens, 0);
     });
 }
@@ -1150,7 +1150,7 @@ fn footer_model_token_usage_preserves_unresolved_custom_endpoint_usage_with_fall
                 .get(&category),
             Some(&9)
         );
-        assert_eq!(custom_usage.rook_tokens, 0);
+        assert_eq!(custom_usage.pterm_tokens, 0);
     });
 }
 

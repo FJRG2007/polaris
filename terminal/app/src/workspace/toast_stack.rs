@@ -1,4 +1,4 @@
-use rookui::{Entity, ModelContext, SingletonEntity, WindowId};
+use ptermui::{Entity, ModelContext, SingletonEntity, WindowId};
 
 use crate::view_components::{DismissibleToast, ToastType};
 use crate::workspace::WorkspaceAction;

@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::fmt;
 
-use rookui::Action;
+use ptermui::Action;
 
 use crate::WorkspaceAction;
 use crate::server::telemetry::AddTabWithShellSource;

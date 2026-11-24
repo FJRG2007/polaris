@@ -4,9 +4,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use instant::Instant;
+pub use pterm_terminal::event::{ExecutedExecutorCommandEvent, ParseGeneratorOutputError};
+use pterm_util::lazy::Lazy;
 pub use remote_server::setup::RemoteServerSetupState;
-pub use rook_terminal::event::{ExecutedExecutorCommandEvent, ParseGeneratorOutputError};
-use rook_util::lazy::Lazy;
 
 use super::history::HistoryEntry;
 use super::model::ansi::{ExternalShellWidgetSelectionValue, FinishUpdateValue};
@@ -26,7 +26,7 @@ use crate::terminal::shell::ShellType;
 #[derive(Clone)]
 /// Events sent to the main thread by the terminal model & event loop.
 pub enum Event {
-    CompletionsFinished(Vec<ShellCompletion>, Option<rook_completer::meta::Span>),
+    CompletionsFinished(Vec<ShellCompletion>, Option<pterm_completer::meta::Span>),
     MouseCursorDirty,
     Title(String),
     VisibleBootstrapBlock,
@@ -89,8 +89,8 @@ pub enum Event {
     SourcedRcFileInSubshell(SourcedRcFileInSubshellEvent),
     /// Emitted when the active block's prompt has been updated.
     PromptUpdated,
-    /// Emitted when the honor_ps1 state of the shell is out-of-sync with Rook's settings.
-    /// This can happen in cases such as when the user changes between PS1 and Rook prompt inside
+    /// Emitted when the honor_ps1 state of the shell is out-of-sync with Polaris Terminal's settings.
+    /// This can happen in cases such as when the user changes between PS1 and Polaris Terminal prompt inside
     /// of an SSH session (the bindkeys are sent to the SSH session but not the local session, so
     /// they are out-of-sync when the user exits SSH).
     HonorPS1OutOfSync,
@@ -138,7 +138,7 @@ pub enum Event {
     },
     BootstrapPrecmdDone,
     /// A pluggable notification triggered via OSC 9 or OSC 777 escape sequences.
-    /// External programs can use this to trigger notifications in Rook.
+    /// External programs can use this to trigger notifications in Polaris Terminal.
     ///
     /// References:
     /// - OSC 9: <https://conemu.github.io/en/AnsiEscapeCodes.html#OSC_Operating_system_commands>
@@ -149,21 +149,21 @@ pub enum Event {
     },
 }
 
-impl From<rook_terminal::event::Event> for Event {
-    fn from(event: rook_terminal::event::Event) -> Self {
+impl From<pterm_terminal::event::Event> for Event {
+    fn from(event: pterm_terminal::event::Event) -> Self {
         match event {
-            rook_terminal::event::Event::MouseCursorDirty => Self::MouseCursorDirty,
-            rook_terminal::event::Event::ClipboardStore(clipboard, text) => {
+            pterm_terminal::event::Event::MouseCursorDirty => Self::MouseCursorDirty,
+            pterm_terminal::event::Event::ClipboardStore(clipboard, text) => {
                 Self::ClipboardStore(clipboard, text)
             }
-            rook_terminal::event::Event::ClipboardLoad(clipboard, load) => {
+            pterm_terminal::event::Event::ClipboardLoad(clipboard, load) => {
                 Self::ClipboardLoad(clipboard, load)
             }
-            rook_terminal::event::Event::CursorBlinkingChange(blinking) => {
+            pterm_terminal::event::Event::CursorBlinkingChange(blinking) => {
                 Self::CursorBlinkingChange(blinking)
             }
-            rook_terminal::event::Event::Bell => Self::Bell,
-            rook_terminal::event::Event::ImageReceived {
+            pterm_terminal::event::Event::Bell => Self::Bell,
+            pterm_terminal::event::Event::ImageReceived {
                 image_id,
                 image_data,
                 image_protocol,
@@ -197,9 +197,9 @@ pub enum TerminalMode {
 #[derive(Clone, Debug)]
 pub enum SshLoginStatus {
     /// We have some evidence login is complete but should check again.
-    RecheckBeforeRookifying,
+    RecheckBeforePtermifying,
     /// We have high confidence login is complete.
-    ReadyToRookify,
+    ReadyToPtermify,
 }
 
 #[derive(Clone, Debug)]
@@ -267,7 +267,7 @@ pub enum BlockType {
     /// This is a block containing background process output.
     Background(Arc<SerializedBlock>),
 
-    /// This is a block containing static/hardcoded content (e.g. the subshell Rookification
+    /// This is a block containing static/hardcoded content (e.g. the subshell Ptermification
     /// welcome block).
     Static,
 }

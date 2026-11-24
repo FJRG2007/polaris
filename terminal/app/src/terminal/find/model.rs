@@ -15,9 +15,9 @@ pub use async_find::{AsyncFindController, AsyncFindStatus};
 use block_list::run_find_on_block_list;
 pub use block_list::{BlockGridMatch, BlockListFindRun, BlockListMatch};
 use parking_lot::FairMutex;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity, ViewHandle};
 use rich_content::FindableRichContentHandle;
 pub use rich_content::{FindableRichContentView, RichContentMatchId};
-use rookui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity, ViewHandle};
 use settings::Setting as _;
 
 use crate::settings::InputModeSettings;

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
+use ptermui_core::{AppContext, Entity, ModelContext, ModelHandle};
 use rangemap::RangeSet;
-use rookui_core::{AppContext, Entity, ModelContext, ModelHandle};
 use string_offset::CharOffset;
 
 use super::anchor::{Anchor, AnchorSide};

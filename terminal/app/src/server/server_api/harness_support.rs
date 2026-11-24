@@ -51,7 +51,7 @@ pub enum UploadFieldValue {
     /// Client should compute CRC32C of the upload, base64-encode the 4-byte
     /// big-endian result, and send it as this field's value.
     // `snake_case` would derive `content_crc32_c`, which does not match the
-    // `ContentCRC32CFieldValue` discriminator in rook-server's OpenAPI schema.
+    // `ContentCRC32CFieldValue` discriminator in polaris-terminal-server's OpenAPI schema.
     #[serde(rename = "content_crc32c")]
     ContentCrc32C,
     /// Client should use the raw upload bytes as this field's value.
@@ -192,7 +192,7 @@ pub struct SnapshotFileInfo {
 /// list in the request, so callers match each upload target back to the filename
 /// they requested by position. The server does not include filenames on the
 /// response entries — see the `UploadSnapshotResponse` schema in
-/// `rook-server`'s `public_api/openapi.yaml`.
+/// `polaris-terminal-server`'s `public_api/openapi.yaml`.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct SnapshotUploadResponse {
     pub uploads: Vec<UploadTarget>,

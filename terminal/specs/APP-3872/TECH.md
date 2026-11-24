@@ -37,7 +37,7 @@ The recording API is exposed through `TestStep` helpers:
 This means annotated recording is opt-in at the test level. A test author does not need to change how clicks, drags, or keystrokes are authored once recording has started.
 
 ### Environment-Based Debugging API
-The existing environment variable `ROOK_INTEGRATION_TEST_VIDEO` remains available as a convenience override for automatic recording during test runs. This is useful for debugging, but the primary product-facing API remains the explicit step-based recording controls.
+The existing environment variable `POLARIS_TERMINAL_INTEGRATION_TEST_VIDEO` remains available as a convenience override for automatic recording during test runs. This is useful for debugging, but the primary product-facing API remains the explicit step-based recording controls.
 
 ## High-Level Architecture
 
@@ -77,7 +77,7 @@ This approach has a few benefits:
 If MP4 encoding fails, the implementation falls back to writing PNG frames.
 
 ### 4. How the overlay pixels are actually produced
-The implementation does not ask RookUI to render a second overlay scene and it does not add overlays after MP4 encoding. Instead, the compositor mutates each captured frame's RGBA pixel buffer in memory before the frame is converted to RGB/YUV and handed to OpenH264.
+The implementation does not ask PtermUI to render a second overlay scene and it does not add overlays after MP4 encoding. Instead, the compositor mutates each captured frame's RGBA pixel buffer in memory before the frame is converted to RGB/YUV and handed to OpenH264.
 
 The concrete flow is:
 - `VideoRecorder::finalize(...)` drains the captured `TimestampedFrame` list
@@ -261,8 +261,8 @@ If the current keyboard overlays are too pixelated, the best next step is to inc
 
 ## Validation
 Implementation was validated with:
-- `cargo check -p rookui_core --features integration_tests --manifest-path /Users/zach/Projects/rook_5/Cargo.toml`
-- `cargo check -p integration --manifest-path /Users/zach/Projects/rook_5/Cargo.toml`
+- `cargo check -p ptermui_core --features integration_tests --manifest-path /Users/zach/Projects/pterm_5/Cargo.toml`
+- `cargo check -p integration --manifest-path /Users/zach/Projects/pterm_5/Cargo.toml`
 
 For manual validation, the existing `integration/src/test/video_recording.rs` flow should be used to inspect:
 - click visibility

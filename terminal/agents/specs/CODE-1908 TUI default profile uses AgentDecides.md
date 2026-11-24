@@ -1,7 +1,7 @@
 *Spec: TUI default execution profile uses AgentDecides for shell commands*
 
 == PRODUCT ==
-*Summary:* When Rook starts the headless TUI with no explicitly configured
+*Summary:* When Polaris Terminal starts the headless TUI with no explicitly configured
 `agents.execution_profiles` collection, its materialized default agent profile
 must use `ActionPermission::AgentDecides` for `execute_commands`. The GUI must
 retain its existing `ActionPermission::AlwaysAsk` default, and any profile
@@ -104,7 +104,7 @@ TUI, requires GUI `AlwaysAsk`, and requires explicit user profiles to remain
 untouched. Triage and the independent investigation confirmed that the missing
 TUI collection is the only incorrect seed and that the shared default is used
 by GUI and other callers. The target is the client repository
-`FJRG2007/rook`; no server change is required. This changes headless
+`FJRG2007/polaris`; no server change is required. This changes headless
 permission/model initialization rather than rendered layout or interaction, so
 verification is code-level (regression tests plus presubmit), with no
 computer-use screenshot requirement.
@@ -155,7 +155,7 @@ presubmit gate.
    deterministic equivalent.
 7. Re-run the original focused profile test/reproduction after restoring the
    Cargo dependency-cache permissions:
-   `cargo test --manifest-path /workspace/rook/Cargo.toml -p rook --lib ai::execution_profiles::profiles_tests::tui_missing_collection_seeds_agent_decides_for_execute_commands -- --nocapture`.
+   `cargo test --manifest-path /workspace/polaris-terminal/Cargo.toml -p polaris-terminal --lib ai::execution_profiles::profiles_tests::tui_missing_collection_seeds_agent_decides_for_execute_commands -- --nocapture`.
    Record the before/after result: the base TUI seed is `AlwaysAsk`, while the
    fixed TUI seed is `AgentDecides`, and the GUI/explicit-profile guards pass.
 8. Run the adjacent execution-profile regression set in

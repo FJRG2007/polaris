@@ -1,12 +1,12 @@
 ---
 name: terminal-gui-create-launch-modal
-description: GUI desktop app only. Create a one-time launch modal in the Rook client (feature announcement, onboarding, etc.). Use when adding a new modal that should appear exactly once per user on startup, gated by a feature flag, with colors sourced from Rook theme tokens and terminal theme colors.
+description: GUI desktop app only. Create a one-time launch modal in the Polaris Terminal client (feature announcement, onboarding, etc.). Use when adding a new modal that should appear exactly once per user on startup, gated by a feature flag, with colors sourced from Polaris Terminal theme tokens and terminal theme colors.
 ---
 
 # terminal-gui-create-launch-modal
-**Scope — GUI desktop app only.** This skill applies to Rook's **GUI** desktop front-end (the `app/` crate on the RookUI pixel/GPU framework). It does **not** apply to the headless **TUI** front-end (`crates/rook_tui`; cell-grid `TuiElement` library under `crates/rookui_core/src/elements/tui`), which has its own components, tests, and change-verification workflow. For TUI work, see the `terminal-tui-ui-guidelines`, `terminal-tui-testing`, and `terminal-tui-verify-change` skills instead.
+**Scope — GUI desktop app only.** This skill applies to Polaris Terminal's **GUI** desktop front-end (the `app/` crate on the PtermUI pixel/GPU framework). It does **not** apply to the headless **TUI** front-end (`crates/pterm_tui`; cell-grid `TuiElement` library under `crates/ptermui_core/src/elements/tui`), which has its own components, tests, and change-verification workflow. For TUI work, see the `terminal-tui-ui-guidelines`, `terminal-tui-testing`, and `terminal-tui-verify-change` skills instead.
 
-Create a one-time launch modal — the feature-announcement design used for launches like "Orchestrate any agent, anywhere" or "Rook is now open-source."
+Create a one-time launch modal — the feature-announcement design used for launches like "Orchestrate any agent, anywhere" or "Polaris Terminal is now open-source."
 
 ## Reference implementation
 
@@ -14,14 +14,14 @@ Create a one-time launch modal — the feature-announcement design used for laun
 
 ## Checklist
 
-- [ ] Feature flag in `rook_features/src/lib.rs`
+- [ ] Feature flag in `pterm_features/src/lib.rs`
 - [ ] Settings field in `app/src/settings/ai.rs`
 - [ ] Trigger logic in `app/src/workspace/one_time_modal_model.rs`
 - [ ] View files under `app/src/workspace/view/<name>_launch_modal/`
 - [ ] Workspace wiring in `app/src/workspace/view.rs` and `app/src/workspace/mod.rs`
 - [ ] Debug actions in `app/src/workspace/action.rs`
 - [ ] Hero image at `app/assets/async/png/onboarding/<name>_launch_banner.png`
-- [ ] Any custom icons added to `crates/rook_core/src/ui/icons.rs` + SVG in `app/assets/bundled/svg/`
+- [ ] Any custom icons added to `crates/pterm_core/src/ui/icons.rs` + SVG in `app/assets/bundled/svg/`
 
 ---
 
@@ -29,7 +29,7 @@ Create a one-time launch modal — the feature-announcement design used for laun
 
 If the modal uses icons not yet in the `Icon` enum, add them before writing the view.
 
-In `crates/rook_core/src/ui/icons.rs`:
+In `crates/pterm_core/src/ui/icons.rs`:
 
 ```rust
 // Add to enum
@@ -45,7 +45,7 @@ Drop the SVG file at `app/assets/bundled/svg/your-icon-name.svg`. Use the same 2
 
 ## Step 1 – Feature flag
 
-Add to `crates/rook_features/src/lib.rs`:
+Add to `crates/pterm_features/src/lib.rs`:
 
 ```rust
 /// Enables the <name> launch modal.
@@ -203,7 +203,7 @@ Create `app/src/workspace/view/<name>_launch_modal/view.rs`. Copy from `orchestr
 
 ### Color sources (important)
 
-- Prefer Rook theme tokens for modal backgrounds, text, overlays, and borders:
+- Prefer Polaris Terminal theme tokens for modal backgrounds, text, overlays, and borders:
   - background surfaces: `appearance.theme().surface_3()` (or another `surface_*` token when needed)
   - primary/subtext: `appearance.theme().main_text_color(...)` and `appearance.theme().sub_text_color(...)`
   - overlays/hover fills: `appearance.theme().surface_overlay_1()` / `surface_overlay_2()`

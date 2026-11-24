@@ -1,5 +1,5 @@
 //! OAuth flow for connecting an xAI / Grok subscription (e.g. SuperGrok) to
-//! Rook, so users can "plug in" their subscription instead of pasting a
+//! Polaris Terminal, so users can "plug in" their subscription instead of pasting a
 //! pay-as-you-go API key.
 //!
 //! This mirrors the public Grok-CLI desktop OAuth flow: an OAuth 2.0
@@ -226,7 +226,7 @@ fn authorize_url(pkce: &PkceParams) -> String {
         ("code_challenge_method", "S256"),
         ("state", &pkce.state),
         ("plan", "generic"),
-        ("referrer", "rook"),
+        ("referrer", "polaris-terminal"),
     ];
     let query =
         serde_urlencoded::to_string(params).expect("static OAuth params are always serializable");
@@ -291,8 +291,8 @@ async fn run_oauth_flow(
             // port and shouldn't block a caller that only wants to retry.
             // `send_blocking` is disallowed (no wasm support); block this
             // dedicated thread on the async `send` instead.
-            let _ = rookui_core::r#async::block_on(release_tx.send(()));
-            let _ = rookui_core::r#async::block_on(tx.send(callback));
+            let _ = ptermui_core::r#async::block_on(release_tx.send(()));
+            let _ = ptermui_core::r#async::block_on(tx.send(callback));
         })
         .context("failed to spawn the Grok OAuth callback server thread")?;
 
@@ -564,14 +564,14 @@ async fn post_token_request<T: serde::Serialize + ?Sized>(
 }
 
 const SUCCESS_HTML: &str = "<!doctype html><html><head><meta charset=\"utf-8\">\
-<title>Rook — Grok connected</title></head>\
+<title>Polaris Terminal — Grok connected</title></head>\
 <body style=\"font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:3rem\">\
-<h1>Grok connected</h1><p>You can close this window and return to Rook.</p></body></html>";
+<h1>Grok connected</h1><p>You can close this window and return to Polaris Terminal.</p></body></html>";
 
 const FAILURE_HTML: &str = "<!doctype html><html><head><meta charset=\"utf-8\">\
-<title>Rook — Grok authorization failed</title></head>\
+<title>Polaris Terminal — Grok authorization failed</title></head>\
 <body style=\"font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:3rem\">\
-<h1>Authorization failed</h1><p>Something went wrong. Return to Rook and try again.</p></body></html>";
+<h1>Authorization failed</h1><p>Something went wrong. Return to Polaris Terminal and try again.</p></body></html>";
 
 #[cfg(test)]
 #[path = "oauth_tests.rs"]

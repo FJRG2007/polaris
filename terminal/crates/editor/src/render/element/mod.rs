@@ -7,19 +7,19 @@ use std::time::Duration;
 use float_cmp::ApproxEq;
 use instant::Instant;
 use parking_lot::Mutex;
-use rook_core::ui::theme::Fill as ThemeFill;
-use rook_errors::report_error;
-use rookui_core::color::ColorU;
-use rookui_core::elements::new_scrollable::{NewScrollableElement, ScrollableAxis};
-use rookui_core::elements::{
+use pterm_core::ui::theme::Fill as ThemeFill;
+use pterm_errors::report_error;
+use ptermui_core::color::ColorU;
+use ptermui_core::elements::new_scrollable::{NewScrollableElement, ScrollableAxis};
+use ptermui_core::elements::{
     Axis, Border, Dash, Point, ScrollData, ScrollableElement, Vector2FExt, ZIndex,
 };
-use rookui_core::event::{DispatchedEvent, ModifiersState};
-use rookui_core::geometry::rect::RectF;
-use rookui_core::geometry::vector::{Vector2F, vec2f};
-use rookui_core::platform::Cursor;
-use rookui_core::units::{IntoPixels, Pixels};
-use rookui_core::{
+use ptermui_core::event::{DispatchedEvent, ModifiersState};
+use ptermui_core::geometry::rect::RectF;
+use ptermui_core::geometry::vector::{Vector2F, vec2f};
+use ptermui_core::platform::Cursor;
+use ptermui_core::units::{IntoPixels, Pixels};
+use ptermui_core::{
     AfterLayoutContext, AppContext, Element, Event, EventContext, LayoutContext, ModelHandle,
     PaintContext, SizeConstraint, WeakViewHandle,
 };
@@ -87,7 +87,7 @@ pub enum VerticalExpansionBehavior {
 /// An element that renders rich text, with no additional UI or decorations.
 ///
 /// This element caches the positions listed in [`super::model::saved_positions::SavedPositions`],
-/// and the parent view can overlay UI controls on top of them using a [`rookui_core::elements::Stack`].
+/// and the parent view can overlay UI controls on top of them using a [`ptermui_core::elements::Stack`].
 ///
 /// It additionally reserves horizontal gutters, which are considered in-bounds for content hit
 /// testing.
@@ -1111,7 +1111,7 @@ impl<V: EditorView> Element for RichTextElement<V> {
             return;
         };
         ctx.scene
-            .start_layer(rookui_core::ClipBounds::BoundedBy(clip_bounds));
+            .start_layer(ptermui_core::ClipBounds::BoundedBy(clip_bounds));
         // Save the clipped content layer z-index for hover detection.
         self.content_z_index = Some(ctx.scene.z_index());
 
@@ -1270,7 +1270,7 @@ impl<V: EditorView> NewScrollableElement for RichTextElement<V> {
         })
     }
 
-    fn scroll(&mut self, delta: rookui_core::units::Pixels, axis: Axis, ctx: &mut EventContext) {
+    fn scroll(&mut self, delta: ptermui_core::units::Pixels, axis: Axis, ctx: &mut EventContext) {
         if let Some(action) = V::Action::scroll(delta, axis) {
             ctx.dispatch_typed_action(action);
         }
@@ -1291,7 +1291,7 @@ impl<V: EditorView> ScrollableElement for RichTextElement<V> {
         Some(self.vertical_scroll_data(app))
     }
 
-    fn scroll(&mut self, delta: rookui_core::units::Pixels, ctx: &mut EventContext) {
+    fn scroll(&mut self, delta: ptermui_core::units::Pixels, ctx: &mut EventContext) {
         if let Some(action) = V::Action::scroll(delta, Axis::Vertical) {
             ctx.dispatch_typed_action(action);
         }

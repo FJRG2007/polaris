@@ -1,11 +1,11 @@
 use std::path::Path;
 
-use rook_core::features::FeatureFlag;
-use rook_core::semantic_selection::SemanticSelection;
-use rook_errors::report_if_error;
-use rookui::rendering::GPUPowerPreference;
-use rookui::{AppContext, SingletonEntity};
-use rookui_extras::user_preferences;
+use pterm_core::features::FeatureFlag;
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_errors::report_if_error;
+use ptermui::rendering::GPUPowerPreference;
+use ptermui::{AppContext, SingletonEntity};
+use ptermui_extras::user_preferences;
 use settings::{Setting as _, SettingsManager};
 
 use super::app_icon::AppIconSettings;
@@ -17,7 +17,7 @@ use super::{
     AISettings, AccessibilitySettings, AliasExpansionSettings, AppEditorSettings,
     BlockVisibilitySettings, ChangelogSettings, CodeSettings, DebugSettings, EmacsBindingsSettings,
     FontSettings, FontSettingsChangedEvent, GPUSettings, InputBoxType, InputModeSettings,
-    InputSettings, LocalControlSettings, PaneSettings, RookDrivePrivacySettings,
+    InputSettings, LocalControlSettings, PaneSettings, PtermDrivePrivacySettings,
     SameLinePromptBlockSettings, ScrollSettings, SelectionSettings,
     SharedObjectLimitBannerSettings, SshSettings, ThemeSettings, TuiAutoupdateSettings,
     TuiThemeSettings, TuiVoiceSettings, TuiZeroStateSettings, VimBannerSettings,
@@ -25,7 +25,7 @@ use super::{
 use crate::ai::cloud_agent_settings::CloudAgentSettings;
 use crate::appearance;
 use crate::banner::BannerState;
-use crate::drive::settings::RookDriveSettings;
+use crate::drive::settings::PtermDriveSettings;
 use crate::resource_center::TipsCompleted;
 use crate::search::command_search::settings::CommandSearchSettings;
 use crate::terminal::BlockListSettings;
@@ -33,7 +33,7 @@ use crate::terminal::alt_screen_reporting::AltScreenReporting;
 use crate::terminal::general_settings::GeneralSettings;
 use crate::terminal::keys_settings::KeysSettings;
 use crate::terminal::ligature_settings::LigatureSettings;
-use crate::terminal::rookify::settings::RookifySettings;
+use crate::terminal::ptermify::settings::PtermifySettings;
 use crate::terminal::safe_mode_settings::SafeModeSettings;
 use crate::terminal::session_settings::{SessionSettings, SessionSettingsChangedEvent};
 use crate::terminal::settings::TerminalSettings;
@@ -87,24 +87,24 @@ pub fn register_all_settings(ctx: &mut AppContext) {
     AccessibilitySettings::register(ctx);
     NativePreferenceSettings::register(ctx);
     CloudPreferencesSettings::register(ctx);
-    RookDrivePrivacySettings::register(ctx);
+    PtermDrivePrivacySettings::register(ctx);
     UserAppInstallDetectionSettings::register(ctx);
     AppIconSettings::register(ctx);
     AppEditorSettings::register(ctx);
     InputSettings::register(ctx);
-    RookifySettings::register(ctx);
+    PtermifySettings::register(ctx);
     AltScreenReporting::register(ctx);
     UndoCloseSettings::register(ctx);
     SshSettings::register(ctx);
     VimBannerSettings::register(ctx);
     SharedObjectLimitBannerSettings::register(ctx);
     SharedSessionSettings::register(ctx);
-    RookDriveSettings::register(ctx);
+    PtermDriveSettings::register(ctx);
     WorkflowAliases::register(ctx);
     EmacsBindingsSettings::register(ctx);
     SameLinePromptBlockSettings::register(ctx);
     SemanticSelection::register(ctx);
-    if FeatureFlag::RookControlCli.is_enabled() {
+    if FeatureFlag::PtermControlCli.is_enabled() {
         LocalControlSettings::register(ctx);
     }
 
@@ -227,16 +227,16 @@ pub fn init(
 
     appearance::register(ctx);
 
-    // Set up hot-reload for the settings file. When the RookConfig watcher
+    // Set up hot-reload for the settings file. When the PtermConfig watcher
     // detects a change to settings.toml, reload preferences from disk and
     // push changed values into setting models.
     #[cfg(feature = "local_fs")]
     {
-        let prefs = <settings::PublicPreferences as rookui::SingletonEntity>::as_ref(ctx);
+        let prefs = <settings::PublicPreferences as ptermui::SingletonEntity>::as_ref(ctx);
         if prefs.is_settings_file() {
             ctx.subscribe_to_model(
-                &crate::user_config::RookConfig::handle(ctx),
-                handle_rook_config_change,
+                &crate::user_config::PtermConfig::handle(ctx),
+                handle_pterm_config_change,
             );
         }
     }
@@ -244,24 +244,24 @@ pub fn init(
     user_defaults_on_startup
 }
 
-/// Handles a `RookConfig` change event, reloading settings from disk when
+/// Handles a `PtermConfig` change event, reloading settings from disk when
 /// the settings file is modified, created, or deleted.
 #[cfg(feature = "local_fs")]
-fn handle_rook_config_change(
-    _: rookui::ModelHandle<crate::user_config::RookConfig>,
-    event: &crate::user_config::RookConfigUpdateEvent,
+fn handle_pterm_config_change(
+    _: ptermui::ModelHandle<crate::user_config::PtermConfig>,
+    event: &crate::user_config::PtermConfigUpdateEvent,
     ctx: &mut AppContext,
 ) {
-    use crate::user_config::{RookConfig, RookConfigUpdateEvent};
+    use crate::user_config::{PtermConfig, PtermConfigUpdateEvent};
 
-    if !matches!(event, RookConfigUpdateEvent::Settings) {
+    if !matches!(event, PtermConfigUpdateEvent::Settings) {
         return;
     }
-    let prefs = <settings::PublicPreferences as rookui::SingletonEntity>::as_ref(ctx);
+    let prefs = <settings::PublicPreferences as ptermui::SingletonEntity>::as_ref(ctx);
     if let Err(err) = prefs.reload_from_disk() {
         log::warn!("Settings file reload failed: {err}");
-        RookConfig::handle(ctx).update(ctx, |_, ctx| {
-            ctx.emit(RookConfigUpdateEvent::SettingsErrors(
+        PtermConfig::handle(ctx).update(ctx, |_, ctx| {
+            ctx.emit(PtermConfigUpdateEvent::SettingsErrors(
                 super::SettingsFileError::FileParseFailed(err.to_string()),
             ));
         });
@@ -269,11 +269,11 @@ fn handle_rook_config_change(
     }
     let failed_keys = settings::SettingsManager::handle(ctx)
         .update(ctx, |manager, ctx| manager.reload_all_public_settings(ctx));
-    RookConfig::handle(ctx).update(ctx, |_, ctx| {
+    PtermConfig::handle(ctx).update(ctx, |_, ctx| {
         if failed_keys.is_empty() {
-            ctx.emit(RookConfigUpdateEvent::SettingsErrorsCleared);
+            ctx.emit(PtermConfigUpdateEvent::SettingsErrorsCleared);
         } else {
-            ctx.emit(RookConfigUpdateEvent::SettingsErrors(
+            ctx.emit(PtermConfigUpdateEvent::SettingsErrors(
                 super::SettingsFileError::InvalidSettings(failed_keys),
             ));
         }
@@ -291,16 +291,16 @@ fn init_platform_native_preferences() -> user_preferences::Model {
             match user_preferences::file_backed::FileBackedUserPreferences::new(super::user_preferences_file_path()) {
                 Ok(prefs) => Box::new(prefs) as user_preferences::Model,
                 Err(err) => {
-                    rook_errors::report_error!(anyhow::anyhow!(err));
+                    pterm_errors::report_error!(anyhow::anyhow!(err));
                     Box::<user_preferences::in_memory::InMemoryPreferences>::default()
                 }
             }
         } else if #[cfg(target_os = "windows")] {
-            let app_id = rook_core::channel::ChannelState::app_id();
+            let app_id = pterm_core::channel::ChannelState::app_id();
             Box::new(user_preferences::registry_backed::RegistryBackedPreferences::new(app_id.application_name()))
         } else if #[cfg(target_os = "macos")] {
             Box::new(user_preferences::user_defaults::UserDefaultsPreferencesStorage::new(
-                rook_core::channel::ChannelState::data_domain_if_not_default()
+                pterm_core::channel::ChannelState::data_domain_if_not_default()
             ))
         } else if #[cfg(target_family = "wasm")] {
             Box::<user_preferences::local_storage::LocalStoragePreferences>::default()
@@ -335,7 +335,7 @@ pub fn init_public_user_preferences() -> (user_preferences::Model, Option<user_p
         } else if #[cfg(target_family = "wasm")] {
             (Box::<user_preferences::local_storage::LocalStoragePreferences>::default(), None)
         } else {
-            if rook_core::features::FeatureFlag::SettingsFile.is_enabled() {
+            if pterm_core::features::FeatureFlag::SettingsFile.is_enabled() {
                 let (prefs, parse_error) =
                     user_preferences::toml_backed::TomlBackedUserPreferences::new(
                         super::user_preferences_toml_file_path(),
@@ -378,7 +378,7 @@ fn needs_settings_file_migration_for_path(ctx: &AppContext, settings_file_path: 
         return false;
     }
 
-    use rook_core::user_preferences::GetUserPreferences as _;
+    use pterm_core::user_preferences::GetUserPreferences as _;
     ctx.private_user_preferences()
         .read_value(SETTINGS_FILE_MIGRATION_COMPLETE_KEY)
         .unwrap_or_default()
@@ -395,7 +395,7 @@ fn needs_settings_file_migration_for_path(ctx: &AppContext, settings_file_path: 
 /// the in-memory setting, and writes to the TOML file with the correct
 /// hierarchy, `serialize_for_file` transforms, and `max_table_depth`.
 fn migrate_native_settings_to_settings_file(ctx: &mut AppContext) {
-    use rook_core::user_preferences::GetUserPreferences as _;
+    use pterm_core::user_preferences::GetUserPreferences as _;
 
     log::info!("Migrating public settings from native store to settings.toml");
 

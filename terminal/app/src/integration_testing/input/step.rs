@@ -1,7 +1,7 @@
 use pathfinder_geometry::vector::Vector2F;
-use rookui::SingletonEntity;
-use rookui::integration::TestStep;
-use rookui::windowing::WindowManager;
+use ptermui::SingletonEntity;
+use ptermui::integration::TestStep;
+use ptermui::windowing::WindowManager;
 
 use crate::ai::blocklist::agent_view::AgentInputFooterEvent;
 use crate::ai::blocklist::{InputConfig, InputType};
@@ -66,12 +66,14 @@ pub fn open_cli_agent_rich_input(tab_index: usize) -> TestStep {
 }
 
 /// Asserts that the Rich Input buffer text for `tab_index` is empty.
-pub fn rich_input_buffer_text_is_empty(tab_index: usize) -> rookui::integration::AssertionCallback {
+pub fn rich_input_buffer_text_is_empty(
+    tab_index: usize,
+) -> ptermui::integration::AssertionCallback {
     Box::new(move |app, window_id| {
         let input_view = single_input_view_for_tab(app, window_id, tab_index);
         input_view.read(app, |view, ctx| {
             let text = view.buffer_text(ctx);
-            rookui::async_assert!(
+            ptermui::async_assert!(
                 text.is_empty(),
                 "Expected Rich Input buffer to be empty; got: {text:?}"
             )
@@ -82,12 +84,12 @@ pub fn rich_input_buffer_text_is_empty(tab_index: usize) -> rookui::integration:
 /// Asserts that the Rich Input buffer text for `tab_index` contains a newline character.
 pub fn rich_input_buffer_contains_newline(
     tab_index: usize,
-) -> rookui::integration::AssertionCallback {
+) -> ptermui::integration::AssertionCallback {
     Box::new(move |app, window_id| {
         let input_view = single_input_view_for_tab(app, window_id, tab_index);
         input_view.read(app, |view, ctx| {
             let text = view.buffer_text(ctx);
-            rookui::async_assert!(
+            ptermui::async_assert!(
                 text.contains('\n'),
                 "Expected Rich Input buffer to contain a newline; got: {text:?}"
             )
@@ -98,12 +100,12 @@ pub fn rich_input_buffer_contains_newline(
 /// Asserts that the Rich Input buffer for `tab_index` contains no newline (verifies menu-acceptance, not newline insertion).
 pub fn rich_input_buffer_does_not_contain_newline(
     tab_index: usize,
-) -> rookui::integration::AssertionCallback {
+) -> ptermui::integration::AssertionCallback {
     Box::new(move |app, window_id| {
         let input_view = single_input_view_for_tab(app, window_id, tab_index);
         input_view.read(app, |view, ctx| {
             let text = view.buffer_text(ctx);
-            rookui::async_assert!(
+            ptermui::async_assert!(
                 !text.contains('\n'),
                 "Expected Rich Input buffer to NOT contain a newline; got: {text:?}"
             )

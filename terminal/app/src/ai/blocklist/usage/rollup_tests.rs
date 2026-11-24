@@ -1,4 +1,4 @@
-use rookui::{App, EntityId};
+use ptermui::{App, EntityId};
 
 use super::*;
 use crate::ai::agent::conversation::AIConversationId;
@@ -8,7 +8,7 @@ use crate::test_util::settings::initialize_history_persistence_for_tests;
 
 fn set_credits(
     app: &mut App,
-    history: &rookui::ModelHandle<BlocklistAIHistoryModel>,
+    history: &ptermui::ModelHandle<BlocklistAIHistoryModel>,
     id: AIConversationId,
     credits: f32,
 ) {
@@ -22,7 +22,7 @@ fn set_credits(
 
 fn set_cost_in_cents(
     app: &mut App,
-    history: &rookui::ModelHandle<BlocklistAIHistoryModel>,
+    history: &ptermui::ModelHandle<BlocklistAIHistoryModel>,
     id: AIConversationId,
     cost_in_cents: Option<f32>,
 ) {
@@ -36,7 +36,7 @@ fn set_cost_in_cents(
 
 fn set_charged_usage_tokens(
     app: &mut App,
-    history: &rookui::ModelHandle<BlocklistAIHistoryModel>,
+    history: &ptermui::ModelHandle<BlocklistAIHistoryModel>,
     id: AIConversationId,
     total_tokens: Option<u32>,
 ) {
@@ -53,7 +53,7 @@ fn set_charged_usage_tokens(
 
 fn set_charged_usage(
     app: &mut App,
-    history: &rookui::ModelHandle<BlocklistAIHistoryModel>,
+    history: &ptermui::ModelHandle<BlocklistAIHistoryModel>,
     id: AIConversationId,
     cost_in_cents: f32,
     total_tokens: u32,
@@ -72,7 +72,7 @@ fn set_charged_usage(
 
 fn spawn_child(
     app: &mut App,
-    history: &rookui::ModelHandle<BlocklistAIHistoryModel>,
+    history: &ptermui::ModelHandle<BlocklistAIHistoryModel>,
     name: &str,
     parent_id: AIConversationId,
     terminal_view_id: EntityId,

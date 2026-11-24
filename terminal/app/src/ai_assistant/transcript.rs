@@ -2,20 +2,20 @@ use markdown_parser::CodeBlockText;
 use markdown_parser::markdown_parser::RUNNABLE_BLOCK_MARKDOWN_LANG;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::builder::AnimatedButtonOptions;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_core::ui::builder::AnimatedButtonOptions;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, EventHandler, Fill, Flex,
     FormattedTextElement, HyperlinkUrl, Icon, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     ParentAnchor, ParentElement, Radius, SavePosition, ScrollbarWidth, Shrinkable, Stack, Text,
     Wrap,
 };
-use rookui::keymap::Keystroke;
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::units::{IntoPixels, Pixels};
-use rookui::{
+use ptermui::keymap::Keystroke;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::units::{IntoPixels, Pixels};
+use ptermui::{
     AppContext, BlurContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity,
     TypedActionView, View, ViewContext, WeakViewHandle,
 };
@@ -31,7 +31,7 @@ use super::utils::{
 use crate::ai::AIRequestUsageModel;
 use crate::appearance::Appearance;
 use crate::send_telemetry_from_ctx;
-use crate::server::telemetry::{RookAIActionType, SaveAsWorkflowModalSource, TelemetryEvent};
+use crate::server::telemetry::{PtermAIActionType, SaveAsWorkflowModalSource, TelemetryEvent};
 use crate::ui_components::blended_colors;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
@@ -58,7 +58,7 @@ const WHAT_TO_DO_NEXT_PROMPT: &str = "What should I do next?";
 const IN_FLIGHT_REQUEST_TEXT: &str = "Generating answer...";
 const ACCURACY_NOTICE_TEXT: &str = "AI responses can be inaccurate.";
 const MISSING_CONTEXT_NOTICE_TEXT: &str =
-    "Rook AI might forget earlier answers as conversations get long.";
+    "Polaris Terminal AI might forget earlier answers as conversations get long.";
 
 lazy_static::lazy_static! {
     static ref SCROLL_BUFFER_OFFSET_PX: Pixels = (10.).into_pixels();
@@ -146,8 +146,8 @@ impl TypedActionView for Transcript {
                     ctx.clipboard().write(ClipboardContent::plain_text(answer));
                 }
                 send_telemetry_from_ctx!(
-                    TelemetryEvent::RookAIAction {
-                        action_type: RookAIActionType::CopyAnswer
+                    TelemetryEvent::PtermAIAction {
+                        action_type: PtermAIActionType::CopyAnswer
                     },
                     ctx
                 );
@@ -203,8 +203,8 @@ impl Transcript {
         }
 
         send_telemetry_from_ctx!(
-            TelemetryEvent::RookAIAction {
-                action_type: RookAIActionType::CopyCode
+            TelemetryEvent::PtermAIAction {
+                action_type: PtermAIActionType::CopyCode
             },
             ctx
         );
@@ -217,8 +217,8 @@ impl Transcript {
     ) {
         ctx.emit(TranscriptEvent::PasteInTerminalInput { code_block_index });
         send_telemetry_from_ctx!(
-            TelemetryEvent::RookAIAction {
-                action_type: RookAIActionType::InsertIntoInput
+            TelemetryEvent::PtermAIAction {
+                action_type: PtermAIActionType::InsertIntoInput
             },
             ctx
         );
@@ -235,7 +235,7 @@ impl Transcript {
 
         send_telemetry_from_ctx!(
             TelemetryEvent::SaveAsWorkflowModal {
-                source: SaveAsWorkflowModalSource::RookAIPanel
+                source: SaveAsWorkflowModalSource::PtermAIPanel
             },
             ctx
         );

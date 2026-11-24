@@ -4,16 +4,16 @@ use std::path::PathBuf;
 
 use ai::skills::{ParsedSkill, SkillProvider, SkillReference, SkillScope, parse_skill};
 use async_channel::unbounded;
+use pterm_core::HostId;
+use pterm_core::execution_mode::{AppExecutionMode, ExecutionMode};
+use pterm_core::features::FeatureFlag;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::{App, ModelHandle};
 use repo_metadata::RepoMetadataModel;
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::watcher::DirectoryWatcher;
-use rook_core::HostId;
-use rook_core::execution_mode::{AppExecutionMode, ExecutionMode};
-use rook_core::features::FeatureFlag;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::{App, ModelHandle};
 use tempfile::TempDir;
 use watcher::HomeDirectoryWatcher;
 
@@ -25,7 +25,7 @@ use crate::ai::agent::{
 };
 use crate::ai::blocklist::action_model::AIConversationId;
 use crate::ai::skills::{BundledSkillActivation, SkillManager};
-use crate::rook_managed_paths_watcher::RookManagedPathsWatcher;
+use crate::pterm_managed_paths_watcher::PtermManagedPathsWatcher;
 use crate::settings::AISettings;
 use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::model::session::{BootstrapSessionType, SessionId, SessionInfo, Sessions};
@@ -38,7 +38,7 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| DetectedRepositories::default());
     app.add_singleton_model(RepoMetadataModel::new);
     app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-    app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+    app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
     app.add_singleton_model(SkillManager::new);
 }
 fn add_test_read_skill_executor(app: &mut App) -> ModelHandle<ReadSkillExecutor> {
@@ -58,7 +58,7 @@ fn bundled_skill(name: &str) -> ParsedSkill {
         path: LocalOrRemotePath::Local(PathBuf::from(format!("/bundled/skills/{name}/SKILL.md"))),
         content: format!("# {name}"),
         line_range: None,
-        provider: SkillProvider::Rook,
+        provider: SkillProvider::Pterm,
         scope: SkillScope::Bundled,
     }
 }
@@ -155,7 +155,7 @@ fn disconnected_remote_session_does_not_fall_back_to_client_global_bundled_skill
             sessions.register_session_for_test(
                 SessionInfo::new_for_test()
                     .with_id(session_id)
-                    .with_session_type(BootstrapSessionType::RookifiedRemote),
+                    .with_session_type(BootstrapSessionType::PtermifiedRemote),
             );
         });
         let (_model_events_tx, model_events_rx) = unbounded();
@@ -206,13 +206,13 @@ fn remote_session_reads_remote_bundled_skill_catalog() {
             path: LocalOrRemotePath::Remote(RemotePath::new(
                 host_id.clone(),
                 StandardizedPath::try_new(
-                    "/opt/rook/resources/bundled/skills/host-specific/SKILL.md",
+                    "/opt/polaris-terminal/resources/bundled/skills/host-specific/SKILL.md",
                 )
                 .unwrap(),
             )),
             content: "remote rendered content".to_string(),
             line_range: None,
-            provider: SkillProvider::Rook,
+            provider: SkillProvider::Pterm,
             scope: SkillScope::Bundled,
         };
         SkillManager::handle(&app).update(&mut app, |manager, _ctx| {
@@ -235,7 +235,7 @@ fn remote_session_reads_remote_bundled_skill_catalog() {
             sessions.register_session_for_test(
                 SessionInfo::new_for_test()
                     .with_id(session_id)
-                    .with_session_type(BootstrapSessionType::RookifiedRemote),
+                    .with_session_type(BootstrapSessionType::PtermifiedRemote),
             );
         });
         let session = sessions
@@ -275,7 +275,7 @@ fn remote_session_reads_remote_bundled_skill_catalog() {
                 )) => {
                     assert_eq!(
                         content.file_name,
-                        "/opt/rook/resources/bundled/skills/host-specific/SKILL.md"
+                        "/opt/polaris-terminal/resources/bundled/skills/host-specific/SKILL.md"
                     );
                     assert_eq!(
                         content.content,
@@ -332,17 +332,17 @@ fn test_read_skill_executor_reads_enabled_bundled_skill() {
 }
 
 #[test]
-fn test_read_skill_executor_rejects_rook_control_bundled_skills_when_disabled() {
+fn test_read_skill_executor_rejects_pterm_control_bundled_skills_when_disabled() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
         let _bundled_skills = FeatureFlag::BundledSkills.override_enabled(true);
-        let _rook_control_cli = FeatureFlag::RookControlCli.override_enabled(false);
-        let skill_id = "rookctrl";
+        let _pterm_control_cli = FeatureFlag::PtermControlCli.override_enabled(false);
+        let skill_id = "ptermctrl";
         SkillManager::handle(&app).update(&mut app, |manager, _ctx| {
             manager.add_bundled_skill_for_testing(
                 skill_id,
                 bundled_skill(skill_id),
-                BundledSkillActivation::RequiresFeature(FeatureFlag::RookControlCli),
+                BundledSkillActivation::RequiresFeature(FeatureFlag::PtermControlCli),
             );
         });
         let executor_handle = add_test_read_skill_executor(&mut app);

@@ -3,7 +3,7 @@ GitHub issue: https://github.com/warpdotdev/warp-external/issues/849
 Figma: none provided
 
 ## Summary
-Expand Rook's markdown image parser and renderer so that the AI block list supports same-line CommonMark image title forms such as `![alt](source \"title\")`, using the title as a hover tooltip on successful renders and the alt text as the load-failure fallback. This makes the dogfood block-list image feature consistent with how GitHub, GitLab, VS Code Markdown Preview, Obsidian, Typora, and Pandoc render markdown images today.
+Expand Polaris Terminal's markdown image parser and renderer so that the AI block list supports same-line CommonMark image title forms such as `![alt](source \"title\")`, using the title as a hover tooltip on successful renders and the alt text as the load-failure fallback. This makes the dogfood block-list image feature consistent with how GitHub, GitLab, VS Code Markdown Preview, Obsidian, Typora, and Pandoc render markdown images today.
 
 ## Problem
 The AI block-list image renderer described in `specs/zachlloyd/inline-markdown-images-in-blocklist/PRODUCT.md` parses only `![alt](source)`. Two concrete gaps fall out of that today:
@@ -16,7 +16,7 @@ The behavior in this spec is additive on top of the existing block-list image fe
 ## Goals
 - Parse the optional CommonMark title suffix on markdown images — `"..."`, `'...'`, and `(...)` — in both block-level and inline image positions already supported by the block-list renderer.
 - Carry the parsed title through every downstream consumer of the shared `FormattedImage` image model so it is available to the AI block-list renderer, the editor buffer round-trip, and HTML export.
-- Render the title as a hover tooltip on successfully rendered block-list images, using Rook's standard tooltip treatment.
+- Render the title as a hover tooltip on successfully rendered block-list images, using Polaris Terminal's standard tooltip treatment.
 - Surface the alt text as a visible fallback string when the image fails to render (missing file, unsupported format, asset load failure).
 - Preserve the parsed alt, source, and title content through block-level copy and export. Markdown re-serialization may canonicalize titled images to the double-quoted form `![alt](src \"title\")`; HTML export must carry `alt=\"...\"` and, when present, `title=\"...\"`.
 - Leave behavior unchanged for images that do not have a title (pure `![alt](source)`).
@@ -50,7 +50,7 @@ The behavior in this spec is additive on top of the existing block-list image fe
 
 5. When the image source is unparseable or the closing `)` is missing, the entire construct continues to fall back to plain text. Adding title support must not change the existing fallback surface area for malformed images.
 
-6. When a block-list image renders successfully and the parsed title is non-empty, hovering the rendered image displays the title string in Rook's standard tooltip.
+6. When a block-list image renders successfully and the parsed title is non-empty, hovering the rendered image displays the title string in Polaris Terminal's standard tooltip.
    - The tooltip uses the same tooltip primitive already used elsewhere in the product.
    - The tooltip content is the literal title string, with no markdown re-rendering, no link decoration, and no truncation beyond the tooltip's existing layout rules.
    - A successful render with an empty or absent title shows no tooltip on hover.

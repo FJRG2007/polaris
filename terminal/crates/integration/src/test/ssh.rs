@@ -1,25 +1,27 @@
 use std::collections::HashMap;
 
-use regex::Regex;
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::subshell::{
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::subshell::{
     enter_ssh_command, enter_ssh_password, setup_gcloud_sdk, wait_for_password_prompt,
 };
-use rook::integration_testing::terminal::util::{
+use polaris_terminal::integration_testing::terminal::util::{
     ExactLine, ExpectedExitStatus, current_shell_starter_and_version, nonce,
 };
-use rook::integration_testing::terminal::{
+use polaris_terminal::integration_testing::terminal::{
     assert_active_block_output_for_single_terminal_in_tab,
     assert_long_running_block_executing_for_single_terminal_in_tab,
     execute_command_for_single_terminal_in_tab, validate_block_output,
     wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::view_getters::{single_terminal_view, single_terminal_view_for_tab};
-use rook::terminal::model::bootstrap::BootstrapStage;
-use rook::terminal::session_settings::{StartupShell, StartupShellOverride};
-use rook::terminal::shell::ShellType;
-use rookui_core::integration::{AssertionCallback, AssertionOutcome, TestStep};
-use rookui_core::{async_assert, async_assert_eq};
+use polaris_terminal::integration_testing::view_getters::{
+    single_terminal_view, single_terminal_view_for_tab,
+};
+use polaris_terminal::terminal::model::bootstrap::BootstrapStage;
+use polaris_terminal::terminal::session_settings::{StartupShell, StartupShellOverride};
+use polaris_terminal::terminal::shell::ShellType;
+use ptermui_core::integration::{AssertionCallback, AssertionOutcome, TestStep};
+use ptermui_core::{async_assert, async_assert_eq};
+use regex::Regex;
 use settings::Setting as _;
 
 use super::new_builder;
@@ -116,7 +118,7 @@ fn verify_login_shell(shell: &str) -> TestStep {
         "zsh" => "[[ -o login ]]",
         "fish" => "status --is-login",
         // For other shells, we don't actually start a login shell but do source /etc/profile.
-        _ => "test \"$ROOK_PROFILE_LOADED\" = true",
+        _ => "test \"$POLARIS_TERMINAL_PROFILE_LOADED\" = true",
     };
 
     match shell {

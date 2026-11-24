@@ -1,4 +1,4 @@
-use rookui::platform::GraphicsBackend;
+use ptermui::platform::GraphicsBackend;
 use settings::macros::define_settings_group;
 use settings::{SupportedPlatforms, SyncToCloud};
 

@@ -7,11 +7,11 @@ use itertools::Itertools;
 use num_traits::Float as _;
 use parking_lot::Mutex;
 use pathfinder_color::ColorU;
-use rook_core::semantic_selection::SemanticSelection;
-use rook_errors::report_error;
-use rook_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
-use rookui::text::SelectionType;
-use rookui::units::Lines;
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_errors::report_error;
+use pterm_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
+use ptermui::text::SelectionType;
+use ptermui::units::Lines;
 use vec1::Vec1;
 
 use super::find::RegexDFAs;
@@ -400,7 +400,7 @@ impl ansi::Handler for AltScreen {
         self.ansi_handler().input(c);
     }
 
-    fn set_hyperlink(&mut self, hyperlink: Option<rook_terminal::model::ansi::Hyperlink>) {
+    fn set_hyperlink(&mut self, hyperlink: Option<pterm_terminal::model::ansi::Hyperlink>) {
         self.ansi_handler().set_hyperlink(hyperlink);
     }
 

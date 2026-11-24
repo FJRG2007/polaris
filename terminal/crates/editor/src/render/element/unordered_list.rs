@@ -1,6 +1,6 @@
-use rookui_core::elements::{Border, CornerRadius, ListIndentLevel, Radius, Rect};
-use rookui_core::geometry::vector::vec2f;
-use rookui_core::{Element, SizeConstraint};
+use ptermui_core::elements::{Border, CornerRadius, ListIndentLevel, Radius, Rect};
+use ptermui_core::geometry::vector::vec2f;
+use ptermui_core::{Element, SizeConstraint};
 
 use super::RenderableBlock;
 use super::paint::RenderContext;
@@ -61,8 +61,8 @@ impl RenderableBlock for RenderableBulletList {
     fn layout(
         &mut self,
         model: &RenderState,
-        ctx: &mut rookui_core::LayoutContext,
-        app: &rookui_core::AppContext,
+        ctx: &mut ptermui_core::LayoutContext,
+        app: &ptermui_core::AppContext,
     ) {
         self.bullet_point.layout(
             SizeConstraint::strict(vec2f(self.bullet_size, self.bullet_size)),
@@ -91,7 +91,7 @@ impl RenderableBlock for RenderableBulletList {
         &mut self,
         model: &RenderState,
         ctx: &mut RenderContext,
-        app: &rookui_core::AppContext,
+        app: &ptermui_core::AppContext,
     ) {
         let content = model.content();
         let unordered_list = extract_block!(self.viewport_item, content, (block, BlockItem::UnorderedList{ paragraph: inner, ..}) => block.unordered_list(inner));

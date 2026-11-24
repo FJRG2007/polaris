@@ -14,23 +14,21 @@ use futures::future::BoxFuture;
 use lazy_static::lazy_static;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_geometry::vector::vec2f;
-use rand::distributions::Alphanumeric;
-use rand::{Rng as _, thread_rng};
-use rook_core::features::FeatureFlag;
-use rook_core::platform::SessionPlatform;
-use rook_core::settings::ToggleableSetting;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::color::CLAUDE_ORANGE;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors::{fg_overlay_6, neutral_1, neutral_4};
-use rook_editor::content::buffer::InitialBufferState;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rook_errors::report_error;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::elements::new_scrollable::{ScrollableAppearance, SingleAxisConfig};
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::platform::SessionPlatform;
+use pterm_core::settings::ToggleableSetting;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::color::CLAUDE_ORANGE;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors::{fg_overlay_6, neutral_1, neutral_4};
+use pterm_editor::content::buffer::InitialBufferState;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use pterm_errors::report_error;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::elements::new_scrollable::{ScrollableAppearance, SingleAxisConfig};
+use ptermui::elements::{
     Align, Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, Empty, EventHandler, Flex,
     FormattedTextElement, HighlightedHyperlink, Hoverable, MainAxisAlignment, MainAxisSize,
@@ -39,13 +37,15 @@ use rookui::elements::{
     SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Shrinkable,
     SizeConstraintCondition, SizeConstraintSwitch, Stack, Text,
 };
-use rookui::keymap::{EditableBinding, FixedBinding, Keystroke};
-use rookui::platform::{Cursor, OperatingSystem};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::keymap::{EditableBinding, FixedBinding, Keystroke};
+use ptermui::platform::{Cursor, OperatingSystem};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
+use rand::distributions::Alphanumeric;
+use rand::{Rng as _, thread_rng};
 
 use super::malformed_line_heuristics::has_malformed_terminal_correction_signal;
 use crate::ai::agent::icons::{self, yellow_stop_icon};
@@ -149,7 +149,7 @@ lazy_static! {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -488,8 +488,8 @@ impl CodeDiffView {
                 ctx,
             )
             .with_horizontal_scrollbar_appearance(
-                rookui::elements::new_scrollable::ScrollableAppearance::new(
-                    rookui::elements::ScrollbarWidth::Auto,
+                ptermui::elements::new_scrollable::ScrollableAppearance::new(
+                    ptermui::elements::ScrollbarWidth::Auto,
                     true,
                 ),
             )
@@ -1157,7 +1157,7 @@ impl CodeDiffView {
 
     fn render_scroll_icon_for_inline_banner(&self, appearance: &Appearance) -> Box<dyn Element> {
         let background = appearance.theme().foreground();
-        let icon = rookui::elements::Icon::new(
+        let icon = ptermui::elements::Icon::new(
             Icon::ArrowDown.into(),
             appearance.theme().main_text_color(background).into_solid(),
         )
@@ -1363,7 +1363,7 @@ impl CodeDiffView {
             }
             CodeDiffState::WaitingForUser => {
                 if self.display_mode().is_inline_banner() {
-                    rookui::elements::Icon::new(
+                    ptermui::elements::Icon::new(
                         Icon::Code2.into(),
                         appearance
                             .theme()
@@ -1540,7 +1540,7 @@ impl CodeDiffView {
 
         // Renders the 'open config' button only when every MCP config file in this diff
         // belongs to the same provider. Mixed-provider diffs (e.g. editing both a Claude
-        // config and a Rook config at once) show no badge to avoid misleading attribution.
+        // config and a Polaris Terminal config at once) show no badge to avoid misleading attribution.
         // MCP config actions currently operate on local paths only.
         let local_file_paths: Vec<PathBuf> = file_locations
             .iter()
@@ -1874,7 +1874,7 @@ impl CodeDiffView {
                 },
                 theme.nonactive_ui_detail().into(),
                 theme.active_ui_detail().into(),
-                rookui::elements::Fill::None,
+                ptermui::elements::Fill::None,
             )
             .with_horizontal_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Custom(4.), true))
             .with_propagate_mousewheel_if_not_handled(true)
@@ -2528,7 +2528,7 @@ impl View for CodeDiffView {
         root_stack.finish()
     }
 
-    fn keymap_context(&self, _app: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, _app: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         if self.display_mode().is_full_pane() {
@@ -3032,7 +3032,7 @@ impl BackingView for CodeDiffView {
             title: "Requested Edit".to_string(),
             title_secondary: None,
             title_style: None,
-            title_clip_config: rookui::text_layout::ClipConfig::start(),
+            title_clip_config: ptermui::text_layout::ClipConfig::start(),
             title_max_width: None,
             left_of_title: None,
             right_of_title: None,

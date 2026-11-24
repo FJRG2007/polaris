@@ -4,9 +4,9 @@ use std::time::Duration;
 
 use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
 use markdown_parser::FormattedTextFragment;
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::keymap::Keystroke;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::keymap::Keystroke;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::ai::persisted_workspace::PersistedWorkspace;
 use crate::palette::PaletteMode;
@@ -72,7 +72,7 @@ pub trait AITip: Clone {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AgentTipKind {
     CodebaseContext,
-    RookDrive,
+    PtermDrive,
     General,
     Mcp,
     SlashCommands,
@@ -108,7 +108,7 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             kind: AgentTipKind::SlashCommands,
         },
         AgentTip {
-            description: "<keybinding> to open the Command Palette and access Rook actions and shortcuts.".to_string(),
+            description: "<keybinding> to open the Command Palette and access Polaris Terminal actions and shortcuts.".to_string(),
             link: Some("https://docs.rook.dev/terminal/command-palette".to_string()),
             binding_name: Some(TOGGLE_COMMAND_PALETTE_KEYBINDING_NAME),
             action: Some(WorkspaceAction::OpenPalette {
@@ -120,10 +120,10 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
         },
         AgentTip {
             description: "Store reusable workflows, notebooks, and prompts in your".to_string(),
-            link: Some("https://docs.rook.dev/knowledge-and-collaboration/rook-drive".to_string()),
+            link: Some("https://docs.rook.dev/knowledge-and-collaboration/polaris-terminal-drive".to_string()),
             binding_name: None,
-            action: Some(WorkspaceAction::OpenRookDrive),
-            kind: AgentTipKind::RookDrive,
+            action: Some(WorkspaceAction::OpenPtermDrive),
+            kind: AgentTipKind::PtermDrive,
         },
         AgentTip {
             description: "Enter a new prompt to redirect the agent while it's running.".to_string(),
@@ -133,7 +133,7 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             kind: AgentTipKind::General,
         },
         AgentTip {
-            description: "`@` to add context from files, blocks, or Rook Drive objects to your prompt.".to_string(),
+            description: "`@` to add context from files, blocks, or Polaris Terminal Drive objects to your prompt.".to_string(),
             link: Some("https://docs.rook.dev/agents/local-agents/agent-context/using-to-add-context".to_string()),
             binding_name: None,
             action: None,
@@ -221,7 +221,7 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             link: None,
             binding_name: None,
             action: None,
-            kind: AgentTipKind::RookDrive,
+            kind: AgentTipKind::PtermDrive,
         },
         AgentTip {
             description: "`/add-rule` to create a global agent rule.".to_string(),
@@ -266,7 +266,7 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             kind: AgentTipKind::General,
         },
         AgentTip {
-            description: "Use the `oz` command to run the Rook Agent in headless mode, useful for remote machines.".to_string(),
+            description: "Use the `oz` command to run the Polaris Terminal Agent in headless mode, useful for remote machines.".to_string(),
             link: Some("https://docs.rook.dev/reference/cli".to_string()),
             binding_name: None,
             action: None,
@@ -294,8 +294,8 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             kind: AgentTipKind::Context,
         },
         AgentTip {
-            description: "Rookify a remote SSH session to enable the Rook Agent inside that environment.".to_string(),
-            link: Some("https://docs.rook.dev/terminal/rookify".to_string()),
+            description: "Ptermify a remote SSH session to enable the Polaris Terminal Agent inside that environment.".to_string(),
+            link: Some("https://docs.rook.dev/terminal/ptermify".to_string()),
             binding_name: None,
             action: None,
             kind: AgentTipKind::General,
@@ -308,7 +308,7 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             kind: AgentTipKind::General,
         },
         AgentTip {
-            description: "`/init` to generate a `ROOK.md` file and define project rules for the agent.".to_string(),
+            description: "`/init` to generate a `POLARIS_TERMINAL.md` file and define project rules for the agent.".to_string(),
             link: Some("https://docs.rook.dev/agents/capabilities/rules".to_string()),
             binding_name: None,
             action: None,
@@ -439,7 +439,7 @@ impl WorkspaceAction {
     pub fn display_text(&self) -> Option<String> {
         match self {
             WorkspaceAction::OpenPalette { .. } => Some("Open palette".to_string()),
-            WorkspaceAction::OpenRookDrive => Some("Rook Drive.".to_string()),
+            WorkspaceAction::OpenPtermDrive => Some("Polaris Terminal Drive.".to_string()),
             WorkspaceAction::ToggleRightPanel => Some("Show diff view".to_string()),
             _ => None,
         }

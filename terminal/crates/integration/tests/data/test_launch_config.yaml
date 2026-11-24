@@ -1,4 +1,4 @@
-# Rook Launch Configuration
+# Polaris Terminal Launch Configuration
 #
 #
 # Use this to start a certain configuration of windows, tabs, and panes
@@ -7,7 +7,7 @@
 # This file defines your launch configuration
 # More on how to do so here: [link to docs]
 #
-# All launch configurations are stored under ~/.rook/launch_configurations/
+# All launch configurations are stored under ~/.polaris-terminal/launch_configurations/
 # Edit them anytime!
 
 ---
@@ -17,12 +17,12 @@ windows:
       - layout:
           split_direction: horizontal
           panes:
-            - cwd: /Users/zhengtao/src/rook-internal/app/src/terminal
-            - cwd: /Users/zhengtao/src/rook-internal
+            - cwd: /Users/zhengtao/src/polaris-terminal-internal/app/src/terminal
+            - cwd: /Users/zhengtao/src/polaris-terminal-internal
       - layout:
-          cwd: /Users/zhengtao/src/rook-internal
+          cwd: /Users/zhengtao/src/polaris-terminal-internal
       - layout:
-          cwd: /Users/zhengtao/src/rook-internal
+          cwd: /Users/zhengtao/src/polaris-terminal-internal
   - tabs:
       - layout:
           split_direction: horizontal

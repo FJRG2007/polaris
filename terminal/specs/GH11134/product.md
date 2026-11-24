@@ -1,6 +1,6 @@
 # Product Spec: Boolean parameters for tab configs
 
-**Issue:** [FJRG2007/rook#11134](https://github.com/FJRG2007/rook/issues/11134)
+**Issue:** [FJRG2007/polaris#11134](https://github.com/FJRG2007/polaris/issues/11134)
 
 ## Summary
 
@@ -59,7 +59,7 @@ Figma: none provided.
 
 3. A quoted default such as `default = "true"` is invalid for a boolean
    parameter. Conversely, an unquoted boolean default is invalid for text,
-   branch, and repository parameters. Rook does not silently coerce either
+   branch, and repository parameters. Polaris Terminal does not silently coerce either
    mismatch.
 
 4. Opening a config with parameters shows each boolean parameter as a checkbox
@@ -108,7 +108,7 @@ Figma: none provided.
 
 13. Invalid boolean declarations use the existing tab config parse-error flow:
     the invalid config is not offered as a runnable config, and the error names
-    the affected file and explains the invalid type/default combination. Rook
+    the affected file and explains the invalid type/default combination. Polaris Terminal
     never opens a text field as a fallback for an invalid boolean declaration.
 
 14. Every previously valid config remains valid and behaves the same. Omitting
@@ -117,5 +117,5 @@ Figma: none provided.
     remains text.
 
 15. Boolean rows remain usable with long names or descriptions, at modal scroll
-    boundaries, and in every supported Rook theme. Text may wrap, but the
+    boundaries, and in every supported Polaris Terminal theme. Text may wrap, but the
     checkbox, checked state, focus treatment, and click target remain visible.

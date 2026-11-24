@@ -13,8 +13,10 @@ fn observes_synthetic_recording_exit() {
 #[cfg(linux)]
 #[test]
 fn removes_unclaimed_output_when_handle_is_dropped() {
-    let path =
-        std::env::temp_dir().join(format!("rook-recording-drop-test-{}", std::process::id()));
+    let path = std::env::temp_dir().join(format!(
+        "polaris-terminal-recording-drop-test-{}",
+        std::process::id()
+    ));
     std::fs::write(&path, b"video").unwrap();
     let handle = RecordingHandle {
         width: 1,
@@ -37,8 +39,10 @@ fn removes_unclaimed_output_when_handle_is_dropped_macos() {
     // Mirrors the Linux drop test: the macOS `Drop` impl (widened to
     // `any(linux, macos)`) must remove a handle's partial output when it is
     // abandoned without `Recorder::stop`.
-    let path =
-        std::env::temp_dir().join(format!("rook-recording-drop-test-{}", std::process::id()));
+    let path = std::env::temp_dir().join(format!(
+        "polaris-terminal-recording-drop-test-{}",
+        std::process::id()
+    ));
     std::fs::write(&path, b"video").unwrap();
     let handle = RecordingHandle {
         width: 1,
@@ -67,7 +71,7 @@ async fn start_reports_unsupported_when_ffmpeg_absent() {
     // SAFETY: these env mutations are process-local; this test runs in process
     // isolation under `cargo nextest`, so no other task observes them.
     unsafe {
-        std::env::remove_var("ROOK_MOCK_RECORDER");
+        std::env::remove_var("POLARIS_TERMINAL_MOCK_RECORDER");
     }
     let saved_path = std::env::var_os("PATH");
     unsafe {

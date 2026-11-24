@@ -9,15 +9,15 @@ That V0 has two rough edges this spec addresses:
 The pieces this spec builds on:
 - **Cloud-cloud handoff replay suppression.** When `attach_followup_session` joins a fresh shared session for a follow-up cloud execution, it uses `SharedSessionInitialLoadMode::AppendFollowupScrollback`, which (a) deduplicates blocks by ID via `BlockList::append_followup_shared_session_scrollback` and (b) flips `should_suppress_existing_agent_conversation_replay = true`. That flag drives `BlocklistAIController::should_skip_replayed_response_for_existing_conversation` to skip replayed response streams. We reuse this mechanism for the local→cloud first-session connect.
 - **Fork-into-new-pane restoration.** `BlocklistAIHistoryModel::fork_conversation` materializes a forked `AIConversation` locally; `restore_conversation_after_view_creation` feeds it into a freshly-created pane and restores AI blocks for every exchange with live (non-restored) appearance.
-- **Server-side fork and conversation-token binding.** `ForkConversationForHandoff` in `../rook-server-2/logic/ai_conversation_fork.go` already implements the server fork end-to-end (auth on source, GCS data copy, metadata insert). The viewer-side `BlocklistAIController::find_existing_conversation_by_server_token` maps a `StreamInit.conversation_id` to a local `AIConversation` by token; binding the local fork's `server_conversation_token` to the server fork's id at chip-click time wires them up automatically when the cloud session arrives.
+- **Server-side fork and conversation-token binding.** `ForkConversationForHandoff` in `../polaris-terminal-server-2/logic/ai_conversation_fork.go` already implements the server fork end-to-end (auth on source, GCS data copy, metadata insert). The viewer-side `BlocklistAIController::find_existing_conversation_by_server_token` maps a `StreamInit.conversation_id` to a local `AIConversation` by token; binding the local fork's `server_conversation_token` to the server fork's id at chip-click time wires them up automatically when the cloud session arrives.
 ## Diagram
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant C as Local Rook Client
+    participant C as Local Polaris Terminal Client
     participant LP as Local Pane
     participant HP as Handoff Pane (new)
-    participant API as rook-server (public API)
+    participant API as polaris-terminal-server (public API)
     participant Sand as Cloud Sandbox
     U->>C: Click "Hand off to cloud" chip on local pane
     C->>API: POST /agent/handoff/prepare-fork {source_conversation_id}
@@ -50,7 +50,7 @@ sequenceDiagram
     Note over LP: Local pane unchanged throughout
 ```
 ## Proposed changes
-### 1. Server-side: split fork from spawn (`../rook-server-2`)
+### 1. Server-side: split fork from spawn (`../polaris-terminal-server-2`)
 Forking on chip click (vs at submit time) freezes the cloud's view at the moment the user opted into the handoff and lets the two conversations evolve independently.
 **New endpoint** `POST /api/v1/agent/handoff/prepare-fork`:
 ```go path=null start=null
@@ -103,7 +103,7 @@ No new feature flags. All changes are gated on the existing `FeatureFlag::OzHand
 - `app/src/server/server_api/ai_test.rs`: serialization/deserialization tests for `PrepareHandoffForkRequest` / `PrepareHandoffForkResponse`.
 - `app/src/ai/blocklist/history_model_test.rs`: test that `set_server_conversation_token_for_conversation` after `fork_conversation` updates the token-to-conversation reverse index so `find_conversation_id_by_server_token(T_C)` finds the fork. Plus a test exercising `preserve_task_ids: true` to confirm task ids are preserved across the fork.
 - `app/src/terminal/shared_session/viewer/event_loop_test.rs`: extend the existing append-mode tests to cover the local→cloud connect path.
-### Server tests (`../rook-server-2`)
+### Server tests (`../polaris-terminal-server-2`)
 - `router/handlers/public_api/agent_handoff_test.go`: add a `TestPrepareLocalHandoffForkHandler_*` suite covering: feature-flag-off; missing `source_conversation_id`; happy path; auth failure on the source.
 - Update existing `agent_webhooks_test.go::TestHandoff_*` cases that exercise `ForkFromConversationID` to instead drive the new `prepare-fork` endpoint and then send `ConversationID` on the run request.
 ### Integration / manual

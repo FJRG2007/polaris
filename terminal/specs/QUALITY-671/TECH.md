@@ -176,7 +176,7 @@ Run `./script/presubmit` before pushing. Formatting, clippy, and tests must pass
 
 ## Parallelization
 
-Single change, single repo, single owner. The aggregation helper, view extension, and feature-flag wiring touch the same handful of files and require a shared mental model. A parallel split would manufacture coordination overhead with no real wall-clock savings. This is best done by one local agent in this checkout (`/Users/matthew/src/rollup-orch-credit-usage/rook` on branch `matthew/rollup-orch-credit-usage`). No `run_agents` proposed for v1.
+Single change, single repo, single owner. The aggregation helper, view extension, and feature-flag wiring touch the same handful of files and require a shared mental model. A parallel split would manufacture coordination overhead with no real wall-clock savings. This is best done by one local agent in this checkout (`/Users/matthew/src/rollup-orch-credit-usage/polaris-terminal` on branch `matthew/rollup-orch-credit-usage`). No `run_agents` proposed for v1.
 
 ## Risks and mitigations
 

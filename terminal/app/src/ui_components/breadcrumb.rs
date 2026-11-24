@@ -1,11 +1,11 @@
 use std::fmt::Debug;
 
 use itertools::{Itertools, Position};
-use rookui::elements::{
+use ptermui::elements::{
     CrossAxisAlignment, Flex, Hoverable, MainAxisSize, MouseStateHandle, ParentElement, Shrinkable,
 };
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, EventContext};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, EventContext};
 
 use crate::appearance::Appearance;
 

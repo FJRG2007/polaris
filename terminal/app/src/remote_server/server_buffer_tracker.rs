@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
-use rook_editor::content::buffer::Buffer;
-use rook_util::file::FileId;
-use rookui::{ModelContext, ModelHandle, SingletonEntity};
+use pterm_editor::content::buffer::Buffer;
+use pterm_util::file::FileId;
+use ptermui::{ModelContext, ModelHandle, SingletonEntity};
 
 use super::server_model::{ConnectionId, ServerModel};
 use crate::code::global_buffer_model::GlobalBufferModel;

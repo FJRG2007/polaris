@@ -1,7 +1,7 @@
 use ai::agent::action_result::{AskUserQuestionAnswerItem, AskUserQuestionResult};
 use futures::FutureExt;
 use futures::future::BoxFuture;
-use rookui::{Entity, EntityId, ModelContext, SingletonEntity};
+use ptermui::{Entity, EntityId, ModelContext, SingletonEntity};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 use crate::ai::agent::{AIAgentActionResultType, AIAgentActionType};

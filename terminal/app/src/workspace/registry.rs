@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rookui::{AppContext, Entity, SingletonEntity, WeakViewHandle, WindowId};
+use ptermui::{AppContext, Entity, SingletonEntity, WeakViewHandle, WindowId};
 
 use super::Workspace;
 
@@ -40,7 +40,7 @@ impl WorkspaceRegistry {
         &self,
         window_id: WindowId,
         app: &AppContext,
-    ) -> Option<rookui::ViewHandle<Workspace>> {
+    ) -> Option<ptermui::ViewHandle<Workspace>> {
         self.workspaces.get(&window_id)?.upgrade(app)
     }
 
@@ -49,7 +49,7 @@ impl WorkspaceRegistry {
     pub fn all_workspaces(
         &self,
         app: &AppContext,
-    ) -> Vec<(WindowId, rookui::ViewHandle<Workspace>)> {
+    ) -> Vec<(WindowId, ptermui::ViewHandle<Workspace>)> {
         self.workspaces
             .iter()
             .filter_map(|(window_id, weak_handle)| {

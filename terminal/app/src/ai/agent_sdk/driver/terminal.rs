@@ -9,15 +9,15 @@ use std::time::Duration;
 
 use anyhow::Context as _;
 use futures::channel::oneshot;
-use rook_cli::share::{ShareAccessLevel, ShareRequest, ShareSubject};
-use rook_completer::completer::CommandOutput;
-use rook_core::command::ExitCode;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_if_error;
-use rook_terminal::model::grid::Dimensions;
-use rook_util::path::ShellFamily;
-use rookui::r#async::FutureExt;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity as _, ViewHandle};
+use pterm_cli::share::{ShareAccessLevel, ShareRequest, ShareSubject};
+use pterm_completer::completer::CommandOutput;
+use pterm_core::command::ExitCode;
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_if_error;
+use pterm_terminal::model::grid::Dimensions;
+use pterm_util::path::ShellFamily;
+use ptermui::r#async::FutureExt;
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity as _, ViewHandle};
 use session_sharing_protocol::common::{Role, SessionId};
 use session_sharing_protocol::sharer::SessionRetentionReason;
 
@@ -45,9 +45,9 @@ use crate::workspaces::user_workspaces::{TeamScope, TeamScopeForCli, UserWorkspa
 pub(crate) enum BootstrapError {
     /// The PTY or shell process failed before the bootstrap script completed.
     /// When `reason` is `Some`, the message is
-    /// "Shell spawn failed: {reason}. Check the Rook logs for details."
+    /// "Shell spawn failed: {reason}. Check the Polaris Terminal logs for details."
     /// When `reason` is `None`, it is
-    /// "Shell spawn failed. Check the Rook logs for details."
+    /// "Shell spawn failed. Check the Polaris Terminal logs for details."
     PtySpawnFailed { reason: Option<String> },
     /// The bootstrap script did not complete within the expected time.
     TimedOut,
@@ -62,16 +62,19 @@ impl std::fmt::Display for BootstrapError {
             BootstrapError::PtySpawnFailed { reason: Some(r) } => {
                 write!(
                     f,
-                    "Shell spawn failed: {r}. Check the Rook logs for details."
+                    "Shell spawn failed: {r}. Check the Polaris Terminal logs for details."
                 )
             }
             BootstrapError::PtySpawnFailed { reason: None } => {
-                write!(f, "Shell spawn failed. Check the Rook logs for details.")
+                write!(
+                    f,
+                    "Shell spawn failed. Check the Polaris Terminal logs for details."
+                )
             }
             BootstrapError::TimedOut => write!(
                 f,
                 "Terminal session did not start within the expected time. \
-                 Check the Rook logs for details."
+                 Check the Polaris Terminal logs for details."
             ),
             BootstrapError::InternalError => {
                 write!(f, "An unexpected internal error occurred during bootstrap.")
@@ -266,7 +269,7 @@ impl TerminalDriver {
         // When sharing is disabled (or running against ngrok), leave both halves
         // as None so that `wait_for_session_shared` returns immediately.
         let sharing_expected =
-            should_share && !rook_core::channel::ChannelState::server_root_url().contains("ngrok");
+            should_share && !pterm_core::channel::ChannelState::server_root_url().contains("ngrok");
         let (mut session_share_tx, session_share_rx) = if sharing_expected {
             if !FeatureFlag::CreatingSharedSessions.is_enabled() {
                 // Session sharing was requested but the feature is not enabled for this
@@ -348,7 +351,7 @@ impl TerminalDriver {
     pub fn with_terminal_view(
         &self,
         ctx: &mut ModelContext<Self>,
-        f: impl FnOnce(&mut TerminalView, &mut rookui::ViewContext<TerminalView>),
+        f: impl FnOnce(&mut TerminalView, &mut ptermui::ViewContext<TerminalView>),
     ) {
         self.terminal_view.update(ctx, f);
     }

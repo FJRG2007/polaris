@@ -1,13 +1,13 @@
 use std::time::Duration;
 
-use rook::integration_testing::ai_document::{
+use polaris_terminal::integration_testing::ai_document::{
     ai_document_overflow_button_position_id, assert_ai_document_overflow_button_position_exists,
     assert_viewed_ai_document_has_code_and_mermaid_controls, create_and_open_ai_document,
     restore_and_open_ai_document, select_initial_ai_document_version,
 };
-use rook::integration_testing::clipboard::assert_clipboard_contains_string;
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::integration_testing::clipboard::assert_clipboard_contains_string;
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
 
 use super::new_builder;
 use crate::Builder;

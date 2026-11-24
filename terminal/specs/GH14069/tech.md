@@ -2,7 +2,7 @@
 
 Product spec: [`specs/GH14069/product.md`](product.md)
 
-GitHub issue: https://github.com/FJRG2007/rook/issues/14069
+GitHub issue: https://github.com/FJRG2007/polaris/issues/14069
 
 Code references inspected at commit: `c20645b9b0425dd8fb49fe9f9d08280e1e725ce9`
 
@@ -12,27 +12,27 @@ Issue #14069 asks for one keybinding that rotates the active tab color. A mainta
 
 The current GUI already owns all required color state and rendering:
 
-- [`CONTRIBUTING.md:86-109 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/CONTRIBUTING.md#L86-L109) defines the `ready-to-spec` flow and the required `specs/GH<issue>/product.md` plus `tech.md` layout.
-- [`app/src/ui_components/color_dot.rs:18-25 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/ui_components/color_dot.rs#L18-L25) is the canonical ordered list of six tab colors: Red, Green, Yellow, Blue, Magenta, Cyan.
-- [`app/src/tab.rs:111-135 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/tab.rs#L111-L135) models a manual color as `Unset`, `Cleared`, or `Color`, and resolves it against a directory-derived default.
-- [`app/src/tab.rs:163-216 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/tab.rs#L163-L216) stores both the directory default and manual selection on `TabData`; `TabData::color` exposes the visible result.
-- [`app/src/tab.rs:755-825 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/tab.rs#L755-L825) builds the existing picker from the canonical list and dispatches the established tab or tab-group toggle actions.
-- [`app/src/workspace/view.rs:5534-5592 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/workspace/view.rs#L5534-L5592) applies a manual tab color, sends existing set/reset telemetry, notifies the view, and contains the current single-color toggle behavior.
-- [`app/src/workspace/view.rs:5594-5634 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/workspace/view.rs#L5594-L5634) owns the shared color of a tab group and propagates it through the group's rendering model.
-- [`app/src/workspace/action.rs:128-155 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/workspace/action.rs#L128-L155) defines active-tab workspace actions, including the parameterized `SetActiveTabColor`.
-- [`app/src/workspace/view.rs:23698-23712 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/workspace/view.rs#L23698-L23712) handles `SetActiveTabColor` and already redirects a grouped active tab to the group's color.
-- [`app/src/workspace/mod.rs:515-623 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/workspace/mod.rs#L515-L623) registers editable workspace actions, while [`app/src/workspace/mod.rs:951-971 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/workspace/mod.rs#L951-L971) shows the established keyless-by-default registration pattern.
-- [`app/src/settings_view/keybindings.rs:749-785 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/settings_view/keybindings.rs#L749-L785) materializes every editable binding in the Keyboard Shortcuts page.
-- [`app/src/search/action/data_source.rs:67-90 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/search/action/data_source.rs#L67-L90) indexes the active view's command bindings, and [`app/src/search/command_palette/data_sources.rs:110-119 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/search/command_palette/data_sources.rs#L110-L119) adds those actions to the Command Palette.
-- [`app/src/terminal/input/slash_commands/mod.rs:613-659 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/terminal/input/slash_commands/mod.rs#L613-L659) validates explicit `/set-tab-color` arguments and dispatches `SetActiveTabColor`; this path remains unchanged.
-- [`app/src/workspace/action.rs:911-975 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/workspace/action.rs#L911-L975) exhaustively decides which workspace actions save app state, and [`app/src/workspace/view.rs:26049-26052 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/workspace/view.rs#L26049-L26052) dispatches the save after such an action.
-- [`app/src/persistence/sqlite.rs:1012-1024 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/persistence/sqlite.rs#L1012-L1024) and [`app/src/persistence/sqlite.rs:2552-2567 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/persistence/sqlite.rs#L2552-L2567) serialize and restore tab-group colors.
-- [`app/src/persistence/sqlite.rs:1042-1059 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/persistence/sqlite.rs#L1042-L1059) serializes manual tab colors, and [`app/src/persistence/sqlite.rs:2583-2603 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/persistence/sqlite.rs#L2583-L2603) restores them.
-- [`app/src/workspace/view_tests.rs:1407-1488 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/workspace/view_tests.rs#L1407-L1488) is the existing active-tab color regression coverage.
-- [`app/src/workspace/view.rs:5201-5208 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/app/src/workspace/view.rs#L5201-L5208) exposes the resolved tab color used by integration assertions.
-- [`crates/integration/src/test.rs:1655-1696 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/crates/integration/src/test.rs#L1655-L1696) demonstrates the current custom-keybinding GUI integration-test setup and keystroke dispatch pattern.
-- [`crates/integration/src/bin/integration.rs:156-159 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/crates/integration/src/bin/integration.rs#L156-L159) and [`crates/integration/tests/integration/ui_tests.rs:33-38 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/crates/integration/tests/integration/ui_tests.rs#L33-L38) show the two registrations required for a GUI integration test.
-- [`script/presubmit:1-70 @ c20645b9b`](https://github.com/FJRG2007/rook/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/script/presubmit#L1-L70) is the current repository-owned format, inline-test-module, three-profile Clippy, native-format, and test entry point.
+- [`CONTRIBUTING.md:86-109 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/CONTRIBUTING.md#L86-L109) defines the `ready-to-spec` flow and the required `specs/GH<issue>/product.md` plus `tech.md` layout.
+- [`app/src/ui_components/color_dot.rs:18-25 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/ui_components/color_dot.rs#L18-L25) is the canonical ordered list of six tab colors: Red, Green, Yellow, Blue, Magenta, Cyan.
+- [`app/src/tab.rs:111-135 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/tab.rs#L111-L135) models a manual color as `Unset`, `Cleared`, or `Color`, and resolves it against a directory-derived default.
+- [`app/src/tab.rs:163-216 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/tab.rs#L163-L216) stores both the directory default and manual selection on `TabData`; `TabData::color` exposes the visible result.
+- [`app/src/tab.rs:755-825 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/tab.rs#L755-L825) builds the existing picker from the canonical list and dispatches the established tab or tab-group toggle actions.
+- [`app/src/workspace/view.rs:5534-5592 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/workspace/view.rs#L5534-L5592) applies a manual tab color, sends existing set/reset telemetry, notifies the view, and contains the current single-color toggle behavior.
+- [`app/src/workspace/view.rs:5594-5634 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/workspace/view.rs#L5594-L5634) owns the shared color of a tab group and propagates it through the group's rendering model.
+- [`app/src/workspace/action.rs:128-155 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/workspace/action.rs#L128-L155) defines active-tab workspace actions, including the parameterized `SetActiveTabColor`.
+- [`app/src/workspace/view.rs:23698-23712 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/workspace/view.rs#L23698-L23712) handles `SetActiveTabColor` and already redirects a grouped active tab to the group's color.
+- [`app/src/workspace/mod.rs:515-623 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/workspace/mod.rs#L515-L623) registers editable workspace actions, while [`app/src/workspace/mod.rs:951-971 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/workspace/mod.rs#L951-L971) shows the established keyless-by-default registration pattern.
+- [`app/src/settings_view/keybindings.rs:749-785 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/settings_view/keybindings.rs#L749-L785) materializes every editable binding in the Keyboard Shortcuts page.
+- [`app/src/search/action/data_source.rs:67-90 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/search/action/data_source.rs#L67-L90) indexes the active view's command bindings, and [`app/src/search/command_palette/data_sources.rs:110-119 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/search/command_palette/data_sources.rs#L110-L119) adds those actions to the Command Palette.
+- [`app/src/terminal/input/slash_commands/mod.rs:613-659 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/terminal/input/slash_commands/mod.rs#L613-L659) validates explicit `/set-tab-color` arguments and dispatches `SetActiveTabColor`; this path remains unchanged.
+- [`app/src/workspace/action.rs:911-975 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/workspace/action.rs#L911-L975) exhaustively decides which workspace actions save app state, and [`app/src/workspace/view.rs:26049-26052 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/workspace/view.rs#L26049-L26052) dispatches the save after such an action.
+- [`app/src/persistence/sqlite.rs:1012-1024 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/persistence/sqlite.rs#L1012-L1024) and [`app/src/persistence/sqlite.rs:2552-2567 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/persistence/sqlite.rs#L2552-L2567) serialize and restore tab-group colors.
+- [`app/src/persistence/sqlite.rs:1042-1059 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/persistence/sqlite.rs#L1042-L1059) serializes manual tab colors, and [`app/src/persistence/sqlite.rs:2583-2603 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/persistence/sqlite.rs#L2583-L2603) restores them.
+- [`app/src/workspace/view_tests.rs:1407-1488 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/workspace/view_tests.rs#L1407-L1488) is the existing active-tab color regression coverage.
+- [`app/src/workspace/view.rs:5201-5208 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/app/src/workspace/view.rs#L5201-L5208) exposes the resolved tab color used by integration assertions.
+- [`crates/integration/src/test.rs:1655-1696 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/crates/integration/src/test.rs#L1655-L1696) demonstrates the current custom-keybinding GUI integration-test setup and keystroke dispatch pattern.
+- [`crates/integration/src/bin/integration.rs:156-159 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/crates/integration/src/bin/integration.rs#L156-L159) and [`crates/integration/tests/integration/ui_tests.rs:33-38 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/crates/integration/tests/integration/ui_tests.rs#L33-L38) show the two registrations required for a GUI integration test.
+- [`script/presubmit:1-70 @ c20645b9b`](https://github.com/FJRG2007/polaris/blob/c20645b9b0425dd8fb49fe9f9d08280e1e725ce9/terminal/script/presubmit#L1-L70) is the current repository-owned format, inline-test-module, three-profile Clippy, native-format, and test entry point.
 
 No new persistence format, renderer, settings schema, color values, or network API is required.
 
@@ -143,9 +143,9 @@ Map the product invariants to concrete coverage:
 Run the focused unit tests:
 
 ```bash
-cargo nextest run -p rook tab::tests
-cargo nextest run -p rook workspace::action::tests
-cargo nextest run -p rook workspace::view::tests::test_cycle_active_tab_color
+cargo nextest run -p polaris-terminal tab::tests
+cargo nextest run -p polaris-terminal workspace::action::tests
+cargo nextest run -p polaris-terminal workspace::view::tests::test_cycle_active_tab_color
 ```
 
 ### GUI integration test
@@ -166,7 +166,7 @@ Following the existing custom-keybinding integration pattern:
 This approach is grounded in the current custom-keybinding integration test and the existing public `Workspace::get_tab_color` assertion surface linked in Context. It covers the actual editable-binding dispatch and behavior 2–4, 8–9, and 11. Run it with:
 
 ```bash
-ROOKUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS=1 cargo run -p integration --bin integration -- test_cycle_active_tab_color_with_keybinding
+PTERMUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS=1 cargo run -p integration --bin integration -- test_cycle_active_tab_color_with_keybinding
 ```
 
 ### Manual proof for the implementation PR
@@ -190,7 +190,7 @@ Before pushing an implementation update:
 ./script/presubmit
 ```
 
-Use the repository-owned script rather than a generic all-features Clippy command. At the inspected commit, `script/presubmit` runs `./script/format --check`, `./script/check_no_inline_test_modules`, the workspace/default-GUI/`rook_completer` Clippy profiles, native format checks, nextest, and doc tests.
+Use the repository-owned script rather than a generic all-features Clippy command. At the inspected commit, `script/presubmit` runs `./script/format --check`, `./script/check_no_inline_test_modules`, the workspace/default-GUI/`pterm_completer` Clippy profiles, native format checks, nextest, and doc tests.
 
 ## Parallelization
 

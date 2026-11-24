@@ -3,15 +3,15 @@
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_errors::report_error;
-use rookui::elements::{
+use pterm_errors::report_error;
+use ptermui::elements::{
     ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty, Flex,
     FormattedTextElement, Hoverable, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, Shrinkable, Stack, Text,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::components::UiComponent;
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use super::WithContentItemSpacing;
 use super::common::render_scrollable_collapsible_content;
@@ -237,7 +237,7 @@ fn render_transcript_row(
                 .with_child(Shrinkable::new(1., header).finish())
                 .with_child(
                     Container::new(
-                        ConstrainedBox::new(chevron_icon.to_rookui_icon(text_color).finish())
+                        ConstrainedBox::new(chevron_icon.to_ptermui_icon(text_color).finish())
                             .with_width(icon_sz)
                             .with_height(icon_sz)
                             .finish(),
@@ -636,7 +636,7 @@ fn render_collapse_chevron(
 
     Some(
         Hoverable::new(toggle_mouse_state, move |_| {
-            ConstrainedBox::new(chevron_icon.to_rookui_icon(text_color).finish())
+            ConstrainedBox::new(chevron_icon.to_ptermui_icon(text_color).finish())
                 .with_width(icon_sz)
                 .with_height(icon_sz)
                 .finish()

@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use anyhow::{Result, anyhow};
-use rook_features::FeatureFlag;
-use rookui_core::{AppContext, Entity, ModelContext, SingletonEntity};
-use rookui_extras::user_preferences::UserPreferences;
+use pterm_features::FeatureFlag;
+use ptermui_core::{AppContext, Entity, ModelContext, SingletonEntity};
+use ptermui_extras::user_preferences::UserPreferences;
 
 use super::{PrivatePreferences, RespectUserSyncSetting, SupportedPlatforms, SyncToCloud};
 

@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use rook_editor::render::model::CharCellState;
+use pterm_editor::render::model::CharCellState;
 use string_offset::CharOffset;
 
 struct CountingAllocator;

@@ -23,38 +23,38 @@ use num_traits::SaturatingSub;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
-use remote_server::manager::RemoteServerManager;
+use pterm_core::r#async::debounce;
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::icons::Icon;
+use pterm_editor::content::buffer::InitialBufferState;
+use pterm_editor::content::text::IndentUnit;
+use pterm_editor::render::model::{Decoration, LineCount};
+use pterm_util::content_version::ContentVersion;
+use pterm_util::file::{FileId, FileLoadError, FileSaveError};
 #[cfg(feature = "local_fs")]
-use repo_metadata::repositories::DetectedRepositories;
-use rook_core::r#async::debounce;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::icons::Icon;
-use rook_editor::content::buffer::InitialBufferState;
-use rook_editor::content::text::IndentUnit;
-use rook_editor::render::model::{Decoration, LineCount};
-use rook_util::content_version::ContentVersion;
-use rook_util::file::{FileId, FileLoadError, FileSaveError};
-#[cfg(feature = "local_fs")]
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::path::to_relative_path;
-use rook_util::sync::Condition;
-use rookui::elements::{
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::path::to_relative_path;
+use pterm_util::sync::Condition;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, DropShadow, Flex, Hoverable, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius,
     Rect, Shrinkable, Stack, Text,
 };
-use rookui::keymap::FixedBinding;
-use rookui::keymap::macros::*;
-use rookui::platform::SaveFilePickerConfiguration;
-use rookui::text::point::Point;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::keymap::FixedBinding;
+use ptermui::keymap::macros::*;
+use ptermui::platform::SaveFilePickerConfiguration;
+use ptermui::text::point::Point;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WindowId,
 };
+use remote_server::manager::RemoteServerManager;
+#[cfg(feature = "local_fs")]
+use repo_metadata::repositories::DetectedRepositories;
 use string_offset::CharOffset;
 use vec1::Vec1;
 use vim::vim::{MotionType, VimMode};
@@ -85,7 +85,7 @@ const HOVER_DEBOUNCE_PERIOD: Duration = Duration::from_millis(500);
 /// auto-save. Mirrors VS Code's default `files.autoSaveDelay` of 1000ms.
 const AUTO_SAVE_DEBOUNCE_PERIOD: Duration = Duration::from_millis(1000);
 
-use rook_core::send_telemetry_from_ctx;
+use pterm_core::send_telemetry_from_ctx;
 
 use super::ImmediateSaveError;
 use super::diff_viewer::DiffViewer;
@@ -176,7 +176,7 @@ struct LoadedFileMetadata {
     location: BufferFileLocation,
 }
 
-use rook_errors::report_error;
+use pterm_errors::report_error;
 
 pub use super::diff_viewer::DisplayMode;
 
@@ -509,7 +509,7 @@ impl LocalCodeEditorView {
         // Auto-save when the editor's window is navigated away from (mirrors VS
         // Code's `files.autoSave: onWindowChange`).
         ctx.subscribe_to_model(
-            &rookui::windowing::WindowManager::handle(ctx),
+            &ptermui::windowing::WindowManager::handle(ctx),
             Self::handle_window_focus_change,
         );
 
@@ -694,7 +694,7 @@ impl LocalCodeEditorView {
                 let window_id = ctx.window_id();
 
                 // Create the on-click action based on whether we have a definition
-                let on_click: Box<dyn Fn(&mut rookui::AppContext)> = if has_different_definition {
+                let on_click: Box<dyn Fn(&mut ptermui::AppContext)> = if has_different_definition {
                     let target_location = definition_locations.first().unwrap().target.clone();
                     Box::new(move |app| {
                         app.dispatch_typed_action_for_view(
@@ -1257,11 +1257,11 @@ impl LocalCodeEditorView {
     /// handled separately by [`View::on_blur`].
     fn handle_window_focus_change(
         &mut self,
-        _handle: ModelHandle<rookui::windowing::WindowManager>,
-        event: &rookui::windowing::StateEvent,
+        _handle: ModelHandle<ptermui::windowing::WindowManager>,
+        event: &ptermui::windowing::StateEvent,
         ctx: &mut ViewContext<Self>,
     ) {
-        let rookui::windowing::StateEvent::ValueChanged { current, previous } = event;
+        let ptermui::windowing::StateEvent::ValueChanged { current, previous } = event;
         let focused = ctx.is_self_or_child_focused();
         let was_window_focused = focused && previous.active_window == Some(ctx.window_id());
         let is_window_focused = focused && current.active_window == Some(ctx.window_id());
@@ -2292,13 +2292,13 @@ impl View for LocalCodeEditorView {
         "LocalCodeEditorView"
     }
 
-    fn on_focus(&mut self, focus_ctx: &rookui::FocusContext, ctx: &mut ViewContext<Self>) {
+    fn on_focus(&mut self, focus_ctx: &ptermui::FocusContext, ctx: &mut ViewContext<Self>) {
         if focus_ctx.is_self_focused() {
             self.editor.update(ctx, |editor, ctx| editor.focus(ctx));
         }
     }
 
-    fn on_blur(&mut self, _blur_ctx: &rookui::BlurContext, ctx: &mut ViewContext<Self>) {
+    fn on_blur(&mut self, _blur_ctx: &ptermui::BlurContext, ctx: &mut ViewContext<Self>) {
         // When focus leaves this editor's subtree entirely, treat it as a
         // focus-change auto-save (mirrors VS Code's `files.autoSave:
         // onFocusChange`). Focus moving to a child overlay (hover card,
@@ -2309,7 +2309,7 @@ impl View for LocalCodeEditorView {
         }
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn ptermui::Element> {
         // Rendering the remote disconnection banner or version conflict banner.
         // Only show the disconnection banner if the file was successfully loaded;
         // if it never loaded, the error/loading state handles that.
@@ -2532,7 +2532,7 @@ pub fn render_unsaved_changes_banner(
             Container::new(
                 ConstrainedBox::new(
                     Icon::Warning
-                        .to_rookui_icon(appearance.theme().active_ui_text_color())
+                        .to_ptermui_icon(appearance.theme().active_ui_text_color())
                         .finish(),
                 )
                 .with_height(16.)
@@ -2629,7 +2629,7 @@ pub fn render_remote_disconnected_banner(appearance: &Appearance) -> Box<dyn Ele
             Container::new(
                 ConstrainedBox::new(
                     Icon::Warning
-                        .to_rookui_icon(appearance.theme().active_ui_text_color())
+                        .to_ptermui_icon(appearance.theme().active_ui_text_color())
                         .finish(),
                 )
                 .with_height(16.)

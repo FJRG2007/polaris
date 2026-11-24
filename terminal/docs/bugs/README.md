@@ -1,6 +1,6 @@
 # Diagnosed bugs
 
-What Rook was forked to fix, how each cause was established, and what was changed. One file per bug.
+What Polaris Terminal was forked to fix, how each cause was established, and what was changed. One file per bug.
 
 Every entry records the measurement the diagnosis rests on, because the point of these notes is to be able to tell later whether a change actually helped, and to avoid re-deriving the same investigation.
 
@@ -15,7 +15,7 @@ Every entry records the measurement the diagnosis rests on, because the point of
 | [The window stops responding while another program writes many files](main-thread-stalls-on-file-floods.md) | "Not responding" for 20 s to 3 min while a build, checkout or worktree fills a repository open in a tab: one stat per new file, on the UI thread | Fixed |
 | [A restored pane comes back in the home directory](restored-panes-lose-their-directory.md) | Tabs restore, but each in the home directory rather than its own: a pane whose shell has not bootstrapped yet is saved as having no directory, and a short restart erases every one of them | Fixed |
 | [`.git/info/exclude` is never loaded](git-info-exclude-is-never-loaded.md) | Whatever an agent excludes there - its worktrees, above all - counts as tracked, so every file it writes reaches the main thread, the subscribers, the tree and the search | Fixed |
-| [The command still running at quit is missing from the restored session](running-command-lost-at-quit.md) | A command still executing when Rook quit - typically an agent such as `claude` left open overnight - is absent from the next launch while everything before it comes back | Fixed |
+| [The command still running at quit is missing from the restored session](running-command-lost-at-quit.md) | A command still executing when Polaris Terminal quit - typically an agent such as `claude` left open overnight - is absent from the next launch while everything before it comes back | Fixed |
 
 ## Writing one of these
 

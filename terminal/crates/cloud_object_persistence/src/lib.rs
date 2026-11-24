@@ -1,4 +1,4 @@
-//! This crate defines shared SQLite persistence infrastructure for Rook cloud objects.
+//! This crate defines shared SQLite persistence infrastructure for Polaris Terminal cloud objects.
 //!
 //! It owns model-agnostic persistence helpers for object metadata, permissions, refresh
 //! scheduling, guest and link-sharing encoding, callback-based object upsert and delete

@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     ChildView, ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisAlignment,
     MainAxisSize, ParentElement,
 };
-use rookui::{Action, AppContext, Element, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::{Action, AppContext, Element, TypedActionView, View, ViewContext, ViewHandle};
 
 use crate::ai::blocklist::inline_action::inline_action_icons::icon_size;
 use crate::ui_components::icons::Icon;
@@ -230,7 +230,7 @@ pub fn render_expansion_icon(
     app: &AppContext,
 ) -> Box<dyn Element> {
     ConstrainedBox::new(
-        rookui::elements::Icon::new(
+        ptermui::elements::Icon::new(
             if expanded {
                 if expands_upwards {
                     Icon::ChevronUp.into()

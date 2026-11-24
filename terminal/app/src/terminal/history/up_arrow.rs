@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use rook_core::features::FeatureFlag;
-use rookui::{AppContext, EntityId, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::{AppContext, EntityId, SingletonEntity};
 
 use super::History;
 use crate::ai::blocklist::history_model::AIQueryHistory;

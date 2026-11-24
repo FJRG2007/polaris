@@ -4,26 +4,26 @@ use onboarding::components::feature_optout_dialog::{
     FeatureOptOutDialog, render_feature_optout_dialog,
 };
 use onboarding::slides::{layout, onboarding_bottom_nav, slide_content};
-use onboarding::{OnboardingEvent, OnboardingIntention, ROOK_DRIVE_FEATURES};
+use onboarding::{OnboardingEvent, OnboardingIntention, POLARIS_TERMINAL_DRIVE_FEATURES};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::safe_error;
-use rook_core::ui::Icon;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::actions::StandardAction;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::safe_error;
+use pterm_core::ui::Icon;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::actions::StandardAction;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Align, Border, CacheOption, ChildAnchor, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Dismiss, Fill, Flex, FormattedTextElement,
     HighlightedHyperlink, Image, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Shrinkable, Stack,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::{FixedBinding, Keystroke};
-use rookui::text_layout::TextAlignment;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::{FixedBinding, Keystroke};
+use ptermui::text_layout::TextAlignment;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, UpdateModel, View,
     ViewContext, ViewHandle,
 };
@@ -50,7 +50,7 @@ const TOS_URL: &str = "https://www.rook.dev/terms-of-service";
 // ---------------------------------------------------------------------------
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -92,17 +92,17 @@ pub fn init(app: &mut AppContext) {
 impl LoginPurpose {
     fn copy(self) -> (&'static str, &'static str) {
         match self {
-            LoginPurpose::RookDrive => (
-                "Get started with Rook Drive",
+            LoginPurpose::PtermDrive => (
+                "Get started with Polaris Terminal Drive",
                 "Connect your account to save and share notebooks, workflows, and more across devices.",
             ),
-            LoginPurpose::RookAgent => (
+            LoginPurpose::PtermAgent => (
                 "Get started with AI",
                 "Connect your account to enable AI-powered planning, coding, and automation.",
             ),
             LoginPurpose::ThirdParty => (
                 "Create an account",
-                "Create a Rook account to enable AI-powered planning, coding, and automations.",
+                "Create a Polaris Terminal account to enable AI-powered planning, coding, and automations.",
             ),
             LoginPurpose::AccountFirst => (
                 "Create an account",
@@ -185,14 +185,14 @@ enum LoginSlideOverlay {
 }
 
 /// Why the login slide is being shown, which drives its copy. All paths
-/// need an account: Terminal+Drive for cloud sync, and the Rook-agent and
-/// third-party paths because Rook's AI features run on a Rook account. Skipping
+/// need an account: Terminal+Drive for cloud sync, and the Polaris Terminal-agent and
+/// third-party paths because Polaris Terminal's AI features run on a Polaris Terminal account. Skipping
 /// therefore defers sign-in and leaves the gated features off until the user
 /// creates an account.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum LoginPurpose {
-    RookAgent,
-    RookDrive,
+    PtermAgent,
+    PtermDrive,
     ThirdParty,
     AccountFirst,
 }
@@ -207,18 +207,18 @@ pub struct LoginSlideView {
     /// Whether this path wants AI (agent intent) vs. not (terminal intention).
     /// Used to gate the cloud-conversation-storage toggle and AI wording in the
     /// privacy settings step. This reflects intent, not the final state: AI runs
-    /// on a Rook account, so skipping login leaves it off even when this is true.
+    /// on a Polaris Terminal account, so skipping login leaves it off even when this is true.
     /// The actual `AISettings` value is written when settings are applied.
     ai_enabled: bool,
     /// Whether the user chose third-party (BYO) agents during onboarding. Drives
     /// the agent-path login copy ("Create an account" for third-party vs. "Get
-    /// started with AI" for Rook Agent); it does not affect whether AI is
+    /// started with AI" for Polaris Terminal Agent); it does not affect whether AI is
     /// enabled, which depends on the user creating an account.
     uses_third_party_agents: bool,
     /// Onboarding intention selected by the user, used to render Drive-focused
     /// copy on the Terminal+Drive path. On the login slide, `intention ==
     /// OnboardingIntention::Terminal` is equivalent to "Terminal+Drive":
-    /// `RootView` only routes Terminal-intent users here when Rook Drive is
+    /// `RootView` only routes Terminal-intent users here when Polaris Terminal Drive is
     /// enabled.
     intention: OnboardingIntention,
     theme_visual_path: &'static str,
@@ -596,12 +596,12 @@ impl LoginSlideView {
             return LoginPurpose::AccountFirst;
         }
         match self.intention {
-            OnboardingIntention::Terminal => LoginPurpose::RookDrive,
+            OnboardingIntention::Terminal => LoginPurpose::PtermDrive,
             OnboardingIntention::AgentDrivenDevelopment => {
                 if self.uses_third_party_agents {
                     LoginPurpose::ThirdParty
                 } else {
-                    LoginPurpose::RookAgent
+                    LoginPurpose::PtermAgent
                 }
             }
         }
@@ -641,7 +641,7 @@ impl LoginSlideView {
         let tos_line = Flex::row()
             .with_child(
                 ui_builder
-                    .span("By continuing, you agree to Rook's ")
+                    .span("By continuing, you agree to Polaris Terminal's ")
                     .with_style(disclaimer_styles)
                     .build()
                     .finish(),
@@ -729,7 +729,7 @@ impl LoginSlideView {
     ) -> Box<dyn Element> {
         let theme = appearance.theme();
         let background = theme.background().into_solid();
-        let icon = ConstrainedBox::new(Icon::Lightbulb.to_rookui_icon(theme.accent()).finish())
+        let icon = ConstrainedBox::new(Icon::Lightbulb.to_ptermui_icon(theme.accent()).finish())
             .with_width(20.)
             .with_height(20.)
             .finish();
@@ -796,8 +796,8 @@ impl LoginSlideView {
 
         let cmd_enter = Keystroke::parse("cmdorctrl-enter").unwrap_or_default();
         let skip_label = match self.login_purpose() {
-            LoginPurpose::RookDrive => "Disable Rook Drive",
-            LoginPurpose::RookAgent => "Skip for now",
+            LoginPurpose::PtermDrive => "Disable Polaris Terminal Drive",
+            LoginPurpose::PtermAgent => "Skip for now",
             LoginPurpose::ThirdParty => "Skip for now",
             LoginPurpose::AccountFirst => "Skip",
         };
@@ -963,7 +963,7 @@ impl LoginSlideView {
             } else {
                 // First call (narrow layout fallback): placeholder.
                 editor_rendered.set(true);
-                Container::new(rookui::elements::Empty::new().finish())
+                Container::new(ptermui::elements::Empty::new().finish())
                     .with_padding_top(12.)
                     .with_padding_bottom(12.)
                     .with_padding_left(16.)
@@ -1106,15 +1106,15 @@ impl LoginSlideView {
             &'static [&'static str],
             &'static str,
         ) = match self.login_purpose() {
-            LoginPurpose::RookDrive => (
-                "Are you sure you want to disable Rook Drive?",
-                "Rook Drive lets you save workflows and knowledge across devices and share them with your team. By continuing, you won't have access to the following features:",
-                ROOK_DRIVE_FEATURES,
-                "Enable Rook Drive",
+            LoginPurpose::PtermDrive => (
+                "Are you sure you want to disable Polaris Terminal Drive?",
+                "Polaris Terminal Drive lets you save workflows and knowledge across devices and share them with your team. By continuing, you won't have access to the following features:",
+                POLARIS_TERMINAL_DRIVE_FEATURES,
+                "Enable Polaris Terminal Drive",
             ),
-            LoginPurpose::RookAgent | LoginPurpose::ThirdParty | LoginPurpose::AccountFirst => (
+            LoginPurpose::PtermAgent | LoginPurpose::ThirdParty | LoginPurpose::AccountFirst => (
                 "Continue without signing in?",
-                "Without an account, you won't have access to Rook's AI features. Sign in anytime to unlock agents and other AI features.",
+                "Without an account, you won't have access to Polaris Terminal's AI features. Sign in anytime to unlock agents and other AI features.",
                 &[],
                 "Sign in",
             ),
@@ -1220,14 +1220,14 @@ impl View for LoginSlideView {
                 );
                 let overlay_opacity = (100u8).saturating_sub(img.opacity);
                 stack.add_child(
-                    rookui::elements::Rect::new()
+                    ptermui::elements::Rect::new()
                         .with_background(theme.background().with_opacity(overlay_opacity))
                         .finish(),
                 );
             }
             _ => {
                 stack.add_child(
-                    Container::new(rookui::elements::Empty::new().finish())
+                    Container::new(ptermui::elements::Empty::new().finish())
                         .with_background(theme.background())
                         .finish(),
                 );
@@ -1248,9 +1248,9 @@ impl View for LoginSlideView {
         if matches!(self.active_overlay, Some(LoginSlideOverlay::SkipDialog)) {
             let dialog = self.render_skip_dialog(appearance);
             stack.add_child(
-                rookui::elements::Rect::new()
+                ptermui::elements::Rect::new()
                     .with_background(
-                        rook_core::ui::theme::Fill::Solid(ColorU::black()).with_opacity(60),
+                        pterm_core::ui::theme::Fill::Solid(ColorU::black()).with_opacity(60),
                     )
                     .finish(),
             );

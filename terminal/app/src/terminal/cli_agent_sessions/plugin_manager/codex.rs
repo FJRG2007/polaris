@@ -14,13 +14,13 @@ use crate::features::FeatureFlag;
 use crate::terminal::model::session::LocalCommandExecutor;
 use crate::terminal::shell::ShellType;
 
-const PLUGIN_NAME: &str = "rook";
-const PLUGIN_KEY: &str = "rook@codex-rook";
+const PLUGIN_NAME: &str = "polaris-terminal";
+const PLUGIN_KEY: &str = "polaris-terminal@codex-polaris-terminal";
 const MARKETPLACE_REPO: &str = "warpdotdev/codex-warp";
-const MARKETPLACE_NAME: &str = "codex-rook";
+const MARKETPLACE_NAME: &str = "codex-polaris-terminal";
 
 const PLATFORM_PLUGIN_NAME: &str = "orchestration";
-const PLATFORM_PLUGIN_KEY: &str = "orchestration@codex-rook";
+const PLATFORM_PLUGIN_KEY: &str = "orchestration@codex-polaris-terminal";
 
 const CODEX_CONFIG_DIR: &str = ".codex";
 const CODEX_HOME_ENV: &str = "CODEX_HOME";
@@ -56,14 +56,14 @@ impl CodexPluginManager {
         run_cli_command_logged("codex", args, &self.executor, env_vars, log).await
     }
 
-    /// Ensures the codex-rook marketplace is registered, while preserving a
+    /// Ensures the codex-polaris-terminal marketplace is registered, while preserving a
     /// non-Git/local marketplace override. If the marketplace is already a
     /// Git repo, upgrade it; if it is a non-Git source, leave it alone; otherwise
     /// add it from the canonical repository.
     async fn ensure_marketplace(&self, log: &mut String) -> Result<(), PluginInstallError> {
         match codex_home_dir()
             .ok()
-            .and_then(|dir| codex_rook_marketplace_config(&dir))
+            .and_then(|dir| codex_pterm_marketplace_config(&dir))
         {
             Some(config) if config.is_git() => {
                 self.run_logged(&["plugin", "marketplace", "upgrade", MARKETPLACE_NAME], log)
@@ -109,7 +109,7 @@ impl CliAgentPluginManager for CodexPluginManager {
         let Ok(codex_dir) = codex_home_dir() else {
             return false;
         };
-        if codex_rook_marketplace_config(&codex_dir).is_some_and(|config| !config.is_git()) {
+        if codex_pterm_marketplace_config(&codex_dir).is_some_and(|config| !config.is_git()) {
             return false;
         }
         plugin_needs_update(&codex_dir, PLUGIN_NAME, PLUGIN_KEY, MINIMUM_PLUGIN_VERSION)
@@ -132,7 +132,7 @@ impl CliAgentPluginManager for CodexPluginManager {
         let Ok(codex_dir) = codex_home_dir() else {
             return false;
         };
-        if codex_rook_marketplace_config(&codex_dir).is_some_and(|config| !config.is_git()) {
+        if codex_pterm_marketplace_config(&codex_dir).is_some_and(|config| !config.is_git()) {
             return false;
         }
         plugin_needs_update(
@@ -147,7 +147,7 @@ impl CliAgentPluginManager for CodexPluginManager {
         let Ok(codex_dir) = codex_home_dir() else {
             return false;
         };
-        codex_rook_marketplace_config(&codex_dir).is_some_and(|config| !config.is_git())
+        codex_pterm_marketplace_config(&codex_dir).is_some_and(|config| !config.is_git())
     }
 
     async fn install(&self) -> Result<(), PluginInstallError> {
@@ -193,11 +193,11 @@ impl CliAgentPluginManager for CodexPluginManager {
     }
 
     fn install_success_message(&self) -> &'static str {
-        "Rook plugin installed. Please restart Codex to activate."
+        "Polaris Terminal plugin installed. Please restart Codex to activate."
     }
 
     fn update_success_message(&self) -> &'static str {
-        "Rook plugin updated. Please restart Codex to activate."
+        "Polaris Terminal plugin updated. Please restart Codex to activate."
     }
 
     fn install_instructions(&self) -> &'static PluginInstructions {
@@ -273,18 +273,18 @@ impl CliAgentPluginManager for CodexPluginManager {
 
 static PLUGIN_INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> =
     LazyLock::new(|| PluginInstructions {
-        title: "Install Rook Plugin for Codex",
+        title: "Install Polaris Terminal Plugin for Codex",
         subtitle: "Run the following commands, then restart Codex.",
         steps: &[
             PluginInstructionStep {
-                description: "Add the Rook plugin marketplace repository",
+                description: "Add the Polaris Terminal plugin marketplace repository",
                 command: "codex plugin marketplace add warpdotdev/codex-warp",
                 executable: true,
                 link: None,
             },
             PluginInstructionStep {
-                description: "Install the Rook plugin",
-                command: "codex plugin add rook@codex-rook",
+                description: "Install the Polaris Terminal plugin",
+                command: "codex plugin add polaris-terminal@codex-polaris-terminal",
                 executable: true,
                 link: None,
             },
@@ -294,8 +294,8 @@ static PLUGIN_INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> =
 
 static NATIVE_INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| {
     PluginInstructions {
-        title: "Enable Rook Notifications for Codex",
-        subtitle: "Update Codex to the latest version, then enable in-focus notifications so Rook can display them while you work.",
+        title: "Enable Polaris Terminal Notifications for Codex",
+        subtitle: "Update Codex to the latest version, then enable in-focus notifications so Polaris Terminal can display them while you work.",
         steps: &[
             PluginInstructionStep {
                 description: "Update Codex to the latest version.",
@@ -323,25 +323,25 @@ static EMPTY_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| Plugi
 
 static PLUGIN_UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| {
     PluginInstructions {
-        title: "Update Rook Plugin for Codex",
+        title: "Update Polaris Terminal Plugin for Codex",
         subtitle: "Run the following commands, then restart Codex.",
         steps: &[
             PluginInstructionStep {
                 description: "Upgrade the marketplace",
-                command: "codex plugin marketplace upgrade codex-rook",
+                command: "codex plugin marketplace upgrade codex-polaris-terminal",
                 executable: true,
                 link: None,
             },
             PluginInstructionStep {
-                description: "Reinstall the Rook plugin",
-                command: "codex plugin add rook@codex-rook",
+                description: "Reinstall the Polaris Terminal plugin",
+                command: "codex plugin add polaris-terminal@codex-polaris-terminal",
                 executable: true,
                 link: None,
             },
         ],
         post_install_notes: &[
             "Restart Codex to activate the update.",
-            "If this fails because codex-rook is not configured as a Git marketplace, remove and re-add the marketplace.",
+            "If this fails because codex-polaris-terminal is not configured as a Git marketplace, remove and re-add the marketplace.",
         ],
     }
 });
@@ -371,7 +371,7 @@ fn check_plugin_enabled(codex_dir: &Path, plugin_key: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Reads the latest cached Rook plugin version, if present.
+/// Reads the latest cached Polaris Terminal plugin version, if present.
 fn installed_version(codex_dir: &Path) -> Option<String> {
     installed_plugin_version(codex_dir, PLUGIN_NAME)
 }
@@ -388,7 +388,7 @@ fn platform_plugin_version_is_current(codex_dir: &Path) -> bool {
 }
 
 /// Reads the latest cached version for `plugin_name` from
-/// `plugins/cache/codex-rook/<plugin_name>/<version>/.codex-plugin/plugin.json`.
+/// `plugins/cache/codex-polaris-terminal/<plugin_name>/<version>/.codex-plugin/plugin.json`.
 fn installed_plugin_version(codex_dir: &Path, plugin_name: &str) -> Option<String> {
     let cache_dir = codex_dir
         .join("plugins")
@@ -438,22 +438,22 @@ fn plugin_needs_update(
     }
 }
 
-struct CodexRookMarketplaceConfig {
+struct CodexPtermMarketplaceConfig {
     source_type: Option<String>,
 }
 
-impl CodexRookMarketplaceConfig {
+impl CodexPtermMarketplaceConfig {
     fn is_git(&self) -> bool {
         self.source_type.as_deref() == Some("git")
     }
 }
 
-fn codex_rook_marketplace_config(codex_dir: &Path) -> Option<CodexRookMarketplaceConfig> {
+fn codex_pterm_marketplace_config(codex_dir: &Path) -> Option<CodexPtermMarketplaceConfig> {
     let config_path = codex_dir.join("config.toml");
     let contents = fs::read_to_string(config_path).ok()?;
     let parsed = contents.parse::<toml_edit::DocumentMut>().ok()?;
     let marketplace = parsed.get("marketplaces")?.get(MARKETPLACE_NAME)?;
-    Some(CodexRookMarketplaceConfig {
+    Some(CodexPtermMarketplaceConfig {
         source_type: marketplace
             .get("source_type")
             .and_then(|source_type| source_type.as_str())

@@ -2,7 +2,7 @@
 
 ## Problem
 
-When a user opens a non-oz (claude, gemini) cloud agent conversation, the resulting UX depends on which entry point they used: some land in a shared-session viewer, some land in a plain transcript viewer, and none consistently enter the agent view. For 3p harnesses the block snapshot is a single block in the terminal model with no surrounding agent-view chrome (pane header, exit affordance, details panel), so opening a 3p conversation feels unlike every other agent interaction in Rook.
+When a user opens a non-oz (claude, gemini) cloud agent conversation, the resulting UX depends on which entry point they used: some land in a shared-session viewer, some land in a plain transcript viewer, and none consistently enter the agent view. For 3p harnesses the block snapshot is a single block in the terminal model with no surrounding agent-view chrome (pane header, exit affordance, details panel), so opening a 3p conversation feels unlike every other agent interaction in Polaris Terminal.
 
 Reference issue: https://linear.app/warpdotdev/issue/REMOTE-1459/fix-agent-view-entry-with-3rd-party-harnesses
 
@@ -12,8 +12,8 @@ REMOTE-1454 handled the *locally-started* cloud-mode flow for 3p harnesses (setu
 
 In scope — both converge on the user opening an existing 3p cloud conversation:
 
-- Live shared-session viewer join (from `rook://shared_session/{id}`, management view `OpenAmbientAgentSession`, or conversation list `OpenAmbientAgentSession`).
-- Transcript viewer load (from `rook://conversation/{id}` or management / conversation-list `OpenConversationTranscriptViewer`).
+- Live shared-session viewer join (from `polaris-terminal://shared_session/{id}`, management view `OpenAmbientAgentSession`, or conversation list `OpenAmbientAgentSession`).
+- Transcript viewer load (from `polaris-terminal://conversation/{id}` or management / conversation-list `OpenConversationTranscriptViewer`).
 
 Out of scope:
 
@@ -47,7 +47,7 @@ Telemetry: `TelemetryAgentViewEntryOrigin::ThirdPartyCloudAgent` is added and `F
 
 `app/src/pane_group/mod.rs`
 
-The `CloudConversationData::CLIAgent` branch maps `AIAgentHarness` → `rook_cli::agent::Harness`, restores the block snapshot, calls `set_harness` to keep the viewer's `AmbientAgentViewModel::harness` in sync with the loaded run, calls `enter_agent_view_for_new_conversation(None, ThirdPartyCloudAgent, ctx)`, and then calls `attach_non_startup_blocks_to_conversation(vehicle_conversation_id)` to retag the snapshot block. All four steps run inside a single `terminal_view.update` closure so the flow reads linearly.
+The `CloudConversationData::CLIAgent` branch maps `AIAgentHarness` → `pterm_cli::agent::Harness`, restores the block snapshot, calls `set_harness` to keep the viewer's `AmbientAgentViewModel::harness` in sync with the loaded run, calls `enter_agent_view_for_new_conversation(None, ThirdPartyCloudAgent, ctx)`, and then calls `attach_non_startup_blocks_to_conversation(vehicle_conversation_id)` to retag the snapshot block. All four steps run inside a single `terminal_view.update` closure so the flow reads linearly.
 
 ### 3. Live shared-session viewer entry — `HarnessSelected` handler
 
@@ -89,10 +89,10 @@ Generalized from the old `move_ai_block_to_agent_view_conversation`. Updates bot
 
 Manual:
 
-- **Claude / Gemini, live, shared session link** — start a run on one client, join from another via `rook://shared_session/{id}`. Confirm the joining client lands in agent view.
+- **Claude / Gemini, live, shared session link** — start a run on one client, join from another via `polaris-terminal://shared_session/{id}`. Confirm the joining client lands in agent view.
 - **Claude / Gemini, live, management view and conversation list** — same via `OpenAmbientAgentSession`.
 - **Claude / Gemini, completed, transcript viewer** — open a completed task from management view / conversation list. Confirm the transcript viewer opens in agent view with the block snapshot as the content.
-- **Claude / Gemini, completed, conversation link** — same via `rook://conversation/{id}`.
+- **Claude / Gemini, completed, conversation link** — same via `polaris-terminal://conversation/{id}`.
 - **Oz** — repeat the live and completed cases; confirm no regression on any branch we didn't touch.
 - **`AgentHarness` disabled** — confirm `is_third_party_harness()` returns false and both new paths no-op.
 - **Idempotency** — a run that spams `HarnessSelected` only enters agent view once.

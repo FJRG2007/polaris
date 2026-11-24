@@ -1,12 +1,12 @@
-use rook_core::ui::appearance::Appearance;
-use rook_editor::editor::NavigationKey;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_editor::editor::NavigationKey;
+use ptermui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, Flex, MouseStateHandle, ParentElement, Radius,
     Shrinkable,
 };
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -198,7 +198,7 @@ impl EnvVarCommandDialog {
             .with_centered_text_label(label_text.to_owned())
             .with_style(UiComponentStyles {
                 font_size: Some(BUTTON_FONT_SIZE),
-                font_weight: Some(rookui::fonts::Weight::Normal),
+                font_weight: Some(ptermui::fonts::Weight::Normal),
                 ..Default::default()
             });
 
@@ -209,7 +209,7 @@ impl EnvVarCommandDialog {
         button
             .build()
             .on_click(move |ctx, _, _| ctx.dispatch_typed_action(action.clone()))
-            .with_cursor(rookui::platform::Cursor::PointingHand)
+            .with_cursor(ptermui::platform::Cursor::PointingHand)
             .finish()
     }
 

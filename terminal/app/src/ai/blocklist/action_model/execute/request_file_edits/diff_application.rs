@@ -12,7 +12,7 @@ use ai::diff_validation::{
     SearchAndReplace, V4AHunk, fuzzy_match_diffs, fuzzy_match_v4a_diffs,
 };
 use itertools::Itertools;
-use rookui::r#async::executor::Background;
+use ptermui::r#async::executor::Background;
 use vec1::Vec1;
 
 use super::telemetry::{

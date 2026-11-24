@@ -13,9 +13,9 @@ use std::{
 use chrono::{Local, SecondsFormat};
 #[cfg(test)]
 use parking_lot::Mutex;
-use rook_completer::completer::{CommandExitStatus, CommandOutput};
+use pterm_completer::completer::{CommandExitStatus, CommandOutput};
 #[cfg(not(target_family = "wasm"))]
-use rook_errors::report_error;
+use pterm_errors::report_error;
 
 use super::ContextChipKind;
 use crate::terminal::shell::ShellType;
@@ -101,7 +101,7 @@ impl PromptChipLogger {
 
     #[cfg(not(target_family = "wasm"))]
     fn init_runtime() -> Self {
-        if !rook_core::channel::ChannelState::enable_debug_features() {
+        if !pterm_core::channel::ChannelState::enable_debug_features() {
             return Self::Disabled;
         }
 
@@ -133,7 +133,7 @@ impl PromptChipLogger {
 
 #[cfg(not(target_family = "wasm"))]
 pub(crate) fn log_file_path() -> anyhow::Result<PathBuf> {
-    let log_path = rook_logging::log_file_path()?;
+    let log_path = pterm_logging::log_file_path()?;
     prompt_chip_log_file_path(&log_path)
 }
 

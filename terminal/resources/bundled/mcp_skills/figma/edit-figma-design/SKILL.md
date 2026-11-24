@@ -9,7 +9,7 @@ metadata:
 
 ## Overview
 
-This skill creates or updates Figma designs directly from a natural-language description. It combines Figma library search with direct file authoring, and uses Rook's broader agent capabilities only when they are needed to make the design more product-aware or codebase-aware.
+This skill creates or updates Figma designs directly from a natural-language description. It combines Figma library search with direct file authoring, and uses Polaris Terminal's broader agent capabilities only when they are needed to make the design more product-aware or codebase-aware.
 
 ## When to use this skill
 
@@ -71,9 +71,9 @@ Decide how much non-Figma context is actually necessary.
 
 **Stay inside Figma MCP only** when the user wants an exploratory concept, wireframe, or mockup and does not ask for codebase alignment.
 
-**Use Rook agent context selectively** when the user wants the design to match an existing product or design system:
+**Use Polaris Terminal agent context selectively** when the user wants the design to match an existing product or design system:
 
-- read project rules from `AGENTS.md` and/or `ROOK.md` if they exist
+- read project rules from `AGENTS.md` and/or `POLARIS_TERMINAL.md` if they exist
 - use semantic codebase search, grep, and file reads to find relevant components, product vocabulary, layout patterns, and design-token sources
 - use other MCP sources or web search only when the prompt directly depends on them, such as product requirements in another system or explicit inspiration requests
 - do not edit code, run REPL commands, or use computer use as part of this skill's normal workflow
@@ -133,11 +133,11 @@ When the first usable draft is ready:
 
 If the user asks to implement the approved design in code, stop using this skill and consult `implement-design`.
 
-## Rook-agent guidance
+## Polaris Terminal-agent guidance
 
-Use Rook's broader capabilities to reduce manual prompting, not to add unnecessary work.
+Use Polaris Terminal's broader capabilities to reduce manual prompting, not to add unnecessary work.
 
-**Good uses of Rook agent capabilities in this skill:**
+**Good uses of Polaris Terminal agent capabilities in this skill:**
 
 - finding existing component names or design tokens in the repo
 - reading project rules that constrain layout, naming, or branding
@@ -160,7 +160,7 @@ User says: "Design a billing overview screen in Figma for our desktop app. Use o
 
 1. Confirm this is Figma authoring, not code implementation.
 2. Resolve the destination by calling `whoami` if needed, then `create_new_file`.
-3. Read `AGENTS.md` or `ROOK.md`, or search the codebase only if needed to understand billing terminology and existing components.
+3. Read `AGENTS.md` or `POLARIS_TERMINAL.md`, or search the codebase only if needed to understand billing terminology and existing components.
 4. Call `search_design_system` with billing-related queries.
 5. Build the screen in small `use_figma` steps.
 6. Return the new Figma file URL and offer to revise.

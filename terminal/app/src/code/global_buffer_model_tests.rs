@@ -1,13 +1,13 @@
 use lsp::LspManagerModel;
+use pterm_files::FileModel;
+use pterm_util::content_version::ContentVersion;
+use pterm_util::host_id::HostId;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::{App, ModelHandle, SingletonEntity};
 use remote_server::proto::TextEdit;
 use repo_metadata::RepoMetadataModel;
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::watcher::DirectoryWatcher;
-use rook_files::FileModel;
-use rook_util::content_version::ContentVersion;
-use rook_util::host_id::HostId;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::{App, ModelHandle, SingletonEntity};
 
 use super::{BufferSource, CharOffsetEdit, GlobalBufferModel, PendingEditBatch};
 use crate::test_util::settings::initialize_settings_for_tests;
@@ -22,14 +22,14 @@ use crate::test_util::settings::initialize_settings_for_tests;
 
 impl GlobalBufferModel {
     /// Returns whether a pending edit batch exists for a Remote buffer.
-    fn has_pending_batch_for_test(&self, file_id: rook_util::file::FileId) -> bool {
+    fn has_pending_batch_for_test(&self, file_id: pterm_util::file::FileId) -> bool {
         self.buffers.get(&file_id).is_some_and(|state| {
             matches!(&state.source, BufferSource::Remote { pending_batch, .. } if pending_batch.is_some())
         })
     }
 
     /// Returns the number of edits in the pending batch, or 0 if none.
-    fn pending_batch_edit_count_for_test(&self, file_id: rook_util::file::FileId) -> usize {
+    fn pending_batch_edit_count_for_test(&self, file_id: pterm_util::file::FileId) -> usize {
         self.buffers
             .get(&file_id)
             .and_then(|state| match &state.source {
@@ -46,7 +46,7 @@ impl GlobalBufferModel {
     /// `ContentChanged` subscription path.
     fn insert_pending_batch_for_test(
         &mut self,
-        file_id: rook_util::file::FileId,
+        file_id: pterm_util::file::FileId,
         expected_server_version: u64,
         edits: Vec<remote_server::proto::TextEdit>,
         client_version: ContentVersion,
@@ -88,7 +88,7 @@ fn gbm(app: &App) -> ModelHandle<GlobalBufferModel> {
     GlobalBufferModel::handle(app)
 }
 
-fn content(app: &App, file_id: rook_util::file::FileId) -> String {
+fn content(app: &App, file_id: pterm_util::file::FileId) -> String {
     let handle = gbm(app);
     app.read(|ctx| {
         handle

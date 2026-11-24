@@ -2,17 +2,17 @@ use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     Border, ChildAnchor, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, DropShadow, EventHandler,
     Flex, Hoverable, MainAxisSize, MouseInBehavior, MouseStateHandle, OffsetPositioning,
     ParentElement, PositionedElementAnchor, PositionedElementOffsetBounds, Radius, SavePosition,
     ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Stack, Text,
 };
-use rookui::platform::Cursor;
-use rookui::{
+use ptermui::platform::Cursor;
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
@@ -433,7 +433,7 @@ impl CloudModeV2SlashCommandView {
     fn rebuild_from_results(&mut self, ctx: &mut ViewContext<Self>) {
         let on_click_fn = |_idx: usize,
                            item: AcceptSlashCommandOrSavedPrompt,
-                           evt_ctx: &mut rookui::EventContext| {
+                           evt_ctx: &mut ptermui::EventContext| {
             evt_ctx.dispatch_typed_action(CloudModeV2SlashCommandAction::Accept {
                 item,
                 cmd_or_ctrl_enter: false,
@@ -1064,7 +1064,7 @@ impl CloudModeV2SlashCommandView {
             ScrollbarWidth::Auto,
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .with_overlayed_scrollbar()
         .finish();
@@ -1218,7 +1218,7 @@ fn render_divider(app: &AppContext) -> Box<dyn Element> {
     let theme = appearance.theme();
     Container::new(
         ConstrainedBox::new(
-            Container::new(rookui::elements::Empty::new().finish())
+            Container::new(ptermui::elements::Empty::new().finish())
                 .with_background(theme.surface_overlay_2())
                 .finish(),
         )

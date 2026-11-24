@@ -1,4 +1,4 @@
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::{Entity, ModelContext, SingletonEntity};
 use session_sharing_protocol::common::{Guest, PendingGuest, Role, SessionId, TeamAclData};
 
 use crate::drive::sharing::SharingAccessLevel;

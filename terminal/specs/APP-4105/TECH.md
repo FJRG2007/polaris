@@ -2,7 +2,7 @@
 
 ## Problem
 
-MCP tool call arguments are transported from rook-server to the Rook client as a `google.protobuf.Struct` (`structpb`). The protobuf `NumberValue` field stores all numeric values as `float64`, erasing the integer/float distinction present in the original JSON. When the Rust client converts this struct back to `serde_json::Value` for dispatch, `serde_json::Number::from_f64` together with the ryu formatter serializes `f64(5.0)` as `"5.0"`, not `"5"`. Strict MCP servers (GoLand, JVM-based servers, strict Python with Pydantic, Rust with `i64`) reject this when parsing integer-typed fields.
+MCP tool call arguments are transported from polaris-terminal-server to the Polaris Terminal client as a `google.protobuf.Struct` (`structpb`). The protobuf `NumberValue` field stores all numeric values as `float64`, erasing the integer/float distinction present in the original JSON. When the Rust client converts this struct back to `serde_json::Value` for dispatch, `serde_json::Number::from_f64` together with the ryu formatter serializes `f64(5.0)` as `"5.0"`, not `"5"`. Strict MCP servers (GoLand, JVM-based servers, strict Python with Pydantic, Rust with `i64`) reject this when parsing integer-typed fields.
 
 The fix is a scoped client-side coercion step: before dispatching the tool call via `rmcp`, we look up the tool's cached `input_schema` and rewrite any whole-number `f64` arguments to `i64` when the schema declares the property as [`"type": "integer"`](https://json-schema.org/understanding-json-schema/reference/type).
 
@@ -26,7 +26,7 @@ Neither path runs any schema-aware correction, so integer-typed fields are dispa
 
 ## Proposed Changes
 
-Entirely contained in rook-internal. No proto, server, or coordinated-deploy changes.
+Entirely contained in polaris-terminal-internal. No proto, server, or coordinated-deploy changes.
 
 ### 1. Add a schema-lookup helper to `TemplatableMCPServerManager`
 
@@ -176,8 +176,8 @@ These tests exercise the shared helper once; both dispatch and render use the sa
 ```mermaid
 sequenceDiagram
     participant LLM
-    participant Server as rook-server
-    participant Client as rook-internal
+    participant Server as polaris-terminal-server
+    participant Client as polaris-terminal-internal
     participant MCP as MCP Server
 
     LLM->>Server: tool call JSON "{\"line\": 5}"
@@ -212,5 +212,5 @@ sequenceDiagram
 ## Follow-ups
 
 - **Nested / array coercion.** If an MCP tool surfaces a schema with nested integer fields or arrays of integers, extend `coerce_integer_args` to recurse. Deferred until there's a concrete case.
-- **Long-term proto-level fix.** The root cause is the lossy `structpb.NumberValue` encoding on rook-server. A `raw_args_json` string field on the `CallMCPTool` proto would preserve full precision (including integers above 2⁵³) and eliminate this class of bug entirely. Not in scope for this PR; tracked separately.
+- **Long-term proto-level fix.** The root cause is the lossy `structpb.NumberValue` encoding on polaris-terminal-server. A `raw_args_json` string field on the `CallMCPTool` proto would preserve full precision (including integers above 2⁵³) and eliminate this class of bug entirely. Not in scope for this PR; tracked separately.
 - **Debug logging.** Consider a `log::debug!` when coercion is applied, to help diagnose MCP integration issues.

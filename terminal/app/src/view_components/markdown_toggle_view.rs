@@ -1,10 +1,10 @@
-use rookui::elements::{CornerRadius, Fill as UiFill, Radius};
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::UiComponentStyles;
-use rookui::ui_components::segmented_control::{
+use ptermui::elements::{CornerRadius, Fill as UiFill, Radius};
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::UiComponentStyles;
+use ptermui::ui_components::segmented_control::{
     LabelConfig, RenderableOptionConfig, SegmentedControl, SegmentedControlEvent,
 };
-use rookui::{
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -114,8 +114,8 @@ fn markdown_toggle_styles(app: &AppContext) -> UiComponentStyles {
         border_color: Some(UiFill::Solid(theme.surface_3().into())),
         background: Some(UiFill::Solid(theme.background().into())),
         height: Some(20.0),
-        padding: Some(rookui::ui_components::components::Coords::uniform(0.0)),
-        margin: Some(rookui::ui_components::components::Coords {
+        padding: Some(ptermui::ui_components::components::Coords::uniform(0.0)),
+        margin: Some(ptermui::ui_components::components::Coords {
             top: 0.0,
             bottom: 0.0,
             left: 0.0,

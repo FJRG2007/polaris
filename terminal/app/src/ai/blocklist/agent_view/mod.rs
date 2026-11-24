@@ -26,10 +26,10 @@ pub(crate) use gui_input_mode_policy::GuiInputModePolicy;
 pub use inline_agent_view_header::*;
 pub use orchestration_pill_bar::{OrchestrationPillBar, render_orchestration_breadcrumbs};
 use pathfinder_color::ColorU;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rookui::fonts::Properties;
-use rookui::keymap::Keystroke;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use ptermui::fonts::Properties;
+use ptermui::keymap::Keystroke;
 pub use zero_state_block::*;
 
 use crate::terminal::model::TerminalModel;

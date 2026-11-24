@@ -21,7 +21,7 @@ not export or directly compose `AIClient`, `AgentConfigSnapshot`,
 ### Session event bridge
 Each `TuiTerminalSessionView` owns its `StartAgentExecutor` subscription and
 converts executor events into semantic session events
-(`crates/rook_tui/src/terminal_session_view.rs (111-136, 599-614)`):
+(`crates/pterm_tui/src/terminal_session_view.rs (111-136, 599-614)`):
 - `CreateAgent` emits `StartAgentConversation` with the request and a snapshot of the parent's
   current working directory.
 - `CleanupFailedChildLaunch` emits the corresponding cleanup event.
@@ -31,10 +31,10 @@ session view and forwards orchestration attempts into `TuiOrchestrationModel`.
 creation and removal intents from the orchestration model. Because every
 session, including a background child session, passes through the same
 registration boundary, children are also wired to launch descendants
-(`crates/rook_tui/src/session_registry.rs (77-181)`).
+(`crates/pterm_tui/src/session_registry.rs (77-181)`).
 ### Native child launch
 `TuiOrchestrationModel` separates task creation from TUI-owned surface creation
-(`crates/rook_tui/src/orchestration_model.rs (83-209)`):
+(`crates/pterm_tui/src/orchestration_model.rs (83-209)`):
 1. `begin_local_oz_child_launch` starts shared server-task preparation.
 2. The orchestration model emits `CreateLocalOzChildSession` after preparation succeeds.
 3. `TuiSessions` creates an unfocused terminal session using the parent's captured working
@@ -46,13 +46,13 @@ registration boundary, children are also wired to launch descendants
    pending `StartAgentExecutor` slot.
 6. The coordinator registers event consumers for the parent and child conversations.
 7. `TuiTerminalSessionView::start_orchestrated_child` attaches the task id to the child controller
-   and sends the first prompt (`crates/rook_tui/src/terminal_session_view.rs (1092-1104)`).
+   and sends the first prompt (`crates/pterm_tui/src/terminal_session_view.rs (1092-1104)`).
 `create_local_terminal_session` is the single session factory for both the
 focused bootstrap session and background children. Callers pass the window from
 their existing view context rather than storing it in `TuiSessions`; child
 orchestration derives it from the requesting parent session. The factory's
 explicit startup-directory parameter preserves the parent's current directory
-for child shells (`crates/rook_tui/src/session.rs (190-243)`).
+for child shells (`crates/pterm_tui/src/session.rs (190-243)`).
 ### Model selection
 The active execution profile's `base_model` is the default model for ordinary
 TUI surfaces. Explicit child model selections remain pinned per surface even
@@ -62,7 +62,7 @@ but emits the existing active-model event only when the surface's effective
 model changes (`app/src/ai/llms.rs (844-878, 1470-1542)`).
 ### Streamer and session ownership
 The coordinator stores only orchestration runtime bookkeeping
-(`crates/rook_tui/src/orchestration_model.rs (31-39)`):
+(`crates/pterm_tui/src/orchestration_model.rs (31-39)`):
 - `child_session_by_conversation` maps a child conversation to its background session.
 - `event_consumers_by_session` records which conversation streams each live session consumes.
 `TuiOrchestrationModel` intentionally does not duplicate participant names,
@@ -99,7 +99,7 @@ Removing a conversation also removes its id from `children_by_parent`
 ### Unsupported modes and failed launch cleanup
 Local CLI-harness and remote requests resolve as explicit per-child failures
 instead of waiting for the spawn timeout
-(`crates/rook_tui/src/orchestration_model.rs (83-156, 211-255)`).
+(`crates/pterm_tui/src/orchestration_model.rs (83-156, 211-255)`).
 The failure path creates an errored child conversation on a synthetic surface
 and echoes its id to `StartAgentExecutor`. The resulting cleanup event:
 - deletes the child conversation and persisted state,
@@ -109,14 +109,14 @@ and echoes its id to `StartAgentExecutor`. The resulting cleanup event:
 - unregisters consumers when `TuiSessions` reports the removal.
 This leaves no dead child conversation, session, or streamer registration.
 ### Transcript rendering
-`crates/rook_tui/src/agent_block.rs`:
+`crates/pterm_tui/src/agent_block.rs`:
 - suppresses the `WaitForEvents` tool-call row, matching the GUI,
 - preserves every `MessagesReceivedFromAgents` payload as an `AgentMessage`
   section, and
 - omits `EventsFromAgents` rows because those outputs contain opaque ids rather
   than displayable participant or lifecycle data.
 
-`crates/rook_tui/src/agent_message.rs` owns TUI presentation:
+`crates/pterm_tui/src/agent_message.rs` owns TUI presentation:
 1. Resolve the current conversation's immediate orchestrator through the
    shared topology helper.
 2. Resolve the sender run id through `BlocklistAIHistoryModel`.
@@ -147,21 +147,21 @@ types remain behind their respective boundaries.
 - Removing completed child sessions; successful children remain retained like GUI hidden panes.
 - Rendering opaque lifecycle event ids as transcript content.
 ## Testing and validation
-- `crates/rook_tui/src/orchestration_model_tests.rs (154-221)` verifies that local-harness and
+- `crates/pterm_tui/src/orchestration_model_tests.rs (154-221)` verifies that local-harness and
   remote requests resolve with explicit failures while leaving no child topology, extra session,
   or event-consumer state. It also verifies that failed-launch cleanup preserves unrelated
   retained sessions.
 - `app/src/ai/blocklist/orchestration_topology_tests.rs` verifies shared
   participant discovery and that a grandchild resolves its direct parent,
   rather than the tree root, as orchestrator.
-- `crates/rook_tui/src/agent_message_tests.rs` verifies parent/orchestrator
+- `crates/pterm_tui/src/agent_message_tests.rs` verifies parent/orchestrator
   labeling, direct `ConversationStatus` glyphs and styles, deterministic child
   identity presentation, collapse behavior, wrapping, and subject fallback.
-- `crates/rook_tui/src/agent_block_tests.rs` verifies that received messages
+- `crates/pterm_tui/src/agent_block_tests.rs` verifies that received messages
   remain distinct rich sections, opaque lifecycle ids render no row,
   `WaitForEvents` contributes no tool row, hidden-only exchanges reserve no
   whitespace, and collapse state is owned by the agent block.
-- `crates/rook_tui/src/tool_call_labels_tests.rs` keeps tool-call-only
+- `crates/pterm_tui/src/tool_call_labels_tests.rs` keeps tool-call-only
   constructing, pending, blocked, running, and terminal presentation covered
   independently of conversation lifecycle state.
 - `app/src/ai/llms_tests.rs (936-1035)` verifies explicit child pins preserve GUI pane behavior,
@@ -170,11 +170,11 @@ types remain behind their respective boundaries.
   cleans both its incoming child reference and its outgoing parent index.
 
 Validation commands:
-- `cargo check -p rook_tui`
-- `cargo nextest run -p rook_tui`
-- `cargo nextest run -p rook -E 'test(orchestration_topology)'`
-- `cargo clippy -p rook_tui --all-targets --all-features --tests -- -D warnings`
-- `cargo clippy -p rook --lib --tests --features tui,test-util -- -D warnings`
+- `cargo check -p pterm_tui`
+- `cargo nextest run -p pterm_tui`
+- `cargo nextest run -p polaris-terminal -E 'test(orchestration_topology)'`
+- `cargo clippy -p pterm_tui --all-targets --all-features --tests -- -D warnings`
+- `cargo clippy -p polaris-terminal --lib --tests --features tui,test-util -- -D warnings`
 - `./script/format`
 ## Follow-ups
 - Add local CLI-harness children by reusing the existing local-harness preparation path.

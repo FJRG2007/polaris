@@ -6,9 +6,9 @@ use chrono::{DateTime, Duration, Utc};
 use instant::Instant;
 use parking_lot::Mutex;
 use persistence::model::{AgentConversationData, ConversationUsageMetadata};
-use rook_cli::agent::Harness;
-use rook_core::features::FeatureFlag;
-use rookui::{App, EntityId, ModelHandle, SingletonEntity};
+use pterm_cli::agent::Harness;
+use pterm_core::features::FeatureFlag;
+use ptermui::{App, EntityId, ModelHandle, SingletonEntity};
 
 use super::entry::{
     AgentConversationEntryId, AgentConversationNavigationSubject, AgentConversationProvenance,
@@ -2684,13 +2684,13 @@ fn test_harness_filter_matches_only_selected_harness() {
             assert_eq!(
                 oz_items.len(),
                 2,
-                "expected 2 Rook Agent matches, got {oz_items:?}"
+                "expected 2 Polaris Terminal Agent matches, got {oz_items:?}"
             );
             assert!(oz_items.contains(&format!("task:{}", task_oz_default.task_id)));
             assert!(oz_items.contains(&format!("conversation:{conv_id}")));
             assert!(
                 !oz_items.contains(&format!("task:{}", task_no_snapshot.task_id)),
-                "stub task with no snapshot should not match the Rook Agent filter"
+                "stub task with no snapshot should not match the Polaris Terminal Agent filter"
             );
         });
     });

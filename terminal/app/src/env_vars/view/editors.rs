@@ -1,10 +1,10 @@
-use rook_editor::editor::NavigationKey;
-use rookui::elements::{
+use pterm_editor::editor::NavigationKey;
+use ptermui::elements::{
     Align, ConstrainedBox, Container, Flex, ParentElement, SavePosition, Shrinkable, Stack,
 };
-use rookui::fonts::FamilyId;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, ViewContext, ViewHandle};
+use ptermui::fonts::FamilyId;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, ViewContext, ViewHandle};
 
 use crate::Appearance;
 use crate::editor::{

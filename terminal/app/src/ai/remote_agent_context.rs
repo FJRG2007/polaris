@@ -2,17 +2,17 @@ use ::ai::project_context::model::{ProjectContextModel, ProjectRule};
 use ::ai::skills::{
     ParsedSkill, SkillProvider, SkillScope, get_provider_for_path, parse_skill_content_at_location,
 };
+use pterm_core::features::FeatureFlag;
+use pterm_core::safe_warn;
+use pterm_util::host_id::HostId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 use remote_server::manager::{RemoteServerManager, RemoteServerManagerEvent};
 use remote_server::proto::{
     RemoteAgentContextSnapshot, RemoteContextFileProto, RemoteSkillProto, remote_skill_proto,
 };
-use rook_core::features::FeatureFlag;
-use rook_core::safe_warn;
-use rook_util::host_id::HostId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::{Entity, ModelContext, SingletonEntity};
 
 use super::mcp::McpIntegration;
 use super::skills::{BundledSkill, BundledSkillActivation, SkillManager};
@@ -166,7 +166,7 @@ fn bundled_skill_from_protos(host_id: &HostId, skills: &[RemoteSkillProto]) -> B
             proto,
             SkillScope::Bundled,
             None,
-            |_| Some(SkillProvider::Rook),
+            |_| Some(SkillProvider::Pterm),
         )?;
         let activation = match metadata.requires_mcp.as_deref() {
             None => BundledSkillActivation::Always,

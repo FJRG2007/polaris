@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use rook_completer::completer::{CommandExitStatus, CommandOutput};
-use rook_core::SessionId;
-use rook_core::command::ExitCode;
+use pterm_completer::completer::{CommandExitStatus, CommandOutput};
+use pterm_core::SessionId;
+use pterm_core::command::ExitCode;
 
 use crate::remote_server::client::RemoteServerClient;
 use crate::remote_server::proto::{RunCommandErrorCode, run_command_response};
@@ -14,7 +14,7 @@ use crate::terminal::model::session::command_executor::{CommandExecutor, Execute
 use crate::terminal::shell::Shell;
 
 /// `CommandExecutor` implementation that executes commands via a persistent
-/// `rook remote-server` process running on the remote host over SSH.
+/// `polaris-terminal remote-server` process running on the remote host over SSH.
 ///
 /// The executor is always constructed with a live `RemoteServerClient` that
 /// was obtained from [`crate::remote_server::manager::RemoteServerManager`]
@@ -95,7 +95,7 @@ impl CommandExecutor for RemoteServerCommandExecutor {
             }
             Some(run_command_response::Result::Error(err)) => {
                 if err.code() == RunCommandErrorCode::SessionNotFound {
-                    rook_core::safe_error!(
+                    pterm_core::safe_error!(
                         safe: ("Remote command SESSION_NOT_FOUND — SessionBootstrapped notification likely lost"),
                         full: ("Remote command SESSION_NOT_FOUND (session={:?}): {} — the SessionBootstrapped notification was likely lost", self.session_id, err.message)
                     );
@@ -108,7 +108,7 @@ impl CommandExecutor for RemoteServerCommandExecutor {
                 ))
             }
             None => {
-                rook_core::safe_error!(
+                pterm_core::safe_error!(
                     safe: ("Remote command returned empty response — proto-level bug"),
                     full: ("Remote command returned empty response (session={:?}) — proto-level bug", self.session_id)
                 );

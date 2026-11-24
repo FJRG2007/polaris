@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use rookui::{AppContext, SingletonEntity, ViewContext, WindowId};
+use ptermui::{AppContext, SingletonEntity, ViewContext, WindowId};
 
 use super::Workspace;
 use crate::terminal::ShellLaunchData;

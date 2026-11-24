@@ -17,7 +17,7 @@ fn remaining(query: SearchQuery, label: &str) -> SearchQuery {
 fn empty_query_matches_everything() {
     assert!(exact("").is_empty());
     assert!(exact("   ").is_empty());
-    assert!(exact("").matches("rook agent global ai toggle"));
+    assert!(exact("").matches("polaris-terminal agent global ai toggle"));
     assert!(fuzzy("").matches(""));
 }
 
@@ -29,7 +29,7 @@ fn exact_requires_every_word_in_any_order_and_case() {
     assert!(exact("prompt active").matches(terms));
     assert!(!exact("autosuggestions key").matches(terms));
 
-    let terms = "rook agent global ai toggle";
+    let terms = "polaris-terminal agent global ai toggle";
     assert!(!exact("file search").matches(terms));
 }
 
@@ -120,7 +120,7 @@ fn a_label_consumes_the_words_it_matches() {
     assert_eq!(remaining(query.clone(), "Appearance"), query);
 
     let query = exact("agents");
-    assert!(remaining(query, "Rook Agent Agents").is_empty());
+    assert!(remaining(query, "Polaris Terminal Agent Agents").is_empty());
 
     let query = exact("opacity");
     assert_eq!(remaining(query.clone(), ""), query);

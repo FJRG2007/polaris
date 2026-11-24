@@ -1,12 +1,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rook_core::features::FeatureFlag;
-use rookui::{App, EntityId, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::{App, EntityId, SingletonEntity};
 
 use super::{
-    BlocklistAIStatusBarEvent, ModelInUse, RookingModelInputs, RookingModelMessage,
-    UNNAMED_FALLBACK_MODEL_ROOKING_TEXT, rooking_model_message,
+    BlocklistAIStatusBarEvent, ModelInUse, PtermingModelInputs, PtermingModelMessage,
+    UNNAMED_FALLBACK_MODEL_POLARIS_TERMINALING_TEXT, pterming_model_message,
 };
 use crate::ai::agent::OutputModelInfo;
 use crate::ai::agent::conversation::{AIConversation, AIConversationId};
@@ -114,8 +114,8 @@ fn fallback(display_name: &str) -> ModelInUse {
     }
 }
 
-fn for_current(current: Option<ModelInUse>) -> RookingModelInputs {
-    RookingModelInputs {
+fn for_current(current: Option<ModelInUse>) -> PtermingModelInputs {
+    PtermingModelInputs {
         current,
         previous: None,
         is_new_user_query: false,
@@ -143,7 +143,7 @@ fn reads_a_reported_model_off_the_exchange_output() {
 }
 
 /// An empty display name is an absent one, not a name: carrying it through would
-/// render "Rooking with ...".
+/// render "Pterming with ...".
 #[test]
 fn treats_an_empty_display_name_as_no_name() {
     assert_eq!(ModelInUse::from(&model_info("", false)).display_name, None);
@@ -151,12 +151,12 @@ fn treats_an_empty_display_name_as_no_name() {
 
 #[test]
 fn names_the_model_reported_for_the_exchange() {
-    let _naming = FeatureFlag::RookingModelName.override_enabled(true);
+    let _naming = FeatureFlag::PtermingModelName.override_enabled(true);
 
     assert_eq!(
-        rooking_model_message(for_current(Some(named("Claude Sonnet 4.5")))),
-        Some(RookingModelMessage {
-            text: "Rooking with Claude Sonnet 4.5...".to_owned(),
+        pterming_model_message(for_current(Some(named("Claude Sonnet 4.5")))),
+        Some(PtermingModelMessage {
+            text: "Pterming with Claude Sonnet 4.5...".to_owned(),
             model_display_name: Some("Claude Sonnet 4.5".to_owned()),
             show_fallback_explanation: false,
         })
@@ -167,29 +167,29 @@ fn names_the_model_reported_for_the_exchange() {
 /// copy rather than guessing at a model.
 #[test]
 fn stays_generic_until_a_model_is_reported() {
-    let _naming = FeatureFlag::RookingModelName.override_enabled(true);
+    let _naming = FeatureFlag::PtermingModelName.override_enabled(true);
     let _fallback_messaging = FeatureFlag::FallbackModelLoadOutputMessaging.override_enabled(true);
 
-    assert_eq!(rooking_model_message(for_current(None)), None);
+    assert_eq!(pterming_model_message(for_current(None)), None);
 }
 
 #[test]
 fn stays_generic_when_naming_is_disabled() {
-    let _naming = FeatureFlag::RookingModelName.override_enabled(false);
+    let _naming = FeatureFlag::PtermingModelName.override_enabled(false);
     let _fallback_messaging = FeatureFlag::FallbackModelLoadOutputMessaging.override_enabled(true);
 
     assert_eq!(
-        rooking_model_message(for_current(Some(named("Claude Sonnet 4.5")))),
+        pterming_model_message(for_current(Some(named("Claude Sonnet 4.5")))),
         None
     );
 }
 
 #[test]
 fn stays_generic_when_the_reported_model_has_no_display_name() {
-    let _naming = FeatureFlag::RookingModelName.override_enabled(true);
+    let _naming = FeatureFlag::PtermingModelName.override_enabled(true);
 
     assert_eq!(
-        rooking_model_message(for_current(Some(ModelInUse {
+        pterming_model_message(for_current(Some(ModelInUse {
             display_name: None,
             is_fallback: false,
         }))),
@@ -204,13 +204,13 @@ fn stays_generic_when_the_reported_model_has_no_display_name() {
 /// into the row's other messages.
 #[test]
 fn names_a_fallback_model_without_the_naming_flag() {
-    let _naming = FeatureFlag::RookingModelName.override_enabled(false);
+    let _naming = FeatureFlag::PtermingModelName.override_enabled(false);
     let _fallback_messaging = FeatureFlag::FallbackModelLoadOutputMessaging.override_enabled(true);
 
     assert_eq!(
-        rooking_model_message(for_current(Some(fallback("Claude Haiku 4.5")))),
-        Some(RookingModelMessage {
-            text: "Rooking with Claude Haiku 4.5.".to_owned(),
+        pterming_model_message(for_current(Some(fallback("Claude Haiku 4.5")))),
+        Some(PtermingModelMessage {
+            text: "Pterming with Claude Haiku 4.5.".to_owned(),
             model_display_name: None,
             show_fallback_explanation: true,
         })
@@ -221,21 +221,21 @@ fn names_a_fallback_model_without_the_naming_flag() {
 /// fallback message ends in a period, the model naming ends in an ellipsis.
 #[test]
 fn ends_the_fallback_message_in_a_period_and_the_named_message_in_an_ellipsis() {
-    let _naming = FeatureFlag::RookingModelName.override_enabled(true);
+    let _naming = FeatureFlag::PtermingModelName.override_enabled(true);
     let _fallback_messaging = FeatureFlag::FallbackModelLoadOutputMessaging.override_enabled(true);
 
     let fallback_text =
-        rooking_model_message(for_current(Some(fallback("Claude Haiku 4.5")))).map(|m| m.text);
+        pterming_model_message(for_current(Some(fallback("Claude Haiku 4.5")))).map(|m| m.text);
     let named_text =
-        rooking_model_message(for_current(Some(named("Claude Haiku 4.5")))).map(|m| m.text);
+        pterming_model_message(for_current(Some(named("Claude Haiku 4.5")))).map(|m| m.text);
 
     assert_eq!(
         fallback_text.as_deref(),
-        Some("Rooking with Claude Haiku 4.5.")
+        Some("Pterming with Claude Haiku 4.5.")
     );
     assert_eq!(
         named_text.as_deref(),
-        Some("Rooking with Claude Haiku 4.5...")
+        Some("Pterming with Claude Haiku 4.5...")
     );
 }
 
@@ -245,13 +245,13 @@ fn ends_the_fallback_message_in_a_period_and_the_named_message_in_an_ellipsis() 
 /// and that message does not exist with its flag off.
 #[test]
 fn names_a_fallback_model_without_the_explanation_line() {
-    let _naming = FeatureFlag::RookingModelName.override_enabled(true);
+    let _naming = FeatureFlag::PtermingModelName.override_enabled(true);
     let _fallback_messaging = FeatureFlag::FallbackModelLoadOutputMessaging.override_enabled(false);
 
     assert_eq!(
-        rooking_model_message(for_current(Some(fallback("Claude Haiku 4.5")))),
-        Some(RookingModelMessage {
-            text: "Rooking with Claude Haiku 4.5...".to_owned(),
+        pterming_model_message(for_current(Some(fallback("Claude Haiku 4.5")))),
+        Some(PtermingModelMessage {
+            text: "Pterming with Claude Haiku 4.5...".to_owned(),
             model_display_name: Some("Claude Haiku 4.5".to_owned()),
             show_fallback_explanation: false,
         })
@@ -259,7 +259,7 @@ fn names_a_fallback_model_without_the_explanation_line() {
 }
 
 /// Goes through the conversion rather than hand-building the input, so this also
-/// covers what an empty display name renders as: "Rooking with ." before the
+/// covers what an empty display name renders as: "Pterming with ." before the
 /// normalization, this afterwards. No name means no name for the other status
 /// messages either.
 #[test]
@@ -267,9 +267,9 @@ fn describes_an_unnamed_fallback_model_generically() {
     let _fallback_messaging = FeatureFlag::FallbackModelLoadOutputMessaging.override_enabled(true);
 
     assert_eq!(
-        rooking_model_message(for_current(Some(ModelInUse::from(&model_info("", true))))),
-        Some(RookingModelMessage {
-            text: UNNAMED_FALLBACK_MODEL_ROOKING_TEXT.to_owned(),
+        pterming_model_message(for_current(Some(ModelInUse::from(&model_info("", true))))),
+        Some(PtermingModelMessage {
+            text: UNNAMED_FALLBACK_MODEL_POLARIS_TERMINALING_TEXT.to_owned(),
             model_display_name: None,
             show_fallback_explanation: true,
         })
@@ -280,11 +280,11 @@ fn describes_an_unnamed_fallback_model_generically() {
 /// name, so the row keeps its generic text rather than borrowing the fallback's.
 #[test]
 fn stays_generic_for_an_unnamed_fallback_model_when_fallback_messaging_is_disabled() {
-    let _naming = FeatureFlag::RookingModelName.override_enabled(true);
+    let _naming = FeatureFlag::PtermingModelName.override_enabled(true);
     let _fallback_messaging = FeatureFlag::FallbackModelLoadOutputMessaging.override_enabled(false);
 
     assert_eq!(
-        rooking_model_message(for_current(Some(ModelInUse {
+        pterming_model_message(for_current(Some(ModelInUse {
             display_name: None,
             is_fallback: true,
         }))),
@@ -294,11 +294,11 @@ fn stays_generic_for_an_unnamed_fallback_model_when_fallback_messaging_is_disabl
 
 #[test]
 fn stays_generic_for_a_fallback_model_when_both_flags_are_disabled() {
-    let _naming = FeatureFlag::RookingModelName.override_enabled(false);
+    let _naming = FeatureFlag::PtermingModelName.override_enabled(false);
     let _fallback_messaging = FeatureFlag::FallbackModelLoadOutputMessaging.override_enabled(false);
 
     assert_eq!(
-        rooking_model_message(for_current(Some(fallback("Claude Haiku 4.5")))),
+        pterming_model_message(for_current(Some(fallback("Claude Haiku 4.5")))),
         None
     );
 }
@@ -307,17 +307,17 @@ fn stays_generic_for_a_fallback_model_when_both_flags_are_disabled() {
 /// borrowed rather than to the flag.
 #[test]
 fn names_the_previous_exchanges_fallback_model_on_agent_follow_ups() {
-    let _naming = FeatureFlag::RookingModelName.override_enabled(true);
+    let _naming = FeatureFlag::PtermingModelName.override_enabled(true);
     let _fallback_messaging = FeatureFlag::FallbackModelLoadOutputMessaging.override_enabled(true);
 
     assert_eq!(
-        rooking_model_message(RookingModelInputs {
+        pterming_model_message(PtermingModelInputs {
             current: None,
             previous: Some(fallback("Claude Haiku 4.5")),
             is_new_user_query: false,
         }),
-        Some(RookingModelMessage {
-            text: "Rooking with Claude Haiku 4.5.".to_owned(),
+        Some(PtermingModelMessage {
+            text: "Pterming with Claude Haiku 4.5.".to_owned(),
             // Borrowed, so it stays out of the row's other messages: the lookback
             // was justified for this one sentence, not for five more.
             model_display_name: None,
@@ -331,7 +331,7 @@ fn ignores_the_previous_exchanges_fallback_model_after_a_new_user_query() {
     let _fallback_messaging = FeatureFlag::FallbackModelLoadOutputMessaging.override_enabled(true);
 
     assert_eq!(
-        rooking_model_message(RookingModelInputs {
+        pterming_model_message(PtermingModelInputs {
             current: None,
             previous: Some(fallback("Claude Haiku 4.5")),
             is_new_user_query: true,
@@ -344,11 +344,11 @@ fn ignores_the_previous_exchanges_fallback_model_after_a_new_user_query() {
 /// never leaks forward into an exchange that has not reported yet.
 #[test]
 fn never_borrows_an_ordinary_model_from_the_previous_exchange() {
-    let _naming = FeatureFlag::RookingModelName.override_enabled(true);
+    let _naming = FeatureFlag::PtermingModelName.override_enabled(true);
     let _fallback_messaging = FeatureFlag::FallbackModelLoadOutputMessaging.override_enabled(true);
 
     assert_eq!(
-        rooking_model_message(RookingModelInputs {
+        pterming_model_message(PtermingModelInputs {
             current: None,
             previous: Some(named("Claude Sonnet 4.5")),
             is_new_user_query: false,

@@ -8,14 +8,14 @@
 //! so the user can pick up items captured since the pane was opened. The
 //! pane header also exposes a refresh icon that reloads the snapshot in
 //! place.
-use rook_editor::content::buffer::InitialBufferState;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rook_server_client::network_logging::NetworkLogModel;
-use rook_util::path::LineAndColumnArg;
-use rookui::elements::{ChildView, MouseStateHandle};
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use pterm_editor::content::buffer::InitialBufferState;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use pterm_server_client::network_logging::NetworkLogModel;
+use pterm_util::path::LineAndColumnArg;
+use ptermui::elements::{ChildView, MouseStateHandle};
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };

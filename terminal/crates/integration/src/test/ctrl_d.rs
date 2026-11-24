@@ -1,19 +1,19 @@
 //! Integration tests for CTRL-D / EOT behaviour.
 
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::util::current_shell_starter_and_version;
-use rook::integration_testing::terminal::{
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::util::current_shell_starter_and_version;
+use polaris_terminal::integration_testing::terminal::{
     PYTHON_PROMPT_READY, assert_active_block_command_for_single_terminal_in_tab,
     assert_bootstrapping_stage, assert_no_block_executing, assert_terminal_bootstrapped,
     execute_python_interpreter_in_tab, wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::view_getters::assert_no_views_of_type;
-use rook::pane_group::PaneGroup;
-use rook::terminal::TerminalView;
-use rook::terminal::model::bootstrap::BootstrapStage;
-use rook::terminal::shell::ShellType;
-use rook::workspace::Workspace;
-use rookui_core::integration::TestStep;
+use polaris_terminal::integration_testing::view_getters::assert_no_views_of_type;
+use polaris_terminal::pane_group::PaneGroup;
+use polaris_terminal::terminal::TerminalView;
+use polaris_terminal::terminal::model::bootstrap::BootstrapStage;
+use polaris_terminal::terminal::shell::ShellType;
+use polaris_terminal::workspace::Workspace;
+use ptermui_core::integration::TestStep;
 
 use super::{Builder, new_builder};
 use crate::util::write_all_rc_files_for_test;
@@ -51,7 +51,7 @@ pub fn test_ctrl_d_handled_by_read_during_bootstrapping() -> Builder {
     new_builder()
         .set_should_run_test(|| {
             let (starter, _) = current_shell_starter_and_version();
-            // We need to fix https://github.com/FJRG2007/rook/issues/1869 before
+            // We need to fix https://github.com/FJRG2007/polaris/issues/1869 before
             // this test works on fish.
             !matches!(starter.shell_type(), ShellType::Fish)
         })

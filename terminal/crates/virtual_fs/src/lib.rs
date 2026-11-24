@@ -22,7 +22,7 @@ pub struct Dirs {
 impl Dirs {
     #[allow(dead_code)]
     pub fn git_repository_fixture(&self) -> PathBuf {
-        Rook::fixtures().join("git_repository")
+        Pterm::fixtures().join("git_repository")
     }
 }
 
@@ -39,18 +39,19 @@ impl VirtualFS {
     pub fn test(tag: &str, test_callback: impl FnOnce(Dirs, VirtualFS)) {
         let root = tempdir().expect("failed create root directory.");
 
-        let rookbox_dir = root.path().join(tag);
+        let ptermbox_dir = root.path().join(tag);
 
-        if PathBuf::from(&rookbox_dir).exists() {
-            std::fs::remove_dir_all(PathBuf::from(&rookbox_dir)).expect("can not remove directory");
+        if PathBuf::from(&ptermbox_dir).exists() {
+            std::fs::remove_dir_all(PathBuf::from(&ptermbox_dir))
+                .expect("can not remove directory");
         }
 
-        std::fs::create_dir(PathBuf::from(&rookbox_dir)).expect("can not create directory");
+        std::fs::create_dir(PathBuf::from(&ptermbox_dir)).expect("can not create directory");
 
-        let tests = dunce::canonicalize(&rookbox_dir).unwrap_or_else(|e| {
+        let tests = dunce::canonicalize(&ptermbox_dir).unwrap_or_else(|e| {
             panic!(
                 "Couldn't canonicalize test path {}: {:?}",
-                rookbox_dir.display(),
+                ptermbox_dir.display(),
                 e
             )
         });
@@ -60,13 +61,13 @@ impl VirtualFS {
             tests,
         };
 
-        let rookbox = VirtualFS {
+        let ptermbox = VirtualFS {
             root,
-            cwd: rookbox_dir,
+            cwd: ptermbox_dir,
             tests: tag.to_string(),
         };
 
-        test_callback(directories, rookbox);
+        test_callback(directories, ptermbox);
     }
 
     pub fn back_to_root(&mut self) -> &mut Self {
@@ -157,9 +158,9 @@ impl VirtualFS {
     }
 }
 
-pub struct Rook;
+pub struct Pterm;
 
-impl Rook {
+impl Pterm {
     #[allow(dead_code)]
     pub fn executable() -> PathBuf {
         let mut path = {
@@ -175,7 +176,7 @@ impl Rook {
                 .unwrap_or_else(|| Self::root().join(format!("target/{}", &build)))
         };
 
-        path.push("rook");
+        path.push("polaris-terminal");
         path
     }
 

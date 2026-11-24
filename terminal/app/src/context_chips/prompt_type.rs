@@ -1,21 +1,21 @@
-use rook_errors::report_error;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use super::current_prompt::CurrentPrompt;
 use super::prompt_snapshot::PromptSnapshot;
 use super::{ChipResult, ChipValue, ContextChipKind};
 use crate::menu::{MenuItem, MenuItemFields};
-use crate::settings::RookPromptSeparator;
+use crate::settings::PtermPromptSeparator;
 use crate::terminal::model::session::Sessions;
 use crate::terminal::session_settings::{SessionSettings, ToolbarChipSelection};
 use crate::terminal::view::{ContextMenuAction, PromptPart, PromptPosition, TerminalAction};
 
-/// The type of rook prompt being used
+/// The type of polaris-terminal prompt being used
 #[derive(Clone)]
 pub enum PromptType {
-    /// A rook prompt that refreshes chip values on its own. Typical for local sessions.
+    /// A polaris-terminal prompt that refreshes chip values on its own. Typical for local sessions.
     Dynamic { prompt: ModelHandle<CurrentPrompt> },
-    /// A rook prompt that does not change unless explicitly overwritten. Used for viewers of shared sessions.
+    /// A polaris-terminal prompt that does not change unless explicitly overwritten. Used for viewers of shared sessions.
     Static { snapshot: PromptSnapshot },
 }
 
@@ -41,7 +41,7 @@ impl PromptType {
     pub fn new_static(
         chips: Vec<ChipResult>,
         same_line_prompt_enabled: bool,
-        separator: RookPromptSeparator,
+        separator: PtermPromptSeparator,
     ) -> Self {
         PromptType::Static {
             snapshot: PromptSnapshot::from_chips(chips, same_line_prompt_enabled, separator),
@@ -160,7 +160,7 @@ impl PromptType {
             .collect()
     }
 
-    /// Whether same line prompt is enabled for the Rook Prompt.
+    /// Whether same line prompt is enabled for the Polaris Terminal Prompt.
     pub fn same_line_prompt_enabled(&self, ctx: &AppContext) -> bool {
         match self {
             Self::Dynamic { prompt } => prompt.as_ref(ctx).same_line_prompt_enabled(),
@@ -168,8 +168,8 @@ impl PromptType {
         }
     }
 
-    /// The separator for the Rook prompt.
-    pub fn separator(&self, ctx: &AppContext) -> RookPromptSeparator {
+    /// The separator for the Polaris Terminal prompt.
+    pub fn separator(&self, ctx: &AppContext) -> PtermPromptSeparator {
         match self {
             Self::Dynamic { prompt } => prompt.as_ref(ctx).separator(),
             Self::Static { snapshot } => snapshot.separator(),

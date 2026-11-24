@@ -1,14 +1,16 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     Align, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DropShadow, Flex,
     MainAxisAlignment, ParentElement as _, Radius, Shrinkable,
 };
-use rookui::fonts::Weight;
-use rookui::ui_components::components::{BorderStyle, Coords, UiComponent as _, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::ui_components::components::{
+    BorderStyle, Coords, UiComponent as _, UiComponentStyles,
+};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity as _, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -158,7 +160,7 @@ impl View for GlowingEditor {
         let agent_icon = Container::new(
             ConstrainedBox::new(
                 Icon::AgentMode
-                    .to_rookui_icon(theme.sub_text_color(theme.background()))
+                    .to_ptermui_icon(theme.sub_text_color(theme.background()))
                     .finish(),
             )
             .with_height(font_size)

@@ -1,5 +1,5 @@
-use rookui::Element;
-use rookui::elements::MouseStateHandle;
+use ptermui::Element;
+use ptermui::elements::MouseStateHandle;
 
 use super::{
     InlineBannerButtonState, InlineBannerCloseButton, InlineBannerContent, InlineBannerStyle,
@@ -47,7 +47,7 @@ pub fn render_vim_mode_banner(
         InlineBannerStyle::LowPriority,
         appearance,
         InlineBannerContent {
-            title: "Enable Rook's Vim keybindings?".to_string(),
+            title: "Enable Polaris Terminal's Vim keybindings?".to_string(),
             buttons,
             close_button: Some(close_button),
             ..Default::default()

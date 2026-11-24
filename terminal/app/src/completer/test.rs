@@ -3,9 +3,9 @@ use std::iter::FromIterator;
 use std::sync::Arc;
 
 use itertools::Itertools;
-use rook_completer::completer::{CompletionContext, EngineDirEntry, PathCompletionContext};
-use rook_completer::signatures::CommandRegistry;
-use rookui::App;
+use pterm_completer::completer::{CompletionContext, EngineDirEntry, PathCompletionContext};
+use pterm_completer::signatures::CommandRegistry;
+use ptermui::App;
 use typed_path::{TypedPath, TypedPathBuf};
 #[cfg(windows)]
 use typed_path::{UnixComponent, WindowsComponent, WindowsPrefix};
@@ -117,7 +117,7 @@ pub fn test_session_context_top_level_commands_includes_external_commands() {
             SessionInfo::new_for_test(),
             Arc::new(TestCommandExecutor::default()),
         );
-        rookui::r#async::block_on(session.load_external_commands());
+        ptermui::r#async::block_on(session.load_external_commands());
 
         let ctx = test_session_context(session, working_directory(), &app);
 
@@ -157,7 +157,7 @@ pub fn test_session_context_lists_directory_entries_locally() {
                 sandbox.touch(vec![
                     Stub::EmptyFile("Cargo.toml"),
                     Stub::EmptyFile("src/app/mod.rs"),
-                    Stub::EmptyFile("target/debug/rookui"),
+                    Stub::EmptyFile("target/debug/ptermui"),
                 ]);
 
                 let tests_dir = TypedPathBuf::from(dirs.tests().to_string_lossy().as_bytes());
@@ -169,7 +169,7 @@ pub fn test_session_context_lists_directory_entries_locally() {
 
                 assert_eq!(
                     HashSet::<EngineDirEntry>::from_iter(Arc::unwrap_or_clone(
-                        rookui::r#async::block_on(ctx.list_directory_entries(tests_dir))
+                        ptermui::r#async::block_on(ctx.list_directory_entries(tests_dir))
                     )),
                     HashSet::from_iter([
                         EngineDirEntry::test_dir(".hidden"),
@@ -232,7 +232,7 @@ pub fn test_session_context_lists_directory_entries_remotely() {
                     Stub::EmptyFile("control_path.socket"),
                     Stub::EmptyFile("Cargo.toml"),
                     Stub::EmptyFile("src/app/mod.rs"),
-                    Stub::EmptyFile("target/debug/rookui"),
+                    Stub::EmptyFile("target/debug/ptermui"),
                 ]);
 
                 let cwd = TypedPathBuf::from(dirs.tests().to_string_lossy().as_bytes());
@@ -253,7 +253,7 @@ pub fn test_session_context_lists_directory_entries_remotely() {
                 let ctx = test_session_context(Session::test_remote(), cwd.clone(), &app);
 
                 let mut entries = HashSet::<EngineDirEntry>::from_iter(Arc::unwrap_or_clone(
-                    rookui::r#async::block_on(ctx.list_directory_entries(cwd)),
+                    ptermui::r#async::block_on(ctx.list_directory_entries(cwd)),
                 ));
                 // TODO(CORE-2000): The ls script we use to list entries in remote
                 // sessions adds a spurious "." directory when run in the VirtualFS.
@@ -274,7 +274,7 @@ pub fn test_session_context_lists_directory_entries_remotely() {
     });
 }
 
-/// Regression test for APP-5190: in a remote/Rookified session a symlink pointing at a
+/// Regression test for APP-5190: in a remote/Ptermified session a symlink pointing at a
 /// directory is classified as a directory (so it completes with a trailing separator and is
 /// offered for `cd`), while a symlink to a file completes as a file.
 #[cfg(unix)]
@@ -293,7 +293,7 @@ pub fn test_session_context_follows_symlinked_directories_remotely() {
                 let ctx = test_session_context(Session::test_remote(), cwd.clone(), &app);
 
                 let mut entries = HashSet::<EngineDirEntry>::from_iter(Arc::unwrap_or_clone(
-                    rookui::r#async::block_on(ctx.list_directory_entries(cwd)),
+                    ptermui::r#async::block_on(ctx.list_directory_entries(cwd)),
                 ));
                 // TODO(CORE-2000): The ls script we use to list entries in remote
                 // sessions adds a spurious "." directory when run in the VirtualFS.
@@ -359,7 +359,7 @@ fn perform_special_characters_in_path_test(session: Session, file_names: Vec<&st
                 let ctx = test_session_context(session, test_dir.clone(), &app);
 
                 let mut entries = HashSet::<EngineDirEntry>::from_iter(Arc::unwrap_or_clone(
-                    rookui::r#async::block_on(ctx.list_directory_entries(test_dir)),
+                    ptermui::r#async::block_on(ctx.list_directory_entries(test_dir)),
                 ));
                 // TODO(CORE-2000): The ls script we use to list entries in remote
                 // sessions adds a spurious "." directory when run in the VirtualFS.
@@ -422,7 +422,7 @@ pub fn test_session_context_refresh_directory_entries_bypasses_cache() {
                 let ctx = test_session_context(Session::test(), tests_dir.clone(), &app);
 
                 // Prime the shared cache with the directory's initial contents.
-                let cached = rookui::r#async::block_on(
+                let cached = ptermui::r#async::block_on(
                     ctx.path_completion_context()
                         .expect("Path completion context should exist with active session")
                         .list_directory_entries(tests_dir.clone()),
@@ -436,7 +436,7 @@ pub fn test_session_context_refresh_directory_entries_bypasses_cache() {
                 sandbox.touch(vec![Stub::EmptyFile("second.txt")]);
 
                 // `list_directory_entries` keeps returning the stale cached listing.
-                let stale = rookui::r#async::block_on(
+                let stale = ptermui::r#async::block_on(
                     ctx.path_completion_context()
                         .expect("Path completion context should exist with active session")
                         .list_directory_entries(tests_dir.clone()),
@@ -448,7 +448,7 @@ pub fn test_session_context_refresh_directory_entries_bypasses_cache() {
 
                 // `refresh_directory_entries` re-reads from disk and overwrites the cached entry.
                 let refreshed =
-                    rookui::r#async::block_on(ctx.refresh_directory_entries(tests_dir.clone()));
+                    ptermui::r#async::block_on(ctx.refresh_directory_entries(tests_dir.clone()));
                 assert_eq!(
                     HashSet::<EngineDirEntry>::from_iter(Arc::unwrap_or_clone(refreshed)),
                     HashSet::from_iter([
@@ -458,7 +458,7 @@ pub fn test_session_context_refresh_directory_entries_bypasses_cache() {
                 );
 
                 // Subsequent cached reads now observe the refreshed listing.
-                let after_refresh = rookui::r#async::block_on(
+                let after_refresh = ptermui::r#async::block_on(
                     ctx.path_completion_context()
                         .expect("Path completion context should exist with active session")
                         .list_directory_entries(tests_dir),

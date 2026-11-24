@@ -4,7 +4,7 @@ Linear: CODE-1806. Product behavior: [PRODUCT.md](./PRODUCT.md).
 
 ## Context
 
-The headless TUI runs with terminal mouse capture, so host-terminal selection is unavailable. The transcript is rendered by `TuiViewportedList<TuiBlockListViewportSource>` over absolute content rows (`crates/rookui_core/src/elements/tui/viewported_list.rs`, `crates/rook_tui/src/tui_block_list_viewport_source.rs`). Selection therefore lives in the TUI element tree and uses the viewport's existing content coordinate system.
+The headless TUI runs with terminal mouse capture, so host-terminal selection is unavailable. The transcript is rendered by `TuiViewportedList<TuiBlockListViewportSource>` over absolute content rows (`crates/ptermui_core/src/elements/tui/viewported_list.rs`, `crates/pterm_tui/src/tui_block_list_viewport_source.rs`). Selection therefore lives in the TUI element tree and uses the viewport's existing content coordinate system.
 
 Selection is visual/grid-based rather than model-offset-based:
 
@@ -17,7 +17,7 @@ Selection is visual/grid-based rather than model-offset-based:
 
 ### Generic selection wrapper
 
-`TuiSelectable<Child>` in `crates/rookui_core/src/elements/tui/selectable.rs` owns the persistent `TuiSelectionHandle` and mouse gesture state machine. It:
+`TuiSelectable<Child>` in `crates/ptermui_core/src/elements/tui/selectable.rs` owns the persistent `TuiSelectionHandle` and mouse gesture state machine. It:
 
 - gives normal child interactions first refusal on mouse-down;
 - captures drag/up while its selection handle reports an active gesture;
@@ -34,7 +34,7 @@ Selection is visual/grid-based rather than model-offset-based:
 
 ### Viewport selection adapter
 
-`TuiViewportedList` implements `TuiSelectableElement` (`crates/rookui_core/src/elements/tui/viewported_list.rs`).
+`TuiViewportedList` implements `TuiSelectableElement` (`crates/ptermui_core/src/elements/tui/viewported_list.rs`).
 
 Because the viewport owns resolved layout and scrolling, it performs the content-specific work:
 
@@ -52,7 +52,7 @@ Mouse-wheel and page scrolling preserve absolute selection anchors. Selected row
 
 ### Selection state
 
-`TuiSelectionHandle` persists across per-frame element reconstruction (`crates/rookui_core/src/elements/tui/selectable/state.rs`). The transcript retains the handle and supplies a clone to each rebuilt `TuiSelectable`. It stores:
+`TuiSelectionHandle` persists across per-frame element reconstruction (`crates/ptermui_core/src/elements/tui/selectable/state.rs`). The transcript retains the handle and supplies a clone to each rebuilt `TuiSelectable`. It stores:
 
 - anchor and focus spans;
 - character/word/line mode;
@@ -62,11 +62,11 @@ Mouse-wheel and page scrolling preserve absolute selection anchors. Selected row
 
 The handle clears on width change before child layout, removed selected rows, or visible selected glyph mutation. It rebases points and glyph snapshots through ordered row-resize batches, skipping batches without selection state and changes entirely below the selected rows.
 
-The transcript configures `TuiSelectable` with `SemanticSelection::word_boundary_policy()` and `SemanticSelection::smart_select_fn()`. Generic glyph-to-word resolution remains in `rookui_core`; Rook-specific settings are converted into the same policy and function used by GUI selection.
+The transcript configures `TuiSelectable` with `SemanticSelection::word_boundary_policy()` and `SemanticSelection::smart_select_fn()`. Generic glyph-to-word resolution remains in `ptermui_core`; Polaris Terminal-specific settings are converted into the same policy and function used by GUI selection.
 
 ### Viewport content contract
 
-`TuiViewportedElement` directly provides two optional selection hooks (`crates/rookui_core/src/elements/tui/viewported_list.rs`):
+`TuiViewportedElement` directly provides two optional selection hooks (`crates/ptermui_core/src/elements/tui/viewported_list.rs`):
 
 - `selection_content(window, width, app)` returns arbitrary rows without mutating layout state;
 - `take_selection_row_resizes()` drains original row ranges and new heights produced by the latest layout.
@@ -81,14 +81,14 @@ Defaults disable off-screen extraction and return no resizes. No extension trait
 
 ### Transcript composition
 
-`TuiTranscriptView::render` (`crates/rook_tui/src/transcript_view.rs`) creates:
+`TuiTranscriptView::render` (`crates/pterm_tui/src/transcript_view.rs`) creates:
 
 1. `TuiBlockListViewportSource`;
 2. `TuiViewportedList` with `GrowFromBottom` alignment;
 3. `TuiSelectable` with the transcript's persistent handle, semantic-selection policy, smart-select function, and transcript-owned selection actions;
 4. the existing `TuiScrollable` wheel driver.
 
-The transcript view owns the selectable region and translates element actions into `TuiTranscriptViewEvent`s. `TuiTerminalSessionView` subscribes to those child-view events and owns cross-surface policy and clipboard side effects (`crates/rook_tui/src/terminal_session_view.rs`).
+The transcript view owns the selectable region and translates element actions into `TuiTranscriptViewEvent`s. `TuiTerminalSessionView` subscribes to those child-view events and owns cross-surface policy and clipboard side effects (`crates/pterm_tui/src/terminal_session_view.rs`).
 
 ## Event flow
 
@@ -118,7 +118,7 @@ The transcript view owns the selectable region and translates element actions in
 2. It asks the viewport to materialize the resolved span; the viewport requests selected row windows through `TuiViewportedElement::selection_content`.
 3. Rows are rendered with the viewport's canonical clipping helper, scraped by cell width, trimmed, and joined with newlines.
 4. The wrapper dispatches a transcript-owned completion action, and the transcript emits the selected text as a view event.
-5. The subscribed session writes OSC 52 clipboard and PRIMARY targets and shows the success hint (`crates/rook_tui/src/clipboard.rs`, `crates/rook_tui/src/transient_hint.rs`).
+5. The subscribed session writes OSC 52 clipboard and PRIMARY targets and shows the success hint (`crates/pterm_tui/src/clipboard.rs`, `crates/pterm_tui/src/transient_hint.rs`).
 
 ## Content updates and invalidation
 
@@ -130,7 +130,7 @@ The transcript view owns the selectable region and translates element actions in
 - Auto-follow and explicit scrolling preserve anchors.
 - Horizontal resize clears selection.
 
-Conversation removal obtains the rich-content row range before deletion and applies a shrink-to-zero rebase (`crates/rook_tui/src/transcript_view.rs`).
+Conversation removal obtains the rich-content row range before deletion and applies a shrink-to-zero rebase (`crates/pterm_tui/src/transcript_view.rs`).
 
 ## Exclusivity
 
@@ -143,7 +143,7 @@ Conversation removal obtains the rich-content row range before deletion and appl
 
 ## Validation
 
-Focused viewport tests in `crates/rookui_core/src/elements/tui/viewported_list_tests.rs` cover:
+Focused viewport tests in `crates/ptermui_core/src/elements/tui/viewported_list_tests.rs` cover:
 
 - linear highlight and copy;
 - edge-drag selection into newly scrolled rows;
@@ -152,9 +152,9 @@ Focused viewport tests in `crates/rookui_core/src/elements/tui/viewported_list_t
 - reverse-video modifier toggling;
 - canonical viewport clamping, bottom alignment, and resolved geometry.
 
-Selection-state tests in `crates/rookui_core/src/elements/tui/selectable/state_tests.rs` cover cumulative resize rebasing.
+Selection-state tests in `crates/ptermui_core/src/elements/tui/selectable/state_tests.rs` cover cumulative resize rebasing.
 
-Rook TUI tests cover:
+Polaris Terminal TUI tests cover:
 
 - read-only transcript row extraction and explicit resize reporting (`tui_block_list_viewport_source_tests.rs`);
 - input selection clearing (`input/view_tests.rs`);
@@ -164,10 +164,10 @@ Rook TUI tests cover:
 Before submission run:
 
 - `./script/format`
-- `cargo test -p rookui_core --lib --features tui viewported_list`
-- `cargo test -p rookui_core --lib --features tui selectable::state::tests`
-- `cargo nextest run -p rook_tui`
-- focused Clippy for `rookui_core` and `rook_tui` with warnings denied
+- `cargo test -p ptermui_core --lib --features tui viewported_list`
+- `cargo test -p ptermui_core --lib --features tui selectable::state::tests`
+- `cargo nextest run -p pterm_tui`
+- focused Clippy for `ptermui_core` and `pterm_tui` with warnings denied
 
 ## Risks
 

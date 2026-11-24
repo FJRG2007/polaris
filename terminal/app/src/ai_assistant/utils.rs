@@ -1,14 +1,14 @@
 /// Common functionality used across different AI Assistant components.
 use markdown_parser::{CodeBlockText, FormattedText, FormattedTextLine, parse_markdown};
 use pathfinder_color::ColorU;
-use rookui::elements::{
+use ptermui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, HighlightedHyperlink, Icon,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, ModelHandle};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, ModelHandle};
 
 use super::panel::AIAssistantAction;
 use super::requests::Requests;

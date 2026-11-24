@@ -7,15 +7,15 @@ use std::sync::Arc;
 use fuzzy_match::{FuzzyMatchResult, match_indices_case_insensitive};
 use instant::Instant;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::builder::MIN_FONT_SIZE;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::editor::NavigationKey;
-use rookui::r#async::Timer;
-use rookui::clipboard::ClipboardContent;
-use rookui::color::ColorU;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::builder::MIN_FONT_SIZE;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::editor::NavigationKey;
+use ptermui::r#async::Timer;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::color::ColorU;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, Dismiss, DispatchEventResult, DropShadow, Empty,
     EventHandler, Flex, Highlight, Hoverable, MainAxisAlignment, MainAxisSize, MouseInBehavior,
@@ -23,11 +23,11 @@ use rookui::elements::{
     PositionedElementOffsetBounds, Radius, SavePosition, ScrollStateHandle, Scrollable,
     ScrollableElement, ScrollbarWidth, Shrinkable, Stack, Text, UniformList, UniformListState,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::units::Pixels;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::units::Pixels;
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity as _, TypedActionView, View,
     ViewContext, ViewHandle, WindowId,
 };
@@ -125,7 +125,7 @@ const ENV_SIDE_CAR_OUTER_RADIUS: f32 = 6.;
 const ENV_SIDE_CAR_INNER_RADIUS: f32 = 4.;
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -777,7 +777,7 @@ impl DisplayChipMenu {
         let image_key = format!("env-sidecar:{}:image", data.id);
 
         let icon = |icon: Icon| {
-            ConstrainedBox::new(icon.to_rookui_icon(Fill::Solid(label_text_color)).finish())
+            ConstrainedBox::new(icon.to_ptermui_icon(Fill::Solid(label_text_color)).finish())
                 .with_width(ENV_SIDE_CAR_ICON_SIZE)
                 .with_height(ENV_SIDE_CAR_ICON_SIZE)
                 .finish()
@@ -900,7 +900,7 @@ impl DisplayChipMenu {
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
             // Leave the scrollbar gutter background transparent.
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .with_padding_start(0.)
         .with_padding_end(0.)
@@ -994,7 +994,7 @@ impl DisplayChipMenu {
                     updated_text.add_child(
                         Container::new(
                             ConstrainedBox::new(
-                                icon.to_rookui_icon(Fill::Solid(text_color)).finish(),
+                                icon.to_ptermui_icon(Fill::Solid(text_color)).finish(),
                             )
                             .with_height(icon_size)
                             .with_width(icon_size)
@@ -1165,7 +1165,7 @@ impl DisplayChipMenu {
                                 let glyph_size = ENV_MENU_ICON_SIZE;
 
                                 let icon_glyph = ConstrainedBox::new(
-                                    icon.to_rookui_icon(Fill::Solid(main_text)).finish(),
+                                    icon.to_ptermui_icon(Fill::Solid(main_text)).finish(),
                                 )
                                 .with_width(glyph_size)
                                 .with_height(glyph_size)
@@ -1192,7 +1192,7 @@ impl DisplayChipMenu {
                             left_side.add_child(
                                 Container::new(
                                     ConstrainedBox::new(
-                                        icon.to_rookui_icon(Fill::Solid(main_text)).finish(),
+                                        icon.to_ptermui_icon(Fill::Solid(main_text)).finish(),
                                     )
                                     .with_height(icon_size)
                                     .with_width(icon_size)
@@ -1309,7 +1309,7 @@ impl DisplayChipMenu {
             scrollbar_width,
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .with_padding_end(0.)
         .with_padding_start(0.);

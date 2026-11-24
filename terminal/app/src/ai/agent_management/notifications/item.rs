@@ -1,6 +1,6 @@
 use enum_iterator::Sequence;
 use instant::Instant;
-use rookui::EntityId;
+use ptermui::EntityId;
 use uuid::Uuid;
 
 use crate::ai::agent::conversation::AIConversationId;

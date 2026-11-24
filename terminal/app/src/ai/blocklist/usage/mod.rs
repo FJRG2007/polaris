@@ -1,6 +1,6 @@
-use rook_core::ui::Icon;
-use rook_core::ui::theme::{Fill, RookTheme};
-use rookui::Element;
+use pterm_core::ui::Icon;
+use pterm_core::ui::theme::{Fill, PtermTheme};
+use ptermui::Element;
 
 pub mod conversation_usage_view;
 pub mod rollup;
@@ -40,7 +40,7 @@ pub fn icon_for_context_window_usage(context_window_usage: f32) -> Icon {
 
 pub fn render_context_window_usage_icon(
     context_window_usage: f32,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     color_override: Option<Fill>,
 ) -> Box<dyn Element> {
     let icon = icon_for_context_window_usage(context_window_usage);
@@ -51,7 +51,7 @@ pub fn render_context_window_usage_icon(
         color_override.unwrap_or_else(|| theme.main_text_color(theme.background()))
     };
 
-    icon.to_rookui_icon(fill).finish()
+    icon.to_ptermui_icon(fill).finish()
 }
 
 #[cfg(test)]

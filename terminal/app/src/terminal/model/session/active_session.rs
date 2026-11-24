@@ -1,15 +1,15 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use rook_core::SessionId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle};
+use pterm_core::SessionId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle};
 
 use super::{Session, SessionType, Sessions};
 use crate::ai_assistant::execution_context::{
-    RookAiExecutionContext, execution_context_for_session,
+    PtermAiExecutionContext, execution_context_for_session,
 };
 use crate::terminal::ShellLaunchData;
 use crate::terminal::model::session::SessionsEvent;
@@ -104,12 +104,12 @@ impl ActiveSession {
     /// the connected host ID.
     pub fn location_for_path(&self, path: &str, app: &AppContext) -> Option<LocalOrRemotePath> {
         match self.session_type(app) {
-            Some(SessionType::RookifiedRemote {
+            Some(SessionType::PtermifiedRemote {
                 host_id: Some(host_id),
             }) => StandardizedPath::try_new(path)
                 .ok()
                 .map(|path| LocalOrRemotePath::Remote(RemotePath::new(host_id, path))),
-            Some(SessionType::RookifiedRemote { host_id: None }) => None,
+            Some(SessionType::PtermifiedRemote { host_id: None }) => None,
             Some(SessionType::Local) | None => {
                 let path =
                     dunce::canonicalize(Path::new(path)).unwrap_or_else(|_| PathBuf::from(path));
@@ -126,8 +126,8 @@ impl ActiveSession {
         self.location_for_path(cwd.as_str(), app)
     }
 
-    /// Returns the `RookAiExecutionContext` for the active session.
-    pub fn ai_execution_environment(&self, app: &AppContext) -> Option<RookAiExecutionContext> {
+    /// Returns the `PtermAiExecutionContext` for the active session.
+    pub fn ai_execution_environment(&self, app: &AppContext) -> Option<PtermAiExecutionContext> {
         self.session(app)
             .as_ref()
             .map(execution_context_for_session)

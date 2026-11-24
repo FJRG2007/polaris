@@ -4,12 +4,12 @@ use std::time::Duration;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::context_flag::ContextFlag;
-use rook_core::ui::builder::UiBuilder;
-use rook_core::ui::theme::AnsiColors;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::elements::{
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::ui::builder::UiBuilder;
+use pterm_core::ui::theme::AnsiColors;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::elements::{
     Align, Border, ChildAnchor, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DragAxis, Draggable, DraggableState, DropTarget, Element, Empty, Fill,
     Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, Padding,
@@ -17,13 +17,13 @@ use rookui::elements::{
     PositionedElementOffsetBounds, Radius, Rect, SavePosition, Shrinkable, SizeConstraintCondition,
     SizeConstraintSwitch, Stack, Text,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::Keystroke;
-use rookui::platform::keyboard::KeyCode;
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::text_input::TextInput;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity, ViewHandle};
+use ptermui::fonts::Weight;
+use ptermui::keymap::Keystroke;
+use ptermui::platform::keyboard::KeyCode;
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::text_input::TextInput;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity, ViewHandle};
 use serde::{Deserialize, Serialize};
 use settings::Setting as _;
 
@@ -256,8 +256,8 @@ pub fn uses_vertical_tabs(ctx: &AppContext) -> bool {
     FeatureFlag::VerticalTabs.is_enabled() && *TabSettings::as_ref(ctx).use_vertical_tabs
 }
 
-const ROOK_2_TAB_COLOR_OPACITY: Opacity = 25;
-const ROOK_2_HOVERED_TAB_COLOR_OPACITY: Opacity = 50;
+const POLARIS_TERMINAL_2_TAB_COLOR_OPACITY: Opacity = 25;
+const POLARIS_TERMINAL_2_HOVERED_TAB_COLOR_OPACITY: Opacity = 50;
 const TAB_CLOSE_BUTTON_OPACITY: Opacity = 60;
 const TAB_CLOSE_BUTTON_WIDTH: f32 = 20.0;
 const MAX_TOOLTIP_LENGTH: usize = 80;
@@ -1608,7 +1608,7 @@ impl<'a> TabComponent<'a> {
                 Align::new(
                     ConstrainedBox::new(
                         Icon::PinFilledDiagonal
-                            .to_rookui_icon(theme.main_text_color(theme.background()))
+                            .to_ptermui_icon(theme.main_text_color(theme.background()))
                             .finish(),
                     )
                     .with_width(TAB_PIN_INDICATOR_ICON_SIZE)
@@ -1660,22 +1660,22 @@ impl<'a> TabComponent<'a> {
             Indicator::None => None,
             Indicator::Synced => Some(
                 Icon::LinkHorizontal
-                    .to_rookui_icon(self.styles.synced_input_indicator_color.into())
+                    .to_ptermui_icon(self.styles.synced_input_indicator_color.into())
                     .finish(),
             ),
             Indicator::Error => Some(
                 Icon::AlertTriangle
-                    .to_rookui_icon(self.styles.error_color.into())
+                    .to_ptermui_icon(self.styles.error_color.into())
                     .finish(),
             ),
             Indicator::Shared => Some(
                 Icon::Sharing
-                    .to_rookui_icon(self.styles.sharing_color.into())
+                    .to_ptermui_icon(self.styles.sharing_color.into())
                     .finish(),
             ),
             Indicator::Maximized => Some(
                 Icon::Maximize
-                    .to_rookui_icon(
+                    .to_ptermui_icon(
                         self.styles
                             .default
                             .font_color
@@ -1687,7 +1687,7 @@ impl<'a> TabComponent<'a> {
             Indicator::Shell(shell_indicator_type) => Some(
                 shell_indicator_type
                     .to_icon()
-                    .to_rookui_icon(internal_colors::neutral_5(self.appearance.theme()).into())
+                    .to_ptermui_icon(internal_colors::neutral_5(self.appearance.theme()).into())
                     .finish(),
             ),
             Indicator::Agent {
@@ -1702,7 +1702,7 @@ impl<'a> TabComponent<'a> {
                     }
                 } else {
                     let icon_color = self.appearance.theme().nonactive_ui_text_color();
-                    Some(Icon::Agent.to_rookui_icon(icon_color).finish())
+                    Some(Icon::Agent.to_ptermui_icon(icon_color).finish())
                 }
             }
             Indicator::AmbientAgent => {
@@ -1717,7 +1717,9 @@ impl<'a> TabComponent<'a> {
                 Some(
                     Hoverable::new(mouse_state, move |state| {
                         let mut stack = Stack::new().with_child(
-                            Icon::CloudFilled.to_rookui_icon(icon_color.into()).finish(),
+                            Icon::CloudFilled
+                                .to_ptermui_icon(icon_color.into())
+                                .finish(),
                         );
 
                         if state.is_hovered() {
@@ -1842,9 +1844,9 @@ impl<'a> TabComponent<'a> {
             (bg, border)
         } else {
             let tab_opacity = if is_active || is_hovered {
-                ROOK_2_HOVERED_TAB_COLOR_OPACITY
+                POLARIS_TERMINAL_2_HOVERED_TAB_COLOR_OPACITY
             } else {
-                ROOK_2_TAB_COLOR_OPACITY
+                POLARIS_TERMINAL_2_TAB_COLOR_OPACITY
             };
 
             let bg = if let Some(custom_background) = self.styles.background {
@@ -1874,7 +1876,7 @@ impl<'a> TabComponent<'a> {
             let mut flex_row = Flex::row()
                 .with_main_axis_size(MainAxisSize::Max)
                 .with_main_axis_alignment(MainAxisAlignment::Center)
-                .with_cross_axis_alignment(rookui::elements::CrossAxisAlignment::Center);
+                .with_cross_axis_alignment(ptermui::elements::CrossAxisAlignment::Center);
             if let Some(indicator) = self.render_indicator() {
                 flex_row.add_child(indicator);
             }
@@ -1912,7 +1914,7 @@ impl<'a> TabComponent<'a> {
                 _ => {
                     // Fallback to terminal icon if no indicator is present
                     Icon::Terminal
-                        .to_rookui_icon(
+                        .to_ptermui_icon(
                             self.styles
                                 .default
                                 .font_color
@@ -1927,7 +1929,7 @@ impl<'a> TabComponent<'a> {
             Flex::row()
                 .with_main_axis_size(MainAxisSize::Max)
                 .with_main_axis_alignment(MainAxisAlignment::Center)
-                .with_cross_axis_alignment(rookui::elements::CrossAxisAlignment::Center)
+                .with_cross_axis_alignment(ptermui::elements::CrossAxisAlignment::Center)
                 .with_child(
                     ConstrainedBox::new(compact_icon)
                         .with_max_width(TAB_INDICATOR_HEIGHT)
@@ -2117,7 +2119,7 @@ impl<'a> TabComponent<'a> {
             Container::new(tab.finish())
                 .with_background_color(
                     self.ui_builder
-                        .rook_theme()
+                        .pterm_theme()
                         .background()
                         .into_solid_bias_top_color(),
                 )
@@ -2207,7 +2209,7 @@ impl UiComponent for TabComponent<'_> {
 
                         if let Some(directory) = &tooltip_directory_clone {
                             let folder_icon = Icon::Folder
-                                .to_rookui_icon(ThemeFill::Solid(font_color))
+                                .to_ptermui_icon(ThemeFill::Solid(font_color))
                                 .finish();
 
                             let directory_row = Flex::row()
@@ -2240,7 +2242,7 @@ impl UiComponent for TabComponent<'_> {
 
                         if let Some(branch) = &tooltip_git_branch_clone {
                             let branch_icon = Icon::GitBranch
-                                .to_rookui_icon(ThemeFill::Solid(font_color))
+                                .to_ptermui_icon(ThemeFill::Solid(font_color))
                                 .finish();
 
                             let branch_row = Flex::row()

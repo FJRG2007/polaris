@@ -61,8 +61,8 @@ This is consistency, not divergence: the fallback covers states comment submissi
 
 ## Testing and validation
 
-- `cargo check -p rook` and `cargo check -p rook --tests` pass; `./script/format` and `cargo clippy -p rook --all-targets -- -D warnings` pass.
-- `cargo test -p rook --lib code_review`: 115 passed, 0 failed — includes `code_review_view_tests.rs` and `find_model_tests.rs`, which construct `CodeReviewView` with the new provider parameter (`None`).
+- `cargo check -p polaris-terminal` and `cargo check -p polaris-terminal --tests` pass; `./script/format` and `cargo clippy -p polaris-terminal --all-targets -- -D warnings` pass.
+- `cargo test -p polaris-terminal --lib code_review`: 115 passed, 0 failed — includes `code_review_view_tests.rs` and `find_model_tests.rs`, which construct `CodeReviewView` with the new provider parameter (`None`).
 - The selection-priority logic is shared, unchanged code (`find_available_terminal_for_review`), already exercised by comment-routing usage; no new unit tests were added because the new code is glue requiring a live pane group + focus state.
 - Manual verification (the scenario from the bug report): open an orchestrator with a sub-agent, focus the parent conversation, and confirm each action lands in the parent's input — gutter paperclip, highlight + "Add as context", header "Add diff set as context", per-file diff attach. Repeat after swapping to the sub-agent's conversation to confirm it targets the sub-agent. Also confirm the selection tooltip hides when no in-repo terminal can be resolved.
 

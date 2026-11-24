@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use rook_core::send_telemetry_from_ctx;
-use rookui::{
+use pterm_core::send_telemetry_from_ctx;
+use ptermui::{
     AppContext, Entity, EntityId, ModelContext, SingletonEntity, TypedActionView, ViewHandle,
     WindowId,
 };
@@ -51,7 +51,7 @@ pub(crate) struct AutoCloudHandoffEligibility {
     /// active local child agent. Handing such a session off to the cloud would
     /// fork only the parent and orphan its local children, so we skip it.
     pub(crate) has_local_orchestrated_children: bool,
-    /// True when the pane's active Agent Mode model can't run in a Rook cloud
+    /// True when the pane's active Agent Mode model can't run in a Polaris Terminal cloud
     /// (Oz) agent (e.g. a custom-endpoint/BYOK model or local custom router).
     /// Handing off would silently swap the run onto a different model, so we
     /// skip instead.
@@ -441,7 +441,7 @@ pub(crate) fn init(app: &mut AppContext) {
 }
 
 /// Triggers an auto-handoff to the cloud. This is the entry point for the
-/// `rook://.../auto_handoff_to_cloud` URI action; the real macOS sleep path
+/// `polaris-terminal://.../auto_handoff_to_cloud` URI action; the real macOS sleep path
 /// goes through the `SystemStats` subscription instead.
 ///
 /// Callers that dispatch from inside an in-progress workspace view update

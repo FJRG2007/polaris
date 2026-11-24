@@ -4,12 +4,12 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use ai::diff_validation::DiffType;
-use rook_core::ui::appearance::Appearance;
-use rook_editor::content::buffer::InitialBufferState;
-use rook_editor::render::model::LineCount;
-use rook_util::file::{FileLoadError, FileSaveError};
-use rookui::elements::MouseStateHandle;
-use rookui::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_editor::content::buffer::InitialBufferState;
+use pterm_editor::render::model::LineCount;
+use pterm_util::file::{FileLoadError, FileSaveError};
+use ptermui::elements::MouseStateHandle;
+use ptermui::{
     AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle, WindowId,
 };
 
@@ -120,7 +120,7 @@ impl View for LocalCodeEditorView {
         "LocalCodeEditorView"
     }
     fn render(&self, _app: &AppContext) -> Box<dyn Element> {
-        rookui::elements::Empty::new().finish()
+        ptermui::elements::Empty::new().finish()
     }
 }
 
@@ -137,5 +137,5 @@ pub fn render_unsaved_circle_with_tooltip(
     _right_margin: f32,
     _appearance: &Appearance,
 ) -> Box<dyn Element> {
-    rookui::elements::Empty::new().finish()
+    ptermui::elements::Empty::new().finish()
 }

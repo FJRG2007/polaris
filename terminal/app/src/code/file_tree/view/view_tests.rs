@@ -1,15 +1,15 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use pterm_core::ui::appearance::Appearance;
+use ptermui::platform::WindowStyle;
+use ptermui::{App, ModelHandle, SingletonEntity};
 use repo_metadata::entry::{DirectoryEntry, Entry, FileMetadata};
 use repo_metadata::file_tree_store::FileTreeState;
 use repo_metadata::local_model::IndexedRepoState;
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::watcher::DirectoryWatcher;
 use repo_metadata::{RepoMetadataModel, RepositoryIdentifier};
-use rook_core::ui::appearance::Appearance;
-use rookui::platform::WindowStyle;
-use rookui::{App, ModelHandle, SingletonEntity};
 use settings::Setting;
 use virtual_fs::{Stub, VirtualFS};
 
@@ -25,8 +25,8 @@ use crate::workspace::ToastStack;
 use crate::workspace::sync_inputs::SyncedInputState;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
-fn std_path(path: &std::path::Path) -> rook_util::standardized_path::StandardizedPath {
-    rook_util::standardized_path::StandardizedPath::try_from_local(path).unwrap()
+fn std_path(path: &std::path::Path) -> pterm_util::standardized_path::StandardizedPath {
+    pterm_util::standardized_path::StandardizedPath::try_from_local(path).unwrap()
 }
 
 fn initialize_app(
@@ -62,7 +62,7 @@ fn build_repo_state(repo_root: &std::path::Path) -> FileTreeState {
         false,
     ));
     let src_dir = Entry::Directory(DirectoryEntry {
-        path: rook_util::standardized_path::StandardizedPath::try_from_local(
+        path: pterm_util::standardized_path::StandardizedPath::try_from_local(
             &repo_root.join("packages/app/src"),
         )
         .unwrap(),
@@ -71,7 +71,7 @@ fn build_repo_state(repo_root: &std::path::Path) -> FileTreeState {
         loaded: true,
     });
     let app_dir = Entry::Directory(DirectoryEntry {
-        path: rook_util::standardized_path::StandardizedPath::try_from_local(
+        path: pterm_util::standardized_path::StandardizedPath::try_from_local(
             &repo_root.join("packages/app"),
         )
         .unwrap(),
@@ -80,7 +80,7 @@ fn build_repo_state(repo_root: &std::path::Path) -> FileTreeState {
         loaded: true,
     });
     let packages_dir = Entry::Directory(DirectoryEntry {
-        path: rook_util::standardized_path::StandardizedPath::try_from_local(
+        path: pterm_util::standardized_path::StandardizedPath::try_from_local(
             &repo_root.join("packages"),
         )
         .unwrap(),
@@ -99,7 +99,7 @@ fn build_repo_state(repo_root: &std::path::Path) -> FileTreeState {
 
 fn build_repo_state_with_unloaded_directory(repo_root: &std::path::Path) -> FileTreeState {
     let unloaded_src_dir = Entry::Directory(DirectoryEntry {
-        path: rook_util::standardized_path::StandardizedPath::try_from_local(
+        path: pterm_util::standardized_path::StandardizedPath::try_from_local(
             &repo_root.join("src"),
         )
         .unwrap(),
@@ -119,7 +119,7 @@ fn build_repo_state_with_unloaded_directory(repo_root: &std::path::Path) -> File
 fn flattened_paths(
     view: &FileTreeView,
     root: &std::path::Path,
-) -> Vec<rook_util::standardized_path::StandardizedPath> {
+) -> Vec<pterm_util::standardized_path::StandardizedPath> {
     view.root_directories
         .get(&std_path(root))
         .expect("root directory is tracked")
@@ -312,7 +312,7 @@ fn repo_transition_unregisters_lazy_loaded_path() {
         let repo_root = dirs.tests().join("repo");
         let displayed_root = repo_root.join("packages/app");
         let canonical_repo_root =
-            rook_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo_root)
+            pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo_root)
                 .unwrap();
 
         App::test((), |mut app| async move {
@@ -332,15 +332,17 @@ fn repo_transition_unregisters_lazy_loaded_path() {
             file_tree_view.read(&app, |view, _ctx| {
                 assert!(
                     view.registered_lazy_loaded_paths.contains(
-                        &rook_util::standardized_path::StandardizedPath::try_from_local(
+                        &pterm_util::standardized_path::StandardizedPath::try_from_local(
                             &displayed_root
                         )
                         .unwrap()
                     )
                 );
                 let displayed_std =
-                    rook_util::standardized_path::StandardizedPath::try_from_local(&displayed_root)
-                        .unwrap();
+                    pterm_util::standardized_path::StandardizedPath::try_from_local(
+                        &displayed_root,
+                    )
+                    .unwrap();
                 assert_eq!(
                     view.root_directories
                         .get(&displayed_std)
@@ -351,7 +353,7 @@ fn repo_transition_unregisters_lazy_loaded_path() {
             repository_metadata_model.read(&app, |model, ctx| {
                 assert!(
                     model.is_lazy_loaded_path(
-                        &rook_util::standardized_path::StandardizedPath::try_from_local(
+                        &pterm_util::standardized_path::StandardizedPath::try_from_local(
                             &displayed_root
                         )
                         .unwrap(),
@@ -370,10 +372,12 @@ fn repo_transition_unregisters_lazy_loaded_path() {
 
             file_tree_view.read(&app, |view, _ctx| {
                 let displayed_std =
-                    rook_util::standardized_path::StandardizedPath::try_from_local(&displayed_root)
-                        .unwrap();
+                    pterm_util::standardized_path::StandardizedPath::try_from_local(
+                        &displayed_root,
+                    )
+                    .unwrap();
                 let repo_std =
-                    rook_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
+                    pterm_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
                         .unwrap();
                 assert!(!view.registered_lazy_loaded_paths.contains(&displayed_std));
                 assert_eq!(view.root_for_path(&displayed_std), Some(repo_std.clone()));
@@ -387,7 +391,7 @@ fn repo_transition_unregisters_lazy_loaded_path() {
             repository_metadata_model.read(&app, |model, ctx| {
                 assert!(
                     !model.is_lazy_loaded_path(
-                        &rook_util::standardized_path::StandardizedPath::try_from_local(
+                        &pterm_util::standardized_path::StandardizedPath::try_from_local(
                             &displayed_root
                         )
                         .unwrap(),
@@ -423,7 +427,7 @@ fn repo_backed_unloaded_directory_loads_through_model() {
         let nested_dir = repo_root.join("src/nested");
         let source_file = repo_root.join("src/nested/main.rs");
         let canonical_repo_root =
-            rook_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo_root)
+            pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo_root)
                 .unwrap();
 
         App::test((), |mut app| async move {
@@ -452,13 +456,13 @@ fn repo_backed_unloaded_directory_loads_through_model() {
                     !view
                         .root_directories
                         .get(
-                            &rook_util::standardized_path::StandardizedPath::try_from_local(
+                            &pterm_util::standardized_path::StandardizedPath::try_from_local(
                                 &repo_root
                             )
                             .unwrap()
                         )
                         .is_some_and(|root_dir| root_dir.entry.contains(
-                            &rook_util::standardized_path::StandardizedPath::try_from_local(
+                            &pterm_util::standardized_path::StandardizedPath::try_from_local(
                                 &source_file
                             )
                             .unwrap()
@@ -468,9 +472,9 @@ fn repo_backed_unloaded_directory_loads_through_model() {
 
             file_tree_view.update(&mut app, |view, ctx| {
                 view.ensure_loaded_path(
-                    &rook_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
+                    &pterm_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
                         .unwrap(),
-                    &rook_util::standardized_path::StandardizedPath::try_from_local(&src_dir)
+                    &pterm_util::standardized_path::StandardizedPath::try_from_local(&src_dir)
                         .unwrap(),
                     ctx,
                 );
@@ -482,13 +486,13 @@ fn repo_backed_unloaded_directory_loads_through_model() {
                 assert!(
                     view.root_directories
                         .get(
-                            &rook_util::standardized_path::StandardizedPath::try_from_local(
+                            &pterm_util::standardized_path::StandardizedPath::try_from_local(
                                 &repo_root
                             )
                             .unwrap()
                         )
                         .is_some_and(|root_dir| root_dir.entry.contains(
-                            &rook_util::standardized_path::StandardizedPath::try_from_local(
+                            &pterm_util::standardized_path::StandardizedPath::try_from_local(
                                 &nested_dir
                             )
                             .unwrap()
@@ -498,9 +502,9 @@ fn repo_backed_unloaded_directory_loads_through_model() {
 
             file_tree_view.update(&mut app, |view, ctx| {
                 view.ensure_loaded_path(
-                    &rook_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
+                    &pterm_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
                         .unwrap(),
-                    &rook_util::standardized_path::StandardizedPath::try_from_local(&nested_dir)
+                    &pterm_util::standardized_path::StandardizedPath::try_from_local(&nested_dir)
                         .unwrap(),
                     ctx,
                 );
@@ -517,13 +521,13 @@ fn repo_backed_unloaded_directory_loads_through_model() {
                 assert!(
                     view.root_directories
                         .get(
-                            &rook_util::standardized_path::StandardizedPath::try_from_local(
+                            &pterm_util::standardized_path::StandardizedPath::try_from_local(
                                 &repo_root
                             )
                             .unwrap()
                         )
                         .is_some_and(|root_dir| root_dir.entry.contains(
-                            &rook_util::standardized_path::StandardizedPath::try_from_local(
+                            &pterm_util::standardized_path::StandardizedPath::try_from_local(
                                 &source_file
                             )
                             .unwrap()
@@ -533,18 +537,20 @@ fn repo_backed_unloaded_directory_loads_through_model() {
             repository_metadata_model.read(&app, |model, ctx| {
                 assert!(
                     !model.is_lazy_loaded_path(
-                        &rook_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
-                            .unwrap(),
+                        &pterm_util::standardized_path::StandardizedPath::try_from_local(
+                            &repo_root
+                        )
+                        .unwrap(),
                         ctx
                     )
                 );
                 let id = repo_metadata::RepositoryIdentifier::local(
-                    rook_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
+                    pterm_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
                         .unwrap(),
                 );
                 assert!(model.get_repository(&id, ctx).is_some_and(|state| {
                     state.entry.contains(
-                        &rook_util::standardized_path::StandardizedPath::try_from_local(
+                        &pterm_util::standardized_path::StandardizedPath::try_from_local(
                             &source_file,
                         )
                         .unwrap(),
@@ -565,7 +571,7 @@ fn pending_repository_root_does_not_register_lazy_loaded_path() {
 
         let repo_root = dirs.tests().join("repo");
         let canonical_repo_root =
-            rook_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo_root)
+            pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo_root)
                 .unwrap();
 
         App::test((), |mut app| async move {
@@ -587,7 +593,7 @@ fn pending_repository_root_does_not_register_lazy_loaded_path() {
             });
             repository_metadata_model.read(&app, |model, ctx| {
                 let id = repo_metadata::RepositoryIdentifier::local(
-                    rook_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
+                    pterm_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
                         .unwrap(),
                 );
                 assert!(matches!(
@@ -604,21 +610,25 @@ fn pending_repository_root_does_not_register_lazy_loaded_path() {
             file_tree_view.read(&app, |view, _ctx| {
                 assert!(
                     !view.registered_lazy_loaded_paths.contains(
-                        &rook_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
-                            .unwrap()
+                        &pterm_util::standardized_path::StandardizedPath::try_from_local(
+                            &repo_root
+                        )
+                        .unwrap()
                     )
                 );
             });
             repository_metadata_model.read(&app, |model, ctx| {
                 assert!(
                     !model.is_lazy_loaded_path(
-                        &rook_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
-                            .unwrap(),
+                        &pterm_util::standardized_path::StandardizedPath::try_from_local(
+                            &repo_root
+                        )
+                        .unwrap(),
                         ctx
                     )
                 );
                 let id = repo_metadata::RepositoryIdentifier::local(
-                    rook_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
+                    pterm_util::standardized_path::StandardizedPath::try_from_local(&repo_root)
                         .unwrap(),
                 );
                 assert!(matches!(
@@ -648,7 +658,7 @@ fn failed_lazy_loaded_path_registration_is_retried() {
             file_tree_view.read(&app, |view, _ctx| {
                 assert!(
                     !view.registered_lazy_loaded_paths.contains(
-                        &rook_util::standardized_path::StandardizedPath::try_from_local(
+                        &pterm_util::standardized_path::StandardizedPath::try_from_local(
                             &displayed_root
                         )
                         .unwrap()
@@ -658,7 +668,7 @@ fn failed_lazy_loaded_path_registration_is_retried() {
             repository_metadata_model.read(&app, |model, ctx| {
                 assert!(
                     !model.is_lazy_loaded_path(
-                        &rook_util::standardized_path::StandardizedPath::try_from_local(
+                        &pterm_util::standardized_path::StandardizedPath::try_from_local(
                             &displayed_root
                         )
                         .unwrap(),
@@ -686,7 +696,7 @@ fn failed_lazy_loaded_path_registration_is_retried() {
             repository_metadata_model.read(&app, |model, ctx| {
                 assert!(
                     model.is_lazy_loaded_path(
-                        &rook_util::standardized_path::StandardizedPath::try_from_local(
+                        &pterm_util::standardized_path::StandardizedPath::try_from_local(
                             &displayed_root
                         )
                         .unwrap(),
@@ -833,21 +843,21 @@ fn click_on_file_under_absorbed_descendant_keeps_file_selected() {
     VirtualFS::test(
         "file_tree_click_file_preserves_selection",
         |dirs, mut vfs| {
-            vfs.mkdir("code/rook-server")
+            vfs.mkdir("code/polaris-terminal-server")
                 .with_files(vec![Stub::FileWithContent(
-                    "code/rook-server/main.rs",
+                    "code/polaris-terminal-server/main.rs",
                     "fn main() {}\n",
                 )]);
             let code = dirs.tests().join("code");
-            let rook_server = code.join("rook-server");
-            let main_rs = rook_server.join("main.rs");
+            let pterm_server = code.join("polaris-terminal-server");
+            let main_rs = pterm_server.join("main.rs");
 
             App::test((), |mut app| async move {
                 let (_, repository_metadata_model) = initialize_app(&mut app);
                 let (_, file_tree_view) =
                     app.add_window(WindowStyle::NotStealFocus, FileTreeView::new);
 
-                // Seed with `code` as the only root and expand rook-server so
+                // Seed with `code` as the only root and expand polaris-terminal-server so
                 // main.rs is materialized in the flattened items.
                 file_tree_view.update(&mut app, |view, ctx| {
                     view.set_is_active(true, ctx);
@@ -856,9 +866,9 @@ fn click_on_file_under_absorbed_descendant_keeps_file_selected() {
                 await_repository_indexed(&mut app, &repository_metadata_model, &code).await;
 
                 file_tree_view.update(&mut app, |view, ctx| {
-                    view.toggle_folder_expansion(&std_path(&code), &std_path(&rook_server), ctx);
+                    view.toggle_folder_expansion(&std_path(&code), &std_path(&pterm_server), ctx);
                 });
-                await_directory_loaded(&mut app, &repository_metadata_model, &code, &rook_server)
+                await_directory_loaded(&mut app, &repository_metadata_model, &code, &pterm_server)
                     .await;
 
                 // Simulate a click on main.rs (select_id is what the click
@@ -880,13 +890,13 @@ fn click_on_file_under_absorbed_descendant_keeps_file_selected() {
 
                 // Now `DirectoriesChanged` fires as a side effect of the file
                 // opening in a code view — the working-directories-model adds
-                // the file's repo/parent (rook-server) to the active set.
+                // the file's repo/parent (polaris-terminal-server) to the active set.
                 file_tree_view.update(&mut app, |view, ctx| {
-                    view.set_root_directories(vec![rook_server.clone(), code.clone()], ctx);
+                    view.set_root_directories(vec![pterm_server.clone(), code.clone()], ctx);
                 });
 
                 file_tree_view.read(&app, |view, _ctx| {
-                    // Selection is still on main.rs, not on rook-server.
+                    // Selection is still on main.rs, not on polaris-terminal-server.
                     let selected = view.selected_item.clone().expect("selection");
                     let root_dir = view.root_directories.get(&std_path(&code)).unwrap();
                     let path = root_dir.items.get(selected.index).unwrap().path();
@@ -906,13 +916,13 @@ fn pending_focus_target_does_not_re_scroll_after_first_apply() {
     // rebuilds (e.g. from repo-metadata updates) must keep the
     // selection but NOT re-scroll, so user scrolling is respected.
     VirtualFS::test("file_tree_pending_respects_user_scroll", |dirs, mut vfs| {
-        vfs.mkdir("tree/rook-server")
+        vfs.mkdir("tree/polaris-terminal-server")
             .with_files(vec![Stub::FileWithContent(
-                "tree/rook-server/main.rs",
+                "tree/polaris-terminal-server/main.rs",
                 "fn main() {}\n",
             )]);
         let tree = dirs.tests().join("tree");
-        let rook_server = tree.join("rook-server");
+        let pterm_server = tree.join("polaris-terminal-server");
 
         App::test((), |mut app| async move {
             let (_, repository_metadata_model) = initialize_app(&mut app);
@@ -920,7 +930,7 @@ fn pending_focus_target_does_not_re_scroll_after_first_apply() {
 
             file_tree_view.update(&mut app, |view, ctx| {
                 view.set_is_active(true, ctx);
-                view.set_root_directories(vec![rook_server.clone(), tree.clone()], ctx);
+                view.set_root_directories(vec![pterm_server.clone(), tree.clone()], ctx);
             });
             await_repository_indexed(&mut app, &repository_metadata_model, &tree).await;
 
@@ -931,7 +941,7 @@ fn pending_focus_target_does_not_re_scroll_after_first_apply() {
             });
 
             // Simulate a later rebuild (e.g. metadata update). Selection
-            // should still land on rook-server, but `scrolled` must stay
+            // should still land on polaris-terminal-server, but `scrolled` must stay
             // true (no re-scroll).
             file_tree_view.update(&mut app, |view, _ctx| {
                 view.rebuild_flattened_items();
@@ -942,7 +952,7 @@ fn pending_focus_target_does_not_re_scroll_after_first_apply() {
                 let selected = view.selected_item.clone().expect("selection");
                 let root_dir = view.root_directories.get(&std_path(&tree)).unwrap();
                 let path = root_dir.items.get(selected.index).unwrap().path();
-                assert_eq!(path, &std_path(&rook_server));
+                assert_eq!(path, &std_path(&pterm_server));
                 let pending = view.pending_focus_target.as_ref().expect("pending");
                 assert!(pending.scrolled, "scrolled flag stays set after re-apply");
             });
@@ -953,31 +963,31 @@ fn pending_focus_target_does_not_re_scroll_after_first_apply() {
 #[test]
 fn focus_follows_absorbed_descendant_once_its_item_is_materialized() {
     VirtualFS::test("file_tree_focus_follow_deferred", |dirs, mut vfs| {
-        vfs.mkdir("tree/rook-server")
+        vfs.mkdir("tree/polaris-terminal-server")
             .with_files(vec![Stub::FileWithContent(
-                "tree/rook-server/main.rs",
+                "tree/polaris-terminal-server/main.rs",
                 "fn main() {}\n",
             )]);
         let tree = dirs.tests().join("tree");
-        let rook_server = tree.join("rook-server");
+        let pterm_server = tree.join("polaris-terminal-server");
 
         App::test((), |mut app| async move {
             let (_, repository_metadata_model) = initialize_app(&mut app);
             let (_, file_tree_view) = app.add_window(WindowStyle::NotStealFocus, FileTreeView::new);
 
-            // User cd's into rook-server with ~/tree as the ancestor root.
-            // The rook-server entry should be materialized by indexing and
+            // User cd's into polaris-terminal-server with ~/tree as the ancestor root.
+            // The polaris-terminal-server entry should be materialized by indexing and
             // selected as the focus-follow target.
             file_tree_view.update(&mut app, |view, ctx| {
                 view.set_is_active(true, ctx);
-                view.set_root_directories(vec![rook_server.clone(), tree.clone()], ctx);
+                view.set_root_directories(vec![pterm_server.clone(), tree.clone()], ctx);
             });
             await_repository_indexed(&mut app, &repository_metadata_model, &tree).await;
 
             file_tree_view.read(&app, |view, _ctx| {
                 // Single displayed root, descendant absorbed.
                 assert_eq!(view.displayed_directories, vec![std_path(&tree)]);
-                // Selection landed on rook-server's directory header.
+                // Selection landed on polaris-terminal-server's directory header.
                 let selected = view.selected_item.clone().expect("selection set");
                 assert_eq!(selected.root, std_path(&tree));
                 let root_dir = view.root_directories.get(&std_path(&tree)).unwrap();
@@ -985,7 +995,7 @@ fn focus_follows_absorbed_descendant_once_its_item_is_materialized() {
                     .items
                     .get(selected.index)
                     .expect("selected index in range");
-                assert_eq!(selected_item.path(), &std_path(&rook_server));
+                assert_eq!(selected_item.path(), &std_path(&pterm_server));
                 // Pending target is preserved across rebuilds so later
                 // repo-metadata updates don't override the cwd-follow
                 // selection. It clears when the user interacts explicitly
@@ -995,7 +1005,7 @@ fn focus_follows_absorbed_descendant_once_its_item_is_materialized() {
                     .as_ref()
                     .expect("pending target preserved");
                 assert_eq!(pending.root, std_path(&tree));
-                assert_eq!(pending.path, std_path(&rook_server));
+                assert_eq!(pending.path, std_path(&pterm_server));
                 // The initial apply scrolled; later applies must not
                 // re-scroll so user scrolling is respected.
                 assert!(pending.scrolled, "initial apply scrolls the tree");
@@ -1009,10 +1019,10 @@ fn focus_follows_absorbed_descendant_once_its_item_is_materialized() {
                     root: std_path(&tree),
                     index: 0,
                 };
-                // Sanity: the first item is the root header, not rook-server.
+                // Sanity: the first item is the root header, not polaris-terminal-server.
                 assert_ne!(
                     root_dir.items.first().unwrap().path(),
-                    &std_path(&rook_server)
+                    &std_path(&pterm_server)
                 );
                 view.select_id(&id, ctx);
             });

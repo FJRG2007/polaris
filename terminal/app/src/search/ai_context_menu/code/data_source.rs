@@ -14,14 +14,14 @@ use instant::Instant;
 #[cfg(not(target_family = "wasm"))]
 use itertools::Itertools;
 #[cfg(not(target_family = "wasm"))]
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::AppContext;
+#[cfg(not(target_family = "wasm"))]
+use ptermui::ModelSpawner;
+#[cfg(not(target_family = "wasm"))]
+use ptermui::SingletonEntity;
+#[cfg(not(target_family = "wasm"))]
 use repo_metadata::repositories::DetectedRepositories;
-#[cfg(not(target_family = "wasm"))]
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::AppContext;
-#[cfg(not(target_family = "wasm"))]
-use rookui::ModelSpawner;
-#[cfg(not(target_family = "wasm"))]
-use rookui::SingletonEntity;
 
 #[cfg(not(target_family = "wasm"))]
 use super::search_item::CodeSearchItem;
@@ -73,13 +73,13 @@ pub struct CodeSymbolCache {
     spawner: ModelSpawner<Self>,
 }
 
-impl rookui::Entity for CodeSymbolCache {
+impl ptermui::Entity for CodeSymbolCache {
     type Event = ();
 }
 
 impl CodeSymbolCache {
     #[cfg(not(target_family = "wasm"))]
-    pub fn new(ctx: &mut rookui::ModelContext<Self>) -> Self {
+    pub fn new(ctx: &mut ptermui::ModelContext<Self>) -> Self {
         let spawner = ctx.spawner();
         let cache = Self {
             symbol_cache: RefCell::new(HashMap::new()),

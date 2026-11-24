@@ -14,15 +14,15 @@ pub struct CloudFolderModel {
     // CloudViewModel. Right now, every server folder uses CloudFolderModel, which means it
     // hardcodes a value of `false` for this property since it can't know what the local state is.
     pub is_open: bool,
-    pub is_rook_pack: bool,
+    pub is_pterm_pack: bool,
 }
 
 impl CloudFolderModel {
-    pub fn new(name: &str, is_rook_pack: bool) -> Self {
+    pub fn new(name: &str, is_pterm_pack: bool) -> Self {
         Self {
             name: name.to_owned(),
             is_open: false,
-            is_rook_pack,
+            is_pterm_pack,
         }
     }
 }

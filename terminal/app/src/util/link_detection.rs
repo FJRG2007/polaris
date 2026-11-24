@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
-use rookui::Action;
-use rookui::elements::{MouseStateHandle, PartialClickableElement};
-use rookui::platform::Cursor;
-use rookui::text::char_slice;
+use ptermui::Action;
+use ptermui::elements::{MouseStateHandle, PartialClickableElement};
+use ptermui::platform::Cursor;
+use ptermui::text::char_slice;
 use string_offset::ByteOffset;
 use urlocator::{UrlLocation, UrlLocator};
 
@@ -20,7 +20,7 @@ cfg_if::cfg_if! {
         use std::collections::HashSet;
         use std::path::Path;
         use std::path::PathBuf;
-        use rook_util::path::CleanPathResult;
+        use pterm_util::path::CleanPathResult;
     }
 }
 
@@ -128,7 +128,7 @@ pub(crate) enum DetectedLinkType {
     #[cfg(feature = "local_fs")]
     FilePath {
         absolute_path: PathBuf,
-        line_and_column_num: Option<rook_util::path::LineAndColumnArg>,
+        line_and_column_num: Option<pterm_util::path::LineAndColumnArg>,
     },
 }
 
@@ -430,7 +430,7 @@ pub(crate) fn detect_file_paths(
                             // Create a new DetectedLinkType with the same file path but with the line number
                             let line_range_link = DetectedLinkType::FilePath {
                                 absolute_path: absolute_path.clone(),
-                                line_and_column_num: Some(rook_util::path::LineAndColumnArg {
+                                line_and_column_num: Some(pterm_util::path::LineAndColumnArg {
                                     line_num: line_number as usize,
                                     column_num: None,
                                 }),
@@ -447,8 +447,8 @@ pub(crate) fn detect_file_paths(
     file_paths
 }
 
-use rook_editor::content::buffer::Buffer;
-use rookui::text::word_boundaries::WordBoundariesPolicy;
+use pterm_editor::content::buffer::Buffer;
+use ptermui::text::word_boundaries::WordBoundariesPolicy;
 use string_offset::CharOffset;
 
 /// Returns the range of the word surrounding the given offset.
@@ -457,9 +457,9 @@ pub(crate) fn get_word_range_at_offset(
     offset: CharOffset,
     word_boundary_policy: Option<WordBoundariesPolicy>,
 ) -> Option<Range<CharOffset>> {
-    use rook_editor::content::buffer::{ToBufferCharOffset, ToBufferPoint};
-    use rookui::text::TextBuffer;
-    use rookui::text::words::is_default_word_boundary;
+    use pterm_editor::content::buffer::{ToBufferCharOffset, ToBufferPoint};
+    use ptermui::text::TextBuffer;
+    use ptermui::text::words::is_default_word_boundary;
 
     let word_boundary_policy = word_boundary_policy.unwrap_or(WordBoundariesPolicy::Default);
     let mut word_found_at: Option<CharOffset> = None;

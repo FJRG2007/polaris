@@ -1,11 +1,11 @@
 # Spec: Fix misleading "These files do not exist" error for oversized files in read_files
 
 Linear: [APP-4882](https://linear.app/warpdotdev/issue/APP-4882/fix-misleading-these-files-do-not-exist-error-for-oversized-files-in)
-Originating thread: https://rook-public.slack.com/archives/C0BDQDW8V5E/p1784468227182559
+Originating thread: https://polaris-terminal-public.slack.com/archives/C0BDQDW8V5E/p1784468227182559
 Estimate: M (3)
 
 ## Reconciliation with master (rebased)
-This spec was originally written against `FJRG2007/rook@69ce372`, where the
+This spec was originally written against `FJRG2007/polaris@69ce372`, where the
 shared result type still carried `missing_files: Vec<String>`. `master` has since
 landed a partial fix: `ReadFileContextResult` now carries
 `failed_files: Vec<ReadFilesFailedFile>` (where `ReadFilesFailedFile { path,

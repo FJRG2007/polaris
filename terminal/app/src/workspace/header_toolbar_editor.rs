@@ -1,6 +1,6 @@
-use rook_errors::report_if_error;
-use rookui::keymap::FixedBinding;
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use pterm_errors::report_if_error;
+use ptermui::keymap::FixedBinding;
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 use settings::Setting as _;
 
 use crate::Appearance;
@@ -17,7 +17,7 @@ use crate::workspace::tab_settings::{
 const MODAL_TITLE: &str = "Edit toolbar";
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",

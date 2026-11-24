@@ -1,4 +1,4 @@
-use rookui::elements::{DraggableState, MouseStateHandle};
+use ptermui::elements::{DraggableState, MouseStateHandle};
 
 use super::FileTreeItem;
 use crate::appearance::Appearance;

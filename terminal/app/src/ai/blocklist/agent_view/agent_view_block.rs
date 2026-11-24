@@ -1,17 +1,17 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Empty, Expanded, Flex, Hoverable, MainAxisSize,
     MouseStateHandle, ParentElement, SavePosition, Shrinkable, Text,
 };
-use rookui::fonts::Weight::Bold;
-use rookui::fonts::{Properties, Style};
-use rookui::platform::Cursor;
-use rookui::prelude::{Border, CornerRadius, Radius};
-use rookui::text_layout::ClipConfig;
-use rookui::{
+use ptermui::fonts::Weight::Bold;
+use ptermui::fonts::{Properties, Style};
+use ptermui::platform::Cursor;
+use ptermui::prelude::{Border, CornerRadius, Radius};
+use ptermui::text_layout::ClipConfig;
+use ptermui::{
     AppContext, Element, Entity, EntityId, EventContext, ModelHandle, SingletonEntity,
     TypedActionView, View, ViewContext,
 };
@@ -180,7 +180,7 @@ where
 {
     Hoverable::new(mouse_state, move |state| {
         let container = Container::new(
-            ConstrainedBox::new(icon.to_rookui_icon(icon_color.into()).finish())
+            ConstrainedBox::new(icon.to_ptermui_icon(icon_color.into()).finish())
                 .with_height(20.)
                 .with_width(20.)
                 .finish(),
@@ -244,7 +244,7 @@ impl View for AgentViewEntryBlock {
         "EnterAgentBlock"
     }
 
-    fn render(&self, app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         if self.agent_view_controller.as_ref(app).is_fullscreen() {
             return Empty::new().finish();
         }

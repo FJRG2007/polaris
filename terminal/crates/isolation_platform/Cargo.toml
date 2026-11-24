@@ -1,6 +1,6 @@
 [package]
-name = "rook_isolation_platform"
-description = "Utilities for running Rook within an isolated sandbox, such as a Docker container or Github Actions"
+name = "pterm_isolation_platform"
+description = "Utilities for running Polaris Terminal within an isolated sandbox, such as a Docker container or Github Actions"
 version = "0.1.0"
 authors.workspace = true
 publish.workspace = true
@@ -16,4 +16,4 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 command.workspace = true
-rook_core.workspace = true
+pterm_core.workspace = true

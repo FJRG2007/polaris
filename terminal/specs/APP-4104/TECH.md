@@ -9,7 +9,7 @@ APP-4104 covers the macOS memory growth on the breadcrumb-forwarding path betwee
 - `app/src/crash_reporting/mod.rs (476-489)` — installs the `before_breadcrumb` callback and forwards macOS breadcrumbs through `mac::forward_breadcrumb`
 - `app/src/crash_reporting/mac.rs (20-84)` — Rust-to-ObjC Cocoa Sentry bridge, including `forward_breadcrumb`, `set_user_id`, `set_tag`, and `to_nsstring`
 - `app/src/platform/mac/objc/crash_reporting.m (67-81)` — native `recordBreadcrumb` implementation that constructs `SentryBreadcrumb`
-- `crates/rookui/src/platform/mac/mod.rs (29-34)` — `make_nsstring`, the existing helper that returns an autoreleased `NSString`
+- `crates/ptermui/src/platform/mac/mod.rs (29-34)` — `make_nsstring`, the existing helper that returns an autoreleased `NSString`
 - `app/src/app_services/mac.rs (20-29)` — another app-side example of returning an autoreleased `NSString`
 
 ## Current state
@@ -34,9 +34,9 @@ That file is compiled without ARC, so the native breadcrumb object itself must s
 
 ### Existing repo pattern
 
-Rook already has established patterns for temporary Cocoa strings:
+Polaris Terminal already has established patterns for temporary Cocoa strings:
 
-- `rookui::platform::mac::make_nsstring` returns an autoreleased `NSString`
+- `ptermui::platform::mac::make_nsstring` returns an autoreleased `NSString`
 - app-owned macOS bridges already use direct `.autorelease()` in places like `app_services/mac.rs`
 
 The crash-reporting bridge is the outlier.
@@ -49,7 +49,7 @@ Remove the retained `to_nsstring` pattern from `app/src/crash_reporting/mac.rs` 
 
 Concretely:
 
-- import `rookui::platform::mac::make_nsstring` at the top of the file
+- import `ptermui::platform::mac::make_nsstring` at the top of the file
 - use that helper for every bridge string created in this module
 - apply the change consistently to `init_cocoa_sentry`, `set_user_id`, `forward_breadcrumb`, and `set_tag`
 

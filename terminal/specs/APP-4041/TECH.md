@@ -13,7 +13,7 @@ Users need a way to queue a follow-up prompt while the agent is mid-response. Th
 - `app/src/workspace/view.rs (19634-19658)` — workspace-level handler that routes to `TerminalView`
 - `app/src/terminal/view/pending_user_query.rs` — pending query block insertion, removal, and auto-send logic
 - `app/src/ai/blocklist/block/pending_user_query_block.rs` — pending block view with dismiss button
-- `app/src/ai/blocklist/block/status_bar.rs` — auto-queue toggle button in the rooking indicator
+- `app/src/ai/blocklist/block/status_bar.rs` — auto-queue toggle button in the pterming indicator
 - `app/src/ai/blocklist/context_model.rs` — `queue_next_prompt_enabled` state
 - `app/src/terminal/view.rs:18101` — `active_ai_block` helper (skips pending query blocks)
 - `app/src/terminal/view.rs:20044` — `last_ai_block` helper (skips pending query blocks)

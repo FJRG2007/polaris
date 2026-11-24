@@ -1,6 +1,6 @@
-# PRODUCT: Multi-Level Orchestration in the Rook TUI
+# PRODUCT: Multi-Level Orchestration in the Polaris Terminal TUI
 
-Linear: [CODE-1946 — Design proposal: multi-level orchestration UI in the Rook TUI](https://linear.app/warpdotdev/issue/CODE-1946/design-proposal-multi-level-orchestration-ui-in-the-rook-tui)
+Linear: [CODE-1946 — Design proposal: multi-level orchestration UI in the Polaris Terminal TUI](https://linear.app/warpdotdev/issue/CODE-1946/design-proposal-multi-level-orchestration-ui-in-the-polaris-terminal-tui)
 Baseline this amends: [specs/code-1822-tui-orchestration-tab-bar/PRODUCT.md](../code-1822-tui-orchestration-tab-bar/PRODUCT.md)
 GUI reference: `app/src/ai/blocklist/agent_view/orchestration_pill_bar.rs`, `app/src/ai/blocklist/orchestration_topology.rs`
 Figma: none provided (the mockups below are exact cell-grid frames; the TUI renders to a
@@ -19,7 +19,7 @@ permission card, retained background sessions per child, and the `Agents:` tab b
 behavior underneath is already multi-level — grandchildren materialize, restore across
 restarts, and are killed transitively — but the presentation is flat:
 `TuiOrchestrationModel::snapshot()` lists every descendant of the tree root as a sibling
-tab (`crates/rook_tui/src/orchestration_model.rs:194`), so depth is invisible. No
+tab (`crates/pterm_tui/src/orchestration_model.rs:194`), so depth is invisible. No
 breadcrumbs, no drill-down, no subtree rollups, and an orchestrating child looks identical
 to a leaf.
 
@@ -34,7 +34,7 @@ level shown.
 
 Captured from a live orchestration run on HEAD `7d93fa46886`: screenshots, an MP4, and raw
 `tmux` text frames are attached to the draft GitHub release
-[`tui-orch-triage-evidence-2026-08-09`](https://github.com/FJRG2007/rook/releases/tag/tui-orch-triage-evidence-2026-08-09)
+[`tui-orch-triage-evidence-2026-08-09`](https://github.com/FJRG2007/polaris/releases/tag/tui-orch-triage-evidence-2026-08-09)
 and linked from CODE-1946. The decisive frame: cloud child `gamma` spawned its own nested
 child `delta`, which completed its task — but the bar still reads only:
 
@@ -327,17 +327,17 @@ contexts, and the input box always wins the arrows while it is focused.
 51. Dispatch mechanism: a keystroke is offered to the **focused view first, then its
     ancestors**, and a binding fires only where its context predicate matches. The
     responder chain is the focused view plus its ancestor views only
-    (`crates/rookui_core/src/core/app.rs:2066-2074` `get_responder_chain`,
+    (`crates/ptermui_core/src/core/app.rs:2066-2074` `get_responder_chain`,
     `app.rs:1498-1518` `view_ancestors`); each view in the chain contributes its own
     keymap context (`app.rs:2008-2033`); matching walks the chain deepest-first and the
     first match wins (`app.rs:2178-2214` `dispatch_keystroke`, root-first chain iterated
     with `.rev()`). A view outside the focused chain never sees the key.
 52. When the **input box is focused, it takes the arrows**: `←`/`→` are
     `tui:input:move_left`/`move_right` (cursor movement, including across wrapped
-    multi-line input; `crates/rook_tui/src/editor_interaction.rs:197-210`) and
+    multi-line input; `crates/pterm_tui/src/editor_interaction.rs:197-210`) and
     `Shift+←`/`Shift+→` are `tui:input:select_left`/`select_right`
     (`editor_interaction.rs:253-266`), all registered against the `TuiInputView` context
-    (`crates/rook_tui/src/keybindings.rs:93-98`). The tab bar's bindings cannot fire
+    (`crates/pterm_tui/src/keybindings.rs:93-98`). The tab bar's bindings cannot fire
     then, for two independent reasons:
     - they require the `TuiOrchestrationTabBarFocused` context flag
       (`orchestration_tab_bar.rs:59`), and
@@ -490,7 +490,7 @@ Today this width fits one child; the shed chrome fits three:
    ⊹ researcher  •  ⟡ implementer  •  ✶ reviewer
    These agents may start their own child agents.
 
-   Location: Local  •  Harness: Rook  •  Model: Default model
+   Location: Local  •  Harness: Polaris Terminal  •  Model: Default model
 
 Enter to accept  Ctrl + E to edit  Ctrl + C to reject
 ```

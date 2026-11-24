@@ -10,7 +10,7 @@ use command::r#async::Command;
 use futures::executor::block_on;
 #[cfg(unix)]
 use instant::Instant;
-use rook_errors::ErrorExt as _;
+use pterm_errors::ErrorExt as _;
 
 use super::{
     CacheScope, CacheSetupError, DetectedCacheModes, RepoCacheKey, RepoIdentity,
@@ -129,18 +129,26 @@ fn is_global(command: &Command) -> bool {
 
 #[test]
 fn repo_cache_key_is_stable_for_canonical_identity() {
-    let first = RepoCacheKey::derive(&identity(" GitHub.COM ", "RookDev", "Rook"));
-    let second = RepoCacheKey::derive(&identity("github.com", "rookdev", "rook"));
+    let first = RepoCacheKey::derive(&identity(
+        " GitHub.COM ",
+        "PolarisTerminalDev",
+        "Polaris Terminal",
+    ));
+    let second = RepoCacheKey::derive(&identity(
+        "github.com",
+        "polaris-terminal-dev",
+        "polaris-terminal",
+    ));
     assert_eq!(first, second);
     assert_eq!(first.as_str().len(), 64);
 }
 
 #[test]
 fn repo_cache_key_distinguishes_forge_owner_and_repo() {
-    let base = RepoCacheKey::derive(&identity("github.com", "rook", "client"));
+    let base = RepoCacheKey::derive(&identity("github.com", "polaris-terminal", "client"));
     assert_ne!(
         base,
-        RepoCacheKey::derive(&identity("gitlab.com", "rook", "client"))
+        RepoCacheKey::derive(&identity("gitlab.com", "polaris-terminal", "client"))
     );
     assert_ne!(
         base,
@@ -148,7 +156,7 @@ fn repo_cache_key_distinguishes_forge_owner_and_repo() {
     );
     assert_ne!(
         base,
-        RepoCacheKey::derive(&identity("github.com", "rook", "server"))
+        RepoCacheKey::derive(&identity("github.com", "polaris-terminal", "server"))
     );
 }
 
@@ -186,7 +194,7 @@ fn plan_orders_repository_keys_and_places_single_global_last() {
 #[test]
 fn plan_uses_only_relative_repo_and_shared_cache_directories() {
     let temp = tempfile::tempdir().unwrap();
-    let repo = source(temp.path(), "github.com", "rook", "client");
+    let repo = source(temp.path(), "github.com", "polaris-terminal", "client");
     let plan = construct_plan(
         temp.path().join("cache"),
         vec![detection(repo, &["cargo"])],
@@ -213,7 +221,7 @@ fn plan_uses_only_relative_repo_and_shared_cache_directories() {
 #[test]
 fn plan_sorts_and_deduplicates_configuration_modes() {
     let temp = tempfile::tempdir().unwrap();
-    let repo = source(temp.path(), "github.com", "rook", "client");
+    let repo = source(temp.path(), "github.com", "polaris-terminal", "client");
     let plan = construct_plan(
         temp.path().join("cache"),
         vec![detection(repo, &["cargo", "go"])],
@@ -231,8 +239,8 @@ fn plan_sorts_and_deduplicates_configuration_modes() {
 #[test]
 fn global_modes_are_union_of_successful_repo_detections() {
     let temp = tempfile::tempdir().unwrap();
-    let one = source(temp.path(), "github.com", "rook", "one");
-    let two = source(temp.path(), "github.com", "rook", "two");
+    let one = source(temp.path(), "github.com", "polaris-terminal", "one");
+    let two = source(temp.path(), "github.com", "polaris-terminal", "two");
     let plan = construct_plan(
         temp.path().join("cache"),
         vec![
@@ -295,8 +303,8 @@ fn empty_mode_union_produces_no_executable_plan() {
 fn json_parse_failure_is_classified_and_does_not_abort_later_repos() {
     let temp = tempfile::tempdir().unwrap();
     let repositories = vec![
-        source(temp.path(), "github.com", "rook", "one"),
-        source(temp.path(), "github.com", "rook", "two"),
+        source(temp.path(), "github.com", "polaris-terminal", "one"),
+        source(temp.path(), "github.com", "polaris-terminal", "two"),
     ];
     let calls = Rc::new(RefCell::new(0usize));
     let report = block_on(setup_cache(
@@ -333,7 +341,12 @@ fn destructive_execution_uses_resolved_modes_without_redetection() {
     let commands = Rc::new(RefCell::new(Vec::new()));
     let report = block_on(setup_cache(
         temp.path().join("cache"),
-        vec![source(temp.path(), "github.com", "rook", "client")],
+        vec![source(
+            temp.path(),
+            "github.com",
+            "polaris-terminal",
+            "client",
+        )],
         Vec::new(),
         {
             let commands = Rc::clone(&commands);
@@ -365,8 +378,8 @@ fn repo_failure_continues_and_global_still_executes() {
     let report = block_on(setup_cache(
         temp.path().join("cache"),
         vec![
-            source(temp.path(), "github.com", "rook", "one"),
-            source(temp.path(), "github.com", "rook", "two"),
+            source(temp.path(), "github.com", "polaris-terminal", "one"),
+            source(temp.path(), "github.com", "polaris-terminal", "two"),
         ],
         Vec::new(),
         {
@@ -404,8 +417,8 @@ fn spacectl_calls_are_bounded_by_two_repos_plus_one_global() {
     let report = block_on(setup_cache(
         temp.path().join("cache"),
         vec![
-            source(temp.path(), "github.com", "rook", "one"),
-            source(temp.path(), "github.com", "rook", "two"),
+            source(temp.path(), "github.com", "polaris-terminal", "one"),
+            source(temp.path(), "github.com", "polaris-terminal", "two"),
         ],
         Vec::new(),
         {
@@ -425,7 +438,12 @@ fn shared_success_replaces_complete_repo_env_overlay() {
     let temp = tempfile::tempdir().unwrap();
     let report = block_on(setup_cache(
         temp.path().join("cache"),
-        vec![source(temp.path(), "github.com", "rook", "client")],
+        vec![source(
+            temp.path(),
+            "github.com",
+            "polaris-terminal",
+            "client",
+        )],
         Vec::new(),
         move |command| {
             futures::future::ready(Ok(if is_detect(&command) {
@@ -448,7 +466,12 @@ fn shared_failure_keeps_canonical_repo_env_overlay() {
     let temp = tempfile::tempdir().unwrap();
     let report = block_on(setup_cache(
         temp.path().join("cache"),
-        vec![source(temp.path(), "github.com", "rook", "client")],
+        vec![source(
+            temp.path(),
+            "github.com",
+            "polaris-terminal",
+            "client",
+        )],
         Vec::new(),
         move |command| {
             futures::future::ready(if is_detect(&command) {
@@ -470,8 +493,8 @@ fn shared_failure_keeps_canonical_repo_env_overlay() {
 fn repo_env_conflict_resolves_by_key_order() {
     let temp = tempfile::tempdir().unwrap();
     let repositories = vec![
-        source(temp.path(), "github.com", "rook", "one"),
-        source(temp.path(), "github.com", "rook", "two"),
+        source(temp.path(), "github.com", "polaris-terminal", "one"),
+        source(temp.path(), "github.com", "polaris-terminal", "two"),
     ];
     let keys = repositories
         .iter()
@@ -511,7 +534,12 @@ fn invalid_env_names_are_rejected_individually() {
     let temp = tempfile::tempdir().unwrap();
     let report = block_on(setup_cache(
         temp.path().join("cache"),
-        vec![source(temp.path(), "github.com", "rook", "client")],
+        vec![source(
+            temp.path(),
+            "github.com",
+            "polaris-terminal",
+            "client",
+        )],
         Vec::new(),
         move |command| {
             futures::future::ready(Ok(if is_detect(&command) {
@@ -579,7 +607,7 @@ fn scratch_directories_are_unique_0700_outside_repo_and_retained() {
             .file_name()
             .unwrap()
             .to_string_lossy()
-            .starts_with("rook-spacectl-")
+            .starts_with("polaris-terminal-spacectl-")
     );
     #[cfg(unix)]
     {
@@ -682,7 +710,7 @@ fn failure_categories_are_preserved() {
             vec![source(
                 temp.path(),
                 "github.com",
-                "rook",
+                "polaris-terminal",
                 &format!("repo-{}", error.kind()),
             )],
             Vec::new(),
@@ -698,7 +726,12 @@ fn failure_categories_are_preserved() {
     fs::write(&cache_root_file, "not a directory").unwrap();
     let report = block_on(setup_cache(
         cache_root_file,
-        vec![source(temp.path(), "github.com", "rook", "root-failure")],
+        vec![source(
+            temp.path(),
+            "github.com",
+            "polaris-terminal",
+            "root-failure",
+        )],
         Vec::new(),
         |_| futures::future::ready(Ok(Vec::new())),
     ));
@@ -718,8 +751,8 @@ fn queued_executor_can_return_each_failure_category() {
     let report = block_on(setup_cache(
         temp.path().join("cache"),
         vec![
-            source(temp.path(), "github.com", "rook", "one"),
-            source(temp.path(), "github.com", "rook", "two"),
+            source(temp.path(), "github.com", "polaris-terminal", "one"),
+            source(temp.path(), "github.com", "polaris-terminal", "two"),
         ],
         Vec::new(),
         {

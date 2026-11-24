@@ -31,8 +31,8 @@ use command::r#async::Command;
 use futures_lite::future;
 use is_executable::IsExecutable as _;
 use itertools::Itertools;
-use rook_core::safe_info;
-use rook_errors::{ErrorExt, register_error};
+use pterm_core::safe_info;
+use pterm_errors::{ErrorExt, register_error};
 use sha2::{Digest, Sha256};
 
 pub mod spacectl;
@@ -753,7 +753,7 @@ fn create_retained_scratch_directory<'a>(
 ) -> Result<PathBuf, CacheSetupError> {
     let repository_paths = repository_paths.collect::<Vec<_>>();
     let mut builder = tempfile::Builder::new();
-    builder.prefix("rook-spacectl-");
+    builder.prefix("polaris-terminal-spacectl-");
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt as _;

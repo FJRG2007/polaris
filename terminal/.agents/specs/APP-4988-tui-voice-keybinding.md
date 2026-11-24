@@ -1,8 +1,8 @@
 # Spec: TUI configurable hold key for voice input
 
 Linear: APP-4988 — https://linear.app/warpdotdev/issue/APP-4988/tui-configurable-keybinding-to-start-voice-mode
-Originating thread: https://rookdev.slack.com/archives/C0BDQDW8V5E/p1784988760470699
-Relevant repo: `rook`
+Originating thread: https://polaris-terminal-dev.slack.com/archives/C0BDQDW8V5E/p1784988760470699
+Relevant repo: `polaris-terminal`
 
 == PRODUCT ==
 
@@ -29,18 +29,18 @@ Relevant repo: `rook`
 
 *Terminal input protocol:*
 - The lower `factory/tui-key-lifecycle` branch enables `DISAMBIGUATE_ESCAPE_CODES | REPORT_EVENT_TYPES` on enhancement-capable terminals, and adds `REPORT_ALTERNATE_KEYS | REPORT_ALL_KEYS_AS_ESCAPE_CODES` only when standalone modifier reporting is requested. It exposes repeat-aware `TuiEvent::KeyDown` plus `TuiEvent::ModifierKeyChanged { key_code, state }`.
-- This branch derives that request from the hold-key setting: `crates/rook_tui/src/voice_input.rs` (`configured_hold_key`, `requires_modifier_key_reporting`) maps the setting to a physical `KeyCode` and to that request, `crates/rook_tui/src/session.rs` applies it at mount, and `TuiDriverHandle::set_modifier_key_lifecycle_enabled` re-applies it to a live session using the protocol's set form, which leaves the mode-stack entry restored at exit untouched.
+- This branch derives that request from the hold-key setting: `crates/pterm_tui/src/voice_input.rs` (`configured_hold_key`, `requires_modifier_key_reporting`) maps the setting to a physical `KeyCode` and to that request, `crates/pterm_tui/src/session.rs` applies it at mount, and `TuiDriverHandle::set_modifier_key_lifecycle_enabled` re-applies it to a live session using the protocol's set form, which leaves the mode-stack entry restored at exit untouched.
 - `ModifierKeyChanged` carries a platform-neutral `KeyCode`, so modifier events preserve left/right identity without a voice-specific core enum.
 - Repeats remain key-down events for existing keymap, editor, and PTY behavior. Non-modifier releases are dropped before dispatch; modifier press/release reaches the foreground process only when that process requested all-keys reporting itself.
 - Requesting modifier reporting also makes the terminal report the layout's shifted character, so symbol chords are spelled as the produced character (`ctrl-!`) rather than the base key (`ctrl-shift-1`). No TUI binding uses punctuation today.
 
 *Dispatch and state ownership:*
 - The lower branch's `TuiEventHandler::on_modifier_key_changed` lets an element wrapper observe modifier press/release after its child declines them, with explicit propagation.
-- `crates/rook_tui/src/terminal_session_view.rs` (`VOICE_INPUT_BINDING_NAME`) preserves the existing `tui:session:start_voice_input` `ctrl-s` binding and `StartVoiceInput` action.
-- `crates/rook_tui/src/terminal_session_view.rs` (`with_voice_hold_handler`) wraps the rendered session tree and matches only the configured physical `KeyCode`. Press starts; release stops; a press while a hold is already active does not retrigger. The wrap lives at the session rather than the input view because the input view's element subtree is absent whenever something else owns the composer area, and `TuiView::render` applies it once for every session state — including the conversation-restore screens — so no state can swallow a release.
+- `crates/pterm_tui/src/terminal_session_view.rs` (`VOICE_INPUT_BINDING_NAME`) preserves the existing `tui:session:start_voice_input` `ctrl-s` binding and `StartVoiceInput` action.
+- `crates/pterm_tui/src/terminal_session_view.rs` (`with_voice_hold_handler`) wraps the rendered session tree and matches only the configured physical `KeyCode`. Press starts; release stops; a press while a hold is already active does not retrigger. The wrap lives at the session rather than the input view because the input view's element subtree is absent whenever something else owns the composer area, and `TuiView::render` applies it once for every session state — including the conversation-restore screens — so no state can swallow a release.
 - `TuiTerminalSessionAction::VoiceHoldKeyChanged { key, state }` is separate from `StartVoiceInput`, so release handling remains independent of the ordinary keymap.
-- `crates/rook_tui/src/voice_input.rs` (`TuiVoiceInputModel::hold_key`, `handle_hold_key`, `stop_hold`) owns hold state alongside the voice lifecycle it constrains: `start` records the `KeyCode` only for `VoiceInputStartSource::HoldKey`, and `set_state` drops it on every transition out of `Listening`, so a release can only stop the recording its own press started.
-- `crates/rook_tui/src/input/view.rs` (`voice_hold_key`, `handle_voice_hold_key`, `stop_active_voice_hold`, `stop_voice_input`) exposes those model operations to the session owner. The recording, transcription, Escape, and Enter lifecycle remains owned by the TUI voice model and input view.
+- `crates/pterm_tui/src/voice_input.rs` (`TuiVoiceInputModel::hold_key`, `handle_hold_key`, `stop_hold`) owns hold state alongside the voice lifecycle it constrains: `start` records the `KeyCode` only for `VoiceInputStartSource::HoldKey`, and `set_state` drops it on every transition out of `Listening`, so a release can only stop the recording its own press started.
+- `crates/pterm_tui/src/input/view.rs` (`voice_hold_key`, `handle_voice_hold_key`, `stop_active_voice_hold`, `stop_voice_input`) exposes those model operations to the session owner. The recording, transcription, Escape, and Enter lifecycle remains owned by the TUI voice model and input view.
 
 *Compatibility and blast radius:*
 - The lower branch owns terminal-protocol and general key-lifecycle compatibility. This branch only consumes physical modifier key-down/key-up events.
@@ -49,10 +49,10 @@ Relevant repo: `rook`
 - If a host terminal does not report the configured modifier or its release, the feature degrades without affecting other input. Escape and Enter remain available to end recording.
 
 *Validation:*
-1. `cargo check -p rookui_core --features tui --all-targets` and `cargo check -p rook_tui --all-targets` compile cleanly.
-2. The lower branch's complete `rookui_core` and `rook_tui` suites cover Press/Repeat/Release conversion, keymap behavior, child-first lifecycle dispatch, PTY forwarding, and keyboard protocol setup.
-3. `cargo nextest run -p rook_tui -E 'test(/voice/)'` covers setting-to-modifier mapping, exact-side matching, release-to-stop, stale-hold cleanup, release after composer ownership changes, `ctrl-s` independence, and user guidance.
-4. `cargo nextest run -p rook -E 'test(/tui_voice_setting/)'` covers the setting default, round trip, TOML path, local-only sync policy, and TUI-only schema surface.
-5. `cargo nextest run -p rookui_core --features tui` and `cargo nextest run -p rook_tui` pass as crate-level regressions.
+1. `cargo check -p ptermui_core --features tui --all-targets` and `cargo check -p pterm_tui --all-targets` compile cleanly.
+2. The lower branch's complete `ptermui_core` and `pterm_tui` suites cover Press/Repeat/Release conversion, keymap behavior, child-first lifecycle dispatch, PTY forwarding, and keyboard protocol setup.
+3. `cargo nextest run -p pterm_tui -E 'test(/voice/)'` covers setting-to-modifier mapping, exact-side matching, release-to-stop, stale-hold cleanup, release after composer ownership changes, `ctrl-s` independence, and user guidance.
+4. `cargo nextest run -p polaris-terminal -E 'test(/tui_voice_setting/)'` covers the setting default, round trip, TOML path, local-only sync policy, and TUI-only schema surface.
+5. `cargo nextest run -p ptermui_core --features tui` and `cargo nextest run -p pterm_tui` pass as crate-level regressions.
 6. `./script/format` and the repository clippy command pass.
 7. Real-terminal verification on a Kitty-protocol-capable terminal confirms: the configured physical modifier starts on Press and stops on Release; the opposite side does nothing; `none` disables the hold interaction; `ctrl-s` still starts independently; Escape/Enter still end recording; and a chord using the configured modifier continues to dispatch its normal action while voice remains active for the physical hold.

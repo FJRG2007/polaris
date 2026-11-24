@@ -7,8 +7,8 @@ use std::borrow::Cow;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use rook_completer::ParsedTokensSnapshot;
-use rook_errors::report_error;
+use pterm_completer::ParsedTokensSnapshot;
+use pterm_errors::report_error;
 use rust_embed::RustEmbed;
 
 use crate::parser::parse_query_into_tokens;
@@ -144,7 +144,7 @@ impl InputClassifier for OnnxClassifier {
 
     async fn classify_input(
         &self,
-        input: rook_completer::ParsedTokensSnapshot,
+        input: pterm_completer::ParsedTokensSnapshot,
         context: &Context,
     ) -> anyhow::Result<ClassificationResult> {
         // If we ever panicked while running inference, we should fall back to the heuristic classifier.

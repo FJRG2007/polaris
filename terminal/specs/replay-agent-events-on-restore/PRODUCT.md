@@ -1,28 +1,28 @@
 # Orchestration Conversation Restore
 
 ## Summary
-When Rook restarts — or when a parent conversation is re-attached via `rook agent run --conversation` — an orchestration session involving parent and child agent runs must resume as if the interruption had not occurred. Parents must receive pending events from children, event delivery must not duplicate messages already processed, and parent-child identity links must be re-established automatically.
+When Polaris Terminal restarts — or when a parent conversation is re-attached via `polaris-terminal agent run --conversation` — an orchestration session involving parent and child agent runs must resume as if the interruption had not occurred. Parents must receive pending events from children, event delivery must not duplicate messages already processed, and parent-child identity links must be re-established automatically.
 
 ## Problem
-Orchestration conversations spanning a parent and one or more child agent runs are not durable across Rook restarts today. After a restart:
+Orchestration conversations spanning a parent and one or more child agent runs are not durable across Polaris Terminal restarts today. After a restart:
 - The parent's event listeners are not restored, so no new events (lifecycle signals or messages) from children arrive.
 - The event cursor is not persisted, so if event delivery is re-established, all events since the beginning of the conversation replay from sequence 0, causing duplicate delivery.
-- In the driver case (`rook agent run --conversation`), the parent cannot discover children that ran on remote workers with no local DB record.
+- In the driver case (`polaris-terminal agent run --conversation`), the parent cannot discover children that ran on remote workers with no local DB record.
 
 ## Behavior
 
-### Startup restoration (Rook GUI restart)
-1. After Rook restarts and a previously active parent conversation is restored, the parent continues to receive lifecycle events (in-progress, succeeded, failed, blocked, cancelled, errored) and inbox messages from any children that were running at the time of the restart.
-2. Any lifecycle events from children — including terminal events such as `succeeded` or `failed` — that arrived while Rook was not running are delivered to the parent once event delivery resumes. This is the primary scenario the feature addresses.
+### Startup restoration (Polaris Terminal GUI restart)
+1. After Polaris Terminal restarts and a previously active parent conversation is restored, the parent continues to receive lifecycle events (in-progress, succeeded, failed, blocked, cancelled, errored) and inbox messages from any children that were running at the time of the restart.
+2. Any lifecycle events from children — including terminal events such as `succeeded` or `failed` — that arrived while Polaris Terminal was not running are delivered to the parent once event delivery resumes. This is the primary scenario the feature addresses.
 3. A parent that was in `Success` status at restart time with watched children resumes event delivery without requiring the user to take any action or for the conversation to transition back through `InProgress`.
-4. A parent that was in `InProgress` at restart (i.e., Rook quit while the parent was actively running) resumes event delivery from children once the parent's current exchange completes and the parent becomes idle again.
+4. A parent that was in `InProgress` at restart (i.e., Polaris Terminal quit while the parent was actively running) resumes event delivery from children once the parent's current exchange completes and the parent becomes idle again.
 5. A parent that has never spawned a child agent does not start any event polling after restart.
 6. Child conversations whose records have a `parent_conversation_id` pointing at the restored parent are re-linked to that parent, so their status transitions continue to propagate correctly.
 7. Event delivery resumes from the last event the parent had confirmed receiving; no event that the parent had already acted on before the restart is delivered again.
 8. Under normal operation, each event is delivered to a parent agent at most once. A crash between the parent receiving a batch of events and acknowledging them may result in that batch being retransmitted once on restart; this is the worst-case behavior and does not cascade.
-9. Transient network failures during event resumption after restart are retried automatically. The user does not need to restart Rook again to recover from a failed resume attempt.
+9. Transient network failures during event resumption after restart are retried automatically. The user does not need to restart Polaris Terminal again to recover from a failed resume attempt.
 
-### Driver restoration (`rook agent run --conversation`)
+### Driver restoration (`polaris-terminal agent run --conversation`)
 10. When a parent conversation is loaded from the server via `--conversation`, all children that were spawned by that conversation — including children that ran on remote workers with no record in the local database — are rediscovered and their events are delivered.
 10a. If rediscovery of a specific child fails (e.g. a server error), the parent is still restored and events from any other children continue to be delivered. Partial child-rediscovery failure does not prevent the overall session from resuming.
 11. After a driver restoration, event delivery from children behaves identically to invariants 1–9 above.

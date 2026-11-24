@@ -1,6 +1,6 @@
 # Markdown ToC Manual Test
 
-Use this file in a Rook notebook to verify fragment link navigation.
+Use this file in a Polaris Terminal notebook to verify fragment link navigation.
 
 ## Table of contents
 

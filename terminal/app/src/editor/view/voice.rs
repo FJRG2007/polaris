@@ -1,13 +1,13 @@
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::theme::AnsiColorIdentifier;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_error;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::elements::{Container, CornerRadius, Icon, Radius};
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonTooltipPosition;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, SingletonEntity, ViewContext, ViewHandle, elements};
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::theme::AnsiColorIdentifier;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_error;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::elements::{Container, CornerRadius, Icon, Radius};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonTooltipPosition;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, SingletonEntity, ViewContext, ViewHandle, elements};
 use settings::Setting as _;
 use voice_input::{
     StartListeningError, VoiceInput, VoiceInputLifecycle, VoiceInputLifecycleState,
@@ -73,7 +73,7 @@ impl EditorView {
                 crate::view_components::NewFeaturePopupEvent::Dismissed
             ) {
                 AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                    rook_errors::report_if_error!(
+                    pterm_errors::report_if_error!(
                         settings
                             .dismissed_voice_input_new_feature_popup
                             .set_value(true, ctx)
@@ -239,18 +239,18 @@ impl EditorView {
                 // If the keypress is not valid in the current state, we ignore it.
                 match self.voice_input_state.lifecycle.state() {
                     // For example, the user could press Fn in a different app, then switch focus
-                    // to Rook and let it go - we should NOT activate voice input in this case.
+                    // to Polaris Terminal and let it go - we should NOT activate voice input in this case.
                     VoiceInputLifecycleState::Idle => {
-                        if matches!(state, rookui::event::KeyState::Released) {
+                        if matches!(state, ptermui::event::KeyState::Released) {
                             return false;
                         }
                     }
                     // Note that in reality, this case is unreachable because we stop voice input
-                    // if the user is not focused on Rook (since we lose the ability to listen to modifier
+                    // if the user is not focused on Polaris Terminal (since we lose the ability to listen to modifier
                     // key events). Thus, the user cannot enter a state where we're listening for voice input
                     // but the key is not held already.
                     VoiceInputLifecycleState::Listening => {
-                        if matches!(state, rookui::event::KeyState::Pressed) {
+                        if matches!(state, ptermui::event::KeyState::Pressed) {
                             return false;
                         }
                     }
@@ -559,8 +559,8 @@ impl EditorView {
         let microphone_access_state = app.microphone_access_state();
         let mic_access_denied = matches!(
             microphone_access_state,
-            rookui::platform::MicrophoneAccessState::Restricted
-                | rookui::platform::MicrophoneAccessState::Denied
+            ptermui::platform::MicrophoneAccessState::Restricted
+                | ptermui::platform::MicrophoneAccessState::Denied
         );
 
         let modifier_key = AISettings::handle(app).as_ref(app).voice_input_toggle_key;
@@ -644,7 +644,7 @@ impl EditorView {
             button = button.disabled();
         }
 
-        rookui::elements::SavePosition::new(
+        ptermui::elements::SavePosition::new(
             button
                 .build()
                 .on_click(move |ctx, _, _| {

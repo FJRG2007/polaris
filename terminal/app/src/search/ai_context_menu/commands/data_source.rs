@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use fuzzy_match::FuzzyMatchResult;
-use rookui::{AppContext, SingletonEntity};
+use ptermui::{AppContext, SingletonEntity};
 
 use super::search_item::CommandSearchItem;
 use crate::search::ai_context_menu::mixer::AIContextMenuSearchableAction;
@@ -120,6 +120,6 @@ impl SyncDataSource for CommandDataSource {
     }
 }
 
-impl rookui::Entity for CommandDataSource {
+impl ptermui::Entity for CommandDataSource {
     type Event = ();
 }

@@ -1,5 +1,5 @@
 # APP-4579 — Client tech spec
-Implements the client-side surface of `specs/APP-4579/PRODUCT.md`. Server persistence and hidden-prompt injection are specified in `../rook-server/specs/APP-4579/TECH.md`.
+Implements the client-side surface of `specs/APP-4579/PRODUCT.md`. Server persistence and hidden-prompt injection are specified in `../polaris-terminal-server/specs/APP-4579/TECH.md`.
 ## Problem
 Local-to-cloud handoff must be available for conversations involved in orchestration, and the handoff spawn request must identify those conversations without exporting their topology. The server needs one fact only: whether it should inject the universal hidden orchestration-handoff message on the first cloud turn.
 ## Current handoff path

@@ -9,12 +9,12 @@ use ai::skills::{
     provider_rank,
 };
 use lazy_static::lazy_static;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::color::internal_colors;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::prelude::MouseStateHandle;
-use rookui::{AppContext, Element, EventContext, SingletonEntity};
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::prelude::MouseStateHandle;
+use ptermui::{AppContext, Element, EventContext, SingletonEntity};
 use siphasher::sip::SipHasher;
 
 use super::{SkillDescriptor, SkillManager};
@@ -96,7 +96,7 @@ impl SkillDeduplicator {
 ///
 /// Two skills are considered duplicates only when they share the same owning directory
 /// **and** identical content — which is the common case when a tool like `npx skills`
-/// symlinks the same skill under `~/.agents/skills/`, `~/.rook/skills/`, `~/.claude/skills/`, etc.
+/// symlinks the same skill under `~/.agents/skills/`, `~/.polaris-terminal/skills/`, `~/.claude/skills/`, etc.
 ///
 /// Each element of `skill_paths` is a `(dir_path, skill_file_path)` tuple where
 /// `dir_path` is the directory that owns the skill.

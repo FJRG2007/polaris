@@ -1,4 +1,4 @@
-use rookui::{App, EntityId, ModelHandle};
+use ptermui::{App, EntityId, ModelHandle};
 use uuid::Uuid;
 
 use super::*;

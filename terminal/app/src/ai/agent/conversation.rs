@@ -6,17 +6,17 @@ use ai::skills::SkillPathOrigin;
 use anyhow::Context as _;
 use chrono::{DateTime, Local, TimeZone};
 use itertools::Itertools as _;
-use rook_cli::agent::Harness;
-use rook_core::command::ExitCode;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_core::features::FeatureFlag;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::RookTheme;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_error;
-use rookui::color::ColorU;
-use rookui::{AppContext, EntityId, ModelContext, SingletonEntity};
+use pterm_cli::agent::Harness;
+use pterm_core::command::ExitCode;
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_core::features::FeatureFlag;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::PtermTheme;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_error;
+use ptermui::color::ColorU;
+use ptermui::{AppContext, EntityId, ModelContext, SingletonEntity};
 use vec1::{Size0Error, Vec1};
 use warp_multi_agent_api::response_event::stream_finished;
 use warp_multi_agent_api::response_event::stream_finished::TokenUsage;
@@ -135,9 +135,9 @@ fn footer_model_token_usage(
     usage_metadata: &stream_finished::ConversationUsageMetadata,
     llm_preferences: &LLMPreferences,
 ) -> Vec<ModelTokenUsage> {
-    // rook + byok rows merge on their server-known model id. Custom endpoint
+    // polaris-terminal + byok rows merge on their server-known model id. Custom endpoint
     // rows live in a separate bucket keyed by their upstream `config_key` so
-    // they never collide with a rook/byok row that happens to share the same
+    // they never collide with a polaris-terminal/byok row that happens to share the same
     // resolved alias. The `config_key` itself is not retained on
     // `ModelTokenUsage`; it is translated to an alias up front and only the
     // alias flows downstream (display + shared-session replay).
@@ -149,12 +149,12 @@ fn footer_model_token_usage(
                 model_id: model_id.clone(),
                 ..Default::default()
             });
-        entry.rook_tokens = entry
-            .rook_tokens
+        entry.pterm_tokens = entry
+            .pterm_tokens
             .saturating_add(narrow_token_count(usage.total_tokens));
         for (category, tokens) in &usage.token_usage_by_category {
             let category_tokens = entry
-                .rook_token_usage_by_category
+                .pterm_token_usage_by_category
                 .entry(category.clone())
                 .or_default();
             *category_tokens = category_tokens.saturating_add(narrow_token_count(*tokens));
@@ -305,7 +305,7 @@ pub struct AIConversation {
     /// Unique ID for this conversation.
     id: AIConversationId,
 
-    /// Whether this conversation is being shared from a different rook instance
+    /// Whether this conversation is being shared from a different polaris-terminal instance
     /// (i.e. is not a local conversation).
     is_viewing_shared_session: bool,
     task_store: TaskStore,
@@ -1805,7 +1805,7 @@ impl AIConversation {
         });
     }
 
-    /// Updates the notebook_uid for a plan artifact when it's synced to Rook Drive.
+    /// Updates the notebook_uid for a plan artifact when it's synced to Polaris Terminal Drive.
     pub fn update_plan_notebook_uid(
         &mut self,
         document_uid: AIDocumentId,
@@ -4217,7 +4217,7 @@ impl AIConversation {
     /// Converts the conversation into a vector of serialized command blocks.
     /// When we open a new tab to restore a conversation in, we need to precompute this serialized list of blocks
     /// to pass into the TerminalModel constructor since command blocks must be created
-    /// before the rook input block to not break bootstrapping.
+    /// before the polaris-terminal input block to not break bootstrapping.
     /// Only the command blocks are actually created in the terminal model. During restoration in the TerminalView,
     /// AI blocks are inserted relative to the command blocks based on timestamp.
     pub fn to_serialized_blocklist_items(&self) -> Vec<SerializedBlockListItem> {
@@ -4646,7 +4646,7 @@ pub enum AIAgentSerializedBlockFormat {
 /// Describes the format capabilities of a conversation.
 #[derive(Debug, Clone)]
 pub struct AIAgentConversationFormat {
-    /// Whether there is a Rook MAA task list available for this conversation.
+    /// Whether there is a Polaris Terminal MAA task list available for this conversation.
     pub has_task_list: bool,
     /// The format of the TUI serialized block, if available.
     pub block_snapshot: Option<AIAgentSerializedBlockFormat>,
@@ -4822,7 +4822,7 @@ impl std::fmt::Display for ConversationStatus {
 }
 
 impl ConversationStatus {
-    pub fn render_icon(&self, appearance: &Appearance) -> rookui::elements::Icon {
+    pub fn render_icon(&self, appearance: &Appearance) -> ptermui::elements::Icon {
         match self {
             ConversationStatus::InProgress => in_progress_icon(appearance),
             ConversationStatus::Success => succeeded_icon(appearance),
@@ -4837,7 +4837,7 @@ impl ConversationStatus {
 
     pub fn status_icon_and_color(
         &self,
-        theme: &RookTheme,
+        theme: &PtermTheme,
         color_style: StatusColorStyle,
     ) -> (Icon, ColorU) {
         match self {

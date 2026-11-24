@@ -1,4 +1,4 @@
-use rook_managed_secrets::{ManagedSecretValue, UploadKey, init_envelope};
+use pterm_managed_secrets::{ManagedSecretValue, UploadKey, init_envelope};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 

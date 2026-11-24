@@ -3,7 +3,7 @@ use uuid::Uuid;
 use super::{
     TuiMcpFileScope, TuiMcpFileSource, TuiMcpServerId, TuiMcpServerSnapshot, TuiMcpServerSource,
     TuiMcpServerStatus, TuiMcpSyncedTemplateProvenance, TuiMcpTemplateVariable,
-    TuiMcpVariableValue, is_represented_by_global_rook_server, server_priority, sort_servers,
+    TuiMcpVariableValue, is_represented_by_global_pterm_server, server_priority, sort_servers,
     template_identity, validate_variable_values,
 };
 use crate::ai::mcp::TemplatableMCPServer;
@@ -102,7 +102,7 @@ fn file_sources_keep_distinct_provider_scope_and_root_provenance() {
 }
 
 #[test]
-fn global_rook_server_replaces_only_matching_personal_synced_template() {
+fn global_pterm_server_replaces_only_matching_personal_synced_template() {
     let local = template(
         r#"{"Figma":{"url":"https://mcp.figma.com/mcp","headers":{"Authorization":"local-token"}}}"#,
     );
@@ -122,17 +122,17 @@ fn global_rook_server_replaces_only_matching_personal_synced_template() {
         },
     };
 
-    assert!(is_represented_by_global_rook_server(
+    assert!(is_represented_by_global_pterm_server(
         &cloud,
         &personal,
         &identities
     ));
-    assert!(!is_represented_by_global_rook_server(
+    assert!(!is_represented_by_global_pterm_server(
         &cloud,
         &shared,
         &identities
     ));
-    assert!(!is_represented_by_global_rook_server(
+    assert!(!is_represented_by_global_pterm_server(
         &other,
         &personal,
         &identities

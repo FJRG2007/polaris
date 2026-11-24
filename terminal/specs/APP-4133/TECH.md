@@ -1,11 +1,11 @@
 # Code Review: Case-Insensitive CWD Matching on macOS
 
 ## Context
-When sending review comments, Rook checks whether a terminal's session CWD is inside the selected repo. This check uses `PathBuf::starts_with`, which does byte-level component comparison — case-sensitive even on macOS's case-insensitive APFS.
+When sending review comments, Polaris Terminal checks whether a terminal's session CWD is inside the selected repo. This check uses `PathBuf::starts_with`, which does byte-level component comparison — case-sensitive even on macOS's case-insensitive APFS.
 
 The two paths come from different sources with different casing guarantees:
-- **Repo path** — from `DetectedRepositories::detect_possible_git_repo`, which discovers via git and returns a canonicalized path with on-disk casing (e.g. `/Users/kevin/Documents/GitHub/rook-2`).
-- **Session CWD** — from shell-reported `$PWD` via `BlockMetadata::current_working_directory`, which preserves whatever casing the user typed when `cd`'ing (e.g. `/Users/kevin/Documents/Github/rook-2`).
+- **Repo path** — from `DetectedRepositories::detect_possible_git_repo`, which discovers via git and returns a canonicalized path with on-disk casing (e.g. `/Users/kevin/Documents/GitHub/polaris-terminal-2`).
+- **Session CWD** — from shell-reported `$PWD` via `BlockMetadata::current_working_directory`, which preserves whatever casing the user typed when `cd`'ing (e.g. `/Users/kevin/Documents/Github/polaris-terminal-2`).
 
 When these differ only in case, the terminal is marked unavailable with "session cwd is not inside selected repo", and the send button shows "All terminals are busy" despite no command executing.
 

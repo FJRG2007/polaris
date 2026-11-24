@@ -4,7 +4,7 @@ Linear: [APP-3791](https://linear.app/warpdotdev/issue/APP-3791/code-feature-sup
 
 ## 1. Problem
 
-When a user SSHes into a remote host, Rook's completions pipeline (autosuggestions, syntax highlighting, tab completions) needs to run generator commands on the remote machine. Today this is done by opening a new SSH session per command, which is constrained by the host's `MaxSessions` limit and cannot run commands in parallel.
+When a user SSHes into a remote host, Polaris Terminal's completions pipeline (autosuggestions, syntax highlighting, tab completions) needs to run generator commands on the remote machine. Today this is done by opening a new SSH session per command, which is constrained by the host's `MaxSessions` limit and cannot run commands in parallel.
 
 This spec covers building the completions path through the persistent `remote_server` process:
 
@@ -175,7 +175,7 @@ The `SshRemoteServer` branch is added as the **first** check in `new_command_exe
 1. SshRemoteServer + IsLegacySSHSession::Yes     → RemoteServerCommandExecutor  [NEW]
 2. SSHTmuxWrapper + tmux_control_mode             → TmuxCommandExecutor
 3. SessionType::Local (various)                   → LocalCommandExecutor / MSYS2 / WSL
-4. RookifiedRemote + legacy SSH + !InBandForSSH   → RemoteCommandExecutor
+4. PtermifiedRemote + legacy SSH + !InBandForSSH   → RemoteCommandExecutor
 5. default                                        → InBandCommandExecutor / NoOp
 ```
 

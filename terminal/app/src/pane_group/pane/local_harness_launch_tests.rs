@@ -2,8 +2,8 @@ use std::ffi::OsString;
 use std::fs;
 use std::sync::Arc;
 
-use rook_cli::agent::Harness;
-use rook_core::features::FeatureFlag;
+use pterm_cli::agent::Harness;
+use pterm_core::features::FeatureFlag;
 use tempfile::TempDir;
 
 use super::{

@@ -4,6 +4,6 @@ CREATE TABLE workflows (
     data TEXT NOT NULL,
     last_updated_at DATETIME NOT NULL,
     -- `user_id` column helps to support multiple users logged into same device.
-    -- It ensures the user is only served data meant for their Rook account.
+    -- It ensures the user is only served data meant for their Polaris Terminal account.
     user_id INTEGER NOT NULL REFERENCES users(id)
 );

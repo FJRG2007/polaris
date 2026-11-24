@@ -2,7 +2,7 @@
 //! validation, and catalog providers shared by the GUI orchestration
 //! controls and the TUI orchestration card.
 //!
-//! Nothing in this module may depend on `rookui::elements` or any other
+//! Nothing in this module may depend on `ptermui::elements` or any other
 //! GUI rendering types; it only reads/writes app singletons through
 //! `AppContext`.
 
@@ -18,9 +18,9 @@ pub use edit_state::OrchestrationEditState;
 #[cfg_attr(not(feature = "tui"), allow(unused_imports))]
 pub use providers::ORCHESTRATION_ENV_NONE_LABEL;
 pub use providers::{
-    ORCHESTRATION_ROOK_WORKER_HOST, persist_environment_selection, persist_host_selection,
-    resolve_auth_secret_selection_for_harness, resolve_default_environment_id,
-    resolve_default_host_slug,
+    ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST, persist_environment_selection,
+    persist_host_selection, resolve_auth_secret_selection_for_harness,
+    resolve_default_environment_id, resolve_default_host_slug,
 };
 pub(crate) use providers::{
     can_execute_with_auth_secret, persist_auth_secret_selection,

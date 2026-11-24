@@ -1,6 +1,6 @@
 ---
 name: oz-platform
-description: Use Rook's REST API and command line to run, configure, and inspect Oz cloud agents
+description: Use Polaris Terminal's REST API and command line to run, configure, and inspect Oz cloud agents
 ---
 
 # oz-platform
@@ -17,21 +17,21 @@ Use the Oz REST API and CLI to:
 Prefer current, authoritative sources when answering questions or authoring skills about Oz platform behavior:
 * Start with https://docs.rook.dev/llms.txt to discover the relevant documentation page.
 * Every `docs.rook.dev` page has an agent-readable Markdown version at the same URL with `.md` appended. Fetch that version when reading documentation; for example, https://docs.rook.dev/agents/capabilities/computer-use.md.
-* For CLI commands and flags, also confirm the installed version's behavior with `{{rook_cli_binary_name}} help` or `{{rook_cli_binary_name}} help <subcommand>`.
+* For CLI commands and flags, also confirm the installed version's behavior with `{{pterm_cli_binary_name}} help` or `{{pterm_cli_binary_name}} help <subcommand>`.
 
 Treat the examples below as starting points, not the sole source of truth for details that can evolve, such as computer-use artifacts, CLI flags, and API behavior. If they conflict with the live Markdown documentation or CLI help, follow the live source.
 
 ## Command Line
 
-The Oz CLI is installed as `{{rook_cli_binary_name}}`. To get help output, use `{{rook_cli_binary_name}} help` or `{{rook_cli_binary_name}} help <subcommand>`.
+The Oz CLI is installed as `{{pterm_cli_binary_name}}`. To get help output, use `{{pterm_cli_binary_name}} help` or `{{pterm_cli_binary_name}} help <subcommand>`.
 Prefer `--output-format text` to review the response, or `--output-format json` to parse fields with `jq`.
 You can find more information at https://docs.rook.dev/reference/cli.md.
 
 The most important commands are:
-* `{{rook_cli_binary_name}} agent run-cloud`: Spawn a new cloud agent. You can configure the prompt, model, environment, and other settings.
-* `{{rook_cli_binary_name}} run list` and `{{rook_cli_binary_name}} run get <run-id>`: List all cloud agent runs, and get details about a particular run.
-* `{{rook_cli_binary_name}} environment list` and `{{rook_cli_binary_name}} environment get`: List available environments, and get more information about a particular environment.
-* `{{rook_cli_binary_name}} schedule list` and `{{rook_cli_binary_name}} schedule get`: List scheduled tasks with most recent runs, and get more information about a particular scheduled run.
+* `{{pterm_cli_binary_name}} agent run-cloud`: Spawn a new cloud agent. You can configure the prompt, model, environment, and other settings.
+* `{{pterm_cli_binary_name}} run list` and `{{pterm_cli_binary_name}} run get <run-id>`: List all cloud agent runs, and get details about a particular run.
+* `{{pterm_cli_binary_name}} environment list` and `{{pterm_cli_binary_name}} environment get`: List available environments, and get more information about a particular environment.
+* `{{pterm_cli_binary_name}} schedule list` and `{{pterm_cli_binary_name}} schedule get`: List scheduled tasks with most recent runs, and get more information about a particular scheduled run.
 
 Most subcommands support the `--output-format json` flag to produce JSON output, which you can pipe into `jq` or other commands.
 
@@ -40,20 +40,20 @@ Most subcommands support the `--output-format json` flag to produce JSON output,
 Start a cloud agent, and then monitor its status:
 
 ```sh
-$ {{rook_cli_binary_name}} agent run-cloud --prompt "Update the login error to be more specific" --environment UA17BXYZ
+$ {{pterm_cli_binary_name}} agent run-cloud --prompt "Update the login error to be more specific" --environment UA17BXYZ
 # ...
 Spawned agent with run ID: 5972cca4-a410-42af-930a-e56bc23e07ac
 ```
 
 ```sh
-$ {{rook_cli_binary_name}} run get 5972cca4-a410-42af-930a-e56bc23e07ac
+$ {{pterm_cli_binary_name}} run get 5972cca4-a410-42af-930a-e56bc23e07ac
 # ...
 ```
 
 Schedule an agent to summarize feedback every day at 8am UTC:
 
 ```sh
-$ {{rook_cli_binary_name}} schedule create --cron "0 8 * * *" \
+$ {{pterm_cli_binary_name}} schedule create --cron "0 8 * * *" \
     --name "GitHub issue summary" \
     --prompt "Collect all feedback from new GitHub issues and provide a summary report" \
     --environment UA17BXYZ
@@ -62,21 +62,21 @@ $ {{rook_cli_binary_name}} schedule create --cron "0 8 * * *" \
 List and inspect scheduled agents:
 
 ```sh
-$ {{rook_cli_binary_name}} schedule list
-$ {{rook_cli_binary_name}} schedule get <schedule-id>
+$ {{pterm_cli_binary_name}} schedule list
+$ {{pterm_cli_binary_name}} schedule get <schedule-id>
 ```
 
 Create a secret for cloud agents to use:
 
 ```sh
-$ {{rook_cli_binary_name}} secret create JIRA_API_KEY --team --value-file jira_key.txt --description "API key to access Jira"
+$ {{pterm_cli_binary_name}} secret create JIRA_API_KEY --team --value-file jira_key.txt --description "API key to access Jira"
 ```
 
 ## REST API
 
 Oz has a REST API for starting and inspecting cloud agents.
 
-All API requests require authentication using an API key. The user can generate API keys in their Rook settings, on the `Platform` page (accessible via `{{rook_url_scheme}}://settings/platform`).
+All API requests require authentication using an API key. The user can generate API keys in their Polaris Terminal settings, on the `Platform` page (accessible via `{{pterm_url_scheme}}://settings/platform`).
 
 You can find the API and SDK reference here: https://docs.rook.dev/reference/api-and-sdk.md.
 
@@ -99,7 +99,7 @@ The Python SDK is available from PyPi. It can be used synchronously or asynchron
 ### API Examples
 
 ```sh
-curl -L -X POST {{rook_server_url}}/api/v1/agent/run \
+curl -L -X POST {{pterm_server_url}}/api/v1/agent/run \
     --header 'Authorization: Bearer YOUR_API_KEY' \
     --header 'Content-Type: application/json' \
     --data '{
@@ -111,7 +111,7 @@ curl -L -X POST {{rook_server_url}}/api/v1/agent/run \
 ```
 
 ```sh
-curl -L -X GET {{rook_server_url}}/api/v1/agent/runs/5972cca4-a410-42af-930a-e56bc23e07ac \
+curl -L -X GET {{pterm_server_url}}/api/v1/agent/runs/5972cca4-a410-42af-930a-e56bc23e07ac \
     --header 'Authorization: Bearer YOUR_API_KEY' \
     --header 'Content-Type: application/json'
 ```
@@ -125,7 +125,7 @@ You can trigger Oz cloud agents from GitHub Actions workflows. This enables auto
 
 Use GitHub Actions when the trigger itself lives in GitHub: An event like an issue being opened, a PR being labeled, a push, or a CI workflow completing.
 
-For periodic/recurring work, prefer `{{rook_cli_binary_name}} schedule create` to enhance scheduled run tracking with the Oz platform.
+For periodic/recurring work, prefer `{{pterm_cli_binary_name}} schedule create` to enhance scheduled run tracking with the Oz platform.
 
 The agent will have access to the `gh` CLI to communicate back to the repository. Prefer prompting the agent to use `gh` vs. requiring the agent to respond with structured output for the GitHub workflow to parse.
 
@@ -133,8 +133,8 @@ The agent will have access to the `gh` CLI to communicate back to the repository
 
 Use `warpdotdev/oz-agent-action@main` in your workflow. Required inputs:
 * `prompt`: The task description for the agent
-* `rook_api_key`: API key (store in GitHub secrets, e.g., `${{ secrets.ROOK_API_KEY }}`)
-* `profile`: Optional agent profile identifier (can use repo variable, e.g., `${{ vars.ROOK_AGENT_PROFILE || '' }}`)
+* `pterm_api_key`: API key (store in GitHub secrets, e.g., `${{ secrets.POLARIS_TERMINAL_API_KEY }}`)
+* `profile`: Optional agent profile identifier (can use repo variable, e.g., `${{ vars.POLARIS_TERMINAL_AGENT_PROFILE || '' }}`)
 
 The action outputs `agent_output` with the agent's response.
 
@@ -164,8 +164,8 @@ jobs:
             ${{ github.event.issue.body }}
 
             Respond to the issue with a comment containing your summary using the `gh` CLI.
-          rook_api_key: ${{ secrets.ROOK_API_KEY }}
-          profile: ${{ vars.ROOK_AGENT_PROFILE || '' }}
+          pterm_api_key: ${{ secrets.POLARIS_TERMINAL_API_KEY }}
+          profile: ${{ vars.POLARIS_TERMINAL_AGENT_PROFILE || '' }}
       - name: Use Agent Output
         run: echo "${{ steps.agent.outputs.agent_output }}"
 ```
@@ -192,7 +192,7 @@ You should almost always run cloud agents in an environment. Otherwise, they may
 
 Cloud agents run in a sandbox, so they _can_ install additional programs into their environment. They also have Git credentials to create PRs and push branches.
 
-Cloud environments DO NOT store secret values, like API keys. Use the `{{rook_cli_binary_name}} secret` commands instead.
+Cloud environments DO NOT store secret values, like API keys. Use the `{{pterm_cli_binary_name}} secret` commands instead.
 
 ## Using Third-Party Coding CLIs
 
@@ -217,14 +217,14 @@ When you are an interactive agent launching a cloud agent to use a third-party C
 
    Also ask if they want to use an existing environment instead. To list their environments:
    ```sh
-   {{rook_cli_binary_name}} environment list --output-format text
+   {{pterm_cli_binary_name}} environment list --output-format text
    ```
 
-   If they choose a public image without an existing environment, create one with `{{rook_cli_binary_name}} environment create ...`
+   If they choose a public image without an existing environment, create one with `{{pterm_cli_binary_name}} environment create ...`
 
 2. **Prompt Construction**: Construct a simple prompt that delegates CLI invocation to the cloud agent:
    ```sh
-   {{rook_cli_binary_name}} agent run-cloud \
+   {{pterm_cli_binary_name}} agent run-cloud \
        --environment <ENV_ID> \
        --prompt 'Read the oz-platform skill for instructions on using [CLI name] to solve: <task description>'
    ```
@@ -233,7 +233,7 @@ When you are an interactive agent launching a cloud agent to use a third-party C
 
 **Example**:
 ```sh
-$ {{rook_cli_binary_name}} agent run-cloud \
+$ {{pterm_cli_binary_name}} agent run-cloud \
     --environment <ENV_ID> \
     --prompt 'Read the oz-platform skill for instructions on using Claude Code to solve: Summarize the architecture of this project'
 ```
@@ -246,15 +246,15 @@ When you are a cloud agent instructed to use a third-party CLI:
 
 2. **Authentication**: API keys are available as environment variables (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`). These were configured as Oz secrets by the user.
 
-3. **Task Delegation (IMPORTANT)**: The user's task should be completed **entirely by the third-party CLI**. Do NOT use Rook's built-in tools to complete the task yourself:
-   - Do NOT use `edit_files`, `read_files`, `grep`, `codebase_semantic_search`, or other Rook coding tools to perform the user's task
+3. **Task Delegation (IMPORTANT)**: The user's task should be completed **entirely by the third-party CLI**. Do NOT use Polaris Terminal's built-in tools to complete the task yourself:
+   - Do NOT use `edit_files`, `read_files`, `grep`, `codebase_semantic_search`, or other Polaris Terminal coding tools to perform the user's task
    - The third-party CLI should do all the coding, file editing, searching, and analysis work
    - Your role is to:
      - Set up the CLI (e.g., authenticate if needed)
      - Construct the prompt for the CLI with the user's task
      - Run the CLI and monitor its execution
      - Debug any issues with the CLI itself
-     - Report artifacts back to Rook (see below)
+     - Report artifacts back to Polaris Terminal (see below)
 
 4. **CLI Invocation**: Read [references/third-party-clis.md](./references/third-party-clis.md) for detailed instructions on:
    - Non-interactive mode flags for each CLI (e.g. `claude -p`, `codex exec`, `gemini -p`)
@@ -262,7 +262,7 @@ When you are a cloud agent instructed to use a third-party CLI:
    - Useful flags and options
    - Example commands
 
-5. **Artifact Reporting**: When the third-party CLI creates a PR, parse its output for the PR URL and branch name, then call `report_pr` to register the artifact in the Rook UI.
+5. **Artifact Reporting**: When the third-party CLI creates a PR, parse its output for the PR URL and branch name, then call `report_pr` to register the artifact in the Polaris Terminal UI.
 
 **Example workflow**:
 ```sh

@@ -24,15 +24,15 @@ pub use init_project::{
 };
 use onboarding::callout::{FinalState, OnboardingCalloutViewEvent, OnboardingQuery};
 use onboarding::{OnboardingCalloutView, OnboardingKeybindings};
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
 use repo_metadata::CanonicalizedPath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
 
 use crate::ai::block_context::BlockContext;
 use crate::global_resource_handles::GlobalResourceHandlesProvider;
 pub(crate) mod docker_sandbox;
 mod link_detection;
-mod open_in_rook;
+mod open_in_pterm;
 mod pane_impl;
 mod passive_suggestions;
 mod pending_user_query;
@@ -67,14 +67,14 @@ use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use action::RememberForRookification;
+use action::RememberForPtermification;
 pub use action::{AgentOnboardingVersion, OnboardingIntention, OnboardingVersion, TerminalAction};
 use ai::api_keys::{ApiKeyManager, AwsCredentialsState};
 use ai::index::full_source_code_embedding::manager::{BuildSource, CodebaseIndexManager};
 use async_channel::{Receiver, Sender};
 use base64::Engine as _;
 pub use block_banner::{BLOCK_BANNER_HEIGHT, WithinBlockBanner};
-use block_banner::{RookifyBannerState, render_rookification_banner};
+use block_banner::{PtermifyBannerState, render_ptermification_banner};
 use block_onboarding::onboarding_drive_sharing_block::OnboardingDriveSharingBlock;
 use bookmarks::render_floating_block_snapshot;
 use chrono::{DateTime, Local, NaiveDateTime};
@@ -90,11 +90,11 @@ use init::{INPUT_BOX_VISIBLE_KEY, TOGGLE_BLOCK_FILTER_KEYBINDING};
 use inline_banner::{
     AliasExpansionBanner, AliasExpansionBannerAction, AwsBedrockLoginBannerAction,
     AwsBedrockLoginBannerState, AwsCliNotInstalledBannerAction, AwsCliNotInstalledBannerState,
-    ByoLlmAuthBannerSessionState, OpenInRookBannerState, VimModeBannerAction,
+    ByoLlmAuthBannerSessionState, OpenInPtermBannerState, VimModeBannerAction,
     render_alias_expansion_banner, render_aws_bedrock_login_banner,
     render_aws_cli_not_installed_banner, render_inline_notifications_discovery_banner,
     render_inline_notifications_error_banner, render_inline_shared_session_ended_banner,
-    render_inline_shared_session_started_banner, render_open_in_rook_banner,
+    render_inline_shared_session_started_banner, render_open_in_pterm_banner,
     render_shell_process_terminated_banner, render_vim_mode_banner,
 };
 pub use inline_banner::{NotificationsDiscoveryBannerAction, NotificationsErrorBannerAction};
@@ -104,34 +104,30 @@ use lazy_static::lazy_static;
 use markdown_parser::FormattedTextFragment;
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
-use regex::Regex;
-#[cfg(not(target_family = "wasm"))]
-use repo_metadata::repositories::DetectedRepositories;
-use repo_metadata::repositories::RepoDetectionSource;
-use rook_completer::meta::Span;
-use rook_core::r#async::debounce;
-use rook_core::channel::ChannelState;
-use rook_core::command::ExitCode;
-use rook_core::context_flag::ContextFlag;
-use rook_core::semantic_selection::SemanticSelection;
-use rook_core::user_preferences::GetUserPreferences as _;
-use rook_errors::{report_error, report_if_error};
-use rook_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_completer::meta::Span;
+use pterm_core::r#async::debounce;
+use pterm_core::channel::ChannelState;
+use pterm_core::command::ExitCode;
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_core::user_preferences::GetUserPreferences as _;
+use pterm_errors::{report_error, report_if_error};
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
 #[cfg(feature = "local_fs")]
-use rook_util::path::LineAndColumnArg;
-use rook_util::path::ShellFamily;
-use rookui::accessibility::{AccessibilityContent, ActionAccessibilityContent, RookA11yRole};
-use rookui::assets::asset_cache::{AssetCache, AssetCacheEvent};
-use rookui::r#async::executor::Background;
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::clipboard::ClipboardContent;
-use rookui::clipboard_utils::get_image_filepaths_from_paths;
-use rookui::elements::new_scrollable::{
+use pterm_util::path::LineAndColumnArg;
+use pterm_util::path::ShellFamily;
+use ptermui::accessibility::{AccessibilityContent, ActionAccessibilityContent, PtermA11yRole};
+use ptermui::assets::asset_cache::{AssetCache, AssetCacheEvent};
+use ptermui::r#async::executor::Background;
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::clipboard::ClipboardContent;
+use ptermui::clipboard_utils::get_image_filepaths_from_paths;
+use ptermui::elements::new_scrollable::{
     AxisConfiguration, ClippedAxisConfiguration, DualAxisConfig, NewScrollableElement,
     ScrollableAppearance, SingleAxisConfig,
 };
-use rookui::elements::shimmering_text::ShimmeringTextStateHandle;
-use rookui::elements::{
+use ptermui::elements::shimmering_text::ShimmeringTextStateHandle;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, DropTarget, DropTargetData,
     Empty, EventHandler, Expanded, Fill, Flex, Hoverable, Icon, LiveElement, MouseStateHandle,
@@ -140,23 +136,27 @@ use rookui::elements::{
     ScrollStateHandle, Scrollable, ScrollableElement, ScrollbarWidth, Shrinkable, Stack, Text,
     get_rich_content_position_id,
 };
-use rookui::event::ModifiersState;
-use rookui::fonts::{Cache as FontCache, FamilyId, Properties};
-use rookui::geometry::vector::{Vector2F, vec2f};
-use rookui::image_cache::ImageType;
-use rookui::keymap::Keystroke;
-use rookui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
-use rookui::platform::{Cursor, OperatingSystem};
-use rookui::text::SelectionType;
-use rookui::ui_components::components::UiComponent;
-use rookui::units::{IntoLines, IntoPixels, Lines, Pixels};
-use rookui::windowing::WindowManager;
-use rookui::{
+use ptermui::event::ModifiersState;
+use ptermui::fonts::{Cache as FontCache, FamilyId, Properties};
+use ptermui::geometry::vector::{Vector2F, vec2f};
+use ptermui::image_cache::ImageType;
+use ptermui::keymap::Keystroke;
+use ptermui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
+use ptermui::platform::{Cursor, OperatingSystem};
+use ptermui::text::SelectionType;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::units::{IntoLines, IntoPixels, Lines, Pixels};
+use ptermui::windowing::WindowManager;
+use ptermui::{
     AccessibilityData, AppContext, BlurContext, CursorInfo, Element, Entity, EntityId,
     EventContext, FocusContext, ModelAsRef, ModelHandle, SingletonEntity, Tracked, TypedActionView,
     View, ViewAsRef, ViewContext, ViewHandle, WeakModelHandle, WeakViewHandle, WindowId,
     end_trace_after_next, record_trace_event, windowing,
 };
+use regex::Regex;
+#[cfg(not(target_family = "wasm"))]
+use repo_metadata::repositories::DetectedRepositories;
+use repo_metadata::repositories::RepoDetectionSource;
 use serde::Serialize;
 use serde_json::json;
 use session_sharing_protocol::common::{
@@ -198,11 +198,11 @@ use super::model::rich_content::RichContentType;
 use super::model::secrets::RichContentSecretTooltipInfo;
 use super::model::selection::ExpandedSelectionRange;
 use super::model::session::SessionBootstrappedEvent;
-use super::rookify::RookificationSource;
-use super::rookify::success_block::{RookifySuccessBlock, RookifySuccessBlockEvent};
-use super::rookify::trigger_state::{RookifyState, SshBlockState};
+use super::ptermify::PtermificationSource;
+use super::ptermify::success_block::{PtermifySuccessBlock, PtermifySuccessBlockEvent};
+use super::ptermify::trigger_state::{PtermifyState, SshBlockState};
 use super::settings::AltScreenPaddingMode;
-use super::ssh::util::{InteractiveSshCommand, SshRookifyCommand, parse_interactive_ssh_command};
+use super::ssh::util::{InteractiveSshCommand, SshPtermifyCommand, parse_interactive_ssh_command};
 use super::{CLIAgent, GridType, cli_agent, should_right_click_paste};
 #[cfg(any(test, feature = "integration_tests"))]
 use crate::ai::agent::UserQueryMode;
@@ -281,7 +281,7 @@ use crate::ai::execution_profiles::ExecutionProfileId;
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::get_relevant_files::controller::GetRelevantFilesController;
 use crate::ai::llms::{LLMId, LLMModelHost, LLMPreferences};
-use crate::ai::loading::shimmering_rook_loading_text;
+use crate::ai::loading::shimmering_pterm_loading_text;
 #[cfg(feature = "local_fs")]
 use crate::ai::persisted_workspace::PersistedWorkspace;
 use crate::ai::predict::prompt_suggestions::{
@@ -326,7 +326,7 @@ use crate::context_chips::ContextChipKind;
 use crate::context_chips::prompt::{Prompt, PromptSelection};
 use crate::context_chips::prompt_type::PromptType;
 use crate::drive::CloudObjectTypeAndId;
-use crate::drive::settings::RookDriveSettings;
+use crate::drive::settings::PtermDriveSettings;
 use crate::drive::sharing::ShareableObject;
 use crate::editor::{AutosuggestionType, CrdtOperation, EditorAction};
 use crate::env_vars::env_var_collection_block::{
@@ -457,10 +457,10 @@ use crate::terminal::model::terminal_model::{
 };
 use crate::terminal::model::{ObfuscateSecrets, RespectObfuscatedSecrets, SecretHandle};
 use crate::terminal::model_events::{AnsiHandlerEvent, ModelEvent, ModelEventDispatcher};
+use crate::terminal::ptermify::SubshellSource;
+use crate::terminal::ptermify::render::render_subshell_separator;
+use crate::terminal::ptermify::settings::PtermifySettings;
 use crate::terminal::recorder::PtyRecorder;
-use crate::terminal::rookify::SubshellSource;
-use crate::terminal::rookify::render::render_subshell_separator;
-use crate::terminal::rookify::settings::RookifySettings;
 use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
 use crate::terminal::session_settings::{
     DEFAULT_THRESHOLD_FOR_LONG_RUNNING_NOTIFICATION, NotificationsMode, NotificationsSettings,
@@ -520,7 +520,7 @@ use crate::terminal::{
     shell::ShellType,
     terminal_size_element::TerminalSizeElement,
 };
-use crate::themes::theme::RookTheme;
+use crate::themes::theme::PtermTheme;
 use crate::throttle::throttle;
 use crate::ui_components::icons::{self};
 use crate::util::bindings::{
@@ -533,7 +533,7 @@ use crate::util::color::darken;
 use crate::util::file::external_editor::{EditorSettings, settings::EditorLayout};
 #[cfg(feature = "local_fs")]
 use crate::util::openable_file_type::{
-    FileTarget, renders_in_rook_notebook_viewer, resolve_file_target,
+    FileTarget, renders_in_pterm_notebook_viewer, resolve_file_target,
 };
 use crate::util::repo_detection::{RepoDetectionSessionType, detect_possible_git_repo};
 use crate::util::truncation::truncate_from_end;
@@ -621,7 +621,7 @@ pub const WAKEUP_THROTTLE_PERIOD: Duration =
 
 pub const EXECUTE_PENDING_COMMAND_DELAY: Duration = Duration::from_millis(100);
 
-pub const ROOK_PROMPT_HEIGHT_LINES: f32 = 0.9;
+pub const POLARIS_TERMINAL_PROMPT_HEIGHT_LINES: f32 = 0.9;
 
 const SCROLLBAR_WIDTH: ScrollbarWidth = ScrollbarWidth::Auto;
 
@@ -648,7 +648,7 @@ const ENV_VAR_BOOTSTRAP_FAILED_DURATION: Duration = Duration::from_secs(60);
 /// before it auto-dismisses. The banner used to persist until the user
 /// dismissed it manually or bootstrap finished, but in workflows where
 /// bootstrap will never complete (e.g. a shell that `exec`s into `expect`
-/// before Rook's shell integration runs), nothing ever clears it. Auto-
+/// before Polaris Terminal's shell integration runs), nothing ever clears it. Auto-
 /// dismissal keeps the warning informational without turning it into a
 /// permanent fixture.
 const SLOW_BOOTSTRAP_BANNER_AUTO_DISMISS_DURATION: Duration = Duration::from_secs(30);
@@ -661,7 +661,7 @@ const PROMPT_COMPATIBILITY_URL: &str =
 
 /// Link to troubleshooting steps for ControlMaster errors.
 const CONTROLMASTER_ISSUES_URL: &str =
-    "https://docs.rook.dev/terminal/rookify/ssh-legacy#troubleshooting";
+    "https://docs.rook.dev/terminal/ptermify/ssh-legacy#troubleshooting";
 
 /// Link to instructions on how to update p10k.
 const P10K_UPDATE_INSTRUCTIONS_URL: &str =
@@ -701,10 +701,10 @@ enum Osc52ClipboardBlockedType {
 /// Key used in user defaults to save whether the user has seen the banner.
 pub const ALIAS_EXPANSION_BANNER_SEEN_KEY: &str = "AliasExpansionBannerSeen";
 
-/// Delay between receiving preexec hook for a command we want to auto-rookify
-/// and triggering the rookification (subshell bootstrapping).
+/// Delay between receiving preexec hook for a command we want to auto-ptermify
+/// and triggering the ptermification (subshell bootstrapping).
 /// Reached this number after experimenting with different values to find a reliable delay.
-const AUTO_ROOKIFY_DELAY: u64 = 1000;
+const AUTO_POLARIS_TERMINALIFY_DELAY: u64 = 1000;
 
 /// Binding names to be customized if the user indicates they prefer
 /// Emacs-style keybindings instead of IDE-style keybindings.
@@ -717,7 +717,7 @@ const DEFAULT_AI_BLOCK_HEIGHT: f32 = 96.;
 
 pub const DEFAULT_ASK_AI_AUTOSUGGESTION_TEXT: &str = "What happened here?";
 
-const ROOK_MD_PATH: &str = "ROOK.md";
+const POLARIS_TERMINAL_MD_PATH: &str = "POLARIS_TERMINAL.md";
 
 /// `shell_plugins` tags reported by bootstrap when ctrl-r identifies a supported shell plugin.
 /// fzf provides ctrl-r, ctrl-t, and alt-c, while atuin only provides ctrl-r.
@@ -727,16 +727,16 @@ const ATUIN_PLUGIN_TAG: &str = "atuin";
 /// Name of the bootstrap-installed shell function invoked to hand ctrl-r off to the shell's
 /// own external history widget. Must match the function name defined in
 /// `app/assets/bundled/bootstrap/zsh_body.sh`.
-const EXTERNAL_CTRL_R_HELPER_COMMAND: &str = "rook_run_external_ctrl_r_widget";
+const EXTERNAL_CTRL_R_HELPER_COMMAND: &str = "pterm_run_external_ctrl_r_widget";
 
 /// Name of the bootstrap-installed shell function invoked to hand ctrl-t off to the shell's own
 /// external file-search widget. Must match the function name defined in
 /// `app/assets/bundled/bootstrap/zsh_body.sh`.
-const EXTERNAL_CTRL_T_HELPER_COMMAND: &str = "rook_run_external_ctrl_t_widget";
+const EXTERNAL_CTRL_T_HELPER_COMMAND: &str = "pterm_run_external_ctrl_t_widget";
 
 /// Name of the bootstrap-installed shell function invoked to hand alt-c off to fzf's directory
 /// search widget.
-const EXTERNAL_ALT_C_HELPER_COMMAND: &str = "rook_run_external_alt_c_widget";
+const EXTERNAL_ALT_C_HELPER_COMMAND: &str = "pterm_run_external_alt_c_widget";
 
 fn ctrl_t_apply_mode(shell_type: ShellType) -> ShellWidgetApplyMode {
     match shell_type {
@@ -831,16 +831,16 @@ impl NotificationsTrigger {
     pub fn discovery_banner_copy(&self) -> &'static str {
         match self {
             NotificationsTrigger::LongRunningCommand(..) => {
-                "Rook can notify you when long-running commands finish."
+                "Polaris Terminal can notify you when long-running commands finish."
             }
             NotificationsTrigger::AgentTaskCompleted(..) => {
-                "Rook can notify you when an agent finishes responding."
+                "Polaris Terminal can notify you when an agent finishes responding."
             }
             NotificationsTrigger::NeedsAttention => {
-                "Rook can notify you when a command or agent needs your attention."
+                "Polaris Terminal can notify you when a command or agent needs your attention."
             }
             NotificationsTrigger::PasswordPrompt => {
-                "Rook can notify you when you're prompted to enter a password."
+                "Polaris Terminal can notify you when you're prompted to enter a password."
             }
         }
     }
@@ -1045,7 +1045,7 @@ pub enum InlineBannerType {
     SharedSessionStart,
     SharedSessionEnd,
     ShellProcessTerminated,
-    OpenInRook,
+    OpenInPterm,
     VimMode,
     CodebaseIndexSpeedbump,
     AgentModeSetup,
@@ -1071,7 +1071,7 @@ impl InlineBannerType {
             | Self::SharedSessionStart
             | Self::SharedSessionEnd
             | Self::ShellProcessTerminated
-            | Self::OpenInRook
+            | Self::OpenInPterm
             | Self::VimMode => false,
         }
     }
@@ -1113,7 +1113,7 @@ struct InlineBannersState {
     /// banner to display.
     shell_process_terminated_banner: Option<ShellProcessTerminatedBanner>,
 
-    open_in_rook_banner: Option<OpenInRookBannerState>,
+    open_in_pterm_banner: Option<OpenInPtermBannerState>,
 
     vim_banner_state: Option<VimModeBannerState>,
 
@@ -1494,7 +1494,7 @@ pub enum InputContextMenuAction {
     Paste,
     ShowCommandSearch,
     ShowAICommandSearch,
-    AskRookAI,
+    AskPtermAI,
     SaveAsWorkflow,
     ToggleInputHintText,
 }
@@ -1586,7 +1586,7 @@ impl fmt::Debug for InputContextMenuAction {
             Paste => f.write_str("Paste"),
             ShowCommandSearch => f.write_str("CommandSearch"),
             ShowAICommandSearch => f.write_str("AICommandSearch"),
-            AskRookAI => f.write_str("AskRookAI"),
+            AskPtermAI => f.write_str("AskPtermAI"),
             SaveAsWorkflow => f.write_str("SaveAsWorkflow"),
             ToggleInputHintText => f.write_str("ToggleInputHintText"),
         }
@@ -1735,7 +1735,7 @@ pub enum Event {
     OpenWorkflowModalWithCloudWorkflow(SyncId),
     // Tell the pane group to open the workflow modal with an unsaved workflow.
     OpenWorkflowModalWithTemporary(Box<Workflow>),
-    OpenRookDriveObjectInPane(ObjectUid),
+    OpenPtermDriveObjectInPane(ObjectUid),
     OpenSuggestedAgentModeWorkflowModal {
         workflow_and_id: SuggestedAgentModeWorkflowAndId,
     },
@@ -1790,19 +1790,19 @@ pub enum Event {
     BlockStarted {
         is_for_in_band_command: bool,
     },
-    /// Tell the pane group to open a file within Rook.
-    OpenFileInRook {
+    /// Tell the pane group to open a file within Polaris Terminal.
+    OpenFileInPterm {
         path: PathBuf,
         /// The session that the file belongs to.
         session: Arc<Session>,
     },
     #[cfg(feature = "local_fs")]
-    OpenCodeInRook {
+    OpenCodeInPterm {
         source: CodeSource,
         layout: EditorLayout,
     },
     #[cfg(feature = "local_fs")]
-    PreviewCodeInRook {
+    PreviewCodeInPterm {
         source: CodeSource,
     },
     OpenCodeDiff {
@@ -2114,7 +2114,7 @@ pub enum Event {
 #[derive(Clone, Copy, Debug)]
 pub enum LeftPanelTargetView {
     FileTree,
-    RookDrive,
+    PtermDrive,
 }
 
 #[derive(Clone)]
@@ -2310,7 +2310,7 @@ impl BlocklistAIRenderContext {
     }
 
     /// Returns the AI context stripe color to use for a block, if any.
-    pub fn context_color_for_block(&self, block: &Block, theme: &RookTheme) -> Option<ColorU> {
+    pub fn context_color_for_block(&self, block: &Block, theme: &PtermTheme) -> Option<ColorU> {
         match self.context_inclusion_state_for_block(block) {
             Some(AIContextInclusionState::Active) => self.context_color(theme),
             _ => None,
@@ -2321,7 +2321,7 @@ impl BlocklistAIRenderContext {
     pub fn context_color_for_rich_content(
         &self,
         rich_content: &RichContentMetadata,
-        theme: &RookTheme,
+        theme: &PtermTheme,
     ) -> Option<ColorU> {
         match rich_content {
             RichContentMetadata::AIBlock(ai_metadata)
@@ -2340,7 +2340,7 @@ impl BlocklistAIRenderContext {
 
     /// The context color to use for a block, given its conversation phase.
     /// This assumes the block is part of the active conversation.
-    fn context_color(&self, theme: &RookTheme) -> Option<ColorU> {
+    fn context_color(&self, theme: &PtermTheme) -> Option<ColorU> {
         (self.is_ai_input_enabled && self.should_highlight_context).then(|| ai_brand_color(theme))
     }
 }
@@ -2387,7 +2387,7 @@ struct TerminalViewMouseStates {
     copy_secrets_tooltip: MouseStateHandle,
 
     #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
-    open_in_rook_tooltip: MouseStateHandle,
+    open_in_pterm_tooltip: MouseStateHandle,
     #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
     show_in_file_explorer_tooltip: MouseStateHandle,
     jump_to_bottom_of_block_button: MouseStateHandle,
@@ -2470,7 +2470,7 @@ impl Default for TerminalViewStateChange {
 }
 
 /// Whether or not this is the active terminal session. The active session for a pane group
-/// is the one used for executing workflows, Rook AI suggestions, etc.
+/// is the one used for executing workflows, Polaris Terminal AI suggestions, etc.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActiveSessionState {
     Active,
@@ -2675,7 +2675,7 @@ pub struct TerminalView {
     control_master_error_banner_suppressed: bool,
 
     /// Banner to show if we detect a configuration in the user's rc files that
-    /// is incompatible with Rook.
+    /// is incompatible with Polaris Terminal.
     incompatible_configuration_banner: ViewHandle<Banner<TerminalAction>>,
     is_incompatible_configuration_banner_open: bool,
 
@@ -2744,14 +2744,14 @@ pub struct TerminalView {
     ///   2. Whether this View's window is the active window.
     ///
     /// We need to derive and cache this state on this View in order to correctly implement focus
-    /// reporting. Because focus is window-scoped, i.e. rookui does not consider activating a
+    /// reporting. Because focus is window-scoped, i.e. ptermui does not consider activating a
     /// different window as blurring the focused View in the previously active window, we cannot
-    /// simply rely on the rookui::View::on_blur and on_focus methods to report focus-in/out to the
+    /// simply rely on the ptermui::View::on_blur and on_focus methods to report focus-in/out to the
     /// PTY, as those methods will not trigger when changing active windows. The singleton model
-    /// [`rookui::windowing::State`] will allow us to subscribe to active window change. So, we can
+    /// [`ptermui::windowing::State`] will allow us to subscribe to active window change. So, we can
     /// subscribe to that and have that callback also report focus-in/out. However, that will still
     /// leave cases for potential double-reporting, as a single click can trigger both
-    /// [`rookui::View::on_focus`] and emit a [`rookui::windowing::StateEvent`]. This field will
+    /// [`ptermui::View::on_focus`] and emit a [`ptermui::windowing::StateEvent`]. This field will
     /// guard against that double- reporting case, though it needs to be kept in sync with the
     /// focused view and active window.
     is_focused_and_active: bool,
@@ -2781,7 +2781,7 @@ pub struct TerminalView {
 
     onboarding_callout_view: Option<ViewHandle<onboarding::OnboardingCalloutView>>,
 
-    /// The type of the subshell that we will bootstrap/"rookify"" on the next [`AfterBlockStarted`]
+    /// The type of the subshell that we will bootstrap/"ptermify"" on the next [`AfterBlockStarted`]
     /// terminal model event. Will only be `Some` with a [`ShellType`] we can bootstrap.
     pending_auto_bootstrap_shell_type: Option<ShellType>,
     env_vars: Vec<EnvVar>,
@@ -2843,7 +2843,7 @@ pub struct TerminalView {
 
     find_model: ModelHandle<TerminalFindModel>,
 
-    rookify_state: RookifyState,
+    ptermify_state: PtermifyState,
 
     /// The keystroke bound to canceling a command.
     ///
@@ -2950,9 +2950,9 @@ pub struct TerminalView {
     /// Mouse state handle for the conversation details panel toggle button in the pane header.
     /// On WASM this is used by the workspace-level transcript panel toggle; on desktop, it is used
     /// by the pane-level details panel toggle.
-    conversation_details_panel_toggle_mouse_state: rookui::elements::MouseStateHandle,
+    conversation_details_panel_toggle_mouse_state: ptermui::elements::MouseStateHandle,
     /// Mouse state handle for the ambient agent cancel button in the pane header.
-    ambient_agent_cancel_mouse_state: rookui::elements::MouseStateHandle,
+    ambient_agent_cancel_mouse_state: ptermui::elements::MouseStateHandle,
 
     /// First-time cloud agent setup view (full-screen overlay for creating initial environment).
     first_time_cloud_agent_setup_view: ViewHandle<ambient_agent::FirstTimeCloudAgentSetupView>,
@@ -4011,7 +4011,7 @@ impl TerminalView {
                 FormattedTextFragment::plain_text("). Enabling the SSH extension in "),
                 FormattedTextFragment::hyperlink_action(
                     "settings",
-                    TerminalAction::ShowRookifySettings,
+                    TerminalAction::ShowPtermifySettings,
                 ),
                 FormattedTextFragment::plain_text(" may resolve this issue."),
             ]))
@@ -4024,7 +4024,7 @@ impl TerminalView {
         let incompatible_configuration_banner = ctx.add_typed_action_view(|_| {
             Banner::new(BannerTextContent::formatted_text(vec![
                 FormattedTextFragment::plain_text(
-                    "Your shell configuration is incompatible with Rook...  ",
+                    "Your shell configuration is incompatible with Polaris Terminal...  ",
                 ),
                 FormattedTextFragment::hyperlink("More info", KNOWN_ISSUES_URL),
             ]))
@@ -4377,7 +4377,7 @@ impl TerminalView {
                 ConversationDetailsPanelEvent::OpenPlanNotebook { notebook_uid } => {
                     // Convert NotebookId -> SyncId -> ObjectUid (String)
                     let object_uid = SyncId::from(*notebook_uid).uid();
-                    ctx.emit(Event::OpenRookDriveObjectInPane(object_uid));
+                    ctx.emit(Event::OpenPtermDriveObjectInPane(object_uid));
                 }
             }
         });
@@ -4495,7 +4495,7 @@ impl TerminalView {
             input_position_id,
             input_hoverable_handle: Default::default(),
             find_model,
-            rookify_state: Default::default(),
+            ptermify_state: Default::default(),
             cancel_command_keystroke: keybinding_name_to_keystroke(CANCEL_COMMAND_KEYBINDING, ctx),
             is_file_drop_target: false,
             is_ssh_file_uploader: false,
@@ -5249,15 +5249,15 @@ impl TerminalView {
             return true;
         }
 
-        // Terminal prompt path: the Rook prompt is active when honor_ps1 is
+        // Terminal prompt path: the Polaris Terminal prompt is active when honor_ps1 is
         // off, or when UDI overrides PS1. The prompt must include a chip backed
         // by git status.
-        let is_using_rook_prompt = !*SessionSettings::as_ref(ctx).honor_ps1
+        let is_using_pterm_prompt = !*SessionSettings::as_ref(ctx).honor_ps1
             || InputSettings::as_ref(ctx).is_universal_developer_input_enabled(ctx);
-        if is_using_rook_prompt && Self::should_retry_default_pr_chip_validation(ctx) {
+        if is_using_pterm_prompt && Self::should_retry_default_pr_chip_validation(ctx) {
             return true;
         }
-        is_using_rook_prompt && Self::uses_git_status_chips(Prompt::as_ref(ctx).chip_kinds())
+        is_using_pterm_prompt && Self::uses_git_status_chips(Prompt::as_ref(ctx).chip_kinds())
     }
 
     fn needs_git_status_for_agent_context(&self, ctx: &AppContext) -> bool {
@@ -5286,9 +5286,9 @@ impl TerminalView {
             return true;
         }
 
-        let is_using_rook_prompt = !*SessionSettings::as_ref(ctx).honor_ps1
+        let is_using_pterm_prompt = !*SessionSettings::as_ref(ctx).honor_ps1
             || InputSettings::as_ref(ctx).is_universal_developer_input_enabled(ctx);
-        is_using_rook_prompt
+        is_using_pterm_prompt
             && (Self::should_retry_default_pr_chip_validation(ctx)
                 || Prompt::as_ref(ctx)
                     .chip_kinds()
@@ -7580,7 +7580,7 @@ impl TerminalView {
                     .unwrap_or(false);
 
                 if maybe_modified_files {
-                    self.refresh_rook_prompt(ctx);
+                    self.refresh_pterm_prompt(ctx);
                     ctx.notify();
                 }
 
@@ -7766,7 +7766,7 @@ impl TerminalView {
                             .requested_command_copied_from_doc(action_id, ctx)
                     })
                     .and_then(|citation| {
-                        if let AIAgentCitation::RookDriveObject { uid } = citation {
+                        if let AIAgentCitation::PtermDriveObject { uid } = citation {
                             CloudModel::as_ref(ctx).get_workflow_by_uid(&uid)
                         } else {
                             None
@@ -7935,24 +7935,24 @@ impl TerminalView {
                 .get_pending_action(app)
                 .map(|action| match &action.action {
                     AIAgentActionType::RequestCommandOutput { command, .. } => {
-                        format!("Rook Agent needs your permission to run `{command}`")
+                        format!("Polaris Terminal Agent needs your permission to run `{command}`")
                     }
                     AIAgentActionType::ReadFiles(..) => {
-                        "Rook Agent needs your permission to read files".to_string()
+                        "Polaris Terminal Agent needs your permission to read files".to_string()
                     }
                     AIAgentActionType::SearchCodebase(..) => {
-                        "Rook Agent needs your permission to search your codebase".to_string()
+                        "Polaris Terminal Agent needs your permission to search your codebase".to_string()
                     }
                     AIAgentActionType::RequestFileEdits { .. } => {
-                        "Rook Agent needs your permission to edit a file".to_string()
+                        "Polaris Terminal Agent needs your permission to edit a file".to_string()
                     }
                     AIAgentActionType::WriteToLongRunningShellCommand { .. } => {
-                        "Rook Agent needs your permission to interact with a running shell command"
+                        "Polaris Terminal Agent needs your permission to interact with a running shell command"
                             .to_string()
                     }
-                    _ => "Rook Agent needs your confirmation to continue".to_string(),
+                    _ => "Polaris Terminal Agent needs your confirmation to continue".to_string(),
                 })
-                .unwrap_or("Rook Agent needs your confirmation to continue".to_string());
+                .unwrap_or("Polaris Terminal Agent needs your confirmation to continue".to_string());
             return Some(AIBlockNotificationSummary {
                 success: false,
                 title,
@@ -8048,7 +8048,7 @@ impl TerminalView {
     }
 
     #[cfg(any(test, feature = "integration_tests"))]
-    pub fn sessions<'a, A: rookui::ModelAsRef>(&self, ctx: &'a A) -> &'a Sessions {
+    pub fn sessions<'a, A: ptermui::ModelAsRef>(&self, ctx: &'a A) -> &'a Sessions {
         self.sessions.as_ref(ctx)
     }
 
@@ -8696,11 +8696,11 @@ impl TerminalView {
         if model.is_read_only() {
             return false;
         }
-        // Rook's own headless TUI (`rook_tui`) is itself an agent surface, so
+        // Polaris Terminal's own headless TUI (`pterm_tui`) is itself an agent surface, so
         // suppress the outer agent input bar while it runs in this pane. Uses
         // the same command-based detection as the CLI agent footer (see
-        // `is_running_rook_tui`).
-        if self.is_running_rook_tui(model, app) {
+        // `is_running_pterm_tui`).
+        if self.is_running_pterm_tui(model, app) {
             return false;
         }
         if self.conversation_ended_tombstone_view_id.is_some() {
@@ -9360,7 +9360,7 @@ impl TerminalView {
     /// events, allow it to handle the event.
     ///
     /// TODO(CORE-3415): We should probably remove the FixedBindings for ctrl-c
-    /// in the SSH rookification blocks and handle them here as well.
+    /// in the SSH ptermification blocks and handle them here as well.
     fn maybe_handle_ctrl_c_in_rich_content_block(&mut self, ctx: &mut ViewContext<Self>) {
         if self.active_ai_block(ctx).is_some() {
             self.cancel_active_conversation_via_status_bar(ctx);
@@ -9432,10 +9432,10 @@ impl TerminalView {
     }
 
     /// If ctrl-r was pressed at an idle prompt on a session using fzf or atuin, hands the keypress
-    /// off to that plugin instead of opening Rook's own command search.
+    /// off to that plugin instead of opening Polaris Terminal's own command search.
     ///
     /// Returns `true` if the handoff was triggered, in which case the caller should not open
-    /// Rook's command search.
+    /// Polaris Terminal's command search.
     pub fn maybe_trigger_external_ctrl_r_history_search(
         &mut self,
         ctx: &mut ViewContext<Self>,
@@ -9549,7 +9549,7 @@ impl TerminalView {
     /// the workspace to derive `PendingRemoteSession` without storing
     /// mutable state on the workspace itself.
     pub fn has_pending_ssh_command(&self) -> bool {
-        self.rookify_state.get_pending_ssh_host().is_some() && self.is_long_running()
+        self.ptermify_state.get_pending_ssh_host().is_some() && self.is_long_running()
     }
 
     /// Like `is_long_running`, but also requires the user to be in control of the command
@@ -9657,7 +9657,7 @@ impl TerminalView {
         });
     }
 
-    /// Receiving the rookui::Event::KeyDown event from a child element.
+    /// Receiving the ptermui::Event::KeyDown event from a child element.
     /// Generally, this should be control characters rather than printable characters.
     fn keydown_on_terminal(&mut self, characters: &str, ctx: &mut ViewContext<Self>) {
         if self.is_long_running() {
@@ -9700,7 +9700,7 @@ impl TerminalView {
 
         was_bootstrap_script_echoed || is_shared_session_executor
     }
-    /// Receiving a rookui::Event::TypedCharacters event from a child element.
+    /// Receiving a ptermui::Event::TypedCharacters event from a child element.
     /// We can assume `characters` consists of all printable characters, and therefore,
     /// can go into the input box.
     fn typed_characters_on_terminal(&mut self, characters: &str, ctx: &mut ViewContext<Self>) {
@@ -10120,7 +10120,7 @@ impl TerminalView {
                     .is_some_and(|session| {
                         matches!(
                             session.session_type(),
-                            SessionType::RookifiedRemote {
+                            SessionType::PtermifiedRemote {
                                 host_id: Some(_),
                                 ..
                             }
@@ -10180,7 +10180,10 @@ impl TerminalView {
         triggered_by_rc_file_snippet: bool,
         ctx: &mut ViewContext<Self>,
     ) {
-        self.dismiss_rookify_banner(&RememberForRookification::DoNotRememberSubshellCommand, ctx);
+        self.dismiss_ptermify_banner(
+            &RememberForPtermification::DoNotRememberSubshellCommand,
+            ctx,
+        );
 
         // Record the active long-running block so we can hide it later once the remote
         // actually confirms subshell bootstrap is in progress.
@@ -10193,7 +10196,7 @@ impl TerminalView {
                 .is_active_and_long_running()
             {
                 let block_id = model.block_list().active_block_id().clone();
-                self.rookify_state.set_block_id(block_id);
+                self.ptermify_state.set_block_id(block_id);
             }
         }
 
@@ -10216,7 +10219,7 @@ impl TerminalView {
 
     /// Util method to update the ssh block, with a lock
     fn update_long_running_ssh_block_with_lock(&self, f: impl FnOnce(&mut Block)) -> bool {
-        if let Some(block_id) = self.rookify_state.block_id()
+        if let Some(block_id) = self.ptermify_state.block_id()
             && let Some(block) = self
                 .model
                 .lock()
@@ -10237,15 +10240,15 @@ impl TerminalView {
     }
 
     fn clear_ssh_blocks(&mut self, ctx: &mut ViewContext<Self>) {
-        self.dismiss_rookify_banner(&RememberForRookification::DoNotRememberSSHHost, ctx);
-        if let Some(ssh_block) = self.rookify_state.ssh_block_state() {
+        self.dismiss_ptermify_banner(&RememberForPtermification::DoNotRememberSSHHost, ctx);
+        if let Some(ssh_block) = self.ptermify_state.ssh_block_state() {
             let view_id = ssh_block.get_block_view_id();
 
             self.remove_ssh_block_by_id(view_id);
 
             self.redetermine_global_focus(ctx);
 
-            self.rookify_state.clear_ssh_block_state();
+            self.ptermify_state.clear_ssh_block_state();
         }
     }
 
@@ -10269,13 +10272,13 @@ impl TerminalView {
             });
         }
 
-        let rookification_source = match session_type {
-            BootstrapSessionType::RookifiedRemote => RookificationSource::Ssh,
-            BootstrapSessionType::Local => RookificationSource::Subshell,
+        let ptermification_source = match session_type {
+            BootstrapSessionType::PtermifiedRemote => PtermificationSource::Ssh,
+            BootstrapSessionType::Local => PtermificationSource::Subshell,
         };
         let ssh_success_block_handle = ctx.add_typed_action_view(|ctx| {
-            RookifySuccessBlock::new(
-                rookification_source,
+            PtermifySuccessBlock::new(
+                ptermification_source,
                 spawning_command,
                 subshell_info,
                 shell,
@@ -10288,9 +10291,9 @@ impl TerminalView {
 
         self.clear_ssh_blocks(ctx);
         self.insert_rich_content(
-            Some(RichContentType::RookifySuccessBlock),
+            Some(RichContentType::PtermifySuccessBlock),
             ssh_success_block_handle.clone(),
-            Some(RichContentMetadata::RookifySuccessBlock {
+            Some(RichContentMetadata::PtermifySuccessBlock {
                 bootstrap_success_block_handle: ssh_success_block_handle.clone(),
             }),
             RichContentInsertionPosition::Append {
@@ -10298,30 +10301,30 @@ impl TerminalView {
             },
             ctx,
         );
-        self.rookify_state
-            .set_ssh_block_state(SshBlockState::RookifySuccess {
+        self.ptermify_state
+            .set_ssh_block_state(SshBlockState::PtermifySuccess {
                 handle: ssh_success_block_handle,
             });
         let active_session_id = self.active_block_session_id();
-        self.rookify_state.on_rookify_start(active_session_id);
-        self.refresh_rook_prompt(ctx);
+        self.ptermify_state.on_ptermify_start(active_session_id);
+        self.refresh_pterm_prompt(ctx);
     }
 
     fn handle_ssh_success_block_events(
         &mut self,
-        event: &RookifySuccessBlockEvent,
+        event: &PtermifySuccessBlockEvent,
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            RookifySuccessBlockEvent::OpenRookifySettings => {
-                ctx.emit(Event::OpenSettings(SettingsSection::Rookify));
+            PtermifySuccessBlockEvent::OpenPtermifySettings => {
+                ctx.emit(Event::OpenSettings(SettingsSection::Ptermify));
             }
         }
     }
 
-    fn dismiss_rookify_banner(
+    fn dismiss_ptermify_banner(
         &mut self,
-        remember_command: &RememberForRookification,
+        remember_command: &RememberForPtermification,
         ctx: &mut ViewContext<Self>,
     ) {
         {
@@ -10329,72 +10332,74 @@ impl TerminalView {
             model.block_list_mut().set_active_block_banner(None);
         }
 
-        // Also clear the rookify footer so it doesn't linger after rookification
+        // Also clear the ptermify footer so it doesn't linger after ptermification
         // starts, fails, or is cancelled.
-        if FeatureFlag::RookifyFooter.is_enabled() {
+        if FeatureFlag::PtermifyFooter.is_enabled() {
             self.use_agent_footer.update(ctx, |footer, ctx| {
-                footer.clear_rookify(ctx);
+                footer.clear_ptermify(ctx);
             });
         }
 
         match remember_command {
-            RememberForRookification::RememberSubshellCommand(command) => {
-                RookifySettings::handle(ctx).update(ctx, |rookify, ctx| {
-                    rookify.denylist_subshell_command(command, ctx);
+            RememberForPtermification::RememberSubshellCommand(command) => {
+                PtermifySettings::handle(ctx).update(ctx, |ptermify, ctx| {
+                    ptermify.denylist_subshell_command(command, ctx);
                 });
             }
-            RememberForRookification::RememberSSHHost(host) => {
-                RookifySettings::handle(ctx).update(ctx, |rookify, ctx| {
-                    rookify.denylist_ssh_host(host, ctx);
+            RememberForPtermification::RememberSSHHost(host) => {
+                PtermifySettings::handle(ctx).update(ctx, |ptermify, ctx| {
+                    ptermify.denylist_ssh_host(host, ctx);
                 });
             }
-            RememberForRookification::DoNotRememberSubshellCommand
-            | RememberForRookification::DoNotRememberSSHHost => {}
+            RememberForPtermification::DoNotRememberSubshellCommand
+            | RememberForPtermification::DoNotRememberSSHHost => {}
         }
     }
 
-    fn show_rookify_banner(
+    fn show_ptermify_banner(
         &mut self,
         command: String,
         title: &str,
         lowercase_title: &str,
-        rookify_keybinding: Option<Keystroke>,
+        ptermify_keybinding: Option<Keystroke>,
         telemetry_event: TelemetryEvent,
         ctx: &mut ViewContext<Self>,
     ) {
-        if FeatureFlag::RookifyFooter.is_enabled() {
+        if FeatureFlag::PtermifyFooter.is_enabled() {
             return;
         }
 
         let mut model = self.model.lock();
 
-        // Shared session viewers can't initiate rookification currently.
-        // Don't show the rookify banner when an agent is monitoring the command either.
+        // Shared session viewers can't initiate ptermification currently.
+        // Don't show the ptermify banner when an agent is monitoring the command either.
         if model.shared_session_status().is_viewer()
             || model.block_list().active_block().is_agent_monitoring()
         {
             return;
         }
 
-        let a11y_message = match &rookify_keybinding {
+        let a11y_message = match &ptermify_keybinding {
             Some(keystroke) => format!(
-                "You can press {} to Rookify this {} for more Rook features.",
+                "You can press {} to Ptermify this {} for more Polaris Terminal features.",
                 keystroke.displayed(),
                 lowercase_title
             ),
-            None => format!("You can Rookify this {lowercase_title} for more Rook features."),
+            None => format!(
+                "You can Ptermify this {lowercase_title} for more Polaris Terminal features."
+            ),
         };
 
         model
             .block_list_mut()
-            .set_active_block_banner(Some(WithinBlockBanner::RookifyBanner(
-                RookifyBannerState::new(command, rookify_keybinding),
+            .set_active_block_banner(Some(WithinBlockBanner::PtermifyBanner(
+                PtermifyBannerState::new(command, ptermify_keybinding),
             )));
 
         let a11y_content = AccessibilityContent::new(
             format!("{title} recognized."),
             a11y_message,
-            RookA11yRole::TextRole,
+            PtermA11yRole::TextRole,
         );
         ctx.emit_a11y_content(a11y_content);
 
@@ -10502,7 +10507,7 @@ impl TerminalView {
         let a11y_content = AccessibilityContent::new(
             trigger.discovery_banner_copy(),
             "You can enable notifications through the command palette.",
-            RookA11yRole::TextRole,
+            PtermA11yRole::TextRole,
         );
         ctx.emit_a11y_content(a11y_content);
 
@@ -10540,8 +10545,8 @@ impl TerminalView {
 
         let a11y_content = AccessibilityContent::new(
             banner_title,
-            "Make sure you have enabled access for Rook notifications in System Preferences.",
-            RookA11yRole::TextRole,
+            "Make sure you have enabled access for Polaris Terminal notifications in System Preferences.",
+            PtermA11yRole::TextRole,
         );
         ctx.emit_a11y_content(a11y_content);
 
@@ -11142,7 +11147,7 @@ impl TerminalView {
     /// Checks if the current model request could be served via AWS Bedrock and the user
     /// isn't already using it. If so, inserts a banner prompting the user to log in.
     ///
-    /// The banner is shown when the user could be using AWS Bedrock to save on rook AI spend, but isn't.
+    /// The banner is shown when the user could be using AWS Bedrock to save on polaris-terminal AI spend, but isn't.
     fn maybe_insert_aws_bedrock_login_banner(
         &mut self,
         model_id: &LLMId,
@@ -11445,8 +11450,8 @@ impl TerminalView {
         reset_focus
     }
 
-    /// Recomputes the chip values for the Rook prompt (i.e. _not_ PS1).
-    fn refresh_rook_prompt(&mut self, ctx: &mut ViewContext<Self>) {
+    /// Recomputes the chip values for the Polaris Terminal prompt (i.e. _not_ PS1).
+    fn refresh_pterm_prompt(&mut self, ctx: &mut ViewContext<Self>) {
         // Ask the per-repo sub-model to re-fetch metadata so the chip values
         // reflect the latest git state (branch, diff stats, etc.).
         #[cfg(feature = "local_fs")]
@@ -11583,7 +11588,7 @@ impl TerminalView {
 
     /// The user command still running in this pane, as a block that ended now, and whether it
     /// is local. Blocks are otherwise saved only when they finish, so without this a command
-    /// left running when Rook quits - a shutdown with an agent open, say - is missing from the
+    /// left running when Polaris Terminal quits - a shutdown with an agent open, say - is missing from the
     /// restored session.
     ///
     /// Recorded with exit code 130, which the block list shows as interrupted rather than
@@ -11610,7 +11615,7 @@ impl TerminalView {
     /// Returns true if the block is considered remote.
     ///
     /// Note that we don't know for sure if a block is remote, because we can only detect
-    /// rookified remote blocks.
+    /// ptermified remote blocks.
     ///
     /// For some organizations, we accept a regex list that we run against commands to
     /// further make the determination.
@@ -11620,7 +11625,7 @@ impl TerminalView {
         command: Option<&str>,
         app: &AppContext,
     ) -> bool {
-        let is_rookified_remote = session_id
+        let is_ptermified_remote = session_id
             .map(|id| {
                 self.sessions
                     .as_ref(app)
@@ -11630,7 +11635,7 @@ impl TerminalView {
             })
             .unwrap_or_default();
 
-        if is_rookified_remote {
+        if is_ptermified_remote {
             return true;
         }
 
@@ -11666,7 +11671,7 @@ impl TerminalView {
         };
         let escape_char = session.shell_family().escape_char();
         let Some(top_level_command) =
-            rook_completer::parsers::simple::top_level_command(command, escape_char)
+            pterm_completer::parsers::simple::top_level_command(command, escape_char)
         else {
             return false;
         };
@@ -12303,7 +12308,8 @@ impl TerminalView {
 
                 // If this block ran a possible subshell command, and it exited before the 1s timer
                 // completed, abort showing the banner.
-                if let Some(abort_handle) = self.rookify_state.take_subshell_banner_abort_handle() {
+                if let Some(abort_handle) = self.ptermify_state.take_subshell_banner_abort_handle()
+                {
                     abort_handle.abort();
                 }
 
@@ -12325,9 +12331,9 @@ impl TerminalView {
                     self.on_user_block_completed(&block_completed_event.block_id, ctx);
                 }
 
-                // Clear any stale rookify footer so it doesn't leak into the next command's footer rendering.
+                // Clear any stale ptermify footer so it doesn't leak into the next command's footer rendering.
                 self.use_agent_footer.update(ctx, |footer, ctx| {
-                    footer.clear_rookify(ctx);
+                    footer.clear_ptermify(ctx);
                 });
                 self.hide_use_agent_footer_in_blocklist(ctx);
                 if matches!(block_completed_event.block_type, BlockType::User(_)) {
@@ -12422,7 +12428,7 @@ impl TerminalView {
                 self.drop_hidden_passive_ai_blocks(ctx);
 
                 // If the first word of the command is a shell alias, expand it
-                // for subshell/SSH detection. This enables rookification for
+                // for subshell/SSH detection. This enables ptermification for
                 // aliased SSH commands (e.g. `alias myssh='ssh user@host'`).
                 let expanded_command = self
                     .active_block_session_id()
@@ -12432,19 +12438,19 @@ impl TerminalView {
                         let alias_value = session.alias_value(first_word)?;
                         Some(format!("{alias_value}{rest}"))
                     });
-                let rookify_command = expanded_command.as_deref().unwrap_or(command.as_str());
+                let ptermify_command = expanded_command.as_deref().unwrap_or(command.as_str());
 
-                // Check if the current running command spawns a subshell eligible for Rookification.
+                // Check if the current running command spawns a subshell eligible for Ptermification.
                 let shell_family = self.shell_family(ctx);
-                let rookify_settings = RookifySettings::as_ref(ctx);
-                let is_compatible_subshell_command = rookify_settings
+                let ptermify_settings = PtermifySettings::as_ref(ctx);
+                let is_compatible_subshell_command = ptermify_settings
                     .is_compatible_subshell_command(command, shell_family)
-                    || rookify_settings
-                        .is_compatible_subshell_command(rookify_command, shell_family);
-                let command_is_denylisted = rookify_settings
+                    || ptermify_settings
+                        .is_compatible_subshell_command(ptermify_command, shell_family);
+                let command_is_denylisted = ptermify_settings
                     .is_denylisted_subshell_command(command)
-                    || rookify_settings.is_denylisted_subshell_command(rookify_command);
-                // Never rookify or surface rookification for agent-requested commands.
+                    || ptermify_settings.is_denylisted_subshell_command(ptermify_command);
+                // Never ptermify or surface ptermification for agent-requested commands.
                 let has_ai_metadata = self
                     .model
                     .lock()
@@ -12455,30 +12461,30 @@ impl TerminalView {
 
                 if is_compatible_subshell_command {
                     if command_is_denylisted || has_ai_metadata {
-                        // Don't auto-rookify or surface rookification for these commands.
+                        // Don't auto-ptermify or surface ptermification for these commands.
                     } else if let Some(shell_type) = self.pending_auto_bootstrap_shell_type.take() {
                         // If there is a subshell we're waiting to bootstrap until we receive
                         // the preexec hook, now we can bootstrap it.
-                        let auto_rookify_abort_handle = ctx.spawn_abortable(
-                            Timer::after(Duration::from_millis(AUTO_ROOKIFY_DELAY)),
+                        let auto_ptermify_abort_handle = ctx.spawn_abortable(
+                            Timer::after(Duration::from_millis(AUTO_POLARIS_TERMINALIFY_DELAY)),
                             move |me, _, ctx| {
                                 me.trigger_subshell_bootstrap(Some(shell_type), false, ctx);
                             },
                             |_, _| (),
                         );
-                        self.rookify_state
-                            .add_auto_rookify_abort_handle(auto_rookify_abort_handle);
+                        self.ptermify_state
+                            .add_auto_ptermify_abort_handle(auto_ptermify_abort_handle);
                     } else {
                         // Wait 1 second before showing the banner, just to make sure the
                         // command stays running for a bit. If the command fails instantly,
                         // we don't want to flicker the banner away so quickly.
                         let command = command.clone();
-                        self.rookify_state
+                        self.ptermify_state
                             .add_subshell_banner_abort_handle(ctx.spawn_abortable(
                                 Timer::after(*SUBSHELL_BANNER_DELAY_DURATION),
                                 |view, _, ctx| {
-                                    if FeatureFlag::RookifyFooter.is_enabled() {
-                                        view.show_rookify_footer(ctx);
+                                    if FeatureFlag::PtermifyFooter.is_enabled() {
+                                        view.show_ptermify_footer(ctx);
                                     } else {
                                         view.handle_action(
                                             &TerminalAction::ShowSubshellBanner(command),
@@ -12492,14 +12498,14 @@ impl TerminalView {
                 } else {
                     if !has_ai_metadata {
                         if let Some(ssh_host) =
-                            parse_interactive_ssh_command(rookify_command).map(|cmd| cmd.host)
+                            parse_interactive_ssh_command(ptermify_command).map(|cmd| cmd.host)
                         {
-                            self.rookify_state
-                                .set_pending_ssh_host(rookify_command.to_string(), ssh_host);
+                            self.ptermify_state
+                                .set_pending_ssh_host(ptermify_command.to_string(), ssh_host);
                             self.model.lock().start_notify_on_end_of_ssh_login();
                             ctx.emit(Event::TerminalViewStateChanged);
                         } else {
-                            self.rookify_state.clear_pending_ssh_host();
+                            self.ptermify_state.clear_pending_ssh_host();
 
                             ctx.spawn(
                                 Timer::after(Duration::from_millis(
@@ -12600,14 +12606,14 @@ impl TerminalView {
                 cloud_workflow_id,
                 cloud_env_var_collection_id,
             }) => {
-                // To automatically rookify a subshell, we run the relevant command to open the
+                // To automatically ptermify a subshell, we run the relevant command to open the
                 // subshell and create a future to delay bootstrapping the subshell long enough for
                 // the command to complete. We receive AfterBlockCompleted if the subshell command
                 // returns an error or the user exits the subshell. Here we abort the future to
                 // avoid an attempt to trigger bootstrapping if the subshell command failed. If the
                 // future already resolved, abort has no effect. We handle this as early as possible
                 // because the abort is time sensitive.
-                self.rookify_state.abort_auto_rookify();
+                self.ptermify_state.abort_auto_ptermify();
 
                 let active_session = self
                     .active_block_session_id()
@@ -12663,7 +12669,7 @@ impl TerminalView {
                         );
 
                         // On dogfood only, we're interested in the block commands, durations,
-                        // and exit codes to trial Rook Analytics.
+                        // and exit codes to trial Polaris Terminal Analytics.
                         if ChannelState::channel().is_dogfood() {
                             send_telemetry_from_ctx!(
                                 TelemetryEvent::BlockCompletedOnDogfoodOnly {
@@ -12693,14 +12699,14 @@ impl TerminalView {
                 }
                 let active_session_id = self.active_block_session_id();
                 if let Some(block_id) = self
-                    .rookify_state
-                    .get_completed_rookify_session_id(active_session_id, ctx)
+                    .ptermify_state
+                    .get_completed_ptermify_session_id(active_session_id, ctx)
                 {
                     self.remove_ssh_block_by_id(block_id);
                 }
 
-                self.dismiss_rookify_banner(
-                    &RememberForRookification::DoNotRememberSubshellCommand,
+                self.dismiss_ptermify_banner(
+                    &RememberForPtermification::DoNotRememberSubshellCommand,
                     ctx,
                 );
 
@@ -12767,12 +12773,12 @@ impl TerminalView {
                 // command list, we execute the command after a delay.
                 // The delay is necessary because the shell needs a tiny bit of
                 // extra time after the last precmd function is finished.
-                // Additionally, it's possible for hooks to install themselves after the rook
+                // Additionally, it's possible for hooks to install themselves after the polaris-terminal
                 // precmd. For example, `fig_precmd` does this.
                 if self.is_login_shell_bootstrapped {
                     let _ = ctx.spawn(
                         async move {
-                            rookui::r#async::Timer::after(EXECUTE_PENDING_COMMAND_DELAY).await;
+                            ptermui::r#async::Timer::after(EXECUTE_PENDING_COMMAND_DELAY).await;
                         },
                         Self::execute_pending_command,
                     );
@@ -12792,7 +12798,7 @@ impl TerminalView {
                         .block_list()
                         .is_bootstrapping_precmd_done()
                 {
-                    self.refresh_rook_prompt(ctx);
+                    self.refresh_pterm_prompt(ctx);
 
                     // If the completed command was a `gh` or `gt` invocation, eagerly refresh PR
                     // info since these don't touch .git/ and won't be caught by the filesystem watcher.
@@ -12818,14 +12824,14 @@ impl TerminalView {
                                     .and_then(|session| {
                                         let escape_char = session.shell_family().escape_char();
                                         let cmd =
-                                            rook_completer::parsers::simple::top_level_command(
+                                            pterm_completer::parsers::simple::top_level_command(
                                                 command,
                                                 escape_char,
                                             )?;
                                         let cmd = session
                                             .alias_value(cmd.as_str())
                                             .and_then(|alias| {
-                                                rook_completer::parsers::simple::top_level_command(
+                                                pterm_completer::parsers::simple::top_level_command(
                                                     alias,
                                                     escape_char,
                                                 )
@@ -12867,7 +12873,7 @@ impl TerminalView {
                             self.maybe_suggest_alias_expansion(block_completed, ctx);
                         }
 
-                        self.maybe_suggest_open_in_rook(block_completed, ctx);
+                        self.maybe_suggest_open_in_pterm(block_completed, ctx);
                     }
 
                     // Check if the user tried to run an AWS login command but AWS CLI wasn't installed.
@@ -13069,11 +13075,11 @@ impl TerminalView {
                     BlockMetadataUpdateSource::Osc7,
                     ctx,
                 );
-                // Recompute Rook-prompt chip values (notably the
+                // Recompute Polaris Terminal-prompt chip values (notably the
                 // `WorkingDirectory` chip text that feeds the vertical-tab
                 // subtitle via `display_working_directory`). The chip
                 // generator reads from `CurrentPrompt::latest_context`, which
-                // is only refreshed through `refresh_rook_prompt` →
+                // is only refreshed through `refresh_pterm_prompt` →
                 // `current_prompt.update_context`. In the normal precmd flow
                 // that refresh is triggered by `BlockCompleted`, but an OSC 7
                 // fires mid-command — the block never completes — so without
@@ -13086,7 +13092,7 @@ impl TerminalView {
                 // can re-fire chip generators that schedule another in-band
                 // command, leading to a refresh loop.
                 if !block_working_directory_updated_event.is_for_in_band_command {
-                    self.refresh_rook_prompt(ctx);
+                    self.refresh_pterm_prompt(ctx);
                 }
             }
 
@@ -13206,7 +13212,7 @@ impl TerminalView {
 
                 ctx.spawn(
                     async {
-                        rookui::r#async::Timer::after(*TRIGGER_RC_FILE_SUBSHELL_BOOTSTRAP_DELAY)
+                        ptermui::r#async::Timer::after(*TRIGGER_RC_FILE_SUBSHELL_BOOTSTRAP_DELAY)
                             .await
                     },
                     move |me, _, ctx| {
@@ -13217,7 +13223,7 @@ impl TerminalView {
                             .active_block()
                             .agent_interaction_metadata()
                             .is_some();
-                        // Never rookify for agent-requested commands.
+                        // Never ptermify for agent-requested commands.
                         if has_ai_metadata {
                             return;
                         }
@@ -13414,8 +13420,8 @@ impl TerminalView {
                 me.remove_ssh_remote_server_choice_block(session_id, ctx);
                 ctx.emit(Event::RemoteServerSkipRequested { session_id });
             }
-            SshRemoteServerChoiceViewEvent::OpenRookifySettings => {
-                ctx.emit(Event::OpenSettings(SettingsSection::Rookify));
+            SshRemoteServerChoiceViewEvent::OpenPtermifySettings => {
+                ctx.emit(Event::OpenSettings(SettingsSection::Ptermify));
             }
         });
 
@@ -13507,7 +13513,7 @@ impl TerminalView {
             })
             .unwrap_or_else(|| "Starting shell...".to_string());
 
-        let shimmer_element = shimmering_rook_loading_text(
+        let shimmer_element = shimmering_pterm_loading_text(
             message,
             appearance.monospace_font_size() - 2.,
             self.remote_server_shimmer_handle.clone(),
@@ -13609,7 +13615,7 @@ impl TerminalView {
 
         // Clear the pending flag up front so the notice is shown at most once, even if the
         // banner is dismissed without interaction or the session ends early.
-        RookifySettings::handle(ctx).update(ctx, |settings, ctx| {
+        PtermifySettings::handle(ctx).update(ctx, |settings, ctx| {
             settings.mark_tmux_deprecation_notice_shown(ctx);
         });
 
@@ -13692,7 +13698,7 @@ impl TerminalView {
         ctx.notify();
     }
 
-    /// Handles an OSC 777 event with the `rook://cli-agent` sentinel title.
+    /// Handles an OSC 777 event with the `polaris-terminal://cli-agent` sentinel title.
     /// On `session_start`, creates a `CLIAgentSessionListener` that subscribes
     /// to subsequent events from this terminal's PTY.
     fn handle_cli_agent_notification(
@@ -14066,7 +14072,7 @@ impl TerminalView {
         self.update_incompatible_configuration_banner(session.shell().plugins(), ctx);
 
         if let Some(subshell_info) = session.subshell_info() {
-            self.rookify_state
+            self.ptermify_state
                 .add_subshell_separator(subshell_info, self.model.clone(), ctx);
         }
 
@@ -14130,7 +14136,7 @@ impl TerminalView {
                         ctx,
                     );
                 });
-                me.refresh_rook_prompt(ctx);
+                me.refresh_pterm_prompt(ctx);
             },
         );
 
@@ -14142,22 +14148,23 @@ impl TerminalView {
             .spawn(async move { session_clone2.load_all_builtins().await })
             .detach();
 
-        // If we were waiting for a successful rookification, it's come. Stop the timeout.
-        self.rookify_state.abort_ssh_rookify_timeout();
+        // If we were waiting for a successful ptermification, it's come. Stop the timeout.
+        self.ptermify_state.abort_ssh_ptermify_timeout();
 
-        let is_rookified_remote = matches!(
+        let is_ptermified_remote = matches!(
             bootstrap_event.session_type,
-            BootstrapSessionType::RookifiedRemote
+            BootstrapSessionType::PtermifiedRemote
         );
         if bootstrap_event.subshell_info.is_some() {
             self.add_bootstrap_success_block(bootstrap_event, ctx);
         }
 
         // Show the one-time tmux deprecation notice when an SSH session successfully
-        // rookifies. The end-of-ssh-login path (`handle_detected_end_of_ssh_login`) only
-        // fires for sessions that stay unrookified, since rookification replaces the
+        // ptermifies. The end-of-ssh-login path (`handle_detected_end_of_ssh_login`) only
+        // fires for sessions that stay unptermified, since ptermification replaces the
         // original ssh block before login detection can confirm completion.
-        if is_rookified_remote && RookifySettings::as_ref(ctx).should_show_tmux_deprecation_notice()
+        if is_ptermified_remote
+            && PtermifySettings::as_ref(ctx).should_show_tmux_deprecation_notice()
         {
             self.show_ssh_tmux_deprecation_banner(session_id, ctx);
         }
@@ -14222,7 +14229,7 @@ impl TerminalView {
 
         // Now that the session is bootstrapped, update any restored AI blocks that were
         // created before bootstrapping with the shell launch data. This enables file link
-        // detection and the "Open in Rook" button on code blocks in restored conversations.
+        // detection and the "Open in Polaris Terminal" button on code blocks in restored conversations.
         if let Some(shell_launch_data) = self.active_session.as_ref(ctx).shell_launch_data(ctx) {
             let ai_block_handles: Vec<_> = self
                 .rich_content_views
@@ -14237,7 +14244,7 @@ impl TerminalView {
             }
         }
 
-        self.refresh_rook_prompt(ctx);
+        self.refresh_pterm_prompt(ctx);
         ctx.emit(Event::SessionBootstrapped);
     }
 
@@ -14287,7 +14294,7 @@ impl TerminalView {
     ) {
         self.reset_onboarding_blocks(ctx);
 
-        RookDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
+        PtermDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
             report_if_error!(settings.sharing_onboarding_block_shown.set_value(true, ctx));
         });
 
@@ -14747,7 +14754,7 @@ impl TerminalView {
         ctx.emit(Event::OpenEnvironmentManagementPane);
     }
 
-    /// Check if completed command was `rook environment create` and emit event if successful
+    /// Check if completed command was `polaris-terminal environment create` and emit event if successful
     fn maybe_handle_environment_create_command(
         &mut self,
         block_completed: &UserBlockCompleted,
@@ -15582,7 +15589,7 @@ impl TerminalView {
         // https://github.com/warpdotdev/command-corrections/blob/df7848d4fb3da7883623e959889a296a07d88053/src/rules/cd/mod.rs#L31-L36
         // We don't currently support dynamic rules over SSH, so we should not attempt to correct commands if
         // inside ssh session.
-        let is_ssh_command = SshRookifyCommand::matches(input).is_some();
+        let is_ssh_command = SshPtermifyCommand::matches(input).is_some();
         if is_ssh_command {
             return vec![];
         }
@@ -15644,7 +15651,7 @@ impl TerminalView {
             let a11y_content = AccessibilityContent::new(
                 format!("Suggested corrected command: {}", correction.command),
                 "Press right arrow to insert or keep editing to ignore",
-                RookA11yRole::HelpRole,
+                PtermA11yRole::HelpRole,
             );
             ctx.emit_a11y_content(a11y_content);
 
@@ -16447,7 +16454,7 @@ impl TerminalView {
     }
 
     /// Shared logic for sending a desktop notification (or showing a discovery banner)
-    /// for any agent status change (both Rook's agent and any CLI agent).
+    /// for any agent status change (both Polaris Terminal's agent and any CLI agent).
     fn send_agent_desktop_notification_or_show_banner(
         &mut self,
         trigger: NotificationsTrigger,
@@ -16573,7 +16580,7 @@ impl TerminalView {
     fn start_bootstrap_timer(&self, duration: Duration, ctx: &mut ViewContext<Self>) {
         let _ = ctx.spawn(
             async move {
-                rookui::r#async::Timer::after(duration).await;
+                ptermui::r#async::Timer::after(duration).await;
             },
             Self::on_bootstrap_failed_timer_complete,
         );
@@ -16637,7 +16644,7 @@ impl TerminalView {
                 bootstrap_duration_seconds: None,
                 shell_version: None,
                 rcfiles_duration_seconds: None,
-                rook_attributed_bootstrap_duration_seconds: None,
+                pterm_attributed_bootstrap_duration_seconds: None,
                 terminal_session_id: None,
             }),
             ctx
@@ -17203,13 +17210,15 @@ impl TerminalView {
                                     .into_item(),
                             ];
 
-                            if renders_in_rook_notebook_viewer(&path) {
+                            if renders_in_pterm_notebook_viewer(&path) {
                                 items.push(
-                                    MenuItemFields::new("Open in Rook")
-                                        .with_on_select_action(TerminalAction::OpenFileInRook(path))
+                                    MenuItemFields::new("Open in Polaris Terminal")
+                                        .with_on_select_action(TerminalAction::OpenFileInPterm(
+                                            path,
+                                        ))
                                         .into_item(),
                                 );
-                                // Because the default for cmd-click is to open in Rook, we also
+                                // Because the default for cmd-click is to open in Polaris Terminal, we also
                                 // have an open-in-editor option.
                                 items.push(
                                     MenuItemFields::new("Open in editor")
@@ -17476,7 +17485,7 @@ impl TerminalView {
                     ));
                 }
 
-                if RookDriveSettings::is_rook_drive_enabled(ctx) {
+                if PtermDriveSettings::is_pterm_drive_enabled(ctx) {
                     items.push(MenuItem::Separator);
                     items.push(
                         MenuItemFields::new("Save as workflow")
@@ -17511,7 +17520,7 @@ impl TerminalView {
                     } else {
                         items.extend([
                             MenuItem::Separator,
-                            MenuItemFields::new("Ask Rook AI")
+                            MenuItemFields::new("Ask Polaris Terminal AI")
                                 .with_on_select_action(TerminalAction::ContextMenu(
                                     ContextMenuAction::AskAI(AskAISource::SelectedBlockOrText),
                                 ))
@@ -18189,7 +18198,7 @@ impl TerminalView {
             items.extend(self.session_sharing_context_menu_items(&model, false, has_session_link));
         }
 
-        // Section 2: AI Command Search, Ask Rook AI
+        // Section 2: AI Command Search, Ask Polaris Terminal AI
         items.extend([
             MenuItem::Separator,
             MenuItemFields::new("Command search")
@@ -18220,9 +18229,9 @@ impl TerminalView {
 
             if !selected_input_text.is_empty() && !FeatureFlag::AgentMode.is_enabled() {
                 items.push(
-                    MenuItemFields::new("Ask Rook AI")
+                    MenuItemFields::new("Ask Polaris Terminal AI")
                         .with_on_select_action(TerminalAction::InputContextMenuItem(
-                            InputContextMenuAction::AskRookAI,
+                            InputContextMenuAction::AskPtermAI,
                         ))
                         .into_item(),
                 );
@@ -18230,7 +18239,7 @@ impl TerminalView {
         }
 
         // Section 3: Teams related
-        if !all_current_input_text.is_empty() && RookDriveSettings::is_rook_drive_enabled(ctx) {
+        if !all_current_input_text.is_empty() && PtermDriveSettings::is_pterm_drive_enabled(ctx) {
             items.extend([
                 MenuItem::Separator,
                 MenuItemFields::new("Save as workflow")
@@ -18368,7 +18377,7 @@ impl TerminalView {
 
         send_telemetry_from_ctx!(
             TelemetryEvent::SaveAsWorkflowModal {
-                source: SaveAsWorkflowModalSource::RookAIWorkflowCard,
+                source: SaveAsWorkflowModalSource::PtermAIWorkflowCard,
             },
             ctx
         );
@@ -19099,13 +19108,13 @@ impl TerminalView {
     }
 
     #[cfg(feature = "local_fs")]
-    fn open_code_in_rook(
+    fn open_code_in_pterm(
         &mut self,
         source: CodeSource,
         layout: EditorLayout,
         ctx: &mut ViewContext<Self>,
     ) {
-        ctx.emit(Event::OpenCodeInRook { source, layout });
+        ctx.emit(Event::OpenCodeInPterm { source, layout });
     }
     #[cfg(feature = "local_fs")]
     fn open_file_path_with_target(
@@ -19187,13 +19196,13 @@ impl TerminalView {
         self.paste(true, ctx);
     }
 
-    /// Tell the pane group to open a file within Rook.
-    fn open_file_in_rook(&mut self, path: PathBuf, ctx: &mut ViewContext<Self>) {
+    /// Tell the pane group to open a file within Polaris Terminal.
+    fn open_file_in_pterm(&mut self, path: PathBuf, ctx: &mut ViewContext<Self>) {
         if let Some(session) = self
             .active_block_session_id()
             .and_then(|session_id| self.sessions.as_ref(ctx).get(session_id))
         {
-            ctx.emit(Event::OpenFileInRook { path, session })
+            ctx.emit(Event::OpenFileInPterm { path, session })
         }
     }
 
@@ -19713,7 +19722,7 @@ impl TerminalView {
             .and_then(|id| self.sessions.as_ref(ctx).get(id))
             && let Some(info) = session.subshell_info()
         {
-            self.rookify_state
+            self.ptermify_state
                 .add_subshell_separator(info, self.model.clone(), ctx);
         }
 
@@ -20132,7 +20141,7 @@ impl TerminalView {
                     return;
                 }
 
-                send_telemetry_from_ctx!(TelemetryEvent::InputAskRookAI, ctx);
+                send_telemetry_from_ctx!(TelemetryEvent::InputAskPtermAI, ctx);
                 AskAIType::FromTextSelection {
                     text: Arc::new(selected_input_text),
                     populate_input_box: true,
@@ -20952,9 +20961,9 @@ impl TerminalView {
                         env_var_collection_block.clear_selection(ctx);
                     });
                 }
-                Some(RichContentMetadata::RookifySuccessBlock { .. }) => {
-                    // TODO(Simon): We should be checking for RookifySuccessBlocks here as well.
-                    // The `RookifySuccessBlock` implements a `SelectableArea`.
+                Some(RichContentMetadata::PtermifySuccessBlock { .. }) => {
+                    // TODO(Simon): We should be checking for PtermifySuccessBlocks here as well.
+                    // The `PtermifySuccessBlock` implements a `SelectableArea`.
                 }
                 _ => {}
             }
@@ -21194,10 +21203,10 @@ impl TerminalView {
                 ctx.notify();
             }
             AIBlockEvent::OpenCitation(citation) => match citation {
-                AIAgentCitation::RookDriveObject { uid } => {
-                    ctx.emit(Event::OpenRookDriveObjectInPane(uid.clone()));
+                AIAgentCitation::PtermDriveObject { uid } => {
+                    ctx.emit(Event::OpenPtermDriveObjectInPane(uid.clone()));
                 }
-                AIAgentCitation::RookDocumentation { path } => {
+                AIAgentCitation::PtermDocumentation { path } => {
                     ctx.open_url(&format!("https://docs.rook.dev/{path}"));
                 }
                 AIAgentCitation::WebPage { url } => {
@@ -21222,7 +21231,7 @@ impl TerminalView {
             }
             AIBlockEvent::OpenWorkflow { sync_id } => {
                 if let Some(object) = CloudModel::as_ref(ctx).get_workflow(sync_id) {
-                    ctx.emit(Event::OpenRookDriveObjectInPane(object.uid()));
+                    ctx.emit(Event::OpenPtermDriveObjectInPane(object.uid()));
                 }
             }
             AIBlockEvent::OpenSuggestedAgentModeWorkflowModal { workflow_and_id } => {
@@ -21316,11 +21325,11 @@ impl TerminalView {
                 self.handle_usage_footer_toggled(block.id(), *conversation_id, *is_expanded, ctx);
             }
             AIBlockEvent::OpenSettings => {
-                ctx.emit(Event::OpenSettings(SettingsSection::RookAgent));
+                ctx.emit(Event::OpenSettings(SettingsSection::PtermAgent));
             }
             #[cfg(feature = "local_fs")]
-            AIBlockEvent::OpenCodeInRook { source, layout } => {
-                ctx.emit(Event::OpenCodeInRook {
+            AIBlockEvent::OpenCodeInPterm { source, layout } => {
+                ctx.emit(Event::OpenCodeInPterm {
                     source: source.clone(),
                     layout: *layout,
                 });
@@ -22641,8 +22650,8 @@ impl TerminalView {
                 ctx.emit(Event::OpenSettings(*section));
             }
             #[cfg(feature = "local_fs")]
-            InputEvent::OpenCodeInRook { source, layout } => {
-                ctx.emit(Event::OpenCodeInRook {
+            InputEvent::OpenCodeInPterm { source, layout } => {
+                ctx.emit(Event::OpenCodeInPterm {
                     source: source.clone(),
                     layout: *layout,
                 });
@@ -22832,7 +22841,7 @@ impl TerminalView {
 
         // When we insert rich content (including agent view blocks) we insert it immediately before
         // the active block (unless explicitly inserting below a long-running block). The active
-        // block is a special "rook input" block that often exists even when it isn't user-visible.
+        // block is a special "polaris-terminal input" block that often exists even when it isn't user-visible.
         //
         // So, for dedupe we check the first visible (non-zero height) item *immediately before the
         // active block*. This avoids false negatives caused by the active block itself.
@@ -23224,7 +23233,7 @@ impl TerminalView {
         let show_banner = if honor_ps1 {
             let banner_content = if shell_plugins.contains("p10k_unsupported") {
                 Some(BannerTextContent::formatted_text(vec![
-                    FormattedTextFragment::bold("Powerlevel10k now supports Rook!  "),
+                    FormattedTextFragment::bold("Powerlevel10k now supports Polaris Terminal!  "),
                     FormattedTextFragment::plain_text(
                         "You seem to be running an older (unsupported) version, please follow ",
                     ),
@@ -23237,7 +23246,7 @@ impl TerminalView {
             } else if shell_plugins.contains("pure") {
                 Some(BannerTextContent::formatted_text(vec![
                     FormattedTextFragment::plain_text(
-                        "Pure is not yet supported in Rook. You might consider one of the \
+                        "Pure is not yet supported in Polaris Terminal. You might consider one of the \
                         supported prompts as an alternative.  ",
                     ),
                     FormattedTextFragment::hyperlink("Learn more", PROMPT_COMPATIBILITY_URL),
@@ -24133,7 +24142,7 @@ impl TerminalView {
                     self.update_incompatible_configuration_banner(session.shell().plugins(), ctx)
                 }
 
-                // honor_ps1 affects whether the Rook prompt is active, which
+                // honor_ps1 affects whether the Polaris Terminal prompt is active, which
                 // determines if we need git status updates.
                 self.update_git_status_subscription(ctx);
             }
@@ -24345,7 +24354,7 @@ impl TerminalView {
         } else {
             // Remote session: pair CWD with the session's host_id.
             let host_id = match session.session_type() {
-                SessionType::RookifiedRemote { host_id } => host_id,
+                SessionType::PtermifiedRemote { host_id } => host_id,
                 SessionType::Local => return None,
             }?;
             let std_path = StandardizedPath::try_new(cwd_str).ok()?;
@@ -24471,11 +24480,11 @@ impl TerminalView {
         let icon = Container::new(
             ConstrainedBox::new(if has_active_filter {
                 icons::Icon::FilterFunnelFilled
-                    .to_rookui_icon(appearance.theme().accent())
+                    .to_ptermui_icon(appearance.theme().accent())
                     .finish()
             } else {
                 icons::Icon::FilterFunnel
-                    .to_rookui_icon(
+                    .to_ptermui_icon(
                         appearance
                             .theme()
                             .sub_text_color(appearance.theme().surface_2()),
@@ -24702,7 +24711,7 @@ impl TerminalView {
         let prompt = Text::new_inline(
             Self::block_prompt(model, sessions, index),
             appearance.monospace_font_family(),
-            appearance.monospace_font_size() * ROOK_PROMPT_HEIGHT_LINES,
+            appearance.monospace_font_size() * POLARIS_TERMINAL_PROMPT_HEIGHT_LINES,
         )
         .with_style(Properties::default().weight(appearance.monospace_font_weight()))
         .with_color(terminal_theme_prompt)
@@ -24715,7 +24724,7 @@ impl TerminalView {
             let duration = Text::new_inline(
                 duration_string,
                 appearance.monospace_font_family(),
-                appearance.monospace_font_size() * ROOK_PROMPT_HEIGHT_LINES,
+                appearance.monospace_font_size() * POLARIS_TERMINAL_PROMPT_HEIGHT_LINES,
             )
             .with_style(Properties::default().weight(appearance.monospace_font_weight()))
             .with_color(terminal_theme_prompt)
@@ -24925,10 +24934,10 @@ impl TerminalView {
             }
         }
 
-        if let Some(open_in_rook_banner) = &self.inline_banners_state.open_in_rook_banner {
+        if let Some(open_in_pterm_banner) = &self.inline_banners_state.open_in_pterm_banner {
             inline_banners.insert(
-                open_in_rook_banner.id,
-                render_open_in_rook_banner(open_in_rook_banner, self.view_id, appearance),
+                open_in_pterm_banner.id,
+                render_open_in_pterm_banner(open_in_pterm_banner, self.view_id, appearance),
             );
         }
 
@@ -25151,7 +25160,7 @@ impl TerminalView {
 
         let mut subshell_separators = HashMap::new();
 
-        for (id, command) in self.rookify_state.get_subshell_separators() {
+        for (id, command) in self.ptermify_state.get_subshell_separators() {
             subshell_separators.insert(*id, render_subshell_separator(command.clone(), appearance));
         }
 
@@ -25163,8 +25172,8 @@ impl TerminalView {
             .active_block()
             .block_banner()
             .map(|banner| match banner {
-                WithinBlockBanner::RookifyBanner(state) => {
-                    render_rookification_banner(state, appearance)
+                WithinBlockBanner::PtermifyBanner(state) => {
+                    render_ptermification_banner(state, appearance)
                 }
             });
 
@@ -26161,7 +26170,7 @@ impl TerminalView {
             SelectAll => self.select_all_text_from_input(ctx),
             Paste => self.paste_in_input(ctx),
             ShowCommandSearch => self.command_search_from_input(ctx),
-            AskRookAI => self.ask_ai(&AskAISource::SelectedInputText, ctx),
+            AskPtermAI => self.ask_ai(&AskAISource::SelectedInputText, ctx),
             ShowAICommandSearch => self.ai_command_search_from_input(ctx),
             SaveAsWorkflow => self.save_as_workflow_from_input(ctx),
             ToggleInputHintText => self.toggle_input_hint_text(ctx),
@@ -26189,7 +26198,7 @@ impl TerminalView {
                 // TODO (a11y) Keybindings should be taken from the actual user's
                 // configuration
                 "Press cmd-C to read and copy both command and output, and cmd-option-shift-C to read and copy output only. Press cmd-B to bookmark the block: you could navigate between bookmarked blocks quickly using option-up and option-down.",
-                RookA11yRole::TextRole,
+                PtermA11yRole::TextRole,
             )
         })
     }
@@ -26407,7 +26416,7 @@ impl TerminalView {
     }
 
     /// Replace the terminal input buffer with the given command that is meant to open a subshell.
-    /// Set a flag that we should automatically bootstrap AKA "rookify" the subshell when we
+    /// Set a flag that we should automatically bootstrap AKA "ptermify" the subshell when we
     /// receive the [`AfterBlockStarted`] event.
     pub fn insert_subshell_command_and_bootstrap_if_supported(
         &mut self,
@@ -26641,7 +26650,7 @@ impl TerminalView {
         shell_type: ShellType,
         ctx: &mut ViewContext<Self>,
     ) {
-        // Attempt to auto rookify the subshell when bootstrapped
+        // Attempt to auto ptermify the subshell when bootstrapped
         self.pending_auto_bootstrap_shell_type = Some(shell_type);
 
         self.input.update(ctx, |input, ctx| {
@@ -26792,7 +26801,7 @@ impl TerminalView {
                 && session.shell_family() == ShellFamily::Posix
                 && is_in_long_running_command;
             if is_msys2_long_running {
-                let input = rookui::clipboard_utils::escaped_paths_str(paths, None);
+                let input = ptermui::clipboard_utils::escaped_paths_str(paths, None);
                 self.typed_characters_on_terminal(&input, ctx);
                 return;
             }
@@ -26803,7 +26812,7 @@ impl TerminalView {
             let paths = if session.is_wsl() {
                 paths_converted = paths
                     .iter()
-                    .map(|p| rook_util::path::convert_windows_path_to_wsl(p))
+                    .map(|p| pterm_util::path::convert_windows_path_to_wsl(p))
                     .collect::<Vec<_>>();
                 paths_converted.as_slice()
             } else {
@@ -26811,7 +26820,7 @@ impl TerminalView {
             };
 
             let input =
-                rookui::clipboard_utils::escaped_paths_str(paths, Some(self.shell_family(ctx)));
+                ptermui::clipboard_utils::escaped_paths_str(paths, Some(self.shell_family(ctx)));
             self.typed_characters_on_terminal(&input, ctx);
         }
     }
@@ -26863,7 +26872,7 @@ impl TerminalView {
         ctx: &mut ViewContext<TerminalView>,
     ) {
         match check_type {
-            SshLoginStatus::RecheckBeforeRookifying => {
+            SshLoginStatus::RecheckBeforePtermifying => {
                 // After we receive a line of output from ssh that is NOT prompting for user input (unlike "Enter passphrase: "),
                 // we wait and repeat the check after a small delay in case the state returned to something that's user-input bound.
                 // For example, say the output that kicked off this event was "Permission denied, please try again." and
@@ -26874,7 +26883,7 @@ impl TerminalView {
                 let active_block_id = self.model.lock().block_list().active_block_id().clone();
                 ctx.spawn(
                     async {
-                        rookui::r#async::Timer::after(Duration::from_secs(3)).await;
+                        ptermui::r#async::Timer::after(Duration::from_secs(3)).await;
                         active_block_id
                     },
                     move |terminal_view, active_block_id, _| {
@@ -26885,11 +26894,11 @@ impl TerminalView {
                     },
                 );
             }
-            SshLoginStatus::ReadyToRookify => {
-                // The tmux-based SSH rookification flow has been removed in favor of the
+            SshLoginStatus::ReadyToPtermify => {
+                // The tmux-based SSH ptermification flow has been removed in favor of the
                 // remote-server SSH extension. If this user had previously opted into the tmux
                 // wrapper, show them a one-time deprecation notice on their next SSH session.
-                if RookifySettings::as_ref(ctx).should_show_tmux_deprecation_notice()
+                if PtermifySettings::as_ref(ctx).should_show_tmux_deprecation_notice()
                     && let Some(session_id) = self.active_block_session_id()
                 {
                     self.show_ssh_tmux_deprecation_banner(session_id, ctx);
@@ -26932,22 +26941,22 @@ impl TerminalView {
                 let alias_value = session.alias_value(first_word)?;
                 Some(format!("{alias_value}{rest}"))
             });
-        let rookify_command = expanded_command.as_deref().unwrap_or(command);
+        let ptermify_command = expanded_command.as_deref().unwrap_or(command);
         let shell_family = self.shell_family_for_password_prompt_polling(ctx);
-        let rookify_settings = RookifySettings::as_ref(ctx);
-        let is_compatible_subshell_command = rookify_settings
+        let ptermify_settings = PtermifySettings::as_ref(ctx);
+        let is_compatible_subshell_command = ptermify_settings
             .is_compatible_subshell_command(command, shell_family)
-            || rookify_settings.is_compatible_subshell_command(rookify_command, shell_family);
+            || ptermify_settings.is_compatible_subshell_command(ptermify_command, shell_family);
 
         !is_compatible_subshell_command
     }
 
-    /// Shows the rookify footer for a detected subshell command.
-    fn show_rookify_footer(&mut self, ctx: &mut ViewContext<Self>) {
+    /// Shows the ptermify footer for a detected subshell command.
+    fn show_ptermify_footer(&mut self, ctx: &mut ViewContext<Self>) {
         let model = self.model.lock();
 
-        // Shared session viewers can't initiate rookification currently.
-        // Don't show the rookify footer when an agent is monitoring the command either.
+        // Shared session viewers can't initiate ptermification currently.
+        // Don't show the ptermify footer when an agent is monitoring the command either.
         if model.shared_session_status().is_viewer()
             || model.block_list().active_block().is_agent_monitoring()
         {
@@ -26956,11 +26965,11 @@ impl TerminalView {
         drop(model);
 
         self.use_agent_footer.update(ctx, |footer, ctx| {
-            footer.show_rookify(ctx);
+            footer.show_ptermify(ctx);
         });
         self.maybe_show_use_agent_footer_in_blocklist(ctx);
 
-        send_telemetry_from_ctx!(TelemetryEvent::RookifyFooterShown { is_ssh: false }, ctx);
+        send_telemetry_from_ctx!(TelemetryEvent::PtermifyFooterShown { is_ssh: false }, ctx);
     }
 
     fn show_initialization_block(&mut self) {
@@ -27218,7 +27227,7 @@ impl TypedActionView for TerminalView {
                     .map_or(Empty, |selected| {
                         Custom(AccessibilityContent::new_without_help(
                             selected,
-                            RookA11yRole::TextRole,
+                            PtermA11yRole::TextRole,
                         ))
                     })
             }
@@ -27245,7 +27254,7 @@ impl TypedActionView for TerminalView {
             BookmarkBlock(_) | BookmarkSelectedBlock => {
                 Custom(AccessibilityContent::new_without_help(
                     "Toggle Bookmark block",
-                    RookA11yRole::TextRole,
+                    PtermA11yRole::TextRole,
                 ))
             }
             ExpandBlockSelectionAbove | ExpandBlockSelectionBelow => {
@@ -27267,19 +27276,19 @@ impl TypedActionView for TerminalView {
                     "Selected all {} blocks.",
                     self.num_non_hidden_selected_blocks()
                 ),
-                RookA11yRole::TextRole,
+                PtermA11yRole::TextRole,
             )),
             ScrollToBottomOfSelectedBlocks => Custom(AccessibilityContent::new_without_help(
                 "Scrolled to bottom of selected block".to_string(),
-                RookA11yRole::TextRole,
+                PtermA11yRole::TextRole,
             )),
             ScrollToTopOfSelectedBlocks => Custom(AccessibilityContent::new_without_help(
                 "Scrolled to top of selected block".to_string(),
-                RookA11yRole::TextRole,
+                PtermA11yRole::TextRole,
             )),
             ScrollToBottomOfOverhangingBlock(_) => Custom(AccessibilityContent::new_without_help(
                 "Scrolled to bottom of bottommost visible block".to_string(),
-                RookA11yRole::TextRole,
+                PtermA11yRole::TextRole,
             )),
             CopyOutputs => {
                 let mut outputs = vec![];
@@ -27300,7 +27309,7 @@ impl TypedActionView for TerminalView {
                 );
                 Custom(AccessibilityContent::new_without_help(
                     text,
-                    RookA11yRole::TextRole,
+                    PtermA11yRole::TextRole,
                 ))
             }
             Copy => {
@@ -27319,7 +27328,7 @@ impl TypedActionView for TerminalView {
                 let text = format!("Copied {} blocks.\n{}", blocks.len(), blocks.join("\n"));
                 Custom(AccessibilityContent::new_without_help(
                     text,
-                    RookA11yRole::TextRole,
+                    PtermA11yRole::TextRole,
                 ))
             }
             FocusInputAndClearSelection => {
@@ -27327,7 +27336,7 @@ impl TypedActionView for TerminalView {
                     INPUT_A11Y_LABEL,
                     // TODO (a11y) use bindings from user settings
                     INPUT_A11Y_HELPER,
-                    RookA11yRole::TextareaRole,
+                    PtermA11yRole::TextareaRole,
                 ))
             }
             KeyDown(key) => {
@@ -27338,24 +27347,24 @@ impl TypedActionView for TerminalView {
                 };
                 Custom(AccessibilityContent::new_without_help(
                     label,
-                    RookA11yRole::TextareaRole,
+                    PtermA11yRole::TextareaRole,
                 ))
             }
             OpenBlockFilterEditor(block_index) => Custom(AccessibilityContent::new_without_help(
                 format!("Open block filter editor for block {block_index}"),
-                RookA11yRole::TextRole,
+                PtermA11yRole::TextRole,
             )),
             ShowInitializationBlock => Custom(AccessibilityContent::new_without_help(
                 "Showed initialization block",
-                RookA11yRole::TextareaRole,
+                PtermA11yRole::TextareaRole,
             )),
-            ShowRookifySettings => Custom(AccessibilityContent::new_without_help(
-                "Opened Rookify Settings",
-                RookA11yRole::ButtonRole,
+            ShowPtermifySettings => Custom(AccessibilityContent::new_without_help(
+                "Opened Ptermify Settings",
+                PtermA11yRole::ButtonRole,
             )),
             OpenFilesPalette { .. } => Custom(AccessibilityContent::new_without_help(
                 "Opened file search palette",
-                RookA11yRole::ButtonRole,
+                PtermA11yRole::ButtonRole,
             )),
             InsertCommandCorrection { .. }
             | BlockListContextMenu(_)
@@ -27389,7 +27398,7 @@ impl TypedActionView for TerminalView {
             | CopyGridSecret(_)
             | CopyRichContentSecret(_)
             | ShowInFileExplorer(_)
-            | OpenFileInRook(_)
+            | OpenFileInPterm(_)
             | CtrlD
             | CtrlC
             | ClearSelectionsWhenShellMode
@@ -27399,7 +27408,7 @@ impl TypedActionView for TerminalView {
             | ControlSequence(_)
             | TriggerSubshellBootstrap
             | ShowSubshellBanner(_)
-            | DismissRookifyBanner(_)
+            | DismissPtermifyBanner(_)
             | OpenBlockListContextMenu
             | AliasExpansionBanner(_)
             | VimModeBanner(_)
@@ -27417,32 +27426,32 @@ impl TypedActionView for TerminalView {
             | ClearMarkedText
             | StartLspServer => ActionAccessibilityContent::from_debug(),
             #[cfg(feature = "local_fs")]
-            OpenCodeInRook { .. } => ActionAccessibilityContent::from_debug(),
-            OpenInRookBanner(action) => self.open_in_rook_banner_accessibility_content(*action),
+            OpenCodeInPterm { .. } => ActionAccessibilityContent::from_debug(),
+            OpenInPtermBanner(action) => self.open_in_pterm_banner_accessibility_content(*action),
             OpenAIBlockAttachedBlocksMenu { .. } => Custom(AccessibilityContent::new_without_help(
                 "Open list of blocks attached as context to this AI query.".to_owned(),
-                RookA11yRole::PopoverRole,
+                PtermA11yRole::PopoverRole,
             )),
             OpenAIBlockOverflowMenu { .. } => Custom(AccessibilityContent::new_without_help(
                 "Open overflow menu with copy options for this AI block.".to_owned(),
-                RookA11yRole::PopoverRole,
+                PtermA11yRole::PopoverRole,
             )),
             RewindAIConversation { .. } => Custom(AccessibilityContent::new_without_help(
                 "Show confirmation dialog to rewind to before this point in the AI conversation."
                     .to_owned(),
-                RookA11yRole::ButtonRole,
+                PtermA11yRole::ButtonRole,
             )),
             ExecuteRewindAIConversation { .. } => Custom(AccessibilityContent::new_without_help(
                 "Execute rewind to before this point in the AI conversation.".to_owned(),
-                RookA11yRole::ButtonRole,
+                PtermA11yRole::ButtonRole,
             )),
             SelectAIAttachedBlock(_) => Custom(AccessibilityContent::new_without_help(
                 "Click on a block attached as context to this AI query.".to_owned(),
-                RookA11yRole::ButtonRole,
+                PtermA11yRole::ButtonRole,
             )),
             PickRepoToOpen => Custom(AccessibilityContent::new_without_help(
                 "Use file picker to select a git repository".to_owned(),
-                RookA11yRole::PopoverRole,
+                PtermA11yRole::PopoverRole,
             )),
             #[cfg(feature = "voice_input")]
             ToggleCLIAgentVoiceInput(_) => Empty,
@@ -27842,16 +27851,16 @@ impl TypedActionView for TerminalView {
 
                 ctx.open_file_path_in_explorer(path);
             }
-            OpenFileInRook(path) => {
-                self.open_file_in_rook(path.clone(), ctx);
+            OpenFileInPterm(path) => {
+                self.open_file_in_pterm(path.clone(), ctx);
             }
             #[cfg(feature = "local_fs")]
-            OpenCodeInRook {
+            OpenCodeInPterm {
                 path,
                 layout,
                 line_col,
             } => {
-                self.open_code_in_rook(
+                self.open_code_in_pterm(
                     CodeSource::Link {
                         path: path.clone(),
                         range_start: *line_col,
@@ -27887,21 +27896,21 @@ impl TypedActionView for TerminalView {
             TriggerSubshellBootstrap => self.trigger_subshell_bootstrap(None, false, ctx),
             ShowSubshellBanner(command) => {
                 // Abort handle is no longer needed since we've waited the 1s already.
-                self.rookify_state.take_subshell_banner_abort_handle();
+                self.ptermify_state.take_subshell_banner_abort_handle();
 
-                let rookify_keybinding =
-                    keybinding_name_to_keystroke("terminal:rookify_subshell", ctx);
-                self.show_rookify_banner(
+                let ptermify_keybinding =
+                    keybinding_name_to_keystroke("terminal:ptermify_subshell", ctx);
+                self.show_ptermify_banner(
                     command.to_owned(),
                     "Subshell",
                     "subshell",
-                    rookify_keybinding,
+                    ptermify_keybinding,
                     TelemetryEvent::ShowSubshellBanner,
                     ctx,
                 );
             }
-            DismissRookifyBanner(remember) => {
-                self.dismiss_rookify_banner(remember, ctx);
+            DismissPtermifyBanner(remember) => {
+                self.dismiss_ptermify_banner(remember, ctx);
                 if !remember.is_ssh() {
                     send_telemetry_from_ctx!(
                         TelemetryEvent::DeclineSubshellBootstrap {
@@ -27913,7 +27922,7 @@ impl TypedActionView for TerminalView {
             }
             InsertMostRecentCommandCorrection => self.insert_most_recent_command_correction(ctx),
             AliasExpansionBanner(action) => self.alias_expansion_banner_action(*action, ctx),
-            OpenInRookBanner(action) => self.handle_open_in_rook_banner_action(*action, ctx),
+            OpenInPtermBanner(action) => self.handle_open_in_pterm_banner_action(*action, ctx),
             OpenBlockFilterEditor(block_index) => {
                 self.open_block_filter_editor(*block_index, OpenedFromClick::Yes, ctx)
             }
@@ -28138,7 +28147,7 @@ impl TypedActionView for TerminalView {
             LoadAgentModeConversation => {
                 self.load_agent_mode_conversation(ctx);
             }
-            ShowRookifySettings => ctx.emit(Event::OpenSettings(SettingsSection::Rookify)),
+            ShowPtermifySettings => ctx.emit(Event::OpenSettings(SettingsSection::Ptermify)),
             DeleteAttachment { index } => {
                 self.ai_context_model.update(ctx, |context_model, ctx| {
                     context_model.remove_pending_attachment(*index, ctx);
@@ -28185,7 +28194,7 @@ impl TypedActionView for TerminalView {
                     }
                     images.push(ui_components::lightbox::LightboxImage {
                         source: ui_components::lightbox::LightboxImageSource::Resolved {
-                            asset_source: rookui::assets::asset_cache::AssetSource::Raw {
+                            asset_source: ptermui::assets::asset_cache::AssetSource::Raw {
                                 id: asset_id,
                             },
                         },
@@ -28429,12 +28438,12 @@ impl TypedActionView for TerminalView {
             }
             OpenProjectRulesPane => {
                 if let Some(current_dir) = self.pwd() {
-                    let mut rook_md_path = PathBuf::from(&current_dir);
-                    rook_md_path.push(ROOK_MD_PATH);
+                    let mut pterm_md_path = PathBuf::from(&current_dir);
+                    pterm_md_path.push(POLARIS_TERMINAL_MD_PATH);
                     #[cfg(feature = "local_fs")]
-                    ctx.emit(Event::OpenCodeInRook {
+                    ctx.emit(Event::OpenCodeInPterm {
                         source: CodeSource::ProjectRules {
-                            location: LocalOrRemotePath::Local(rook_md_path),
+                            location: LocalOrRemotePath::Local(pterm_md_path),
                         },
                         layout: *crate::util::file::external_editor::EditorSettings::as_ref(ctx)
                             .open_file_layout
@@ -28468,7 +28477,7 @@ impl TypedActionView for TerminalView {
 
                     match skill_reference {
                         SkillReference::Path(path) => {
-                            ctx.emit(Event::OpenCodeInRook {
+                            ctx.emit(Event::OpenCodeInPterm {
                                 source: CodeSource::Skill {
                                     reference: skill_reference.clone(),
                                     location: path.clone(),
@@ -28804,11 +28813,11 @@ impl View for TerminalView {
                     column.add_child(Shrinkable::new(1., output_area).finish());
 
                     // Suppress the "Use agent" footer when the nested program is
-                    // Rook's own TUI (`rook_tui`) — it's already an agent surface,
+                    // Polaris Terminal's own TUI (`pterm_tui`) — it's already an agent surface,
                     // so the outer footer would just stack on top of it. Other
                     // full-screen TUIs (vim, htop, …) still get the footer.
                     if model.is_alt_screen_active()
-                        && !self.is_running_rook_tui(&model, app)
+                        && !self.is_running_pterm_tui(&model, app)
                         && self.should_render_use_agent_footer(&model, app)
                     {
                         column.add_child(ChildView::new(&self.use_agent_footer).finish());
@@ -29237,7 +29246,7 @@ impl View for TerminalView {
         if should_show_panel {
             Container::new(
                 Flex::row()
-                    .with_main_axis_size(rookui::elements::MainAxisSize::Max)
+                    .with_main_axis_size(ptermui::elements::MainAxisSize::Max)
                     .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
                     .with_child(Shrinkable::new(1., final_element).finish())
                     .with_child(ChildView::new(&self.conversation_details_panel).finish())
@@ -29276,7 +29285,7 @@ impl View for TerminalView {
         }
     }
 
-    fn keymap_context(&self, app: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
         context.map.insert(
             "TerminalView_BlockSelectionCardinality",
@@ -29381,15 +29390,15 @@ impl View for TerminalView {
             context.set.insert(init::ROOT_CLOUD_MODE_PANE_KEY);
         }
 
-        if let Some(WithinBlockBanner::RookifyBanner(_)) =
+        if let Some(WithinBlockBanner::PtermifyBanner(_)) =
             model_lock.block_list().active_block().block_banner()
         {
             context.set.insert("SubshellBanner");
         }
 
-        // Also set the rookify context when the footer (flag-gated replacement
+        // Also set the ptermify context when the footer (flag-gated replacement
         // for the in-block banner) is active, so the ctrl-i keybinding works.
-        if self.use_agent_footer.as_ref(app).is_rookify_active(app) {
+        if self.use_agent_footer.as_ref(app).is_ptermify_active(app) {
             context.set.insert("SubshellBanner");
         }
 
@@ -29797,7 +29806,7 @@ fn maybe_wrap_terminal_element_in_scrollable(
     vertical_scroll_handle: ScrollStateHandle,
     horizontal_scroll_handle: ClippedScrollStateHandle,
     required_terminal_width: f32,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     element: impl NewScrollableElement + 'static,
 ) -> Box<dyn Element> {
     let nonactive_thumb_background = theme.disabled_text_color(theme.background()).into();

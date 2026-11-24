@@ -96,7 +96,7 @@ fn scroll_sample_updates_release_point_without_claiming_a_button() {
         Some(MouseButton::Left),
         Vector2I::new(1, 2),
     );
-    // The pointer rooks to the wheel point before scrolling, so a later
+    // The pointer pterms to the wheel point before scrolling, so a later
     // release is recorded there.
     session.record_press_or_move(PointerEventKind::Scroll, None, Vector2I::new(7, 8));
     assert_eq!(

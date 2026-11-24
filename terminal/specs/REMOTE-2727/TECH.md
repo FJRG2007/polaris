@@ -1,14 +1,14 @@
 # Bundled skill for authoring Factory files
 ## Summary
-[REMOTE-2727](https://linear.app/warpdotdev/issue/REMOTE-2727/bundled-skill-for-authoringediting-file-based-factory-definitions) adds one bundled skill that teaches agents to create and edit file-based software factory definitions. The skill ships in Rook for the native GUI, TUI, and every Oz cloud agent. Copies ship in the Claude Code and Codex Oz platform plugins because third-party harnesses cannot resolve a Rook `bundled_skill_id`.
+[REMOTE-2727](https://linear.app/warpdotdev/issue/REMOTE-2727/bundled-skill-for-authoringediting-file-based-factory-definitions) adds one bundled skill that teaches agents to create and edit file-based software factory definitions. The skill ships in Polaris Terminal for the native GUI, TUI, and every Oz cloud agent. Copies ship in the Claude Code and Codex Oz platform plugins because third-party harnesses cannot resolve a Polaris Terminal `bundled_skill_id`.
 
 The skill carries machine-readable JSON Schemas for the format and a dependency-free validator that runs them, so an agent can check its own edits before opening a pull request. That requirement came from the Factory bug bash, where the recurring failures were malformed frontmatter metadata that the parser accepts and the apply step later rejects.
 
 This work needs only a technical spec. The user workflow is already defined, and the remaining decisions concern packaging, rollout, validation, and schema maintenance.
 
-The implementation uses `FJRG2007/rook` as its primary repository. Rook owns the canonical skill copy and the shared distribution path for three of the four requested surfaces. `rook-server` remains authoritative for the Factory file schema. The Claude Code and Codex plugin repositories contain downstream mirrors.
+The implementation uses `FJRG2007/polaris` as its primary repository. Polaris Terminal owns the canonical skill copy and the shared distribution path for three of the four requested surfaces. `polaris-terminal-server` remains authoritative for the Factory file schema. The Claude Code and Codex plugin repositories contain downstream mirrors.
 
-The schema-ownership, drift, trigger-filter validation, and follow-up design in this document is superseded by [`warpdotdev/warp-server/specs/REMOTE-2868/TECH.md`](https://github.com/warpdotdev/warp-server/blob/develop/specs/REMOTE-2868/TECH.md). REMOTE-2868 moves schema generation and parser-backed validation to `rook-server` while retaining this skill's permissive offline fallback. This document remains authoritative for the skill trigger, authoring workflow, canonical paths, symlink policy, and boundary against `factory-mcp`.
+The schema-ownership, drift, trigger-filter validation, and follow-up design in this document is superseded by [`warpdotdev/warp-server/specs/REMOTE-2868/TECH.md`](https://github.com/warpdotdev/warp-server/blob/develop/specs/REMOTE-2868/TECH.md). REMOTE-2868 moves schema generation and parser-backed validation to `polaris-terminal-server` while retaining this skill's permissive offline fallback. This document remains authoritative for the skill trigger, authoring workflow, canonical paths, symlink policy, and boundary against `factory-mcp`.
 
 ## Context
 The Factory file parser accepts a versioned, path-derived tree:
@@ -37,19 +37,19 @@ The current schema is `v1alpha1`. The parser rejects unknown fields, duplicate k
 
 The schema is still changing. During this PR, `cloudProviders` replaced the legacy read-only `providers` key and file-managed Scorers landed. A manually copied closed-world schema will become stale.
 
-Rook already provides the common distribution mechanism:
+Polaris Terminal already provides the common distribution mechanism:
 
-- [`app/src/ai/skills/bundled.rs (346-445) @ 352a7fc1`](https://github.com/FJRG2007/rook/blob/352a7fc10707fd6a8ef3341961870746f4a9c557/app/src/ai/skills/bundled.rs#L346-L445) loads directories under `resources/bundled/skills` and uses the directory name as the bundled skill ID.
-- [`app/src/ai/skills/bundled.rs (553-572) @ 352a7fc1`](https://github.com/FJRG2007/rook/blob/352a7fc10707fd6a8ef3341961870746f4a9c557/app/src/ai/skills/bundled.rs#L553-L572) defaults unlisted skills to `BundledSkillActivation::Always`.
-- [`script/prepare_bundled_resources (60-83) @ 352a7fc1`](https://github.com/FJRG2007/rook/blob/352a7fc10707fd6a8ef3341961870746f4a9c557/script/prepare_bundled_resources#L60-L83) copies the bundled tree into client and remote-server distributions.
+- [`app/src/ai/skills/bundled.rs (346-445) @ 352a7fc1`](https://github.com/FJRG2007/polaris/blob/352a7fc10707fd6a8ef3341961870746f4a9c557/terminal/app/src/ai/skills/bundled.rs#L346-L445) loads directories under `resources/bundled/skills` and uses the directory name as the bundled skill ID.
+- [`app/src/ai/skills/bundled.rs (553-572) @ 352a7fc1`](https://github.com/FJRG2007/polaris/blob/352a7fc10707fd6a8ef3341961870746f4a9c557/terminal/app/src/ai/skills/bundled.rs#L553-L572) defaults unlisted skills to `BundledSkillActivation::Always`.
+- [`script/prepare_bundled_resources (60-83) @ 352a7fc1`](https://github.com/FJRG2007/polaris/blob/352a7fc10707fd6a8ef3341961870746f4a9c557/terminal/script/prepare_bundled_resources#L60-L83) copies the bundled tree into client and remote-server distributions.
 
 The live Factory example at [`factory-dev/v1/factory.yaml @ b17d6b27`](https://github.com/warpdotdev/factory-dev/blob/b17d6b275c40679c42ddc19a71dac36c5adf8d86/v1/factory.yaml) demonstrates the canonical root. Its agent, automation, runner, and skill directories provide realistic examples, but they are not the schema authority.
 
-Third-party harness plugins load filesystem skills instead of Rook bundled IDs:
+Third-party harness plugins load filesystem skills instead of Polaris Terminal bundled IDs:
 
 - Claude Code loads Oz skills from [`plugins/oz-harness-support/skills @ e0e18e16`](https://github.com/warpdotdev/claude-code-warp/tree/e0e18e162aa5ec97a6d4cecdf66b08b75eb1e149/plugins/oz-harness-support/skills).
 - Codex loads Oz skills from [`plugins/orchestration/skills @ f11334dc`](https://github.com/warpdotdev/codex-warp/tree/f11334dc715d48f07d133db6046895cb45f4accb/plugins/orchestration/skills).
-- Rook enforces minimum platform plugin versions in [`claude.rs (17-26) @ 352a7fc1`](https://github.com/FJRG2007/rook/blob/352a7fc10707fd6a8ef3341961870746f4a9c557/app/src/terminal/cli_agent_sessions/plugin_manager/claude.rs#L17-L26) and [`codex.rs (23-31) @ 352a7fc1`](https://github.com/FJRG2007/rook/blob/352a7fc10707fd6a8ef3341961870746f4a9c557/app/src/terminal/cli_agent_sessions/plugin_manager/codex.rs#L23-L31).
+- Polaris Terminal enforces minimum platform plugin versions in [`claude.rs (17-26) @ 352a7fc1`](https://github.com/FJRG2007/polaris/blob/352a7fc10707fd6a8ef3341961870746f4a9c557/terminal/app/src/terminal/cli_agent_sessions/plugin_manager/claude.rs#L17-L26) and [`codex.rs (23-31) @ 352a7fc1`](https://github.com/FJRG2007/polaris/blob/352a7fc10707fd6a8ef3341961870746f4a9c557/terminal/app/src/terminal/cli_agent_sessions/plugin_manager/codex.rs#L23-L31).
 
 ## Decisions
 ### Skill identity and trigger
@@ -59,7 +59,7 @@ Use:
 - User-facing title: `Factory Files`
 - Trigger description:
 
-  > Create and edit file-based Rook software factory definitions, in a repository tree rooted at a factory.yaml. Use when authoring or changing that factory.yaml, Agent, Automation, Scorer, or Runner files under that root, or its factory and agent skill trees, and when fixing Factory file diagnostics. Do not use for agent-definition Markdown that belongs to another tool, for a tree with no factory.yaml, or to operate a live factory or hand work to one through Factory MCP.
+  > Create and edit file-based Polaris Terminal software factory definitions, in a repository tree rooted at a factory.yaml. Use when authoring or changing that factory.yaml, Agent, Automation, Scorer, or Runner files under that root, or its factory and agent skill trees, and when fixing Factory file diagnostics. Do not use for agent-definition Markdown that belongs to another tool, for a tree with no factory.yaml, or to operate a live factory or hand work to one through Factory MCP.
 
 `factory-files` names the artifact instead of the deployment model. `factory-as-code` is broader and can imply sync, deployment, or live operations.
 
@@ -79,7 +79,7 @@ Gating was considered and rejected. The case for it is that Factory is not relea
 
 The skill is self-gating by context. It does nothing unless the tree has a `factory.yaml`, so the population it can affect is Factory users, which is the same population a flag would select. The cost to everyone else is the name and trigger description in the skill list; full content and the schemas load only when the skill is read.
 
-Gating would misfire across surfaces. Whether Oz cloud agents running factory agents have `FactoryMcp` enabled depends on prod experiment state rather than anything in this repository, and a skill that fails to activate is invisible — the primary requested surface could lose it with no signal. The Claude Code and Codex plugin mirrors load filesystem skills and cannot read a Rook flag at all, so gating would leave third-party harnesses enabled while disabling Rook's own cloud agents.
+Gating would misfire across surfaces. Whether Oz cloud agents running factory agents have `FactoryMcp` enabled depends on prod experiment state rather than anything in this repository, and a skill that fails to activate is invisible — the primary requested surface could lose it with no signal. The Claude Code and Codex plugin mirrors load filesystem skills and cannot read a Polaris Terminal flag at all, so gating would leave third-party harnesses enabled while disabling Polaris Terminal's own cloud agents.
 
 A flag would also couple authoring guidance to an unrelated kill switch. `FactoryMcp` attaches an MCP server for operating a live factory, which is exactly the boundary this skill excludes; turning it off during an MCP incident would remove file-authoring help for no reason. A dedicated flag avoids that but adds a second flag to flip in lockstep for no additional safety.
 
@@ -90,7 +90,7 @@ Bundled skills ship inside the artifact; nothing delivers them from the server. 
 
 - The macOS app bundle resolves `Contents/Resources`, and Linux and Windows resolve a `resources` directory beside the executable.
 - The TUI builds with the `standalone` feature so it resolves that same sibling directory, and its release job packages `resources` alongside the binary.
-- The `oz` CLI is packaged the same way, and `oz-agent-worker` executes exactly that binary (`internal/worker/direct.go`), so cloud Rook agents load the bundle without extra work.
+- The `oz` CLI is packaged the same way, and `oz-agent-worker` executes exactly that binary (`internal/worker/direct.go`), so cloud Polaris Terminal agents load the bundle without extra work.
 
 The fourth surface, third-party harness agents, is not covered by any of this and needs the plugin mirrors in sequence step 3.
 
@@ -101,7 +101,7 @@ The harmful direction is deletion, not rejection: an agent that trusts an unknow
 ### Oz scope
 Make the skill available to every Oz agent.
 
-All Oz agents already receive the shared Rook bundled-resource catalog. No factory-only bundled activation exists. Adding an environment or agent-type gate would increase implementation and testing scope for no material safety benefit, and would reintroduce the invisible-failure risk described under Rollout. Skill metadata is small, and full content is loaded only when the agent reads the skill.
+All Oz agents already receive the shared Polaris Terminal bundled-resource catalog. No factory-only bundled activation exists. Adding an environment or agent-type gate would increase implementation and testing scope for no material safety benefit, and would reintroduce the invisible-failure risk described under Rollout. Skill metadata is small, and full content is loaded only when the agent reads the skill.
 
 ### Skill structure
 Use one skill for both creation and editing. Both workflows use the same paths, inheritance rules, field constraints, and diagnostics. Splitting them would duplicate schema context and create competing triggers.
@@ -132,7 +132,7 @@ Use progressive disclosure:
 
 Keep `SKILL.md` workflow-oriented. Do not repeat complete field tables in it.
 
-`SKILL.md` uses the `{{skill_dir}}` handlebars variable for the validator path. Rook renders it; plugin mirrors must substitute a harness-appropriate path, so the mirror step is a templated copy rather than a byte copy of that one line.
+`SKILL.md` uses the `{{skill_dir}}` handlebars variable for the validator path. Polaris Terminal renders it; plugin mirrors must substitute a harness-appropriate path, so the mirror step is a templated copy rather than a byte copy of that one line.
 
 ### JSON Schema and validation helper
 Ship machine-readable JSON Schemas and a validator that runs them. This reverses the original recommendation, at the requester's direction and on bug-bash evidence: the recurring failures are frontmatter metadata mistakes, and prose alone does not stop an agent from inventing a field.
@@ -144,7 +144,7 @@ The validator is `scripts/validate_factory_files.py` and depends on nothing but 
 
 The schemas validate known fields while allowing additional properties and newer catalogue values. This is deliberate: a schema bundled in an older client must not reject or erase source accepted by a newer server.
 
-The dividing line is whether a plausible server change could make the input valid. Anything a release could add or retune is recorded as an `x-rook-known-values` or `x-rook-known-max-items` annotation and left to the server: unknown properties everywhere, agent types, credential strategies, harness types and their per-harness capabilities (`reasoningLevel` and `auth` on `oz`), integration slugs, trigger providers and events, runner operating systems, architectures and macOS versions, Scorer output forms, and the Scorer label cap. A tree whose `schemaVersion` these schemas do not describe is reported once and not validated further, rather than being buried under bogus `v1alpha1` unknown-field reports.
+The dividing line is whether a plausible server change could make the input valid. Anything a release could add or retune is recorded as an `x-polaris-terminal-known-values` or `x-polaris-terminal-known-max-items` annotation and left to the server: unknown properties everywhere, agent types, credential strategies, harness types and their per-harness capabilities (`reasoningLevel` and `auth` on `oz`), integration slugs, trigger providers and events, runner operating systems, architectures and macOS versions, Scorer output forms, and the Scorer label cap. A tree whose `schemaVersion` these schemas do not describe is reported once and not validated further, rather than being buried under bogus `v1alpha1` unknown-field reports.
 
 What stays rejected is what remains wrong under any of those changes: malformed YAML and frontmatter, missing required fields, wrong types, exactly one `MAIN`/`FOREMAN` agent, Automation and Scorer Agent references, duplicate resource names, non-empty Scorer rubrics, mixed Scorer outcomes, trimmed alias length, normalized repository/secret/Scorer duplicates, Linux power-of-two shapes, full cron grammar, duplicate inline schedule identities, and matcher `in`/`not_in` conflicts. The last several are owned by the script rather than the schema language.
 
@@ -161,52 +161,52 @@ Correction: `teams`, `projects`, `states`, `issues`, `baseBranches`, `channels`,
 A parser-backed CLI or an API that validates an arbitrary source tree remains a follow-up. Do not add either endpoint in this work item.
 
 ### Schema ownership and drift
-Eng-Platform FA owns the Factory file format, so it owns the bundled schemas. A change author who modifies `logic/factoryfile` owns the companion update to `rook/resources/bundled/skills/factory-files/schemas/`.
+Eng-Platform FA owns the Factory file format, so it owns the bundled schemas. A change author who modifies `logic/factoryfile` owns the companion update to `polaris-terminal/resources/bundled/skills/factory-files/schemas/`.
 
 The schemas are hand-derived from `logic/factoryfile`, `logic/factoryfile/v1alpha1_scoredefinition.go`, `model/types/triggers`, `model/types/runner.go`, `logic/factoryalias`, and `logic/cronspec`. They intentionally accept some inputs the current server rejects when those inputs are plausible future extensions; the server remains authoritative.
 
-Nothing enforces that agreement continuously, which is the main residual risk, and it is not theoretical. During this PR, `rook-server` added trigger providers, renamed `providers` to `cloudProviders`, and added file-managed Scorers. Permissive unknown-property/catalogue handling limits breakage, while explicit schemas and references are refreshed for new resource kinds and known fields.
+Nothing enforces that agreement continuously, which is the main residual risk, and it is not theoretical. During this PR, `polaris-terminal-server` added trigger providers, renamed `providers` to `cloudProviders`, and added file-managed Scorers. Permissive unknown-property/catalogue handling limits breakage, while explicit schemas and references are refreshed for new resource kinds and known fields.
 
-Generating the schemas from the Go packages is not possible in one repository: the schemas live in `rook`, the authority lives in `rook-server`. Two follow-ups close the gap, in preference order:
+Generating the schemas from the Go packages is not possible in one repository: the schemas live in `polaris-terminal`, the authority lives in `polaris-terminal-server`. Two follow-ups close the gap, in preference order:
 
-1. Emit the JSON Schemas from `logic/factoryfile` in `rook-server` behind a golden test, and vendor the generated output into `rook` through a companion PR. This makes drift a build failure on the side that owns the format.
-2. Failing that, add a scheduled job that runs the bundled validator against a corpus of trees whose expected verdicts are recorded in `rook-server`, and fails when the two disagree.
+1. Emit the JSON Schemas from `logic/factoryfile` in `polaris-terminal-server` behind a golden test, and vendor the generated output into `polaris-terminal` through a companion PR. This makes drift a build failure on the side that owns the format.
+2. Failing that, add a scheduled job that runs the bundled validator against a corpus of trees whose expected verdicts are recorded in `polaris-terminal-server`, and fails when the two disagree.
 
-Until one exists, the interim mitigation is a set of notes in `rook-server` at every source the schemas mirror: the `logic/factoryfile` package doc and its field sets, `logic/factoryalias`, `logic/cronspec`, `model/types/triggers`, and the runner platform rules in `model/types/runner.go`. Each says the schemas are hand-derived, that nothing fails when they fall behind, and what to update. Every schema-changing `rook-server` PR must link a companion `rook` PR that refreshes the schemas, or state why the change has no authoring-visible effect. This belongs in the Factory file code-owner checklist too, not only in comments.
+Until one exists, the interim mitigation is a set of notes in `polaris-terminal-server` at every source the schemas mirror: the `logic/factoryfile` package doc and its field sets, `logic/factoryalias`, `logic/cronspec`, `model/types/triggers`, and the runner platform rules in `model/types/runner.go`. Each says the schemas are hand-derived, that nothing fails when they fall behind, and what to update. Every schema-changing `polaris-terminal-server` PR must link a companion `polaris-terminal` PR that refreshes the schemas, or state why the change has no authoring-visible effect. This belongs in the Factory file code-owner checklist too, not only in comments.
 
 The skill instructs the agent to trust the server and report a stale schema rather than work around the validator, so drift degrades to a stale warning instead of a wrong edit.
 
 ### Canonical copy and mirror drift
 The canonical authored skill is:
 
-`rook/resources/bundled/skills/factory-files/`
+`polaris-terminal/resources/bundled/skills/factory-files/`
 
 Mirror that directory to:
 
-- `claude-code-rook/plugins/oz-harness-support/skills/factory-files/`
-- `codex-rook/plugins/orchestration/skills/factory-files/`
+- `claude-code-polaris-terminal/plugins/oz-harness-support/skills/factory-files/`
+- `codex-polaris-terminal/plugins/orchestration/skills/factory-files/`
 
-Every file mirrors byte-for-byte except the one `SKILL.md` line carrying the `{{skill_dir}}` validator path, which the mirror step substitutes. Keeping the Rook copy templated is deliberate: an absolute rendered path is the reliable form for a shell command in the surface that serves most users, and the substitution is a single well-known line.
+Every file mirrors byte-for-byte except the one `SKILL.md` line carrying the `{{skill_dir}}` validator path, which the mirror step substitutes. Keeping the Polaris Terminal copy templated is deliberate: an absolute rendered path is the reliable form for a shell command in the surface that serves most users, and the substitution is a single well-known line.
 
 Add `sync-manifest.json` inside the canonical skill directory. It records SHA-256 hashes for `SKILL.md` and every file under `references/`, `schemas/`, and `scripts/`. It does not hash itself. `SKILL.md` is hashed after substitution so a mirror and its source compare equal.
 
-Add `rook/script/sync_factory_files_skill` with two modes:
+Add `polaris-terminal/script/sync_factory_files_skill` with two modes:
 
-- `--write <plugin-skill-dir>` replaces a mirror from the Rook source and writes plugin-local upstream metadata outside the mirrored directory.
+- `--write <plugin-skill-dir>` replaces a mirror from the Polaris Terminal source and writes plugin-local upstream metadata outside the mirrored directory.
 - `--check <plugin-skill-dir>` verifies byte equality and all manifest hashes.
 
-Each plugin repository stores the Rook source commit in its test metadata. Plugin CI must:
+Each plugin repository stores the Polaris Terminal source commit in its test metadata. Plugin CI must:
 
-- Fetch the skill from that exact public Rook commit.
+- Fetch the skill from that exact public Polaris Terminal commit.
 - Run the equivalent byte and manifest comparison.
 - Run on pull requests and on a daily schedule.
-- On the scheduled run, also compare the pinned manifest to `FJRG2007/rook` `master`. A mismatch fails the job and identifies that the mirror needs a release.
+- On the scheduled run, also compare the pinned manifest to `FJRG2007/polaris` `master`. A mismatch fails the job and identifies that the mirror needs a release.
 
 The exact source pin makes plugin releases reproducible. The scheduled comparison makes an old but internally consistent pin visible instead of allowing it to remain stale indefinitely.
 
 Do not maintain independently edited plugin variants. Harness-specific instructions belong outside `factory-files`.
 
-### Plugin releases and Rook minimums
+### Plugin releases and Polaris Terminal minimums
 Both platform plugins need patch releases because existing installations do not contain the new filesystem skill.
 
 At the revisions researched for this spec:
@@ -216,7 +216,7 @@ At the revisions researched for this spec:
 
 If another release occurs first, use the next patch version instead. Update both the marketplace manifest and plugin manifest in each repository. Update plugin README skill lists and version text where applicable.
 
-After both plugin releases exist, update only the matching platform minimums in Rook:
+After both plugin releases exist, update only the matching platform minimums in Polaris Terminal:
 
 - `claude.rs::MINIMUM_PLATFORM_PLUGIN_VERSION`
 - `codex.rs::MINIMUM_PLATFORM_PLUGIN_VERSION`
@@ -224,21 +224,21 @@ After both plugin releases exist, update only the matching platform minimums in 
 Do not bump `MINIMUM_PLUGIN_VERSION` for the separate local notification plugins.
 
 ## Implementation sequence
-Use the spec PR branch as the primary Rook implementation branch after approval.
+Use the spec PR branch as the primary Polaris Terminal implementation branch after approval.
 
-The Rook skill and the plugin mirrors ship independently. The Rook PR does not change either `MINIMUM_PLATFORM_PLUGIN_VERSION`, so it cannot require an unpublished plugin version and does not need to wait for one.
+The Polaris Terminal skill and the plugin mirrors ship independently. The Polaris Terminal PR does not change either `MINIMUM_PLATFORM_PLUGIN_VERSION`, so it cannot require an unpublished plugin version and does not need to wait for one.
 
-1. Add the canonical skill, its schemas, its validator, trigger tests, and packaging tests to the Rook spec PR. **Done.**
-2. Merge the Rook PR. The native client, TUI, and Rook cloud agents pick the skill up from the shared bundle at that point.
+1. Add the canonical skill, its schemas, its validator, trigger tests, and packaging tests to the Polaris Terminal spec PR. **Done.**
+2. Merge the Polaris Terminal PR. The native client, TUI, and Polaris Terminal cloud agents pick the skill up from the shared bundle at that point.
 3. Add the manifest and sync script.
-4. Copy the merged Rook skill tree into Claude Code and Codex plugin branches, substituting the templated validator path. These two plugin changes can proceed in parallel.
+4. Copy the merged Polaris Terminal skill tree into Claude Code and Codex plugin branches, substituting the templated validator path. These two plugin changes can proceed in parallel.
 5. Merge and release both plugin patch versions.
-6. In a separate Rook PR, raise the platform minimum version constants to the released versions. That PR, not this one, is the one that must not merge before the named releases exist.
+6. In a separate Polaris Terminal PR, raise the platform minimum version constants to the released versions. That PR, not this one, is the one that must not merge before the named releases exist.
 7. Run cross-repository drift checks and final skill evaluations.
 
-The real constraint is only that Rook must never require a plugin version that is not published, which binds step 6 alone. Landing the skill first also gives the plugin copies a merged commit to pin instead of a moving branch.
+The real constraint is only that Polaris Terminal must never require a plugin version that is not published, which binds step 6 alone. Landing the skill first also gives the plugin copies a merged commit to pin instead of a moving branch.
 
-The schema-generation follow-up in `rook-server` is tracked separately; it is not a prerequisite for this PR.
+The schema-generation follow-up in `polaris-terminal-server` is tracked separately; it is not a prerequisite for this PR.
 
 ## Testing and validation
 ### Schema parity
@@ -252,10 +252,10 @@ The schemas and validator were checked against the authoritative Go implementati
 
 Re-run after any format change:
 
-- `./script/test_factory_files_skill.py` in `rook`
-- `go test ./logic/factoryfile` in `rook-server`
+- `./script/test_factory_files_skill.py` in `polaris-terminal`
+- `go test ./logic/factoryfile` in `polaris-terminal-server`
 
-### Rook bundle
+### Polaris Terminal bundle
 Focused tests under the existing bundled-skill test module:
 
 - `factory-files` parses with name `factory-files`.
@@ -268,7 +268,7 @@ Focused tests under the existing bundled-skill test module:
 
 Run:
 
-- `cargo test -p rook --lib ai::skills::bundled`
+- `cargo test -p polaris-terminal --lib ai::skills::bundled`
 - `./script/test_factory_files_skill.py`
 
 ### Skill behavior
@@ -281,12 +281,12 @@ Create deterministic eval prompts and compare the skill-assisted output with a b
 5. Ask to send work to a live factory. `factory-files` must not trigger; `factory-mcp` is the correct skill.
 6. Ask to change a factory agent's review playbook. The agent must edit the playbook and must not treat it as a Factory file schema change.
 
-Each generated tree must pass `factoryfile.ParseTree` through a small test harness in `rook-server`. Trigger evaluations must cover GUI/Oz bundled metadata and both plugin filesystem metadata.
+Each generated tree must pass `factoryfile.ParseTree` through a small test harness in `polaris-terminal-server`. Trigger evaluations must cover GUI/Oz bundled metadata and both plugin filesystem metadata.
 
 ### Plugin mirrors
 In each plugin repository:
 
-- Run the new mirror check against the pinned Rook commit.
+- Run the new mirror check against the pinned Polaris Terminal commit.
 - Parse the marketplace and plugin manifests.
 - Assert `skills/factory-files/SKILL.md` is packaged.
 - Run the repository's existing shell test suite.
@@ -294,7 +294,7 @@ In each plugin repository:
 After release, verify a fresh Claude Code Oz run and a fresh Codex Oz run list `factory-files` as a filesystem skill and can read its references.
 
 ### Release check
-Before the Rook skill PR merges:
+Before the Polaris Terminal skill PR merges:
 
 - Confirm GUI, TUI, and remote-server bundles contain the same skill tree, which `script/test_factory_files_skill.py` checks by packaging it.
 
@@ -314,11 +314,11 @@ No visual recording is required. This feature changes agent context and generate
 - **The bundled schemas can drift from `logic/factoryfile`.** They are hand-derived and nothing enforces agreement continuously. Mitigate with the code-owner checklist now and the generation follow-up next; the skill tells the agent to trust the server and report staleness rather than route around the validator.
 - **An older client validates against older schemas.** The bundle ships with the artifact, so a newer server can accept fields an installed client rejects. Mitigate by instructing the agent never to remove a field solely because the validator calls it unknown, and by keeping the server authoritative whenever it is reachable.
 - **A bundled validator can be wrong in either direction.** A false rejection blocks a correct edit; a false acceptance gives unearned confidence. Mitigate with the parity corpus, by declining to check anything needing server state, and by having the reader report what it cannot parse instead of guessing.
-- **A plugin mirror can remain pinned to an old valid commit.** Mitigate with the daily comparison against Rook `master` and an owning team for failures.
+- **A plugin mirror can remain pinned to an old valid commit.** Mitigate with the daily comparison against Polaris Terminal `master` and an owning team for failures.
 - **Stable rollout increases skill-list size for unrelated agents.** The metadata cost is limited to the name and trigger description. Full content remains progressively disclosed.
 - **The trigger can collide with Factory MCP, or with another tool's agent files.** `agents/<name>/agent.md` is not a Factory-specific path. Mitigate by anchoring the description to a `factory.yaml` root, naming both exclusions explicitly, instructing the agent to stop when no `factory.yaml` is present, and pinning the anchor in a test. Cover both collisions in the trigger evals.
 - **Examples can leak environment-specific values.** Use placeholders. Do not copy production IDs, secrets, account numbers, or images from live factories.
-- **Version ordering can strand existing plugin installations.** Release plugins before merging the Rook minimum-version bump.
+- **Version ordering can strand existing plugin installations.** Release plugins before merging the Polaris Terminal minimum-version bump.
 
 ## Out of scope
 - Changing the `v1alpha1` parser or adding a new schema version.
@@ -335,4 +335,4 @@ No visual recording is required. This feature changes agent context and generate
 ## Assumptions
 - The requester delegated the seven open engineering decisions to this spec and asked for decisive recommendations instead of an additional interview round.
 - `v1alpha1` remains the only registered Factory tree adapter for the first release.
-- The plugin repositories and the canonical Rook skill remain readable to their CI jobs so cross-repository manifest checks can fetch pinned commits.
+- The plugin repositories and the canonical Polaris Terminal skill remain readable to their CI jobs so cross-repository manifest checks can fetch pinned commits.

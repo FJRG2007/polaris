@@ -3,13 +3,13 @@ use std::sync::Arc;
 use async_channel::Sender;
 use async_trait::async_trait;
 use ipc::{Client, ConnectionAddress};
-use rook_errors::report_error;
-use rookui::r#async::executor::Background;
+use pterm_errors::report_error;
+use ptermui::r#async::executor::Background;
 use url::Url;
 
 use super::single_instance_manager::uri_named_pipe_name;
 
-/// IPC Service to respond to URIs sent to the active Rook instance.
+/// IPC Service to respond to URIs sent to the active Polaris Terminal instance.
 pub(super) struct UriService {}
 
 impl ipc::Service for UriService {
@@ -41,7 +41,7 @@ impl ipc::ServiceImpl for UriServiceImpl {
     }
 }
 
-/// Forwards the given URLs to the main running instance of Rook.
+/// Forwards the given URLs to the main running instance of Polaris Terminal.
 pub(super) async fn forward_uri_to_sole_running_instance(
     urls: Vec<Url>,
 ) -> Result<(), ipc::ClientError> {

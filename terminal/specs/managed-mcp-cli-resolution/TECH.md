@@ -2,25 +2,25 @@
 
 ## Context
 
-This spec covers the Rook client work needed for CLI-based agent runs to consume managed MCP servers. The authoritative server-side behavior is documented in `../rook-server/specs/oauth-managed-mcp`; this client spec focuses on how `agent run --mcp` resolves a `rook_id` that may refer to a managed MCP installation and turns it into runtime MCP config without persisting resolved secrets, proxy headers, or rendered command config. There is intentionally no sibling `PRODUCT.md` for this spec.
+This spec covers the Polaris Terminal client work needed for CLI-based agent runs to consume managed MCP servers. The authoritative server-side behavior is documented in `../polaris-terminal-server/specs/oauth-managed-mcp`; this client spec focuses on how `agent run --mcp` resolves a `pterm_id` that may refer to a managed MCP installation and turns it into runtime MCP config without persisting resolved secrets, proxy headers, or rendered command config. There is intentionally no sibling `PRODUCT.md` for this spec.
 
 References were inspected at:
 
-- `rook` commit `1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10`
-- `rook-server` commit `b2149361735cc756d54f26522287e79200f37f07`
+- `polaris-terminal` commit `1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10`
+- `polaris-terminal-server` commit `b2149361735cc756d54f26522287e79200f37f07`
 
 Relevant current client flow:
 
-- [`crates/rook_cli/src/mcp.rs:14-24 @ 1cdb4794`](https://github.com/FJRG2007/rook/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/crates/rook_cli/src/mcp.rs#L14-L24) defines `MCPSpec` as either `Uuid` or raw JSON, and [`crates/rook_cli/src/mcp.rs:51-70 @ 1cdb4794`](https://github.com/FJRG2007/rook/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/crates/rook_cli/src/mcp.rs#L51-L70) parses UUID-looking `--mcp` values before falling back to file/inline JSON.
-- [`app/src/ai/agent_sdk/mcp_config.rs:7-60 @ 1cdb4794`](https://github.com/FJRG2007/rook/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/app/src/ai/agent_sdk/mcp_config.rs#L7-L60) builds the `mcp_servers` map sent to the ambient-agent API. UUID specs become `{"rook_id": "<uuid>"}`; JSON specs are unpacked and validated.
-- [`app/src/ai/agent_sdk/config_file.rs:99-136 @ 1cdb4794`](https://github.com/FJRG2007/rook/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/app/src/ai/agent_sdk/config_file.rs#L99-L136) converts persisted `mcp_servers` back into runtime `MCPSpec`s. Any entry with `rook_id` becomes `MCPSpec::Uuid`, so the driver sees the same UUID shape whether the input came from CLI, config file, or server task metadata.
-- [`app/src/ai/agent_sdk/driver.rs:971-1045 @ 1cdb4794`](https://github.com/FJRG2007/rook/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/app/src/ai/agent_sdk/driver.rs#L971-L1045) resolves runtime MCP specs. UUIDs are treated only as local templatable MCP installations today; JSON specs become ephemeral installations.
-- [`app/src/ai/agent_sdk/driver.rs:1310-1387 @ 1cdb4794`](https://github.com/FJRG2007/rook/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/app/src/ai/agent_sdk/driver.rs#L1310-L1387) starts local installed MCPs separately from ephemeral MCPs.
-- [`app/src/ai/agent_sdk/driver.rs:1897-1942 @ 1cdb4794`](https://github.com/FJRG2007/rook/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/app/src/ai/agent_sdk/driver.rs#L1897-L1942) wires the Oz harness startup path through that split.
-- [`app/src/ai/agent_sdk/driver.rs:2440-2526 @ 1cdb4794`](https://github.com/FJRG2007/rook/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/app/src/ai/agent_sdk/driver.rs#L2440-L2526) resolves MCP specs for third-party harnesses into `JSONMCPServer` values after applying local secrets.
-- [`app/src/ai/mcp/parsing.rs:256-374 @ 1cdb4794`](https://github.com/FJRG2007/rook/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/app/src/ai/mcp/parsing.rs#L256-L374) parses user JSON into templatable MCP installations. It only derives install variable values from `env` and `headers`; placeholders elsewhere in the config become template variables without values and currently produce `MCPMissingVariables`.
-- [`app/src/ai/mcp/templatable_installation.rs:100-155 @ 1cdb4794`](https://github.com/FJRG2007/rook/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/app/src/ai/mcp/templatable_installation.rs#L100-L155) applies local raw managed secrets to MCP install variables, including explicit `{{secret_name}}` references.
-- [`app/src/server/server_api.rs:1630-1680 @ 1cdb4794`](https://github.com/FJRG2007/rook/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/app/src/server/server_api.rs#L1630-L1680) exposes domain-specific GraphQL-backed clients from `ServerApiProvider`; managed MCP should follow this pattern rather than passing raw `ServerApi` around new call sites.
+- [`crates/pterm_cli/src/mcp.rs:14-24 @ 1cdb4794`](https://github.com/FJRG2007/polaris/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/terminal/crates/pterm_cli/src/mcp.rs#L14-L24) defines `MCPSpec` as either `Uuid` or raw JSON, and [`crates/pterm_cli/src/mcp.rs:51-70 @ 1cdb4794`](https://github.com/FJRG2007/polaris/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/terminal/crates/pterm_cli/src/mcp.rs#L51-L70) parses UUID-looking `--mcp` values before falling back to file/inline JSON.
+- [`app/src/ai/agent_sdk/mcp_config.rs:7-60 @ 1cdb4794`](https://github.com/FJRG2007/polaris/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/terminal/app/src/ai/agent_sdk/mcp_config.rs#L7-L60) builds the `mcp_servers` map sent to the ambient-agent API. UUID specs become `{"pterm_id": "<uuid>"}`; JSON specs are unpacked and validated.
+- [`app/src/ai/agent_sdk/config_file.rs:99-136 @ 1cdb4794`](https://github.com/FJRG2007/polaris/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/terminal/app/src/ai/agent_sdk/config_file.rs#L99-L136) converts persisted `mcp_servers` back into runtime `MCPSpec`s. Any entry with `pterm_id` becomes `MCPSpec::Uuid`, so the driver sees the same UUID shape whether the input came from CLI, config file, or server task metadata.
+- [`app/src/ai/agent_sdk/driver.rs:971-1045 @ 1cdb4794`](https://github.com/FJRG2007/polaris/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/terminal/app/src/ai/agent_sdk/driver.rs#L971-L1045) resolves runtime MCP specs. UUIDs are treated only as local templatable MCP installations today; JSON specs become ephemeral installations.
+- [`app/src/ai/agent_sdk/driver.rs:1310-1387 @ 1cdb4794`](https://github.com/FJRG2007/polaris/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/terminal/app/src/ai/agent_sdk/driver.rs#L1310-L1387) starts local installed MCPs separately from ephemeral MCPs.
+- [`app/src/ai/agent_sdk/driver.rs:1897-1942 @ 1cdb4794`](https://github.com/FJRG2007/polaris/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/terminal/app/src/ai/agent_sdk/driver.rs#L1897-L1942) wires the Oz harness startup path through that split.
+- [`app/src/ai/agent_sdk/driver.rs:2440-2526 @ 1cdb4794`](https://github.com/FJRG2007/polaris/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/terminal/app/src/ai/agent_sdk/driver.rs#L2440-L2526) resolves MCP specs for third-party harnesses into `JSONMCPServer` values after applying local secrets.
+- [`app/src/ai/mcp/parsing.rs:256-374 @ 1cdb4794`](https://github.com/FJRG2007/polaris/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/terminal/app/src/ai/mcp/parsing.rs#L256-L374) parses user JSON into templatable MCP installations. It only derives install variable values from `env` and `headers`; placeholders elsewhere in the config become template variables without values and currently produce `MCPMissingVariables`.
+- [`app/src/ai/mcp/templatable_installation.rs:100-155 @ 1cdb4794`](https://github.com/FJRG2007/polaris/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/terminal/app/src/ai/mcp/templatable_installation.rs#L100-L155) applies local raw managed secrets to MCP install variables, including explicit `{{secret_name}}` references.
+- [`app/src/server/server_api.rs:1630-1680 @ 1cdb4794`](https://github.com/FJRG2007/polaris/blob/1cdb4794e6d30f9c60d76167ec9b4ee823bc6a10/terminal/app/src/server/server_api.rs#L1630-L1680) exposes domain-specific GraphQL-backed clients from `ServerApiProvider`; managed MCP should follow this pattern rather than passing raw `ServerApi` around new call sites.
 
 Relevant server contract:
 
@@ -30,13 +30,13 @@ Relevant server contract:
 - [`logic/ai/ambient_agents/managed_mcp/client_config.go:51-74 @ b2149361`](https://github.com/warpdotdev/warp-server/blob/b2149361735cc756d54f26522287e79200f37f07/logic/ai/ambient_agents/managed_mcp/client_config.go#L51-L74) implements URL vs command behavior.
 - [`logic/ai/ambient_agents/managed_mcp/client_config.go:92-110 @ b2149361`](https://github.com/warpdotdev/warp-server/blob/b2149361735cc756d54f26522287e79200f37f07/logic/ai/ambient_agents/managed_mcp/client_config.go#L92-L110) returns canonical portable MCP JSON in the `{"mcpServers": {...}}` shape.
 
-The core client bug today is that a managed MCP `rook_id` reaches `AgentDriver` as a UUID, then fails as `MCPServerNotFound` unless a local templatable installation with the same UUID exists. The client needs a runtime fallback that asks the server to resolve that UUID as a managed MCP installation.
+The core client bug today is that a managed MCP `pterm_id` reaches `AgentDriver` as a UUID, then fails as `MCPServerNotFound` unless a local templatable installation with the same UUID exists. The client needs a runtime fallback that asks the server to resolve that UUID as a managed MCP installation.
 
 ## Proposed Changes
 
 ### GraphQL schema and client API
 
-1. Sync `crates/rook_graphql_schema/api/schema.graphql` with the server schema needed for `createManagedMcpClientConfig`.
+1. Sync `crates/pterm_graphql_schema/api/schema.graphql` with the server schema needed for `createManagedMcpClientConfig`.
 2. Add `crates/graphql/src/api/mutations/create_managed_mcp_client_config.rs` with Cynic types for:
    - `CreateManagedMcpClientConfigVariables`
    - `CreateManagedMcpClientConfigInput { uid: cynic::Id }`
@@ -128,17 +128,17 @@ Update `prepare_harness` so the third-party path uses the same managed-aware res
 
 ### Preserved invariants
 
-- `agent run --mcp <uuid>` still stores and sends `{"rook_id":"<uuid>"}` in agent/task config.
+- `agent run --mcp <uuid>` still stores and sends `{"pterm_id":"<uuid>"}` in agent/task config.
 - Managed MCP resolution is use-time only and run-scoped.
 - Existing direct JSON `command` and `url` configs behave unchanged.
 - Existing local templatable MCP UUIDs behave unchanged.
-- Server-side task launches that pass stored `rook_id` values through CLI automatically get the same resolution path because `mcp_specs_from_mcp_servers` already converts `rook_id` entries into `MCPSpec::Uuid`.
+- Server-side task launches that pass stored `pterm_id` values through CLI automatically get the same resolution path because `mcp_specs_from_mcp_servers` already converts `pterm_id` entries into `MCPSpec::Uuid`.
 
 ## Testing and Validation
 
 Add targeted unit tests around the new helpers and driver resolution path:
 
-1. `build_mcp_servers_from_specs` and `mcp_specs_from_mcp_servers` continue to serialize/deserialize UUID specs as `rook_id`; update existing tests only if schema names move.
+1. `build_mcp_servers_from_specs` and `mcp_specs_from_mcp_servers` continue to serialize/deserialize UUID specs as `pterm_id`; update existing tests only if schema names move.
 2. Managed resolver with a locally installed UUID returns that UUID in `local_uuids` and does not call `ManagedMcpClient`.
 3. Managed resolver with a non-local UUID calls `create_managed_mcp_client_config` and turns returned command config into an ephemeral installation.
 4. Managed command config with env placeholder:
@@ -158,17 +158,17 @@ Add targeted unit tests around the new helpers and driver resolution path:
 
 Run targeted validation:
 
-- `cargo test -p rook_graphql`
-- `cargo test -p rook mcp_config_tests`
-- `cargo test -p rook driver_tests`
-- `cargo check -p rook` if Cynic/schema changes touch generated schema usage broadly.
+- `cargo test -p pterm_graphql`
+- `cargo test -p polaris-terminal mcp_config_tests`
+- `cargo test -p polaris-terminal driver_tests`
+- `cargo check -p polaris-terminal` if Cynic/schema changes touch generated schema usage broadly.
 
 Manual smoke validation once implementation exists:
 
 1. Use `agent run --mcp <managed-command-uid>` with a command-backed managed MCP whose env/args reference a managed secret. Confirm the MCP starts and the secret is substituted locally.
 2. Use `agent run --mcp <managed-url-uid>` with a URL-backed managed MCP. Confirm the server mints proxy config and the local run can see the MCP tools.
 3. Use a local templatable MCP UUID. Confirm no managed GraphQL resolution is attempted and the MCP starts as before.
-4. Start from an existing server-side task whose stored config has `mcp_servers.<name>.rook_id`. Confirm the CLI worker path resolves the same way as direct CLI input.
+4. Start from an existing server-side task whose stored config has `mcp_servers.<name>.pterm_id`. Confirm the CLI worker path resolves the same way as direct CLI input.
 
 ## Parallelization
 
@@ -176,12 +176,12 @@ Parallelization is optional for implementation but not useful for this spec itse
 
 - Agent A: GraphQL client wiring
   - Execution mode: local.
-  - Worktree: `/Users/bens/Desktop/rook-managed-mcp-graphql`.
+  - Worktree: `/Users/bens/Desktop/polaris-terminal-managed-mcp-graphql`.
   - Branch: `managed-mcp-cli-resolution-graphql`.
-  - Owns `crates/rook_graphql_schema`, `crates/graphql`, and `app/src/server/server_api/managed_mcp.rs`.
+  - Owns `crates/pterm_graphql_schema`, `crates/graphql`, and `app/src/server/server_api/managed_mcp.rs`.
 - Agent B: Driver/runtime resolution
   - Execution mode: local.
-  - Worktree: `/Users/bens/Desktop/rook-managed-mcp-driver`.
+  - Worktree: `/Users/bens/Desktop/polaris-terminal-managed-mcp-driver`.
   - Branch: `managed-mcp-cli-resolution-driver`.
   - Owns `app/src/ai/agent_sdk/driver.rs`, MCP parsing helpers, and driver tests.
 

@@ -49,7 +49,7 @@ Six builders, one per configuration field, each taking
   product-disabled local harnesses, sorts selectable before disabled, resolves stale
   `Harness::Unknown` cache entries by display name via `harness_display::display_name`,
   and carries `disabled_reason` from `LocalHarnessSetupState` tooltips.
-- `model_snapshot` — three catalog branches: Oz/unset uses the Rook LLM catalog
+- `model_snapshot` — three catalog branches: Oz/unset uses the Polaris Terminal LLM catalog
   (auto, then custom, then other models; custom models excluded for Cloud runs), local
   Codex gets only a "Default model" row, other non-Oz harnesses get "Default model" plus
   the server-provided harness model catalog with unknown selections falling back to the
@@ -58,7 +58,7 @@ Six builders, one per configuration field, each taking
   (names only, never values); status mirrors `AuthSecretFetchState`; emits the
   `CreateNewAuthSecret` footer when `auth_secret_types_for_harness` is non-empty; keeps
   a `Named` selection while the catalog is loading.
-- `host_snapshot` — workspace default (badged `Default`), `rook`, connected worker
+- `host_snapshot` — workspace default (badged `Default`), `polaris-terminal`, connected worker
   hosts (badged `Connected`, case-insensitively deduped), the recent custom slug
   (badged `Recent`), then a `CustomText` footer.
 - `environment_snapshot` — "Empty environment" plus existing environments sorted by
@@ -128,8 +128,8 @@ block: recent-host data now reaches frontends through `host_snapshot`.
 - Pre-existing GUI tests (`run_agents_card_view_tests.rs`, `run_agents_tests.rs`,
   `orchestration_config_block` coverage) must pass unchanged — they are the
   behavior-parity gate for the picker rewrite.
-- Commands: `cargo check -p rook`, `cargo check -p rook --features tui`,
-  `cargo nextest run -p rook -E 'test(orchestration) + test(run_agents) + test(run_agents_card_view) + test(orchestration_config_block)'`,
+- Commands: `cargo check -p polaris-terminal`, `cargo check -p polaris-terminal --features tui`,
+  `cargo nextest run -p polaris-terminal -E 'test(orchestration) + test(run_agents) + test(run_agents_card_view) + test(orchestration_config_block)'`,
   plus `./script/format`.
 - Manual: all five pickers on the confirmation card and plan-card config block render
   the same rows, icons, badges, disabled tooltips, and loading/error placeholders as

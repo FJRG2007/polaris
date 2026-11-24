@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
 use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{ChildView, Empty};
-use rookui::platform::WindowStyle;
-use rookui::{App, AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{ChildView, Empty};
+use ptermui::platform::WindowStyle;
+use ptermui::{App, AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle};
 
 use super::*;
 use crate::server::server_api::ServerApiProvider;

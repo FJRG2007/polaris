@@ -1,9 +1,9 @@
 use async_io::block_on;
 use pathfinder_color::ColorU;
 use plist::{Dictionary, Value};
-use rook_core::ui::theme::{Fill, RookTheme};
-use rookui::fonts::FontInfo;
-use rookui::keymap::Keystroke;
+use pterm_core::ui::theme::{Fill, PtermTheme};
+use ptermui::fonts::FontInfo;
+use ptermui::keymap::Keystroke;
 use virtual_fs::{Stub, VirtualFS};
 
 use super::{ITermTheme, ITermThemeType, color_dictionary_to_coloru};
@@ -107,10 +107,10 @@ fn test_color_dictionary_to_coloru() {
 }
 
 #[test]
-fn test_into_rook_theme_valid() {
-    let theme: RookTheme = solarized_dark_theme()
-        .into_rook_theme("", &default_dark_theme())
-        .expect("Should be able to convert into RookTheme");
+fn test_into_pterm_theme_valid() {
+    let theme: PtermTheme = solarized_dark_theme()
+        .into_pterm_theme("", &default_dark_theme())
+        .expect("Should be able to convert into PtermTheme");
     assert_eq!(
         theme.accent(),
         Fill::Solid(ColorU {
@@ -141,9 +141,9 @@ fn test_into_rook_theme_valid() {
 }
 
 #[test]
-fn test_into_rook_theme_invalid() {
+fn test_into_pterm_theme_invalid() {
     default_dark_theme()
-        .into_rook_theme("", &default_dark_theme())
+        .into_pterm_theme("", &default_dark_theme())
         .expect_err("Should return an error if the theme is not sufficiently configured.");
 }
 
@@ -173,14 +173,14 @@ fn test_import_from_file() {
 
         let config = profile.parse(&[]);
 
-        let ThemeType::Single(rook_theme) =
+        let ThemeType::Single(pterm_theme) =
             config.theme.value().as_ref().expect("Should import theme!")
         else {
             panic!("Should have read a single theme!")
         };
 
         assert_eq!(
-            rook_theme.accent(),
+            pterm_theme.accent(),
             Fill::Solid(ColorU {
                 r: 255,
                 g: 165,
@@ -189,7 +189,7 @@ fn test_import_from_file() {
             })
         );
         assert_eq!(
-            rook_theme.background(),
+            pterm_theme.background(),
             Fill::Solid(ColorU {
                 r: 0,
                 g: 0,
@@ -198,7 +198,7 @@ fn test_import_from_file() {
             })
         );
         assert_eq!(
-            rook_theme.foreground(),
+            pterm_theme.foreground(),
             Fill::Solid(ColorU {
                 r: 187,
                 g: 187,
@@ -294,14 +294,14 @@ fn test_parse_font_without_size() {
 
 #[test]
 fn test_parse_font_with_default_size() {
-    let rook_default_profile = ITermProfile {
+    let pterm_default_profile = ITermProfile {
         font_name: Some("CourierNewPSMT".to_string()),
         font_size: Some("13".to_string()),
         ..Default::default()
     };
     let fonts = courier_new();
     assert_eq!(
-        *rook_default_profile
+        *pterm_default_profile
             .remove_default_values()
             .parse(&fonts)
             .font
@@ -333,7 +333,7 @@ fn test_parse_font_with_default_size() {
 
 #[test]
 fn test_parse_font_with_default_font() {
-    let rook_default_profile = ITermProfile {
+    let pterm_default_profile = ITermProfile {
         font_name: Some("Hack".to_string()),
         font_size: Some("16".to_string()),
         ..Default::default()
@@ -344,7 +344,7 @@ fn test_parse_font_with_default_font() {
         is_monospace: false,
     }];
     assert_eq!(
-        *rook_default_profile
+        *pterm_default_profile
             .remove_default_values()
             .parse(&fonts)
             .font

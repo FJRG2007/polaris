@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use parking_lot::FairMutex;
-use rookui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity as _};
+use ptermui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity as _};
 
 use super::core::subscribe_to_shared_dependencies;
 use super::{

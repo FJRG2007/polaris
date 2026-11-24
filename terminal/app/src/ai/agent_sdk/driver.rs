@@ -21,20 +21,20 @@ use futures::channel::oneshot;
 use futures::future::{self, Either, FusedFuture, join_all};
 use itertools::Itertools as _;
 use oneshot::{Canceled, Receiver};
+use pterm_cli::agent::{Harness, OutputFormat, RepositoryHeadOverride};
+use pterm_cli::mcp::MCPSpec;
+use pterm_cli::share::ShareRequest;
+use pterm_cli::skill::SkillSpec;
+use pterm_core::features::FeatureFlag;
+use pterm_core::{safe_debug, safe_error, safe_info, safe_warn};
+use pterm_errors::{ErrorExt, register_error, report_error, report_if_error};
+use pterm_graphql::ai::{AgentTaskState, PlatformErrorCode};
+use pterm_managed_secrets::ManagedSecretValue;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::r#async::{FutureExt, TimeoutError, Timer};
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle, ModelSpawner, SingletonEntity};
 use repo_metadata::local_model::IndexedRepoState;
 use repo_metadata::{RepoMetadataModel, RepositoryIdentifier};
-use rook_cli::agent::{Harness, OutputFormat, RepositoryHeadOverride};
-use rook_cli::mcp::MCPSpec;
-use rook_cli::share::ShareRequest;
-use rook_cli::skill::SkillSpec;
-use rook_core::features::FeatureFlag;
-use rook_core::{safe_debug, safe_error, safe_info, safe_warn};
-use rook_errors::{ErrorExt, register_error, report_error, report_if_error};
-use rook_graphql::ai::{AgentTaskState, PlatformErrorCode};
-use rook_managed_secrets::ManagedSecretValue;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::r#async::{FutureExt, TimeoutError, Timer};
-use rookui::{AppContext, Entity, ModelContext, ModelHandle, ModelSpawner, SingletonEntity};
 use session_sharing_protocol::sharer::SessionRetentionReason;
 use tracing::Instrument as _;
 use uuid::Uuid;
@@ -174,14 +174,14 @@ const HARNESS_EXIT_FOLLOWUP_DELAY: Duration = Duration::from_secs(1);
 /// force-killing the harness's process group. Together with
 /// `HARNESS_EXIT_FOLLOWUP_DELAY` this bounds the whole escalation ladder to
 /// ~15s from the initial exit request — independent of, and much shorter
-/// than, `ROOK_SANDBOX_DEADLINE`.
+/// than, `POLARIS_TERMINAL_SANDBOX_DEADLINE`.
 const HARNESS_EXIT_FORCE_KILL_DELAY: Duration = Duration::from_secs(14);
 /// Bound on the end-of-run wait for `LocalAgentTaskSyncModel` to finish
 /// delivering queued task status updates before the process may exit.
 const TASK_STATUS_FLUSH_TIMEOUT: Duration = Duration::from_secs(5);
 /// Timeout for individual harness auth preflight commands.
 const PREFLIGHT_CHECK_TIMEOUT: Duration = Duration::from_secs(30);
-pub(crate) const ROOK_DRIVE_SYNC_TIMEOUT: Duration = Duration::from_secs(60);
+pub(crate) const POLARIS_TERMINAL_DRIVE_SYNC_TIMEOUT: Duration = Duration::from_secs(60);
 /// Maximum time to wait for an automatic error resume before propagating the error.
 /// If no follow-up status arrives within this window, the driver terminates with the
 /// original error so the CLI does not hang indefinitely.
@@ -191,23 +191,24 @@ pub(crate) const ROOK_DRIVE_SYNC_TIMEOUT: Duration = Duration::from_secs(60);
 /// fresh one. So it bounds a single attempt, not the whole recovery chain — but a single
 /// attempt's wait (including the recovery backoff) still has to fit inside it.
 pub(crate) const AUTO_RESUME_TIMEOUT: Duration = Duration::from_secs(120);
-/// Signals to Claude child-harness hooks that Rook already owns the background
+/// Signals to Claude child-harness hooks that Polaris Terminal already owns the background
 /// message-listener lifecycle, so the plugin should reuse the shared state
 /// files instead of spawning and cleaning up its own listener.
 ///
 /// When this variable is absent, the Claude plugin falls back to its legacy
-/// self-managed listener path so older Rook builds and standalone plugin
+/// self-managed listener path so older Polaris Terminal builds and standalone plugin
 /// invocations keep working.
 pub(crate) const OZ_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV: &str =
     "OZ_MESSAGE_LISTENER_MANAGED_EXTERNALLY";
-/// Rook-branded name for the same signal, injected alongside the `OZ_` one with the same value.
-pub(crate) const ROOK_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV: &str =
-    "ROOK_MESSAGE_LISTENER_MANAGED_EXTERNALLY";
+/// Polaris Terminal-branded name for the same signal, injected alongside the `OZ_` one with the same value.
+pub(crate) const POLARIS_TERMINAL_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV: &str =
+    "POLARIS_TERMINAL_MESSAGE_LISTENER_MANAGED_EXTERNALLY";
 /// Optional root directory for the per-session Claude message-listener state
-/// that Rook and the Claude hook scripts share.
+/// that Polaris Terminal and the Claude hook scripts share.
 pub(crate) const OZ_MESSAGE_LISTENER_STATE_ROOT_ENV: &str = "OZ_MESSAGE_LISTENER_STATE_ROOT";
-/// Rook-branded name for the same state root, injected alongside the `OZ_` one.
-pub(crate) const ROOK_MESSAGE_LISTENER_STATE_ROOT_ENV: &str = "ROOK_MESSAGE_LISTENER_STATE_ROOT";
+/// Polaris Terminal-branded name for the same state root, injected alongside the `OZ_` one.
+pub(crate) const POLARIS_TERMINAL_MESSAGE_LISTENER_STATE_ROOT_ENV: &str =
+    "POLARIS_TERMINAL_MESSAGE_LISTENER_STATE_ROOT";
 // Keep exporting the legacy `OZ_PARENT_*` names to child hooks until the
 // external Claude plugin has fully migrated to the canonical
 // `OZ_MESSAGE_LISTENER_*` names.
@@ -621,7 +622,7 @@ pub struct AgentDriverOptions {
     pub mcp_startup_timeout: Option<Duration>,
 }
 
-/// `AgentDriver` is a model for driving an ambient Rook agent to completion.
+/// `AgentDriver` is a model for driving an ambient Polaris Terminal agent to completion.
 ///
 /// Its primary responsibility is to configure a headless terminal pane and execute an AI query within it.
 pub struct AgentDriver {
@@ -818,7 +819,7 @@ pub enum AgentDriverError {
     #[error("Agent profile \"{0}\" not found")]
     ProfileError(String),
     #[error(
-        "Failed to authenticate with server - please log in via 'oz login', provide an API key via '--api-key <key>', or set the ROOK_API_KEY environment variable"
+        "Failed to authenticate with server - please log in via 'oz login', provide an API key via '--api-key <key>', or set the POLARIS_TERMINAL_API_KEY environment variable"
     )]
     NotLoggedIn,
     #[error("Saved prompt not found for id {0}")]
@@ -833,8 +834,8 @@ pub enum AgentDriverError {
         #[source]
         error: terminal::ShareSessionError,
     },
-    #[error("Error syncing Rook Drive")]
-    RookDriveSyncFailed,
+    #[error("Error syncing Polaris Terminal Drive")]
+    PtermDriveSyncFailed,
     #[error("Requested environment not found: {0}")]
     EnvironmentNotFound(String),
     #[error("Environment setup failed: {0}")]
@@ -936,7 +937,7 @@ pub enum AgentDriverError {
          forcibly terminated."
     )]
     HarnessExitTimedOut { harness: String },
-    /// `ROOK_SANDBOX_DEADLINE` expired before `run_internal` completed.
+    /// `POLARIS_TERMINAL_SANDBOX_DEADLINE` expired before `run_internal` completed.
     /// For free plans, this is a user-facing limit (upgrade to remove it).
     /// For paid plans, it's a configurable limit the user or team set.
     /// Either way, it's a task outcome — the user's requested work didn't fit
@@ -978,8 +979,8 @@ impl ErrorExt for AgentDriverError {
 }
 register_error!(AgentDriverError);
 
-impl From<rookui::ModelDropped> for AgentDriverError {
-    fn from(_: rookui::ModelDropped) -> Self {
+impl From<ptermui::ModelDropped> for AgentDriverError {
+    fn from(_: ptermui::ModelDropped) -> Self {
         AgentDriverError::InvalidRuntimeState
     }
 }
@@ -1091,7 +1092,7 @@ impl AgentDriver {
 
         // Signal to third-party harnesses (e.g. Claude Code) that we're in a sandbox
         // so they allow root execution with permissive flags.
-        if rook_isolation_platform::detect().is_some() {
+        if pterm_isolation_platform::detect().is_some() {
             env_vars.insert(OsString::from("IS_SANDBOX"), OsString::from("1"));
             tracing::Span::current().record("is_sandbox", true);
         }
@@ -1333,9 +1334,9 @@ impl AgentDriver {
                 {
                     report_error!(e);
                 }
-                // Primary: ROOK_SANDBOX_DEADLINE client-side timer.
+                // Primary: POLARIS_TERMINAL_SANDBOX_DEADLINE client-side timer.
                 //
-                // The server injects ROOK_SANDBOX_DEADLINE (Unix timestamp, seconds since
+                // The server injects POLARIS_TERMINAL_SANDBOX_DEADLINE (Unix timestamp, seconds since
                 // epoch) into the container environment at sandbox creation time for both
                 // Docker Sandbox and Namespace. The sandbox deadline is set to
                 // MaxInstanceRuntime + SandboxShutdownWarningWindow (5 min); this timer
@@ -1350,18 +1351,18 @@ impl AgentDriver {
                 // SIGTERM ~10-20 seconds before SIGKILL), container-runtime stops, and
                 // self-hosted workers being terminated. When the deadline timer is
                 // active it fires 5 minutes earlier and wins this race, but SIGTERM is
-                // the primary signal whenever ROOK_SANDBOX_DEADLINE is absent or the
+                // the primary signal whenever POLARIS_TERMINAL_SANDBOX_DEADLINE is absent or the
                 // shutdown was not deadline-driven. The SIGTERM handler is unregistered
                 // after run_internal resolves to restore the default terminate
                 // disposition.
                 //
-                // When ROOK_SANDBOX_DEADLINE is absent and no SIGTERM arrives, run_internal
+                // When POLARIS_TERMINAL_SANDBOX_DEADLINE is absent and no SIGTERM arrives, run_internal
                 // runs to completion as before (local and self-hosted runs are unaffected).
                 let result = {
                     /// How far before the sandbox deadline to start the teardown sequence.
                     const SHUTDOWN_WARNING_WINDOW: Duration = Duration::from_secs(5 * 60);
 
-                    let maybe_wait = std::env::var("ROOK_SANDBOX_DEADLINE")
+                    let maybe_wait = std::env::var("POLARIS_TERMINAL_SANDBOX_DEADLINE")
                         .ok()
                         .and_then(|s| s.parse::<i64>().ok())
                         .and_then(|deadline_unix| {
@@ -1442,7 +1443,7 @@ impl AgentDriver {
                         r = Self::run_internal(task, foreground.clone()).fuse() => r,
                         _ = timer_fut.fuse() => {
                             log::info!(
-                                "Sandbox deadline approaching (ROOK_SANDBOX_DEADLINE); \
+                                "Sandbox deadline approaching (POLARIS_TERMINAL_SANDBOX_DEADLINE); \
                                  aborting run_internal to allow recording finalization"
                             );
                             Err(AgentDriverError::SandboxDeadlineReached { on_free_plan })
@@ -1982,9 +1983,9 @@ impl AgentDriver {
         }
     }
 
-    /// Load skills from the `ROOK_SKILL_DIRS` environment variable as personal (home) tier skills.
+    /// Load skills from the `POLARIS_TERMINAL_SKILL_DIRS` environment variable as personal (home) tier skills.
     ///
-    /// `ROOK_SKILL_DIRS` is a comma-separated list of paths; each entry is itself a skills directory
+    /// `POLARIS_TERMINAL_SKILL_DIRS` is a comma-separated list of paths; each entry is itself a skills directory
     /// whose **direct children** are expected to be skill folders containing `SKILL.md`. Relative
     /// entries are resolved against the driver's working directory — not the process's current
     /// working directory, which environment preparation may have changed (e.g. by cd-ing into a
@@ -1999,7 +2000,7 @@ impl AgentDriver {
             return;
         }
         log::info!(
-            "ROOK_SKILL_DIRS: loading skills from {} directories",
+            "POLARIS_TERMINAL_SKILL_DIRS: loading skills from {} directories",
             dirs.len()
         );
         let load_result = foreground
@@ -2007,9 +2008,12 @@ impl AgentDriver {
                 let dirs = resolve_skills_dirs(&me.working_dir, dirs);
                 let skills = read_skills_for_skills_dirs(&dirs);
                 if skills.is_empty() {
-                    log::info!("ROOK_SKILL_DIRS: no skills found");
+                    log::info!("POLARIS_TERMINAL_SKILL_DIRS: no skills found");
                 } else {
-                    log::info!("ROOK_SKILL_DIRS: loaded {} skill(s)", skills.len());
+                    log::info!(
+                        "POLARIS_TERMINAL_SKILL_DIRS: loaded {} skill(s)",
+                        skills.len()
+                    );
                 }
                 SkillManager::handle(ctx).update(ctx, |manager, _| {
                     manager.add_skills_dirs_skills(skills);
@@ -2017,7 +2021,7 @@ impl AgentDriver {
             })
             .await;
         if let Err(err) = load_result {
-            log::warn!("Failed to load ROOK_SKILL_DIRS skills: {err}");
+            log::warn!("Failed to load POLARIS_TERMINAL_SKILL_DIRS skills: {err}");
         }
     }
 
@@ -2422,7 +2426,7 @@ impl AgentDriver {
                 // and then call stop_sharing_session when they're done. To know when streams are finished, we would need to modify start_ordered_terminal_events_listener
                 // to send a message when the streams are finished, flushed, and the websocket is disconnected. For now, we'll just sleep for a second, as this seems
                 // to be enough time for the streams to be finished and the events to be flushed.
-                rookui::r#async::Timer::after(Duration::from_secs(1)).await;
+                ptermui::r#async::Timer::after(Duration::from_secs(1)).await;
 
                 conversation_status.into_result()
             }
@@ -2829,7 +2833,7 @@ impl AgentDriver {
     }
 
     /// Sets up the third-party harness by subscribing to CLI session events and
-    /// installing the Rook plugin and platform plugin, if applicable.
+    /// installing the Polaris Terminal plugin and platform plugin, if applicable.
     ///
     /// Returns a oneshot receiver that fires when the harness should exit
     /// (either immediately on completion or after the idle-on-complete timeout).
@@ -3160,7 +3164,7 @@ impl AgentDriver {
         let command_result = loop {
             futures::select! {
                 exit_code = command_handle => break exit_code,
-                _ = rookui::r#async::Timer::after(HARNESS_SAVE_INTERVAL).fuse() => {
+                _ = ptermui::r#async::Timer::after(HARNESS_SAVE_INTERVAL).fuse() => {
                     log::debug!("Triggering periodic save of harness conversation data");
                     report_if_error!(runner
                         .save_conversation(SavePoint::Periodic, foreground)
@@ -3191,7 +3195,7 @@ impl AgentDriver {
                         let telemetry_pattern = error.pattern.clone();
                         let _ = foreground
                             .spawn(move |_, ctx| {
-                                use rook_core::telemetry::TelemetryEvent as _;
+                                use pterm_core::telemetry::TelemetryEvent as _;
                                 let event =
                                     ThirdPartyHarnessTelemetryEvent::RuntimeErrorDetected {
                                         harness: telemetry_harness,
@@ -3304,11 +3308,11 @@ impl AgentDriver {
         harness_name: &str,
         start_event: ExitEscalationEvent,
         mut command_handle: &mut (
-                 impl FusedFuture<Output = Result<rook_core::command::ExitCode, AgentDriverError>>
+                 impl FusedFuture<Output = Result<pterm_core::command::ExitCode, AgentDriverError>>
                  + Unpin
              ),
         foreground: &ModelSpawner<Self>,
-    ) -> Result<rook_core::command::ExitCode, AgentDriverError> {
+    ) -> Result<pterm_core::command::ExitCode, AgentDriverError> {
         let mut escalation = ExitEscalation::new();
         match escalation.on_event(start_event) {
             ExitEscalationAction::SendExit => {}
@@ -3339,7 +3343,7 @@ impl AgentDriver {
 
         let resolved = futures::select! {
             exit_code = command_handle => Some(exit_code),
-            _ = rookui::r#async::Timer::after(HARNESS_EXIT_FOLLOWUP_DELAY).fuse() => None,
+            _ = ptermui::r#async::Timer::after(HARNESS_EXIT_FOLLOWUP_DELAY).fuse() => None,
         };
         if let Some(exit_code) = resolved {
             let _ = escalation.on_event(ExitEscalationEvent::CommandExited);
@@ -3371,7 +3375,7 @@ impl AgentDriver {
 
         let resolved = futures::select! {
             exit_code = command_handle => Some(exit_code),
-            _ = rookui::r#async::Timer::after(HARNESS_EXIT_FORCE_KILL_DELAY).fuse() => None,
+            _ = ptermui::r#async::Timer::after(HARNESS_EXIT_FORCE_KILL_DELAY).fuse() => None,
         };
         if let Some(exit_code) = resolved {
             let _ = escalation.on_event(ExitEscalationEvent::CommandExited);
@@ -3396,7 +3400,7 @@ impl AgentDriver {
         harness_name: &str,
         attempt: u8,
         foreground: &ModelSpawner<Self>,
-    ) -> Result<rook_core::command::ExitCode, AgentDriverError> {
+    ) -> Result<pterm_core::command::ExitCode, AgentDriverError> {
         log::warn!(
             "Ambient agent CLI lifecycle: event=harness_exit_attempt \
              harness={harness_name} attempt={attempt} method=force_kill"
@@ -3453,7 +3457,7 @@ impl AgentDriver {
         let harness = harness_name.to_owned();
         let _ = foreground
             .spawn(move |_, ctx| {
-                use rook_core::telemetry::TelemetryEvent as _;
+                use pterm_core::telemetry::TelemetryEvent as _;
                 let event = ThirdPartyHarnessTelemetryEvent::ExitEscalation { harness, method };
                 send_telemetry_from_app_ctx!(event, ctx);
             })
@@ -3858,7 +3862,7 @@ impl AgentDriver {
             }
         });
 
-        // Subscribe to document model events to emit artifact_created when plans sync to Rook Drive.
+        // Subscribe to document model events to emit artifact_created when plans sync to Polaris Terminal Drive.
         ctx.subscribe_to_model(&AIDocumentModel::handle(ctx), move |me, _, event, ctx| {
             let AIDocumentModelEvent::DocumentSaveStatusUpdated(document_id) = event else {
                 return;
@@ -3878,7 +3882,7 @@ impl AgentDriver {
 
             // Get the notebook link from the document model
             let Some(notebook_link) =
-                doc_model.get_document_rook_drive_object_link(document_id, ctx)
+                doc_model.get_document_pterm_drive_object_link(document_id, ctx)
             else {
                 return;
             };

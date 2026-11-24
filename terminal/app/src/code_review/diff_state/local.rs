@@ -12,7 +12,7 @@ use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use instant::Instant;
 #[cfg(feature = "local_fs")]
-use rook_util::standardized_path::StandardizedPath;
+use pterm_util::standardized_path::StandardizedPath;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {
@@ -20,15 +20,15 @@ cfg_if::cfg_if! {
     }
 }
 #[cfg(not(target_family = "wasm"))]
-use rook_core::channel::ChannelState;
-use rook_core::send_telemetry_from_ctx;
+use pterm_core::channel::ChannelState;
+use pterm_core::send_telemetry_from_ctx;
 #[cfg(feature = "local_fs")]
-use rook_core::sync_queue::SyncQueue;
-use rook_util::git::run_git_command;
+use pterm_core::sync_queue::SyncQueue;
+use pterm_util::git::run_git_command;
 #[cfg(not(target_arch = "wasm32"))]
-use rookui::AppContext;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{ModelContext, SingletonEntity};
+use ptermui::AppContext;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{ModelContext, SingletonEntity};
 
 use crate::code_review::diff_size_limits::{
     DiffSize, MAX_DIFF_SIZE, UnrenderableReason, compute_diff_size,
@@ -57,11 +57,11 @@ cfg_if::cfg_if! {
             RepoMetadataError, Repository, RepositoryUpdate, RepositoryWatchMode,
         };
         use async_channel::Sender;
-        use rookui::ModelHandle;
+        use ptermui::ModelHandle;
     }
 }
 #[cfg(feature = "local_fs")]
-use rook_errors::report_error;
+use pterm_errors::report_error;
 
 #[cfg(feature = "local_fs")]
 use super::DiffOperation;
@@ -440,7 +440,7 @@ impl LocalDiffStateModel {
     }
 
     #[cfg(not(feature = "local_fs"))]
-    pub fn is_git_operation_blocked(&self, _app: &rookui::AppContext) -> bool {
+    pub fn is_git_operation_blocked(&self, _app: &ptermui::AppContext) -> bool {
         false
     }
     /// Returns `true` once the repository has at least one commit.
@@ -467,7 +467,7 @@ impl LocalDiffStateModel {
     }
 
     #[cfg(not(feature = "local_fs"))]
-    fn active_repository_path(&self, _app: &rookui::AppContext) -> Option<PathBuf> {
+    fn active_repository_path(&self, _app: &ptermui::AppContext) -> Option<PathBuf> {
         None
     }
 
@@ -1728,7 +1728,7 @@ impl LocalDiffStateModel {
         let n = file.read(&mut buffer)?;
         buffer.truncate(n);
 
-        if rook_util::file_type::is_buffer_binary(&buffer) {
+        if pterm_util::file_type::is_buffer_binary(&buffer) {
             return Ok(None);
         }
         file.rewind()?;
@@ -2944,7 +2944,7 @@ pub(crate) async fn diff_metadata_against_head(
     })
 }
 
-impl rookui::Entity for LocalDiffStateModel {
+impl ptermui::Entity for LocalDiffStateModel {
     type Event = DiffStateModelEvent;
 }
 

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use parking_lot::Mutex;
-use rookui::text_layout;
+use ptermui::text_layout;
 
 use crate::editor::Point;
 use crate::editor::view::DisplayPoint;

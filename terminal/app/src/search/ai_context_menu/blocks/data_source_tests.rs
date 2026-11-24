@@ -1,7 +1,7 @@
 use chrono::{Duration, Local};
 use fuzzy_match::FuzzyMatchResult;
-use rook_core::command::ExitCode;
-use rookui::{App, SingletonEntity};
+use pterm_core::command::ExitCode;
+use ptermui::{App, SingletonEntity};
 
 use crate::search::ai_context_menu::blocks::data_source::BlockDataSource;
 use crate::search::ai_context_menu::blocks::search_item::BlockSearchItem;

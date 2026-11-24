@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime};
 
 #[cfg(not(target_family = "wasm"))]
-use rookui_core::App;
+use ptermui_core::App;
 
 use super::*;
 
@@ -28,10 +28,10 @@ fn llm_provider_parses_supported_api_key_provider_names() {
 
 #[test]
 fn persisted_provider_api_key_updates_request_state() {
-    rookui_core::App::test((), |mut app| async move {
+    ptermui_core::App::test((), |mut app| async move {
         app.update(|ctx| {
-            rookui_extras::secure_storage::register_noop("test", ctx);
-            rook_core::telemetry::testing::MockTelemetryContextProvider::register(ctx);
+            ptermui_extras::secure_storage::register_noop("test", ctx);
+            pterm_core::telemetry::testing::MockTelemetryContextProvider::register(ctx);
         });
         let manager = app.add_singleton_model(ApiKeyManager::new);
 
@@ -56,10 +56,10 @@ fn persisted_provider_api_key_updates_request_state() {
 
 #[test]
 fn persisted_provider_api_key_can_be_cleared() {
-    rookui_core::App::test((), |mut app| async move {
+    ptermui_core::App::test((), |mut app| async move {
         app.update(|ctx| {
-            rookui_extras::secure_storage::register_noop("test", ctx);
-            rook_core::telemetry::testing::MockTelemetryContextProvider::register(ctx);
+            ptermui_extras::secure_storage::register_noop("test", ctx);
+            pterm_core::telemetry::testing::MockTelemetryContextProvider::register(ctx);
         });
         let manager = app.add_singleton_model(ApiKeyManager::new);
 
@@ -310,9 +310,9 @@ fn legacy_endpoint_ids_are_deterministic_and_preserve_config_keys() {
 
 #[test]
 fn endpoint_definitions_join_keys_fail_closed_and_recover() {
-    rookui_core::App::test((), |mut app| async move {
+    ptermui_core::App::test((), |mut app| async move {
         app.update(|ctx| {
-            rookui_extras::secure_storage::register_noop("test", ctx);
+            ptermui_extras::secure_storage::register_noop("test", ctx);
         });
         let manager = app.add_singleton_model(ApiKeyManager::new);
         let legacy = vec![endpoint_with_keys(
@@ -370,7 +370,7 @@ fn endpoint_definitions_join_keys_fail_closed_and_recover() {
 
 #[test]
 fn empty_active_definitions_disable_the_legacy_fallback() {
-    rookui_core::App::test((), |mut app| async move {
+    ptermui_core::App::test((), |mut app| async move {
         let manager = app.add_singleton_model(|_| {
             make_manager(ApiKeys {
                 custom_endpoints: vec![endpoint_with_keys(

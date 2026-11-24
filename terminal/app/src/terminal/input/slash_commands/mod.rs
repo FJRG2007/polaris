@@ -12,16 +12,16 @@ pub use cloud_mode_v2_view::{CloudModeV2SlashCommandView, Section as CloudModeV2
 pub use data_source::*;
 pub use mixer::{SlashCommandMixer, build_slash_command_mixer, slash_command_query};
 #[cfg(not(target_family = "wasm"))]
-use rook_cli::agent::Harness;
-use rook_core::features::FeatureFlag;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::AnsiColorIdentifier;
-use rook_errors::report_error;
+use pterm_cli::agent::Harness;
+use pterm_core::features::FeatureFlag;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::AnsiColorIdentifier;
+use pterm_errors::report_error;
 #[cfg(feature = "local_fs")]
-use rook_util::path::{CleanPathResult, LineAndColumnArg, expand_session_home};
-use rookui::clipboard::ClipboardContent;
-use rookui::{AppContext, SingletonEntity, ViewContext};
+use pterm_util::path::{CleanPathResult, LineAndColumnArg, expand_session_home};
+use ptermui::clipboard::ClipboardContent;
+use ptermui::{AppContext, SingletonEntity, ViewContext};
 pub use view::{CloseReason, InlineSlashCommandView, SlashCommandsEvent};
 
 use crate::TelemetryEvent;
@@ -419,7 +419,7 @@ impl Input {
 
                 self.show_workflows_info_box_on_workflow_selection(
                     WorkflowType::Cloud(Box::new(workflow)),
-                    WorkflowSource::RookAI,
+                    WorkflowSource::PtermAI,
                     WorkflowSelectionSource::SlashMenu,
                     None,
                     ctx,
@@ -774,7 +774,7 @@ impl Input {
                             Ok(metadata) if metadata.is_file() => {
                                 use crate::util::file::external_editor;
 
-                                ctx.dispatch_typed_action(&TerminalAction::OpenCodeInRook {
+                                ctx.dispatch_typed_action(&TerminalAction::OpenCodeInPterm {
                                     path: file_path,
                                     layout: external_editor::settings::EditorLayout::SplitPane,
                                     line_col,

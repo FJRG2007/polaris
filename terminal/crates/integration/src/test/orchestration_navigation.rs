@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use rook::integration_testing::orchestration_navigation::child_pill_after_reopening_closed_parent_tab;
+use polaris_terminal::integration_testing::orchestration_navigation::child_pill_after_reopening_closed_parent_tab;
 
 use crate::Builder;
 

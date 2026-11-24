@@ -5,11 +5,11 @@ use anyhow::Context as _;
 // Only the legacy import, which eval builds compile out, materializes an ordered collection.
 #[cfg(not(feature = "agent_mode_evals"))]
 use indexmap::IndexMap;
-use rook_core::channel::ChannelState;
-use rook_core::features::FeatureFlag;
-use rook_core::user_preferences::GetUserPreferences;
-use rook_errors::report_error;
-use rookui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
+use pterm_core::channel::ChannelState;
+use pterm_core::features::FeatureFlag;
+use pterm_core::user_preferences::GetUserPreferences;
+use pterm_errors::report_error;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
 use settings::Setting as _;
 use uuid::Uuid;
 
@@ -54,7 +54,7 @@ impl AIExecutionProfileInfo {
         &self.id
     }
 
-    /// The Rook Drive sync ID of this profile, if it has been synced.
+    /// The Polaris Terminal Drive sync ID of this profile, if it has been synced.
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
     pub fn sync_id(&self) -> Option<SyncId> {
         self.sync_id
@@ -83,7 +83,7 @@ fn file_backed_execution_profiles_enabled(launch_mode: &LaunchMode) -> bool {
 /// Selects the authoritative persistence backend for execution profiles.
 #[derive(Clone, Copy, Debug)]
 enum ProfileSource {
-    /// Existing per-profile Rook Drive objects used by GUI rollback builds.
+    /// Existing per-profile Polaris Terminal Drive objects used by GUI rollback builds.
     LegacyCloudObjects,
     /// One file-backed collection stored in [`AISettings`].
     SettingsCollection {
@@ -841,7 +841,7 @@ impl AIExecutionProfilesModel {
             let mut new_profile = self.default_profile(ctx).data().clone();
             new_profile.name = String::new();
             new_profile.is_default_profile = false;
-            new_profile.autosync_plans_to_rook_drive = true;
+            new_profile.autosync_plans_to_pterm_drive = true;
             profiles.insert(profile_id.clone(), new_profile);
             if !self.activate_pending_settings_collection(profiles, ctx) {
                 return None;
@@ -855,7 +855,7 @@ impl AIExecutionProfilesModel {
             let mut new_profile = self.default_profile(ctx).data().clone();
             new_profile.name = String::new();
             new_profile.is_default_profile = false;
-            new_profile.autosync_plans_to_rook_drive = true;
+            new_profile.autosync_plans_to_pterm_drive = true;
             profiles.insert(profile_id.clone(), new_profile);
             if let Err(error) = AISettings::handle(ctx).update(ctx, |settings, ctx| {
                 settings.execution_profiles.set_value(profiles, ctx)
@@ -875,7 +875,7 @@ impl AIExecutionProfilesModel {
         let mut new_profile = self.default_profile(ctx).data().clone();
         new_profile.name = "".to_string();
         new_profile.is_default_profile = false;
-        new_profile.autosync_plans_to_rook_drive = true;
+        new_profile.autosync_plans_to_pterm_drive = true;
 
         let update_manager = UpdateManager::handle(ctx);
         let client_id = ClientId::default();
@@ -1644,7 +1644,7 @@ impl AIExecutionProfilesModel {
         );
     }
 
-    pub fn set_autosync_plans_to_rook_drive(
+    pub fn set_autosync_plans_to_pterm_drive(
         &mut self,
         profile_id: &ExecutionProfileId,
         enabled: bool,
@@ -1653,8 +1653,8 @@ impl AIExecutionProfilesModel {
         self.edit_profile_internal(
             profile_id,
             |profile| {
-                if profile.autosync_plans_to_rook_drive != enabled {
-                    profile.autosync_plans_to_rook_drive = enabled;
+                if profile.autosync_plans_to_pterm_drive != enabled {
+                    profile.autosync_plans_to_pterm_drive = enabled;
                     return true;
                 }
                 false

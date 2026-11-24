@@ -2,17 +2,17 @@ use std::collections::HashMap;
 use std::ops::Range;
 
 #[cfg(not(target_family = "wasm"))]
-use rook_core::channel::ChannelState;
-use rook_core::send_telemetry_from_ctx;
+use pterm_core::channel::ChannelState;
+use pterm_core::send_telemetry_from_ctx;
 #[cfg(not(target_family = "wasm"))]
-use rook_editor::content::find::SearchConfig;
+use pterm_editor::content::find::SearchConfig;
 #[cfg(not(target_family = "wasm"))]
-use rook_editor::search::Searcher;
-use rook_editor::search::{RestorableSearchResults, SelectedResult};
+use pterm_editor::search::Searcher;
+use pterm_editor::search::{RestorableSearchResults, SelectedResult};
 #[cfg(not(target_family = "wasm"))]
-use rook_errors::report_error;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{AppContext, Entity, EntityId, ModelContext, ViewHandle, WeakViewHandle};
+use pterm_errors::report_error;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, ViewHandle, WeakViewHandle};
 use string_offset::CharOffset;
 
 use crate::code::local_code_editor::LocalCodeEditorView;
@@ -238,7 +238,7 @@ impl CodeReviewFindModel {
         &self,
         editor_id: EntityId,
         ctx: &AppContext,
-    ) -> Option<rookui::ModelHandle<Searcher>> {
+    ) -> Option<ptermui::ModelHandle<Searcher>> {
         let view = self.weak_view_handle.upgrade(ctx);
         if view.is_none() {
             if ChannelState::enable_debug_features() {

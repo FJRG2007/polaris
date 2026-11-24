@@ -63,7 +63,7 @@ Reference PRODUCT.md invariants by number.
 - `diff_selector_items_preserve_legacy_order` — asserts `CodeReviewView::build_diff_targets` produces the same `DiffMode` sequence as today's selector for the same `available_branches` + `current_mode`. Covers §9, §26.
 - `diff_selector_marks_selected` — after `update_diff_selector_selection`, exactly one `DiffTarget` has `is_selected = true`, matching `DiffStateModel::diff_mode()`. Covers §25.
 - `apply_diff_mode_no_op_on_same_mode` — re-invoking `apply_diff_mode` with the currently-active mode does not call `DiffStateModel::set_diff_mode` and does not emit `BaseChanged` telemetry. Covers §17.
-### Integration tests (`crates/integration`, follow `rook-integration-test` skill)
+### Integration tests (`crates/integration`, follow `polaris-terminal-integration-test` skill)
 - `code_review_diff_selector_opens_below` — open code review with prepared fixture, click the trigger, assert the menu is rendered below the trigger and the search input has focus. Covers §7, §11.
 - `code_review_diff_selector_filters_and_selects` — type a substring, assert only matching rows remain in order; click a row, assert the button label updates and `DiffMode` changes via `DiffStateModel`. Covers §11, §12, §16.
 - `code_review_diff_selector_keyboard_nav` — open, press `ArrowDown` into list, `Enter` to select, verify selection changed; re-open, press `Escape`, verify menu closes with no change. Covers §21, §22.

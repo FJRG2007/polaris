@@ -9,8 +9,8 @@ use jaq_all::fmts::Format;
 use jaq_all::fmts::write::Writer;
 // Use jaq_json directly to ensure serde support is included.
 use jaq_json::{Val, write as jaq_write};
-use rook_cli::agent::OutputFormat;
-use rook_cli::json_filter::{JqFilter, JsonOutput};
+use pterm_cli::agent::OutputFormat;
+use pterm_cli::json_filter::{JqFilter, JsonOutput};
 use serde::Serialize;
 use tabwriter::TabWriter;
 

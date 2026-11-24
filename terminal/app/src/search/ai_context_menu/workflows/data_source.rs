@@ -1,5 +1,5 @@
 use fuzzy_match::FuzzyMatchResult;
-use rookui::{AppContext, SingletonEntity};
+use ptermui::{AppContext, SingletonEntity};
 
 use super::search_item::WorkflowSearchItem;
 use crate::cloud_object::CloudModelType;
@@ -132,6 +132,6 @@ impl SyncDataSource for WorkflowDataSource {
     }
 }
 
-impl rookui::Entity for WorkflowDataSource {
+impl ptermui::Entity for WorkflowDataSource {
     type Event = ();
 }

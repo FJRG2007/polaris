@@ -4,7 +4,7 @@ use std::sync::Arc;
 use ai::agent::FileLocations;
 use ai::agent::action_result::AnyFileContent;
 use futures::FutureExt as _;
-use rookui::{App, Entity, ModelHandle};
+use ptermui::{App, Entity, ModelHandle};
 
 use super::*;
 

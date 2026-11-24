@@ -4,15 +4,15 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use rook_core::features::FeatureFlag;
-use rook_core::settings::ToggleableSetting as _;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::settings::ToggleableSetting as _;
+use ptermui::elements::{
     Container, Element, Flex, FormattedTextElement, HighlightedHyperlink, HyperlinkUrl,
     MouseStateHandle, ParentElement,
 };
-use rookui::keymap::ContextPredicate;
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{
+use ptermui::keymap::ContextPredicate;
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{
     Action, AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle, id,
 };
 
@@ -24,7 +24,9 @@ use super::settings_page::{
 };
 use super::{SettingsAction, SettingsSection, ToggleSettingActionPair, flags};
 use crate::appearance::Appearance;
-use crate::settings::{AISettings, MemoryEnabled, RookDriveContextEnabled, RuleSuggestionsEnabled};
+use crate::settings::{
+    AISettings, MemoryEnabled, PtermDriveContextEnabled, RuleSuggestionsEnabled,
+};
 use crate::util::bindings;
 
 const PAGE_TITLE: &str = "Knowledge";
@@ -53,7 +55,7 @@ impl KnowledgePageView {
             }
             widgets.extend([
                 Box::new(ManageRulesWidget::default()) as Box<dyn SettingsWidget<View = Self>>,
-                Box::new(RookDriveContextWidget::default()),
+                Box::new(PtermDriveContextWidget::default()),
             ]);
         }
         PageType::new_uncategorized(widgets, Some(PageTitle::new(PAGE_TITLE)))
@@ -82,7 +84,7 @@ pub enum KnowledgePageEvent {
 pub enum KnowledgePageAction {
     ToggleRules,
     ToggleRuleSuggestions,
-    ToggleRookDriveContext,
+    TogglePtermDriveContext,
     OpenAIFactCollection,
     HyperlinkClick(HyperlinkUrl),
 }
@@ -106,10 +108,10 @@ impl TypedActionView for KnowledgePageView {
                 });
                 ctx.notify();
             }
-            KnowledgePageAction::ToggleRookDriveContext => {
+            KnowledgePageAction::TogglePtermDriveContext => {
                 AISettings::handle(ctx).update(ctx, |settings, ctx| {
                     let _ = settings
-                        .rook_drive_context_enabled
+                        .pterm_drive_context_enabled
                         .toggle_and_save_value(ctx);
                 });
                 ctx.notify();
@@ -166,7 +168,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 &(context.clone() & id!(flags::IS_ANY_AI_ENABLED)),
                 flags::AI_RULES_FLAG,
             )
-            .with_group(bindings::BindingGroup::RookAi)
+            .with_group(bindings::BindingGroup::PtermAi)
             .with_enabled(|| FeatureFlag::AIRules.is_enabled()),
             ToggleSettingActionPair::new(
                 "Suggested Rules",
@@ -176,19 +178,19 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 &(context.clone() & id!(flags::IS_ANY_AI_ENABLED)),
                 flags::SUGGESTED_RULES_FLAG,
             )
-            .with_group(bindings::BindingGroup::RookAi)
+            .with_group(bindings::BindingGroup::PtermAi)
             .with_enabled(|| {
                 FeatureFlag::AIRules.is_enabled() && FeatureFlag::SuggestedRules.is_enabled()
             }),
             ToggleSettingActionPair::new(
-                "Rook Drive as agent context",
+                "Polaris Terminal Drive as agent context",
                 builder(SettingsAction::Knowledge(
-                    KnowledgePageAction::ToggleRookDriveContext,
+                    KnowledgePageAction::TogglePtermDriveContext,
                 )),
                 &(context.clone() & id!(flags::IS_ANY_AI_ENABLED)),
-                flags::ROOK_DRIVE_CONTEXT_FLAG,
+                flags::POLARIS_TERMINAL_DRIVE_CONTEXT_FLAG,
             )
-            .with_group(bindings::BindingGroup::RookAi)
+            .with_group(bindings::BindingGroup::PtermAi)
             .with_enabled(|| FeatureFlag::AIRules.is_enabled()),
         ],
         app,
@@ -227,7 +229,7 @@ impl SettingsWidget for RulesWidget {
 
         let rules_description = vec![
             FormattedTextFragment::plain_text(
-                "Rules help the Rook Agent follow your conventions, whether for codebases or specific workflows. ",
+                "Rules help the Polaris Terminal Agent follow your conventions, whether for codebases or specific workflows. ",
             ),
             FormattedTextFragment::hyperlink("Learn more", RULES_DOCS_URL),
         ];
@@ -329,15 +331,15 @@ impl SettingsWidget for ManageRulesWidget {
 }
 
 #[derive(Default)]
-struct RookDriveContextWidget {
-    rook_drive_context_toggle: SwitchStateHandle,
+struct PtermDriveContextWidget {
+    pterm_drive_context_toggle: SwitchStateHandle,
 }
 
-impl SettingsWidget for RookDriveContextWidget {
+impl SettingsWidget for PtermDriveContextWidget {
     type View = KnowledgePageView;
 
     fn search_terms(&self) -> &str {
-        "rook drive agent context contents personal team developer workflows environments notebooks environment variables"
+        "polaris-terminal drive agent context contents personal team developer workflows environments notebooks environment variables"
     }
 
     fn render(
@@ -347,18 +349,18 @@ impl SettingsWidget for RookDriveContextWidget {
         app: &AppContext,
     ) -> Box<dyn Element> {
         let ai_settings = AISettings::as_ref(app);
-        let toggle = render_ai_setting_toggle::<RookDriveContextEnabled>(
-            "Rook Drive as agent context",
-            KnowledgePageAction::ToggleRookDriveContext,
-            *ai_settings.rook_drive_context_enabled,
+        let toggle = render_ai_setting_toggle::<PtermDriveContextEnabled>(
+            "Polaris Terminal Drive as agent context",
+            KnowledgePageAction::TogglePtermDriveContext,
+            *ai_settings.pterm_drive_context_enabled,
             ai_settings.is_any_ai_enabled(app),
-            self.rook_drive_context_toggle.clone(),
+            self.pterm_drive_context_toggle.clone(),
             &view.local_only_icon_tooltip_states,
             app,
         );
 
         let description = render_ai_setting_description(
-            "The Rook Agent can leverage your Rook Drive Contents to tailor responses to your personal and team developer workflows and environments. This includes any Workflows, Notebooks, and Environment Variables.",
+            "The Polaris Terminal Agent can leverage your Polaris Terminal Drive Contents to tailor responses to your personal and team developer workflows and environments. This includes any Workflows, Notebooks, and Environment Variables.",
             ai_settings.is_any_ai_enabled(app),
             app,
         );

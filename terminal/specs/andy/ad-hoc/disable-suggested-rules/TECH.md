@@ -10,7 +10,7 @@ Rule suggestions are inline chip views shown at the bottom of an AI block after 
 
 - `app/src/settings/ai.rs` — `AISettings` settings group; all Active AI toggles (`prompt_suggestions_enabled_internal`, `code_suggestions_enabled_internal`, etc.) follow the same `define_settings_group!` + getter pattern.
 - `app/src/ai/blocklist/block.rs (2137–2189)` — `handle_complete_output` creates `SuggestionChipView` instances for each suggested rule. The check `if FeatureFlag::SuggestedRules.is_enabled()` guards the entire block.
-- `app/src/settings_view/ai_page.rs` — `AIFactWidget` renders the Knowledge section. Contains the `ToggleRules` and `ToggleRookDriveContext` toggle rows.
+- `app/src/settings_view/ai_page.rs` — `AIFactWidget` renders the Knowledge section. Contains the `ToggleRules` and `TogglePtermDriveContext` toggle rows.
 
 The pattern for an opt-out Active AI setting already exists verbatim for Prompt Suggestions (`prompt_suggestions_enabled_internal` / `is_prompt_suggestions_enabled`) and Code Suggestions.
 
@@ -27,7 +27,7 @@ rule_suggestions_enabled_internal: RuleSuggestionsEnabled {
     supported_platforms: SupportedPlatforms::ALL,
     sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
     private: false,
-    toml_path: "agents.rook_agent.active_ai.rule_suggestions_enabled",
+    toml_path: "agents.pterm_agent.active_ai.rule_suggestions_enabled",
     description: "Controls whether the agent suggests rules to save after responses.",
     feature_flag: FeatureFlag::SuggestedRules,
 }
@@ -38,7 +38,7 @@ The `feature_flag` field causes the setting to be excluded from the user-facing 
 Add the getter to `impl AISettings`:
 
 ```rust
-pub fn is_rule_suggestions_enabled(&self, app: &rookui::AppContext) -> bool {
+pub fn is_rule_suggestions_enabled(&self, app: &ptermui::AppContext) -> bool {
     self.is_active_ai_enabled(app) && *self.rule_suggestions_enabled_internal
 }
 ```
@@ -69,14 +69,14 @@ This is the single chokepoint where `SuggestionChipView::new_rule_chip` instance
 - Add `RuleSuggestionsEnabled` to the `use crate::settings::{…}` import block.
 - Add `ToggleRuleSuggestions` variant to `AISettingsPageAction`.
 - Add a handler for `ToggleRuleSuggestions` in `handle_action` that calls `settings.rule_suggestions_enabled_internal.toggle_and_save_value(ctx)`.
-- Add a `render_rule_suggestions_toggle` method to `AIFactWidget` following the same structure as `render_rook_drive_context_toggle`.
+- Add a `render_rule_suggestions_toggle` method to `AIFactWidget` following the same structure as `render_pterm_drive_context_toggle`.
 - In `AIFactWidget::render`, call `render_rule_suggestions_toggle` conditionally:
   ```rust
   if FeatureFlag::SuggestedRules.is_enabled() {
       column.add_child(self.render_rule_suggestions_toggle(view, ai_settings, app));
   }
   ```
-  Insert this between the rules toggle + "Manage rules" button and the Rook Drive context toggle.
+  Insert this between the rules toggle + "Manage rules" button and the Polaris Terminal Drive context toggle.
 
 The toggle renders with `is_any_ai_enabled` as the `is_toggleable` argument (not `is_active_ai_enabled`), consistent with other Knowledge-section toggles like `ToggleRules`.
 

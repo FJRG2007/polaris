@@ -1,5 +1,5 @@
-pub use rook_terminal::model::secrets::*;
-use rookui::EntityId;
+pub use pterm_terminal::model::secrets::*;
+use ptermui::EntityId;
 use string_offset::StringRange;
 
 use crate::ai::blocklist::block::TextLocation;

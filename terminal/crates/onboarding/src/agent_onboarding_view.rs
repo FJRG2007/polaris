@@ -2,12 +2,12 @@ use std::time::Duration;
 
 use ai::LLMId;
 use instant::Instant;
-use rook_core::features::FeatureFlag;
-use rook_core::send_telemetry_from_ctx;
-use rookui_core::assets::asset_cache::AssetSource;
-use rookui_core::image_cache::ImageType;
-use rookui_core::windowing::WindowManager;
-use rookui_core::windowing::state::{ApplicationStage, StateEvent};
+use pterm_core::features::FeatureFlag;
+use pterm_core::send_telemetry_from_ctx;
+use ptermui_core::assets::asset_cache::AssetSource;
+use ptermui_core::image_cache::ImageType;
+use ptermui_core::windowing::WindowManager;
+use ptermui_core::windowing::state::{ApplicationStage, StateEvent};
 
 use crate::components::feature_optout_dialog::{FeatureOptOutDialog, render_feature_optout_dialog};
 use crate::model::{
@@ -27,20 +27,20 @@ const PLAN_ACTIVATED_TOAST_DURATION: Duration = Duration::from_secs(5);
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::{Fill, RookTheme};
-use rookui_core::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::{Fill, PtermTheme};
+use ptermui_core::elements::{
     Align, CacheOption, ChildAnchor, ConstrainedBox, Container, CrossAxisAlignment, Dismiss, Empty,
     Flex, Image, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
     ParentAnchor, ParentElement, ParentOffsetBounds, Rect, Shrinkable, Stack,
 };
-use rookui_core::fonts::Weight;
-use rookui_core::keymap::macros::*;
-use rookui_core::keymap::{FixedBinding, Keystroke};
-use rookui_core::presenter::ChildView;
-use rookui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
-use rookui_core::{
+use ptermui_core::fonts::Weight;
+use ptermui_core::keymap::macros::*;
+use ptermui_core::keymap::{FixedBinding, Keystroke};
+use ptermui_core::presenter::ChildView;
+use ptermui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui_core::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -142,7 +142,7 @@ impl AgentOnboardingView {
     /// Creates a new AgentOnboardingView.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        theme_picker_themes: [RookTheme; 4],
+        theme_picker_themes: [PtermTheme; 4],
         skippable: bool,
         models: Vec<OnboardingModelInfo>,
         default_model_id: LLMId,
@@ -431,7 +431,7 @@ impl AgentOnboardingView {
     /// Eagerly loads all onboarding slide images into the asset cache
     /// so they display instantly when the user navigates between slides.
     fn preload_onboarding_images(ctx: &mut ViewContext<Self>) {
-        let asset_cache = rookui_core::assets::asset_cache::AssetCache::as_ref(ctx);
+        let asset_cache = ptermui_core::assets::asset_cache::AssetCache::as_ref(ctx);
         // Preload the shared background image used on all right panels.
         asset_cache.load_asset::<ImageType>(AssetSource::Bundled {
             path: crate::slides::layout::ONBOARDING_BG_PATH,
@@ -521,7 +521,7 @@ impl AgentOnboardingView {
             appearance,
             FeatureOptOutDialog {
                 title: "Are you sure you don't want AI?",
-                body: "Without AI, you'll still get Rook's terminal experience, but you'll miss \
+                body: "Without AI, you'll still get Polaris Terminal's terminal experience, but you'll miss \
                        our agentic features like automatic fixes for terminal errors.",
                 features: &[],
                 close_button,
@@ -563,7 +563,7 @@ impl AgentOnboardingView {
 
         self.show_plan_activated_toast = true;
         let _ = ctx.spawn(
-            rookui_core::r#async::Timer::after(PLAN_ACTIVATED_TOAST_DURATION),
+            ptermui_core::r#async::Timer::after(PLAN_ACTIVATED_TOAST_DURATION),
             |me: &mut Self, _, ctx| {
                 if me.show_plan_activated_toast {
                     me.show_plan_activated_toast = false;
@@ -587,7 +587,7 @@ impl AgentOnboardingView {
         let ui_builder = appearance.ui_builder();
 
         let check_icon = ConstrainedBox::new(Box::new(
-            Icon::CheckSkinny.to_rookui_icon(Fill::Solid(text_color)),
+            Icon::CheckSkinny.to_ptermui_icon(Fill::Solid(text_color)),
         ))
         .with_width(ICON_SIZE)
         .with_height(ICON_SIZE)

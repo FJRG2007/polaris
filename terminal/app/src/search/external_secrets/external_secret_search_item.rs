@@ -1,7 +1,7 @@
 use ordered_float::OrderedFloat;
-use rookui::elements::{ConstrainedBox, Container, Highlight, Text};
-use rookui::fonts::{Properties, Weight};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::elements::{ConstrainedBox, Container, Highlight, Text};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use super::external_secret_fuzzy_match::FuzzyMatchExternalSecretResult;
 use super::searcher::ExternalSecretSearchItemAction;
@@ -31,7 +31,7 @@ impl SearchItem for ExternalSecretSearchItem {
             ConstrainedBox::new(
                 self.external_secret
                     .icon()
-                    .to_rookui_icon(appearance.theme().active_ui_text_color())
+                    .to_ptermui_icon(appearance.theme().active_ui_text_color())
                     .finish(),
             )
             .with_width(ICON_SIZE)

@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use rook_core::execution_mode::{AppExecutionMode, ExecutionMode};
-use rookui::r#async::Timer;
-use rookui::{App, EntityId};
+use pterm_core::execution_mode::{AppExecutionMode, ExecutionMode};
+use ptermui::r#async::Timer;
+use ptermui::{App, EntityId};
 
 use super::event::{
     CLIAgentEvent, CLIAgentEventPayload, CLIAgentEventSource, CLIAgentEventType, parse_event,
@@ -17,7 +17,7 @@ use crate::terminal::CLIAgent;
 #[test]
 fn parse_stop_notification() {
     let body = r#"{"v":1,"agent":"claude","event":"stop","session_id":"abc","cwd":"/tmp/proj","project":"proj","query":"write a haiku","response":"Memory is safe","transcript_path":"/tmp/t.jsonl"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
 
     assert_eq!(notif.v, 1);
     assert_eq!(notif.agent, CLIAgent::Claude);
@@ -76,7 +76,7 @@ fn cli_agent_session_context_title_helpers_ignore_empty_text() {
 #[test]
 fn parse_permission_request_notification() {
     let body = r#"{"v":1,"agent":"claude","event":"permission_request","session_id":"abc","cwd":"/tmp/proj","project":"proj","summary":"Wants to run Bash: rm -rf /tmp","tool_name":"Bash","tool_input":{"command":"rm -rf /tmp"}}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
 
     assert_eq!(notif.event, CLIAgentEventType::PermissionRequest);
     assert_eq!(
@@ -93,7 +93,7 @@ fn parse_permission_request_notification() {
 #[test]
 fn parse_permission_request_with_file_path() {
     let body = r#"{"v":1,"agent":"claude","event":"permission_request","session_id":"abc","cwd":"/tmp","project":"tmp","tool_name":"Write","tool_input":{"file_path":"/tmp/test.py","content":"print('hi')"}}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
 
     assert_eq!(
         notif.payload.tool_input_preview.as_deref(),
@@ -104,7 +104,7 @@ fn parse_permission_request_with_file_path() {
 #[test]
 fn parse_idle_prompt_notification() {
     let body = r#"{"v":1,"agent":"claude","event":"idle_prompt","session_id":"abc","cwd":"/tmp","project":"tmp","summary":"Claude is waiting for your input"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
 
     assert_eq!(notif.event, CLIAgentEventType::IdlePrompt);
     assert_eq!(
@@ -116,7 +116,7 @@ fn parse_idle_prompt_notification() {
 #[test]
 fn parse_agent_needs_input_notification() {
     let body = r#"{"v":1,"agent":"claude","event":"agent_needs_input","session_id":"abc","cwd":"/tmp","project":"tmp","summary":"Some dialog text"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
 
     assert_eq!(notif.event, CLIAgentEventType::NeedsInput);
     assert_eq!(notif.payload.summary.as_deref(), Some("Some dialog text"));
@@ -125,7 +125,7 @@ fn parse_agent_needs_input_notification() {
 #[test]
 fn parse_session_start_notification() {
     let body = r#"{"v":1,"agent":"claude","event":"session_start","session_id":"abc","cwd":"/tmp","project":"tmp","plugin_version":"1.1.0"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
 
     assert_eq!(notif.event, CLIAgentEventType::SessionStart);
     assert_eq!(notif.payload.plugin_version.as_deref(), Some("1.1.0"));
@@ -145,13 +145,13 @@ fn returns_none_for_missing_title() {
 
 #[test]
 fn returns_none_for_invalid_json() {
-    assert!(parse_event(Some("rook://cli-agent"), "not json").is_none());
+    assert!(parse_event(Some("polaris-terminal://cli-agent"), "not json").is_none());
 }
 
 #[test]
 fn handles_unknown_event_type() {
     let body = r#"{"v":1,"agent":"claude","event":"some_future_event"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
     assert_eq!(
         notif.event,
         CLIAgentEventType::Unknown("some_future_event".to_string())
@@ -161,7 +161,7 @@ fn handles_unknown_event_type() {
 #[test]
 fn handles_missing_optional_fields() {
     let body = r#"{"event":"stop"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
 
     assert_eq!(notif.v, 1);
     assert_eq!(notif.agent, CLIAgent::Unknown);
@@ -175,7 +175,7 @@ fn handles_missing_optional_fields() {
 #[test]
 fn handles_special_characters_in_values() {
     let body = r#"{"v":1,"agent":"claude","event":"stop","query":"what does \"hello\" mean?","response":"It means greeting. Use: printf(\"hello\")"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
 
     assert_eq!(
         notif.payload.query.as_deref(),
@@ -190,13 +190,13 @@ fn handles_special_characters_in_values() {
 #[test]
 fn rejects_unsupported_schema_version() {
     let body = r#"{"v":2,"agent":"claude","event":"stop"}"#;
-    assert!(parse_event(Some("rook://cli-agent"), body).is_none());
+    assert!(parse_event(Some("polaris-terminal://cli-agent"), body).is_none());
 }
 
 #[test]
 fn defaults_to_v1_when_version_missing() {
     let body = r#"{"agent":"claude","event":"stop","query":"hi"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
     assert_eq!(notif.v, 1);
     assert_eq!(notif.payload.query.as_deref(), Some("hi"));
 }
@@ -204,7 +204,7 @@ fn defaults_to_v1_when_version_missing() {
 #[test]
 fn explicit_v1_parses_correctly() {
     let body = r#"{"v":1,"agent":"claude","event":"stop","query":"test"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
     assert_eq!(notif.v, 1);
     assert_eq!(notif.payload.query.as_deref(), Some("test"));
 }
@@ -212,7 +212,7 @@ fn explicit_v1_parses_correctly() {
 #[test]
 fn parse_prompt_submit_notification() {
     let body = r#"{"v":1,"agent":"claude","event":"prompt_submit","session_id":"abc","cwd":"/tmp/proj","project":"proj","query":"fix the bug"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
 
     assert_eq!(notif.event, CLIAgentEventType::PromptSubmit);
     assert_eq!(notif.payload.query.as_deref(), Some("fix the bug"));
@@ -221,7 +221,7 @@ fn parse_prompt_submit_notification() {
 #[test]
 fn parse_tool_complete_notification() {
     let body = r#"{"v":1,"agent":"claude","event":"tool_complete","session_id":"abc","cwd":"/tmp/proj","project":"proj","tool_name":"Bash"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
 
     assert_eq!(notif.event, CLIAgentEventType::ToolComplete);
     assert_eq!(notif.payload.tool_name.as_deref(), Some("Bash"));
@@ -229,9 +229,9 @@ fn parse_tool_complete_notification() {
 
 #[test]
 fn parse_auggie_stop_notification() {
-    // Mirrors what the community auggie-rook plugin emits on the Stop hook.
+    // Mirrors what the community auggie-polaris-terminal plugin emits on the Stop hook.
     let body = r#"{"v":1,"agent":"auggie","event":"stop","session_id":"abc","cwd":"/tmp/proj","project":"proj","query":"write a haiku","response":"Memory is safe"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
 
     assert_eq!(notif.agent, CLIAgent::Auggie);
     assert_eq!(notif.event, CLIAgentEventType::Stop);
@@ -245,7 +245,7 @@ fn parse_pi_stop_notification() {
     // matches the Auggie shape and uses `"agent":"pi"`, which `resolve_agent`
     // already maps to `CLIAgent::Pi` via `command_prefix()`.
     let body = r#"{"v":1,"agent":"pi","event":"stop","session_id":"abc","cwd":"/tmp/proj","project":"proj","query":"write a haiku","response":"Memory is safe"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
 
     assert_eq!(notif.agent, CLIAgent::Pi);
     assert_eq!(notif.event, CLIAgentEventType::Stop);
@@ -259,7 +259,7 @@ fn parse_droid_stop_notification() {
     // `"agent":"droid"` should resolve through the existing command prefix
     // parser without any Droid-specific parser logic.
     let body = r#"{"v":1,"agent":"droid","event":"stop","session_id":"abc","cwd":"/tmp/proj","project":"proj","query":"write a haiku","response":"Memory is safe"}"#;
-    let notif = parse_event(Some("rook://cli-agent"), body).unwrap();
+    let notif = parse_event(Some("polaris-terminal://cli-agent"), body).unwrap();
 
     assert_eq!(notif.agent, CLIAgent::Droid);
     assert_eq!(notif.event, CLIAgentEventType::Stop);
@@ -1290,7 +1290,7 @@ fn prompt_submit_after_cancelled_returns_session_to_in_progress() {
 
 #[test]
 fn stale_timer_callback_after_disarming_event_does_not_overwrite_newer_status() {
-    // RookUI's `SpawnedFutureHandle::abort` only takes effect the next time
+    // PtermUI's `SpawnedFutureHandle::abort` only takes effect the next time
     // the future is polled: if the timer already completed and queued its
     // resolve callback before a disarming event arrives, that callback can
     // still run after `abort()` was called on it. The token guard in

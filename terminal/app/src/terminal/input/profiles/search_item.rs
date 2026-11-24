@@ -1,12 +1,12 @@
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_core::ui::Icon;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{ConstrainedBox, Container, Flex, Highlight, ParentElement as _, Text};
-use rookui::fonts::{Properties, Style, Weight};
-use rookui::prelude::CrossAxisAlignment;
-use rookui::text_layout::ClipConfig;
-use rookui::{AppContext, Element, SingletonEntity as _};
+use pterm_core::ui::Icon;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{ConstrainedBox, Container, Flex, Highlight, ParentElement as _, Text};
+use ptermui::fonts::{Properties, Style, Weight};
+use ptermui::prelude::CrossAxisAlignment;
+use ptermui::text_layout::ClipConfig;
+use ptermui::{AppContext, Element, SingletonEntity as _};
 
 use crate::ai::execution_profiles::ExecutionProfileId;
 use crate::appearance::Appearance;
@@ -81,7 +81,7 @@ impl SearchItem for ProfileSearchItem {
             ProfileSearchItemKind::Profile { .. } => Icon::Psychology,
             ProfileSearchItemKind::ManageProfiles => Icon::Gear,
         }
-        .to_rookui_icon(inline_styles::icon_color(appearance));
+        .to_ptermui_icon(inline_styles::icon_color(appearance));
 
         Container::new(
             ConstrainedBox::new(icon.finish())

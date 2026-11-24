@@ -1,22 +1,22 @@
 ---
 name: terminal-gui-onboarding-verification-skill
-description: GUI desktop app only. Launch two parallel Oz cloud agents with computer use to download and install the latest stable Linux Rook build, capture screenshots while walking through first-time onboarding in both logged-out and logged-in states, then selectively fan out follow-up cloud agents for distinct onboarding branches proposed by those initial explorers. Use this whenever the user asks to test, document, screenshot, or walk through the Rook first-time install/onboarding experience in a cloud Linux environment.
+description: GUI desktop app only. Launch two parallel Oz cloud agents with computer use to download and install the latest stable Linux Polaris Terminal build, capture screenshots while walking through first-time onboarding in both logged-out and logged-in states, then selectively fan out follow-up cloud agents for distinct onboarding branches proposed by those initial explorers. Use this whenever the user asks to test, document, screenshot, or walk through the Polaris Terminal first-time install/onboarding experience in a cloud Linux environment.
 ---
 
 # Onboarding verification skill
 
-**Scope — GUI desktop app only.** This skill applies to Rook's **GUI** desktop front-end (the `app/` crate on the RookUI pixel/GPU framework). It does **not** apply to the headless **TUI** front-end (`crates/rook_tui`; cell-grid `TuiElement` library under `crates/rookui_core/src/elements/tui`), which has its own components, tests, and change-verification workflow. For TUI work, see the `terminal-tui-ui-guidelines`, `terminal-tui-testing`, and `terminal-tui-verify-change` skills instead.
+**Scope — GUI desktop app only.** This skill applies to Polaris Terminal's **GUI** desktop front-end (the `app/` crate on the PtermUI pixel/GPU framework). It does **not** apply to the headless **TUI** front-end (`crates/pterm_tui`; cell-grid `TuiElement` library under `crates/ptermui_core/src/elements/tui`), which has its own components, tests, and change-verification workflow. For TUI work, see the `terminal-tui-ui-guidelines`, `terminal-tui-testing`, and `terminal-tui-verify-change` skills instead.
 
-Use this skill to verify the first-time Rook install and onboarding flow on Linux with broader branch coverage than a single linear walkthrough.
+Use this skill to verify the first-time Polaris Terminal install and onboarding flow on Linux with broader branch coverage than a single linear walkthrough.
 
-The parent agent should not perform the walkthrough locally. Launch two parallel Oz cloud agents with computer use. Both initial children install the latest stable Rook Linux package appropriate for their platform and capture screenshots at every visible onboarding step until Rook reaches a usable terminal session. One child verifies the login-free flow. The other child verifies the logged-in flow using the managed secret `ONBOARDING_AGENT_FTUE_REFRESH_TOKEN`.
+The parent agent should not perform the walkthrough locally. Launch two parallel Oz cloud agents with computer use. Both initial children install the latest stable Polaris Terminal Linux package appropriate for their platform and capture screenshots at every visible onboarding step until Polaris Terminal reaches a usable terminal session. One child verifies the login-free flow. The other child verifies the logged-in flow using the managed secret `ONBOARDING_AGENT_FTUE_REFRESH_TOKEN`.
 
 Those two baseline explorers are also responsible for noticing meaningful alternate onboarding branches and returning concrete plans for follow-up cloud agents. The parent agent should synthesize those plans, deduplicate overlapping suggestions, and launch a bounded second wave of targeted follow-up agents to improve coverage of paths a real user might encounter.
 
 ## Parent workflow
 
 1. Launch exactly two remote Oz cloud agents in a single parallel `run_agents` batch with computer use enabled.
-2. Use no environment-specific assumptions unless the user provided an environment. If no environment was provided, omit the environment ID and let Rook choose the default remote environment.
+2. Use no environment-specific assumptions unless the user provided an environment. If no environment was provided, omit the environment ID and let Polaris Terminal choose the default remote environment.
 3. Give both baseline child agents the shared child prompt below, plus the appropriate flow-specific prompt.
 4. Wait for both baseline agents' reports. Each report must include:
    - The completed baseline walkthrough result and artifacts.
@@ -43,12 +43,12 @@ Those two baseline explorers are also responsible for noticing meaningful altern
 Use the initial `run_agents` call shaped like this:
 
 ```text
-summary: Launching two baseline cloud agents with computer use to compare logged-out and logged-in Rook onboarding screenshots and propose follow-up coverage branches.
+summary: Launching two baseline cloud agents with computer use to compare logged-out and logged-in Polaris Terminal onboarding screenshots and propose follow-up coverage branches.
 remote.computer_use_enabled: true
 agent_run_configs:
-- name: "rook-onboarding-logged-out"
+- name: "polaris-terminal-onboarding-logged-out"
   prompt: the logged-out flow prompt below
-- name: "rook-onboarding-logged-in"
+- name: "polaris-terminal-onboarding-logged-in"
   prompt: the logged-in flow prompt below
 base_prompt: the shared child prompt below
 ```
@@ -59,9 +59,9 @@ When the baseline reports identify concrete follow-up branches, use a second `ru
 summary: Launching targeted cloud follow-up agents to explore distinct onboarding branches identified by the baseline onboarding explorers.
 remote.computer_use_enabled: true
 agent_run_configs:
-- name: "rook-onboarding-followup-theme-choice"
+- name: "polaris-terminal-onboarding-followup-theme-choice"
   prompt: the follow-up flow prompt below, the logged-out flow prompt below, and one synthesized logged-out branch assignment
-- name: "rook-onboarding-followup-model-choice"
+- name: "polaris-terminal-onboarding-followup-model-choice"
   prompt: the follow-up flow prompt below, the logged-in flow prompt below, and one synthesized logged-in branch assignment
 base_prompt: the shared child prompt below
 ```
@@ -71,19 +71,19 @@ base_prompt: the shared child prompt below
 Give both cloud agents these shared instructions:
 
 ```text
-You are verifying the first-time Rook install and onboarding experience on Linux.
+You are verifying the first-time Polaris Terminal install and onboarding experience on Linux.
 
 Goal:
-- Download and install the latest stable Rook Linux build appropriate for this cloud environment's distro and CPU architecture.
-- Launch Rook in a fresh first-run state.
+- Download and install the latest stable Polaris Terminal Linux build appropriate for this cloud environment's distro and CPU architecture.
+- Launch Polaris Terminal in a fresh first-run state.
 - Take a screenshot at every visible onboarding step.
-- Continue until Rook reaches a usable terminal session, or stop and report a blocker if the assigned flow cannot proceed.
+- Continue until Polaris Terminal reaches a usable terminal session, or stop and report a blocker if the assigned flow cannot proceed.
 - Notice alternate onboarding decisions that lead to meaningfully different screens, states, or outcomes, and return concrete follow-up cloud-agent plans for the parent orchestrator.
 - Treat visual polish, missing assets, misalignment, overlapping content, clipped text, poor contrast, broken loading states, unexpected errors, and confusing controls as verification findings rather than ignoring them.
 
 Install requirements:
-- Use official stable Rook downloads only.
-- Do not use Rook Preview, Alpha, source builds, or a repository development build.
+- Use official stable Polaris Terminal downloads only.
+- Do not use Polaris Terminal Preview, Alpha, source builds, or a repository development build.
 - Detect CPU architecture with `uname -m`.
 - Detect the package manager or distro before choosing the package format.
 - Prefer native packages over AppImage because they install dependencies and register the app normally.
@@ -100,12 +100,12 @@ Stable Linux package mapping:
   - arm64 or aarch64: https://app.rook.dev/download?package=appimage_arm64
 
 Before launch:
-- Create a flow-specific artifact directory such as `~/rook-onboarding-logged-out` or `~/rook-onboarding-logged-in`.
-- Ensure the run starts from a fresh Rook first-run state by removing only Rook-specific config/data/cache/state directories for the test user, such as `~/.config/rook-terminal`, `~/.local/share/rook-terminal`, `~/.local/state/rook-terminal`, and `~/.cache/rook-terminal` if they exist.
+- Create a flow-specific artifact directory such as `~/polaris-terminal-onboarding-logged-out` or `~/polaris-terminal-onboarding-logged-in`.
+- Ensure the run starts from a fresh Polaris Terminal first-run state by removing only Polaris Terminal-specific config/data/cache/state directories for the test user, such as `~/.config/polaris-terminal-stable`, `~/.local/share/polaris-terminal-stable`, `~/.local/state/polaris-terminal-stable`, and `~/.cache/polaris-terminal-stable` if they exist.
 - Do not delete unrelated user files or system directories.
 
 Screenshot workflow:
-- Take the first screenshot before interacting with the first visible Rook window.
+- Take the first screenshot before interacting with the first visible Polaris Terminal window.
 - Take one screenshot before every user action.
 - Take another screenshot after each action if the UI changes.
 - Use sequential filenames with a flow prefix, such as `01-logged-out-initial-window.png` or `01-logged-in-initial-window.png`.
@@ -134,8 +134,8 @@ UI quality review:
 
 Terminal verification:
 - Once a terminal session is visible, run a harmless flow-specific command:
-  - logged-out flow: `echo rook-onboarding-logged-out-ready`
-  - logged-in flow: `echo rook-onboarding-logged-in-ready`
+  - logged-out flow: `echo polaris-terminal-onboarding-logged-out-ready`
+  - logged-in flow: `echo polaris-terminal-onboarding-logged-in-ready`
 - Capture a final screenshot showing the usable terminal and command output.
 
 Report back:
@@ -179,14 +179,14 @@ You own the logged-out onboarding flow.
 
 Flow-specific goal:
 - Do not create an account, log in, or use a real user identity.
-- Continue only through login-free or account-free paths until Rook reaches a usable terminal session.
+- Continue only through login-free or account-free paths until Polaris Terminal reaches a usable terminal session.
 - Stop and report a blocker if the flow requires login or account creation with no skip/continue-without-account option.
 
 Flow-specific onboarding behavior:
 - If there is a skip, "continue without account", "not now", "login later", or equivalent option, use it.
 - Do not enter an email address, connect OAuth, paste an auth token, or create credentials.
 - Be especially alert for logged-out branch points around choosing terminal-only versus agentic experiences, customization/layout options, third-party integration toggles, and terminal theme selection. If they appear, propose follow-up branches that exercise materially different choices rather than trying all alternates inline.
-- Use the artifact directory `~/rook-onboarding-logged-out`.
+- Use the artifact directory `~/polaris-terminal-onboarding-logged-out`.
 ```
 
 ## Logged-in flow prompt
@@ -199,7 +199,7 @@ You own the logged-in onboarding flow.
 Flow-specific goal:
 - Use the managed secret environment variable `ONBOARDING_AGENT_FTUE_REFRESH_TOKEN` to authenticate as the dedicated non-employee, non-`rook.dev` FTUE test user.
 - Exercise onboarding screens that are available to an already-authenticated user.
-- Continue through the authenticated onboarding path until Rook reaches a usable terminal session.
+- Continue through the authenticated onboarding path until Polaris Terminal reaches a usable terminal session.
 
 Secret handling requirements:
 - Before doing auth work, verify that `ONBOARDING_AGENT_FTUE_REFRESH_TOKEN` exists and is non-empty without printing it.
@@ -207,44 +207,44 @@ Secret handling requirements:
 - Avoid shell tracing (`set -x`) and avoid writing commands that place the raw token in shell history or process lists.
 - Treat every auth redirect URL containing the refresh token as secret-bearing material, even after URL-encoding.
 - Do not pass a token-bearing redirect URL to a shell command, desktop URI handler, browser address bar, process argument, log, artifact, or report. In particular, do not use commands such as `xdg-open`, `gio open`, `open`, or equivalent with the redirect URL.
-- If you need to construct an auth redirect URL, keep it only in a clipboard value or a private temporary file with user-only permissions, paste it through Rook's visible Paste Auth Token flow, then delete the temporary file immediately after use.
+- If you need to construct an auth redirect URL, keep it only in a clipboard value or a private temporary file with user-only permissions, paste it through Polaris Terminal's visible Paste Auth Token flow, then delete the temporary file immediately after use.
 
 Secure Paste Auth Token process:
 1. Verify `ONBOARDING_AGENT_FTUE_REFRESH_TOKEN` exists and is non-empty without printing it.
-2. Start Rook's normal login flow and derive the current-run `state` from Rook's generated login URL.
+2. Start Polaris Terminal's normal login flow and derive the current-run `state` from Polaris Terminal's generated login URL.
 3. Normalize the managed secret privately:
    - Trim surrounding whitespace and one pair of surrounding single or double quotes if present.
    - If the secret parses as a URL with a `refresh_token` query parameter, extract that `refresh_token` value and ignore any stale `state` in the secret.
    - Otherwise, treat the trimmed secret as the raw refresh token.
 4. URL-encode the extracted refresh token and current-run `state` separately as query parameter values.
 5. Construct the redirect URL only in a clipboard value or private temporary file with user-only permissions.
-6. Return to Rook and use the visible Paste Auth Token path:
-   - Click the `Click here to paste your token from the browser` link, `Paste Auth Token` button, or equivalent pasted-token control shown by Rook.
+6. Return to Polaris Terminal and use the visible Paste Auth Token path:
+   - Click the `Click here to paste your token from the browser` link, `Paste Auth Token` button, or equivalent pasted-token control shown by Polaris Terminal.
    - Focus the auth token text input that appears.
-   - Paste the prepared redirect URL into that input and submit it through Rook's UI so Rook parses and validates it.
+   - Paste the prepared redirect URL into that input and submit it through Polaris Terminal's UI so Polaris Terminal parses and validates it.
 7. Delete any private temporary files immediately after use and clear the clipboard if the environment supports doing so safely.
-8. If the Paste Auth Token UI cannot be reached or automated safely, stop and report an auth blocker instead of parsing the redirect in place of Rook, using a desktop URI handler, browser address bar, or shell command with the token-bearing URL.
+8. If the Paste Auth Token UI cannot be reached or automated safely, stop and report an auth blocker instead of parsing the redirect in place of Polaris Terminal, using a desktop URI handler, browser address bar, or shell command with the token-bearing URL.
 
 Preferred authenticated path:
-- Launch Rook in a fresh first-run state and choose the login/sign-in path from onboarding.
-- Use Rook's built-in Paste Auth Token flow rather than visiting real OAuth providers, invoking a desktop URI handler, or asking the agent to parse/validate the redirect URI itself.
-- Derive `<state>` from the login URL generated by Rook if the UI exposes a copied login URL or opens the browser. If the UI does not expose the state after reasonable effort, report that as an auth blocker rather than bypassing state validation.
-- Do not preflight the token with Firebase Secure Token before handing it to Rook. Rook's desktop redirect handler only requires `refresh_token` and `state`; `user_uid` is optional, and `deleted_anonymous_user=true` handles the anonymous-user override case.
+- Launch Polaris Terminal in a fresh first-run state and choose the login/sign-in path from onboarding.
+- Use Polaris Terminal's built-in Paste Auth Token flow rather than visiting real OAuth providers, invoking a desktop URI handler, or asking the agent to parse/validate the redirect URI itself.
+- Derive `<state>` from the login URL generated by Polaris Terminal if the UI exposes a copied login URL or opens the browser. If the UI does not expose the state after reasonable effort, report that as an auth blocker rather than bypassing state validation.
+- Do not preflight the token with Firebase Secure Token before handing it to Polaris Terminal. Polaris Terminal's desktop redirect handler only requires `refresh_token` and `state`; `user_uid` is optional, and `deleted_anonymous_user=true` handles the anonymous-user override case.
 - Treat `ONBOARDING_AGENT_FTUE_REFRESH_TOKEN` as either of these secret shapes:
   - a raw Firebase refresh token, or
-  - a complete Rook desktop auth redirect URL containing a `refresh_token` query parameter.
+  - a complete Polaris Terminal desktop auth redirect URL containing a `refresh_token` query parameter.
 - Normalize the secret into a current-run redirect URL without printing it:
   - Trim surrounding whitespace and one pair of surrounding single or double quotes if present.
   - If the secret parses as a URL with a `refresh_token` query parameter, extract that `refresh_token` value and ignore any stale `state` in the secret.
   - Otherwise, treat the trimmed secret as the raw refresh token.
   - URL-encode the extracted refresh token and the current-run `state` separately as query parameter values.
-  - Build `rook://auth/desktop_redirect?refresh_token=<url-encoded-normalized-refresh-token>&deleted_anonymous_user=true&state=<url-encoded-current-state>`.
+  - Build `polaris-terminal://auth/desktop_redirect?refresh_token=<url-encoded-normalized-refresh-token>&deleted_anonymous_user=true&state=<url-encoded-current-state>`.
   - Do not include `user_uid` unless it is already present in a provided desktop redirect URL; it is not required for this flow.
-- Construct the normalized redirect URL in a clipboard value or private temporary file only, then hand it to Rook through the Paste Auth Token UI. Do not parse, validate, or route the redirect outside of Rook.
+- Construct the normalized redirect URL in a clipboard value or private temporary file only, then hand it to Polaris Terminal through the Paste Auth Token UI. Do not parse, validate, or route the redirect outside of Polaris Terminal.
 - If the Paste Auth Token flow cannot be reached or automated safely, stop and report an auth blocker instead of using a desktop URI handler or any shell command that contains the token-bearing URL.
 
 Fallback authenticated path:
-- If Rook rejects the normalized redirect, report the non-sensitive user-visible error and classify whether the secret appeared to be a raw token or a desktop redirect URL, without reporting any token contents.
+- If Polaris Terminal rejects the normalized redirect, report the non-sensitive user-visible error and classify whether the secret appeared to be a raw token or a desktop redirect URL, without reporting any token contents.
 - If the Paste Auth Token flow is blocked by UI automation issues, report the blocker and include the exact non-sensitive step where automation failed.
 - Do not switch to a logged-out path for this child.
 
@@ -252,9 +252,9 @@ Flow-specific onboarding behavior:
 - Choose login/sign-in rather than skip/login-later when presented with an auth choice.
 - After auth succeeds, continue through the remaining onboarding screens with default or conservative options.
 - Be especially alert for logged-in branch points around model selection, account-aware onboarding screens, AI/agent setup, workspace or project setup, and any decision that changes available product capability. If they appear, propose follow-up branches that exercise materially different choices rather than trying all alternates inline.
-- After the terminal verification succeeds, click the upper-right avatar/account control, open Settings from that menu, and capture an additional screenshot that clearly shows the logged-in user's email address in Rook settings or account/profile settings.
+- After the terminal verification succeeds, click the upper-right avatar/account control, open Settings from that menu, and capture an additional screenshot that clearly shows the logged-in user's email address in Polaris Terminal settings or account/profile settings.
 - Include the account/settings email screenshot in the manifest and final report. The email address itself may be visible in the screenshot, but do not copy the email into logs, shell output, or the final text report unless the user explicitly asks for it.
-- Use the artifact directory `~/rook-onboarding-logged-in`.
+- Use the artifact directory `~/polaris-terminal-onboarding-logged-in`.
 ```
 
 ## Follow-up flow prompt
@@ -265,7 +265,7 @@ Append this prompt to the shared child prompt for every second-wave child, follo
 You own one follow-up onboarding branch selected by the parent orchestrator from an earlier baseline exploration report.
 
 Follow-up branch behavior:
-- Start from a fresh first-run Rook state and install the same latest stable Linux build using the shared instructions.
+- Start from a fresh first-run Polaris Terminal state and install the same latest stable Linux build using the shared instructions.
 - Respect the assigned auth state: remain logged out for logged-out assignments, or use the managed authenticated flow for logged-in assignments.
 - Follow the exact alternate onboarding choice or action sequence in the branch assignment.
 - Capture screenshots before and after each assigned branch decision, then continue to a usable terminal session if the path allows it.
@@ -283,7 +283,7 @@ Final report additions:
 
 The run is successful when:
 
-- Rook stable was installed from an official Linux package or AppImage for the detected architecture.
+- Polaris Terminal stable was installed from an official Linux package or AppImage for the detected architecture.
 - Screenshots were captured for each onboarding screen and the final usable terminal.
 - The logged-out child reached a usable terminal without login, account creation, or a real user identity.
 - The logged-in child authenticated using `ONBOARDING_AGENT_FTUE_REFRESH_TOKEN` and reached a usable terminal in the authenticated FTUE path.
@@ -296,7 +296,7 @@ The run is successful when:
 ## Common failure handling
 
 - If the package manager prompts for confirmation, use the non-interactive confirmation flag supported by that package manager.
-- If launching `rook-terminal` fails because of display setup, inspect the cloud environment's display variables and try launching from the desktop/app launcher if computer use provides one.
+- If launching `polaris-terminal-stable` fails because of display setup, inspect the cloud environment's display variables and try launching from the desktop/app launcher if computer use provides one.
 - If the logged-out flow blocks on login with no skip path, stop at that screen, capture a screenshot, and report that as the terminal point for the logged-out flow.
-- If the logged-in flow cannot authenticate because the secret is missing, invalid, expired, revoked, or cannot be routed through Rook's auth redirect flow, stop at that screen, capture a screenshot, and report the non-sensitive blocker.
+- If the logged-in flow cannot authenticate because the secret is missing, invalid, expired, revoked, or cannot be routed through Polaris Terminal's auth redirect flow, stop at that screen, capture a screenshot, and report the non-sensitive blocker.
 - If the native package cannot be installed because dependencies are unavailable, fall back to the matching AppImage and clearly report the fallback.

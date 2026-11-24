@@ -5,20 +5,20 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use comfy_table::Cell;
 use inquire::{Confirm, InquireError, Password};
-use rook_cli::GlobalOptions;
-use rook_cli::agent::OutputFormat;
-use rook_cli::scope::ObjectScope;
-use rook_cli::secret::{
+use pterm_cli::GlobalOptions;
+use pterm_cli::agent::OutputFormat;
+use pterm_cli::scope::ObjectScope;
+use pterm_cli::secret::{
     AnthropicMethod, CodexMethod, CreateProvider, CreateSecretArgs, DeleteSecretArgs,
     ListSecretsArgs, SecretCommand, SecretType, UpdateSecretArgs, ValueArgs,
 };
-use rook_core::features::FeatureFlag;
-use rook_graphql::managed_secrets::{ManagedSecret, ManagedSecretType};
-use rook_graphql::object::SpaceType;
-use rook_managed_secrets::client::SecretOwner;
-use rook_managed_secrets::{ManagedSecretManager, ManagedSecretValue};
-use rookui::platform::TerminationMode;
-use rookui::{AppContext, SingletonEntity as _};
+use pterm_core::features::FeatureFlag;
+use pterm_graphql::managed_secrets::{ManagedSecret, ManagedSecretType};
+use pterm_graphql::object::SpaceType;
+use pterm_managed_secrets::client::SecretOwner;
+use pterm_managed_secrets::{ManagedSecretManager, ManagedSecretValue};
+use ptermui::platform::TerminationMode;
+use ptermui::{AppContext, SingletonEntity as _};
 use serde::Serialize;
 
 use super::output::{self, TableFormat};
@@ -67,7 +67,7 @@ pub fn run(
     global_options: GlobalOptions,
     command: SecretCommand,
 ) -> Result<()> {
-    if !FeatureFlag::RookManagedSecrets.is_enabled() {
+    if !FeatureFlag::PtermManagedSecrets.is_enabled() {
         return Err(anyhow::anyhow!("This feature is not enabled"));
     }
 

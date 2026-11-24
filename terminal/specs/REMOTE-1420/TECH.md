@@ -2,7 +2,7 @@
 
 ## Context
 
-Opening a shared-session link beachballs the desktop app and crashes Rook-on-Web. Main thread stalls inside `ConversationListViewModel::refresh_cached_items` → `AgentConversationsModel::conversation_ids_shadowed_by_tasks` → `BlocklistAIHistoryModel::find_conversation_id_by_server_token`.
+Opening a shared-session link beachballs the desktop app and crashes Polaris Terminal-on-Web. Main thread stalls inside `ConversationListViewModel::refresh_cached_items` → `AgentConversationsModel::conversation_ids_shadowed_by_tasks` → `BlocklistAIHistoryModel::find_conversation_id_by_server_token`.
 
 Each lookup is O(conversations + metadata) (two linear scans), the miss path emits `log::info!`, and INFO is captured as a synchronous Sentry breadcrumb (JSON-encoded on main).
 

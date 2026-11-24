@@ -6,7 +6,7 @@ use ai::agent::action_result::{
     RunAgentsResult,
 };
 use ai::skills::SkillReference;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::{RunAgentsCardFields, RunAgentsEditState};
 use crate::ai::blocklist::inline_action::orchestration_controls::OrchestrationConfigState;
@@ -82,7 +82,7 @@ fn local_to_cloud_initializes_remote_with_empty_environment() {
         panic!("expected Remote after toggle");
     };
     assert_eq!(environment_id, "");
-    assert_eq!(worker_host, "rook");
+    assert_eq!(worker_host, "polaris-terminal");
     assert!(!computer_use_enabled);
 }
 
@@ -92,7 +92,7 @@ fn cloud_to_local_drops_environment() {
         "oz",
         RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: false,
             runner_id: String::new(),
         },
@@ -122,7 +122,7 @@ fn cloud_without_env_no_longer_disables_accept() {
         "oz",
         RunAgentsExecutionMode::Remote {
             environment_id: String::new(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: false,
             runner_id: String::new(),
         },
@@ -143,7 +143,7 @@ fn cloud_with_opencode_disables_accept() {
         "opencode",
         RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: false,
             runner_id: String::new(),
         },
@@ -199,7 +199,7 @@ fn cloud_with_env_and_non_opencode_harness_allows_accept() {
             harness,
             RunAgentsExecutionMode::Remote {
                 environment_id: "env-1".to_string(),
-                worker_host: "rook".to_string(),
+                worker_host: "polaris-terminal".to_string(),
                 computer_use_enabled: false,
                 runner_id: String::new(),
             },
@@ -233,7 +233,7 @@ fn set_environment_id_updates_remote() {
         "oz",
         RunAgentsExecutionMode::Remote {
             environment_id: "old".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: false,
             runner_id: String::new(),
         },
@@ -255,7 +255,7 @@ fn set_runner_id_updates_remote_and_round_trips() {
         "oz",
         RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: false,
             runner_id: String::new(),
         },
@@ -274,7 +274,7 @@ fn set_runner_id_updates_remote_and_round_trips() {
         state.to_request().execution_mode,
         RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: false,
             runner_id: "runner-9".to_string(),
         }
@@ -300,7 +300,7 @@ fn to_request_round_trips_request_fields() {
         "claude",
         RunAgentsExecutionMode::Remote {
             environment_id: "env-2".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: true,
             runner_id: String::new(),
         },
@@ -476,7 +476,7 @@ mod override_from_approved_config_tests {
             harness_type: harness.to_string(),
             execution_mode: OrchestrationExecutionMode::Remote {
                 environment_id: env.to_string(),
-                worker_host: "rook".to_string(),
+                worker_host: "polaris-terminal".to_string(),
                 runner_id: String::new(),
             },
         }
@@ -525,7 +525,7 @@ mod override_from_approved_config_tests {
             panic!("expected Remote after override");
         };
         assert_eq!(environment_id, "env-1");
-        assert_eq!(worker_host, "rook");
+        assert_eq!(worker_host, "polaris-terminal");
     }
 
     #[test]
@@ -534,7 +534,7 @@ mod override_from_approved_config_tests {
             "oz",
             RunAgentsExecutionMode::Remote {
                 environment_id: "env-1".to_string(),
-                worker_host: "rook".to_string(),
+                worker_host: "polaris-terminal".to_string(),
                 computer_use_enabled: true,
                 runner_id: String::new(),
             },
@@ -557,7 +557,7 @@ mod override_from_approved_config_tests {
             "oz",
             RunAgentsExecutionMode::Remote {
                 environment_id: "old-env".to_string(),
-                worker_host: "rook".to_string(),
+                worker_host: "polaris-terminal".to_string(),
                 computer_use_enabled: true,
                 runner_id: String::new(),
             },
@@ -620,7 +620,7 @@ fn local_to_cloud_idempotent_when_already_remote() {
         "oz",
         RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: true,
             runner_id: String::new(),
         },

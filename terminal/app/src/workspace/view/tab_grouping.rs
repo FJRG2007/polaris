@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use itertools::{Either, Itertools};
-use rook_core::features::FeatureFlag;
-use rookui::{EntityId, UpdateView, ViewContext};
+use pterm_core::features::FeatureFlag;
+use ptermui::{EntityId, UpdateView, ViewContext};
 
 use super::{Workspace, group_member_indices};
 use crate::menu::{MenuItem, MenuItemFields};

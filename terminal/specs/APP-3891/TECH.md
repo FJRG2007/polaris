@@ -2,7 +2,7 @@
 
 ## Problem
 
-The CLI agent rich input (used for composing prompts to Claude Code, Gemini CLI, etc.) did not support image attachments. The existing image paste infrastructure in Rook's agent mode needed to be extended to (1) render chips in the CLI agent input layout, (2) allow the paste flow to work when CLI agent input is open, and (3) deliver images to the CLI agent on submission by simulating clipboard-based Ctrl+V paste.
+The CLI agent rich input (used for composing prompts to Claude Code, Gemini CLI, etc.) did not support image attachments. The existing image paste infrastructure in Polaris Terminal's agent mode needed to be extended to (1) render chips in the CLI agent input layout, (2) allow the paste flow to work when CLI agent input is open, and (3) deliver images to the CLI agent on submission by simulating clipboard-based Ctrl+V paste.
 
 ## Relevant code
 
@@ -12,7 +12,7 @@ The CLI agent rich input (used for composing prompts to Claude Code, Gemini CLI,
 - `app/src/terminal/view/use_agent_footer/mod.rs` — `submit_cli_agent_rich_input`, new `paste_images_then_submit_text`
 - `app/src/ai/blocklist/context_model.rs` — `BlocklistAIContextModel`, `PendingAttachment`, `ImageContext`, `pending_images()`, `clear_pending_images()`
 - `app/src/ai/agent/mod.rs` — `ImageContext` struct (base64 data + mime_type + file_name)
-- `crates/rookui_core/src/clipboard.rs` — `Clipboard` trait, `ClipboardContent`, `ImageData`
+- `crates/ptermui_core/src/clipboard.rs` — `Clipboard` trait, `ClipboardContent`, `ImageData`
 
 ## Current state
 

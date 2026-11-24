@@ -10,19 +10,19 @@ use markdown_parser::{
     CodeBlockText, FormattedText, FormattedTextFragment, FormattedTextLine, parse_markdown,
 };
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::features::FeatureFlag;
-use rook_editor::content::buffer::{AutoScrollBehavior, BufferSelectAction, SelectionOffsets};
-use rook_editor::content::text::{BlockType, BufferBlockStyle, CodeBlockType, TextStyles};
-use rook_editor::model::{CoreEditorModel, RichTextEditorModel};
-use rook_editor::render::model::viewport::SizeInfo;
-use rook_editor::render::model::{BlockItem, RenderEvent};
-use rook_editor::selection::{TextDirection, TextUnit};
-use rookui::r#async::{FutureId, Timer, block_on};
-use rookui::elements::ListIndentLevel;
-use rookui::platform::WindowStyle;
-use rookui::presenter::ChildView;
-use rookui::text::word_boundaries::WordBoundariesPolicy;
-use rookui::{
+use pterm_core::features::FeatureFlag;
+use pterm_editor::content::buffer::{AutoScrollBehavior, BufferSelectAction, SelectionOffsets};
+use pterm_editor::content::text::{BlockType, BufferBlockStyle, CodeBlockType, TextStyles};
+use pterm_editor::model::{CoreEditorModel, RichTextEditorModel};
+use pterm_editor::render::model::viewport::SizeInfo;
+use pterm_editor::render::model::{BlockItem, RenderEvent};
+use pterm_editor::selection::{TextDirection, TextUnit};
+use ptermui::r#async::{FutureId, Timer, block_on};
+use ptermui::elements::ListIndentLevel;
+use ptermui::platform::WindowStyle;
+use ptermui::presenter::ChildView;
+use ptermui::text::word_boundaries::WordBoundariesPolicy;
+use ptermui::{
     AddSingletonModel, App, AppContext, Element, Entity, ModelHandle, SingletonEntity,
     TypedActionView, View, ViewHandle,
 };
@@ -69,7 +69,7 @@ impl View for TestView {
         "TestView"
     }
 
-    fn render(&self, _app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, _app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         ChildView::new(&self.editor).finish()
     }
 }
@@ -97,7 +97,7 @@ fn model_from_markdown(
 
 /// Register the singletons and host window that a [`NotebooksEditorModel`] depends on, returning
 /// the window a model should bind to.
-fn setup_editor_window(app: &mut App, should_initialize_cloud_model: bool) -> rookui::WindowId {
+fn setup_editor_window(app: &mut App, should_initialize_cloud_model: bool) -> ptermui::WindowId {
     let global_resources = GlobalResourceHandles::mock(app);
     app.add_singleton_model(|_| GlobalResourceHandlesProvider::new(global_resources));
     app.add_singleton_model(|_| ActiveSession::default());
@@ -1892,11 +1892,11 @@ fn test_interleaving_command_and_embedding() {
 
         let model_handle = model_from_markdown(
             r#"Text
-```rook-embedded-object
+```polaris-terminal-embedded-object
 id: Workflow-test_uid00000000000123
 ```
 More text
-```rook-embedded-object
+```polaris-terminal-embedded-object
 id: Workflow-test_uid00000000000245
 ```
 ```Python
@@ -2616,7 +2616,7 @@ fn test_cut_code_block() {
             assert_eq!(clipboard.plain_text, "command");
             assert_eq!(
                 clipboard.html.unwrap(),
-                r#"<pre><code class="language-rook-runnable-command">command</code></pre>"#
+                r#"<pre><code class="language-polaris-terminal-runnable-command">command</code></pre>"#
             );
         })
     });

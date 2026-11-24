@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use mockall::predicate::eq;
-use rook_core::features::FeatureFlag;
-use rookui::App;
+use pterm_core::features::FeatureFlag;
+use ptermui::App;
 
 use super::*;
 use crate::ai::agent::conversation::{AIConversation, ConversationStatus};
@@ -55,7 +55,7 @@ fn restored_observer_registration_hydrates_local_cursor() {
         parent.set_task_id(parent_task_id);
         parent.set_last_event_sequence(27);
         let parent_id = parent.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |history, ctx| {
             history.restore_conversations(terminal_view_id, vec![parent], ctx);
         });
@@ -69,7 +69,7 @@ fn restored_observer_registration_hydrates_local_cursor() {
             streamer.register_viewer_mode_consumer(
                 parent_task_id,
                 parent_id,
-                rookui::EntityId::new(),
+                ptermui::EntityId::new(),
                 ctx,
             );
         });
@@ -107,7 +107,7 @@ fn observer_placeholder_completion_creates_one_named_history_mapping() {
             parent
         };
         let parent_id = parent.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |history, ctx| {
             history.restore_conversations(terminal_view_id, vec![parent], ctx);
             history.set_active_conversation_id(parent_id, terminal_view_id, ctx);
@@ -187,7 +187,7 @@ fn primary_placeholder_still_created_for_out_of_band_local_children() {
         let mut parent = AIConversation::new(false, false);
         parent.set_task_id(parent_task_id);
         let parent_id = parent.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |history, ctx| {
             history.restore_conversations(terminal_view_id, vec![parent], ctx);
         });
@@ -237,7 +237,7 @@ fn local_oz_launch_indexes_run_id_before_child_agent_started_sse() {
         let mut parent = AIConversation::new(false, false);
         parent.set_task_id(parent_task_id);
         let parent_id = parent.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |history, ctx| {
             history.restore_conversations(terminal_view_id, vec![parent], ctx);
         });
@@ -325,7 +325,7 @@ fn sse_placeholder_then_local_launch_converges_on_one_conversation() {
         let mut parent = AIConversation::new(false, false);
         parent.set_task_id(parent_task_id);
         let parent_id = parent.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |history, ctx| {
             history.restore_conversations(terminal_view_id, vec![parent], ctx);
         });
@@ -627,7 +627,7 @@ fn make_server_metadata_with_harness(
 fn dormant_local_claude_child_skips_generic_sse_but_allows_wake_listener() {
     use std::sync::Arc;
 
-    use rookui::App;
+    use ptermui::App;
 
     use crate::ai::agent::conversation::{AIConversation, ConversationStatus};
     use crate::server::server_api::ServerApiProvider;
@@ -646,7 +646,7 @@ fn dormant_local_claude_child_skips_generic_sse_but_allows_wake_listener() {
             AIAgentHarness::ClaudeCode,
         ));
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -667,7 +667,7 @@ fn dormant_local_claude_child_skips_generic_sse_but_allows_wake_listener() {
 
         streamer.update(&mut app, |me, _| {
             let stream = me.streams.entry(conversation_id).or_default();
-            stream.consumers.insert(rookui::EntityId::new());
+            stream.consumers.insert(ptermui::EntityId::new());
             stream.watched_run_ids.insert(run_id);
         });
 
@@ -688,7 +688,7 @@ fn dormant_local_claude_child_skips_generic_sse_but_allows_wake_listener() {
 fn persist_event_cursor_keeps_the_max_sequence_and_updates_history_model() {
     use std::sync::Arc;
 
-    use rookui::App;
+    use ptermui::App;
 
     use crate::ai::agent::conversation::{AIConversation, AIConversationId};
     use crate::persistence::ModelEvent;
@@ -711,7 +711,7 @@ fn persist_event_cursor_keeps_the_max_sequence_and_updates_history_model() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id(run_id.clone());
         let conversation_id: AIConversationId = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -758,7 +758,7 @@ fn persist_event_cursor_keeps_the_max_sequence_and_updates_history_model() {
 fn wake_ready_does_not_advance_cursor_before_wake_preparation() {
     use std::sync::Arc;
 
-    use rookui::App;
+    use ptermui::App;
 
     use crate::ai::agent::conversation::AIConversation;
     use crate::ai::agent_events::AgentMessageEventMetadata;
@@ -772,7 +772,7 @@ fn wake_ready_does_not_advance_cursor_before_wake_preparation() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_last_event_sequence(17);
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -822,8 +822,8 @@ fn wake_ready_does_not_advance_cursor_before_wake_preparation() {
 fn dormant_local_claude_child_uses_task_harness_when_server_metadata_missing() {
     use std::sync::Arc;
 
-    use rook_cli::agent::Harness;
-    use rookui::App;
+    use pterm_cli::agent::Harness;
+    use ptermui::App;
 
     use crate::ai::agent::conversation::{AIConversation, ConversationStatus};
     use crate::server::server_api::ServerApiProvider;
@@ -839,7 +839,7 @@ fn dormant_local_claude_child_uses_task_harness_when_server_metadata_missing() {
         conversation.set_run_id(run_id.clone());
         conversation.set_parent_conversation_id(parent_id);
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -860,7 +860,7 @@ fn dormant_local_claude_child_uses_task_harness_when_server_metadata_missing() {
 
         streamer.update(&mut app, |me, _| {
             let stream = me.streams.entry(conversation_id).or_default();
-            stream.consumers.insert(rookui::EntityId::new());
+            stream.consumers.insert(ptermui::EntityId::new());
             stream.watched_run_ids.insert(run_id);
         });
 
@@ -952,7 +952,7 @@ async fn dormant_claude_wake_consumer_stops_on_first_target_event() {
 fn restored_conversations_initialize_v2_streaming_state() {
     use std::sync::Arc;
 
-    use rookui::App;
+    use ptermui::App;
 
     use crate::ai::agent::conversation::AIConversation;
     use crate::server::server_api::ServerApiProvider;
@@ -965,7 +965,7 @@ fn restored_conversations_initialize_v2_streaming_state() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id("550e8400-e29b-41d4-a716-446655440500".to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -1039,7 +1039,7 @@ async fn sse_forwarding_consumer_skips_message_hydration_when_disabled() {
 fn finish_restore_fetch_uses_server_cursor_when_sqlite_is_absent() {
     use std::sync::Arc;
 
-    use rookui::App;
+    use ptermui::App;
 
     use crate::ai::agent::conversation::AIConversation;
     use crate::server::server_api::ServerApiProvider;
@@ -1054,7 +1054,7 @@ fn finish_restore_fetch_uses_server_cursor_when_sqlite_is_absent() {
         // the in-memory cursor to be 42 (max(0, 42)).
         let conversation = AIConversation::new(false, false);
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -1099,7 +1099,7 @@ fn finish_restore_fetch_uses_server_cursor_when_sqlite_is_absent() {
 fn handle_event_batch_persists_max_seq_to_history_model() {
     use std::sync::Arc;
 
-    use rookui::App;
+    use ptermui::App;
 
     use crate::ai::agent::conversation::{AIConversation, AIConversationId};
     use crate::persistence::ModelEvent;
@@ -1124,7 +1124,7 @@ fn handle_event_batch_persists_max_seq_to_history_model() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id("550e8400-e29b-41d4-a716-446655440200".to_string());
         let conversation_id: AIConversationId = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -1210,7 +1210,7 @@ fn handle_event_batch_drops_events_for_killed_run_ids_after_persisting_cursor() 
         let mut parent_conversation = AIConversation::new(false, false);
         parent_conversation.set_run_id(parent_run_id.clone());
         let parent_conversation_id = parent_conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![parent_conversation], ctx);
         });
@@ -1334,7 +1334,7 @@ fn finish_restore_fetch_no_ops_when_conversation_deleted_mid_flight() {
     // streamer state for the deleted conversation.
     use std::sync::Arc;
 
-    use rookui::App;
+    use ptermui::App;
 
     use crate::ai::agent::conversation::AIConversation;
     use crate::server::server_api::ServerApiProvider;
@@ -1347,7 +1347,7 @@ fn finish_restore_fetch_no_ops_when_conversation_deleted_mid_flight() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id("550e8400-e29b-41d4-a716-446655440300".to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -1404,7 +1404,7 @@ fn finish_restore_fetch_err_does_not_resurrect_deleted_conversation() {
     // indefinite retry loop).
     use std::sync::Arc;
 
-    use rookui::App;
+    use ptermui::App;
 
     use crate::ai::agent::conversation::AIConversation;
     use crate::server::server_api::ServerApiProvider;
@@ -1417,7 +1417,7 @@ fn finish_restore_fetch_err_does_not_resurrect_deleted_conversation() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id("550e8400-e29b-41d4-a716-446655440500".to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -1470,7 +1470,7 @@ fn on_conversation_removed_prunes_stale_child_run_id_from_parent() {
     // history model emits `RemoveConversation` after dropping the record.
     use std::sync::Arc;
 
-    use rookui::App;
+    use ptermui::App;
 
     use crate::ai::agent::conversation::AIConversation;
     use crate::server::server_api::ServerApiProvider;
@@ -1485,7 +1485,7 @@ fn on_conversation_removed_prunes_stale_child_run_id_from_parent() {
         let child_run_id = "550e8400-e29b-41d4-a716-446655440600".to_string();
         child_conversation.set_run_id(child_run_id.clone());
         let child_id = child_conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![child_conversation], ctx);
         });
@@ -1530,7 +1530,7 @@ fn on_conversation_removed_prunes_stale_child_run_id_from_parent() {
 fn on_conversation_removed_prunes_killed_child_run_id_from_parent_but_keeps_tombstone() {
     use std::sync::Arc;
 
-    use rookui::App;
+    use ptermui::App;
 
     use crate::ai::agent::conversation::AIConversation;
     use crate::server::server_api::ServerApiProvider;
@@ -1726,7 +1726,7 @@ fn is_known_child_dedupes_per_parent_after_first_observation() {
         // Register a consumer to materialize the entry, then seed the known
         // set (simulating the emission path that populates this on the
         // first lifecycle event observed for a new run_id).
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         let placeholder_conv_id =
             crate::ai::agent::conversation::AIConversation::new(true, false).id();
         streamer.update(&mut app, |me, ctx| {
@@ -1775,7 +1775,7 @@ fn is_known_child_isolated_per_parent() {
         let parent_b = make_parent_task_id_for_test(0xb2);
         let shared_run_id = "child-run-shared";
 
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         let placeholder_conv_id =
             crate::ai::agent::conversation::AIConversation::new(true, false).id();
         streamer.update(&mut app, |me, ctx| {
@@ -1815,8 +1815,8 @@ fn viewer_mode_consumer_refcount_handles_multiple_panes_and_double_unregister() 
         });
 
         let parent_task_id = make_parent_task_id_for_test(0xc1);
-        let consumer_a = rookui::EntityId::new();
-        let consumer_b = rookui::EntityId::new();
+        let consumer_a = ptermui::EntityId::new();
+        let consumer_b = ptermui::EntityId::new();
         // Each pane has its own orchestrator-placeholder conversation; the
         // recorded value is used to persist per-pane cursors.
         let placeholder_a = crate::ai::agent::conversation::AIConversation::new(true, false).id();
@@ -1891,7 +1891,7 @@ fn is_remote_run_view_excludes_shared_session_viewer() {
         // `is_viewing_shared_session = true` to `AIConversation::new`.
         let conversation = AIConversation::new(true, false);
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -1924,7 +1924,7 @@ fn is_remote_run_view_excludes_remote_child() {
         let mut conversation = AIConversation::new(false, false);
         conversation.mark_as_remote_child();
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -1957,7 +1957,7 @@ fn reevaluate_eligibility_does_not_reconnect_when_watched_run_ids_unchanged() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id(own_run_id.to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -1980,7 +1980,7 @@ fn reevaluate_eligibility_does_not_reconnect_when_watched_run_ids_unchanged() {
         // always use now. The filter is unchanged by a status transition,
         // so reevaluate_eligibility must not reconnect.
         let (_, rx) = futures::channel::mpsc::unbounded::<SseStreamItem>();
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         poller.update(&mut app, |me, _| {
             let stream = me.streams.entry(conversation_id).or_default();
             stream.event_cursor = 0;
@@ -2034,7 +2034,7 @@ fn finish_restore_fetch_reconnects_sse_when_children_added_to_open_connection() 
     // with the updated run_id set rather than leaving children unwatched.
     use std::sync::Arc;
 
-    use rookui::App;
+    use ptermui::App;
 
     use crate::ai::agent::conversation::{AIConversation, ConversationStatus};
     use crate::server::server_api::ServerApiProvider;
@@ -2048,7 +2048,7 @@ fn finish_restore_fetch_reconnects_sse_when_children_added_to_open_connection() 
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id(own_run_id.to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -2075,7 +2075,7 @@ fn finish_restore_fetch_reconnects_sse_when_children_added_to_open_connection() 
         // bail and reconnect_sse would tear the connection down instead
         // of opening a new one.
         let (_, rx) = futures::channel::mpsc::unbounded::<SseStreamItem>();
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         poller.update(&mut app, |me, _| {
             let stream = me.streams.entry(conversation_id).or_default();
             stream.event_cursor = 0;
@@ -2136,7 +2136,7 @@ fn finish_restore_fetch_reconnects_sse_when_children_added_to_open_connection() 
 /// `notebooks/link_tests.rs`) so we don't need a real subscriber model.
 fn capture_child_spawns(
     app: &mut App,
-    streamer: &rookui::ModelHandle<OrchestrationEventStreamer>,
+    streamer: &ptermui::ModelHandle<OrchestrationEventStreamer>,
 ) -> std::sync::Arc<parking_lot::Mutex<Vec<(AmbientAgentTaskId, String)>>> {
     let captured: std::sync::Arc<parking_lot::Mutex<Vec<(AmbientAgentTaskId, String)>>> =
         std::sync::Arc::new(parking_lot::Mutex::new(Vec::new()));
@@ -2184,7 +2184,7 @@ fn finish_ancestor_seed_fetch_emits_child_spawned_for_each_seeded_child() {
         // Register a viewer-mode consumer so the entry exists. The seed
         // fetch is normally kicked off by registration; here we drive
         // `finish_ancestor_seed_fetch` synchronously to control the input.
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         let placeholder_conv_id =
             crate::ai::agent::conversation::AIConversation::new(true, false).id();
         streamer.update(&mut app, |me, ctx| {
@@ -2270,8 +2270,8 @@ fn register_viewer_mode_consumer_replays_known_children_for_later_panes() {
 
         let parent_task_id = make_parent_task_id_for_test(0xe1);
         let child_a = make_parent_task_id_for_test(0xe2);
-        let consumer_a = rookui::EntityId::new();
-        let consumer_b = rookui::EntityId::new();
+        let consumer_a = ptermui::EntityId::new();
+        let consumer_b = ptermui::EntityId::new();
         let placeholder_a = crate::ai::agent::conversation::AIConversation::new(true, false).id();
         let placeholder_b = crate::ai::agent::conversation::AIConversation::new(true, false).id();
 
@@ -2345,7 +2345,7 @@ fn parent_with_many_children_opens_one_ancestor_include_self_stream() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id(own_run_id.to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -2362,7 +2362,7 @@ fn parent_with_many_children_opens_one_ancestor_include_self_stream() {
             OrchestrationEventStreamer::new_with_clients_for_test(ai_client, server_api, ctx)
         });
 
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         poller.update(&mut app, |me, ctx| {
             let stream = me.streams.entry(conversation_id).or_default();
             stream.consumers.insert(consumer_id);
@@ -2400,7 +2400,7 @@ fn registering_additional_child_does_not_reconnect_parent_family_stream() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id(own_run_id.to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -2417,7 +2417,7 @@ fn registering_additional_child_does_not_reconnect_parent_family_stream() {
             OrchestrationEventStreamer::new_with_clients_for_test(ai_client, server_api, ctx)
         });
 
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         poller.update(&mut app, |me, ctx| {
             let stream = me.streams.entry(conversation_id).or_default();
             stream.consumers.insert(consumer_id);
@@ -2463,7 +2463,7 @@ fn child_only_conversation_opens_self_run_id_filter() {
         conversation.set_run_id(own_run_id.to_string());
         conversation.set_parent_agent_id("550e8400-e29b-41d4-a716-4466554405ff".to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -2480,7 +2480,7 @@ fn child_only_conversation_opens_self_run_id_filter() {
             OrchestrationEventStreamer::new_with_clients_for_test(ai_client, server_api, ctx)
         });
 
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         poller.update(&mut app, |me, ctx| {
             let stream = me.streams.entry(conversation_id).or_default();
             stream.consumers.insert(consumer_id);
@@ -2508,7 +2508,7 @@ fn restored_parent_with_children_opens_ancestor_include_self_stream() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id(own_run_id.to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -2525,7 +2525,7 @@ fn restored_parent_with_children_opens_ancestor_include_self_stream() {
             OrchestrationEventStreamer::new_with_clients_for_test(ai_client, server_api, ctx)
         });
 
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         poller.update(&mut app, |me, _| {
             let stream = me.streams.entry(conversation_id).or_default();
             stream.event_cursor = 5;
@@ -2579,7 +2579,7 @@ fn restored_child_without_children_opens_self_run_id_stream() {
         conversation.set_run_id(own_run_id.to_string());
         conversation.set_parent_agent_id("550e8400-e29b-41d4-a716-4466554405fe".to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -2596,7 +2596,7 @@ fn restored_child_without_children_opens_self_run_id_stream() {
             OrchestrationEventStreamer::new_with_clients_for_test(ai_client, server_api, ctx)
         });
 
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         poller.update(&mut app, |me, _| {
             let stream = me.streams.entry(conversation_id).or_default();
             stream.watched_run_ids.insert(own_run_id.to_string());
@@ -2630,8 +2630,8 @@ fn restored_child_without_children_opens_self_run_id_stream() {
 /// must never be called. Used by the synchronous short-circuit tests to assert
 /// no server fetch is spawned.
 fn streamer_with_no_fetch_expected(
-    app: &mut rookui::App,
-) -> rookui::ModelHandle<OrchestrationEventStreamer> {
+    app: &mut ptermui::App,
+) -> ptermui::ModelHandle<OrchestrationEventStreamer> {
     let mut mock = MockAIClient::new();
     mock.expect_get_ambient_agent_task().times(0);
     let ai_client: Arc<dyn AIClient> = Arc::new(mock);
@@ -2653,7 +2653,7 @@ fn wait_registration_root_with_children_opens_ancestor_include_self_stream() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id(own_run_id.to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -2670,7 +2670,7 @@ fn wait_registration_root_with_children_opens_ancestor_include_self_stream() {
             OrchestrationEventStreamer::new_with_clients_for_test(ai_client, server_api, ctx)
         });
 
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         poller.update(&mut app, |me, _| {
             let stream = me.streams.entry(conversation_id).or_default();
             stream.event_cursor = 3;
@@ -2715,7 +2715,7 @@ fn wait_registration_root_without_children_does_not_register() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id(own_run_id.to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -2732,7 +2732,7 @@ fn wait_registration_root_without_children_does_not_register() {
             OrchestrationEventStreamer::new_with_clients_for_test(ai_client, server_api, ctx)
         });
 
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         poller.update(&mut app, |me, _| {
             let stream = me.streams.entry(conversation_id).or_default();
             stream.watched_run_ids.insert(own_run_id.to_string());
@@ -2771,7 +2771,7 @@ fn wait_registration_fetch_error_does_not_register() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id(own_run_id.to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -2788,7 +2788,7 @@ fn wait_registration_fetch_error_does_not_register() {
             OrchestrationEventStreamer::new_with_clients_for_test(ai_client, server_api, ctx)
         });
 
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         poller.update(&mut app, |me, _| {
             let stream = me.streams.entry(conversation_id).or_default();
             stream.watched_run_ids.insert(own_run_id.to_string());
@@ -2820,7 +2820,7 @@ fn register_parent_on_wait_flag_off_is_noop() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id(own_run_id.to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -2943,7 +2943,7 @@ fn drain_family_events_primary_routes_mixed_batch_and_delivers_inbox() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id(parent_run_id.clone());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -3045,7 +3045,7 @@ fn drain_family_events_observer_advances_cursor_without_server_push() {
         // Viewer placeholder: a shared-session view (is_viewing_shared_session).
         let placeholder = AIConversation::new(true, false);
         let placeholder_id = placeholder.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![placeholder], ctx);
         });
@@ -3106,7 +3106,7 @@ fn wait_registration_eligibility_child_conversation_is_eligible() {
         conversation.set_run_id("550e8400-e29b-41d4-a716-446655440526".to_string());
         conversation.set_parent_agent_id("550e8400-e29b-41d4-a716-4466554405fe".to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -3128,7 +3128,7 @@ fn wait_registration_eligibility_requires_the_flag() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id("550e8400-e29b-41d4-a716-446655440527".to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -3155,7 +3155,7 @@ fn wait_registration_eligibility_excludes_remote_run_views() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id("550e8400-e29b-41d4-a716-446655440528".to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.mark_conversation_as_remote_child(conversation_id, ctx);
@@ -3181,7 +3181,7 @@ fn wait_registration_eligibility_excludes_established_parents() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id(own_run_id.to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -3212,7 +3212,7 @@ fn wait_registration_mid_tree_child_with_children_registers_as_parent() {
         conversation.set_run_id(own_run_id.to_string());
         conversation.set_parent_agent_id("550e8400-e29b-41d4-a716-4466554405fd".to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -3229,7 +3229,7 @@ fn wait_registration_mid_tree_child_with_children_registers_as_parent() {
             OrchestrationEventStreamer::new_with_clients_for_test(ai_client, server_api, ctx)
         });
 
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         poller.update(&mut app, |me, _| {
             let stream = me.streams.entry(conversation_id).or_default();
             stream.watched_run_ids.insert(own_run_id.to_string());
@@ -3278,7 +3278,7 @@ fn register_parent_on_wait_already_parent_is_idempotent() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_run_id(own_run_id.to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(
@@ -3290,7 +3290,7 @@ fn register_parent_on_wait_already_parent_is_idempotent() {
         });
 
         let poller = streamer_with_no_fetch_expected(&mut app);
-        let consumer_id = rookui::EntityId::new();
+        let consumer_id = ptermui::EntityId::new();
         poller.update(&mut app, |me, ctx| {
             let stream = me.streams.entry(conversation_id).or_default();
             stream.consumers.insert(consumer_id);
@@ -3327,7 +3327,7 @@ fn register_parent_on_wait_without_self_run_id_is_noop() {
         // Intentionally leave run_id unset.
         let conversation = AIConversation::new(false, false);
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
             model.update_conversation_status(

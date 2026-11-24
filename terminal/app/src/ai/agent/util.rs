@@ -8,8 +8,8 @@ use markdown_parser::{
     FormattedImage, FormattedTextLine, parse_image_run_line, parse_markdown_with_gfm_tables,
 };
 use mermaid_to_svg::is_mermaid_diagram;
+use pterm_util::path::LineAndColumnArg;
 use regex::Regex;
-use rook_util::path::LineAndColumnArg;
 
 use super::{
     AIAgentTextSection, AgentOutputImage, AgentOutputImageLayout, AgentOutputMermaidDiagram,
@@ -261,7 +261,7 @@ fn image_section(image: FormattedImage, layout: AgentOutputImageLayout) -> AIAge
 }
 
 fn markdown_source_for_image(image: &FormattedImage) -> String {
-    rook_editor::content::text::format_image_markdown(
+    pterm_editor::content::text::format_image_markdown(
         &image.alt_text,
         &image.source,
         image.title.as_deref(),

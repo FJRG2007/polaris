@@ -1,4 +1,4 @@
-use rookui::{Entity, ModelContext};
+use ptermui::{Entity, ModelContext};
 
 use crate::editor::InteractionState;
 

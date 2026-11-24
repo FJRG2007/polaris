@@ -1,7 +1,7 @@
 use pathfinder_geometry::vector::vec2f;
-use rookui::elements::{Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle};
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::elements::{Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle};
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 
 use super::SettingsSection;
 use super::settings_page::{MatchData, NAV_ITEM_LEFT_MARGIN};
@@ -74,7 +74,7 @@ impl SettingsUmbrella {
             .with_text_and_icon_label(TextAndIcon::new(
                 TextAndIconAlignment::TextFirst,
                 self.label.to_string(),
-                chevron_icon.to_rookui_icon(text_color),
+                chevron_icon.to_ptermui_icon(text_color),
                 MainAxisSize::Max,
                 MainAxisAlignment::SpaceBetween,
                 vec2f(16., 16.),

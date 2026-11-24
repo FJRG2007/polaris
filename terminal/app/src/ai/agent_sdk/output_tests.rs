@@ -1,6 +1,6 @@
 use comfy_table::Cell;
-use rook_cli::agent::OutputFormat;
-use rook_cli::json_filter::parse_jq_filter;
+use pterm_cli::agent::OutputFormat;
+use pterm_cli::json_filter::parse_jq_filter;
 use serde::Serialize;
 use serde_json::json;
 

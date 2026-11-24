@@ -78,8 +78,8 @@ Upstream publishes five CLI-agent integrations. All of them are in `plugins/` no
 
 Codex and Gemini share the Claude Code implementation, so they take the same emitter with the agent name passed in rather than hardcoded.
 
-## Only Rook's own plugins are accepted
+## Only Polaris Terminal's own plugins are accepted
 
-`is_cli_agent_notification` recognises Rook's sentinel and nothing else, and the terminal exports only its own environment variable names. An upstream plugin therefore neither activates nor is listened to.
+`is_cli_agent_notification` recognises Polaris Terminal's sentinel and nothing else, and the terminal exports only its own environment variable names. An upstream plugin therefore neither activates nor is listened to.
 
-That is deliberate. Those plugins carry the per-hook cost measured above, and accepting them would leave a user paying it with no indication why. The client installs Rook's copies from this repository through the marketplace manifest at the root.
+That is deliberate. Those plugins carry the per-hook cost measured above, and accepting them would leave a user paying it with no indication why. The client installs Polaris Terminal's copies from this repository through the marketplace manifest at the root.

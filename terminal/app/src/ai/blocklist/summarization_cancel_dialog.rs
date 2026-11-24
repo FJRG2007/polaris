@@ -1,19 +1,21 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{Align, Container, CrossAxisAlignment, Dismiss, Flex, ParentElement, Stack};
-use rookui::fonts::Weight;
-use rookui::keymap::FixedBinding;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{BorderStyle, Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
+    Align, Container, CrossAxisAlignment, Dismiss, Flex, ParentElement, Stack,
+};
+use ptermui::fonts::Weight;
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{BorderStyle, Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::appearance::Appearance;
 use crate::ui_components::buttons;
 use crate::ui_components::dialog::{Dialog, dialog_styles};
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -45,7 +47,7 @@ pub enum SummarizationCancelDialogAction {
     Continue,
 }
 
-use rookui::elements::MouseStateHandle;
+use ptermui::elements::MouseStateHandle;
 
 #[derive(Default)]
 pub struct SummarizationCancelDialog {
@@ -63,7 +65,7 @@ impl View for SummarizationCancelDialog {
         "SummarizationCancelDialog"
     }
 
-    fn on_focus(&mut self, _focus_ctx: &rookui::FocusContext, ctx: &mut ViewContext<Self>) {
+    fn on_focus(&mut self, _focus_ctx: &ptermui::FocusContext, ctx: &mut ViewContext<Self>) {
         // Ensure this dialog takes focus away from the terminal editor
         ctx.focus_self();
     }
@@ -118,7 +120,7 @@ impl View for SummarizationCancelDialog {
             .finish();
 
         // Close header with Icon::X and ESC pill
-        let esc_keystroke = rookui::keymap::Keystroke::parse("escape").expect("Valid keystroke");
+        let esc_keystroke = ptermui::keymap::Keystroke::parse("escape").expect("Valid keystroke");
         let close_header = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_children([
@@ -190,11 +192,11 @@ impl View for SummarizationCancelDialog {
         let mut stack = Stack::new();
         stack.add_positioned_child(
             dialog_dismiss,
-            rookui::elements::OffsetPositioning::offset_from_parent(
+            ptermui::elements::OffsetPositioning::offset_from_parent(
                 vec2f(0., 0.),
-                rookui::elements::ParentOffsetBounds::WindowByPosition,
-                rookui::elements::ParentAnchor::Center,
-                rookui::elements::ChildAnchor::Center,
+                ptermui::elements::ParentOffsetBounds::WindowByPosition,
+                ptermui::elements::ParentAnchor::Center,
+                ptermui::elements::ChildAnchor::Center,
             ),
         );
 

@@ -1,5 +1,5 @@
-use rookui::Element;
-use rookui::elements::MouseStateHandle;
+use ptermui::Element;
+use ptermui::elements::MouseStateHandle;
 
 use super::{
     InlineBannerButtonState, InlineBannerCloseButton, InlineBannerContent, InlineBannerIcon,
@@ -66,7 +66,7 @@ pub fn render_aws_cli_not_installed_banner(
         mouse_state_handle: state.dismiss_button_mouse_state.clone(),
     });
 
-    let description_text = rookui::elements::Text::new(
+    let description_text = ptermui::elements::Text::new(
         "The AWS CLI is required to authenticate with your organization's AWS Bedrock. Install it to continue.",
         appearance.ui_font_family(),
         appearance.monospace_font_size() - 2.,

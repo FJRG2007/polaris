@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use rook_errors::report_error;
-use rookui::elements::{ChildView, Container};
-use rookui::ui_components::components::{Coords, UiComponentStyles};
-use rookui::{
+use pterm_errors::report_error;
+use ptermui::elements::{ChildView, Container};
+use ptermui::ui_components::components::{Coords, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 use uuid::Uuid;
@@ -44,10 +44,10 @@ use crate::workspace::ToastStack;
 /// See `specs/GH686/product.md`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum InstallOrigin {
-    /// Triggered by a user gesture inside Rook (gallery card click,
+    /// Triggered by a user gesture inside Polaris Terminal (gallery card click,
     /// reinstall button, programmatic in-app flows, etc.).
     InApp,
-    /// Triggered by a `rook://settings/mcp?autoinstall=...` deeplink; must be
+    /// Triggered by a `polaris-terminal://settings/mcp?autoinstall=...` deeplink; must be
     /// gated by an explicit in-app confirmation before install or spawn.
     Deeplink,
 }
@@ -292,7 +292,7 @@ impl MCPServersSettingsPageView {
 
     /// Auto-installs an MCP server from the gallery.
     ///
-    /// This is the single sink for `rook://settings/mcp?autoinstall=<title>`
+    /// This is the single sink for `polaris-terminal://settings/mcp?autoinstall=<title>`
     /// deeplinks; callers must therefore treat the `autoinstall_param` as
     /// untrusted input. The `autoinstall_param` is matched case-insensitively
     /// against gallery titles.

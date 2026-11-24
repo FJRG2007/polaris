@@ -6,7 +6,7 @@ mod search_item;
 mod view;
 
 pub use data_source::SelectRewindPoint;
-use rookui::keymap::Keystroke;
+use ptermui::keymap::Keystroke;
 pub use view::{RewindMenuEvent, RewindMenuView};
 
 use crate::terminal::input::inline_menu::{

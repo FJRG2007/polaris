@@ -6,7 +6,7 @@ When a user selects a non-Oz harness (e.g. Claude Code) in cloud mode, they must
 
 ## Problem
 
-Today the Rook desktop client has no way to associate an auth secret with a third-party harness in cloud mode. The oz web app supports this, but the native client silently launches runs without credentials, causing failures. Users need a clear, guided way to provide auth credentials the first time they use a non-Oz harness, and an efficient way to change credentials afterward.
+Today the Polaris Terminal desktop client has no way to associate an auth secret with a third-party harness in cloud mode. The oz web app supports this, but the native client silently launches runs without credentials, causing failures. Users need a clear, guided way to provide auth credentials the first time they use a non-Oz harness, and an efficient way to change credentials afterward.
 
 ## Goals
 
@@ -18,10 +18,10 @@ Today the Rook desktop client has no way to associate an auth secret with a thir
 
 ## Non-goals
 
-- Editing or deleting existing secrets (users go to Rook Drive for that).
+- Editing or deleting existing secrets (users go to Polaris Terminal Drive for that).
 - Auth secret flows for harnesses other than Claude Code (will extend the same pattern later).
-- A dedicated secrets management UI beyond the existing Rook Drive secrets pane.
-- Changes to the rook-server — all necessary GraphQL queries and mutations already exist.
+- A dedicated secrets management UI beyond the existing Polaris Terminal Drive secrets pane.
+- Changes to the polaris-terminal-server — all necessary GraphQL queries and mutations already exist.
 
 ## Figma
 
@@ -81,7 +81,7 @@ Today the Rook desktop client has no way to associate an auth secret with a thir
 
 ### Toast notification
 
-20. After successfully creating a new secret, an ephemeral toast appears: "API key saved." with a "Manage secrets" button that opens the Rook Drive secrets pane.
+20. After successfully creating a new secret, an ephemeral toast appears: "API key saved." with a "Manage secrets" button that opens the Polaris Terminal Drive secrets pane.
 
 ### Spawn integration
 

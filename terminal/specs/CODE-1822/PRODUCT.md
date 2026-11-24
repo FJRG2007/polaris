@@ -2,7 +2,7 @@
 Linear: [CODE-1822 — Orchestration](https://linear.app/warpdotdev/issue/CODE-1822/orchestration)
 
 ## Summary
-The Rook TUI gains an interactive permission card for an active `RunAgents` request. A user can review the proposed agents and run-wide configuration, accept or reject the request, or edit its configuration using the keyboard or mouse without leaving the TUI.
+The Polaris Terminal TUI gains an interactive permission card for an active `RunAgents` request. A user can review the proposed agents and run-wide configuration, accept or reject the request, or edit its configuration using the keyboard or mouse without leaving the TUI.
 
 ## Figma
 - Initial acceptance card: https://www.figma.com/design/yg5nbPZuGoAszHS3Rhvehu/TUI?node-id=766-18419&m=dev
@@ -24,7 +24,7 @@ The Rook TUI gains an interactive permission card for an active `RunAgents` requ
 ## Behavior
 ### Active interaction and input visibility
 1. When a `RunAgents` request reaches the front of the confirmation queue and awaits a decision, its permission card becomes the active interaction.
-2. While the permission card or one of its configuration pages is active, the main input row, input cursor, normal input footer, and the in-progress rooking indicator / last-response summary row are hidden. The permission surface provides the relevant action hints in their place.
+2. While the permission card or one of its configuration pages is active, the main input row, input cursor, normal input footer, and the in-progress pterming indicator / last-response summary row are hidden. The permission surface provides the relevant action hints in their place.
 3. Hiding the input preserves its draft text, cursor position, selection, editor mode, and scroll state without modification.
 4. Pending requests behind the active front-of-queue blocker do not independently affect input visibility or focus.
 5. Accepting or rejecting the request ends the blocking interaction immediately, even while an accepted request continues into a spawning state. The main input and footer reappear with their preserved state, and prior focus is restored.
@@ -60,7 +60,7 @@ The Rook TUI gains an interactive permission card for an active `RunAgents` requ
    5. Environment
    6. Model
 20. The page count is dynamic. Adding or removing the conditional API-key page immediately updates the current position and total.
-21. Selecting Local immediately forces the Rook harness and removes the Harness, API key, Host, and Environment pages. The flow becomes Location (1 of 2) followed by Model (2 of 2).
+21. Selecting Local immediately forces the Polaris Terminal harness and removes the Harness, API key, Host, and Environment pages. The flow becomes Location (1 of 2) followed by Model (2 of 2).
 22. Selecting Cloud restores the applicable Cloud page sequence and valid selections from the current edit session when possible.
 23. Each page initially highlights the request's current value, including values inherited from an approved plan configuration. If the current value is unavailable, the page highlights the appropriate valid default and clearly reflects the replacement.
 24. A confirmed selection is saved immediately to the edit session.
@@ -88,18 +88,18 @@ The Rook TUI gains an interactive permission card for an active `RunAgents` requ
 38. Location offers Cloud and Local.
 39. Harness shows the same live availability, display labels, ordering, and disabled reasons as the GUI's orchestration controls, subject to the TUI's Local behavior in (21).
 40. Model shows the same live, harness-specific catalog, labels, ordering, and default behavior as the GUI:
-   - Rook Cloud excludes unsupported custom models.
-   - Rook Local includes models supported by local Rook agents.
-   - Non-Rook Cloud harnesses include their harness default and server-provided models.
+   - Polaris Terminal Cloud excludes unsupported custom models.
+   - Polaris Terminal Local includes models supported by local Polaris Terminal agents.
+   - Non-Polaris Terminal Cloud harnesses include their harness default and server-provided models.
 41. API key appears only for Cloud harnesses that support managed credentials. It offers:
    - “Skip (advanced)” to inherit credentials from the selected worker environment.
    - Existing named managed secrets valid for the selected harness.
    - No resource-creation option.
-42. Host appears only for Cloud. It offers the Rook-hosted option, the workspace default when configured, known connected self-hosted workers, the user's recent custom host when available, and a custom-host text-entry option.
+42. Host appears only for Cloud. It offers the Polaris Terminal-hosted option, the workspace default when configured, known connected self-hosted workers, the user's recent custom host when available, and a custom-host text-entry option.
 43. A custom host is trimmed and validated before it is confirmed. Invalid or empty custom input remains editable and shows a concise error. Once confirmed, the user-entered value replaces the generic `Custom host…` option text and pre-fills the editor if selected again.
 44. Environment appears only for Cloud. It offers “Empty environment” plus existing environments, using the same labels and default-selection behavior as the GUI. It does not offer environment creation.
 45. Switching Location or Harness revalidates all dependent fields:
-   - Local forces Rook and removes Cloud-only values from the launch configuration.
+   - Local forces Polaris Terminal and removes Cloud-only values from the launch configuration.
    - A Harness change restores that harness's prior model selection when still valid, otherwise it selects the appropriate default.
    - A Harness change re-resolves the API-key choice for the new harness.
    - Values that remain applicable are preserved.

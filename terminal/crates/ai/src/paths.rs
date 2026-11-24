@@ -1,9 +1,9 @@
-use rook_errors::report_error;
-use rook_terminal::shell::ShellLaunchData;
-use rook_util::path::{
+use pterm_errors::report_error;
+use pterm_terminal::shell::ShellLaunchData;
+use pterm_util::path::{
     convert_msys2_to_windows_native_path, convert_wsl_to_windows_host_path, msys2_exe_to_root,
 };
-use rookui_core::platform::OperatingSystem;
+use ptermui_core::platform::OperatingSystem;
 use typed_path::{TypedPath, TypedPathBuf, WindowsPath};
 
 fn use_unix_paths(shell: Option<&ShellLaunchData>) -> bool {

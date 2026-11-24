@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use lazy_static::lazy_static;
-use rook_completer::ParsedTokensSnapshot;
+use pterm_completer::ParsedTokensSnapshot;
 
 /// The percentage of input tokens that can be described by our completion engine before
 /// we consider the input as a shell command. This could be tuned.
@@ -14,13 +14,13 @@ const DETECT_AS_COMMAND_LOW_TOKEN_THRESHOLD: f32 = 0.7;
 lazy_static! {
     /// One-off commands / keywords that should trigger a shell command classification.
     ///
-    /// `claude`, `codex`, `gemini`, and `rook` are not actually _really_ one-off shell command
+    /// `claude`, `codex`, `gemini`, and `polaris-terminal` are not actually _really_ one-off shell command
     /// keywords, but false-positive NL classifications for these inputs (where the user was trying
-    /// to use claude code, codex CLI, gemini CLI, or the Rook Agent CLI) suck, because the user
+    /// to use claude code, codex CLI, gemini CLI, or the Polaris Terminal Agent CLI) suck, because the user
     /// often thinks we're intentionally trying to push them away from those CLIs into Agent Mode,
-    /// so we mitigate the risk by always treating as shell. `rook` is the command that launches the
-    /// Rook Agent CLI / TUI, so bare `rook` (and `rook …` invocations) should classify as shell.
-    static ref ONE_OFF_SHELL_COMMAND_KEYWORDS: HashSet<&'static str> = HashSet::from(["#", "echo", "man", "sudo", "claude", "codex", "gemini", "agy", "omp", "rook"]);
+    /// so we mitigate the risk by always treating as shell. `polaris-terminal` is the command that launches the
+    /// Polaris Terminal Agent CLI / TUI, so bare `polaris-terminal` (and `polaris-terminal …` invocations) should classify as shell.
+    static ref ONE_OFF_SHELL_COMMAND_KEYWORDS: HashSet<&'static str> = HashSet::from(["#", "echo", "man", "sudo", "claude", "codex", "gemini", "agy", "omp", "polaris-terminal"]);
 
     static ref ONE_OFF_NATURAL_LANGUAGE_WORDS: HashSet<&'static str> = HashSet::from(["hello", "hi", "hey", "hola", "thanks", "explain", "yes", "no", "what", "nice", "1. "]);
 

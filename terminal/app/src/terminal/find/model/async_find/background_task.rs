@@ -11,8 +11,8 @@ use std::sync::Arc;
 use futures_lite::future::yield_now;
 use instant::Instant;
 use parking_lot::FairMutex;
-use rook_terminal::model::grid::Dimensions;
-use rookui::{Entity, ModelContext};
+use pterm_terminal::model::grid::Dimensions;
+use ptermui::{Entity, ModelContext};
 
 use super::work_queue::{FindWorkItem, FindWorkQueue};
 use super::{AbsoluteMatch, AsyncFindConfig, FindTaskMessage};
@@ -38,7 +38,7 @@ pub fn spawn_find_task<E: Entity>(
     queue: FindWorkQueue,
     result_tx: async_channel::Sender<FindTaskMessage>,
     ctx: &mut ModelContext<E>,
-) -> rookui::r#async::SpawnedFutureHandle {
+) -> ptermui::r#async::SpawnedFutureHandle {
     ctx.spawn(
         async move {
             run_find_task_loop(config, terminal_model, queue, result_tx).await;

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds a structured rook://cli-agent payload and delivers it, in one jq call.
+# Builds a structured polaris-terminal://cli-agent payload and delivers it, in one jq call.
 #
 # Hooks run on Claude Code's critical path: PostToolUse fires after every single
 # tool call, UserPromptSubmit before every prompt. What they cost is paid by the
@@ -79,12 +79,12 @@ _EMIT_EVENT_JQ_PROGRAM='
 '
 
 # Which agent this plugin integrates. Each plugin sets it before sourcing.
-: "${ROOK_PLUGIN_AGENT:=gemini}"
+: "${POLARIS_TERMINAL_PLUGIN_AGENT:=gemini}"
 
-# The sentinel this plugin sends. Rook accepts the upstream one as well, so a
-# plugin built against upstream keeps working, but a plugin shipped with Rook
-# names Rook.
-ROOK_CLI_AGENT_SENTINEL="rook://cli-agent"
+# The sentinel this plugin sends. Polaris Terminal accepts the upstream one as well, so a
+# plugin built against upstream keeps working, but a plugin shipped with Polaris Terminal
+# names Polaris Terminal.
+POLARIS_TERMINAL_CLI_AGENT_SENTINEL="polaris-terminal://cli-agent"
 
 # Feeds jq: either the captured input, or the caller's stdin untouched.
 _emit_feed() {
@@ -97,7 +97,7 @@ emit_event() {
     local program="${_EMIT_EVENT_JQ_PROGRAM/EXTRA_FIELDS/$extra}"
 
     # Negotiate down to whatever the terminal advertises, defaulting to 1.
-    local protocol_version="${ROOK_CLI_AGENT_PROTOCOL_VERSION:-1}"
+    local protocol_version="${POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION:-1}"
     case "$protocol_version" in
         '' | *[!0-9]*) protocol_version=$PLUGIN_CURRENT_PROTOCOL_VERSION ;;
     esac
@@ -112,8 +112,8 @@ emit_event() {
         _emit_feed "$input" | jq -c \
             --argjson v "$protocol_version" \
             --arg event "$event" \
-            --arg agent "$ROOK_PLUGIN_AGENT" \
-            --arg sentinel "$ROOK_CLI_AGENT_SENTINEL" \
+            --arg agent "$POLARIS_TERMINAL_PLUGIN_AGENT" \
+            --arg sentinel "$POLARIS_TERMINAL_CLI_AGENT_SENTINEL" \
             --argjson wrap true \
             "$@" "$program"
         return 0
@@ -124,8 +124,8 @@ emit_event() {
         _emit_feed "$input" | jq -j \
             --argjson v "$protocol_version" \
             --arg event "$event" \
-            --arg agent "$ROOK_PLUGIN_AGENT" \
-            --arg sentinel "$ROOK_CLI_AGENT_SENTINEL" \
+            --arg agent "$POLARIS_TERMINAL_PLUGIN_AGENT" \
+            --arg sentinel "$POLARIS_TERMINAL_CLI_AGENT_SENTINEL" \
             --argjson wrap false \
             "$@" "$program" > /dev/tty 2>/dev/null || true
         return 0
@@ -137,8 +137,8 @@ emit_event() {
         _emit_feed "$input" | jq -j \
             --argjson v "$protocol_version" \
             --arg event "$event" \
-            --arg agent "$ROOK_PLUGIN_AGENT" \
-            --arg sentinel "$ROOK_CLI_AGENT_SENTINEL" \
+            --arg agent "$POLARIS_TERMINAL_PLUGIN_AGENT" \
+            --arg sentinel "$POLARIS_TERMINAL_CLI_AGENT_SENTINEL" \
             --argjson wrap false \
             "$@" "$program" > /dev/tty 2>/dev/null && return 0
     fi
@@ -146,8 +146,8 @@ emit_event() {
     _emit_feed "$input" | jq -c \
         --argjson v "$protocol_version" \
         --arg event "$event" \
-            --arg agent "$ROOK_PLUGIN_AGENT" \
-        --arg sentinel "$ROOK_CLI_AGENT_SENTINEL" \
+            --arg agent "$POLARIS_TERMINAL_PLUGIN_AGENT" \
+        --arg sentinel "$POLARIS_TERMINAL_CLI_AGENT_SENTINEL" \
         --argjson wrap true \
         "$@" "$program"
 }

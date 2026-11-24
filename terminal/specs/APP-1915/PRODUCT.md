@@ -12,7 +12,7 @@ A previous change on `oz-agent/copy-url-in-ai-response-context-menu` added the a
 
 ## Non-goals
 
-- Adding "Show in Finder", "Open in Rook", or "Open in editor" items for file-path links in AI responses. Scope is limited to copying the target.
+- Adding "Show in Finder", "Open in Polaris Terminal", or "Open in editor" items for file-path links in AI responses. Scope is limited to copying the target.
 - Changing the terminal grid link context menu.
 - Adding a separate slimmed-down link-only menu (the earlier attempt). The existing AI block menu is kept intact.
 - Changing how hyperlinks are detected or rendered inside AI responses.
@@ -37,9 +37,9 @@ Figma: none provided. The existing AI block context menu (see screenshots attach
 
 7. Right-clicking anywhere inside an AI response where the cursor is not on a hyperlink shows the existing AI block context menu unchanged — no link-specific items, no reorderings, no omissions.
 
-8. Right-clicking inside an AI response while a text selection is active shows the existing selection-oriented menu (Copy, Insert into input, optionally Ask Rook AI / Attach as agent mode context). No "Copy URL" or "Copy path" item is added in this case, even if the selection overlaps a link — the user's primary intent is the selection.
+8. Right-clicking inside an AI response while a text selection is active shows the existing selection-oriented menu (Copy, Insert into input, optionally Ask Polaris Terminal AI / Attach as agent mode context). No "Copy URL" or "Copy path" item is added in this case, even if the selection overlaps a link — the user's primary intent is the selection.
 
-9. Right-clicking a link in the terminal grid (outside AI responses) is unchanged: it continues to show the existing grid link context menu (Copy URL / Copy path / Show in Finder / Open in Rook / Open in editor).
+9. Right-clicking a link in the terminal grid (outside AI responses) is unchanged: it continues to show the existing grid link context menu (Copy URL / Copy path / Show in Finder / Open in Polaris Terminal / Open in editor).
 
 10. Right-click never crashes or panics when there is no hovered link at the time the menu is requested; the link-specific item is simply omitted.
 

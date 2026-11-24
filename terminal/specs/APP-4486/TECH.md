@@ -8,7 +8,7 @@ The server-side fork endpoint already exists and is used by the local-to-cloud h
 
 ### Relevant code
 
-**Server endpoint**: `../rook-server/logic/ai_conversation_fork.go` — `ForkConversation()` copies GCS data, creates a new metadata row, returns a new conversation ID. No changes needed.
+**Server endpoint**: `../polaris-terminal-server/logic/ai_conversation_fork.go` — `ForkConversation()` copies GCS data, creates a new metadata row, returns a new conversation ID. No changes needed.
 
 **Client API**: `app/src/server/server_api/ai.rs:942-946` — `AIClient::fork_conversation()` calls `POST /agent/conversations/{id}/fork`. No changes needed.
 

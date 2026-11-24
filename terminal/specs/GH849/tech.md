@@ -28,7 +28,7 @@ Relevant code:
 - `app/src/ai/blocklist/block/view_impl/common_tests.rs` — block-list section renderer tests.
 - `app/src/ai/blocklist/block.rs (360-430, 2291-2316)` — `AIBlockStateHandles` and the per-section handle-allocation fold where new image tooltip handles must also be pre-allocated so they persist across frames.
 - `app/src/ai/blocklist/block/view_impl/output.rs (278-317)` — the `TextSectionsProps` construction that threads the pre-allocated handles into the renderer.
-- `crates/ui_components/src/tooltip.rs` — reusable tooltip primitive to wrap rendered images. Backed by `rook_core::ui::builder::tool_tip_on_element`, which constructs a `Hoverable::new(mouse_state_handle, ...)` that reads `state.is_hovered()`. The mouse state handle must therefore live across frames; passing a fresh `MouseStateHandle::default()` per render causes `is_hovered()` to always return `false` and the tooltip to never appear.
+- `crates/ui_components/src/tooltip.rs` — reusable tooltip primitive to wrap rendered images. Backed by `pterm_core::ui::builder::tool_tip_on_element`, which constructs a `Hoverable::new(mouse_state_handle, ...)` that reads `state.is_hovered()`. The mouse state handle must therefore live across frames; passing a fresh `MouseStateHandle::default()` per render causes `is_hovered()` to always return `false` and the tooltip to never appear.
 - `app/src/ai/agent_sdk/driver/output.rs (1260-1290)` — image section plumbing used by the agent SDK driver (needs field parity).
 
 ## Proposed changes
@@ -87,7 +87,7 @@ Update the block-list parser tests in `app/src/ai/agent/util_tests.rs` with:
 - an image whose title is unclosed — parses as plain text
 
 ### 5. Render title as a tooltip and alt as load-failure fallback
-Update the block-list renderers in `app/src/ai/blocklist/block/view_impl/common.rs` so that every successfully rendered image is wrapped with Rook's existing tooltip helper when the section's `title` is `Some(non_empty)`. Concretely:
+Update the block-list renderers in `app/src/ai/blocklist/block/view_impl/common.rs` so that every successfully rendered image is wrapped with Polaris Terminal's existing tooltip helper when the section's `title` is `Some(non_empty)`. Concretely:
 
 - `render_visual_markdown_block` (current inline-image/Mermaid shared helper) gains an optional `tooltip: Option<String>` and an optional `tooltip_mouse_state: Option<MouseStateHandle>` in its `VisualMarkdownBlockOptions`. When `tooltip` is `Some`, wrap `content` with `appearance.ui_builder().tool_tip_on_element(...)` using the passed-in `tooltip_mouse_state`; if the caller does not supply one, fall back to `MouseStateHandle::default()` (used only by call sites that do not have stable per-image handles, such as the collapsible reasoning path).
 - The `MouseStateHandle` used for the tooltip must persist across frames. `tool_tip_on_element` wraps the element in `Hoverable::new(mouse_state_handle, ...)` and the tooltip is rendered only when `state.is_hovered()` returns true; a fresh `MouseStateHandle::default()` per render resets the hover state every frame, which is why image tooltips never appear today. Allocate a stable handle per `AIAgentTextSection::Image` section on `AIBlockStateHandles` (new `image_section_tooltip_handles: Vec<MouseStateHandle>` field next to `normal_response_code_snippet_buttons` and `table_section_handles`), populated in the same per-section fold at `app/src/ai/blocklist/block.rs (~2291-2316)`, and thread that slice through `TextSectionsProps` alongside the existing code / table handle slices. The renderer walks the slice in source order using a new `starting_image_section_index` counter (mirroring `starting_code_section_index`), incremented by `image_group.images.len()` for grouped renders and by 1 for the single-image fallback path.
@@ -134,7 +134,7 @@ Each numbered invariant in `specs/GH849/product.md` maps to at least one test or
   - a block image whose file is removed falls back to the alt string, not the raw markdown, when alt is non-empty
 
 ### Manual validation
-- Author a dogfood AI response that includes `![A dog](docs/dog.png "Rex, my dog")` and confirm the image renders and hovering shows "Rex, my dog" in the Rook tooltip (invariant 6).
+- Author a dogfood AI response that includes `![A dog](docs/dog.png "Rex, my dog")` and confirm the image renders and hovering shows "Rex, my dog" in the Polaris Terminal tooltip (invariant 6).
 - Trigger all three delimiter forms (`"…"`, `'…'`, `(…)`) and verify the tooltip text matches the authored title (invariant 3).
 - Trigger an empty title (`""`) and verify no tooltip appears (invariants 4, 6).
 - Point the image at a missing file and verify the inline fallback shows the alt string when alt is non-empty and the raw markdown when alt is empty (invariant 7).

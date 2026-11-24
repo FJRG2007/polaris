@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 pub use cloud_object_models::{CloudWorkflow, CloudWorkflowModel, WorkflowId};
-use rook_core::context_flag::ContextFlag;
-use rook_core::features::FeatureFlag;
-use rookui::{AppContext, SingletonEntity};
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::features::FeatureFlag;
+use ptermui::{AppContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 
 pub mod categories;
@@ -30,8 +30,8 @@ use crate::cloud_object::{
     CreateObjectRequest, GenericServerObject, ObjectType, Revision, UpdateCloudObjectResult,
 };
 use crate::drive::CloudObjectTypeAndId;
-use crate::drive::items::RookDriveItem;
-use crate::drive::items::workflow::RookDriveWorkflow;
+use crate::drive::items::PtermDriveItem;
+use crate::drive::items::workflow::PtermDriveWorkflow;
 use crate::notebooks::{NotebookId, NotebookLocation};
 use crate::persistence::ModelEvent;
 use crate::server::cloud_objects::update_manager::InitiatedBy;
@@ -53,25 +53,25 @@ pub enum WorkflowSource {
         team_uid: ServerId,
     },
     PersonalCloud,
-    RookAI,
+    PtermAI,
     Notebook {
         notebook_id: Option<NotebookId>,
         team_uid: Option<ServerId>,
         location: NotebookLocation,
     },
 
-    /// A hardcoded workflow type that allows Rook to surface features as Workflows (e.g.
+    /// A hardcoded workflow type that allows Polaris Terminal to surface features as Workflows (e.g.
     /// a command to see our network log)
     App,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, Eq, PartialEq, Hash, PartialOrd)]
 pub enum WorkflowSelectionSource {
-    RookDrive,
+    PtermDrive,
     CommandPalette,
     UniversalSearch,
     Voltron,
-    RookAI,
+    PtermAI,
     Notebook,
     SlashMenu,
     UpArrowHistory,
@@ -142,7 +142,7 @@ impl WorkflowViewMode {
 pub enum AIWorkflowOrigin {
     CommandSearch,
     AgentMode,
-    LegacyRookAI,
+    LegacyPtermAI,
 }
 
 /// Wrapper type for a workflow that may be saved locally or using cloud sync.
@@ -152,7 +152,7 @@ pub enum WorkflowType {
     Local(Workflow),
     /// Saved workflows from personal or team collections, saved using cloud-sync.
     Cloud(Box<CloudWorkflow>),
-    /// Ephemeral/transient workflows created from Rook AI output
+    /// Ephemeral/transient workflows created from Polaris Terminal AI output
     AIGenerated {
         workflow: Workflow,
         origin: AIWorkflowOrigin,
@@ -316,17 +316,17 @@ impl CloudModelType for CloudWorkflowModel {
             .await
     }
 
-    fn renders_in_rook_drive(&self) -> bool {
+    fn renders_in_pterm_drive(&self) -> bool {
         true
     }
 
-    fn to_rook_drive_item(
+    fn to_pterm_drive_item(
         &self,
         id: SyncId,
         _appearance: &Appearance,
         workflow: &CloudWorkflow,
-    ) -> Option<Box<dyn RookDriveItem>> {
-        Some(Box::new(RookDriveWorkflow::new(
+    ) -> Option<Box<dyn PtermDriveItem>> {
+        Some(Box::new(PtermDriveWorkflow::new(
             self.cloud_object_type_and_id(id),
             workflow.clone(),
         )))

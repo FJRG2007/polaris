@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use rook_util::path::ShellFamily;
-use rookui::platform::OperatingSystem;
+use pterm_util::path::ShellFamily;
+use ptermui::platform::OperatingSystem;
 use serde::{Deserialize, Serialize};
 
 #[derive(

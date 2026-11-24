@@ -1,9 +1,9 @@
 use ai::api_keys::{CustomEndpointModel, CustomEndpointSchema};
 use pathfinder_geometry::vector::vec2f;
-use rookui::platform::WindowStyle;
-use rookui::scene::Scene;
-use rookui::units::Pixels;
-use rookui::{App, EntityIdSet, Presenter, WindowInvalidation};
+use ptermui::platform::WindowStyle;
+use ptermui::scene::Scene;
+use ptermui::units::Pixels;
+use ptermui::{App, EntityIdSet, Presenter, WindowInvalidation};
 
 use super::*;
 use crate::test_util::terminal::initialize_app_for_terminal_view;

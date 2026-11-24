@@ -4,12 +4,12 @@ Figma: House of Agents — https://www.figma.com/design/CsBdBW4YoLgSAbr5eSkwV6/H
 Reference styling baseline: PR #23908 — https://github.com/warpdotdev/warp-internal/pull/23908
 
 ## Summary
-Make rendered Markdown tables use the same blockless visual treatment across every Rook surface that renders Markdown tables.
+Make rendered Markdown tables use the same blockless visual treatment across every Polaris Terminal surface that renders Markdown tables.
 
-The block list styling introduced in PR #23908 should become the visual baseline for Markdown tables everywhere they render in Rook, including Markdown notebooks and the Markdown editor. This is a consistency and presentation change, not a redesign of Markdown table semantics or editing behavior.
+The block list styling introduced in PR #23908 should become the visual baseline for Markdown tables everywhere they render in Polaris Terminal, including Markdown notebooks and the Markdown editor. This is a consistency and presentation change, not a redesign of Markdown table semantics or editing behavior.
 
 ## Problem
-Rook currently renders the same Markdown table with noticeably different visual treatments depending on where the user sees it.
+Polaris Terminal currently renders the same Markdown table with noticeably different visual treatments depending on where the user sees it.
 
 After PR #23908, AI block list tables use a lighter, blockless presentation based on the House of Agents design: no outer container, no full border, no vertical dividers, no filled header row, and more typography-driven hierarchy. Other Markdown-rendering surfaces still use the older table treatment, which creates visible inconsistency in:
 
@@ -19,15 +19,15 @@ After PR #23908, AI block list tables use a lighter, blockless presentation base
 - background fills
 - overall visual weight
 
-This makes the same Markdown content feel like different components in different parts of the product. Users moving between notebooks, the Markdown editor, AI documents, comment editors, file notebooks, and AI output should not have to mentally re-parse the same table because Rook styled it differently in each surface.
+This makes the same Markdown content feel like different components in different parts of the product. Users moving between notebooks, the Markdown editor, AI documents, comment editors, file notebooks, and AI output should not have to mentally re-parse the same table because Polaris Terminal styled it differently in each surface.
 
 ## Goals
-- Make rendered Markdown tables in every current Rook Markdown-rendering surface match the visual treatment now used in the AI block list.
+- Make rendered Markdown tables in every current Polaris Terminal Markdown-rendering surface match the visual treatment now used in the AI block list.
 - Treat the merged block list styling from PR #23908 as the visual source of truth for this work.
 - Preserve existing Markdown table semantics, supported inline formatting, alignment rules, and editability.
 - Preserve existing selection, cursor, link, copy, and scrolling behavior unless a change is required to achieve the styling consistency.
-- Ensure the same Markdown table feels like the same component across all Rook Markdown-rendering surfaces.
-- Ensure future Rook surfaces that adopt Markdown table rendering inherit this same style by default rather than introducing another table treatment.
+- Ensure the same Markdown table feels like the same component across all Polaris Terminal Markdown-rendering surfaces.
+- Ensure future Polaris Terminal surfaces that adopt Markdown table rendering inherit this same style by default rather than introducing another table treatment.
 
 ## Non-goals
 - Changing Markdown table parsing rules or supported syntax.
@@ -35,14 +35,14 @@ This makes the same Markdown content feel like different components in different
 - Changing block list table styling again as part of this work.
 - Redesigning non-table Markdown blocks.
 - Converting non-table text into tables.
-- Broadly restyling every table-like UI in Rook outside Markdown-rendered tables.
+- Broadly restyling every table-like UI in Polaris Terminal outside Markdown-rendered tables.
 
 ## Figma / design references
 - Figma: House of Agents — https://www.figma.com/design/CsBdBW4YoLgSAbr5eSkwV6/House-of-Agents?node-id=7451-99490&t=NvrWl7bhDEC5kpKF-1
 - PR baseline: https://github.com/warpdotdev/warp-internal/pull/23908
 - Existing related spec: `specs/blocklist-markdown-table-rendering/PRODUCT.md`
 
-The Figma node shows the blockless table treatment that now exists in the AI block list and should be reused for Markdown tables across Rook.
+The Figma node shows the blockless table treatment that now exists in the AI block list and should be reused for Markdown tables across Polaris Terminal.
 
 ## User experience
 
@@ -53,21 +53,21 @@ This feature applies to rendered GitHub Flavored Markdown tables in:
 - file notebooks and other rendered Markdown file views
 - AI documents and other notebook-backed planning/editor surfaces
 - Markdown comment editors and other lightweight rendered Markdown editors
-- any other current or future Rook surface that renders Markdown tables through the shared Markdown rendering stack or through a dedicated Markdown table renderer
+- any other current or future Polaris Terminal surface that renders Markdown tables through the shared Markdown rendering stack or through a dedicated Markdown table renderer
 
-If a Rook surface renders a valid Markdown table as a table, it should adopt the updated styling described here.
+If a Polaris Terminal surface renders a valid Markdown table as a table, it should adopt the updated styling described here.
 
 This feature does not change the appearance of raw Markdown source when the user is viewing or editing literal source text rather than a rendered table presentation.
 
 ### Visual consistency rule
 The user-visible rule is simple:
 
-The same valid Markdown table should look materially the same in the AI block list and in every other Rook surface that renders Markdown tables.
+The same valid Markdown table should look materially the same in the AI block list and in every other Polaris Terminal surface that renders Markdown tables.
 
 The goal is not approximate similarity. The goal is one shared visual treatment for Markdown-rendered tables across these surfaces.
 
 ### Styling invariants
-Rendered Markdown tables in all Rook Markdown-rendering surfaces should adopt the same structural styling introduced for block list tables in PR #23908.
+Rendered Markdown tables in all Polaris Terminal Markdown-rendering surfaces should adopt the same structural styling introduced for block list tables in PR #23908.
 
 That means:
 
@@ -180,12 +180,12 @@ The updated style should apply consistently to:
 Users should not have to migrate or rewrite table Markdown to get the new treatment.
 
 ## Success criteria
-- A Markdown table rendered in any current Rook Markdown-rendering surface uses the same blockless styling pattern as the AI block list table from PR #23908.
-- Rook no longer shows two competing visual treatments for rendered Markdown tables across its current Markdown surfaces.
+- A Markdown table rendered in any current Polaris Terminal Markdown-rendering surface uses the same blockless styling pattern as the AI block list table from PR #23908.
+- Polaris Terminal no longer shows two competing visual treatments for rendered Markdown tables across its current Markdown surfaces.
 - Other Markdown-rendering surfaces no longer show the older table chrome such as a full outer border, vertical dividers, zebra striping, or a filled header background.
 - Header rows remain visually distinct through typography and text color rather than heavy background treatment.
 - Body rows use secondary text color and subtle horizontal separators, matching the block list treatment.
-- The same Markdown table shown in the AI block list and in other Rook Markdown-rendering surfaces looks materially identical aside from surface-specific typography or layout constraints.
+- The same Markdown table shown in the AI block list and in other Polaris Terminal Markdown-rendering surfaces looks materially identical aside from surface-specific typography or layout constraints.
 - Alignment behavior remains correct for left-, center-, and right-aligned columns.
 - Inline Markdown inside cells continues to render correctly.
 - Editing and selection behavior in editable Markdown surfaces does not regress.
@@ -209,4 +209,4 @@ Users should not have to migrate or rewrite table Markdown to get the new treatm
 - Screenshot-based review confirming that the editor-backed result is visually consistent with the merged block list result.
 
 ## Open questions
-None currently. New Rook surfaces that render Markdown tables should inherit this style by default.
+None currently. New Polaris Terminal surfaces that render Markdown tables should inherit this style by default.

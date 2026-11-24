@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use rook_core::telemetry::TelemetryEvent as _;
+use pterm_core::telemetry::TelemetryEvent as _;
 use serde_json::json;
 
 use super::{

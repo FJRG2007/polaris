@@ -1,11 +1,11 @@
 use pathfinder_color::ColorU;
-use rookui_core::elements::{
+use ptermui_core::elements::{
     Align, Border, ConstrainedBox, Container, CornerRadius, Hoverable, Icon, ListIndentLevel,
     MouseStateHandle, Radius, Rect,
 };
-use rookui_core::geometry::vector::vec2f;
-use rookui_core::platform::Cursor;
-use rookui_core::{AppContext, Element, SizeConstraint, WeakViewHandle};
+use ptermui_core::geometry::vector::vec2f;
+use ptermui_core::platform::Cursor;
+use ptermui_core::{AppContext, Element, SizeConstraint, WeakViewHandle};
 
 use super::paint::RenderContext;
 use super::placeholder::{self, BlockPlaceholder};
@@ -106,8 +106,8 @@ impl RenderableBlock for RenderableTaskList {
     fn layout(
         &mut self,
         model: &RenderState,
-        ctx: &mut rookui_core::LayoutContext,
-        app: &rookui_core::AppContext,
+        ctx: &mut ptermui_core::LayoutContext,
+        app: &ptermui_core::AppContext,
     ) {
         self.task_list_icon.layout(
             SizeConstraint::strict(vec2f(self.icon_size, self.icon_size)),
@@ -143,7 +143,7 @@ impl RenderableBlock for RenderableTaskList {
         &mut self,
         model: &RenderState,
         ctx: &mut RenderContext,
-        app: &rookui_core::AppContext,
+        app: &ptermui_core::AppContext,
     ) {
         let content = model.content();
         let task_list = extract_block!(self.viewport_item, content, (block, BlockItem::TaskList{ paragraph: inner, ..}) => block.task_list(inner));
@@ -176,8 +176,8 @@ impl RenderableBlock for RenderableTaskList {
     fn dispatch_event(
         &mut self,
         _model: &crate::render::model::RenderState,
-        event: &rookui_core::event::DispatchedEvent,
-        ctx: &mut rookui_core::EventContext,
+        event: &ptermui_core::event::DispatchedEvent,
+        ctx: &mut ptermui_core::EventContext,
         app: &AppContext,
     ) -> bool {
         self.task_list_icon.dispatch_event(event, ctx, app)

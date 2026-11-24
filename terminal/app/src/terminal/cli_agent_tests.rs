@@ -4,9 +4,9 @@ use std::sync::Arc;
 use ai::skills::SkillProvider;
 use chrono::Local;
 use pathfinder_color::ColorU;
-use rook_editor::render::model::LineCount;
-use rook_util::path::EscapeChar;
-use rookui::App;
+use pterm_editor::render::model::LineCount;
+use pterm_util::path::EscapeChar;
+use ptermui::App;
 use smol_str::SmolStr;
 
 use super::{
@@ -271,9 +271,9 @@ fn test_detect_known_agents() {
                 ("omp", CLIAgent::OhMyPi),
                 ("grok", CLIAgent::Grok),
                 ("muse", CLIAgent::Muse),
-                ("rook", CLIAgent::RookTui),
-                ("rook-dev", CLIAgent::RookTui),
-                ("./script/run-tui", CLIAgent::RookTui),
+                ("polaris-terminal", CLIAgent::PtermTui),
+                ("polaris-terminal-dev", CLIAgent::PtermTui),
+                ("./script/run-tui", CLIAgent::PtermTui),
             ] {
                 assert_eq!(
                     CLIAgent::detect(command, None, None, ctx),
@@ -727,81 +727,85 @@ fn test_oh_my_pi_supports_bash_mode() {
 }
 
 #[test]
-fn test_rook_tui_matches_binaries_and_launchers() {
+fn test_pterm_tui_matches_binaries_and_launchers() {
     // Direct binary names.
-    assert!(CLIAgent::RookTui.matches_command("rook", None));
-    assert!(CLIAgent::RookTui.matches_command("rook-preview", None));
-    assert!(CLIAgent::RookTui.matches_command("rook-dev", None));
-    assert!(CLIAgent::RookTui.matches_command("rook-tui", None));
-    assert!(CLIAgent::RookTui.matches_command("rook-tui-oss", None));
+    assert!(CLIAgent::PtermTui.matches_command("polaris-terminal", None));
+    assert!(CLIAgent::PtermTui.matches_command("polaris-terminal-preview", None));
+    assert!(CLIAgent::PtermTui.matches_command("polaris-terminal-dev", None));
+    assert!(CLIAgent::PtermTui.matches_command("polaris-terminal-tui", None));
+    assert!(CLIAgent::PtermTui.matches_command("polaris-terminal-tui-oss", None));
     // The dev launcher script.
-    assert!(CLIAgent::RookTui.matches_command("./script/run-tui", None));
-    assert!(CLIAgent::RookTui.matches_command("script/run-tui", None));
+    assert!(CLIAgent::PtermTui.matches_command("./script/run-tui", None));
+    assert!(CLIAgent::PtermTui.matches_command("script/run-tui", None));
     // Absolute / relative paths to the binary.
-    assert!(CLIAgent::RookTui.matches_command("/workspace/rook/target/debug/rook-tui", None,));
-    assert!(CLIAgent::RookTui.matches_command("./target/debug/rook-tui", None));
-    assert!(CLIAgent::RookTui.matches_command(
-        "/Applications/RookPreview.app/Contents/MacOS/rook-preview --resume abc",
+    assert!(CLIAgent::PtermTui.matches_command(
+        "/workspace/polaris-terminal/target/debug/polaris-terminal-tui",
+        None,
+    ));
+    assert!(CLIAgent::PtermTui.matches_command("./target/debug/polaris-terminal-tui", None));
+    assert!(CLIAgent::PtermTui.matches_command(
+        "/Applications/PolarisTerminalPreview.app/Contents/MacOS/polaris-terminal-preview --resume abc",
         None,
     ));
     // With arguments and leading whitespace.
-    assert!(CLIAgent::RookTui.matches_command("  rook --resume abc", None));
+    assert!(CLIAgent::PtermTui.matches_command("  polaris-terminal --resume abc", None));
 }
 
 #[test]
-fn test_rook_tui_matches_with_env_var_prefix() {
+fn test_pterm_tui_matches_with_env_var_prefix() {
     // Env-var assignments before the command are skipped when an escape char is
     // provided (mirrors `CLIAgent::detect`).
-    assert!(
-        CLIAgent::RookTui.matches_command("ROOK_API_KEY=secret rook", Some(EscapeChar::Backslash),)
-    );
+    assert!(CLIAgent::PtermTui.matches_command(
+        "POLARIS_TERMINAL_API_KEY=secret polaris-terminal",
+        Some(EscapeChar::Backslash),
+    ));
 }
 
 #[test]
-fn test_rook_tui_does_not_match_other_commands() {
-    assert!(!CLIAgent::RookTui.matches_command("vim", None));
-    assert!(!CLIAgent::RookTui.matches_command("htop", None));
-    assert!(!CLIAgent::RookTui.matches_command("claude", None));
+fn test_pterm_tui_does_not_match_other_commands() {
+    assert!(!CLIAgent::PtermTui.matches_command("vim", None));
+    assert!(!CLIAgent::PtermTui.matches_command("htop", None));
+    assert!(!CLIAgent::PtermTui.matches_command("claude", None));
     // Lookalikes / substrings should not match.
-    assert!(!CLIAgent::RookTui.matches_command("rook-preview-wrapper", None));
-    assert!(!CLIAgent::RookTui.matches_command("myrook-dev", None));
-    assert!(!CLIAgent::RookTui.matches_command("rook-tui-wrapper", None));
-    assert!(!CLIAgent::RookTui.matches_command("myrook-tui", None));
-    assert!(!CLIAgent::RookTui.matches_command("", None));
+    assert!(!CLIAgent::PtermTui.matches_command("polaris-terminal-preview-wrapper", None));
+    assert!(!CLIAgent::PtermTui.matches_command("mypterm-dev", None));
+    assert!(!CLIAgent::PtermTui.matches_command("polaris-terminal-tui-wrapper", None));
+    assert!(!CLIAgent::PtermTui.matches_command("mypterm-tui", None));
+    assert!(!CLIAgent::PtermTui.matches_command("", None));
     // `cargo run` is a known non-match (the first token is `cargo`).
-    assert!(!CLIAgent::RookTui.matches_command("cargo run -p rook_tui", None));
+    assert!(!CLIAgent::PtermTui.matches_command("cargo run -p pterm_tui", None));
 }
 
 #[test]
-fn test_rook_tui_variant_properties() {
+fn test_pterm_tui_variant_properties() {
     assert!(CLIAgent::Claude.supports_cli_agent_footer());
-    assert_eq!(CLIAgent::RookTui.command_prefix(), "rook");
+    assert_eq!(CLIAgent::PtermTui.command_prefix(), "polaris-terminal");
     assert_eq!(
-        CLIAgent::RookTui.command_prefixes(),
+        CLIAgent::PtermTui.command_prefixes(),
         &[
-            "rook",
-            "rook-preview",
-            "rook-dev",
-            "rook-tui",
-            "rook-tui-oss",
+            "polaris-terminal",
+            "polaris-terminal-preview",
+            "polaris-terminal-dev",
+            "polaris-terminal-tui",
+            "polaris-terminal-tui-oss",
             "run-tui",
         ]
     );
-    assert_eq!(CLIAgent::RookTui.display_name(), "Rook TUI");
-    assert_eq!(CLIAgent::RookTui.brand_color(), Some(ColorU::black()));
-    assert_eq!(CLIAgent::RookTui.icon(), Some(Icon::Rook));
-    assert_eq!(CLIAgent::RookTui.brand_icon_color(), ColorU::white());
-    assert!(CLIAgent::RookTui.supported_skill_providers().is_empty());
-    assert!(!CLIAgent::RookTui.supports_bash_mode());
-    assert!(!CLIAgent::RookTui.supports_cli_agent_footer());
+    assert_eq!(CLIAgent::PtermTui.display_name(), "Polaris Terminal TUI");
+    assert_eq!(CLIAgent::PtermTui.brand_color(), Some(ColorU::black()));
+    assert_eq!(CLIAgent::PtermTui.icon(), Some(Icon::Pterm));
+    assert_eq!(CLIAgent::PtermTui.brand_icon_color(), ColorU::white());
+    assert!(CLIAgent::PtermTui.supported_skill_providers().is_empty());
+    assert!(!CLIAgent::PtermTui.supports_bash_mode());
+    assert!(!CLIAgent::PtermTui.supports_cli_agent_footer());
     assert!(matches!(
-        crate::server::telemetry::CLIAgentType::from(CLIAgent::RookTui),
-        crate::server::telemetry::CLIAgentType::RookTui
+        crate::server::telemetry::CLIAgentType::from(CLIAgent::PtermTui),
+        crate::server::telemetry::CLIAgentType::PtermTui
     ));
     // Serialized name round-trips (also covered by
     // `test_serialized_name_round_trips_known_agents`, asserted explicitly here).
     assert_eq!(
-        CLIAgent::from_serialized_name(&CLIAgent::RookTui.to_serialized_name()),
-        CLIAgent::RookTui
+        CLIAgent::from_serialized_name(&CLIAgent::PtermTui.to_serialized_name()),
+        CLIAgent::PtermTui
     );
 }

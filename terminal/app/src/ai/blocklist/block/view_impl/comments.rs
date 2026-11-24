@@ -1,11 +1,11 @@
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     Axis, Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Expanded, Flex, Hoverable, MouseState, ParentElement, Radius, Text, Wrap, WrapFillEntireRun,
 };
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::ai::agent::comment::ReviewComment;
 use crate::ai::agent::icons::addressed_comment_icon;
@@ -163,7 +163,7 @@ fn comment_icon(is_addressed: bool, appearance: &Appearance) -> Box<dyn Element>
         addressed_comment_icon(appearance).finish()
     } else {
         Icon::MessageText
-            .to_rookui_icon(
+            .to_ptermui_icon(
                 appearance
                     .theme()
                     .sub_text_color(appearance.theme().background()),

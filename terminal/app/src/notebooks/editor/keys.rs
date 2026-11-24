@@ -1,6 +1,6 @@
 //! Utilities for notebook keybindings.
 
-use rookui::{Entity, ModelContext, ModelHandle, SingletonEntity};
+use ptermui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier};
 use crate::util::bindings::{

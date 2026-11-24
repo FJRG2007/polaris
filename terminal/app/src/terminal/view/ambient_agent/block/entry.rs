@@ -1,15 +1,15 @@
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, Hoverable, MainAxisSize, MouseStateHandle,
     ParentElement, Shrinkable, Text,
 };
-use rookui::fonts::Properties;
-use rookui::platform::Cursor;
-use rookui::prelude::Empty;
-use rookui::text_layout::ClipConfig;
-use rookui::{
+use ptermui::fonts::Properties;
+use ptermui::platform::Cursor;
+use ptermui::prelude::Empty;
+use ptermui::text_layout::ClipConfig;
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakModelHandle,
 };
@@ -260,7 +260,7 @@ impl View for AmbientAgentEntryBlock {
                 )
                 .with_color(theme.main_text_color(theme.background()).into_solid())
                 .with_style(Properties {
-                    weight: rookui::fonts::Weight::Bold,
+                    weight: ptermui::fonts::Weight::Bold,
                     ..Default::default()
                 })
                 .soft_wrap(false)
@@ -304,7 +304,7 @@ impl View for AmbientAgentEntryBlock {
             .with_child(
                 ConstrainedBox::new(
                     Icon::ChevronRight
-                        .to_rookui_icon(theme.sub_text_color(theme.background()))
+                        .to_ptermui_icon(theme.sub_text_color(theme.background()))
                         .finish(),
                 )
                 .with_height(20.)

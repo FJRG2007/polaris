@@ -9,10 +9,10 @@ use aws_credential_types::provider::error::CredentialsError;
 use futures::channel::oneshot::channel;
 use futures::future::BoxFuture;
 use parking_lot::FairMutex;
-use rook_errors::report_error;
-use rook_managed_secrets::ManagedSecretManager;
-use rook_managed_secrets::client::IdentityTokenOptions;
-use rookui::{ModelContext, ModelHandle, SingletonEntity};
+use pterm_errors::report_error;
+use pterm_managed_secrets::ManagedSecretManager;
+use pterm_managed_secrets::client::IdentityTokenOptions;
+use ptermui::{ModelContext, ModelHandle, SingletonEntity};
 use tokio::sync::Mutex;
 use vec1::vec1;
 
@@ -96,7 +96,7 @@ pub(crate) fn aws_role_session_name(run_id: &str) -> String {
 }
 
 /// Cached STS client for OIDC credential refreshes -- cached on the last region used.
-/// (in practice, there should only ever be 1 region used per rook app lifetime)
+/// (in practice, there should only ever be 1 region used per polaris-terminal app lifetime)
 ///
 /// `AssumeRoleWithWebIdentity` is unauthenticated (the web identity token is the
 /// credential), so we skip the default credentials chain via `no_credentials()`

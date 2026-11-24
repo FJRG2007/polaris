@@ -5,17 +5,17 @@
 macro_rules! send_telemetry_sync_from_ctx {
     ($event:expr_2021, $ctx:expr_2021) => {
         #[allow(unused_imports)]
-        use rook_core::telemetry::TelemetryEvent as _;
+        use pterm_core::telemetry::TelemetryEvent as _;
         let event = $event;
         if event.enablement_state().is_enabled() {
             let server_api =
-                <$crate::server::server_api::ServerApiProvider as rookui::SingletonEntity>::handle(
+                <$crate::server::server_api::ServerApiProvider as ptermui::SingletonEntity>::handle(
                     $ctx,
                 )
                 .as_ref($ctx)
                 .get();
             let privacy_settings_snapshot =
-                <$crate::settings::PrivacySettings as rookui::SingletonEntity>::handle($ctx)
+                <$crate::settings::PrivacySettings as ptermui::SingletonEntity>::handle($ctx)
                     .as_ref($ctx)
                     .get_snapshot($ctx);
             let _ = $ctx.spawn(
@@ -40,16 +40,16 @@ macro_rules! send_telemetry_sync_from_ctx {
 macro_rules! send_telemetry_sync_from_app_ctx {
     ($event:expr_2021, $app_ctx:expr_2021) => {
         #[allow(unused_imports)]
-        use rook_core::telemetry::TelemetryEvent as _;
+        use pterm_core::telemetry::TelemetryEvent as _;
         if $event.enablement_state().is_enabled() {
             let server_api =
-                <$crate::server::server_api::ServerApiProvider as rookui::SingletonEntity>::handle(
+                <$crate::server::server_api::ServerApiProvider as ptermui::SingletonEntity>::handle(
                     $app_ctx,
                 )
                 .as_ref($app_ctx)
                 .get();
             let privacy_settings_snapshot =
-                <$crate::settings::PrivacySettings as rookui::SingletonEntity>::handle($app_ctx)
+                <$crate::settings::PrivacySettings as ptermui::SingletonEntity>::handle($app_ctx)
                     .as_ref($app_ctx)
                     .get_snapshot($app_ctx);
             $app_ctx
@@ -75,12 +75,12 @@ macro_rules! send_telemetry_sync_from_app_ctx {
 macro_rules! send_telemetry_on_executor {
     ($auth_state: expr_2021, $event:expr_2021, $executor:expr_2021) => {
         #[allow(unused_imports)]
-        use rook_core::telemetry::TelemetryEvent as _;
+        use pterm_core::telemetry::TelemetryEvent as _;
         let event = $event;
         if event.enablement_state().is_enabled() {
             let user_id = $auth_state.user_id().map(|uid| uid.as_string());
             let anonymous_id = $auth_state.anonymous_id();
-            rookui::record_telemetry_on_executor!(
+            ptermui::record_telemetry_on_executor!(
                 user_id,
                 anonymous_id,
                 event.name().into(),

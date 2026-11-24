@@ -4,10 +4,10 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::time::Duration;
 
-use rookui_core::integration::{self, PersistedDataMap, TestDriver, TestSetupUtils, TestStep};
-use rookui_core::{App, WindowId};
-use rookui_extras::user_preferences::UserPreferences;
-use rookui_extras::user_preferences::file_backed::FileBackedUserPreferences;
+use ptermui_core::integration::{self, PersistedDataMap, TestDriver, TestSetupUtils, TestStep};
+use ptermui_core::{App, WindowId};
+use ptermui_extras::user_preferences::UserPreferences;
+use ptermui_extras::user_preferences::file_backed::FileBackedUserPreferences;
 
 use crate::util::{ShellRcType, set_zsh_histfile_location, write_rc_files_for_test};
 
@@ -44,7 +44,7 @@ impl Builder {
         let tmp_fs = PathBuf::from(cargo_target_tmpdir::get());
         let mut builder = integration::Builder::new(tmp_fs).with_timeout(TEST_TIMEOUT);
 
-        if std::env::var("ROOKUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS").is_ok() {
+        if std::env::var("PTERMUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS").is_ok() {
             builder = builder.with_real_display();
         }
 
@@ -180,7 +180,10 @@ impl Builder {
 
             // Set the DISABLE_SAVE_ENV_VAR to make sure we don't write any keybinding changes to the
             // filesystem
-            utils.set_env(rook::keyboard::DISABLE_SAVE_ENV_VAR, Some("true"));
+            utils.set_env(
+                polaris_terminal::keyboard::DISABLE_SAVE_ENV_VAR,
+                Some("true"),
+            );
 
             // On Ubuntu (and possibly other Linux distros), a message is
             // printed out during shell initialization telling the user how to
@@ -200,7 +203,7 @@ impl Builder {
         // As part of initializing the test driver, $HOME gets set to a unique
         // temporary directory.  We can now construct a file containing any
         // initial user preferences that are needed for the test.
-        let file_path = rook::settings::user_preferences_file_path();
+        let file_path = polaris_terminal::settings::user_preferences_file_path();
         // Use println because logging may not have been initialized yet.
         println!("Initializing preferences file at {file_path:?}");
         let prefs = match FileBackedUserPreferences::new(file_path.clone()) {

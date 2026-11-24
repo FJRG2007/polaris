@@ -38,7 +38,7 @@ async fn probes_duration_after_timestamp_rescaling() {
     }
 
     let path = std::env::temp_dir().join(format!(
-        "rook-duration-probe-test-{}.mp4",
+        "polaris-terminal-duration-probe-test-{}.mp4",
         uuid::Uuid::new_v4()
     ));
     let output = Command::new("ffmpeg")

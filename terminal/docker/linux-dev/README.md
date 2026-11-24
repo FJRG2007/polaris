@@ -1,6 +1,6 @@
 # Dockerfile for Linux Development
 
-The Dockerfile in this directory defines a container that has all of the necessary tools installed to quickly get engineers up and running with building Rook on Linux.
+The Dockerfile in this directory defines a container that has all of the necessary tools installed to quickly get engineers up and running with building Polaris Terminal on Linux.
 
 This container is based on Debian Sid, Debian's unstable branch.  It ensures that you are running the latest versions of things like `mesa` (an open-source 3D graphics library, providing implementations of OpenGL and Vulkan).
 
@@ -19,7 +19,7 @@ You'll run all of these commands from the repository's root directory.
 First, build the docker container image:
 
 ```
-CONTAINER_NAME="rook-client-linux-dev"
+CONTAINER_NAME="polaris-terminal-client-linux-dev"
 docker build -t $CONTAINER_NAME docker/linux-dev
 ```
 
@@ -27,7 +27,7 @@ Next, run the container:
 
 ```
 # The path to the source code directory that you want to mount in the
-# container. This can be the `rook` repository or some parent
+# container. This can be the `polaris-terminal` repository or some parent
 # directory of your choice.
 LOCAL_PATH="/Users/$USER/src"
 
@@ -47,7 +47,7 @@ Every time you start XQuartz, you'll need to run this once in order for programs
 xhost +localhost
 ```
 
-You should be able to SSH into the container and build and run rook without any additional setup (dev account password is "password"):
+You should be able to SSH into the container and build and run polaris-terminal without any additional setup (dev account password is "password"):
 
 ```
 ssh dev@localhost
@@ -55,4 +55,4 @@ cd /src
 cargo run --features fast_dev
 ```
 
-It's possible you'll run into some odd errors while trying to compile Rook; if so, just keep rerunning the cargo command and it should work eventually.
+It's possible you'll run into some odd errors while trying to compile Polaris Terminal; if so, just keep rerunning the cargo command and it should work eventually.

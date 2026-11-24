@@ -9,7 +9,7 @@ The existing local-to-cloud handoff flow is discoverable through the footer chip
 - The `&` flow exposes environment selection before submission by reusing the same visual and interaction patterns as the existing cloud environment selector.
 - `/handoff query` starts the same auto-run behavior as `& query`; `/handoff` without a query activates `&` handoff-compose mode, same as the footer chip.
 - While `&` mode is active, the input is explicitly locked in AI mode so autodetection and shell-mode transitions cannot steal the prompt.
-- Auto-run submissions feel instant: once Rook opens and claims the cloud launch surface, the prompt leaves the editable input and the cloud pane shows a queued/starting state immediately, even if local handoff preparation is still finishing.
+- Auto-run submissions feel instant: once Polaris Terminal opens and claims the cloud launch surface, the prompt leaves the editable input and the cloud pane shows a queued/starting state immediately, even if local handoff preparation is still finishing.
 - The feature never silently drops the user's prompt or pending file/image attachments when handoff preparation fails.
 - Existing local-to-cloud handoff behavior remains available for users who want to review or edit before submitting.
 ## Non-goals
@@ -46,7 +46,7 @@ Figma: none provided.
 16. Normal prompt editing continues to work while in handoff-compose mode. Pending file/image attachments remain visible and editable until the prompt is submitted or the user removes them.
 ### Submitting `& query`
 17. Pressing Enter in handoff-compose mode with a non-empty prompt starts the cloud path. The user is not required to press Enter again in the cloud pane.
-18. After Rook opens and claims the destination cloud surface, auto-submit is optimistically queued immediately: the submitted prompt is owned by the pending launch state rather than hydrated into the destination editor, and the cloud pane moves into its queued/starting state before slower handoff preparation finishes.
+18. After Polaris Terminal opens and claims the destination cloud surface, auto-submit is optimistically queued immediately: the submitted prompt is owned by the pending launch state rather than hydrated into the destination editor, and the cloud pane moves into its queued/starting state before slower handoff preparation finishes.
 19. The submitted cloud prompt includes:
    - The prompt text without the leading `&`.
    - Pending file/image attachments.
@@ -61,11 +61,11 @@ Figma: none provided.
    - The source local agent view exits behind the cloud pane, matching the current handoff navigation behavior.
    - The cloud pane shows the source conversation history as the handoff context.
    - The prompt is optimistically queued as soon as the handoff pane is ready to own it, without appearing as editable destination input; the actual cloud run dispatch occurs automatically once the conversation fork, environment selection, and local snapshot preparation are ready.
-22. If the active local conversation is non-empty but currently running or blocked, submission is blocked. Rook shows a toast explaining that handoff can only start from an idle conversation, leaves the user in the source local agent view, and preserves the prompt and pending file/image attachments.
-23. If the active local conversation is non-empty and idle but cannot be handed off because it lacks synced cloud conversation identity, submission is blocked. Rook shows a toast, leaves the user in the source local agent view, and preserves the prompt and pending file/image attachments.
-24. If handoff preparation fails before a cloud pane exists, such as a failed conversation fork request, Rook stays in the source local agent view, shows a toast, and preserves the prompt and pending file/image attachments.
-25. If handoff preparation fails after a cloud pane has opened but before the cloud run is accepted by the server, Rook restores the prompt and pending file/image attachments into the handoff pane, shows a toast, returns the pane to a retryable compose state, and lets the user retry manually from that pane.
-26. Rook must not auto-start a non-empty local-to-cloud handoff without the intended local context. If the handoff cannot safely carry the forked conversation and usable prepared snapshot, it falls back to the retryable handoff pane state rather than silently starting a reduced-context cloud run.
+22. If the active local conversation is non-empty but currently running or blocked, submission is blocked. Polaris Terminal shows a toast explaining that handoff can only start from an idle conversation, leaves the user in the source local agent view, and preserves the prompt and pending file/image attachments.
+23. If the active local conversation is non-empty and idle but cannot be handed off because it lacks synced cloud conversation identity, submission is blocked. Polaris Terminal shows a toast, leaves the user in the source local agent view, and preserves the prompt and pending file/image attachments.
+24. If handoff preparation fails before a cloud pane exists, such as a failed conversation fork request, Polaris Terminal stays in the source local agent view, shows a toast, and preserves the prompt and pending file/image attachments.
+25. If handoff preparation fails after a cloud pane has opened but before the cloud run is accepted by the server, Polaris Terminal restores the prompt and pending file/image attachments into the handoff pane, shows a toast, returns the pane to a retryable compose state, and lets the user retry manually from that pane.
+26. Polaris Terminal must not auto-start a non-empty local-to-cloud handoff without the intended local context. If the handoff cannot safely carry the forked conversation and usable prepared snapshot, it falls back to the retryable handoff pane state rather than silently starting a reduced-context cloud run.
 27. Once the destination cloud surface claims an auto-submit launch, the source input no longer shows the submitted prompt or pending attachments. If the launch later fails before the server accepts the cloud run, the prompt and attachments are restored in the destination pane rather than the source input.
 28. Closing a cloud pane while auto-start preparation is still in progress cancels that pending auto-start from the user's perspective. The source local conversation is unaffected.
 ### `/handoff`

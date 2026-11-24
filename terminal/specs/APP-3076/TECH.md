@@ -32,7 +32,7 @@ The implementation needs to satisfy four constraints at once:
 - `ui/src/elements/table/mod.rs (117-240)` — shared `Table`, `TableConfig`, and column sizing API
 - `ui/src/elements/table/mod.rs (517-980)` — `Table` layout behavior, including intrinsic measurement and viewport sizing
 - `ui/src/elements/table/mod.rs (1002-1478)` — selection and scroll behavior for the shared table element
-- `rook_core/src/features.rs` — `FeatureFlag` definitions and dogfood/default channel enablement
+- `pterm_core/src/features.rs` — `FeatureFlag` definitions and dogfood/default channel enablement
 
 ## Current State
 
@@ -67,10 +67,10 @@ Those defaults are reasonable for a general-purpose scrollable table, but not fo
 ## Proposed Changes
 
 ### 0. Gate the feature behind `BlocklistMarkdownTableRendering`
-Add a dedicated feature flag named `BlocklistMarkdownTableRendering` and wire it through the normal Rook feature-flag plumbing:
+Add a dedicated feature flag named `BlocklistMarkdownTableRendering` and wire it through the normal Polaris Terminal feature-flag plumbing:
 - add `blocklist_markdown_table_rendering` to `app/Cargo.toml`
 - map that Cargo feature to `FeatureFlag::BlocklistMarkdownTableRendering` in `app/src/lib.rs`
-- add the new enum variant in `rook_core/src/features.rs`
+- add the new enum variant in `pterm_core/src/features.rs`
 - enable it by default for dogfood builds via `DOGFOOD_FLAGS`
 
 The new structured table rendering should only activate when this flag is enabled. When disabled, AI block list responses should continue to detect tables and render them with the pre-feature monospace scrollable table block.
@@ -197,8 +197,8 @@ This keeps find behavior aligned with the rendered content while leaving clipboa
 3. When it encounters a candidate table region, it collects the raw Markdown block and hands it to a shared `markdown_parser` helper.
 4. The parser returns a `FormattedTable`.
 5. The block list stores that as `AIAgentTextSection::Table { table: AgentOutputTable { markdown_source, table } }`.
-6. The block renderer sees the table section and builds a read-only RookUI `Table`.
-7. The RookUI table renders inline cell formatting via `FormattedTextElement`.
+6. The block renderer sees the table section and builds a read-only PtermUI `Table`.
+7. The PtermUI table renders inline cell formatting via `FormattedTextElement`.
 8. The block list wraps the table in a horizontal scroller only.
 9. Vertical scrolling stays with the surrounding block list.
 10. Block-level copy actions export `markdown_source`; selection copy comes from the rendered table elements.
@@ -224,7 +224,7 @@ This keeps find behavior aligned with the rendered content while leaving clipboa
 - Keep existing behavior as the default for current users of the component
 
 ### Phase 4: Block-list rendering
-- Replace the current monospace `render_table_section` with a structured renderer built on RookUI `Table`
+- Replace the current monospace `render_table_section` with a structured renderer built on PtermUI `Table`
 - Reuse current horizontal scroll handle plumbing
 - Match notebook table styling as closely as practical via block-list table theme helpers
 
@@ -281,7 +281,7 @@ Mitigation:
 - Add block-list find tests to verify searches match rendered cell text rather than Markdown syntax
 
 ### UI table tests
-- Add RookUI table tests for the new expand-to-content mode:
+- Add PtermUI table tests for the new expand-to-content mode:
   - no local vertical scroll behavior
   - full content height is returned
   - selection spans all rows because no rows are virtualized away

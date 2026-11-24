@@ -1,11 +1,11 @@
 ---
 name: terminal-tui-verify-change
-description: Verify a change to Rook's headless TUI front-end (crates/rook_tui) by running it — locally via ./script/run-tui, or in a headless cloud runner via a ROOK_API_KEY dogfood build — and reading the rendered screen back (under tmux when it's installed, otherwise directly). Use whenever you change TUI UI, rendering, input, or behavior and need to confirm the real on-screen result.
+description: Verify a change to Polaris Terminal's headless TUI front-end (crates/pterm_tui) by running it — locally via ./script/run-tui, or in a headless cloud runner via a POLARIS_TERMINAL_API_KEY dogfood build — and reading the rendered screen back (under tmux when it's installed, otherwise directly). Use whenever you change TUI UI, rendering, input, or behavior and need to confirm the real on-screen result.
 ---
 
 # terminal-tui-verify-change
-Verify a change to Rook's **headless TUI** front-end (`crates/rook_tui`, and the
-cell-grid element library in `crates/rookui_core/src/elements/tui`) by running it
+Verify a change to Polaris Terminal's **headless TUI** front-end (`crates/pterm_tui`, and the
+cell-grid element library in `crates/ptermui_core/src/elements/tui`) by running it
 and reading back the actual rendered screen.
 
 The whole point: **the TUI is a console program, so you can run it in a real
@@ -29,38 +29,38 @@ it in.
 ## When to use
 
 - You changed anything a TUI user sees or interacts with: an element/layout in
-  `crates/rookui_core/src/elements/tui`, a TUI view/screen in `crates/rook_tui`
+  `crates/ptermui_core/src/elements/tui`, a TUI view/screen in `crates/pterm_tui`
   (transcript, input, zero state, login placeholder, etc.), TUI keybindings, or
   TUI rendering/behavior.
 - You want to confirm the *actual* rendered result, not just that it compiles or
   a unit test passes.
 
-If your change is GUI-only (`app/`, RookUI pixel `Element`/`View`), this is the
+If your change is GUI-only (`app/`, PtermUI pixel `Element`/`View`), this is the
 wrong skill — use the GUI verification path instead.
 
 ## Local vs cloud verification (pick your context first)
 
 *How* you build, run, and log in depends on **where you're running**. Decide this
-up front — it determines whether you use `./script/run-tui` or the `ROOK_API_KEY`
+up front — it determines whether you use `./script/run-tui` or the `POLARIS_TERMINAL_API_KEY`
 path below.
 
 - **Local context** — you're working in a local dev checkout, typically
   alongside the user. Just run **`./script/run-tui`** directly: it builds
-  `rook_tui` and runs it, selecting the internal `local` channel when the
-  `rook-channel-config` generator is available and falling back to
-  `rook-tui-oss` otherwise. **Do not reach for `ROOK_API_KEY`** here — it's
+  `pterm_tui` and runs it, selecting the internal `local` channel when the
+  `polaris-terminal-channel-config` generator is available and falling back to
+  `polaris-terminal-tui-oss` otherwise. **Do not reach for `POLARIS_TERMINAL_API_KEY`** here — it's
   generally **not set** in a local environment, and you don't need it: a local
   build reaches the authenticated state through the normal interactive
   device-auth login flow (or you're already signed in on this machine). The
-  non-interactive `ROOK_API_KEY` login below is a *cloud-runner* affordance, not
+  non-interactive `POLARIS_TERMINAL_API_KEY` login below is a *cloud-runner* affordance, not
   a local one, so don't let a missing key block you locally.
 - **Cloud context** — you're a headless cloud agent (e.g. the factory-client
   runner) with no browser for device-auth, so reaching a **signed-in** surface
-  relies on the non-interactive `ROOK_API_KEY` already in the environment. That
-  does **not** mean bypassing `./script/run-tui`: when the `rook-channel-config`
+  relies on the non-interactive `POLARIS_TERMINAL_API_KEY` already in the environment. That
+  does **not** mean bypassing `./script/run-tui`: when the `polaris-terminal-channel-config`
   generator is available, `./script/run-tui` selects the internal `local`
-  binary; otherwise it falls back to `rook-tui-oss`. Both accept the inherited
-  `ROOK_API_KEY`, so prefer the maintained runner unless you need a specific
+  binary; otherwise it falls back to `polaris-terminal-tui-oss`. Both accept the inherited
+  `POLARIS_TERMINAL_API_KEY`, so prefer the maintained runner unless you need a specific
   binary or profile. In the cloud, the inherited key signs you in without the
   browser device-auth flow.
 
@@ -70,18 +70,18 @@ context.
 
 ## Step 1 — Build the TUI
 
-Always build with a small job count so the large `rook` dependency tree doesn't
+Always build with a small job count so the large `polaris-terminal` dependency tree doesn't
 OOM the machine:
 
 ```bash
-cd <rook-repo-root>
-CARGO_BUILD_JOBS=2 cargo build -p rook_tui --bin rook-tui-oss
+cd <polaris-terminal-repo-root>
+CARGO_BUILD_JOBS=2 cargo build -p pterm_tui --bin polaris-terminal-tui-oss
 ```
 
-- `rook-tui-oss` is the OSS channel binary and the safest default (no internal
-  `rook-channel-config` generator required). `./script/run-tui` does the
+- `polaris-terminal-tui-oss` is the OSS channel binary and the safest default (no internal
+  `polaris-terminal-channel-config` generator required). `./script/run-tui` does the
   equivalent, selecting the internal `local` binary when the generator is
-  available and falling back to `rook-tui-oss` otherwise.
+  available and falling back to `polaris-terminal-tui-oss` otherwise.
 - Fix all compile errors before running (see `fix-errors`). The first build of
   this tree takes a while; **incremental rebuilds after a one-line change are
   fast (~10s)**, so the edit → rebuild → re-capture loop below is quick.
@@ -95,12 +95,12 @@ The login-gated root has three pre-session states you may see:
 - `AwaitingLogin` → a centered placeholder that reads `Sign in to continue`,
   then `Opening your browser…` (or, once the device code is known, `Open <uri> in
   your browser` and `and enter code: <code>`). It does **not** show a Ctrl-C hint.
-- `LoggedIn` → briefly `Starting terminal…`, then the **zero state** (`Rook
+- `LoggedIn` → briefly `Starting terminal…`, then the **zero state** (`Polaris Terminal
   Agent` + version, a "What's new" list, and the project context section) with the
   input view.
 - `Failed` → `Login failed: <message>` followed by `Press Ctrl-C to exit.`
 
-(Exact strings live in `crates/rook_tui/src/ui.rs` — verify against it if you're
+(Exact strings live in `crates/pterm_tui/src/ui.rs` — verify against it if you're
 asserting on placeholder text.)
 
 So: if your change is on the **login placeholder** or a pure element/layout, the
@@ -109,43 +109,43 @@ transcript / input** surface, you must reach the authenticated state (see the
 next section), or your change will sit behind the login gate and you'll only ever
 see `Sign in to continue`.
 
-### Logging in non-interactively (`ROOK_API_KEY`) — cloud context
+### Logging in non-interactively (`POLARIS_TERMINAL_API_KEY`) — cloud context
 
 **This is the cloud path.** In a local checkout, skip it: run `./script/run-tui`
 and log in interactively (see **Local vs cloud verification** above), since
-`ROOK_API_KEY` usually isn't set locally. Use the flow here when you're a
+`POLARIS_TERMINAL_API_KEY` usually isn't set locally. Use the flow here when you're a
 headless cloud runner where the key *is* set and there's no browser for
 device-auth.
 
 You can reach the authenticated (`LoggedIn`) state headlessly — no browser, no
-device-auth flow — by launching any TUI channel binary with a `ROOK_API_KEY` in
+device-auth flow — by launching any TUI channel binary with a `POLARIS_TERMINAL_API_KEY` in
 the environment. This is the fast way to verify live terminal/transcript/input
 changes.
 
 Key constraints:
 
-- **All channels are supported.** API-key login works with `rook-tui-oss` as
+- **All channels are supported.** API-key login works with `polaris-terminal-tui-oss` as
   well as the Preview, Dev, Local, and Stable binaries.
 - **The key must already be in the environment.** In a sandbox where
-  `ROOK_API_KEY` is set, a freshly started `tmux` server inherits it. Never echo,
+  `POLARIS_TERMINAL_API_KEY` is set, a freshly started `tmux` server inherits it. Never echo,
   print, or inline the secret value in a command — just rely on the inherited
   environment variable. (`--api-key <key>` on the command line also works but
   would expose the secret, so prefer the env var.)
 
 ```bash
-cd <rook-repo-root>
-CARGO_BUILD_JOBS=2 cargo build -p rook_tui --bin rook-tui-oss
+cd <polaris-terminal-repo-root>
+CARGO_BUILD_JOBS=2 cargo build -p pterm_tui --bin polaris-terminal-tui-oss
 tmux kill-session -t tuicheck 2>/dev/null
-# ROOK_API_KEY is inherited from the environment by the new tmux server.
-tmux new-session -d -s tuicheck -x 120 -y 40 './target/debug/rook-tui-oss'
+# POLARIS_TERMINAL_API_KEY is inherited from the environment by the new tmux server.
+tmux new-session -d -s tuicheck -x 120 -y 40 './target/debug/polaris-terminal-tui-oss'
 sleep 20                                      # login + session start
 tmux capture-pane -t tuicheck -p              # expect the logged-in zero state
 ```
 
-When it works you'll see the **zero state** (`Rook Agent` + input view + model
+When it works you'll see the **zero state** (`Polaris Terminal Agent` + input view + model
 selector) instead of `Sign in to continue`, and you can `send-keys` a real prompt
 and read the agent's reply back with `capture-pane`. (This login path was added
-in FJRG2007/rook#13583.)
+in FJRG2007/polaris#13583.)
 
 ## Step 2 — Run under tmux and read the frame back
 
@@ -155,9 +155,9 @@ in a detached session with an explicit size (don't skip `-x`/`-y`; a degenerate
 1-row pane renders nothing useful):
 
 ```bash
-cd <rook-repo-root>
+cd <polaris-terminal-repo-root>
 tmux kill-session -t tuicheck 2>/dev/null   # clear any prior run
-tmux new-session -d -s tuicheck -x 120 -y 40 './target/debug/rook-tui-oss'
+tmux new-session -d -s tuicheck -x 120 -y 40 './target/debug/polaris-terminal-tui-oss'
 sleep 1                                       # let it draw + probe the terminal
 tmux capture-pane -t tuicheck -p              # <-- the rendered screen, as text
 ```
@@ -195,7 +195,7 @@ back:
   what renders. Installing tmux is optional, not a prerequisite.
 - **Cloud / no-tmux context:** run the built binary inside another PTY wrapper so
   you can still capture output — e.g. `script` (util-linux):
-  `script -qe -c './target/debug/rook-tui-oss' /tmp/tui.log`, then read
+  `script -qe -c './target/debug/polaris-terminal-tui-oss' /tmp/tui.log`, then read
   `/tmp/tui.log`. If tmux is installable in your environment
   (`apt-get install -y tmux`) and that's cheaper, do that and use the flow above
   instead. If none of these work, run the binary directly, capture whatever
@@ -208,7 +208,7 @@ is identical whether or not tmux drove the run.
 ### Iterate loop
 
 Because incremental rebuilds are ~10s, iterate tightly: edit the TUI code →
-`cargo build -p rook_tui --bin rook-tui-oss` → `tmux kill-session` + restart the
+`cargo build -p pterm_tui --bin polaris-terminal-tui-oss` → `tmux kill-session` + restart the
 session → `capture-pane` and compare. Verified before/after example: changing the
 login placeholder string and rebuilding flips the captured line from
 `Sign in to continue` to the new text, visible directly in `capture-pane` output.
@@ -226,9 +226,9 @@ if the expected text isn't in the capture, the change isn't rendering.
   tmux as above.
 - **If it exits (code 101) right after the first frame instead of staying up:**
   don't assume it's a terminal/stdin problem — **check the TUI log first**:
-  `tail -40 ~/.local/state/rook-terminal-tui/oz/rook-tui.log`. One cause seen in
+  `tail -40 ~/.local/state/polaris-terminal-terminal-tui/oz/polaris-terminal-tui.log`. One cause seen in
   the headless OSS/logged-out sandbox build is a debug-only binding-validation
-  panic: `crates/rookui_core/src/keymap/matcher.rs` (`validate_bindings`, gated on
+  panic: `crates/ptermui_core/src/keymap/matcher.rs` (`validate_bindings`, gated on
   `#[cfg(debug_assertions)]`) panics with `Bindings failed validation` when a
   *keystroke* binding matches a TUI keymap context without being TUI-owned (it was
   `app:reopen_closed_session`, Ctrl+Alt+T). It does **not** reproduce in every
@@ -238,13 +238,13 @@ if the expected text isn't in the capture, the change isn't rendering.
   change:
   - **Build `--release`** — the validator is compiled out, so the TUI stays up
     and you can `send-keys`/`capture-pane` freely:
-    `cargo build --release -p rook_tui --bin rook-tui-oss` then run
-    `./target/release/rook-tui-oss`.
+    `cargo build --release -p pterm_tui --bin polaris-terminal-tui-oss` then run
+    `./target/release/polaris-terminal-tui-oss`.
   - **Or poll `capture-pane` right after launch** on the debug build to grab the
     first frame before the panic:
 
     ```bash
-    tmux new-session -d -s tuicheck -x 120 -y 40 './target/debug/rook-tui-oss'
+    tmux new-session -d -s tuicheck -x 120 -y 40 './target/debug/polaris-terminal-tui-oss'
     for i in $(seq 1 15); do
       frame=$(tmux capture-pane -t tuicheck -p | sed 's/[[:space:]]*$//' | grep .)
       [ -n "$frame" ] && { echo "$frame"; break; }
@@ -272,7 +272,7 @@ on a change. But for PR evidence — and for attaching durable image/video
 artifacts — you often want an actual **screenshot** or a short **video** of the
 rendered TUI. Because the TUI is a console program, capture it by recording its
 PTY session with **asciinema**, rendering that recording with **agg**, and
-transcoding it to an **MP4** (the same format Rook's `computer_use` screen
+transcoding it to an **MP4** (the same format Polaris Terminal's `computer_use` screen
 recording produces) with `ffmpeg`; pull a still frame out with `ffmpeg` too.
 
 **Install the tooling (cloud runner — one-time).** asciinema and ffmpeg are
@@ -297,11 +297,11 @@ terminal"). Drive the TUI with `tmux send-keys` exactly as in Step 2 — the key
 reach the binary running under asciinema:
 
 ```bash
-cd <rook-repo-root>
+cd <polaris-terminal-repo-root>
 tmux kill-session -t tuicap 2>/dev/null     # clear only THIS capture session (not kill-server)
 # asciinema records the TUI's PTY; -c runs the binary; --overwrite replaces a prior cast.
 tmux new-session -d -s tuicap -x 120 -y 40 \
-  'asciinema rec --overwrite -c "./target/debug/rook-tui-oss" /tmp/tui.cast'
+  'asciinema rec --overwrite -c "./target/debug/polaris-terminal-tui-oss" /tmp/tui.cast'
 sleep 1                                     # let it draw + answer the theme probe
 # ...drive the interaction you want to show, e.g.:
 # tmux send-keys -t tuicap "hello" Enter && sleep 3
@@ -313,10 +313,10 @@ tmux send-keys -t tuicap C-c && sleep 0.5 && tmux send-keys -t tuicap C-c 2>/dev
 sleep 1
 ```
 
-For a **logged-in** capture, build/run `rook-tui-dev` with `ROOK_API_KEY` per
-Step 1 instead of `rook-tui-oss`.
+For a **logged-in** capture, build/run `polaris-terminal-tui-dev` with `POLARIS_TERMINAL_API_KEY` per
+Step 1 instead of `polaris-terminal-tui-oss`.
 
-**Render the video (MP4).** Match the format Rook's `computer_use` screen
+**Render the video (MP4).** Match the format Polaris Terminal's `computer_use` screen
 recording uses — an **H.264 / yuv420p MP4** with `+faststart` (see
 `crates/computer_use/src/linux/recording.rs`) — so TUI captures are consistent
 with GUI/computer-use recordings. `agg` only emits GIF, so render to GIF and then
@@ -357,7 +357,7 @@ Capture pitfalls:
 - **Don't take the still from the first or last video frame.** The first frame
   is the blank terminal *before* the TUI draws, and once you quit the TUI the alt
   screen is restored — so the final frames show the normal terminal (e.g. the
-  OSS `ROOK_API_KEY ... IGNORED` startup warning), **not** the TUI surface.
+  OSS `POLARIS_TERMINAL_API_KEY ... IGNORED` startup warning), **not** the TUI surface.
   Extract a mid-recording timestamp (when the surface is up), or stop recording
   while the surface is still displayed so the last frame *is* the surface.
 - **Keep it short.** A few seconds at 120x40 renders to tens of KB; downstream
@@ -371,12 +371,12 @@ need the image/video to attach.
 
 A live run proves the change works now; it is not a regression guard. For any
 non-trivial TUI rendering/behavior change, add or update a render-to-lines unit
-test (`rookui_core::elements::tui::test_support::render_to_lines` /
+test (`ptermui_core::elements::tui::test_support::render_to_lines` /
 `TuiBuffer::to_lines`) per `terminal-tui-testing`, and run:
 
 ```bash
-cargo nextest run -p rook_tui
-cargo nextest run -p rookui_core
+cargo nextest run -p pterm_tui
+cargo nextest run -p ptermui_core
 ```
 
 ## Evidence for the PR

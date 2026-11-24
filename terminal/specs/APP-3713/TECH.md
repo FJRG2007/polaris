@@ -43,7 +43,7 @@ The "Group panes by" section is purely visual — it dispatches no actions and r
 
 ### Compact terminal row rendering
 
-`render_compact_pane_row` calls `render_terminal_primary_line_for_view` with `Some(RookIcon::Terminal)` as a prefix icon, producing a single-line row with the terminal icon + primary line data text. For agent terminals, the status icon comes from the `StatusText` variant of `TerminalPrimaryLineData`.
+`render_compact_pane_row` calls `render_terminal_primary_line_for_view` with `Some(PtermIcon::Terminal)` as a prefix icon, producing a single-line row with the terminal icon + primary line data text. For agent terminals, the status icon comes from the `StatusText` variant of `TerminalPrimaryLineData`.
 
 ### Key render functions and their color contracts
 
@@ -114,7 +114,7 @@ In `render_settings_popup`:
 The header reuses the same styling as the current "Group panes by" header but with text `"Show first"`.
 
 Each option row is a `Hoverable` wrapping a `Flex::row` with:
-- A 16×16 checkmark icon (`RookIcon::Check` in main-text color) if selected, or a 16×16 `Empty` spacer if not.
+- A 16×16 checkmark icon (`PtermIcon::Check` in main-text color) if selected, or a 16×16 `Empty` spacer if not.
 - An 8px gap.
 - Label text ("Command / Conversation" or "Directory / Branch") in main-text color, 12px.
 
@@ -127,7 +127,7 @@ The divider and segmented control below remain unchanged.
 
 ### 5. Parameterize text color in terminal line renderers
 
-The existing `render_terminal_primary_line` hardcodes `main_text_color` and `render_terminal_secondary_line` hardcodes `sub_text_color`. To support swapping, add a `text_color: RookThemeFill` parameter to both functions so the caller controls which color each line uses.
+The existing `render_terminal_primary_line` hardcodes `main_text_color` and `render_terminal_secondary_line` hardcodes `sub_text_color`. To support swapping, add a `text_color: PtermThemeFill` parameter to both functions so the caller controls which color each line uses.
 
 **`render_terminal_primary_line`**: Add `text_color` param. Replace `main_text_color` usage for text rendering with the passed color. The status indicator icon color remains unchanged (it comes from `render_status_element` and is independent of text color).
 
@@ -151,7 +151,7 @@ The tertiary line is always appended last, unchanged.
 
 Read the primary info setting. For terminal panes:
 
-- **`Command`**: Current behavior — call `render_terminal_primary_line_for_view` with `Some(RookIcon::Terminal)` prefix icon.
+- **`Command`**: Current behavior — call `render_terminal_primary_line_for_view` with `Some(PtermIcon::Terminal)` prefix icon.
 - **`WorkingDirectory`**: Render a single-line row with the terminal icon (or agent status icon) + working directory text (start-clipped). This can be done by building a `Flex::row` directly:
   - Add the kind icon (terminal icon for non-agent, status element for agent, `OzCloud` for ambient agent) — same icon logic as the current compact rendering.
   - Add the working directory text with `ClipConfig::start()`.
@@ -160,7 +160,7 @@ The icon is always determined by pane type / agent state, not by the primary inf
 
 ### 8. Update `render_terminal_primary_line_for_view`
 
-Add a `text_color: RookThemeFill` parameter. Pass it through to `render_terminal_primary_line`.
+Add a `text_color: PtermThemeFill` parameter. Pass it through to `render_terminal_primary_line`.
 
 All existing call sites pass `theme.main_text_color(theme.background())` to preserve current behavior unless the caller is in the swapped path.
 

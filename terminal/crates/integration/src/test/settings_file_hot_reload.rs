@@ -2,23 +2,23 @@
 //!
 //! Verifies that changes to `settings.toml` on disk are picked up by the
 //! filesystem watcher and pushed into the in-memory setting models, on every
-//! platform where Rook watches `config_local_dir()`.
+//! platform where Polaris Terminal watches `config_local_dir()`.
 
 use std::time::Duration;
 
-use rook::features::FeatureFlag;
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use rook::settings::FontSettings;
-use rookui_core::integration::TestStep;
-use rookui_core::{SingletonEntity, async_assert_eq};
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::settings::FontSettings;
+use ptermui_core::integration::TestStep;
+use ptermui_core::{SingletonEntity, async_assert_eq};
 use settings::Setting as _;
 
 use super::{Builder, new_builder};
 
 /// Helper: returns the path to the TOML settings file.
 fn toml_file_path() -> std::path::PathBuf {
-    rook::settings::user_preferences_toml_file_path()
+    polaris_terminal::settings::user_preferences_toml_file_path()
 }
 
 /// Verifies the full settings hot-reload pipeline end-to-end: the filesystem
@@ -31,7 +31,10 @@ pub fn test_settings_file_hot_reload_applies_new_values() -> Builder {
     new_builder()
         .with_setup(move |utils| {
             // Use a short watcher delay so each reload fires quickly.
-            utils.set_env("ROOK_CONFIG_WATCHER_DELAY_MS", Some("10".to_string()));
+            utils.set_env(
+                "POLARIS_TERMINAL_CONFIG_WATCHER_DELAY_MS",
+                Some("10".to_string()),
+            );
 
             // Write an initial valid settings file so the watcher is already
             // tracking it and the app reads a known value at startup.

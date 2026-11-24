@@ -3,11 +3,11 @@ use std::fmt::Debug;
 use std::mem;
 use std::ops::RangeInclusive;
 
-use rook_core::semantic_selection::SemanticSelection;
-use rook_terminal::model::grid::CellType;
-use rookui::text::{IsRect, SelectionType};
-use rookui::units::{IntoLines as _, Lines};
-use rookui::{AppContext, EntityId, ViewAsRef as _};
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_terminal::model::grid::CellType;
+use ptermui::text::{IsRect, SelectionType};
+use ptermui::units::{IntoLines as _, Lines};
+use ptermui::{AppContext, EntityId, ViewAsRef as _};
 use sum_tree::SeekBias;
 use vec1::{Vec1, vec1};
 
@@ -23,7 +23,7 @@ use crate::terminal::model::block::BlockSection;
 use crate::terminal::model::index::{Direction, Point, Side};
 use crate::terminal::model::selection::{ExpandedSelectionRange, Selection, SelectionDirection};
 use crate::terminal::model::terminal_model::{BlockIndex, WithinBlock};
-use crate::terminal::rookify::success_block::RookifySuccessBlock;
+use crate::terminal::ptermify::success_block::PtermifySuccessBlock;
 
 /// A selection that can span multiple blocks (and thus grids). Here row is the number of lines from
 /// the top of all blocks.
@@ -998,11 +998,14 @@ impl BlockList {
                             }
 
                             if let Some(active_window_id) = app.windows().active_window()
-                                && let Some(ssh_block) = app
-                                    .view_with_id::<RookifySuccessBlock>(active_window_id, *view_id)
+                                && let Some(ssh_block) = app.view_with_id::<PtermifySuccessBlock>(
+                                    active_window_id,
+                                    *view_id,
+                                )
                             {
-                                let rookify_success_block = app.view(&ssh_block);
-                                if let Some(selected_text) = rookify_success_block.selected_text() {
+                                let ptermify_success_block = app.view(&ssh_block);
+                                if let Some(selected_text) = ptermify_success_block.selected_text()
+                                {
                                     selected_texts.push(selected_text);
                                 }
                             }
@@ -1120,10 +1123,10 @@ impl BlockList {
                         }
 
                         if let Some(ssh_block) =
-                            app.view_with_id::<RookifySuccessBlock>(active_window_id, view_id)
+                            app.view_with_id::<PtermifySuccessBlock>(active_window_id, view_id)
                         {
-                            let rookify_success_block = app.view(&ssh_block);
-                            if let Some(selected_text) = rookify_success_block.selected_text() {
+                            let ptermify_success_block = app.view(&ssh_block);
+                            if let Some(selected_text) = ptermify_success_block.selected_text() {
                                 selected_texts.push(selected_text);
                             }
                         }

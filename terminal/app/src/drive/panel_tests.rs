@@ -1,6 +1,6 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::App;
-use rookui::platform::WindowStyle;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::App;
+use ptermui::platform::WindowStyle;
 
 use super::DrivePanel;
 use crate::ai::blocklist::BlocklistAIHistoryModel;
@@ -48,7 +48,7 @@ fn initialize_app(app: &mut App) {
 }
 
 #[test]
-fn test_rook_drive_sections_with_no_team() {
+fn test_pterm_drive_sections_with_no_team() {
     App::test(ASSETS, |mut app| async move {
         initialize_app(&mut app);
 

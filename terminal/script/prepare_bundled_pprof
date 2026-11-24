@@ -2,7 +2,7 @@
 #
 # Prepares bundled pprof for distribution.
 #
-# This script copies a pprof binary that should be bundled with Rook into a
+# This script copies a pprof binary that should be bundled with Polaris Terminal into a
 # destination directory.
 #
 # Usage:

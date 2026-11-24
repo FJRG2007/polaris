@@ -1,15 +1,15 @@
 use std::fmt::Display;
 
-use rook_errors::{ReportErrorLogMode, report_error};
+use pterm_errors::{ReportErrorLogMode, report_error};
 use warp_multi_agent_api as api;
 
 /// A citation listed in an AI response.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum AIAgentCitation {
-    RookDriveObject {
+    PtermDriveObject {
         uid: String,
     },
-    RookDocumentation {
+    PtermDocumentation {
         path: String,
     },
     WebPage {
@@ -27,11 +27,11 @@ pub enum AIAgentCitation {
 impl Display for AIAgentCitation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AIAgentCitation::RookDriveObject { uid } => {
-                write!(f, "Rook Drive Object: {uid}")
+            AIAgentCitation::PtermDriveObject { uid } => {
+                write!(f, "Polaris Terminal Drive Object: {uid}")
             }
-            AIAgentCitation::RookDocumentation { path } => {
-                write!(f, "Rook Documentation: {path}")
+            AIAgentCitation::PtermDocumentation { path } => {
+                write!(f, "Polaris Terminal Documentation: {path}")
             }
             AIAgentCitation::WebPage { url } => {
                 write!(f, "Web Page: {url}")
@@ -63,10 +63,10 @@ impl TryFrom<api::Citation> for AIAgentCitation {
             api::DocumentType::WarpDriveWorkflow
             | api::DocumentType::WarpDriveNotebook
             | api::DocumentType::WarpDriveEnvVar
-            | api::DocumentType::Rule => Ok(AIAgentCitation::RookDriveObject {
+            | api::DocumentType::Rule => Ok(AIAgentCitation::PtermDriveObject {
                 uid: citation.document_id,
             }),
-            api::DocumentType::WarpDocumentation => Ok(AIAgentCitation::RookDocumentation {
+            api::DocumentType::WarpDocumentation => Ok(AIAgentCitation::PtermDocumentation {
                 path: citation.document_id,
             }),
             api::DocumentType::WebPage => Ok(AIAgentCitation::WebPage {

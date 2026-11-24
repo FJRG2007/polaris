@@ -22,8 +22,8 @@ impl RenderableBlock for RenderableTextBlock {
     fn layout(
         &mut self,
         _model: &RenderState,
-        _ctx: &mut rookui_core::LayoutContext,
-        _app: &rookui_core::AppContext,
+        _ctx: &mut ptermui_core::LayoutContext,
+        _app: &ptermui_core::AppContext,
     ) {
     }
 
@@ -31,7 +31,7 @@ impl RenderableBlock for RenderableTextBlock {
         &mut self,
         model: &RenderState,
         ctx: &mut RenderContext,
-        _app: &rookui_core::AppContext,
+        _app: &ptermui_core::AppContext,
     ) {
         let content = model.content();
         let text_block = extract_block!(

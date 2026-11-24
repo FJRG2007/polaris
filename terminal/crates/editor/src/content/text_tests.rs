@@ -1,6 +1,6 @@
 use markdown_parser::{CodeBlockText, FormattedTable};
-use rook_core::features::FeatureFlag;
-use rookui_core::fonts::Weight;
+use pterm_core::features::FeatureFlag;
+use ptermui_core::fonts::Weight;
 
 use super::{
     BufferBlockItem, BufferTextStyle, CodeBlockType, MarkdownStyle, TextStyles,

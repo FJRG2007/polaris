@@ -1,5 +1,5 @@
 use fuzzy_match::FuzzyMatchResult;
-use rookui::{AppContext, SingletonEntity};
+use ptermui::{AppContext, SingletonEntity};
 
 use super::search_item::NotebookSearchItem;
 use crate::cloud_object::CloudModelType;
@@ -153,7 +153,7 @@ impl SyncDataSource for NotebookDataSource {
     }
 }
 
-impl rookui::Entity for NotebookDataSource {
+impl ptermui::Entity for NotebookDataSource {
     type Event = ();
 }
 

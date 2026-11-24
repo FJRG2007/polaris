@@ -5,8 +5,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use ptermui::ModelSpawner;
 use regex::escape;
-use rookui::ModelSpawner;
 
 use super::AgentDriver;
 use super::terminal::BlockOutputMatch;
@@ -117,7 +117,7 @@ async fn confirm_stall(
     let mut previous = fetch_plaintext(block_id, foreground).await;
     let mut elapsed = Duration::ZERO;
     while elapsed < STALL_CONFIRMATION_BUDGET {
-        rookui::r#async::Timer::after(STALL_POLL_INTERVAL).await;
+        ptermui::r#async::Timer::after(STALL_POLL_INTERVAL).await;
         elapsed += STALL_POLL_INTERVAL;
         let current = fetch_plaintext(block_id, foreground).await;
         if outputs_stalled(previous.as_deref(), current.as_deref()) {
@@ -160,7 +160,7 @@ pub(crate) async fn watch_block_for_errors(
     let mut elapsed = Duration::ZERO;
 
     for &interval in SCAN_INTERVALS {
-        rookui::r#async::Timer::after(interval).await;
+        ptermui::r#async::Timer::after(interval).await;
         elapsed += interval;
 
         if find_match_once(&block_id, &dfas, foreground)

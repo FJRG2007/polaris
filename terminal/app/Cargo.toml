@@ -1,16 +1,16 @@
 [package]
-authors = ["Rook Contributors"]
-default-run = "rook-oss"
+authors = ["Polaris Terminal Contributors"]
+default-run = "polaris-terminal"
 description = "The cloud-backed terminal for individuals and teams"
 edition = "2024"
 autobins = false
-name = "rook"
+name = "polaris-terminal"
 version = "0.1.0"
 publish.workspace = true
 license.workspace = true
 
 [lib]
-name = "rook"
+name = "polaris_terminal"
 path = "src/lib.rs"
 
 # We define separate targets for each channel (stable, preview, dev) so that we can
@@ -18,12 +18,12 @@ path = "src/lib.rs"
 # flag overrides). Otherwise these binaries are exactly identical to our main binary.
 
 [[bin]]
-name = "rook-oss"
+name = "polaris-terminal"
 path = "src/bin/oss.rs"
 test = false
 
 [[bin]]
-name = "rook"
+name = "polaris-terminal-local"
 path = "src/bin/local.rs"
 test = false
 
@@ -140,7 +140,7 @@ line-ending.workspace = true
 log.workspace = true
 log-panics = { version = "2.1.0", features = ["with-backtrace"] }
 lsp.workspace = true
-rook_logging.workspace = true
+pterm_logging.workspace = true
 sentry = { workspace = true, optional = true }
 lz4_flex = "0.11"
 markdown_parser.workspace = true
@@ -220,7 +220,7 @@ unindent = "0.1.7"
 url = { workspace = true, features = ["serde"] }
 urlocator.workspace = true
 uuid.workspace = true
-rook_cli.workspace = true
+pterm_cli.workspace = true
 validator = "0.19.0"
 variant_count = "1.1.0"
 vec1.workspace = true
@@ -228,24 +228,24 @@ version-compare.workspace = true
 vte.workspace = true
 walkdir.workspace = true
 warp-workflows.workspace = true
-rook_assets.workspace = true
-rook_channel_config.workspace = true
-rook_completer.workspace = true
-rook_core.workspace = true
-rook_errors = { workspace = true, features = ["reqwest-errors"] }
-rook_editor.workspace = true
-rook_graphql.workspace = true
-rook_search_core.workspace = true
-rook_server_auth.workspace = true
-rook_server_client.workspace = true
-rook_util.workspace = true
-rookui = { workspace = true, features = ["schema_gen", "settings_value"] }
-rookui_core.workspace = true
+pterm_assets.workspace = true
+pterm_channel_config.workspace = true
+pterm_completer.workspace = true
+pterm_core.workspace = true
+pterm_errors = { workspace = true, features = ["reqwest-errors"] }
+pterm_editor.workspace = true
+pterm_graphql.workspace = true
+pterm_search_core.workspace = true
+pterm_server_auth.workspace = true
+pterm_server_client.workspace = true
+pterm_util.workspace = true
+ptermui = { workspace = true, features = ["schema_gen", "settings_value"] }
+ptermui_core.workspace = true
 voice_input = { workspace = true, optional = true }
-rookui_extras = { workspace = true, features = ["default", "user_preferences-toml"] }
+ptermui_extras = { workspace = true, features = ["default", "user_preferences-toml"] }
 syntax_tree.workspace = true
 languages.workspace = true
-rook_terminal.workspace = true
+pterm_terminal.workspace = true
 websocket.workspace = true
 wgpu = { workspace = true, optional = true }
 natural_language_detection.workspace = true
@@ -264,10 +264,10 @@ remote_server.workspace = true
 repo_metadata.workspace = true
 vim.workspace = true
 rmcp.workspace = true
-rook_isolation_platform.workspace = true
-rook_ripgrep.workspace = true
-rook_managed_secrets.workspace = true
-rook_multi_agent_client.workspace = true
+pterm_isolation_platform.workspace = true
+pterm_ripgrep.workspace = true
+pterm_managed_secrets.workspace = true
+pterm_multi_agent_client.workspace = true
 local_control.workspace = true
 hashbrown.workspace = true
 rustc-hash.workspace = true
@@ -328,7 +328,7 @@ tokio.workspace = true
 tokio-util.workspace = true
 tracing-opentelemetry.workspace = true
 tracing-subscriber.workspace = true
-rook_errors = { workspace = true, features = ["tokio-errors", "websocket-errors"] }
+pterm_errors = { workspace = true, features = ["tokio-errors", "websocket-errors"] }
 
 # AWS SDK (loading credentials for BYO LLM)
 aws-config = { version = "1.8.16", features = ["credentials-login"] }
@@ -343,7 +343,7 @@ sysinfo.workspace = true
 warp-command-signatures = { workspace = true, features = ["embed-signatures"] }
 is_executable = "1.0.1"
 watcher.workspace = true
-rook_files.workspace = true
+pterm_files.workspace = true
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 console_error_panic_hook = { version = "0.1.6" }
@@ -367,7 +367,7 @@ serde-wasm-bindgen = "0.6.5"
 # For wasm, we don't use the feature "embed-signatures".
 warp-command-signatures = { workspace = true }
 web-sys.workspace = true
-rook_web_event_bus.workspace = true
+pterm_web_event_bus.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3.17"
@@ -436,16 +436,16 @@ mockito.workspace = true
 serial_test = "0.8.0"
 sum_tree = { workspace = true, features = ["test-util"] }
 virtual-fs.workspace = true
-rook_completer = { workspace = true, features = ["test-util"] }
-rook_core = { workspace = true, features = ["test-util"] }
-rook_editor = { workspace = true, features = ["test-util"] }
-rook_server_client = { workspace = true, features = ["test-util"] }
-rook_server_auth = { workspace = true, features = ["test-util"] }
-rook_terminal = { workspace = true, features = ["test-util"] }
-rookui = { workspace = true, features = ["test-util"] }
-rookui_core = { workspace = true, features = ["test-util"] }
-rookui_extras = { workspace = true, features = ["test-util"] }
-rook_files = { workspace = true, features = ["test-util"] }
+pterm_completer = { workspace = true, features = ["test-util"] }
+pterm_core = { workspace = true, features = ["test-util"] }
+pterm_editor = { workspace = true, features = ["test-util"] }
+pterm_server_client = { workspace = true, features = ["test-util"] }
+pterm_server_auth = { workspace = true, features = ["test-util"] }
+pterm_terminal = { workspace = true, features = ["test-util"] }
+ptermui = { workspace = true, features = ["test-util"] }
+ptermui_core = { workspace = true, features = ["test-util"] }
+ptermui_extras = { workspace = true, features = ["test-util"] }
+pterm_files = { workspace = true, features = ["test-util"] }
 repo_metadata = { workspace = true, features = ["test-util"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
@@ -459,14 +459,14 @@ prost-build.workspace = true
 sha2.workspace = true
 tempfile.workspace = true
 walkdir = "2.3.2"
-rook_util.workspace = true
+pterm_util.workspace = true
 
 [target.'cfg(windows)'.build-dependencies]
 embed-resource = "3.0"
 
 # Note that we support channel-specific enables for these features
 [features]
-tui = ["rook_terminal/tui", "rookui_core/tui"]
+tui = ["pterm_terminal/tui", "ptermui_core/tui"]
 ai_resume_button = []
 autoupdate = []
 figma_detection = []
@@ -494,9 +494,9 @@ crash_reporting = [
     "dep:sentry-log",
     "dep:minidumper",
     "dep:crash-handler",
-    "rook_logging/crash_reporting",
-    "rook_errors/crash_reporting",
-    "rook_terminal/crash_reporting",
+    "pterm_logging/crash_reporting",
+    "pterm_errors/crash_reporting",
+    "pterm_terminal/crash_reporting",
     "ai/crash_reporting",
 ]
 creating_shared_sessions = []
@@ -522,7 +522,7 @@ default = [
     "rect_selection",
     "reload_stale_conversation_files",
     "loginless_conversion",
-    "rook_packs",
+    "pterm_packs",
     "ai_rules",
     "suggested_rules",
     "default_waterfall_mode",
@@ -600,7 +600,7 @@ default = [
     "ambient_agents_command_line",
     "ambient_agents_image_upload",
     "scheduled_ambient_agents",
-    "rook_managed_secrets",
+    "pterm_managed_secrets",
     "v4a_file_diffs",
     "classic_completions",
     "force_classic_completions",
@@ -633,7 +633,7 @@ default = [
     "inline_model_selector",
     "restore_prompt_on_inline_model_selector_search",
     "oz_launch_modal",
-    "open_rook_launch_modal",
+    "open_pterm_launch_modal",
     "orchestration_launch_modal",
     "agent_cli_launch_modal",
     "new_tab_styling",
@@ -660,7 +660,7 @@ default = [
     "revert_to_checkpoints",
     "rewind_slash_command",
     "hoa_code_review",
-    "rookify_footer",
+    "ptermify_footer",
     "agent_toolbar_editor",
     "configurable_toolbar",
     "transfer_control_tool",
@@ -729,9 +729,9 @@ full_screen_zen_mode = []
 global_ai_analytics_banner = []
 global_ai_analytics_collection = []
 grep_tool = []
-# This feature is enabled in graphical builds of Rook, and groups together other features
+# This feature is enabled in graphical builds of Polaris Terminal, and groups together other features
 # that are not needed in headless builds. Because Cargo features are additive, the default
-# feature set is for a minimal build of Rook, and we add on GUI-specific features here.
+# feature set is for a minimal build of Polaris Terminal, and we add on GUI-specific features here.
 # For the most part, including GUI code in headless builds is fine; the main use case is
 # for things that pull in external dependencies.
 gui = ["voice_input"]
@@ -748,15 +748,15 @@ github_pr_prompt_chip = []
 create_project_flow = []
 agent_mode_evals = [
     "integration_tests",
-    "rookui/defer_scene_build",
+    "ptermui/defer_scene_build",
     "full_source_code_embedding",
     "cross_repo_context",
     "cloud_object_models/agent_mode_evals",
     "rust-embed/debug-embed",
-    "rookui/log_named_telemetry_events",
-    "rook_logging/agent_mode_evals",
-    "rook_multi_agent_client/agent_mode_evals",
-    "rook_server_client/agent_mode_evals",
+    "ptermui/log_named_telemetry_events",
+    "pterm_logging/agent_mode_evals",
+    "pterm_multi_agent_client/agent_mode_evals",
+    "pterm_server_client/agent_mode_evals",
 ]
 ambient_agents_command_line = []
 ambient_agents_image_upload = []
@@ -767,7 +767,7 @@ inline_slash_commands = ["agent_view"]
 # Enable this feature to track heap usage and automatically produce a heap
 # profile report when app memory usage exceeds a 10GB threshold.
 #
-# Enabled on RookDev by default.
+# Enabled on PolarisTerminalDev by default.
 heap_usage_tracking = ["jemalloc_pprof", "crash_reporting"]
 image_as_context = []
 in_band_generators_ssh = []
@@ -785,7 +785,7 @@ list_skills = []
 # This feature is enabled in build.rs when compiling for platforms which
 # support having a local tty/shell session.  It can be used to conditionally
 # include dependencies that should only exist in such environments.
-local_tty = ["rook_terminal/local_tty"]
+local_tty = ["pterm_terminal/local_tty"]
 local_computer_use = []
 local_claude_codex_child_harnesses = []
 # This feature is enabled in build.rs when compiling for platforms which
@@ -797,8 +797,8 @@ local_fs = [
     "lsp/local_fs",
     "persistence/local_fs",
     "repo_metadata/local_fs",
-    "rook_core/local_fs",
-    "rook_terminal/local_fs",
+    "pterm_core/local_fs",
+    "pterm_terminal/local_fs",
 ]
 log_expensive_frames_in_sentry = []
 jupyter_notebook_rendering = []
@@ -809,7 +809,7 @@ mcp_oauth = []
 mcp_debugging_ids = []
 oz_changelog_updates = []
 # Remote-backed tty that connects to a PTY-like interface via a server.
-remote_tty = ["rook_terminal/remote_tty"]
+remote_tty = ["pterm_terminal/remote_tty"]
 # Fix for cursor reflow bug during window resize, from Alacritty resizing logic.
 resize_fix = []
 pluggable_notifications = []
@@ -827,7 +827,7 @@ remote_codebase_indexing = ["full_source_code_embedding"]
 # This feature should only be enabled when building a release bundle with
 # the bundle script, and can be used to conditionally enable functionality
 # accordingly.
-release_bundle = ["rust-embed/debug-embed", "rook_core/release_bundle"]
+release_bundle = ["rust-embed/debug-embed", "pterm_core/release_bundle"]
 render_agent_mode_output_markdown = []
 render_continuous_block_selections_with_single_border = []
 richtext_multiselect = []
@@ -836,30 +836,30 @@ selectable_prompt = []
 settings_file = []
 sequential_storage = []
 session_sharing_acls = []
-skip_login = ["rook_server_client/skip_login"]
+skip_login = ["pterm_server_client/skip_login"]
 # This feature should only be enabled when building a self-contained binary with the bundle script.
-standalone = ["rook_assets/standalone", "rook_core/standalone"]
+standalone = ["pterm_assets/standalone", "pterm_core/standalone"]
 prompt_suggestions_via_maa = []
 voice_input = ["dep:voice_input"]
 tab_close_button_on_left = []
 test-util = [
     "cloud_object_client/test-util",
-    "rook_server_auth/test-util",
+    "pterm_server_auth/test-util",
     "http_client/test-util",
-    "rook_core/test-util",
-    "rook_terminal/test-util",
+    "pterm_core/test-util",
+    "pterm_terminal/test-util",
     "ai/test-util",
-    "rook_server_client/test-util",
+    "pterm_server_client/test-util",
 ]
 terminal_lifecycle_recovery = []
 # Feature enabled only when app is compiled for integration tests.
 integration_tests = [
-    "rook_cli/integration_tests",
-    "rookui/integration_tests",
-    "rookui/test-util",
-    "rook_core/integration_tests",
-    "rook_terminal/integration_tests",
-    "rook_server_client/integration_tests",
+    "pterm_cli/integration_tests",
+    "ptermui/integration_tests",
+    "ptermui/test-util",
+    "pterm_core/integration_tests",
+    "pterm_terminal/integration_tests",
+    "pterm_server_client/integration_tests",
 ]
 traces = []
 viewing_shared_sessions = []
@@ -886,7 +886,7 @@ drive_objects_as_context = []
 iterm_images = []
 validate_autosuggestions = []
 autoupdate_ui_revamp = []
-rook_packs = []
+pterm_packs = []
 suggested_rules = []
 command_correction_key = []
 full_source_code_embedding = []
@@ -907,7 +907,7 @@ preview_channel = []
 ai_context_menu_code = []
 expand_edit_to_pane = []
 fallback_model_load_output_messaging = []
-rooking_model_name = []
+pterming_model_name = []
 profiles_design_revamp = []
 search_codebase_ui = []
 linked_code_blocks = []
@@ -957,7 +957,7 @@ revert_to_checkpoints = []
 rewind_slash_command = []
 agent_view = []
 agent_view_block_context = ["agent_view"]
-rook_managed_secrets = []
+pterm_managed_secrets = []
 v4a_file_diffs = []
 agent_tips = []
 agent_toolbar_editor = ["agent_view"]
@@ -983,7 +983,7 @@ restore_prompt_on_inline_model_selector_search = []
 oz_platform_skills = []
 oz_identity_federation = []
 oz_launch_modal = []
-open_rook_launch_modal = []
+open_pterm_launch_modal = []
 orchestration_launch_modal = []
 agent_cli_launch_modal = []
 new_tab_styling = []
@@ -1004,7 +1004,7 @@ vertical_tabs_summary_mode = []
 tab_configs = []
 grouped_tabs = []
 pinned_tabs = []
-rook_control_cli = []
+pterm_control_cli = []
 agent_harness = []
 oz_handoff = []
 handoff_local_cloud = []
@@ -1017,7 +1017,7 @@ solo_user_byok = []
 billing_and_usage_page_v2 = []
 gpt_configurable_context_window = []
 configurable_toolbar = []
-rookify_footer = []
+ptermify_footer = []
 hoa_onboarding_flow = []
 git_operations_in_code_review = []
 hoa_remote_control = []
@@ -1037,11 +1037,11 @@ shell_widget_handoff = []
 history_search_ranking_v2 = []
 stored_screenshots = []
 
-[package.metadata.bundle.bin.rook-oss]
+[package.metadata.bundle.bin.polaris-terminal-oss]
 category = "public.app-category.developer-tools"
 copyright = "© 2025, Denver Technologies, Inc"
-identifier = "dev.rook.RookOss"
-name = "RookOss"
+identifier = "dev.polaris.PolarisTerminal"
+name = "PolarisTerminal"
 resources = ["assets/onboarding"]
 icon = ["channels/oss/icon/no-padding/512x512.png", "channels/oss/icon/no-padding/icon.ico"]
 short_description = "The open-source, cloud-backed terminal for individuals and teams."
@@ -1049,8 +1049,8 @@ short_description = "The open-source, cloud-backed terminal for individuals and 
 [package.metadata.bundle.bin.stable]
 category = "public.app-category.developer-tools"
 copyright = "© 2025, Denver Technologies, Inc"
-identifier = "dev.rook.Rook-Stable"
-name = "Rook"
+identifier = "dev.polaris.PolarisTerminal-Stable"
+name = "Polaris Terminal"
 osx_frameworks = [
     "frameworks/default/Sentry-Dynamic-WithARM64e.xcframework/macos-arm64_arm64e_x86_64/Sentry.framework",
 ]
@@ -1060,8 +1060,8 @@ short_description = "The cloud-backed terminal for individuals and teams, stable
 [package.metadata.bundle.bin.preview]
 category = "public.app-category.developer-tools"
 copyright = "© 2025, Denver Technologies, Inc"
-identifier = "dev.rook.Rook-Preview"
-name = "RookPreview"
+identifier = "dev.polaris.PolarisTerminal-Preview"
+name = "PolarisTerminalPreview"
 osx_frameworks = [
     "frameworks/default/Sentry-Dynamic-WithARM64e.xcframework/macos-arm64_arm64e_x86_64/Sentry.framework",
 ]
@@ -1071,19 +1071,19 @@ short_description = "The cloud-backed terminal for individuals and teams, featur
 [package.metadata.bundle.bin.dev]
 category = "public.app-category.developer-tools"
 copyright = "© 2025, Denver Technologies, Inc"
-identifier = "dev.rook.Rook-Dev"
-name = "RookDev"
+identifier = "dev.polaris.PolarisTerminal-Dev"
+name = "PolarisTerminalDev"
 osx_frameworks = [
     "frameworks/dev/Sentry-Dynamic-WithARM64e.xcframework/macos-arm64_arm64e_x86_64/Sentry.framework",
 ]
 resources = ["assets/onboarding"]
 short_description = "The cloud-backed terminal for individuals and teams, developer build."
 
-[package.metadata.bundle.bin.rook]
+[package.metadata.bundle.bin.polaris-terminal]
 category = "public.app-category.developer-tools"
 copyright = "© 2025, Denver Technologies, Inc"
-identifier = "dev.rook.Rook-Local"
-name = "RookLocal"
+identifier = "dev.polaris.PolarisTerminal-Local"
+name = "PolarisTerminalLocal"
 resources = ["assets/onboarding"]
 short_description = "The cloud-backed terminal for individuals and teams, developer build."
 

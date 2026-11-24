@@ -4,9 +4,9 @@ use std::path::PathBuf;
 use anyhow::{Context as _, Result, bail};
 use channel_versions::VersionInfo;
 use instant::Duration;
-use rook_core::channel::{Channel, ChannelState};
-use rook_terminal::shell::ShellType;
-use rookui::ViewContext;
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_terminal::shell::ShellType;
+use ptermui::ViewContext;
 
 use super::{DownloadReady, ReadyForRelaunch, release_assets_directory_url};
 use crate::workspace::Workspace;
@@ -31,7 +31,7 @@ pub(super) async fn download_update_and_cleanup(
             appimage::download_update_and_cleanup(version_info, &appimage_path, client).await
         }
         UpdateMethod::PackageManager(package_manager) => {
-            log::info!("Detected that Rook was installed using {package_manager:?}");
+            log::info!("Detected that Polaris Terminal was installed using {package_manager:?}");
             Ok(DownloadReady::Yes)
         }
     }
@@ -121,7 +121,7 @@ mod appimage {
             .as_file_mut()
             .set_permissions(appimage_path.metadata()?.permissions())?;
 
-        // Move new AppImage over the one that launched the current Rook instance.
+        // Move new AppImage over the one that launched the current Polaris Terminal instance.
         let new_appimage_path = new_appimage.into_temp_path();
         let mv_status = command::r#async::Command::new("mv")
             .arg(new_appimage_path.as_os_str())
@@ -144,15 +144,15 @@ mod appimage {
         let mut command = command::blocking::Command::new(appimage_path);
         // Pass a flag to the app to let it know it was restarted as part of the
         // autoupdate process.
-        command.arg(rook_cli::finish_update_flag());
+        command.arg(pterm_cli::finish_update_flag());
         // If we're testing with a local copy of channel_versions.json, have the
         // newly-started binary also reference that same file (so we can test
         // displaying an updated changelog after an autoupdate).
-        if let Ok(path) = std::env::var("ROOK_CHANNEL_VERSIONS_PATH") {
-            command.env("ROOK_CHANNEL_VERSIONS_PATH", path);
+        if let Ok(path) = std::env::var("POLARIS_TERMINAL_CHANNEL_VERSIONS_PATH") {
+            command.env("POLARIS_TERMINAL_CHANNEL_VERSIONS_PATH", path);
         }
 
-        log::info!("Relaunching rook for update...");
+        log::info!("Relaunching polaris-terminal for update...");
         command.spawn()?;
         Ok(())
     }
@@ -162,8 +162,8 @@ mod package_manager {
     use markdown_parser::{
         FormattedText, FormattedTextFragment, FormattedTextHeader, FormattedTextLine,
     };
-    use rookui::elements::{Container, FormattedTextElement, HighlightedHyperlink};
-    use rookui::{Element, SingletonEntity as _};
+    use ptermui::elements::{Container, FormattedTextElement, HighlightedHyperlink};
+    use ptermui::{Element, SingletonEntity as _};
 
     use super::*;
     use crate::appearance::Appearance;
@@ -182,16 +182,16 @@ mod package_manager {
         }
     }
 
-    impl rookui::Entity for AutoupdateContextBlock {
+    impl ptermui::Entity for AutoupdateContextBlock {
         type Event = ();
     }
 
-    impl rookui::View for AutoupdateContextBlock {
+    impl ptermui::View for AutoupdateContextBlock {
         fn ui_name() -> &'static str {
             "AutoupdateContextBlock"
         }
 
-        fn render(&self, app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+        fn render(&self, app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
             let appearance = Appearance::as_ref(app);
             let theme = appearance.theme();
             let package_manager_name = self.package_manager.to_string();
@@ -205,10 +205,10 @@ mod package_manager {
                     ))],
                 }),
                 FormattedTextLine::Line(vec![
-                    FormattedTextFragment::plain_text("If you installed Rook using "),
+                    FormattedTextFragment::plain_text("If you installed Polaris Terminal using "),
                     FormattedTextFragment::bold(package_manager_name),
                     FormattedTextFragment::plain_text(
-                        " or a compatible tool, the pre-filled command will update Rook for you.",
+                        " or a compatible tool, the pre-filled command will update Polaris Terminal for you.",
                     ),
                 ]),
             ];
@@ -216,7 +216,7 @@ mod package_manager {
             if self.package_manager.needs_repository_configuration() {
                 lines.push(FormattedTextLine::Line(vec![
                     FormattedTextFragment::plain_text(
-                        "\nThe command below includes a one-time configuration of the Rook package repository and PGP signing key.",
+                        "\nThe command below includes a one-time configuration of the Polaris Terminal package repository and PGP signing key.",
                     ),
                 ]));
             }
@@ -229,9 +229,9 @@ mod package_manager {
                     FormattedTextFragment::plain_text(
                         "\nThe ",
                     ),
-                    FormattedTextFragment::inline_code("rook_handle_dist_upgrade"),
+                    FormattedTextFragment::inline_code("pterm_handle_dist_upgrade"),
                     FormattedTextFragment::plain_text(
-                        " function ensures the Rook package repository is enabled, as we've detected you recently upgraded your distribution.",
+                        " function ensures the Polaris Terminal package repository is enabled, as we've detected you recently upgraded your distribution.",
                     ),
                 ]));
             }
@@ -239,10 +239,12 @@ mod package_manager {
             lines.push(FormattedTextLine::Line(vec![
                 FormattedTextFragment::plain_text("\nReview the command below, then "),
                 FormattedTextFragment::bold("press enter"),
-                FormattedTextFragment::plain_text(" to install the update and re-launch Rook.  "),
+                FormattedTextFragment::plain_text(
+                    " to install the update and re-launch Polaris Terminal.  ",
+                ),
                 FormattedTextFragment::hyperlink(
                     "Please report any issues",
-                    "https://github.com/FJRG2007/rook/issues/new/choose",
+                    "https://github.com/FJRG2007/polaris/issues/new/choose",
                 ),
             ]));
 
@@ -281,10 +283,10 @@ mod package_manager {
         };
         log::info!("Relaunching using path: {program:?}");
         let mut command = command::blocking::Command::new(program);
-        // Add any arguments that were passed to rook, skipping the first
+        // Add any arguments that were passed to polaris-terminal, skipping the first
         // argument (the name of the executable) and dropping the flag for
         // finishing an update.
-        let finish_update_flag = rook_cli::finish_update_flag();
+        let finish_update_flag = pterm_cli::finish_update_flag();
         command.args(
             std::env::args()
                 .skip(1)
@@ -296,24 +298,24 @@ mod package_manager {
         // If we're testing with a local copy of channel_versions.json, have the
         // newly-started binary also reference that same file (so we can test
         // displaying an updated changelog after an autoupdate).
-        if let Ok(path) = std::env::var("ROOK_CHANNEL_VERSIONS_PATH") {
-            command.env("ROOK_CHANNEL_VERSIONS_PATH", path);
+        if let Ok(path) = std::env::var("POLARIS_TERMINAL_CHANNEL_VERSIONS_PATH") {
+            command.env("POLARIS_TERMINAL_CHANNEL_VERSIONS_PATH", path);
         }
 
-        log::info!("Relaunching rook for update...");
+        log::info!("Relaunching polaris-terminal for update...");
         command.spawn()?;
         Ok(())
     }
 }
 
-/// Returns which method should be used to update Rook.
+/// Returns which method should be used to update Polaris Terminal.
 #[derive(Debug)]
 pub(crate) enum UpdateMethod {
-    /// We don't know how to update Rook.
+    /// We don't know how to update Polaris Terminal.
     Unknown,
-    /// Rook is running as an AppImage and should be updated in-place.
+    /// Polaris Terminal is running as an AppImage and should be updated in-place.
     AppImage(PathBuf),
-    /// Rook can be updated using the given package manager.
+    /// Polaris Terminal can be updated using the given package manager.
     PackageManager(PackageManager),
 }
 
@@ -358,12 +360,12 @@ impl PackageManager {
             } => {
                 let dist_upgrade_fn = match shell_type {
                     ShellType::Zsh | ShellType::Bash | ShellType::Fish => {
-                        "rook_handle_dist_upgrade"
+                        "pterm_handle_dist_upgrade"
                     }
-                    ShellType::PowerShell => "Rook-Handle-DistUpgrade",
+                    ShellType::PowerShell => "PolarisTerminal-Handle-DistUpgrade",
                 };
                 // If running with apt, attempt to handle a distribution update that may rename the
-                // rook source file to `{repo_name}.distUpgrade`.
+                // polaris-terminal source file to `{repo_name}.distUpgrade`.
                 // We explicitly use `or` here instead of `and` to limit the blast radius of this
                 // change, if handling a dist upgrade was unsuccessful we still want to try to
                 // install the new version.
@@ -388,7 +390,7 @@ impl PackageManager {
                 is_signing_key_configured,
             } => {
                 let repo_prefix = if !is_repo_configured {
-                    let cache_dir = rook_core::paths::cache_dir();
+                    let cache_dir = pterm_core::paths::cache_dir();
                     let cache_dir_str = cache_dir.display();
                     // Back up the existing pacman.conf file just in case
                     // anything goes wrong, then add the repository config.
@@ -413,8 +415,8 @@ impl PackageManager {
         };
 
         let finish_update_fn = match shell_type {
-            ShellType::Zsh | ShellType::Bash | ShellType::Fish => "rook_finish_update",
-            ShellType::PowerShell => "Rook-Finish-Update",
+            ShellType::Zsh | ShellType::Bash | ShellType::Fish => "pterm_finish_update",
+            ShellType::PowerShell => "PolarisTerminal-Finish-Update",
         };
         format!("{base_command}{and}{finish_update_fn} {update_id}")
     }
@@ -470,7 +472,9 @@ impl PackageManager {
         match output {
             Ok(output) => {
                 if !output.status.success() {
-                    bail!("Failed to determine which package manager was used to install rook");
+                    bail!(
+                        "Failed to determine which package manager was used to install polaris-terminal"
+                    );
                 }
                 let Ok(stdout) = std::str::from_utf8(&output.stdout) else {
                     bail!("Could not parse package manager detection script output as UTF-8");
@@ -540,16 +544,16 @@ impl std::fmt::Display for PackageManager {
     }
 }
 
-/// Returns whether the rook apt repository is disabled due to a version update.
+/// Returns whether the polaris-terminal apt repository is disabled due to a version update.
 /// This occurs if there's a `warpdotdev.list.distUpgrade` file but no `warpdotdev.sources` or
 /// `warpdotdev.list` file.
 /// In a traditional Ubuntu distro update, Ubuntu renames each source file from `foo.list` to
 /// `foo.list.distUpgrade`. It then creates a new version of `foo.list` (or `foo.sources` if
 /// updating to Ubuntu 24+) with the repo disabled.
 ///
-/// However, Ubuntu incorrectly thinks the Rook source file is invalid (due to the addition of the
+/// However, Ubuntu incorrectly thinks the Polaris Terminal source file is invalid (due to the addition of the
 /// `signed-by` key) so it only leaves the `*.distUpgrade` source file. We use the existence of this
-/// file to determine whether we need to run the special `rook_handle_dist_upgrade` function to copy
+/// file to determine whether we need to run the special `pterm_handle_dist_upgrade` function to copy
 /// `warpdotdev.list.distUpgrade` back to `warpdotdev.list` to re-enable the repository.
 fn is_apt_repository_disabled_due_to_version_update(repo_name: &str) -> bool {
     let apt_sources_directory = match get_apt_sources_directory() {
@@ -669,19 +673,19 @@ fn is_pacman_signing_key_installed() -> bool {
 
 fn package_name(channel: Channel) -> &'static str {
     match channel {
-        Channel::Stable => "rook-terminal",
-        Channel::Preview => "rook-terminal-preview",
-        Channel::Dev => "rook-terminal-dev",
-        Channel::Integration => "rook-terminal-integration",
-        Channel::Local => "rook-terminal-local",
-        Channel::Oss => "rook-oss",
+        Channel::Stable => "polaris-terminal-stable",
+        Channel::Preview => "polaris-terminal-preview",
+        Channel::Dev => "polaris-terminal-dev",
+        Channel::Integration => "polaris-terminal-integration",
+        Channel::Local => "polaris-terminal-local",
+        Channel::Oss => "polaris-terminal",
     }
 }
 
 fn repo_name(channel: Channel) -> String {
     let package_name = package_name(channel);
     let channel_suffix = package_name
-        .strip_prefix("rook-terminal")
+        .strip_prefix("polaris-terminal-stable")
         .unwrap_or_default();
     format!("warpdotdev{channel_suffix}")
 }

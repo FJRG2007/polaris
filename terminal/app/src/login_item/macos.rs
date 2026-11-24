@@ -5,8 +5,8 @@
 //! updates, but we don't try to register against a class that isn't there.
 
 use ::settings::Setting;
-use rook_errors::report_if_error;
-use rookui::{AppContext, SingletonEntity};
+use pterm_errors::report_if_error;
+use ptermui::{AppContext, SingletonEntity};
 
 use crate::terminal::general_settings::GeneralSettings;
 

@@ -8,12 +8,12 @@ use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use derivative::Derivative;
 use lazy_static::lazy_static;
+use pterm_core::channel::Channel;
+use pterm_core::features::FeatureFlag;
+use pterm_graphql::queries::get_updated_cloud_objects::UpdatedObjectInput;
+use pterm_graphql::scalars::time::ServerTimestamp;
+use ptermui::{AppContext, SingletonEntity};
 use regex::Regex;
-use rook_core::channel::Channel;
-use rook_core::features::FeatureFlag;
-use rook_graphql::queries::get_updated_cloud_objects::UpdatedObjectInput;
-use rook_graphql::scalars::time::ServerTimestamp;
-use rookui::{AppContext, SingletonEntity};
 use url::Url;
 
 use self::breadcrumbs::ContainingObject;
@@ -25,8 +25,8 @@ use self::model::persistence::CloudModel;
 use crate::appearance::Appearance;
 use crate::auth::UserUid;
 use crate::channel::ChannelState;
-use crate::drive::items::RookDriveItem;
-use crate::drive::{CloudObjectTypeAndId, OpenRookDriveObjectArgs, OpenRookDriveObjectSettings};
+use crate::drive::items::PtermDriveItem;
+use crate::drive::{CloudObjectTypeAndId, OpenPtermDriveObjectArgs, OpenPtermDriveObjectSettings};
 use crate::persistence::ModelEvent;
 use crate::server::cloud_objects::update_manager::InitiatedBy;
 use crate::server::ids::{HashableId, HashedSqliteId, ObjectUid, ServerId, SyncId, ToServerId};
@@ -151,17 +151,17 @@ pub trait CloudObject: Debug {
     /// in the sync queue item.
     fn update_object_queue_item(&self, revision_ts: Option<Revision>) -> QueueItem;
 
-    /// Returns whether this model type should render as a rook drive item.
-    fn renders_in_rook_drive(&self) -> bool;
+    /// Returns whether this model type should render as a polaris-terminal drive item.
+    fn renders_in_pterm_drive(&self) -> bool;
 
     /// Returns whether this model type should show update toasts in the UI.
     fn should_show_activity_toasts(&self) -> bool {
         true
     }
 
-    /// Creates a new Rook Drive item for this object.  Returns None if this
-    /// object is not rendered in Rook Drive.
-    fn to_rook_drive_item(&self, appearance: &Appearance) -> Option<Box<dyn RookDriveItem>>;
+    /// Creates a new Polaris Terminal Drive item for this object.  Returns None if this
+    /// object is not rendered in Polaris Terminal Drive.
+    fn to_pterm_drive_item(&self, appearance: &Appearance) -> Option<Box<dyn PtermDriveItem>>;
 
     /// Returns the web link of this object. Will return none if we do not support web links
     /// for this particular object (i.e. if it's not yet sync'd to the server, or if we don't
@@ -436,8 +436,8 @@ pub trait CloudModelType: Debug + Clone + Send + Sync {
     /// Returns the ObjectType for this model.
     fn object_type(&self) -> ObjectType;
 
-    /// Returns whether this model type should render as a rook drive item.
-    fn renders_in_rook_drive(&self) -> bool;
+    /// Returns whether this model type should render as a polaris-terminal drive item.
+    fn renders_in_pterm_drive(&self) -> bool;
 
     /// Returns whether this model type should show update toasts in the UI.
     fn should_show_activity_toasts(&self) -> bool {
@@ -450,19 +450,19 @@ pub trait CloudModelType: Debug + Clone + Send + Sync {
         true
     }
 
-    /// Creates a new rook drive item for this model type. Returns None
-    /// if this object does not render in Rook Drive.
-    fn to_rook_drive_item(
+    /// Creates a new polaris-terminal drive item for this model type. Returns None
+    /// if this object does not render in Polaris Terminal Drive.
+    fn to_pterm_drive_item(
         &self,
         id: SyncId,
         appearance: &Appearance,
         object: &Self::CloudObjectType,
-    ) -> Option<Box<dyn RookDriveItem>>;
+    ) -> Option<Box<dyn PtermDriveItem>>;
 
-    /// Returns the display name for this model (e.g. to show in the Rook Drive index)
+    /// Returns the display name for this model (e.g. to show in the Polaris Terminal Drive index)
     fn display_name(&self) -> String;
 
-    /// Sets the display name to show in the Rook Drive Index.  Setting the name
+    /// Sets the display name to show in the Polaris Terminal Drive Index.  Setting the name
     /// is not currently supported by all object types, hence the default empty
     /// implementation.
     fn set_display_name(&mut self, _name: &str) {}
@@ -774,12 +774,12 @@ where
         self.model().update_object_queue_item(revision_ts, self)
     }
 
-    fn renders_in_rook_drive(&self) -> bool {
-        self.model().renders_in_rook_drive()
+    fn renders_in_pterm_drive(&self) -> bool {
+        self.model().renders_in_pterm_drive()
     }
 
-    fn to_rook_drive_item(&self, appearance: &Appearance) -> Option<Box<dyn RookDriveItem>> {
-        self.model().to_rook_drive_item(self.id, appearance, self)
+    fn to_pterm_drive_item(&self, appearance: &Appearance) -> Option<Box<dyn PtermDriveItem>> {
+        self.model().to_pterm_drive_item(self.id, appearance, self)
     }
 
     fn can_export(&self) -> bool {
@@ -800,11 +800,11 @@ where
 }
 
 /// Extracts the server id and object type from a (caller validated) Drive link.
-/// Intended use is deriving metadata from links such that Rook objects
-/// can be opened natively in Rook with no web interaction.
-pub fn extract_server_id_and_object_type_from_rook_drive_link(
+/// Intended use is deriving metadata from links such that Polaris Terminal objects
+/// can be opened natively in Polaris Terminal with no web interaction.
+pub fn extract_server_id_and_object_type_from_pterm_drive_link(
     url: &Url,
-) -> Option<OpenRookDriveObjectArgs> {
+) -> Option<OpenPtermDriveObjectArgs> {
     let server_id = url
         .path_segments()
         .and_then(|mut segments| segments.next_back())
@@ -827,13 +827,13 @@ pub fn extract_server_id_and_object_type_from_rook_drive_link(
 
     let invitee_email: Option<String> = query_string.get("invitee_email").map(|s| s.to_string());
 
-    Some(OpenRookDriveObjectArgs {
+    Some(OpenPtermDriveObjectArgs {
         object_type,
         server_id: match server_id {
             Some(server_id) => server_id.try_into().ok()?,
             _ => return None,
         },
-        settings: OpenRookDriveObjectSettings {
+        settings: OpenPtermDriveObjectSettings {
             focused_folder_id,
             invitee_email,
         },
@@ -989,7 +989,7 @@ pub use cloud_object_models::{
     ServerPreference, ServerScheduledAmbientAgent, ServerTemplatableMCPServer, ServerWorkflow,
     ServerWorkflowEnum, TryFromGql,
 };
-use rook_errors::report_error;
+use pterm_errors::report_error;
 
 #[derive(Default, Clone, Copy, Debug, Eq, Derivative)]
 #[derivative(PartialEq, Hash)]
@@ -1020,7 +1020,7 @@ impl Space {
     }
 }
 
-/// Enum for specifying the location of a rook drive object.
+/// Enum for specifying the location of a polaris-terminal drive object.
 /// Objects can live in top level spaces, or a specific folder.
 #[derive(Eq, PartialEq, Copy, Clone, Debug, Hash)]
 pub enum CloudObjectLocation {

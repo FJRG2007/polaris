@@ -12,8 +12,8 @@ use cloud_objects::ids::{
 };
 #[cfg(any(test, feature = "test-util"))]
 use mockall::automock;
-use rook_graphql::mcp_gallery_template::MCPGalleryTemplate;
-use rook_graphql::object_permissions::AccessLevel;
+use pterm_graphql::mcp_gallery_template::MCPGalleryTemplate;
+use pterm_graphql::object_permissions::AccessLevel;
 
 /// Identifies a guest to remove from an object.
 #[derive(Clone, Debug)]
@@ -274,8 +274,8 @@ pub trait ObjectClient: 'static + Send + Sync {
         notebook_id: cloud_object_models::NotebookId,
     ) -> Result<ServerMetadata>;
 
-    /// Gets updates for all Rook Drive actions.
-    async fn get_rook_drive_updates(
+    /// Gets updates for all Polaris Terminal Drive actions.
+    async fn get_pterm_drive_updates(
         &self,
         message_sender: Sender<ObjectUpdateMessage>,
         stream_ready_sender: Sender<()>,

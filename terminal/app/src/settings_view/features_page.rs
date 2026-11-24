@@ -6,24 +6,24 @@ use std::time::Duration;
 
 use ::settings::{Setting, ToggleableSetting};
 use lazy_static::lazy_static;
-use rook_core::channel::ChannelState;
-use rook_core::context_flag::ContextFlag;
-use rook_core::semantic_selection::{
+use pterm_core::channel::ChannelState;
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::semantic_selection::{
     SemanticSelection, SemanticSelectionChangedEvent, SmartSelectEnabled,
 };
-use rook_errors::{report_error, report_if_error};
-use rookui::elements::{
+use pterm_errors::{report_error, report_if_error};
+use ptermui::elements::{
     Align, Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss,
     DispatchEventResult, Element, Empty, EventHandler, Fill, Flex, Hoverable, MainAxisAlignment,
     MainAxisSize, MouseState, MouseStateHandle, ParentElement, Radius, Shrinkable, Text,
 };
-use rookui::keymap::{ContextPredicate, FixedBinding, Keystroke};
-use rookui::platform::{Cursor, GraphicsBackend};
-use rookui::rendering::GPUPowerPreference;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{
+use ptermui::keymap::{ContextPredicate, FixedBinding, Keystroke};
+use ptermui::platform::{Cursor, GraphicsBackend};
+use ptermui::rendering::GPUPowerPreference;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{
     Action, AppContext, DisplayIdx, Entity, EventContext, ModelHandle, SingletonEntity, Tracked,
     TypedActionView, View, ViewContext, ViewHandle, WindowId,
 };
@@ -31,7 +31,7 @@ use strum::IntoEnumIterator;
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use {
     crate::settings::ForceX11, crate::settings::LinuxAppConfiguration,
-    rookui::platform::linux::windowing_system_is_customizable,
+    ptermui::platform::linux::windowing_system_is_customizable,
 };
 
 use super::keybindings::KeyBindingModifyingState;
@@ -73,8 +73,8 @@ use crate::settings::{
     GPUSettings, GlobalHotkeyMode, InputSettings, InputSettingsChangedEvent,
     LinuxSelectionClipboard, MiddleClickPasteEnabled, MouseScrollMultiplier,
     NativeShellCompletionsEnabled, OutlineCodebaseSymbolsForAtContextMenu, PreferLowPowerGPU,
-    PreferredGraphicsBackend, QUAKE_WINDOW_AUTOHIDE_SUPPORTED, QuakeModeSettings,
-    RightClickBehavior, RightClickBehaviorSetting, RookCompletionsEnabled, ScrollSettings,
+    PreferredGraphicsBackend, PtermCompletionsEnabled, QUAKE_WINDOW_AUTOHIDE_SUPPORTED,
+    QuakeModeSettings, RightClickBehavior, RightClickBehaviorSetting, ScrollSettings,
     ScrollSettingsChangedEvent, SelectionSettings, SelectionSettingsChangedEvent,
     ShowAutosuggestionIgnoreButton, ShowChangelogAfterUpdate, ShowTerminalInputMessageBar,
     SshSettings, SyntaxHighlighting, TabBehavior, UserNativeRedirectPreference, VimModeEnabled,
@@ -105,7 +105,7 @@ use crate::terminal::settings::{
 };
 use crate::terminal::{BlockListSettings, PreserveInputFocusOnBlockSelection, SnackbarEnabled};
 use crate::undo_close::UndoCloseSettings;
-use crate::user_config::{RookConfig, RookConfigUpdateEvent};
+use crate::user_config::{PtermConfig, PtermConfigUpdateEvent};
 use crate::util::bindings::{
     keybinding_name_to_display_string, reset_keybinding_to_default, set_custom_keybinding,
 };
@@ -129,7 +129,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     context: &ContextPredicate,
     builder: fn(SettingsAction) -> T,
 ) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     // Add all of the toggle settings from the Features Page that you want to show up on the Command Palette here.
     let mut toggle_binding_pairs = vec![
@@ -228,12 +228,12 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 .is_supported_on_current_platform(),
         ),
         ToggleSettingActionPair::new(
-            "rook completions",
+            "polaris-terminal completions",
             builder(SettingsAction::FeaturesPageToggle(
-                FeaturesPageAction::ToggleRookCompletions,
+                FeaturesPageAction::TogglePtermCompletions,
             )),
             context,
-            flags::ROOK_COMPLETIONS_CONTEXT_FLAG,
+            flags::POLARIS_TERMINAL_COMPLETIONS_CONTEXT_FLAG,
         )
         .with_enabled(|| FeatureFlag::NativeShellCompletions.is_enabled()),
         ToggleSettingActionPair::new(
@@ -325,7 +325,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ];
 
     toggle_binding_pairs.push(ToggleSettingActionPair::new(
-        "reuse existing SSH ControlMaster in the Rook SSH wrapper",
+        "reuse existing SSH ControlMaster in the Polaris Terminal SSH wrapper",
         builder(SettingsAction::FeaturesPageToggle(
             FeaturesPageAction::ToggleSshReuseControlMaster,
         )),
@@ -734,13 +734,13 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         id!("Workspace"),
     )]);
 
-    if DefaultTerminal::can_rook_become_default() {
+    if DefaultTerminal::can_pterm_become_default() {
         app.register_fixed_bindings([FixedBinding::empty(
-            "Make Rook the default terminal",
+            "Make Polaris Terminal the default terminal",
             builder(SettingsAction::FeaturesPageToggle(
-                FeaturesPageAction::MakeRookDefaultTerminal,
+                FeaturesPageAction::MakePtermDefaultTerminal,
             )),
-            context.to_owned() & !id!(flags::ROOK_IS_DEFAULT_TERMINAL),
+            context.to_owned() & !id!(flags::POLARIS_TERMINAL_IS_DEFAULT_TERMINAL),
         )]);
     }
 }
@@ -758,7 +758,7 @@ pub enum FeaturesPageAction {
     ToggleSnackbar,
     ToggleLinkTooltip,
     ToggleCompletionsOpenWhileTyping,
-    ToggleRookCompletions,
+    TogglePtermCompletions,
     ToggleNativeShellCompletions,
     ToggleCommandCorrections,
     ToggleErrorUnderlining,
@@ -833,7 +833,7 @@ pub enum FeaturesPageAction {
     ToggleShowTerminalInputMessageLine,
     TogglePreserveInputFocusOnBlockSelection,
     ToggleAgentInAppNotifications,
-    MakeRookDefaultTerminal,
+    MakePtermDefaultTerminal,
 }
 
 lazy_static! {
@@ -965,9 +965,9 @@ impl FeaturesPageAction {
                 action: "ToggleCompletionsOpenWhileTyping".to_string(),
                 value: to_string(*input_settings.completions_open_while_typing.value()),
             },
-            Self::ToggleRookCompletions => TelemetryEvent::FeaturesPageAction {
-                action: "ToggleRookCompletions".to_string(),
-                value: to_string(*input_settings.rook_completions_enabled.value()),
+            Self::TogglePtermCompletions => TelemetryEvent::FeaturesPageAction {
+                action: "TogglePtermCompletions".to_string(),
+                value: to_string(*input_settings.pterm_completions_enabled.value()),
             },
             Self::ToggleNativeShellCompletions => TelemetryEvent::FeaturesPageAction {
                 action: "ToggleNativeShellCompletions".to_string(),
@@ -1343,9 +1343,9 @@ impl FeaturesPageAction {
                     ),
                 }
             }
-            Self::MakeRookDefaultTerminal => TelemetryEvent::FeaturesPageAction {
-                action: "MakeRookDefaultTerminal".to_string(),
-                value: to_string(DefaultTerminal::as_ref(ctx).is_rook_default()),
+            Self::MakePtermDefaultTerminal => TelemetryEvent::FeaturesPageAction {
+                action: "MakePtermDefaultTerminal".to_string(),
+                value: to_string(DefaultTerminal::as_ref(ctx).is_pterm_default()),
             },
             Self::ToggleAutoOpenCodeReviewPane => TelemetryEvent::FeaturesPageAction {
                 action: "ToggleAutoOpenCodeReviewPane".to_string(),
@@ -1869,11 +1869,11 @@ impl TypedActionView for FeaturesPageView {
                     );
                 });
             }
-            ToggleRookCompletions => {
+            TogglePtermCompletions => {
                 InputSettings::handle(ctx).update(ctx, |input_settings, ctx| {
                     report_if_error!(
                         input_settings
-                            .rook_completions_enabled
+                            .pterm_completions_enabled
                             .toggle_and_save_value(ctx)
                     );
                 });
@@ -2143,7 +2143,7 @@ impl TypedActionView for FeaturesPageView {
                 self.force_x11_changed = true;
                 // This is a workaround to make sure the user sees the new text that is added to the description after changing the setting.
                 // Without scrolling, the new description text gets cut off.
-                self.page.scroll_by(rookui::units::Pixels::new(40.));
+                self.page.scroll_by(ptermui::units::Pixels::new(40.));
                 ctx.notify();
             }
             ToggleQuitOnLastWindowClosed => {
@@ -2224,9 +2224,9 @@ impl TypedActionView for FeaturesPageView {
                     });
                 }
             }
-            MakeRookDefaultTerminal => {
+            MakePtermDefaultTerminal => {
                 DefaultTerminal::handle(ctx).update(ctx, |default_terminal, ctx| {
-                    default_terminal.make_rook_default(ctx);
+                    default_terminal.make_pterm_default(ctx);
                 });
             }
             ToggleAsyncFind => {
@@ -2480,8 +2480,8 @@ impl FeaturesPageView {
         let default_session_mode_dropdown = ctx.add_typed_action_view(FilterableDropdown::new);
         Self::update_default_session_mode_dropdown(default_session_mode_dropdown.clone(), ctx);
 
-        ctx.subscribe_to_model(&RookConfig::handle(ctx), |me, _, event, ctx| {
-            if matches!(event, RookConfigUpdateEvent::TabConfigs) {
+        ctx.subscribe_to_model(&PtermConfig::handle(ctx), |me, _, event, ctx| {
+            if matches!(event, PtermConfigUpdateEvent::TabConfigs) {
                 Self::update_default_session_mode_dropdown(
                     me.default_session_mode_dropdown.clone(),
                     ctx,
@@ -2834,7 +2834,7 @@ impl FeaturesPageView {
             general_widgets.push(Box::new(MouseScrollMultiplierWidget::default()));
         }
 
-        if DefaultTerminal::can_rook_become_default() {
+        if DefaultTerminal::can_pterm_become_default() {
             general_widgets.push(Box::new(DefaultTerminalWidget::default()));
         }
 
@@ -2935,7 +2935,7 @@ impl FeaturesPageView {
             editor_widgets.push(Box::new(SyntaxHighlightingWidget::default()))
         }
         if FeatureFlag::NativeShellCompletions.is_enabled() {
-            editor_widgets.push(Box::new(RookCompletionsWidget::default()));
+            editor_widgets.push(Box::new(PtermCompletionsWidget::default()));
             editor_widgets.push(Box::new(NativeShellCompletionsWidget::default()));
         } else if input_settings
             .completions_open_while_typing
@@ -3750,7 +3750,7 @@ impl FeaturesPageView {
                     .collect();
 
                 // Append each loaded tab config
-                let tab_configs = RookConfig::as_ref(ctx).tab_configs().to_vec();
+                let tab_configs = PtermConfig::as_ref(ctx).tab_configs().to_vec();
                 for config in &tab_configs {
                     if let Some(path) = &config.source_path {
                         items.push(DropdownItem::new(
@@ -4450,7 +4450,7 @@ impl SettingsPageMeta for FeaturesPageView {
     }
 
     fn on_page_selected(&mut self, _: bool, ctx: &mut ViewContext<Self>) {
-        // On MacOS, we rely on [`rookui::platform::AppCallbacks::on_screen_changed`] to update and
+        // On MacOS, we rely on [`ptermui::platform::AppCallbacks::on_screen_changed`] to update and
         // notify on the [`DisplayCount`] model. However, no mechanism exists on Linux to trigger
         // that callback. As a workaround, we check for updates here where quake mode is
         // configured.
@@ -4898,9 +4898,9 @@ impl SettingsWidget for LoginItemWidget {
         let general_settings = GeneralSettings::as_ref(app);
         let ui_builder = appearance.ui_builder();
         #[cfg(target_os = "macos")]
-        let label = "Start Rook at login (requires macOS 13+)";
+        let label = "Start Polaris Terminal at login (requires macOS 13+)";
         #[cfg(not(target_os = "macos"))]
-        let label = "Start Rook at login";
+        let label = "Start Polaris Terminal at login";
         render_body_item::<FeaturesPageAction>(
             label.into(),
             None,
@@ -5117,7 +5117,7 @@ impl SettingsWidget for DefaultTerminalWidget {
     type View = FeaturesPageView;
 
     fn search_terms(&self) -> &str {
-        "rook default terminal application"
+        "polaris-terminal default terminal application"
     }
 
     fn render(
@@ -5128,9 +5128,9 @@ impl SettingsWidget for DefaultTerminalWidget {
     ) -> Box<dyn Element> {
         let ui_builder = appearance.ui_builder();
         let default_terminal = DefaultTerminal::as_ref(app);
-        if default_terminal.is_rook_default() {
+        if default_terminal.is_pterm_default() {
             ui_builder
-                .wrappable_text("Rook is the default terminal", true)
+                .wrappable_text("Polaris Terminal is the default terminal", true)
                 .with_style(UiComponentStyles {
                     font_color: Some(appearance.theme().disabled_ui_text_color().into()),
                     margin: Some(Coords::default().bottom(16.)),
@@ -5141,10 +5141,10 @@ impl SettingsWidget for DefaultTerminalWidget {
         } else {
             ui_builder
                 .link(
-                    "Make Rook the default terminal".to_string(),
+                    "Make Polaris Terminal the default terminal".to_string(),
                     None,
                     Some(Box::new(|ctx| {
-                        ctx.dispatch_typed_action(FeaturesPageAction::MakeRookDefaultTerminal);
+                        ctx.dispatch_typed_action(FeaturesPageAction::MakePtermDefaultTerminal);
                     })),
                     self.link_state.clone(),
                 )
@@ -5236,7 +5236,7 @@ impl SettingsWidget for DesktopNotificationsWidget {
         let ui_builder = appearance.ui_builder();
         let mut column = Flex::column();
         column.add_child(render_body_item::<FeaturesPageAction>(
-            "Receive desktop notifications from Rook".into(),
+            "Receive desktop notifications from Polaris Terminal".into(),
             Some(AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
                 on_click_action: Some(FeaturesPageAction::OpenUrl(NOTIFICATIONS_DOCS_URL.into())),
@@ -5617,7 +5617,7 @@ impl SettingsWidget for ExtraMetaKeysWidget {
 }
 
 /// Stable `&'static str` id for the global-hotkey settings widget, exposed for
-/// the `rook://settings?widget=global_hotkey` deeplink (see
+/// the `polaris-terminal://settings?widget=global_hotkey` deeplink (see
 /// `settings_widget_deeplink_target`).
 pub(crate) fn global_hotkey_widget_id() -> &'static str {
     GlobalHotkeyWidget::static_widget_id()
@@ -5955,16 +5955,16 @@ impl SettingsWidget for CompletionsMenuWhileTypingWidget {
 }
 
 #[derive(Default)]
-struct RookCompletionsWidget {
+struct PtermCompletionsWidget {
     switch_state: SwitchStateHandle,
     as_you_type_switch_state: SwitchStateHandle,
 }
 
-impl SettingsWidget for RookCompletionsWidget {
+impl SettingsWidget for PtermCompletionsWidget {
     type View = FeaturesPageView;
 
     fn search_terms(&self) -> &str {
-        "rook completions built-in shell command suggestions open completions menu as you type typing"
+        "polaris-terminal completions built-in shell command suggestions open completions menu as you type typing"
     }
 
     fn render(
@@ -5974,15 +5974,16 @@ impl SettingsWidget for RookCompletionsWidget {
         app: &AppContext,
     ) -> Box<dyn Element> {
         let ui_builder = appearance.ui_builder();
-        let rook_completions_enabled = *InputSettings::as_ref(app).rook_completions_enabled.value();
+        let pterm_completions_enabled =
+            *InputSettings::as_ref(app).pterm_completions_enabled.value();
 
         let mut column = Flex::column();
         column.add_child(render_body_item::<FeaturesPageAction>(
-            "Rook completions".into(),
+            "Polaris Terminal completions".into(),
             None,
             LocalOnlyIconState::for_setting(
-                RookCompletionsEnabled::storage_key(),
-                RookCompletionsEnabled::sync_to_cloud(),
+                PtermCompletionsEnabled::storage_key(),
+                PtermCompletionsEnabled::sync_to_cloud(),
                 &mut view
                     .button_mouse_states
                     .local_only_icon_tooltip_states
@@ -5993,16 +5994,16 @@ impl SettingsWidget for RookCompletionsWidget {
             appearance,
             ui_builder
                 .switch(self.switch_state.clone())
-                .check(rook_completions_enabled)
+                .check(pterm_completions_enabled)
                 .build()
                 .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(FeaturesPageAction::ToggleRookCompletions);
+                    ctx.dispatch_typed_action(FeaturesPageAction::TogglePtermCompletions);
                 })
                 .finish(),
             None,
         ));
 
-        if rook_completions_enabled {
+        if pterm_completions_enabled {
             let as_you_type_switch = ui_builder
                 .switch(self.as_you_type_switch_state.clone())
                 .check(
@@ -6056,10 +6057,10 @@ impl SettingsWidget for NativeShellCompletionsWidget {
     ) -> Box<dyn Element> {
         let input_settings = InputSettings::as_ref(app);
         let native_on = *input_settings.native_shell_completions_enabled.value();
-        let rook_on = *input_settings.rook_completions_enabled.value();
+        let pterm_on = *input_settings.pterm_completions_enabled.value();
         let as_you_type_on = *input_settings.completions_open_while_typing.value();
 
-        let description = if rook_on && as_you_type_on && native_on {
+        let description = if pterm_on && as_you_type_on && native_on {
             let keystroke = &*view.completions_keystroke;
             keystroke.is_empty().not().then_some(format!(
                 "Native shell completions aren't generated as you type; press {keystroke} to fetch them."
@@ -7729,17 +7730,17 @@ impl SettingsWidget for WindowSystemWidget {
                     may be blurry if your Wayland compositor is using fraction scaling (ex: 125%)."
                 .to_string();
         if view.force_x11_changed {
-            secondary_text.push_str("\n\nRestart Rook for changes to take effect.");
+            secondary_text.push_str("\n\nRestart Polaris Terminal for changes to take effect.");
         }
-        let rook_theme = appearance.theme();
+        let pterm_theme = appearance.theme();
         children.add_child(
             appearance
                 .ui_builder()
                 .wrappable_text(secondary_text, true)
                 .with_style(UiComponentStyles {
                     font_color: Some(
-                        rook_theme
-                            .sub_text_color(rook_theme.background())
+                        pterm_theme
+                            .sub_text_color(pterm_theme.background())
                             .into_solid(),
                     ),
                     ..Default::default()

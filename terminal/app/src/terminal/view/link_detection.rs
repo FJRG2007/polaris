@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
-use rookui::ViewContext;
-use rookui::platform::Cursor;
+use ptermui::ViewContext;
+use ptermui::platform::Cursor;
 use serde::{Serialize, Serializer};
 
 use crate::terminal::TerminalModel;
@@ -21,13 +21,13 @@ cfg_if::cfg_if! {
         use std::path::PathBuf;
         use unicode_general_category::{get_general_category, GeneralCategory};
         use unicode_width::UnicodeWidthChar;
-        use rook_util::path::CleanPathResult;
-        use rook_util::path::LineAndColumnArg;
+        use pterm_util::path::CleanPathResult;
+        use pterm_util::path::LineAndColumnArg;
     }
 }
 
 #[cfg(feature = "local_fs")]
-use rook_errors::report_error;
+use pterm_errors::report_error;
 
 use super::{FindLinkArg, TerminalEditor};
 

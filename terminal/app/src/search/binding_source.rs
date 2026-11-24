@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rookui::{Entity, EntityId, WindowId};
+use ptermui::{Entity, EntityId, WindowId};
 
 use crate::util::bindings::CommandBinding;
 

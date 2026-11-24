@@ -1,14 +1,14 @@
 use pathfinder_geometry::vector::vec2f;
-use rookui::color::ColorU;
-use rookui::elements::{
+use ptermui::color::ColorU;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Dismiss, Element, Flex, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Percentage, Radius, Shrinkable, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::{FixedBinding, Keystroke};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::{FixedBinding, Keystroke};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -99,7 +99,7 @@ pub enum ModalAction {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings(vec![FixedBinding::new(
         "escape",
@@ -313,7 +313,7 @@ impl<T: View> Modal<T> {
             Some(
                 Align::new(
                     Container::new(
-                        ConstrainedBox::new(icon.to_rookui_icon(icon_color).finish())
+                        ConstrainedBox::new(icon.to_ptermui_icon(icon_color).finish())
                             .with_width(icon_size)
                             .with_height(icon_size)
                             .finish(),

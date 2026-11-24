@@ -54,7 +54,7 @@ fn custom_theme_path_from_storage(path: &Path, theme_root: &Path) -> PathBuf {
 
 #[test]
 fn custom_theme_path_under_theme_root_storage_helper_returns_relative_path() {
-    let root = PathBuf::from("/home/user/.local/share/rook-terminal/themes");
+    let root = PathBuf::from("/home/user/.local/share/polaris-terminal-stable/themes");
     let path = root.join("catppuccin/catppuccin_mocha.yml");
 
     assert_eq!(
@@ -65,7 +65,7 @@ fn custom_theme_path_under_theme_root_storage_helper_returns_relative_path() {
 
 #[test]
 fn custom_theme_relative_path_resolves_under_local_theme_root() {
-    let root = PathBuf::from("/Users/example/.rook/themes");
+    let root = PathBuf::from("/Users/example/.polaris/terminal/themes");
     let stored = PathBuf::from("catppuccin/catppuccin_latte.yml");
 
     assert_eq!(
@@ -76,7 +76,7 @@ fn custom_theme_relative_path_resolves_under_local_theme_root() {
 
 #[test]
 fn custom_theme_relative_parent_dir_path_is_preserved() {
-    let root = PathBuf::from("/Users/example/.rook/themes");
+    let root = PathBuf::from("/Users/example/.polaris/terminal/themes");
     let stored = PathBuf::from("../outside.yml");
 
     assert_eq!(custom_theme_path_from_storage(&stored, &root), stored);
@@ -84,7 +84,7 @@ fn custom_theme_relative_parent_dir_path_is_preserved() {
 
 #[test]
 fn custom_theme_relative_parent_dir_path_is_not_portable() {
-    let root = PathBuf::from("/Users/example/.rook/themes");
+    let root = PathBuf::from("/Users/example/.polaris/terminal/themes");
 
     assert!(!custom_theme_path_is_portable(
         &PathBuf::from("../outside.yml"),
@@ -95,7 +95,7 @@ fn custom_theme_relative_parent_dir_path_is_not_portable() {
 #[test]
 fn custom_theme_absolute_parent_dir_path_under_theme_root_storage_helper_preserves_path_and_rejects_portability()
  {
-    let root = PathBuf::from("/Users/example/.rook/themes");
+    let root = PathBuf::from("/Users/example/.polaris/terminal/themes");
     let path = root.join("../outside.yml");
 
     assert_eq!(custom_theme_path_from_storage(&path, &root), path);
@@ -106,12 +106,13 @@ fn custom_theme_absolute_parent_dir_path_under_theme_root_storage_helper_preserv
 #[test]
 fn custom_theme_legacy_macos_path_is_preserved_even_when_local_file_exists() {
     let temp = tempfile::tempdir().unwrap();
-    let root = temp.path().join("rook-terminal/themes");
+    let root = temp.path().join("polaris-terminal-stable/themes");
     let local = root.join("catppuccin/catppuccin_mocha.yml");
     std::fs::create_dir_all(local.parent().unwrap()).unwrap();
     std::fs::write(&local, "").unwrap();
 
-    let stored = PathBuf::from("/Users/example/.rook/themes/catppuccin/catppuccin_mocha.yml");
+    let stored =
+        PathBuf::from("/Users/example/.polaris/terminal/themes/catppuccin/catppuccin_mocha.yml");
 
     assert_eq!(custom_theme_path_from_storage(&stored, &root), stored);
 }
@@ -119,12 +120,12 @@ fn custom_theme_legacy_macos_path_is_preserved_even_when_local_file_exists() {
 #[test]
 fn custom_theme_legacy_parent_dir_path_is_preserved() {
     let temp = tempfile::tempdir().unwrap();
-    let root = temp.path().join("rook-terminal/themes");
+    let root = temp.path().join("polaris-terminal-stable/themes");
     let local = root.join("outside.yml");
     std::fs::create_dir_all(local.parent().unwrap()).unwrap();
     std::fs::write(&local, "").unwrap();
 
-    let stored = PathBuf::from("/Users/example/.rook/themes/../outside.yml");
+    let stored = PathBuf::from("/Users/example/.polaris/terminal/themes/../outside.yml");
 
     assert_eq!(custom_theme_path_from_storage(&stored, &root), stored);
 }
@@ -132,13 +133,13 @@ fn custom_theme_legacy_parent_dir_path_is_preserved() {
 #[test]
 fn custom_theme_legacy_linux_path_is_preserved_even_when_local_file_exists() {
     let temp = tempfile::tempdir().unwrap();
-    let root = temp.path().join(".rook/themes");
+    let root = temp.path().join(".polaris/terminal/themes");
     let local = root.join("catppuccin/catppuccin_latte.yml");
     std::fs::create_dir_all(local.parent().unwrap()).unwrap();
     std::fs::write(&local, "").unwrap();
 
     let stored = PathBuf::from(
-        "/home/user/.local/share/rook-terminal/themes/catppuccin/catppuccin_latte.yml",
+        "/home/user/.local/share/polaris-terminal-stable/themes/catppuccin/catppuccin_latte.yml",
     );
 
     assert_eq!(custom_theme_path_from_storage(&stored, &root), stored);
@@ -147,40 +148,46 @@ fn custom_theme_legacy_linux_path_is_preserved_even_when_local_file_exists() {
 #[test]
 fn custom_theme_unmatched_legacy_absolute_path_is_preserved() {
     let temp = tempfile::tempdir().unwrap();
-    let root = temp.path().join(".rook/themes");
-    let stored = PathBuf::from("/Users/example/.rook/themes/missing.yml");
+    let root = temp.path().join(".polaris/terminal/themes");
+    let stored = PathBuf::from("/Users/example/.polaris/terminal/themes/missing.yml");
 
     assert_eq!(custom_theme_path_from_storage(&stored, &root), stored);
 }
 
 #[test]
 fn custom_theme_windows_absolute_path_string_is_preserved() {
-    let root = PathBuf::from("/Users/example/.rook/themes");
-    let stored = PathBuf::from(r"C:\Users\example\AppData\Roaming\rook\Rook\data\themes\mocha.yml");
+    let root = PathBuf::from("/Users/example/.polaris/terminal/themes");
+    let stored = PathBuf::from(
+        r"C:\Users\example\AppData\Roaming\polaris-terminal\Polaris Terminal\data\themes\mocha.yml",
+    );
 
     assert_eq!(custom_theme_path_from_storage(&stored, &root), stored);
 }
 
 #[test]
 fn custom_theme_windows_absolute_path_string_is_not_portable() {
-    let root = PathBuf::from("/Users/example/.rook/themes");
-    let stored = PathBuf::from(r"C:\Users\example\AppData\Roaming\rook\Rook\data\themes\mocha.yml");
+    let root = PathBuf::from("/Users/example/.polaris/terminal/themes");
+    let stored = PathBuf::from(
+        r"C:\Users\example\AppData\Roaming\polaris-terminal\Polaris Terminal\data\themes\mocha.yml",
+    );
 
     assert!(!custom_theme_path_is_portable(&stored, &root));
 }
 
 #[test]
 fn custom_theme_windows_absolute_path_string_storage_helper_preserves_path() {
-    let root = PathBuf::from("/Users/example/.rook/themes");
-    let stored = PathBuf::from(r"C:\Users\example\AppData\Roaming\rook\Rook\data\themes\mocha.yml");
+    let root = PathBuf::from("/Users/example/.polaris/terminal/themes");
+    let stored = PathBuf::from(
+        r"C:\Users\example\AppData\Roaming\polaris-terminal\Polaris Terminal\data\themes\mocha.yml",
+    );
 
     assert_eq!(custom_theme_path_for_storage(&stored, &root), stored);
 }
 
 #[test]
 fn custom_theme_windows_unc_path_string_is_preserved() {
-    let root = PathBuf::from("/Users/example/.rook/themes");
-    let stored = PathBuf::from(r"\\server\share\rook\themes\mocha.yml");
+    let root = PathBuf::from("/Users/example/.polaris/terminal/themes");
+    let stored = PathBuf::from(r"\\server\share\polaris-terminal\themes\mocha.yml");
 
     assert_eq!(custom_theme_path_from_storage(&stored, &root), stored);
 }
@@ -188,7 +195,7 @@ fn custom_theme_windows_unc_path_string_is_preserved() {
 #[test]
 #[cfg(not(windows))]
 fn custom_theme_relative_backslash_path_is_preserved() {
-    let root = PathBuf::from("/Users/example/.rook/themes");
+    let root = PathBuf::from("/Users/example/.polaris/terminal/themes");
     let stored = PathBuf::from(r"catppuccin\mocha.yml");
 
     assert_eq!(custom_theme_path_from_storage(&stored, &root), stored);
@@ -197,7 +204,7 @@ fn custom_theme_relative_backslash_path_is_preserved() {
 #[test]
 #[cfg(not(windows))]
 fn custom_theme_relative_backslash_path_is_not_portable() {
-    let root = PathBuf::from("/Users/example/.rook/themes");
+    let root = PathBuf::from("/Users/example/.polaris/terminal/themes");
     let stored = PathBuf::from(r"catppuccin\mocha.yml");
 
     assert!(!custom_theme_path_is_portable(&stored, &root));
@@ -206,7 +213,7 @@ fn custom_theme_relative_backslash_path_is_not_portable() {
 #[test]
 #[cfg(not(windows))]
 fn custom_theme_relative_backslash_path_storage_helper_preserves_path() {
-    let root = PathBuf::from("/Users/example/.rook/themes");
+    let root = PathBuf::from("/Users/example/.polaris/terminal/themes");
     let stored = PathBuf::from(r"catppuccin\mocha.yml");
 
     assert_eq!(custom_theme_path_for_storage(&stored, &root), stored);
@@ -234,7 +241,7 @@ fn custom_theme_serde_preserves_unportable_raw_paths() {
         "../outside.yml",
         "catppuccin/../mocha.yml",
         r"catppuccin\mocha.yml",
-        "C:/Users/example/AppData/Roaming/rook/Rook/data/themes/mocha.yml",
+        "C:/Users/example/AppData/Roaming/polaris-terminal/Polaris Terminal/data/themes/mocha.yml",
         "C:themes/mocha.yml",
     ] {
         let custom = custom_theme_from_serde_path(raw_path);
@@ -266,7 +273,7 @@ fn custom_theme_settings_value_preserves_unportable_raw_paths() {
         "../outside.yml",
         "catppuccin/../mocha.yml",
         r"catppuccin\mocha.yml",
-        "C:/Users/example/AppData/Roaming/rook/Rook/data/themes/mocha.yml",
+        "C:/Users/example/AppData/Roaming/polaris-terminal/Polaris Terminal/data/themes/mocha.yml",
         "C:themes/mocha.yml",
     ] {
         let custom = custom_theme_from_file_value_path(raw_path);
@@ -319,7 +326,9 @@ mod windows_custom_theme_path_tests {
     use super::*;
 
     fn windows_theme_root() -> PathBuf {
-        PathBuf::from(r"C:\Users\example\AppData\Roaming\rook\Rook\data\themes")
+        PathBuf::from(
+            r"C:\Users\example\AppData\Roaming\polaris-terminal\Polaris Terminal\data\themes",
+        )
     }
 
     #[test]
@@ -366,7 +375,7 @@ mod windows_custom_theme_path_tests {
 
         for raw_path in [
             r"catppuccin\mocha.yml",
-            "C:/Users/example/AppData/Roaming/rook/Rook/data/themes/mocha.yml",
+            "C:/Users/example/AppData/Roaming/polaris-terminal/Polaris Terminal/data/themes/mocha.yml",
             "C:themes/mocha.yml",
         ] {
             assert_eq!(
@@ -382,7 +391,7 @@ mod windows_custom_theme_path_tests {
 
         for raw_path in [
             r"catppuccin\mocha.yml",
-            "C:/Users/example/AppData/Roaming/rook/Rook/data/themes/mocha.yml",
+            "C:/Users/example/AppData/Roaming/polaris-terminal/Polaris Terminal/data/themes/mocha.yml",
             "C:themes/mocha.yml",
         ] {
             assert!(!custom_theme_path_is_portable(
@@ -430,7 +439,7 @@ fn in_memory_theme_generation_test() {
     .iter()
     .collect();
 
-    let mut in_memory_theme = rookui::r#async::block_on(InMemoryThemeOptions::new(
+    let mut in_memory_theme = ptermui::r#async::block_on(InMemoryThemeOptions::new(
         "mountains".to_string(),
         mountains_bg_path.clone(),
     ))
@@ -439,7 +448,7 @@ fn in_memory_theme_generation_test() {
     let mountains_bg_path_string = mountains_bg_path.to_str().unwrap_or_default().to_owned();
     assert_eq!(
         in_memory_theme.theme(),
-        RookTheme::new(
+        PtermTheme::new(
             // the theme defaults to the 0th bg color
             ColorU::new(35, 31, 44, OPAQUE).into(),
             // this background color makes it a "dark" theme, so the foreground is white
@@ -464,7 +473,7 @@ fn in_memory_theme_generation_test() {
 
     assert_eq!(
         in_memory_theme.theme(),
-        RookTheme::new(
+        PtermTheme::new(
             // now the background is the 2nd one
             ColorU::new(229, 142, 113, OPAQUE).into(),
             // changing the background color made this a light theme

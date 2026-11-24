@@ -5,28 +5,28 @@ use lsp::LspManagerModel;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::channel::{Channel, ChannelState};
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::icons::ICON_DIMENSIONS;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rook_util::path::LineAndColumnArg;
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::icons::ICON_DIMENSIONS;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use pterm_util::path::LineAndColumnArg;
 #[cfg(feature = "local_fs")]
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     AcceptedByDropTarget, Align, Border, ChildAnchor, ChildView, Clipped, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, Draggable, DraggableState, DropTarget, Empty,
     Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     OffsetPositioning, Padding, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Rect,
     SavePosition, Shrinkable, Stack, Text,
 };
-use rookui::fonts::{Properties, Style, Weight};
-use rookui::keymap::EditableBinding;
-use rookui::text::point::Point;
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::fonts::{Properties, Style, Weight};
+use ptermui::keymap::EditableBinding;
+use ptermui::text::point::Point;
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WindowId, id,
 };
@@ -48,7 +48,7 @@ use crate::menu::{MenuItem, MenuItemFields};
 use crate::notebooks::file::{
     MARKDOWN_DISPLAY_MODE_TOGGLE_CONTEXT, MarkdownDisplayMode,
     TOGGLE_MARKDOWN_DISPLAY_MODE_BINDING_DESCRIPTION, TOGGLE_MARKDOWN_DISPLAY_MODE_BINDING_NAME,
-    TOGGLE_MARKDOWN_DISPLAY_MODE_KEY_BINDING, renders_in_rook_notebook_viewer,
+    TOGGLE_MARKDOWN_DISPLAY_MODE_KEY_BINDING, renders_in_pterm_notebook_viewer,
 };
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::view::header::components::{
@@ -294,7 +294,7 @@ impl CodeView {
         let renders_in_notebook_viewer = self
             .tab_at(self.active_tab_index)
             .and_then(|t| t.location.as_ref())
-            .map(|loc| renders_in_rook_notebook_viewer(std::path::Path::new(&loc.display_path())))
+            .map(|loc| renders_in_pterm_notebook_viewer(std::path::Path::new(&loc.display_path())))
             .unwrap_or(false);
 
         if !renders_in_notebook_viewer {
@@ -401,8 +401,8 @@ impl CodeView {
                             ctx,
                         )
                         .with_horizontal_scrollbar_appearance(
-                            rookui::elements::new_scrollable::ScrollableAppearance::new(
-                                rookui::elements::ScrollbarWidth::Auto,
+                            ptermui::elements::new_scrollable::ScrollableAppearance::new(
+                                ptermui::elements::ScrollbarWidth::Auto,
                                 true,
                             ),
                         )
@@ -445,8 +445,8 @@ impl CodeView {
                 ctx,
             )
             .with_horizontal_scrollbar_appearance(
-                rookui::elements::new_scrollable::ScrollableAppearance::new(
-                    rookui::elements::ScrollbarWidth::Auto,
+                ptermui::elements::new_scrollable::ScrollableAppearance::new(
+                    ptermui::elements::ScrollbarWidth::Auto,
                     true,
                 ),
             )
@@ -2178,11 +2178,11 @@ impl CodeView {
 
             let renders_in_notebook_viewer = local_path
                 .as_ref()
-                .map(renders_in_rook_notebook_viewer)
+                .map(renders_in_pterm_notebook_viewer)
                 .unwrap_or_else(|| {
                     active_location
                         .map(|loc| {
-                            renders_in_rook_notebook_viewer(std::path::Path::new(
+                            renders_in_pterm_notebook_viewer(std::path::Path::new(
                                 &loc.display_path(),
                             ))
                         })
@@ -2247,7 +2247,7 @@ impl View for CodeView {
         "CodeView"
     }
 
-    fn keymap_context(&self, _app: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, _app: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
         if self.markdown_mode_segmented_control.is_some() {
             context.set.insert(MARKDOWN_DISPLAY_MODE_TOGGLE_CONTEXT);

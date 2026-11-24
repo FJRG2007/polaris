@@ -1,11 +1,11 @@
 use std::any::Any;
 
 use async_channel::Sender;
-use rookui::elements::Point;
-use rookui::event::DispatchedEvent;
-use rookui::geometry::rect::RectF;
-use rookui::geometry::vector::Vector2F;
-use rookui::{
+use ptermui::elements::Point;
+use ptermui::event::DispatchedEvent;
+use ptermui::geometry::rect::RectF;
+use ptermui::geometry::vector::Vector2F;
+use ptermui::{
     AfterLayoutContext, AppContext, Element, Event, EventContext, LayoutContext, PaintContext,
     SizeConstraint,
 };

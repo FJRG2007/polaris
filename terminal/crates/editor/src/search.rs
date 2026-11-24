@@ -3,9 +3,9 @@ use std::ops::Range;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use pathfinder_color::ColorU;
-use rook_core::ui::theme::Fill;
-use rookui_core::r#async::SpawnedFutureHandle;
-use rookui_core::{Entity, ModelContext, ModelHandle};
+use pterm_core::ui::theme::Fill;
+use ptermui_core::r#async::SpawnedFutureHandle;
+use ptermui_core::{Entity, ModelContext, ModelHandle};
 use string_offset::CharOffset;
 
 use crate::content::anchor::Anchor;
@@ -278,7 +278,7 @@ impl Searcher {
     #[cfg(test)]
     pub fn search_finished(
         &self,
-        ctx: &mut rookui_core::AppContext,
+        ctx: &mut ptermui_core::AppContext,
     ) -> impl std::future::Future<Output = ()> + use<> {
         let maybe_search = self
             .search_handle

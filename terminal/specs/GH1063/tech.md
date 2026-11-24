@@ -1,11 +1,11 @@
-# TECH.md — Rename Oz to Rook Agent in settings and onboarding
+# TECH.md — Rename Oz to Polaris Terminal Agent in settings and onboarding
 
 Issue: https://github.com/warpdotdev/warp-external/issues/1063
 Product spec: `specs/GH1063/product.md`
 
 ## Context
 
-This is a rename of the in-app agent from "Oz" to "Rook Agent" across user-facing
+This is a rename of the in-app agent from "Oz" to "Polaris Terminal Agent" across user-facing
 strings, the internal enum variants that back those strings, and all call-sites
 that referenced the old variant. "Oz" remains reserved for the cloud agent
 orchestration platform, so the rename must not touch any cloud surfaces.
@@ -39,33 +39,33 @@ Out-of-scope references that must be preserved as "Oz" (verified by grep):
 ## Proposed changes
 
 1. `app/src/settings_view/mod.rs`
-   - Rename `SettingsSection::Oz` variant to `SettingsSection::RookAgent`.
-   - In the `Display` impl, the `RookAgent` arm writes `"Rook Agent"`.
+   - Rename `SettingsSection::Oz` variant to `SettingsSection::PtermAgent`.
+   - In the `Display` impl, the `PtermAgent` arm writes `"Polaris Terminal Agent"`.
    - In the `FromStr` impl, accept both `"Oz"` (backward-compat legacy name)
-     and `"Rook Agent"` as parseable forms that map to
-     `SettingsSection::RookAgent`, per Behavior #8 in `product.md`.
+     and `"Polaris Terminal Agent"` as parseable forms that map to
+     `SettingsSection::PtermAgent`, per Behavior #8 in `product.md`.
    - Update `is_ai_subpage`, `ai_subpages()`, and the two default-subpage
-     fallbacks (`SettingsSection::AI => SettingsSection::RookAgent`) to use the
+     fallbacks (`SettingsSection::AI => SettingsSection::PtermAgent`) to use the
      new variant name.
    - Leave `SettingsSection::OzCloudAPIKeys` and its `"Oz Cloud API Keys"`
      display untouched. Do not alter the `"Agents"` umbrella name or subpage
      order.
-   - Update the doc-comment on `SettingsSection::AI` to reference `RookAgent`.
+   - Update the doc-comment on `SettingsSection::AI` to reference `PtermAgent`.
 
 2. `app/src/settings_view/ai_page.rs`
-   - Rename `AISubpage::Oz` variant to `AISubpage::RookAgent`; update
+   - Rename `AISubpage::Oz` variant to `AISubpage::PtermAgent`; update
      `AISubpage::from_section` and the `build_page` match arm accordingly.
    - In `GlobalAIWidget::render`, replace `Text::new_inline("Oz", ...)` with
-     `Text::new_inline("Rook Agent", ...)`. Keep every other argument, style,
+     `Text::new_inline("Polaris Terminal Agent", ...)`. Keep every other argument, style,
      alignment, and layout constant.
    - In `GlobalAIWidget::search_terms`, keep existing terms (including `"oz"`
-     for legacy muscle memory, allowed by Behavior #7) and keep `"rook agent"`
+     for legacy muscle memory, allowed by Behavior #7) and keep `"polaris-terminal agent"`
      so the new label is directly searchable.
    - Replace all remaining user-visible description strings that referenced
-     "Oz" or "Oz agent" with "the Rook Agent" / "Rook Agent" as appropriate.
+     "Oz" or "Oz agent" with "the Polaris Terminal Agent" / "Polaris Terminal Agent" as appropriate.
      Specifically: command denylist/allowlist descriptions, base model
      description, codebase context description, MCP zero-state and
-     allowlist/denylist descriptions, Rules description, Rook Drive context
+     allowlist/denylist descriptions, Rules description, Polaris Terminal Drive context
      description, API keys description, and MCP servers description.
    - Preserve the two "Oz changelog" toggle labels in `OtherAIWidget` and
      `SettingActionPairDescriptions` unchanged — these refer to Oz platform
@@ -73,10 +73,10 @@ Out-of-scope references that must be preserved as "Oz" (verified by grep):
 
 3. `crates/onboarding/src/slides/agent_slide.rs`
    - `render_header`: change paragraph text from `"Customize your Agent, Oz"`
-     to `"Customize your Rook Agent"`. Keep font size, weight, layout, and
+     to `"Customize your Polaris Terminal Agent"`. Keep font size, weight, layout, and
      surrounding subtitle unchanged.
    - `render_disable_oz_section`: change checkbox label from `"Disable Oz"` to
-     `"Disable Rook Agent"`. Keep styling, spacing, `disable_oz_mouse` state
+     `"Disable Polaris Terminal Agent"`. Keep styling, spacing, `disable_oz_mouse` state
      handle, and the dispatched `AgentSlideAction::ToggleDisableOz` action
      unchanged.
    - Internal identifiers (`disable_oz_mouse`, `disable_oz` field on
@@ -87,7 +87,7 @@ Out-of-scope references that must be preserved as "Oz" (verified by grep):
 4. Navigation call-sites (approximately 15 files)
    - All `SettingsSection::Oz` references in navigation actions, workspace
      dispatch, settings page helpers, and editable bindings are updated to
-     `SettingsSection::RookAgent`. Affected files include:
+     `SettingsSection::PtermAgent`. Affected files include:
      `app/src/ai/blocklist/agent_view/agent_input_footer/mod.rs`,
      `app/src/ai/blocklist/block.rs`,
      `app/src/ai/blocklist/block/cli.rs`,
@@ -110,14 +110,14 @@ Out-of-scope references that must be preserved as "Oz" (verified by grep):
 Runtime checks:
 
 - `cargo fmt` and `cargo clippy --workspace --all-targets --all-features --tests
-  -- -D warnings` must pass (per `ROOK.md` PR workflow).
-- `cargo nextest run -p rook_app --no-fail-fast` or the relevant subset covering
+  -- -D warnings` must pass (per `POLARIS_TERMINAL.md` PR workflow).
+- `cargo nextest run -p pterm_app --no-fail-fast` or the relevant subset covering
   `settings_view::mod_test` must pass. The Display test asserts
-  `SettingsSection::RookAgent.to_string() == "Rook Agent"`. The `FromStr` test
-  covers both `"Oz"` and `"Rook Agent"` resolving to
-  `SettingsSection::RookAgent`, exercising Behavior #8. All helper tests
+  `SettingsSection::PtermAgent.to_string() == "Polaris Terminal Agent"`. The `FromStr` test
+  covers both `"Oz"` and `"Polaris Terminal Agent"` resolving to
+  `SettingsSection::PtermAgent`, exercising Behavior #8. All helper tests
   (`is_ai_subpage`, `ai_subpages_list_contains_all_ai_subpage_variants`,
-  filter/visibility tests) are updated to reference `SettingsSection::RookAgent`.
+  filter/visibility tests) are updated to reference `SettingsSection::PtermAgent`.
   Existing tests for `OzCloudAPIKeys` are left untouched to guard against
   accidentally renaming the cloud subpage.
 - `cargo nextest run -p onboarding` (if a test crate exists for the onboarding
@@ -127,8 +127,8 @@ Runtime checks:
 Behavior-to-verification mapping (from `product.md`):
 
 - Behavior #1, #2, #3, #9: manually open the settings UI and confirm the
-  sidebar entry reads "Rook Agent", the subpage renders unchanged content, the
-  heading above the global toggle reads "Rook Agent", and the "Oz Cloud API
+  sidebar entry reads "Polaris Terminal Agent", the subpage renders unchanged content, the
+  heading above the global toggle reads "Polaris Terminal Agent", and the "Oz Cloud API
   Keys" entry under "Cloud platform" still reads "Oz Cloud API Keys".
 - Behavior #4: toggle the global AI switch and verify it still enables and
   disables AI features as before.
@@ -136,15 +136,15 @@ Behavior-to-verification mapping (from `product.md`):
   existing onboarding test fixtures) and confirm the title, subtitle, disable
   checkbox label, autonomy options, and step progress are all correct.
 - Behavior #7: search within the settings modal using each of
-  `"rook agent"`, `"ai"`, `"agent"`, `"oz"` (should still reach the subpage) and
+  `"polaris-terminal agent"`, `"ai"`, `"agent"`, `"oz"` (should still reach the subpage) and
   `"oz cloud"` (should reach the cloud subpage only).
-- Behavior #8: confirm both `"Oz"` and `"Rook Agent"` resolve to
-  `SettingsSection::RookAgent` via the `FromStr` round-trip test.
+- Behavior #8: confirm both `"Oz"` and `"Polaris Terminal Agent"` resolve to
+  `SettingsSection::PtermAgent` via the `FromStr` round-trip test.
 - Behavior #11: no automated accessibility test exists for these labels; manual
   verification on macOS VoiceOver is sufficient since the visible text is the
   accessible label.
-- Behavior #12: toggle the `OpenRookNewSettingsModes` feature flag and confirm
-  the disable row only appears when enabled and always reads "Disable Rook
+- Behavior #12: toggle the `OpenPtermNewSettingsModes` feature flag and confirm
+  the disable row only appears when enabled and always reads "Disable Polaris Terminal
   Agent" when it does appear.
 
 Manual verification artifacts:
@@ -158,8 +158,8 @@ Manual verification artifacts:
 ## Risks and mitigations
 
 - Risk: external deep links or persisted telemetry strings reference `"Oz"` and
-  break. Mitigation: `FromStr` accepts both `"Oz"` and `"Rook Agent"` mapping to
-  `SettingsSection::RookAgent`, and the legacy `"oz"` search term is preserved so
+  break. Mitigation: `FromStr` accepts both `"Oz"` and `"Polaris Terminal Agent"` mapping to
+  `SettingsSection::PtermAgent`, and the legacy `"oz"` search term is preserved so
   `oz`-based search still lands on the subpage.
 - Risk: accidentally renaming cloud Oz surfaces. Mitigation: grep for `"Oz"`
   literals confirms `harness_selector.rs`, `zero_state_block.rs`, and
@@ -168,7 +168,7 @@ Manual verification artifacts:
 - Risk: stale comments inside `agent_slide.rs` that still reference "Disable Oz"
   mislead future readers. Mitigation: internal identifiers (`disable_oz_mouse`,
   `AgentSlideAction::ToggleDisableOz`, etc.) intentionally retain the `oz` name;
-  comments describing them are acceptable to leave as-is per `ROOK.md`.
+  comments describing them are acceptable to leave as-is per `POLARIS_TERMINAL.md`.
 
 ## Follow-ups
 

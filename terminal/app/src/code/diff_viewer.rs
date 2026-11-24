@@ -1,10 +1,10 @@
 use std::ops::Range;
 
 use ai::diff_validation::DiffType;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rookui::elements::ScrollbarWidth;
-use rookui::elements::new_scrollable::ScrollableAppearance;
-use rookui::{AppContext, View, ViewContext, ViewHandle};
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use ptermui::elements::ScrollbarWidth;
+use ptermui::elements::new_scrollable::ScrollableAppearance;
+use ptermui::{AppContext, View, ViewContext, ViewHandle};
 
 use super::editor::NavBarBehavior;
 use super::editor::scroll::ScrollWheelBehavior;

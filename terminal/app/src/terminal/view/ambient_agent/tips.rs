@@ -1,7 +1,7 @@
 //! Tips for cloud mode loading screen.
 
-use rookui::AppContext;
-use rookui::keymap::Keystroke;
+use ptermui::AppContext;
+use ptermui::keymap::Keystroke;
 
 use crate::ai::agent_tips::AITip;
 
@@ -93,7 +93,7 @@ pub fn get_cloud_mode_tips() -> Vec<CloudModeTip> {
             Some("https://docs.rook.dev/platform/overview/"),
         ),
         CloudModeTip::new(
-            "Fork a completed Oz cloud agent session into Rook to continue the work locally.",
+            "Fork a completed Oz cloud agent session into Polaris Terminal to continue the work locally.",
             Some("https://docs.rook.dev/platform/viewing-cloud-agent-runs"),
         ),
         CloudModeTip::new(
@@ -117,7 +117,7 @@ pub fn get_cloud_mode_tips() -> Vec<CloudModeTip> {
             Some("https://docs.rook.dev/agents/capabilities/mcp"),
         ),
         CloudModeTip::new(
-            "Use `oz agent run` to kick off tasks without opening the Rook terminal.",
+            "Use `oz agent run` to kick off tasks without opening the Polaris Terminal terminal.",
             Some("https://docs.rook.dev/platform/overview/"),
         ),
         CloudModeTip::new(

@@ -1,5 +1,5 @@
-use rookui::windowing::{StateEvent, WindowManager};
-use rookui::{Entity, ModelContext, ModelHandle, SingletonEntity};
+use ptermui::windowing::{StateEvent, WindowManager};
+use ptermui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 
 #[cfg(target_os = "macos")]
 mod mac;
@@ -14,12 +14,12 @@ mod non_mac {
         false
     }
 
-    pub fn is_rook_default_terminal() -> bool {
+    pub fn is_pterm_default_terminal() -> bool {
         false
     }
 
-    /// Sets Rook as the default terminal
-    pub fn set_rook_as_default_terminal() -> Result<(), String> {
+    /// Sets Polaris Terminal as the default terminal
+    pub fn set_pterm_as_default_terminal() -> Result<(), String> {
         Err("Not implemented".to_string())
     }
 }
@@ -27,11 +27,11 @@ mod non_mac {
 #[allow(unused_imports)]
 #[cfg(not(target_os = "macos"))]
 use non_mac::*;
-use rook_errors::report_error;
+use pterm_errors::report_error;
 
 pub struct DefaultTerminal {
-    /// Whether the OS will treat Rook as the default app for scripts/executables.
-    is_rook_default: bool,
+    /// Whether the OS will treat Polaris Terminal as the default app for scripts/executables.
+    is_pterm_default: bool,
 }
 
 impl DefaultTerminal {
@@ -43,18 +43,18 @@ impl DefaultTerminal {
 
         // This can be slow to compute due to calling into platform APIs, so in unit
         // tests, where we shouldn't care, just pretend that we are not.
-        let is_rook_default = if cfg!(test) {
+        let is_pterm_default = if cfg!(test) {
             false
         } else {
-            is_rook_default_terminal()
+            is_pterm_default_terminal()
         };
 
-        Self { is_rook_default }
+        Self { is_pterm_default }
     }
 
-    /// This is an OS-level setting. Unlike most other settings, where Rook is the source-of-truth
-    /// for the value of the setting, it can be changed outside of Rook. We monitor if it gets
-    /// changed externally by checking when Rook is focused.
+    /// This is an OS-level setting. Unlike most other settings, where Polaris Terminal is the source-of-truth
+    /// for the value of the setting, it can be changed outside of Polaris Terminal. We monitor if it gets
+    /// changed externally by checking when Polaris Terminal is focused.
     fn handle_window_manager_event(
         &mut self,
         _: ModelHandle<WindowManager>,
@@ -64,22 +64,22 @@ impl DefaultTerminal {
         match event {
             StateEvent::ValueChanged { current, previous } => {
                 if current.active_window.is_some() && previous.active_window.is_none() {
-                    let is_rook_default_now = is_rook_default_terminal();
-                    if is_rook_default_now != self.is_rook_default {
-                        self.set_is_rook_default(is_rook_default_now, ctx);
+                    let is_pterm_default_now = is_pterm_default_terminal();
+                    if is_pterm_default_now != self.is_pterm_default {
+                        self.set_is_pterm_default(is_pterm_default_now, ctx);
                     }
                 }
             }
         }
     }
 
-    fn set_is_rook_default(&mut self, value: bool, ctx: &mut ModelContext<Self>) {
-        self.is_rook_default = value;
+    fn set_is_pterm_default(&mut self, value: bool, ctx: &mut ModelContext<Self>) {
+        self.is_pterm_default = value;
         ctx.emit(DefaultTerminalEvent::ValueChanged);
         ctx.notify();
     }
 
-    pub fn can_rook_become_default() -> bool {
+    pub fn can_pterm_become_default() -> bool {
         if cfg!(test) {
             // Determining whether or not we can become the default terminal requires
             // calling into platform APIs, which can be slow, and we can't actually
@@ -90,17 +90,20 @@ impl DefaultTerminal {
         }
     }
 
-    pub fn is_rook_default(&self) -> bool {
-        self.is_rook_default
+    pub fn is_pterm_default(&self) -> bool {
+        self.is_pterm_default
     }
 
-    /// This is a one-way operation. Once we set the default terminal to Rook, we can't really
+    /// This is a one-way operation. Once we set the default terminal to Polaris Terminal, we can't really
     /// "unset" it unless we pick a new default terminal. Picking a new default is complicated.
-    pub fn make_rook_default(&mut self, ctx: &mut ModelContext<Self>) {
-        if let Err(e) = set_rook_as_default_terminal() {
-            report_error!(anyhow::anyhow!("{e}").context("Error setting Rook as default terminal"));
+    pub fn make_pterm_default(&mut self, ctx: &mut ModelContext<Self>) {
+        if let Err(e) = set_pterm_as_default_terminal() {
+            report_error!(
+                anyhow::anyhow!("{e}")
+                    .context("Error setting Polaris Terminal as default terminal")
+            );
         } else {
-            self.set_is_rook_default(true, ctx);
+            self.set_is_pterm_default(true, ctx);
         }
     }
 }

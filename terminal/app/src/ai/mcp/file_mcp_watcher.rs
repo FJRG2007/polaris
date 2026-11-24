@@ -7,6 +7,8 @@ use std::sync::LazyLock;
 use async_channel::Sender;
 use futures::Future;
 use futures::stream::AbortHandle;
+use pterm_core::safe_warn;
+use ptermui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 use regex::Regex;
 use repo_metadata::RepositoryWatchMode;
 use repo_metadata::repositories::{
@@ -14,8 +16,6 @@ use repo_metadata::repositories::{
 };
 use repo_metadata::repository::{Repository, RepositorySubscriber, SubscriberId};
 use repo_metadata::watcher::{DirectoryWatcher, RepositoryUpdate};
-use rook_core::safe_warn;
-use rookui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 use strum::IntoEnumIterator;
 use watcher::HomeDirectoryWatcherEvent;
 
@@ -24,21 +24,21 @@ use crate::ai::mcp::parsing::normalize_codex_toml_to_json;
 use crate::ai::mcp::{
     MCPProvider, ParsedTemplatableMCPServerResult, home_config_file_path, home_dir,
 };
-use crate::rook_managed_paths_watcher::{
-    RookManagedPathsWatcher, RookManagedPathsWatcherEvent, rook_managed_mcp_config_path,
+use crate::pterm_managed_paths_watcher::{
+    PtermManagedPathsWatcher, PtermManagedPathsWatcherEvent, pterm_managed_mcp_config_path,
 };
 
 static ENV_VAR_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\$\{([^}]+)\}").expect("Regex is valid"));
 
 /// Matches home config paths that are exactly one directory deep (e.g. `.codex/config.toml`,
-/// `.rook/.mcp.json`), capturing the parent directory component.
+/// `.polaris/terminal/.mcp.json`), capturing the parent directory component.
 static HOME_SUBDIR_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^([^/]+)/[^/]+$").expect("Regex is valid"));
 
 /// Returns the subdirectory under the home directory that needs its own [`DirectoryWatcher`],
 /// inferred from the provider's home config path. Matches paths that are exactly one directory
-/// deep (e.g. `.codex/config.toml` → `.codex`, `.rook/.mcp.json` → `.rook`). Returns `None`
+/// deep (e.g. `.codex/config.toml` → `.codex`, `.polaris/terminal/.mcp.json` → `.polaris/terminal`). Returns `None`
 /// when the config file lives directly in the home dir (e.g. `.claude.json`) and is already
 /// covered by `HomeDirectoryWatcher`.
 fn home_subdir_to_watch(provider: MCPProvider) -> Option<PathBuf> {
@@ -137,7 +137,7 @@ struct InFlightParse {
 pub enum PendingScan {
     /// Every provider config file in a cloud-environment repo, keyed by repo root.
     CloudEnvRepo(PathBuf),
-    /// Every global (home-directory and Rook-managed) config source read at startup.
+    /// Every global (home-directory and Polaris Terminal-managed) config source read at startup.
     InitialGlobal,
 }
 
@@ -201,15 +201,15 @@ impl FileMCPWatcher {
             me.handle_home_directory_watcher_event(event, ctx);
         });
         ctx.subscribe_to_model(
-            &RookManagedPathsWatcher::handle(ctx),
+            &PtermManagedPathsWatcher::handle(ctx),
             |me, _, event, ctx| {
-                me.handle_rook_managed_paths_event(event, ctx);
+                me.handle_pterm_managed_paths_event(event, ctx);
             },
         );
 
         let mut home_provider_watchers = HashMap::new();
         if let Some(home_dir) = home_dir() {
-            for provider in MCPProvider::iter().filter(|provider| *provider != MCPProvider::Rook) {
+            for provider in MCPProvider::iter().filter(|provider| *provider != MCPProvider::Pterm) {
                 let Some(subdir) = home_subdir_to_watch(provider) else {
                     continue;
                 };
@@ -265,13 +265,13 @@ impl FileMCPWatcher {
 
     #[cfg(feature = "tui")]
     pub fn reload_global_config(&mut self, ctx: &mut ModelContext<Self>) {
-        let Some(config) = rook_managed_mcp_config_path() else {
+        let Some(config) = pterm_managed_mcp_config_path() else {
             return;
         };
         self.update_servers_from_config_file(
             &config.config_path,
             config.root_path,
-            MCPProvider::Rook,
+            MCPProvider::Pterm,
             ctx,
         );
     }
@@ -335,7 +335,7 @@ impl FileMCPWatcher {
         }
 
         let Ok(std_path) =
-            rook_util::standardized_path::StandardizedPath::from_local_canonicalized(subdir_path)
+            pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(subdir_path)
         else {
             return;
         };
@@ -397,7 +397,7 @@ impl FileMCPWatcher {
         };
 
         for provider in MCPProvider::iter() {
-            if provider == MCPProvider::Rook {
+            if provider == MCPProvider::Pterm {
                 continue;
             }
             match home_subdir_to_watch(provider) {
@@ -458,13 +458,13 @@ impl FileMCPWatcher {
         }
     }
 
-    fn handle_rook_managed_paths_event(
+    fn handle_pterm_managed_paths_event(
         &mut self,
-        event: &RookManagedPathsWatcherEvent,
+        event: &PtermManagedPathsWatcherEvent,
         ctx: &mut ModelContext<Self>,
     ) {
-        let RookManagedPathsWatcherEvent::FilesChanged(update) = event;
-        let Some(mcp_config_path) = rook_managed_mcp_config_path() else {
+        let PtermManagedPathsWatcherEvent::FilesChanged(update) = event;
+        let Some(mcp_config_path) = pterm_managed_mcp_config_path() else {
             return;
         };
         let config_path = mcp_config_path.config_path;
@@ -482,7 +482,7 @@ impl FileMCPWatcher {
             || update.moved.keys().any(|target| target.path == config_path);
         self.handle_single_config_update(
             mcp_config_path.root_path,
-            MCPProvider::Rook,
+            MCPProvider::Pterm,
             config_path,
             was_deleted,
             was_added,
@@ -721,17 +721,17 @@ fn config_change_flags(update: &RepositoryUpdate, config_path: &Path) -> (bool, 
     (was_deleted, was_added)
 }
 
-/// Every global config source as `(config_path, root_path, provider)`: the Rook-managed config
+/// Every global config source as `(config_path, root_path, provider)`: the Polaris Terminal-managed config
 /// plus each other provider's home-directory config.
 fn global_config_sources() -> Vec<(PathBuf, PathBuf, MCPProvider)> {
     let mut sources = Vec::new();
-    if let Some(config) = rook_managed_mcp_config_path() {
-        sources.push((config.config_path, config.root_path, MCPProvider::Rook));
+    if let Some(config) = pterm_managed_mcp_config_path() {
+        sources.push((config.config_path, config.root_path, MCPProvider::Pterm));
     }
     if let Some(home_dir) = home_dir() {
         sources.extend(
             MCPProvider::iter()
-                .filter(|provider| *provider != MCPProvider::Rook)
+                .filter(|provider| *provider != MCPProvider::Pterm)
                 .filter_map(|provider| {
                     home_config_file_path(provider)
                         .map(|config_path| (config_path, home_dir.clone(), provider))
@@ -888,7 +888,7 @@ async fn parse_mcp_config_file(
                 });
             }
         },
-        MCPProvider::Claude | MCPProvider::Rook | MCPProvider::Agents => file_contents,
+        MCPProvider::Claude | MCPProvider::Pterm | MCPProvider::Agents => file_contents,
     };
 
     let resolved_contents = match substitute_env_vars(&json) {

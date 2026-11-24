@@ -5,14 +5,14 @@
 
 use std::collections::HashMap;
 
-use rook::features::FeatureFlag;
-use rook::integration_testing::input::{
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::input::{
     open_cli_agent_rich_input, rich_input_buffer_contains_newline,
     rich_input_buffer_does_not_contain_newline, rich_input_buffer_text_is_empty,
 };
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use rook::settings::SubmitRichInputOnCtrlEnter;
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::settings::SubmitRichInputOnCtrlEnter;
 use settings::Setting as _;
 
 use super::new_builder;

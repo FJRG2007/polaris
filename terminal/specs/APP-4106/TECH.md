@@ -52,9 +52,9 @@ between file tree and global search.
   path-deduplicated list; ancestor dedup happens inside each view (the file
   tree needs the absorbed descendants to drive auto-expand, so it can't
   happen upstream).
-- `crates/rook_util/src/path.rs` + `path_test.rs` — target location for the
+- `crates/pterm_util/src/path.rs` + `path_test.rs` — target location for the
   shared `group_roots_by_common_ancestor` helper.
-- `crates/rook_util/src/standardized_path.rs` — `StandardizedPath` impls
+- `crates/pterm_util/src/standardized_path.rs` — `StandardizedPath` impls
   `AsRef<Path>` and `starts_with(&StandardizedPath)`; usable directly with the
   shared helper.
 
@@ -83,12 +83,12 @@ This is the behavior we want to reuse in the file tree.
 
 ## Proposed changes
 
-### 1. Shared helper in `rook_util::path`
+### 1. Shared helper in `pterm_util::path`
 
 Add a generic ancestor-dedup helper usable by both views.
 
 ```rust path=null start=null
-// crates/rook_util/src/path.rs
+// crates/pterm_util/src/path.rs
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -130,7 +130,7 @@ where
 }
 ```
 
-Place unit tests next to the impl in `crates/rook_util/src/path_test.rs`
+Place unit tests next to the impl in `crates/pterm_util/src/path_test.rs`
 (following the existing `_test.rs` convention in that crate).
 
 ### 2. Thin `StandardizedPath` wrapper in the file tree
@@ -145,7 +145,7 @@ builds a small adapter inside `view.rs`:
 fn group_std_roots_by_common_ancestor(
     roots: &[StandardizedPath],
 ) -> RootGrouping<StandardizedPath> {
-    rook_util::path::group_roots_by_common_ancestor(roots)
+    pterm_util::path::group_roots_by_common_ancestor(roots)
 }
 ```
 
@@ -324,7 +324,7 @@ Replace the private `deduplicate_search_roots` call with the shared helper:
 
 ```rust path=null start=null
 pub fn set_root_directories(&mut self, roots: Vec<PathBuf>, _ctx: &mut ViewContext<Self>) {
-    let grouping = rook_util::path::group_roots_by_common_ancestor(&roots);
+    let grouping = pterm_util::path::group_roots_by_common_ancestor(&roots);
     self.search_roots = grouping.roots;
     self.root_directories = roots;
 }
@@ -466,7 +466,7 @@ sequenceDiagram
     participant LP as LeftPanelView
     participant FT as FileTreeView
     participant GS as GlobalSearchView
-    participant U as rook_util::path
+    participant U as pterm_util::path
 
     Term->>WDM: refresh(cwds, local_paths)
     WDM->>WDM: resolve to repo roots / parents, IndexSet insert
@@ -542,7 +542,7 @@ sequenceDiagram
 
 ## Testing and validation
 
-### Unit tests (`crates/rook_util/src/path_test.rs`)
+### Unit tests (`crates/pterm_util/src/path_test.rs`)
 
 - `group_roots_by_common_ancestor`:
   - Empty input → empty grouping.
@@ -577,16 +577,16 @@ Using the `VirtualFS::test` harness already used by the existing tests:
   `~/code/a/z` is NOT expanded (blocked by the collapsed link).
 - **Sibling preservation**: set roots `[~/code/a, ~/code/b]`. Assert both
   are kept as top-level roots.
-- **Focus-follow on cd**: simulate cd-ing into `~/code/rook-server` with
+- **Focus-follow on cd**: simulate cd-ing into `~/code/polaris-terminal-server` with
   `~/code` as the ancestor. Assert `selected_item` lands on
-  `~/code/rook-server`, and `pending_focus_target.scrolled` is `true`.
+  `~/code/polaris-terminal-server`, and `pending_focus_target.scrolled` is `true`.
   After a subsequent `select_id` on an unrelated item, pending clears.
 - **No re-scroll on rebuild**: after initial apply, trigger a rebuild
   and re-apply. Assert selection is re-set to the cwd but
   `pending_focus_target.scrolled` stays `true` (no re-scroll).
 - **Click preserves file selection**: seed `~/code`, expand
-  `~/code/rook-server`, select `main.rs`. Simulate a
-  `DirectoriesChanged` emitting `[rook-server, code]`. Assert selection
+  `~/code/polaris-terminal-server`, select `main.rs`. Simulate a
+  `DirectoriesChanged` emitting `[polaris-terminal-server, code]`. Assert selection
   stays on `main.rs` and no `pending_focus_target` is set.
 - **Cd to new unrelated root**: with `~/code` selected, call
   `set_root_directories` with `[~/other, ~/code]` and invoke
@@ -602,7 +602,7 @@ Using the `VirtualFS::test` harness already used by the existing tests:
 ### Cross-view parity
 
 Because both views now call
-`rook_util::path::group_roots_by_common_ancestor`, their surviving-root
+`pterm_util::path::group_roots_by_common_ancestor`, their surviving-root
 sets agree by construction. The shared helper's unit tests cover the
 path-shape behavior for both consumers.
 

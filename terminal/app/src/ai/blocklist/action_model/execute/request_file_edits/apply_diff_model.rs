@@ -10,8 +10,8 @@
 
 use ai::diff_validation::AIRequestedCodeDiff;
 use futures::FutureExt;
-use rookui::r#async::BoxFuture;
-use rookui::{Entity, ModelContext, ModelHandle, SingletonEntity as _};
+use ptermui::r#async::BoxFuture;
+use ptermui::{Entity, ModelContext, ModelHandle, SingletonEntity as _};
 use vec1::Vec1;
 
 use super::diff_application::{DiffApplicationError, FileReadResult, apply_edits};

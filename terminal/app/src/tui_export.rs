@@ -1,4 +1,4 @@
-//! Public app APIs used by the `rook_tui` frontend.
+//! Public app APIs used by the `pterm_tui` frontend.
 
 mod history;
 
@@ -10,12 +10,12 @@ pub use ::ai::agent::{
 };
 pub use ai::agent::action::{RunAgentsAgentRunConfig, RunAgentsExecutionMode, RunAgentsRequest};
 pub use ai::agent::orchestration_config::{OrchestrationConfig, OrchestrationConfigStatus};
+pub use pterm_cli::agent::Harness;
+use pterm_completer::completer::{CompletionContext as _, TopLevelCommandCaseSensitivity};
+use pterm_completer::signatures::CommandRegistry;
+pub use pterm_core::SessionId;
+use ptermui::SingletonEntity as _;
 pub use repo_metadata::repositories::RepoDetectionSource;
-pub use rook_cli::agent::Harness;
-use rook_completer::completer::{CompletionContext as _, TopLevelCommandCaseSensitivity};
-use rook_completer::signatures::CommandRegistry;
-pub use rook_core::SessionId;
-use rookui::SingletonEntity as _;
 #[cfg(feature = "voice_input")]
 pub use voice_input::{
     StartListeningError, VoiceInput, VoiceInputLifecycle, VoiceInputLifecycleState,
@@ -146,8 +146,8 @@ pub use crate::ai::llms::{
 pub use crate::ai::orchestration::{
     AuthSecretSelection, CloudAgentStartupAuthFlow, CloudAgentStartupBlocker,
     CloudAgentStartupFailure, CloudAgentStartupIssue, CloudAgentStartupPresentation,
-    ORCHESTRATION_ENV_NONE_LABEL, ORCHESTRATION_ROOK_WORKER_HOST, OptionBadge, OptionFooter,
-    OptionRow, OptionSnapshot, OptionSourceStatus, OrchestrationConfigState,
+    ORCHESTRATION_ENV_NONE_LABEL, ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST, OptionBadge,
+    OptionFooter, OptionRow, OptionSnapshot, OptionSourceStatus, OrchestrationConfigState,
     OrchestrationEditState, PrepareRemoteChildLaunchError, PreparedRemoteChildLaunch,
     RemoteChildLaunchConfig, accept_disabled_reason_with_auth, api_key_snapshot,
     auth_secret_selection_required, classify_cloud_agent_startup_error,
@@ -269,7 +269,7 @@ pub use crate::tui_test_support::{
     register_tui_session_view_test_singletons, set_tui_default_team_admin_for_test,
     set_tui_workspace_teams_for_test,
 };
-pub use crate::user_config::{RookConfig, RookConfigUpdateEvent};
+pub use crate::user_config::{PtermConfig, PtermConfigUpdateEvent};
 pub use crate::util::image::{
     MAX_IMAGE_COUNT_FOR_QUERY, MAX_IMAGE_SIZE_BYTES, MIME_SNIFF_BYTES, ProcessImageResult,
     infer_mime_type, is_supported_image_mime_type, process_image_for_agent,
@@ -297,7 +297,7 @@ pub fn format_usage_credits(credits: i64) -> String {
 pub fn tui_completion_session_context(
     active_session: &ActiveSession,
     current_working_directory: String,
-    app: &rookui::AppContext,
+    app: &ptermui::AppContext,
 ) -> Option<SessionContext> {
     let session = active_session.session(app)?;
     let current_working_directory =
@@ -337,7 +337,7 @@ pub fn tui_completion_context_has_exact_command(
 }
 
 /// Returns whether cloud conversation metadata failed to load.
-pub fn agent_conversations_cloud_metadata_load_failed(app: &rookui::AppContext) -> bool {
+pub fn agent_conversations_cloud_metadata_load_failed(app: &ptermui::AppContext) -> bool {
     crate::ai::agent_conversations_model::AgentConversationsModel::as_ref(app)
         .cloud_conversation_metadata_load_failed()
 }
@@ -346,6 +346,6 @@ pub fn agent_conversations_cloud_metadata_load_failed(app: &rookui::AppContext) 
 /// UUID. Returns `None` when the server is unknown (e.g. a legacy/flat MCP call
 /// with no server id, or the server is not installed). Used by the TUI to surface
 /// tool/server identity in permission cards and transcript labels.
-pub fn mcp_server_name_for_id(uuid: &uuid::Uuid, app: &rookui::AppContext) -> Option<String> {
+pub fn mcp_server_name_for_id(uuid: &uuid::Uuid, app: &ptermui::AppContext) -> Option<String> {
     crate::ai::mcp::TemplatableMCPServerManager::get_mcp_name(uuid, app)
 }

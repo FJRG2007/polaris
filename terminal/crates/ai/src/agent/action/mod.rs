@@ -7,11 +7,11 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use itertools::Itertools as _;
+use pterm_terminal::model::BlockId;
 pub use review_comments::{
     ReviewCommentThread, ReviewCommentThreadItem, format_review_comment_thread,
     group_review_comment_threads,
 };
-use rook_terminal::model::BlockId;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 use uuid::Uuid;
@@ -835,7 +835,7 @@ impl AIAgentPtyWriteMode {
         bytes: impl Into<Vec<u8>>,
         is_bracketed_paste_enabled: bool,
     ) -> Vec<u8> {
-        use rook_terminal::model::escape_sequences;
+        use pterm_terminal::model::escape_sequences;
 
         let bytes = bytes.into();
         match self {

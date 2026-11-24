@@ -1,12 +1,12 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::{AnsiColorIdentifier, Fill as ThemeFill};
-use rookui::elements::{
+use pterm_core::ui::theme::{AnsiColorIdentifier, Fill as ThemeFill};
+use ptermui::elements::{
     Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, Element, Hoverable,
     MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius,
     Stack,
 };
-use rookui::platform::Cursor;
+use ptermui::platform::Cursor;
 use ui_components::tooltip::{Params as TooltipParams, Tooltip as TooltipComponent};
 use ui_components::{Component as _, Options as ComponentOptions};
 
@@ -40,7 +40,7 @@ pub(crate) fn render_color_dot(
 ) -> Hoverable {
     Hoverable::new(mouse_state, move |state| {
         let overlay: Option<Box<dyn Element>> = if is_no_color {
-            Some(Icon::SlashCircle.to_rookui_icon(foreground_color).finish())
+            Some(Icon::SlashCircle.to_ptermui_icon(foreground_color).finish())
         } else {
             None
         };
@@ -81,7 +81,7 @@ fn render_dot_element(
     ring_color: ColorU,
     overlay: Option<Box<dyn Element>>,
 ) -> Box<dyn Element> {
-    let dot = ConstrainedBox::new(Icon::Ellipse.to_rookui_icon(dot_color.into()).finish())
+    let dot = ConstrainedBox::new(Icon::Ellipse.to_ptermui_icon(dot_color.into()).finish())
         .with_width(COLOR_DOT_SIZE)
         .with_height(COLOR_DOT_SIZE)
         .finish();

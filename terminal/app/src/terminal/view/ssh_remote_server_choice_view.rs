@@ -1,14 +1,14 @@
 //! Inline block view that asks the user whether they want to install
-//! Rook's SSH extension on the remote host the shell just connected to,
+//! Polaris Terminal's SSH extension on the remote host the shell just connected to,
 //! or continue without installing (falling back to the existing
-//! ControlMaster rookification path).
+//! ControlMaster ptermification path).
 //!
 //! Designed from frame 6050:2448 of the Figma file
 //! [Remote session initialization](https://www.figma.com/design/r0BO9cTZCK6pDE6qerg2K0/Remote-session-initialization).
 //!
 //! The view owns:
 //! - a child [`KeyboardNavigableButtons`] handle for the two selectable
-//!   cards ("Install Rook's SSH extension" / "Continue without installing"),
+//!   cards ("Install Polaris Terminal's SSH extension" / "Continue without installing"),
 //! - the [`SessionId`] this prompt is scoped to (used for event forwarding),
 //! - the current "Don't ask me this again" checked state (purely local to
 //!   this prompt instance; persisted to `ssh_extension_install_mode` only
@@ -16,15 +16,15 @@
 //!
 //! Dismissing the block (on click of either option, or when the session is
 //! deregistered) is the parent's responsibility.
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_error;
-use rookui::elements::{
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_error;
+use ptermui::elements::{
     Border, ChildView, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -38,7 +38,7 @@ use crate::ai::blocklist::inline_action::inline_action_header::{
 };
 use crate::server::telemetry::TelemetryEvent;
 use crate::terminal::model::session::SessionId;
-use crate::terminal::rookify::settings::{RookifySettings, SshExtensionInstallMode};
+use crate::terminal::ptermify::settings::{PtermifySettings, SshExtensionInstallMode};
 use crate::ui_components::blended_colors;
 use crate::{Appearance, send_telemetry_from_ctx};
 
@@ -49,14 +49,14 @@ pub enum SshRemoteServerChoiceViewAction {
     Install,
     Skip,
     ToggleDoNotAskAgain,
-    OpenRookifySettings,
+    OpenPtermifySettings,
 }
 
 #[derive(Clone, Debug)]
 pub enum SshRemoteServerChoiceViewEvent {
     Install,
     Skip,
-    OpenRookifySettings,
+    OpenPtermifySettings,
 }
 
 /// Choice block prompting the user to install the remote-server binary on the remote host or skip.
@@ -75,9 +75,9 @@ impl SshRemoteServerChoiceView {
         let buttons = ctx.add_typed_action_view(|_| {
             KeyboardNavigableButtons::new(vec![
                 rich_navigation_button(
-                    "Install Rook's SSH extension".to_string(),
+                    "Install Polaris Terminal's SSH extension".to_string(),
                     Some(
-                        "Install Rook's extension to enable agent features like file browsing, \
+                        "Install Polaris Terminal's extension to enable agent features like file browsing, \
                          code review, and intelligent command completions in this session."
                             .to_string(),
                     ),
@@ -88,7 +88,7 @@ impl SshRemoteServerChoiceView {
                 rich_navigation_button(
                     "Continue without installing".to_string(),
                     Some(
-                        "You'll still get a Rookified experience just without the coding \
+                        "You'll still get a Ptermified experience just without the coding \
                          features."
                             .to_string(),
                     ),
@@ -172,14 +172,16 @@ impl SshRemoteServerChoiceView {
             .with_child(Container::new(checkbox_label).with_margin_left(4.).finish())
             .finish();
 
-        // Right: "Manage Rookify settings" link.
+        // Right: "Manage Ptermify settings" link.
         let manage_settings_link = appearance
             .ui_builder()
             .link(
-                "Manage Rookify settings".into(),
+                "Manage Ptermify settings".into(),
                 None,
                 Some(Box::new(|ctx| {
-                    ctx.dispatch_typed_action(SshRemoteServerChoiceViewAction::OpenRookifySettings);
+                    ctx.dispatch_typed_action(
+                        SshRemoteServerChoiceViewAction::OpenPtermifySettings,
+                    );
                 })),
                 self.manage_settings_mouse_state.clone(),
             )
@@ -265,7 +267,7 @@ impl TypedActionView for SshRemoteServerChoiceView {
             SshRemoteServerChoiceViewAction::Install => {
                 if self.do_not_ask_again {
                     let mode = SshExtensionInstallMode::AlwaysInstall;
-                    RookifySettings::handle(ctx).update(ctx, |settings, ctx| {
+                    PtermifySettings::handle(ctx).update(ctx, |settings, ctx| {
                         if let Err(e) = settings.ssh_extension_install_mode.set_value(mode, ctx) {
                             report_error!(
                                 e.context("Failed to persist ssh_extension_install_mode")
@@ -284,7 +286,7 @@ impl TypedActionView for SshRemoteServerChoiceView {
             SshRemoteServerChoiceViewAction::Skip => {
                 if self.do_not_ask_again {
                     let mode = SshExtensionInstallMode::NeverInstall;
-                    RookifySettings::handle(ctx).update(ctx, |settings, ctx| {
+                    PtermifySettings::handle(ctx).update(ctx, |settings, ctx| {
                         if let Err(e) = settings.ssh_extension_install_mode.set_value(mode, ctx) {
                             report_error!(
                                 e.context("Failed to persist ssh_extension_install_mode")
@@ -310,8 +312,8 @@ impl TypedActionView for SshRemoteServerChoiceView {
                 );
                 ctx.notify();
             }
-            SshRemoteServerChoiceViewAction::OpenRookifySettings => {
-                ctx.emit(SshRemoteServerChoiceViewEvent::OpenRookifySettings);
+            SshRemoteServerChoiceViewAction::OpenPtermifySettings => {
+                ctx.emit(SshRemoteServerChoiceViewEvent::OpenPtermifySettings);
             }
         }
     }

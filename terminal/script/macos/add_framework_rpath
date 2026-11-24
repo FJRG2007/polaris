@@ -7,7 +7,7 @@
 # as an error, and cargo-bundle 0.11.0 adds this rpath itself whenever it
 # copies at least one framework into the bundle. Bins that declare
 # `osx_frameworks` (`dev`, `stable`, `preview`) therefore arrive with the rpath
-# already set, while bins that declare none (`rook`, `rook-oss`) still need us
+# already set, while bins that declare none (`polaris-terminal`, `polaris-terminal`) still need us
 # to add it, so the add has to be conditional rather than dropped.
 
 set -euo pipefail

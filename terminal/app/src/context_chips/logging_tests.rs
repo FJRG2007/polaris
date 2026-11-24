@@ -1,16 +1,16 @@
-use rook_completer::completer::{CommandExitStatus, CommandOutput};
+use pterm_completer::completer::{CommandExitStatus, CommandOutput};
 
 use super::*;
 
 #[test]
 fn test_prompt_chip_log_filename_uses_channel_logfile_stem() {
     assert_eq!(
-        prompt_chip_log_filename("rook_dev.log"),
-        "rook_dev.prompt_chips.log"
+        prompt_chip_log_filename("pterm_dev.log"),
+        "pterm_dev.prompt_chips.log"
     );
     assert_eq!(
-        prompt_chip_log_filename("rook_local"),
-        "rook_local.prompt_chips.log"
+        prompt_chip_log_filename("pterm_local"),
+        "pterm_local.prompt_chips.log"
     );
 }
 
@@ -18,16 +18,16 @@ fn test_prompt_chip_log_filename_uses_channel_logfile_stem() {
 fn prompt_chip_log_path_stays_beside_resolved_frontend_log() {
     for (active_log, expected_sidecar) in [
         (
-            "/tmp/rook-logs/rook_dev.log",
-            "/tmp/rook-logs/rook_dev.prompt_chips.log",
+            "/tmp/polaris-terminal-logs/pterm_dev.log",
+            "/tmp/polaris-terminal-logs/pterm_dev.prompt_chips.log",
         ),
         (
-            "/tmp/rook-logs/rook-cli/rook_preview.log",
-            "/tmp/rook-logs/rook-cli/rook_preview.prompt_chips.log",
+            "/tmp/polaris-terminal-logs/polaris-terminal-cli/pterm_preview.log",
+            "/tmp/polaris-terminal-logs/polaris-terminal-cli/pterm_preview.prompt_chips.log",
         ),
         (
-            "/tmp/rook-logs/oz/rook.log",
-            "/tmp/rook-logs/oz/rook.prompt_chips.log",
+            "/tmp/polaris-terminal-logs/oz/polaris-terminal.log",
+            "/tmp/polaris-terminal-logs/oz/polaris-terminal.prompt_chips.log",
         ),
     ] {
         assert_eq!(
@@ -64,7 +64,7 @@ fn test_format_log_entry_preserves_stdout_and_stderr_sections() {
         stdout: b"https://github.com/warpdotdev/warp-internal/pull/123\n".to_vec(),
         stderr: b"warning output\n".to_vec(),
         status: CommandExitStatus::Success,
-        exit_code: Some(rook_core::command::ExitCode::from(0)),
+        exit_code: Some(pterm_core::command::ExitCode::from(0)),
     };
 
     let entry = format_log_entry(&ChipCommandLogEntry {

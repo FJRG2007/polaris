@@ -12,7 +12,7 @@
 # Prerequisites (same as script/deploy_remote_server):
 #   On Linux, install curl, sha256sum, tar, and sshpass.
 #   rustup target add x86_64-unknown-linux-musl
-#   gcloud CLI authenticated for the rook-ssh-integration-testing project
+#   gcloud CLI authenticated for the polaris-terminal-ssh-integration-testing project
 #
 # Usage:
 #   script/deploy_remote_server_to_test_vm
@@ -25,26 +25,26 @@ WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TARGET="x86_64-unknown-linux-musl"
 CARGO_PROFILE="dev-remote"
 FEATURES="crash_reporting,standalone,agent_mode_debug,remote_codebase_indexing"
-ROOK_BIN="integration"
+POLARIS_TERMINAL_BIN="integration"
 # The integration test runner uses Channel::Integration, which maps to
-# cli_command_name() = "oz-integration", remote_server_dir() = "~/.rook-dev/remote-server",
+# cli_command_name() = "oz-integration", remote_server_dir() = "~/.polaris-terminal-dev/remote-server",
 # and remote_server_binary() = "oz-integration-${pinned_version}".
-# See crates/rook_core/src/channel/mod.rs, crates/remote_server/src/setup.rs,
+# See crates/pterm_core/src/channel/mod.rs, crates/remote_server/src/setup.rs,
 # and crates/integration/src/bin/integration.rs.
 #
 # We intentionally build app/src/bin/integration.rs instead of the normal
 # Local-channel app binary. The Local-channel release bundle requires
-# rook-channel-config to generate local_config.json at compile time, but this CI
+# polaris-terminal-channel-config to generate local_config.json at compile time, but this CI
 # path should not depend on private channel config. The Integration-channel
 # binary embeds a static non-secret config instead.
-REMOTE_DIR=".rook-dev/remote-server"
+REMOTE_DIR=".polaris-terminal-dev/remote-server"
 
 # Dedicated remote-server test VM, configured similarly to the SSH integration
 # test VM but isolated from the general SSH integration suite.
 REMOTE_USERS=(bash zsh)
 REMOTE_HOST="ssh-remote-server-testing"
 REMOTE_PORT="22"
-PROXY_COMMAND="gcloud compute start-iap-tunnel ssh-remote-server-testing ${REMOTE_PORT} --listen-on-stdin --project=rook-ssh-integration-testing --zone=us-east4-b"
+PROXY_COMMAND="gcloud compute start-iap-tunnel ssh-remote-server-testing ${REMOTE_PORT} --listen-on-stdin --project=polaris-terminal-ssh-integration-testing --zone=us-east4-b"
 
 
 app_version() {
@@ -74,15 +74,15 @@ BINARY_NAME="$BUNDLE_BINARY_NAME-$BUNDLE_VERSION"
 
 CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$WORKSPACE_ROOT/target}"
 OUTPUT_DIR="$CARGO_TARGET_DIR/$TARGET/$CARGO_PROFILE"
-BUILT_BINARY="$OUTPUT_DIR/$ROOK_BIN"
+BUILT_BINARY="$OUTPUT_DIR/$POLARIS_TERMINAL_BIN"
 LOCAL_BUNDLE_DIR="$OUTPUT_DIR/remote-server-integration-bundle"
 LOCAL_BUNDLE_TARBALL="$OUTPUT_DIR/remote-server-integration-bundle.tar.gz"
 
 echo "==> Building Integration-channel Oz CLI for $TARGET (profile=$CARGO_PROFILE)"
 
 cargo build \
-    -p rook \
-    --bin "$ROOK_BIN" \
+    -p polaris-terminal \
+    --bin "$POLARIS_TERMINAL_BIN" \
     --target "$TARGET" \
     --profile "$CARGO_PROFILE" \
     --features "$FEATURES"

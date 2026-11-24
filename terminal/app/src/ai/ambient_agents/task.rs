@@ -5,10 +5,10 @@ use chrono::{DateTime, Duration as ChronoDuration, Utc};
 pub use cloud_object_models::HarnessModelConfig;
 pub use cloud_object_models::{AgentConfigSnapshot, HarnessAuthSecretsConfig, HarnessConfig};
 use iso8601_duration::Duration as Iso8601Duration;
-use rook_core::ui::theme::RookTheme;
-use rook_errors::report_error;
-use rookui::color::ColorU;
-use rookui::{SingletonEntity, View, ViewContext};
+use pterm_core::ui::theme::PtermTheme;
+use pterm_errors::report_error;
+use ptermui::color::ColorU;
+use ptermui::{SingletonEntity, View, ViewContext};
 use serde::{Deserialize, Serialize};
 use session_sharing_protocol::common::SessionId;
 use url::Url;
@@ -89,7 +89,7 @@ impl AgentSource {
             AgentSource::Slack => "Slack",
             AgentSource::Cli => "CLI",
             AgentSource::ScheduledAgent => "Scheduled",
-            AgentSource::Interactive | AgentSource::CloudMode => "Rook App",
+            AgentSource::Interactive | AgentSource::CloudMode => "Polaris Terminal App",
             AgentSource::WebApp => "Oz Web",
             AgentSource::GitHubAction => "GitHub Action",
             AgentSource::GitHubWebhook => "GitHub",
@@ -558,7 +558,7 @@ impl AmbientAgentTaskState {
         }
     }
 
-    pub fn status_icon_and_color(&self, theme: &RookTheme) -> (Icon, ColorU) {
+    pub fn status_icon_and_color(&self, theme: &PtermTheme) -> (Icon, ColorU) {
         match self {
             AmbientAgentTaskState::Queued
             | AmbientAgentTaskState::Pending

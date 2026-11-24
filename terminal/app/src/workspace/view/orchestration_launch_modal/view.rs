@@ -1,15 +1,15 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::Fill;
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::{
     Align, CacheOption, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Expanded, Flex, Image, MainAxisSize, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -73,7 +73,7 @@ const FEATURE_ITEMS: &[FeatureItem] = &[
     FeatureItem {
         icon: Icon::Atom,
         title: "Multi-agent orchestration",
-        description: "Rook Agents will now orchestrate swarms of subagents, allowing you to parallelize tasks.",
+        description: "Polaris Terminal Agents will now orchestrate swarms of subagents, allowing you to parallelize tasks.",
         badge: None,
     },
     FeatureItem {
@@ -85,7 +85,7 @@ const FEATURE_ITEMS: &[FeatureItem] = &[
 ];
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",
@@ -171,7 +171,7 @@ impl ActionButtonTheme for CtaButtonTheme {
 pub struct OrchestrationLaunchModal {
     close_button: ViewHandle<ActionButton>,
     learn_more_button: ViewHandle<ActionButton>,
-    go_to_rook_button: ViewHandle<ActionButton>,
+    go_to_pterm_button: ViewHandle<ActionButton>,
 }
 
 impl OrchestrationLaunchModal {
@@ -192,7 +192,7 @@ impl OrchestrationLaunchModal {
                 })
         });
 
-        let go_to_rook_button = ctx.add_view(|_ctx| {
+        let go_to_pterm_button = ctx.add_view(|_ctx| {
             ActionButton::new("Close", CtaButtonTheme)
                 .with_full_width(true)
                 .on_click(|ctx| ctx.dispatch_typed_action(OrchestrationLaunchModalAction::Close))
@@ -201,7 +201,7 @@ impl OrchestrationLaunchModal {
         Self {
             close_button,
             learn_more_button,
-            go_to_rook_button,
+            go_to_pterm_button,
         }
     }
 
@@ -280,7 +280,7 @@ impl OrchestrationLaunchModal {
 
     fn render_description(appearance: &Appearance) -> Box<dyn Element> {
         Text::new(
-            "We've made major improvements to Rook's cloud agent orchestration platform, Oz.",
+            "We've made major improvements to Polaris Terminal's cloud agent orchestration platform, Oz.",
             appearance.ui_font_family(),
             14.,
         )
@@ -306,7 +306,7 @@ impl OrchestrationLaunchModal {
     fn render_feature_row(&self, item: &FeatureItem, appearance: &Appearance) -> Box<dyn Element> {
         let icon_el = ConstrainedBox::new(
             item.icon
-                .to_rookui_icon(Fill::Solid(modal_text_sub(appearance)))
+                .to_ptermui_icon(Fill::Solid(modal_text_sub(appearance)))
                 .finish(),
         )
         .with_width(16.)
@@ -359,7 +359,7 @@ impl OrchestrationLaunchModal {
                 Expanded::new(1., ChildView::new(&self.learn_more_button).finish()).finish(),
             )
             .with_child(
-                Expanded::new(1., ChildView::new(&self.go_to_rook_button).finish()).finish(),
+                Expanded::new(1., ChildView::new(&self.go_to_pterm_button).finish()).finish(),
             )
             .finish();
 
@@ -400,7 +400,7 @@ impl View for OrchestrationLaunchModal {
         "OrchestrationLaunchModal"
     }
 
-    fn on_focus(&mut self, _focus_ctx: &rookui::FocusContext, ctx: &mut ViewContext<Self>) {
+    fn on_focus(&mut self, _focus_ctx: &ptermui::FocusContext, ctx: &mut ViewContext<Self>) {
         ctx.focus_self();
     }
 

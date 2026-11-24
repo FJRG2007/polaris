@@ -1,16 +1,16 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, Flex, Highlight, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, ScrollbarWidth,
     Shrinkable, Stack, Text,
 };
-use rookui::platform::{FilePickerConfiguration, FileType};
-use rookui::presenter::ChildView;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::platform::{FilePickerConfiguration, FileType};
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -20,7 +20,7 @@ use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::{CloudObject, Owner};
 use crate::server::ids::SyncId;
 use crate::server::sync_queue::SyncQueue;
-use crate::themes::theme::RookTheme;
+use crate::themes::theme::PtermTheme;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
 const CLOSE_BUTTON_SIZE: f32 = 24.;
@@ -182,7 +182,7 @@ impl ImportModal {
     fn render_breadcrumbs(
         &self,
         appearance: &Appearance,
-        theme: &RookTheme,
+        theme: &PtermTheme,
         app: &AppContext,
     ) -> Box<dyn Element> {
         let (breadcrumb_text, highlight_indices) = self.breadcrumb(app);
@@ -220,7 +220,7 @@ impl ImportModal {
     fn render_header(
         &self,
         appearance: &Appearance,
-        theme: &RookTheme,
+        theme: &PtermTheme,
         app: &AppContext,
     ) -> Box<dyn Element> {
         let top_row = Flex::row()
@@ -256,7 +256,7 @@ impl ImportModal {
             .finish()
     }
 
-    fn render_body(&self, theme: &RookTheme) -> Box<dyn Element> {
+    fn render_body(&self, theme: &PtermTheme) -> Box<dyn Element> {
         Container::new(
             ConstrainedBox::new(
                 ClippedScrollable::vertical(

@@ -2,11 +2,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::new_scrollable::SingleAxisConfig;
-use rookui::elements::{ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox, Fill};
-use rookui::platform::WindowStyle;
-use rookui::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::new_scrollable::SingleAxisConfig;
+use ptermui::elements::{ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox, Fill};
+use ptermui::platform::WindowStyle;
+use ptermui::{
     App, Entity, Event, Presenter, TypedActionView, View, ViewContext, ViewHandle, WindowId,
     WindowInvalidation,
 };
@@ -71,8 +71,8 @@ impl View for TestView {
         "NumberShortcutButtonsTestView"
     }
 
-    fn render(&self, _app: &rookui::AppContext) -> Box<dyn rookui::Element> {
-        let scrollable = rookui::elements::NewScrollable::vertical(
+    fn render(&self, _app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
+        let scrollable = ptermui::elements::NewScrollable::vertical(
             SingleAxisConfig::Clipped {
                 handle: self.scroll_state.clone(),
                 child: ChildView::new(&self.buttons).finish(),

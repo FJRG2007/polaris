@@ -8,11 +8,11 @@ use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Sample, StreamConfig};
 use futures::channel::oneshot;
 use parking_lot::Mutex;
-use rook_errors::report_error;
-use rookui_core::r#async::SpawnedFutureHandle;
-use rookui_core::event::KeyState;
-use rookui_core::platform::MicrophoneAccessState;
-use rookui_core::{Entity, ModelContext, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui_core::r#async::SpawnedFutureHandle;
+use ptermui_core::event::KeyState;
+use ptermui_core::platform::MicrophoneAccessState;
+use ptermui_core::{Entity, ModelContext, SingletonEntity};
 use rubato::{
     Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction,
 };
@@ -306,7 +306,7 @@ impl VoiceInput {
                         .collect();
 
                     // This is blocking, but we aren't on the main thread.
-                    let _ = rookui_core::r#async::block_on(audio_frame_tx.send(mono_samples));
+                    let _ = ptermui_core::r#async::block_on(audio_frame_tx.send(mono_samples));
                 },
                 move |err| {
                     if has_logged_stream_error {

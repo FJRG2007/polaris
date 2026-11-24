@@ -11,32 +11,32 @@ use lazy_static::lazy_static;
 use markdown_parser::FormattedText;
 use mermaid_to_svg::MermaidTheme;
 use num_traits::SaturatingSub;
-use regex::Regex;
-use rook_core::r#async::debounce;
-use rook_core::features::FeatureFlag;
-use rook_core::semantic_selection::SemanticSelection;
-use rook_editor::content::buffer::{
+use pterm_core::r#async::debounce;
+use pterm_core::features::FeatureFlag;
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_editor::content::buffer::{
     AutoScrollBehavior, Buffer, BufferEditAction, BufferEvent, BufferSelectAction, EditOrigin,
     SelectionOffsets, ShouldAutoscroll,
 };
-use rook_editor::content::selection_model::BufferSelectionModel;
-use rook_editor::content::text::{
+use pterm_editor::content::selection_model::BufferSelectionModel;
+use pterm_editor::content::text::{
     BlockHeaderSize, BlockType, BufferBlockItem, BufferBlockStyle, BufferTextStyle, CodeBlockType,
     IndentBehavior, IndentUnit, TextStyles, TextStylesWithMetadata,
 };
-use rook_editor::model::{BufferUpdateWrapper, CoreEditorModel, RichTextEditorModel};
-use rook_editor::render::model::{
+use pterm_editor::model::{BufferUpdateWrapper, CoreEditorModel, RichTextEditorModel};
+use pterm_editor::render::model::{
     AutoScrollMode, BlockItem, RenderEvent, RenderState, RichTextStyles, StyleUpdateAction,
 };
-use rook_editor::search::Searcher;
-use rook_editor::selection::{SelectionMode, SelectionModel, TextDirection, TextUnit};
-use rook_errors::report_error;
-use rookui::accessibility::{AccessibilityContent, ActionAccessibilityContent, RookA11yRole};
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::ListIndentLevel;
-use rookui::{
+use pterm_editor::search::Searcher;
+use pterm_editor::selection::{SelectionMode, SelectionModel, TextDirection, TextUnit};
+use pterm_errors::report_error;
+use ptermui::accessibility::{AccessibilityContent, ActionAccessibilityContent, PtermA11yRole};
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::ListIndentLevel;
+use ptermui::{
     AppContext, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity, WindowId,
 };
+use regex::Regex;
 use string_offset::CharOffset;
 use url::Url;
 use vec1::{Vec1, vec1};
@@ -1435,7 +1435,7 @@ impl NotebooksEditorModel {
         if let Some(command) = child_model.executable_command(ctx) {
             ctx.emit_a11y_content(AccessibilityContent::new_without_help(
                 format!("Selected workflow: {command}"),
-                RookA11yRole::TextareaRole,
+                PtermA11yRole::TextareaRole,
             ));
         }
 
@@ -1799,7 +1799,7 @@ impl NotebooksEditorModel {
         let text = format!("{style:?} {action}");
         ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
             text,
-            RookA11yRole::UserAction,
+            PtermA11yRole::UserAction,
         ))
     }
 

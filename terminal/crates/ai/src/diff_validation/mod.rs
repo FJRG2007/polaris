@@ -450,7 +450,7 @@ pub fn fuzzy_match_v4a_diffs(
     // multiple hunks targeting the same region (e.g. a large deletion whose
     // matched range subsumes a nearby single-line edit), the overlapping delta
     // must be dropped — applying both would produce an invalid edit range in
-    // the editor buffer (see ROOK-CLIENT-DEV-NYY).
+    // the editor buffer (see POLARIS_TERMINAL-CLIENT-DEV-NYY).
     deltas.sort_by_key(|d| d.replacement_line_range.start);
     deltas = deduplicate_overlapping_deltas(deltas);
 

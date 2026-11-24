@@ -1,5 +1,5 @@
 use fuzzy_match::FuzzyMatchResult;
-use rookui::{AppContext, Entity, SingletonEntity};
+use ptermui::{AppContext, Entity, SingletonEntity};
 
 use super::search_item::RuleSearchItem;
 use crate::ai::facts::{AIFact, CloudAIFactModel};

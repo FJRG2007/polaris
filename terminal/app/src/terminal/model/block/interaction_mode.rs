@@ -1,6 +1,6 @@
 use anyhow::anyhow;
-use rook_terminal::model::Point;
-use rook_terminal::model::grid::Dimensions;
+use pterm_terminal::model::Point;
+use pterm_terminal::model::grid::Dimensions;
 
 use super::{Block, SerializedAIMetadata};
 use crate::ai::agent::AIAgentActionId;

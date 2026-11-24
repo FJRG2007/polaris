@@ -1,6 +1,6 @@
-use rookui::Element;
-use rookui::elements::MouseStateHandle;
-use rookui::notification::RequestPermissionsOutcome;
+use ptermui::Element;
+use ptermui::elements::MouseStateHandle;
+use ptermui::notification::RequestPermissionsOutcome;
 use serde::Serialize;
 
 use super::{
@@ -109,7 +109,7 @@ pub fn render_inline_notifications_discovery_banner(
                         learn_more_button,
                     ),
                     RequestPermissionsOutcome::PermissionsDenied => (
-                        "Rook was denied permissions to send you notifications.",
+                        "Polaris Terminal was denied permissions to send you notifications.",
                         troubleshoot_button,
                     ),
                     RequestPermissionsOutcome::OtherError { .. } => (

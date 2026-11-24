@@ -27,7 +27,7 @@ CodeEditorModel (app)               edits, selection, diff; visual-row kill APIs
           └─ display_lattice(hidden)
                └─ DisplayLattice    per-scope row projection: rows() plus
                                     offset ↔ display-point queries
-TuiEditorElement (crates/rook_tui)  paints rows, draws cursor/selection, hit-tests
+TuiEditorElement (crates/pterm_tui)  paints rows, draws cursor/selection, hit-tests
  │                                  mouse; emits editor-generic TuiEditorActions
  └─ consumers (policy)              TuiInputView: editable, scroll-windowed,
                                     keybindings / kill buffer / submit / shell mode
@@ -69,7 +69,7 @@ Hidden line ranges are a *parameter* to `display_lattice` rather than internal s
 
 Scroll deliberately gets no model wrappers: it is read-side glue, so consumers gather the inputs (primary cursor, model-derived hidden ranges) through the public accessors and drive `CharCellState::follow_cursor` / `scroll_by` directly, keeping the shared model's TUI surface minimal.
 
-### `crates/rook_tui` — the core element
+### `crates/pterm_tui` — the core element
 
 `editor_element.rs` (new): `TuiEditorElement`, snapshot-based (built fresh per render), configured by builder methods:
 
@@ -88,7 +88,7 @@ The element carries no scroll or drag state of its own: the first visible row is
 
 The element *paints and interacts*; it does not compute row structure: at layout time it constructs one `DisplayLattice` (pushing `width − gutter columns` into `set_terminal_width` first, so softwrap math agrees) and builds rows, cursor position, and selection spans against that single projection — slicing its text snapshot by each row's `char_range`, applying styles and gutter cells, rendering gaps as `… {N} lines`, windowing by scroll, and keeping the phantom-row / empty-row-`" "` invariants. The structural extras (`hide_trailing_empty_line`) are folded into the hidden set via one helper (`effective_hidden_ranges`) used by both layout and events. Mouse events construct their own lattice at event time, re-deriving text and hidden ranges from the model (the presenter caches elements across frames, so construction-time snapshots may be stale) and map to a `TuiEditorAction` enum dispatched through `.on_action`; no handler ⇒ no event handling. Keybindings, kill/yank, submit, focus remain consumer policy.
 
-### Input migration (`crates/rook_tui/src/input/view.rs`)
+### Input migration (`crates/pterm_tui/src/input/view.rs`)
 
 `TuiInputView` renders the core element verbatim (`.editable().with_viewport_rows(...).on_action(map to TuiInputAction)`). Deleted: `TuiInputElement`, `char_cell_cursor_pos` (duplicate wrap math), the selection-span loop, `offset_at` internals, the kill-helper row segmentation and buffer-edit plumbing (now `CodeEditorModel::kill_to_char_cell_visual_row_end/_start`), the view-held `scroll_offset` and scroll policy (now `CharCellState` scroll; two thin view helpers gather the cursor and hidden ranges and call `follow_cursor` / `scroll_by` — `handle_action` follows the cursor after every action except wheel scroll), and the mirrored `is_selecting` flag (derived from the selection model's pending selection; `update_pending_selection`/`end_selection` are already no-ops without one, so the view dispatches unconditionally). Kept — the input policy layer: `tui:input:*` keybindings, `KillBuffer`, `max_visible_rows` (viewport policy), submit/clear, focus, shell-mode composition. Scroll geometry is computed in display-row space inside `CharCellState` — the same space the element windows by — so viewport math and rendering agree even once overlays apply to an editable surface. Net **−600 lines** in the input view; input behavior unchanged.
 
@@ -120,7 +120,7 @@ The lattice is rebuilt on every `display_lattice` call rather than stored on `Ch
 - `mod_tests.rs`: `TemporaryBlock → CharCellTemporaryBlock` flattening and replace-all storage semantics; `CharCellState` scroll (scroll-by clamping, minimal-move cursor following, stale-offset clamping after content shrinks).
 - `editor_element_tests.rs`: painted rows, gutter numbering/blank rules, trailing-empty-line elision, scroll windowing, empty-buffer row invariant.
 - Input parity: `input/view_tests.rs` behavioral assertions unchanged (harness updated to the element's types) — empty input occupies one row, wide-char cursor columns, mouse cell → offset mapping, wheel scrolling, kill/yank.
-- Suites: `cargo nextest run -p rook_editor -p rook_tui`; `./script/format` + presubmit clippy.
+- Suites: `cargo nextest run -p pterm_editor -p pterm_tui`; `./script/format` + presubmit clippy.
 
 ## Risks
 

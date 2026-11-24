@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use parking_lot::FairMutex;
-use rook_core::ui::appearance::Appearance;
-use rook_terminal::model::BlockId;
-use rookui::prelude::{Container, Empty, MouseStateHandle};
-use rookui::scene::{CornerRadius, Radius};
-use rookui::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_terminal::model::BlockId;
+use ptermui::prelude::{Container, Empty, MouseStateHandle};
+use ptermui::scene::{CornerRadius, Radius};
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 

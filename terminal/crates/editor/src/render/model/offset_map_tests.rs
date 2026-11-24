@@ -77,10 +77,10 @@ fn test_offset_map_placeholders() {
 fn test_end_to_end() {
     // Group imports here so they don't cause "unused import" warnings on other targets.
 
-    use rookui_core::App;
-    use rookui_core::color::ColorU;
-    use rookui_core::elements::Fill;
-    use rookui_core::fonts::Cache as FontCache;
+    use ptermui_core::App;
+    use ptermui_core::color::ColorU;
+    use ptermui_core::elements::Fill;
+    use ptermui_core::fonts::Cache as FontCache;
 
     use crate::content::buffer::{Buffer, BufferEditAction, EditOrigin};
     use crate::content::selection_model::BufferSelectionModel;
@@ -93,7 +93,7 @@ fn test_end_to_end() {
     };
 
     App::test((), |mut app| async move {
-        let mut font_cache = FontCache::new(Box::new(rookui::platform::current::FontDB::new()));
+        let mut font_cache = FontCache::new(Box::new(ptermui::platform::current::FontDB::new()));
         let paragraph_styles = ParagraphStyles {
             font_family: font_cache
                 .load_system_font("Arial")

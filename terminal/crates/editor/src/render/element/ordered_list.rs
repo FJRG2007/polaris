@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use rookui_core::elements::ListIndentLevel;
-use rookui_core::geometry::vector::vec2f;
-use rookui_core::text_layout::TextFrame;
+use ptermui_core::elements::ListIndentLevel;
+use ptermui_core::geometry::vector::vec2f;
+use ptermui_core::text_layout::TextFrame;
 
 use super::RenderableBlock;
 use super::paint::RenderContext;
@@ -40,8 +40,8 @@ impl RenderableBlock for RenderableOrderedListItem {
     fn layout(
         &mut self,
         model: &RenderState,
-        ctx: &mut rookui_core::LayoutContext,
-        app: &rookui_core::AppContext,
+        ctx: &mut ptermui_core::LayoutContext,
+        app: &ptermui_core::AppContext,
     ) {
         let text_layout = TextLayout::for_render_state(app, model);
         let block_style = BufferBlockStyle::OrderedList {
@@ -78,7 +78,7 @@ impl RenderableBlock for RenderableOrderedListItem {
         &mut self,
         model: &RenderState,
         ctx: &mut RenderContext,
-        _app: &rookui_core::AppContext,
+        _app: &ptermui_core::AppContext,
     ) {
         let content = model.content();
         let paragraph = extract_block!(self.viewport_item, content, (block, BlockItem::OrderedList{ paragraph: inner, ..}) => block.ordered_list(inner));

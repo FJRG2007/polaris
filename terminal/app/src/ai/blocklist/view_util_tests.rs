@@ -1,4 +1,4 @@
-use rook_core::features::FeatureFlag;
+use pterm_core::features::FeatureFlag;
 
 use super::*;
 use crate::settings::UsageDisplayUnit;

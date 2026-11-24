@@ -125,11 +125,14 @@ impl LoopbackOAuthReceiver {
         };
 
         let (status, message) = if result.is_ok() {
-            ("200 OK", "Authentication complete. You can return to Rook.")
+            (
+                "200 OK",
+                "Authentication complete. You can return to Polaris Terminal.",
+            )
         } else {
             (
                 "400 Bad Request",
-                "Authentication failed. Return to Rook for details.",
+                "Authentication failed. Return to Polaris Terminal for details.",
             )
         };
         let response = format!(

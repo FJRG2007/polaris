@@ -6,13 +6,13 @@
 //! - StaticWorkflowEnumSuggestions
 //! - DynamicWorkflowEnumSuggestions
 
-use rookui::elements::{
+use ptermui::elements::{
     Align, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DragBarSide,
     DropShadow, Element, Empty, Flex, ParentElement, Radius, Resizable, Shrinkable,
     SizeConstraintCondition, SizeConstraintSwitch, Text,
 };
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 
 use super::{
     DYNAMIC_ENUM_FAILURE_MESSAGE, DYNAMIC_ENUM_GENERATE_MESSAGE,
@@ -27,7 +27,7 @@ use crate::input_suggestions::{
     DETAILS_PANEL_MARGIN, DETAILS_PANEL_PADDING, HISTORY_DETAILS_PANEL_WIDTH,
     LABEL_PADDING as InputSuggestionsLabelPadding,
 };
-use crate::themes::theme::RookTheme;
+use crate::themes::theme::PtermTheme;
 
 enum SuggestionsResizeConfig {
     WidthAndHeight,
@@ -189,7 +189,7 @@ impl Input {
         &self,
         margin: f32,
         corner_radius: CornerRadius,
-        theme: &RookTheme,
+        theme: &PtermTheme,
         resize_config: SuggestionsResizeConfig,
         menu_positioning: MenuPositioning,
         content: Box<dyn Element>,

@@ -26,7 +26,7 @@ That one function feeds both consumers, so a single omission covered both:
 
 The file matters because it is the only one of the three a tool can add patterns
 to without touching a file under version control. Claude Code records its
-`.claude/` worktree root there rather than in `.gitignore`, and Rook itself
+`.claude/` worktree root there rather than in `.gitignore`, and Polaris Terminal itself
 writes the skill symlinks it publishes into the same file
 (`app/src/ai/agent_sdk/driver/harness/skill_dirs_publish.rs`).
 

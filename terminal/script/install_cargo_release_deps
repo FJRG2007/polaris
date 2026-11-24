@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Installs all cargo-managed dependencies required to build Rook release
+# Installs all cargo-managed dependencies required to build Polaris Terminal release
 # artifacts (e.g., bundled license generation).
 
 # This script should be platform-agnostic (eg. no unix-only references like /dev/null).

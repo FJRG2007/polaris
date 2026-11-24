@@ -1,7 +1,7 @@
 use itertools::Itertools;
-use rookui_core::SizeConstraint;
-use rookui_core::geometry::vector::vec2f;
-use rookui_core::units::{IntoPixels, Pixels};
+use ptermui_core::SizeConstraint;
+use ptermui_core::geometry::vector::vec2f;
+use ptermui_core::units::{IntoPixels, Pixels};
 use sum_tree::SumTree;
 
 use super::ViewportState;

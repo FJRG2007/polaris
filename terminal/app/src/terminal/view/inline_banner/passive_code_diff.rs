@@ -1,5 +1,5 @@
-use rookui::elements::{Border, ChildView, Container};
-use rookui::{AppContext, Element, Entity, SingletonEntity, View, ViewHandle};
+use ptermui::elements::{Border, ChildView, Container};
+use ptermui::{AppContext, Element, Entity, SingletonEntity, View, ViewHandle};
 
 use crate::ai::blocklist::inline_action::code_diff_view::CodeDiffView;
 use crate::ai::blocklist::inline_action::inline_action_header::INLINE_ACTION_HORIZONTAL_PADDING;

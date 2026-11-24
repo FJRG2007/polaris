@@ -16,13 +16,13 @@ Commit ref: `724c54771e2a06766257bc20f0053c6737a7d1b8`
 
 ## Context
 
-The TUI runtime introduces a parallel rendering path — ratatui + crossterm instead of RookUI's GPU renderer — with its own entity lifecycle (`TuiView`) and element traits (`TuiElement`) in `crates/rookui_core`. Existing TUI elements (`TuiText`, `TuiColumn`, `TuiContainer`, `TuiEventHandler`) are display-only or generic input hooks; there was no text input widget.
+The TUI runtime introduces a parallel rendering path — ratatui + crossterm instead of PtermUI's GPU renderer — with its own entity lifecycle (`TuiView`) and element traits (`TuiElement`) in `crates/ptermui_core`. Existing TUI elements (`TuiText`, `TuiColumn`, `TuiContainer`, `TuiEventHandler`) are display-only or generic input hooks; there was no text input widget.
 
-`crates/editor/` provides the reusable editing core: the `CoreEditorModel` / `PlainTextEditorModel` traits, the `Buffer` (rope-style text storage with undo/redo, word-boundary movement, selection), `SelectionModel`, and `RenderState`. The crate has no GPU coupling — it depends only on `rookui_core` for `AppContext` / `ModelHandle`.
+`crates/editor/` provides the reusable editing core: the `CoreEditorModel` / `PlainTextEditorModel` traits, the `Buffer` (rope-style text storage with undo/redo, word-boundary movement, selection), `SelectionModel`, and `RenderState`. The crate has no GPU coupling — it depends only on `ptermui_core` for `AppContext` / `ModelHandle`.
 
 **Key architectural decision**: rather than build a parallel `TuiRenderState` or a bespoke `TuiInputModel`, the TUI input view reuses the existing `CodeEditorModel` (the app's plain-text editor model) in a new **char-cell layout mode**. `RenderState` gains a `LayoutMode` enum; in `LayoutMode::CharCell` it skips the font engine and computes soft-wrap positions with monospace character-count arithmetic. `SelectionModel` stays non-generic (it still holds `ModelHandle<RenderState>`). This makes the full editing model — vim-capable navigation, syntax, diff, hidden lines — reusable by the TUI for free, and positions `RenderState` to handle future TUI rich-text content by extending the `CharCell` branch rather than building a separate layout system.
 
-**Scope of this milestone**: a functional multi-line, selectable editor with Emacs/readline keybindings, living in the `rook_tui` crate and exercised by unit tests and an interactive example. Wiring it into the `rook-tui` binary's runtime, input-mode switching, slash-command detection, and history navigation are explicitly deferred (see Follow-ups).
+**Scope of this milestone**: a functional multi-line, selectable editor with Emacs/readline keybindings, living in the `pterm_tui` crate and exercised by unit tests and an interactive example. Wiring it into the `polaris-terminal-tui` binary's runtime, input-mode switching, slash-command detection, and history navigation are explicitly deferred (see Follow-ups).
 
 ## Proposed Changes
 
@@ -84,9 +84,9 @@ There is **no** `TuiInputModel`. The TUI input is backed directly by the existin
 - The terminal width is pushed during the element's layout pass (see §2) via `render_state.char_cell()?.set_terminal_width(..)` (interior-mutable). `line_starts`/`char_widths` don't depend on the width, so no text rebuild is needed on resize.
 - **Keeping char-cell layout in sync**: `CodeEditorModel`'s `CoreEditorModel::on_buffer_version_updated` override calls `render_state.char_cell()` and, when `Some`, synchronously calls `update_text(text)` on it. Because the async font-shaping pipeline is bypassed in `CharCell` mode, this guaranteed-synchronous post-edit hook is what keeps `max_line` / `offset_to_softwrap_point` correct within the same frame as each edit.
 
-`app/src/editor/mod.rs` re-exports `CodeEditorModel` / `CodeEditorModelEvent` so the `rook_tui` crate can construct and subscribe to it.
+`app/src/editor/mod.rs` re-exports `CodeEditorModel` / `CodeEditorModelEvent` so the `pterm_tui` crate can construct and subscribe to it.
 
-### 2. `TuiInputView` — view in `crates/rook_tui/src/input/view.rs`
+### 2. `TuiInputView` — view in `crates/pterm_tui/src/input/view.rs`
 
 `TuiInputView` implements `TuiView` + `TypedActionView`. It holds `ModelHandle<CodeEditorModel>` plus all **TUI-specific session state** (deliberately kept on the view, not the model):
 
@@ -136,7 +136,7 @@ Keybinding table (Milestone 1):
 ### 3. Module layout
 
 ```
-crates/rook_tui/src/
+crates/pterm_tui/src/
     input/
         mod.rs          — pub use TuiInputView, TuiInputViewEvent
         view.rs         — TuiInputView (TuiView + TypedActionView), TuiInputAction,
@@ -145,15 +145,15 @@ crates/rook_tui/src/
         kill_buffer.rs  — KillBuffer (single-entry for M1)
 ```
 
-The editor-crate refactor is additive to existing files (`render/model/mod.rs`, `selection.rs`). The `new_tui` constructor lives on the existing `CodeEditorModel` in `app/src/code/editor/model.rs`. `app/src/tui/mod.rs` remains the auth-only headless entry point; the input view is not yet wired into the `rook-tui` runtime (next step).
+The editor-crate refactor is additive to existing files (`render/model/mod.rs`, `selection.rs`). The `new_tui` constructor lives on the existing `CodeEditorModel` in `app/src/code/editor/model.rs`. `app/src/tui/mod.rs` remains the auth-only headless entry point; the input view is not yet wired into the `polaris-terminal-tui` runtime (next step).
 
 **Framework change (resize)**: `TuiElement::layout` takes an `app: &AppContext` parameter (mirroring the GUI `Element::layout`), threaded through the presenter and every element impl. This lets an element refresh viewport-dependent model state during layout, so terminal resizes flow through the normal layout pass — no `TuiView::on_resize` hook is needed. `TuiRuntime::draw_if_dirty` marks the window dirty on a size change; the presenter then lays out against the new size, and each element's `layout` sees it.
 
 ### 4. Dependency notes
 
-- `crates/rook_tui` depends on `rook` (with the `tui` feature) for `CodeEditorModel`, on `rook_editor` for the editing traits/types, and on `rookui_core` (with `tui`) for the TUI elements/runtime.
-- `app`'s `tui` feature enables `rookui_core/tui`; `CodeEditorModel::new_tui` is not feature-gated.
-- `rook_tui` dev-dependencies enable `rook_core`'s `test-util` feature so tests/examples can register `Appearance::mock()`.
+- `crates/pterm_tui` depends on `polaris-terminal` (with the `tui` feature) for `CodeEditorModel`, on `pterm_editor` for the editing traits/types, and on `ptermui_core` (with `tui`) for the TUI elements/runtime.
+- `app`'s `tui` feature enables `ptermui_core/tui`; `CodeEditorModel::new_tui` is not feature-gated.
+- `pterm_tui` dev-dependencies enable `pterm_core`'s `test-util` feature so tests/examples can register `Appearance::mock()`.
 
 ## Diagram
 
@@ -191,11 +191,11 @@ TuiInputView : TuiView + TypedActionView
 - Explicit checks that the char-cell path returns `ColumnUnit::Chars` (not `Pixels`) and that offset 0 maps to row 0 / col 0; that the final shorter line clamps without exceeding the buffer.
 - Unicode display width: wide CJK chars occupy two columns and wrap when they don't fit (with round-trips), zero-width/combining marks don't advance the column, and `char_cell_line_row_starts` breaks on wide-char boundaries.
 
-**`TuiInputView` tests** (`crates/rook_tui/src/input/view_tests.rs` — 14 tests): drive a real `CodeEditorModel` (char-cell) behind a real `TuiInputView` (registering `Appearance::mock()`), covering cursor placement on empty/multi-line buffers, empty-line handling, up/down navigation across blank lines, selection text, `Ctrl+K` / `Ctrl+U` / `Ctrl+Y` kill-yank behaviour, and display-width cursor positioning for wide (CJK) and zero-width characters.
+**`TuiInputView` tests** (`crates/pterm_tui/src/input/view_tests.rs` — 14 tests): drive a real `CodeEditorModel` (char-cell) behind a real `TuiInputView` (registering `Appearance::mock()`), covering cursor placement on empty/multi-line buffers, empty-line handling, up/down navigation across blank lines, selection text, `Ctrl+K` / `Ctrl+U` / `Ctrl+Y` kill-yank behaviour, and display-width cursor positioning for wide (CJK) and zero-width characters.
 
 **Examples (manual smoke)**:
-- `crates/rook_tui/examples/tui_input_demo.rs` — interactive editor-backed input demo. (Since removed — the input view is exercised by the real `rook-tui` binary via `./script/run-tui`.)
-- `crates/rookui_core/examples/tui_file_viewer.rs` — validates the TUI runtime/rendering pipeline independently (scrollable file viewer, no editor dependency). Run: `cargo run -p rookui_core --example tui_file_viewer --features tui -- <path>`.
+- `crates/pterm_tui/examples/tui_input_demo.rs` — interactive editor-backed input demo. (Since removed — the input view is exercised by the real `polaris-terminal-tui` binary via `./script/run-tui`.)
+- `crates/ptermui_core/examples/tui_file_viewer.rs` — validates the TUI runtime/rendering pipeline independently (scrollable file viewer, no editor dependency). Run: `cargo run -p ptermui_core --example tui_file_viewer --features tui -- <path>`.
 
 ## Risks and Mitigations
 
@@ -207,13 +207,13 @@ TuiInputView : TuiView + TypedActionView
 
 **Selection rendering**: ratatui has no selection-highlight primitive, so `TuiInputElement` applies `Modifier::REVERSED` to selected cell spans manually. Tested with empty and non-empty selections.
 
-**`Appearance` dependency**: `new_tui` reads syntax colours from the `Appearance` singleton (shared with the GUI). Contexts that build the model must register one — a real `Appearance` at runtime, `Appearance::mock()` in tests/examples. When the input view is wired into the `rook-tui` runtime, that runtime will need to register `Appearance`.
+**`Appearance` dependency**: `new_tui` reads syntax colours from the `Appearance` singleton (shared with the GUI). Contexts that build the model must register one — a real `Appearance` at runtime, `Appearance::mock()` in tests/examples. When the input view is wired into the `polaris-terminal-tui` runtime, that runtime will need to register `Appearance`.
 
 ## Follow-ups
 
 Intentionally out of scope for M1; each should become its own task:
 
-- **Wire into the `rook-tui` runtime**: render `TuiInputView` in the `rook_tui` binary (today only auth runs in `app/src/tui/mod.rs`); register `Appearance` there. (Resize is already handled through the layout pass — `TuiElement::layout` receives the `AppContext` — so this remaining item is just mounting the view in the binary.)
+- **Wire into the `polaris-terminal-tui` runtime**: render `TuiInputView` in the `pterm_tui` binary (today only auth runs in `app/src/tui/mod.rs`); register `Appearance` there. (Resize is already handled through the layout pass — `TuiElement::layout` receives the `AppContext` — so this remaining item is just mounting the view in the binary.)
 - **Input mode (Agent / Shell)**: wire `BlocklistAIInputModel`; placeholder text and submit routing per mode.
 - **Slash command menu**: render an overlay on the `Composing` state.
 - **History (up-arrow)**: open a TUI history overlay; add an "is cursor on first visual row" trigger.

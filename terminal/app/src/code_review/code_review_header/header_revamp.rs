@@ -6,13 +6,13 @@
 //! Separated into its own module so the two codepaths are easy to distinguish.
 
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use ptermui::elements::{
     ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CrossAxisAlignment, Flex,
     MainAxisAlignment, MainAxisSize, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Shrinkable, Stack,
 };
-use rookui::{Element, ViewHandle};
+use ptermui::{Element, ViewHandle};
 
 use super::CodeReviewHeader;
 use crate::appearance::Appearance;
@@ -88,8 +88,8 @@ impl CodeReviewHeader {
 
     fn render_file_nav_button(button: &ViewHandle<ActionButton>) -> Box<dyn Element> {
         ConstrainedBox::new(ChildView::new(button).finish())
-            .with_height(rook_core::ui::icons::ICON_DIMENSIONS)
-            .with_width(rook_core::ui::icons::ICON_DIMENSIONS)
+            .with_height(pterm_core::ui::icons::ICON_DIMENSIONS)
+            .with_width(pterm_core::ui::icons::ICON_DIMENSIONS)
             .finish()
     }
 
@@ -143,8 +143,8 @@ impl CodeReviewHeader {
     ) -> Box<dyn Element> {
         let button_container = Container::new(
             ConstrainedBox::new(ChildView::new(header_dropdown_button).finish())
-                .with_height(rook_core::ui::icons::ICON_DIMENSIONS)
-                .with_width(rook_core::ui::icons::ICON_DIMENSIONS)
+                .with_height(pterm_core::ui::icons::ICON_DIMENSIONS)
+                .with_width(pterm_core::ui::icons::ICON_DIMENSIONS)
                 .finish(),
         )
         .finish();

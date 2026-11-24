@@ -44,11 +44,11 @@ integration_tests! {
     // Tests zsh-specific behavior.
     test_auto_title,
     // Tests zsh-specific behavior.
-    test_rook_auto_title_disabled,
+    test_pterm_auto_title_disabled,
     // Tests bash-specific behavior.
-    test_rook_honors_user_title_bash,
+    test_pterm_honors_user_title_bash,
     // Tests zsh-specific behavior.
-    test_rook_honors_user_title_zsh,
+    test_pterm_honors_user_title_zsh,
     // Tests OSC 7 updates the block's working directory on bash and zsh.
     test_osc7_updates_current_working_directory,
     // Tests shell-specific "autocd" behavior.
@@ -112,8 +112,8 @@ integration_tests! {
     test_copy_prompt_from_input_honor_ps1_enabled,
     test_copy_block_command_and_output_honor_ps1_disabled,
     test_copy_block_command_and_output_honor_ps1_enabled,
-    // Tests zsh-specific right-prompt behavior in Rook prompt mode.
-    test_rook_prompt_unsets_zsh_rprompt,
+    // Tests zsh-specific right-prompt behavior in Polaris Terminal prompt mode.
+    test_pterm_prompt_unsets_zsh_rprompt,
 
     // Disabled due to flakiness on CI.
     #[ignore]

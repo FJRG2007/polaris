@@ -1,6 +1,6 @@
 use ai::skills::{ParsedSkill, SkillPathOrigin, SkillProvider, SkillReference};
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::ai::skills::{
     ActiveSkillLookupError, SkillDescriptor, SkillManagerEvent, SkillPathQuery,

@@ -3,19 +3,19 @@
 use std::cmp;
 
 use fuzzy_match::{FuzzyMatchResult, match_indices_case_insensitive};
-use rook_core::ui::theme::Fill;
-use rook_editor::editor::NavigationKey;
-use rookui::color::ColorU;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use pterm_editor::editor::NavigationKey;
+use ptermui::color::ColorU;
+use ptermui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss,
     DispatchEventResult, DropShadow, Element, Empty, EventHandler, Flex, Highlight, MainAxisSize,
     MouseInBehavior, ParentElement, Radius, ScrollStateHandle, Scrollable, ScrollableElement,
     ScrollbarWidth, Text, UniformList, UniformListState,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Entity, FocusContext, SingletonEntity as _, TypedActionView, View, ViewContext,
     ViewHandle, id,
 };
@@ -331,7 +331,9 @@ impl CodeReviewDiffMenu {
 
                         let check_slot: Box<dyn Element> = if target.is_selected {
                             ConstrainedBox::new(
-                                Icon::Check.to_rookui_icon(Fill::Solid(text_color)).finish(),
+                                Icon::Check
+                                    .to_ptermui_icon(Fill::Solid(text_color))
+                                    .finish(),
                             )
                             .with_width(CHECK_SLOT_SIZE)
                             .with_height(CHECK_SLOT_SIZE)
@@ -412,7 +414,7 @@ impl CodeReviewDiffMenu {
             ScrollbarWidth::None,
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .with_padding_end(0.)
         .with_padding_start(0.);

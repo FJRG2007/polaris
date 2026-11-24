@@ -1,5 +1,5 @@
-use rookui::elements::ChildView;
-use rookui::{
+use ptermui::elements::ChildView;
+use ptermui::{
     Element, Entity, EntityId, ModelHandle, SingletonEntity as _, View, ViewContext, ViewHandle,
 };
 
@@ -212,7 +212,7 @@ impl View for InlineProfileSelectorView {
         "InlineProfileSelectorView"
     }
 
-    fn render(&self, _app: &rookui::AppContext) -> Box<dyn Element> {
+    fn render(&self, _app: &ptermui::AppContext) -> Box<dyn Element> {
         ChildView::new(&self.menu_view).finish()
     }
 }

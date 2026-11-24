@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use ai::diff_validation::{DiffDelta, ParsedDiff, V4AHunk};
 use async_io::block_on;
-use rookui::App;
+use ptermui::App;
 use tempfile::NamedTempFile;
 use vec1::vec1;
 

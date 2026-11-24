@@ -1,6 +1,6 @@
 use chrono::Local;
-use rookui::integration::{AssertionCallback, TestStep};
-use rookui::{App, SingletonEntity, TypedActionView, ViewHandle, WindowId, async_assert};
+use ptermui::integration::{AssertionCallback, TestStep};
+use ptermui::{App, SingletonEntity, TypedActionView, ViewHandle, WindowId, async_assert};
 
 use crate::ai::ai_document_view::{AIDocumentAction, AIDocumentView};
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;

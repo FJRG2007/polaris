@@ -1,8 +1,8 @@
-use rook_core::ui::appearance::Appearance;
-use rookui_core::elements::Empty;
-use rookui_core::keymap::macros::*;
-use rookui_core::keymap::{FixedBinding, Keystroke};
-use rookui_core::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui_core::elements::Empty;
+use ptermui_core::keymap::macros::*;
+use ptermui_core::keymap::{FixedBinding, Keystroke};
+use ptermui_core::{
     AppContext, Element, Entity, EventContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext,
 };
@@ -59,7 +59,7 @@ fn get_universal_input_callout_options(
 ) -> Option<CalloutOptions> {
     match state {
         UniversalInputCalloutState::MeetInput => Some(CalloutOptions {
-            title: "Meet the Rook input",
+            title: "Meet the Polaris Terminal input",
             text: format!(
                 "Your terminal input accepts both terminal commands and agent prompts and automatically detects which you're using. Use {} to lock the input to Agent mode (natural language) or Terminal mode (commands).",
                 keybindings.toggle_input_mode
@@ -119,7 +119,7 @@ fn get_agent_modality_callout_options(
                 Some(CalloutOptions {
                     title: "Welcome to terminal mode",
                     text: format!(
-                        "Run commands here, just like a regular terminal. If you type a question or task using natural language, Rook can suggest opening it in agent mode. You can always override using {}.",
+                        "Run commands here, just like a regular terminal. If you type a question or task using natural language, Polaris Terminal can suggest opening it in agent mode. You can always override using {}.",
                         keybindings.toggle_input_mode
                     ),
                     step: StepStatus::new(0, total_steps),
@@ -136,7 +136,7 @@ fn get_agent_modality_callout_options(
                 Some(CalloutOptions {
                     title: "You’re in terminal mode",
                     text: format!(
-                        "Run commands here, just like a regular terminal. If you type a question or task using natural language, Rook can suggest opening it in agent mode. You can always override using {}.",
+                        "Run commands here, just like a regular terminal. If you type a question or task using natural language, Polaris Terminal can suggest opening it in agent mode. You can always override using {}.",
                         keybindings.toggle_input_mode
                     ),
                     step: StepStatus::new(0, total_steps),

@@ -5,8 +5,8 @@
 //! how many panes are in each tab.
 //! See https://github.com/warpdotdev/warp-internal/pull/4785#issue-1634862270
 
-use rookui::integration::AssertionCallback;
-use rookui::{App, Entity, View, ViewHandle, WindowId, async_assert};
+use ptermui::integration::AssertionCallback;
+use ptermui::{App, Entity, View, ViewHandle, WindowId, async_assert};
 
 use crate::ai_assistant::panel::AIAssistantPanelView;
 use crate::input_suggestions::InputSuggestions;

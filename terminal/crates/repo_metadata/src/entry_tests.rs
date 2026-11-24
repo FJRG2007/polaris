@@ -442,7 +442,7 @@ fn unknown_kind_is_settled_by_the_patterns_unless_they_need_it() {
 
     // Inside an ignored directory, whether or not the file still exists.
     assert!(super::matches_gitignores_of_unknown_kind(
-        &root.join("target/debug/deps/librook.rmeta"),
+        &root.join("target/debug/deps/libpterm.rmeta"),
         &gitignores,
         true,
         never,
@@ -510,7 +510,7 @@ fn should_watch_preserves_git_internal_allowlist() {
 }
 
 fn find_entry<'a>(entry: &'a super::Entry, path: &std::path::Path) -> Option<&'a super::Entry> {
-    let std_path = rook_util::standardized_path::StandardizedPath::try_from_local(path).ok()?;
+    let std_path = pterm_util::standardized_path::StandardizedPath::try_from_local(path).ok()?;
     if entry.path() == &std_path {
         return Some(entry);
     }
@@ -582,7 +582,7 @@ fn standing_queries_report_skills_below_an_ignored_directory() {
         assert!(agents.loaded());
         assert!(find_entry(&tree, &repo.join(".agents/skills/test/SKILL.md")).is_some());
 
-        let skill_path = rook_util::standardized_path::StandardizedPath::try_from_local(
+        let skill_path = pterm_util::standardized_path::StandardizedPath::try_from_local(
             &repo.join(".agents/skills/test/SKILL.md"),
         )
         .unwrap();
@@ -639,7 +639,7 @@ fn standing_queries_report_symlinked_skills_without_materializing_symlinked_dire
             assert!(results.project_skills().any(|content| {
                 content
                     == &StandingQueryContent::file(
-                        rook_util::standardized_path::StandardizedPath::try_from_local(
+                        pterm_util::standardized_path::StandardizedPath::try_from_local(
                             &linked_directory.join("SKILL.md"),
                         )
                         .unwrap(),
@@ -653,7 +653,7 @@ fn standing_queries_do_not_report_rules_below_an_unloaded_shallow_directory() {
     virtual_fs::VirtualFS::test("standing_queries_report_shallow_rules", |dirs, mut vfs| {
         vfs.mkdir("repo/src/deep")
             .with_files(vec![virtual_fs::Stub::FileWithContent(
-                "repo/src/deep/ROOK.md",
+                "repo/src/deep/POLARIS_TERMINAL.md",
                 "project rules",
             )]);
         let repo = dirs.tests().join("repo");
@@ -681,10 +681,10 @@ fn standing_queries_do_not_report_rules_below_an_unloaded_shallow_directory() {
 
         let src = find_entry(&tree, &repo.join("src")).expect("src should be represented");
         assert!(!src.loaded());
-        assert!(find_entry(&tree, &repo.join("src/deep/ROOK.md")).is_none());
+        assert!(find_entry(&tree, &repo.join("src/deep/POLARIS_TERMINAL.md")).is_none());
 
-        let rule_path = rook_util::standardized_path::StandardizedPath::try_from_local(
-            &repo.join("src/deep/ROOK.md"),
+        let rule_path = pterm_util::standardized_path::StandardizedPath::try_from_local(
+            &repo.join("src/deep/POLARIS_TERMINAL.md"),
         )
         .unwrap();
         assert!(
@@ -705,11 +705,14 @@ fn shallow_tree_expands_force_included_skill_branch_only() {
                     "workspace/.agents/skills/review/SKILL.md",
                     "name: review",
                 ),
-                virtual_fs::Stub::FileWithContent("workspace/src/deep/ROOK.md", "project rules"),
+                virtual_fs::Stub::FileWithContent(
+                    "workspace/src/deep/POLARIS_TERMINAL.md",
+                    "project rules",
+                ),
             ]);
         let workspace = dirs.tests().join("workspace");
         let skill_path = workspace.join(".agents/skills/review/SKILL.md");
-        let rule_path = workspace.join("src/deep/ROOK.md");
+        let rule_path = workspace.join("src/deep/POLARIS_TERMINAL.md");
 
         let mut files = Vec::new();
         let mut gitignores = Vec::new();
@@ -745,9 +748,9 @@ fn shallow_tree_expands_force_included_skill_branch_only() {
         assert!(find_entry(&tree, &rule_path).is_none());
 
         let skill_path =
-            rook_util::standardized_path::StandardizedPath::try_from_local(&skill_path).unwrap();
+            pterm_util::standardized_path::StandardizedPath::try_from_local(&skill_path).unwrap();
         let rule_path =
-            rook_util::standardized_path::StandardizedPath::try_from_local(&rule_path).unwrap();
+            pterm_util::standardized_path::StandardizedPath::try_from_local(&rule_path).unwrap();
         assert!(
             results
                 .project_skills()
@@ -1159,7 +1162,10 @@ fn root_gitignore_and_git_info_exclude_are_both_honored() {
     let gitignores = gitignores_for_directory(&root_path);
 
     for ignored in [
-        root_path.join("target").join("debug").join("rook.exe"),
+        root_path
+            .join("target")
+            .join("debug")
+            .join("polaris-terminal.exe"),
         root_path.join(".claude").join("worktrees").join("x"),
     ] {
         assert!(
@@ -1190,7 +1196,10 @@ fn a_malformed_git_info_exclude_keeps_the_root_gitignore() {
     let gitignores = gitignores_for_directory(&root_path);
 
     assert!(matches_gitignores_of_unknown_kind(
-        &root_path.join("target").join("debug").join("rook.exe"),
+        &root_path
+            .join("target")
+            .join("debug")
+            .join("polaris-terminal.exe"),
         &gitignores,
         true,
         || false,

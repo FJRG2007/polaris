@@ -1,9 +1,9 @@
-use rook_core::ui::color::coloru_with_opacity;
-use rookui::elements::{
+use pterm_core::ui::color::coloru_with_opacity;
+use ptermui::elements::{
     ConstrainedBox, Element, Fill, Hoverable, MouseStateHandle, ParentElement, Rect, Stack,
 };
-use rookui::windowing::WindowManager;
-use rookui::{AppContext, SingletonEntity, WindowId};
+use ptermui::windowing::WindowManager;
+use ptermui::{AppContext, SingletonEntity, WindowId};
 
 use crate::window_settings::WindowSettings;
 use crate::workspace::panel_header_corner_radius;
@@ -23,7 +23,7 @@ impl WindowFocusDimming {
     /// unreliable due to soft keyboard management.
     pub fn is_window_focused(window_id: WindowId, ctx: &AppContext) -> bool {
         #[cfg(target_family = "wasm")]
-        if rookui::platform::wasm::is_mobile_device() {
+        if ptermui::platform::wasm::is_mobile_device() {
             return true;
         }
 
@@ -41,7 +41,7 @@ impl WindowFocusDimming {
         element: Box<dyn Element>,
         mouse_state: MouseStateHandle,
         height: f32,
-        background_color: rookui::color::ColorU,
+        background_color: ptermui::color::ColorU,
         window_id: WindowId,
         ctx: &AppContext,
     ) -> Box<dyn Element> {

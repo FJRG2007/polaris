@@ -1,10 +1,10 @@
 use ordered_float::OrderedFloat;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{Expanded, Highlight, Icon, ParentElement, Shrinkable};
-use rookui::fonts::{Properties, Weight};
-use rookui::prelude::{ConstrainedBox, Container, CrossAxisAlignment, Empty, Flex, Text};
-use rookui::{AppContext, Element, SingletonEntity};
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{Expanded, Highlight, Icon, ParentElement, Shrinkable};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::prelude::{ConstrainedBox, Container, CrossAxisAlignment, Empty, Flex, Text};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use super::{AcceptSlashCommandOrSavedPrompt, InlineItem};
 use crate::ai::blocklist::agent_view::shortcuts::render_keystroke_with_color_overrides;

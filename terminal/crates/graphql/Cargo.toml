@@ -1,7 +1,7 @@
 [package]
-authors = ["Rook Contributors"]
+authors = ["Polaris Terminal Contributors"]
 edition = "2024"
-name = "rook_graphql"
+name = "pterm_graphql"
 version = "0.1.0"
 publish.workspace = true
 license.workspace = true
@@ -21,9 +21,9 @@ persistence.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 thiserror.workspace = true
-rook_core.workspace = true
-rook_errors = { workspace = true, features = ["reqwest-errors"] }
-rook_graphql_schema.workspace = true
+pterm_core.workspace = true
+pterm_errors = { workspace = true, features = ["reqwest-errors"] }
+pterm_graphql_schema.workspace = true
 websocket = {path = "../websocket"}
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]

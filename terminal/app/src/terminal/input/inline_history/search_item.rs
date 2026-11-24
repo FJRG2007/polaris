@@ -1,15 +1,15 @@
 use chrono::{DateTime, Local};
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_core::ui::Icon;
-use rook_core::ui::color::coloru_with_opacity;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{ConstrainedBox, Container, Highlight, ParentElement, Shrinkable, Text};
-use rookui::fonts::{Properties, Weight};
-use rookui::prelude::{Align, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize};
-use rookui::scene::{CornerRadius, Radius};
-use rookui::text_layout::ClipConfig;
-use rookui::{AppContext, Element, SingletonEntity};
+use pterm_core::ui::Icon;
+use pterm_core::ui::color::coloru_with_opacity;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{ConstrainedBox, Container, Highlight, ParentElement, Shrinkable, Text};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::prelude::{Align, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize};
+use ptermui::scene::{CornerRadius, Radius};
+use ptermui::text_layout::ClipConfig;
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
 use crate::ai::conversation_status_ui::{STATUS_ELEMENT_PADDING, render_status_element};
@@ -124,7 +124,7 @@ impl SearchItem for InlineHistoryItem {
             HistoryItemType::Command { .. } => {
                 let icon_color = inline_styles::icon_color(appearance);
                 Container::new(
-                    ConstrainedBox::new(Icon::Terminal.to_rookui_icon(icon_color).finish())
+                    ConstrainedBox::new(Icon::Terminal.to_ptermui_icon(icon_color).finish())
                         .with_width(icon_size)
                         .with_height(icon_size)
                         .finish(),
@@ -139,7 +139,7 @@ impl SearchItem for InlineHistoryItem {
             HistoryItemType::AIPrompt { .. } => {
                 let icon_color = inline_styles::icon_color(appearance);
                 Container::new(
-                    ConstrainedBox::new(Icon::Prompt.to_rookui_icon(icon_color).finish())
+                    ConstrainedBox::new(Icon::Prompt.to_ptermui_icon(icon_color).finish())
                         .with_width(icon_size)
                         .with_height(icon_size)
                         .finish(),

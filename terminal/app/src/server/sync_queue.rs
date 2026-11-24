@@ -9,10 +9,10 @@ pub use cloud_objects::cloud_object::SerializedModel;
 use derivative::Derivative;
 use http::StatusCode;
 use lazy_static::lazy_static;
-use rook_errors::report_error;
-use rook_graphql::scalars::time::ServerTimestamp;
-use rookui::r#async::FutureId;
-use rookui::{Entity, ModelContext, RequestState, RetryOption, SingletonEntity};
+use pterm_errors::report_error;
+use pterm_graphql::scalars::time::ServerTimestamp;
+use ptermui::r#async::FutureId;
+use ptermui::{Entity, ModelContext, RequestState, RetryOption, SingletonEntity};
 use uuid::Uuid;
 
 use super::graphql::GraphQLError;
@@ -1723,7 +1723,7 @@ impl SyncQueue {
 
             if let Some(err) = cause.downcast_ref::<GraphQLError>() {
                 match err {
-                    // This only applies to RookDev, but if someone's IP address is blocked, there's no
+                    // This only applies to PolarisTerminalDev, but if someone's IP address is blocked, there's no
                     // point in continuing to dequeue.
                     GraphQLError::StagingAccessBlocked => return true,
                     // If the user isn't authorized, stop dequeuing. In general, this should

@@ -1,6 +1,6 @@
-use rookui::integration::{AssertionCallback, AssertionOutcome, StepData};
-use rookui::windowing::WindowManager;
-use rookui::{SingletonEntity, async_assert_eq};
+use ptermui::integration::{AssertionCallback, AssertionOutcome, StepData};
+use ptermui::windowing::WindowManager;
+use ptermui::{SingletonEntity, async_assert_eq};
 
 /// Saves the active window id with the given step data key.
 pub fn save_active_window_id<K>(window_key: K) -> AssertionCallback

@@ -13,9 +13,9 @@ use input_classifier::util::{is_agent_follow_up_input, is_one_off_natural_langua
 pub use input_classifier::{InputClassifierDecisionSource, InputType};
 use instant::Instant;
 use parking_lot::FairMutex;
-use rook_completer::completer::CompletionContext;
-use rook_core::features::FeatureFlag;
-use rookui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use pterm_completer::completer::CompletionContext;
+use pterm_core::features::FeatureFlag;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 use serde::{Deserialize, Serialize};
 use session_sharing_protocol::common::{InputMode, InputType as ProtocolInputType};
 use settings::Setting as _;
@@ -93,7 +93,7 @@ impl From<InputClassifierDecisionSource> for InputTypeAutoDetectionSource {
     }
 }
 
-use rook_errors::report_if_error;
+use pterm_errors::report_if_error;
 
 use super::ConversationSelectionHandle;
 use super::context_model::BlocklistAIContextModel;
@@ -792,7 +792,7 @@ impl BlocklistAIInputModel {
                     futures_lite::future::yield_now().await;
 
                     let input =
-                        rook_completer::util::expand_aliases(input, &completion_context).await;
+                        pterm_completer::util::expand_aliases(input, &completion_context).await;
 
                     futures_lite::future::yield_now().await;
 

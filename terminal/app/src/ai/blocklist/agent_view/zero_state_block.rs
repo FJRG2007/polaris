@@ -7,22 +7,22 @@ use itertools::Itertools as _;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine, parse_markdown};
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::Icon;
-use rook_errors::report_if_error;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::Icon;
+use pterm_errors::report_if_error;
+use ptermui::elements::{
     Clipped, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, EventHandler, Flex,
     FormattedTextElement, HighlightedHyperlink, MainAxisSize, MouseStateHandle, ParentElement,
     Radius, Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::Keystroke;
-use rookui::prelude::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::Keystroke;
+use ptermui::prelude::{
     Align, ConstrainedBox, Cursor, Empty, Hoverable, MainAxisAlignment, SavePosition,
 };
-use rookui::scene::Border;
-use rookui::ui_components::components::{UiComponent as _, UiComponentStyles};
-use rookui::{
+use ptermui::scene::Border;
+use ptermui::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui::{
     Action, AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext,
 };
@@ -56,7 +56,7 @@ use crate::util::time_format::format_approx_duration_from_now_utc;
 const CLOUD_AGENT_DOCS_URL: &str = "https://docs.rook.dev/platform/";
 const OZ_UPDATES_SECTION_HEADER: &str = "Latest updates";
 
-// The maximum number of Rook Agent updates from the changelog rendered in-line in the 'Latest updates' section.
+// The maximum number of Polaris Terminal Agent updates from the changelog rendered in-line in the 'Latest updates' section.
 const MAX_OZ_UPDATE_COUNT: usize = 4;
 
 const MAX_RECENT_CONVERSATION_COUNT: usize = 3;
@@ -373,7 +373,7 @@ fn format_session_location(session: &Session, working_directory: Option<&str>) -
     let hostname = session.hostname();
     match session_type {
         SessionType::Local => Some(display_path),
-        SessionType::RookifiedRemote { .. } => Some(format!("{user}@{hostname}:{display_path}")),
+        SessionType::PtermifiedRemote { .. } => Some(format!("{user}@{hostname}:{display_path}")),
     }
 }
 
@@ -425,7 +425,7 @@ impl View for AgentViewZeroStateBlock {
             }
 
             HeaderProps {
-                title: "New Rook Agent conversation".into(),
+                title: "New Polaris Terminal Agent conversation".into(),
                 description: AgentViewDescription::PlainText(vec![local_description.into()]),
                 icon: IconWithStatusVariant::OzAgent {
                     status: None,
@@ -555,7 +555,7 @@ fn current_working_directory_for_zero_state(terminal_model: &TerminalModel) -> O
                     .is_some_and(|pending_session_info| {
                         matches!(
                             pending_session_info.session_type,
-                            BootstrapSessionType::RookifiedRemote
+                            BootstrapSessionType::PtermifiedRemote
                         )
                     });
             (!terminal_model.block_list().is_bootstrapped() && !is_bootstrapping_remote_shell)
@@ -1049,7 +1049,7 @@ fn render_oz_updates(props: OzUpdatesProps<'_>, app: &AppContext) -> Option<Box<
                                     } else {
                                         Icon::ChevronRight
                                     }
-                                    .to_rookui_icon(theme.sub_text_color(theme.background()))
+                                    .to_ptermui_icon(theme.sub_text_color(theme.background()))
                                     .finish(),
                                 )
                                 .with_height(appearance.monospace_font_size())
@@ -1135,7 +1135,7 @@ fn render_oz_updates(props: OzUpdatesProps<'_>, app: &AppContext) -> Option<Box<
                                 .with_child(
                                     ConstrainedBox::new(
                                         Icon::Share3
-                                            .to_rookui_icon(
+                                            .to_ptermui_icon(
                                                 theme.sub_text_color(theme.background()),
                                             )
                                             .finish(),
@@ -1316,7 +1316,7 @@ where
 }
 
 mod styles {
-    use rook_core::ui::appearance::Appearance;
+    use pterm_core::ui::appearance::Appearance;
 
     pub const CONTAINER_VERTICAL_PADDING: f32 = 16.;
     pub const TITLE_MARGIN_BOTTOM: f32 = 8.;

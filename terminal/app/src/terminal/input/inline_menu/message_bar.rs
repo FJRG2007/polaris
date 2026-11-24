@@ -1,8 +1,8 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::Element;
-use rookui::prelude::Container;
-use rookui::scene::Border;
-use rookui::{AppContext, Entity, ModelHandle, SingletonEntity, View, ViewContext};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::Element;
+use ptermui::prelude::Container;
+use ptermui::scene::Border;
+use ptermui::{AppContext, Entity, ModelHandle, SingletonEntity, View, ViewContext};
 
 use crate::ai::blocklist::agent_view::{AgentViewController, AgentViewControllerEvent};
 use crate::terminal::input::inline_menu::model::InlineMenuModel;

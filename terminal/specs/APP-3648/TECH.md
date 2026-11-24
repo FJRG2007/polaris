@@ -37,7 +37,7 @@ Layout: `Flex::row` with `CrossAxisAlignment::Center`, padded with horizontal `G
 
 **Search input** (left, fills remaining space via `Shrinkable`):
 - `Hoverable` wrapping a `Container` styled as an inert search field:
-  - Left: `RookIcon::Search` magnifying glass icon (12px, sub-text color)
+  - Left: `PtermIcon::Search` magnifying glass icon (12px, sub-text color)
   - Right: `Text::new_inline("Search tabs...", ...)` placeholder in sub-text color, clipped
   - Background: `fg_overlay_1` or similar subtle fill; rounded corners
   - Height: ~24px to match icon button sizing

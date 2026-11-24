@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 
 use async_channel::Receiver;
-use rookui_core::r#async::executor;
+use ptermui_core::r#async::executor;
 use serde::Serialize;
 
 #[cfg(not(target_family = "wasm"))]
@@ -141,17 +141,17 @@ impl Error {
 
 /// The SSH `ControlMaster` socket (if any) behind a connection, tagged
 /// with who owns the master process. Ownership decides teardown
-/// behavior: only `RookManaged` masters are stopped with `ssh -O exit`
+/// behavior: only `PtermManaged` masters are stopped with `ssh -O exit`
 /// on explicit teardown (see [`crate::ssh::stop_control_master`]);
 /// `UserOwned` masters must be left running.
 #[cfg(not(target_family = "wasm"))]
 #[derive(Debug, Clone)]
 pub enum ControlPath {
-    /// Rook created the ControlMaster at this socket path and is
+    /// Polaris Terminal created the ControlMaster at this socket path and is
     /// responsible for tearing it down on session exit.
-    RookManaged(PathBuf),
+    PtermManaged(PathBuf),
     /// The SSH wrapper attached to a ControlMaster the user already had
-    /// running at this socket path. Rook must never tear it down.
+    /// running at this socket path. Polaris Terminal must never tear it down.
     UserOwned(PathBuf),
     /// No ControlMaster socket (e.g. in-process test transports).
     None,

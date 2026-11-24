@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Local, TimeDelta};
 use history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
-use rook_errors::report_error;
-use rookui::{AppContext, Entity, SingletonEntity, ViewContext};
+use pterm_errors::report_error;
+use ptermui::{AppContext, Entity, SingletonEntity, ViewContext};
 use session_sharing_protocol::common::ParticipantId;
 
 use super::{AIBlockModel, AIBlockOutputStatus, OutputStatusUpdateCallback};

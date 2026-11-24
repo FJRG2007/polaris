@@ -1,4 +1,4 @@
-use rookui::App;
+use ptermui::App;
 
 use super::InlineMenuModel;
 use crate::terminal::input::inline_menu::{InlineMenuAction, InlineMenuType};

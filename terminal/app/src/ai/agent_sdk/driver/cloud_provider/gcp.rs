@@ -6,10 +6,10 @@ use std::time::Duration;
 
 use anyhow::Context as _;
 use command::r#async::Command;
-use rook_core::{safe_info, safe_warn};
-use rook_managed_secrets::{GcpCredentials, GcpFederationConfig};
-use rookui::ModelSpawner;
-use rookui::r#async::FutureExt as _;
+use pterm_core::{safe_info, safe_warn};
+use pterm_managed_secrets::{GcpCredentials, GcpFederationConfig};
+use ptermui::ModelSpawner;
+use ptermui::r#async::FutureExt as _;
 
 use super::super::terminal::TerminalDriver;
 use super::{CloudProvider, CloudProviderSetupError, Result};

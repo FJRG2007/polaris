@@ -189,7 +189,7 @@ In this first iteration, a non-active pane that is hidden by Tabs mode does not 
 - **Row parity**: For a given active pane, compare its appearance in `Panes` mode vs `Tabs` mode and verify the row content matches.
 - **Pane-row controls in Tabs mode**: With `View as = Tabs`, change `Pane title as`, `Additional metadata`, and `Show`, and verify they still affect the representative row rather than disappearing.
 - **Header regression**: In `Tabs` mode, verify header rename, close, pane count, drag behavior, and context menu behavior still work.
-- **Persistence**: Select `Tabs`, relaunch Rook, and verify the panel reopens in `Tabs` mode.
+- **Persistence**: Select `Tabs`, relaunch Polaris Terminal, and verify the panel reopens in `Tabs` mode.
 - **Search**: In a multi-pane tab, ensure only the active pane’s representative row is matched and rendered in `Tabs` mode.
 
 ## Open questions

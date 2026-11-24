@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use pathfinder_color::ColorU;
-use rook_core::ui::color::hex_color::HexColorError as UiHexColorError;
-use rook_core::ui::theme::{AnsiColors, RookTheme};
-use rookui::DisplayIdx;
-use rookui::fonts::FontInfo;
-use rookui::keymap::Keystroke;
+use pterm_core::ui::color::hex_color::HexColorError as UiHexColorError;
+use pterm_core::ui::theme::{AnsiColors, PtermTheme};
+use ptermui::DisplayIdx;
+use ptermui::fonts::FontInfo;
+use ptermui::keymap::Keystroke;
 use serde::Serialize;
 use strum_macros::EnumIter;
 use thiserror::Error;
@@ -26,8 +26,8 @@ use crate::{themes::theme_creator_body::ThemeCreatorBody, user_config};
 
 #[derive(Debug)]
 pub enum ThemeType {
-    LightAndDark { light: RookTheme, dark: RookTheme },
-    Single(RookTheme),
+    LightAndDark { light: PtermTheme, dark: PtermTheme },
+    Single(PtermTheme),
 }
 
 #[derive(Clone, Debug)]
@@ -40,7 +40,7 @@ pub enum ThemeError {
 
 #[derive(Clone, Error, Debug)]
 pub enum HotkeyError {
-    #[error("A hotkey window opens in a way Rook does not support")]
+    #[error("A hotkey window opens in a way Polaris Terminal does not support")]
     UnsupportedWindowType,
     #[error("There are multiple hotkeys configured")]
     MultipleHotkeys,
@@ -389,7 +389,7 @@ pub trait ParseableConfig: PartialEq + Sized + Send {
     /// Reads the file at the given path into the struct implementing ParseableConfig.
     async fn from_file(path: PathBuf) -> Result<Vec<Self>, ConfigError>;
 
-    /// Creates a Rook-readable `Config`. Sets corresponding errors if values have
+    /// Creates a Polaris Terminal-readable `Config`. Sets corresponding errors if values have
     /// not been configured from the default.
     fn parse(self, fonts: &[FontInfo]) -> Config;
 

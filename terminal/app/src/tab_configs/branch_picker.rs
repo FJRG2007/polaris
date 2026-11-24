@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use rookui::elements::ChildView;
-use rookui::ui_components::components::UiComponentStyles;
-use rookui::{AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::elements::ChildView;
+use ptermui::ui_components::components::UiComponentStyles;
+use ptermui::{AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle};
 
 use crate::tab_configs::PickerStyle;
 use crate::util::git::{

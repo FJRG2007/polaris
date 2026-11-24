@@ -1,14 +1,14 @@
 use std::path::PathBuf;
 
-use rook_core::ui::appearance::Appearance;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::elements::{
     Align, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
     CrossAxisAlignment, Expanded, Flex, MainAxisAlignment, MainAxisSize, ParentElement,
     ScrollbarWidth,
 };
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -193,7 +193,7 @@ impl AIFactView {
                 .with_child(
                     ConstrainedBox::new(
                         Icon::CloudOffline
-                            .to_rookui_icon(
+                            .to_ptermui_icon(
                                 appearance
                                     .theme()
                                     .sub_text_color(appearance.theme().surface_2()),
@@ -278,7 +278,7 @@ impl View for AIFactView {
             ScrollbarWidth::Auto,
             appearance.theme().nonactive_ui_detail().into(),
             appearance.theme().active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .finish()
     }
@@ -308,16 +308,16 @@ impl BackingView for AIFactView {
     fn handle_pane_header_overflow_menu_action(
         &mut self,
         _action: &Self::PaneHeaderOverflowMenuAction,
-        _ctx: &mut rookui::ViewContext<Self>,
+        _ctx: &mut ptermui::ViewContext<Self>,
     ) {
         self.handle_action(_action, _ctx)
     }
 
-    fn close(&mut self, ctx: &mut rookui::ViewContext<Self>) {
+    fn close(&mut self, ctx: &mut ptermui::ViewContext<Self>) {
         ctx.emit(AIFactViewEvent::Pane(PaneEvent::Close));
     }
 
-    fn focus_contents(&mut self, ctx: &mut rookui::ViewContext<Self>) {
+    fn focus_contents(&mut self, ctx: &mut ptermui::ViewContext<Self>) {
         self.focus(ctx);
     }
 

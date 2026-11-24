@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
-use rookui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity, WeakViewHandle};
+use ptermui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity, WeakViewHandle};
 
 use crate::cloud_object::Owner;
 use crate::cloud_object::model::persistence::CloudModel;

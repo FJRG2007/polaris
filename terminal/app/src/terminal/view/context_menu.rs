@@ -1,4 +1,4 @@
-use rookui::{SingletonEntity, UpdateView};
+use ptermui::{SingletonEntity, UpdateView};
 
 use super::{
     AIAgentExchangeId, AIConversationId, AgentModeRewindEntrypoint, AppContext,

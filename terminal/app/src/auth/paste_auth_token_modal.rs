@@ -7,19 +7,19 @@
 //! `EditorView` for the text input, which the onboarding crate doesn't
 //! depend on.
 use pathfinder_color::ColorU;
-use rook_core::safe_error;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::actions::StandardAction;
-use rookui::elements::{
+use pterm_core::safe_error;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::actions::StandardAction;
+use ptermui::elements::{
     Align, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Fill,
     Flex, FormattedTextElement, HighlightedHyperlink, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, ParentElement, Radius, Shrinkable, Stack,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::{FixedBinding, Keystroke};
-use rookui::text_layout::TextAlignment;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::{FixedBinding, Keystroke};
+use ptermui::text_layout::TextAlignment;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -40,7 +40,7 @@ const MODAL_WIDTH: f32 = 460.;
 const AUTH_TOKEN_INPUT_BORDER_RADIUS: Radius = Radius::Pixels(4.);
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
     app.register_fixed_bindings([
         FixedBinding::new(
             "enter",
@@ -256,7 +256,7 @@ impl View for PasteAuthTokenModalView {
         let close_button = ui_builder
             .close_button(24., self.close_mouse_state.clone())
             .build()
-            .on_click(|ctx: &mut rookui::EventContext, _, _| {
+            .on_click(|ctx: &mut ptermui::EventContext, _, _| {
                 ctx.dispatch_typed_action(PasteAuthTokenModalAction::Cancel);
             })
             .finish();
@@ -407,7 +407,7 @@ impl View for PasteAuthTokenModalView {
         // Dim backdrop with click-to-dismiss behavior (matches the mockup).
         let mut stack = Stack::new();
         stack.add_child(
-            Container::new(rookui::elements::Empty::new().finish())
+            Container::new(ptermui::elements::Empty::new().finish())
                 .with_background_color(ColorU::new(0, 0, 0, 179))
                 .finish(),
         );

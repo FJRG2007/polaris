@@ -7,6 +7,6 @@ pub mod remote_server_controller;
 pub mod terminal_manager_util;
 pub(crate) mod terminal_surface;
 
+pub use pterm_terminal::writeable_pty::Message;
 pub use pty_controller::{PtyController, PtyControllerEvent};
-pub use rook_terminal::writeable_pty::Message;
 pub use terminal_surface::{PtyIntent, PtyIntentEvent, TerminalSurface};

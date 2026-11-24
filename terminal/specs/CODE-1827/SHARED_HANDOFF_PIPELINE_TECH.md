@@ -2,15 +2,15 @@
 
 ## Context
 
-This middle PR extracts local-to-cloud handoff policy and sequencing from GUI workspace/pane state, then migrates the GUI as the shared pipeline’s only caller. It adds no TUI command or handoff card. References are pinned to rook commit `c4cc7be9477897c75c34bdc75c1a324c25b12f27`.
+This middle PR extracts local-to-cloud handoff policy and sequencing from GUI workspace/pane state, then migrates the GUI as the shared pipeline’s only caller. It adds no TUI command or handoff card. References are pinned to polaris-terminal commit `c4cc7be9477897c75c34bdc75c1a324c25b12f27`.
 
-- [`app/src/terminal/input.rs (4244-4617)`](https://github.com/FJRG2007/rook/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/app/src/terminal/input.rs#L4244-L4617) owns GUI compose activation and prompt/attachment dispatch.
-- [`app/src/workspace/view.rs (15540-15941)`](https://github.com/FJRG2007/rook/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/app/src/workspace/view.rs#L15540-L15941) owns eligibility, cancellation, server fork, local fork/pane materialization, and snapshot startup.
-- [`app/src/terminal/view/ambient_agent/model.rs (110-187)`](https://github.com/FJRG2007/rook/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/app/src/terminal/view/ambient_agent/model.rs#L110-L187) stores GUI handoff state.
-- [`app/src/terminal/view/ambient_agent/model.rs (690-807)`](https://github.com/FJRG2007/rook/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/app/src/terminal/view/ambient_agent/model.rs#L690-L807) owns prompt substitution and queued submission.
-- [`app/src/ai/blocklist/handoff/touched_repos.rs (81-422)`](https://github.com/FJRG2007/rook/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/app/src/ai/blocklist/handoff/touched_repos.rs#L81-L422) already provides frontend-neutral path/repository derivation.
-- [`app/src/ai/agent_sdk/driver/snapshot.rs (752-869)`](https://github.com/FJRG2007/rook/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/app/src/ai/agent_sdk/driver/snapshot.rs#L752-L869) uploads handoff snapshots without GUI rendering.
-- [`app/src/ai/ambient_agents/spawn.rs (102-136)`](https://github.com/FJRG2007/rook/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/app/src/ai/ambient_agents/spawn.rs#L102-L136) combines run creation with GUI joinable-session polling.
+- [`app/src/terminal/input.rs (4244-4617)`](https://github.com/FJRG2007/polaris/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/terminal/app/src/terminal/input.rs#L4244-L4617) owns GUI compose activation and prompt/attachment dispatch.
+- [`app/src/workspace/view.rs (15540-15941)`](https://github.com/FJRG2007/polaris/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/terminal/app/src/workspace/view.rs#L15540-L15941) owns eligibility, cancellation, server fork, local fork/pane materialization, and snapshot startup.
+- [`app/src/terminal/view/ambient_agent/model.rs (110-187)`](https://github.com/FJRG2007/polaris/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/terminal/app/src/terminal/view/ambient_agent/model.rs#L110-L187) stores GUI handoff state.
+- [`app/src/terminal/view/ambient_agent/model.rs (690-807)`](https://github.com/FJRG2007/polaris/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/terminal/app/src/terminal/view/ambient_agent/model.rs#L690-L807) owns prompt substitution and queued submission.
+- [`app/src/ai/blocklist/handoff/touched_repos.rs (81-422)`](https://github.com/FJRG2007/polaris/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/terminal/app/src/ai/blocklist/handoff/touched_repos.rs#L81-L422) already provides frontend-neutral path/repository derivation.
+- [`app/src/ai/agent_sdk/driver/snapshot.rs (752-869)`](https://github.com/FJRG2007/polaris/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/terminal/app/src/ai/agent_sdk/driver/snapshot.rs#L752-L869) uploads handoff snapshots without GUI rendering.
+- [`app/src/ai/ambient_agents/spawn.rs (102-136)`](https://github.com/FJRG2007/polaris/blob/c4cc7be9477897c75c34bdc75c1a324c25b12f27/terminal/app/src/ai/ambient_agents/spawn.rs#L102-L136) combines run creation with GUI joinable-session polling.
 
 ## Proposed changes
 
@@ -114,7 +114,7 @@ Retain or migrate existing GUI tests in `ambient_agent/model_tests.rs`, `handoff
 Run:
 
 - `./script/format`
-- Focused `cargo nextest run -p rook` tests.
+- Focused `cargo nextest run -p polaris-terminal` tests.
 - GUI handoff regression tests.
 - The applicable app clippy command from `./script/presubmit`.
 

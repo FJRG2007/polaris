@@ -1,8 +1,8 @@
 //! Mock recorder for exercising the recording UI on macOS, where real capture
 //! is unsupported.
 //!
-//! Enabled by setting `ROOK_MOCK_RECORDER`; `stop` publishes a copy of the MP4
-//! at `ROOK_MOCK_RECORDING_FIXTURE`, and `ROOK_MOCK_RECORDING_STOPPED_EARLY`
+//! Enabled by setting `POLARIS_TERMINAL_MOCK_RECORDER`; `stop` publishes a copy of the MP4
+//! at `POLARIS_TERMINAL_MOCK_RECORDING_FIXTURE`, and `POLARIS_TERMINAL_MOCK_RECORDING_STOPPED_EARLY`
 //! exercises the partial-recording copy.
 
 use std::path::PathBuf;
@@ -58,23 +58,26 @@ impl crate::Recorder for Recorder {
             .map(|started| started.elapsed())
             .unwrap_or_default();
 
-        let fixture = std::env::var("ROOK_MOCK_RECORDING_FIXTURE").map_err(|_| {
+        let fixture = std::env::var("POLARIS_TERMINAL_MOCK_RECORDING_FIXTURE").map_err(|_| {
             RecordingError::Environment {
-                reason: "ROOK_MOCK_RECORDING_FIXTURE is not set".to_string(),
+                reason: "POLARIS_TERMINAL_MOCK_RECORDING_FIXTURE is not set".to_string(),
             }
         })?;
-        let path =
-            std::env::temp_dir().join(format!("rook-mock-recording-{}.mp4", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "polaris-terminal-mock-recording-{}.mp4",
+            std::process::id()
+        ));
         std::fs::copy(&fixture, &path).map_err(|e| RecordingError::Finalize {
             reason: format!("failed to copy mock fixture '{fixture}': {e}"),
         })?;
         let size_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
 
-        let completion_status = if std::env::var_os("ROOK_MOCK_RECORDING_STOPPED_EARLY").is_some() {
-            RecordingCompletionStatus::StoppedEarly
-        } else {
-            RecordingCompletionStatus::Completed
-        };
+        let completion_status =
+            if std::env::var_os("POLARIS_TERMINAL_MOCK_RECORDING_STOPPED_EARLY").is_some() {
+                RecordingCompletionStatus::StoppedEarly
+            } else {
+                RecordingCompletionStatus::Completed
+            };
 
         Ok(RecordingOutput {
             path,

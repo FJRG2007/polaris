@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use itertools::Itertools as _;
-use rook_core::features::FeatureFlag;
+use pterm_core::features::FeatureFlag;
 use uuid::Uuid;
 use warp_multi_agent_api as api;
 

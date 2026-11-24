@@ -34,22 +34,22 @@ use managed_mcp::ManagedMcpClient;
 use non_structural_derive::non_structural_derive;
 use object::ObjectClient;
 use parking_lot::Mutex;
-use referral::ReferralsClient;
-use reqwest::StatusCode;
-use rook_core::context_flag::ContextFlag;
-use rook_core::telemetry::TelemetryEvent;
-use rook_errors::{AnyhowErrorExt, ErrorExt, register_error, report_error};
-use rook_managed_secrets::client::ManagedSecretsClient;
-use rook_server_client::HttpStatusError;
-use rook_server_client::auth::{AuthClientImpl, AuthEvent, EXPERIMENT_ID_HEADER};
-use rook_server_client::base_client::{
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::telemetry::TelemetryEvent;
+use pterm_errors::{AnyhowErrorExt, ErrorExt, register_error, report_error};
+use pterm_managed_secrets::client::ManagedSecretsClient;
+use pterm_server_client::HttpStatusError;
+use pterm_server_client::auth::{AuthClientImpl, AuthEvent, EXPERIMENT_ID_HEADER};
+use pterm_server_client::base_client::{
     AmbientHeaderPolicy, AuthenticatedGraphqlConfig, BaseClient, GraphqlRoutingConfig,
     TEAM_UID_HEADER,
 };
-use rook_server_client::iap::{IapManager, IapState};
-use rook_server_client::network_logging::NetworkLogModel;
-use rookui::r#async::BoxFuture;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_server_client::iap::{IapManager, IapState};
+use pterm_server_client::network_logging::NetworkLogModel;
+use ptermui::r#async::BoxFuture;
+use ptermui::{Entity, ModelContext, SingletonEntity};
+use referral::ReferralsClient;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use team::TeamClient;
 #[cfg(feature = "tui")]
@@ -78,19 +78,19 @@ struct AgentTipShownAnalyticsRequest {
     tip: String,
 }
 
-/// We use a special error code header `X-Rook-Error-Code` to allow the server to send
+/// We use a special error code header `X-PolarisTerminal-Error-Code` to allow the server to send
 /// more specific error code information, so that the client can discern between different
 /// errors with the same error code.
 /// See errors/http_error_codes.go on the server for possible values.
-const ROOK_ERROR_CODE_HEADER: &str = "X-Rook-Error-Code";
+const POLARIS_TERMINAL_ERROR_CODE_HEADER: &str = "X-PolarisTerminal-Error-Code";
 
 /// An error indicating the user is out of credits. The server sends 429s to communicate this
 /// state, but if Cloud Run is overloaded, it can also send 429s that aren't credit-related.
 /// So we use this to distinguish between the two cases.
-const ROOK_ERROR_CODE_OUT_OF_CREDITS: &str = "OUT_OF_CREDITS";
+const POLARIS_TERMINAL_ERROR_CODE_OUT_OF_CREDITS: &str = "OUT_OF_CREDITS";
 
 /// Error code indicating the user has reached their cloud agent concurrency limit.
-const ROOK_ERROR_CODE_AT_CAPACITY: &str = "AT_CLOUD_AGENT_CAPACITY";
+const POLARIS_TERMINAL_ERROR_CODE_AT_CAPACITY: &str = "AT_CLOUD_AGENT_CAPACITY";
 
 /// ResponseType received by Client
 #[derive(thiserror::Error, Debug, Serialize, Deserialize)]
@@ -163,7 +163,7 @@ pub enum AIApiError {
         user_display_message: Option<String>,
     },
 
-    #[error("Rook is currently overloaded. Please try again later.")]
+    #[error("Polaris Terminal is currently overloaded. Please try again later.")]
     ServerOverloaded,
 
     #[error("Internal error occurred at transport layer.")]
@@ -235,7 +235,7 @@ impl AIApiError {
         headers: &::http::HeaderMap,
         body: Option<String>,
     ) -> Self {
-        // For HTTP 429 errors, check the X-Rook-Error-Code header to distinguish
+        // For HTTP 429 errors, check the X-PolarisTerminal-Error-Code header to distinguish
         // between out-of-credits and server-overload.
         if err.status() == Some(http::StatusCode::TOO_MANY_REQUESTS) {
             return Self::error_for_429(headers, body);
@@ -273,12 +273,12 @@ impl AIApiError {
         AIApiError::Transport(err)
     }
 
-    /// Returns the appropriate error for a 429 response by checking the X-Rook-Error-Code header.
+    /// Returns the appropriate error for a 429 response by checking the X-PolarisTerminal-Error-Code header.
     fn error_for_429(headers: &::http::HeaderMap, body: Option<String>) -> Self {
         if headers
-            .get(ROOK_ERROR_CODE_HEADER)
+            .get(POLARIS_TERMINAL_ERROR_CODE_HEADER)
             .and_then(|v| v.to_str().ok())
-            == Some(ROOK_ERROR_CODE_OUT_OF_CREDITS)
+            == Some(POLARIS_TERMINAL_ERROR_CODE_OUT_OF_CREDITS)
         {
             let user_display_message = body
                 .and_then(|body| serde_json::from_str::<OutOfCreditsResponse>(&body).ok())
@@ -378,7 +378,7 @@ pub enum TranscribeError {
     #[error("Request failed due to lack of Voice quota.")]
     QuotaLimit,
 
-    #[error("Rook is currently overloaded. Please try again later.")]
+    #[error("Polaris Terminal is currently overloaded. Please try again later.")]
     ServerOverloaded,
 
     #[error("Internal error occurred at transport layer.")]
@@ -432,7 +432,7 @@ impl ErrorExt for TranscribeError {
 }
 register_error!(TranscribeError);
 
-/// An API wrapper struct with methods to requests to rook-server.
+/// An API wrapper struct with methods to requests to polaris-terminal-server.
 ///
 /// Prefer NOT adding new methods directly on this struct; instead, add to one of the existing
 /// client trait objects, or create your own. This helps keep `ServerApi` from being overloaded
@@ -560,7 +560,7 @@ impl ServerApi {
             .await
     }
 
-    pub fn send_graphql_request<'a, QF, O: rook_graphql::client::Operation<QF> + Send + 'a>(
+    pub fn send_graphql_request<'a, QF, O: pterm_graphql::client::Operation<QF> + Send + 'a>(
         &'a self,
         operation: O,
         timeout: Option<Duration>,
@@ -568,14 +568,14 @@ impl ServerApi {
     where
         QF: 'a,
     {
-        rook_server_client::graphql_helpers::send_graphql_request(
+        pterm_server_client::graphql_helpers::send_graphql_request(
             &self.base_client,
             operation,
             timeout,
         )
     }
 
-    fn send_graphql_request_for_team<'a, QF, O: rook_graphql::client::Operation<QF> + Send + 'a>(
+    fn send_graphql_request_for_team<'a, QF, O: pterm_graphql::client::Operation<QF> + Send + 'a>(
         &'a self,
         operation: O,
         team_scope: RequestTeamScope,
@@ -585,14 +585,14 @@ impl ServerApi {
     {
         match Self::team_uid_header_value(team_scope) {
             Some(team_uid) => {
-                rook_server_client::graphql_helpers::send_team_scoped_graphql_request(
+                pterm_server_client::graphql_helpers::send_team_scoped_graphql_request(
                     &self.base_client,
                     operation,
                     None,
                     team_uid,
                 )
             }
-            None => rook_server_client::graphql_helpers::send_graphql_request(
+            None => pterm_server_client::graphql_helpers::send_graphql_request(
                 &self.base_client,
                 operation,
                 None,
@@ -612,7 +612,7 @@ impl ServerApi {
     /// items until the connection closes or an error occurs. The caller is
     /// responsible for reading the stream and handling reconnection.
     ///
-    /// The stream is served by rook-server-rtc (not the main rook-server pool),
+    /// The stream is served by polaris-terminal-server-rtc (not the main polaris-terminal-server pool),
     /// so the URL is built from `ChannelState::rtc_http_url()` rather than
     /// `server_root_url()`.
     pub async fn stream_agent_events(
@@ -784,14 +784,14 @@ impl ServerApi {
         let status = response.status();
         let is_at_capacity = response
             .headers()
-            .get(ROOK_ERROR_CODE_HEADER)
+            .get(POLARIS_TERMINAL_ERROR_CODE_HEADER)
             .and_then(|v| v.to_str().ok())
-            == Some(ROOK_ERROR_CODE_AT_CAPACITY);
+            == Some(POLARIS_TERMINAL_ERROR_CODE_AT_CAPACITY);
         let is_out_of_credits = response
             .headers()
-            .get(ROOK_ERROR_CODE_HEADER)
+            .get(POLARIS_TERMINAL_ERROR_CODE_HEADER)
             .and_then(|v| v.to_str().ok())
-            == Some(ROOK_ERROR_CODE_OUT_OF_CREDITS);
+            == Some(POLARIS_TERMINAL_ERROR_CODE_OUT_OF_CREDITS);
 
         // Get the response text first since we may need to try multiple deserializations.
         let response_text = response.text().await.unwrap_or_default();
@@ -1272,9 +1272,9 @@ impl ServerApi {
                 } else if res.status() == http::StatusCode::TOO_MANY_REQUESTS {
                     if res
                         .headers()
-                        .get(ROOK_ERROR_CODE_HEADER)
+                        .get(POLARIS_TERMINAL_ERROR_CODE_HEADER)
                         .and_then(|v| v.to_str().ok())
-                        == Some(ROOK_ERROR_CODE_OUT_OF_CREDITS)
+                        == Some(POLARIS_TERMINAL_ERROR_CODE_OUT_OF_CREDITS)
                     {
                         Err(TranscribeError::QuotaLimit)
                     } else {
@@ -1344,7 +1344,7 @@ impl ServerApi {
         }
     }
 
-    /// Fetches updated Rook Channel Versions from Rook Server. If it is the first such request of
+    /// Fetches updated Polaris Terminal Channel Versions from Polaris Terminal Server. If it is the first such request of
     /// the current calendar day, first attempts to call the '/client_version/daily'. If that call
     /// fails or if it not the first request of the calendar day, returns the result of a call to
     /// `/client_version'. The caller can specify whether or not changelog information should be
@@ -1365,9 +1365,11 @@ impl ServerApi {
             .append_pair("include_changelogs", &include_changelogs.to_string());
 
         if include_changelogs {
-            log::info!("Fetching channel versions and changelogs from Rook server");
+            log::info!("Fetching channel versions and changelogs from Polaris Terminal server");
         } else {
-            log::info!("Fetching channel versions (without changelogs) from Rook server");
+            log::info!(
+                "Fetching channel versions (without changelogs) from Polaris Terminal server"
+            );
         }
 
         let mut request_builder = self
@@ -1395,7 +1397,7 @@ impl ServerApi {
             self.observe_iap_challenge(&response);
         }
         let versions: ChannelVersions = response.json().await?;
-        log::info!("Received channel versions from Rook server: {versions}");
+        log::info!("Received channel versions from Polaris Terminal server: {versions}");
         Ok(versions)
     }
 }
@@ -1546,7 +1548,7 @@ impl ServerApiProvider {
     }
 
     /// Returns the shared HTTP client. This client is wired into network logging
-    /// and includes standard Rook request headers.
+    /// and includes standard Polaris Terminal request headers.
     pub fn get_http_client(&self) -> Arc<http_client::Client> {
         self.server_api.owned_http_client()
     }

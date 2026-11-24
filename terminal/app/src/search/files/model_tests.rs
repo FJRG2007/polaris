@@ -1,7 +1,7 @@
 use fuzzy_match::FuzzyMatchResult;
+use ptermui::{App, SingletonEntity};
 use repo_metadata::RepoMetadataModel;
 use repo_metadata::repositories::DetectedRepositories;
-use rookui::{App, SingletonEntity};
 
 use super::super::search_item::{FileSearchItem, FileSearchResult};
 use super::FileSearchModel;

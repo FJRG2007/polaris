@@ -2,9 +2,9 @@
 
 ## Context
 
-Rook's code editor uses `GlobalBufferModel` as a singleton that manages shared `Buffer` instances keyed by `FileId`. Before this work, it only supported local files—backed by `FileModel` for disk I/O and file-watching, with LSP integration for language services.
+Polaris Terminal's code editor uses `GlobalBufferModel` as a singleton that manages shared `Buffer` instances keyed by `FileId`. Before this work, it only supported local files—backed by `FileModel` for disk I/O and file-watching, with LSP integration for language services.
 
-SSH-remote editing needs the same `Buffer` infrastructure to work over the remote-server protocol: a daemon process on the remote host owns the file on disk, and the client-side Rook app operates on a proxy buffer that syncs bidirectionally with the daemon. Rather than build a parallel buffer system, we extend `GlobalBufferModel` with two new source variants so the same `Buffer`, selection model, and editor view can be reused regardless of where the file lives.
+SSH-remote editing needs the same `Buffer` infrastructure to work over the remote-server protocol: a daemon process on the remote host owns the file on disk, and the client-side Polaris Terminal app operates on a proxy buffer that syncs bidirectionally with the daemon. Rather than build a parallel buffer system, we extend `GlobalBufferModel` with two new source variants so the same `Buffer`, selection model, and editor view can be reused regardless of where the file lives.
 
 ### Relevant files
 
@@ -32,7 +32,7 @@ BufferSource
 
 **ServerLocal** — daemon-side variant. Created when `ServerModel` calls `open_server_local`. Extends `Local` with a `SyncClock` for version-vector tracking so the daemon can detect conflicts with connected clients. File-watcher changes produce a background diff (`apply_diff_result`) which emits a `ServerLocalBufferUpdated` event containing 1-indexed `CharOffsetEdit`s. `ServerModel` subscribes to this event and pushes `BufferUpdatedPush` proto messages to all connections that have the buffer open.
 
-**Remote** — client-side proxy. Created by `open_remote_buffer` when a Rook tab opens a file on an SSH host. The `sync_clock` starts as `None` (unloaded) and becomes `Some` once the `OpenBufferResponse` arrives with the initial content and server version. Edits made locally fire `BufferEvent::ContentChanged`, which the subscription handler converts into `BufferEdit` proto messages using the delta's `PreciseDelta` ranges. Incoming `BufferUpdatedPush` events from the daemon are applied via `handle_buffer_updated_push`.
+**Remote** — client-side proxy. Created by `open_remote_buffer` when a Polaris Terminal tab opens a file on an SSH host. The `sync_clock` starts as `None` (unloaded) and becomes `Some` once the `OpenBufferResponse` arrives with the initial content and server version. Edits made locally fire `BufferEvent::ContentChanged`, which the subscription handler converts into `BufferEdit` proto messages using the delta's `PreciseDelta` ranges. Incoming `BufferUpdatedPush` events from the daemon are applied via `handle_buffer_updated_push`.
 
 The `is_loaded()` check differs by variant: `Local`/`ServerLocal` use `base_content_version.is_some()`, while `Remote` uses `sync_clock.is_some()` to distinguish the "waiting for OpenBufferResponse" state from a loaded buffer.
 

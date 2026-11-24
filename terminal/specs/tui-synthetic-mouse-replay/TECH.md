@@ -13,7 +13,7 @@ as hovered until the mouse physically moves.
 The GUI solves this with synthetic mouse moves: it caches the last `MouseMoved`
 per window and, after every scene build, redispatches it with `is_synthetic: true`
 inside a loop capped at three iterations
-([`crates/rookui_core/src/core/app.rs (2894-2961) @ e77426f0`](https://github.com/FJRG2007/rook/blob/e77426f092c84df02a519f43821ac13aa51a7c97/crates/rookui_core/src/core/app.rs#L2894-L2961)).
+([`crates/ptermui_core/src/core/app.rs (2894-2961) @ e77426f0`](https://github.com/FJRG2007/polaris/blob/e77426f092c84df02a519f43821ac13aa51a7c97/terminal/crates/ptermui_core/src/core/app.rs#L2894-L2961)).
 Its `Hoverable` additionally suppresses two consecutive synthetic hover flips via
 `MouseState::last_event_is_synthetic_hover`, breaking layout↔hover feedback loops.
 `TuiEvent::MouseMoved` already carries an `is_synthetic` flag, but nothing emitted
@@ -21,7 +21,7 @@ synthetic moves in the TUI. This change ports the GUI mechanism.
 
 ## Changes
 
-- `crates/rookui_core/src/runtime/mod.rs`:
+- `crates/ptermui_core/src/runtime/mod.rs`:
   - `TuiScreen` records `last_mouse_position` from every positional event in
     `dispatch_event`.
   - `TuiScreen::draw` now mirrors the GUI's `build_scene` loop: up to three
@@ -30,7 +30,7 @@ synthetic moves in the TUI. This change ports the GUI mechanism.
     rendered tree). A hover flip invalidates its view, so the frame is rebuilt
     within the same call; the first iteration always paints, and the loop breaks
     once the replay stops invalidating.
-- `crates/rookui_core/src/elements/tui/hoverable.rs`: on a hover transition,
+- `crates/ptermui_core/src/elements/tui/hoverable.rs`: on a hover transition,
   `TuiHoverable` applies the GUI's guard — the flip is suppressed when both it
   and the previous flip came from synthetic moves; any non-move event re-arms
   the guard. Uses the shared `MouseState::last_event_is_synthetic_hover`
@@ -43,13 +43,13 @@ position if that changes.
 
 ## Testing and validation
 
-- `crates/rookui_core/src/runtime/mod_tests.rs`:
+- `crates/ptermui_core/src/runtime/mod_tests.rs`:
   `synthetic_mouse_move_after_redraw_updates_hover` — a real move hovers a
   target, a keypress shifts it down a row, and the post-draw replay unhovers it
   with no further mouse input.
-- `crates/rookui_core/src/elements/tui/hoverable_tests.rs`:
+- `crates/ptermui_core/src/elements/tui/hoverable_tests.rs`:
   `consecutive_synthetic_hover_flips_are_suppressed` — a synthetic flip in is
   allowed, an immediately following synthetic flip out is suppressed, and a real
   move flips normally.
-- Run with `cargo nextest run -p rookui_core --features tui -E 'test(tui::hoverable) or test(runtime)'`
+- Run with `cargo nextest run -p ptermui_core --features tui -E 'test(tui::hoverable) or test(runtime)'`
   (the TUI module is gated behind the `tui` feature).

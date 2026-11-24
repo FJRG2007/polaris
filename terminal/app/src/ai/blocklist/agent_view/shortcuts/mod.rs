@@ -4,14 +4,14 @@ use std::borrow::Cow;
 
 pub use model::*;
 use pathfinder_color::ColorU;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     Border, Container, CrossAxisAlignment, Expanded, Flex, ParentElement, Text,
 };
-use rookui::keymap::Keystroke;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::keymap::Keystroke;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::ai::blocklist::agent_view::{
     ENTER_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE, ENTER_CLOUD_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE,
@@ -263,7 +263,7 @@ pub fn render_agent_shortcuts_view(
 }
 
 pub mod styles {
-    use rook_core::ui::appearance::Appearance;
+    use pterm_core::ui::appearance::Appearance;
 
     pub fn keystroke_size(appearance: &Appearance) -> f32 {
         font_size(appearance) + 2.

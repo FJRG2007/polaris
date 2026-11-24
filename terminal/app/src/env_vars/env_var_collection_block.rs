@@ -4,16 +4,16 @@ use std::sync::Arc;
 
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
-use rook_core::features::FeatureFlag;
-use rook_core::semantic_selection::SemanticSelection;
-use rook_core::ui::Icon;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_core::ui::Icon;
+use ptermui::elements::{
     Border, Clipped, Container, CornerRadius, CrossAxisAlignment, Flex, FormattedTextElement,
     MouseStateHandle, ParentElement, Radius, SavePosition, SelectableArea, SelectionHandle,
     get_rich_content_position_id,
 };
-use rookui::keymap::{FixedBinding, Keystroke};
-use rookui::{
+use ptermui::keymap::{FixedBinding, Keystroke};
+use ptermui::{
     AppContext, Element, Entity, EntityId, FocusContext, SingletonEntity, TypedActionView, View,
     ViewContext,
 };
@@ -118,7 +118,7 @@ pub struct EnvVarCollectionBlock {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(

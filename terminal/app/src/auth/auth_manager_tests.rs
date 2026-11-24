@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 
 use anyhow::anyhow;
-use rookui::{App, SingletonEntity};
+use ptermui::{App, SingletonEntity};
 
 use super::{AuthManager, AuthManagerEvent, request_device_code_with_timeout};
 use crate::ServerApiProvider;
@@ -38,7 +38,7 @@ fn track_invalid_state_failures(app: &mut App) -> Arc<AtomicBool> {
 }
 
 /// After a logged-in user successfully completes auth, pressing the browser's
-/// "Take me to Rook" button a second time should silently drop the stale
+/// "Take me to Polaris Terminal" button a second time should silently drop the stale
 /// redirect rather than surface an `InvalidStateParameter` error.
 #[test]
 fn test_duplicate_redirect_for_logged_in_user_is_silently_ignored() {
@@ -132,7 +132,7 @@ fn pending_api_key_failure_leaves_auth_state_logged_out() {
         assert!(auth_state.user_id().is_none());
         assert!(!auth_state.is_logged_in());
 
-        rookui::r#async::Timer::after(Duration::from_millis(100)).await;
+        ptermui::r#async::Timer::after(Duration::from_millis(100)).await;
 
         assert!(saw_auth_failure.load(Ordering::Relaxed));
         assert!(auth_state.credentials().is_none());
@@ -284,7 +284,7 @@ fn test_log_out_clears_pending_auth_state() {
         // routes to `PersistedUser::remove_from_secure_storage`. That requires
         // a `SecureStorage` singleton, so register a no-op one for this test.
         app.update(|ctx| {
-            rookui_extras::secure_storage::register_noop("rook_test", ctx);
+            ptermui_extras::secure_storage::register_noop("pterm_test", ctx);
         });
 
         AuthManager::handle(&app).update(&mut app, |auth_manager, ctx| {

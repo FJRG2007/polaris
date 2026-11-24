@@ -1,6 +1,6 @@
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-pub use rook_util::path::*;
-use rookui::{AppContext, SingletonEntity};
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+pub use pterm_util::path::*;
+use ptermui::{AppContext, SingletonEntity};
 
 use crate::remote_server::manager::RemoteServerManager;
 

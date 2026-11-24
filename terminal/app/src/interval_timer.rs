@@ -1,1 +1,1 @@
-pub use rook_core::interval_timer::IntervalTimer;
+pub use pterm_core::interval_timer::IntervalTimer;

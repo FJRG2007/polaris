@@ -16,9 +16,9 @@ pub use task::{
     cancel_task_with_toast,
 };
 pub const OUT_OF_CREDITS_TASK_FAILURE_MESSAGE: &str =
-    "Out of credits. Upgrade your Rook plan to continue running cloud agents.";
+    "Out of credits. Upgrade your Polaris Terminal plan to continue running cloud agents.";
 pub const SERVER_OVERLOADED_TASK_FAILURE_MESSAGE: &str =
-    "Rook is temporarily overloaded. Please try again shortly.";
+    "Polaris Terminal is temporarily overloaded. Please try again shortly.";
 
 pub use ai_types::AmbientAgentTaskId;
 

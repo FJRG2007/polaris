@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use keyboard::Keyboard;
 use mouse::Mouse;
 use pathfinder_geometry::vector::Vector2I;
-use rookui_core::r#async::Timer;
+use ptermui_core::r#async::Timer;
 use session::PortalSession;
 
 use crate::{Action, ActionResult, Options, TargetedAction};

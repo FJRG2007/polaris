@@ -10,7 +10,7 @@ pub use cloud_object_models::{
     CloudAmbientAgentEnvironmentModel, GcpProviderConfig, GithubRepo, ProvidersConfig, SourceRepo,
 };
 use cloud_objects::cloud_object::Owner;
-use rookui::{AppContext, Entity, SingletonEntity as _, ViewContext};
+use ptermui::{AppContext, Entity, SingletonEntity as _, ViewContext};
 
 use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::generic_string_model::StringModel;

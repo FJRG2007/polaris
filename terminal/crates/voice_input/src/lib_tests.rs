@@ -1,4 +1,4 @@
-use rookui_core::App;
+use ptermui_core::App;
 
 use super::{
     StartListeningError, VoiceInput, VoiceInputLifecycle, VoiceInputLifecycleState,

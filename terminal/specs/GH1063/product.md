@@ -1,10 +1,10 @@
-# PRODUCT.md — Rename Oz to Rook Agent in settings and onboarding
+# PRODUCT.md — Rename Oz to Polaris Terminal Agent in settings and onboarding
 
 Issue: https://github.com/warpdotdev/warp-external/issues/1063
 
 ## Summary
 
-The in-app agent is being renamed from "Oz" to "Rook Agent" in the settings page
+The in-app agent is being renamed from "Oz" to "Polaris Terminal Agent" in the settings page
 and the onboarding agent slide. "Oz" is reserved for the cloud agent
 orchestration platform and must not be used for the in-app agent's user-facing
 strings in these surfaces. This change updates only user-visible copy; the cloud
@@ -38,16 +38,16 @@ Out of scope (must continue to say "Oz"):
 ## Behavior
 
 1. On the settings sidebar, under the "Agents" umbrella, the first subpage entry
-   is labeled "Rook Agent" (previously "Oz"). The ordering of subpages, the
+   is labeled "Polaris Terminal Agent" (previously "Oz"). The ordering of subpages, the
    umbrella name ("Agents"), and all sibling subpages ("Profiles", "MCP
    servers", "Knowledge", "Third party CLI agents") are unchanged.
 
-2. Opening that "Rook Agent" subpage renders the same settings content it did
+2. Opening that "Polaris Terminal Agent" subpage renders the same settings content it did
    before this rename. No widgets, toggles, options, defaults, or telemetry
    change behavior as a result of this rename.
 
-3. On the "Rook Agent" subpage, the primary page heading that sits above the
-   global AI enable toggle reads "Rook Agent" (previously "Oz"). Typography,
+3. On the "Polaris Terminal Agent" subpage, the primary page heading that sits above the
+   global AI enable toggle reads "Polaris Terminal Agent" (previously "Oz"). Typography,
    color, size, weight, and layout of the heading are unchanged; only the text
    differs.
 
@@ -57,11 +57,11 @@ Out of scope (must continue to say "Oz"):
    unchanged.
 
 5. On the onboarding agent slide (the third onboarding step), the title reads
-   "Customize your Rook Agent" (previously "Customize your Agent, Oz"). The
+   "Customize your Polaris Terminal Agent" (previously "Customize your Agent, Oz"). The
    subtitle "Select your in-app agent's defaults." is unchanged.
 
 6. When the "new settings modes" feature flag is enabled and the slide renders
-   the disable checkbox row, the checkbox label reads "Disable Rook Agent"
+   the disable checkbox row, the checkbox label reads "Disable Polaris Terminal Agent"
    (previously "Disable Oz"). Checkbox visual state, hit target, and click
    behavior are unchanged — toggling it still enables/disables the in-app agent
    for onboarding and still dims the upper sections of the slide while checked.
@@ -69,7 +69,7 @@ Out of scope (must continue to say "Oz"):
 7. Search within settings still finds the in-app agent subpage when the user
    types any previously-matching search term (for example, terms already covered
    by the AI page's global widget search terms such as "ai", "agent", "next
-   command", "api keys"). Additionally, typing "rook agent" finds this subpage.
+   command", "api keys"). Additionally, typing "polaris-terminal agent" finds this subpage.
    Typing "oz" is acceptable to continue matching this subpage so existing
    muscle memory is not broken, but is not required by this spec; search for
    "Oz Cloud API Keys" must continue to find the cloud platform subpage
@@ -78,7 +78,7 @@ Out of scope (must continue to say "Oz"):
 8. Deep links and external callers that previously navigated to this subpage by
    section identifier continue to resolve to the same subpage. In particular,
    navigation requests that reference the legacy "Oz" section name still land on
-   the renamed "Rook Agent" subpage. Navigation requests referencing "Rook
+   the renamed "Polaris Terminal Agent" subpage. Navigation requests referencing "Polaris Terminal
    Agent" also resolve to the same subpage.
 
 9. The "Oz Cloud API Keys" subpage under the "Cloud platform" umbrella is
@@ -91,11 +91,11 @@ Out of scope (must continue to say "Oz"):
     plan-activated toast changes.
 
 11. Accessibility: the settings sidebar item, the page heading, and the
-    onboarding checkbox label expose the new visible text ("Rook Agent",
-    "Disable Rook Agent") to assistive technologies. No separate aria-only label
+    onboarding checkbox label expose the new visible text ("Polaris Terminal Agent",
+    "Disable Polaris Terminal Agent") to assistive technologies. No separate aria-only label
     still announces "Oz" for the renamed surfaces.
 
 12. The rename applies consistently across themes, appearances, and the new
     settings modes feature flag on/off. The only user-visible difference between
-    flag states remains whether the "Disable Rook Agent" row renders at all; its
+    flag states remains whether the "Disable Polaris Terminal Agent" row renders at all; its
     label text does not depend on the flag.

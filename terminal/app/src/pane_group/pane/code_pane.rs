@@ -1,5 +1,5 @@
-use rook_util::path::LineAndColumnArg;
-use rookui::{AppContext, ModelHandle, SingletonEntity, View, ViewContext, ViewHandle};
+use pterm_util::path::LineAndColumnArg;
+use ptermui::{AppContext, ModelHandle, SingletonEntity, View, ViewContext, ViewHandle};
 
 use super::{
     DetachType, PaneConfiguration, PaneContent, PaneId, PaneView, ShareableLink, ShareableLinkError,

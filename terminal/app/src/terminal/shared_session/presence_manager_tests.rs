@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 use std::iter;
 
 use itertools::Itertools;
-use rook_core::command::ExitCode;
-use rookui::App;
+use pterm_core::command::ExitCode;
+use ptermui::App;
 use session_sharing_protocol::common::{
     ParticipantId, ParticipantInfo, ParticipantList, ProfileData, Role, Selection, Sharer, Viewer,
 };

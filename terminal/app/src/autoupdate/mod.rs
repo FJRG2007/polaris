@@ -16,15 +16,15 @@ use std::time::Duration;
 use ::channel_versions::{ParsedVersion, VersionInfo};
 use anyhow::{Context as _, Result, anyhow};
 use chrono::{DateTime, FixedOffset, NaiveDate};
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_errors::report_if_error;
+use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::r#async::Timer;
+use ptermui::platform::TerminationMode;
+use ptermui::windowing::state::ApplicationStage;
+use ptermui::windowing::{self, WindowManager};
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity, ViewContext};
 use rand::Rng as _;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_errors::report_if_error;
-use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::r#async::Timer;
-use rookui::platform::TerminationMode;
-use rookui::windowing::state::ApplicationStage;
-use rookui::windowing::{self, WindowManager};
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity, ViewContext};
 
 pub use self::changelog::get_current_changelog;
 use self::channel_versions::fetch_channel_versions;
@@ -65,7 +65,7 @@ pub enum AutoupdateStage {
     },
     /// A relaunch was initiated to use the new version, but failed.
     UnableToLaunchNewVersion { new_version: VersionInfo },
-    /// A new version was installed, but Rook hasn't restarted yet.
+    /// A new version was installed, but Polaris Terminal hasn't restarted yet.
     ///
     /// This state is only used on macOS, where the update isn't fully applied until right before
     /// restarting.
@@ -82,7 +82,7 @@ impl AutoupdateStage {
         )
     }
 
-    /// Returns `true` if a newer version exists, whether or not Rook is able to
+    /// Returns `true` if a newer version exists, whether or not Polaris Terminal is able to
     /// install it itself.
     ///
     /// Wider than [`Self::ready_for_update`], which means "downloaded and
@@ -768,13 +768,13 @@ pub fn accessibility_content(
         // Found autoupdate
         (RequestType::ManualCheck, Ok(UpdateReady::Yes { .. })) => Some(AccessibilityContent::new(
             "Update available.",
-            "Use the command palette to install and relaunch Rook",
-            RookA11yRole::HelpRole,
+            "Use the command palette to install and relaunch Polaris Terminal",
+            PtermA11yRole::HelpRole,
         )),
         // Any non-successful autoupdate check
         (RequestType::ManualCheck, _) => Some(AccessibilityContent::new_without_help(
             "No updates available",
-            RookA11yRole::HelpRole,
+            PtermA11yRole::HelpRole,
         )),
         _ => None,
     }
@@ -806,7 +806,7 @@ async fn fetch_version(
     update_id: &str,
     server_api: Arc<ServerApi>,
 ) -> Result<VersionInfo> {
-    // Rook ships on the open-source channel, which the upstream version server
+    // Polaris Terminal ships on the open-source channel, which the upstream version server
     // does not serve. Releases are published to GitHub, so that is what is asked.
     if matches!(channel, Channel::Oss) {
         return github::fetch_latest_release_version(&http_client::Client::new()).await;
@@ -889,7 +889,7 @@ pub fn apply_update(
     }
 }
 
-/// Relaunch Rook to apply an update.
+/// Relaunch Polaris Terminal to apply an update.
 ///
 /// This will:
 /// 1. Perform any last update steps.
@@ -1015,7 +1015,7 @@ where
                         autoupdate_state.relaunch_failed(ctx);
 
                         let err = anyhow!(err).context("Error applying installed update");
-                        rook_errors::report_error!(&err);
+                        pterm_errors::report_error!(&err);
                         callback(Err(err), ctx);
                     }
                 }
@@ -1092,7 +1092,7 @@ pub fn manually_download_new_version(ctx: &mut AppContext) {
 
 #[allow(unused_variables)]
 fn manually_download_version(channel: &Channel, version: &VersionInfo, ctx: &mut AppContext) {
-    // Rook publishes to GitHub releases and has no unattended installer, so the
+    // Polaris Terminal publishes to GitHub releases and has no unattended installer, so the
     // button opens the page for the version being offered. Before this it called
     // into a macOS-only path and did nothing at all on Windows or Linux.
     if matches!(channel, Channel::Oss) {
@@ -1197,7 +1197,7 @@ fn release_assets_directory_url(channel: Channel, version: &str) -> String {
             format!("{releases_base_url}/preview/{version}")
         }
         Channel::Dev => format!("{releases_base_url}/dev/{version}"),
-        // Rook publishes to GitHub releases, where one release's assets sit
+        // Polaris Terminal publishes to GitHub releases, where one release's assets sit
         // under its tag. `version` is that tag verbatim - see
         // `github::version_from_tag`.
         Channel::Oss => format!("{}/download/{version}", github::RELEASES_URL),

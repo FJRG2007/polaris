@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use futures::FutureExt as _;
 use futures::future::BoxFuture;
-pub use rook_terminal::local_tty::docker_sandbox::*;
-use rookui::{AppContext, SingletonEntity as _};
+pub use pterm_terminal::local_tty::docker_sandbox::*;
+use ptermui::{AppContext, SingletonEntity as _};
 
 use crate::terminal::local_shell::LocalShellState;
 use crate::util::path::{resolve_executable, resolve_executable_in_path};

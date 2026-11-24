@@ -12,7 +12,7 @@ The installer is a single executable that takes care of:
 
 
 `windows-installer.iss` is an **Inno Setup script**:
-a configuration file for building a Rook installer.
+a configuration file for building a Polaris Terminal installer.
 The Inno Setup Compiler takes a script file and generates an installer executable.
 This is roughly equivalent to the bundling process on MacOS.
 
@@ -28,7 +28,7 @@ However, it requires the Inno Setup compiler to be turned into a `.exe` file.
 
 First, ensure you've set up your environment.
 * Download and install the [Inno Setup Compiler](https://jrsoftware.org/isdl.php).
-* Run `cargo build` to ensure the installer uses the latest version of Rook.
+* Run `cargo build` to ensure the installer uses the latest version of Polaris Terminal.
 
 ### Option 1: Use the CLI
 1. Add the Inno Setup Command-line Compiler executable to your shell path.
@@ -39,7 +39,7 @@ iscc .\script\windows\windows-installer.iss
 ```
 3. Run the generated executable:
 ```shell
-.\script\windows\Output\Rook-Windows-Setup.exe
+.\script\windows\Output\PolarisTerminal-Windows-Setup.exe
 ```
 
 The script begins with a series of preprocessor definitions.
@@ -49,7 +49,7 @@ Usage: `iscc <script path> /D<name>[=<value>]`
 
 The following constants can be overwritten:
 * `MyAppVersion` (default: `0.1.0`)
-* `MyAppExeName` (default: `rook.exe`)
+* `MyAppExeName` (default: `polaris-terminal.exe`)
 * `ReleaseChannel` (default: `dev`)
 * `TargetProfileDir` (default: `debug`)
 

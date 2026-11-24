@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use rook::settings::INPUT_MODE;
-use rook::terminal::block_list_viewport::InputMode;
+use polaris_terminal::settings::INPUT_MODE;
+use polaris_terminal::terminal::block_list_viewport::InputMode;
 
 /// Returns a user defaults map with the `InputMode` set to `input_mode`.
 #[allow(dead_code)]

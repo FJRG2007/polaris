@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use futures::channel::oneshot;
 use parking_lot::Mutex;
-use rook_util::path::ShellFamily;
-use rookui::{AddSingletonModel, App, SingletonEntity, WindowId};
+use pterm_util::path::ShellFamily;
+use ptermui::{AddSingletonModel, App, SingletonEntity, WindowId};
 use tempfile::TempDir;
 
 use super::{ExportEvent, ExportId, ExportManager, safe_filename};
@@ -285,7 +285,7 @@ fn test_export_notebook_with_embeds() {
                 r#"
 # This is a notebook
 It has *text*.
-```rook-embedded-object
+```polaris-terminal-embedded-object
 id: {}
 ```
 
@@ -322,7 +322,7 @@ print("hello")
             r#"
 # This is a notebook
 It has *text*\.
-```rook-embedded-object
+```polaris-terminal-embedded-object
 ---
 name: Test workflow
 command: echo hello world
@@ -410,7 +410,7 @@ fn test_safe_filename() {
             "allowed $special %characters",
             "allowed $special %characters",
         ),
-        ("rook:drive", "rook_drive"),
+        ("polaris-terminal:drive", "pterm_drive"),
         ("a/b/c/d:e", "a_b_c_d_e"),
         ("the\0sneaky\0null", "the_sneaky_null"),
         ("ascii\x03control\x1bchars", "ascii_control_chars"),

@@ -34,7 +34,7 @@ mod native {
             .unwrap_or(MAX_PARALLEL_THREADS);
 
         rayon::ThreadPoolBuilder::new()
-            .thread_name(|index| format!("rook-code-indexing-{index}"))
+            .thread_name(|index| format!("polaris-terminal-code-indexing-{index}"))
             .num_threads(num_threads)
             .build()
             .ok()

@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use chrono::Local;
-use rook_editor::render::model::LineCount;
-use rookui::App;
+use pterm_editor::render::model::LineCount;
+use ptermui::App;
 
 use crate::code::buffer_location::LocalOrRemotePath;
 use crate::code::editor::line::EditorLineLocation;

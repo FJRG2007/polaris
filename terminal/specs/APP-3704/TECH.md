@@ -58,7 +58,7 @@ Added at `tab.rs:340`. Static method gated behind `FeatureFlag::TabConfigs`. Ret
 
 ### 5. `save_current_tab_as_new_config` workspace handler
 
-Added at `workspace/view.rs:4969`. Gated behind `#[cfg(feature = "local_fs")]` with a no-op stub for non-local-fs builds. Inline-imports `tab_config_from_pane_snapshot` and `write_tab_config` to match the existing inline import pattern used by `handle_session_config_completed`. Snapshots the tab's pane group, extracts custom title and color, builds the `TabConfig`, writes TOML to `~/.rook/tab_configs/my_tab_config.toml` (collision-safe), and opens the file in the user's editor via `resolve_file_target` + `open_file_with_target`.
+Added at `workspace/view.rs:4969`. Gated behind `#[cfg(feature = "local_fs")]` with a no-op stub for non-local-fs builds. Inline-imports `tab_config_from_pane_snapshot` and `write_tab_config` to match the existing inline import pattern used by `handle_session_config_completed`. Snapshots the tab's pane group, extracts custom title and color, builds the `TabConfig`, writes TOML to `~/.polaris-terminal/tab_configs/my_tab_config.toml` (collision-safe), and opens the file in the user's editor via `resolve_file_target` + `open_file_with_target`.
 
 Action dispatch wired at `workspace/view.rs:16831`.
 
@@ -68,7 +68,7 @@ Action dispatch wired at `workspace/view.rs:16831`.
 2. User clicks → `WorkspaceAction::SaveCurrentTabAsNewConfig(tab_index)` dispatched.
 3. Workspace handler snapshots the tab's `PaneGroup` via `snapshot()`.
 4. `tab_config_from_pane_snapshot` converts the `PaneNodeSnapshot` tree into a flat `TabConfig`.
-5. `write_tab_config` serializes to TOML and writes to `~/.rook/tab_configs/my_tab_config.toml`.
+5. `write_tab_config` serializes to TOML and writes to `~/.polaris-terminal/tab_configs/my_tab_config.toml`.
 6. The file is opened in the user's configured editor.
 7. The filesystem watcher detects the new file and adds it to the `+` menu.
 
@@ -96,7 +96,7 @@ Action dispatch wired at `workspace/view.rs:16831`.
 
 ### Manual verification
 
-- Build and run Rook, create a split layout, right-click → "Save as new config", verify the TOML, open from `+` menu.
+- Build and run Polaris Terminal, create a split layout, right-click → "Save as new config", verify the TOML, open from `+` menu.
 
 ## Follow-ups
 

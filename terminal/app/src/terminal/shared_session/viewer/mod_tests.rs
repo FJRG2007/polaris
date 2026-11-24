@@ -1,4 +1,4 @@
-use rookui::{App, SingletonEntity};
+use ptermui::{App, SingletonEntity};
 use settings::Setting;
 
 use crate::terminal::TerminalModel;

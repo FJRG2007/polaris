@@ -1,11 +1,11 @@
-use rookui::elements::{CornerRadius, MouseStateHandle, Radius};
-use rookui::ui_components::button::Button;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::elements::{CornerRadius, MouseStateHandle, Radius};
+use ptermui::ui_components::button::Button;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 
 use super::icons::{ICON_DIMENSIONS, Icon};
 use super::{BORDER_RADIUS, blended_colors};
 use crate::appearance::Appearance;
-use crate::themes::theme::{Fill, RookTheme};
+use crate::themes::theme::{Fill, PtermTheme};
 
 const ICON_BUTTON_PADDING: f32 = 4.;
 
@@ -32,39 +32,40 @@ pub struct AllButtonStyles {
     disabled_styles: Option<UiComponentStyles>,
 }
 
-fn all_icon_button_styles(rook_theme: &RookTheme, mode: ButtonMode) -> AllButtonStyles {
+fn all_icon_button_styles(pterm_theme: &PtermTheme, mode: ButtonMode) -> AllButtonStyles {
     AllButtonStyles {
-        default_styles: icon_button_styles(rook_theme, mode, ButtonState::Default),
-        hovered_styles: Some(icon_button_styles(rook_theme, mode, ButtonState::Hover)),
-        clicked_styles: Some(icon_button_styles(rook_theme, mode, ButtonState::Pressed)),
-        disabled_styles: Some(icon_button_styles(rook_theme, mode, ButtonState::Disabled)),
+        default_styles: icon_button_styles(pterm_theme, mode, ButtonState::Default),
+        hovered_styles: Some(icon_button_styles(pterm_theme, mode, ButtonState::Hover)),
+        clicked_styles: Some(icon_button_styles(pterm_theme, mode, ButtonState::Pressed)),
+        disabled_styles: Some(icon_button_styles(pterm_theme, mode, ButtonState::Disabled)),
     }
 }
 
 fn icon_button_styles(
-    rook_theme: &RookTheme,
+    pterm_theme: &PtermTheme,
     mode: ButtonMode,
     state: ButtonState,
 ) -> UiComponentStyles {
-    let icon_color = icon_color(rook_theme, mode);
+    let icon_color = icon_color(pterm_theme, mode);
 
     let (background_color, border_color): (Option<Fill>, Option<Fill>) = match (mode, state) {
         (ButtonMode::Base, ButtonState::Default) => (None, None),
         (ButtonMode::Base, ButtonState::Hover) => {
-            (Some(rook_theme.surface_2()), Some(rook_theme.surface_3()))
+            (Some(pterm_theme.surface_2()), Some(pterm_theme.surface_3()))
         }
-        (ButtonMode::Base, ButtonState::Pressed) | (ButtonMode::Base, ButtonState::Disabled) => {
-            (Some(rook_theme.background()), Some(rook_theme.surface_3()))
-        }
+        (ButtonMode::Base, ButtonState::Pressed) | (ButtonMode::Base, ButtonState::Disabled) => (
+            Some(pterm_theme.background()),
+            Some(pterm_theme.surface_3()),
+        ),
         (ButtonMode::Accent, ButtonState::Default) => (None, None),
         (ButtonMode::Accent, ButtonState::Hover) => (
-            Some(rook_theme.surface_3()),
-            Some(blended_colors::accent(rook_theme)),
+            Some(pterm_theme.surface_3()),
+            Some(blended_colors::accent(pterm_theme)),
         ),
         (ButtonMode::Accent, ButtonState::Pressed)
         | (ButtonMode::Accent, ButtonState::Disabled) => (
-            Some(rook_theme.background()),
-            Some(blended_colors::accent_pressed(rook_theme)),
+            Some(pterm_theme.background()),
+            Some(blended_colors::accent_pressed(pterm_theme)),
         ),
     };
 
@@ -85,12 +86,12 @@ fn icon_button_styles(
     styles
 }
 
-fn combo_inner_button_styles(rook_theme: &RookTheme, state: ButtonState) -> UiComponentStyles {
+fn combo_inner_button_styles(pterm_theme: &PtermTheme, state: ButtonState) -> UiComponentStyles {
     let background = match state {
         ButtonState::Default => None,
-        ButtonState::Hover => Some(blended_colors::neutral_2(rook_theme)),
-        ButtonState::Pressed => Some(blended_colors::neutral_4(rook_theme)),
-        ButtonState::Disabled => Some(rook_theme.background().into()),
+        ButtonState::Hover => Some(blended_colors::neutral_2(pterm_theme)),
+        ButtonState::Pressed => Some(blended_colors::neutral_4(pterm_theme)),
+        ButtonState::Disabled => Some(pterm_theme.background().into()),
     };
 
     UiComponentStyles {
@@ -99,7 +100,7 @@ fn combo_inner_button_styles(rook_theme: &RookTheme, state: ButtonState) -> UiCo
         border_width: None,
         padding: Some(Coords::uniform(ICON_BUTTON_PADDING - 1.)),
         border_radius: None,
-        font_color: Some(rook_theme.foreground().into()),
+        font_color: Some(pterm_theme.foreground().into()),
         border_color: None,
         background: background.map(Into::into),
         ..Default::default()
@@ -129,7 +130,7 @@ pub fn combo_inner_button(
         Some(combo_inner_button_styles(theme, ButtonState::Pressed)),
         Some(combo_inner_button_styles(theme, ButtonState::Disabled)),
     )
-    .with_icon_label(icon.to_rookui_icon(theme.foreground()));
+    .with_icon_label(icon.to_ptermui_icon(theme.foreground()));
 
     if active {
         return button.active();
@@ -137,10 +138,10 @@ pub fn combo_inner_button(
     button
 }
 
-fn icon_color(rook_theme: &RookTheme, mode: ButtonMode) -> Fill {
+fn icon_color(pterm_theme: &PtermTheme, mode: ButtonMode) -> Fill {
     match mode {
-        ButtonMode::Base => rook_theme.foreground(),
-        ButtonMode::Accent => blended_colors::accent(rook_theme),
+        ButtonMode::Base => pterm_theme.foreground(),
+        ButtonMode::Accent => blended_colors::accent(pterm_theme),
     }
 }
 
@@ -162,7 +163,7 @@ fn icon_button_internal(
         button_styles.clicked_styles,
         button_styles.disabled_styles,
     )
-    .with_icon_label(icon.to_rookui_icon(color.unwrap_or(icon_color(theme, mode))));
+    .with_icon_label(icon.to_ptermui_icon(color.unwrap_or(icon_color(theme, mode))));
 
     if let Some(color) = color.take() {
         // We also need to set the font color here to get the button to be colored correctly.

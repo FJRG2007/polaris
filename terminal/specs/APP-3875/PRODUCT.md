@@ -94,7 +94,7 @@ When `View as = Tabs`:
   - `Show`
 - Switching back from `Summary` to `Focused session` restores those sections exactly as they were before; Summary does not overwrite the stored values for those controls.
 - Switching from `Tabs` back to `Panes` hides `Tab item` entirely.
-- If the user later returns to `View as = Tabs`, Rook restores the last selected `Tab item` mode.
+- If the user later returns to `View as = Tabs`, Polaris Terminal restores the last selected `Tab item` mode.
 
 ### Focused session behavior
 
@@ -197,12 +197,12 @@ The second line summarizes where the work in the tab is happening.
 - The line is single-line and truncates visually when it does not fit.
 - If no pane exposes working-directory data, omit the line.
 
-Rook should not try to pick one "most representative" directory in Summary mode. The card should show the stable list of unique working directories instead.
+Polaris Terminal should not try to pick one "most representative" directory in Summary mode. The card should show the stable list of unique working directories instead.
 
 Examples:
 
-- `~/rook-internal`
-- `~/rook-internal • ~/rook-server • ~/rook-terraform`
+- `~/polaris-terminal-internal`
+- `~/polaris-terminal-internal • ~/polaris-terminal-server • ~/polaris-terminal-terraform`
 
 ### Branch lines
 
@@ -247,7 +247,7 @@ Within one coalesced repository + branch group:
 - diff stats are shown once for the group
 - the PR chip is shown once for the group
 
-If multiple panes in the same coalesced group expose the same logical branch metadata, Rook should simply coalesce them into that one rendered line rather than treating them as separate rows.
+If multiple panes in the same coalesced group expose the same logical branch metadata, Polaris Terminal should simply coalesce them into that one rendered line rather than treating them as separate rows.
 
 ### Summary-card interactions
 
@@ -294,7 +294,7 @@ Examples:
 - A tab may include panes that contribute branch context but no working-directory data.
 - A tab may include only one visible branch line and no working-directory line.
 
-Rook must not insert placeholder copy such as `No branch` or `No directory`.
+Polaris Terminal must not insert placeholder copy such as `No branch` or `No directory`.
 
 ### Search behavior
 
@@ -356,7 +356,7 @@ This means a tab can match the search query even if the matching branch or work 
 - Create more than three unique branch contexts in one tab and verify only three branch lines are shown, followed by `+ N more`.
 - Verify tabs with no branch data omit the branch section entirely.
 - Verify tabs with no working-directory data omit the working-directory line entirely.
-- Click a Summary card and verify Rook activates the tab and focuses its active pane.
+- Click a Summary card and verify Polaris Terminal activates the tab and focuses its active pane.
 - Verify clicking on branch lines or chips does not trigger separate actions.
 - Search for a work label, directory, hidden-overflow branch, PR number, and diff-stat text, and verify the correct tab still matches in Summary mode.
 - Verify tab headers, drag-and-drop, rename, close, and hover-sidecar behavior are unchanged while Summary mode is selected.

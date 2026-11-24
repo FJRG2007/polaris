@@ -3,8 +3,8 @@ Linear: [APP-4115](https://linear.app/warpdotdev/issue/APP-4115/dont-auto-add-in
 ## Summary
 The Directory tab colors list in Settings > Appearance should stop auto-populating itself from the set of indexed codebases. Instead, the user explicitly chooses which directories to color, assisted by a searchable `Add directory color` dropdown when known repos are available. If there are no candidate repos left to show, the control falls back to a plain `Add directory color` button that opens the native folder picker directly.
 ## Problem
-Today, every time `CodebaseIndexManager` emits a sync-state update, Rook merges all currently-indexed codebase paths into the user's `appearance.tabs.directory_tab_colors` setting as `Unassigned` entries. This produces two user-visible problems reported in `#feedback-app`:
-1. Worktrees under paths like `~/.rook-dev/worktrees/rook-internal/...` get indexed as codebases and then silently added to the colors list, flooding the settings panel with entries the user never wanted to manage.
+Today, every time `CodebaseIndexManager` emits a sync-state update, Polaris Terminal merges all currently-indexed codebase paths into the user's `appearance.tabs.directory_tab_colors` setting as `Unassigned` entries. This produces two user-visible problems reported in `#feedback-app`:
+1. Worktrees under paths like `~/.polaris-terminal-dev/worktrees/polaris-terminal-internal/...` get indexed as codebases and then silently added to the colors list, flooding the settings panel with entries the user never wanted to manage.
 2. The Directory tab colors list grows to reflect indexing state rather than intentional user configuration, making the settings panel noisy and hard to use.
 The relevant subscription lives in `app/src/workspace/view.rs:2775-2790`. The existing folder-picker button lives in `app/src/settings_view/appearance_page.rs:4632-4671`.
 ## Goals
@@ -51,7 +51,7 @@ Interaction details and invariants:
 - The per-row color picker and X button continue to read/write through the existing `SetDefaultDirectoryTabColor` and `RemoveDefaultDirectoryTabColor` actions.
 - `RemoveDefaultDirectoryTabColor` continues to persist `Suppressed` rather than deleting the key.
 ## Success criteria
-- Starting Rook fresh, opening and closing repos, triggering codebase indexing, or creating worktrees does **not** add any entries to `appearance.tabs.directory_tab_colors` in the TOML settings file.
+- Starting Polaris Terminal fresh, opening and closing repos, triggering codebase indexing, or creating worktrees does **not** add any entries to `appearance.tabs.directory_tab_colors` in the TOML settings file.
 - When candidate repos exist, the `Add directory color` control is the searchable dropdown.
 - The dropdown lists indexed codebases and persisted workspaces that are not already keyed in `directory_tab_colors` with a non-`Suppressed` color. Entries are deduped by canonical path.
 - Worktrees (paths whose repository has an external gitdir) are included in the candidate set and can be added.
@@ -64,7 +64,7 @@ Interaction details and invariants:
 - Unit tests on a helper that computes the candidate set, covering dedupe across indexed and persisted sources, filtering out keys present with non-`Suppressed` colors, keeping `Suppressed` keys, filtering out missing paths, and worktree inclusion.
 - Unit test confirming that handling a `CodebaseIndexManagerEvent::SyncStateUpdated` does not mutate `directory_tab_colors`.
 - Manual validation:
-  1. With several worktrees under `~/.rook-dev/worktrees/rook-internal/...` indexed, confirm none appear in the Directory tab colors list on a fresh profile.
+  1. With several worktrees under `~/.polaris-terminal-dev/worktrees/polaris-terminal-internal/...` indexed, confirm none appear in the Directory tab colors list on a fresh profile.
   2. Confirm that when candidate repos exist, `Add directory color` renders as the searchable dropdown and its list contains those worktrees.
   3. Select a repo from the dropdown, confirm it appears in the list below with the `Unassigned` dot selected.
   4. With all known repos added, confirm the control falls back to the plain button and clicking it opens the native folder picker.

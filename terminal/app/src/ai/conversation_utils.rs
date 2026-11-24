@@ -1,7 +1,7 @@
 use anyhow::Context as _;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rookui::{AppContext, EntityId, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use ptermui::{AppContext, EntityId, SingletonEntity};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_conversations_model::AgentConversationsModel;

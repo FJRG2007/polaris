@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use rookui_core::text::TextBuffer;
+use ptermui_core::text::TextBuffer;
 use string_offset::CharOffset;
 
 /// Neovim's "inner line" text object, excluding leading and trailing spaces and tabs.

@@ -13,27 +13,27 @@ use markdown_parser::TableAlignment;
 use num_traits::SaturatingSub;
 use ordered_float::OrderedFloat;
 use parking_lot::Mutex;
-use rangemap::RangeSet;
-use rook_core::channel::ChannelState;
-use rook_core::ui::Icon;
-use rook_core::ui::theme::Fill as ThemeFill;
-use rook_errors::report_error;
-use rookui_core::assets::asset_cache::AssetSource;
-use rookui_core::color::ColorU;
-use rookui_core::elements::{
+use pterm_core::channel::ChannelState;
+use pterm_core::ui::Icon;
+use pterm_core::ui::theme::Fill as ThemeFill;
+use pterm_errors::report_error;
+use ptermui_core::assets::asset_cache::AssetSource;
+use ptermui_core::color::ColorU;
+use ptermui_core::elements::{
     Border, Fill, ListIndentLevel, ListNumbering, Margin, MouseStateHandle, Padding, ScrollData,
 };
-use rookui_core::fonts::{FamilyId, Properties, Weight};
-use rookui_core::geometry::rect::RectF;
-use rookui_core::geometry::vector::{Vector2F, vec2f};
-use rookui_core::platform::LineStyle;
-use rookui_core::text_layout::{CaretPosition, Line, TextFrame};
-use rookui_core::text_selection_utils::{
+use ptermui_core::fonts::{FamilyId, Properties, Weight};
+use ptermui_core::geometry::rect::RectF;
+use ptermui_core::geometry::vector::{Vector2F, vec2f};
+use ptermui_core::platform::LineStyle;
+use ptermui_core::text_layout::{CaretPosition, Line, TextFrame};
+use ptermui_core::text_selection_utils::{
     NewlineTickParams, calculate_tick_width, create_newline_tick_rect,
     selection_crosses_newline_offset_based,
 };
-use rookui_core::units::{IntoPixels, Pixels};
-use rookui_core::{AppContext, Entity, EntityId, ModelContext, ModelHandle};
+use ptermui_core::units::{IntoPixels, Pixels};
+use ptermui_core::{AppContext, Entity, EntityId, ModelContext, ModelHandle};
+use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Mapping;
 use string_offset::{CharOffset, impl_offset};
@@ -1024,7 +1024,7 @@ impl CharCellState {
     /// channel (no font engine): the channel only carries an `EditDelta` (not the
     /// full text this rebuild needs) and is async, whereas TUI cursor queries need
     /// fresh `line_starts` synchronously within the same frame as the edit.
-    /// [`on_buffer_version_updated`](rook_editor::model::CoreEditorModel::on_buffer_version_updated)
+    /// [`on_buffer_version_updated`](pterm_editor::model::CoreEditorModel::on_buffer_version_updated)
     /// is the guaranteed-synchronous post-edit hook that calls this.
     ///
     /// `text` should be the buffer's current plain text (without any trailing
@@ -2495,7 +2495,7 @@ impl RenderState {
     ///
     /// CharCell mode consumes `styles.base_text.fixed_width_tab_size` for tab
     /// geometry. Other style fields are retained for API compatibility but are
-    /// unused; callers (e.g. `rook_tui`) may supply a minimal stub.
+    /// unused; callers (e.g. `pterm_tui`) may supply a minimal stub.
     pub fn new_tui(
         terminal_width: u16,
         styles: RichTextStyles,
@@ -5280,7 +5280,7 @@ impl<'a> Positioned<'a, Paragraph> {
                 vec2f(underline_width, UNDERLINE_THICKNESS),
             );
 
-            let dash = rookui_core::scene::Dash {
+            let dash = ptermui_core::scene::Dash {
                 dash_length: DASHED_UNDERLINE_DASH_LENGTH,
                 gap_length: DASHED_UNDERLINE_GAP_LENGTH,
                 force_consistent_gap_length: true,
@@ -5289,7 +5289,7 @@ impl<'a> Positioned<'a, Paragraph> {
                 .scene
                 .draw_rect_without_hit_recording(underline_rect)
                 .with_border(
-                    rookui_core::scene::Border::bottom(UNDERLINE_THICKNESS)
+                    ptermui_core::scene::Border::bottom(UNDERLINE_THICKNESS)
                         .with_dashed_border(dash)
                         .with_border_color(color),
                 );

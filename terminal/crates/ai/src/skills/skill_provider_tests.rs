@@ -1,7 +1,7 @@
-use rook_util::host_id::HostId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
+use pterm_util::host_id::HostId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
 
 use super::{
     SkillProvider, SkillScope, get_provider_for_path, get_scope_for_path, home_skills_path,
@@ -9,24 +9,24 @@ use super::{
 };
 
 #[test]
-fn rook_home_skills_path_uses_rook_home_path() {
+fn pterm_home_skills_path_uses_pterm_home_path() {
     assert_eq!(
-        home_skills_path(SkillProvider::Rook),
-        rook_core::paths::rook_home_skills_dir()
+        home_skills_path(SkillProvider::Pterm),
+        pterm_core::paths::pterm_home_skills_dir()
     );
 }
 
 #[test]
-fn rook_home_skill_path_is_home_rook_skill() {
-    let Some(rook_home_skills_dir) = rook_core::paths::rook_home_skills_dir() else {
+fn pterm_home_skill_path_is_home_pterm_skill() {
+    let Some(pterm_home_skills_dir) = pterm_core::paths::pterm_home_skills_dir() else {
         eprintln!("Skipping test: home directory not available");
         return;
     };
-    let path = rook_home_skills_dir.join("my-skill").join("SKILL.md");
+    let path = pterm_home_skills_dir.join("my-skill").join("SKILL.md");
 
     assert_eq!(
         get_provider_for_path(&LocalOrRemotePath::Local(path.clone())),
-        Some(SkillProvider::Rook)
+        Some(SkillProvider::Pterm)
     );
     assert_eq!(get_scope_for_path(&path), SkillScope::Home);
 }

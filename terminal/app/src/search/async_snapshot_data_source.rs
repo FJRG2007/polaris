@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rookui::{Action, AppContext};
+use ptermui::{Action, AppContext};
 
 use crate::search::data_source::{Query, QueryResult};
 use crate::search::mixer::{AsyncDataSource, BoxFuture, DataSourceRunErrorWrapper};

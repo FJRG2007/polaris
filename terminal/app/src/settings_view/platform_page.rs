@@ -2,20 +2,22 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use rook_core::features::FeatureFlag;
-use rook_graphql::object_permissions::OwnerType;
-use rook_graphql::queries::api_keys::ApiKeyProperties as GqlApiKeyProperties;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_graphql::object_permissions::OwnerType;
+use pterm_graphql::queries::api_keys::ApiKeyProperties as GqlApiKeyProperties;
+use ptermui::elements::{
     Align, Border, ChildView, ConstrainedBox, Container, CrossAxisAlignment, DragBarSide, Element,
     Empty, Expanded, Flex, FormattedTextElement, HighlightedHyperlink, MainAxisSize,
     MouseStateHandle, Padding, ParentElement, Resizable, ResizableStateHandle, Shrinkable, Text,
     resizable_state_handle,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
+    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 
 use super::SettingsSection;
 use super::platform::{
@@ -201,7 +203,7 @@ impl PlatformPageView {
                         right: 24.,
                     }),
                     font_size: Some(16.),
-                    font_weight: Some(rookui::fonts::Weight::Bold),
+                    font_weight: Some(ptermui::fonts::Weight::Bold),
                     ..Default::default()
                 })
                 .with_body_style(UiComponentStyles {
@@ -491,7 +493,7 @@ impl PlatformPageWidget {
     ) -> Box<dyn Element> {
         let text = vec![
             FormattedTextFragment::plain_text(
-                "Create and manage API keys to allow cloud agents to access your Rook account.\nFor more information, visit the ",
+                "Create and manage API keys to allow cloud agents to access your Polaris Terminal account.\nFor more information, visit the ",
             ),
             FormattedTextFragment::hyperlink("Documentation.", API_KEY_DOCS_URL),
         ];
@@ -850,7 +852,7 @@ impl PlatformPageWidget {
                     .with_child(
                         ConstrainedBox::new(
                             Icon::Key
-                                .to_rookui_icon(appearance.theme().nonactive_ui_text_color())
+                                .to_ptermui_icon(appearance.theme().nonactive_ui_text_color())
                                 .finish(),
                         )
                         .with_width(48.)
@@ -874,7 +876,7 @@ impl PlatformPageWidget {
                     .with_child(
                         Container::new(
                             Text::new(
-                                "Create a key to manage external access to Rook",
+                                "Create a key to manage external access to Polaris Terminal",
                                 appearance.ui_font_family(),
                                 CONTENT_FONT_SIZE,
                             )
@@ -909,7 +911,7 @@ impl PlatformPageWidget {
 
 impl SettingsPageMeta for PlatformPageView {
     fn section() -> SettingsSection {
-        SettingsSection::RookCloudAgentAPIKeys
+        SettingsSection::PtermCloudAgentAPIKeys
     }
 
     fn should_render(&self, ctx: &AppContext) -> bool {
@@ -940,7 +942,7 @@ impl SettingsPageMeta for PlatformPageView {
 
 impl From<ViewHandle<PlatformPageView>> for SettingsPageViewHandle {
     fn from(view_handle: ViewHandle<PlatformPageView>) -> Self {
-        SettingsPageViewHandle::RookCloudAgentAPIKeys(view_handle)
+        SettingsPageViewHandle::PtermCloudAgentAPIKeys(view_handle)
     }
 }
 

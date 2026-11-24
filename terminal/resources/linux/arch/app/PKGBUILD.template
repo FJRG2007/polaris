@@ -1,7 +1,7 @@
-pkgname=rook-terminal@@CHANNEL_SUFFIX@@
+pkgname=polaris-terminal-stable@@CHANNEL_SUFFIX@@
 pkgver=@@VERSION@@
 pkgrel=@@RELEASE@@
-pkgdesc="Rook, the Rust-based terminal for developers and teams"
+pkgdesc="Polaris Terminal, the Rust-based terminal for developers and teams"
 arch=('@@ARCH@@')
 url="https://rook.dev"
 license=('custom')

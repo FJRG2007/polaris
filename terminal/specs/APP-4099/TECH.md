@@ -17,7 +17,7 @@ The fix removes `server_id` from the redirect URI and instead routes callbacks u
 - `app/src/ai/mcp/templatable_manager/oauth.rs (225–449)` — `make_authenticated_client`: constructs redirect URI and drives the full OAuth state machine
 - `app/src/ai/mcp/templatable_manager/oauth.rs (457–504)` — `handle_oauth_callback`: routes incoming callback URLs to waiting OAuth flows
 - `app/src/ai/mcp/templatable_manager.rs (41–86)` — `TemplatableMCPServerManager` and `SpawnedServerInfo` struct definitions
-- `app/src/uri/mod.rs:410–418` — URL scheme handler: dispatches `rook://mcp/*` URLs to `handle_oauth_callback`
+- `app/src/uri/mod.rs:410–418` — URL scheme handler: dispatches `polaris-terminal://mcp/*` URLs to `handle_oauth_callback`
 - `~/.cargo/git/checkouts/rmcp-349989f9317a4437/c0f65dc/crates/rmcp/src/transport/auth.rs:490–517` — rmcp's `get_authorization_url`: generates a random CSRF token and embeds it as the `state` query parameter in the authorization URL
 
 ## Current State
@@ -181,7 +181,7 @@ make_authenticated_client()
         ↓
 User approves in browser
         ↓
-Browser → rook://mcp/oauth2callback?code=<code>&state=<csrf>
+Browser → polaris-terminal://mcp/oauth2callback?code=<code>&state=<csrf>
         ↓
 uri/mod.rs UriHost::Mcp handler
   handle_oauth_callback(url)
@@ -201,20 +201,20 @@ make_authenticated_client() (resumed)
 
 ```mermaid
 sequenceDiagram
-    participant W as Rook
+    participant W as Polaris Terminal
     participant AS as OAuth Server
     participant B as Browser
     participant U as URL Handler
 
-    W->>W: redirect_uri = "rook://mcp/oauth2callback"
-    W->>AS: POST /register { redirect_uris: ["rook://mcp/oauth2callback"] }
+    W->>W: redirect_uri = "polaris-terminal://mcp/oauth2callback"
+    W->>AS: POST /register { redirect_uris: ["polaris-terminal://mcp/oauth2callback"] }
     AS-->>W: { client_id, ... }
     W->>W: auth_url = get_authorization_url() → ?state=<csrf>
     W->>W: register_oauth_csrf(csrf, uuid)
     W->>B: open auth_url
-    B->>AS: GET /authorize?...&redirect_uri=rook://mcp/oauth2callback&state=<csrf>
-    AS-->>B: redirect to rook://mcp/oauth2callback?code=<code>&state=<csrf>
-    B->>U: rook://mcp/oauth2callback?code=<code>&state=<csrf>
+    B->>AS: GET /authorize?...&redirect_uri=polaris-terminal://mcp/oauth2callback&state=<csrf>
+    AS-->>B: redirect to polaris-terminal://mcp/oauth2callback?code=<code>&state=<csrf>
+    B->>U: polaris-terminal://mcp/oauth2callback?code=<code>&state=<csrf>
     U->>W: handle_oauth_callback(url)
     W->>W: uuid = pending_oauth_csrf[csrf]
     W->>W: send CallbackResult to server channel

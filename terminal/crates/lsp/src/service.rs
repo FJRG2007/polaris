@@ -16,8 +16,8 @@ use lsp_types::{
     RegistrationParams, RelativePattern, TextDocumentIdentifier, TextDocumentItem,
     TextDocumentPositionParams, UnregistrationParams, VersionedTextDocumentIdentifier, WatchKind,
 };
-use rook_errors::report_error;
-use rook_util::on_cancel::OnCancelFutureExt;
+use pterm_errors::report_error;
+use pterm_util::on_cancel::OnCancelFutureExt;
 use serde_json::Value;
 #[cfg(not(target_arch = "wasm32"))]
 use simple_logger::SimpleLogger;
@@ -358,7 +358,7 @@ impl WatchedFilesRegistry {
             return false;
         };
 
-        let path_relative = rook_util::path::normalize_relative_path_for_glob(path_relative);
+        let path_relative = pterm_util::path::normalize_relative_path_for_glob(path_relative);
 
         self.registrations
             .values()
@@ -416,7 +416,7 @@ impl WatchedFilesRegistry {
         };
 
         // Normalize to forward slashes so glob patterns and event paths are comparable across platforms (esp. Windows).
-        let prefix = rook_util::path::normalize_relative_path_for_glob(base_relative);
+        let prefix = pterm_util::path::normalize_relative_path_for_glob(base_relative);
 
         if prefix.is_empty() {
             Some(pattern)

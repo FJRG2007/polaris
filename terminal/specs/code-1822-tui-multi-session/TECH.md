@@ -19,7 +19,7 @@ the focused view participates in rendering and input routing.
 
 ## Proposed changes
 
-### New: `crates/rook_tui/src/session_registry.rs`
+### New: `crates/pterm_tui/src/session_registry.rs`
 
 - Add `TuiSessionId(EntityId)`, using the eagerly-created view's entity id as
   both session identity and shared-model `terminal_surface_id`.
@@ -33,7 +33,7 @@ the focused view participates in rendering and input routing.
 - Session removal (with a `SessionRemoved` event and focus fallback) lands
   with the orchestration PR that first needs it.
 
-### Changed: `crates/rook_tui/src/root_view.rs`
+### Changed: `crates/pterm_tui/src/root_view.rs`
 
 - Replace the single authenticated child with projection of
   `TuiSessions::focused_session()`.
@@ -42,7 +42,7 @@ the focused view participates in rendering and input routing.
 - Return only the focused view from `child_view_ids()`, keeping background
   views out of rendering and the responder chain.
 
-### Changed: `crates/rook_tui/src/session.rs`
+### Changed: `crates/pterm_tui/src/session.rs`
 
 - Replace the single-session singleton with `TuiSessions`.
 - Create the full `TuiTerminalSessionView` synchronously inside the terminal
@@ -50,7 +50,7 @@ the focused view participates in rendering and input routing.
   with `TuiSessions` so the container owns the session lifetime.
 - The login bootstrap registers the first session focused.
 
-### Changed: `crates/rook_tui/src/terminal_session_view.rs`
+### Changed: `crates/pterm_tui/src/terminal_session_view.rs`
 - Keep construction focus-neutral. When `TuiSessions` activates a session, the
   view focuses its current input owner and refreshes the exit summary.
 - Route later blocker, process, CLI-subagent, and conversation-restoration
@@ -69,4 +69,4 @@ the focused view participates in rendering and input routing.
 - Construct two full session views and verify the root projects only the
   focused view, background registration does not steal focus, and focus
   changes reuse retained views.
-- Run `cargo nextest run -p rook_tui --no-fail-fast` and `./script/format`.
+- Run `cargo nextest run -p pterm_tui --no-fail-fast` and `./script/format`.

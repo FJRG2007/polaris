@@ -16,9 +16,9 @@ The fix mirrors the established `LLMPreferences` pattern: a singleton model fetc
 - `on_server_update` invalidates stale per-profile model selections
 - Emits `LLMPreferencesEvent::UpdatedAvailableLLMs`
 
-**Harness enum** — `crates/rook_cli/src/agent.rs:122-148`: `Harness` with variants Oz, Claude, OpenCode, Gemini, Codex, Unknown. Now derives `Serialize`/`Deserialize` for caching.
+**Harness enum** — `crates/pterm_cli/src/agent.rs:122-148`: `Harness` with variants Oz, Claude, OpenCode, Gemini, Codex, Unknown. Now derives `Serialize`/`Deserialize` for caching.
 
-**GraphQL schema** — `crates/rook_graphql_schema/api/schema.graphql`: existing `AgentHarness` enum. New `HarnessInfo` type and `User.availableHarnesses` field.
+**GraphQL schema** — `crates/pterm_graphql_schema/api/schema.graphql`: existing `AgentHarness` enum. New `HarnessInfo` type and `User.availableHarnesses` field.
 
 **UI consumers** — hard-coded harness lists in:
 - `app/src/terminal/view/ambient_agent/harness_selector.rs` — selector dropdown
@@ -38,7 +38,7 @@ New file `crates/graphql/src/api/queries/get_available_harnesses.rs`:
 Schema additions in `schema.graphql`:
 - `HarnessInfo` type, `AvailableHarnesses` wrapper, `User.availableHarnesses` field
 
-Conversion: `convert_agent_harness_to_cli` maps `AgentHarness → rook_cli::agent::Harness` (same pattern as existing model conversions in `ai.rs`).
+Conversion: `convert_agent_harness_to_cli` maps `AgentHarness → pterm_cli::agent::Harness` (same pattern as existing model conversions in `ai.rs`).
 
 ### 2. `HarnessAvailabilityModel` singleton
 
@@ -82,7 +82,7 @@ The feature flag is NOT removed — it gates CLI harness parsing, conversation l
 
 ### 6. `Harness` serde support
 
-`crates/rook_cli/src/agent.rs`: `Harness` gains `Serialize`/`Deserialize` derives (+ `serde` dep in `rook_cli/Cargo.toml`) so `HarnessAvailability` can be cached as JSON.
+`crates/pterm_cli/src/agent.rs`: `Harness` gains `Serialize`/`Deserialize` derives (+ `serde` dep in `pterm_cli/Cargo.toml`) so `HarnessAvailability` can be cached as JSON.
 
 ## Testing and validation
 

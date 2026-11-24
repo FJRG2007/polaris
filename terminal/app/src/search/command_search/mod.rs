@@ -2,7 +2,7 @@ mod ai_queries;
 mod env_var_collections;
 mod history;
 pub mod projects;
-mod rook_ai;
+mod pterm_ai;
 pub mod searcher;
 pub mod settings;
 pub mod view;

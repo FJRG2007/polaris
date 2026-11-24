@@ -4,7 +4,7 @@ Product spec: `specs/zachlloyd/inline-markdown-images-in-blocklist/PRODUCT.md`
 ## Problem
 The AI block list does not currently support the product behavior described in `PRODUCT.md`: rendering supported Markdown images and Mermaid diagrams inline inside AI responses with the approved inline-row, grouped-image, and Mermaid-card treatments.
 
-Rook already has the underlying primitives needed to build this behavior:
+Polaris Terminal already has the underlying primitives needed to build this behavior:
 
 - local image asset loading
 - responsive image sizing
@@ -19,7 +19,7 @@ The implementation should add support for the required file-backed image and Mer
 - no broad markdown-renderer refactor
 - no new dependency edge from the block list into a rendering stack it does not already use
 
-This should be a surgical extension of the existing section-based block-list renderer, with explicit copy behavior for rendered visuals, a visible file-link label below successfully rendered file-backed images, raw-Markdown fallback when rendering is unavailable, and reuse of Rook’s existing fullscreen lightbox treatment when the user clicks a rendered visual.
+This should be a surgical extension of the existing section-based block-list renderer, with explicit copy behavior for rendered visuals, a visible file-link label below successfully rendered file-backed images, raw-Markdown fallback when rendering is unavailable, and reuse of Polaris Terminal’s existing fullscreen lightbox treatment when the user clicks a rendered visual.
 
 ## Relevant Code
 - `specs/zachlloyd/inline-markdown-images-in-blocklist/PRODUCT.md` — approved product behavior
@@ -46,13 +46,13 @@ This should be a surgical extension of the existing section-based block-list ren
 - `crates/markdown_parser/src/markdown_parser.rs (286-326)` — `parse_image`; current image recognition behavior
 - `crates/markdown_parser/src/markdown_parser.rs (466-475)` — `parse_inline_markdown`; current inline parser surface
 - `crates/markdown_parser/src/markdown_parser_test.rs (2171-2320)` — current parser coverage for images
-- `crates/rookui_core/src/elements/formatted_text_element.rs (1580-1591, 1661-1671)` — images are currently treated as line breaks in the block-list rich-text path
+- `crates/ptermui_core/src/elements/formatted_text_element.rs (1580-1591, 1661-1671)` — images are currently treated as line breaks in the block-list rich-text path
 - `crates/editor/src/content/text.rs (280-362)` — image markdown round-trip behavior in the editor stack
 - `crates/editor/src/content/text.rs (526-579)` — `CodeBlockType::Mermaid` gating
 - `crates/editor/src/content/edit.rs (56-91)` — native/WASM asset-source resolution rules
 - `crates/editor/src/content/mermaid_diagram.rs (20-67)` — in-memory Mermaid SVG asset generation and sizing
-- `crates/rookui_core/src/image_cache.rs` — supported shared image types (JPEG, PNG, GIF, WebP, SVG)
-- `crates/rook_features/src/lib.rs (525-540, 817-858)` — markdown-related feature flags
+- `crates/ptermui_core/src/image_cache.rs` — supported shared image types (JPEG, PNG, GIF, WebP, SVG)
+- `crates/pterm_features/src/lib.rs (525-540, 817-858)` — markdown-related feature flags
 - `app/src/lib.rs (2462-2471)` — app-side feature-flag wiring for markdown tables and Mermaid
 - `app/Cargo.toml (667-746)` — compile-time feature declarations
 - `app/src/ai/agent/util_tests.rs` — block-list markdown parser/unit test pattern
@@ -80,19 +80,19 @@ Our current `markdown_parser` does not fully implement that inline image semanti
 - multiple image references on the same line, which become an inline image row
 
 ### Why images disappear today
-Plain-text markdown sections are rendered with `render_rich_text_output_text_section` in `app/src/ai/blocklist/block/view_impl/common.rs (986-1084)`, which delegates to `FormattedTextElement`. In `crates/rookui_core/src/elements/formatted_text_element.rs (1580-1591, 1661-1671)`, `FormattedTextLine::Image(_)`, `FormattedTextLine::Embedded(_)`, and `FormattedTextLine::HorizontalRule` are all treated as line-break-like layout items rather than renderable content. That is the immediate reason that block-list Markdown images never show up.
+Plain-text markdown sections are rendered with `render_rich_text_output_text_section` in `app/src/ai/blocklist/block/view_impl/common.rs (986-1084)`, which delegates to `FormattedTextElement`. In `crates/ptermui_core/src/elements/formatted_text_element.rs (1580-1591, 1661-1671)`, `FormattedTextLine::Image(_)`, `FormattedTextLine::Embedded(_)`, and `FormattedTextLine::HorizontalRule` are all treated as line-break-like layout items rather than renderable content. That is the immediate reason that block-list Markdown images never show up.
 
 ### Asset and Mermaid support already exists elsewhere
-Rook already has the low-level capabilities this feature needs:
+Polaris Terminal already has the low-level capabilities this feature needs:
 
-- shared image format support in `crates/rookui_core/src/image_cache.rs`
+- shared image format support in `crates/ptermui_core/src/image_cache.rs`
 - asset-source resolution, including WASM-safe behavior, in `crates/editor/src/content/edit.rs (56-91)`
 - Mermaid SVG generation and sizing in `crates/editor/src/content/mermaid_diagram.rs (20-67)`
 - Mermaid code-block identification in `crates/editor/src/content/text.rs (526-579)`
 
-The app crate already depends on `rook_editor`, and the block list already embeds editor-backed code blocks. Reusing editor Mermaid/image helpers therefore does not introduce a new crate dependency edge.
+The app crate already depends on `pterm_editor`, and the block list already embeds editor-backed code blocks. Reusing editor Mermaid/image helpers therefore does not introduce a new crate dependency edge.
 
-Rook also already has a reusable fullscreen lightbox path at the workspace layer. `WorkspaceAction::OpenLightbox` / `UpdateLightboxImage` drive `LightboxView`, which already supports Escape dismissal, left/right keyboard navigation, and previous/next buttons. The block-list visual renderer should reuse that path rather than inventing a new fullscreen viewer.
+Polaris Terminal also already has a reusable fullscreen lightbox path at the workspace layer. `WorkspaceAction::OpenLightbox` / `UpdateLightboxImage` drive `LightboxView`, which already supports Escape dismissal, left/right keyboard navigation, and previous/next buttons. The block-list visual renderer should reuse that path rather than inventing a new fullscreen viewer.
 
 ### Working-directory metadata already exists
 The product requirement for resolving relative paths against the working directory captured when the AI block rendered is already compatible with existing data flow:
@@ -122,7 +122,7 @@ That architecture does not support a continuous mixed-content selection model ac
 Add a new feature flag dedicated to AI block-list markdown visuals, e.g. `BlocklistMarkdownImages`.
 
 Implementation points:
-- add `BlocklistMarkdownImages` to `crates/rook_features/src/lib.rs`
+- add `BlocklistMarkdownImages` to `crates/pterm_features/src/lib.rs`
 - add `blocklist_markdown_images = []` to `app/Cargo.toml`
 - wire it in `app/src/lib.rs` alongside the existing markdown table/Mermaid flags
 - enable it in `DOGFOOD_FLAGS`, but leave it out of `PREVIEW_FLAGS` until the surface is stable
@@ -210,7 +210,7 @@ For Mermaid:
 
 For actual rendering:
 - use a block-list-local renderer in the existing section flow
-- use RookUI image elements and existing block-list spacing/styling conventions
+- use PtermUI image elements and existing block-list spacing/styling conventions
 - preserve the existing right-click-to-copy Markdown behavior on every rendered visual
 - for inline image runs, render medium-height image tiles with per-image labels below
 - for grouped block images, render stacked thumbnail-plus-path rows using the full source path text
@@ -358,7 +358,7 @@ Mitigation:
 
 ### Integration tests
 - A reasonable first integration test is a single manual-observation test, `test_restored_ai_block_renders_mermaid_and_local_images`, in `crates/integration/src/test/agent_mode.rs`.
-- That test would restore a synthetic `ConversationData` through `load_conversation_from_tasks`, set `InputContext.directory` to `crates/rookui_core/test_data`, and capture a real-display screenshot of one AI response that contains same-line local image markdown plus a Mermaid fence.
+- That test would restore a synthetic `ConversationData` through `load_conversation_from_tasks`, set `InputContext.directory` to `crates/ptermui_core/test_data`, and capture a real-display screenshot of one AI response that contains same-line local image markdown plus a Mermaid fence.
 - It would be intentionally narrow: it would prove the restored AI block list can render both surfaces through the real conversation-hydration path without introducing protobuf fixtures or test-only UI hooks.
 - Recommended follow-up integration coverage remains:
   - an AI response containing plain text, a linked code block, a markdown table, a relative-path image, and a Mermaid diagram
@@ -384,5 +384,5 @@ Mitigation:
 ## Follow-ups
 - full CommonMark-style inline image support if we decide to expand `markdown_parser` beyond its current standalone-image behavior
 - unified mixed-content selection across block-list renderer types
-- consolidating `MarkdownImages` and `BlocklistMarkdownImages` if Rook later ships a broader app-wide markdown-image rollout
+- consolidating `MarkdownImages` and `BlocklistMarkdownImages` if Polaris Terminal later ships a broader app-wide markdown-image rollout
 - richer image interactions such as open/save/zoom, if product wants them later

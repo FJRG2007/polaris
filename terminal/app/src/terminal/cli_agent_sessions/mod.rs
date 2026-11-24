@@ -7,9 +7,9 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use event::{CLIAgentEvent, CLIAgentEventSource, CLIAgentEventType};
-use rook_core::execution_mode::AppExecutionMode;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use pterm_core::execution_mode::AppExecutionMode;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use self::listener::CLIAgentSessionListener;
 use super::CLIAgent;
@@ -162,7 +162,7 @@ pub struct CLIAgentSession {
     /// `None` if the plugin predates version reporting or Codex is using OSC9 fallback.
     pub plugin_version: Option<String>,
     /// `None` when the session is local.
-    /// `Some("user@hostname")` when running over SSH (rookified or legacy).
+    /// `Some("user@hostname")` when running over SSH (ptermified or legacy).
     /// Used as a key for per-host plugin install failure tracking.
     pub remote_host: Option<String>,
     /// Draft text saved from the rich input composer when it was closed.
@@ -634,7 +634,7 @@ impl CLIAgentSessionsModel {
             .entry(terminal_view_id)
             .or_default();
         let handle = ctx.spawn_abortable(
-            async move { rookui::r#async::Timer::after(window).await },
+            async move { ptermui::r#async::Timer::after(window).await },
             move |model, _, ctx| model.resolve_pending_cancel(terminal_view_id, token, ctx),
             |_, _| {},
         );

@@ -5,8 +5,8 @@ use std::sync::{Arc, Mutex};
 
 use arborium::tree_sitter::{Language as ParserGrammar, Query};
 use lazy_static::lazy_static;
-use rook_editor::content::text::IndentUnit;
-use rook_util::standardized_path::StandardizedPath;
+use pterm_editor::content::text::IndentUnit;
+use pterm_util::standardized_path::StandardizedPath;
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 

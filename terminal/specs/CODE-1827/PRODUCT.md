@@ -2,7 +2,7 @@
 
 ## Summary
 
-Rook’s headless TUI lets users fork a local Oz conversation into an Oz cloud run with `/handoff [prompt]`. Handoff preserves the local transcript, gathers the required cloud configuration in a blocking card, transfers applicable local context, and leaves the user with explicit choices to open the cloud run, continue locally, or start a new conversation.
+Polaris Terminal’s headless TUI lets users fork a local Oz conversation into an Oz cloud run with `/handoff [prompt]`. Handoff preserves the local transcript, gathers the required cloud configuration in a blocking card, transfers applicable local context, and leaves the user with explicit choices to open the cloud run, continue locally, or start a new conversation.
 
 ## Problem
 
@@ -53,13 +53,13 @@ Figma: none provided. The existing TUI orchestration card is the structural and 
 
 ### Eligibility and cancellation
 
-8. Before cancelling local generation, Rook checks whether a long-running command is active. If one is active:
+8. Before cancelling local generation, Polaris Terminal checks whether a long-running command is active. If one is active:
    - Handoff is rejected.
    - The command and agent conversation remain untouched.
    - The prompt argument and pending images remain in local input.
    - A transient bottom-row message tells the user to cancel the command or wait for it to finish.
 
-9. Before cancelling an orchestrator conversation, Rook checks every loaded child conversation. An in-progress or blocked child prevents handoff.
+9. Before cancelling an orchestrator conversation, Polaris Terminal checks every loaded child conversation. An in-progress or blocked child prevents handoff.
 
 10. When a child prevents handoff:
    - The parent and children remain untouched.
@@ -83,7 +83,7 @@ Figma: none provided. The existing TUI orchestration card is the structural and 
 17. The handoff card belongs to the source TUI session. If another session becomes focused through existing session navigation, the handoff state does not move to that session; returning to the source session restores its card and state.
 
 18. While the handoff card is active:
-   - Normal input, image attachments, inline menus, footer content, and response-summary/rooking rows are hidden.
+   - Normal input, image attachments, inline menus, footer content, and response-summary/pterming rows are hidden.
    - Keyboard focus belongs to the handoff card or its active selector.
    - The hidden local input’s cursor and editing state are not mutated.
 
@@ -106,7 +106,7 @@ Figma: none provided. The existing TUI orchestration card is the structural and 
 
 23. The initial environment is the user’s saved/recent environment when one remains available.
 
-24. While the card is open, Rook asynchronously inspects the current working directory’s Git repository. If an available environment contains that repository, Rook may replace the default suggestion with the most-recent matching environment.
+24. While the card is open, Polaris Terminal asynchronously inspects the current working directory’s Git repository. If an available environment contains that repository, Polaris Terminal may replace the default suggestion with the most-recent matching environment.
 
 25. A repository-based suggestion never overwrites a selection the user explicitly made.
 
@@ -130,7 +130,7 @@ Figma: none provided. The existing TUI orchestration card is the structural and 
    - The card identifies the model as incompatible.
    - Handoff confirmation remains unavailable.
    - The user must explicitly choose a compatible model.
-   - Rook never silently substitutes `auto` or another model.
+   - Polaris Terminal never silently substitutes `auto` or another model.
 
 31. Enter confirms handoff only when the selected environment still exists and the selected model remains compatible.
 
@@ -209,7 +209,7 @@ Figma: none provided. The existing TUI orchestration card is the structural and 
 
 ### Successful handoff
 
-53. Handoff is considered created when Rook receives a cloud run identifier.
+53. Handoff is considered created when Polaris Terminal receives a cloud run identifier.
 
 54. The blocking card becomes a static created card. It does not continue tracking queued, setup, running, completed, cancelled, or failed cloud-task state.
 

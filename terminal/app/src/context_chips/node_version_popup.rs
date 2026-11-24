@@ -1,14 +1,14 @@
 use pathfinder_color::ColorU;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Dismiss, DropShadow, Flex, MainAxisAlignment, MainAxisSize,
     ParentElement, Radius, ScrollbarWidth, Text,
 };
-use rookui::fonts::{FamilyId, Properties};
-use rookui::keymap::FixedBinding;
-use rookui::{
+use ptermui::fonts::{FamilyId, Properties};
+use ptermui::keymap::FixedBinding;
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -57,7 +57,7 @@ struct Styles {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",
@@ -164,7 +164,7 @@ impl NodeVersionPopupView {
             Container::new(
                 ConstrainedBox::new(
                     icons::Icon::NodeJS
-                        .to_rookui_icon(styles.tertiary_text_color.into())
+                        .to_ptermui_icon(styles.tertiary_text_color.into())
                         .finish(),
                 )
                 .with_width(24.)
@@ -224,7 +224,7 @@ impl NodeVersionPopupView {
             Container::new(
                 ConstrainedBox::new(
                     icons::Icon::NodeJS
-                        .to_rookui_icon(styles.tertiary_text_color.into())
+                        .to_ptermui_icon(styles.tertiary_text_color.into())
                         .finish(),
                 )
                 .with_width(24.)
@@ -368,7 +368,7 @@ impl View for NodeVersionPopupView {
             ScrollbarWidth::Auto,
             appearance.theme().nonactive_ui_detail().into(),
             appearance.theme().active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .with_overlayed_scrollbar()
         .finish();

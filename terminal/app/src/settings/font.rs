@@ -1,8 +1,8 @@
-use rook_core::ui::builder::MIN_FONT_SIZE;
-use rookui::elements::DEFAULT_UI_LINE_HEIGHT_RATIO;
-use rookui::fonts::Weight;
-use rookui::rendering::ThinStrokes;
-use rookui::{AppContext, SingletonEntity};
+use pterm_core::ui::builder::MIN_FONT_SIZE;
+use ptermui::elements::DEFAULT_UI_LINE_HEIGHT_RATIO;
+use ptermui::fonts::Weight;
+use ptermui::rendering::ThinStrokes;
+use ptermui::{AppContext, SingletonEntity};
 use settings::macros::define_settings_group;
 use settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud};
 

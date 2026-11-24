@@ -1,11 +1,11 @@
 use itertools::Itertools;
-use rook_core::context_flag::ContextFlag;
-use rookui::elements::{Clipped, Container, Flex, MouseStateHandle, ParentElement};
-use rookui::fonts::Weight;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, SingletonEntity};
+use pterm_core::context_flag::ContextFlag;
+use ptermui::elements::{Clipped, Container, Flex, MouseStateHandle, ParentElement};
+use ptermui::fonts::Weight;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, SingletonEntity};
 
-use super::{RookDriveItem, RookDriveItemId};
+use super::{PtermDriveItem, PtermDriveItemId};
 use crate::appearance::Appearance;
 use crate::cloud_object::CloudObjectMetadata;
 use crate::cloud_object::model::actions::{ObjectActionType, ObjectActions};
@@ -15,12 +15,12 @@ use crate::env_vars::{CloudEnvVarCollection, EnvVarValue};
 use crate::themes::theme::Fill;
 
 #[derive(Clone)]
-pub struct RookDriveEnvVarCollection {
+pub struct PtermDriveEnvVarCollection {
     id: CloudObjectTypeAndId,
     env_var_collection: CloudEnvVarCollection,
 }
 
-impl RookDriveEnvVarCollection {
+impl PtermDriveEnvVarCollection {
     pub fn new(id: CloudObjectTypeAndId, env_var_collection: CloudEnvVarCollection) -> Self {
         Self {
             id,
@@ -29,7 +29,7 @@ impl RookDriveEnvVarCollection {
     }
 }
 
-impl RookDriveItem for RookDriveEnvVarCollection {
+impl PtermDriveItem for PtermDriveEnvVarCollection {
     fn display_name(&self) -> Option<String> {
         self.env_var_collection.model().string_model.title.clone()
     }
@@ -149,8 +149,8 @@ impl RookDriveItem for RookDriveEnvVarCollection {
         Some(text.finish())
     }
 
-    fn rook_drive_id(&self) -> RookDriveItemId {
-        RookDriveItemId::Object(self.id)
+    fn pterm_drive_id(&self) -> PtermDriveItemId {
+        PtermDriveItemId::Object(self.id)
     }
 
     fn sync_status_icon(
@@ -170,7 +170,7 @@ impl RookDriveItem for RookDriveEnvVarCollection {
             .get_action_history_summary_for_action_type(&self.id.uid(), ObjectActionType::Execute)
     }
 
-    fn clone_box(&self) -> Box<dyn RookDriveItem> {
+    fn clone_box(&self) -> Box<dyn PtermDriveItem> {
         Box::new(self.clone())
     }
 }

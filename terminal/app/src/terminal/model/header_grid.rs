@@ -1,14 +1,14 @@
 //! This module defines HeaderGrid, a struct which manages the prompt and command grid's within
-//! Rook. This struct is abstracted away from Block, for the purposes of enabling same-line prompt,
+//! Polaris Terminal. This struct is abstracted away from Block, for the purposes of enabling same-line prompt,
 //! utilizing a combined prompt/command grid, with helper methods to expose the prompt and command.
 use std::cmp::max;
 use std::io;
 
 use instant::Instant;
 use pathfinder_color::ColorU;
-use rook_errors::report_error;
-use rook_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
-use rookui::units::{IntoLines as _, Lines};
+use pterm_errors::report_error;
+use pterm_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
+use ptermui::units::{IntoLines as _, Lines};
 
 use super::ansi::{self, Attr, Handler, PrecmdValue, PreexecValue, Processor, PromptMetadata};
 use super::block::{BlockGridPoint, BlockSize};
@@ -120,8 +120,8 @@ pub struct HeaderGrid {
     /// with remote subshells correctly).
     /// TODO(CORE-2403): Rename this field to should_populate_prompt_preview_grid.
     ignore_next_prompt_preview: bool,
-    /// The height of the Rook prompt in lines (non-PS1).
-    rook_prompt_height_lines: f32,
+    /// The height of the Polaris Terminal prompt in lines (non-PS1).
+    pterm_prompt_height_lines: f32,
     // whether to honor users ps1 and rprompt values, can be changed by a user in the settings
     // note that the change will only apply to the active block; historical blocks will keep the
     // previous setting
@@ -168,7 +168,7 @@ impl HeaderGrid {
             prompt_and_command_grid,
             receiving_chars_for_prompt: None,
             ignore_next_prompt_preview: false,
-            rook_prompt_height_lines: sizes.rook_prompt_height_lines,
+            pterm_prompt_height_lines: sizes.pterm_prompt_height_lines,
             honor_ps1,
             command_started: false,
             command_start_time: None,
@@ -185,7 +185,7 @@ impl HeaderGrid {
     pub fn set_honor_ps1(&mut self, honor_ps1: bool) {
         self.honor_ps1 = honor_ps1;
         if !self.honor_ps1 {
-            // If we are switching to Rook prompt (from PS1), we need to clear the cached prompt end point
+            // If we are switching to Polaris Terminal prompt (from PS1), we need to clear the cached prompt end point
             // and update the command start point appropriately!
             self.cached_prompt_end_point = Some(PromptEndPoint::EmptyPrompt);
             self.cached_command_start_point = Some(CommandStartPoint::CommandStart {
@@ -312,7 +312,7 @@ impl HeaderGrid {
     /// the command to be finished.
     fn is_command_finished_and_empty(&self) -> bool {
         if !self.honor_ps1 {
-            // If we are using Rook prompt, we expect the combined grid cursor to be at the start, if
+            // If we are using Polaris Terminal prompt, we expect the combined grid cursor to be at the start, if
             // the command is truly empty.
             return self.prompt_and_command_grid.finished()
                 && self.prompt_and_command_grid.grid_handler().cursor_point() == Point::new(0, 0);
@@ -789,7 +789,7 @@ impl HeaderGrid {
         } else if self.honor_ps1 {
             self.prompt_grid.len().into_lines()
         } else {
-            self.rook_prompt_height_lines.into_lines()
+            self.pterm_prompt_height_lines.into_lines()
         }
     }
 
@@ -1162,12 +1162,12 @@ impl ansi::Handler for HeaderGrid {
                 honor_ps1
             );
             // We send a terminal event which will result in bindkeys being issued to the shell session, to
-            // switch the prompt mode via the $ROOK_HONOR_PS1 environment variable.
+            // switch the prompt mode via the $POLARIS_TERMINAL_HONOR_PS1 environment variable.
             self.event_proxy.send_app_event(Event::HonorPS1OutOfSync);
 
             // We synchronize the state of our `honor_ps1` setting with the value passed from the shell.
             // Note that we ALWAYS want this to be synced properly since the shell determines the prompt
-            // to be emitted. This may be de-synced from Rook settings in particular niche cases (which are
+            // to be emitted. This may be de-synced from Polaris Terminal settings in particular niche cases (which are
             // bugs), however, we still want consistent behavior for the prompt in the blocklist (we want to
             // avoid double prompt or empty prompt issues).
             self.honor_ps1 = honor_ps1;

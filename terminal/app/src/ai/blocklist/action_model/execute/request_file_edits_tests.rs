@@ -4,7 +4,7 @@ use std::rc::Rc;
 use ai::diff_validation::{AIRequestedCodeDiff, DiffType};
 use async_channel::unbounded;
 use futures::FutureExt;
-use rookui::{App, AppContext, EntityId};
+use ptermui::{App, AppContext, EntityId};
 
 use super::*;
 use crate::ai::agent::task::TaskId;

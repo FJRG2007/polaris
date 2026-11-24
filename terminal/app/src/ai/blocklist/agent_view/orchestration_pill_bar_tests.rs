@@ -7,13 +7,13 @@ use super::*;
 #[test]
 fn pill_bar_scrollable_finite_under_capped_drag_preview() {
     use pathfinder_geometry::vector::vec2f;
-    use rookui::elements::new_scrollable::{NewScrollable, SingleAxisConfig};
-    use rookui::elements::{
+    use ptermui::elements::new_scrollable::{NewScrollable, SingleAxisConfig};
+    use ptermui::elements::{
         ClippedScrollStateHandle, ConstrainedBox, Container, CrossAxisAlignment, Fill, Flex,
         MainAxisSize, ParentElement, Rect,
     };
-    use rookui::platform::WindowStyle;
-    use rookui::{
+    use ptermui::platform::WindowStyle;
+    use ptermui::{
         App, Element, Entity, Presenter, TypedActionView, View, ViewContext, WindowInvalidation,
     };
 
@@ -42,7 +42,7 @@ fn pill_bar_scrollable_finite_under_capped_drag_preview() {
             "DragPreviewTestView"
         }
 
-        fn render(&self, _app: &rookui::AppContext) -> Box<dyn Element> {
+        fn render(&self, _app: &ptermui::AppContext) -> Box<dyn Element> {
             // Overflowing content so the clipped scrollable has something to clip.
             let content = ConstrainedBox::new(Rect::new().finish())
                 .with_width(2000.)
@@ -134,7 +134,7 @@ fn pill_bar_scrollable_finite_under_capped_drag_preview() {
 #[test]
 fn pill_bar_data_layer_finds_restored_children_before_pane_creation() {
     use chrono::Utc;
-    use rookui::App;
+    use ptermui::App;
     use uuid::Uuid;
 
     use crate::ai::blocklist::BlocklistAIHistoryModel;
@@ -319,14 +319,14 @@ fn navigation_action_for_orchestrator_pill_switches_in_place() {
 /// Builds a 3-level tree (root → mid → grandchild) and returns the history
 /// handle plus the ids.
 fn build_three_level_tree(
-    app: &mut rookui::App,
+    app: &mut ptermui::App,
 ) -> (
     ModelHandle<BlocklistAIHistoryModel>,
     AIConversationId,
     AIConversationId,
     AIConversationId,
 ) {
-    use rookui::EntityId;
+    use ptermui::EntityId;
 
     use crate::test_util::settings::initialize_history_persistence_for_tests;
 
@@ -361,7 +361,7 @@ fn build_three_level_tree(
 
 #[test]
 fn breadcrumb_ids_show_only_root_when_parent_is_root() {
-    use rookui::App;
+    use ptermui::App;
 
     App::test((), |mut app| async move {
         let (history_model, root_id, mid_id, _grandchild_id) = build_three_level_tree(&mut app);
@@ -373,7 +373,7 @@ fn breadcrumb_ids_show_only_root_when_parent_is_root() {
 
 #[test]
 fn breadcrumb_ids_show_root_and_parent_when_two_levels_deep() {
-    use rookui::App;
+    use ptermui::App;
 
     App::test((), |mut app| async move {
         let (history_model, root_id, mid_id, grandchild_id) = build_three_level_tree(&mut app);
@@ -388,7 +388,7 @@ fn breadcrumb_ids_show_root_and_parent_when_two_levels_deep() {
 
 #[test]
 fn breadcrumb_ids_are_empty_at_the_root() {
-    use rookui::App;
+    use ptermui::App;
 
     App::test((), |mut app| async move {
         let (history_model, root_id, _mid_id, _grandchild_id) = build_three_level_tree(&mut app);
@@ -400,7 +400,7 @@ fn breadcrumb_ids_are_empty_at_the_root() {
 
 #[test]
 fn drill_down_anchor_is_the_parent_level_for_a_leaf() {
-    use rookui::App;
+    use ptermui::App;
 
     App::test((), |mut app| async move {
         let (_history_model, _root_id, mid_id, grandchild_id) = build_three_level_tree(&mut app);
@@ -419,7 +419,7 @@ fn drill_down_anchor_is_the_parent_level_for_a_leaf() {
 
 #[test]
 fn drill_down_anchor_is_the_node_itself_when_it_has_children() {
-    use rookui::App;
+    use ptermui::App;
 
     App::test((), |mut app| async move {
         let (_history_model, root_id, mid_id, _grandchild_id) = build_three_level_tree(&mut app);
@@ -446,7 +446,7 @@ fn drill_down_anchor_is_the_node_itself_when_it_has_children() {
 /// children anchor the root's level.
 #[test]
 fn drill_down_anchor_matches_root_anchoring_at_depth_one() {
-    use rookui::{App, EntityId};
+    use ptermui::{App, EntityId};
 
     use crate::test_util::settings::initialize_history_persistence_for_tests;
 
@@ -491,7 +491,7 @@ fn drill_down_anchor_matches_root_anchoring_at_depth_one() {
 #[test]
 fn breadcrumbs_resolve_token_only_parent_linkage_after_restore() {
     use chrono::Utc;
-    use rookui::App;
+    use ptermui::App;
 
     use crate::ai::blocklist::BlocklistAIHistoryModel;
     use crate::persistence::model::{
@@ -629,9 +629,9 @@ fn conversation_server_token_assignment_rerenders_the_pill_bar() {
     use std::sync::Arc;
 
     use parking_lot::FairMutex;
-    use rookui::App;
-    use rookui::r#async::executor::Background;
-    use rookui::platform::WindowStyle;
+    use ptermui::App;
+    use ptermui::r#async::executor::Background;
+    use ptermui::platform::WindowStyle;
 
     use crate::ai::blocklist::agent_view::{AgentViewEntryOrigin, EphemeralMessageModel};
     use crate::terminal::TerminalModel;

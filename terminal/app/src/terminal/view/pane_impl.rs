@@ -1,16 +1,16 @@
 //! This module contains the implementation of `BackingView` for `TerminalView`, as well as
 //! business logic for integrating the terminal view with the pane infra (`crate::pane_group`).
-use rook_core::context_flag::ContextFlag;
-use rookui::elements::{
+use pterm_core::context_flag::ContextFlag;
+use ptermui::elements::{
     ConstrainedBox, CrossAxisAlignment, Empty, Flex, MainAxisAlignment, MainAxisSize,
     ParentElement, Shrinkable,
 };
-use rookui::prelude::{ChildView, Container};
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::components::UiComponent;
+use ptermui::prelude::{ChildView, Container};
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::components::UiComponent;
 #[cfg(not(target_arch = "wasm32"))]
-use rookui::ui_components::components::UiComponentStyles;
-use rookui::{
+use ptermui::ui_components::components::UiComponentStyles;
+use ptermui::{
     AppContext, Element, ModelHandle, SingletonEntity, TypedActionView, ViewContext,
     WeakModelHandle,
 };
@@ -242,7 +242,7 @@ impl TerminalView {
     /// Renders the back button for the pane header, or an empty element if the
     /// back button should not be shown.
     fn maybe_render_header_back_button(&self, app: &AppContext) -> Box<dyn Element> {
-        if !FeatureFlag::AgentView.is_enabled() || rookui::platform::is_mobile_device() {
+        if !FeatureFlag::AgentView.is_enabled() || ptermui::platform::is_mobile_device() {
             return Flex::row().finish();
         }
 
@@ -322,7 +322,7 @@ impl TerminalView {
                 Some(
                     ConstrainedBox::new(
                         icons::Icon::Sharing
-                            .to_rookui_icon(shared_session_indicator_color(appearance).into())
+                            .to_ptermui_icon(shared_session_indicator_color(appearance).into())
                             .finish(),
                     )
                     .with_height(appearance.ui_font_size())
@@ -908,7 +908,7 @@ impl TerminalView {
             return Some(
                 ConstrainedBox::new(
                     icons::Icon::AlertTriangle
-                        .to_rookui_icon(appearance.theme().ui_error_color().into())
+                        .to_ptermui_icon(appearance.theme().ui_error_color().into())
                         .finish(),
                 )
                 .with_height(font_size)
@@ -921,7 +921,7 @@ impl TerminalView {
         if let Some(shell_indicator_type) = self.shell_indicator_type {
             let shell_indicator_icon = shell_indicator_type
                 .to_icon()
-                .to_rookui_icon(
+                .to_ptermui_icon(
                     blended_colors::text_sub(appearance.theme(), appearance.theme().background())
                         .into(),
                 )

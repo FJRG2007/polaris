@@ -1,6 +1,6 @@
 use onboarding::SelectedSettings;
-use rook_core::execution_mode::AppExecutionMode;
-use rookui::{SingletonEntity as _, ViewContext};
+use pterm_core::execution_mode::AppExecutionMode;
+use ptermui::{SingletonEntity as _, ViewContext};
 
 use crate::settings::AISettings;
 use crate::terminal::view::{

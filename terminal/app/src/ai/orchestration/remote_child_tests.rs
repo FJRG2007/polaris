@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use ai::skills::parse_skill;
 use anyhow::anyhow;
-use rookui::{App, SingletonEntity as _};
+use ptermui::{App, SingletonEntity as _};
 use tempfile::TempDir;
 
 use super::{
@@ -41,11 +41,11 @@ fn config(harness_type: &str) -> RemoteChildLaunchConfig {
 fn orchestration_harness_defaults_to_oz_and_parses_known_harnesses() {
     assert_eq!(
         config("").orchestration_harness(),
-        rook_cli::agent::Harness::Oz
+        pterm_cli::agent::Harness::Oz
     );
     assert_eq!(
         config("claude").orchestration_harness(),
-        rook_cli::agent::Harness::Claude
+        pterm_cli::agent::Harness::Claude
     );
 }
 
@@ -62,7 +62,7 @@ fn prepared_remote_request_matches_gui_wire_semantics() {
                 skill_references: Vec::new(),
                 model_id: "auto".to_string(),
                 computer_use_enabled: true,
-                worker_host: "rook".to_string(),
+                worker_host: "polaris-terminal".to_string(),
                 harness_type: "oz".to_string(),
                 title: "Research".to_string(),
                 auth_secret_name: None,
@@ -82,7 +82,7 @@ fn prepared_remote_request_matches_gui_wire_semantics() {
                     working_dir: PathBuf::new(),
                     model_id: "auto".to_string(),
                     computer_use_enabled: true,
-                    worker_host: "rook".to_string(),
+                    worker_host: "polaris-terminal".to_string(),
                     harness_type: "oz".to_string(),
                     title: "Research".to_string(),
                     auth_secret_name: None,
@@ -112,7 +112,7 @@ fn prepared_remote_request_matches_gui_wire_semantics() {
             assert_eq!(config.environment_id.as_deref(), Some("env-1"));
             assert_eq!(config.runner_id.as_deref(), Some("runner-1"));
             assert_eq!(config.model_id.as_deref(), Some("auto"));
-            assert_eq!(config.worker_host.as_deref(), Some("rook"));
+            assert_eq!(config.worker_host.as_deref(), Some("polaris-terminal"));
             assert_eq!(config.computer_use_enabled, Some(true));
         });
     });
@@ -146,13 +146,13 @@ fn repo_qualified_skill_spec_resolves_into_runtime_skills() {
             );
         });
         let skill_references = vec![
-            SkillReference::Path(rook_util::local_or_remote_path::LocalOrRemotePath::Local(
+            SkillReference::Path(pterm_util::local_or_remote_path::LocalOrRemotePath::Local(
                 PathBuf::from(&skill_spec),
             )),
-            SkillReference::Path(rook_util::local_or_remote_path::LocalOrRemotePath::Local(
+            SkillReference::Path(pterm_util::local_or_remote_path::LocalOrRemotePath::Local(
                 PathBuf::from("myrepo:my-skill"),
             )),
-            SkillReference::Path(rook_util::local_or_remote_path::LocalOrRemotePath::Local(
+            SkillReference::Path(pterm_util::local_or_remote_path::LocalOrRemotePath::Local(
                 skill_path.clone(),
             )),
             SkillReference::BundledSkillId("bundled-test".to_string()),
@@ -233,7 +233,7 @@ fn missing_repo_qualified_skill_reports_repository_and_reason() {
                 &request,
                 RemoteChildLaunchConfig {
                     skill_references: vec![SkillReference::Path(
-                        rook_util::local_or_remote_path::LocalOrRemotePath::Local(
+                        pterm_util::local_or_remote_path::LocalOrRemotePath::Local(
                             "missing-repo:missing-skill".into(),
                         ),
                     )],
@@ -254,7 +254,7 @@ fn missing_repo_qualified_skill_reports_repository_and_reason() {
 fn github_auth_error_is_a_shared_blocker_with_cloud_callback_url() {
     let error = anyhow::Error::new(ClientError {
         error: "GitHub authentication required".to_string(),
-        auth_url: Some("https://example.com/auth?scheme=rookdev".to_string()),
+        auth_url: Some("https://example.com/auth?scheme=polaris-terminal-dev".to_string()),
     });
     let CloudAgentStartupIssue::Blocked(CloudAgentStartupBlocker::GitHubAuthRequired {
         message,

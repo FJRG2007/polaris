@@ -42,7 +42,7 @@ The vertical tabs panel currently renders each pane row with a small 12px inline
 - `app/src/ai/conversation_status_ui.rs:14` — `render_status_element()` helper
 
 **CLI agent icons:**
-- `vertical_tabs.rs:1918` — `cli_agent_rook_icon()` maps `CLIAgent` to branded `RookIcon`
+- `vertical_tabs.rs:1918` — `cli_agent_pterm_icon()` maps `CLIAgent` to branded `PtermIcon`
 
 **Language file icons:**
 - `app/src/code/mod.rs` — `icon_from_file_path()` returns language-specific icon element
@@ -93,7 +93,7 @@ Add a new function `render_pane_circle_icon()` in `vertical_tabs.rs` that return
 ```rust
 enum CircleIconVariant<'a> {
     /// Neutral circle: fg_overlay_2 background, 16px type icon
-    Neutral { icon: RookIcon },
+    Neutral { icon: PtermIcon },
     /// Oz agent: dark background, 10px Oz icon, status badge
     OzAgent { status: Option<&'a ConversationStatus>, is_ambient: bool },
     /// CLI agent: brand-colored background, 10px agent icon, status badge
@@ -246,7 +246,7 @@ In `render_settings_popup()`, rename the "Show first" header text to "Pane title
 - **Unit tests for `terminal_primary_line_data()`:** Update existing tests in `vertical_tabs_tests.rs` to verify the simplified 3-step priority (CLI agent → conversation → terminal title) and ensure the old fallbacks (last command, "New session") are removed.
 - **Unit test for `has_unread_for_terminal_view()`:** Add to `item_tests.rs` — create items with different `terminal_view_id` and `is_read` states, verify query correctness.
 - **Visual validation:** Per the validation section in PRODUCT.md — open a mix of pane types, verify circle icons, slot content, indicators, and "Pane title as" setting behavior.
-- **Presubmit:** `cargo clippy` and `cargo fmt` must pass. Run `cargo nextest run -p rook` for the workspace tests.
+- **Presubmit:** `cargo clippy` and `cargo fmt` must pass. Run `cargo nextest run -p polaris-terminal` for the workspace tests.
 
 ### 8. "Additional metadata" setting for compact subtitle
 

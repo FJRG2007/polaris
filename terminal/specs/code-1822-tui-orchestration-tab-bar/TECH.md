@@ -6,25 +6,25 @@ Inspected commit: `0bfc788907e2b27c3488c581fee92e2f67a18ef1`
 
 ## Context
 The preceding stack gives every native local child a retained full TUI session, but only the focused session is projected and there is no navigation chrome between related sessions:
-- [`crates/rook_tui/src/sessions.rs (20-175) @ 0bfc7889`](https://github.com/FJRG2007/rook/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/crates/rook_tui/src/sessions.rs#L20-L175) — `TuiSessionId`, retained `TuiSession` views/managers, and `TuiSessions::focus_session`. `FocusChanged` updates projection state but currently has no focus-routing subscriber.
-- [`crates/rook_tui/src/root_view.rs (36-82) @ 0bfc7889`](https://github.com/FJRG2007/rook/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/crates/rook_tui/src/root_view.rs#L36-L82) — the root renders and exposes only `TuiSessions::focused_session()`, so switching sessions is a full-view swap rather than transcript replacement.
-- [`crates/rook_tui/src/orchestration_model.rs (30-266) @ 0bfc7889`](https://github.com/FJRG2007/rook/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/crates/rook_tui/src/orchestration_model.rs#L30-L266) — `TuiOrchestrationModel` materializes local native children, retains the child-conversation/session mapping needed for failed-launch cleanup, and subscribes to every session's `StartAgentExecutor`.
-- [`app/src/ai/blocklist/history_model.rs (403-568) @ 0bfc7889`](https://github.com/FJRG2007/rook/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/app/src/ai/blocklist/history_model.rs#L403-L568) — the shared history model owns loaded conversations, parent resolution, and the restart-durable `children_by_parent` index.
-- [`app/src/ai/blocklist/history_model.rs (963-1018) @ 0bfc7889`](https://github.com/FJRG2007/rook/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/app/src/ai/blocklist/history_model.rs#L963-L1018) — `terminal_surface_id_for_conversation` and `active_conversation` provide the authoritative conversation↔surface mapping. This mapping remains correct when a session restores a different conversation, unlike `TuiOrchestrationModel::child_session_by_conversation`.
+- [`crates/pterm_tui/src/sessions.rs (20-175) @ 0bfc7889`](https://github.com/FJRG2007/polaris/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/terminal/crates/pterm_tui/src/sessions.rs#L20-L175) — `TuiSessionId`, retained `TuiSession` views/managers, and `TuiSessions::focus_session`. `FocusChanged` updates projection state but currently has no focus-routing subscriber.
+- [`crates/pterm_tui/src/root_view.rs (36-82) @ 0bfc7889`](https://github.com/FJRG2007/polaris/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/terminal/crates/pterm_tui/src/root_view.rs#L36-L82) — the root renders and exposes only `TuiSessions::focused_session()`, so switching sessions is a full-view swap rather than transcript replacement.
+- [`crates/pterm_tui/src/orchestration_model.rs (30-266) @ 0bfc7889`](https://github.com/FJRG2007/polaris/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/terminal/crates/pterm_tui/src/orchestration_model.rs#L30-L266) — `TuiOrchestrationModel` materializes local native children, retains the child-conversation/session mapping needed for failed-launch cleanup, and subscribes to every session's `StartAgentExecutor`.
+- [`app/src/ai/blocklist/history_model.rs (403-568) @ 0bfc7889`](https://github.com/FJRG2007/polaris/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/terminal/app/src/ai/blocklist/history_model.rs#L403-L568) — the shared history model owns loaded conversations, parent resolution, and the restart-durable `children_by_parent` index.
+- [`app/src/ai/blocklist/history_model.rs (963-1018) @ 0bfc7889`](https://github.com/FJRG2007/polaris/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/terminal/app/src/ai/blocklist/history_model.rs#L963-L1018) — `terminal_surface_id_for_conversation` and `active_conversation` provide the authoritative conversation↔surface mapping. This mapping remains correct when a session restores a different conversation, unlike `TuiOrchestrationModel::child_session_by_conversation`.
 
 The GUI already owns the canonical orchestration ordering and tree traversal:
-- [`app/src/ai/blocklist/orchestration_topology.rs (107-180) @ 0bfc7889`](https://github.com/FJRG2007/rook/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/app/src/ai/blocklist/orchestration_topology.rs#L107-L180) — `descendant_conversations_in_pill_order` implements pin/status/recency/spawn ordering, and adjacent navigation establishes wraparound semantics.
-- [`app/src/ai/blocklist/agent_view/orchestration_pill_bar.rs (600-670) @ 0bfc7889`](https://github.com/FJRG2007/rook/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/app/src/ai/blocklist/agent_view/orchestration_pill_bar.rs#L600-L670) — the GUI renders an orchestrator first, then descendants in the shared canonical order. Its current active-child lookup climbs one parent; PRODUCT (2) requires the TUI to climb to the top orchestration root so every member session shows the same complete tree.
+- [`app/src/ai/blocklist/orchestration_topology.rs (107-180) @ 0bfc7889`](https://github.com/FJRG2007/polaris/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/terminal/app/src/ai/blocklist/orchestration_topology.rs#L107-L180) — `descendant_conversations_in_pill_order` implements pin/status/recency/spawn ordering, and adjacent navigation establishes wraparound semantics.
+- [`app/src/ai/blocklist/agent_view/orchestration_pill_bar.rs (600-670) @ 0bfc7889`](https://github.com/FJRG2007/polaris/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/terminal/app/src/ai/blocklist/agent_view/orchestration_pill_bar.rs#L600-L670) — the GUI renders an orchestrator first, then descendants in the shared canonical order. Its current active-child lookup climbs one parent; PRODUCT (2) requires the TUI to climb to the top orchestration root so every member session shows the same complete tree.
 
 The focused session already owns the relevant input and focus transitions:
-- [`crates/rook_tui/src/terminal_session_view.rs (746-1037) @ 0bfc7889`](https://github.com/FJRG2007/rook/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/crates/rook_tui/src/terminal_session_view.rs#L746-L1037) — input construction, history subscriptions, background-session focus guards, blocker precedence, and input restoration.
-- [`crates/rook_tui/src/terminal_session_view.rs (2166-2342) @ 0bfc7889`](https://github.com/FJRG2007/rook/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/crates/rook_tui/src/terminal_session_view.rs#L2166-L2342) — the current session render tree, including alt-screen replacement, transcript, blocker handling, input, and footer.
-- [`crates/rook_tui/src/input/view.rs (61-170) @ 0bfc7889`](https://github.com/FJRG2007/rook/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/crates/rook_tui/src/input/view.rs#L61-L170) and [`crates/rook_tui/src/input/view.rs (584-675) @ 0bfc7889`](https://github.com/FJRG2007/rook/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/crates/rook_tui/src/input/view.rs#L584-L675) — `Shift+Up` currently dispatches `SelectUp` unconditionally and the input applies vertical selection directly.
-- [`crates/rook_tui/src/editor_element.rs (271-408) @ 0bfc7889`](https://github.com/FJRG2007/rook/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/crates/rook_tui/src/editor_element.rs#L271-L408) — the char-cell display lattice is the source of truth for wrapped visual rows and cursor placement.
+- [`crates/pterm_tui/src/terminal_session_view.rs (746-1037) @ 0bfc7889`](https://github.com/FJRG2007/polaris/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/terminal/crates/pterm_tui/src/terminal_session_view.rs#L746-L1037) — input construction, history subscriptions, background-session focus guards, blocker precedence, and input restoration.
+- [`crates/pterm_tui/src/terminal_session_view.rs (2166-2342) @ 0bfc7889`](https://github.com/FJRG2007/polaris/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/terminal/crates/pterm_tui/src/terminal_session_view.rs#L2166-L2342) — the current session render tree, including alt-screen replacement, transcript, blocker handling, input, and footer.
+- [`crates/pterm_tui/src/input/view.rs (61-170) @ 0bfc7889`](https://github.com/FJRG2007/polaris/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/terminal/crates/pterm_tui/src/input/view.rs#L61-L170) and [`crates/pterm_tui/src/input/view.rs (584-675) @ 0bfc7889`](https://github.com/FJRG2007/polaris/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/terminal/crates/pterm_tui/src/input/view.rs#L584-L675) — `Shift+Up` currently dispatches `SelectUp` unconditionally and the input applies vertical selection directly.
+- [`crates/pterm_tui/src/editor_element.rs (271-408) @ 0bfc7889`](https://github.com/FJRG2007/polaris/blob/0bfc788907e2b27c3488c581fee92e2f67a18ef1/terminal/crates/pterm_tui/src/editor_element.rs#L271-L408) — the char-cell display lattice is the source of truth for wrapped visual rows and cursor placement.
 
 ## Proposed changes
 ### 1. Export and reuse the GUI topology policy
-Re-export `descendant_conversations_in_pill_order` through `app/src/tui_export.rs`; do not duplicate its sort keys in `rook_tui`.
+Re-export `descendant_conversations_in_pill_order` through `app/src/tui_export.rs`; do not duplicate its sort keys in `pterm_tui`.
 
 `TuiOrchestrationModel` reuses the GUI's descendant ordering while resolving the complete tree required by PRODUCT (2):
 1. Receive the focused session's selected conversation ID from `TuiTerminalSessionView`; do not substitute the history model's “most recently streamed” active pointer for the input selection.
@@ -125,9 +125,9 @@ Use `tui-testing` render-to-lines coverage for 40-, 80-, and 132-column widths a
 - Input drafts and running child state preserved across repeated switches.
 
 Run focused validation first:
-- `cargo nextest run -p rook_tui orchestration`
-- `cargo nextest run -p rook_tui terminal_session`
-- `cargo nextest run -p rook_tui input`
+- `cargo nextest run -p pterm_tui orchestration`
+- `cargo nextest run -p pterm_tui terminal_session`
+- `cargo nextest run -p pterm_tui input`
 
 Before PR submission, run `./script/format`, the repository-prescribed Clippy command, and `./script/presubmit`.
 

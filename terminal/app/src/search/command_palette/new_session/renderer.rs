@@ -1,6 +1,6 @@
-use rookui::Element;
-use rookui::elements::{Container, Flex, Highlight, ParentElement, Text};
-use rookui::fonts::{Properties, Weight};
+use ptermui::Element;
+use ptermui::elements::{Container, Flex, Highlight, ParentElement, Text};
+use ptermui::fonts::{Properties, Weight};
 
 use super::new_session_option::NewSessionOption;
 use crate::appearance::Appearance;

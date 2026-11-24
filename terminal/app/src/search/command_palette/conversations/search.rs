@@ -1,5 +1,5 @@
 use fuzzy_match::match_indices_case_insensitive;
-use rookui::AppContext;
+use ptermui::AppContext;
 
 use crate::ai::conversation_navigation::ConversationNavigationData;
 use crate::search::SyncDataSource;

@@ -1,23 +1,23 @@
 use ai::LLMId;
 use pathfinder_color::ColorU;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::icons::Icon;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rookui_core::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::icons::Icon;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui_core::elements::{
     AnchorPair, Border, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Dismiss, Empty, Flex, FormattedTextElement, Hoverable,
-    Icon as RookUiIcon, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
+    Icon as PtermUiIcon, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
     OffsetType, ParentElement, ParentOffsetBounds, PositioningAxis, Radius, SavePosition,
     ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Stack, Text, XAxisAnchor, YAxisAnchor,
 };
-use rookui_core::fonts::{Properties, Weight};
-use rookui_core::keymap::Keystroke;
-use rookui_core::platform::Cursor;
-use rookui_core::scene::DropShadow;
-use rookui_core::text_layout::TextAlignment;
-use rookui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
-use rookui_core::{
+use ptermui_core::fonts::{Properties, Weight};
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::platform::Cursor;
+use ptermui_core::scene::DropShadow;
+use ptermui_core::text_layout::TextAlignment;
+use ptermui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui_core::{
     AppContext, Element, Entity, SingletonEntity as _, TypedActionView, View, ViewContext,
 };
 use ui_components::{Component as _, Options as _, button};
@@ -98,7 +98,7 @@ pub enum AgentSlideAction {
 }
 
 pub struct AgentSlide {
-    onboarding_state: rookui_core::ModelHandle<OnboardingStateModel>,
+    onboarding_state: ptermui_core::ModelHandle<OnboardingStateModel>,
 
     /// Mouse state handles for each model row.
     model_mouse_states: Vec<MouseStateHandle>,
@@ -127,7 +127,7 @@ fn model_row_position_id(index: usize) -> String {
 
 impl AgentSlide {
     pub(crate) fn new(
-        onboarding_state: rookui_core::ModelHandle<OnboardingStateModel>,
+        onboarding_state: ptermui_core::ModelHandle<OnboardingStateModel>,
         ctx: &mut ViewContext<Self>,
     ) -> Self {
         let model_count = onboarding_state.as_ref(ctx).models().len();
@@ -222,7 +222,7 @@ impl AgentSlide {
     fn render_header(&self, appearance: &Appearance) -> Box<dyn Element> {
         let title = appearance
             .ui_builder()
-            .paragraph("Customize your Rook Agent")
+            .paragraph("Customize your Polaris Terminal Agent")
             .with_style(UiComponentStyles {
                 font_size: Some(36.),
                 font_weight: Some(Weight::Medium),
@@ -232,7 +232,7 @@ impl AgentSlide {
             .finish();
 
         let subtitle = FormattedTextElement::from_str(
-            "Select your Rook Agent's defaults.",
+            "Select your Polaris Terminal Agent's defaults.",
             appearance.ui_font_family(),
             16.,
         )
@@ -415,7 +415,7 @@ impl AgentSlide {
             let title_row: Box<dyn Element> = if let Some(icon) = icon {
                 const ICON_SIZE: f32 = 14.;
                 let icon_el =
-                    ConstrainedBox::new(Box::new(icon.to_rookui_icon(title_color.into())))
+                    ConstrainedBox::new(Box::new(icon.to_ptermui_icon(title_color.into())))
                         .with_width(ICON_SIZE)
                         .with_height(ICON_SIZE)
                         .finish();
@@ -429,7 +429,7 @@ impl AgentSlide {
             };
 
             // Trailing chevron icon.
-            let chevron = ConstrainedBox::new(Box::new(RookUiIcon::new(
+            let chevron = ConstrainedBox::new(Box::new(PtermUiIcon::new(
                 "bundled/svg/chevron-down.svg",
                 title_color,
             )))
@@ -586,7 +586,7 @@ impl AgentSlide {
                 .finish();
 
             const ICON_SIZE: f32 = 14.;
-            let icon_el = ConstrainedBox::new(Box::new(icon.to_rookui_icon(title_color.into())))
+            let icon_el = ConstrainedBox::new(Box::new(icon.to_ptermui_icon(title_color.into())))
                 .with_width(ICON_SIZE)
                 .with_height(ICON_SIZE)
                 .finish();
@@ -735,19 +735,19 @@ impl AgentSlide {
             (
                 AgentAutonomy::Full,
                 "Full",
-                "Rook Agent runs commands, writes code, and reads files without asking.",
+                "Polaris Terminal Agent runs commands, writes code, and reads files without asking.",
                 self.autonomy_full_mouse_state.clone(),
             ),
             (
                 AgentAutonomy::Partial,
                 "Partial",
-                "Rook Agent can plan, read files, and execute low-risk commands. Asks before making any changes or executing sensitive commands.",
+                "Polaris Terminal Agent can plan, read files, and execute low-risk commands. Asks before making any changes or executing sensitive commands.",
                 self.autonomy_partial_mouse_state.clone(),
             ),
             (
                 AgentAutonomy::None,
                 "None",
-                "Rook Agent takes no actions without your approval.",
+                "Polaris Terminal Agent takes no actions without your approval.",
                 self.autonomy_none_mouse_state.clone(),
             ),
         ];

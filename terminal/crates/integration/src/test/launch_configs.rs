@@ -1,33 +1,38 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use rook::features::FeatureFlag;
-use rook::integration_testing::pane_group::assert_focused_pane_index;
-use rook::integration_testing::settings::set_window_custom_size;
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::{
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::pane_group::assert_focused_pane_index;
+use polaris_terminal::integration_testing::settings::set_window_custom_size;
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::{
     validate_block_output, wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::type_getters::get_launch_config_ui_location;
-use rook::integration_testing::window::assert_num_windows_open;
-use rook::integration_testing::workspace::{assert_focused_tab_index, assert_tab_count};
-use rook::integration_testing::{self};
-use rook::search::SyncDataSource;
-use rook::search::command_palette::launch_config;
-use rook::search::data_source::Query;
-use rook::workspace::NEW_TAB_BUTTON_POSITION_ID;
-use rookui_core::integration::{AssertionOutcome, TestStep};
-use rookui_core::{ModelHandle, async_assert};
+use polaris_terminal::integration_testing::type_getters::get_launch_config_ui_location;
+use polaris_terminal::integration_testing::window::assert_num_windows_open;
+use polaris_terminal::integration_testing::workspace::{
+    assert_focused_tab_index, assert_tab_count,
+};
+use polaris_terminal::integration_testing::{self};
+use polaris_terminal::search::SyncDataSource;
+use polaris_terminal::search::command_palette::launch_config;
+use polaris_terminal::search::data_source::Query;
+use polaris_terminal::workspace::NEW_TAB_BUTTON_POSITION_ID;
+use ptermui_core::integration::{AssertionOutcome, TestStep};
+use ptermui_core::{ModelHandle, async_assert};
 
 use super::{TEST_ONLY_ASSETS, assert_approx_eq, new_builder};
 use crate::Builder;
 
-/// Adds a launch config to the mocked out rook config directory and verifies that
+/// Adds a launch config to the mocked out polaris-terminal config directory and verifies that
 /// the launch config appears in the launch config palette.
-pub fn test_add_launch_config_to_rook_config() -> Builder {
+pub fn test_add_launch_config_to_pterm_config() -> Builder {
     new_builder()
         .with_setup(move |utils| {
-            utils.set_env("ROOK_CONFIG_WATCHER_DELAY_MS", Some((10).to_string()));
+            utils.set_env(
+                "POLARIS_TERMINAL_CONFIG_WATCHER_DELAY_MS",
+                Some((10).to_string()),
+            );
 
             std::fs::create_dir_all(integration_testing::launch_configs::launch_configs_dir())
                 .expect("Should be able to create launch configs dir");
@@ -44,7 +49,7 @@ pub fn test_add_launch_config_to_rook_config() -> Builder {
                         .clone();
                     launch_config_data_source.read(app, |palette, app| {
                         // Note that this can be a synchronous assertion because unlike the next test step,
-                        // we don't have concurrency with a RookConfig watcher thread
+                        // we don't have concurrency with a PtermConfig watcher thread
                         assert_eq!(
                             palette.run_query(&Query::from(""), app).unwrap().len(),
                             0,
@@ -98,9 +103,9 @@ pub fn test_with_launch_config() -> Builder {
                 move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config:
-                                rook::launch_configs::launch_config::make_mock_single_window_launch_config(),
+                                polaris_terminal::launch_configs::launch_config::make_mock_single_window_launch_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: false,
                         },
@@ -129,7 +134,10 @@ pub fn test_open_launch_config_from_add_tab_menu_legacy() -> Builder {
     new_builder()
         .set_should_run_test(|| !FeatureFlag::ShellSelector.is_enabled())
         .with_setup(move |utils| {
-            utils.set_env("ROOK_CONFIG_WATCHER_DELAY_MS", Some((10).to_string()));
+            utils.set_env(
+                "POLARIS_TERMINAL_CONFIG_WATCHER_DELAY_MS",
+                Some((10).to_string()),
+            );
 
             // Write a new launch config file. Launch config is named "Launch Config"
             let dir = integration_testing::launch_configs::launch_configs_dir();
@@ -158,10 +166,10 @@ pub fn test_open_launch_config_from_add_tab_menu_legacy() -> Builder {
 }
 
 pub fn test_launch_config_single_child_branch() -> Builder {
-    use rook::launch_configs::launch_config::{
+    use polaris_terminal::launch_configs::launch_config::{
         LaunchConfig, PaneMode, PaneTemplateType, SplitDirection, TabTemplate, WindowTemplate,
     };
-    use rookui_core::actions::StandardAction;
+    use ptermui_core::actions::StandardAction;
 
     /// Create a launch config that has a branch with a single child
     fn create_launch_config() -> LaunchConfig {
@@ -198,7 +206,7 @@ pub fn test_launch_config_single_child_branch() -> Builder {
                 .with_action(move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config: create_launch_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: false,
@@ -230,9 +238,9 @@ pub fn test_open_launch_config_with_custom_size() -> Builder {
                 move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config:
-                                rook::launch_configs::launch_config::make_mock_single_window_launch_config(),
+                                polaris_terminal::launch_configs::launch_config::make_mock_single_window_launch_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: false,
                         },
@@ -270,9 +278,9 @@ pub fn test_open_launch_config_in_active_window() -> Builder {
                 move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config:
-                                rook::launch_configs::launch_config::make_mock_single_window_launch_config(),
+                                polaris_terminal::launch_configs::launch_config::make_mock_single_window_launch_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: true,
                         },
@@ -291,7 +299,7 @@ pub fn test_open_launch_config_in_active_window() -> Builder {
 }
 
 pub fn test_with_launch_config_with_active_tab_index() -> Builder {
-    use rook::launch_configs::launch_config::{
+    use polaris_terminal::launch_configs::launch_config::{
         LaunchConfig, PaneMode, PaneTemplateType, SplitDirection, TabTemplate, WindowTemplate,
     };
 
@@ -336,7 +344,7 @@ pub fn test_with_launch_config_with_active_tab_index() -> Builder {
                 move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config: create_launch_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: false,
@@ -353,7 +361,7 @@ pub fn test_with_launch_config_with_active_tab_index() -> Builder {
 }
 
 pub fn test_with_launch_config_with_active_pane() -> Builder {
-    use rook::launch_configs::launch_config::{
+    use polaris_terminal::launch_configs::launch_config::{
         LaunchConfig, PaneMode, PaneTemplateType, SplitDirection, TabTemplate, WindowTemplate,
     };
 
@@ -416,7 +424,7 @@ pub fn test_with_launch_config_with_active_pane() -> Builder {
                 move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config: create_launch_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: false,
@@ -434,7 +442,7 @@ pub fn test_with_launch_config_with_active_pane() -> Builder {
 }
 
 pub fn test_with_launch_config_with_no_active_pane() -> Builder {
-    use rook::launch_configs::launch_config::{
+    use polaris_terminal::launch_configs::launch_config::{
         LaunchConfig, PaneMode, PaneTemplateType, SplitDirection, TabTemplate, WindowTemplate,
     };
 
@@ -497,7 +505,7 @@ pub fn test_with_launch_config_with_no_active_pane() -> Builder {
                 move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config: create_launch_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: false,
@@ -527,11 +535,11 @@ pub fn test_with_launch_config_with_no_active_pane() -> Builder {
 /// - group "Orphan", which no tab joins. Restore must not put it in workspace
 ///   state, where nothing could reach it.
 pub fn test_launch_config_restores_tab_groups() -> Builder {
-    use rook::integration_testing::workspace::assert_tab_groups;
-    use rook::launch_configs::launch_config::{
+    use polaris_terminal::integration_testing::workspace::assert_tab_groups;
+    use polaris_terminal::launch_configs::launch_config::{
         LaunchConfig, PaneMode, PaneTemplateType, TabGroupTemplate, TabTemplate, WindowTemplate,
     };
-    use rook::themes::theme::AnsiColorIdentifier;
+    use polaris_terminal::themes::theme::AnsiColorIdentifier;
 
     FeatureFlag::GroupedTabs.set_enabled(true);
 
@@ -599,7 +607,7 @@ pub fn test_launch_config_restores_tab_groups() -> Builder {
                 .with_action(move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config: create_launch_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: false,
@@ -635,11 +643,11 @@ pub fn test_launch_config_restores_tab_groups() -> Builder {
 /// `start_index + tab_index` arithmetic landed one slot late -- grouping a
 /// pre-existing tab and leaving a restored one out.
 pub fn test_launch_config_restores_tab_groups_into_active_window() -> Builder {
-    use rook::integration_testing::workspace::assert_tab_groups;
-    use rook::launch_configs::launch_config::{
+    use polaris_terminal::integration_testing::workspace::assert_tab_groups;
+    use polaris_terminal::launch_configs::launch_config::{
         LaunchConfig, PaneMode, PaneTemplateType, TabGroupTemplate, TabTemplate, WindowTemplate,
     };
-    use rook::themes::theme::AnsiColorIdentifier;
+    use polaris_terminal::themes::theme::AnsiColorIdentifier;
 
     FeatureFlag::GroupedTabs.set_enabled(true);
 
@@ -708,7 +716,7 @@ pub fn test_launch_config_restores_tab_groups_into_active_window() -> Builder {
                 .with_action(move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config: ungrouped_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: false,
@@ -726,7 +734,7 @@ pub fn test_launch_config_restores_tab_groups_into_active_window() -> Builder {
                 .with_action(move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config: grouped_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: true,
@@ -759,11 +767,11 @@ pub fn test_launch_config_restores_tab_groups_into_active_window() -> Builder {
 /// that already holds unpinned tabs therefore used to leave the pinned group
 /// stranded in the middle of the list, which no other code path can produce.
 pub fn test_launch_config_restores_pinned_tab_group_into_pinned_prefix() -> Builder {
-    use rook::integration_testing::workspace::assert_tab_groups;
-    use rook::launch_configs::launch_config::{
+    use polaris_terminal::integration_testing::workspace::assert_tab_groups;
+    use polaris_terminal::launch_configs::launch_config::{
         LaunchConfig, PaneMode, PaneTemplateType, TabGroupTemplate, TabTemplate, WindowTemplate,
     };
-    use rook::themes::theme::AnsiColorIdentifier;
+    use polaris_terminal::themes::theme::AnsiColorIdentifier;
 
     FeatureFlag::GroupedTabs.set_enabled(true);
     FeatureFlag::PinnedTabs.set_enabled(true);
@@ -834,7 +842,7 @@ pub fn test_launch_config_restores_pinned_tab_group_into_pinned_prefix() -> Buil
                 .with_action(move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config: ungrouped_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: false,
@@ -852,7 +860,7 @@ pub fn test_launch_config_restores_pinned_tab_group_into_pinned_prefix() -> Buil
                 .with_action(move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config: pinned_group_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: true,
@@ -890,11 +898,11 @@ pub fn test_launch_config_restores_pinned_tab_group_into_pinned_prefix() -> Buil
 /// inside the host group's run, leaving two runs of one id -- which
 /// `tab_bar_slots` renders as two separate containers for the same group.
 pub fn test_launch_config_restore_keeps_existing_group_contiguous() -> Builder {
-    use rook::integration_testing::workspace::assert_tab_groups;
-    use rook::launch_configs::launch_config::{
+    use polaris_terminal::integration_testing::workspace::assert_tab_groups;
+    use polaris_terminal::launch_configs::launch_config::{
         LaunchConfig, PaneMode, PaneTemplateType, TabGroupTemplate, TabTemplate, WindowTemplate,
     };
-    use rook::themes::theme::AnsiColorIdentifier;
+    use polaris_terminal::themes::theme::AnsiColorIdentifier;
 
     FeatureFlag::GroupedTabs.set_enabled(true);
 
@@ -953,7 +961,7 @@ pub fn test_launch_config_restore_keeps_existing_group_contiguous() -> Builder {
                 .with_action(move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config: grouped_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: false,
@@ -971,7 +979,7 @@ pub fn test_launch_config_restore_keeps_existing_group_contiguous() -> Builder {
                 .with_action(move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        rook::root_view::OpenLaunchConfigArg {
+                        polaris_terminal::root_view::OpenLaunchConfigArg {
                             launch_config: ungrouped_config(),
                             ui_location: get_launch_config_ui_location(),
                             open_in_active_window: true,

@@ -1,7 +1,7 @@
 use ai::project_context::model::ProjectRuleContents;
 use futures::future::{BoxFuture, FutureExt as _};
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::AppContext;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::AppContext;
 
 use super::remote_context_files::read_remote_text_file_contents;
 

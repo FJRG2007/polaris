@@ -6,8 +6,8 @@ pub mod switch;
 pub mod tooltip;
 
 pub use keyboard_shortcut::KeyboardShortcut;
-use rook_core::ui::appearance::Appearance;
-use rookui_core::Element;
+use pterm_core::ui::appearance::Appearance;
+use ptermui_core::Element;
 
 /// A reusable UI component that can be rendered with configurable parameters.
 ///
@@ -30,8 +30,8 @@ use rookui_core::Element;
 ///
 /// ```rust
 /// use ui_components::{Component, Options, button};
-/// use rook_core::ui::appearance::Appearance;
-/// use rookui_core::prelude::*;
+/// use pterm_core::ui::appearance::Appearance;
+/// use ptermui_core::prelude::*;
 ///
 /// // Store component as a field in your view.
 /// struct MyView {
@@ -39,7 +39,7 @@ use rookui_core::Element;
 /// }
 ///
 /// impl MyView {
-///     fn render_button(&self, appearance: &Appearance) -> Box<dyn rookui_core::Element> {
+///     fn render_button(&self, appearance: &Appearance) -> Box<dyn ptermui_core::Element> {
 ///         self.my_button.render(
 ///             appearance,
 ///             button::Params {
@@ -61,8 +61,8 @@ use rookui_core::Element;
 ///
 /// ```rust
 /// use ui_components::Component;
-/// use rook_core::ui::appearance::Appearance;
-/// use rookui_core::prelude::*;
+/// use pterm_core::ui::appearance::Appearance;
+/// use ptermui_core::prelude::*;
 ///
 /// // 1. Define the component struct with any persistent state.
 /// #[derive(Default)]
@@ -135,7 +135,7 @@ pub trait Component: Default {
 ///
 /// ```rust
 /// use ui_components::{Params, Options};
-/// use rook_core::ui::appearance::Appearance;
+/// use pterm_core::ui::appearance::Appearance;
 ///
 /// pub struct MyParams {
 ///     pub content: String,   // Required.
@@ -176,7 +176,7 @@ pub trait Params {
 ///
 /// ```rust
 /// use ui_components::{Options, MouseEventHandler};
-/// use rook_core::ui::appearance::Appearance;
+/// use pterm_core::ui::appearance::Appearance;
 ///
 /// pub struct MyOptions {
 ///     pub disabled: bool,
@@ -231,8 +231,8 @@ pub trait Options {
 ///
 /// ```rust
 /// use ui_components::{Renderable, Options};
-/// use rook_core::ui::appearance::Appearance;
-/// use rookui_core::prelude::*;
+/// use pterm_core::ui::appearance::Appearance;
+/// use ptermui_core::prelude::*;
 ///
 /// pub struct SwitchOptions<'a> {
 ///     pub disabled: bool,
@@ -282,8 +282,8 @@ where
 /// A function that handles mouse events.
 pub type MouseEventHandler = Box<
     dyn FnMut(
-        &mut rookui_core::EventContext,
-        &rookui_core::AppContext,
+        &mut ptermui_core::EventContext,
+        &ptermui_core::AppContext,
         pathfinder_geometry::vector::Vector2F,
     ),
 >;

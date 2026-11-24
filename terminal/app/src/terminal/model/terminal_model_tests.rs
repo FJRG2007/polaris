@@ -3,12 +3,12 @@ use std::sync::Arc;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use chrono::{DateTime, Local};
-use rook_completer::completer::MatchedSuggestion;
-use rook_core::command::ExitCode;
-use rook_core::features::FeatureFlag;
-use rook_terminal::model::ansi::ClearMode;
-use rookui::r#async::executor::Background;
-use rookui::text::{SelectionType, str_to_byte_vec};
+use pterm_completer::completer::MatchedSuggestion;
+use pterm_core::command::ExitCode;
+use pterm_core::features::FeatureFlag;
+use pterm_terminal::model::ansi::ClearMode;
+use ptermui::r#async::executor::Background;
+use ptermui::text::{SelectionType, str_to_byte_vec};
 use vec1::vec1;
 
 use super::*;
@@ -297,7 +297,7 @@ fn ignores_non_inline_iterm_file_payload_without_overwriting_cwd_file() {
     let temp_dir = tempfile::tempdir().unwrap();
     let target_path = temp_dir.path().join(".zshenv");
     let original_bytes = b"ORIGINAL=1\n";
-    let attacker_bytes = b"touch /tmp/rook-pwned\n";
+    let attacker_bytes = b"touch /tmp/polaris-terminal-pwned\n";
     fs::write(&target_path, original_bytes).unwrap();
 
     let mut terminal = TerminalModel::mock(None, None);
@@ -318,7 +318,7 @@ fn ignores_multipart_non_inline_iterm_file_payload_without_overwriting_cwd_file(
     let temp_dir = tempfile::tempdir().unwrap();
     let target_path = temp_dir.path().join(".zshenv");
     let original_bytes = b"ORIGINAL=1\n";
-    let attacker_bytes = b"touch /tmp/rook-pwned\n";
+    let attacker_bytes = b"touch /tmp/polaris-terminal-pwned\n";
     fs::write(&target_path, original_bytes).unwrap();
 
     let mut terminal = TerminalModel::mock(None, None);
@@ -484,7 +484,7 @@ pub fn test_restored_empty_command_block() {
         !restored_block.is_command_empty(),
         "The empty block should have nonzero length"
     );
-    // The mocked terminal model comes with a RookInput block and the active block.
+    // The mocked terminal model comes with a PtermInput block and the active block.
     assert_eq!(model.block_list().blocks().len(), 3);
 }
 
@@ -497,7 +497,7 @@ fn test_restored_blocks_on_different_host() {
         SerializedBlock {
             id: BlockId::new(),
             stylized_command: str_to_byte_vec("echo $TERM_PROGRAM"),
-            stylized_output: str_to_byte_vec("RookTerminal"),
+            stylized_output: str_to_byte_vec("PtermTerminal"),
             pwd: Some("/".to_owned()),
             git_head: None,
             git_branch_name: None,
@@ -644,7 +644,7 @@ fn test_restored_blocks_on_different_host() {
         .into(),
     ];
     let model = TerminalModel::mock(Some(&restored_blocks), None);
-    // The mocked terminal model comes with a RookInput block and the active block.
+    // The mocked terminal model comes with a PtermInput block and the active block.
     assert_eq!(model.block_list().blocks().len(), restored_blocks.len() + 2);
     for restored_block in model
         .block_list()
@@ -659,7 +659,7 @@ fn test_restored_blocks_on_different_host() {
     }
     let blocks = model.block_list().blocks();
     assert_eq!(blocks[0].command_to_string(), "echo $TERM_PROGRAM",);
-    assert_eq!(blocks[0].output_to_string(), "RookTerminal",);
+    assert_eq!(blocks[0].output_to_string(), "PtermTerminal",);
     assert_eq!(blocks[1].command_to_string(), "pwd",);
     assert_eq!(blocks[1].output_to_string(), "/",);
     assert_eq!(blocks[2].command_to_string(), "uname",);

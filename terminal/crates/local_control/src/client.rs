@@ -1,4 +1,4 @@
-//! Blocking client helpers used by the standalone `rookctrl` CLI.
+//! Blocking client helpers used by the standalone `ptermctrl` CLI.
 //!
 //! Authentication is a two-transport flow:
 //!
@@ -14,7 +14,7 @@
 //!    issuing a short-lived, action-scoped credential.
 //! 4. The client keeps that credential in memory and presents it as a bearer
 //!    token only to the selected instance's loopback HTTP endpoint. The running
-//!    Rook app revalidates the credential, current settings, action scope, and
+//!    Polaris Terminal app revalidates the credential, current settings, action scope, and
 //!    request before dispatch.
 //!
 //! Client-side validation prevents accidental use of inconsistent discovery

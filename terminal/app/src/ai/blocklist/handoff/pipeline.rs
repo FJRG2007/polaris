@@ -26,10 +26,10 @@ use std::sync::Arc;
 use anyhow::Context as _;
 use futures::channel::oneshot;
 use futures::future::{Either, select};
-use rook_core::send_telemetry_from_ctx;
-use rook_errors::report_error;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::{AppContext, EntityId, ModelHandle, SingletonEntity};
+use pterm_core::send_telemetry_from_ctx;
+use pterm_errors::report_error;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::{AppContext, EntityId, ModelHandle, SingletonEntity};
 
 use super::snapshot::{HandoffUploadResult, SnapshotUploadTarget, upload_handoff_snapshot};
 use super::touched_repos::extract_paths_from_conversation;

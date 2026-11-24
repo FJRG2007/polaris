@@ -1,13 +1,13 @@
-use rookui::elements::{Container, Flex, MainAxisSize, MouseStateHandle, ParentElement};
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::UiComponent;
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::elements::{Container, Flex, MainAxisSize, MouseStateHandle, ParentElement};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use super::style::{self, MODAL_PADDING};
 use crate::appearance::Appearance;
 
-const SESSION_BUILD_FREE_PLAN_SUBHEADER: &str = "Rook's free and pro plans come with a limited number of shared sessions.\n\nFor increased access to session sharing upgrade to the Build plan.";
+const SESSION_BUILD_FREE_PLAN_SUBHEADER: &str = "Polaris Terminal's free and pro plans come with a limited number of shared sessions.\n\nFor increased access to session sharing upgrade to the Build plan.";
 const VIEW_PLANS_TEXT: &str = "View plans";
 
 pub struct DeniedBody {

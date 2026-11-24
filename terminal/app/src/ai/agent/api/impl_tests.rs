@@ -1,10 +1,10 @@
-use rook_core::HostId;
-use rook_core::features::FeatureFlag;
+use pterm_core::HostId;
+use pterm_core::features::FeatureFlag;
 use warp_multi_agent_api as api;
 
 use super::{
-    api_keys_with_rook_credit_fallback_setting, get_supported_cli_agent_tools, get_supported_tools,
-    supports_orchestration_v2,
+    api_keys_with_pterm_credit_fallback_setting, get_supported_cli_agent_tools,
+    get_supported_tools, supports_orchestration_v2,
 };
 use crate::ai::agent::api::RequestParams;
 use crate::ai::blocklist::SessionContext;
@@ -28,7 +28,7 @@ fn request_params_with_ask_user_question_enabled(ask_user_question_enabled: bool
         cli_agent_model: model.clone(),
         computer_use_model: model,
         is_memory_enabled: false,
-        rook_drive_context_enabled: false,
+        pterm_drive_context_enabled: false,
         context_window_limit: None,
         mcp_context: None,
         planning_enabled: true,
@@ -54,22 +54,22 @@ fn request_params_with_ask_user_question_enabled(ask_user_question_enabled: bool
 fn request_params_for_remote(host_id: Option<HostId>) -> RequestParams {
     let mut params = request_params_with_ask_user_question_enabled(false);
     params.session_context =
-        SessionContext::new_with_session_type_for_test(Some(SessionType::RookifiedRemote {
+        SessionContext::new_with_session_type_for_test(Some(SessionType::PtermifiedRemote {
             host_id,
         }));
     params
 }
 
 #[test]
-fn api_keys_with_rook_credit_fallback_setting_returns_none_without_keys_or_fallback() {
-    let api_keys = api_keys_with_rook_credit_fallback_setting(None, false);
+fn api_keys_with_pterm_credit_fallback_setting_returns_none_without_keys_or_fallback() {
+    let api_keys = api_keys_with_pterm_credit_fallback_setting(None, false);
 
     assert!(api_keys.is_none());
 }
 
 #[test]
-fn api_keys_with_rook_credit_fallback_setting_creates_fallback_only_api_keys() {
-    let api_keys = api_keys_with_rook_credit_fallback_setting(None, true)
+fn api_keys_with_pterm_credit_fallback_setting_creates_fallback_only_api_keys() {
+    let api_keys = api_keys_with_pterm_credit_fallback_setting(None, true)
         .expect("fallback setting should create ApiKeys");
 
     assert!(api_keys.allow_use_of_warp_credits);
@@ -81,8 +81,8 @@ fn api_keys_with_rook_credit_fallback_setting_creates_fallback_only_api_keys() {
 }
 
 #[test]
-fn api_keys_with_rook_credit_fallback_setting_preserves_existing_keys() {
-    let api_keys = api_keys_with_rook_credit_fallback_setting(
+fn api_keys_with_pterm_credit_fallback_setting_preserves_existing_keys() {
+    let api_keys = api_keys_with_pterm_credit_fallback_setting(
         Some(api::request::settings::ApiKeys {
             anthropic: "anthropic-key".to_string(),
             openai: String::new(),

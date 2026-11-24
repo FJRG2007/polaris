@@ -3,7 +3,7 @@
 //! These cover the producer side of the pinned BYO seal format (the exact
 //! `byo:1:TEAM:…` context string and the snake_case JSON payloads). The
 //! seal/unseal round-trip across the real Tink/HPKE primitive lives in
-//! `rook_managed_secrets`'s `envelope_tests.rs`, which has access to the private
+//! `pterm_managed_secrets`'s `envelope_tests.rs`, which has access to the private
 //! decrypt primitive and fixture keysets.
 
 use super::{

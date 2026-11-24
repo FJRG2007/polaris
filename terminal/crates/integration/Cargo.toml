@@ -38,22 +38,22 @@ strum.workspace = true
 strum_macros.workspace = true
 sum_tree.workspace = true
 version-compare.workspace = true
-rook = { workspace = true, features = ["integration_tests"] }
-rook_cli = { workspace = true, features = ["integration_tests"] }
-rook_core.workspace = true
+polaris-terminal = { workspace = true, features = ["integration_tests"] }
+pterm_cli = { workspace = true, features = ["integration_tests"] }
+pterm_core.workspace = true
 warp-command-signatures.workspace = true
 warp_multi_agent_api.workspace = true
 warp-workflows.workspace = true
-rookui_core.workspace = true
-rookui_extras = { workspace = true, features = [
+ptermui_core.workspace = true
+ptermui_extras = { workspace = true, features = [
     "user_preferences-file",
 ] }
 whoami = "1.5.2"
 
 [dev-dependencies]
 command = { workspace = true, features = ["test-util"] }
-rookui = { workspace = true, features = ["integration_tests"] }
-rook_core = { workspace = true, features = ["test-util"] }
+ptermui = { workspace = true, features = ["integration_tests"] }
+pterm_core = { workspace = true, features = ["test-util"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 app-installation-detection.workspace = true
@@ -65,5 +65,5 @@ nix = { workspace = true, features = ["user", "signal"] }
 
 [features]
 run_on_linux = []
-drag_tabs_to_windows = ["rook/drag_tabs_to_windows"]
+drag_tabs_to_windows = ["polaris-terminal/drag_tabs_to_windows"]
 default = ["run_on_linux"]

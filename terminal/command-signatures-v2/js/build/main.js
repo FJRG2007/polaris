@@ -12,8 +12,8 @@ let generatedArgument = {
         }
     ],
 };
-export function activate(rook) {
-    rook.completions.registerCommandSignature({
+export function activate(polaris-terminal) {
+    polaris-terminal.completions.registerCommandSignature({
         command: {
             name: "jack",
             alias: "j",

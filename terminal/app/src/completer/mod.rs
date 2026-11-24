@@ -8,14 +8,14 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use rook_completer::completer::{
+use pterm_completer::completer::{
     CommandExitStatus, CommandOutput, CompletionContext, EngineDirEntry, EngineFileType,
     GeneratorContext, PathCompletionContext, PathSeparators, TopLevelCommandCaseSensitivity,
 };
-use rook_completer::signatures::CommandRegistry;
-use rook_core::features::FeatureFlag;
-use rook_util::path::{EscapeChar, ShellFamily};
-use rookui::{AppContext, SingletonEntity};
+use pterm_completer::signatures::CommandRegistry;
+use pterm_core::features::FeatureFlag;
+use pterm_util::path::{EscapeChar, ShellFamily};
+use ptermui::{AppContext, SingletonEntity};
 use smol_str::SmolStr;
 use typed_path::{TypedPath, TypedPathBuf};
 
@@ -46,7 +46,7 @@ pub struct SessionContext {
     /// current contents should use `refresh_directory_entries` to re-read from disk.
     cached_directory_entries: Arc<dashmap::DashMap<TypedPathBuf, Arc<Vec<EngineDirEntry>>>>,
 
-    /// Snapshot of all Rook workflow aliases.
+    /// Snapshot of all Polaris Terminal workflow aliases.
     workflow_aliases: HashMap<String, String>,
 }
 
@@ -118,7 +118,7 @@ impl SessionContext {
                     .filter_map(|res| res.and_then(EngineDirEntry::try_from).ok())
                     .collect::<Vec<_>>()
             }
-            SessionType::RookifiedRemote { .. } => {
+            SessionType::PtermifiedRemote { .. } => {
                 let env_vars = self
                     .session
                     .path()
@@ -218,7 +218,7 @@ impl GeneratorContext for SessionContext {
     ) -> Result<CommandOutput> {
         let mut env_vars = session_env_vars.unwrap_or_default();
         // We need to run the command with the PATH var set explicitly even if we have session env vars
-        // because if the user opened Rook through a parent process that didn't have the PATH var set
+        // because if the user opened Polaris Terminal through a parent process that didn't have the PATH var set
         // (i.e. outside of a shell, for example opening the app via Finder),
         // the subshell won't inherit the PATH var, but we need the PATH var
         // to reference executables we might run as part of generators.
@@ -434,7 +434,7 @@ fn ls_script_for_dir(directory: &TypedPath) -> Option<String> {
         log::warn!("Non-unicode character found in path: `{directory:?}`");
         return None;
     };
-    let escaped_dir = rook_util::path::ShellFamily::Posix.shell_escape(dir_str);
+    let escaped_dir = pterm_util::path::ShellFamily::Posix.shell_escape(dir_str);
 
     // Get all directories with -print0, which makes all items end in `\0` (null character)
     // Get all files with -print0, which makes all items end in `\0`

@@ -1,26 +1,26 @@
 {
-  "name": "claude-code-rook",
-  "description": "Official Rook terminal integrations for Claude Code",
+  "name": "claude-code-polaris-terminal",
+  "description": "Official Polaris Terminal terminal integrations for Claude Code",
   "owner": {
-    "name": "Rook",
+    "name": "Polaris Terminal",
     "url": "https://rook.dev"
   },
   "plugins": [
     {
-      "name": "rook",
-      "description": "Native Rook notifications when Claude completes tasks or needs input",
-      "source": "./plugins/rook",
+      "name": "polaris-terminal",
+      "description": "Native Polaris Terminal notifications when Claude completes tasks or needs input",
+      "source": "./plugins/polaris-terminal",
       "version": "2.2.0",
       "category": "productivity",
-      "tags": ["notifications", "terminal", "rook"]
+      "tags": ["notifications", "terminal", "polaris-terminal"]
     },
     {
       "name": "oz-harness-support",
-      "description": "Rook integration for Claude Code in Oz cloud agent environments, including parent-message delivery hooks",
+      "description": "Polaris Terminal integration for Claude Code in Oz cloud agent environments, including parent-message delivery hooks",
       "source": "./plugins/oz-harness-support",
       "version": "1.1.2",
       "category": "productivity",
-      "tags": ["terminal", "rook", "oz"]
+      "tags": ["terminal", "polaris-terminal", "oz"]
     }
   ]
 }

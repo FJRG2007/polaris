@@ -7,10 +7,10 @@ use futures::FutureExt;
 use futures::future::BoxFuture;
 #[cfg(not(target_family = "wasm"))]
 use futures::future::Either;
-use rook_core::send_telemetry_from_ctx;
+use pterm_core::send_telemetry_from_ctx;
 #[cfg(not(target_family = "wasm"))]
-use rookui::r#async::Timer;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use ptermui::r#async::Timer;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 use crate::ai::agent::conversation::AIConversationId;

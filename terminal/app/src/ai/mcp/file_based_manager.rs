@@ -3,17 +3,17 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use itertools::Itertools as _;
+use pterm_core::features::FeatureFlag;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 use repo_metadata::repositories::DetectedRepositories;
-use rook_core::features::FeatureFlag;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
 use uuid::Uuid;
 
 use super::file_mcp_watcher::{FileMCPConfigDiagnostic, PendingScan};
 use super::{FileMCPWatcher, FileMCPWatcherEvent, MCPProvider, home_dir};
 use crate::ai::mcp::ParsedTemplatableMCPServerResult;
 use crate::ai::mcp::templatable_installation::TemplatableMCPServerInstallation;
-use crate::rook_managed_paths_watcher::rook_managed_mcp_config_path;
+use crate::pterm_managed_paths_watcher::pterm_managed_mcp_config_path;
 use crate::settings::AISettingsChangedEvent;
 use crate::settings::ai::AISettings;
 
@@ -39,10 +39,10 @@ pub struct FileBasedMCPManager {
     /// The TUI scans its global config before login so it can render config
     /// health immediately, but starting servers before authentication would
     /// expose tools and begin OAuth before the session is ready. Hold global
-    /// Rook servers until the TUI login flow explicitly activates them.
-    defer_global_rook_autostart: bool,
-    /// Whether deferred global Rook servers may now be started.
-    global_rook_servers_activated: bool,
+    /// Polaris Terminal servers until the TUI login flow explicitly activates them.
+    defer_global_pterm_autostart: bool,
+    /// Whether deferred global Polaris Terminal servers may now be started.
+    global_pterm_servers_activated: bool,
     /// Readiness latch exposed through [`Self::initial_global_scan_result`].
     initial_global_scan_state: InitialGlobalMcpScanState,
 }
@@ -64,7 +64,7 @@ impl Default for InitialGlobalMcpScanState {
 
 impl FileBasedMCPManager {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        let defer_global_rook_autostart = settings::settings_mode() == settings::SettingsMode::Tui;
+        let defer_global_pterm_autostart = settings::settings_mode() == settings::SettingsMode::Tui;
         if FeatureFlag::FileBasedMcp.is_enabled() {
             ctx.subscribe_to_model(&FileMCPWatcher::handle(ctx), |me, _, event, ctx| {
                 me.handle_watcher_event(event, ctx);
@@ -82,8 +82,8 @@ impl FileBasedMCPManager {
             file_based_servers_by_root: Default::default(),
             pending_scan_auto_started_servers_by_root: Default::default(),
             config_diagnostics_by_path: Default::default(),
-            defer_global_rook_autostart,
-            global_rook_servers_activated: !defer_global_rook_autostart,
+            defer_global_pterm_autostart,
+            global_pterm_servers_activated: !defer_global_pterm_autostart,
             initial_global_scan_state: Default::default(),
         }
     }
@@ -340,7 +340,7 @@ impl FileBasedMCPManager {
     /// config location.
     ///
     /// "Global" means the installation was detected outside of a user repository:
-    /// - For `MCPProvider::Rook`: the logical root for `~/.rook*/.mcp.json`.
+    /// - For `MCPProvider::Polaris Terminal`: the logical root for `~/.polaris-terminal*/.mcp.json`.
     /// - For any other provider: the user's home directory (e.g. `~/.claude.json`).
     ///
     /// Project-scoped installations (those detected inside a repo) are not considered
@@ -359,26 +359,26 @@ impl FileBasedMCPManager {
     }
 
     /// Returns `true` if the server identified by `hash` is referenced from the global
-    /// Rook config (`~/.rook/.mcp.json`). Global Rook servers always auto-spawn.
-    fn is_global_rook_server(&self, hash: u64) -> bool {
+    /// Polaris Terminal config (`~/.polaris-terminal/.mcp.json`). Global Polaris Terminal servers always auto-spawn.
+    fn is_global_pterm_server(&self, hash: u64) -> bool {
         self.file_based_servers_by_root
             .iter()
             .any(|(root_path, provider_map)| {
-                Self::is_global_rook_root(root_path)
+                Self::is_global_pterm_root(root_path)
                     && provider_map
-                        .get(&MCPProvider::Rook)
+                        .get(&MCPProvider::Pterm)
                         .is_some_and(|hashes| hashes.contains(&hash))
             })
     }
 
-    fn is_global_rook_root(root_path: &Path) -> bool {
-        rook_managed_mcp_config_path().is_some_and(|path| root_path == path.root_path.as_path())
+    fn is_global_pterm_root(root_path: &Path) -> bool {
+        pterm_managed_mcp_config_path().is_some_and(|path| root_path == path.root_path.as_path())
     }
 
     fn scope_for_source(root_path: &Path, provider: MCPProvider) -> FileBasedMCPServerScope {
         match provider {
-            MCPProvider::Rook => {
-                if Self::is_global_rook_root(root_path) {
+            MCPProvider::Pterm => {
+                if Self::is_global_pterm_root(root_path) {
                     FileBasedMCPServerScope::Global
                 } else {
                     FileBasedMCPServerScope::Project
@@ -394,17 +394,17 @@ impl FileBasedMCPManager {
         }
     }
     fn auto_start_decision(&self, hash: u64, file_based_mcp_enabled: bool) -> AutoStartDecision {
-        let server_type = if self.is_global_rook_server(hash) {
-            FileBasedMCPServerType::GlobalRook
+        let server_type = if self.is_global_pterm_server(hash) {
+            FileBasedMCPServerType::GlobalPterm
         } else if self.is_global_server(hash) {
             FileBasedMCPServerType::GlobalThirdParty
         } else {
             FileBasedMCPServerType::ProjectScoped
         };
         let should_autostart = match server_type {
-            FileBasedMCPServerType::GlobalRook => true,
+            FileBasedMCPServerType::GlobalPterm => true,
             FileBasedMCPServerType::GlobalThirdParty => {
-                !self.defer_global_rook_autostart && file_based_mcp_enabled
+                !self.defer_global_pterm_autostart && file_based_mcp_enabled
             }
             FileBasedMCPServerType::ProjectScoped => false,
         };
@@ -427,8 +427,8 @@ impl FileBasedMCPManager {
         let mcp_enabled = AISettings::as_ref(ctx).is_file_based_mcp_enabled(ctx);
 
         // Partition servers into three buckets based on scope:
-        // - Global Rook: always auto-spawn.
-        // - Global non-Rook: auto-spawn iff the toggle is on.
+        // - Global Polaris Terminal: always auto-spawn.
+        // - Global non-Polaris Terminal: auto-spawn iff the toggle is on.
         // - Project-scoped (any provider): never auto-spawn; require explicit opt-in
         //   via the "Detected from {provider}" section of the MCP settings.
         let mut to_spawn = Vec::new();
@@ -443,9 +443,9 @@ impl FileBasedMCPManager {
                 mut should_autostart,
                 server_type,
             } = self.auto_start_decision(hash, mcp_enabled);
-            if server_type == FileBasedMCPServerType::GlobalRook
-                && self.defer_global_rook_autostart
-                && !self.global_rook_servers_activated
+            if server_type == FileBasedMCPServerType::GlobalPterm
+                && self.defer_global_pterm_autostart
+                && !self.global_pterm_servers_activated
             {
                 should_autostart = false;
             }
@@ -457,7 +457,7 @@ impl FileBasedMCPManager {
                     &mut self.initial_global_scan_state
                     && matches!(
                         server_type,
-                        FileBasedMCPServerType::GlobalRook
+                        FileBasedMCPServerType::GlobalPterm
                             | FileBasedMCPServerType::GlobalThirdParty
                     )
                     && !awaited.contains(&installation_uuid)
@@ -537,11 +537,11 @@ impl FileBasedMCPManager {
         // The setting is GUI-only. TUI-discovered third-party servers always
         // require an explicit start action, even if a value is loaded into the
         // shared model by tests or future settings migrations.
-        if self.defer_global_rook_autostart {
+        if self.defer_global_pterm_autostart {
             return;
         }
         // Only global third-party servers are affected by the toggle:
-        // - Global Rook servers always spawn regardless of the toggle.
+        // - Global Polaris Terminal servers always spawn regardless of the toggle.
         // - Project-scoped servers (any provider) are never auto-spawned and their
         //   running state is managed per-card via the MCP settings UI; toggling the
         //   setting must not spawn or despawn them.
@@ -563,7 +563,7 @@ impl FileBasedMCPManager {
                     .collect_vec(),
             });
         } else {
-            // Toggle on: spawn global third-party servers (global Rook servers are
+            // Toggle on: spawn global third-party servers (global Polaris Terminal servers are
             // already running; project-scoped servers are unaffected).
             ctx.emit(FileBasedMCPManagerEvent::SpawnServers {
                 installations: global_third_party_servers,
@@ -592,22 +592,22 @@ impl FileBasedMCPManager {
     }
 
     #[cfg(any(feature = "tui", test))]
-    pub fn global_rook_servers(&self) -> Vec<&TemplatableMCPServerInstallation> {
+    pub fn global_pterm_servers(&self) -> Vec<&TemplatableMCPServerInstallation> {
         self.file_based_servers
             .iter()
-            .filter(|(hash, _)| self.is_global_rook_server(**hash))
+            .filter(|(hash, _)| self.is_global_pterm_server(**hash))
             .map(|(_, installation)| installation)
             .collect()
     }
 
     #[cfg(any(feature = "tui", test))]
-    pub fn activate_global_rook_servers(&mut self, ctx: &mut ModelContext<Self>) {
-        if self.global_rook_servers_activated {
+    pub fn activate_global_pterm_servers(&mut self, ctx: &mut ModelContext<Self>) {
+        if self.global_pterm_servers_activated {
             return;
         }
-        self.global_rook_servers_activated = true;
+        self.global_pterm_servers_activated = true;
         let installations = self
-            .global_rook_servers()
+            .global_pterm_servers()
             .into_iter()
             .cloned()
             .collect_vec();
@@ -696,11 +696,11 @@ impl FileBasedMCPManager {
     /// when its config does not specify `working_directory`.
     ///
     /// The spawn root is the directory the config was discovered in, with one
-    /// exception: global Rook installs are discovered in `~/.rook*/`, which
+    /// exception: global Polaris Terminal installs are discovered in `~/.polaris-terminal*/`, which
     /// isn't a useful cwd for spawned processes, so they are remapped to the
     /// home directory instead.
     /// - Project-scoped installations: the repo root.
-    /// - Global installations (`~/.rook/.mcp.json`, `~/.claude.json`, etc.): the
+    /// - Global installations (`~/.polaris-terminal/.mcp.json`, `~/.claude.json`, etc.): the
     ///   home directory.
     ///
     /// If the installation is referenced from multiple roots, the lexicographically
@@ -716,11 +716,11 @@ impl FileBasedMCPManager {
             .sorted()
             .next()?;
 
-        // Global Rook installs live under `~/.rook*/`, which is internal Rook
+        // Global Polaris Terminal installs live under `~/.polaris-terminal*/`, which is internal Polaris Terminal
         // state rather than a meaningful working directory. Map them to the
-        // home dir so all global installs (Rook and third-party) share a
+        // home dir so all global installs (Polaris Terminal and third-party) share a
         // consistent cwd.
-        if self.is_global_rook_server(hash) {
+        if self.is_global_pterm_server(hash) {
             return home_dir().or(Some(discovery_root));
         }
         Some(discovery_root)
@@ -730,7 +730,7 @@ impl FileBasedMCPManager {
 #[cfg(any(feature = "tui", test))]
 fn provider_sort_key(provider: MCPProvider) -> u8 {
     match provider {
-        MCPProvider::Rook => 0,
+        MCPProvider::Pterm => 0,
         MCPProvider::Claude => 1,
         MCPProvider::Codex => 2,
         MCPProvider::Agents => 3,
@@ -764,9 +764,9 @@ struct AutoStartDecision {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum FileBasedMCPServerType {
-    /// A file-based MCP server detected from Rook's global managed config.
-    GlobalRook,
-    /// A file-based MCP server detected from a non-Rook provider's global user config.
+    /// A file-based MCP server detected from Polaris Terminal's global managed config.
+    GlobalPterm,
+    /// A file-based MCP server detected from a non-Polaris Terminal provider's global user config.
     GlobalThirdParty,
     /// A file-based MCP server detected from a project/repository-scoped config.
     ProjectScoped,

@@ -2,10 +2,10 @@
 Product spec: `specs/zachlloyd/markdown-table-consistency/PRODUCT.md`
 
 ## Problem
-PR #23908 updated AI block list Markdown tables to the new blockless visual treatment, but the rest of Rook’s Markdown table renderers still use the older boxed table styling. On the current branch, Markdown table appearance is owned by two separate rendering paths:
+PR #23908 updated AI block list Markdown tables to the new blockless visual treatment, but the rest of Polaris Terminal’s Markdown table renderers still use the older boxed table styling. On the current branch, Markdown table appearance is owned by two separate rendering paths:
 
 - editor-backed Markdown surfaces use `RichTextStyles.table_style`
-- AI block list tables build a separate RookUI `TableConfig` inline
+- AI block list tables build a separate PtermUI `TableConfig` inline
 
 That split creates two technical problems:
 
@@ -21,9 +21,9 @@ The implementation should make every current Markdown table renderer inherit the
 - `crates/editor/src/render/model/mod.rs (424-568)` — `RichTextStyles` and `TableStyle`
 - `crates/editor/src/render/element/table.rs:1-220` — editor-backed Markdown table painting path
 - `app/src/ai/blocklist/block/view_impl/common.rs (1140-1270)` — `render_table_section`; current AI block list table renderer and inline `TableConfig`
-- `crates/rookui_core/src/elements/table/mod.rs (117-239)` — shared `TableConfig`, `RowBackground`, and `TableVerticalSizing`
-- `crates/rookui_core/src/elements/table/mod.rs (537-759)` — intrinsic width measurement logic
-- `crates/rookui_core/src/elements/table/mod.rs (1013-1211)` — viewported row layout and painting behavior
+- `crates/ptermui_core/src/elements/table/mod.rs (117-239)` — shared `TableConfig`, `RowBackground`, and `TableVerticalSizing`
+- `crates/ptermui_core/src/elements/table/mod.rs (537-759)` — intrinsic width measurement logic
+- `crates/ptermui_core/src/elements/table/mod.rs (1013-1211)` — viewported row layout and painting behavior
 - `app/src/notebooks/file/mod.rs (230-278)` — file notebook view using `rich_text_styles`
 - `app/src/ai/ai_document_view.rs (292-321)` — AI document view fallback editor using `rich_text_styles`
 - `app/src/ai/document/ai_document_model.rs (783-801)` — AI document model creating notebook-backed editors with `rich_text_styles`
@@ -63,7 +63,7 @@ In addition, `code_text_styles()` starts from `rich_text_styles()` before overri
 This means a change to the shared editor-backed style source will propagate to multiple surfaces automatically.
 
 ### AI block list tables
-The AI block list no longer uses the old style. `render_table_section()` in `app/src/ai/blocklist/block/view_impl/common.rs` builds a RookUI `Table` with an inline `TableConfig` that already matches the desired structural treatment:
+The AI block list no longer uses the old style. `render_table_section()` in `app/src/ai/blocklist/block/view_impl/common.rs` builds a PtermUI `Table` with an inline `TableConfig` that already matches the desired structural treatment:
 
 - `outer_border: false`
 - `column_dividers: false`
@@ -79,7 +79,7 @@ That renderer is already the visual baseline from PR #23908, but it is defined i
 Today there is no shared “Markdown table appearance” abstraction. The editor-backed path and block list path both describe the same visual decisions in different structures:
 
 - `TableStyle` for the editor renderer
-- `TableConfig` plus per-cell text styling for RookUI `Table`
+- `TableConfig` plus per-cell text styling for PtermUI `Table`
 
 As a result:
 
@@ -169,7 +169,7 @@ The shared appearance helper should therefore be mapped differently by each rend
 What must remain shared is the blockless table chrome and the text hierarchy relationship, not every literal font token.
 
 ### 7. Treat the shared helper as the default for future Markdown table renderers
-Document in the code by naming and placement that this helper is the default source for Markdown table appearance in Rook.
+Document in the code by naming and placement that this helper is the default source for Markdown table appearance in Polaris Terminal.
 
 The goal is that a new Markdown-rendering surface should not invent its own `TableConfig` or `TableStyle` values for tables unless it has a clear product reason to diverge.
 
@@ -178,7 +178,7 @@ The goal is that a new Markdown-rendering surface should not invent its own `Tab
 2. If it is editor-backed, it obtains `RichTextStyles` from `rich_text_styles()` or `code_text_styles()`.
 3. `rich_text_styles()` builds `table_style` from the shared Markdown table appearance helper.
 4. The editor renderer lays out and paints table content using the updated `TableStyle`, which now supports the blockless chrome.
-5. If it is the AI block list path, `render_table_section()` builds its RookUI `Table` using the same shared appearance helper, while keeping block-list-specific typography and selection settings.
+5. If it is the AI block list path, `render_table_section()` builds its PtermUI `Table` using the same shared appearance helper, while keeping block-list-specific typography and selection settings.
 6. The user sees the same structural Markdown table treatment across surfaces, with existing interaction behavior preserved.
 
 ## Risks and mitigations

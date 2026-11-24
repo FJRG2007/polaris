@@ -1,6 +1,6 @@
-use rookui_core::elements::{CacheOption, Image};
-use rookui_core::geometry::vector::vec2f;
-use rookui_core::{Element, SizeConstraint};
+use ptermui_core::elements::{CacheOption, Image};
+use ptermui_core::geometry::vector::vec2f;
+use ptermui_core::{Element, SizeConstraint};
 
 use super::{RenderContext, RenderableBlock};
 use crate::extract_block;
@@ -33,8 +33,8 @@ impl RenderableBlock for RenderableImage {
     fn layout(
         &mut self,
         model: &RenderState,
-        ctx: &mut rookui_core::LayoutContext,
-        app: &rookui_core::AppContext,
+        ctx: &mut ptermui_core::LayoutContext,
+        app: &ptermui_core::AppContext,
     ) {
         let content = model.content();
         let (asset_source, config) = extract_block!(
@@ -58,7 +58,7 @@ impl RenderableBlock for RenderableImage {
         &mut self,
         model: &RenderState,
         ctx: &mut RenderContext,
-        app: &rookui_core::AppContext,
+        app: &ptermui_core::AppContext,
     ) {
         let content = model.content();
         let positioned_image = extract_block!(
@@ -82,7 +82,7 @@ impl RenderableBlock for RenderableImage {
         }
 
         if selected {
-            let rect_bounds = rookui_core::geometry::rect::RectF::new(screen_position, size);
+            let rect_bounds = ptermui_core::geometry::rect::RectF::new(screen_position, size);
             ctx.paint
                 .scene
                 .draw_rect_with_hit_recording(rect_bounds)

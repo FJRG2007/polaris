@@ -8,7 +8,7 @@ use cloud_object_client::MockObjectClient;
 use cloud_objects::cloud_object::ServerPermissions;
 use firebase::FirebaseError;
 use itertools::Itertools;
-use rookui::{App, Entity, ModelHandle, SingletonEntity};
+use ptermui::{App, Entity, ModelHandle, SingletonEntity};
 
 use super::QueueDependency;
 use crate::ai::facts::{AIFact, AIMemory, CloudAIFactModel};

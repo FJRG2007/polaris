@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use rookui::{Entity, SingletonEntity};
+use ptermui::{Entity, SingletonEntity};
 
 use super::server_api::{ServerApi, TranscribeError};
 use super::team_scope::RequestTeamScope;

@@ -10,7 +10,7 @@ The `/open-file` slash command handler does not expand `~` before resolving the 
 
 - `app/src/terminal/input/slash_commands/mod.rs (445-450)` — The `/open-file` (`commands::EDIT`) handler that parses the path argument and resolves it. This is the code that needs to change.
 - `app/src/search/command_palette/files/data_source.rs:196` — The Cmd-O palette's tilde expansion: `shellexpand::tilde(&query_file_content).into_owned()`. This is the pattern to follow.
-- `crates/rook_util/src/path.rs (149-181)` — `CleanPathResult::with_line_and_column_number()`, which strips line/column suffixes from the path string. Called before path resolution.
+- `crates/pterm_util/src/path.rs (149-181)` — `CleanPathResult::with_line_and_column_number()`, which strips line/column suffixes from the path string. Called before path resolution.
 - `app/src/terminal/input_test.rs (2553-2596)` — Existing test `test_open_slash_command_clears_buffer_on_success` that exercises the `/open-file` handler with a real file.
 
 ## Current state
@@ -64,7 +64,7 @@ No other files need to change.
 ## Testing and validation
 
 1. **New unit test:** Add a `#[cfg(feature = "local_fs")]` test similar to `test_open_slash_command_clears_buffer_on_success` that creates a temp file at a known location, simulates `/open-file ~/relative-to-home` using the temp file's home-relative path, and verifies the buffer clears (indicating success).
-2. **Manual test:** Run Rook, type `/open-file ~/.bashrc`, confirm it opens.
+2. **Manual test:** Run Polaris Terminal, type `/open-file ~/.bashrc`, confirm it opens.
 3. **Regression:** Existing tests (`test_open_slash_command_clears_buffer_on_success`, `test_open_slash_command_requires_path`, etc.) continue to pass.
 
 ## Follow-ups

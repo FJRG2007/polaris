@@ -9,16 +9,16 @@ use futures::channel::oneshot;
 use futures::executor::block_on;
 use http::StatusCode;
 use instant::Instant;
-use rook_cli::mcp::MCPSpec;
-use rook_core::channel::ChannelState;
-use rook_core::features::FeatureFlag;
-use rook_graphql::mutations::create_managed_mcp_client_config::{
+use pterm_cli::mcp::MCPSpec;
+use pterm_core::channel::ChannelState;
+use pterm_core::features::FeatureFlag;
+use pterm_graphql::mutations::create_managed_mcp_client_config::{
     CreateManagedMcpClientConfigOutput, ManagedMcpTransportKind,
 };
-use rook_graphql::response_context::ResponseContext;
-use rook_managed_secrets::ManagedSecretValue;
-use rookui::r#async::{FutureExt as _, Timer};
-use rookui::{App, ModelContext, ModelHandle, SingletonEntity as _};
+use pterm_graphql::response_context::ResponseContext;
+use pterm_managed_secrets::ManagedSecretValue;
+use ptermui::r#async::{FutureExt as _, Timer};
+use ptermui::{App, ModelContext, ModelHandle, SingletonEntity as _};
 use uuid::Uuid;
 
 use super::{AgentDriver, AgentDriverError, MANAGED_MCP_RESOLVE_MAX_ATTEMPTS};
@@ -36,7 +36,7 @@ use crate::ai::mcp::{
 };
 use crate::auth::AuthStateProvider;
 use crate::auth::credentials::Credentials;
-use crate::rook_managed_paths_watcher::rook_managed_mcp_config_path;
+use crate::pterm_managed_paths_watcher::pterm_managed_mcp_config_path;
 use crate::server::graphql::GraphQLError;
 use crate::server::server_api::ServerApiProvider;
 use crate::server::server_api::managed_mcp::MockManagedMcpClient;
@@ -275,7 +275,8 @@ fn resolve_mcp_specs_to_json_preserves_exact_name_collision() {
         });
         let driver_handle = setup_agent_driver(&mut app);
         let foreground = driver_handle.update(&mut app, |_, ctx| ctx.spawner());
-        let user_factory_json = r#"{"rook-factory":{"url":"https://user.example.com/factory"}}"#;
+        let user_factory_json =
+            r#"{"polaris-terminal-factory":{"url":"https://user.example.com/factory"}}"#;
         let specs = vec![MCPSpec::Json(user_factory_json.to_string())];
 
         let resolved = AgentDriver::resolve_mcp_specs_to_json(
@@ -997,14 +998,14 @@ impl FileBasedMcpFixture {
             FileMCPWatcherEvent::ConfigRemoved {
                 config_path: server.config_path.clone(),
                 root_path: server.root_path.clone(),
-                provider: MCPProvider::Rook,
+                provider: MCPProvider::Pterm,
             },
         );
     }
 }
 
-/// One auto-started global Rook server, as tracked after a simulated parse of the managed
-/// Rook MCP config.
+/// One auto-started global Polaris Terminal server, as tracked after a simulated parse of the managed
+/// Polaris Terminal MCP config.
 struct SimulatedGlobalServer {
     installation_uuid: Uuid,
     config_path: PathBuf,
@@ -1017,24 +1018,24 @@ enum InitialGlobalScan {
     Complete,
 }
 
-/// Simulates the global Rook config parsing one server, then leaves the initial global scan
-/// in `scan` state. `None` when this platform has no managed Rook MCP config path.
-fn simulate_global_rook_server(
+/// Simulates the global Polaris Terminal config parsing one server, then leaves the initial global scan
+/// in `scan` state. `None` when this platform has no managed Polaris Terminal MCP config path.
+fn simulate_global_pterm_server(
     app: &mut App,
     fixture: &FileBasedMcpFixture,
     scan: InitialGlobalScan,
 ) -> Option<SimulatedGlobalServer> {
-    let rook_mcp_config_path = rook_managed_mcp_config_path()?;
+    let pterm_mcp_config_path = pterm_managed_mcp_config_path()?;
     let servers = ParsedTemplatableMCPServerResult::from_user_json(
-        r#"{"global-rook": {"command": "npx", "args": ["rook"]}}"#,
+        r#"{"global-polaris-terminal": {"command": "npx", "args": ["polaris-terminal"]}}"#,
     )
     .unwrap_or_default();
     fixture.emit(
         app,
         FileMCPWatcherEvent::ConfigParsed {
-            config_path: rook_mcp_config_path.config_path.clone(),
-            root_path: rook_mcp_config_path.root_path.clone(),
-            provider: MCPProvider::Rook,
+            config_path: pterm_mcp_config_path.config_path.clone(),
+            root_path: pterm_mcp_config_path.root_path.clone(),
+            provider: MCPProvider::Pterm,
             servers,
         },
     );
@@ -1045,16 +1046,16 @@ fn simulate_global_rook_server(
 
     let installation_uuid = fixture.manager.read(app, |manager, _| {
         manager
-            .global_rook_servers()
+            .global_pterm_servers()
             .into_iter()
             .map(|installation| installation.uuid())
             .next()
-            .expect("the global Rook server should have been auto-started")
+            .expect("the global Polaris Terminal server should have been auto-started")
     });
     Some(SimulatedGlobalServer {
         installation_uuid,
-        config_path: rook_mcp_config_path.config_path,
-        root_path: rook_mcp_config_path.root_path,
+        config_path: pterm_mcp_config_path.config_path,
+        root_path: pterm_mcp_config_path.root_path,
     })
 }
 
@@ -1082,7 +1083,7 @@ fn initial_global_scan_wait_resolves_after_pending_scan_completes() {
         initialize_app_for_terminal_view(&mut app);
         let fixture = FileBasedMcpFixture::register(&mut app);
         let Some(server) =
-            simulate_global_rook_server(&mut app, &fixture, InitialGlobalScan::Pending)
+            simulate_global_pterm_server(&mut app, &fixture, InitialGlobalScan::Pending)
         else {
             return;
         };
@@ -1120,7 +1121,7 @@ fn assert_initial_global_mcp_readiness_wait_unblocks_on(state: MCPServerState) {
         initialize_app_for_terminal_view(&mut app);
         let fixture = FileBasedMcpFixture::register(&mut app);
         let Some(server) =
-            simulate_global_rook_server(&mut app, &fixture, InitialGlobalScan::Complete)
+            simulate_global_pterm_server(&mut app, &fixture, InitialGlobalScan::Complete)
         else {
             return;
         };
@@ -1173,7 +1174,7 @@ fn initial_global_scan_and_readiness_share_one_bounded_timeout_budget() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         let fixture = FileBasedMcpFixture::register(&mut app);
-        if simulate_global_rook_server(&mut app, &fixture, InitialGlobalScan::Pending).is_none() {
+        if simulate_global_pterm_server(&mut app, &fixture, InitialGlobalScan::Pending).is_none() {
             return;
         }
         let driver_handle = setup_agent_driver(&mut app);
@@ -1241,7 +1242,7 @@ fn initial_global_mcp_readiness_wait_settles_immediately_when_config_removed_bef
         initialize_app_for_terminal_view(&mut app);
         let fixture = FileBasedMcpFixture::register(&mut app);
         let Some(server) =
-            simulate_global_rook_server(&mut app, &fixture, InitialGlobalScan::Complete)
+            simulate_global_pterm_server(&mut app, &fixture, InitialGlobalScan::Complete)
         else {
             return;
         };
@@ -1292,7 +1293,7 @@ fn initial_global_mcp_readiness_wait_settles_on_notrunning_after_subscribing() {
         initialize_app_for_terminal_view(&mut app);
         let fixture = FileBasedMcpFixture::register(&mut app);
         let Some(server) =
-            simulate_global_rook_server(&mut app, &fixture, InitialGlobalScan::Complete)
+            simulate_global_pterm_server(&mut app, &fixture, InitialGlobalScan::Complete)
         else {
             return;
         };
@@ -1362,7 +1363,8 @@ fn timed_out_wait_does_not_tear_down_a_later_waits_subscription() {
         // are tracked (so `is_file_based_mcp_pending` finds their hash) and never reach a
         // terminal state on their own. Nothing touches the filesystem, so this path need not
         // exist.
-        let root_path = std::env::temp_dir().join(format!("rook-test-mcp-root-{}", Uuid::new_v4()));
+        let root_path =
+            std::env::temp_dir().join(format!("polaris-terminal-test-mcp-root-{}", Uuid::new_v4()));
         let config_path = root_path.join(".mcp.json");
         let servers = ParsedTemplatableMCPServerResult::from_user_json(
             r#"{"wait-a": {"command": "npx", "args": ["a"]}, "wait-b": {"command": "npx", "args": ["b"]}}"#,
@@ -1373,7 +1375,7 @@ fn timed_out_wait_does_not_tear_down_a_later_waits_subscription() {
             FileMCPWatcherEvent::ConfigParsed {
                 config_path,
                 root_path,
-                provider: MCPProvider::Rook,
+                provider: MCPProvider::Pterm,
                 servers,
             },
         );

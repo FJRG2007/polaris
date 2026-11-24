@@ -1,5 +1,5 @@
 use ai::skills::{SkillProvider, SkillReference, SkillScope};
-use rook_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
+use pterm_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use strum_macros::{EnumDiscriminants, EnumIter};
@@ -31,7 +31,7 @@ pub enum SkillTelemetryEvent {
         name: Option<String>,
         /// Specifies the scope of the skill (home or project)
         scope: Option<SkillScope>,
-        /// Specifies the provider of the skill (Rook, Claude, Codex, etc.)
+        /// Specifies the provider of the skill (Polaris Terminal, Claude, Codex, etc.)
         provider: Option<SkillProvider>,
         /// Whether the ReadSkill lookup failed (reference could not be resolved)
         error: bool,
@@ -94,7 +94,7 @@ impl TelemetryEvent for SkillTelemetryEvent {
     }
 
     fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        rook_core::telemetry::enum_events::<Self>()
+        pterm_core::telemetry::enum_events::<Self>()
     }
 }
 
@@ -118,4 +118,4 @@ impl TelemetryEventDesc for SkillTelemetryEventDiscriminants {
     }
 }
 
-rook_core::register_telemetry_event!(SkillTelemetryEvent);
+pterm_core::register_telemetry_event!(SkillTelemetryEvent);

@@ -2,18 +2,18 @@ use std::path::Path;
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::vec2f;
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use pterm_editor::render::model::BlockItem;
+#[cfg(feature = "local_fs")]
+use pterm_files::FileModel;
+use ptermui::keymap::Keystroke;
+use ptermui::platform::WindowStyle;
+use ptermui::{App, SingletonEntity, View};
 #[cfg(feature = "local_fs")]
 use repo_metadata::RepoMetadataModel;
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::watcher::DirectoryWatcher;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rook_editor::render::model::BlockItem;
-#[cfg(feature = "local_fs")]
-use rook_files::FileModel;
-use rookui::keymap::Keystroke;
-use rookui::platform::WindowStyle;
-use rookui::{App, SingletonEntity, View};
 use string_offset::CharOffset;
 
 use super::{
@@ -371,14 +371,14 @@ fn test_file_notebook_mermaid_blocks_default_to_rendered() {
 #[cfg(feature = "local_fs")]
 #[test]
 fn test_reload_and_discard_after_failed_open() {
-    use rookui::TypedActionView;
+    use ptermui::TypedActionView;
 
     /// Opens the notebook's current file and waits for the read to settle.
     async fn await_open(
-        app: &mut rookui::App,
-        handle: &rookui::ViewHandle<FileNotebookView>,
-        open: impl FnOnce(&mut FileNotebookView, &mut rookui::ViewContext<FileNotebookView>),
-    ) -> rook_util::file::FileId {
+        app: &mut ptermui::App,
+        handle: &ptermui::ViewHandle<FileNotebookView>,
+        open: impl FnOnce(&mut FileNotebookView, &mut ptermui::ViewContext<FileNotebookView>),
+    ) -> pterm_util::file::FileId {
         let (file_id, future) = handle.update(app, |file_notebook, ctx| {
             open(file_notebook, ctx);
             let file_id = file_notebook.file_id.expect("File should have a file_id");

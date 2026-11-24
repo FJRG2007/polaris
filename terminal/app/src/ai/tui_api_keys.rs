@@ -1,14 +1,14 @@
 use ai::api_keys::ApiKeyManager;
 use anyhow::Context as _;
-use rookui::{ModelContext, SingletonEntity as _};
+use ptermui::{ModelContext, SingletonEntity as _};
 use uuid::Uuid;
 
-use crate::rook_managed_paths_watcher::{
-    RookManagedPathsWatcher, RookManagedPathsWatcherEvent, repository_update_touches_path,
+use crate::pterm_managed_paths_watcher::{
+    PtermManagedPathsWatcher, PtermManagedPathsWatcherEvent, repository_update_touches_path,
 };
 
 fn revision_file_path() -> std::path::PathBuf {
-    rook_core::paths::tui_config_local_dir().join("api_keys.revision")
+    pterm_core::paths::tui_config_local_dir().join("api_keys.revision")
 }
 
 /// Signals running TUI processes to reload their API keys from secure storage.
@@ -34,9 +34,9 @@ pub(crate) trait TuiApiKeyRefresher {
 impl TuiApiKeyRefresher for ApiKeyManager {
     fn subscribe_to_tui_api_key_changes(&mut self, ctx: &mut ModelContext<Self>) {
         ctx.subscribe_to_model(
-            &RookManagedPathsWatcher::handle(ctx),
+            &PtermManagedPathsWatcher::handle(ctx),
             |manager, _, event, ctx| {
-                let RookManagedPathsWatcherEvent::FilesChanged(update) = event;
+                let PtermManagedPathsWatcherEvent::FilesChanged(update) = event;
                 if repository_update_touches_path(update, &revision_file_path()) {
                     manager.reload_keys_from_secure_storage(ctx);
                 }

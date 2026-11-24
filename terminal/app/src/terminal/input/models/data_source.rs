@@ -2,21 +2,21 @@ use fuzzy_match::{FuzzyMatchResult, match_indices_case_insensitive};
 use itertools::Itertools;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use ordered_float::OrderedFloat;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::icons::Icon;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::icons::Icon;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     ConstrainedBox, Container, CornerRadius, FormattedTextElement, Highlight, HighlightedHyperlink,
     MouseStateHandle, Radius, Text,
 };
-use rookui::fonts::{Properties, Style, Weight};
-use rookui::keymap::Keystroke;
-use rookui::platform::{Cursor, OperatingSystem};
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{Properties, Style, Weight};
+use ptermui::keymap::Keystroke;
+use ptermui::platform::{Cursor, OperatingSystem};
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity as _,
 };
 
@@ -245,7 +245,7 @@ impl ModelSelectorDataSource {
 
     /// Returns whether a model should appear in the inline picker.
     /// Custom-endpoint models are suppressed in Oz cloud agent panes because
-    /// they cannot route through Rook's cloud inference infrastructure.
+    /// they cannot route through Polaris Terminal's cloud inference infrastructure.
     pub(crate) fn include_model_in_picker(is_cloud_pane: bool, is_custom_endpoint: bool) -> bool {
         !is_cloud_pane || !is_custom_endpoint
     }
@@ -434,7 +434,7 @@ impl SearchItem for ModelSearchItem {
         let icon_size = inline_styles::font_size(appearance);
         let icon_color = inline_styles::icon_color(appearance);
 
-        let icon = self.leading_icon.to_rookui_icon(icon_color).finish();
+        let icon = self.leading_icon.to_ptermui_icon(icon_color).finish();
 
         Container::new(
             ConstrainedBox::new(icon)
@@ -451,8 +451,8 @@ impl SearchItem for ModelSearchItem {
         _highlight_state: ItemHighlightState,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        use rookui::elements::{Flex, ParentElement as _};
-        use rookui::prelude::CrossAxisAlignment;
+        use ptermui::elements::{Flex, ParentElement as _};
+        use ptermui::prelude::CrossAxisAlignment;
 
         let appearance = crate::appearance::Appearance::as_ref(app);
         let theme = appearance.theme();
@@ -491,7 +491,7 @@ impl SearchItem for ModelSearchItem {
             .with_child(text.finish());
         if let Some(icon) = self.credential_icon {
             let credential_icon =
-                ConstrainedBox::new(icon.to_rookui_icon(secondary_text_color).finish())
+                ConstrainedBox::new(icon.to_ptermui_icon(secondary_text_color).finish())
                     .with_width(font_size)
                     .with_height(font_size)
                     .finish();
@@ -577,7 +577,7 @@ impl SearchItem for ModelSearchItem {
     }
 
     fn render_details(&self, app: &AppContext) -> Option<Box<dyn Element>> {
-        use rookui::elements::{Flex, ParentElement as _};
+        use ptermui::elements::{Flex, ParentElement as _};
 
         let appearance = crate::appearance::Appearance::as_ref(app);
         let theme = appearance.theme();
@@ -648,7 +648,7 @@ impl SearchItem for ModelSearchItem {
                 .on_click(move |ctx, _, _| {
                     ctx.dispatch_typed_action(WorkspaceAction::ShowSettingsPageWithSearch {
                         search_query: search_query.clone(),
-                        section: Some(SettingsSection::RookAgent),
+                        section: Some(SettingsSection::PtermAgent),
                     });
                 })
                 .finish();
@@ -714,7 +714,7 @@ impl SearchItem for ModelSearchItem {
                     "bring your own key",
                     WorkspaceAction::ShowSettingsPageWithSearch {
                         search_query: "api".to_string(),
-                        section: Some(SettingsSection::RookAgent),
+                        section: Some(SettingsSection::PtermAgent),
                     },
                 ));
             }
@@ -730,10 +730,10 @@ impl SearchItem for ModelSearchItem {
             .with_hyperlink_font_color(theme.accent().into_solid())
             .register_default_click_handlers_with_action_support(|hyperlink_lens, event, ctx| {
                 match hyperlink_lens {
-                    rookui::elements::HyperlinkLens::Url(url) => {
+                    ptermui::elements::HyperlinkLens::Url(url) => {
                         ctx.open_url(url);
                     }
-                    rookui::elements::HyperlinkLens::Action(action_ref) => {
+                    ptermui::elements::HyperlinkLens::Action(action_ref) => {
                         if let Some(action) = action_ref.as_any().downcast_ref::<WorkspaceAction>()
                         {
                             event.dispatch_typed_action(action.clone());
@@ -794,7 +794,7 @@ impl SearchItem for ModelSearchItem {
 }
 
 /// Returns true when a promo discount chip should be shown for a model.
-/// Discounts only apply when the user is billing through Rook credits,
+/// Discounts only apply when the user is billing through Polaris Terminal credits,
 /// so we suppress the chip when the user is routing through their own API key.
 fn should_show_discount_chip(discount_percentage: Option<f32>, is_using_byok: bool) -> bool {
     discount_percentage.is_some_and(|p| p > 0.) && !is_using_byok

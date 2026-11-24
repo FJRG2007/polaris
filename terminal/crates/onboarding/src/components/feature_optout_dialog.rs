@@ -1,15 +1,15 @@
 use pathfinder_color::ColorU;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rookui_core::Element;
-use rookui_core::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui_core::Element;
+use ptermui_core::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex,
     FormattedTextElement, MainAxisAlignment, MainAxisSize, ParentElement, Radius, Shrinkable,
 };
-use rookui_core::fonts::Weight;
-use rookui_core::text_layout::TextAlignment;
+use ptermui_core::fonts::Weight;
+use ptermui_core::text_layout::TextAlignment;
 
 /// Content for a "you'll lose these features" opt-out confirmation dialog.
 pub struct FeatureOptOutDialog {
@@ -62,7 +62,7 @@ pub fn render_feature_optout_dialog(
         let mut feature_list =
             Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
         for &item in dialog.features {
-            let icon_el = ConstrainedBox::new(Icon::X.to_rookui_icon(feature_x_fill).finish())
+            let icon_el = ConstrainedBox::new(Icon::X.to_ptermui_icon(feature_x_fill).finish())
                 .with_width(16.)
                 .with_height(16.)
                 .finish();

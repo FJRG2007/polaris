@@ -2,17 +2,17 @@ use std::sync::Arc;
 
 pub use lightbox::LightboxImage;
 use pathfinder_geometry::vector::Vector2F;
-use rookui::assets::asset_cache::{AssetCache, AssetSource, AssetState};
-use rookui::image_cache::ImageType;
-use rookui::keymap::{FixedBinding, Keystroke};
-use rookui::prelude::*;
-use rookui::{AppContext, BlurContext, Element, Entity, SingletonEntity, View, ViewContext};
+use ptermui::assets::asset_cache::{AssetCache, AssetSource, AssetState};
+use ptermui::image_cache::ImageType;
+use ptermui::keymap::{FixedBinding, Keystroke};
+use ptermui::prelude::*;
+use ptermui::{AppContext, BlurContext, Element, Entity, SingletonEntity, View, ViewContext};
 use ui_components::{Component as _, lightbox};
 
 use crate::appearance::Appearance;
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
     let view_id = id!(LightboxView::ui_name());
     app.register_fixed_bindings([
         FixedBinding::new("escape", LightboxViewAction::Dismiss, view_id.clone()),

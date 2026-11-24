@@ -1,8 +1,8 @@
 //! WASM-only view functions for the Workspace.
 
-use rook_core::channel::ChannelState;
-use rookui::elements::{ChildView, Element};
-use rookui::{AppContext, SingletonEntity, ViewContext, ViewHandle};
+use pterm_core::channel::ChannelState;
+use ptermui::elements::{ChildView, Element};
+use ptermui::{AppContext, SingletonEntity, ViewContext, ViewHandle};
 
 use super::PanelPosition;
 use crate::BlocklistAIHistoryModel;
@@ -18,7 +18,7 @@ use crate::view_components::action_button::{
 };
 use crate::wasm_nux_dialog::{WasmNUXDialog, WasmNUXDialogEvent};
 use crate::workspace::action::WorkspaceAction;
-use crate::workspace::view::{NotebookSource, OpenRookDriveObjectSettings, Workspace};
+use crate::workspace::view::{NotebookSource, OpenPtermDriveObjectSettings, Workspace};
 
 const TRANSCRIPT_PANEL_WIDTH: f32 = 280.0;
 
@@ -39,16 +39,16 @@ impl Workspace {
         wasm_nux_dialog
     }
 
-    pub(super) fn build_open_in_rook_button(
+    pub(super) fn build_open_in_pterm_button(
         ctx: &mut ViewContext<Self>,
     ) -> ViewHandle<ActionButton> {
         ctx.add_typed_action_view(|_ctx| {
-            ActionButton::new("Open in Rook", PrimaryTheme).on_click(move |ctx| {
+            ActionButton::new("Open in Polaris Terminal", PrimaryTheme).on_click(move |ctx| {
                 // Get the current URL and dispatch action to open it on desktop
                 if let Some(url) = parse_current_url() {
                     ctx.dispatch_typed_action(WorkspaceAction::OpenLinkOnDesktop(url));
                 } else {
-                    log::warn!("Could not get URL for Open in Rook button");
+                    log::warn!("Could not get URL for Open in Polaris Terminal button");
                 }
             })
         })
@@ -98,7 +98,7 @@ impl Workspace {
             ConversationDetailsPanelEvent::OpenPlanNotebook { notebook_uid } => {
                 me.open_notebook(
                     &NotebookSource::Existing((*notebook_uid).into()),
-                    &OpenRookDriveObjectSettings::default(),
+                    &OpenPtermDriveObjectSettings::default(),
                     ctx,
                     true,
                 );

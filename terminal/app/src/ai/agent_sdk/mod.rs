@@ -12,35 +12,35 @@ use anyhow::Context;
 pub use driver::AgentDriver;
 use driver::AgentDriverError;
 pub(crate) use driver::harness::{ClaudeHarness, task_env_vars, validate_cli_installed};
-use rook_cli::agent::{
+use pterm_cli::agent::{
     AgentCommand, AgentProfileCommand, Harness, OutputFormat, Prompt, RunAgentArgs,
 };
-use rook_cli::api_key::ApiKeyCommand;
-use rook_cli::artifact::ArtifactCommand;
-use rook_cli::environment::{EnvironmentCommand, ImageCommand};
-use rook_cli::federate::FederateCommand;
-use rook_cli::harness_support::{HarnessSupportCommand, ReportArtifactCommand, TaskStatus};
-use rook_cli::integration::IntegrationCommand;
-use rook_cli::mcp::MCPCommand;
-use rook_cli::memory_store::{MemoryCommand, MemoryStoreCommand};
-use rook_cli::model::ModelCommand;
-use rook_cli::provider::ProviderCommand;
-use rook_cli::runner::RunnerCommand;
-use rook_cli::schedule::ScheduleSubcommand;
-use rook_cli::secret::SecretCommand;
-use rook_cli::share::ShareRequest;
-use rook_cli::task::{MessageCommand, TaskCommand};
-use rook_cli::{CliCommand, GlobalOptions, OZ_HARNESS_ENV};
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rook_graphql::object_permissions::OwnerType;
-use rook_isolation_platform::IsolationPlatformError;
+use pterm_cli::api_key::ApiKeyCommand;
+use pterm_cli::artifact::ArtifactCommand;
+use pterm_cli::environment::{EnvironmentCommand, ImageCommand};
+use pterm_cli::federate::FederateCommand;
+use pterm_cli::harness_support::{HarnessSupportCommand, ReportArtifactCommand, TaskStatus};
+use pterm_cli::integration::IntegrationCommand;
+use pterm_cli::mcp::MCPCommand;
+use pterm_cli::memory_store::{MemoryCommand, MemoryStoreCommand};
+use pterm_cli::model::ModelCommand;
+use pterm_cli::provider::ProviderCommand;
+use pterm_cli::runner::RunnerCommand;
+use pterm_cli::schedule::ScheduleSubcommand;
+use pterm_cli::secret::SecretCommand;
+use pterm_cli::share::ShareRequest;
+use pterm_cli::task::{MessageCommand, TaskCommand};
+use pterm_cli::{CliCommand, GlobalOptions, OZ_HARNESS_ENV};
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use pterm_graphql::object_permissions::OwnerType;
+use pterm_isolation_platform::IsolationPlatformError;
 #[cfg(not(target_family = "wasm"))]
-use rook_logging::log_file_path;
-use rook_managed_secrets::ManagedSecretManager;
-use rook_server_client::iap::{IapManager, IapManagerEvent};
-use rookui::platform::TerminationMode;
-use rookui::{AppContext, ModelSpawner, SingletonEntity};
+use pterm_logging::log_file_path;
+use pterm_managed_secrets::ManagedSecretManager;
+use pterm_server_client::iap::{IapManager, IapManagerEvent};
+use ptermui::platform::TerminationMode;
+use ptermui::{AppContext, ModelSpawner, SingletonEntity};
 use telemetry::CliTelemetryEvent;
 use tracing::Instrument as _;
 
@@ -128,7 +128,7 @@ fn maybe_warn_team_api_key(ctx: &AppContext) {
     );
 }
 
-/// Run a Rook CLI command.
+/// Run a Polaris Terminal CLI command.
 #[tracing::instrument(name = "agent_sdk::run", skip_all, err, fields(tags.cloud_agent = true))]
 pub fn run(
     ctx: &mut AppContext,
@@ -189,7 +189,7 @@ fn dispatch_command(
             schedule::run(ctx, global_options, schedule_cmd)
         }
         CliCommand::Secret(secret_cmd) => {
-            if !FeatureFlag::RookManagedSecrets.is_enabled() {
+            if !FeatureFlag::PtermManagedSecrets.is_enabled() {
                 return Err(anyhow::anyhow!("invalid value 'secret'"));
             }
             secret::run(ctx, global_options, secret_cmd)
@@ -613,7 +613,7 @@ fn run_task(
                 ));
             }
             match conv_cmd {
-                rook_cli::task::ConversationCommand::Get(args) => {
+                pterm_cli::task::ConversationCommand::Get(args) => {
                     ambient::get_conversation(ctx, args.conversation_id)
                 }
             }
@@ -627,11 +627,11 @@ fn run_task(
 /// requires spawning an async task, which requires a ModelContext.
 struct AgentDriverRunner;
 
-impl rookui::Entity for AgentDriverRunner {
+impl ptermui::Entity for AgentDriverRunner {
     type Event = ();
 }
 
-impl rookui::SingletonEntity for AgentDriverRunner {}
+impl ptermui::SingletonEntity for AgentDriverRunner {}
 
 fn resolve_local_run_team_scope(
     args: &RunAgentArgs,
@@ -684,18 +684,18 @@ impl AgentDriverRunner {
             .await?
             .map_err(AgentDriverError::ConfigBuildFailed)?;
 
-        // Wait for Rook Drive to sync before building the task config, since
+        // Wait for Polaris Terminal Drive to sync before building the task config, since
         // prompt resolution (SavedPrompt -> workflow lookup) and environment
         // resolution (CloudAmbientAgentEnvironment lookup) depend on it.
         setup_events
-            .record_result(SetupStep::RookDriveSync, async {
+            .record_result(SetupStep::PtermDriveSync, async {
                 if foreground
-                    .spawn(|_, ctx| common::refresh_rook_drive(ctx))
+                    .spawn(|_, ctx| common::refresh_pterm_drive(ctx))
                     .await?
                     .await
                     .is_err()
                 {
-                    return Err(AgentDriverError::RookDriveSyncFailed);
+                    return Err(AgentDriverError::PtermDriveSyncFailed);
                 }
                 Ok(())
             })
@@ -880,7 +880,7 @@ impl AgentDriverRunner {
         task_id_str: String,
         ai_client: Arc<dyn AIClient>,
     ) -> anyhow::Result<Vec<GitCredential>> {
-        let workload_token = rook_isolation_platform::issue_workload_token(Some(
+        let workload_token = pterm_isolation_platform::issue_workload_token(Some(
             std::time::Duration::from_secs(5 * 60),
         ))
         .await?
@@ -902,7 +902,7 @@ impl AgentDriverRunner {
         // The gh CLI only covers github.com, so this must not replace the
         // server fetch below — other forges (GitLab, Azure DevOps) get their
         // credentials exclusively from the server.
-        let git_credentials_configured_with_gh = rook_isolation_platform::detect().is_none()
+        let git_credentials_configured_with_gh = pterm_isolation_platform::detect().is_none()
             && args.configure_git_credentials_with_github;
         if git_credentials_configured_with_gh {
             foreground
@@ -1201,7 +1201,7 @@ impl AgentDriverRunner {
     }
 
     /// Creates a new task on the server for this agent run, sets the task ID on the driver
-    /// options, and updates the Server API provider so that all subsequent requests to rook-server
+    /// options, and updates the Server API provider so that all subsequent requests to polaris-terminal-server
     /// contain this new task ID.
     async fn initialize_new_task(
         foreground: &ModelSpawner<Self>,
@@ -1689,7 +1689,7 @@ fn launch_command(
         return dispatch_command(ctx, command, global_options);
     }
 
-    let cli_name = rook_cli::binary_name().unwrap_or_else(|| "rook".to_string());
+    let cli_name = pterm_cli::binary_name().unwrap_or_else(|| "polaris-terminal".to_string());
 
     let auth_state = AuthStateProvider::handle(ctx).as_ref(ctx).get();
     let Some(authentication) =
@@ -1700,8 +1700,8 @@ fn launch_command(
         ));
     };
 
-    // On staging the rook-server is fronted by IAP, so establish an IAP token
-    // before *any* rook-server request.
+    // On staging the polaris-terminal-server is fronted by IAP, so establish an IAP token
+    // before *any* polaris-terminal-server request.
     let iap = IapManager::handle(ctx);
     if !iap.as_ref(ctx).is_enabled() || iap.as_ref(ctx).has_valid_token() {
         authenticate_and_dispatch(ctx, command, global_options, authentication, parent_span);
@@ -1731,7 +1731,9 @@ fn launch_command(
             IapManagerEvent::AccessUnavailable => {
                 handled = true;
                 report_fatal_error(
-                    anyhow::anyhow!("Timed out establishing IAP access to rook-server."),
+                    anyhow::anyhow!(
+                        "Timed out establishing IAP access to polaris-terminal-server."
+                    ),
                     ctx,
                 );
             }
@@ -1753,7 +1755,7 @@ fn authenticate_and_dispatch(
     authentication: CommandAuthentication,
     parent_span: tracing::Span,
 ) {
-    let cli_name = rook_cli::binary_name().unwrap_or_else(|| "rook".to_string());
+    let cli_name = pterm_cli::binary_name().unwrap_or_else(|| "polaris-terminal".to_string());
 
     // Subscribe to auth events and wait for validation before running the command.
     let mut dispatched = false;
@@ -1773,7 +1775,7 @@ fn authenticate_and_dispatch(
                 dispatched = true;
                 let auth_state = AuthStateProvider::handle(ctx).as_ref(ctx).get();
                 let message = if auth_state.is_api_key_authenticated() {
-                    "Your API key is invalid. Please provide a valid key via '--api-key' or the ROOK_API_KEY environment variable.".to_string()
+                    "Your API key is invalid. Please provide a valid key via '--api-key' or the POLARIS_TERMINAL_API_KEY environment variable.".to_string()
                 } else {
                     format!("Your credentials are invalid. Please log in again with `{cli_name} login`.")
                 };
@@ -1796,11 +1798,11 @@ fn authenticate_and_dispatch(
     });
 }
 
-/// Check if we're running within Rook (for example, if this is an invocation of the Rook CLI
-/// within a Rook terminal session).
-pub fn is_running_in_rook() -> bool {
+/// Check if we're running within Polaris Terminal (for example, if this is an invocation of the Polaris Terminal CLI
+/// within a Polaris Terminal terminal session).
+pub fn is_running_in_pterm() -> bool {
     std::env::var("TERM_PROGRAM")
-        .map(|v| v == "RookTerminal")
+        .map(|v| v == "PtermTerminal")
         .unwrap_or(false)
 }
 
@@ -1818,7 +1820,7 @@ fn report_fatal_error(err: anyhow::Error, ctx: &mut AppContext) {
         if let Ok(path) = log_file_path() {
             let _ = write!(
                 message,
-                "\n\nFor more information, check Rook logs at {}",
+                "\n\nFor more information, check Polaris Terminal logs at {}",
                 path.display()
             );
         }

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::{Duration, Utc};
 use cloud_object_client::MockObjectClient;
-use rookui::{App, SingletonEntity};
+use ptermui::{App, SingletonEntity};
 use settings::manager::SettingsManager;
 
 use crate::NetworkStatus;

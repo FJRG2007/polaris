@@ -8,11 +8,11 @@ Product spec: `specs/APP-3680/PRODUCT.md`
 
 **Tab replacement:** There is no existing "replace current tab" API. `add_tab_with_pane_layout` (`app/src/workspace/view.rs:8157`) always adds a new tab. `close_tab` (`app/src/workspace/view.rs:7805`) removes by index.
 
-**Tab config TOML writing:** `create_and_open_new_tab_config` (`app/src/workspace/view.rs:4739`) writes the template to `~/.rook/tab_configs/` via `find_unused_tab_config_path` (`app/src/user_config/mod.rs:173`). The filesystem watcher (`app/src/user_config/native.rs:266`) auto-reloads tab configs.
+**Tab config TOML writing:** `create_and_open_new_tab_config` (`app/src/workspace/view.rs:4739`) writes the template to `~/.polaris-terminal/tab_configs/` via `find_unused_tab_config_path` (`app/src/user_config/mod.rs:173`). The filesystem watcher (`app/src/user_config/native.rs:266`) auto-reloads tab configs.
 
 **DefaultSessionMode:** `DefaultSessionMode` (`app/src/settings/ai.rs:252`) has `Terminal` and `Agent` variants. Set during onboarding via `apply_agent_settings` (`app/src/settings/onboarding.rs:122`).
 
-**Feature flags:** `TabConfigs`, `AgentOnboarding`, `OpenRookNewSettingsModes`, and `AgentView` are the relevant flags (`rook_core/src/features.rs`). We'll add a new flag for this modal.
+**Feature flags:** `TabConfigs`, `AgentOnboarding`, `OpenPtermNewSettingsModes`, and `AgentView` are the relevant flags (`pterm_core/src/features.rs`). We'll add a new flag for this modal.
 
 ## Relevant Code
 
@@ -33,7 +33,7 @@ Product spec: `specs/APP-3680/PRODUCT.md`
 
 ### 1. New feature flag
 
-No new feature flag needed. Gate the modal behind both `FeatureFlag::OpenRookNewSettingsModes` (this is the new onboarding path) and `FeatureFlag::TabConfigs` (the modal produces a tab config, so the tab config system must be enabled). Both flags must be on for the modal to appear. When either is off, the old onboarding flow runs unchanged.
+No new feature flag needed. Gate the modal behind both `FeatureFlag::OpenPtermNewSettingsModes` (this is the new onboarding path) and `FeatureFlag::TabConfigs` (the modal produces a tab config, so the tab config system must be enabled). Both flags must be on for the modal to appear. When either is off, the old onboarding flow runs unchanged.
 
 ### 2. Add `Serialize` to tab config types
 
@@ -98,9 +98,9 @@ Uses `toml::to_string_pretty(config)` (now possible with `Serialize`), finds an 
 
 Create `app/src/tab_configs/session_config_modal.rs`. This is a self-contained `View` that renders the Figma layout:
 - Session type pill buttons using `Wrap::row()` for flex-wrap (hardcoded list in order: Built in agent (Oz), Claude, Codex, Gemini, Terminal)
-- Directory picker button (opens native `FilePickerConfiguration::folders_only()`), displays `~` via `rook_util::path::user_friendly_path()`, left-aligned text with semibold weight, no folder icon
+- Directory picker button (opens native `FilePickerConfiguration::folders_only()`), displays `~` via `pterm_util::path::user_friendly_path()`, left-aligned text with semibold weight, no folder icon
 - "Enable worktree support" checkbox (disabled when directory is not a git repo)
-- "Get rooking" button using `ActionButton` with `PrimaryTheme` and `with_full_width(true)`, includes Enter keystroke badge via `with_keybinding()`
+- "Get pterming" button using `ActionButton` with `PrimaryTheme` and `with_full_width(true)`, includes Enter keystroke badge via `with_keybinding()`
 
 The modal always saves a tab config — there is no "Save as tab config" checkbox.
 
@@ -157,7 +157,7 @@ Agent view entry for Oz is handled automatically by `PaneMode::Agent` in the tab
 
 ### 9. Triggering the modal after onboarding
 
-In `handle_agent_onboarding_event` (`app/src/root_view.rs:2080`), after the existing `OnboardingCompleted` handling, when both `FeatureFlag::OpenRookNewSettingsModes.is_enabled()` and `FeatureFlag::TabConfigs.is_enabled()`:
+In `handle_agent_onboarding_event` (`app/src/root_view.rs:2080`), after the existing `OnboardingCompleted` handling, when both `FeatureFlag::OpenPtermNewSettingsModes.is_enabled()` and `FeatureFlag::TabConfigs.is_enabled()`:
 
 Instead of calling `start_agent_onboarding_tutorial` directly, dispatch a new `WorkspaceAction::ShowSessionConfigModal`. The workspace opens the modal. On `Completed`, the workspace replaces the tab and applies settings. On `Dismissed`, fall through to the existing tutorial path (or just leave the empty tab).
 
@@ -170,7 +170,7 @@ When either flag is off (old onboarding), the existing path (`start_agent_onboar
 2. `root_view` applies settings, transitions to `Terminal` state with the workspace.
 3. `root_view` dispatches `WorkspaceAction::ShowSessionConfigModal` (flag-gated).
 4. Workspace opens `session_config_modal` as a centered overlay.
-5. User selects session type, picks directory, optionally toggles worktree, clicks "Get rooking".
+5. User selects session type, picks directory, optionally toggles worktree, clicks "Get pterming".
 6. Modal emits `SessionConfigModalEvent::Completed(selection)`.
 7. Workspace calls `handle_session_config_completed`:
    - Sets `DefaultSessionMode` if Oz.
@@ -181,7 +181,7 @@ When either flag is off (old onboarding), the existing path (`start_agent_onboar
 
 ## Risks and Mitigations
 
-**Risk: Breaking existing onboarding.** All new behavior is gated behind both `FeatureFlag::OpenRookNewSettingsModes` and `FeatureFlag::TabConfigs`. When either is off, `handle_agent_onboarding_event` follows the identical code path as today. No changes to `OnboardingTutorial`, `SelectedSettings`, or `apply_onboarding_settings`.
+**Risk: Breaking existing onboarding.** All new behavior is gated behind both `FeatureFlag::OpenPtermNewSettingsModes` and `FeatureFlag::TabConfigs`. When either is off, `handle_agent_onboarding_event` follows the identical code path as today. No changes to `OnboardingTutorial`, `SelectedSettings`, or `apply_onboarding_settings`.
 
 **Risk: Tab index math when replacing.** Closing the wrong tab index would lose user work. Mitigated by: the old tab is always empty (just created by onboarding), and we close with `skip_confirmation = true`. We also use the tab index arithmetic described above, which can be validated in tests.
 
@@ -233,11 +233,11 @@ These verify the full pipeline from `build_tab_config` → `render_tab_config` p
 - Selecting Oz sets `DefaultSessionMode::Agent`.
 - Selecting Terminal sets `DefaultSessionMode::Terminal`.
 - Selecting a CLI agent sets `DefaultSessionMode::Terminal`.
-- When `OpenRookNewSettingsModes` is off, `DefaultSessionMode` is not touched by this code path.
+- When `OpenPtermNewSettingsModes` is off, `DefaultSessionMode` is not touched by this code path.
 
 ### Feature flag gating (integration)
-- When either `OpenRookNewSettingsModes` or `TabConfigs` is off, `OnboardingCompleted` follows the old tutorial path — modal is never shown.
-- When both `OpenRookNewSettingsModes` and `TabConfigs` are on, `OnboardingCompleted` dispatches `ShowSessionConfigModal`.
+- When either `OpenPtermNewSettingsModes` or `TabConfigs` is off, `OnboardingCompleted` follows the old tutorial path — modal is never shown.
+- When both `OpenPtermNewSettingsModes` and `TabConfigs` are on, `OnboardingCompleted` dispatches `ShowSessionConfigModal`.
 
 ### UI verification
 - Compare rendered modal against Figma mock.

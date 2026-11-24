@@ -7,18 +7,18 @@
 
 use std::time::Duration;
 
-use rook::features::FeatureFlag;
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use rook::integration_testing::view_getters::workspace_view;
-use rookui_core::async_assert;
-use rookui_core::integration::TestStep;
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::integration_testing::view_getters::workspace_view;
+use ptermui_core::async_assert;
+use ptermui_core::integration::TestStep;
 
 use super::{Builder, new_builder};
 
 /// Helper: returns the path to the TOML settings file.
 fn toml_file_path() -> std::path::PathBuf {
-    rook::settings::user_preferences_toml_file_path()
+    polaris_terminal::settings::user_preferences_toml_file_path()
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,10 @@ pub fn test_settings_error_banner_on_reload_with_invalid_toml() -> Builder {
     new_builder()
         .with_setup(move |utils| {
             // Use a short watcher delay so the reload fires quickly.
-            utils.set_env("ROOK_CONFIG_WATCHER_DELAY_MS", Some("10".to_string()));
+            utils.set_env(
+                "POLARIS_TERMINAL_CONFIG_WATCHER_DELAY_MS",
+                Some("10".to_string()),
+            );
 
             // Create a valid settings file so the watcher is already tracking
             // it. The reload tests modify this file rather than creating a new
@@ -186,7 +189,10 @@ pub fn test_settings_error_banner_on_reload_with_invalid_value() -> Builder {
 
     new_builder()
         .with_setup(move |utils| {
-            utils.set_env("ROOK_CONFIG_WATCHER_DELAY_MS", Some("10".to_string()));
+            utils.set_env(
+                "POLARIS_TERMINAL_CONFIG_WATCHER_DELAY_MS",
+                Some("10".to_string()),
+            );
 
             // Create the settings file at startup so the watcher tracks it.
             let path = toml_file_path();

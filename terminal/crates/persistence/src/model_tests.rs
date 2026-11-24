@@ -553,10 +553,10 @@ fn model_token_usage_replays_custom_endpoint_usage_by_model_id() {
 #[allow(deprecated)]
 #[test]
 fn model_token_usage_replay_skips_non_custom_endpoint_entries() {
-    let rook_only = ModelTokenUsage {
-        model_id: "rook-model".to_string(),
-        rook_tokens: 4,
+    let pterm_only = ModelTokenUsage {
+        model_id: "polaris-terminal-model".to_string(),
+        pterm_tokens: 4,
         ..Default::default()
     };
-    assert!(rook_only.to_proto_custom_endpoint_usage().is_none());
+    assert!(pterm_only.to_proto_custom_endpoint_usage().is_none());
 }

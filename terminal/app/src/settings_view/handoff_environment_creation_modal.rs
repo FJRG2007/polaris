@@ -1,11 +1,11 @@
 use pathfinder_color::ColorU;
-use rook_errors::report_error;
-use rookui::elements::{
+use pterm_errors::report_error;
+use ptermui::elements::{
     Align, ChildView, ClippedScrollStateHandle, ClippedScrollable, CrossAxisAlignment, Dismiss,
     Element, Flex, MouseStateHandle, ParentElement, ScrollbarWidth,
 };
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -186,11 +186,11 @@ impl HandoffEnvironmentCreationModal {
             ScrollbarWidth::Auto,
             theme.nonactive_ui_text_color().into(),
             theme.active_ui_text_color().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .finish();
 
-        let padded_form = rookui::elements::Container::new(scrollable_form)
+        let padded_form = ptermui::elements::Container::new(scrollable_form)
             .with_uniform_padding(8.)
             .finish();
 
@@ -211,7 +211,7 @@ impl HandoffEnvironmentCreationModal {
             })
             .finish();
 
-        rookui::elements::Container::new(Align::new(dialog).finish())
+        ptermui::elements::Container::new(Align::new(dialog).finish())
             .with_background_color(ColorU::new(0, 0, 0, MODAL_BACKDROP_OPACITY))
             .with_corner_radius(app.windows().window_corner_radius())
             .finish()

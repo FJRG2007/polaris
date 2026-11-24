@@ -1,7 +1,7 @@
 //! Shared projection of cloud environments for GUI and TUI consumers.
 
-use rook_errors::report_if_error;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity as _};
+use pterm_errors::report_if_error;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity as _};
 use settings::Setting as _;
 
 use super::CloudAmbientAgentEnvironment;
@@ -151,7 +151,7 @@ impl Entity for CloudEnvironmentCatalog {
     type Event = CloudEnvironmentCatalogEvent;
 }
 
-impl rookui::SingletonEntity for CloudEnvironmentCatalog {}
+impl ptermui::SingletonEntity for CloudEnvironmentCatalog {}
 
 pub(crate) fn sort_environments_by_recency(environments: &mut [CloudAmbientAgentEnvironment]) {
     environments.sort_by(|a, b| {

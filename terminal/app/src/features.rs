@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use rook_core::channel::ChannelState;
-pub use rook_core::features::*;
+use pterm_core::channel::ChannelState;
+pub use pterm_core::features::*;
 
 /// Mark all features which should be enabled on the current channel as enabled.
 /// This sets global feature flag state and should never be called in a unit test.
@@ -127,8 +127,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::AutoupdateUIRevamp,
         #[cfg(all(not(windows), feature = "kitty_images"))]
         FeatureFlag::KittyImages,
-        #[cfg(feature = "rook_packs")]
-        FeatureFlag::RookPacks,
+        #[cfg(feature = "pterm_packs")]
+        FeatureFlag::PtermPacks,
         #[cfg(feature = "global_ai_analytics_banner")]
         FeatureFlag::GlobalAIAnalyticsBanner,
         #[cfg(feature = "global_ai_analytics_collection")]
@@ -223,8 +223,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::ExpandEditToPane,
         #[cfg(feature = "fallback_model_load_output_messaging")]
         FeatureFlag::FallbackModelLoadOutputMessaging,
-        #[cfg(feature = "rooking_model_name")]
-        FeatureFlag::RookingModelName,
+        #[cfg(feature = "pterming_model_name")]
+        FeatureFlag::PtermingModelName,
         #[cfg(feature = "tab_close_button_on_left")]
         FeatureFlag::TabCloseButtonOnLeft,
         #[cfg(feature = "profiles_design_revamp")]
@@ -343,8 +343,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::AgentView,
         #[cfg(feature = "agent_view_block_context")]
         FeatureFlag::AgentViewBlockContext,
-        #[cfg(feature = "rook_managed_secrets")]
-        FeatureFlag::RookManagedSecrets,
+        #[cfg(feature = "pterm_managed_secrets")]
+        FeatureFlag::PtermManagedSecrets,
         #[cfg(feature = "v4a_file_diffs")]
         FeatureFlag::V4AFileDiffs,
         #[cfg(feature = "interactive_conversation_management_view")]
@@ -415,8 +415,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::BundledSkills,
         #[cfg(feature = "oz_launch_modal")]
         FeatureFlag::OzLaunchModal,
-        #[cfg(feature = "open_rook_launch_modal")]
-        FeatureFlag::OpenRookLaunchModal,
+        #[cfg(feature = "open_pterm_launch_modal")]
+        FeatureFlag::OpenPtermLaunchModal,
         #[cfg(feature = "orchestration_launch_modal")]
         FeatureFlag::OrchestrationLaunchModal,
         #[cfg(feature = "agent_cli_launch_modal")]
@@ -461,8 +461,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::GroupedTabs,
         #[cfg(feature = "pinned_tabs")]
         FeatureFlag::PinnedTabs,
-        #[cfg(feature = "rook_control_cli")]
-        FeatureFlag::RookControlCli,
+        #[cfg(feature = "pterm_control_cli")]
+        FeatureFlag::PtermControlCli,
         #[cfg(feature = "agent_harness")]
         FeatureFlag::AgentHarness,
         #[cfg(feature = "oz_handoff")]
@@ -477,8 +477,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::CLIAgentRichInput,
         #[cfg(feature = "transfer_control_tool")]
         FeatureFlag::TransferControlTool,
-        #[cfg(feature = "rookify_footer")]
-        FeatureFlag::RookifyFooter,
+        #[cfg(feature = "ptermify_footer")]
+        FeatureFlag::PtermifyFooter,
         #[cfg(feature = "solo_user_byok")]
         FeatureFlag::SoloUserByok,
         #[cfg(feature = "billing_and_usage_page_v2")]

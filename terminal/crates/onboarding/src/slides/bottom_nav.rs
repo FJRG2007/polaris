@@ -1,6 +1,6 @@
-use rook_core::ui::appearance::Appearance;
-use rookui_core::Element;
-use rookui_core::elements::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui_core::Element;
+use ptermui_core::elements::{
     Align, CrossAxisAlignment, Empty, Flex, MainAxisSize, ParentElement, Shrinkable,
 };
 

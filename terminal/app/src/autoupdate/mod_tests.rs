@@ -1,6 +1,6 @@
 use chrono::{Local, TimeZone};
-use rook_core::execution_mode::{AppExecutionMode, ExecutionMode};
-use rookui::{App, ModelHandle, ReadModel, UpdateModel};
+use pterm_core::execution_mode::{AppExecutionMode, ExecutionMode};
+use ptermui::{App, ModelHandle, ReadModel, UpdateModel};
 
 use super::*;
 use crate::auth::{AuthManager, AuthStateProvider};

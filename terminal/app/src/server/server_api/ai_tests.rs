@@ -2,7 +2,7 @@ use chrono::{TimeZone, Utc};
 use futures::executor::block_on;
 use itertools::Itertools;
 use mockito::{Matcher, Server};
-use rook_server_client::base_client::CLOUD_AGENT_ID_HEADER;
+use pterm_server_client::base_client::CLOUD_AGENT_ID_HEADER;
 
 use super::super::ServerApi;
 use super::{
@@ -1191,7 +1191,7 @@ fn deserialize_fork_conversation_response() {
 }
 
 /// Verbatim prepare-upload response bodies, captured by marshalling the
-/// handler's own `PrepareAttachmentUploadsResponse` in rook-server. Hand-written
+/// handler's own `PrepareAttachmentUploadsResponse` in polaris-terminal-server. Hand-written
 /// approximations hid two mismatches that the real bytes exposed, so keep these
 /// literal rather than rebuilding them with `serde_json::json!`.
 const S3_FORM_PREPARE_RESPONSE: &str = r#"{"attachments":[{"attachment_id":"7b1f1f6c-2f5c-4c3e-9c3a-6a1a3d9f0001","upload_target":{"fields":[{"name":"key","value":{"kind":"static","value":"task-1/7b1f1f6c-2f5c-4c3e-9c3a-6a1a3d9f0001"}},{"name":"x-amz-checksum-crc32c","value":{"kind":"content_crc32c"}},{"name":"file","value":{"kind":"content_data"}}],"headers":null,"method":"POST","url":"UPLOAD_URL"},"upload_url":"UPLOAD_URL"}]}"#;

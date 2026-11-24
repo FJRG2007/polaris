@@ -16,7 +16,7 @@ Two coupled code changes are needed to deliver the product behavior:
 - `app/src/view_components/filterable_dropdown.rs` — existing searchable dropdown behavior and pinned footer support.
 - `app/src/ai/persisted_workspace.rs:714-721` — `PersistedWorkspace::workspaces()` iterator.
 - `crates/ai/src/index/full_source_code_embedding/manager.rs:556-558` — `get_codebase_paths`.
-- `crates/rook_util/src/path.rs:85-114` — `user_friendly_path` helper used in the visible list.
+- `crates/pterm_util/src/path.rs:85-114` — `user_friendly_path` helper used in the visible list.
 ## Current state
 - On startup and on every indexing sync-state update, the workspace view reads all `CodebaseIndexManager` paths and calls `DirectoryTabColors::merge_new_paths`, which inserts each canonical path into `directory_tab_colors` as `Unassigned` if not already present.
 - `DirectoryColorAddPicker` already wraps `FilterableDropdown` and computes the correct candidate set for the searchable known-repo flow.

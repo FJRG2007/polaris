@@ -1,5 +1,5 @@
 use js_sys::ReferenceError;
-pub use rook_web_event_bus::{RookEvent, emit_event};
+pub use pterm_web_event_bus::{PtermEvent, emit_event};
 use thiserror::Error;
 use wasm_bindgen::{JsCast, JsValue};
 
@@ -24,7 +24,7 @@ mod ffi {
 
     #[wasm_bindgen]
     extern "C" {
-        #[wasm_bindgen(js_name = "rookUserHandoff", catch)]
+        #[wasm_bindgen(js_name = "ptermUserHandoff", catch)]
         pub fn user_handoff() -> Result<Option<String>, JsValue>;
     }
 }

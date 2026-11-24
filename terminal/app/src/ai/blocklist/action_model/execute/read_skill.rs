@@ -1,6 +1,6 @@
 use ai::agent::action_result::{AnyFileContent, FileContext};
 use futures::future::{BoxFuture, FutureExt};
-use rookui::{Entity, ModelContext, ModelHandle, SingletonEntity};
+use ptermui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 use crate::ai::agent::{AIAgentActionType, ReadSkillRequest, ReadSkillResult};

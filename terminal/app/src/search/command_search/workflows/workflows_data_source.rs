@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use rookui::{AppContext, SingletonEntity};
+use ptermui::{AppContext, SingletonEntity};
 
 use super::{WorkflowIdentity, WorkflowSearchItem};
 use crate::completer::SessionContext;
@@ -10,7 +10,7 @@ use crate::search::command_search::settings::CommandSearchSettings;
 use crate::search::data_source::{Query, QueryResult};
 use crate::search::mixer::{DataSourceRunErrorWrapper, SyncDataSource};
 use crate::search::workflows::fuzzy_match::FuzzyMatchWorkflowResult;
-use crate::user_config::RookConfig;
+use crate::user_config::PtermConfig;
 use crate::workflows::local_workflows::LocalWorkflows;
 #[cfg(feature = "local_fs")]
 use crate::workflows::local_workflows::UseCache;
@@ -34,7 +34,7 @@ impl WorkflowsDataSource {
 
         workflows_by_source.insert(WorkflowSource::Global, global_workflows);
 
-        let user_workflows = RookConfig::as_ref(app).local_user_workflows().clone();
+        let user_workflows = PtermConfig::as_ref(app).local_user_workflows().clone();
         workflows_by_source.insert(WorkflowSource::Local, user_workflows);
 
         #[cfg(feature = "local_fs")]

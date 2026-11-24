@@ -10,14 +10,14 @@ use std::future::Future;
 #[cfg(not(target_family = "wasm"))]
 use futures::future::Either;
 use futures::future::ready;
+use pterm_core::SessionId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::AppContext;
+#[cfg(not(target_family = "wasm"))]
+use ptermui::SingletonEntity;
 #[cfg(not(target_family = "wasm"))]
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::repositories::RepoDetectionSource;
-use rook_core::SessionId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::AppContext;
-#[cfg(not(target_family = "wasm"))]
-use rookui::SingletonEntity;
 
 #[cfg(not(target_family = "wasm"))]
 use crate::remote_server::manager::RemoteServerManager;

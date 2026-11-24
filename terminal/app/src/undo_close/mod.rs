@@ -1,8 +1,8 @@
 pub mod settings;
 mod stack;
 
-use rookui::AppContext;
-use rookui::keymap::EditableBinding;
+use ptermui::AppContext;
+use ptermui::keymap::EditableBinding;
 
 pub use self::settings::UndoCloseSettings;
 pub use self::stack::{UndoCloseStack, UndoCloseStackEvent};
@@ -11,7 +11,7 @@ use crate::workspace::WorkspaceAction;
 
 /// Register keybindings for undo close functionality.
 pub fn init(ctx: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     ctx.register_editable_bindings([EditableBinding::new(
         "app:reopen_closed_session",

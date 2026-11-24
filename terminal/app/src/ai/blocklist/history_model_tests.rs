@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use chrono::{DateTime, Local, Utc};
 use itertools::Itertools;
-use rook_cli::agent::Harness;
-use rookui::{App, EntityId, ModelHandle};
+use pterm_cli::agent::Harness;
+use ptermui::{App, EntityId, ModelHandle};
 use uuid::Uuid;
 
 use super::{
@@ -4733,7 +4733,7 @@ fn has_dangling_subagent_pair(task: &warp_multi_agent_api::Task) -> bool {
 /// `compute_active_tasks()` plus the full set of task ids that survive in the
 /// task store (so callers can assert subtask pruning).
 fn restore_truncate_and_collect(
-    app: &mut rookui::App,
+    app: &mut ptermui::App,
     root_task: warp_multi_agent_api::Task,
     subtasks: Vec<warp_multi_agent_api::Task>,
     rewind_query: &str,
@@ -5344,7 +5344,7 @@ fn forked_root_task(forked: &AIConversation) -> &warp_multi_agent_api::Task {
 /// Restores `source` into the history model and returns the exchange id whose
 /// input is the given user query.
 fn restore_and_find_exchange(
-    app: &mut rookui::App,
+    app: &mut ptermui::App,
     history_model: &ModelHandle<BlocklistAIHistoryModel>,
     source: AIConversation,
     query: &str,
@@ -5373,7 +5373,9 @@ fn restore_and_find_exchange(
 /// Wires up the sqlite sender the fork path requires. Returns the receiver,
 /// which the caller must keep alive so the bounded channel stays open (a
 /// dropped receiver makes the fork's persist `send` fail).
-fn install_mock_model_event_sender(app: &mut rookui::App) -> std::sync::mpsc::Receiver<ModelEvent> {
+fn install_mock_model_event_sender(
+    app: &mut ptermui::App,
+) -> std::sync::mpsc::Receiver<ModelEvent> {
     let (sender, receiver) = std::sync::mpsc::sync_channel(8);
     let mut global_resource_handles = GlobalResourceHandles::mock(app);
     global_resource_handles.model_event_sender = Some(sender);

@@ -13,8 +13,8 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::{Entity, EntityId, ModelContext, SingletonEntity, WeakViewHandle};
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::{Entity, EntityId, ModelContext, SingletonEntity, WeakViewHandle};
 use session_sharing_protocol::common::SessionId;
 
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};

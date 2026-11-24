@@ -1,5 +1,5 @@
 #[cfg(feature = "tui")]
-use rookui_core::runtime::BackgroundLuminance;
+use ptermui_core::runtime::BackgroundLuminance;
 use settings::schema::SettingSchemaEntry;
 use settings::{Setting, SettingSurfaces, SettingsMode, SyncToCloud};
 use settings_value::SettingsValue;
@@ -63,7 +63,7 @@ fn theme_schema_entry_is_tui_only() {
     let entry = inventory::iter::<SettingSchemaEntry>
         .into_iter()
         .find(|entry| entry.hierarchy == Some("appearance") && entry.storage_key == "theme")
-        .expect("expected Rook Agent CLI theme schema entry");
+        .expect("expected Polaris Terminal Agent CLI theme schema entry");
     let surfaces: SettingSurfaces = (entry.surfaces_fn)();
 
     assert!(surfaces.includes(SettingsMode::Tui));

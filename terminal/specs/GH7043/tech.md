@@ -1,7 +1,7 @@
 # Side-by-Side Diff Layout in the Code Review Pane - Tech Spec
 Product spec: `specs/GH7043/product.md`
-GitHub issue: https://github.com/FJRG2007/rook/issues/7043
-Roadmap reference: https://github.com/FJRG2007/rook/issues/9233
+GitHub issue: https://github.com/FJRG2007/polaris/issues/7043
+Roadmap reference: https://github.com/FJRG2007/polaris/issues/9233
 
 ## Context
 
@@ -11,7 +11,7 @@ Relevant Code Review and editor primitives:
 
 - `app/src/code/editor/view.rs::CodeEditorView` is the rendering target. V1 side-by-side uses two editor-view instances: a select-only baseline view and the normal modified view.
 - `app/src/code/editor/element.rs::EditorWrapper` owns editor rendering, layout, hit testing, gutters, and text shaping for each `CodeEditorView`. V1 keeps the editor internals mostly unchanged and puts cross-pane coordination in a parent bridge wrapper.
-- `rook_editor::render::model::RenderState` holds the state used for shaped text, gutters, visible rows, and hit testing. Each editor view keeps its own render state.
+- `pterm_editor::render::model::RenderState` holds the state used for shaped text, gutters, visible rows, and hit testing. Each editor view keeps its own render state.
 - `app/src/code/editor/diff.rs` holds editor-level diff line decoration and gutter rendering. `DiffLineType` classifies lines as `Context`, `Add`, `Delete`, and `HunkHeader`.
 - `app/src/code_review/diff_state.rs` holds hunk state, the `DiffMode` enum (`Head` / `MainBranch` / `OtherBranch(String)`, comparison base rather than layout), and the per-file diff state model.
 - `app/src/code_review/comments/diff_hunk_parser.rs` parses hunks into ordered per-line records. The side-by-side aligner consumes those records; no new parser is introduced.
@@ -19,7 +19,7 @@ Relevant Code Review and editor primitives:
 - `app/src/code/local_code_editor.rs::LocalCodeEditorView` owns the local editor path that hosts Code Review editors. Layout flips route through this host into the side-by-side bridge wrapper when the Code Review path renders side-by-side.
 - `app/src/settings/code.rs` is the settings group for `code.*`. Settings are declared via `define_settings_group!` with `toml_path`, `default`, `supported_platforms`, and `sync_to_cloud` fields.
 - `app/src/settings_view/code_page.rs` is the explicit Code settings UI. Declaring a settings entry does not render it; the page needs a concrete widget registered in the Code section.
-- `crates/rook_features/src/lib.rs` defines the canonical `FeatureFlag` enum, `DOGFOOD_FLAGS`, `PREVIEW_FLAGS`, and changelog descriptions. `app/src/features.rs` re-exports the feature API.
+- `crates/pterm_features/src/lib.rs` defines the canonical `FeatureFlag` enum, `DOGFOOD_FLAGS`, `PREVIEW_FLAGS`, and changelog descriptions. `app/src/features.rs` re-exports the feature API.
 - `app/src/lib.rs` builds the set of compiled-in feature flags through cfg-gated `FeatureFlag::Variant` entries. The corresponding Cargo feature declarations live in `app/Cargo.toml`.
 - `app/src/code_review/scroll_preservation.rs` holds scroll preservation helpers that the side-by-side scroll-sync model can build on.
 - `app/src/code_review/comments/comment.rs` and `comment_list_view.rs` own comment rendering. Comment placement gains a per-pane gutter marker; existing anchoring on `EditorLineLocation` remains.
@@ -104,7 +104,7 @@ Resolution: the settings-page widget integration is part of v1 and is not left a
 
 The flag is wired in the actual repo feature-flag locations:
 
-1. **Enum variant**: add `SideBySideDiffLayout,` to `crates/rook_features/src/lib.rs::FeatureFlag`, near related Code Review flags such as `CodeReviewFind`.
+1. **Enum variant**: add `SideBySideDiffLayout,` to `crates/pterm_features/src/lib.rs::FeatureFlag`, near related Code Review flags such as `CodeReviewFind`.
 
 2. **Cargo feature and compiled-in registration**:
    - Add `side_by_side_diff_layout = []` to `[features]` in `app/Cargo.toml`, following the existing `code_review_find = []` pattern.
@@ -115,7 +115,7 @@ The flag is wired in the actual repo feature-flag locations:
      ```
 
 3. **Dogfood and preview runtime defaults**:
-   - Add `FeatureFlag::SideBySideDiffLayout` to `DOGFOOD_FLAGS` in `crates/rook_features/src/lib.rs` for the first internal phase.
+   - Add `FeatureFlag::SideBySideDiffLayout` to `DOGFOOD_FLAGS` in `crates/pterm_features/src/lib.rs` for the first internal phase.
    - Move it to `PREVIEW_FLAGS` when widening beyond dogfood. Preview flags are automatically included in dogfood builds.
    - Do not add it to `RELEASE_FLAGS` until the staged rollout is complete.
 

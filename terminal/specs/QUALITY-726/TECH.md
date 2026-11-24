@@ -100,7 +100,7 @@ Leaving `SessionSourceType::User` strictly unit means existing readers — inclu
 #### Cascade to local children
 - Single cascade rule: `inherit_share_for_local_child` cascades when the host carries an orchestrator `task_id` (resolved from `source_task_id`, with `AmbientAgent.task_id` as a fallback for cloud orchestrators that already populate it). A host that is sharing pre-`StreamInit` (no resolved task_id) does *not* cascade, since the host’s viewer cannot enumerate children via REST without the host task id; cascaded children would just hang as loading placeholders. Once `StreamInit` upgrades the host’s stored `source_task_id` to `Some(_)` (per the pre-first-response handling above), subsequent local children cascade.
 #### Catch-up cascade for pre-existing children
-- The cascade in `inherit_share_for_local_child` only fires at child-pane *creation* time. If the user shares an orchestrator that already has spawned children, those pre-existing child panes were created with `IsSharedSessionCreator::No` and stay unshared even after the parent share goes active. The parent viewer's pill bar lists the children (rook-server has their task rows) but the materialization gate in `OrchestrationViewerModel` never trips because `session_id` is never populated on the child task rows.
+- The cascade in `inherit_share_for_local_child` only fires at child-pane *creation* time. If the user shares an orchestrator that already has spawned children, those pre-existing child panes were created with `IsSharedSessionCreator::No` and stay unshared even after the parent share goes active. The parent viewer's pill bar lists the children (polaris-terminal-server has their task rows) but the materialization gate in `OrchestrationViewerModel` never trips because `session_id` is never populated on the child task rows.
 - Fix: `PaneGroup` subscribes to `BlocklistAIHistoryEvent::LocalSharedSessionEstablished` (Thread D's event). When the parent's local share goes active, `transitively_share_existing_local_children` iterates direct child agent panes in this group, computes the cascaded source type via `inherit_share_for_local_child`, and dispatches `attempt_to_share_session` on each child that isn't already in a sharer/viewer state. Cascaded children are recorded in `transitively_shared_child_panes` so the host's stop-share cascade also stops them.
 - Multi-level: grandchildren are picked up transitively. Each newly-shared child's own `LocalSharedSessionEstablished` event re-enters the subscriber, which then cascades to its direct children. Direct-only iteration per event keeps each cascade decision local to one host pane.
 - The cascade carries the child’s own `task_id` alongside the host’s variant kind. `User` host with `source_task_id: Some(parent_task_id)` → child gets `User` + `source_task_id: Some(child_task_id)`. `AmbientAgent { Some(parent_task_id) }` host (cloud orchestrator) → child gets `AmbientAgent { Some(child_task_id) }` (unchanged from today). The child’s `task_id` is provided by its launch path (`launch_local_no_harness_child` / `launch_local_harness_child`, `terminal_pane.rs:1694-1989`).
@@ -168,7 +168,7 @@ ai_client
   - Skip when `task_id` or `session_id` is `None`.
   - Dedupe per `(task_id, session_id)` in an in-memory `HashSet`; reconnect/restart paths should not re-fire. The server treats repeated updates as idempotent; dedupe is a network-traffic optimization.
 #### Server-side gates required by Thread D
-Two `rook-server` predicates that previously assumed cloud-only execution must be relaxed before Thread D's `update_agent_task(session_id)` will land for local children:
+Two `polaris-terminal-server` predicates that previously assumed cloud-only execution must be relaxed before Thread D's `update_agent_task(session_id)` will land for local children:
 - **`updateSharedSessionLinkQuery` state gate** (`model/ai_run_executions.go`). The query previously required `state = 'RUNNING'`, but local executions transition directly from `CLAIMED` to `ENDED` without ever passing through `RUNNING` (only the cloud worker's `markExecutionRunning` path advances state). Predicate must accept `state IN ('CLAIMED', 'RUNNING')` so the update lands for local children. `ENDED` stays excluded to block stale-session writes against terminal rows.
 - **`convertTasksToItems` REST stale-link guard** (`router/handlers/public_api/agent_webhooks.go`). The `/agent/runs?ancestor_run_id=` handler previously stripped `session_id` for any non-active run without GCS transcript data. Local runs have no GCS transcript and reach terminal state quickly; the guard must exempt LOCAL-execution rows so child `session_id` continues to surface to the viewer after the child finishes. The stale-link concern motivating the original guard is cloud-sandbox-specific.
 ### Cross-cutting: keep the existing pill bar visual + interactions unchanged
@@ -209,33 +209,33 @@ Track results in a check matrix in the PR description.
 - `orchestration_pill_bar_tests.rs` should keep its existing rendering coverage; no behavior changes required there.
 ## Parallelization
 The four threads touch largely independent code areas. They run as parallel local sub-agents with separate worktrees once Thread A0 lands, then merge into a single PR (or 1-PR-per-thread). The strict sequencing is: A0 (protocol crate) → A/B/C/D in parallel.
-All worktrees live under the shared task directory `~/src/orch-shared-sessions/`, alongside the existing `rook` and `rook-server` worktrees on this branch. Thread A0 adds a sibling `session-sharing-protocol` worktree. Each rook-side thread gets its own rook worktree so the four threads can run in parallel without conflicting on the same working copy.
-- **Thread A0** — protocol crate changes + rook rev bump (Thread A prerequisite).
-  - Files owned: external `session-sharing-protocol` crate (`sharer.rs`, `viewer.rs` if needed for legacy payload audits) and the rook-side `Cargo.toml` git rev pin at `Cargo.toml:249` (applied via the `rook-thread-a` worktree as part of A landing).
-  - Worktree: `~/src/orch-shared-sessions/session-sharing-protocol` (new sibling of the existing `rook` and `rook-server` worktrees).
+All worktrees live under the shared task directory `~/src/orch-shared-sessions/`, alongside the existing `polaris-terminal` and `polaris-terminal-server` worktrees on this branch. Thread A0 adds a sibling `session-sharing-protocol` worktree. Each polaris-terminal-side thread gets its own polaris-terminal worktree so the four threads can run in parallel without conflicting on the same working copy.
+- **Thread A0** — protocol crate changes + polaris-terminal rev bump (Thread A prerequisite).
+  - Files owned: external `session-sharing-protocol` crate (`sharer.rs`, `viewer.rs` if needed for legacy payload audits) and the polaris-terminal-side `Cargo.toml` git rev pin at `Cargo.toml:249` (applied via the `polaris-terminal-thread-a` worktree as part of A landing).
+  - Worktree: `~/src/orch-shared-sessions/session-sharing-protocol` (new sibling of the existing `polaris-terminal` and `polaris-terminal-server` worktrees).
   - Branch: `matthew/QUALITY-726-protocol`.
   - Depends on: none.
-  - Must merge to the protocol crate (and have its commit hash available) before A or C can compile on the rook side.
-- **Thread A** — local share cascade + reuse of orchestrator `task_id` (rook client).
+  - Must merge to the protocol crate (and have its commit hash available) before A or C can compile on the polaris-terminal side.
+- **Thread A** — local share cascade + reuse of orchestrator `task_id` (polaris-terminal client).
   - Files owned: `app/src/pane_group/pane/terminal_pane.rs`, `app/src/pane_group/mod.rs` (cascade tracking + stop-share iteration), `app/src/terminal/view/shared_session/view_impl.rs` (`attempt_to_share_session` callers), `app/src/terminal/local_tty/terminal_manager.rs` (`start_sharing_session` + source type upgrade on `StreamInit`), call sites that currently pass `SessionSourceType::default()` (see *Relevant files*), and the `Cargo.toml:249` git rev bump that picks up Thread A0’s commit, new tests.
-  - Worktree: `~/src/orch-shared-sessions/rook-thread-a`.
+  - Worktree: `~/src/orch-shared-sessions/polaris-terminal-thread-a`.
   - Branch: `matthew/QUALITY-726-thread-a`.
   - Depends on: Thread A0.
   - Shared gate logic with Thread C: the viewer-side gate restructure at `terminal_manager.rs:778-816` is owned by Thread A (it lives in a Thread-A-owned file); Thread C consumes the helper / restructured gate and adds the polling-cost mitigation.
 - **Thread B** — agent-id index population (B1) + parent_agent_id backfill (B2). B4 (child-link sibling preload) is deferred; see §B4.
   - Files owned: `app/src/ai/blocklist/history_model.rs`, `app/src/ai/blocklist/agent_view/orchestration_conversation_links.rs` (audit only), `app/src/terminal/shared_session/viewer/orchestration_viewer_model.rs`, tests.
-  - Worktree: `~/src/orch-shared-sessions/rook-thread-b`.
+  - Worktree: `~/src/orch-shared-sessions/polaris-terminal-thread-b`.
   - Branch: `matthew/QUALITY-726-thread-b`.
   - Depends on: none beyond A0 (the source type change does not affect Thread B’s code paths).
 - **Thread C** — polling-cost mitigation + render-gate verification.
   - Files owned: `app/src/terminal/shared_session/viewer/orchestration_viewer_model.rs` (idle-due-to-empty flag, polling state machine), `app/src/terminal/view/pane_impl.rs` (gate audit only — no expected changes), integration tests.
-  - Worktree: `~/src/orch-shared-sessions/rook-thread-c`.
+  - Worktree: `~/src/orch-shared-sessions/polaris-terminal-thread-c`.
   - Branch: `matthew/QUALITY-726-thread-c`.
   - Depends on: Thread A (consumes the viewer-side gate restructure landed in Thread A).
   - Coordination with Thread B: both threads touch `orchestration_viewer_model.rs`. C’s state-machine changes are in the polling/timer section (`116-186`); B’s changes are in `apply_children_fetch` (`235-358`) and the join handshake. Merge order does not matter, but rebase the second-to-merge thread on top of the first.
 - **Thread D** — driver-side `session_id` link.
   - Files owned: `app/src/terminal/local_tty/terminal_manager.rs` (`SharedSessionCreatedSuccessfully` emission point + new event), `app/src/ai/blocklist/local_shared_session_link_model.rs` (new dedicated subscriber model), tests.
-  - Worktree: `~/src/orch-shared-sessions/rook-thread-d`.
+  - Worktree: `~/src/orch-shared-sessions/polaris-terminal-thread-d`.
   - Branch: `matthew/QUALITY-726-thread-d`.
   - Depends on: none beyond A0 (the new `update_agent_task(session_id)` call uses an existing trait signature parameter).
 Execution mode: all five threads run locally. The repo builds and integration tests run on the developer’s machine; no remote-only resources are involved.
@@ -259,7 +259,7 @@ graph TD
 ```
 If launched as sub-agents, each one should:
 - Stay in its assigned worktree under `~/src/orch-shared-sessions/`.
-- Run `./script/presubmit` (rook) or the crate-equivalent (`cargo test`, `cargo clippy --workspace --all-targets --all-features --tests -- -D warnings`, `cargo fmt --check` in `session-sharing-protocol`) before reporting back.
+- Run `./script/presubmit` (polaris-terminal) or the crate-equivalent (`cargo test`, `cargo clippy --workspace --all-targets --all-features --tests -- -D warnings`, `cargo fmt --check` in `session-sharing-protocol`) before reporting back.
 - Report the branch name, changed files, and a list of failing or skipped tests.
 - Not merge into `matthew/orch-shared-sessions` directly; the orchestrator (the user, or a separate merge step) integrates the threads into one branch.
 ## Risks and mitigations
@@ -273,4 +273,4 @@ If launched as sub-agents, each one should:
 ## Follow-ups
 - Once Threads A and D are in place, evaluate whether the `OrchestrationViewerModel` polling cadence is still appropriate for live local-local shares (every 5s may be excessive when all updates are also flowing through the shared-session WebSocket). A follow-up could switch to a WebSocket-driven update for local-local at the cost of larger protocol changes.
 - Consider unifying the dispatcher state-machine on the server side so local and cloud executions share a single life-cycle for session-link writes. The CLAIMED-vs-RUNNING split is currently implicit in worker behavior; an explicit `state IN ('CLAIMED', 'RUNNING')` predicate captures the intent but doesn't address why local executions never advance past CLAIMED in the first place.
-- Once the upstream `session-sharing-protocol` commit is published and consumed by both rook and session-sharing-server, drop the vendored copy in session-sharing-server entirely and depend on the git crate. Removes the two-place-update tax for future wire changes.
+- Once the upstream `session-sharing-protocol` commit is published and consumed by both polaris-terminal and session-sharing-server, drop the vendored copy in session-sharing-server entirely and depend on the git crate. Removes the two-place-update tax for future wire changes.

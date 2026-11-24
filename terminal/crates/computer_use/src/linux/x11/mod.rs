@@ -18,7 +18,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use instant::Instant;
 use pathfinder_geometry::vector::Vector2I;
-use rookui_core::r#async::Timer;
+use ptermui_core::r#async::Timer;
 use x11rb::connection::Connection;
 use x11rb::protocol::xinput::ConnectionExt as _;
 use x11rb::protocol::xproto::{self, ConnectionExt as _};

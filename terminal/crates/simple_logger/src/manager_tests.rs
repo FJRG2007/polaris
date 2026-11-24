@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use rookui_core::r#async::executor::Background;
+use ptermui_core::r#async::executor::Background;
 
 use super::LogManager;
 use crate::{RotationConfig, path_with_suffix};

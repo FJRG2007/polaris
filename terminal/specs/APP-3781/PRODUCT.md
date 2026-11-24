@@ -47,7 +47,7 @@ The entry points remain the same buttons in the CLI agent toolbar:
 ### Instructions block content
 
 The instructions block renders the same information as the current modal:
-- **Title** (e.g., "Install Rook Plugin for Claude Code")
+- **Title** (e.g., "Install Polaris Terminal Plugin for Claude Code")
 - **Subtitle** (e.g., "Ensure that jq is installed on your machine. Then, run these commands inside your Claude Code session.")
 - **Numbered steps**, each with:
   - A step number in a circular badge

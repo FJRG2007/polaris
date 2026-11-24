@@ -1,7 +1,7 @@
-use rookui::elements::{Align, MouseStateHandle, Shrinkable};
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::elements::{Align, MouseStateHandle, Shrinkable};
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use super::auth_manager::AuthManager;
 use crate::appearance::Appearance;
@@ -78,7 +78,7 @@ impl View for NeedsSsoLinkView {
 
         LoginErrorModal::new(app)
             .with_header("Your organization has enabled SSO for your account")
-            .with_detail("Click the button below to link your Rook account to your SSO provider.")
+            .with_detail("Click the button below to link your Polaris Terminal account to your SSO provider.")
             .with_action(link_sso_button)
             .build()
             .finish()

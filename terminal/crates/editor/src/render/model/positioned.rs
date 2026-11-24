@@ -3,9 +3,9 @@
 
 use std::sync::Arc;
 
-use rookui_core::geometry::vector::Vector2F;
-use rookui_core::text_layout::Line;
-use rookui_core::units::{IntoPixels, Pixels};
+use ptermui_core::geometry::vector::Vector2F;
+use ptermui_core::text_layout::Line;
+use ptermui_core::units::{IntoPixels, Pixels};
 use string_offset::CharOffset;
 use sum_tree::{Cursor, Dimension};
 

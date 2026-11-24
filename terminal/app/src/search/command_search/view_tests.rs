@@ -1,5 +1,5 @@
-use rookui::App;
-use rookui::platform::WindowStyle;
+use ptermui::App;
+use ptermui::platform::WindowStyle;
 
 use super::*;
 use crate::cloud_object::model::persistence::CloudModel;

@@ -7,9 +7,9 @@ use std::sync::OnceLock;
 
 use command::r#async::Command;
 use enum_iterator::{all, cardinality};
-use rook_errors::report_error;
-use rook_util::path::LineAndColumnArg;
-use rookui::AppContext;
+use pterm_errors::report_error;
+use pterm_util::path::LineAndColumnArg;
+use ptermui::AppContext;
 use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
 use winreg::{HKEY, RegKey};
 

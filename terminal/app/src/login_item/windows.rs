@@ -1,11 +1,11 @@
 //! Windows implementation of login-item registration.
 //!
-//! Rook starts at sign-in through a Task Scheduler task with a logon trigger,
+//! Polaris Terminal starts at sign-in through a Task Scheduler task with a logon trigger,
 //! scoped to the current user and needing no elevation. Earlier builds used a
 //! value under HKCU `Software\Microsoft\Windows\CurrentVersion\Run`, which
 //! Explorer works through one entry at a time once the desktop is up: on a
 //! machine with a long startup list, an entry near the end of it started six
-//! minutes after sign-in while Rook itself took three seconds to open. A logon
+//! minutes after sign-in while Polaris Terminal itself took three seconds to open. A logon
 //! task fires with the session instead, so it does not wait behind that queue.
 //!
 //! An existing Run value is moved to a task on the next launch, and the Run
@@ -16,9 +16,9 @@ use std::path::{Path, PathBuf};
 
 use ::settings::Setting;
 use command::blocking::Command;
-use rook_core::channel::ChannelState;
-use rook_errors::report_if_error;
-use rookui::{AppContext, SingletonEntity};
+use pterm_core::channel::ChannelState;
+use pterm_errors::report_if_error;
+use ptermui::{AppContext, SingletonEntity};
 use winreg::RegKey;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
 
@@ -82,13 +82,13 @@ fn reconcile(
         if let Err(err) = unregister_run_value(app_name) {
             // Don't flip app_added_as_login_item on failure - let a later
             // retoggle try again.
-            log::warn!("Failed to unregister Rook as a login item: {err}");
+            log::warn!("Failed to unregister Polaris Terminal as a login item: {err}");
             return None;
         }
         // Only a build that set app_added_as_login_item can have registered a
         // task, so a default install never spawns schtasks here.
         if app_added_as_login_item && let Err(err) = unregister_task(app_name) {
-            log::warn!("Failed to remove Rook's sign-in task: {err}");
+            log::warn!("Failed to remove Polaris Terminal's sign-in task: {err}");
             return None;
         }
         return Some(false);
@@ -104,10 +104,12 @@ fn reconcile(
             match register_task(app_name, exe) {
                 Ok(()) => {
                     if let Err(err) = unregister_run_value(app_name) {
-                        log::warn!("Failed to remove Rook's old Run entry: {err}");
+                        log::warn!("Failed to remove Polaris Terminal's old Run entry: {err}");
                     }
                 }
-                Err(err) => log::warn!("Failed to move Rook's Run entry to a sign-in task: {err}"),
+                Err(err) => log::warn!(
+                    "Failed to move Polaris Terminal's Run entry to a sign-in task: {err}"
+                ),
             }
         }
         return None;
@@ -116,16 +118,18 @@ fn reconcile(
     match register_task(app_name, exe) {
         Ok(()) => {
             if let Err(err) = unregister_run_value(app_name) {
-                log::warn!("Failed to remove Rook's old Run entry: {err}");
+                log::warn!("Failed to remove Polaris Terminal's old Run entry: {err}");
             }
             Some(true)
         }
         Err(err) => {
-            log::warn!("Failed to register Rook's sign-in task, using the Run key: {err}");
+            log::warn!(
+                "Failed to register Polaris Terminal's sign-in task, using the Run key: {err}"
+            );
             match register_run_value(app_name, exe) {
                 Ok(()) => Some(true),
                 Err(err) => {
-                    log::warn!("Failed to register Rook as a login item: {err}");
+                    log::warn!("Failed to register Polaris Terminal as a login item: {err}");
                     Some(false)
                 }
             }
@@ -142,7 +146,7 @@ fn current_exe_path() -> Option<PathBuf> {
 /// Returns the per-channel name used for the `Run` value and the task.
 ///
 /// Using the channel's application name keeps Dogfood / Preview / Stable installs
-/// isolated (`Rook`, `RookPreview`, `RookDev`, etc.) so installing multiple
+/// isolated (`Polaris Terminal`, `PolarisTerminalPreview`, `PolarisTerminalDev`, etc.) so installing multiple
 /// channels doesn't cause one to overwrite another's startup entry.
 fn login_item_value_name() -> String {
     ChannelState::app_id().application_name().to_owned()
@@ -163,8 +167,8 @@ fn task_name(app_name: &str, user_sid: &str) -> String {
 fn task_xml(user_sid: &str, exe: &Path) -> String {
     let user_sid = xml_escape(user_sid);
     let exe = xml_escape(&exe.display().to_string());
-    let autostart_arg = rook_cli::AUTOSTART_ARG;
-    // ExecutionTimeLimit: the default of three days would end Rook after it.
+    let autostart_arg = pterm_cli::AUTOSTART_ARG;
+    // ExecutionTimeLimit: the default of three days would end Polaris Terminal after it.
     // Priority: the default of 7 also lowers the process's I/O and memory
     // priority; 5 runs it as a normal app.
     format!(
@@ -218,7 +222,7 @@ fn register_task(app_name: &str, exe: &Path) -> std::io::Result<()> {
     let mut contents = vec![0xFF, 0xFE];
     contents.extend(xml.encode_utf16().flat_map(u16::to_le_bytes));
     let mut file = tempfile::Builder::new()
-        .prefix("rook-startup-task")
+        .prefix("polaris-terminal-startup-task")
         .suffix(".xml")
         .tempfile()?;
     file.write_all(&contents)?;
@@ -283,7 +287,7 @@ fn unregister_task(app_name: &str) -> std::io::Result<()> {
 
 fn run_schtasks(args: &[&std::ffi::OsStr]) -> std::io::Result<()> {
     // No CREATE_BREAKAWAY_FROM_JOB: schtasks is waited on, so it can share
-    // Rook's job, and breaking away fails outright inside a job that forbids it.
+    // Polaris Terminal's job, and breaking away fails outright inside a job that forbids it.
     let output = Command::new(system_directory()?.join("schtasks.exe"))
         .creation_flags(0)
         .args(args)
@@ -379,7 +383,7 @@ fn run_value_is_enabled_in(
 /// Writes the startup registry value pointing at `exe` under `value_name`.
 ///
 /// The path is wrapped in quotes so paths containing spaces (e.g.
-/// `C:\Program Files\Rook\rook.exe`) are parsed as a single executable path.
+/// `C:\Program Files\Polaris Terminal\polaris-terminal.exe`) are parsed as a single executable path.
 fn register_run_value(value_name: &str, exe: &Path) -> std::io::Result<()> {
     register_run_value_in(HKEY_CURRENT_USER, RUN_SUBKEY, value_name, exe)
 }
@@ -392,7 +396,7 @@ fn register_run_value_in(
 ) -> std::io::Result<()> {
     let hkey = RegKey::predef(hive);
     let (run_key, _) = hkey.create_subkey(subkey)?;
-    let command = format!("\"{}\" --{}", exe.display(), rook_cli::AUTOSTART_ARG);
+    let command = format!("\"{}\" --{}", exe.display(), pterm_cli::AUTOSTART_ARG);
     run_key.set_value(value_name, &command)
 }
 

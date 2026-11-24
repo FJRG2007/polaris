@@ -52,13 +52,13 @@ impl InputClassificationResult {
 pub trait InputClassifier: 'static + Send + Sync {
     async fn detect_input_type(
         &self,
-        input: rook_completer::ParsedTokensSnapshot,
+        input: pterm_completer::ParsedTokensSnapshot,
         context: &Context,
     ) -> InputClassificationResult;
 
     async fn classify_input(
         &self,
-        input: rook_completer::ParsedTokensSnapshot,
+        input: pterm_completer::ParsedTokensSnapshot,
         context: &Context,
     ) -> anyhow::Result<ClassificationResult>;
 }

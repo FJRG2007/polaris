@@ -1,11 +1,11 @@
 //! Grid tooltips for the terminal view
 
 use pathfinder_geometry::vector::vec2f;
-use rookui::elements::{
+use ptermui::elements::{
     ChildAnchor, Dismiss, MouseStateHandle, OffsetPositioning, PositionedElementAnchor,
     PositionedElementOffsetBounds, Stack,
 };
-use rookui::{AppContext, Element, EventContext};
+use ptermui::{AppContext, Element, EventContext};
 
 use super::{GridHighlightedLink, TerminalAction, TerminalView};
 use crate::appearance::Appearance;
@@ -30,25 +30,25 @@ struct GridTooltipLink {
     mouse_state: MouseStateHandle,
 }
 
-/// If appropriate, returns a GridTooltipLink for opening the file in rook.
+/// If appropriate, returns a GridTooltipLink for opening the file in polaris-terminal.
 /// Mutates `detail_for_default` leaving None in place if the GridTooltipLink returned is the default
 /// action on "Cmd+Click" and thus should use the detail_for_default.
 #[cfg(feature = "local_fs")]
-fn open_in_rook_tooltip(
+fn open_in_pterm_tooltip(
     path: std::path::PathBuf,
-    line_and_column_num: Option<rook_util::path::LineAndColumnArg>,
+    line_and_column_num: Option<pterm_util::path::LineAndColumnArg>,
     detail_for_default: &mut Option<String>,
     mouse_state: MouseStateHandle,
     app: &AppContext,
 ) -> Option<GridTooltipLink> {
-    use rookui::SingletonEntity;
+    use ptermui::SingletonEntity;
     use settings::Setting as _;
 
     use crate::settings::CodeSettings;
     use crate::util::file::external_editor::EditorSettings;
-    use crate::util::tooltips::should_show_open_in_rook_link;
+    use crate::util::tooltips::should_show_open_in_pterm_link;
 
-    if !should_show_open_in_rook_link(&path, app) {
+    if !should_show_open_in_pterm_link(&path, app) {
         return None;
     }
 
@@ -58,8 +58,8 @@ fn open_in_rook_tooltip(
         None
     };
     Some(GridTooltipLink {
-        text: "Open in Rook".to_string(),
-        action: TerminalAction::OpenCodeInRook {
+        text: "Open in Polaris Terminal".to_string(),
+        action: TerminalAction::OpenCodeInPterm {
             path,
             layout: *EditorSettings::as_ref(app).open_file_layout.value(),
             line_col: line_and_column_num,
@@ -204,7 +204,7 @@ impl TerminalView {
 
         #[cfg_attr(not(feature = "local_fs"), allow(unused_mut))]
         if let Some(link) = &self.open_grid_link_tool_tip {
-            let mut open_in_rook = None;
+            let mut open_in_pterm = None;
             let mut show_in_file_explorer = None;
             let modifier = directly_open_link_keybinding_string();
             let mut detail = Some(format!("[{modifier} Click]"));
@@ -213,11 +213,11 @@ impl TerminalView {
                 if let GridHighlightedLink::File(file_link) = link
                     && let Some(path) = file_link.get_inner().absolute_path()
                 {
-                    open_in_rook = open_in_rook_tooltip(
+                    open_in_pterm = open_in_pterm_tooltip(
                         path.clone(),
                         file_link.get_inner().line_and_column_num,
                         &mut detail,
-                        self.mouse_states.open_in_rook_tooltip.clone(),
+                        self.mouse_states.open_in_pterm_tooltip.clone(),
                         app,
                     );
                     show_in_file_explorer = Some(show_in_file_explorer_tooltip(
@@ -240,14 +240,14 @@ impl TerminalView {
                 detail,
             });
 
-            links.extend(open_in_rook);
+            links.extend(open_in_pterm);
             links.extend(show_in_file_explorer);
         }
 
         #[cfg_attr(not(feature = "local_fs"), allow(unused_mut))]
         if let Some(tooltip_info) = &self.open_rich_content_link_tool_tip {
             element_id = tooltip_info.position_id.to_owned();
-            let mut open_in_rook = None;
+            let mut open_in_pterm = None;
             let mut show_in_file_explorer = None;
             let modifier_string = directly_open_link_keybinding_string();
             let mut detail = Some(format!("[{modifier_string} Click]"));
@@ -260,11 +260,11 @@ impl TerminalView {
                     ..
                 } = &tooltip_info.link
                 {
-                    open_in_rook = open_in_rook_tooltip(
+                    open_in_pterm = open_in_pterm_tooltip(
                         absolute_path.clone(),
                         *line_and_column_num,
                         &mut detail,
-                        self.mouse_states.open_in_rook_tooltip.clone(),
+                        self.mouse_states.open_in_pterm_tooltip.clone(),
                         app,
                     );
                     show_in_file_explorer = Some(show_in_file_explorer_tooltip(
@@ -281,7 +281,7 @@ impl TerminalView {
                 detail,
             });
 
-            links.extend(open_in_rook);
+            links.extend(open_in_pterm);
             links.extend(show_in_file_explorer);
         }
 

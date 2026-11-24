@@ -1,9 +1,9 @@
-use rook_core::features::FeatureFlag;
-use rookui::elements::ScrollOffset;
-use rookui::units::Pixels;
+use pterm_core::features::FeatureFlag;
+use ptermui::elements::ScrollOffset;
+use ptermui::units::Pixels;
 #[cfg(not(target_family = "wasm"))]
-use rookui::{AppContext, WeakViewHandle};
-use rookui::{ViewContext, ViewHandle};
+use ptermui::{AppContext, WeakViewHandle};
+use ptermui::{ViewContext, ViewHandle};
 
 #[cfg(not(target_family = "wasm"))]
 use super::FILE_HEADER_HEIGHT;

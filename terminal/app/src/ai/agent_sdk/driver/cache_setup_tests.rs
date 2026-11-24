@@ -3,7 +3,7 @@ use std::ffi::OsStr;
 use std::path::Path;
 
 use cloud_object_models::{CodeForge, SourceRepo};
-use rook_isolation_platform::IsolationPlatformType;
+use pterm_isolation_platform::IsolationPlatformType;
 
 use super::{build_export_command, repository_cache_source, should_setup_cache};
 use crate::terminal::shell::ShellType;

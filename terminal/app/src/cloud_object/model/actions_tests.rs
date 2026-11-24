@@ -1,5 +1,5 @@
 use chrono::{Duration, Utc};
-use rookui::App;
+use ptermui::App;
 
 use super::{ObjectAction, ObjectActionSubtype, ObjectActionType, ObjectActions};
 

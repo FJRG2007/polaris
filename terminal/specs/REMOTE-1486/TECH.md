@@ -7,9 +7,9 @@ Sub-specs (lower stack branches):
 ## Context
 The product spec describes a chip + `/move-to-cloud` slash command that opens a split cloud-mode pane next to the local agent to hand off the active local Oz conversation to the cloud. The user types the follow-up prompt and submits inside the pane's existing cloud-mode input bar; the cloud agent runs in a fresh sandbox, gets a forked copy of the conversation history, and rehydrates from a workspace snapshot taken on the local machine.
 The pieces this builds on already exist:
-- **Cloud→cloud handoff and rehydration** (REMOTE-1290): `snapshots/{run_id}/{execution_id}/` GCS layout, the `<system-message>`-wrapped `UserQuery` rehydration prompt injected by `logic/ai/multi_agent/runtime/interceptors/input.go:433` via `ResolveHandoffRehydrationPrompt` in `../rook-server/logic/ai/ambient_agents/handoff_rehydration.go`. Server discovers snapshot files by GCS path convention (`ListSnapshotFiles` in `../rook-server/logic/ai/ambient_agents/attachment_storage.go:281`), no DB column needed.
+- **Cloud→cloud handoff and rehydration** (REMOTE-1290): `snapshots/{run_id}/{execution_id}/` GCS layout, the `<system-message>`-wrapped `UserQuery` rehydration prompt injected by `logic/ai/multi_agent/runtime/interceptors/input.go:433` via `ResolveHandoffRehydrationPrompt` in `../polaris-terminal-server/logic/ai/ambient_agents/handoff_rehydration.go`. Server discovers snapshot files by GCS path convention (`ListSnapshotFiles` in `../polaris-terminal-server/logic/ai/ambient_agents/attachment_storage.go:281`), no DB column needed.
 - **End-of-run snapshot pipeline** (REMOTE-1332): `app/src/ai/agent_sdk/driver/snapshot.rs` reads JSONL declarations and uploads patches + a `snapshot_state.json` manifest. The pipeline is generic over JSONL — it doesn't care who wrote the declarations or where the artifacts go.
-- **`task.AgentConversationID` is the load-bearing field**: `RunAgentRequest` already accepts `ConversationID *string` at `../rook-server/router/handlers/public_api/agent_webhooks.go:205`, persisted onto the new task as `AgentConversationID`. The cloud-side resume happens via the `--task-id` chain: the worker passes only `--task-id` (not `--conversation`); the embedded CLI's `--task-id` path fetches the task metadata, reads `conversation_id` off it, and resumes via `get_ai_conversation`. See section 8 for the full trace.
+- **`task.AgentConversationID` is the load-bearing field**: `RunAgentRequest` already accepts `ConversationID *string` at `../polaris-terminal-server/router/handlers/public_api/agent_webhooks.go:205`, persisted onto the new task as `AgentConversationID`. The cloud-side resume happens via the `--task-id` chain: the worker passes only `--task-id` (not `--conversation`); the embedded CLI's `--task-id` path fetches the task metadata, reads `conversation_id` off it, and resumes via `get_ai_conversation`. See section 8 for the full trace.
 - **Local fork**: `BlocklistAIHistoryModel::fork_conversation` at `app/src/ai/blocklist/history_model.rs:1016` already produces a forked AIConversation by copying tasks. We need a server-side analogue that operates on a `server_conversation_token`.
 - **EnvironmentSelector**: existing component at `app/src/ai/blocklist/agent_view/agent_input_footer/environment_selector.rs` reads `CloudAmbientAgentEnvironment::get_all` from `app/src/ai/cloud_environments/mod.rs:114`. Each env carries `github_repos: Vec<GithubRepo>` so overlap with our touched-repo set is computable client-side.
 - **Agent input footer chips**: rendered by `app/src/ai/blocklist/agent_view/agent_input_footer/chips.rs`. The chip system is data-driven via `ChipResult` and slot positions (left/right). We add a new chip kind here.
@@ -18,9 +18,9 @@ The pieces this builds on already exist:
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant C as Local Rook Client
+    participant C as Local Polaris Terminal Client
     participant LC as Local Conversation
-    participant API as rook-server (public API)
+    participant API as polaris-terminal-server (public API)
     participant DB as Postgres
     participant GCS
     participant Disp as Dispatcher
@@ -124,7 +124,7 @@ func ForkConversation(
     principal types.Principal,
 ) (string, error)
 ```
-Location: alongside `UpsertAIConversationMetadata` / `CreateThirdPartyAIConversation` in `../rook-server/logic/ai_conversation_object.go`. Steps:
+Location: alongside `UpsertAIConversationMetadata` / `CreateThirdPartyAIConversation` in `../polaris-terminal-server/logic/ai_conversation_object.go`. Steps:
 1. **Authorize.** `GetAIConversationObjectInfo(sourceConversationID)` + require `ViewAction` for `principal` (mirrors `CheckAndRecordConversationAccess` at `ai_conversation_object.go:603`); reject with `NotAuthorizedError` otherwise.
 2. **Require persisted source data.** `DoesConversationDataExist(ctx, sourceConversationID)` rejects unsynced conversations before task creation.
 3. **Read source metadata.** `AIConversationMetadataStore.GetUsageByConversationIDs([sourceConversationID])` so the fork inherits `title`, `working_directory`, `harness`, `latest_git_branch`.
@@ -133,7 +133,7 @@ Location: alongside `UpsertAIConversationMetadata` / `CreateThirdPartyAIConversa
 6. **Return `newID`** and emit a structured log line linking source→fork→principal.
 The server-side copy keeps conversation bytes inside GCS even for large conversations. No lineage column is persisted today; if one is added later, the helper can populate it.
 ### 6. Server-side `RunAgentRequest` extensions
-Extend `RunAgentRequest` in `../rook-server/router/handlers/public_api/agent_webhooks.go:199` with two new fields:
+Extend `RunAgentRequest` in `../polaris-terminal-server/router/handlers/public_api/agent_webhooks.go:199` with two new fields:
 ```go path=null start=null
 type RunAgentRequest struct {
     // existing fields...
@@ -184,11 +184,11 @@ With the conversation-resume side covered above, the only remaining sandbox-side
 - `fetch_and_download_handoff_snapshot_attachments` (`app/src/ai/agent_sdk/driver/attachments.rs:68`) calls `GET /agent/runs/:runId/handoff/attachments`. The server reads the active execution's `Input.InitialSnapshotToken` and lists files at `handoff/{token}/`; if the token is absent (post-first-execution retries, cloud→cloud handoffs) it falls back to the latest ENDED execution's `snapshots/{run_id}/{exec_id}/` upload.
 - The runtime's rehydration message construction (`logic/ai/multi_agent/runtime/interceptors/input.go:433` → `resolveHandoffRehydrationMessage`) shares the same two-rule discovery as the `/handoff/attachments` handler. It lists snapshot files at the resolved prefix and prepends the `<system-message>`-wrapped UserQuery to the runtime's first input.
 ### 10. Feature flags
-Add `FeatureFlag::HandoffLocalCloud` in `crates/rook_features/src/lib.rs`. The chip, slash command, client API methods, and server endpoint behavior are all gated on `OzHandoff && HandoffLocalCloud`. Both flags must be enabled for the feature to function.
+Add `FeatureFlag::HandoffLocalCloud` in `crates/pterm_features/src/lib.rs`. The chip, slash command, client API methods, and server endpoint behavior are all gated on `OzHandoff && HandoffLocalCloud`. Both flags must be enabled for the feature to function.
 On the server, mirror with a `local_to_cloud_handoff` flag in `config/features/features.go`. The server feature-flag check happens at the request handler level (returns 404 / `feature not available` when off). This mirrors `HandoffCloudCloudEnabled` which already exists.
 ## Risks and mitigations
 - **Initial snapshot token expires before task creation.** The `initial_snapshot_token` is short-lived (15 min, matching presigned URL lifetime); a stalled handoff past expiry would fail with a "can't find files" error. *Mitigation:* the upload-snapshot endpoint returns the expiry timestamp so the pane can request a fresh token before the deadline; as a backstop, the task-creation handler returns a structured "initial snapshot token expired" error so the client can transparently retry.
-- **Fork on a very large conversation.** `ForkConversation` copies the source conversation object inside GCS. *Mitigation:* use the server-side `CopyConversationDataInGCS` path so bytes do not round-trip through the rook-server process.
+- **Fork on a very large conversation.** `ForkConversation` copies the source conversation object inside GCS. *Mitigation:* use the server-side `CopyConversationDataInGCS` path so bytes do not round-trip through the polaris-terminal-server process.
 - **Source conversation isn't fully synced to GCS.** A `server_conversation_token` only proves the metadata row exists; the GCS data (`{conversation_id}.pb`) may still be in flight or never written. *Mitigation:* the fork helper checks `DoesConversationDataExist` before copying and returns a structured `SourceConversationNotPersisted` error; the pane surfaces it via `HandoffSubmissionState::Failed`.
 - **Unauthorized cross-user fork.** A caller could try to fork another user's conversation. *Mitigation:* `ForkConversation` step 1 requires `ViewAction` on the source via the existing `auth_types.For(ctx)` engine (same posture as `CheckAndRecordConversationAccess`); the new fork is owned by the requesting principal, not the source's owner.
 - **Local-only changes that aren't reproducible in cloud.** Private forks, submodules, large LFS files. `git diff --binary HEAD` and `git ls-files --others --exclude-standard` cover the common cases; submodules are not recursed (same as cloud→cloud). *Mitigation:* acceptable for V0; the rehydration prompt instructs the agent to report apply failures.
@@ -196,7 +196,7 @@ On the server, mirror with a `local_to_cloud_handoff` flag in `config/features/f
 - **Snapshot upload tail latency.** Pathological binary diffs hit the existing pipeline's cap (3 retries, exponential backoff, 2-min ceiling). *Mitigation:* same caps as cloud→cloud; the user sees the "Starting…" state for the duration and closing the pane aborts in-flight uploads.
 ## Testing and validation
 Per-branch unit-test coverage (touched-repo helpers, snapshot pipeline, `SessionJoinInfo`) is documented in `TOUCHED_WORKSPACE_TECH.md` and `SNAPSHOT_UPLOAD_TECH.md`.
-### Server tests (`../rook-server`)
+### Server tests (`../polaris-terminal-server`)
 - `agent_webhooks_test.go::TestHandoff_ForkAndInitialSnapshotToken`: end-to-end inside the test harness. Pre-creates a source conversation, calls the upload-snapshot endpoint, uploads test files, calls `POST /agent/runs` with both new fields, asserts that the new task has `AgentConversationID` pointing at a fresh forked conversation, that `handoff/{initial_snapshot_token}/` retains the uploaded files (no move), and that the QUEUED `ai_run_executions` row's `Input.InitialSnapshotToken` matches the token.
 - `agent_webhooks_test.go::TestHandoff_FlagOff`: with `local_to_cloud_handoff=false`, the request fails with the expected error and no task / no fork side effects.
 - `agent_webhooks_test.go::TestHandoff_InitialSnapshotTokenWithoutFiles`: `POST /agent/runs` with a `initial_snapshot_token` whose prefix is empty creates the task normally; `/handoff/attachments` returns an empty list at rehydration time.
@@ -207,7 +207,7 @@ Per-branch unit-test coverage (touched-repo helpers, snapshot pipeline, `Session
 - Toggling settings to verify chip availability under various states (no synced server token, `CloudConversations` disabled, etc.).
 - Manually break a touched repo's `.git` and confirm the manifest captures it as `gather_failed` and the rest of the snapshot proceeds.
 ### Feature-flag rollout
-- Server flag (`local_to_cloud_handoff`) goes Dogfood first, end-to-end tested with a Rook engineer's local→cloud handoff against a staging worker.
+- Server flag (`local_to_cloud_handoff`) goes Dogfood first, end-to-end tested with a Polaris Terminal engineer's local→cloud handoff against a staging worker.
 - Client flag (`HandoffLocalCloud`) follows once server flag is stable.
 - Promote together to Preview and Stable per the standard `promote-feature` skill.
 ## Follow-ups

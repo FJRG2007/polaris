@@ -14,11 +14,11 @@ use ai::agent::orchestration_config::OrchestrationConfig;
 use ai::skills::SkillReference;
 use futures::FutureExt;
 use futures::future::BoxFuture;
-use rook_cli::agent::Harness;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_core::telemetry::TelemetryEvent as _;
-use rook_core::{send_telemetry_from_app_ctx, send_telemetry_from_ctx};
-use rookui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use pterm_cli::agent::Harness;
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_core::telemetry::TelemetryEvent as _;
+use pterm_core::{send_telemetry_from_app_ctx, send_telemetry_from_ctx};
+use ptermui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::start_agent::{StartAgentExecutor, StartAgentOutcome};
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
@@ -297,7 +297,7 @@ impl RunAgentsExecutor {
                     let kind = match slot {
                         ChildSlot::Failed(error) => RunAgentsAgentOutcomeKind::Failed { error },
                         ChildSlot::Pending(recv) => {
-                            let timeout = rookui::r#async::Timer::after(SPAWN_TIMEOUT);
+                            let timeout = ptermui::r#async::Timer::after(SPAWN_TIMEOUT);
                             match futures::future::select(Box::pin(recv.recv()), Box::pin(timeout))
                                 .await
                             {

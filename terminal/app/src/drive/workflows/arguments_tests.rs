@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::iter::zip;
 
-use rookui::App;
+use ptermui::App;
 
 use super::ArgumentsState;
 use crate::workflows::workflow::Argument;

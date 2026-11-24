@@ -7,9 +7,9 @@ pub mod mixer;
 pub mod navigation;
 #[cfg_attr(not(feature = "local_tty"), allow(dead_code))]
 pub mod new_session;
+pub mod pterm_drive;
 pub mod render_util;
 pub mod repos;
-pub mod rook_drive;
 mod selected_items;
 pub mod separator_search_item;
 pub mod tabs;

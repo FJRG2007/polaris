@@ -1,15 +1,15 @@
 use std::net::SocketAddr;
 
-use rook_core::channel::{Channel, ChannelState};
-use rook_errors::report_error;
-use rookui_core::{Entity, ModelContext, SingletonEntity};
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_errors::report_error;
+use ptermui_core::{Entity, ModelContext, SingletonEntity};
 use tower_http::trace::TraceLayer;
 
-// Spells "Rook" - should hopefully not conflict with other ports.
+// Spells "Polaris Terminal" - should hopefully not conflict with other ports.
 // Does not conflict with known ports on https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers
 const PORT_BASE: u16 = 9277;
 
-/// A singleton model for the small HTTP server that is run by the Rook client.
+/// A singleton model for the small HTTP server that is run by the Polaris Terminal client.
 pub struct HttpServer {
     /// The tokio runtime that the HTTP server runs on.
     ///

@@ -1,8 +1,8 @@
 use ai::agent::action_result::FetchConversationResult;
 use futures::FutureExt;
 use futures::future::BoxFuture;
-use rook_errors::report_error;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 use crate::BlocklistAIHistoryModel;

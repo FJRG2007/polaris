@@ -2,17 +2,17 @@ use std::cell::RefCell;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use ptermui::elements::{
     Border, ChildView, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex,
     MainAxisAlignment, MainAxisSize, ParentElement, Radius, Shrinkable, Text,
 };
-use rookui::keymap::Keystroke;
-use rookui::text_layout::ClipConfig;
-use rookui::units::Pixels;
-use rookui::{
+use ptermui::keymap::Keystroke;
+use ptermui::text_layout::ClipConfig;
+use ptermui::units::Pixels;
+use ptermui::{
     AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -330,7 +330,7 @@ impl CommentEditor {
         let theme = appearance.theme();
         let sub_text_color = theme.sub_text_color(Fill::Solid(background)).into_solid();
         let icon = Icon::Github
-            .to_rookui_icon(Fill::Solid(sub_text_color))
+            .to_ptermui_icon(Fill::Solid(sub_text_color))
             .finish();
 
         let label = Text::new(

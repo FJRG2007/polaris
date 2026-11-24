@@ -1,6 +1,6 @@
 use itertools::Itertools as _;
-use rookui::elements::ChildView;
-use rookui::{
+use ptermui::elements::ChildView;
+use ptermui::{
     Element as _, Entity, SingletonEntity as _, TypedActionView, View, ViewAsRef, ViewContext,
     ViewHandle,
 };
@@ -130,7 +130,7 @@ impl View for EnvVarSelector {
         "EnvVarSelector"
     }
 
-    fn render(&self, _app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, _app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         ChildView::new(&self.dropdown).finish()
     }
 }

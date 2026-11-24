@@ -5,9 +5,9 @@ use std::pin::Pin;
 use std::time::Duration;
 
 use anyhow::Context;
-use rook_core::safe_info;
-use rook_managed_secrets::ManagedSecretManager;
-use rookui::{ModelSpawner, SingletonEntity};
+use pterm_core::safe_info;
+use pterm_managed_secrets::ManagedSecretManager;
+use ptermui::{ModelSpawner, SingletonEntity};
 use tempfile::{Builder, NamedTempFile};
 use vec1::Vec1;
 
@@ -21,7 +21,7 @@ use crate::ai::cloud_environments::AwsProviderConfig;
 /// set this to the current maximum task duration.
 const IDENTITY_TOKEN_DURATION: Duration = Duration::from_hours(3);
 
-/// AWS STS audience for Rook Oz OIDC federation.
+/// AWS STS audience for Polaris Terminal Oz OIDC federation.
 const AWS_AUDIENCE: &str = "sts.amazonaws.com";
 
 /// Provides AWS Web Identity credentials for the agent session.
@@ -96,7 +96,7 @@ impl CloudProvider for AwsCloudProvider {
                     ManagedSecretManager::handle(ctx)
                         .as_ref(ctx)
                         .issue_task_identity_token(
-                            rook_managed_secrets::client::IdentityTokenOptions {
+                            pterm_managed_secrets::client::IdentityTokenOptions {
                                 audience,
                                 requested_duration: duration,
                                 subject_template,

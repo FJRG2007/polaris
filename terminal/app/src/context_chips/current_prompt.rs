@@ -7,12 +7,12 @@ use futures::{FutureExt as _, pin_mut};
 use instant::Instant;
 use itertools::Itertools;
 use parking_lot::FairMutex;
-use rook_completer::completer::CommandExitStatus;
-use rook_core::r#async::debounce;
-use rook_core::user_preferences::GetUserPreferences;
-use rook_errors::report_error;
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::{
+use pterm_completer::completer::CommandExitStatus;
+use pterm_core::r#async::debounce;
+use pterm_core::user_preferences::GetUserPreferences;
+use pterm_errors::report_error;
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::{
     AppContext, Entity, EntityId, ModelAsRef, ModelContext, ModelHandle, SingletonEntity,
     ViewHandle, WeakModelHandle,
 };
@@ -34,7 +34,7 @@ use crate::context_chips::display_chip::GitLineChanges;
 use crate::editor::EditorView;
 use crate::features::FeatureFlag;
 use crate::menu::{MenuItem, MenuItemFields};
-use crate::settings::{AISettings, AISettingsChangedEvent, InputSettings, RookPromptSeparator};
+use crate::settings::{AISettings, AISettingsChangedEvent, InputSettings, PtermPromptSeparator};
 use crate::terminal::event::BlockType;
 use crate::terminal::model::block::{Block, BlockMetadata};
 use crate::terminal::model::session::{ExecuteCommandOptions, Session, Sessions, SessionsEvent};
@@ -159,8 +159,8 @@ pub struct CurrentPrompt {
     renderable_chips: HashSet<ContextChipKind>,
 
     same_line_prompt_enabled: bool,
-    /// The separator to use as a trailing character at the end of Rook prompt, if any.
-    separator: RookPromptSeparator,
+    /// The separator to use as a trailing character at the end of Polaris Terminal prompt, if any.
+    separator: PtermPromptSeparator,
 
     latest_context: Option<PromptContext>,
     sessions: ModelHandle<Sessions>,
@@ -376,13 +376,13 @@ impl CurrentPrompt {
             .collect()
     }
 
-    /// Whether same line prompt is enabled for the Rook prompt.
+    /// Whether same line prompt is enabled for the Polaris Terminal prompt.
     pub fn same_line_prompt_enabled(&self) -> bool {
         self.same_line_prompt_enabled
     }
 
-    /// The separator for the current Rook prompt.
-    pub fn separator(&self) -> RookPromptSeparator {
+    /// The separator for the current Polaris Terminal prompt.
+    pub fn separator(&self) -> PtermPromptSeparator {
         self.separator
     }
 
@@ -666,7 +666,7 @@ impl CurrentPrompt {
         environment_variables: Option<HashMap<String, String>>,
         timeout: Option<Duration>,
         local_git_query: Option<LocalGitQuery>,
-    ) -> (Option<rook_completer::completer::CommandOutput>, bool) {
+    ) -> (Option<pterm_completer::completer::CommandOutput>, bool) {
         let command_future = async {
             #[cfg(feature = "local_tty")]
             if let Some(query) = local_git_query {
@@ -1369,7 +1369,7 @@ impl CurrentPrompt {
     #[cfg(test)]
     pub fn await_generators(
         &self,
-        ctx: &mut rookui::AppContext,
+        ctx: &mut ptermui::AppContext,
     ) -> futures_util::future::BoxFuture<'static, ()> {
         use futures_util::FutureExt;
         use itertools::Itertools;

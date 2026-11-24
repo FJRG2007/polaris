@@ -4,17 +4,17 @@
 Add support for `@` context (files, folders, and code symbols) in the CLI agent rich input composer — the input that appears when composing a prompt to send to a running CLI agent (Claude Code, Codex, Gemini CLI, etc.). Selected items are inserted as repo-relative paths.
 
 ## Problem
-When users compose prompts for CLI agents through Rook's rich input (Ctrl-G or the Compose button), they cannot reference files or code symbols. Users must manually type file paths without any discovery or autocomplete. The normal Rook agent input supports `@` context, but the CLI agent input does not.
+When users compose prompts for CLI agents through Polaris Terminal's rich input (Ctrl-G or the Compose button), they cannot reference files or code symbols. Users must manually type file paths without any discovery or autocomplete. The normal Polaris Terminal agent input supports `@` context, but the CLI agent input does not.
 
 The core constraint is that CLI agent input writes plain text to a PTY — so `@` context must resolve to a plain text path that the CLI agent can interpret.
 
 ## Goals
 - Let users attach file, folder, and code symbol paths via `@` in the CLI agent rich input.
 - Insert repo-relative paths as plain text.
-- Hide Rook-specific `@` context categories that CLI agents cannot interpret.
+- Hide Polaris Terminal-specific `@` context categories that CLI agents cannot interpret.
 
 ## Non-goals
-- Supporting `@` context types other than files/folders and code symbols (e.g., Blocks, Workflows, Diff Sets, Notebooks). These are Rook-specific concepts that CLI agents cannot interpret.
+- Supporting `@` context types other than files/folders and code symbols (e.g., Blocks, Workflows, Diff Sets, Notebooks). These are Polaris Terminal-specific concepts that CLI agents cannot interpret.
 
 ## Figma
 https://www.figma.com/design/CsBdBW4YoLgSAbr5eSkwV6/House-of-Agents?node-id=7001-18001&p=f&m=dev
@@ -28,7 +28,7 @@ User types `@` anywhere in the CLI agent rich input. This works regardless of po
 `@` context is only available in local sessions. It is not supported in SSH/remote contexts because file search and code symbol indexing rely on local filesystem access.
 
 ### Menu
-The AI context menu opens showing the available categories: files/folders and code symbols. These are the only categories relevant for CLI agents — all Rook-specific categories (Blocks, Workflows, Notebooks, Diff Sets, Conversations, etc.) are hidden.
+The AI context menu opens showing the available categories: files/folders and code symbols. These are the only categories relevant for CLI agents — all Polaris Terminal-specific categories (Blocks, Workflows, Notebooks, Diff Sets, Conversations, etc.) are hidden.
 
 ### Search
 The user can type after `@` to filter file results, reusing the existing file search logic. For example, typing `@foo` filters to files matching "foo" (e.g., `footer.rs`, `foo_bar.py`). This is the same search behavior already implemented for the file data source in the AI context menu.
@@ -36,7 +36,7 @@ The user can type after `@` to filter file results, reusing the existing file se
 ### Selection
 When the user selects a file or folder, the repo-relative path is inserted into the input buffer as plain text followed by a trailing space (e.g., `src/foo.rs `). The trailing space lets the user continue typing immediately. CLI agents typically reference files relative to the project root, so repo-relative paths are concise and consistent with how these tools handle file references. If the file is outside the project tree, fall back to an absolute path. No special chip or token rendering is needed.
 
-When the user is outside a git repository, the menu shows files from the current working directory (matching existing Rook behavior). Paths are relative to pwd in this case. This is the existing `CurrentFolderFiles` vs `RepoFiles` distinction in the AI context menu.
+When the user is outside a git repository, the menu shows files from the current working directory (matching existing Polaris Terminal behavior). Paths are relative to pwd in this case. This is the existing `CurrentFolderFiles` vs `RepoFiles` distinction in the AI context menu.
 
 ### Submission
 The inserted file path is part of the plain text written to the PTY. No special processing is needed at submit time.
@@ -47,12 +47,12 @@ The inserted file path is part of the plain text written to the PTY. No special 
 
 ## Success Criteria
 - Users can type `@` in the CLI agent rich input, see file/folder and code symbol results, select one, and have the repo-relative path inserted as text.
-- Rook-specific `@` context categories do not appear in the menu.
+- Polaris Terminal-specific `@` context categories do not appear in the menu.
 - This feature is only available in local sessions, not SSH/remote.
 
 ## Validation
-- Open a CLI agent rich input while Claude Code is running. Type `@`, verify files/folders and code symbols categories appear (no Rook-specific categories), select a file, verify the repo-relative path is inserted.
+- Open a CLI agent rich input while Claude Code is running. Type `@`, verify files/folders and code symbols categories appear (no Polaris Terminal-specific categories), select a file, verify the repo-relative path is inserted.
 - Verify `@foo` filters files by name.
 - Verify `@` works after `!` prefix in the buffer.
-- Verify that Rook-specific context categories (Blocks, Workflows, etc.) do not appear.
+- Verify that Polaris Terminal-specific context categories (Blocks, Workflows, etc.) do not appear.
 - Verify that `@` context is not available in SSH/remote sessions.

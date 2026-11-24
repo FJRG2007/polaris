@@ -1,10 +1,10 @@
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::{
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::{
     Align, CacheOption, ConstrainedBox, Container, CrossAxisAlignment, Element, Flex, Image,
     MainAxisAlignment, MouseStateHandle, ParentElement, Wrap,
 };
-use rookui::ui_components::components::UiComponent;
-use rookui::{AppContext, Entity, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{AppContext, Entity, TypedActionView, View, ViewContext, ViewHandle};
 
 use super::SettingsSection;
 use super::search::SearchQuery;
@@ -55,7 +55,7 @@ impl SettingsWidget for AboutPageWidget {
     type View = AboutPageView;
 
     fn search_terms(&self) -> &str {
-        "about rook version"
+        "about polaris-terminal version"
     }
 
     fn render(
@@ -68,9 +68,9 @@ impl SettingsWidget for AboutPageWidget {
         let ui_builder = appearance.ui_builder();
 
         let image_path = if theme.inferred_color_scheme() == ColorScheme::LightOnDark {
-            "bundled/svg/rook-logo-with-light-title.svg"
+            "bundled/svg/polaris-terminal-logo-with-light-title.svg"
         } else {
-            "bundled/svg/rook-logo-with-dark-title.svg"
+            "bundled/svg/polaris-terminal-logo-with-dark-title.svg"
         };
 
         let version = ChannelState::app_version().unwrap_or("v#.##.###");
@@ -119,7 +119,7 @@ impl SettingsWidget for AboutPageWidget {
                 .with_child(version_row.finish())
                 .with_child(
                     ui_builder
-                        .span("Copyright 2026 Rook")
+                        .span("Copyright 2026 Polaris Terminal")
                         .build()
                         .with_margin_top(16.)
                         .finish(),

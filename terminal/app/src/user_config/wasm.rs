@@ -1,23 +1,23 @@
 use std::path::Path;
 
-use rookui::ModelContext;
+use ptermui::ModelContext;
 
 use crate::launch_configs::launch_config::LaunchConfig;
 use crate::tab_configs::{TabConfig, TabConfigError};
-use crate::themes::theme::RookThemeConfig;
+use crate::themes::theme::PtermThemeConfig;
 use crate::workflows::workflow::Workflow;
 
-impl super::RookConfig {
+impl super::PtermConfig {
     pub fn new(_ctx: &mut ModelContext<Self>) -> Self {
         Self {
-            theme_config: RookThemeConfig::new(),
+            theme_config: PtermThemeConfig::new(),
             ..Default::default()
         }
     }
 }
 
 /// Loads all themes relative to the `workflow_path`.
-pub fn load_theme_configs(_theme_path: &Path) -> RookThemeConfig {
+pub fn load_theme_configs(_theme_path: &Path) -> PtermThemeConfig {
     // There's no local filesystem for wasm, so we'll never be able to retrieve
     // themes from any path.
     Default::default()

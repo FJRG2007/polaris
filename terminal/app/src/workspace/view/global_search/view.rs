@@ -8,19 +8,18 @@ use std::time::Duration;
 use async_channel::Sender;
 use instant::Instant;
 use pathfinder_geometry::vector::vec2f;
-use remote_server::HostId;
-use rook_core::r#async::debounce;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::color::internal_colors;
-use rook_core::ui::theme::{AnsiColorIdentifier, Fill as ThemeFill};
-use rook_editor::editor::NavigationKey;
-use rook_ripgrep::search::Submatch;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::elements::{
+use pterm_core::r#async::debounce;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_core::ui::theme::{AnsiColorIdentifier, Fill as ThemeFill};
+use pterm_editor::editor::NavigationKey;
+use pterm_ripgrep::search::Submatch;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DispatchEventResult, Empty, EventHandler, Fill, Flex, FormattedTextElement,
     Highlight, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
@@ -28,16 +27,17 @@ use rookui::elements::{
     Scrollable, ScrollableElement, ScrollbarWidth, Shrinkable, Stack, Text, UniformList,
     UniformListState,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::platform::Cursor;
-use rookui::text_layout::{TextAlignment, TextStyle};
-use rookui::ui_components::components::{UiComponent as _, UiComponentStyles};
-use rookui::ui_components::text::Span;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::Cursor;
+use ptermui::text_layout::{TextAlignment, TextStyle};
+use ptermui::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui::ui_components::text::Span;
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle,
 };
+use remote_server::HostId;
 use string_offset::{ByteOffset, CharCounter};
 
 use crate::TelemetryEvent;
@@ -602,7 +602,7 @@ impl GlobalSearchView {
     }
 
     pub fn init(app: &mut AppContext) {
-        use rookui::keymap::macros::*;
+        use ptermui::keymap::macros::*;
 
         app.register_fixed_bindings([
             FixedBinding::new(
@@ -1026,7 +1026,7 @@ impl GlobalSearchView {
             .iter()
             .filter_map(|root| root.to_local_path().map(Path::to_path_buf))
             .collect();
-        let deduped_local = rook_util::path::group_roots_by_common_ancestor(&local_roots).roots;
+        let deduped_local = pterm_util::path::group_roots_by_common_ancestor(&local_roots).roots;
 
         let mut remote_roots_by_host: Vec<(HostId, Vec<StandardizedPath>)> = Vec::new();
         for root in &roots {
@@ -1046,7 +1046,7 @@ impl GlobalSearchView {
         let deduped_remote = remote_roots_by_host
             .into_iter()
             .flat_map(|(host_id, paths)| {
-                rook_util::path::group_roots_by_common_ancestor(&paths)
+                pterm_util::path::group_roots_by_common_ancestor(&paths)
                     .roots
                     .into_iter()
                     .map(move |path| {
@@ -1148,7 +1148,7 @@ impl GlobalSearchView {
         directory_path: &LocalOrRemotePath,
         matched_path: &MatchedPath,
         appearance: &Appearance,
-        theme: &rook_core::ui::theme::RookTheme,
+        theme: &pterm_core::ui::theme::PtermTheme,
         app: &AppContext,
     ) -> Box<dyn Element> {
         let is_selected = self.is_row_at_index_selected(index);
@@ -1179,7 +1179,7 @@ impl GlobalSearchView {
             let icon_size = 16.0;
             let chevron_color = item_highlight_state.text_and_icon_color(appearance);
             let chevron_icon = chevron_icon_enum
-                .to_rookui_icon(ThemeFill::from(chevron_color))
+                .to_ptermui_icon(ThemeFill::from(chevron_color))
                 .finish();
             let chevron_icon = ConstrainedBox::new(chevron_icon)
                 .with_width(icon_size)
@@ -1231,7 +1231,7 @@ impl GlobalSearchView {
             let icon_color = list_highlight_state.text_and_icon_color(appearance);
             let file_icon = match icon_from_file_path {
                 ImageOrIcon::Icon(icon) => {
-                    icon.to_rookui_icon(ThemeFill::from(icon_color)).finish()
+                    icon.to_ptermui_icon(ThemeFill::from(icon_color)).finish()
                 }
                 ImageOrIcon::Image(image) => image,
             };
@@ -1323,7 +1323,7 @@ impl GlobalSearchView {
         matched: &Match,
         match_index: usize,
         appearance: &Appearance,
-        theme: &rook_core::ui::theme::RookTheme,
+        theme: &pterm_core::ui::theme::PtermTheme,
     ) -> Box<dyn Element> {
         let is_selected = self.is_row_at_index_selected(index);
         let line_number = matched.line_number;
@@ -1922,7 +1922,7 @@ impl GlobalSearchView {
         index: usize,
         dir_entry: &DirectoryEntry,
         appearance: &Appearance,
-        theme: &rook_core::ui::theme::RookTheme,
+        theme: &pterm_core::ui::theme::PtermTheme,
         app: &AppContext,
     ) -> Box<dyn Element> {
         let is_selected = self.is_row_at_index_selected(index);
@@ -1951,7 +1951,7 @@ impl GlobalSearchView {
             let icon_size = 16.0;
             let chevron_color = list_highlight_state.text_and_icon_color(appearance);
             let chevron_icon = chevron_icon_enum
-                .to_rookui_icon(ThemeFill::from(chevron_color))
+                .to_ptermui_icon(ThemeFill::from(chevron_color))
                 .finish();
             let chevron_icon = ConstrainedBox::new(chevron_icon)
                 .with_width(icon_size)
@@ -1962,7 +1962,7 @@ impl GlobalSearchView {
             // Folder icon
             let icon_color = list_highlight_state.text_and_icon_color(appearance);
             let folder_icon = Icon::Folder
-                .to_rookui_icon(ThemeFill::from(icon_color))
+                .to_ptermui_icon(ThemeFill::from(icon_color))
                 .finish();
             let folder_icon_element = Container::new(
                 ConstrainedBox::new(folder_icon)
@@ -2185,7 +2185,7 @@ impl View for GlobalSearchView {
         if self.capped_matches {
             let alert_icon = ConstrainedBox::new(
                 Icon::AlertTriangle
-                    .to_rookui_icon(ThemeFill::Solid(
+                    .to_ptermui_icon(ThemeFill::Solid(
                         theme.terminal_colors().normal.yellow.into(),
                     ))
                     .finish(),
@@ -2261,7 +2261,7 @@ impl GlobalSearchView {
             .with_child(
                 Container::new(
                     ConstrainedBox::new(
-                        icon.to_rookui_icon(ThemeFill::Solid(internal_colors::neutral_6(theme)))
+                        icon.to_ptermui_icon(ThemeFill::Solid(internal_colors::neutral_6(theme)))
                             .finish(),
                     )
                     .with_width(24.)

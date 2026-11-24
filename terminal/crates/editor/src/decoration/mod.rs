@@ -1,4 +1,4 @@
-use rookui_core::ModelContext;
+use ptermui_core::ModelContext;
 
 use crate::content::buffer::BufferSnapshot;
 use crate::content::edit::PreciseDelta;

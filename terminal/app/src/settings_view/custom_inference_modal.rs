@@ -1,16 +1,16 @@
 use ::ai::api_keys::{CustomEndpoint, CustomEndpointSchema, validate_custom_endpoint_url};
-use rook_editor::editor::NavigationKey;
-use rookui::elements::{
+use pterm_editor::editor::NavigationKey;
+use ptermui::elements::{
     Border, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Empty, Expanded, Flex, MainAxisSize, MouseStateHandle,
     ParentElement, Radius, SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth,
     Shrinkable, Stack, Text,
 };
-use rookui::fonts::FamilyId;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::units::Pixels;
-use rookui::{
+use ptermui::fonts::FamilyId;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::units::Pixels;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -1042,7 +1042,7 @@ impl View for CustomEndpointModal {
             ScrollbarWidth::Custom(MODAL_SCROLLBAR_WIDTH),
             theme.nonactive_ui_text_color().into(),
             theme.active_ui_text_color().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .with_overlayed_scrollbar()
         .with_padding_start(0.)

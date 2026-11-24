@@ -3,9 +3,9 @@
 //! [`TextBuffer`] API.
 
 use anyhow::anyhow;
-use rookui_core::text::TextBuffer;
-use rookui_core::text::point::Point;
-use rookui_core::text::word_boundaries::WordBoundariesPolicy;
+use ptermui_core::text::TextBuffer;
+use ptermui_core::text::point::Point;
+use ptermui_core::text::word_boundaries::WordBoundariesPolicy;
 use string_offset::CharOffset;
 
 use super::buffer::{Buffer, ToBufferCharOffset, ToBufferPoint};

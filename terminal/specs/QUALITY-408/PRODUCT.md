@@ -2,21 +2,21 @@
 
 ## Summary
 
-On macOS, give the Preview channel its own config directory (`~/.rook-preview`) instead of sharing `~/.rook` with Stable. On first launch, migrate existing config by symlinking each top-level entry from `~/.rook` into `~/.rook-preview`, so existing Preview users keep all their customizations.
+On macOS, give the Preview channel its own config directory (`~/.polaris-terminal-preview`) instead of sharing `~/.polaris-terminal` with Stable. On first launch, migrate existing config by symlinking each top-level entry from `~/.polaris-terminal` into `~/.polaris-terminal-preview`, so existing Preview users keep all their customizations.
 
 ## Problem
 
-Stable and Preview currently share the `~/.rook` directory on macOS. This means:
+Stable and Preview currently share the `~/.polaris-terminal` directory on macOS. This means:
 
 - Settings changes made in one channel affect the other.
 - Preview experiments (themes, keybindings, tab configs, etc.) can break the Stable experience.
 - There is no safe way to test config-level changes on Preview without risking Stable user data.
 
-Other channels (Dev, Integration, Local) already use separate directories (`.rook-dev`, `.rook-integration`, `.rook-local`). Preview is the only non-Stable channel that still shares with Stable.
+Other channels (Dev, Integration, Local) already use separate directories (`.polaris-terminal-dev`, `.polaris-terminal-integration`, `.polaris-terminal-local`). Preview is the only non-Stable channel that still shares with Stable.
 
 ## Goals
 
-1. Preview uses `~/.rook-preview` as its config directory on macOS.
+1. Preview uses `~/.polaris-terminal-preview` as its config directory on macOS.
 2. Existing Preview users retain all their customizations after the change.
 3. Stable users see no change whatsoever.
 4. The migration is automatic and requires no user action.
@@ -36,48 +36,48 @@ Figma: none needed (no UI changes).
 
 ### First launch after upgrade (Preview channel)
 
-When a Preview user launches Rook for the first time after this change:
+When a Preview user launches Polaris Terminal for the first time after this change:
 
-1. Rook detects that `~/.rook-preview` does not exist.
-2. Rook creates `~/.rook-preview`.
-3. For each top-level entry in `~/.rook` (files and directories), Rook creates a symbolic link in `~/.rook-preview` pointing to the corresponding entry in `~/.rook`.
-4. Preview proceeds using `~/.rook-preview` as its config directory.
+1. Polaris Terminal detects that `~/.polaris-terminal-preview` does not exist.
+2. Polaris Terminal creates `~/.polaris-terminal-preview`.
+3. For each top-level entry in `~/.polaris-terminal` (files and directories), Polaris Terminal creates a symbolic link in `~/.polaris-terminal-preview` pointing to the corresponding entry in `~/.polaris-terminal`.
+4. Preview proceeds using `~/.polaris-terminal-preview` as its config directory.
 
 After migration, the directory looks like:
 
 ```
-~/.rook-preview/
-  keybindings.yaml  -> ~/.rook/keybindings.yaml
-  themes/           -> ~/.rook/themes/
-  workflows/        -> ~/.rook/workflows/
-  tab_configs/      -> ~/.rook/tab_configs/
+~/.polaris-terminal-preview/
+  keybindings.yaml  -> ~/.polaris-terminal/keybindings.yaml
+  themes/           -> ~/.polaris-terminal/themes/
+  workflows/        -> ~/.polaris-terminal/workflows/
+  tab_configs/      -> ~/.polaris-terminal/tab_configs/
   ...etc
 ```
 
 ### Subsequent launches (Preview)
 
-No migration occurs. Preview reads and writes from `~/.rook-preview`.
+No migration occurs. Preview reads and writes from `~/.polaris-terminal-preview`.
 
 ### Stable users
 
-Zero change. Stable continues to use `~/.rook`.
+Zero change. Stable continues to use `~/.polaris-terminal`.
 
 ### settings.toml is not symlinked
 
-The `settings.toml` file (used by the Settings File feature) is intentionally kept separate between Stable and Preview. The migration uses an explicit exclude list (`MIGRATION_EXCLUDED_FILES`) to skip `settings.toml` during symlinking. This handles the case where a user runs Stable first (which creates `settings.toml` in `~/.rook`) and later updates Preview — without the filter, the migration would symlink the file, causing both channels to share settings.
+The `settings.toml` file (used by the Settings File feature) is intentionally kept separate between Stable and Preview. The migration uses an explicit exclude list (`MIGRATION_EXCLUDED_FILES`) to skip `settings.toml` during symlinking. This handles the case where a user runs Stable first (which creates `settings.toml` in `~/.polaris-terminal`) and later updates Preview — without the filter, the migration would symlink the file, causing both channels to share settings.
 
 ### Behavior after migration
 
 - **Reading config**: Preview reads through symlinks, so existing Stable config is visible.
 - **Modifying a shared file**: If Preview modifies a symlinked file (e.g., `keybindings.yaml`), the change affects Stable too, since the symlink points to the same file. This is the intended tradeoff — users who customize on Preview are likely the same user customizing on Stable.
-- **Creating new entries in a symlinked directory**: If Preview creates a new file inside a symlinked directory (e.g., a new tab config in `tab_configs/`), the file is created in `~/.rook/tab_configs/` because the directory symlink resolves there. This is an acceptable limitation of the symlink approach.
-- **Breaking the symlink**: If the user wants full independence for a specific config, they can delete the symlink in `~/.rook-preview/` and replace it with a real file or directory. Preview will use the local copy from that point on.
+- **Creating new entries in a symlinked directory**: If Preview creates a new file inside a symlinked directory (e.g., a new tab config in `tab_configs/`), the file is created in `~/.polaris-terminal/tab_configs/` because the directory symlink resolves there. This is an acceptable limitation of the symlink approach.
+- **Breaking the symlink**: If the user wants full independence for a specific config, they can delete the symlink in `~/.polaris-terminal-preview/` and replace it with a real file or directory. Preview will use the local copy from that point on.
 
 ### Edge cases
 
-- **`~/.rook` does not exist**: No migration needed. Preview creates `~/.rook-preview` fresh, and Rook's existing directory-creation logic populates it.
-- **`~/.rook-preview` already exists**: Migration is skipped entirely. This handles the case where the user has manually created the directory or is launching for a second time.
-- **Entries in `~/.rook` are themselves symlinks** (e.g., `keybindings.yaml -> ~/dotfiles/...`): The migration creates a symlink to the symlink. The chain resolves correctly. No special handling needed.
+- **`~/.polaris-terminal` does not exist**: No migration needed. Preview creates `~/.polaris-terminal-preview` fresh, and Polaris Terminal's existing directory-creation logic populates it.
+- **`~/.polaris-terminal-preview` already exists**: Migration is skipped entirely. This handles the case where the user has manually created the directory or is launching for a second time.
+- **Entries in `~/.polaris-terminal` are themselves symlinks** (e.g., `keybindings.yaml -> ~/dotfiles/...`): The migration creates a symlink to the symlink. The chain resolves correctly. No special handling needed.
 - **`.DS_Store` and hidden OS files**: These should be skipped during migration to avoid unnecessary clutter.
 - **Simultaneous Stable and Preview launch**: The directory creation (`create_dir`) fails atomically if the directory already exists, so concurrent launches are safe. The migration will run in one process and be skipped in the other.
 - **Permissions errors**: If symlink creation fails for a specific entry, log a warning and continue with the remaining entries. Partial migration is better than no migration.
@@ -85,27 +85,27 @@ The `settings.toml` file (used by the Settings File feature) is intentionally ke
 ## Alternatives Considered
 
 ### 1. Full copy instead of symlinks
-Copy all files and directories from `~/.rook` to `~/.rook-preview`.
+Copy all files and directories from `~/.polaris-terminal` to `~/.polaris-terminal-preview`.
 
 - Pro: Full independence from day one.
 - Con: Doubles disk usage for themes, workflows, etc. Changes in Stable no longer propagate to Preview, which could confuse users who expect their config to be shared.
 
 ### 2. Symlink the entire directory
-Create `~/.rook-preview` as a symlink to `~/.rook`.
+Create `~/.polaris-terminal-preview` as a symlink to `~/.polaris-terminal`.
 
 - Pro: Simplest implementation.
-- Con: Not actually a separate directory. Any new entries created by Preview (e.g., new directories Rook adds in future versions) would appear in `~/.rook`. Defeats the purpose of separation.
+- Con: Not actually a separate directory. Any new entries created by Preview (e.g., new directories Polaris Terminal adds in future versions) would appear in `~/.polaris-terminal`. Defeats the purpose of separation.
 
 ### 3. No migration (clean start)
-Simply start using `~/.rook-preview` with no migration.
+Simply start using `~/.polaris-terminal-preview` with no migration.
 
 - Pro: Simplest. No migration code.
 - Con: Users lose all custom keybindings, themes, workflows, launch configs, tab configs, and settings. This is a bad experience.
 
 ### 4. Deep symlink (per-file in each subdirectory)
-For each directory like `themes/`, create the directory in `.rook-preview` and symlink each individual file.
+For each directory like `themes/`, create the directory in `.polaris-terminal-preview` and symlink each individual file.
 
-- Pro: New files created inside directories stay in `.rook-preview` rather than leaking into `.rook`.
+- Pro: New files created inside directories stay in `.polaris-terminal-preview` rather than leaking into `.polaris/terminal`.
 - Con: Significantly more complex. The improvement is marginal — most users don't create new config files frequently, and those who do are likely sophisticated enough to understand the symlink behavior.
 
 **Decision**: Symlink top-level contents (option in the main proposal) is the best balance of simplicity, backwards compatibility, and user experience.
@@ -113,17 +113,17 @@ For each directory like `themes/`, create the directory in `.rook-preview` and s
 ## Success Criteria
 
 1. After upgrading, a Preview user's keybindings, themes, workflows, launch configs, tab configs, MCP config, and settings are all accessible in Preview without manual action.
-2. A Stable user's `~/.rook` directory is unchanged after the upgrade.
-3. `~/.rook-preview` is created on first launch of Preview and contains symlinks to each top-level entry in `~/.rook`.
-4. If `~/.rook` does not exist, `~/.rook-preview` is created empty (normal startup logic applies).
-5. If `~/.rook-preview` already exists, no migration runs.
+2. A Stable user's `~/.polaris-terminal` directory is unchanged after the upgrade.
+3. `~/.polaris-terminal-preview` is created on first launch of Preview and contains symlinks to each top-level entry in `~/.polaris-terminal`.
+4. If `~/.polaris-terminal` does not exist, `~/.polaris-terminal-preview` is created empty (normal startup logic applies).
+5. If `~/.polaris-terminal-preview` already exists, no migration runs.
 6. The migration only runs on macOS.
-7. Partial migration failures (e.g., one symlink fails) do not prevent Rook from launching.
+7. Partial migration failures (e.g., one symlink fails) do not prevent Polaris Terminal from launching.
 
 ## Validation
 
 - **Manual testing on macOS Preview build**:
-  - Fresh install with no `~/.rook`: Preview creates `~/.rook-preview`, normal setup.
-  - Existing `~/.rook` with custom keybindings/themes: After upgrade, verify symlinks exist and config loads correctly.
-  - Launch Stable after Preview migration: Stable still uses `~/.rook` and is unaffected.
-- **Integration test**: Verify the migration function creates expected symlinks given a mock `~/.rook` directory.
+  - Fresh install with no `~/.polaris-terminal`: Preview creates `~/.polaris-terminal-preview`, normal setup.
+  - Existing `~/.polaris-terminal` with custom keybindings/themes: After upgrade, verify symlinks exist and config loads correctly.
+  - Launch Stable after Preview migration: Stable still uses `~/.polaris-terminal` and is unaffected.
+- **Integration test**: Verify the migration function creates expected symlinks given a mock `~/.polaris-terminal` directory.

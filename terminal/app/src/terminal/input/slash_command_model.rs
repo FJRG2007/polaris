@@ -1,8 +1,8 @@
 use ai::skills::SkillReference;
 use input_classifier::InputType;
-use rook_core::features::FeatureFlag;
-use rook_search_core::inline_menu::InputDrivenInlineMenuLifecycle;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_search_core::inline_menu::InputDrivenInlineMenuLifecycle;
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 use settings::Setting as _;
 
 use crate::ai::blocklist::{

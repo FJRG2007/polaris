@@ -1,21 +1,21 @@
-use rook::integration_testing::clipboard::assert_clipboard_contains_string;
-use rook::integration_testing::secret_redaction::{
+use polaris_terminal::integration_testing::clipboard::assert_clipboard_contains_string;
+use polaris_terminal::integration_testing::secret_redaction::{
     assert_secret_tooltip_open, assert_secrets_redacted_for_ai,
 };
-use rook::integration_testing::settings::toggle_setting;
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::util::ExpectedExitStatus;
-use rook::integration_testing::terminal::{
+use polaris_terminal::integration_testing::settings::toggle_setting;
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::util::ExpectedExitStatus;
+use polaris_terminal::integration_testing::terminal::{
     assert_selected_block_index_is_last_renderable, execute_command_for_single_terminal_in_tab,
     initialize_secret_regexes, open_context_menu_for_selected_block, run_alt_grid_program,
     wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::view_getters::single_terminal_view;
-use rook::settings_view::{PrivacyPageAction, SettingsAction};
-use rook::terminal::model::index::Point;
-use rook::terminal::model::terminal_model::WithinModel;
-use rookui_core::async_assert;
-use rookui_core::integration::TestStep;
+use polaris_terminal::integration_testing::view_getters::single_terminal_view;
+use polaris_terminal::settings_view::{PrivacyPageAction, SettingsAction};
+use polaris_terminal::terminal::model::index::Point;
+use polaris_terminal::terminal::model::terminal_model::WithinModel;
+use ptermui_core::async_assert;
+use ptermui_core::integration::TestStep;
 
 use super::{Builder, new_builder};
 use crate::util::skip_if_powershell_core_2303;

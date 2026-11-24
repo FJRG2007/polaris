@@ -1,4 +1,4 @@
-use rookui::{AppContext, EntityId, ModelHandle, SingletonEntity};
+use ptermui::{AppContext, EntityId, ModelHandle, SingletonEntity};
 
 use super::AIBlockModel;
 use crate::BlocklistAIHistoryModel;

@@ -1,4 +1,4 @@
-use rook_core::telemetry::TelemetryEvent;
+use pterm_core::telemetry::TelemetryEvent;
 use serde_json::json;
 
 use super::{PricingPromotionState, PricingPromotionSurface, PricingPromotionTelemetryEvent};

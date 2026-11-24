@@ -9,7 +9,7 @@ Companion product spec: `specs/QUALITY-643/PRODUCT.md`
 The orchestration config UI (plan card and run_agents confirmation card) lets users pick a harness and model for child agents. Both cards share picker logic in `orchestration_controls.rs`. Two problems exist today:
 
 1. **Harness picker** is hardcoded to `[Oz, Claude, Codex]` — it doesn't read from the server's `availableHarnesses` list, doesn't include Gemini, and doesn't respect admin enabled/disabled state.
-2. **Model picker** always shows Rook's internal LLM catalog filtered by provider (Anthropic for Claude, OpenAI for Codex). Those IDs (e.g. `claude-4-6-opus-high`) are not recognized by third-party harness CLIs. The server maintains separate harness-specific model catalogs that the desktop client already fetches and caches in `HarnessAvailabilityModel`, but the orchestration UI doesn't use them.
+2. **Model picker** always shows Polaris Terminal's internal LLM catalog filtered by provider (Anthropic for Claude, OpenAI for Codex). Those IDs (e.g. `claude-4-6-opus-high`) are not recognized by third-party harness CLIs. The server maintains separate harness-specific model catalogs that the desktop client already fetches and caches in `HarnessAvailabilityModel`, but the orchestration UI doesn't use them.
 
 Additionally, model_id is not delivered to local child harness processes: Claude Code doesn't receive `ANTHROPIC_MODEL`. Codex model delivery uses `~/.codex/config.toml`, which is only safe in cloud/remote environments where the filesystem is isolated — local children must not touch it (see `local_harness_launch.rs:143` comment).
 
@@ -149,10 +149,10 @@ Addresses behaviors 17 (remote), 18 (remote).
 - `populate_model_picker_for_harness` with harness="claude": "Default model" entry at top, then harness-specific models from `HarnessAvailabilityModel`. (Behavior 7)
 - `populate_model_picker_for_harness` with harness="codex", cloud mode: "Default model" entry at top, then Codex models. (Behavior 8)
 - `populate_model_picker_for_harness` with harness="codex", local mode: only "Default model" entry. (Behavior 8)
-- `populate_model_picker_for_harness` with harness="oz": Rook LLM catalog (existing behavior). (Behavior 6)
-- `is_model_in_filtered_choices` returns false for Rook IDs when harness is non-Oz, true for empty string ("Default model"). (Behavior 12)
+- `populate_model_picker_for_harness` with harness="oz": Polaris Terminal LLM catalog (existing behavior). (Behavior 6)
+- `is_model_in_filtered_choices` returns false for Polaris Terminal IDs when harness is non-Oz, true for empty string ("Default model"). (Behavior 12)
 - `first_filtered_model_id` returns empty string for non-Oz harness. (Behavior 11)
-- Harness change from Claude (model="opus") to Oz: model resets to first Rook LLM. (Behavior 12)
+- Harness change from Claude (model="opus") to Oz: model resets to first Polaris Terminal LLM. (Behavior 12)
 
 **local_harness_launch tests** — new/updated tests:
 - `prepare_local_harness_child_launch` merges `ANTHROPIC_MODEL` into env_vars when harness is Claude and model_id is provided. (Behavior 17)
@@ -177,7 +177,7 @@ Run `cargo fmt`, `cargo clippy`, and `./script/presubmit` before PR.
 - Select Codex (Cloud mode) → model picker shows "Default model" at top, then `default`, `GPT-5.5`, `GPT-5.4`, etc.
 - Select Codex (Local mode) → model picker shows only "Default model".
 - Toggle Local → Cloud with Codex selected → model picker repopulates with full Codex catalog.
-- Select Oz → model picker returns to Rook LLM catalog.
+- Select Oz → model picker returns to Polaris Terminal LLM catalog.
 - Change harness from Claude (with "opus" selected) to Oz → model resets.
 - Launch local agents with Claude Code + "opus" → verify `ANTHROPIC_MODEL=opus` in child env.
 - Launch local agents with Claude Code + "Default model" → verify no `ANTHROPIC_MODEL` in child env.

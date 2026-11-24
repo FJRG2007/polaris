@@ -1,12 +1,12 @@
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rookui_core::assets::asset_cache::AssetSource;
-use rookui_core::elements::{
+use ptermui_core::assets::asset_cache::AssetSource;
+use ptermui_core::elements::{
     Align, CacheOption, Clipped, ConstrainedBox, Container, CrossAxisAlignment, Empty, Expanded,
     Flex, Image, MainAxisSize, ParentElement, Point, Shrinkable, SizeConstraintCondition,
     SizeConstraintSwitch, Stack,
 };
-use rookui_core::event::DispatchedEvent;
-use rookui_core::{
+use ptermui_core::event::DispatchedEvent;
+use ptermui_core::{
     AfterLayoutContext, AppContext, Element, EventContext, LayoutContext, PaintContext,
     SizeConstraint,
 };

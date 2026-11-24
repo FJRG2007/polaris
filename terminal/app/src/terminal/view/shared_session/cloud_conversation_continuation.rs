@@ -1,5 +1,5 @@
-use rook_cli::agent::Harness;
-use rookui::{AppContext, EntityId, ModelHandle, SingletonEntity};
+use pterm_cli::agent::Harness;
+use ptermui::{AppContext, EntityId, ModelHandle, SingletonEntity};
 
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{

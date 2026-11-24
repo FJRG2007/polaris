@@ -5,10 +5,10 @@ use std::sync::Arc;
 use std::sync::mpsc::SyncSender;
 
 use parking_lot::FairMutex;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_core::send_telemetry_from_ctx;
-use rook_errors::report_error;
-use rookui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle, WindowId};
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_errors::report_error;
+use ptermui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle, WindowId};
 use session_sharing_protocol::common::{
     ActivePrompt, AgentPromptFailureReason, AgentPromptRequest, CLIAgentSessionState,
     CommandExecutionFailureReason, ControlAction, ControlActionFailureReason,
@@ -330,9 +330,9 @@ fn wire_up_terminal_view_session_sharing(
     let session_sharer: Rc<RefCell<Option<ModelHandle<Network>>>> = Rc::new(RefCell::new(None));
     let session_sharer_clone = session_sharer.clone();
 
-    // Send rook prompt updates.
+    // Send polaris-terminal prompt updates.
     ctx.observe_model(&current_prompt, move |current_prompt, ctx| {
-        // If for some reason ctx.notify() was called on the rook prompt but we're using ps1, do nothing.
+        // If for some reason ctx.notify() was called on the polaris-terminal prompt but we're using ps1, do nothing.
         if *SessionSettings::as_ref(ctx).honor_ps1 {
             return
         }
@@ -354,8 +354,8 @@ fn wire_up_terminal_view_session_sharing(
     ctx.subscribe_to_model(&SessionSettings::handle(ctx), move |_, event, ctx| {
         if let SessionSettingsChangedEvent::HonorPS1 { .. } = event {
             if !*SessionSettings::as_ref(ctx).honor_ps1 {
-                // We don't need to send a RookPrompt message here when turning off PS1 because this will be sent
-                // as part of observing the rook prompt and sending messages on updates.
+                // We don't need to send a PtermPrompt message here when turning off PS1 because this will be sent
+                // as part of observing the polaris-terminal prompt and sending messages on updates.
                 return;
             }
             if let Some(network) = session_sharer_clone.borrow().as_ref() {
@@ -1488,7 +1488,7 @@ impl TerminalManager<TerminalView> {
                                 ctx.spawn(
                                     async move {
                                         let workload_token =
-                                            rook_isolation_platform::issue_workload_token(Some(
+                                            pterm_isolation_platform::issue_workload_token(Some(
                                                 std::time::Duration::from_secs(60),
                                             ))
                                             .await

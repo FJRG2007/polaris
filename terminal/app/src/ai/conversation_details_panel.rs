@@ -9,25 +9,25 @@ use instant::Instant;
 use parking_lot::RwLock;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_cli::agent::Harness;
-use rook_cli::skill::SkillSpec;
-use rook_core::channel::ChannelState;
-use rook_core::ui::color::coloru_with_opacity;
-use rook_graphql::queries::get_runners::Runner;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::new_scrollable::{NewScrollable, SingleAxisConfig};
-use rookui::elements::{
+use pterm_cli::agent::Harness;
+use pterm_cli::skill::SkillSpec;
+use pterm_core::channel::ChannelState;
+use pterm_core::ui::color::coloru_with_opacity;
+use pterm_graphql::queries::get_runners::Runner;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::new_scrollable::{NewScrollable, SingleAxisConfig};
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, DragBarSide, Empty, Expanded, Flex, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, Resizable, ResizableStateHandle, SelectableArea,
     SelectionHandle, Shrinkable, Stack, Text, Wrap, resizable_state_handle,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::platform::Cursor;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -294,7 +294,7 @@ impl ConversationDetailsData {
 
     /// Build details data from an in-memory `AIConversation`. Used both by the WASM
     /// transcript/shared-session details panel and by the native pane-level details panel
-    /// when the active conversation is a local (non-cloud) Rook Agent run.
+    /// when the active conversation is a local (non-cloud) Polaris Terminal Agent run.
     pub fn from_conversation(conversation: &AIConversation, app: &AppContext) -> Self {
         let mut directory = None;
         let mut conversation_id = None;
@@ -361,7 +361,7 @@ impl ConversationDetailsData {
         let total_tokens: u32 = conversation
             .token_usage()
             .iter()
-            .map(|model| model.rook_tokens + model.byok_tokens + model.custom_endpoint_tokens)
+            .map(|model| model.pterm_tokens + model.byok_tokens + model.custom_endpoint_tokens)
             .sum();
 
         ConversationDetailsData {
@@ -696,7 +696,7 @@ enum DetailsPanelLocalContinuationInfo {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::custom(
         CustomAction::Copy,
@@ -1169,16 +1169,16 @@ impl ConversationDetailsPanel {
             .unwrap_or_else(|| AvatarContent::DisplayName(creator.display_name.clone()));
         let avatar = Avatar::new(
             avatar_content,
-            rookui::ui_components::components::UiComponentStyles {
+            ptermui::ui_components::components::UiComponentStyles {
                 width: Some(20.),
                 height: Some(20.),
-                border_radius: Some(rookui::elements::CornerRadius::with_all(
-                    rookui::elements::Radius::Percentage(50.),
+                border_radius: Some(ptermui::elements::CornerRadius::with_all(
+                    ptermui::elements::Radius::Percentage(50.),
                 )),
                 background: Some(blended_colors::accent(theme).into()),
                 font_color: Some(ColorU::black()),
                 font_family_id: Some(appearance.ui_font_family()),
-                font_weight: Some(rookui::fonts::Weight::Bold),
+                font_weight: Some(ptermui::fonts::Weight::Bold),
                 font_size: Some(small_font_size),
                 ..Default::default()
             },
@@ -1335,7 +1335,7 @@ impl ConversationDetailsPanel {
         if fetch_error.is_access_denied() {
             let icon_color = blended_colors::text_sub(theme, theme.surface_1());
             let notice_icon =
-                ConstrainedBox::new(Icon::Info.to_rookui_icon(icon_color.into()).finish())
+                ConstrainedBox::new(Icon::Info.to_ptermui_icon(icon_color.into()).finish())
                     .with_width(STATUS_ICON_SIZE)
                     .with_height(STATUS_ICON_SIZE)
                     .finish();
@@ -1383,7 +1383,7 @@ impl ConversationDetailsPanel {
 
         let error_icon = ConstrainedBox::new(
             Icon::Triangle
-                .to_rookui_icon(theme.ansi_fg_red().into())
+                .to_ptermui_icon(theme.ansi_fg_red().into())
                 .finish(),
         )
         .with_width(STATUS_ICON_SIZE)
@@ -1442,7 +1442,7 @@ impl ConversationDetailsPanel {
             }
         };
 
-        let status_icon = ConstrainedBox::new(icon.to_rookui_icon(color.into()).finish())
+        let status_icon = ConstrainedBox::new(icon.to_ptermui_icon(color.into()).finish())
             .with_width(STATUS_ICON_SIZE)
             .with_height(STATUS_ICON_SIZE)
             .finish();
@@ -1540,7 +1540,7 @@ impl ConversationDetailsPanel {
         let icon_fill = harness_display::icon_fill_on_circle(harness, theme);
         let icon_glyph = ConstrainedBox::new(
             harness_display::icon_for(harness)
-                .to_rookui_icon(icon_fill)
+                .to_ptermui_icon(icon_fill)
                 .finish(),
         )
         .with_width(HARNESS_ICON_IN_CIRCLE)
@@ -1591,7 +1591,7 @@ impl ConversationDetailsPanel {
         let ui_font_size = appearance.ui_font_size();
         let sub_color = blended_colors::text_sub(theme, theme.surface_1());
 
-        let icon = ConstrainedBox::new(Icon::Rook.to_rookui_icon(theme.foreground()).finish())
+        let icon = ConstrainedBox::new(Icon::Pterm.to_ptermui_icon(theme.foreground()).finish())
             .with_width(20.)
             .with_height(20.)
             .finish();
@@ -1926,10 +1926,11 @@ impl ConversationDetailsPanel {
         let theme = appearance.theme();
         let ui_font_size = appearance.ui_font_size();
 
-        let icon = ConstrainedBox::new(platform.icon().to_rookui_icon(theme.foreground()).finish())
-            .with_width(PLATFORM_ICON_SIZE)
-            .with_height(PLATFORM_ICON_SIZE)
-            .finish();
+        let icon =
+            ConstrainedBox::new(platform.icon().to_ptermui_icon(theme.foreground()).finish())
+                .with_width(PLATFORM_ICON_SIZE)
+                .with_height(PLATFORM_ICON_SIZE)
+                .finish();
 
         let label = Text::new(
             platform.summary(),
@@ -2044,7 +2045,7 @@ impl ConversationDetailsPanel {
         let duration = COPY_FEEDBACK_DURATION;
         ctx.spawn(
             async move {
-                rookui::r#async::Timer::after(duration).await;
+                ptermui::r#async::Timer::after(duration).await;
             },
             |me, _, ctx| {
                 ctx.notify();
@@ -2397,7 +2398,7 @@ impl View for ConversationDetailsPanel {
             },
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .finish();
 
@@ -2430,7 +2431,7 @@ impl View for ConversationDetailsPanel {
 
         // On mobile, add background and skip Resizable
         #[cfg(target_family = "wasm")]
-        if rookui::platform::wasm::is_mobile_device() {
+        if ptermui::platform::wasm::is_mobile_device() {
             return Container::new(panel_content)
                 .with_background(theme.surface_1())
                 .finish();

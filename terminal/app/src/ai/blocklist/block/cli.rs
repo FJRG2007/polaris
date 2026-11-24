@@ -9,17 +9,17 @@ use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use parking_lot::{FairMutex, RwLock};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::semantic_selection::SemanticSelection;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::content::buffer::InitialBufferState;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rook_errors::report_error;
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::new_scrollable::SingleAxisConfig;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::content::buffer::InitialBufferState;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use pterm_errors::report_error;
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::new_scrollable::SingleAxisConfig;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, DragBarSide, DropShadow, Empty, Expanded, Fill, Flex,
     FormattedTextElement, Highlight, HighlightedHyperlink, Hoverable, MainAxisAlignment,
@@ -28,11 +28,11 @@ use rookui::elements::{
     ResizableStateHandle, SavePosition, SelectableArea, SelectionHandle, Shrinkable,
     SizeConstraintCondition, SizeConstraintSwitch, Stack, Text, resizable_state_handle,
 };
-use rookui::fonts::{Properties, Style, Weight};
-use rookui::keymap::{EditableBinding, Keystroke};
-use rookui::platform::{Cursor, OperatingSystem};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{Properties, Style, Weight};
+use ptermui::keymap::{EditableBinding, Keystroke};
+use ptermui::platform::{Cursor, OperatingSystem};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -130,8 +130,8 @@ const HAS_PENDING_NON_TRANSFER_CONTROL_ACTION_CONTEXT_KEY: &str =
 const BLOCKED_ACTION_MESSAGE_FOR_TRANSFER_CONTROL: &str = "Agent is asking you to take control.";
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::FixedBinding;
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::FixedBinding;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -968,7 +968,7 @@ impl View for CLISubagentView {
         "CLISubagentView"
     }
 
-    fn render(&self, app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         let terminal_model = self.terminal_model.lock();
         let Some(block) = terminal_model.block_list().block_with_id(&self.block_id) else {
             return Empty::new().finish();
@@ -1443,7 +1443,7 @@ impl View for CLISubagentView {
             .finish()
     }
 
-    fn keymap_context(&self, app: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         let terminal_model = self.terminal_model.lock();
@@ -1620,7 +1620,7 @@ fn render_action(action: AIAgentActionType, app: &AppContext) -> Option<Box<dyn 
 
     let icon = Container::new(
         ConstrainedBox::new(
-            rookui::elements::Icon::new(icon.into(), internal_colors::neutral_5(theme)).finish(),
+            ptermui::elements::Icon::new(icon.into(), internal_colors::neutral_5(theme)).finish(),
         )
         .with_width(icon_size(app))
         .with_height(icon_size(app))
@@ -1662,7 +1662,7 @@ fn render_web_search(query: Option<String>, app: &AppContext) -> Box<dyn Element
 
     let icon = Container::new(
         ConstrainedBox::new(
-            rookui::elements::Icon::new(Icon::Search.into(), internal_colors::neutral_5(theme))
+            ptermui::elements::Icon::new(Icon::Search.into(), internal_colors::neutral_5(theme))
                 .finish(),
         )
         .with_width(icon_size(app))
@@ -1895,7 +1895,7 @@ fn render_permissions_speedbump(
     .with_hyperlink_font_color(blended_colors::accent_fg_strong(theme).into())
     .register_default_click_handlers(|_, ctx, _| {
         ctx.dispatch_typed_action(WorkspaceAction::ShowSettingsPage(
-            SettingsSection::RookAgent,
+            SettingsSection::PtermAgent,
         ));
     })
     .finish();

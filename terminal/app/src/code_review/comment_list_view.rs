@@ -3,19 +3,19 @@ use std::borrow::Cow;
 use indexmap::IndexMap;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors::{
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors::{
     accent_overlay_2, accent_overlay_3, neutral_1, neutral_3, neutral_4, neutral_6, text_main,
     text_sub,
 };
-use rook_editor::model::CoreEditorModel;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
-use rookui::elements::resizable::{
+use pterm_editor::model::CoreEditorModel;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
+use ptermui::elements::resizable::{
     DragBarSide, Resizable, ResizableStateHandle, resizable_state_handle,
 };
-use rookui::elements::{
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Dismiss, DispatchEventResult, Element, Empty, EventHandler,
     Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
@@ -23,12 +23,12 @@ use rookui::elements::{
     Radius, SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Shrinkable, Stack,
     Text,
 };
-use rookui::keymap::Keystroke;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::UiComponent;
-use rookui::units::Pixels;
-use rookui::{
+use ptermui::keymap::Keystroke;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::units::Pixels;
+use ptermui::{
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle,
 };
@@ -619,7 +619,7 @@ impl CommentListView {
             },
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .with_vertical_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Auto, false))
         .with_propagate_mousewheel_if_not_handled(true)
@@ -708,7 +708,7 @@ impl CommentListView {
                 };
 
                 let icon_element = icon
-                    .to_rookui_icon(rook_core::ui::theme::Fill::Solid(text_sub(
+                    .to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(text_sub(
                         theme,
                         neutral_1(theme),
                     )))
@@ -790,7 +790,7 @@ impl CommentListView {
                         false, /* bottom */
                         true,  /* right */
                     )
-                    .with_border_fill(rook_core::ui::theme::Fill::Solid(neutral_4(theme))),
+                    .with_border_fill(pterm_core::ui::theme::Fill::Solid(neutral_4(theme))),
             )
             .finish()
     }
@@ -852,7 +852,7 @@ impl CommentListView {
                 };
 
                 let icon_element = icon
-                    .to_rookui_icon(rook_core::ui::theme::Fill::Solid(text_sub(
+                    .to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(text_sub(
                         theme,
                         neutral_3(theme),
                     )))
@@ -925,7 +925,7 @@ impl CommentListView {
             ReviewDestination::None => false,
             // CLI agents don't consume AI credits, so bypass the ai check.
             ReviewDestination::Cli(_) => has_sendable_comments,
-            ReviewDestination::Rook => {
+            ReviewDestination::Pterm => {
                 let user_workspaces = UserWorkspaces::as_ref(ctx);
                 let scope = user_workspaces.team_context(&self.view_handle, ctx);
                 AIRequestUsageModel::as_ref(ctx).has_any_ai_remaining(&scope, ctx)
@@ -1148,8 +1148,8 @@ impl View for CommentListView {
 
             Resizable::new(self.view_state.resizable_state.clone(), panel)
                 .with_dragbar_side(DragBarSide::Top)
-                .with_dragbar_color(rookui::elements::Fill::Solid(
-                    rookui::color::ColorU::transparent_black(),
+                .with_dragbar_color(ptermui::elements::Fill::Solid(
+                    ptermui::color::ColorU::transparent_black(),
                 ))
                 .with_bounds_callback(Box::new(|window_size| {
                     (100.0, (window_size.y() * 0.8).max(100.0))

@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use cynic::MutationBuilder;
 #[cfg(test)]
 use mockall::automock;
-use rook_graphql::mutations::create_managed_mcp_client_config::{
+use pterm_graphql::mutations::create_managed_mcp_client_config::{
     CreateManagedMcpClientConfig, CreateManagedMcpClientConfigInput,
     CreateManagedMcpClientConfigOutput, CreateManagedMcpClientConfigResult,
     CreateManagedMcpClientConfigVariables,

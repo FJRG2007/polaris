@@ -126,7 +126,7 @@ pub(crate) async fn watch_block_for_errors(
 Implementation notes:
 - Resolve immediately with `None` when `patterns.is_empty()` so Gemini/Oz pay zero runtime cost.
 - Build the combined DFA once at scanner entry via `RegexDFAs::new_many` (with regex-escaped needles + case-insensitive matching). Wrap in `Arc` so each tick can clone cheaply.
-- Use `rookui::r#async::Timer::after` for ticks, matching the existing `run_harness` periodic-save pattern.
+- Use `ptermui::r#async::Timer::after` for ticks, matching the existing `run_harness` periodic-save pattern.
 - Each tick spawns onto `foreground` to call `TerminalDriver::find_first_match_in_block_output(&dfas)`. On `Some`, the scanner runs the **stall confirmation loop** (see below) before mapping `matched_text` → originating needle via `pattern_for_match`, capping the excerpt to ~240 chars, and resolving the future with `DetectedHarnessError`.
 - The DFA scans cell storage from the start each tick, so no `last_scanned_len` cursor is needed — the regex_automata cache memoizes transitions.
 
@@ -189,7 +189,7 @@ async fn run_harness(
     let command_result = loop {
         futures::select! {
             exit_code = command_handle => break exit_code,
-            _ = rookui::r#async::Timer::after(HARNESS_SAVE_INTERVAL).fuse() => {
+            _ = ptermui::r#async::Timer::after(HARNESS_SAVE_INTERVAL).fuse() => {
                 /* existing periodic save */
             }
             _ = harness_exit_rx => {

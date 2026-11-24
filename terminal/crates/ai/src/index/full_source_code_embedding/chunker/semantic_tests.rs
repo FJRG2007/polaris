@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use languages::language_by_filename;
-use rook_util::standardized_path::StandardizedPath;
+use pterm_util::standardized_path::StandardizedPath;
 
 use super::*;
 

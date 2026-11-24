@@ -6,14 +6,14 @@ use chrono::Utc;
 use cynic::{MutationBuilder, QueryBuilder};
 #[cfg(test)]
 use mockall::automock;
-use rook_core::channel::{Channel, ChannelState};
-use rook_graphql::mutations::share_block::{
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_graphql::mutations::share_block::{
     BlockInput, ShareBlock, ShareBlockResult, ShareBlockVariables,
 };
-use rook_graphql::mutations::unshare_block::{
+use pterm_graphql::mutations::unshare_block::{
     UnshareBlock, UnshareBlockInput, UnshareBlockResult, UnshareBlockVariables,
 };
-use rook_graphql::queries::get_blocks_for_user::{
+use pterm_graphql::queries::get_blocks_for_user::{
     Block as GqlBlock, GetBlocksForUser, GetBlocksForUserVariables,
 };
 
@@ -124,7 +124,7 @@ impl BlockClient for ServerApi {
         let response = self.send_graphql_request(operation, None).await?;
 
         match response.user {
-            rook_graphql::queries::get_blocks_for_user::UserResult::UserOutput(user_output) => {
+            pterm_graphql::queries::get_blocks_for_user::UserResult::UserOutput(user_output) => {
                 Ok(user_output
                     .user
                     .blocks
@@ -132,7 +132,7 @@ impl BlockClient for ServerApi {
                     .filter_map(|block| block.try_into().ok())
                     .collect())
             }
-            rook_graphql::queries::get_blocks_for_user::UserResult::Unknown => {
+            pterm_graphql::queries::get_blocks_for_user::UserResult::Unknown => {
                 Err(anyhow!("Unable to fetch blocks"))
             }
         }

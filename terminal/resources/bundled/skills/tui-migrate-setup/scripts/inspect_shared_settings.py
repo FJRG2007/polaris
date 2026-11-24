@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect only GUI settings explicitly supported by both GUI and Rook Agent CLI."""
+"""Inspect only GUI settings explicitly supported by both GUI and Polaris Terminal Agent CLI."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def shared_setting_paths(schema: dict[str, Any]) -> list[tuple[str, ...]]:
         if not isinstance(node, dict):
             return
 
-        surfaces = node.get("x-rook-surfaces")
+        surfaces = node.get("x-polaris-terminal-surfaces")
         if (
             prefix
             and isinstance(surfaces, list)
@@ -74,7 +74,7 @@ def _find_probe_path(
     value: Any, prefix: tuple[str, ...] = ()
 ) -> tuple[str, ...] | None:
     if isinstance(value, dict):
-        if value.get("__rook_probe__") is True:
+        if value.get("__pterm_probe__") is True:
             return prefix
         for key, child in value.items():
             result = _find_probe_path(child, (*prefix, key))
@@ -93,7 +93,7 @@ def _table_header_path(line: str) -> tuple[bool, tuple[str, ...] | None]:
     if not stripped.startswith("["):
         return False, None
     try:
-        document = tomllib.loads(f"{stripped}\n__rook_probe__ = true\n")
+        document = tomllib.loads(f"{stripped}\n__pterm_probe__ = true\n")
     except tomllib.TOMLDecodeError:
         return False, None
     return True, _find_probe_path(document)
@@ -173,7 +173,7 @@ def inspect_settings(
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Inspect GUI settings declared for both Rook GUI and Rook Agent CLI."
+        description="Inspect GUI settings declared for both Polaris Terminal GUI and Polaris Terminal Agent CLI."
     )
     parser.add_argument("--schema", required=True)
     parser.add_argument("--source", required=True)

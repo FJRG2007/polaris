@@ -1,5 +1,5 @@
-use rookui::async_assert_eq;
-use rookui::integration::{AssertionCallback, AssertionOutcome};
+use ptermui::async_assert_eq;
+use ptermui::integration::{AssertionCallback, AssertionOutcome};
 
 use crate::ai::agent::redaction::redact_secrets;
 use crate::ai::blocklist::block::secret_redaction::find_secrets_in_text;

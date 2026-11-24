@@ -1,14 +1,14 @@
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use rook_errors::report_if_error;
-use rookui::elements::{
+use pterm_errors::report_if_error;
+use ptermui::elements::{
     Align, Border, Clipped, ConstrainedBox, Container, CornerRadius, Flex, FormattedTextElement,
     HighlightedHyperlink, Hoverable, HyperlinkUrl, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, ParentElement, Radius, Shrinkable, Text, Wrap,
 };
-use rookui::fonts::Weight;
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::fonts::Weight;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 use settings::Setting as _;
 
 use crate::appearance::Appearance;
@@ -28,7 +28,7 @@ const CONFIRM_MARGIN_TOP: f32 = 16.;
 pub struct OnboardingPromptBlock {
     learn_more_highlight_index: HighlightedHyperlink,
     mouse_state_handle_look_incorrect: MouseStateHandle,
-    mouse_state_handle_rook_prompt: MouseStateHandle,
+    mouse_state_handle_pterm_prompt: MouseStateHandle,
     mouse_state_handle_existing_prompt: MouseStateHandle,
     mouse_state_handle_confirm: MouseStateHandle,
     ps1_grid_info: Option<(BlockGrid, SizeInfo)>,
@@ -41,7 +41,7 @@ impl OnboardingPromptBlock {
         Self {
             learn_more_highlight_index: Default::default(),
             mouse_state_handle_look_incorrect: Default::default(),
-            mouse_state_handle_rook_prompt: Default::default(),
+            mouse_state_handle_pterm_prompt: Default::default(),
             mouse_state_handle_existing_prompt: Default::default(),
             mouse_state_handle_confirm: Default::default(),
             ps1_grid_info,
@@ -62,9 +62,8 @@ impl OnboardingPromptBlock {
         let font_color = current_theme.main_text_color(current_theme.background());
 
         // Copy - https://docs.google.com/document/d/1zttBLI5Mw07kUupvrMQoC5aTwTXSHIUOIFFnxZ8GQEU/edit
-        const LINE_ONE: &str = "Next, let’s set up your prompt. Rook has a custom prompt builder or you can select PS1 to honor your pre-existing prompt configuration.";
-        const LINE_TWO: &str =
-            "Rook works with many custom prompts like oh-my-zsh, Starship, Powerlevel10K. ";
+        const LINE_ONE: &str = "Next, let’s set up your prompt. Polaris Terminal has a custom prompt builder or you can select PS1 to honor your pre-existing prompt configuration.";
+        const LINE_TWO: &str = "Polaris Terminal works with many custom prompts like oh-my-zsh, Starship, Powerlevel10K. ";
         const LINK_TEXT: &str = "Learn more";
         const LINK_DESTINATION: &str =
             "https://docs.rook.dev/terminal/appearance/prompt#custom-prompt-compatibility-table";
@@ -107,7 +106,7 @@ impl OnboardingPromptBlock {
         let mut confirm_button = appearance
             .ui_builder()
             .button(
-                rookui::ui_components::button::ButtonVariant::Accent,
+                ptermui::ui_components::button::ButtonVariant::Accent,
                 self.mouse_state_handle_confirm.clone(),
             )
             .with_style(UiComponentStyles {
@@ -178,8 +177,8 @@ impl OnboardingPromptBlock {
                         };
 
                     ConstrainedBox::new(
-                        Container::new(if prompt_type == OnboardingPromptType::RookDefault {
-                            self.render_rook_prompt_button_interior(appearance)
+                        Container::new(if prompt_type == OnboardingPromptType::PtermDefault {
+                            self.render_pterm_prompt_button_interior(appearance)
                         } else {
                             self.render_existing_prompt_button_interior(appearance)
                         })
@@ -240,7 +239,7 @@ impl OnboardingPromptBlock {
         const NO_PS1_TEXT: &str = "No existing prompt.";
         const CORRECTION_TEXT: &str = "Look incorrect? ";
         const LINK_TEXT: &str = "Let us know.";
-        const LINK_DESTINATION: &str = "https://github.com/FJRG2007/rook/issues/new?assignees=&labels=Bug&projects=&template=01_bug_report.yml";
+        const LINK_DESTINATION: &str = "https://github.com/FJRG2007/polaris/issues/new?assignees=&labels=Bug&projects=&template=01_bug_report.yml";
 
         const HEADER_MARGIN_LEFT: f32 = 4.;
         const PS1_PADDING_VERTICAL: f32 = 12.;
@@ -322,10 +321,10 @@ impl OnboardingPromptBlock {
             .finish()
     }
 
-    fn render_rook_prompt_button_interior(&self, appearance: &Appearance) -> Box<dyn Element> {
+    fn render_pterm_prompt_button_interior(&self, appearance: &Appearance) -> Box<dyn Element> {
         // Pixel values pulled from Figma mocks
         // https://www.figma.com/file/y888viqzWBoMpFTxQqkQEN/Activation?node-id=568:1595&mode=dev
-        const HEADER_TEXT: &str = "Rook prompt";
+        const HEADER_TEXT: &str = "Polaris Terminal prompt";
         const HEADER_MARGIN_LEFT: f32 = 4.;
         const SECTION_MARGIN_TOP: f32 = 8.;
         const OUTER_CORNER_RADIUS: f32 = 4.;
@@ -409,7 +408,7 @@ impl OnboardingPromptBlock {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum OnboardingPromptType {
     PS1,
-    RookDefault,
+    PtermDefault,
 }
 
 impl Entity for OnboardingPromptBlock {
@@ -439,8 +438,8 @@ impl View for OnboardingPromptBlock {
                     .with_main_axis_alignment(MainAxisAlignment::Start)
                     .with_child(self.render_prompt_button(
                         appearance,
-                        self.mouse_state_handle_rook_prompt.clone(),
-                        OnboardingPromptType::RookDefault,
+                        self.mouse_state_handle_pterm_prompt.clone(),
+                        OnboardingPromptType::PtermDefault,
                     ))
                     .with_child(self.render_prompt_button(
                         appearance,
@@ -479,8 +478,8 @@ impl TypedActionView for OnboardingPromptBlock {
                 self.selected_prompt = Some(*prompt);
 
                 match prompt {
-                    OnboardingPromptType::RookDefault => {
-                        self.selected_prompt = Some(OnboardingPromptType::RookDefault);
+                    OnboardingPromptType::PtermDefault => {
+                        self.selected_prompt = Some(OnboardingPromptType::PtermDefault);
                         Prompt::handle(ctx).update(ctx, |prompt, ctx| {
                             report_if_error!(prompt.reset(ctx));
                         });

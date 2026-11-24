@@ -10,7 +10,7 @@
 //!
 //! The declarations file is an append-only UTF-8 JSONL file. The Rust pipeline only ever
 //! *reads* it; the sibling bash generator `snapshot-declarations.sh` (shipped in
-//! `rook-agent-docker`) is the primary writer, and operators may hand-edit entries.
+//! `polaris-terminal-agent-docker`) is the primary writer, and operators may hand-edit entries.
 //!
 //! Each non-empty line is a JSON object with:
 //! - `version`: `1`,
@@ -34,10 +34,10 @@ use anyhow::{Context as _, Result};
 use command::Stdio;
 use command::r#async::Command;
 use futures::future::join_all;
-use rook_core::safe_info;
-use rook_errors::report_error;
-use rookui::r#async::FutureExt as _;
-use rookui::r#async::executor::Background;
+use pterm_core::safe_info;
+use pterm_errors::report_error;
+use ptermui::r#async::FutureExt as _;
+use ptermui::r#async::executor::Background;
 use tokio::fs::{self as tokio_fs, OpenOptions};
 use tokio::io::AsyncWriteExt as _;
 use tokio::sync::{mpsc, oneshot};
@@ -62,9 +62,10 @@ const DECLARATION_VERSION: u32 = 1;
 /// Env var override for the declarations file path (useful for tests and operators).
 const DECLARATIONS_PATH_ENV_VAR: &str = "OZ_SNAPSHOT_DECLARATIONS_FILE";
 
-/// Rook-branded name for the same path, set alongside [`DECLARATIONS_PATH_ENV_VAR`] with the
+/// Polaris Terminal-branded name for the same path, set alongside [`DECLARATIONS_PATH_ENV_VAR`] with the
 /// same value. Only the `OZ_` name is read back.
-const ROOK_DECLARATIONS_PATH_ENV_VAR: &str = "ROOK_SNAPSHOT_DECLARATIONS_FILE";
+const POLARIS_TERMINAL_DECLARATIONS_PATH_ENV_VAR: &str =
+    "POLARIS_TERMINAL_SNAPSHOT_DECLARATIONS_FILE";
 
 /// Env var pointing directly at the declarations-generator script.
 /// Set by `entrypoint.sh` in containerized runs and by `oz-local --docker-dir` in local dev.
@@ -172,7 +173,7 @@ pub(super) async fn run_declarations_script(
     // Setting `current_dir` ensures `$PWD` in the bash script is the workspace even when the
     // driver process's own CWD has drifted (e.g. the macOS startup path does `cd $HOME`).
     // Setting the declarations-file path, under both `OZ_SNAPSHOT_DECLARATIONS_FILE` and
-    // `ROOK_SNAPSHOT_DECLARATIONS_FILE`, keeps the script and the upload pipeline in sync on
+    // `POLARIS_TERMINAL_SNAPSHOT_DECLARATIONS_FILE`, keeps the script and the upload pipeline in sync on
     // which file to read/write.
     let declarations_path = resolve_declarations_path(Some(task_id));
     log::info!(
@@ -185,7 +186,10 @@ pub(super) async fn run_declarations_script(
     command
         .current_dir(working_dir)
         .env(DECLARATIONS_PATH_ENV_VAR, &declarations_path)
-        .env(ROOK_DECLARATIONS_PATH_ENV_VAR, &declarations_path);
+        .env(
+            POLARIS_TERMINAL_DECLARATIONS_PATH_ENV_VAR,
+            &declarations_path,
+        );
 
     let output = match command.output().with_timeout(script_timeout).await {
         Ok(Ok(output)) => output,

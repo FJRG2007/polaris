@@ -1,29 +1,31 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use rook::features::FeatureFlag;
-use rook::integration_testing::remote_server::{
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::remote_server::{
     assert_command_executor_is_remote_server, assert_remote_server_connected,
     assert_remote_server_has_navigated, assert_remote_server_loaded_repo_metadata_directory,
     load_repo_metadata_directory_via_remote_server, record_remote_server_lazy_load_events,
     record_remote_server_navigation_events, wait_for_remote_server_ready,
     write_file_via_remote_server,
 };
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::subshell::{
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::subshell::{
     enter_remote_server_ssh_command, enter_ssh_password, setup_gcloud_sdk,
     wait_for_remote_server_password_prompt,
 };
-use rook::integration_testing::terminal::util::{
+use polaris_terminal::integration_testing::terminal::util::{
     ExpectedExitStatus, current_shell_starter_and_version,
 };
-use rook::integration_testing::terminal::{
+use polaris_terminal::integration_testing::terminal::{
     execute_command_for_single_terminal_in_tab, run_completer,
     wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::terminal::rookify::settings::{SshExtensionInstallMode, SshExtensionInstallModeSetting};
-use rook::terminal::shell::ShellType;
-use rookui_core::integration::TestStep;
+use polaris_terminal::terminal::ptermify::settings::{
+    SshExtensionInstallMode, SshExtensionInstallModeSetting,
+};
+use polaris_terminal::terminal::shell::ShellType;
+use ptermui_core::integration::TestStep;
 use settings::Setting as _;
 
 use super::{Builder, new_builder};
@@ -101,13 +103,13 @@ pub fn test_remote_server_navigate_to_repo() -> Builder {
         .with_step(record_remote_server_navigation_events())
         .with_step(execute_command_for_single_terminal_in_tab(
             0,
-            "mkdir -p /tmp/rook-test-repo && cd /tmp/rook-test-repo && git init -b main && git config user.email test@test.com && git config user.name TestUser && touch file && git add file && git commit -m init".into(),
+            "mkdir -p /tmp/polaris-terminal-test-repo && cd /tmp/polaris-terminal-test-repo && git init -b main && git config user.email test@test.com && git config user.name TestUser && touch file && git add file && git commit -m init".into(),
             ExpectedExitStatus::Success,
             (),
         ))
         .with_step(execute_command_for_single_terminal_in_tab(
             0,
-            "cd /tmp/rook-test-repo".into(),
+            "cd /tmp/polaris-terminal-test-repo".into(),
             ExpectedExitStatus::Success,
             (),
         ))
@@ -120,7 +122,7 @@ pub fn test_remote_server_navigate_to_repo() -> Builder {
             .set_timeout(Duration::from_secs(15))
             .add_named_assertion_with_data_from_prior_step(
                 "remote server navigated to expected repo path",
-                assert_remote_server_has_navigated(0, "/tmp/rook-test-repo"),
+                assert_remote_server_has_navigated(0, "/tmp/polaris-terminal-test-repo"),
             ),
         )
         // Verify the connection is still healthy after navigation.
@@ -144,13 +146,14 @@ pub fn test_remote_server_completions() -> Builder {
     builder
         .with_step(execute_command_for_single_terminal_in_tab(
             0,
-            "touch /tmp/rook-rs-completion-target".into(),
+            "touch /tmp/polaris-terminal-rs-completion-target".into(),
             ExpectedExitStatus::Success,
             (),
         ))
         // Trigger the actual tab-completion request path for a remote file.
         .with_step(
-            run_completer(0, "cat /tmp/rook-rs-completion-t").set_timeout(Duration::from_secs(15)),
+            run_completer(0, "cat /tmp/polaris-terminal-rs-completion-t")
+                .set_timeout(Duration::from_secs(15)),
         )
         // Verify the executor is still the remote server executor after
         // completions have been triggered.
@@ -183,7 +186,7 @@ pub fn test_remote_server_lazy_load_directory() -> Builder {
         // Create a git repo with a subdirectory on the remote.
         .with_step(execute_command_for_single_terminal_in_tab(
             0,
-            "rm -rf /tmp/rook-lazy-repo && mkdir -p /tmp/rook-lazy-repo/subdir && cd /tmp/rook-lazy-repo && git init -b main && git config user.email test@test.com && git config user.name TestUser && touch file subdir/nested && git add . && git commit -m init".into(),
+            "rm -rf /tmp/polaris-terminal-lazy-repo && mkdir -p /tmp/polaris-terminal-lazy-repo/subdir && cd /tmp/polaris-terminal-lazy-repo && git init -b main && git config user.email test@test.com && git config user.name TestUser && touch file subdir/nested && git add . && git commit -m init".into(),
             ExpectedExitStatus::Success,
             (),
         ))
@@ -191,7 +194,7 @@ pub fn test_remote_server_lazy_load_directory() -> Builder {
         // server indexes it.
         .with_step(execute_command_for_single_terminal_in_tab(
             0,
-            "cd /tmp/rook-lazy-repo".into(),
+            "cd /tmp/polaris-terminal-lazy-repo".into(),
             ExpectedExitStatus::Success,
             (),
         ))
@@ -202,7 +205,7 @@ pub fn test_remote_server_lazy_load_directory() -> Builder {
             .set_timeout(Duration::from_secs(15))
             .add_named_assertion_with_data_from_prior_step(
                 "remote server navigated to expected lazy-load repo path",
-                assert_remote_server_has_navigated(0, "/tmp/rook-lazy-repo"),
+                assert_remote_server_has_navigated(0, "/tmp/polaris-terminal-lazy-repo"),
             ),
         )
         // Trigger lazy-load of the subdirectory via the proto API.
@@ -210,8 +213,8 @@ pub fn test_remote_server_lazy_load_directory() -> Builder {
             TestStep::new("Load subdirectory via LoadRepoMetadataDirectory")
                 .with_action(load_repo_metadata_directory_via_remote_server(
                     0,
-                    "/tmp/rook-lazy-repo".to_string(),
-                    "/tmp/rook-lazy-repo/subdir".to_string(),
+                    "/tmp/polaris-terminal-lazy-repo".to_string(),
+                    "/tmp/polaris-terminal-lazy-repo/subdir".to_string(),
                 ))
                 // Give the async request a moment to complete.
                 .set_post_step_pause(Duration::from_secs(2)),
@@ -235,7 +238,7 @@ pub fn test_remote_server_lazy_load_directory() -> Builder {
         // the nested file through the remote server executor.
         .with_step(execute_command_for_single_terminal_in_tab(
             0,
-            "cat /tmp/rook-lazy-repo/subdir/nested && echo 'file exists'".into(),
+            "cat /tmp/polaris-terminal-lazy-repo/subdir/nested && echo 'file exists'".into(),
             ExpectedExitStatus::Success,
             "file exists",
         ))
@@ -257,7 +260,7 @@ pub fn test_remote_server_file_operations() -> Builder {
             TestStep::new("Write file via RemoteServerClient proto API")
                 .with_action(write_file_via_remote_server(
                     0,
-                    "/tmp/rook-rs-test-file.txt".to_string(),
+                    "/tmp/polaris-terminal-rs-test-file.txt".to_string(),
                     "hello from proto".to_string(),
                 ))
                 // Give the async write a moment to complete
@@ -267,14 +270,14 @@ pub fn test_remote_server_file_operations() -> Builder {
         // (which goes through RemoteServerCommandExecutor::run_command).
         .with_step(execute_command_for_single_terminal_in_tab(
             0,
-            "cat /tmp/rook-rs-test-file.txt".into(),
+            "cat /tmp/polaris-terminal-rs-test-file.txt".into(),
             ExpectedExitStatus::Success,
             "hello from proto",
         ))
         // Step 3: Clean up
         .with_step(execute_command_for_single_terminal_in_tab(
             0,
-            "rm -f /tmp/rook-rs-test-file.txt".into(),
+            "rm -f /tmp/polaris-terminal-rs-test-file.txt".into(),
             ExpectedExitStatus::Success,
             (),
         ))

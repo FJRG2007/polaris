@@ -5,15 +5,15 @@ use std::sync::Arc;
 
 #[cfg(test)]
 use markdown_parser::FormattedTextInline;
-use rookui_core::AppContext;
-use rookui_core::color::ColorU;
-use rookui_core::fonts::TextLayoutSystem;
+use ptermui_core::AppContext;
+use ptermui_core::color::ColorU;
+use ptermui_core::fonts::TextLayoutSystem;
 #[cfg(test)]
-use rookui_core::fonts::{Style, Weight};
-use rookui_core::text_layout::{
+use ptermui_core::fonts::{Style, Weight};
+use ptermui_core::text_layout::{
     ClipConfig, LayoutCache, Line, StyleAndFont, TextAlignment, TextBorder, TextFrame, TextStyle,
 };
-use rookui_core::units::{IntoPixels, Pixels};
+use ptermui_core::units::{IntoPixels, Pixels};
 
 use super::model::{BlockSpacing, ParagraphStyles, RenderState, RichTextStyles};
 use crate::content::text::{BufferBlockStyle, TextStylesWithMetadata};

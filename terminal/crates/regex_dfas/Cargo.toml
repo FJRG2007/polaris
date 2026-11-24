@@ -1,5 +1,5 @@
 [package]
-authors = ["Rook Contributors"]
+authors = ["Polaris Terminal Contributors"]
 edition = "2024"
 name = "regex_dfas"
 publish.workspace = true

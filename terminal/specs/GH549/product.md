@@ -1,12 +1,12 @@
 # Notebook editor: Raw/Rendered toggle for Mermaid code blocks
 
 ## Summary
-When a notebook code block's language is set to `Mermaid`, Rook shows a Raw/Rendered icon-button toggle in the block footer. The toggle defaults to Raw only when the user explicitly creates or converts a Mermaid code block in an ordinary editable notebook, which keeps in-progress source text editable. Planning documents and rendered Markdown file views default Mermaid blocks to Rendered so diagrams are visible by default. Selecting Rendered renders the source as a full-width diagram whose height is derived from the loaded SVG's aspect ratio; if rendering fails, an error frame is shown. The language dropdown also shows branded icons for each language.
+When a notebook code block's language is set to `Mermaid`, Polaris Terminal shows a Raw/Rendered icon-button toggle in the block footer. The toggle defaults to Raw only when the user explicitly creates or converts a Mermaid code block in an ordinary editable notebook, which keeps in-progress source text editable. Planning documents and rendered Markdown file views default Mermaid blocks to Rendered so diagrams are visible by default. Selecting Rendered renders the source as a full-width diagram whose height is derived from the loaded SVG's aspect ratio; if rendering fails, an error frame is shown. The language dropdown also shows branded icons for each language.
 
 Reference: GitHub issue `warpdotdev/warp-external#549`.
 
 ## Problem
-The notebook code block language dropdown exposes `Mermaid` as a selectable language. Today, as soon as the user picks `Mermaid`, Rook unconditionally switches the block into its Mermaid diagram rendering path. This makes ordinary code, plain notes, or work-in-progress diagrams appear as a broken or empty diagram frame instead of staying readable and editable as normal text.
+The notebook code block language dropdown exposes `Mermaid` as a selectable language. Today, as soon as the user picks `Mermaid`, Polaris Terminal unconditionally switches the block into its Mermaid diagram rendering path. This makes ordinary code, plain notes, or work-in-progress diagrams appear as a broken or empty diagram frame instead of staying readable and editable as normal text.
 
 ## Goals / Non-goals
 
@@ -58,7 +58,7 @@ The following invariants apply to notebook code blocks whose language is set to 
 
 **Rendered mode — successful render**
 
-15. When the user selects Rendered, Rook attempts to render the block's current source as a Mermaid diagram using the existing SVG rendering pipeline.
+15. When the user selects Rendered, Polaris Terminal attempts to render the block's current source as a Mermaid diagram using the existing SVG rendering pipeline.
 16. While the async render is in progress the block shows a "Rendering Mermaid diagram…" placeholder inside a full-width diagram frame.
 17. Before the Mermaid SVG has loaded, the diagram frame uses the full available code-block content width and a stable placeholder height that does not depend on the raw Mermaid source text height.
 18. On a successful render the block shows the rendered diagram inside the diagram frame. The rendered frame uses the full available code-block content width, and its height is derived from the loaded SVG's aspect ratio at that full width. The rendered height must not be derived from the raw source text height, and loaded diagrams must not be capped to their intrinsic SVG width when additional block width is available.
@@ -84,7 +84,7 @@ The following invariants apply to notebook code blocks whose language is set to 
 
 **Rendered Markdown file views**
 
-29. Directly opened Markdown files default to the rendered Markdown view rather than raw Markdown source when Rook opens them in the Markdown viewer.
+29. Directly opened Markdown files default to the rendered Markdown view rather than raw Markdown source when Polaris Terminal opens them in the Markdown viewer.
 30. Mermaid blocks in the rendered Markdown file view default to Rendered diagrams rather than Mermaid source text.
 31. Users can switch a rendered Markdown file back to Raw from the pane header Markdown toggle; Raw mode opens the file in the code editor. Returning to the rendered Markdown view defaults Mermaid blocks to Rendered again for that view.
 

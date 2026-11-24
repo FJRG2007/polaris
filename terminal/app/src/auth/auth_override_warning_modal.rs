@@ -1,8 +1,8 @@
 use pathfinder_color::ColorU;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{ChildView, Container, Fill};
-use rookui::ui_components::components::{Coords, UiComponentStyles};
-use rookui::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{ChildView, Container, Fill};
+use ptermui::ui_components::components::{Coords, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };

@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use rook_core::context_flag::ContextFlag;
-use rook_core::features::FeatureFlag;
-use rookui::keymap::BindingId;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity, WindowId};
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::features::FeatureFlag;
+use ptermui::keymap::BindingId;
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity, WindowId};
 
-use super::{conversations, rook_drive};
-use crate::drive::settings::RookDriveSettings;
+use super::{conversations, pterm_drive};
+use crate::drive::settings::PtermDriveSettings;
 use crate::search::QueryFilter;
 use crate::search::action::CommandBindingDataSource;
 use crate::search::binding_source::BindingSource;
@@ -25,7 +25,7 @@ use crate::settings::AISettings;
 pub struct DataSourceStore {
     actions_data_source: ModelHandle<CommandBindingDataSource>,
     sessions_data_source: ModelHandle<navigation::DataSource>,
-    rook_drive_data_source: ModelHandle<rook_drive::DataSource>,
+    pterm_drive_data_source: ModelHandle<pterm_drive::DataSource>,
     launch_config_data_source: ModelHandle<launch_config::DataSource>,
     new_session_data_source: Option<ModelHandle<NewSessionDataSource>>,
     all_conversation_data_source: ModelHandle<conversations::DataSource>,
@@ -46,8 +46,8 @@ impl DataSourceStore {
         let sessions_data_source =
             ctx.add_model(|_| navigation::DataSource::new(active_session_handle));
 
-        let rook_drive_data_source =
-            ctx.add_model(|ctx| rook_drive::DataSource::new(window_id, ctx));
+        let pterm_drive_data_source =
+            ctx.add_model(|ctx| pterm_drive::DataSource::new(window_id, ctx));
 
         let launch_config_data_source = ctx.add_model(launch_config::DataSource::new);
 
@@ -63,7 +63,7 @@ impl DataSourceStore {
         Self {
             actions_data_source,
             sessions_data_source,
-            rook_drive_data_source,
+            pterm_drive_data_source,
             launch_config_data_source,
             new_session_data_source,
             all_conversation_data_source,
@@ -94,20 +94,20 @@ impl DataSourceStore {
                 HashSet::from([QueryFilter::Sessions]),
             );
 
-            if RookDriveSettings::is_rook_drive_enabled(ctx) {
-                let mut rook_drive_filters = HashSet::from([
+            if PtermDriveSettings::is_pterm_drive_enabled(ctx) {
+                let mut pterm_drive_filters = HashSet::from([
                     QueryFilter::Notebooks,
                     QueryFilter::Plans,
                     QueryFilter::Drive,
                     QueryFilter::Workflows,
                 ]);
 
-                rook_drive_filters.insert(QueryFilter::EnvironmentVariables);
+                pterm_drive_filters.insert(QueryFilter::EnvironmentVariables);
 
                 if AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
-                    rook_drive_filters.insert(QueryFilter::AgentModeWorkflows);
+                    pterm_drive_filters.insert(QueryFilter::AgentModeWorkflows);
                 }
-                mixer.add_sync_source(self.rook_drive_data_source.clone(), rook_drive_filters);
+                mixer.add_sync_source(self.pterm_drive_data_source.clone(), pterm_drive_filters);
             }
 
             mixer.add_sync_source(
@@ -212,15 +212,15 @@ impl DataSourceStore {
                 .as_ref(app)
                 .query_result(*binding_id),
             ItemSummary::Workflow { id } => self
-                .rook_drive_data_source
+                .pterm_drive_data_source
                 .as_ref(app)
                 .query_result(id, app),
             ItemSummary::EnvVarCollection { id } => self
-                .rook_drive_data_source
+                .pterm_drive_data_source
                 .as_ref(app)
                 .query_result(id, app),
             ItemSummary::Notebook { id } => self
-                .rook_drive_data_source
+                .pterm_drive_data_source
                 .as_ref(app)
                 .query_result(id, app),
             ItemSummary::Session { pane_view_locator } => self
@@ -234,7 +234,7 @@ impl DataSourceStore {
             }
             ItemSummary::CloudObject => {
                 // We don't yet support all cloud objects in the command palette but
-                // we have a `ViewInRookDrive` action that supports all of them, so
+                // we have a `ViewInPtermDrive` action that supports all of them, so
                 // this is necessary to make the compiler happy.
                 None
             }

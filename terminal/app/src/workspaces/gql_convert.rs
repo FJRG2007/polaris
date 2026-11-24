@@ -1,9 +1,8 @@
 use std::path::PathBuf;
 
 use anyhow::{Result, anyhow, bail};
-use regex::Regex;
-use rook_errors::report_error;
-use rook_graphql::billing::{
+use pterm_errors::report_error;
+use pterm_graphql::billing::{
     AiAutonomyPolicy as GqlAiAutonomyPolicy, AmbientAgentsPolicy as GqlAmbientAgentsPolicy,
     BillingCycleUsageHistory as GqlBillingCycleUsageHistory, BillingMetadata as GqlBillingMetadata,
     BonusGrant as GqlBonusGrant, BonusGrantScope as GqlBonusGrantScope,
@@ -13,9 +12,9 @@ use rook_graphql::billing::{
     EnterpriseCreditsAutoReloadPolicy as GqlEnterpriseCreditsAutoReloadPolicy,
     EnterprisePayAsYouGoPolicy as GqlEnterprisePayAsYouGoPolicy, InstanceShape as GqlInstanceShape,
     ManagedByokByoePolicy as GqlManagedByokByoePolicy, MultiAdminPolicy as GqlMultiAdminPolicy,
-    NativeWorkspacesPolicy as GqlNativeWorkspacesPolicy,
-    PurchaseAddOnCreditsPolicy as GqlPurchaseAddOnCreditsPolicy, RookAiPolicy as GqlRookAiPolicy,
-    ServiceAgreementType, SessionSharingPolicy as GqlSessionSharingPolicy,
+    NativeWorkspacesPolicy as GqlNativeWorkspacesPolicy, PtermAiPolicy as GqlPtermAiPolicy,
+    PurchaseAddOnCreditsPolicy as GqlPurchaseAddOnCreditsPolicy, ServiceAgreementType,
+    SessionSharingPolicy as GqlSessionSharingPolicy,
     SharedNotebooksPolicy as GqlSharedNotebooksPolicy,
     SharedWorkflowsPolicy as GqlSharedWorkflowsPolicy, StripeSubscriptionPlan,
     TeamSizePolicy as GqlTeamSizePolicy,
@@ -25,11 +24,11 @@ use rook_graphql::billing::{
     UsageVisibilityGranularity as GqlUsageVisibilityGranularity,
     UsageVisibilityPolicy as GqlUsageVisibilityPolicy,
 };
-use rook_graphql::queries::get_conversation_usage as gql_usage;
-use rook_graphql::queries::get_workspaces_metadata_for_user::User as GqlUser;
-use rook_graphql::subscriptions::get_rook_drive_updates::RookDriveUpdate;
-use rook_graphql::user::DiscoverableTeamData as GqlDiscoverableTeamData;
-use rook_graphql::workspace::{
+use pterm_graphql::queries::get_conversation_usage as gql_usage;
+use pterm_graphql::queries::get_workspaces_metadata_for_user::User as GqlUser;
+use pterm_graphql::subscriptions::get_pterm_drive_updates::PtermDriveUpdate;
+use pterm_graphql::user::DiscoverableTeamData as GqlDiscoverableTeamData;
+use pterm_graphql::workspace::{
     AddonCreditsSettings as GqlAddonCreditsSettings,
     AdminEnablementSetting as GqlAdminEnablementSetting, AiAutonomyValue as GqlAiAutonomyValue,
     AiPermissionsSettings as GqlAiPermissionsSettings,
@@ -47,6 +46,7 @@ use rook_graphql::workspace::{
     WorkspaceSettings as GqlWorkspaceSettings,
     WriteToPtyAutonomyValue as GqlWriteToPtyAutonomyValue,
 };
+use regex::Regex;
 
 use super::team::{DiscoverableTeam, MembershipRole, Team, TeamMember, TeamVisibility};
 use super::user_workspaces::WorkspacesMetadataResponse;
@@ -57,7 +57,7 @@ use super::workspace::{
     ByoFirstPartyKey, CloudConversationStorageSettings, CodebaseContextSettings, CustomerType,
     DelinquencyStatus, EmailInvite, EnforceableSetting, EnterpriseSecretRegex,
     HostEnablementSetting, InstanceShape, InviteLinkDomainRestriction, LinkSharingSettings,
-    LlmSettings, MaxPriorCycles, RookAiPolicy, SandboxedAgentSettings, SecretRedactionSettings,
+    LlmSettings, MaxPriorCycles, PtermAiPolicy, SandboxedAgentSettings, SecretRedactionSettings,
     SessionSharingPolicy, SharedNotebooksPolicy, SharedWorkflowsPolicy, SplitListSetting,
     TeamAiAutonomySettings, TeamAiPermissionsSettings, TeamByoSettings, TeamLinkSharingSettings,
     TeamSandboxedAgentSettings, TeamSecretRedactionSettings, TeamSettings,
@@ -104,7 +104,7 @@ impl From<GqlTeamMember> for TeamMember {
 /// The server hands workspace admins every team in the workspace so admin
 /// surfaces can manage them, but a team the user is not a member of is not one
 /// they can operate as in the client. Filtering here keeps every consumer of
-/// `Workspace::teams` (team switcher, team spaces, rook drive teams, ...)
+/// `Workspace::teams` (team switcher, team spaces, polaris-terminal drive teams, ...)
 /// scoped to real memberships.
 fn retain_authenticated_teams(workspace: &mut Workspace, user_uid: UserUid) {
     workspace
@@ -206,7 +206,7 @@ impl From<GqlTeamVisibility> for TeamVisibility {
                 report_error!(
                     "Invalid TeamVisibility from server; treating as Private",
                     extra: { "value" => %value },
-                    rook_errors::ReportErrorLogMode::OncePerRun
+                    pterm_errors::ReportErrorLogMode::OncePerRun
                 );
                 // Fail closed: an unrecognized value must not be treated as Open,
                 // since that would surface the invite-by-link control.
@@ -265,15 +265,15 @@ impl From<GqlInviteLinkDomainRestriction> for InviteLinkDomainRestriction {
     }
 }
 
-impl From<GqlRookAiPolicy> for RookAiPolicy {
-    fn from(gql_rook_ai_policy: GqlRookAiPolicy) -> RookAiPolicy {
+impl From<GqlPtermAiPolicy> for PtermAiPolicy {
+    fn from(gql_pterm_ai_policy: GqlPtermAiPolicy) -> PtermAiPolicy {
         Self {
-            limit: i64::from(gql_rook_ai_policy.limit),
-            is_code_suggestions_toggleable: gql_rook_ai_policy.is_code_suggestions_toggleable,
-            is_prompt_suggestions_toggleable: gql_rook_ai_policy.is_prompt_suggestions_toggleable,
-            is_next_command_enabled: gql_rook_ai_policy.is_next_command_enabled,
-            is_git_operations_ai_enabled: gql_rook_ai_policy.is_git_operations_ai_enabled,
-            is_voice_enabled: gql_rook_ai_policy.is_voice_enabled,
+            limit: i64::from(gql_pterm_ai_policy.limit),
+            is_code_suggestions_toggleable: gql_pterm_ai_policy.is_code_suggestions_toggleable,
+            is_prompt_suggestions_toggleable: gql_pterm_ai_policy.is_prompt_suggestions_toggleable,
+            is_next_command_enabled: gql_pterm_ai_policy.is_next_command_enabled,
+            is_git_operations_ai_enabled: gql_pterm_ai_policy.is_git_operations_ai_enabled,
+            is_voice_enabled: gql_pterm_ai_policy.is_voice_enabled,
         }
     }
 }
@@ -338,7 +338,7 @@ impl From<GqlUgcCollectionEnablementSetting> for UgcCollectionEnablementSetting 
                 report_error!(
                     "Invalid UgcCollectionEnablementSetting. Make sure to update client GraphQL types!",
                     extra: { "value" => %value },
-                    rook_errors::ReportErrorLogMode::OncePerRun
+                    pterm_errors::ReportErrorLogMode::OncePerRun
                 );
                 UgcCollectionEnablementSetting::RespectUserSetting
             }
@@ -392,7 +392,7 @@ impl From<GqlAdminEnablementSetting> for AdminEnablementSetting {
                 report_error!(
                     "Invalid AdminEnablementSetting. Make sure to update client GraphQL types!",
                     extra: { "value" => %value },
-                    rook_errors::ReportErrorLogMode::OncePerRun
+                    pterm_errors::ReportErrorLogMode::OncePerRun
                 );
                 AdminEnablementSetting::RespectUserSetting
             }
@@ -411,7 +411,7 @@ impl From<GqlHostEnablementSetting> for HostEnablementSetting {
                 report_error!(
                     "Invalid HostEnablementSetting. Make sure to update client GraphQL types!",
                     extra: { "value" => %value },
-                    rook_errors::ReportErrorLogMode::OncePerRun
+                    pterm_errors::ReportErrorLogMode::OncePerRun
                 );
                 HostEnablementSetting::RespectUserSetting
             }
@@ -447,7 +447,7 @@ fn compile_remote_session_regex_list(patterns: impl IntoIterator<Item = String>)
                 report_error!(
                     "Invalid regex pattern for remote session detection",
                     extra: { "pattern" => %pattern },
-                    rook_errors::ReportErrorLogMode::OncePerRun
+                    pterm_errors::ReportErrorLogMode::OncePerRun
                 );
                 None
             }
@@ -605,7 +605,7 @@ impl From<GqlUsageVisibilityGranularity> for UsageVisibilityGranularity {
                 report_error!(
                     "Invalid UsageVisibilityGranularity. Make sure to update client GraphQL types!",
                     extra: { "value" => %value },
-                    rook_errors::ReportErrorLogMode::OncePerRun
+                    pterm_errors::ReportErrorLogMode::OncePerRun
                 );
                 // Fail closed to the most restrictive granularity.
                 UsageVisibilityGranularity::OwnOnly
@@ -673,7 +673,7 @@ impl From<GqlTier> for Tier {
         Self {
             name: gql_tier.name,
             description: gql_tier.description,
-            rook_ai_policy: gql_tier.rook_ai_policy.map(From::from),
+            pterm_ai_policy: gql_tier.pterm_ai_policy.map(From::from),
             workspace_size_policy: gql_tier.team_size_policy.map(From::from),
             shared_notebooks_policy: gql_tier.shared_notebooks_policy.map(From::from),
             shared_workflows_policy: gql_tier.shared_workflows_policy.map(From::from),
@@ -750,7 +750,7 @@ fn bonus_grant_scope_from_gql(
                 anyhow!(
                     "Team/Workspace-scoped bonus grant fetched without a workspace uid; treating as user scope"
                 ),
-                rook_errors::ReportErrorLogMode::OncePerRun
+                pterm_errors::ReportErrorLogMode::OncePerRun
             );
             BonusGrantScope::User
         }
@@ -854,7 +854,7 @@ fn convert_gql_ai_autonomy_value_to_action_permission(
             report_error!(
                 "Invalid AiAutonomyValue. Make sure to update client GraphQL types!",
                 extra: { "value" => %value },
-                rook_errors::ReportErrorLogMode::OncePerRun
+                pterm_errors::ReportErrorLogMode::OncePerRun
             );
             None
         }
@@ -873,7 +873,7 @@ fn convert_gql_write_to_pty_autonomy_value_to_write_to_pty_permission(
             report_error!(
                 "Invalid WriteToPtyAutonomyValue. Make sure to update client GraphQL types!",
                 extra: { "value" => %value },
-                rook_errors::ReportErrorLogMode::OncePerRun
+                pterm_errors::ReportErrorLogMode::OncePerRun
             );
             None
         }
@@ -892,7 +892,7 @@ fn convert_gql_computer_use_autonomy_value_to_computer_use_permission(
             report_error!(
                 "Invalid ComputerUseAutonomyValue. Make sure to update client GraphQL types!",
                 extra: { "value" => %value },
-                rook_errors::ReportErrorLogMode::OncePerRun
+                pterm_errors::ReportErrorLogMode::OncePerRun
             );
             None
         }
@@ -930,9 +930,9 @@ impl ToPathBufs for Vec<String> {
         self.into_iter().map(PathBuf::from).collect()
     }
 }
-impl From<rook_graphql::workspace::LlmModelHost> for crate::ai::llms::LLMModelHost {
-    fn from(gql_host: rook_graphql::workspace::LlmModelHost) -> Self {
-        use rook_graphql::workspace::LlmModelHost as GqlLlmModelHost;
+impl From<pterm_graphql::workspace::LlmModelHost> for crate::ai::llms::LLMModelHost {
+    fn from(gql_host: pterm_graphql::workspace::LlmModelHost) -> Self {
+        use pterm_graphql::workspace::LlmModelHost as GqlLlmModelHost;
         match gql_host {
             GqlLlmModelHost::DirectApi => Self::DirectApi,
             GqlLlmModelHost::AwsBedrock => Self::AwsBedrock,
@@ -948,8 +948,8 @@ impl From<rook_graphql::workspace::LlmModelHost> for crate::ai::llms::LLMModelHo
     }
 }
 
-impl From<rook_graphql::workspace::LlmHostSettings> for super::workspace::LlmHostSettings {
-    fn from(gql_settings: rook_graphql::workspace::LlmHostSettings) -> Self {
+impl From<pterm_graphql::workspace::LlmHostSettings> for super::workspace::LlmHostSettings {
+    fn from(gql_settings: pterm_graphql::workspace::LlmHostSettings) -> Self {
         Self {
             enabled: gql_settings.enabled,
             enablement_setting: gql_settings
@@ -962,8 +962,8 @@ impl From<rook_graphql::workspace::LlmHostSettings> for super::workspace::LlmHos
     }
 }
 
-impl From<rook_graphql::workspace::LlmSettings> for LlmSettings {
-    fn from(gql_settings: rook_graphql::workspace::LlmSettings) -> Self {
+impl From<pterm_graphql::workspace::LlmSettings> for LlmSettings {
+    fn from(gql_settings: pterm_graphql::workspace::LlmSettings) -> Self {
         let mut host_configs = std::collections::HashMap::new();
         for entry in gql_settings.host_configs {
             let host: crate::ai::llms::LLMModelHost = entry.host.into();
@@ -1100,10 +1100,10 @@ impl From<GqlWorkspaceSettings> for WorkspaceSettings {
                         .map(|denylist| denylist.to_predicates()),
                 }
             }),
-            enable_rook_attribution: gql_workspace_settings
+            enable_pterm_attribution: gql_workspace_settings
                 .ambient_agent_settings
                 .as_ref()
-                .map(|s| s.enable_rook_attribution.clone().into())
+                .map(|s| s.enable_pterm_attribution.clone().into())
                 .unwrap_or_default(),
             default_host_slug: gql_workspace_settings
                 .ambient_agent_settings
@@ -1126,7 +1126,7 @@ fn split_string_list(info: GqlStringListSettingInfo) -> SplitListSetting<String>
 impl From<GqlTeamSettings> for TeamSettings {
     fn from(gql_team_settings: GqlTeamSettings) -> TeamSettings {
         let map_regexes =
-            |regexes: Vec<rook_graphql::workspace::SecretRedactionRegex>| -> Vec<EnterpriseSecretRegex> {
+            |regexes: Vec<pterm_graphql::workspace::SecretRedactionRegex>| -> Vec<EnterpriseSecretRegex> {
                 regexes
                     .into_iter()
                     .map(|gql_regex| EnterpriseSecretRegex {
@@ -1302,10 +1302,10 @@ impl From<GqlTeamSettings> for TeamSettings {
                     }),
             },
             addon_credits_settings: gql_team_settings.addon_credits_settings.into(),
-            enable_rook_attribution: gql_team_settings
+            enable_pterm_attribution: gql_team_settings
                 .ambient_agent_settings
                 .as_ref()
-                .map(|s| s.enable_rook_attribution.clone().into())
+                .map(|s| s.enable_pterm_attribution.clone().into())
                 .unwrap_or_default(),
             default_host_slug: gql_team_settings
                 .ambient_agent_settings
@@ -1502,14 +1502,14 @@ impl From<GqlUser> for WorkspacesMetadataResponse {
 #[path = "gql_convert_tests.rs"]
 mod tests;
 
-pub fn object_update_message_from_gql(value: RookDriveUpdate) -> Result<ObjectUpdateMessage> {
+pub fn object_update_message_from_gql(value: PtermDriveUpdate) -> Result<ObjectUpdateMessage> {
     match value {
-        RookDriveUpdate::ObjectActionOccurred(message) => {
+        PtermDriveUpdate::ObjectActionOccurred(message) => {
             Ok(ObjectUpdateMessage::ObjectActionOccurred {
                 history: object_action_history_from_gql(message.history)?,
             })
         }
-        RookDriveUpdate::ObjectContentUpdated(message) => {
+        PtermDriveUpdate::ObjectContentUpdated(message) => {
             let server_object = message.object.try_into()?;
             let last_editor = message.last_editor.map(|e| e.into());
             Ok(ObjectUpdateMessage::ObjectContentChanged {
@@ -1517,15 +1517,15 @@ pub fn object_update_message_from_gql(value: RookDriveUpdate) -> Result<ObjectUp
                 last_editor,
             })
         }
-        RookDriveUpdate::ObjectDeleted(message) => Ok(ObjectUpdateMessage::ObjectDeleted {
+        PtermDriveUpdate::ObjectDeleted(message) => Ok(ObjectUpdateMessage::ObjectDeleted {
             object_uid: ServerId::from_string_lossy(message.object_uid.inner()),
         }),
-        RookDriveUpdate::ObjectMetadataUpdated(message) => {
+        PtermDriveUpdate::ObjectMetadataUpdated(message) => {
             Ok(ObjectUpdateMessage::ObjectMetadataChanged {
                 metadata: message.metadata.try_into()?,
             })
         }
-        RookDriveUpdate::ObjectPermissionsUpdated(message) => {
+        PtermDriveUpdate::ObjectPermissionsUpdated(message) => {
             Ok(ObjectUpdateMessage::ObjectPermissionsChangedV2 {
                 object_uid: ServerId::from_string_lossy(message.object_uid.inner()),
                 user_profiles: message
@@ -1537,16 +1537,16 @@ pub fn object_update_message_from_gql(value: RookDriveUpdate) -> Result<ObjectUp
                 permissions: message.permissions.try_into()?,
             })
         }
-        RookDriveUpdate::TeamMembershipsChanged(_) => {
+        PtermDriveUpdate::TeamMembershipsChanged(_) => {
             Ok(ObjectUpdateMessage::TeamMembershipsChanged)
         }
-        RookDriveUpdate::AmbientTaskUpdated(message) => {
+        PtermDriveUpdate::AmbientTaskUpdated(message) => {
             Ok(ObjectUpdateMessage::AmbientTaskUpdated {
                 task_id: message.task_id.inner().to_string(),
                 timestamp: message.task_updated_ts.utc(),
             })
         }
-        RookDriveUpdate::Unknown => bail!("Unexpected RookDriveUpdate variant"),
+        PtermDriveUpdate::Unknown => bail!("Unexpected PtermDriveUpdate variant"),
     }
 }
 

@@ -6,7 +6,7 @@ use diesel::associations::HasTable;
 use diesel::prelude::*;
 use diesel::result::Error;
 use prost::Message;
-use rook_errors::report_error;
+use pterm_errors::report_error;
 use warp_multi_agent_api as api;
 
 use super::ConversationSummaryBackfill;

@@ -1,8 +1,8 @@
-# PRODUCT: Rook TUI Conversation Resume and Restoration (CODE-1820)
+# PRODUCT: Polaris Terminal TUI Conversation Resume and Restoration (CODE-1820)
 
 ## Summary
 
-The Rook TUI prints a resumable server conversation token when the user exits with a non-empty selected conversation and accepts that token through `--resume` on a later launch. Resuming restores the selected Oz/Rook conversation into the TUI's single conversation surface, including its transcript and conversation-derived command history, so the next prompt continues the same conversation.
+The Polaris Terminal TUI prints a resumable server conversation token when the user exits with a non-empty selected conversation and accepts that token through `--resume` on a later launch. Resuming restores the selected Oz/Polaris Terminal conversation into the TUI's single conversation surface, including its transcript and conversation-derived command history, so the next prompt continues the same conversation.
 
 ## Figma
 
@@ -17,7 +17,7 @@ Figma: none provided.
 ## Non-goals
 
 - Restoring agent orchestration subscriptions, child-agent event delivery, or other orchestration runtime state.
-- Restoring or continuing conversations created by Claude Code, Gemini, Codex, or any non-Oz harness. The Rook TUI supports only Oz/Rook conversations.
+- Restoring or continuing conversations created by Claude Code, Gemini, Codex, or any non-Oz harness. The Polaris Terminal TUI supports only Oz/Polaris Terminal conversations.
 - Restoring the previous TUI process, PTY, or shell session. Conversation-derived command blocks are restored as transcript history, but no command is restarted and no prior shell process is recreated.
 - Adding the inline conversation list itself.
 - Supporting multiple simultaneous TUI conversation surfaces.
@@ -28,7 +28,7 @@ Figma: none provided.
 
 1. Launching the TUI without `--resume` opens its normal empty state backed by an eagerly created conversation; the first prompt continues that conversation.
 
-2. Launching the TUI with `--resume <server-conversation-token>` attempts to restore the Oz/Rook conversation identified by that token.
+2. Launching the TUI with `--resume <server-conversation-token>` attempts to restore the Oz/Polaris Terminal conversation identified by that token.
 
 3. The resume token is the server conversation token, regardless of whether the conversation transcript is stored in the cloud. Users never need to provide or distinguish a local conversation ID.
 
@@ -80,7 +80,7 @@ Figma: none provided.
 
 22. A restoration error never silently falls back to a new conversation and never sends a prompt.
 
-23. A non-Oz token produces an explicit message that the Rook TUI only supports Oz/Rook conversations.
+23. A non-Oz token produces an explicit message that the Polaris Terminal TUI only supports Oz/Polaris Terminal conversations.
 
 24. While startup restoration is loading, Escape or Ctrl-C cancels the restore and continues into the provisional new TUI session as though `--resume` had not been supplied.
     - The loading screen shows `Esc or Ctrl-C to cancel and start a new session`.
@@ -93,7 +93,7 @@ Figma: none provided.
 25. When the TUI exits successfully with a selected conversation that contains at least one exchange, it prints a single resume instruction after leaving the full-screen TUI and restoring the host terminal.
 
 26. The instruction contains the selected conversation's server token in the form:
-    `rook-tui --resume <server-conversation-token>`
+    `polaris-terminal-tui --resume <server-conversation-token>`
 
 27. The hint is based only on the selected conversation. The TUI does not fall back to another active or recently streamed conversation.
 

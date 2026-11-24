@@ -7,11 +7,11 @@ mod tests;
 use std::cmp::Ordering;
 use std::sync::Arc;
 
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::ViewContext;
+use ptermui::elements::MouseStateHandle;
 use repo_metadata::file_tree_store::FileTreeEntryState;
 use repo_metadata::{FileMetadata, FileTreeEntry};
-use rook_util::standardized_path::StandardizedPath;
-use rookui::ViewContext;
-use rookui::elements::MouseStateHandle;
 
 use super::{FileTreeIdentifier, FileTreeItem, FileTreeView};
 use crate::code::file_tree::FileTreeEvent;
@@ -106,7 +106,7 @@ impl FileTreeView {
                 metadata: FileMetadata::from_standardized(path.join("new_file"), false).into(),
                 depth: depth + 1,
                 mouse_state_handle: MouseStateHandle::default(),
-                draggable_state: rookui::elements::DraggableState::default(),
+                draggable_state: ptermui::elements::DraggableState::default(),
             },
         );
 

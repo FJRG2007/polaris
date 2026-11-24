@@ -41,9 +41,9 @@ sentry = { workspace = true, optional = true }
 shellexpand.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
-rookui_core.workspace = true
-rookui_extras = { workspace = true, features = ["default"] }
-rook_graphql.workspace = true
+ptermui_core.workspace = true
+ptermui_extras = { workspace = true, features = ["default"] }
+pterm_graphql.workspace = true
 warp_multi_agent_api.workspace = true
 dirs.workspace = true
 lazy_static.workspace = true
@@ -57,10 +57,10 @@ futures.workspace = true
 generic-array = "0.14.7"
 derivative.workspace = true
 hex.workspace = true
-rook_core.workspace = true
-rook_errors.workspace = true
-rook_terminal.workspace = true
-rook_util.workspace = true
+pterm_core.workspace = true
+pterm_errors.workspace = true
+pterm_terminal.workspace = true
+pterm_util.workspace = true
 chrono.workspace = true
 persistence.workspace = true
 priority-queue = "2.3.1"
@@ -90,7 +90,7 @@ filetime = "0.2.25"
 serial_test = "0.8.0"
 tempfile.workspace = true
 virtual-fs.workspace = true
-rook_core = { workspace = true, features = ["test-util"] }
+pterm_core = { workspace = true, features = ["test-util"] }
 
 [build-dependencies]
 anyhow.workspace = true

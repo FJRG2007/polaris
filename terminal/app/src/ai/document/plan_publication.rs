@@ -1,13 +1,13 @@
-//! Publishing plan documents to Rook Drive ahead of child-agent launch.
+//! Publishing plan documents to Polaris Terminal Drive ahead of child-agent launch.
 //!
 //! Callers first call [`prepare_plan_publications`] to kick off publication of
 //! a conversation's plans, then await [`wait_for_plan_publications`] before
 //! proceeding with work that requires the plans to be server-backed.
 use std::time::Duration;
 
-use rook_errors::report_error;
-use rookui::r#async::FutureExt as RookFutureExt;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui::r#async::FutureExt as PtermFutureExt;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentModel, AIDocumentModelEvent};

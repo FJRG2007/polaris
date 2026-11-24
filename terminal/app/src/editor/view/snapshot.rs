@@ -10,17 +10,17 @@ use anyhow::Result;
 use instant::Instant;
 use parking_lot::Mutex;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rayon::prelude::*;
-use rook_completer::completer::Description;
-use rook_errors::report_error;
-use rookui::fonts::{Cache as FontCache, FamilyId, Properties};
-use rookui::platform::LineStyle;
-use rookui::text::point::Point;
-use rookui::text_layout::{
+use pterm_completer::completer::Description;
+use pterm_errors::report_error;
+use ptermui::fonts::{Cache as FontCache, FamilyId, Properties};
+use ptermui::platform::LineStyle;
+use ptermui::text::point::Point;
+use ptermui::text_layout::{
     self, ClipConfig, ComputeBaselinePositionFn, DEFAULT_TOP_BOTTOM_RATIO, LayoutCache,
     StyleAndFont, TextAlignment, TextStyle, default_compute_baseline_position_fn,
 };
-use rookui::{AppContext, EntityId, ModelHandle};
+use ptermui::{AppContext, EntityId, ModelHandle};
+use rayon::prelude::*;
 use string_offset::ByteOffset;
 
 use super::model::EditorModel;

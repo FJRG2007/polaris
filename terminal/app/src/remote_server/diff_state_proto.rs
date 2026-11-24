@@ -8,7 +8,7 @@
 //! (`code_review::diff_state`, `util::git`) that are not available in the crate.
 use std::sync::Arc;
 
-use rook_util::standardized_path::StandardizedPath;
+use pterm_util::standardized_path::StandardizedPath;
 
 use super::proto;
 use crate::code_review::diff_size_limits::{DiffSize, MAX_DIFF_SIZE, UnrenderableReason};

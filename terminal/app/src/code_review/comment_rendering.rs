@@ -7,20 +7,20 @@ use std::rc::Rc;
 
 use chrono::{Duration, Local};
 use pathfinder_color::ColorU;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors::{neutral_1, neutral_2, text_sub};
-use rook_editor::content::buffer::InitialBufferState;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rookui::elements::new_scrollable::ScrollableAppearance;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors::{neutral_1, neutral_2, text_sub};
+use pterm_editor::content::buffer::InitialBufferState;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use ptermui::elements::new_scrollable::ScrollableAppearance;
+use ptermui::elements::{
     Border, ChildView, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, ScrollbarWidth,
     Shrinkable, Text,
 };
-use rookui::platform::Cursor;
-use rookui::text_layout::ClipConfig;
-use rookui::units::Pixels;
-use rookui::{AppContext, Element, EventContext, SingletonEntity, View, ViewContext, ViewHandle};
+use ptermui::platform::Cursor;
+use ptermui::text_layout::ClipConfig;
+use ptermui::units::Pixels;
+use ptermui::{AppContext, Element, EventContext, SingletonEntity, View, ViewContext, ViewHandle};
 
 use crate::appearance::Appearance;
 use crate::code::buffer_location::LocalOrRemotePath;
@@ -43,7 +43,7 @@ pub(crate) struct HeaderClickHandler {
 /// (rounded corners, neutral background, outline border).
 fn comment_card_container(
     content: Box<dyn Element>,
-    theme: &rook_core::ui::theme::RookTheme,
+    theme: &pterm_core::ui::theme::PtermTheme,
 ) -> Box<dyn Element> {
     Container::new(content)
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)))

@@ -3,19 +3,19 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use rook_core::features::FeatureFlag;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::Icon;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_error;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::Icon;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_error;
+use ptermui::elements::{
     Align, Border, ChildView, ConstrainedBox, Container, CrossAxisAlignment, Expanded, Fill, Flex,
     FormattedTextElement, HighlightedHyperlink, MainAxisAlignment, MainAxisSize, ParentElement,
     Text,
 };
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
     WeakViewHandle,
 };
@@ -70,7 +70,7 @@ use crate::workflows::local_workflows::tail_command_for_shell;
 use crate::workspace::Workspace;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
-const DESCRIPTION_TEXT: &str = "Add MCP servers to extend the Rook Agent's capabilities. MCP servers expose data sources or tools to agents through a standardized interface, essentially acting like plugins. Add a custom server, or use the presets to get started with popular servers. You can also find team servers that have been shared with you here. ";
+const DESCRIPTION_TEXT: &str = "Add MCP servers to extend the Polaris Terminal Agent's capabilities. MCP servers expose data sources or tools to agents through a standardized interface, essentially acting like plugins. Add a custom server, or use the presets to get started with popular servers. You can also find team servers that have been shared with you here. ";
 
 #[derive(Debug, Clone)]
 pub enum MCPServersListPageViewEvent {
@@ -1289,8 +1289,8 @@ impl MCPServersListPageView {
                         .team_for_view_handle(&self.handle, app)
                         .map(|team| team.name.clone());
                     let shared_by_text = match team_name {
-                        Some(name) => format!("Shared by Rook and {name}"),
-                        None => "Shared by Rook and from other devices".to_string(),
+                        Some(name) => format!("Shared by Polaris Terminal and {name}"),
+                        None => "Shared by Polaris Terminal and from other devices".to_string(),
                     };
 
                     page.add_child(self.render_server_cards_section(
@@ -1301,7 +1301,7 @@ impl MCPServersListPageView {
                     ));
                 } else if !filtered_gallery_cards.is_empty() {
                     page.add_child(self.render_server_cards_section(
-                        "Shared from Rook",
+                        "Shared from Polaris Terminal",
                         &filtered_gallery_cards,
                         appearance,
                         app,
@@ -1561,10 +1561,10 @@ impl MCPServersListPageView {
             return Some("global".to_string());
         }
 
-        // If the path is the Rook data directory (e.g. ~/.rook or ~/.rook_dev), set the text to
-        // "global". The Rook provider stores its data directory as the root path rather than the
+        // If the path is the Polaris Terminal data directory (e.g. ~/.polaris-terminal or ~/.pterm_dev), set the text to
+        // "global". The Polaris Terminal provider stores its data directory as the root path rather than the
         // home directory, unlike other providers that store the home directory directly.
-        if root_path == &crate::rook_managed_paths_watcher::rook_data_dir() {
+        if root_path == &crate::pterm_managed_paths_watcher::pterm_data_dir() {
             return Some("global".to_string());
         }
 

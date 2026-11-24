@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use rookui::integration::TestStep;
-use rookui::windowing::WindowManager;
-use rookui::{SingletonEntity, WindowId, async_assert};
+use ptermui::integration::TestStep;
+use ptermui::windowing::WindowManager;
+use ptermui::{SingletonEntity, WindowId, async_assert};
 
 use crate::ai::facts::AIMemory;
 use crate::ai::facts::view::AIFactPage;

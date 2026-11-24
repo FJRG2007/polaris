@@ -3,14 +3,14 @@ use std::ops::Range;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use rookui::elements::{
+use ptermui::elements::{
     Align, ConstrainedBox, Container, CornerRadius, Dismiss, Empty, Fill, Flex, ParentElement,
     Radius, SavePosition, ScrollStateHandle, Scrollable, ScrollableElement, Shrinkable,
     UniformList, UniformListState,
 };
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -330,7 +330,7 @@ impl View for EmbeddingSearchMenu {
         }
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
 
         // So that everything lines up correctly, we apply the corner radius and border on the
@@ -374,7 +374,7 @@ impl View for EmbeddingSearchMenu {
 
 pub mod styles {
     use pathfinder_color::ColorU;
-    use rookui::elements::{Border, DropShadow, ScrollbarWidth};
+    use ptermui::elements::{Border, DropShadow, ScrollbarWidth};
 
     use crate::appearance::Appearance;
     use crate::themes::theme::Fill;

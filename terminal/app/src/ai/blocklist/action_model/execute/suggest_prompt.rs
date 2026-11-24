@@ -1,8 +1,8 @@
 use futures::FutureExt;
 use futures::channel::oneshot;
 use futures::future::BoxFuture;
-use rook_core::features::FeatureFlag;
-use rookui::{Entity, ModelContext};
+use pterm_core::features::FeatureFlag;
+use ptermui::{Entity, ModelContext};
 
 use crate::AIAgentActionResultType;
 use crate::ai::agent::conversation::AIConversationId;

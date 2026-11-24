@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::color::internal_colors;
-use rookui_core::keymap::Keystroke;
-use rookui_core::prelude::*;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::prelude::*;
 
 use crate::{Component, keyboard_shortcut};
 
@@ -41,7 +41,7 @@ impl Component for Tooltip {
         &self,
         appearance: &Appearance,
         params: Self::Params<'a>,
-    ) -> Box<dyn rookui_core::Element> {
+    ) -> Box<dyn ptermui_core::Element> {
         let font_family = appearance.ui_font_family();
         let font_size = appearance.ui_font_size() + UI_FONT_SIZE_ADJUSTMENT;
 

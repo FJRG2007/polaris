@@ -2,22 +2,22 @@ use std::sync::Arc;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_if_error;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_if_error;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, OffsetPositioning, ParentAnchor, ParentElement as _,
     ParentOffsetBounds, Stack,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::text_layout::ClipConfig;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::text_layout::ClipConfig;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 use settings::Setting as _;
 
-use crate::ai::blocklist::inline_action::orchestration_controls::ORCHESTRATION_ROOK_WORKER_HOST;
+use crate::ai::blocklist::inline_action::orchestration_controls::ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST;
 use crate::ai::cloud_agent_settings::CloudAgentSettings;
 use crate::ai::connected_self_hosted_workers::ConnectedSelfHostedWorkersModel;
 use crate::menu::{Event as MenuEvent, Menu, MenuItem, MenuItemFields};
@@ -50,14 +50,14 @@ const DISCONNECTED_BADGE: &str = "Disconnected";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Host {
-    Rook,
+    Pterm,
     SelfHosted { slug: String },
 }
 
 impl Host {
     fn display_name(&self) -> &str {
         match self {
-            Host::Rook => "Rook",
+            Host::Pterm => "Polaris Terminal",
             Host::SelfHosted { slug } => slug.as_str(),
         }
     }
@@ -65,7 +65,7 @@ impl Host {
     /// Returns the value to send as `worker_host` in the config snapshot.
     pub fn worker_host_value(&self) -> Option<String> {
         match self {
-            Host::Rook => Some(ORCHESTRATION_ROOK_WORKER_HOST.to_string()),
+            Host::Pterm => Some(ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST.to_string()),
             Host::SelfHosted { slug } => Some(slug.clone()),
         }
     }
@@ -101,7 +101,7 @@ impl HostSelector {
         // field is exercised at construction time (not just written to on
         // `SelectHost`), so it stays out of clippy's `field is never read`
         // warning while still serving as the source of truth for the label.
-        let selected = Host::Rook;
+        let selected = Host::Pterm;
         let initial_label = selected.display_name().to_string();
 
         let button = ctx.add_typed_action_view(|_ctx| {
@@ -153,8 +153,8 @@ impl HostSelector {
             .value()
             .as_deref()
         {
-            let restored = if saved_slug == ORCHESTRATION_ROOK_WORKER_HOST {
-                Host::Rook
+            let restored = if saved_slug == ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST {
+                Host::Pterm
             } else {
                 Host::SelfHosted {
                     slug: saved_slug.to_string(),
@@ -227,7 +227,7 @@ impl HostSelector {
             return;
         }
 
-        self.selected = Host::Rook;
+        self.selected = Host::Pterm;
         let label = self.selected.display_name().to_string();
         self.button.update(ctx, |button, ctx| {
             button.set_label(label, ctx);
@@ -345,10 +345,10 @@ fn build_menu_items(
     if let Some(host) = default_host {
         items.push(item_for(host.clone(), Some(DEFAULT_BADGE)));
     }
-    items.push(item_for(Host::Rook, None));
+    items.push(item_for(Host::Pterm, None));
     let default_slug = match default_host {
         Some(Host::SelfHosted { slug }) => Some(slug.as_str()),
-        Some(Host::Rook) | None => None,
+        Some(Host::Pterm) | None => None,
     };
     let mut connected_hosts = ConnectedSelfHostedWorkersModel::as_ref(ctx)
         .worker_hosts_excluding(default_slug)

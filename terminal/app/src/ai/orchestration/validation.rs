@@ -1,8 +1,8 @@
 //! Frontend-neutral validation predicates for orchestration edit flows.
 
 use ai::agent::action::RunAgentsExecutionMode;
-use rook_cli::agent::Harness;
-use rookui::AppContext;
+use pterm_cli::agent::Harness;
+use ptermui::AppContext;
 
 use super::config_state::{AuthSecretSelection, OrchestrationConfigState};
 use crate::ai::auth_secret_types::auth_secret_types_for_harness;
@@ -10,7 +10,7 @@ use crate::ai::cloud_environments::CloudAmbientAgentEnvironment;
 use crate::ai::local_harness_setup::{
     LocalHarnessSetupState, local_harness_is_product_enabled, local_harness_setup_state,
 };
-use crate::ai::orchestration::providers::ORCHESTRATION_ROOK_WORKER_HOST;
+use crate::ai::orchestration::providers::ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST;
 use crate::cloud_object::CloudObjectLookup as _;
 
 /// Whether a harness's local setup allows selecting it: always true for
@@ -105,7 +105,7 @@ pub fn accept_disabled_reason_with_auth(
     None
 }
 
-/// Soft recommendation copy shown when a Rook-hosted Cloud run has no
+/// Soft recommendation copy shown when a Polaris Terminal-hosted Cloud run has no
 /// environment selected. `None` when not applicable.
 pub fn empty_env_recommendation_message(
     execution_mode: &RunAgentsExecutionMode,
@@ -122,7 +122,7 @@ pub fn empty_env_recommendation_message(
     if !environment_id.trim().is_empty() {
         return None;
     }
-    if !worker_host.eq_ignore_ascii_case(ORCHESTRATION_ROOK_WORKER_HOST) {
+    if !worker_host.eq_ignore_ascii_case(ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST) {
         return None;
     }
     let env_count = CloudAmbientAgentEnvironment::get_all(app).len();

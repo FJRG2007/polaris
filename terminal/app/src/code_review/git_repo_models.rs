@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::{Entity, ModelContext, ModelHandle, SingletonEntity, WeakModelHandle};
 #[cfg(feature = "local_fs")]
 use repo_metadata::repositories::DetectedRepositories;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::{Entity, ModelContext, ModelHandle, SingletonEntity, WeakModelHandle};
 
 #[cfg(feature = "local_fs")]
 use super::git_repo_model::new_local_git_repo_status_model;

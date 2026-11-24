@@ -6,9 +6,9 @@ use std::sync::Arc;
 use futures_lite::future::yield_now;
 use fuzzy_match::FuzzyMatchResult;
 use itertools::Itertools;
+use ptermui::{AppContext, SingletonEntity};
 #[cfg(feature = "local_fs")]
 use repo_metadata::repositories::DetectedRepositories;
-use rookui::{AppContext, SingletonEntity};
 
 use super::search_item::FileSearchItem;
 #[cfg(feature = "local_fs")]

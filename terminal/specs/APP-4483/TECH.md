@@ -19,8 +19,8 @@ The data needed for the new product model is already present:
 - `BlocklistAIHistoryModel::get_server_conversation_metadata` already looks up loaded conversation metadata with a fallback to cached conversation metadata in `app/src/ai/blocklist/history_model.rs:1986`.
 - `AgentConversationsModel::fetch_ambient_agent_tasks_and_cloud_convo_metadata` fetches ambient tasks and cloud conversation metadata together, including additional metadata for task conversation IDs missing from the first metadata response, in `app/src/ai/agent_conversations_model.rs:675`.
 - `AmbientAgentTask` exposes `conversation_id`, active execution state, and whether cloud followup submission is allowed in `app/src/ai/ambient_agents/task.rs:317`.
-- `SharingAccessLevel` is ordered as View < Edit < Full in `crates/rook_server_client/src/drive/sharing.rs:8`.
-There is an object-access precedent, but it is tied to loaded Rook Drive objects:
+- `SharingAccessLevel` is ordered as View < Edit < Full in `crates/pterm_server_client/src/drive/sharing.rs:8`.
+There is an object-access precedent, but it is tied to loaded Polaris Terminal Drive objects:
 - `CloudViewModel::access_level` defaults missing objects to view access in `app/src/cloud_object/model/view.rs:173`.
 - `CloudViewModel::object_access_level` grants full access for personal/team-space objects, applies link and guest ACLs for shared-space objects, and upgrades creator access to edit in `app/src/cloud_object/model/view.rs:181`.
 The APP-4483 implementation should reuse the same permission semantics where possible, but must operate directly on `ServerAIConversationMetadata.permissions` because AI conversation metadata is not a `CloudObject`.
@@ -119,9 +119,9 @@ Permission helper tests should cover:
 - missing current user defaults to non-edit.
 Update or replace creator-based assertions in `app/src/terminal/view/shared_session/view_impl_tests.rs`, especially the tests currently named around “owned” ambient sessions. Add tombstone CTA tests in `app/src/terminal/view/shared_session/conversation_ended_tombstone_view_tests.rs` once CTA state is data-driven.
 Suggested targeted commands:
-- `cargo test -p rook --lib terminal::view::shared_session::view_impl_tests`
-- `cargo test -p rook --lib terminal::view::shared_session::conversation_ended_tombstone_view_tests`
-- `cargo test -p rook --lib terminal::view::shared_session::cloud_conversation_continuation`
+- `cargo test -p polaris-terminal --lib terminal::view::shared_session::view_impl_tests`
+- `cargo test -p polaris-terminal --lib terminal::view::shared_session::conversation_ended_tombstone_view_tests`
+- `cargo test -p polaris-terminal --lib terminal::view::shared_session::cloud_conversation_continuation`
 Before PR/update, run the repository-required format and clippy checks from the PR workflow. Do not use `cargo fmt --all` or file-specific `cargo fmt`.
 ## Parallelization
 Do not split this implementation across sub-agents. The changes are tightly coupled across one UI state resolver, terminal view lifecycle transitions, tombstone CTA rendering, and existing shared-session tests. Parallel edits would likely touch the same files and increase merge overhead more than they reduce wall-clock time.

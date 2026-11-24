@@ -6,18 +6,18 @@ use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_graphql::object_permissions::AccessLevel;
-use rook_graphql::scalars::time::ServerTimestamp;
-use rookui_core::Element;
-use rookui_core::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_graphql::object_permissions::AccessLevel;
+use pterm_graphql::scalars::time::ServerTimestamp;
+use ptermui_core::Element;
+use ptermui_core::elements::{
     Align, ChildAnchor, ConstrainedBox, Hoverable, MouseStateHandle, OffsetPositioning,
     ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
 };
-use rookui_core::ui_components::components::UiComponent;
+use ptermui_core::ui_components::components::UiComponent;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::UserUid;
@@ -229,35 +229,35 @@ impl TryFrom<&str> for JsonObjectType {
     }
 }
 
-impl TryFrom<rook_graphql::object::ObjectType> for ObjectIdType {
+impl TryFrom<pterm_graphql::object::ObjectType> for ObjectIdType {
     type Error = anyhow::Error;
-    fn try_from(object_type: rook_graphql::object::ObjectType) -> Result<Self, Self::Error> {
+    fn try_from(object_type: pterm_graphql::object::ObjectType) -> Result<Self, Self::Error> {
         match object_type {
-            rook_graphql::object::ObjectType::AIConversation => Err(anyhow!(
+            pterm_graphql::object::ObjectType::AIConversation => Err(anyhow!(
                 "AIConversation is not a supported object type for this operation"
             )),
-            rook_graphql::object::ObjectType::Notebook => Ok(ObjectIdType::Notebook),
-            rook_graphql::object::ObjectType::Workflow => Ok(ObjectIdType::Workflow),
-            rook_graphql::object::ObjectType::Folder => Ok(ObjectIdType::Folder),
-            rook_graphql::object::ObjectType::GenericStringObject => {
+            pterm_graphql::object::ObjectType::Notebook => Ok(ObjectIdType::Notebook),
+            pterm_graphql::object::ObjectType::Workflow => Ok(ObjectIdType::Workflow),
+            pterm_graphql::object::ObjectType::Folder => Ok(ObjectIdType::Folder),
+            pterm_graphql::object::ObjectType::GenericStringObject => {
                 Ok(ObjectIdType::GenericStringObject)
             }
-            rook_graphql::object::ObjectType::Unknown => {
+            pterm_graphql::object::ObjectType::Unknown => {
                 Err(anyhow!("could not convert unknown cloud object type"))
             }
         }
     }
 }
 
-impl From<ObjectType> for rook_graphql::object::ObjectType {
+impl From<ObjectType> for pterm_graphql::object::ObjectType {
     fn from(value: ObjectType) -> Self {
         match value {
-            ObjectType::Notebook => rook_graphql::object::ObjectType::Notebook,
-            ObjectType::Workflow => rook_graphql::object::ObjectType::Workflow,
-            ObjectType::Folder => rook_graphql::object::ObjectType::Folder,
+            ObjectType::Notebook => pterm_graphql::object::ObjectType::Notebook,
+            ObjectType::Workflow => pterm_graphql::object::ObjectType::Workflow,
+            ObjectType::Folder => pterm_graphql::object::ObjectType::Folder,
             ObjectType::GenericStringObject(GenericStringObjectFormat::Json(
                 JsonObjectType::EnvVarCollection,
-            )) => rook_graphql::object::ObjectType::GenericStringObject,
+            )) => pterm_graphql::object::ObjectType::GenericStringObject,
             ObjectType::GenericStringObject(gso) => {
                 todo!("Moving is not implemented for {:?}", gso);
             }
@@ -572,7 +572,7 @@ pub struct CloudObjectMetadata {
     pub trashed_ts: Option<ServerTimestamp>,
     pub folder_id: Option<SyncId>,
     /// Welcome objects are created on the server when a user first receives
-    /// access to Rook Drive as part of onboarding.
+    /// access to Polaris Terminal Drive as part of onboarding.
     pub is_welcome_object: bool,
     pub last_editor_uid: Option<String>,
     pub creator_uid: Option<String>,
@@ -738,17 +738,17 @@ impl CloudObjectStatuses {
 
         let icon_and_tooltip_text = if should_show_local_only_indicator {
             Some((
-                Icon::Laptop.to_rookui_icon(theme.main_text_color(theme.surface_1())),
+                Icon::Laptop.to_ptermui_icon(theme.main_text_color(theme.surface_1())),
                 SYNC_STATUS_TOOLTIP_LOCAL_ONLY,
             ))
         } else if should_show_syncing_indicator {
             Some((
-                Icon::Refresh.to_rookui_icon(theme.sub_text_color(theme.surface_2())),
+                Icon::Refresh.to_ptermui_icon(theme.sub_text_color(theme.surface_2())),
                 SYNC_STATUS_TOOLTIP_INFLIGHT,
             ))
         } else if should_show_error_indicator {
             Some((
-                Icon::AlertTriangle.to_rookui_icon(Fill::Solid(theme.ui_error_color())),
+                Icon::AlertTriangle.to_ptermui_icon(Fill::Solid(theme.ui_error_color())),
                 SYNC_STATUS_TOOLTIP_ERROR,
             ))
         } else {
@@ -844,10 +844,10 @@ pub struct RevisionAndLastEditor {
 // GraphQL conversion impls.
 
 impl From<GenericStringObjectFormat>
-    for rook_graphql::generic_string_object::GenericStringObjectFormat
+    for pterm_graphql::generic_string_object::GenericStringObjectFormat
 {
     fn from(format: GenericStringObjectFormat) -> Self {
-        use rook_graphql::generic_string_object::GenericStringObjectFormat as GraphQLFormat;
+        use pterm_graphql::generic_string_object::GenericStringObjectFormat as GraphQLFormat;
         match format {
             GenericStringObjectFormat::Json(JsonObjectType::Preference) => {
                 GraphQLFormat::JsonPreference
@@ -881,9 +881,9 @@ impl From<GenericStringObjectFormat>
     }
 }
 
-impl From<CloudObjectEventEntrypoint> for rook_graphql::object::CloudObjectEventEntrypoint {
+impl From<CloudObjectEventEntrypoint> for pterm_graphql::object::CloudObjectEventEntrypoint {
     fn from(entrypoint: CloudObjectEventEntrypoint) -> Self {
-        use rook_graphql::object::CloudObjectEventEntrypoint as GraphQLEntrypoint;
+        use pterm_graphql::object::CloudObjectEventEntrypoint as GraphQLEntrypoint;
         match entrypoint {
             CloudObjectEventEntrypoint::TeamSettings => GraphQLEntrypoint::TeamSettings,
             CloudObjectEventEntrypoint::ResourceCenter => GraphQLEntrypoint::ResourceCenter,
@@ -898,10 +898,10 @@ impl From<CloudObjectEventEntrypoint> for rook_graphql::object::CloudObjectEvent
 }
 
 impl From<GenericStringObjectUniqueKey>
-    for rook_graphql::generic_string_object::GenericStringObjectUniqueKey
+    for pterm_graphql::generic_string_object::GenericStringObjectUniqueKey
 {
     fn from(key: GenericStringObjectUniqueKey) -> Self {
-        use rook_graphql::generic_string_object::GenericStringObjectUniqueKey as GraphQLKey;
+        use pterm_graphql::generic_string_object::GenericStringObjectUniqueKey as GraphQLKey;
         GraphQLKey {
             key: key.key,
             unique_per: key.unique_per.into(),
@@ -909,21 +909,21 @@ impl From<GenericStringObjectUniqueKey>
     }
 }
 
-impl From<UniquePer> for rook_graphql::generic_string_object::UniquePer {
+impl From<UniquePer> for pterm_graphql::generic_string_object::UniquePer {
     fn from(unique_per: UniquePer) -> Self {
-        use rook_graphql::generic_string_object::UniquePer as GraphQLUniquePer;
+        use pterm_graphql::generic_string_object::UniquePer as GraphQLUniquePer;
         match unique_per {
             UniquePer::User => GraphQLUniquePer::User,
         }
     }
 }
 
-impl TryFrom<rook_graphql::object::ObjectMetadata> for ServerMetadata {
+impl TryFrom<pterm_graphql::object::ObjectMetadata> for ServerMetadata {
     type Error = anyhow::Error;
 
-    fn try_from(value: rook_graphql::object::ObjectMetadata) -> Result<Self, Self::Error> {
+    fn try_from(value: pterm_graphql::object::ObjectMetadata) -> Result<Self, Self::Error> {
         let folder_id: Option<FolderId> = match value.parent {
-            rook_graphql::object::Container::FolderContainer(folder_container) => {
+            pterm_graphql::object::Container::FolderContainer(folder_container) => {
                 Some(folder_container.folder_uid.into_inner().into())
             }
             _ => None,
@@ -943,11 +943,11 @@ impl TryFrom<rook_graphql::object::ObjectMetadata> for ServerMetadata {
     }
 }
 
-impl TryFrom<rook_graphql::object_permissions::ObjectPermissions> for ServerPermissions {
+impl TryFrom<pterm_graphql::object_permissions::ObjectPermissions> for ServerPermissions {
     type Error = anyhow::Error;
 
     fn try_from(
-        value: rook_graphql::object_permissions::ObjectPermissions,
+        value: pterm_graphql::object_permissions::ObjectPermissions,
     ) -> Result<Self, Self::Error> {
         let server_object_guests: Result<Vec<ServerObjectGuest>, _> = value
             .guests
@@ -967,10 +967,12 @@ impl TryFrom<rook_graphql::object_permissions::ObjectPermissions> for ServerPerm
     }
 }
 
-impl TryFrom<rook_graphql::object_permissions::ObjectGuest> for ServerObjectGuest {
+impl TryFrom<pterm_graphql::object_permissions::ObjectGuest> for ServerObjectGuest {
     type Error = anyhow::Error;
 
-    fn try_from(value: rook_graphql::object_permissions::ObjectGuest) -> Result<Self, Self::Error> {
+    fn try_from(
+        value: pterm_graphql::object_permissions::ObjectGuest,
+    ) -> Result<Self, Self::Error> {
         let object_guest = ServerObjectGuest {
             subject: value.subject.try_into()?,
             access_level: value.access_level,
@@ -983,38 +985,40 @@ impl TryFrom<rook_graphql::object_permissions::ObjectGuest> for ServerObjectGues
     }
 }
 
-impl TryFrom<rook_graphql::object_permissions::GuestSubject> for ServerGuestSubject {
+impl TryFrom<pterm_graphql::object_permissions::GuestSubject> for ServerGuestSubject {
     type Error = anyhow::Error;
 
     fn try_from(
-        value: rook_graphql::object_permissions::GuestSubject,
+        value: pterm_graphql::object_permissions::GuestSubject,
     ) -> Result<Self, Self::Error> {
         match value {
-            rook_graphql::object_permissions::GuestSubject::UserGuest(user_guest) => {
+            pterm_graphql::object_permissions::GuestSubject::UserGuest(user_guest) => {
                 let guest_subject = ServerGuestSubject::User {
                     firebase_uid: user_guest.firebase_uid.into_inner(),
                 };
                 Ok(guest_subject)
             }
-            rook_graphql::object_permissions::GuestSubject::PendingUserGuest(guest) => {
+            pterm_graphql::object_permissions::GuestSubject::PendingUserGuest(guest) => {
                 Ok(ServerGuestSubject::PendingUser { email: guest.email })
             }
-            rook_graphql::object_permissions::GuestSubject::TeamGuest(team_guest) => {
+            pterm_graphql::object_permissions::GuestSubject::TeamGuest(team_guest) => {
                 Ok(ServerGuestSubject::Team {
                     team_uid: ServerId::from_string_lossy(team_guest.uid.inner()),
                 })
             }
-            rook_graphql::object_permissions::GuestSubject::Unknown => {
+            pterm_graphql::object_permissions::GuestSubject::Unknown => {
                 anyhow::bail!("Unknown GuestSubject type")
             }
         }
     }
 }
 
-impl TryFrom<rook_graphql::object_permissions::LinkSharing> for ServerLinkSharing {
+impl TryFrom<pterm_graphql::object_permissions::LinkSharing> for ServerLinkSharing {
     type Error = anyhow::Error;
 
-    fn try_from(value: rook_graphql::object_permissions::LinkSharing) -> Result<Self, Self::Error> {
+    fn try_from(
+        value: pterm_graphql::object_permissions::LinkSharing,
+    ) -> Result<Self, Self::Error> {
         Ok(ServerLinkSharing {
             access_level: value.access_level,
             source: value.source.map(TryInto::try_into).transpose()?,
@@ -1022,35 +1026,35 @@ impl TryFrom<rook_graphql::object_permissions::LinkSharing> for ServerLinkSharin
     }
 }
 
-impl TryFrom<rook_graphql::object::Container> for ServerObjectContainer {
+impl TryFrom<pterm_graphql::object::Container> for ServerObjectContainer {
     type Error = anyhow::Error;
 
-    fn try_from(value: rook_graphql::object::Container) -> Result<Self, Self::Error> {
+    fn try_from(value: pterm_graphql::object::Container) -> Result<Self, Self::Error> {
         match value {
-            rook_graphql::object::Container::FolderContainer(folder) => {
+            pterm_graphql::object::Container::FolderContainer(folder) => {
                 Ok(ServerObjectContainer::Folder {
                     folder_uid: ServerId::from_string_lossy(folder.folder_uid.inner()),
                 })
             }
-            rook_graphql::object::Container::Space(space) => Ok(ServerObjectContainer::Drive {
+            pterm_graphql::object::Container::Space(space) => Ok(ServerObjectContainer::Drive {
                 owner: space.try_into()?,
             }),
-            rook_graphql::object::Container::Unknown => {
+            pterm_graphql::object::Container::Unknown => {
                 anyhow::bail!("Unknown Container type")
             }
         }
     }
 }
 
-impl TryFrom<rook_graphql::object::Space> for Owner {
+impl TryFrom<pterm_graphql::object::Space> for Owner {
     type Error = anyhow::Error;
 
-    fn try_from(value: rook_graphql::object::Space) -> Result<Self, Self::Error> {
+    fn try_from(value: pterm_graphql::object::Space) -> Result<Self, Self::Error> {
         let owner = match value.type_ {
-            rook_graphql::object::SpaceType::Team => Owner::Team {
+            pterm_graphql::object::SpaceType::Team => Owner::Team {
                 team_uid: ServerId::from_string_lossy(value.uid.inner()),
             },
-            rook_graphql::object::SpaceType::User => Owner::User {
+            pterm_graphql::object::SpaceType::User => Owner::User {
                 user_uid: UserUid::new(value.uid.inner()),
             },
         };
@@ -1058,9 +1062,9 @@ impl TryFrom<rook_graphql::object::Space> for Owner {
     }
 }
 
-impl From<Owner> for rook_graphql::object_permissions::Owner {
+impl From<Owner> for pterm_graphql::object_permissions::Owner {
     fn from(owner: Owner) -> Self {
-        use rook_graphql::object_permissions::{Owner as GraphQLOwner, OwnerType};
+        use pterm_graphql::object_permissions::{Owner as GraphQLOwner, OwnerType};
         match owner {
             Owner::User { user_uid } => GraphQLOwner {
                 type_: OwnerType::User,

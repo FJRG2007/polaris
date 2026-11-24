@@ -2,9 +2,9 @@
 ## Context
 Cloud environments are persisted in `CloudModel`, but frontend consumers currently project that persistence state independently.
 
-- [`app/src/ai/blocklist/agent_view/agent_input_footer/environment_selector.rs (175-421) @ 8be97b2cb`](https://github.com/FJRG2007/rook/blob/8be97b2cb7967e3ee89f8ac1977be87f1f4d137c/app/src/ai/blocklist/agent_view/agent_input_footer/environment_selector.rs#L175-L421) subscribes directly to `CloudModel`, repeatedly reads `CloudAmbientAgentEnvironment`, sorts it, resolves defaults, and persists selection from the GUI view.
-- [`app/src/ai/orchestration/providers.rs (142-193) @ 8be97b2cb`](https://github.com/FJRG2007/rook/blob/8be97b2cb7967e3ee89f8ac1977be87f1f4d137c/app/src/ai/orchestration/providers.rs#L142-L193) independently reads the same cloud objects for orchestration defaults and persistence.
-- [`app/src/lib.rs (2037-2055) @ 8be97b2cb`](https://github.com/FJRG2007/rook/blob/8be97b2cb7967e3ee89f8ac1977be87f1f4d137c/app/src/lib.rs#L2037-L2055) registers `CloudModel`, which is the source of truth for cloud-object persistence.
+- [`app/src/ai/blocklist/agent_view/agent_input_footer/environment_selector.rs (175-421) @ 8be97b2cb`](https://github.com/FJRG2007/polaris/blob/8be97b2cb7967e3ee89f8ac1977be87f1f4d137c/terminal/app/src/ai/blocklist/agent_view/agent_input_footer/environment_selector.rs#L175-L421) subscribes directly to `CloudModel`, repeatedly reads `CloudAmbientAgentEnvironment`, sorts it, resolves defaults, and persists selection from the GUI view.
+- [`app/src/ai/orchestration/providers.rs (142-193) @ 8be97b2cb`](https://github.com/FJRG2007/polaris/blob/8be97b2cb7967e3ee89f8ac1977be87f1f4d137c/terminal/app/src/ai/orchestration/providers.rs#L142-L193) independently reads the same cloud objects for orchestration defaults and persistence.
+- [`app/src/lib.rs (2037-2055) @ 8be97b2cb`](https://github.com/FJRG2007/polaris/blob/8be97b2cb7967e3ee89f8ac1977be87f1f4d137c/terminal/app/src/lib.rs#L2037-L2055) registers `CloudModel`, which is the source of truth for cloud-object persistence.
 
 The GUI and headless TUI use different view frameworks, so they cannot share selector views. They can share a single model that projects environment identity, display data, ordering, updates, defaults, persistence, and refresh behavior from `CloudModel`.
 
@@ -50,9 +50,9 @@ Repository-overlap suggestion remains asynchronous and applies through `PendingH
 - Add catalog unit coverage proving an `ObjectCreated` event refreshes only after `CloudModel` inserts the new object.
 - Add catalog unit coverage for last-task timestamp reordering and both existing GUI name tie-break policies.
 - Run focused `CloudEnvironmentCatalog`, environment selector, orchestration provider, and handoff pipeline tests.
-- Run the complete `rook_tui` test suite after the TUI branch consumes the catalog.
+- Run the complete `pterm_tui` test suite after the TUI branch consumes the catalog.
 - Run `./script/format`.
-- Run the applicable `rook` and `rook_tui` clippy commands with warnings denied.
+- Run the applicable `polaris-terminal` and `pterm_tui` clippy commands with warnings denied.
 - Manually verify the GUI environment selector still:
   - Restores a valid saved environment.
   - Falls back to the most-recent environment.

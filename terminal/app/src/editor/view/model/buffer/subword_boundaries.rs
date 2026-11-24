@@ -1,9 +1,9 @@
 use std::iter::Peekable;
 
 use itertools::Either;
-use rookui::text::TextBuffer;
-use rookui::text::word_boundaries::WordBoundariesApproach;
-use rookui::text::words::is_subword_boundary_char;
+use ptermui::text::TextBuffer;
+use ptermui::text::word_boundaries::WordBoundariesApproach;
+use ptermui::text::words::is_subword_boundary_char;
 
 use super::{CharOffset, Point};
 

@@ -2,16 +2,16 @@
 //! persistence helpers for orchestration edit flows. No GUI types.
 
 use ai::agent::action::RunAgentsRequest;
-use rook_cli::agent::Harness;
-use rook_errors::report_if_error;
-use rookui::{AppContext, SingletonEntity};
+use pterm_cli::agent::Harness;
+use pterm_errors::report_if_error;
+use ptermui::{AppContext, SingletonEntity};
 use settings::Setting;
 
 use crate::LLMPreferences;
 use crate::ai::auth_secret_types::auth_secret_types_for_harness;
 use crate::ai::cloud_agent_settings::CloudAgentSettings;
 use crate::ai::cloud_environments::CloudEnvironmentCatalog;
-use crate::ai::connected_self_hosted_workers::ROOK_WORKER_HOST;
+use crate::ai::connected_self_hosted_workers::POLARIS_TERMINAL_WORKER_HOST;
 use crate::ai::harness_availability::{AuthSecretFetchState, HarnessAvailabilityModel};
 use crate::ai::llms::LLMInfo;
 use crate::ai::orchestration::config_state::AuthSecretSelection;
@@ -19,13 +19,13 @@ use crate::workspaces::user_workspaces::{TeamScope, UserWorkspaces};
 
 /// Env var override for the workspace default host (developer testing).
 /// Mirrors the single-agent ambient flow.
-const DEFAULT_HOST_ENV_VAR: &str = "ROOK_CLOUD_MODE_DEFAULT_HOST";
+const DEFAULT_HOST_ENV_VAR: &str = "POLARIS_TERMINAL_CLOUD_MODE_DEFAULT_HOST";
 
-pub const ORCHESTRATION_ROOK_WORKER_HOST: &str = ROOK_WORKER_HOST;
+pub const ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST: &str = POLARIS_TERMINAL_WORKER_HOST;
 pub const ORCHESTRATION_ENV_NONE_LABEL: &str = "Empty environment";
 pub const ORCHESTRATION_RUNNER_NONE_LABEL: &str = "Use default";
 
-/// Returns Rook base-model choices for orchestration.
+/// Returns Polaris Terminal base-model choices for orchestration.
 pub(crate) fn get_base_model_choices<'a>(
     llm_prefs: &'a LLMPreferences,
     app: &'a AppContext,
@@ -69,7 +69,7 @@ pub fn is_model_in_filtered_choices(
 
 /// Returns the default model_id for the given harness.
 ///
-/// For Oz this is the first Rook LLM; for non-Oz harnesses it is an empty
+/// For Oz this is the first Polaris Terminal LLM; for non-Oz harnesses it is an empty
 /// string (the "Default model" entry).
 pub fn first_filtered_model_id(harness_type: &str, ctx: &AppContext) -> Option<String> {
     let harness = Harness::parse_orchestration_harness(harness_type);
@@ -87,7 +87,7 @@ pub fn first_filtered_model_id(harness_type: &str, ctx: &AppContext) -> Option<S
 }
 
 /// Resolves the default host slug configured for `scope`'s team, honoring the
-/// `ROOK_CLOUD_MODE_DEFAULT_HOST` env var override for developer
+/// `POLARIS_TERMINAL_CLOUD_MODE_DEFAULT_HOST` env var override for developer
 /// testing. Mirrors the single-agent ambient flow.
 pub fn resolve_default_host_slug<S: TeamScope + ?Sized>(
     scope: &S,
@@ -106,7 +106,7 @@ pub fn resolve_default_host_slug<S: TeamScope + ?Sized>(
 }
 
 /// Returns the user's last-selected custom host slug from
-/// `CloudAgentSettings.last_selected_host`, excluding `"rook"` and
+/// `CloudAgentSettings.last_selected_host`, excluding `"polaris-terminal"` and
 /// `scope`'s team default (those are surfaced as separate menu rows).
 pub fn resolve_recent_host_slug<S: TeamScope + ?Sized>(
     scope: &S,
@@ -117,7 +117,7 @@ pub fn resolve_recent_host_slug<S: TeamScope + ?Sized>(
         .value()
         .clone()
         .filter(|s| !s.trim().is_empty())?;
-    if last.eq_ignore_ascii_case(ORCHESTRATION_ROOK_WORKER_HOST) {
+    if last.eq_ignore_ascii_case(ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST) {
         return None;
     }
     if resolve_default_host_slug(scope, ctx).as_deref() == Some(last.as_str()) {
@@ -127,11 +127,13 @@ pub fn resolve_recent_host_slug<S: TeamScope + ?Sized>(
 }
 
 /// Persists the user's most-recent host selection to
-/// `CloudAgentSettings.last_selected_host`. Skipped for `"rook"` and
+/// `CloudAgentSettings.last_selected_host`. Skipped for `"polaris-terminal"` and
 /// empty values (those don't represent a custom slug worth remembering).
 pub fn persist_host_selection(worker_host: &str, ctx: &mut AppContext) {
     let trimmed = worker_host.trim();
-    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case(ORCHESTRATION_ROOK_WORKER_HOST) {
+    if trimmed.is_empty()
+        || trimmed.eq_ignore_ascii_case(ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST)
+    {
         return;
     }
     let value = trimmed.to_string();

@@ -1,6 +1,6 @@
-use rook_core::safe_info;
-use rookui_core::keymap::Keystroke;
-use rookui_core::{Entity, ModelContext, ModelHandle, ViewContext};
+use pterm_core::safe_info;
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::{Entity, ModelContext, ModelHandle, ViewContext};
 
 use crate::register::{BLACK_HOLE_REGISTER, valid_register_name};
 
@@ -1958,8 +1958,8 @@ pub struct VimState<'a> {
     pub showcmd: &'a str,
 }
 
-/// This struct is a wrapper around the VimFSA that turns it into a rookui_core::Entity. We want to keep
-/// the VimFSA independent of our UI framework, so anything involving rookui should live here
+/// This struct is a wrapper around the VimFSA that turns it into a ptermui_core::Entity. We want to keep
+/// the VimFSA independent of our UI framework, so anything involving ptermui should live here
 /// instead.
 #[derive(Default)]
 pub struct VimModel {

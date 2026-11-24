@@ -2,7 +2,7 @@
 
 ## Summary
 
-Add the vertical-tabs equivalent of Rook's existing horizontal-tab pane-drag flow. When vertical tabs are enabled, a user should be able to drag a pane header over a different tab in the vertical tabs panel, have that tab become the active drag destination, and then drop the pane into the target tab using the same in-tab drop-target and relayout UX that already exists for horizontal tabs.
+Add the vertical-tabs equivalent of Polaris Terminal's existing horizontal-tab pane-drag flow. When vertical tabs are enabled, a user should be able to drag a pane header over a different tab in the vertical tabs panel, have that tab become the active drag destination, and then drop the pane into the target tab using the same in-tab drop-target and relayout UX that already exists for horizontal tabs.
 
 The feature should also preserve the existing "promote to a new tab" behavior: dragging between tabs should create a new tab at that position instead of targeting an existing tab.
 
@@ -62,7 +62,7 @@ Hover-only panel chrome must not interfere with drag targeting:
 
 ### Hovering an existing tab
 
-When the user drags a pane header over a different tab group in the vertical tabs panel, Rook should treat that tab group the same way the horizontal tab strip treats a hovered destination tab today.
+When the user drags a pane header over a different tab group in the vertical tabs panel, Polaris Terminal should treat that tab group the same way the horizontal tab strip treats a hovered destination tab today.
 
 That means:
 
@@ -86,7 +86,7 @@ Specifically:
 
 The vertical tabs panel must also support the vertical analogue of "drop between tabs."
 
-When the dragged pane is positioned between two visible tab groups, Rook should show an insertion indicator between those groups. Dropping there creates a new workspace tab containing the dragged pane at that position.
+When the dragged pane is positioned between two visible tab groups, Polaris Terminal should show an insertion indicator between those groups. Dropping there creates a new workspace tab containing the dragged pane at that position.
 
 The same applies after the last visible tab group:
 
@@ -123,7 +123,7 @@ This ticket does not change how users reorder vertical tabs by dragging the tab 
 ## Success criteria
 
 1. In vertical tabs mode with the panel open, dragging a pane header over a different visible tab group makes that tab group the active drag destination.
-2. When a non-active tab group becomes the drag destination, Rook switches the workspace to that tab so the user can place the pane inside it.
+2. When a non-active tab group becomes the drag destination, Polaris Terminal switches the workspace to that tab so the user can place the pane inside it.
 3. After switching to the destination tab, the existing pane relayout/drop-target UX appears in the workspace and can be used to place the pane.
 4. The placement outcomes inside the destination tab match the existing horizontal-tabs flow; no new placement rules are introduced.
 5. Dragging between two visible tab groups shows an insertion indicator and dropping there creates a new tab containing the pane at that position.

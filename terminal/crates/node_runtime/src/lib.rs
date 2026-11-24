@@ -1,4 +1,4 @@
-//! Node.js and npm runtime management for Rook.
+//! Node.js and npm runtime management for Polaris Terminal.
 //!
 //! This module provides functionality to install and manage Node.js/npm,
 //! supporting multiple platforms (macOS, Linux, Windows) and architectures
@@ -137,7 +137,7 @@ impl NodeDistribution {
 pub fn node_installation_dir() -> Result<PathBuf> {
     let dist = NodeDistribution::current()?;
     let folder_name = dist.folder_name(NODE_VERSION);
-    Ok(rook_core::paths::data_dir().join("node").join(folder_name))
+    Ok(pterm_core::paths::data_dir().join("node").join(folder_name))
 }
 
 /// Returns the path to the installed node binary.
@@ -157,7 +157,7 @@ pub fn npm_binary_path() -> Result<PathBuf> {
 /// This function will:
 /// 1. Check if a valid Node.js installation already exists
 /// 2. Download the appropriate Node.js distribution for the current platform
-/// 3. Extract it to the Rook data directory
+/// 3. Extract it to the Polaris Terminal data directory
 ///
 /// # Returns
 /// Returns the path to the Node.js installation directory on success.
@@ -175,7 +175,7 @@ pub async fn install_npm(client: &http_client::Client) -> Result<PathBuf> {
     let version = NODE_VERSION;
 
     let folder_name = dist.folder_name(version);
-    let node_containing_dir = rook_core::paths::data_dir().join("node");
+    let node_containing_dir = pterm_core::paths::data_dir().join("node");
     let node_dir = node_containing_dir.join(&folder_name);
     let node_binary = node_dir.join(NODE_BINARY_PATH);
 
@@ -395,7 +395,7 @@ where
 /// Finds a working Node.js binary, preferring our custom installation over system node.
 ///
 /// This function checks:
-/// 1. First, our custom Node.js installation in the Rook data directory
+/// 1. First, our custom Node.js installation in the Polaris Terminal data directory
 /// 2. Falls back to system Node.js if custom isn't available
 ///
 /// # Arguments
@@ -456,7 +456,7 @@ pub async fn detect_system_node(path_env_var: impl AsRef<OsStr>) -> Result<()> {
     // (set via `.env("PATH", ...)`) is used for executable search.
     // `CreateProcessW` uses the parent process's PATH, not the child's
     // `lpEnvironment` PATH, so running `node` directly would find node.exe
-    // via Rook's inherited env rather than the captured interactive PATH.
+    // via Polaris Terminal's inherited env rather than the captured interactive PATH.
     #[cfg(windows)]
     let output = Command::new("cmd.exe")
         .args(["/c", "node", "--version"])

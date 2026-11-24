@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
-use rook_util::path::LineAndColumnArg;
-use rookui::{App, ModelHandle, SingletonEntity, WindowId};
+use pterm_util::path::LineAndColumnArg;
+use ptermui::{App, ModelHandle, SingletonEntity, WindowId};
 use settings::Setting as _;
 use tempfile::tempdir;
 use url::Url;
@@ -212,7 +212,7 @@ fn test_open_local_image_uses_system_generic_target() {
 #[test]
 fn test_open_extensionless_non_text_file_does_not_emit_open_event() {
     // Regression test: an extensionless file (e.g. a disguised executable) is classified as
-    // binary by `is_file_openable_in_rook`, which previously routed it to `SystemGeneric` and
+    // binary by `is_file_openable_in_pterm`, which previously routed it to `SystemGeneric` and
     // ultimately `NSWorkspace.openURL` — allowing arbitrary code execution. After the fix,
     // such files are revealed in Finder / Explorer instead of opened, so no `OpenFileWithTarget`
     // event should be emitted.

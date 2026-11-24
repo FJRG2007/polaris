@@ -16,19 +16,19 @@
 use std::sync::OnceLock;
 
 use parking_lot::Mutex;
-use rook::cmd_or_ctrl_shift;
-use rook::features::FeatureFlag;
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::util::{ExactLine, ExpectedExitStatus};
-use rook::integration_testing::terminal::{
+use polaris_terminal::cmd_or_ctrl_shift;
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::util::{ExactLine, ExpectedExitStatus};
+use polaris_terminal::integration_testing::terminal::{
     execute_command_for_single_terminal_in_tab, wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::view_getters::single_terminal_view;
-use rook::terminal::block_list_element::GridType;
-use rook::terminal::model::index::Point;
-use rook::terminal::model::terminal_model::{WithinBlock, WithinModel};
-use rook::terminal::view::{GridHighlightedLink, TerminalAction};
-use rookui_core::async_assert;
+use polaris_terminal::integration_testing::view_getters::single_terminal_view;
+use polaris_terminal::terminal::block_list_element::GridType;
+use polaris_terminal::terminal::model::index::Point;
+use polaris_terminal::terminal::model::terminal_model::{WithinBlock, WithinModel};
+use polaris_terminal::terminal::view::{GridHighlightedLink, TerminalAction};
+use ptermui_core::async_assert;
 
 use super::new_builder;
 use crate::Builder;

@@ -1,6 +1,6 @@
 #[cfg(target_os = "macos")]
-use rook_errors::report_error;
-/// Adjusts resource limits applied to the Rook process (e.g.: the limit on open
+use pterm_errors::report_error;
+/// Adjusts resource limits applied to the Polaris Terminal process (e.g.: the limit on open
 /// file descriptors) to ensure proper behavior.
 pub fn adjust_resource_limits() {
     #[cfg(target_os = "macos")]
@@ -8,7 +8,7 @@ pub fn adjust_resource_limits() {
         /// Our desired limit on the maximum number of file descriptors we can open.
         ///
         /// MacOS sets this value to 256, by default, which can interfere with
-        /// normal usage of Rook for users who open lots of tabs.
+        /// normal usage of Polaris Terminal for users who open lots of tabs.
         const TARGET_FD_LIMIT: u64 = 2560;
 
         use nix::sys::resource::Resource::RLIMIT_NOFILE;

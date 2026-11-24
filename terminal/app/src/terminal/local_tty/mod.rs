@@ -2,7 +2,7 @@ pub mod docker_sandbox;
 pub mod terminal_manager;
 mod terminal_view_adaptor;
 
-pub use rook_terminal::local_tty::*;
+pub use pterm_terminal::local_tty::*;
 pub use terminal_manager::{TerminalManager, get_shell_starter};
 #[cfg(feature = "tui")]
 pub use terminal_manager::{TerminalManagerInit, TerminalSurfaceInit, TerminalSurfaceResult};
@@ -14,8 +14,8 @@ pub(crate) use terminal_view_adaptor::{
 };
 
 #[cfg(unix)]
-pub fn run_terminal_server(args: &rook_cli::TerminalServerArgs) {
-    rook_terminal::local_tty::server::run_terminal_server(
+pub fn run_terminal_server(args: &pterm_cli::TerminalServerArgs) {
+    pterm_terminal::local_tty::server::run_terminal_server(
         args,
         crate::features::init_feature_flags,
         crate::terminal::platform::init,

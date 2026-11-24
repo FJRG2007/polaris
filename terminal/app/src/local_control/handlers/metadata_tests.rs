@@ -4,7 +4,7 @@ use crate::features::FeatureFlag;
 #[test]
 fn agent_management_surface_reports_feature_flag_unavailable() {
     let flag_guard = FeatureFlag::AgentManagementView.override_enabled(false);
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         assert_eq!(
             app.update(|ctx| {
                 surface_unavailable_reason(SurfaceDestination::AgentManagement, ctx)

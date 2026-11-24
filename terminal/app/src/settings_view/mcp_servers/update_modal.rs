@@ -1,17 +1,17 @@
 use chrono::{Local, TimeZone};
-use rook_core::ui::external_product_icon::ExternalProductIcon;
-use rook_core::ui::icons::Icon;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::ui::external_product_icon::ExternalProductIcon;
+use pterm_core::ui::icons::Icon;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     Align, Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Flex, Hoverable, MainAxisAlignment, MouseStateHandle, Padding, ParentElement, Radius,
     Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::Keystroke;
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::Keystroke;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 use uuid::Uuid;
@@ -169,7 +169,7 @@ impl UpdateModalBody {
                     let mut icon = Container::new(
                         ConstrainedBox::new(
                             Icon::X
-                                .to_rookui_icon(theme.active_ui_text_color())
+                                .to_ptermui_icon(theme.active_ui_text_color())
                                 .finish(),
                         )
                         .with_width(16.)

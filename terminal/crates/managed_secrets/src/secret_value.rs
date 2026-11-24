@@ -1,6 +1,6 @@
 use std::fmt;
 
-use rook_graphql::managed_secrets::ManagedSecretType;
+use pterm_graphql::managed_secrets::ManagedSecretType;
 use serde::Serialize;
 
 /// Maximum length in bytes of a `KEY=VALUE` env string, one less than Linux's `MAX_ARG_STRLEN`

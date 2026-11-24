@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use markdown_parser::{compute_formatted_text_delta, parse_markdown};
-use rookui_core::{App, ReadModel};
+use ptermui_core::{App, ReadModel};
 use serde_yaml::Value;
 use string_offset::CharOffset;
 use vec1::Vec1;
@@ -56,7 +56,7 @@ print_endline "Hello, World!"
 #[test]
 fn test_mermaid_markdown_round_trip() {
     App::test((), |mut app| async move {
-        let _flag = rook_core::features::FeatureFlag::MarkdownMermaid.override_enabled(true);
+        let _flag = pterm_core::features::FeatureFlag::MarkdownMermaid.override_enabled(true);
         let markdown = "```mermaid\ngraph TD\nA --> B\n```\n";
         let (buffer, _selection) = Buffer::mock_from_markdown(
             markdown,
@@ -80,10 +80,10 @@ fn test_export_expands_embeds() {
     App::test((), |mut app| async move {
         let (buffer, _selection) = Buffer::mock_from_markdown(
             r#"
-```rook-embedded-object
+```polaris-terminal-embedded-object
 id: embed-123
 ```
-```rook-embedded-object
+```polaris-terminal-embedded-object
 id: embed-456
 ignored: value
 ```"#,
@@ -106,13 +106,13 @@ ignored: value
         assert_eq!(
             exported,
             r#"
-```rook-embedded-object
+```polaris-terminal-embedded-object
 ---
 id: embed-123
 export: true
 
 ```
-```rook-embedded-object
+```polaris-terminal-embedded-object
 ---
 id: embed-456
 export: true
@@ -153,7 +153,7 @@ fn test_table_html_serialization() {
 #[test]
 fn test_gfm_table_html_serialization() {
     App::test((), |mut app| async move {
-        let _flag = rook_core::features::FeatureFlag::MarkdownTables.override_enabled(true);
+        let _flag = pterm_core::features::FeatureFlag::MarkdownTables.override_enabled(true);
         let markdown = "\
 | header 1 | header 2 |\n\
 | --- | --- |\n\

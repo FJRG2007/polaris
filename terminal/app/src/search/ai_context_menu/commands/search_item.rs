@@ -1,7 +1,7 @@
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rookui::elements::{ConstrainedBox, Container, Icon, Text};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::elements::{ConstrainedBox, Container, Icon, Text};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::search::ai_context_menu::mixer::AIContextMenuSearchableAction;
@@ -52,9 +52,9 @@ impl SearchItem for CommandSearchItem {
         )
         .with_color(highlight_state.main_text_fill(appearance).into_solid())
         .with_single_highlight(
-            rookui::elements::Highlight::new()
+            ptermui::elements::Highlight::new()
                 .with_properties(
-                    rookui::fonts::Properties::default().weight(rookui::fonts::Weight::Bold),
+                    ptermui::fonts::Properties::default().weight(ptermui::fonts::Weight::Bold),
                 )
                 .with_foreground_color(highlight_state.main_text_fill(appearance).into_solid()),
             self.match_result.matched_indices.clone(),

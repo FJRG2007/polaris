@@ -1,4 +1,4 @@
-use rook_graphql::queries::get_user::UserOutput as GqlUserOutput;
+use pterm_graphql::queries::get_user::UserOutput as GqlUserOutput;
 
 use super::UserUid;
 use super::user::User;

@@ -3,16 +3,16 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use rook::features::FeatureFlag;
-use rook::integration_testing::settings::{
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::settings::{
     active_execution_profile_id, create_and_select_execution_profile, default_execution_profile,
     execution_profile, has_multiple_execution_profiles,
 };
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use rook::integration_testing::view_getters::single_terminal_view_for_tab;
-use rookui_core::async_assert;
-use rookui_core::integration::TestStep;
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::integration_testing::view_getters::single_terminal_view_for_tab;
+use ptermui_core::async_assert;
+use ptermui_core::integration::TestStep;
 
 use super::{Builder, new_builder};
 
@@ -45,7 +45,7 @@ directory_allowlist = ["/reloaded"]
 "#;
 
 fn settings_file_path() -> PathBuf {
-    rook::settings::user_preferences_toml_file_path()
+    polaris_terminal::settings::user_preferences_toml_file_path()
 }
 
 fn write_settings_file(contents: &str) {
@@ -98,7 +98,7 @@ pub fn test_execution_profile_model_persists_and_hot_reloads_settings_file() -> 
 
     new_builder()
         .with_setup(|utils| {
-            utils.set_env("ROOK_CONFIG_WATCHER_DELAY_MS", Some("10".to_string()));
+            utils.set_env("POLARIS_TERMINAL_CONFIG_WATCHER_DELAY_MS", Some("10".to_string()));
             write_settings_file(INITIAL_PROFILES);
         })
         .with_step(wait_until_bootstrapped_single_pane_for_tab(0))

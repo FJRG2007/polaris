@@ -13,6 +13,6 @@ source ./script/wasm/bundle --debug --no-split --channel local "$@"
 BUNDLE_DIR="$(dirname "$OUT_DIR")"
 
 cp "$WORKSPACE_ROOT_DIR/script/wasm/dev-index.html" "$BUNDLE_DIR/index.html"
-echo  "Built Rook to $BUNDLE_DIR"
+echo  "Built Polaris Terminal to $BUNDLE_DIR"
 
 cargo run --release --package serve-wasm -- "$BUNDLE_DIR"

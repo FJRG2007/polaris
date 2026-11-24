@@ -45,7 +45,7 @@ pub(crate) fn generated_worktree_repo_dir(repo_path: &Path) -> PathBuf {
         .and_then(|name| name.to_str())
         .filter(|name| !name.is_empty())
         .unwrap_or("untitled");
-    rook_core::paths::data_dir()
+    pterm_core::paths::data_dir()
         .join("worktrees")
         .join(repo_name)
 }
@@ -135,7 +135,7 @@ pub struct TabConfigPaneNode {
 
 // ── TabConfig ───────────────────────────────────────────────────────
 
-/// A tab config loaded from a `.toml` file in `~/.rook/tab_configs/`.
+/// A tab config loaded from a `.toml` file in `~/.polaris-terminal/tab_configs/`.
 ///
 /// Pane layout is defined with a flat `[[panes]]` array where the first entry
 /// is the root and splits reference children by ID.

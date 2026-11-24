@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use parking_lot::RwLock;
-use rook_core::features::FeatureFlag;
-use rook_core::semantic_selection::SemanticSelection;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::semantic_selection::SemanticSelection;
+use ptermui::elements::{
     ChildView, Container, CrossAxisAlignment, Expanded, Flex, ParentElement, SavePosition,
     SelectableArea, SelectionHandle, Text, get_rich_content_position_id,
 };
-use rookui::fonts::{Properties, Style, Weight};
-use rookui::{
+use ptermui::fonts::{Properties, Style, Weight};
+use ptermui::{
     AppContext, Element, Entity, EntityId, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };

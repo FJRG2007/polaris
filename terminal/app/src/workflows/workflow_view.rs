@@ -7,25 +7,25 @@ use env_var_selector::{EnvVarSelector, EnvVarSelectorEvent};
 use itertools::Itertools;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::context_flag::ContextFlag;
-use rook_core::settings::Setting;
-use rook_core::ui::theme::AnsiColorIdentifier;
-use rook_editor::editor::NavigationKey;
-use rook_errors::report_error;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::settings::Setting;
+use pterm_core::ui::theme::AnsiColorIdentifier;
+use pterm_editor::editor::NavigationKey;
+use pterm_errors::report_error;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty, Flex, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, Rect, ScrollbarWidth, Shrinkable, Stack,
 };
-use rookui::fonts::{FamilyId, Weight};
-use rookui::keymap::EditableBinding;
-use rookui::platform::Cursor;
-use rookui::text_layout::TextStyle;
-use rookui::ui_components::button::{Button, ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{FamilyId, Weight};
+use ptermui::keymap::EditableBinding;
+use ptermui::platform::Cursor;
+use ptermui::text_layout::TextStyle;
+use ptermui::ui_components::button::{Button, ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WindowId,
 };
@@ -47,9 +47,9 @@ use crate::cloud_object::model::view::CloudViewModel;
 use crate::cloud_object::{
     CloudObject, CloudObjectEventEntrypoint, ObjectType, Owner, Revision, Space,
 };
-use crate::drive::cloud_object_styling::rook_drive_icon_color;
+use crate::drive::cloud_object_styling::pterm_drive_icon_color;
 use crate::drive::drive_helpers::has_feature_gated_anonymous_user_reached_workflow_limit;
-use crate::drive::items::RookDriveItemId;
+use crate::drive::items::PtermDriveItemId;
 use crate::drive::sharing::{ContentEditability, ShareableObject, SharingAccessLevel};
 use crate::drive::workflows::ai_assist::GeneratedCommandMetadataError;
 use crate::drive::workflows::arguments::ArgumentsState;
@@ -60,7 +60,7 @@ use crate::drive::workflows::workflow_arg_selector::{
     WorkflowArgSelector, WorkflowArgSelectorEvent,
 };
 use crate::drive::workflows::workflow_arg_type_helpers::{self, ArgumentEditorRowIndex};
-use crate::drive::{CloudObjectTypeAndId, DriveObjectType, OpenRookDriveObjectSettings};
+use crate::drive::{CloudObjectTypeAndId, DriveObjectType, OpenPtermDriveObjectSettings};
 use crate::editor::{
     EditorOptions, EditorView, EnterAction, EnterSettings, Event as EditorEvent, InteractionState,
     PlainTextEditorViewAction as EditorAction, PropagateAndNoOpNavigationKeys,
@@ -106,7 +106,7 @@ pub mod env_var_selector;
 mod syntax_highlightable;
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::id;
+    use ptermui::keymap::macros::id;
     app.register_editable_bindings([EditableBinding::new(
         "workflowview:save",
         "Save workflow",
@@ -170,7 +170,7 @@ const AI_ASSIST_LOADING_TEXT: &str = "Loading";
 
 const ALIAS_HELP_TEXT: &str = "Aliases allow you to create short strings to execute workflows. Each alias can have different argument values and environment variables, and aliases are personal to you.";
 
-const RUN_ON_DESKTOP_BUTTON_TEXT: &str = "Run in Rook";
+const RUN_ON_DESKTOP_BUTTON_TEXT: &str = "Run in Polaris Terminal";
 const RUN_ON_DESKTOP_BUTTON_WIDTH: f32 = 108.;
 
 const UNSAVED_CHANGES_TEXT: &str = "You have unsaved changes.";
@@ -211,7 +211,7 @@ impl WorkflowEditorErrorState {
 
 #[derive(Debug, Clone)]
 pub enum WorkflowAction {
-    ViewInRookDrive(RookDriveItemId),
+    ViewInPtermDrive(PtermDriveItemId),
     AddArgument,
     ToggleViewMode,
     RunWorkflow,
@@ -235,7 +235,7 @@ pub enum WorkflowViewEvent {
     Pane(PaneEvent),
     CreatedWorkflow(SyncId),
     UpdatedWorkflow(SyncId),
-    ViewInRookDrive(RookDriveItemId),
+    ViewInPtermDrive(PtermDriveItemId),
     OpenDriveObjectShareDialog {
         cloud_object_type_and_id: CloudObjectTypeAndId,
         invitee_email: Option<String>,
@@ -575,7 +575,7 @@ impl WorkflowView {
             if let Some(workflow) = CloudModel::as_ref(ctx).get_workflow_by_uid(&server_id.uid()) {
                 self.load(
                     workflow.clone(),
-                    &OpenRookDriveObjectSettings::default(),
+                    &OpenPtermDriveObjectSettings::default(),
                     self.workflow_view_mode,
                     ctx,
                 );
@@ -594,7 +594,7 @@ impl WorkflowView {
             {
                 self.load(
                     workflow,
-                    &OpenRookDriveObjectSettings::default(),
+                    &OpenPtermDriveObjectSettings::default(),
                     self.workflow_view_mode,
                     ctx,
                 );
@@ -611,7 +611,7 @@ impl WorkflowView {
         if let Some(workflow) = cloud_workflow {
             self.load(
                 workflow,
-                &OpenRookDriveObjectSettings::default(),
+                &OpenPtermDriveObjectSettings::default(),
                 self.workflow_view_mode,
                 ctx,
             );
@@ -621,7 +621,7 @@ impl WorkflowView {
     pub fn wait_for_initial_load_then_load(
         &mut self,
         workflow_id: SyncId,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         mode: WorkflowViewMode,
         window_id: WindowId,
         ctx: &mut ViewContext<Self>,
@@ -662,7 +662,7 @@ impl WorkflowView {
     fn fetch_and_load_workflow(
         &mut self,
         workflow_id: ServerId,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         mode: WorkflowViewMode,
         window_id: WindowId,
         ctx: &mut ViewContext<Self>,
@@ -700,7 +700,7 @@ impl WorkflowView {
     pub fn load(
         &mut self,
         workflow: CloudWorkflow,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         mode: WorkflowViewMode,
         ctx: &mut ViewContext<Self>,
     ) {
@@ -745,7 +745,7 @@ impl WorkflowView {
                 pane_config.set_title(workflow_name, ctx);
                 if let Some(server_id) = workflow.id.into_server() {
                     pane_config.set_shareable_object(
-                        Some(ShareableObject::RookDriveObject(server_id)),
+                        Some(ShareableObject::PtermDriveObject(server_id)),
                         ctx,
                     );
                 }
@@ -831,8 +831,8 @@ impl WorkflowView {
         self.refresh_pane_overflow_menu(ctx);
 
         if let Some(focused_folder_id) = settings.focused_folder_id.map(SyncId::ServerId) {
-            self.view_in_rook_drive(
-                RookDriveItemId::Object(CloudObjectTypeAndId::Folder(focused_folder_id)),
+            self.view_in_pterm_drive(
+                PtermDriveItemId::Object(CloudObjectTypeAndId::Folder(focused_folder_id)),
                 ctx,
             );
         }
@@ -1561,7 +1561,7 @@ impl WorkflowView {
     }
 
     /// Save the workflow and associated state. This makes a best-effort attempt to not
-    /// unnecessarily modify the backing Rook Drive object.
+    /// unnecessarily modify the backing Polaris Terminal Drive object.
     fn save(&mut self, ctx: &mut ViewContext<Self>) {
         if FeatureFlag::WorkflowAliases.is_enabled() && self.are_aliases_dirty(ctx) {
             self.save_aliases(ctx);
@@ -2045,8 +2045,8 @@ impl WorkflowView {
                 } else {
                     Icon::Workflow
                 }
-                .to_rookui_icon(
-                    rook_drive_icon_color(
+                .to_ptermui_icon(
+                    pterm_drive_icon_color(
                         appearance,
                         if self.is_for_agent_mode {
                             DriveObjectType::AgentModeWorkflow
@@ -2200,7 +2200,7 @@ impl WorkflowView {
                 let mut stack = Stack::new().with_child(
                     ConstrainedBox::new(
                         Icon::HelpCircle
-                            .to_rookui_icon(
+                            .to_ptermui_icon(
                                 appearance
                                     .theme()
                                     .sub_text_color(appearance.theme().background()),
@@ -2351,7 +2351,7 @@ impl WorkflowView {
                 let text_and_icon = TextAndIcon::new(
                     alignment,
                     label,
-                    icon.to_rookui_icon(appearance.theme().active_ui_text_color()),
+                    icon.to_ptermui_icon(appearance.theme().active_ui_text_color()),
                     MainAxisSize::Min,
                     MainAxisAlignment::Center,
                     vec2f(10., 10.),
@@ -2446,7 +2446,8 @@ impl WorkflowView {
                     .finish();
 
                 let button_with_tool_tip = appearance.ui_builder().tool_tip_on_element(
-                    "Generate a title, descriptions, or parameters with Rook AI".to_string(),
+                    "Generate a title, descriptions, or parameters with Polaris Terminal AI"
+                        .to_string(),
                     self.ui_state_handles.ai_assist_tool_tip.clone(),
                     rendered_button,
                     ParentAnchor::TopMiddle,
@@ -2588,8 +2589,8 @@ impl WorkflowView {
         })
     }
 
-    fn view_in_rook_drive(&mut self, id: RookDriveItemId, ctx: &mut ViewContext<Self>) {
-        ctx.emit(WorkflowViewEvent::ViewInRookDrive(id));
+    fn view_in_pterm_drive(&mut self, id: PtermDriveItemId, ctx: &mut ViewContext<Self>) {
+        ctx.emit(WorkflowViewEvent::ViewInPtermDrive(id));
     }
 
     fn issue_request(&mut self, ctx: &mut ViewContext<Self>) {
@@ -2824,7 +2825,7 @@ impl WorkflowView {
                     .with_children([
                         ConstrainedBox::new(
                             Icon::Trash
-                                .to_rookui_icon(appearance.theme().foreground())
+                                .to_ptermui_icon(appearance.theme().foreground())
                                 .finish(),
                         )
                         .with_width(16.)
@@ -2947,7 +2948,7 @@ impl View for WorkflowView {
                     self.breadcrumbs.clone(),
                     appearance,
                     |ctx, _, breadcrumb| {
-                        ctx.dispatch_typed_action(WorkflowAction::ViewInRookDrive(
+                        ctx.dispatch_typed_action(WorkflowAction::ViewInPtermDrive(
                             breadcrumb.kind.into_item_id(),
                         ));
                     },
@@ -3040,7 +3041,7 @@ impl View for WorkflowView {
                 SCROLLBAR_WIDTH,
                 theme.nonactive_ui_detail().into(),
                 theme.active_ui_detail().into(),
-                rookui::elements::Fill::None,
+                ptermui::elements::Fill::None,
             )
             .finish(),
         );
@@ -3111,7 +3112,7 @@ impl TypedActionView for WorkflowView {
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
-            WorkflowAction::ViewInRookDrive(id) => self.view_in_rook_drive(*id, ctx),
+            WorkflowAction::ViewInPtermDrive(id) => self.view_in_pterm_drive(*id, ctx),
             WorkflowAction::AddArgument => self.add_argument(ctx),
             WorkflowAction::ToggleViewMode => self.toggle_view_mode(ctx),
             WorkflowAction::CloseUnsavedDialog => self.hide_unsaved_changes_dialog(ctx),

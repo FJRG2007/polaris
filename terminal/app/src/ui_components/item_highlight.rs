@@ -1,15 +1,15 @@
 use pathfinder_color::ColorU;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::Element;
-use rookui::elements::{CornerRadius, MouseState, Radius};
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::Element;
+use ptermui::elements::{CornerRadius, MouseState, Radius};
 
 use crate::appearance::Appearance;
 use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
 
 /// Shared item highlight state for left-panel style lists (file tree, global search results,
-/// rook drive rows, etc.).
+/// polaris-terminal drive rows, etc.).
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ItemHighlightState {
     None,

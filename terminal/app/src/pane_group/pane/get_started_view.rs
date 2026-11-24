@@ -1,16 +1,16 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::color::blend::Blend as _;
-use rook_core::ui::{self};
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::color::blend::Blend as _;
+use pterm_core::ui::{self};
+use ptermui::elements::{
     Align, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Icon,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement as _, Radius,
 };
-use rookui::keymap::EditableBinding;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::keymap::EditableBinding;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -28,7 +28,7 @@ use crate::workspace::{ToastStack, Workspace, WorkspaceAction};
 use crate::{TelemetryEvent, send_telemetry_from_ctx};
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_editable_bindings([EditableBinding::new(
         "workspace:new_tab",
@@ -213,7 +213,11 @@ impl GetStartedView {
             .with_children([
                 Container::new(
                     ConstrainedBox::new(
-                        Icon::new("bundled/svg/rook-logo-neutral.svg", theme.foreground()).finish(),
+                        Icon::new(
+                            "bundled/svg/polaris-terminal-logo-neutral.svg",
+                            theme.foreground(),
+                        )
+                        .finish(),
                     )
                     .with_height(40.)
                     .with_width(40.)
@@ -223,7 +227,7 @@ impl GetStartedView {
                 .finish(),
                 appearance
                     .ui_builder()
-                    .paragraph("Welcome to Rook")
+                    .paragraph("Welcome to Polaris Terminal")
                     .with_style(UiComponentStyles {
                         font_size: Some(20.),
                         ..Default::default()
@@ -280,7 +284,7 @@ impl GetStartedView {
                             keybinding_name_to_display_string("workspace:new_tab", app)
                                 .unwrap_or_default()
                         ),
-                        ui::Icon::Terminal.to_rookui_icon(theme.foreground()),
+                        ui::Icon::Terminal.to_ptermui_icon(theme.foreground()),
                         MainAxisSize::Min,
                         MainAxisAlignment::Center,
                         vec2f(16., 16.),

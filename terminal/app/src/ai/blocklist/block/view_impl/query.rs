@@ -4,18 +4,18 @@
 use chrono::{DateTime, Local};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::color::Opacity;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::color::Opacity;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     Border, ChildAnchor, Container, CornerRadius, DispatchEventResult, DropShadow, EventHandler,
     Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentAnchor, ParentElement, Radius,
     Shrinkable, Wrap,
 };
-use rookui::fonts::{Properties, Style, Weight};
-use rookui::ui_components::chip::Chip;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::fonts::{Properties, Style, Weight};
+use ptermui::ui_components::chip::Chip;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use super::common::{FindContext, render_query_text, render_user_avatar};
 use crate::ai::blocklist::AttachmentType;
@@ -165,7 +165,7 @@ pub(crate) fn render_query(
     }
 
     Flex::row()
-        .with_cross_axis_alignment(rookui::elements::CrossAxisAlignment::Start)
+        .with_cross_axis_alignment(ptermui::elements::CrossAxisAlignment::Start)
         .with_child(avatar)
         .with_child(Shrinkable::new(1., query.finish()).finish())
         .finish()
@@ -202,7 +202,7 @@ fn render_attachments(
                 ..Default::default()
             },
         )
-        .with_icon(icon.to_rookui_icon(
+        .with_icon(icon.to_ptermui_icon(
             blended_colors::text_sub(appearance.theme(), appearance.theme().background()).into(),
         ))
         .build()

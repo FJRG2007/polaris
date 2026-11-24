@@ -1,8 +1,8 @@
 //! Action buttons row for conversation details panel.
 
-use rook_core::ui::theme::AnsiColorIdentifier;
-use rookui::elements::{ChildView, CrossAxisAlignment, Empty, Flex, ParentElement};
-use rookui::{AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle};
+use pterm_core::ui::theme::AnsiColorIdentifier;
+use ptermui::elements::{ChildView, CrossAxisAlignment, Empty, Flex, ParentElement};
+use ptermui::{AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_conversations_model::{AgentConversationEntryId, AgentRunDisplayStatus};
@@ -270,7 +270,7 @@ impl TypedActionView for ConversationActionButtonsRow {
                     let duration = COPY_FEEDBACK_DURATION;
                     ctx.spawn(
                         async move {
-                            rookui::r#async::Timer::after(duration).await;
+                            ptermui::r#async::Timer::after(duration).await;
                         },
                         |me, _, ctx| {
                             me.copy_link_button.update(ctx, |button, ctx| {

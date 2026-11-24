@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use rook_core::ui::appearance::Appearance;
-use rookui::App;
-use rookui::platform::WindowStyle;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::App;
+use ptermui::platform::WindowStyle;
 
 use super::{Find, FindDirection, FindEvent, FindModel};
 use crate::auth::AuthStateProvider;
@@ -17,7 +17,7 @@ use crate::workspaces::user_workspaces::UserWorkspaces;
 
 struct MockFindModel;
 
-impl rookui::Entity for MockFindModel {
+impl ptermui::Entity for MockFindModel {
     type Event = FindEvent;
 }
 
@@ -28,7 +28,7 @@ impl FindModel for MockFindModel {
     fn match_count(&self) -> usize {
         0
     }
-    fn default_find_direction(&self, _app: &rookui::AppContext) -> FindDirection {
+    fn default_find_direction(&self, _app: &ptermui::AppContext) -> FindDirection {
         FindDirection::Down
     }
 }

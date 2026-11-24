@@ -4,7 +4,7 @@
 Uses `gh` CLI (must be authenticated) and `git` — stdlib only, no pip deps.
 
 Usage:
-    python3 fetch_prs.py --repo FJRG2007/rook --base-ref <prev_tag> --head-ref <release_tag>
+    python3 fetch_prs.py --repo FJRG2007/polaris --base-ref <prev_tag> --head-ref <release_tag>
 
 Outputs JSON to stdout.
 """
@@ -26,16 +26,16 @@ LINKED_ISSUE_RE = re.compile(
     r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)",
     re.IGNORECASE,
 )
-PUBLIC_REPO = "FJRG2007/rook"
+PUBLIC_REPO = "FJRG2007/polaris"
 INTERNAL_REPO = "warpdotdev/warp-internal"
 REPO_SYNC_AUTHORS = frozenset(
     {
-        "app/rook-repo-sync",
-        "rook-repo-sync",
-        "rook-repo-sync[bot]",
+        "app/polaris-terminal-repo-sync",
+        "polaris-terminal-repo-sync",
+        "polaris-terminal-repo-sync[bot]",
     }
 )
-PUBLIC_PR_URL_RE = re.compile(r"https://github\.com/FJRG2007/rook/pull/(\d+)")
+PUBLIC_PR_URL_RE = re.compile(r"https://github\.com/FJRG2007/polaris/pull/(\d+)")
 
 
 def run(cmd: list[str], *, check: bool = True) -> str:
@@ -179,7 +179,7 @@ def is_repo_sync_pr(data: dict) -> bool:
 def should_include_pr(repo: str, data: dict) -> bool:
     """Return whether a PR should be exposed to changelog generation.
 
-    Releases are cut from rook-internal, but non-sync-bot PRs merged there are
+    Releases are cut from polaris-terminal-internal, but non-sync-bot PRs merged there are
     private/internal changes. Do not expose them to the Oz changelog agent or to
     generated artifacts.
     """
@@ -187,7 +187,7 @@ def should_include_pr(repo: str, data: dict) -> bool:
 
 
 def extract_public_pr_number(text: str) -> int | None:
-    """Extract a public FJRG2007/rook PR number from text."""
+    """Extract a public FJRG2007/polaris PR number from text."""
     if not text:
         return None
     m = PUBLIC_PR_URL_RE.search(text)
@@ -202,7 +202,7 @@ def extract_public_pr_number(text: str) -> int | None:
 
 
 def resolve_public_pr_number(repo: str, pr_number: int, data: dict) -> int | None:
-    """Resolve a repo-sync PR back to its original public FJRG2007/rook PR."""
+    """Resolve a repo-sync PR back to its original public FJRG2007/polaris PR."""
     public_pr_number = extract_public_pr_number(data.get("body", "") or "")
     if public_pr_number is not None:
         return public_pr_number
@@ -228,8 +228,8 @@ def pr_reference(repo: str, pr_number: int, data: dict) -> dict:
 def normalize_pr_data(repo: str, pr_number: int, data: dict) -> tuple[str, dict, dict | None]:
     """Resolve repo-sync PRs to public PR metadata.
 
-    The release workflow runs from rook-internal, where public PRs are mirrored
-    as rook-repo-sync[bot] PRs with different PR numbers. For changelog output
+    The release workflow runs from polaris-terminal-internal, where public PRs are mirrored
+    as polaris-terminal-repo-sync[bot] PRs with different PR numbers. For changelog output
     and contributor attribution, use the original public PR metadata when it can
     be resolved, and keep the internal PR under `internal_pr` for audit only.
     """

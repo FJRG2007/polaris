@@ -1,4 +1,4 @@
-use rookui::App;
+use ptermui::App;
 
 use super::runner_controls_enabled;
 use crate::features::FeatureFlag;

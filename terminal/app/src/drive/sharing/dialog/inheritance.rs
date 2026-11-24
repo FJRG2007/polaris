@@ -1,9 +1,9 @@
 //! Support for displaying inherited ACLs.
 
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{CrossAxisAlignment, Flex, MouseStateHandle, ParentElement as _};
-use rookui::ui_components::components::UiComponent as _;
-use rookui::{AppContext, Element, SingletonEntity as _};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{CrossAxisAlignment, Flex, MouseStateHandle, ParentElement as _};
+use ptermui::ui_components::components::UiComponent as _;
+use ptermui::{AppContext, Element, SingletonEntity as _};
 
 use super::style;
 use crate::cloud_object::ServerObjectContainer;

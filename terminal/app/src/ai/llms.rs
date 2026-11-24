@@ -4,10 +4,10 @@ use std::sync::{Arc, OnceLock};
 use ai::api_keys::{ApiKeyManager, ApiKeyManagerEvent, CustomEndpoint, CustomEndpointModel};
 pub use ai::{LLMId, LLMProvider};
 use parking_lot::FairMutex;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::Icon;
-use rook_errors::report_error;
-use rookui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::Icon;
+use pterm_errors::report_error;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
 use serde::{Deserialize, Serialize, de};
 use warp_multi_agent_api as api;
 
@@ -16,7 +16,7 @@ use super::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::auth::AuthStateProvider;
 use crate::server::ids::ServerId;
 use crate::server::server_api::ServerApiProvider;
-use crate::user_config::{RookConfig, RookConfigUpdateEvent};
+use crate::user_config::{PtermConfig, PtermConfigUpdateEvent};
 #[cfg(feature = "agent_mode_evals")]
 use crate::workspaces::user_workspaces::ResolvedTeamScope;
 use crate::workspaces::user_workspaces::{TeamScope, UserWorkspaces, UserWorkspacesEvent};
@@ -472,7 +472,7 @@ impl LLMInfo {
 /// The set of LLMs available for a feature.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AvailableLLMs {
-    /// The Rook "default" LLM.
+    /// The Polaris Terminal "default" LLM.
     default_id: LLMId,
     choices: Vec<LLMInfo>,
 
@@ -767,8 +767,8 @@ impl LLMPreferences {
         // Rebuild custom model routers whenever the local `model_configs/` directory
         // changes, and reconcile any now-stale local selection.
         if FeatureFlag::CustomModelRouters.is_enabled() {
-            ctx.subscribe_to_model(&RookConfig::handle(ctx), |me, _, event, ctx| {
-                if matches!(event, RookConfigUpdateEvent::ModelConfigs) {
+            ctx.subscribe_to_model(&PtermConfig::handle(ctx), |me, _, event, ctx| {
+                if matches!(event, PtermConfigUpdateEvent::ModelConfigs) {
                     me.rebuild_custom_model_routers(ctx);
                     me.reconcile_stale_custom_router_selection(ctx);
                 }
@@ -1205,7 +1205,7 @@ impl LLMPreferences {
         self.custom_llms.iter().find(|info| info.id == *id)
     }
 
-    /// Returns `true` when `id` identifies a model that can run in a Rook cloud
+    /// Returns `true` when `id` identifies a model that can run in a Polaris Terminal cloud
     /// (Oz) agent, and is therefore safe to forward as a cloud
     /// `config.model_id`.
     ///
@@ -1235,7 +1235,7 @@ impl LLMPreferences {
         }
     }
 
-    /// True when the pane's active Agent Mode model can run in a Rook cloud
+    /// True when the pane's active Agent Mode model can run in a Polaris Terminal cloud
     /// (Oz) agent (see [`Self::is_cloud_runnable_oz_model_id`]).
     pub(crate) fn is_active_base_model_cloud_runnable(
         &self,
@@ -1345,7 +1345,7 @@ impl LLMPreferences {
     /// (server-fetched + cached), so it is best-effort at startup before
     /// the server responds.
     fn rebuild_custom_model_routers(&mut self, ctx: &mut ModelContext<Self>) {
-        let local = RookConfig::as_ref(ctx).custom_model_routers().clone();
+        let local = PtermConfig::as_ref(ctx).custom_model_routers().clone();
 
         let mut deduped = Vec::with_capacity(local.len());
         let mut seen = HashSet::new();
@@ -1384,8 +1384,8 @@ impl LLMPreferences {
             false
         });
         if !validation_errors.is_empty() {
-            RookConfig::handle(ctx).update(ctx, |_, ctx| {
-                ctx.emit(RookConfigUpdateEvent::ModelConfigErrors(validation_errors));
+            PtermConfig::handle(ctx).update(ctx, |_, ctx| {
+                ctx.emit(PtermConfigUpdateEvent::ModelConfigErrors(validation_errors));
             });
         }
 
@@ -1805,7 +1805,7 @@ impl LLMPreferences {
 
     pub fn new_choices_since_last_update(&self) -> Option<Vec<LLMInfo>> {
         self.last_update.as_ref().map(|update| {
-            // We don't want to display new choices if they are rook branded.
+            // We don't want to display new choices if they are polaris-terminal branded.
             let filter_choices: Vec<LLMInfo> = update
                 .new_choices
                 .clone()

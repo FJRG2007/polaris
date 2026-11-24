@@ -3,12 +3,12 @@
 set -eo pipefail
 
 COMMON_SKILLS_REPO="warpdotdev/common-skills"
-COMMON_SKILLS_REF="${ROOK_COMMON_SKILLS_REF:-main}"
-RAW_BASE_URL="${ROOK_COMMON_SKILLS_RAW_BASE_URL:-https://raw.githubusercontent.com/${COMMON_SKILLS_REPO}/${COMMON_SKILLS_REF}/scripts}"
+COMMON_SKILLS_REF="${POLARIS_TERMINAL_COMMON_SKILLS_REF:-main}"
+RAW_BASE_URL="${POLARIS_TERMINAL_COMMON_SKILLS_RAW_BASE_URL:-https://raw.githubusercontent.com/${COMMON_SKILLS_REPO}/${COMMON_SKILLS_REF}/scripts}"
 RESOLVER_NAME="resolve_common_skills"
 
 execute_resolver_from_dir() {
-  local script_path="${ROOK_COMMON_SKILLS_SCRIPTS_DIR%/}/${RESOLVER_NAME}"
+  local script_path="${POLARIS_TERMINAL_COMMON_SKILLS_SCRIPTS_DIR%/}/${RESOLVER_NAME}"
 
   if [[ -x "${script_path}" ]]; then
     exec "${script_path}" "$@"
@@ -18,7 +18,7 @@ execute_resolver_from_dir() {
     exec bash "${script_path}" "$@"
   fi
 
-  echo "error: could not execute ${RESOLVER_NAME} from ROOK_COMMON_SKILLS_SCRIPTS_DIR=${ROOK_COMMON_SKILLS_SCRIPTS_DIR}" >&2
+  echo "error: could not execute ${RESOLVER_NAME} from POLARIS_TERMINAL_COMMON_SKILLS_SCRIPTS_DIR=${POLARIS_TERMINAL_COMMON_SKILLS_SCRIPTS_DIR}" >&2
   exit 1
 }
 
@@ -50,7 +50,7 @@ execute_resolver_from_remote() {
   return "${status}"
 }
 
-if [[ -n "${ROOK_COMMON_SKILLS_SCRIPTS_DIR:-}" ]]; then
+if [[ -n "${POLARIS_TERMINAL_COMMON_SKILLS_SCRIPTS_DIR:-}" ]]; then
   execute_resolver_from_dir "$@"
 fi
 

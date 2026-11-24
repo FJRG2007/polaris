@@ -105,7 +105,7 @@ pub enum ServiceAgreementType {
 pub struct Tier {
     pub name: String,
     pub description: String,
-    pub rook_ai_policy: Option<RookAiPolicy>,
+    pub pterm_ai_policy: Option<PtermAiPolicy>,
     pub team_size_policy: Option<TeamSizePolicy>,
     pub shared_notebooks_policy: Option<SharedNotebooksPolicy>,
     pub shared_workflows_policy: Option<SharedWorkflowsPolicy>,
@@ -158,7 +158,7 @@ pub struct TeamSizePolicy {
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub struct RookAiPolicy {
+pub struct PtermAiPolicy {
     pub limit: i32,
     pub is_code_suggestions_toggleable: bool,
     pub is_prompt_suggestions_toggleable: bool,

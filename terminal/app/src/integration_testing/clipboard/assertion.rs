@@ -1,5 +1,5 @@
-use rookui::async_assert_eq;
-use rookui::integration::AssertionCallback;
+use ptermui::async_assert_eq;
+use ptermui::integration::AssertionCallback;
 
 pub fn assert_clipboard_contains_string(string: String) -> AssertionCallback {
     Box::new(move |app, _window_id| {

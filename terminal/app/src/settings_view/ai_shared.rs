@@ -11,15 +11,15 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use rook_core::context_flag::ContextFlag;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     ChildView, Container, Element, Fill, Flex, MouseStateHandle, ParentElement,
 };
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{Action, AppContext, SingletonEntity, View, ViewContext, ViewHandle};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{Action, AppContext, SingletonEntity, View, ViewContext, ViewHandle};
 use settings::Setting;
 
 use super::SettingsAction;
@@ -51,7 +51,7 @@ pub fn update_editor_interaction_state<V: View>(
     })
 }
 
-/// The "Toolbar layout" chip editor. Shared by the Rook Agent toolbar and the
+/// The "Toolbar layout" chip editor. Shared by the Polaris Terminal Agent toolbar and the
 /// third-party coding agent toolbar, which are separate settings backed by the
 /// same editor view.
 pub fn render_toolbar_layout_editor(
@@ -211,9 +211,9 @@ pub fn render_ai_feature_switch(
 }
 
 pub mod styles {
-    use rook_core::ui::appearance::Appearance;
-    use rook_core::ui::theme::Fill;
-    use rookui::{AppContext, SingletonEntity};
+    use pterm_core::ui::appearance::Appearance;
+    use pterm_core::ui::theme::Fill;
+    use ptermui::{AppContext, SingletonEntity};
 
     /// Negative margin applied to description text so it appears closer to the main settings option
     /// text.

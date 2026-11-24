@@ -14,12 +14,12 @@ use handlebars::get_arguments;
 use instant::Instant;
 use itertools::Itertools as _;
 use oneshot::Canceled;
-use rook_cli::mcp::MCPSpec;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_core::features::FeatureFlag;
-use rook_managed_secrets::ManagedSecretValue;
-use rookui::r#async::{FutureExt as _, TimeoutError};
-use rookui::{Entity, ModelContext, ModelHandle, ModelSpawner, SingletonEntity};
+use pterm_cli::mcp::MCPSpec;
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_core::features::FeatureFlag;
+use pterm_managed_secrets::ManagedSecretValue;
+use ptermui::r#async::{FutureExt as _, TimeoutError};
+use ptermui::{Entity, ModelContext, ModelHandle, ModelSpawner, SingletonEntity};
 use uuid::Uuid;
 
 use super::{AgentDriver, AgentDriverError};
@@ -45,7 +45,7 @@ pub(super) const MCP_SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(20);
 /// (`ManagedMcpClient::create_managed_mcp_client_config`) in
 /// [`AgentDriver::resolve_mcp_specs_with_local_uuids`].
 ///
-/// A transient rook-server 5xx during this call otherwise fails the whole run (see
+/// A transient polaris-terminal-server 5xx during this call otherwise fails the whole run (see
 /// `AgentDriverError::ManagedMcpResolutionFailed`), so this needs a larger budget than the
 /// shared [`crate::server::retry_strategies::MAX_ATTEMPTS`] default (~2s), which is too short
 /// to ride out even a brief backend blip. Against the shared exponential backoff schedule
@@ -395,12 +395,12 @@ impl AgentDriver {
     /// Returns the built-in Factory MCP server installation to attach to this
     /// run, or `None` when it should not be attached.
     ///
-    /// Interactive clients (GUI/TUI) attach built-in Rook-hosted servers via
+    /// Interactive clients (GUI/TUI) attach built-in Polaris Terminal-hosted servers via
     /// [`TemplatableMCPServerManager::sync_builtin_servers`], which skips CLI
     /// agent runs. The driver mirrors the same eligibility rules for its
     /// run-scoped ephemeral startup path: the `FactoryMcp` feature flag, a
     /// usable bearer token, and no configured server already named
-    /// `rook-factory` (an explicit configuration wins over the built-in).
+    /// `polaris-terminal-factory` (an explicit configuration wins over the built-in).
     ///
     /// The token is pinned into the transport at spawn time and is not
     /// refreshed mid-run: cloud runs authenticate with API keys, which do not
@@ -1179,7 +1179,7 @@ impl AgentDriver {
         })
     }
 
-    /// Await the one-time initial global home-config MCP scan (e.g. `~/.rook/.mcp.json`,
+    /// Await the one-time initial global home-config MCP scan (e.g. `~/.polaris-terminal/.mcp.json`,
     /// `~/.claude.json`, `~/.codex/config.toml`), returning the UUIDs of servers that were
     /// actually auto-start requested while it ran.
     ///

@@ -1,7 +1,7 @@
 # CLI Agent Composer Auto-Show & Auto-Dismiss Settings
 
 ## Summary
-Add three new user-facing settings that control the automatic visibility of the CLI agent rich input composer. The first setting auto-hides the composer whenever a CLI agent is blocked (requiring direct keyboard interaction) and auto-shows it when the agent resumes work, gated on having the Rook plugin installed for rich status information. The second setting auto-opens the composer when a CLI agent session starts or a plugin listener is registered. The third setting controls whether the composer auto-dismisses after the user submits a prompt, applying whenever Setting 1 is not actively managing composer visibility (either because it is disabled or because there is no plugin listener).
+Add three new user-facing settings that control the automatic visibility of the CLI agent rich input composer. The first setting auto-hides the composer whenever a CLI agent is blocked (requiring direct keyboard interaction) and auto-shows it when the agent resumes work, gated on having the Polaris Terminal plugin installed for rich status information. The second setting auto-opens the composer when a CLI agent session starts or a plugin listener is registered. The third setting controls whether the composer auto-dismisses after the user submits a prompt, applying whenever Setting 1 is not actively managing composer visibility (either because it is disabled or because there is no plugin listener).
 
 A per-session `should_auto_toggle_input` flag tracks whether auto-toggle is active for a given session. Opening the composer (manually or automatically) opts the session in; manually dismissing (Escape, Ctrl-G toggle, footer button) opts it out. Auto-close on Blocked preserves the flag so auto-open can fire when the agent resumes.
 
@@ -11,7 +11,7 @@ Today, users interacting with CLI agents (Claude, Codex, Gemini, etc.) must manu
 ## Goals
 - Let users opt into auto-hiding the composer whenever a CLI agent enters a "blocked" state (requiring direct keyboard interaction), and auto-showing it when the agent resumes work, so the interaction feels seamless.
 - Let users opt into auto-dismissing the composer after sending a prompt, reducing visual clutter when the agent is working.
-- Gate the auto-show behavior on having rich conversation status (i.e., the Rook plugin listener is active), since without it we cannot reliably detect when the agent is blocked.
+- Gate the auto-show behavior on having rich conversation status (i.e., the Polaris Terminal plugin listener is active), since without it we cannot reliably detect when the agent is blocked.
 - Gate the auto-dismiss (post-submission) behavior on Setting 1 not actively managing visibility — when the plugin is present and Setting 1 is enabled, auto-show/hide handles visibility; otherwise the user can choose to have the composer close after submission.
 
 ## Non-goals
@@ -27,7 +27,7 @@ Figma: none provided
 ### Setting 1: "Auto show/hide composer based on agent status" (`auto_toggle_composer`)
 - **Location**: Settings > AI > Coding Agents section, below existing "Show coding agent toolbar" toggle.
 - **Label**: `Auto show/hide composer based on agent status`
-- **Info tooltip** (ⓘ icon next to label): "Requires the Rook plugin for your coding agent"
+- **Info tooltip** (ⓘ icon next to label): "Requires the Polaris Terminal plugin for your coding agent"
 - **Default**: `true` (on)
 - **Behavior when enabled**:
   - When a CLI agent session has a plugin listener (`session.listener.is_some()`), the session's `should_auto_toggle_input` flag is true, and the session status transitions to `Blocked` (permission request, idle prompt), the composer automatically closes (the agent requires direct keyboard interaction in the terminal).
@@ -63,7 +63,7 @@ Figma: none provided
 - **Multiple terminals with different CLI agents**: Settings are global; auto-show/hide applies per-terminal based on each terminal's session state and its own `should_auto_toggle_input` flag.
 
 ## Success Criteria
-1. A new "Auto show/hide composer based on agent status" toggle appears in Settings > AI > Coding Agents with an (ⓘ) tooltip reading "Requires the Rook plugin for your coding agent". Defaults to on.
+1. A new "Auto show/hide composer based on agent status" toggle appears in Settings > AI > Coding Agents with an (ⓘ) tooltip reading "Requires the Polaris Terminal plugin for your coding agent". Defaults to on.
 2. When enabled and the plugin is present, the composer closes automatically when the CLI agent enters a blocked state and opens when it resumes (once `should_auto_toggle_input` is true for the session).
 3. A new "Auto open composer when a CLI agent session starts" toggle appears below the first setting. Defaults to off.
 4. A new "Auto dismiss composer after prompt submission" toggle appears below the second setting. Defaults to off.
@@ -73,7 +73,7 @@ Figma: none provided
 8. All three settings are only effective when AI is enabled and the coding agent toolbar is enabled.
 
 ## Validation
-- Manual testing: Enable each setting independently and in combination, with and without the Rook plugin, to verify correct auto-show/hide behavior.
+- Manual testing: Enable each setting independently and in combination, with and without the Polaris Terminal plugin, to verify correct auto-show/hide behavior.
 - Unit tests: Verify that `CLIAgentSessionsModel` status transitions trigger the correct open/close calls when settings are enabled.
 - Settings persistence: Verify settings survive app restart and cloud sync.
 

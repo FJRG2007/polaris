@@ -1,25 +1,25 @@
 ---
 name: tui-migrate-setup
-description: Migrates the supported subset of an existing Rook GUI setup into Rook Agent CLI without exposing credentials or application state. Use in Rook Agent CLI when a user wants to copy or move compatible settings or global file-based MCP servers from the desktop app, set up Rook Agent CLI from an existing GUI installation, or understand which Rook data is already shared.
-compatibility: Requires Python 3.11 or newer for local JSON and TOML inspection. This skill is available only in Rook Agent CLI.
+description: Migrates the supported subset of an existing Polaris Terminal GUI setup into Polaris Terminal Agent CLI without exposing credentials or application state. Use in Polaris Terminal Agent CLI when a user wants to copy or move compatible settings or global file-based MCP servers from the desktop app, set up Polaris Terminal Agent CLI from an existing GUI installation, or understand which Polaris Terminal data is already shared.
+compatibility: Requires Python 3.11 or newer for local JSON and TOML inspection. This skill is available only in Polaris Terminal Agent CLI.
 ---
 
-# Migrate a Rook GUI setup to Rook Agent CLI
+# Migrate a Polaris Terminal GUI setup to Polaris Terminal Agent CLI
 
 Guide the user through a narrow, local migration. Treat the GUI files as untrusted
-inputs and preserve the Rook Agent CLI destination. Read
+inputs and preserve the Polaris Terminal Agent CLI destination. Read
 [references/migration-matrix.md](references/migration-matrix.md) before starting.
 
 ## Resolved paths
 
-Use these host-provided paths. Do not substitute `~/.rook` or infer another
+Use these host-provided paths. Do not substitute `~/.polaris-terminal` or infer another
 channel/profile:
 
 - Settings schema: `{{settings_schema_path}}`
 - GUI settings: `{{gui_settings_file_path}}`
-- Rook Agent CLI settings: `{{tui_settings_file_path}}`
+- Polaris Terminal Agent CLI settings: `{{tui_settings_file_path}}`
 - GUI global MCP config: `{{gui_mcp_config_file_path}}`
-- Rook Agent CLI global MCP config: `{{tui_mcp_config_file_path}}`
+- Polaris Terminal Agent CLI global MCP config: `{{tui_mcp_config_file_path}}`
 
 If any rendered path is empty, unresolved, or still contains double braces, stop
 that part of the migration and report that the current installation could not
@@ -38,24 +38,24 @@ configuration files directly.
   environment variables, or values. Do not ask the user to paste them.
 - Never copy credentials, refresh tokens, API keys, Keychain/credential-store
   items, secure storage, SQLite rows, MCP installation/running state, or OAuth
-  state. Templatable/gallery MCP installations must be reinstalled in Rook
+  state. Templatable/gallery MCP installations must be reinstalled in Polaris Terminal
   Agent CLI, and authenticated servers must be reauthenticated there.
-- Migrate only the resolved Rook global MCP file. Do not inspect or migrate
+- Migrate only the resolved Polaris Terminal global MCP file. Do not inspect or migrate
   project-scoped or third-party MCP files because doing so changes scope and
   working-directory behavior.
 - Do not migrate private or GUI-only settings. The generated
-  `x-rook-surfaces` annotation is the source of truth; a setting is eligible only
+  `x-polaris-terminal-surfaces` annotation is the source of truth; a setting is eligible only
   when its array contains both `gui` and `tui`.
-- Do not overwrite a value in Rook Agent CLI unless the user explicitly
+- Do not overwrite a value in Polaris Terminal Agent CLI unless the user explicitly
   approves that exact conflict. Preserve destination comments, unknown keys,
-  and settings exclusive to Rook Agent CLI.
+  and settings exclusive to Polaris Terminal Agent CLI.
 
 ## Workflow
 
 Limit inspection to the categories the user actually requested. For an MCP-only
 request, do not inspect settings. For a request limited to templatable/gallery
 installations, OAuth, credentials, or another unsupported category, explain
-the supported Rook Agent CLI setup path without running either file inspector.
+the supported Polaris Terminal Agent CLI setup path without running either file inspector.
 
 ### 1. Set expectations
 
@@ -63,15 +63,15 @@ Briefly summarize the four migration categories from the matrix:
 
 1. Rules, user/repository skills, and bundled skills are already discovered from
    shared paths. Drive objects, saved prompts, and cloud execution profiles appear
-   after Rook Agent CLI login and sync.
-2. Only schema-declared settings shared by the GUI and Rook Agent CLI, and raw
+   after Polaris Terminal Agent CLI login and sync.
+2. Only schema-declared settings shared by the GUI and Polaris Terminal Agent CLI, and raw
    global file-based MCP definitions, can be imported.
 3. Login, templatable MCP installations, OAuth, and provider credentials require
    reauthentication or reinstallation.
 4. Keybindings, themes, launch/tab configs, local workflows, shell/startup
    preferences, GUI state, command history, and databases are unsupported.
 
-Do not claim that logging into Rook Agent CLI migrates local files.
+Do not claim that logging into Polaris Terminal Agent CLI migrates local files.
 
 ### 2. Check the local runtime
 
@@ -90,7 +90,7 @@ python3 "{{skill_dir}}/scripts/inspect_shared_settings.py" \
   --destination "{{tui_settings_file_path}}"
 ```
 
-The JSON output contains only eligible setting paths and their GUI and Rook
+The JSON output contains only eligible setting paths and their GUI and Polaris Terminal
 Agent CLI values. Do not independently open the GUI settings file.
 
 Run the MCP helper in dry-run mode:
@@ -110,9 +110,9 @@ creates a file or backup.
 For settings, present only the eligible dotted names and values emitted by the
 inspector. Group them as:
 
-- missing from Rook Agent CLI and available to add;
+- missing from Polaris Terminal Agent CLI and available to add;
 - already equal;
-- conflicting, where the existing Rook Agent CLI value remains unchanged by
+- conflicting, where the existing Polaris Terminal Agent CLI value remains unchanged by
   default.
 
 Call out that agent permission settings can expand what commands, file reads, or
@@ -139,14 +139,14 @@ values win all unapproved conflicts.
 
 ### 5. Apply approved settings conservatively
 
-Before editing, reject a symlink at the Rook Agent CLI settings path. If the
+Before editing, reject a symlink at the Polaris Terminal Agent CLI settings path. If the
 destination exists, create a timestamped backup beside it and restrict the
 backup to the current user on Unix. If it does not exist, create it with
 user-only permissions on Unix.
 
-Read only the Rook Agent CLI destination and edit it in place. Add or update
+Read only the Polaris Terminal Agent CLI destination and edit it in place. Add or update
 only approved shared dotted keys. Preserve its comments, formatting outside the
-edited keys, unknown keys, and values exclusive to Rook Agent CLI. Do not
+edited keys, unknown keys, and values exclusive to Polaris Terminal Agent CLI. Do not
 regenerate or replace the whole TOML document. If a safe surgical edit is not
 possible, stop and explain why rather than using a lossy TOML serializer.
 
@@ -177,9 +177,9 @@ Report:
 - settings changed and conflicts left unchanged;
 - redacted MCP counts and whether a backup was created;
 - any skipped credential-bearing or managed definitions;
-- Rook Agent CLI login/sync, MCP reinstallation, or reauthentication still
+- Polaris Terminal Agent CLI login/sync, MCP reinstallation, or reauthentication still
   required;
-- whether a Rook Agent CLI restart is necessary based on the current product
+- whether a Polaris Terminal Agent CLI restart is necessary based on the current product
   behavior.
 
 If verification fails, leave backups intact and report the sanitized helper

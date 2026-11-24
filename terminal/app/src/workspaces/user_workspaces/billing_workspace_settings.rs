@@ -3,8 +3,8 @@
 //! [`crate::workspaces::user_workspaces::team_workspace_settings`] for the workspace-vs-team
 //! two-layer model and the team-scoped policies that layer on top.
 
-use rook_core::features::FeatureFlag;
-use rookui::{AppContext, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::{AppContext, SingletonEntity};
 
 use super::UserWorkspaces;
 use crate::auth::AuthStateProvider;
@@ -62,7 +62,7 @@ impl UserWorkspaces {
             workspace
                 .billing_metadata
                 .tier
-                .rook_ai_policy
+                .pterm_ai_policy
                 .is_none_or(|policy| {
                     policy.is_prompt_suggestions_toggleable
                         || policy.is_next_command_enabled
@@ -74,7 +74,7 @@ impl UserWorkspaces {
 
     pub fn ai_allowed_for_team(team: Option<&Team>) -> bool {
         !team.is_some_and(|team| team.billing_metadata.customer_type == CustomerType::Enterprise)
-            || team.is_some_and(|team| team.billing_metadata.is_rook_plan())
+            || team.is_some_and(|team| team.billing_metadata.is_pterm_plan())
             || ChannelState::channel().is_dogfood()
     }
 
@@ -87,7 +87,7 @@ impl UserWorkspaces {
                 workspace
                     .billing_metadata
                     .tier
-                    .rook_ai_policy
+                    .pterm_ai_policy
                     .is_some_and(|policy| policy.is_prompt_suggestions_toggleable)
             })
     }
@@ -101,7 +101,7 @@ impl UserWorkspaces {
                 workspace
                     .billing_metadata
                     .tier
-                    .rook_ai_policy
+                    .pterm_ai_policy
                     .is_some_and(|policy| policy.is_code_suggestions_toggleable)
             })
     }
@@ -115,7 +115,7 @@ impl UserWorkspaces {
                 workspace
                     .billing_metadata
                     .tier
-                    .rook_ai_policy
+                    .pterm_ai_policy
                     .is_some_and(|policy| policy.is_next_command_enabled)
             })
     }
@@ -129,7 +129,7 @@ impl UserWorkspaces {
                 workspace
                     .billing_metadata
                     .tier
-                    .rook_ai_policy
+                    .pterm_ai_policy
                     .is_some_and(|policy| policy.is_git_operations_ai_enabled)
             })
     }
@@ -146,7 +146,7 @@ impl UserWorkspaces {
                     workspace
                         .billing_metadata
                         .tier
-                        .rook_ai_policy
+                        .pterm_ai_policy
                         .is_some_and(|policy| policy.is_voice_enabled)
                 })
     }

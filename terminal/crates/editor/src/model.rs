@@ -2,9 +2,9 @@ use std::ops::Range;
 
 use itertools::{Either, Itertools};
 use line_ending::LineEnding;
-use rookui_core::clipboard::ClipboardContent;
-use rookui_core::elements::ListIndentLevel;
-use rookui_core::{AppContext, Entity, ModelAsRef, ModelContext, ModelHandle};
+use ptermui_core::clipboard::ClipboardContent;
+use ptermui_core::elements::ListIndentLevel;
+use ptermui_core::{AppContext, Entity, ModelAsRef, ModelContext, ModelHandle};
 use string_offset::{ByteOffset, CharOffset};
 use vec1::{Vec1, vec1};
 

@@ -1,12 +1,12 @@
-use rook_errors::{report_error, report_if_error};
-use rookui::elements::{
+use pterm_errors::{report_error, report_if_error};
+use ptermui::elements::{
     Align, CrossAxisAlignment, Flex, MainAxisSize, MouseStateHandle, ParentElement as _,
 };
-use rookui::fonts::Weight;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::fonts::Weight;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 use settings::Setting as _;
 
 use crate::appearance::Appearance;
@@ -31,9 +31,9 @@ pub enum WasmNUXDialogAction {
     SetWebAndClose,
     /// Closes the dialog and open on the desktop
     OpenNativeAndClose,
-    /// Open the Rook download page
+    /// Open the Polaris Terminal download page
     OpenDownloadDesktopAppLink,
-    /// Open a link to learn more about Rook
+    /// Open a link to learn more about Polaris Terminal
     LearnMore,
 }
 
@@ -42,12 +42,12 @@ pub enum WasmNUXDialogEvent {
 }
 
 /// A dialog that prompts the user to:
-/// * Download Rook if they haven't already
+/// * Download Polaris Terminal if they haven't already
 /// * Explicitly choose between native and web.
 pub struct WasmNUXDialog {
     close_mouse_state: MouseStateHandle,
     confirm_mouse_state: MouseStateHandle,
-    download_rook_mouse_state: MouseStateHandle,
+    download_pterm_mouse_state: MouseStateHandle,
     learn_more_mouse_state: MouseStateHandle,
     requested_download: bool,
 }
@@ -61,7 +61,7 @@ impl WasmNUXDialog {
         Self {
             close_mouse_state: Default::default(),
             confirm_mouse_state: Default::default(),
-            download_rook_mouse_state: Default::default(),
+            download_pterm_mouse_state: Default::default(),
             learn_more_mouse_state: Default::default(),
             requested_download: false,
         }
@@ -76,17 +76,17 @@ impl WasmNUXDialog {
     /// * The user hasn't dismissed the dialog
     ///
     /// If the user dismisses the dialog without choosing a preference, we'll continue to use the default autodetection
-    /// behavior: if Rook is installed, redirect to it; otherwise stay on the web.
+    /// behavior: if Polaris Terminal is installed, redirect to it; otherwise stay on the web.
     pub fn should_display(app: &AppContext) -> bool {
         // Don't show on mobile devices - they can't use the desktop app
-        if rookui::platform::wasm::is_mobile_device() {
+        if ptermui::platform::wasm::is_mobile_device() {
             return false;
         }
 
         // Someone just viewing a shared session or a conversation transcript (e.g. a
         // factory-onboarding link) isn't a prospective new user composing in their own
         // workspace, so the desktop-download prompt isn't relevant to them. The "Open in
-        // Rook" header button remains available as the unobtrusive path to the app.
+        // Polaris Terminal" header button remains available as the unobtrusive path to the app.
         if matches!(
             web_intent_parser::current_web_intent(),
             Some(WebIntent::SessionView(_)) | Some(WebIntent::ConversationView(_))
@@ -137,8 +137,8 @@ impl View for WasmNUXDialog {
         let appearance = Appearance::handle(app).as_ref(app);
 
         // There are two general cases with the dialog:
-        // 1. The user doesn't have Rook installed - treat them as a potential new user and encourage downloading Rook.
-        // 2. The user has Rook installed, but clicked through to the web - ask if they want to always default to web.
+        // 1. The user doesn't have Polaris Terminal installed - treat them as a potential new user and encourage downloading Polaris Terminal.
+        // 2. The user has Polaris Terminal installed, but clicked through to the web - ask if they want to always default to web.
         // As a sub-state of case 1, if the user clicks the download button, we provide an intent into the app.
 
         let close_button = appearance
@@ -164,18 +164,18 @@ impl View for WasmNUXDialog {
 
         let dialog = if self.requested_download {
             Dialog::new(
-                "Open in Rook Desktop?".to_string(),
+                "Open in Polaris Terminal Desktop?".to_string(),
                 Some("Future links will automatically open on desktop.".to_string()),
                 dialog_styles,
             )
             .with_bottom_row_child(Self::render_dialog_button(
-                "Open in Rook",
+                "Open in Polaris Terminal",
                 WasmNUXDialogAction::OpenNativeAndClose,
                 &self.confirm_mouse_state,
                 appearance,
             ))
         } else if app_install_detected == &UserAppInstallStatus::NotDetected {
-            Dialog::new("Download Rook Desktop?".to_string(), None, dialog_styles)
+            Dialog::new("Download Polaris Terminal Desktop?".to_string(), None, dialog_styles)
                 .with_child(
                     Flex::column()
                         .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
@@ -183,7 +183,7 @@ impl View for WasmNUXDialog {
                         .with_child(
                             appearance
                                 .ui_builder()
-                                .span("Rook is the intelligent terminal with AI and your dev team's knowledge built-in.")
+                                .span("Polaris Terminal is the intelligent terminal with AI and your dev team's knowledge built-in.")
                                 .with_style(UiComponentStyles {
                                     font_weight: Some(Weight::Thin),
                                     font_color: Some(
@@ -223,14 +223,14 @@ impl View for WasmNUXDialog {
                 .with_bottom_row_child(Self::render_dialog_button(
                     "Download",
                     WasmNUXDialogAction::OpenDownloadDesktopAppLink,
-                    &self.download_rook_mouse_state,
+                    &self.download_pterm_mouse_state,
                     appearance,
                 ))
         } else {
             let object_kind = match web_intent_parser::current_web_intent() {
-                Some(WebIntent::DriveObject(_)) => "Rook Drive objects",
+                Some(WebIntent::DriveObject(_)) => "Polaris Terminal Drive objects",
                 Some(WebIntent::SessionView(_)) => "shared sessions",
-                _ => "Rook links",
+                _ => "Polaris Terminal links",
             };
 
             Dialog::new(
@@ -272,14 +272,14 @@ impl TypedActionView for WasmNUXDialog {
                 ctx.emit(WasmNUXDialogEvent::Close);
             }
             WasmNUXDialogAction::OpenNativeAndClose => {
-                // We intentionally do not set the native preference here, in case the user hasn't actually installed Rook.
-                // If they have, on subsequent loads, we'll detect that Rook is installed and redirect to the desktop.
+                // We intentionally do not set the native preference here, in case the user hasn't actually installed Polaris Terminal.
+                // If they have, on subsequent loads, we'll detect that Polaris Terminal is installed and redirect to the desktop.
                 ctx.emit(WasmNUXDialogEvent::Close);
 
                 if let Some(url) = web_intent_parser::parse_web_intent_from_current_url() {
                     // Signals to the react app to open the native app.
                     crate::platform::wasm::emit_event(
-                        crate::platform::wasm::RookEvent::OpenOnNative {
+                        crate::platform::wasm::PtermEvent::OpenOnNative {
                             url: String::from(url.as_str()),
                         },
                     );
@@ -288,7 +288,7 @@ impl TypedActionView for WasmNUXDialog {
                 }
             }
             WasmNUXDialogAction::OpenDownloadDesktopAppLink => {
-                ctx.open_url("https://app.rook.dev/get_rook");
+                ctx.open_url("https://app.rook.dev/get_pterm");
                 self.requested_download = true;
                 ctx.notify();
             }

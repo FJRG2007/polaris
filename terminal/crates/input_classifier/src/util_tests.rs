@@ -1,11 +1,11 @@
-use rook_completer::ParsedTokensSnapshot;
-use rook_completer::util::parse_current_commands_and_tokens;
+use pterm_completer::ParsedTokensSnapshot;
+use pterm_completer::util::parse_current_commands_and_tokens;
 
 use super::*;
 use crate::test_utils::CompletionContext;
 
 async fn mock_parsed_input_token(buffer_text: String) -> ParsedTokensSnapshot {
-    rook_features::mark_initialized();
+    pterm_features::mark_initialized();
     let completion_context = CompletionContext::new();
     parse_current_commands_and_tokens(buffer_text, &completion_context).await
 }
@@ -37,7 +37,7 @@ async fn one_off_keyword_short_circuits() {
     clear_all_token_descriptions(&mut token);
     assert!(is_likely_shell_command(&token, word_tokens_count).await);
 
-    let mut token = mock_parsed_input_token("rook agent run".to_string()).await;
+    let mut token = mock_parsed_input_token("polaris-terminal agent run".to_string()).await;
     let word_tokens_count = token.parsed_tokens.len();
     clear_all_token_descriptions(&mut token);
     assert!(is_likely_shell_command(&token, word_tokens_count).await);

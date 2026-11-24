@@ -1,9 +1,9 @@
-use rookui::AppContext;
+use ptermui::AppContext;
 
 use super::{CloudObject, Space};
 use crate::drive::CloudObjectTypeAndId;
 use crate::drive::folders::CloudFolder;
-use crate::drive::items::RookDriveItemId;
+use crate::drive::items::PtermDriveItemId;
 use crate::ui_components::breadcrumb::Breadcrumb;
 
 // Encapsulates an object that can contain other objects, and keeps
@@ -49,10 +49,10 @@ pub enum ContainingObjectKind {
 }
 
 impl ContainingObjectKind {
-    pub fn into_item_id(self) -> RookDriveItemId {
+    pub fn into_item_id(self) -> PtermDriveItemId {
         match self {
-            ContainingObjectKind::Space(space) => RookDriveItemId::Space(space),
-            ContainingObjectKind::Object(object) => RookDriveItemId::Object(object),
+            ContainingObjectKind::Space(space) => PtermDriveItemId::Space(space),
+            ContainingObjectKind::Object(object) => PtermDriveItemId::Object(object),
         }
     }
 }

@@ -12,11 +12,11 @@ use futures_util::stream::AbortHandle;
 use futures_util::{SinkExt, StreamExt};
 use instant::Instant;
 use parking_lot::FairMutex;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rook_server_client::iap::IapManager;
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::{
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use pterm_server_client::iap::IapManager;
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::{
     Entity, ModelContext, ModelHandle, RequestState, RetryOption, SingletonEntity, WeakViewHandle,
 };
 use session_sharing_protocol::common::{
@@ -225,7 +225,7 @@ impl Network {
         let session_id = SessionId::new();
         let viewer_id = ParticipantId::new();
         let viewer_firebase_uid = UserUid::new("mock_firebase_uid");
-        let active_prompt = ActivePrompt::WarpPrompt("test rook prompt".to_owned());
+        let active_prompt = ActivePrompt::WarpPrompt("test polaris-terminal prompt".to_owned());
 
         let model = Network {
             session_id,

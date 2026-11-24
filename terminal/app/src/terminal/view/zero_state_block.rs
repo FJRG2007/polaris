@@ -1,16 +1,16 @@
-use rook_core::ui::Icon;
-use rook_errors::report_if_error;
-use rookui::elements::{
+use pterm_core::ui::Icon;
+use pterm_errors::report_if_error;
+use ptermui::elements::{
     ChildAnchor, Container, CrossAxisAlignment, Flex, MainAxisSize, OffsetPositioning,
     ParentAnchor, ParentElement, ParentOffsetBounds, Shrinkable, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::Keystroke;
-use rookui::prelude::{ConstrainedBox, Cursor, Empty, Hoverable, MouseStateHandle, vec2f};
-use rookui::scene::{Border, CornerRadius, Radius};
-use rookui::ui_components::checkbox::Checkbox;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::Keystroke;
+use ptermui::prelude::{ConstrainedBox, Cursor, Empty, Hoverable, MouseStateHandle, vec2f};
+use ptermui::scene::{Border, CornerRadius, Radius};
+use ptermui::ui_components::checkbox::Checkbox;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 use settings::Setting;
@@ -147,8 +147,8 @@ impl View for TerminalViewZeroStateBlock {
             .with_child(
                 Container::new(
                     ConstrainedBox::new(
-                        Icon::Rook
-                            .to_rookui_icon(theme.main_text_color(theme.background()))
+                        Icon::Pterm
+                            .to_ptermui_icon(theme.main_text_color(theme.background()))
                             .finish(),
                     )
                     .with_height(title_font_size)

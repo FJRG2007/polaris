@@ -7,20 +7,20 @@ use itertools::Itertools;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rook_graphql::billing::AddonCreditsOption;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use pterm_graphql::billing::AddonCreditsOption;
+use ptermui::elements::{
     Align, Border, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Expanded, Flex, FormattedTextElement, HighlightedHyperlink, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, ParentElement, Radius, Shrinkable, Text, Wrap,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::prelude::ChildView;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::prelude::ChildView;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, UpdateView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -466,7 +466,7 @@ impl BillingAndUsagePageV2View {
                     self.show_toast(CHECKOUT_PENDING_MESSAGE, ToastFlavor::Default, ctx);
                     // Credits are granted via webhook once checkout completes;
                     // `on_page_selected` refreshes billing data when the user
-                    // returns (e.g. via the confirmation page's Open Rook link).
+                    // returns (e.g. via the confirmation page's Open Polaris Terminal link).
                 }
             }
             UserWorkspacesEvent::PurchaseAddonCreditsRejected(err) => {
@@ -652,7 +652,7 @@ impl BillingAndUsagePageV2View {
                                 TextAndIcon::new(
                                     TextAndIconAlignment::IconFirst,
                                     "Manage billing",
-                                    Icon::CoinsStacked.to_rookui_icon(fg_color),
+                                    Icon::CoinsStacked.to_ptermui_icon(fg_color),
                                     MainAxisSize::Min,
                                     MainAxisAlignment::Center,
                                     vec2f(14., 14.),
@@ -700,7 +700,7 @@ impl BillingAndUsagePageV2View {
                                 TextAndIcon::new(
                                     TextAndIconAlignment::IconFirst,
                                     "Open admin panel",
-                                    Icon::Users.to_rookui_icon(fg_color),
+                                    Icon::Users.to_ptermui_icon(fg_color),
                                     MainAxisSize::Min,
                                     MainAxisAlignment::Center,
                                     vec2f(14., 14.),
@@ -744,7 +744,7 @@ impl BillingAndUsagePageV2View {
                                 TextAndIconAlignment::IconFirst,
                                 "Compare plans",
                                 Icon::CoinsStacked
-                                    .to_rookui_icon(appearance.theme().active_ui_text_color()),
+                                    .to_ptermui_icon(appearance.theme().active_ui_text_color()),
                                 MainAxisSize::Min,
                                 MainAxisAlignment::Center,
                                 vec2f(14., 14.),
@@ -786,9 +786,9 @@ impl BillingAndUsagePageV2View {
         let theme = appearance.theme();
         let icon_color = theme.sub_text_color(theme.background());
         let mouse_state = self.plan_mouse_states.refresh_button.clone();
-        rookui::elements::Hoverable::new(mouse_state, move |_| {
+        ptermui::elements::Hoverable::new(mouse_state, move |_| {
             Container::new(
-                ConstrainedBox::new(Icon::Refresh.to_rookui_icon(icon_color).finish())
+                ConstrainedBox::new(Icon::Refresh.to_ptermui_icon(icon_color).finish())
                     .with_width(16.)
                     .with_height(16.)
                     .finish(),
@@ -796,7 +796,7 @@ impl BillingAndUsagePageV2View {
             .with_uniform_padding(2.)
             .finish()
         })
-        .with_cursor(rookui::platform::Cursor::PointingHand)
+        .with_cursor(ptermui::platform::Cursor::PointingHand)
         .on_click(|ctx, _, _| {
             ctx.dispatch_typed_action(BillingAndUsagePageAction::RefreshWorkspaceData);
         })
@@ -1273,11 +1273,11 @@ impl BillingAndUsagePageV2View {
                         option.price_usd_cents_with_premium(premium_bps) as f64 / 100.0
                     );
                     format!(
-                        "Your admin has enabled auto-reload for add-on credits. When your team's add-on credit balance runs low, Rook will automatically purchase {credits} credits for {price} and add them to your team's shared pool."
+                        "Your admin has enabled auto-reload for add-on credits. When your team's add-on credit balance runs low, Polaris Terminal will automatically purchase {credits} credits for {price} and add them to your team's shared pool."
                     )
                 }
                 None => {
-                    "Your admin has enabled auto-reload for add-on credits. When your team's add-on credit balance runs low, Rook will automatically purchase add-on credits and add them to your team's shared pool.".to_string()
+                    "Your admin has enabled auto-reload for add-on credits. When your team's add-on credit balance runs low, Polaris Terminal will automatically purchase add-on credits and add them to your team's shared pool.".to_string()
                 }
             };
             return AddonCreditsPanelState::AutoreloadNonAdmin {
@@ -1323,8 +1323,8 @@ impl BillingAndUsagePageV2View {
                 .with_hyperlink_font_color(theme.accent().into_solid())
                 .register_default_click_handlers_with_action_support(
                     |lens, event, ctx| match lens {
-                        rookui::elements::HyperlinkLens::Url(u) => ctx.open_url(u),
-                        rookui::elements::HyperlinkLens::Action(a) => {
+                        ptermui::elements::HyperlinkLens::Url(u) => ctx.open_url(u),
+                        ptermui::elements::HyperlinkLens::Action(a) => {
                             if let Some(act) =
                                 a.as_any().downcast_ref::<BillingAndUsagePageAction>()
                             {
@@ -1749,7 +1749,7 @@ impl BillingAndUsagePageV2View {
         let theme = appearance.theme();
         let icon = ConstrainedBox::new(
             Icon::AlertTriangle
-                .to_rookui_icon(theme.ui_error_color().into())
+                .to_ptermui_icon(theme.ui_error_color().into())
                 .finish(),
         )
         .with_height(16.)
@@ -1939,7 +1939,7 @@ impl BillingAndUsagePageV2View {
                     Container::new(
                         ConstrainedBox::new(
                             Icon::Conversation
-                                .to_rookui_icon(
+                                .to_ptermui_icon(
                                     blended_colors::text_sub(
                                         appearance.theme(),
                                         appearance.theme().surface_1(),
@@ -2260,7 +2260,7 @@ impl TypedActionView for BillingAndUsagePageV2View {
             BillingAndUsagePageAction::NavigateToByokSettings => {
                 ctx.dispatch_typed_action_deferred(WorkspaceAction::ShowSettingsPageWithSearch {
                     search_query: "api".to_string(),
-                    section: Some(SettingsSection::RookAgent),
+                    section: Some(SettingsSection::PtermAgent),
                 });
             }
         }

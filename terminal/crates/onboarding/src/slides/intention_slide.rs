@@ -1,19 +1,19 @@
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rookui_core::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui_core::elements::{
     Border, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Flex, FormattedTextElement, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     ParentElement, Radius,
 };
-use rookui_core::fonts::Weight;
-use rookui_core::keymap::Keystroke;
-use rookui_core::platform::Cursor;
-use rookui_core::prelude::Align;
-use rookui_core::text_layout::TextAlignment;
-use rookui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
-use rookui_core::{
+use ptermui_core::fonts::Weight;
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::platform::Cursor;
+use ptermui_core::prelude::Align;
+use ptermui_core::text_layout::TextAlignment;
+use ptermui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui_core::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
     ViewContext,
 };
@@ -74,14 +74,14 @@ impl IntentionSlide {
         let theme = appearance.theme();
 
         let logo_fill = internal_colors::fg_overlay_4(theme);
-        let logo = ConstrainedBox::new(Icon::RookLogoLight.to_rookui_icon(logo_fill).finish())
+        let logo = ConstrainedBox::new(Icon::PtermLogoLight.to_ptermui_icon(logo_fill).finish())
             .with_width(64.)
             .with_height(64.)
             .finish();
 
         let title = appearance
             .ui_builder()
-            .paragraph("Welcome to Rook")
+            .paragraph("Welcome to Polaris Terminal")
             .with_style(UiComponentStyles {
                 font_size: Some(36.),
                 font_weight: Some(Weight::Medium),
@@ -217,7 +217,7 @@ impl IntentionSlide {
                 .iter()
                 .enumerate()
             {
-                let el = ConstrainedBox::new(icon.to_rookui_icon(icon_fill).finish())
+                let el = ConstrainedBox::new(icon.to_ptermui_icon(icon_fill).finish())
                     .with_width(16.)
                     .with_height(16.)
                     .finish();
@@ -261,7 +261,7 @@ impl IntentionSlide {
                 .with_main_axis_size(MainAxisSize::Min)
                 .with_cross_axis_alignment(CrossAxisAlignment::Start);
             for &item in items {
-                let icon_el = ConstrainedBox::new(Icon::Check.to_rookui_icon(check_fill).finish())
+                let icon_el = ConstrainedBox::new(Icon::Check.to_ptermui_icon(check_fill).finish())
                     .with_width(16.)
                     .with_height(16.)
                     .finish();

@@ -10,7 +10,7 @@ We are reshaping the Cloud Mode composing UI to match the new Figma design. Toda
 2. The editor/input box.
 3. A separate `AgentInputFooter` below the input box containing the environment selector, mic/file/voice buttons, chips, model/profile selector, etc.
 
-V2 changes the layout: a new **top row above the input box** that contains a host selector ("Rook"), the restyled harness selector ("Oz"), and (out of scope for this PR) an MCP-config button; and a **taller input box** whose **control footer is rendered inside the same rounded container**, holding the environment selector, voice button, image button, and profile/model selector. The legacy `AgentInputFooter` is not rendered in V2.
+V2 changes the layout: a new **top row above the input box** that contains a host selector ("Polaris Terminal"), the restyled harness selector ("Oz"), and (out of scope for this PR) an MCP-config button; and a **taller input box** whose **control footer is rendered inside the same rounded container**, holding the environment selector, voice button, image button, and profile/model selector. The legacy `AgentInputFooter` is not rendered in V2.
 
 This is gated behind a new feature flag `CloudModeInputV2`. When the flag is off, V1 behavior is unchanged.
 
@@ -22,9 +22,9 @@ This is gated behind a new feature flag `CloudModeInputV2`. When the flag is off
 - `app/src/ai/blocklist/agent_view/agent_input_footer/environment_selector.rs` — `EnvironmentSelector`. Already matches V2's chip styling (`Icon::Globe4` + `AgentInputButtonTheme`). Reused as-is.
 - `app/src/ai/blocklist/agent_view/agent_input_footer/mod.rs` (183-757, 2326-2398) — `AgentInputFooter` owns the mic, file/image, profile/model selector views and the theme structs. V2 reuses those view handles via accessors rather than duplicating construction/event wiring.
 - `app/src/terminal/input.rs` (1598-1600, 2140-2159, 3173-3175, 13462-13529) — where `AgentInputFooter` and `HarnessSelector` are constructed on `Input`, and where `render_input_box` lives. V2 adds a new `cloud_mode_input_v2` field on `Input`.
-- `crates/rook_features/src/lib.rs` — `FeatureFlag` enum + `DOGFOOD_FLAGS`.
-- `crates/rook_core/src/ui/theme/color.rs` (485-560) — `internal_colors::{neutral_2, neutral_3, fg_overlay_1, text_sub, ...}` used for V2 theme tokens.
-- `crates/rook_core/src/ui/icons.rs` — `Icon::{Globe4, GitBranch, Microphone, Image, OzCloud, ChevronDown}` already exist. No new icons for this PR.
+- `crates/pterm_features/src/lib.rs` — `FeatureFlag` enum + `DOGFOOD_FLAGS`.
+- `crates/pterm_core/src/ui/theme/color.rs` (485-560) — `internal_colors::{neutral_2, neutral_3, fg_overlay_1, text_sub, ...}` used for V2 theme tokens.
+- `crates/pterm_core/src/ui/icons.rs` — `Icon::{Globe4, GitBranch, Microphone, Image, OzCloud, ChevronDown}` already exist. No new icons for this PR.
 
 ### Figma → theme token mapping
 
@@ -42,18 +42,18 @@ No hex literals in client code.
 
 ### 1. Feature flag
 
-- `crates/rook_features/src/lib.rs`: add `FeatureFlag::CloudModeInputV2`; add to `DOGFOOD_FLAGS`.
-- `app/Cargo.toml`: add `cloud_mode_input_v2 = ["cloud_mode"]` and include it in the default Rook `[features]` list.
+- `crates/pterm_features/src/lib.rs`: add `FeatureFlag::CloudModeInputV2`; add to `DOGFOOD_FLAGS`.
+- `app/Cargo.toml`: add `cloud_mode_input_v2 = ["cloud_mode"]` and include it in the default Polaris Terminal `[features]` list.
 - `app/src/lib.rs`: wire `#[cfg(feature = "cloud_mode_input_v2")] FeatureFlag::CloudModeInputV2` into the compile-time flag list.
 
 Per `add-feature-flag` skill.
 
 ### 2. `HostSelector` (new view)
 
-New file `app/src/terminal/view/ambient_agent/host_selector.rs`. Mirrors `HarnessSelector`'s shape (ActionButton + generic `Menu<A>` positioned via `MenuPositioningProvider`), but its menu is currently stubbed with a single "Rook" entry.
+New file `app/src/terminal/view/ambient_agent/host_selector.rs`. Mirrors `HarnessSelector`'s shape (ActionButton + generic `Menu<A>` positioned via `MenuPositioningProvider`), but its menu is currently stubbed with a single "Polaris Terminal" entry.
 
 ```rust path=null start=null
-pub enum Host { Rook }
+pub enum Host { Polaris Terminal }
 
 pub enum HostSelectorAction { ToggleMenu, SelectHost(Host) }
 pub enum HostSelectorEvent   { MenuVisibilityChanged { open: bool } }

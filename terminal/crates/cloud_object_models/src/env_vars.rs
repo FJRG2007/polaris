@@ -2,7 +2,7 @@ use cloud_objects::cloud_object::{
     GenericCloudObject, GenericServerObject, GenericStringModel, JsonObjectType,
 };
 use cloud_objects::ids::GenericStringObjectId;
-use rook_util::path::ShellFamily;
+use pterm_util::path::ShellFamily;
 use serde::{Deserialize, Serialize};
 
 use crate::{JsonModel, JsonSerializer};

@@ -15,11 +15,11 @@
 use std::rc::Rc;
 use std::sync::OnceLock;
 
-use regex::Regex;
 #[cfg(not(target_family = "wasm"))]
-use rook_cli::scope::{ObjectScope, TeamSelection};
-use rook_core::features::FeatureFlag;
-use rookui::{AppContext, Entity, SingletonEntity, ViewContext, WeakViewHandle, WindowId};
+use pterm_cli::scope::{ObjectScope, TeamSelection};
+use pterm_core::features::FeatureFlag;
+use ptermui::{AppContext, Entity, SingletonEntity, ViewContext, WeakViewHandle, WindowId};
+use regex::Regex;
 use settings::Setting;
 
 #[cfg(not(target_family = "wasm"))]
@@ -441,8 +441,8 @@ impl UserWorkspaces {
     ) -> AdminEnablementSetting {
         self.scoped_or_workspace_setting(
             scope,
-            |team| team.settings.enable_rook_attribution.clone(),
-            |workspace| workspace.settings.enable_rook_attribution.clone(),
+            |team| team.settings.enable_pterm_attribution.clone(),
+            |workspace| workspace.settings.enable_pterm_attribution.clone(),
             AdminEnablementSetting::default(),
         )
     }

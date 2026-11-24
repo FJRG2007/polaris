@@ -2,18 +2,18 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::time::Duration;
 
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::color::internal_colors;
-use rookui_core::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui_core::elements::{
     ChildAnchor, Container, CrossAxisAlignment, Flex, Highlight, Hoverable, MouseStateHandle,
     OffsetPositioning, ParentElement, PositionedElementAnchor, PositionedElementOffsetBounds,
     SavePosition, Stack, Text,
 };
-use rookui_core::geometry::vector::vec2f;
-use rookui_core::platform::Cursor;
-use rookui_core::text_layout::TextStyle;
-use rookui_core::ui_components::components::UiComponent;
-use rookui_core::{
+use ptermui_core::geometry::vector::vec2f;
+use ptermui_core::platform::Cursor;
+use ptermui_core::text_layout::TextStyle;
+use ptermui_core::ui_components::components::UiComponent;
+use ptermui_core::{
     AfterLayoutContext, AppContext, Element, LayoutContext, SingletonEntity, SizeConstraint,
     WeakViewHandle,
 };
@@ -164,8 +164,8 @@ impl RenderableBlock for RenderableHiddenSection {
     fn dispatch_event(
         &mut self,
         _model: &RenderState,
-        event: &rookui_core::event::DispatchedEvent,
-        ctx: &mut rookui_core::EventContext,
+        event: &ptermui_core::event::DispatchedEvent,
+        ctx: &mut ptermui_core::EventContext,
         app: &AppContext,
     ) -> bool {
         self.element.dispatch_event(event, ctx, app)

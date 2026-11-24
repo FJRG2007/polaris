@@ -1,4 +1,4 @@
-use rookui::{AppContext, EntityId, SingletonEntity};
+use ptermui::{AppContext, EntityId, SingletonEntity};
 
 use crate::input_suggestions::HistoryInputSuggestion;
 use crate::terminal::history::{History, LinkedWorkflowData, UpArrowHistoryConfig};

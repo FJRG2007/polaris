@@ -10,7 +10,7 @@ use std::ops::RangeInclusive;
 use std::sync::{Arc, Mutex};
 
 use event_listener::Event;
-use rookui::EntityId;
+use ptermui::EntityId;
 
 use super::BlockInfo;
 use crate::terminal::block_list_element::GridType;

@@ -5,13 +5,13 @@ use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use pterm_core::features::FeatureFlag;
+use ptermui_core::assets::asset_cache::{AssetCache, AssetSource, AssetState};
+use ptermui_core::fonts::{Properties, Style, Weight};
+use ptermui_core::image_cache::ImageType;
+use ptermui_core::text_layout::{StyleAndFont, TextStyle};
+use ptermui_core::{App, SingletonEntity};
 use rangemap::RangeSet;
-use rook_core::features::FeatureFlag;
-use rookui_core::assets::asset_cache::{AssetCache, AssetSource, AssetState};
-use rookui_core::fonts::{Properties, Style, Weight};
-use rookui_core::image_cache::ImageType;
-use rookui_core::text_layout::{StyleAndFont, TextStyle};
-use rookui_core::{App, SingletonEntity};
 use string_offset::CharOffset;
 
 use super::{
@@ -721,7 +721,7 @@ fn unique_markdown_image_path() -> PathBuf {
         .expect("system time should be after the Unix epoch")
         .as_nanos();
     std::env::temp_dir().join(format!(
-        "rook_editor_markdown_image_{}_{nonce}.png",
+        "pterm_editor_markdown_image_{}_{nonce}.png",
         std::process::id()
     ))
 }

@@ -2,7 +2,7 @@ import type { Plugin } from "@opencode-ai/plugin"
 import type { Event, Permission } from "@opencode-ai/sdk"
 
 import { buildPayload } from "./payload"
-import { rookNotify } from "./notify"
+import { ptermNotify } from "./notify"
 import { truncate, extractTextFromParts } from "./utils"
 
 // Must be kept in sync with the "version" field in package.json.
@@ -10,7 +10,7 @@ import { truncate, extractTextFromParts } from "./utils"
 // treats every named export as a plugin function and throws if any export
 // is not a function ("Plugin export is not a function").
 const PLUGIN_VERSION = "0.1.7"
-const NOTIFICATION_TITLE = "rook://cli-agent"
+const NOTIFICATION_TITLE = "polaris-terminal://cli-agent"
 
 function buildPermissionPayload(perm: Permission, cwd: string) {
     const toolName = perm.type || "unknown"
@@ -40,21 +40,21 @@ function buildPermissionPayload(perm: Permission, cwd: string) {
     })
 }
 
-export const RookPlugin: Plugin = async ({ client, directory }) => {
+export const PtermPlugin: Plugin = async ({ client, directory }) => {
     // Fire-and-forget the init log: awaiting client.app.log here can deadlock
     // opencode's plugin loader on some versions (e.g. 1.4.8).
-    if (!process.env.ROOK_CLI_AGENT_PROTOCOL_VERSION) {
+    if (!process.env.POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION) {
         client.app
             .log({
                 body: {
-                    service: "opencode-rook",
+                    service: "opencode-polaris-terminal",
                     level: "warn",
                     message:
-                        "⚠️ Detected unsupported Rook version. Please update Rook to use this plugin.",
+                        "⚠️ Detected unsupported Polaris Terminal version. Please update Polaris Terminal to use this plugin.",
                 },
             })
             .catch((err) => {
-                console.error("[opencode-rook] failed to emit init log:", err)
+                console.error("[opencode-polaris-terminal] failed to emit init log:", err)
             })
         return {}
     }
@@ -62,13 +62,13 @@ export const RookPlugin: Plugin = async ({ client, directory }) => {
     client.app
         .log({
             body: {
-                service: "opencode-rook",
+                service: "opencode-polaris-terminal",
                 level: "info",
-                message: "Rook plugin initialized",
+                message: "Polaris Terminal plugin initialized",
             },
         })
         .catch((err) => {
-            console.error("[opencode-rook] failed to emit init log:", err)
+            console.error("[opencode-polaris-terminal] failed to emit init log:", err)
         })
 
     const subagentCache = new Map<string, boolean>()
@@ -89,9 +89,9 @@ export const RookPlugin: Plugin = async ({ client, directory }) => {
         }
     }
 
-    async function maybeRookNotify(sessionId: string | undefined, body: string): Promise<void> {
+    async function maybePtermNotify(sessionId: string | undefined, body: string): Promise<void> {
         if (await isSubagentSession(sessionId)) return
-        rookNotify(NOTIFICATION_TITLE, body)
+        ptermNotify(NOTIFICATION_TITLE, body)
     }
 
     return {
@@ -105,7 +105,7 @@ export const RookPlugin: Plugin = async ({ client, directory }) => {
                     const body = buildPayload("session_start", info.id, cwd, {
                         plugin_version: PLUGIN_VERSION,
                     })
-                    await maybeRookNotify(info.id, body)
+                    await maybePtermNotify(info.id, body)
                     return
                 }
 
@@ -151,12 +151,12 @@ export const RookPlugin: Plugin = async ({ client, directory }) => {
                         response: truncate(response, 200),
                         transcript_path: "",
                     })
-                    await maybeRookNotify(sessionId, body)
+                    await maybePtermNotify(sessionId, body)
                     return
                 }
 
                 case "permission.updated": {
-                    await maybeRookNotify(
+                    await maybePtermNotify(
                         event.properties.sessionID,
                         buildPermissionPayload(event.properties, cwd),
                     )
@@ -167,7 +167,7 @@ export const RookPlugin: Plugin = async ({ client, directory }) => {
                     const { sessionID, response } = event.properties
                     if (response === "reject") return
                     const body = buildPayload("permission_replied", sessionID, cwd)
-                    await maybeRookNotify(sessionID, body)
+                    await maybePtermNotify(sessionID, body)
                     return
                 }
 
@@ -175,7 +175,7 @@ export const RookPlugin: Plugin = async ({ client, directory }) => {
                     // permission.asked is listed in the opencode docs but has no SDK type.
                     // Handle it with the same logic as permission.updated.
                     if ((event as any).type === "permission.asked") {
-                        await maybeRookNotify(
+                        await maybePtermNotify(
                             (event as any).properties?.sessionID,
                             buildPermissionPayload((event as any).properties, cwd),
                         )
@@ -197,11 +197,11 @@ export const RookPlugin: Plugin = async ({ client, directory }) => {
             const body = buildPayload("prompt_submit", input.sessionID, cwd, {
                 query: truncate(queryText, 200),
             })
-            await maybeRookNotify(input.sessionID, body)
+            await maybePtermNotify(input.sessionID, body)
         },
 
         // Fires before a tool executes — used to detect the built-in
-        // "question" tool so Rook can notify the user that input is needed.
+        // "question" tool so Polaris Terminal can notify the user that input is needed.
         "tool.execute.before": async (input) => {
             if (input.tool !== "question") return
 
@@ -209,7 +209,7 @@ export const RookPlugin: Plugin = async ({ client, directory }) => {
             const body = buildPayload("question_asked", input.sessionID, cwd, {
                 tool_name: input.tool,
             })
-            await maybeRookNotify(input.sessionID, body)
+            await maybePtermNotify(input.sessionID, body)
         },
 
         // Tool completion — fires after every tool call
@@ -221,7 +221,7 @@ export const RookPlugin: Plugin = async ({ client, directory }) => {
             const body = buildPayload("tool_complete", sessionId, cwd, {
                 tool_name: toolName,
             })
-            await maybeRookNotify(sessionId, body)
+            await maybePtermNotify(sessionId, body)
         },
     }
 }

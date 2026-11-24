@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use rookui::elements::{MouseStateHandle, PartialClickableElement};
-use rookui::platform::Cursor;
+use ptermui::elements::{MouseStateHandle, PartialClickableElement};
+use ptermui::platform::Cursor;
 pub use secret_redaction::{
     SECRET_REDACTION_REPLACEMENT_CHARACTER, find_secrets_in_text, find_secrets_in_text_with_levels,
 };

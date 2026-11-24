@@ -6,11 +6,11 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use pathfinder_color::ColorU;
-use rook_core::ui::Icon;
-use rookui::EventContext;
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::MouseStateHandle;
-use rookui::keymap::Keystroke;
+use pterm_core::ui::Icon;
+use ptermui::EventContext;
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::MouseStateHandle;
+use ptermui::keymap::Keystroke;
 /// A trait for types that can produce a message based on some contextual arguments.
 ///
 /// The generic `Args` parameter allows each call site to define its own

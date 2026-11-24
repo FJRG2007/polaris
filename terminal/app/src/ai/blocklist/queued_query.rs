@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rookui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
+use ptermui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
 use uuid::Uuid;
 
 use crate::ai::agent::conversation::AIConversationId;
@@ -30,7 +30,7 @@ pub enum QueuedQueryOrigin {
     InitialCloudMode,
     /// Filed via the `/queue <prompt>` slash command.
     QueueSlashCommand,
-    /// Filed via the auto-queue toggle in the rooking indicator.
+    /// Filed via the auto-queue toggle in the pterming indicator.
     AutoQueueToggle,
     /// Filed because auto-queue was in effect during an agent-requested long-running command.
     LrcAutoQueue,
@@ -188,7 +188,7 @@ pub struct QueuedQueryModel {
     /// Cached value of the `AISettings::default_prompt_submission_mode` setting,
     /// refreshed by an `AISettingsChangedEvent::DefaultPromptSubmissionMode`
     /// subscription. Used as the fallback when a conversation has no explicit
-    /// per-conversation override. Caching keeps the rooking-indicator render
+    /// per-conversation override. Caching keeps the pterming-indicator render
     /// path doing only a hashmap lookup plus a comparison.
     default_mode: PromptSubmissionMode,
 }

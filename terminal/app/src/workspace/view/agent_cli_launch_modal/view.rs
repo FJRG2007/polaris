@@ -1,15 +1,15 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::Fill;
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::{
     Align, CacheOption, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Empty, Expanded, Flex, Highlight, Image, MainAxisSize, OffsetPositioning,
     ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -71,19 +71,19 @@ const FEATURE_ITEMS: &[FeatureItem] = &[
     FeatureItem {
         icon: Icon::LayoutAlt01,
         label: "What's new:",
-        title: "Use the Rook Agent anywhere",
-        description: "Rook's state of the art agent is now available in any terminal through the CLI.",
+        title: "Use the Polaris Terminal Agent anywhere",
+        description: "Polaris Terminal's state of the art agent is now available in any terminal through the CLI.",
     },
     FeatureItem {
         icon: Icon::Inbox,
         label: "What's special:",
         title: "Built-in terminal multiplexer",
-        description: "Each Rook Agent creates its own PTY, enabling better behavior for REPLS, ssh, directory switching, and more.",
+        description: "Each Polaris Terminal Agent creates its own PTY, enabling better behavior for REPLS, ssh, directory switching, and more.",
     },
 ];
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",
@@ -230,7 +230,7 @@ impl AgentCliLaunchModal {
 
     fn render_title(appearance: &Appearance) -> Box<dyn Element> {
         Text::new(
-            "Introducing the Rook Agent CLI: A coding agent that does what others can't",
+            "Introducing the Polaris Terminal Agent CLI: A coding agent that does what others can't",
             appearance.ui_font_family(),
             20.,
         )
@@ -242,7 +242,7 @@ impl AgentCliLaunchModal {
     fn render_feature_row(item: &FeatureItem, appearance: &Appearance) -> Box<dyn Element> {
         let icon_el = ConstrainedBox::new(
             item.icon
-                .to_rookui_icon(Fill::Solid(modal_text_sub(appearance)))
+                .to_ptermui_icon(Fill::Solid(modal_text_sub(appearance)))
                 .finish(),
         )
         .with_width(16.)
@@ -332,7 +332,7 @@ impl View for AgentCliLaunchModal {
         "AgentCliLaunchModal"
     }
 
-    fn on_focus(&mut self, _focus_ctx: &rookui::FocusContext, ctx: &mut ViewContext<Self>) {
+    fn on_focus(&mut self, _focus_ctx: &ptermui::FocusContext, ctx: &mut ViewContext<Self>) {
         ctx.focus_self();
     }
 

@@ -9,8 +9,8 @@ define_settings_group!(CodeSettings, settings: [
         sync_to_cloud: SyncToCloud::Never,
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "code.editor.use_rook_as_default_editor",
-        description: "Whether Rook is used as the default code editor.",
+        toml_path: "code.editor.use_pterm_as_default_editor",
+        description: "Whether Polaris Terminal is used as the default code editor.",
     }
     codebase_context_enabled: CodebaseContextEnabled {
         type: bool,
@@ -87,9 +87,9 @@ define_settings_group!(CodeSettings, settings: [
         toml_path: "code.editor.format_on_save",
         description: "Whether the language server automatically formats the file on save. Other LSP features (hover, go-to-definition, references, diagnostics) are unaffected.",
     },
-    // Controls whether the Rook text editor automatically saves file changes as the
+    // Controls whether the Polaris Terminal text editor automatically saves file changes as the
     // user types (debounced) and when the editor loses focus. Only applies to the
-    // Rook text editor, not the command line or AI input.
+    // Polaris Terminal text editor, not the command line or AI input.
     auto_save: AutoSave {
         type: bool,
         default: false,
@@ -98,6 +98,6 @@ define_settings_group!(CodeSettings, settings: [
         surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "code.editor.auto_save",
-        description: "Whether the Rook text editor automatically saves changes as you type and when the editor loses focus.",
+        description: "Whether the Polaris Terminal text editor automatically saves changes as you type and when the editor loses focus.",
     },
 ]);

@@ -2,10 +2,10 @@ use std::cell::Cell;
 use std::sync::Arc;
 
 use pathfinder_color::ColorU;
-use rookui_core::assets::asset_cache::AssetSource;
-use rookui_core::fonts::FamilyId;
-use rookui_core::text_layout::{CaretPosition, TextFrame};
-use rookui_core::units::IntoPixels;
+use ptermui_core::assets::asset_cache::AssetSource;
+use ptermui_core::fonts::FamilyId;
+use ptermui_core::text_layout::{CaretPosition, TextFrame};
+use ptermui_core::units::IntoPixels;
 use string_offset::CharOffset;
 use sum_tree::SumTree;
 

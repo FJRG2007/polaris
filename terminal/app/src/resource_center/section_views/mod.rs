@@ -2,16 +2,16 @@ pub mod feature_section;
 pub use feature_section::FeatureSectionView;
 pub mod content_section;
 pub use content_section::ContentSectionView;
-use rook_core::features::FeatureFlag;
+use pterm_core::features::FeatureFlag;
 pub mod changelog_section;
 pub use changelog_section::ChangelogSectionView;
-use rookui::elements::{
+use ptermui::elements::{
     Align, Border, ConstrainedBox, Container, CrossAxisAlignment, Element, Flex, Hoverable, Icon,
     MouseStateHandle, ParentElement, ScrollbarWidth, Shrinkable,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, ViewContext, ViewHandle};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, ViewContext, ViewHandle};
 
 use crate::appearance::Appearance;
 use crate::resource_center::TipAction;

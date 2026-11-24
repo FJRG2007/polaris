@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::path::PathBuf;
 
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::{Entity, ModelContext, SingletonEntity};
 use uuid::Uuid;
 
 use crate::ai::mcp::file_based_manager::FileBasedMCPServerScope;
@@ -74,7 +74,7 @@ impl TuiMcpServerSource {
                 .as_ref()
                 .map(|creator| format!("shared by {creator}"))
                 .unwrap_or_else(|| "shared by a team member".to_owned()),
-            Self::Gallery => "shared by Rook".to_owned(),
+            Self::Gallery => "shared by Polaris Terminal".to_owned(),
             Self::FileBased { sources } => {
                 let labels = sources
                     .iter()
@@ -420,8 +420,8 @@ impl TuiMcpManager {
             .iter()
             .filter_map(TemplatableMCPServerInstallation::gallery_uuid)
             .collect::<HashSet<_>>();
-        let global_rook_server_identities = file_manager
-            .global_rook_servers()
+        let global_pterm_server_identities = file_manager
+            .global_pterm_servers()
             .into_iter()
             .filter_map(|installation| template_identity(installation.templatable_mcp_server()))
             .collect::<HashSet<_>>();
@@ -459,10 +459,10 @@ impl TuiMcpManager {
                 continue;
             }
             let source = synced_template_source(template.uuid, runtime_manager, ctx);
-            if is_represented_by_global_rook_server(
+            if is_represented_by_global_pterm_server(
                 &template,
                 &source,
-                &global_rook_server_identities,
+                &global_pterm_server_identities,
             ) {
                 continue;
             }
@@ -683,10 +683,10 @@ fn template_identity(template: &TemplatableMCPServer) -> Option<TuiMcpServerIden
     }
 }
 
-fn is_represented_by_global_rook_server(
+fn is_represented_by_global_pterm_server(
     template: &TemplatableMCPServer,
     source: &TuiMcpServerSource,
-    global_rook_server_identities: &HashSet<TuiMcpServerIdentity>,
+    global_pterm_server_identities: &HashSet<TuiMcpServerIdentity>,
 ) -> bool {
     matches!(
         source,
@@ -694,7 +694,7 @@ fn is_represented_by_global_rook_server(
             provenance: TuiMcpSyncedTemplateProvenance::FromAnotherDevice,
         }
     ) && template_identity(template)
-        .is_some_and(|identity| global_rook_server_identities.contains(&identity))
+        .is_some_and(|identity| global_pterm_server_identities.contains(&identity))
 }
 fn transport_from_template(template: &TemplatableMCPServer) -> Option<TuiMcpTransport> {
     MCPServer::from_user_json(&template.template.json)

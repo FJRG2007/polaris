@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use futures::future::{self, BoxFuture, FutureExt as _};
-use rook_core::HostId;
-use rookui_core::ModelContext;
+use pterm_core::HostId;
+use ptermui_core::ModelContext;
 
 use super::local_model::collect_contents_recursive;
 use crate::RepoMetadataError;
@@ -269,7 +269,7 @@ impl RemoteRepoMetadataModel {
     }
 }
 
-impl rookui_core::Entity for RemoteRepoMetadataModel {
+impl ptermui_core::Entity for RemoteRepoMetadataModel {
     type Event = RemoteRepositoryMetadataEvent;
 }
 

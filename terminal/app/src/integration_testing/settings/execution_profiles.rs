@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use rookui::{App, EntityId, SingletonEntity};
+use ptermui::{App, EntityId, SingletonEntity};
 
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::execution_profiles::{AIExecutionProfile, ActionPermission, ExecutionProfileId};

@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use chrono::{Duration, Utc};
-use rookui::{App, SingletonEntity as _};
+use ptermui::{App, SingletonEntity as _};
 
 use super::*;
 use crate::ai::cloud_environments::{AmbientAgentEnvironment, CloudAmbientAgentEnvironmentModel};

@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
-use rook_core::send_telemetry_from_ctx;
-use rook_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
-use rook_core::user_preferences::GetUserPreferences;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
+use pterm_core::user_preferences::GetUserPreferences;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 use serde_json::{Value, json};
 use strum_macros::{EnumDiscriminants, EnumIter};
 
@@ -163,7 +163,7 @@ impl TelemetryEvent for PricingPromotionTelemetryEvent {
     }
 
     fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        rook_core::telemetry::enum_events::<Self>()
+        pterm_core::telemetry::enum_events::<Self>()
     }
 }
 
@@ -189,7 +189,7 @@ impl TelemetryEventDesc for PricingPromotionTelemetryEventDiscriminants {
     }
 }
 
-rook_core::register_telemetry_event!(PricingPromotionTelemetryEvent);
+pterm_core::register_telemetry_event!(PricingPromotionTelemetryEvent);
 
 #[cfg(test)]
 #[path = "pricing_promotion_tests.rs"]

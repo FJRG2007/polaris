@@ -12,16 +12,18 @@ fn test_create_redacted_grep_error_event() {
     // Create input with a known secret pattern (Firebase domain)
     let queries = vec![
         "normal query".to_string(),
-        "query with rook-server-staging.firebaseapp.com secret".to_string(),
+        "query with polaris-terminal-server-staging.firebaseapp.com secret".to_string(),
     ];
-    let path = "path/to/file/with/rook-server-staging.firebaseapp.com/secret".to_string();
+    let path =
+        "path/to/file/with/polaris-terminal-server-staging.firebaseapp.com/secret".to_string();
     let shell_type = Some(ShellType::Bash);
-    let working_directory = Some("/users/test/rook-server-staging.firebaseapp.com".to_string());
+    let working_directory =
+        Some("/users/test/polaris-terminal-server-staging.firebaseapp.com".to_string());
     let absolute_path =
-        "/absolute/path/with/rook-server-staging.firebaseapp.com/secret".to_string();
+        "/absolute/path/with/polaris-terminal-server-staging.firebaseapp.com/secret".to_string();
     let error = GrepError::new("Error message".to_string())
-        .with_command("grep rook-server-staging.firebaseapp.com".to_string())
-        .with_output("Output with rook-server-staging.firebaseapp.com".to_string());
+        .with_command("grep polaris-terminal-server-staging.firebaseapp.com".to_string())
+        .with_output("Output with polaris-terminal-server-staging.firebaseapp.com".to_string());
 
     // Call the function with the test inputs
     let event = create_redacted_grep_error_event(
@@ -51,22 +53,26 @@ fn test_create_redacted_grep_error_event() {
         // Verify secrets are redacted from all relevant fields
         assert_eq!(redacted_queries.len(), 2);
         assert_eq!(redacted_queries[0], "normal query");
-        assert!(!redacted_queries[1].contains("rook-server-staging.firebaseapp.com"));
+        assert!(!redacted_queries[1].contains("polaris-terminal-server-staging.firebaseapp.com"));
         assert!(redacted_queries[1].contains("*****"));
 
-        assert!(!redacted_path.contains("rook-server-staging.firebaseapp.com"));
+        assert!(!redacted_path.contains("polaris-terminal-server-staging.firebaseapp.com"));
         assert!(redacted_path.contains("*****"));
 
-        assert!(!redacted_working_directory.contains("rook-server-staging.firebaseapp.com"));
+        assert!(
+            !redacted_working_directory.contains("polaris-terminal-server-staging.firebaseapp.com")
+        );
         assert!(redacted_working_directory.contains("*****"));
 
-        assert!(!redacted_absolute_path.contains("rook-server-staging.firebaseapp.com"));
+        assert!(
+            !redacted_absolute_path.contains("polaris-terminal-server-staging.firebaseapp.com")
+        );
         assert!(redacted_absolute_path.contains("*****"));
 
-        assert!(!redacted_command.contains("rook-server-staging.firebaseapp.com"));
+        assert!(!redacted_command.contains("polaris-terminal-server-staging.firebaseapp.com"));
         assert!(redacted_command.contains("*****"));
 
-        assert!(!redacted_output.contains("rook-server-staging.firebaseapp.com"));
+        assert!(!redacted_output.contains("polaris-terminal-server-staging.firebaseapp.com"));
         assert!(redacted_output.contains("*****"));
     } else {
         panic!("Expected GrepToolFailed event");
@@ -75,13 +81,13 @@ fn test_create_redacted_grep_error_event() {
 
 #[test]
 fn build_git_grep_command_single_quotes_shell_substitution() {
-    let queries = vec!["$(touch /tmp/rook-poc); `id`".to_string()];
+    let queries = vec!["$(touch /tmp/polaris-terminal-poc); `id`".to_string()];
 
     let command = build_git_grep_command(&queries, "/tmp/repo path", ShellType::Bash);
 
     assert_eq!(
         command,
-        "git --no-pager grep --color=never --untracked -nIEz -e '$(touch /tmp/rook-poc); `id`' '/tmp/repo path'"
+        "git --no-pager grep --color=never --untracked -nIEz -e '$(touch /tmp/polaris-terminal-poc); `id`' '/tmp/repo path'"
     );
 }
 
@@ -157,11 +163,11 @@ fn build_grep_content_scan_command_escapes_single_quote_through_both_quoting_lay
 
 #[test]
 fn build_grep_content_scan_command_keeps_adversarial_query_inert_through_both_quoting_layers() {
-    let queries = vec!["$(touch /tmp/rook-poc); `id`".to_string()];
+    let queries = vec!["$(touch /tmp/polaris-terminal-poc); `id`".to_string()];
 
     let command = build_grep_content_scan_command(&queries, "/tmp/repo path", ShellType::Bash);
 
-    let expected_script = r#"files=$(grep --color=never -rlIE --devices=skip -e '$(touch /tmp/rook-poc); `id`' '/tmp/repo path'); status=$?; if [ "$status" -gt 1 ]; then exit "$status"; fi; if [ -n "$files" ]; then printf '%s\n' "$files" | while IFS= read -r f; do printf '\000%s\000' "$f"; grep --color=never -nIE --devices=skip -e '$(touch /tmp/rook-poc); `id`' -- "$f"; done; exit 0; fi; exit 1"#;
+    let expected_script = r#"files=$(grep --color=never -rlIE --devices=skip -e '$(touch /tmp/polaris-terminal-poc); `id`' '/tmp/repo path'); status=$?; if [ "$status" -gt 1 ]; then exit "$status"; fi; if [ -n "$files" ]; then printf '%s\n' "$files" | while IFS= read -r f; do printf '\000%s\000' "$f"; grep --color=never -nIE --devices=skip -e '$(touch /tmp/polaris-terminal-poc); `id`' -- "$f"; done; exit 0; fi; exit 1"#;
     assert_eq!(
         command,
         format!(

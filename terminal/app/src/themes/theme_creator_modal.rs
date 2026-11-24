@@ -1,12 +1,12 @@
 use std::default::Default;
 use std::path::PathBuf;
 
-use rookui::fonts::Weight;
-use rookui::keymap::FixedBinding;
-use rookui::platform::{FilePickerConfiguration, FileType};
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::{Coords, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::{FilePickerConfiguration, FileType};
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::{Coords, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity as _, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -37,7 +37,7 @@ pub enum ThemeCreatorModalEvent {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",

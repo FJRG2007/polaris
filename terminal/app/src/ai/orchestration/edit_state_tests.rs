@@ -8,7 +8,7 @@ use crate::ai::orchestration::config_state::{AuthSecretSelection, OrchestrationC
 fn remote_mode() -> RunAgentsExecutionMode {
     RunAgentsExecutionMode::Remote {
         environment_id: "env-1".to_string(),
-        worker_host: "rook".to_string(),
+        worker_host: "polaris-terminal".to_string(),
         computer_use_enabled: false,
         runner_id: String::new(),
     }

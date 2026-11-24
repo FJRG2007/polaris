@@ -4,7 +4,7 @@ See `PRODUCT.md` for user-visible behavior.
 
 ## Context
 
-When Rook saves a session snapshot it records the terminal's current working directory via `TerminalView::active_session_path_if_local`, which calls `ShellLaunchData::maybe_convert_absolute_path` on the raw Unix-style `$PWD` string the shell reports:
+When Polaris Terminal saves a session snapshot it records the terminal's current working directory via `TerminalView::active_session_path_if_local`, which calls `ShellLaunchData::maybe_convert_absolute_path` on the raw Unix-style `$PWD` string the shell reports:
 
 - For WSL, `/home/user/projects` → `\\WSL$\<distro>\home\user\projects` (Windows UNC path).
 - For MSYS2/Git Bash, `/c/Users/user/projects` → `C:\Users\user\projects` (native drive path).
@@ -13,7 +13,7 @@ So by the time the path is written into `TerminalSnapshot::cwd`, it is already a
 
 **Relevant files:**
 
-- `crates/rook_terminal/src/shell/mod.rs (768–790)` — `ShellLaunchData::maybe_convert_absolute_path`, which performs the Unix → Windows conversion at snapshot time.
+- `crates/pterm_terminal/src/shell/mod.rs (768–790)` — `ShellLaunchData::maybe_convert_absolute_path`, which performs the Unix → Windows conversion at snapshot time.
 - `app/src/terminal/view.rs (6506–6528)` — `active_session_path_if_local`, which calls `maybe_convert_absolute_path` and is the write path into the snapshot.
 - `app/src/pane_group/mod.rs (1533–1570)` — session restore logic that reads `TerminalSnapshot::cwd` and computes `startup_directory`.
 
@@ -52,7 +52,7 @@ The `chosen_shell` / `wsl_distro` / `msys2_executable` locals derived from `shel
 
 ## Testing and Validation
 
-- **Behavior 2 (WSL):** Open a WSL terminal, `cd` to a non-default directory (e.g. `~/projects`), quit Rook, relaunch. Confirm the restored WSL tab opens in `~/projects`.
-- **Behavior 3 (MSYS2/Git Bash):** Open a Git Bash terminal, `cd /c/Users/<user>/projects`, quit Rook, relaunch. Confirm the restored tab opens in `/c/Users/<user>/projects`.
+- **Behavior 2 (WSL):** Open a WSL terminal, `cd` to a non-default directory (e.g. `~/projects`), quit Polaris Terminal, relaunch. Confirm the restored WSL tab opens in `~/projects`.
+- **Behavior 3 (MSYS2/Git Bash):** Open a Git Bash terminal, `cd /c/Users/<user>/projects`, quit Polaris Terminal, relaunch. Confirm the restored tab opens in `/c/Users/<user>/projects`.
 - **Behavior 4 (missing directory):** Delete the saved directory before relaunching. Confirm the tab opens without error, falling back to the shell default.
 - **Behavior 5 (unaffected shells):** Verify PowerShell and Cmd session restore continues to work as before.

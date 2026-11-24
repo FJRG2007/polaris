@@ -1,16 +1,16 @@
 ---
 name: terminal-logging-and-error-reporting
-description: How and when to log (log::* levels, safe_* macros) and report errors to Sentry (report_error!) in the Rook codebase. Use when adding or reviewing any logging or error reporting — picking a log level, deciding log vs. report_error!, keeping sensitive data out of logs, or surfacing an error to Sentry.
+description: How and when to log (log::* levels, safe_* macros) and report errors to Sentry (report_error!) in the Polaris Terminal codebase. Use when adding or reviewing any logging or error reporting — picking a log level, deciding log vs. report_error!, keeping sensitive data out of logs, or surfacing an error to Sentry.
 ---
 
 # terminal-logging-and-error-reporting
-Rook has two related ways to surface what happened at runtime:
+Polaris Terminal has two related ways to surface what happened at runtime:
 - **`log::*`** (`error!`/`warn!`/`info!`/`debug!`/`trace!`) — local diagnostics written to the terminal/log file and, on crash-reporting builds, uploaded to Sentry as **breadcrumbs** (context attached to the next captured event).
 - **`report_error!`** — captures a **structured Sentry event** (an actual issue) for errors worth engineering attention.
 
 ## How logs reach Sentry (important)
 
-On crash-reporting builds a `SentryLogger` wraps the logger (`rook_logging`). The filter:
+On crash-reporting builds a `SentryLogger` wraps the logger (`pterm_logging`). The filter:
 - `Error` / `Warn` / `Info` → **breadcrumb** only (not their own Sentry issue).
 - `Debug` / `Trace` → **dropped** from Sentry entirely (local-only).
 - The `Error`-level line emitted by `report_error!` itself → **ignored** by Sentry (the macro already captured a structured event; the log line would double-report).
@@ -52,7 +52,7 @@ Never log secrets, tokens, or credentials at any level. For messages whose *usef
 
 `safe_error!`, `safe_warn!`, `safe_info!`, `safe_debug!` (plus `safe_anyhow!` to build an `anyhow::Error`, and `safe_eprintln!`) each take a `safe:` and a `full:` arm. Dogfood builds log `full:`; release channels log `safe:`:
 ```rust
-use rook_core::safe_error;
+use pterm_core::safe_error;
 
 safe_error!(
     safe: ("Remote server unexpected response for Initialize"),
@@ -84,7 +84,7 @@ report_error!(anyhow::Error::new(err).context("Failed to read persisted data"));
 
 ## Prefer typed error enums over `anyhow` when it makes sense
 
-Don't default to `anyhow`. The conventional Rust guidance is "`anyhow` for applications, `thiserror` for libraries," but the sharper question is: **does anything downstream need to tell the failures apart?** If yes, define a typed error enum (`thiserror`), `impl ErrorExt`, and `register_error!` it. In Rook that "downstream" includes the Sentry reporting layer, not just calling code — so typed errors pay off more often than the plain app-vs-library rule suggests.
+Don't default to `anyhow`. The conventional Rust guidance is "`anyhow` for applications, `thiserror` for libraries," but the sharper question is: **does anything downstream need to tell the failures apart?** If yes, define a typed error enum (`thiserror`), `impl ErrorExt`, and `register_error!` it. In Polaris Terminal that "downstream" includes the Sentry reporting layer, not just calling code — so typed errors pay off more often than the plain app-vs-library rule suggests.
 
 Reach for a typed error enum when these hold:
 - **A caller branches on the failure** — it `match`es to recover, retry, fall back, render a specific message/state, or map to a status. This is the classic reason and the strongest signal: an `anyhow::Error` is opaque, so callers can essentially only print it.
@@ -100,7 +100,7 @@ Default to `anyhow` when these hold:
 
 It's not either/or: a typed enum can keep an `anyhow` escape hatch for the genuinely-unexpected case (an `Unexpected(#[from] anyhow::Error)` variant), classifying the known failures precisely while still absorbing the rest. Group variants by **failure mode** (what went wrong / what the caller does about it), not by which crate produced the error.
 
-Real example (`UserAuthenticationError`, `crates/rook_server_client/src/auth/mod.rs`):
+Real example (`UserAuthenticationError`, `crates/pterm_server_client/src/auth/mod.rs`):
 ```rust
 #[derive(thiserror::Error, Debug)]
 pub enum UserAuthenticationError {
@@ -184,7 +184,7 @@ report_error!(
 
 Sites that can fire repeatedly (hot loops, per-frame paths, enum-fallback conversions from GraphQL/protobuf) should report only once per app run so they don't flood Sentry. Default is `EveryTime`.
 ```rust
-use rook_errors::ReportErrorLogMode;
+use pterm_errors::ReportErrorLogMode;
 
 report_error!(err, ReportErrorLogMode::OncePerRun);
 // with a static message + incidental data:

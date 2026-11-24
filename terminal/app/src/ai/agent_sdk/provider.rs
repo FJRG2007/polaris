@@ -1,10 +1,10 @@
 //! Provider command for linking third-party services.
 use comfy_table::Cell;
-use rook_cli::GlobalOptions;
-use rook_cli::provider::{ProviderCommand, ProviderType};
-use rook_core::channel::ChannelState;
-use rookui::platform::TerminationMode;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_cli::GlobalOptions;
+use pterm_cli::provider::{ProviderCommand, ProviderType};
+use pterm_core::channel::ChannelState;
+use ptermui::platform::TerminationMode;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use serde::Serialize;
 
 use crate::ai::agent_sdk::common::describe_sole_team_error;
@@ -120,7 +120,7 @@ impl ProviderCommandRunner {
     }
 }
 
-impl rookui::Entity for ProviderCommandRunner {
+impl ptermui::Entity for ProviderCommandRunner {
     type Event = ();
 }
 impl SingletonEntity for ProviderCommandRunner {}

@@ -1,5 +1,5 @@
-use rookui::Element;
-use rookui::elements::MouseStateHandle;
+use ptermui::Element;
+use ptermui::elements::MouseStateHandle;
 
 use super::{
     InlineBannerButtonState, InlineBannerCloseButton, InlineBannerContent, InlineBannerIcon,
@@ -63,8 +63,8 @@ pub fn render_aws_bedrock_login_banner(
     });
 
     // Use sub_text_color for description to differentiate from title
-    let description_text = rookui::elements::Text::new(
-        "Your Rook admin has enabled AWS Bedrock for your team.",
+    let description_text = ptermui::elements::Text::new(
+        "Your Polaris Terminal admin has enabled AWS Bedrock for your team.",
         appearance.ui_font_family(),
         appearance.monospace_font_size() - 2.,
     )

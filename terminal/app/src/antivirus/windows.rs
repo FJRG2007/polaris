@@ -1,5 +1,5 @@
-use rook_core::send_telemetry_from_ctx;
-use rookui::ModelContext;
+use pterm_core::send_telemetry_from_ctx;
+use ptermui::ModelContext;
 use windows::Win32::System::Com::{
     CLSCTX_ALL, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize,
 };

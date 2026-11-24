@@ -5,19 +5,19 @@
 use ai::agent::action::RunAgentsExecutionMode;
 use ai::agent::orchestration_config::OrchestrationConfigStatus;
 use pathfinder_geometry::vector::vec2f;
-use rook_cli::agent::Harness;
-use rook_core::send_telemetry_from_ctx;
-use rook_graphql::queries::get_runners::RunnerSortBy;
-use rookui::elements::{
+use pterm_cli::agent::Harness;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_graphql::queries::get_runners::RunnerSortBy;
+use ptermui::elements::{
     ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Flex, Hoverable, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::ui_components::components::UiComponent;
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -519,12 +519,12 @@ impl OrchestrationConfigBlockView {
         let mut filled_defaults = false;
         if needs_host {
             // Prefer the workspace default (or the dev env-var override)
-            // over the bare "rook" fallback so self-hosted teams see
+            // over the bare "polaris-terminal" fallback so self-hosted teams see
             // their default pre-selected. Mirrors the Oz webapp's
             // `HostSelector` initial-selection behavior.
             let scope = UserWorkspaces::as_ref(ctx).team_context_for_view(ctx);
             let default_host = oc::resolve_default_host_slug(&scope, ctx)
-                .unwrap_or_else(|| oc::ORCHESTRATION_ROOK_WORKER_HOST.to_string());
+                .unwrap_or_else(|| oc::ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST.to_string());
             self.orchestration_edit_state
                 .orchestration_config_state
                 .set_worker_host(default_host);
@@ -559,7 +559,7 @@ impl OrchestrationConfigBlockView {
             .execution_mode
         {
             RunAgentsExecutionMode::Remote { worker_host, .. } => worker_host.as_str(),
-            RunAgentsExecutionMode::Local => oc::ORCHESTRATION_ROOK_WORKER_HOST,
+            RunAgentsExecutionMode::Local => oc::ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST,
         };
         let host_handle = ctx.add_typed_action_view(HostPicker::new);
         // Paint the open menu in the overlay layer so it doesn't get covered
@@ -797,7 +797,7 @@ impl View for OrchestrationConfigBlockView {
 
         let header_row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_child(rookui::elements::Expanded::new(1.0, header_label).finish())
+            .with_child(ptermui::elements::Expanded::new(1.0, header_label).finish())
             .with_child(
                 ui_builder
                     .switch(self.toggle_switch_state.clone())
@@ -835,9 +835,9 @@ impl View for OrchestrationConfigBlockView {
 
             // "View details" link row
             let chevron_icon = if self.details_expanded {
-                rook_core::ui::Icon::ChevronDown
+                pterm_core::ui::Icon::ChevronDown
             } else {
-                rook_core::ui::Icon::ChevronRight
+                pterm_core::ui::Icon::ChevronRight
             };
             let disabled_text_color = blended_colors::text_disabled(theme, theme.background());
             let details_text = Text::new(
@@ -849,7 +849,7 @@ impl View for OrchestrationConfigBlockView {
             .finish();
             let chevron = ConstrainedBox::new(
                 chevron_icon
-                    .to_rookui_icon(rook_core::ui::theme::Fill::Solid(disabled_text_color))
+                    .to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(disabled_text_color))
                     .finish(),
             )
             .with_width(14.)
@@ -878,7 +878,7 @@ impl View for OrchestrationConfigBlockView {
             if self.details_expanded {
                 // Cloud / Local mode toggle (full width)
                 let active_seg_bg =
-                    rook_core::ui::theme::color::internal_colors::accent_overlay_2(theme);
+                    pterm_core::ui::theme::color::internal_colors::accent_overlay_2(theme);
                 column.add_child(
                     Container::new(oc::render_mode_toggle(
                         self.orchestration_edit_state
@@ -943,8 +943,8 @@ impl View for OrchestrationConfigBlockView {
         let card = Container::new(column.finish())
             .with_uniform_padding(12.)
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
-            .with_background(rook_core::ui::theme::color::internal_colors::accent_overlay_1(theme))
-            .with_border(rookui::elements::Border::all(1.).with_border_fill(theme.accent()))
+            .with_background(pterm_core::ui::theme::color::internal_colors::accent_overlay_1(theme))
+            .with_border(ptermui::elements::Border::all(1.).with_border_fill(theme.accent()))
             .finish();
 
         let mut stack = Stack::new().with_child(card);

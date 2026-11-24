@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::{AppContext, ModelHandle, View, ViewContext, ViewHandle};
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::{AppContext, ModelHandle, View, ViewContext, ViewHandle};
 
 use super::notebook_pane::subscribe_to_link_model;
 use super::view::PaneView;

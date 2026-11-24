@@ -3,31 +3,31 @@ use std::sync::LazyLock;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     ChildAnchor, ConstrainedBox, Container, CrossAxisAlignment, Flex, Hoverable, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Stack,
 };
-use rookui::fonts::Weight;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::ui_components::text::Span;
-use rookui::{AppContext, Element, EntityId, EventContext, SingletonEntity};
+use ptermui::fonts::Weight;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::ui_components::text::Span;
+use ptermui::{AppContext, Element, EntityId, EventContext, SingletonEntity};
 use thousands::Separable;
 
 use crate::ai::AIRequestUsageModel;
 use crate::ai::agent::RenderableAIError;
 use crate::settings::UsageDisplayUnit;
-use crate::themes::theme::{AnsiColorIdentifier, Fill, RookTheme};
+use crate::themes::theme::{AnsiColorIdentifier, Fill, PtermTheme};
 use crate::ui_components::icons::Icon;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
 const PROVIDER_BUTTON_ICON_SIZE: f32 = 14.;
 const PROVIDER_BUTTON_ICON_TEXT_GAP: f32 = 8.;
 const ERROR_APOLOGY_TEXT: &str = "I'm sorry, I couldn't complete that request.";
-const INTERNAL_ROOK_ERROR: &str = "Internal Rook error.";
+const INTERNAL_POLARIS_TERMINAL_ERROR: &str = "Internal Polaris Terminal error.";
 pub const FAILED_OUTPUT_USAGE_NOTICE_TEXT: &str = "This response won't count towards your usage.";
 pub const OUT_OF_CREDITS_SUBSCRIBE_LABEL: &str = "Subscribe";
 /// Text to use as a label throughout the app for user interactions that will attach selected
@@ -35,7 +35,7 @@ pub const OUT_OF_CREDITS_SUBSCRIBE_LABEL: &str = "Subscribe";
 pub static ATTACH_AS_AGENT_MODE_CONTEXT_TEXT: LazyLock<&'static str> =
     LazyLock::new(|| "Attach as agent context");
 
-/// Label we use for the the command palette action to create a new local Rook Agent pane.
+/// Label we use for the the command palette action to create a new local Polaris Terminal Agent pane.
 pub static NEW_AGENT_PANE_LABEL: LazyLock<&'static str> = LazyLock::new(|| "New Agent Pane");
 
 /// Claude/Anthropic brand color (official brand orange #D97757).
@@ -49,7 +49,7 @@ pub const CLAUDE_ORANGE: ColorU = ColorU {
 
 /// Returns the color to be used for various AI signifiers
 /// input with AI mode).
-pub fn ai_brand_color(theme: &RookTheme) -> ColorU {
+pub fn ai_brand_color(theme: &PtermTheme) -> ColorU {
     AnsiColorIdentifier::Magenta
         .to_ansi_color(&theme.terminal_colors().normal)
         .into()
@@ -57,7 +57,7 @@ pub fn ai_brand_color(theme: &RookTheme) -> ColorU {
 
 /// Returns the color to be used for error UI throughout Agent Mode (like the "request limit
 /// exceeded" chip).
-pub fn error_color(theme: &RookTheme) -> ColorU {
+pub fn error_color(theme: &PtermTheme) -> ColorU {
     AnsiColorIdentifier::Red
         .to_ansi_color(&theme.terminal_colors().normal)
         .into()
@@ -122,10 +122,10 @@ pub fn failed_output_presentation(
             }
         }
         RenderableAIError::ServerOverloaded => FailedOutputPresentation::Message(
-            "Rook is currently overloaded. Please try again later.".to_string(),
+            "Polaris Terminal is currently overloaded. Please try again later.".to_string(),
         ),
-        RenderableAIError::InternalRookError => FailedOutputPresentation::Message(format!(
-            "{ERROR_APOLOGY_TEXT}\n\n{INTERNAL_ROOK_ERROR}"
+        RenderableAIError::InternalPtermError => FailedOutputPresentation::Message(format!(
+            "{ERROR_APOLOGY_TEXT}\n\n{INTERNAL_POLARIS_TERMINAL_ERROR}"
         )),
         RenderableAIError::ContextWindowExceeded(message) => {
             FailedOutputPresentation::ContextWindowExceeded {
@@ -154,7 +154,7 @@ pub fn failed_output_presentation(
             FailedOutputPresentation::GeminiEnterpriseCredentialsExpiredOrInvalid {
                 fallback_message: format!(
                     "{ERROR_APOLOGY_TEXT}\n\nGemini Enterprise credentials expired or invalid.\n\n\
-                     Rook couldn't authenticate with Google Cloud. Refresh your Gemini Enterprise credentials, then retry the request."
+                     Polaris Terminal couldn't authenticate with Google Cloud. Refresh your Gemini Enterprise credentials, then retry the request."
                 ),
             }
         }
@@ -224,7 +224,7 @@ pub fn render_ai_follow_up_icon(
                 .tool_tip("Follow up with existing conversation".to_owned())
                 .with_style(UiComponentStyles {
                     font_size: Some(12.),
-                    background: Some(rookui::elements::Fill::Solid(tooltip_background)),
+                    background: Some(ptermui::elements::Fill::Solid(tooltip_background)),
                     font_color: Some(appearance.theme().background().into_solid()),
                     ..Default::default()
                 });
@@ -249,7 +249,7 @@ fn render_input_icon(icon: Icon, color: Fill, app: &AppContext) -> Box<dyn Eleme
     // height.
     let icon_size = ai_indicator_height(app);
     ConstrainedBox::new(
-        Container::new(icon.to_rookui_icon(color).finish())
+        Container::new(icon.to_ptermui_icon(color).finish())
             .with_uniform_padding(icon_size / 8.)
             .finish(),
     )
@@ -391,7 +391,7 @@ where
     let theme = appearance.theme();
     let font_color = theme.foreground().into_solid();
     let mut label_children = vec![
-        ConstrainedBox::new(icon.to_rookui_icon(color).finish())
+        ConstrainedBox::new(icon.to_ptermui_icon(color).finish())
             .with_width(PROVIDER_BUTTON_ICON_SIZE)
             .with_height(PROVIDER_BUTTON_ICON_SIZE)
             .finish(),

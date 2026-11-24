@@ -1,12 +1,12 @@
 ---
 name: terminal-add-telemetry
-description: Add telemetry events to track user behavior or system events in the Rook codebase. Use when instrumenting new features, debugging issues, or measuring product metrics.
+description: Add telemetry events to track user behavior or system events in the Polaris Terminal codebase. Use when instrumenting new features, debugging issues, or measuring product metrics.
 ---
 
 # terminal-add-telemetry
 ## Overview
 
-Rook uses a trait-based telemetry system where feature-specific enums implement the `TelemetryEvent` trait. This approach keeps telemetry events organized by domain rather than in one giant enum.
+Polaris Terminal uses a trait-based telemetry system where feature-specific enums implement the `TelemetryEvent` trait. This approach keeps telemetry events organized by domain rather than in one giant enum.
 
 **Important**: Before implementing telemetry, collaborate with the user to:
 - Define what events should be tracked and when
@@ -28,7 +28,7 @@ Add a new variant to an enum that implements `TelemetryEvent`, or create a new e
 ```rust
 use serde_json::{json, Value};
 use strum_macros::{EnumDiscriminants, EnumIter};
-use rook_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
+use pterm_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
 
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumIter))]
@@ -85,7 +85,7 @@ impl TelemetryEvent for YourFeatureTelemetryEvent {
     }
 
     fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        rook_core::telemetry::enum_events::<Self>()
+        pterm_core::telemetry::enum_events::<Self>()
     }
 }
 ```
@@ -123,7 +123,7 @@ impl TelemetryEventDesc for YourFeatureTelemetryEventDiscriminants {
 At the end of your telemetry module, register the event:
 
 ```rust
-rook_core::register_telemetry_event!(YourFeatureTelemetryEvent);
+pterm_core::register_telemetry_event!(YourFeatureTelemetryEvent);
 ```
 
 ### 6. Send telemetry events from your code
@@ -131,7 +131,7 @@ rook_core::register_telemetry_event!(YourFeatureTelemetryEvent);
 Use `send_telemetry_from_ctx!` in views or models with a `ViewContext` or `ModelContext`:
 
 ```rust
-use rook_core::send_telemetry_from_ctx;
+use pterm_core::send_telemetry_from_ctx;
 
 // In a view update or model method
 send_telemetry_from_ctx!(
@@ -146,7 +146,7 @@ For code with only `AppContext`, use `send_telemetry_from_app_ctx!` instead.
 
 ### 7. Test locally
 
-Run Rook with the `log_named_telemetry_events` feature flag to see telemetry events logged to the console:
+Run Polaris Terminal with the `log_named_telemetry_events` feature flag to see telemetry events logged to the console:
 
 ```bash
 cargo run --features log_named_telemetry_events

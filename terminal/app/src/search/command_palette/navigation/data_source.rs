@@ -1,4 +1,4 @@
-use rookui::{AppContext, Entity, ModelHandle};
+use ptermui::{AppContext, Entity, ModelHandle};
 
 use crate::search::SyncDataSource;
 use crate::search::command_palette::mixer::CommandPaletteItemAction;
@@ -19,7 +19,7 @@ pub struct DataSource {
 impl DataSource {
     #[cfg(not(target_family = "wasm"))]
     pub fn new(active_session_handle: ModelHandle<SessionSource>) -> Self {
-        if rook_core::features::FeatureFlag::UseTantivySearch.is_enabled() {
+        if pterm_core::features::FeatureFlag::UseTantivySearch.is_enabled() {
             Self::new_full_text(active_session_handle)
         } else {
             Self::new_fuzzy(active_session_handle)

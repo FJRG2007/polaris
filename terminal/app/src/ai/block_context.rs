@@ -1,7 +1,7 @@
 use channel_versions::overrides::TargetOS;
 use chrono::{DateTime, Local};
 use parking_lot::FairMutex;
-use rook_core::command::ExitCode;
+use pterm_core::command::ExitCode;
 use serde::{Deserialize, Serialize};
 
 use crate::terminal::event::UserBlockCompleted;

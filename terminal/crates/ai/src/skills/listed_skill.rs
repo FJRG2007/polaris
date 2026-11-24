@@ -1,4 +1,4 @@
-use rook_core::ui::icons::Icon;
+use pterm_core::ui::icons::Icon;
 use serde::{Deserialize, Serialize};
 
 use super::{ParsedSkill, SkillProvider, SkillReference, SkillScope};
@@ -10,7 +10,7 @@ pub struct SkillDescriptor {
     pub description: String,
     /// The scope of the skill (home directory vs project directory).
     pub scope: SkillScope,
-    /// The provider/origin of the skill (Claude, Codex, or Rook).
+    /// The provider/origin of the skill (Claude, Codex, or Polaris Terminal).
     /// None if the skill path didn't match a known provider directory.
     pub provider: SkillProvider,
     /// Override icon for this skill. When set, rendering code should use this
@@ -27,7 +27,7 @@ impl SkillDescriptor {
 
     pub fn new_bundled(id: String, skill: ParsedSkill, icon: Icon) -> Self {
         Self {
-            provider: SkillProvider::Rook,
+            provider: SkillProvider::Pterm,
             scope: SkillScope::Bundled,
             reference: SkillReference::BundledSkillId(id),
             name: skill.name,

@@ -13,8 +13,8 @@ Two guiding constraints beyond the product spec:
 
 The JSON output path for `oz run list` and `oz run get` is already in place. The relevant code after REMOTE-1374:
 
-- `crates/rook_cli/src/task.rs:101` — `ListTasksArgs` (all existing filter flags).
-- `crates/rook_cli/src/task.rs:281` — `TaskGetArgs`.
+- `crates/pterm_cli/src/task.rs:101` — `ListTasksArgs` (all existing filter flags).
+- `crates/pterm_cli/src/task.rs:281` — `TaskGetArgs`.
 - `app/src/ai/agent_sdk/ambient.rs:566` — `AmbientAgentRunner::list_tasks`, which branches on `OutputFormat` and calls `print_raw_json` for `Json`.
 - `app/src/ai/agent_sdk/ambient.rs:593` — `AmbientAgentRunner::get_task_status`, same pattern for the single-run response.
 - `app/src/ai/agent_sdk/output.rs:80` — `print_raw_json(value: &serde_json::Value) -> anyhow::Result<()>`. The only shared JSON emitter; extending it is the user's stated preference and the lowest-footprint place to plug in a filter.
@@ -42,7 +42,7 @@ jaq-std = "3.0"
 jaq-json = { version = "2.0", features = ["serde"] }
 ```
 
-In both `app/Cargo.toml` and `crates/rook_cli/Cargo.toml`, add:
+In both `app/Cargo.toml` and `crates/pterm_cli/Cargo.toml`, add:
 
 ```toml path=null start=null
 jaq-core.workspace = true
@@ -50,9 +50,9 @@ jaq-std.workspace = true
 jaq-json.workspace = true
 ```
 
-`rook_cli` compiles the filter at clap parse time; `app` runs it. `rook_cli` technically only uses `jaq-core` + `jaq-std` items in its own code, but depends on `jaq-json` too because the stored `Filter` type is parameterized by `jaq_json::Val` — without `Val` in scope, the `Filter` field would not resolve. The alternative (store `Option<String>` in `rook_cli` and recompile in `app`) doubles the compile work and prevents sharing a single compile source of truth; keep the direct `jaq-json` dep and forgo that split unless the binary-size hit shows up as a problem.
+`pterm_cli` compiles the filter at clap parse time; `app` runs it. `pterm_cli` technically only uses `jaq-core` + `jaq-std` items in its own code, but depends on `jaq-json` too because the stored `Filter` type is parameterized by `jaq_json::Val` — without `Val` in scope, the `Filter` field would not resolve. The alternative (store `Option<String>` in `pterm_cli` and recompile in `app`) doubles the compile work and prevents sharing a single compile source of truth; keep the direct `jaq-json` dep and forgo that split unless the binary-size hit shows up as a problem.
 
-### 2. Reusable `JsonFilter` clap component (`crates/rook_cli/src/json_filter.rs`, new)
+### 2. Reusable `JsonFilter` clap component (`crates/pterm_cli/src/json_filter.rs`, new)
 
 Introduce a small module with a `JsonFilter` struct that can be flattened into any command's `Args`. The stored value is the compiled `Filter` itself — no wrapper struct, no `Arc`, no `source()` accessor. `jaq_core::Filter` is already `Clone`, so cloning `JsonFilter` is cheap and lets it cross async boundaries.
 
@@ -102,7 +102,7 @@ fn parse_jq_filter(src: &str) -> Result<JqFilter, String> {
 }
 ```
 
-Expose it from `crates/rook_cli/src/lib.rs`:
+Expose it from `crates/pterm_cli/src/lib.rs`:
 
 ```rust path=null start=null
 pub mod json_filter;
@@ -110,7 +110,7 @@ pub mod json_filter;
 
 The exact spellings of the type alias and `funs::<Val>()` call may need small adjustments once we compile against `jaq-core` 3.0 locally (the crate-level example in the `jaq-core` docs is the canonical reference); the overall shape is stable.
 
-### 3. Flatten `JsonFilter` into both commands (`crates/rook_cli/src/task.rs`)
+### 3. Flatten `JsonFilter` into both commands (`crates/pterm_cli/src/task.rs`)
 
 Replace the per-command flag with a single flattened field:
 
@@ -141,7 +141,7 @@ Because `JsonFilter` is a single-field `Args` struct with `long = "jq"`, both co
 Extend `print_raw_json` to accept an optional pre-compiled filter. When `None`, behavior is identical to today. When `Some(filter)`, run the filter against the input value and print each output on its own line.
 
 ```rust path=null start=null
-use rook_cli::json_filter::JqFilter;
+use pterm_cli::json_filter::JqFilter;
 
 pub fn print_raw_json(
     value: &serde_json::Value,
@@ -174,7 +174,7 @@ The `run_jq_filter` helper lives next to `print_raw_json` in the same file. Beca
    - Otherwise (`Array` or `Object`), write via `serde_json::to_writer_pretty(&mut out, &value)?` followed by `\n`. This keeps the existing pretty-printed, `serde_json`-driven formatting for structured output so that `--jq .` on either command's response stays byte-identical to `--output-format json` without `--jq`.
 3. On runtime errors, flushes already-emitted output, writes the error to stderr via `eprintln!` (so the CLI's standard log-hint suffix isn't appended to user-authored filter errors), and returns a non-zero `anyhow::Error`.
 
-Note that `run_jq_filter` never recompiles the filter — compilation only happens inside `rook_cli::json_filter::parse_jq_filter` at clap parse time. This is what makes the CLI fail fast on bad filters: an invalid `--jq` exits during `Args::from_env()` and never reaches the spawn path, auth refresh, or HTTP client.
+Note that `run_jq_filter` never recompiles the filter — compilation only happens inside `pterm_cli::json_filter::parse_jq_filter` at clap parse time. This is what makes the CLI fail fast on bad filters: an invalid `--jq` exits during `Args::from_env()` and never reaches the spawn path, auth refresh, or HTTP client.
 
 ### 5. Call-site wiring (`app/src/ai/agent_sdk/ambient.rs`)
 
@@ -202,7 +202,7 @@ Runtime failures propagate as `anyhow::Error` through the existing `spawn_comman
 
 ## Testing and validation
 
-Unit tests on `JsonFilter` and `parse_jq_filter` in `crates/rook_cli/src/json_filter_tests.rs` (new):
+Unit tests on `JsonFilter` and `parse_jq_filter` in `crates/pterm_cli/src/json_filter_tests.rs` (new):
 
 - **Invariants 1, 5, 6 (fail-fast):** `parse_jq_filter(".foo")` returns `Ok`; `parse_jq_filter("@")` and `parse_jq_filter("")` return `Err` whose `Display` contains the filter source. This is the regression guard for fail-fast: if this test passes at the `parse_jq_filter` layer, clap's own invocation guarantees failure happens in `Args::from_env()`.
 - **Invariants 1, 5 (end-to-end clap):** calling `Args::try_parse_from(["oz", "run", "list", "--jq", "@"])` returns `Err` with `clap::error::ErrorKind::ValueValidation`. Repeat for `oz run get ID --jq @`.
@@ -218,7 +218,7 @@ Unit tests on `print_raw_json` in `app/src/ai/agent_sdk/output_tests.rs` (existi
 - **Invariant 4 (empty output):** `empty` produces zero bytes of stdout and returns `Ok(())`.
 - **Invariant 5 (runtime error, partial output):** a filter that emits a valid value and then errors writes the valid value to `out` before returning `Err`.
 
-Clap parsing tests in `crates/rook_cli/src/task_tests.rs`:
+Clap parsing tests in `crates/pterm_cli/src/task_tests.rs`:
 
 - Parsing `oz run list --jq ".foo"` populates `ListTasksArgs.json_filter.filter` with `Some(_)` (we don't assert deep structural equality on the compiled filter; the `parse_jq_filter`-level tests above already cover the compile happy path).
 - Parsing `oz run get ID --jq ".foo"` populates `TaskGetArgs.json_filter.filter` with `Some(_)`.
@@ -236,11 +236,11 @@ Manual validation against staging covering invariants 2, 3, 4, 5, 6, 7, and 8:
 - `oz run list --jq empty` (empty output, invariant 4).
 - `oz run list --help` and `oz run get --help` to confirm flag documentation per invariant 8.
 
-Presubmit: `./script/presubmit` (fmt, clippy `-D warnings`, test suite). The touched crates are `rook_cli` (minor) and `rook` (app).
+Presubmit: `./script/presubmit` (fmt, clippy `-D warnings`, test suite). The touched crates are `pterm_cli` (minor) and `polaris-terminal` (app).
 
 ## Risks and mitigations
 
-- **Dependency weight:** `jaq-core`, `jaq-std`, and `jaq-json` together pull in `num-bigint`, `indexmap`, `hifijson`, and a few smaller transitives. The binary-size delta is expected to be modest and similar to other CLI features. `rook_cli` gains all three deps since it compiles filters; `app` already transitively carries serde_json and adds the same set. We deliberately skip `jaq-all` and `jaq-fmts` — the only thing `jaq-all` adds on top of these three is multi-format conveniences we don't use.
+- **Dependency weight:** `jaq-core`, `jaq-std`, and `jaq-json` together pull in `num-bigint`, `indexmap`, `hifijson`, and a few smaller transitives. The binary-size delta is expected to be modest and similar to other CLI features. `pterm_cli` gains all three deps since it compiles filters; `app` already transitively carries serde_json and adds the same set. We deliberately skip `jaq-all` and `jaq-fmts` — the only thing `jaq-all` adds on top of these three is multi-format conveniences we don't use.
 - **Filter dialect drift:** `jaq` aims to be jq-compatible but is not byte-identical to BSD `jq` in every edge case. Mitigation: the product spec explicitly names `jaq` as the dialect, and the help text says so.
 - **Scalar-unwrapping divergence from pure `jq`:** our top-level scalar unwrapping differs from `jq` (which always emits JSON-encoded values) but matches `gh --jq`. Users coming from `jq` may be surprised that top-level strings are unquoted. Mitigation: document this in the help text, and point to `| tojson` as the opt-out.
 - **Partial output on runtime error:** we intentionally flush already-produced outputs before surfacing the error (invariant 5). This matches jq's behavior but means a failing filter can still leave valid JSON on stdout. Downstream scripts that parse stdout should continue to check the CLI exit code, which is unchanged. Documented in the help text is not necessary; the product spec captures it.

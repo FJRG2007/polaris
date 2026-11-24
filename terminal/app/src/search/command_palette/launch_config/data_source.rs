@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use fuzzy_match::match_indices_case_insensitive;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use crate::launch_configs::launch_config::LaunchConfig;
 use crate::search::command_palette::launch_config::search_item::SearchItem;
 use crate::search::command_palette::mixer::CommandPaletteItemAction;
 use crate::search::data_source::{DataSourceSearchError, Query, QueryResult};
 use crate::search::mixer::{DataSourceRunErrorWrapper, SyncDataSource};
-use crate::user_config::{RookConfig, RookConfigUpdateEvent};
+use crate::user_config::{PtermConfig, PtermConfigUpdateEvent};
 
 /// Datasource that searches against `LaunchConfig`s.
 pub struct DataSource {
@@ -19,7 +19,7 @@ pub struct DataSource {
 impl DataSource {
     #[cfg(not(target_family = "wasm"))]
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        if rook_core::features::FeatureFlag::UseTantivySearch.is_enabled() {
+        if pterm_core::features::FeatureFlag::UseTantivySearch.is_enabled() {
             Self::new_full_text(ctx)
         } else {
             Self::new_fuzzy(ctx)
@@ -32,7 +32,7 @@ impl DataSource {
     }
 
     fn new_fuzzy(ctx: &mut ModelContext<Self>) -> Self {
-        ctx.subscribe_to_model(&RookConfig::handle(ctx), Self::handle_config_event);
+        ctx.subscribe_to_model(&PtermConfig::handle(ctx), Self::handle_config_event);
         let mut searcher = Box::new(FuzzyLaunchConfigSearcher::default());
         searcher.refresh_search_index(ctx);
         Self { searcher }
@@ -40,7 +40,7 @@ impl DataSource {
 
     #[cfg(not(target_family = "wasm"))]
     fn new_full_text(ctx: &mut ModelContext<Self>) -> Self {
-        ctx.subscribe_to_model(&RookConfig::handle(ctx), Self::handle_config_event);
+        ctx.subscribe_to_model(&PtermConfig::handle(ctx), Self::handle_config_event);
         let mut searcher = Box::new(full_text_searcher::FullTextLaunchConfigSearcher::new(
             ctx.background_executor(),
         ));
@@ -50,11 +50,11 @@ impl DataSource {
 
     fn handle_config_event(
         &mut self,
-        _: ModelHandle<RookConfig>,
-        event: &RookConfigUpdateEvent,
+        _: ModelHandle<PtermConfig>,
+        event: &PtermConfigUpdateEvent,
         ctx: &mut ModelContext<Self>,
     ) {
-        if matches!(event, RookConfigUpdateEvent::LaunchConfigs) {
+        if matches!(event, PtermConfigUpdateEvent::LaunchConfigs) {
             self.searcher.refresh_search_index(ctx);
         }
     }
@@ -112,7 +112,7 @@ impl LaunchConfigSearcher for FuzzyLaunchConfigSearcher {
     }
 
     fn refresh_search_index(&mut self, app: &AppContext) {
-        self.configs = RookConfig::as_ref(app)
+        self.configs = PtermConfig::as_ref(app)
             .launch_configs()
             .iter()
             .map(|config| (config.name.to_lowercase(), config.clone()))
@@ -126,15 +126,15 @@ mod full_text_searcher {
     use std::sync::Arc;
 
     use fuzzy_match::FuzzyMatchResult;
-    use rook_search_core::define_search_schema;
-    use rookui::r#async::executor::Background;
-    use rookui::{AppContext, SingletonEntity};
+    use pterm_search_core::define_search_schema;
+    use ptermui::r#async::executor::Background;
+    use ptermui::{AppContext, SingletonEntity};
 
     use crate::launch_configs::launch_config::LaunchConfig;
     use crate::search::command_palette::launch_config::data_source::LaunchConfigSearcher;
     use crate::search::command_palette::launch_config::search_item::SearchItem;
     use crate::search::searcher::{AsyncSearcher, DEFAULT_MEMORY_BUDGET, SCORE_CONVERSION_FACTOR};
-    use crate::user_config::RookConfig;
+    use crate::user_config::PtermConfig;
 
     // The name of the launch configs are duplicated to ensure that the searcher
     // hashes the name to uniquely identify the launch config.
@@ -187,13 +187,13 @@ mod full_text_searcher {
         }
 
         fn refresh_search_index(&mut self, app: &AppContext) {
-            self.configs = RookConfig::as_ref(app)
+            self.configs = PtermConfig::as_ref(app)
                 .launch_configs()
                 .iter()
                 .map(|config| (config.name.to_lowercase(), config.clone()))
                 .collect();
             if self.rebuild_search_index().is_err() {
-                rook_errors::report_error!(
+                pterm_errors::report_error!(
                     "Failed to create search index writer for launch configs"
                 );
                 self.clear_search_index();

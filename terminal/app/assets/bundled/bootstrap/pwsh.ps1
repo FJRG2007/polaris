@@ -1,12 +1,12 @@
-[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '', Scope = 'Function', Target = 'Rook-*', Justification = 'Rook-* functions are ours')]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '', Scope = 'Function', Target = 'Polaris Terminal-*', Justification = 'Polaris Terminal-* functions are ours')]
 param()
 
 # Wrap things in a module to avoid cluttering the global scope. We assign it to '$null' to suppress
 # the console output from creating the module.
 # NOTE: If you do need a function to be global and also have access to variables in this scope, add
 # the function name to the 'Export-ModuleMember' call at the end.
-$null = New-Module -Name Rook-Module -ScriptBlock {
-    # Byte sequence used to signal the start of an OSC for Rook JSON messages.
+$null = New-Module -Name PolarisTerminal-Module -ScriptBlock {
+    # Byte sequence used to signal the start of an OSC for Polaris Terminal JSON messages.
     $oscStart = "$([char]0x1b)]9278;"
 
     # Appended to $oscStart to signal that the following message is JSON-encoded.
@@ -14,24 +14,24 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
 
     $oscParamSeparator = ';'
 
-    # Byte used to signal the end of an OSC for Rook JSON messages.
+    # Byte used to signal the end of an OSC for Polaris Terminal JSON messages.
     $oscEnd = "$([char]0x07)"
 
     # Writes a hex-encoded JSON message to the PTY.
-    function Rook-Send-JsonMessage([System.Collections.Hashtable]$table) {
+    function PolarisTerminal-Send-JsonMessage([System.Collections.Hashtable]$table) {
         $json = ConvertTo-Json -InputObject $table -Compress
         # Sends a message to the controlling terminal as an OSC control sequence.
         # TODO(CORE-2718): Determine if we need to hex encode the payload.
         # Note that because the JSON string may contain characters that we don't control (including
         # unicode), we encode it as hexadecimal string to avoid prematurely calling unhook if
         # one of the bytes in JSON is 9c (ST) or other (CAN, SUB, ESC).
-        $encodedMessage = Rook-Encode-HexString $json
+        $encodedMessage = PolarisTerminal-Encode-HexString $json
         Write-Host -NoNewline "$oscStart$oscJsonMarker$oscParamSeparator$encodedMessage$oscEnd"
     }
 
     # This script block contains commands and constants that are needed in background threads.
     # If you want to be able to use it in a background thread, stick it in this block
-    $rookCommon = {
+    $ptermCommon = {
         # OSC used to mark the start of in-band command output.
         #
         # Printable characters received this OSC and oscEndGeneratorOutput are parsed and handled as
@@ -46,13 +46,13 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
 
         $oscResetGrid = "$([char]0x1b)]9279$oscEnd"
 
-        function Rook-Send-ResetGridOSC() {
+        function PolarisTerminal-Send-ResetGridOSC() {
             Write-Host -NoNewline $oscResetGrid
         }
 
         # Safely attempt to get Node.js version if available. Avoid literal 'node' invocation
         # to satisfy PSUseCompatibleCommands across target platforms.
-        function Rook-TryGet-NodeVersion {
+        function PolarisTerminal-TryGet-NodeVersion {
             try {
                 $cmd = Get-Command -CommandType Application node 2>$null
                 if ($null -eq $cmd) { return '' }
@@ -68,11 +68,11 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         }
 
         # Encode a string as hex-encoded UTF-8.
-        function Rook-Encode-HexString([string]$str) {
+        function PolarisTerminal-Encode-HexString([string]$str) {
             [BitConverter]::ToString([System.Text.Encoding]::UTF8.GetBytes($str)).Replace('-', '')
         }
 
-        function Rook-Decode-HexString([string]$hex) {
+        function PolarisTerminal-Decode-HexString([string]$hex) {
             # Guard empty/missing input: otherwise the loop leaves $bytes null and GetString throws.
             if ([string]::IsNullOrEmpty($hex)) {
                 return ''
@@ -87,18 +87,18 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         # sequences for generator output.
         #
         # The payload of the OSC is "<content_length>;<hex-encoded content>".
-        function Rook-Send-GeneratorOutputOsc {
+        function PolarisTerminal-Send-GeneratorOutputOsc {
             param([string]$message)
 
-            $hexEncodedMessage = Rook-Encode-HexString $message
+            $hexEncodedMessage = PolarisTerminal-Encode-HexString $message
             $byteCount = [System.Text.Encoding]::ASCII.GetByteCount($hexEncodedMessage)
 
             Write-Host -NoNewline "$oscStartGeneratorOutput$byteCount;$hexEncodedMessage$oscEndGeneratorOutput"
-            Rook-Send-ResetGridOSC
+            PolarisTerminal-Send-ResetGridOSC
         }
 
         # Do not run this in the main thread. It mucks around with some env vars
-        function Rook-Run-InBandGenerator {
+        function PolarisTerminal-Run-InBandGenerator {
             [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingInvokeExpression', '', Justification = 'We actually need it')]
             param([string]$commandId, [string]$command)
 
@@ -122,11 +122,11 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
 
                 # If the generator command returns multi-line output,
                 # we make sure to join the lines together with a newline, so
-                # they are properly parsed by rook
+                # they are properly parsed by polaris-terminal
                 $stringifiedOutput = $rawOutput -join "$([char]0x0a)"
 
                 # This is a best-effort attempt to get an error code.
-                # We cannot duplicate our error code logic from Rook-Precmd
+                # We cannot duplicate our error code logic from PolarisTerminal-Precmd
                 # b/c Invoke-Expression will swallow the value of $? and always
                 # return true. So we do our best to return a legit error code
                 Write-Output "$commandId;$stringifiedOutput;$exitCode"
@@ -138,15 +138,15 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         }
     }
 
-    # Load the Rook Common functions in the current session
-    . $rookCommon
+    # Load the Polaris Terminal Common functions in the current session
+    . $ptermCommon
 
     function Get-EpochTime {
         [decimal]([DateTime]::UtcNow - [DateTime]::new(1970, 1, 1, 0, 0, 0, 0)).Ticks / 1e7
     }
 
-    function Rook-Bootstrapped {
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'ROOK_BOOTSTRAPPED', Justification = 'False positive as we are assigning to global')]
+    function PolarisTerminal-Bootstrapped {
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'POLARIS_TERMINAL_BOOTSTRAPPED', Justification = 'False positive as we are assigning to global')]
         param([decimal]$rcStartTime, [decimal]$rcEndTime)
 
         $envVarNames = (Get-ChildItem env: | Select-Object -ExpandProperty Name | ForEach-Object { 'env:' + $_ }) + `
@@ -174,7 +174,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         # (0.3-0.6 s against 0.1 s, for the same names in the same order).
         $coreCommands = Get-Command -CommandType Function, Cmdlet -Module $corePsModules
         $functionNamesRaw = $coreCommands |
-            Where-Object { $_.CommandType -eq 'Function' -and -not $_.Name.StartsWith('Rook') } |
+            Where-Object { $_.CommandType -eq 'Function' -and -not $_.Name.StartsWith('Polaris Terminal') } |
             Select-Object -ExpandProperty Name
         $functionNames = $functionNamesRaw -join [Environment]::NewLine
         $builtinsRaw = $coreCommands |
@@ -235,7 +235,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         $bootstrappedMsg = @{
             hook = 'Bootstrapped'
             value = @{
-                session_id = $global:_rookSessionId
+                session_id = $global:_ptermSessionId
                 histfile = $(Get-PSReadLineOption).HistorySavePath
                 shell = 'pwsh'
                 home_dir = "$HOME"
@@ -258,48 +258,48 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
                 shell_path = (Get-Process -Id $PID).Path
             }
         }
-        Rook-Send-JsonMessage $bootstrappedMsg
-        $global:ROOK_BOOTSTRAPPED = 1
+        PolarisTerminal-Send-JsonMessage $bootstrappedMsg
+        $global:POLARIS_TERMINAL_BOOTSTRAPPED = 1
     }
 
-    function Rook-Preexec([string]$command) {
+    function PolarisTerminal-Preexec([string]$command) {
         $HOST.UI.RawUI.WindowTitle = $command
         $preexecMsg = @{
             hook = 'Preexec'
             value = @{
-                session_id = $global:_rookSessionId
+                session_id = $global:_ptermSessionId
                 command = $command
             }
         }
-        Rook-Send-JsonMessage $preexecMsg
-        Rook-Send-ResetGridOSC
+        PolarisTerminal-Send-JsonMessage $preexecMsg
+        PolarisTerminal-Send-ResetGridOSC
 
         # If this preexec is called for user command, kill ongoing generator command jobs and clean
         # up the bookkeeping temp files used to bookkeep.
-        if (-not "$command" -match '^Rook-Run-GeneratorCommand') {
-            Rook-Stop-ActiveThread
+        if (-not "$command" -match '^PolarisTerminal-Run-GeneratorCommand') {
+            PolarisTerminal-Stop-ActiveThread
         }
 
-        # Clean up any completed rook jobs so they do not show up on the user's 'get-job'
+        # Clean up any completed polaris-terminal jobs so they do not show up on the user's 'get-job'
         # commands
-        Rook-Clean-CompletedThread
+        PolarisTerminal-Clean-CompletedThread
 
-        # Remove any instance of the 'Rook-Run-GeneratorCommand' call from the user's history
-        Clear-History -CommandLine 'Rook-Run-GeneratorCommand*'
+        # Remove any instance of the 'PolarisTerminal-Run-GeneratorCommand' call from the user's history
+        Clear-History -CommandLine 'PolarisTerminal-Run-GeneratorCommand*'
     }
 
-    function Rook-Finish-Update([string]$updateId) {
+    function PolarisTerminal-Finish-Update([string]$updateId) {
         $updateMsg = @{
             hook = 'FinishUpdate'
             value = @{
-                session_id = $global:_rookSessionId
+                session_id = $global:_ptermSessionId
                 update_id = $updateId
             }
         }
-        Rook-Send-JsonMessage $updateMsg
+        PolarisTerminal-Send-JsonMessage $updateMsg
     }
 
-    function Rook-Handle-DistUpgrade {
+    function PolarisTerminal-Handle-DistUpgrade {
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingInvokeExpression', '', Justification = 'We actually need it')]
         param([string]$sourceFileName)
 
@@ -331,7 +331,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
     #    an escape sequence '^[i'. Since it made it more convenient to have a wrapper
     #    function anyway, I have not investigated this, but in case someone is working
     #    on this in the future, beware attempting to inline this function.
-    function Rook-Git {
+    function PolarisTerminal-Git {
         $GIT_OPTIONAL_LOCKS = $env:GIT_OPTIONAL_LOCKS
         $env:GIT_OPTIONAL_LOCKS = 0
         try {
@@ -347,7 +347,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
     #
     # Make sure when you call this you call it with -ErrorAction SilentlyContinue
     # or it will print out error information when it is invoked.
-    function Rook-Restore-ErrorStatus {
+    function PolarisTerminal-Restore-ErrorStatus {
         [CmdletBinding()]
         param([boolean]$status, [int]$code)
 
@@ -355,7 +355,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         if ($status -eq $false) {
             $PSCmdlet.WriteError([System.Management.Automation.ErrorRecord]::new(
                     [Exception]::new("$([char]0x00)"),
-                    'rook-reset-error',
+                    'polaris-terminal-reset-error',
                     [System.Management.Automation.ErrorCategory]::NotSpecified,
                     $null
                 ))
@@ -364,13 +364,13 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
 
     # Tracks whether or not powershell is unable to find a command.
     # See the $ExecutionContext.InvokeCommand.CommandNotFoundAction where it is set to $true,
-    # and both $ExecutionContext.InvokeCommand.PostCommandLookupAction and Rook-Precmd where
+    # and both $ExecutionContext.InvokeCommand.PostCommandLookupAction and PolarisTerminal-Precmd where
     # it is set to $false.
     $script:commandNotFound = $false
 
     $script:viEditModeOverridden = $false
 
-    function Rook-Configure-PSReadLine {
+    function PolarisTerminal-Configure-PSReadLine {
         if ((Get-PSReadLineOption).EditMode -eq 'Vi') {
             $script:viEditModeOverridden = $true
             Set-PSReadLineOption -EditMode Emacs
@@ -390,11 +390,11 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
             $inputBufferMsg = @{
                 hook = 'InputBuffer'
                 value = @{
-                    session_id = $global:_rookSessionId
+                    session_id = $global:_ptermSessionId
                     buffer = $inputBuffer
                 }
             }
-            Rook-Send-JsonMessage $inputBufferMsg
+            PolarisTerminal-Send-JsonMessage $inputBufferMsg
             [Microsoft.PowerShell.PSConsoleReadLine]::BackwardDeleteLine()
             # This is triggered after precmd, so output here goes to the "early output" handler,
             # i.e. the background block. This clears the line the cursor is on. We clear it out b/c
@@ -408,35 +408,35 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         }
 
         # Sets the prompt mode to custom prompt (PS1)
-        # Is the equivalent of rook_change_prompt_modes_to_ps1 in other shells
+        # Is the equivalent of pterm_change_prompt_modes_to_ps1 in other shells
         Set-PSReadLineKeyHandler -Chord 'Alt+p' -ScriptBlock {
-            $env:ROOK_HONOR_PS1 = '1'
-            Rook-Redraw-Prompt
+            $env:POLARIS_TERMINAL_HONOR_PS1 = '1'
+            PolarisTerminal-Redraw-Prompt
         }
 
-        # Sets the prompt mode to rook prompt
-        # Is the equivalent of rook_change_prompt_modes_to_rook_prompt in other shells
+        # Sets the prompt mode to polaris-terminal prompt
+        # Is the equivalent of pterm_change_prompt_modes_to_pterm_prompt in other shells
         Set-PSReadLineKeyHandler -Chord 'Alt+w' -ScriptBlock {
-            $env:ROOK_HONOR_PS1 = '0'
-            Rook-Redraw-Prompt
+            $env:POLARIS_TERMINAL_HONOR_PS1 = '0'
+            PolarisTerminal-Redraw-Prompt
         }
 
         Set-PSReadLineOption -AddToHistoryHandler {
             param([string]$line)
 
-            if ($line -match '^Rook-Run-GeneratorCommand') {
+            if ($line -match '^PolarisTerminal-Run-GeneratorCommand') {
                 return $false
             }
             return $true
         }
 
-        Rook-Disable-PSPrediction
+        PolarisTerminal-Disable-PSPrediction
     }
 
     # Force use of the Inline PredictionViewStyle. The ListView style can occasionally cause some
-    # flickering when using Rook and it doesn't matter what the value of this setting is because
-    # Rook has its own input editor.
-    function Rook-Disable-PSPrediction {
+    # flickering when using Polaris Terminal and it doesn't matter what the value of this setting is because
+    # Polaris Terminal has its own input editor.
+    function PolarisTerminal-Disable-PSPrediction {
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseCompatibleCommands', '', Justification = 'Errors are ignored')]
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingEmptyCatchBlock', '', Justification = 'Errors expected')]
         param()
@@ -447,8 +447,8 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         }
     }
 
-    function Rook-Precmd {
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPositionalParameters', '', Justification = 'Rook-Git should use positionals')]
+    function PolarisTerminal-Precmd {
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPositionalParameters', '', Justification = 'PolarisTerminal-Git should use positionals')]
         param([bool]$status, [int]$code)
         # Our logic here is:
         #
@@ -460,12 +460,12 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         #
         # Note that this is not going to be 100% accurate, as some cmdlets will fail
         # without setting a $LASTEXITCODE, meaning the $LASTEXITCODE will be stale.
-        $rookCommandNotFound = $script:commandNotFound
+        $ptermCommandNotFound = $script:commandNotFound
         $script:commandNotFound = $false
 
         $exitCode = if ($status) {
             0
-        } elseif ($rookCommandNotFound) {
+        } elseif ($ptermCommandNotFound) {
             127
         } elseif ($code -eq 0) {
             1
@@ -481,19 +481,19 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         $HOST.UI.RawUI.WindowTitle = $newTitle
 
         $blockId = $script:nextBlockId++
-        $nextBlockId = "precmd-${global:_rookSessionId}-$blockId"
+        $nextBlockId = "precmd-${global:_ptermSessionId}-$blockId"
         $commandFinishedMsg = @{
             hook = 'CommandFinished'
             value = @{
-                session_id = $global:_rookSessionId
+                session_id = $global:_ptermSessionId
                 exit_code = $exitCode
                 next_block_id = $nextBlockId
             }
         }
-        Rook-Send-JsonMessage $commandFinishedMsg
-        Rook-Send-ResetGridOSC
+        PolarisTerminal-Send-JsonMessage $commandFinishedMsg
+        PolarisTerminal-Send-ResetGridOSC
 
-        Rook-Configure-PSReadLine
+        PolarisTerminal-Configure-PSReadLine
 
         # If this is being called for a generator command, short circuit and send an unpopulated
         # precmd payload (except for pwd), since we don't re-render the prompt after generator commands
@@ -514,11 +514,11 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
                     git_branch = ''
                     virtual_env = ''
                     conda_env = ''
-                    session_id = $global:_rookSessionId
+                    session_id = $global:_ptermSessionId
                     is_after_in_band_command = $true
                 }
             }
-            Rook-Send-JsonMessage $precmdMsg
+            PolarisTerminal-Send-JsonMessage $precmdMsg
         } else {
             # TODO(CORE-2678): Figure out resetting bindkeys here
 
@@ -533,7 +533,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
             # blocks created during the bootstrap process don't have visible
             # prompts, and we don't want to invoke 'git' before we've sourced the
             # user's rcfiles and have a fully-populated PATH.
-            if ($global:ROOK_BOOTSTRAPPED -eq 1) {
+            if ($global:POLARIS_TERMINAL_BOOTSTRAPPED -eq 1) {
                 if (Test-Path env:VIRTUAL_ENV) {
                     $virtualEnv = $env:VIRTUAL_ENV
                 }
@@ -545,17 +545,17 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
                 }
 
                 # Compute the Node.js version only when the Node.js Version chip is enabled
-                # (ROOK_PROMPT_NODE_VERSION_ENABLED is '0' when the chip is not shown; default
+                # (POLARIS_TERMINAL_PROMPT_NODE_VERSION_ENABLED is '0' when the chip is not shown; default
                 # enabled when unset) and node is available. Cache the result keyed on the
                 # current location + PATH so we only spawn node when the directory or PATH
                 # changes (PATH changes on version-manager switches like `nvm use`).
-                $nodeChipEnabled = "$env:ROOK_PROMPT_NODE_VERSION_ENABLED" -ne '0'
+                $nodeChipEnabled = "$env:POLARIS_TERMINAL_PROMPT_NODE_VERSION_ENABLED" -ne '0'
                 $hasNodeCommand = if ($nodeChipEnabled) { Get-Command -CommandType Application node 2>$null } else { $null }
                 if ($hasNodeCommand) {
                     try {
                         $nodeCacheKey = "$($PWD.Path)|$env:PATH"
-                        if ($nodeCacheKey -eq $script:rookNodeVersionCacheKey) {
-                            $nodeVersion = $script:rookNodeVersionCacheValue
+                        if ($nodeCacheKey -eq $script:ptermNodeVersionCacheKey) {
+                            $nodeVersion = $script:ptermNodeVersionCacheValue
                         } else {
                             # Walk up from the current directory to find a package.json
                             $dir = Get-Item -LiteralPath $PWD.Path
@@ -584,12 +584,12 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
                                 }
 
                                 if ($inGitRepo) {
-                                    $nodeVersion = Rook-TryGet-NodeVersion
+                                    $nodeVersion = PolarisTerminal-TryGet-NodeVersion
                                 }
                             }
 
-                            $script:rookNodeVersionCacheKey = $nodeCacheKey
-                            $script:rookNodeVersionCacheValue = $nodeVersion
+                            $script:ptermNodeVersionCacheKey = $nodeCacheKey
+                            $script:ptermNodeVersionCacheValue = $nodeVersion
                         }
                     } catch {
                         # Log at verbose level so the catch block is not empty and diagnostics are available when needed.
@@ -604,12 +604,12 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
                 $hasGitCommand = Get-Command -CommandType Application git 2>$null
                 if ($hasGitCommand) {
                     # This is deliberately not using || b/c || only works in Powershell >=7
-                    $gitBranchTmp = Rook-Git symbolic-ref --short HEAD 2>$null
+                    $gitBranchTmp = PolarisTerminal-Git symbolic-ref --short HEAD 2>$null
                     if ($null -ne $gitBranchTmp) {
                         $gitBranch = $gitBranchTmp
                         $gitHead = $gitBranchTmp
                     } else {
-                        $gitHeadTmp = Rook-Git rev-parse --short HEAD 2>$null
+                        $gitHeadTmp = PolarisTerminal-Git rev-parse --short HEAD 2>$null
                         if ($null -ne $gitHeadTmp) {
                             $gitHead = $gitHeadTmp
                         }
@@ -617,7 +617,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
                 }
             }
 
-            $honor_ps1 = "$env:ROOK_HONOR_PS1" -eq '1'
+            $honor_ps1 = "$env:POLARIS_TERMINAL_HONOR_PS1" -eq '1'
 
             $precmdMsg = @{
                 hook = 'Precmd'
@@ -637,11 +637,11 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
                     virtual_env = $virtualEnv
                     conda_env = $condaEnv
                     node_version = $nodeVersion
-                    session_id = $global:_rookSessionId
+                    session_id = $global:_ptermSessionId
                     kube_config = $kubeConfig
                 }
             }
-            Rook-Send-JsonMessage $precmdMsg
+            PolarisTerminal-Send-JsonMessage $precmdMsg
         }
     }
 
@@ -658,7 +658,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
     # Both pools open in the background: opening a runspace costs 50-80 ms,
     # and opening them here kept the prompt waiting for every one of them
     # (0.6-0.8 s with the ten this pool used to start with). They are waited
-    # for in Rook-Wait-RunspacePools, right before their first use.
+    # for in PolarisTerminal-Wait-RunspacePools, right before their first use.
     $script:innerRunspacePool = [runspacefactory]::CreateRunspacePool(2, 20)
     $script:innerRunspacePool.ApartmentState = [System.Threading.ApartmentState]::STA
     $script:innerRunspacePool.ThreadOptions = 'ReuseThread'
@@ -677,7 +677,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
     $script:outerRunspacePoolOpening = $script:outerRunspacePool.BeginOpen($null, $null)
 
     # Blocks until both pools have finished opening. Only the first call waits.
-    function Rook-Wait-RunspacePools {
+    function PolarisTerminal-Wait-RunspacePools {
         if ($null -ne $script:innerRunspacePoolOpening) {
             $script:innerRunspacePool.EndOpen($script:innerRunspacePoolOpening)
             $script:innerRunspacePoolOpening = $null
@@ -688,17 +688,17 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         }
     }
 
-    class RookGeneratorCommand {
+    class PtermGeneratorCommand {
         [string]$CommandId
         [string]$Command
     }
 
-    function Rook-Run-GeneratorCommandImpl {
+    function PolarisTerminal-Run-GeneratorCommandImpl {
         param(
-            [RookGeneratorCommand[]]$commands
+            [PtermGeneratorCommand[]]$commands
         )
 
-        Rook-Wait-RunspacePools
+        PolarisTerminal-Wait-RunspacePools
 
         $jobNumber = $script:inBandCommandCount++
 
@@ -708,18 +708,18 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
             $command = $_.Command
 
             # Creates a powershell instance on one of our inner runspaces
-            # that first loads all the rook common functions, and then
+            # that first loads all the polaris-terminal common functions, and then
             # executes the in-band generator in the current directory
             $ps = [powershell]::Create()
             $ps.RunspacePool = $script:innerRunspacePool
-            $ps.AddScript($rookCommon) | Out-Null
+            $ps.AddScript($ptermCommon) | Out-Null
             $ps.AddScript({
                     param([string]$loc, [string]$commandId, [string]$command)
                     Set-Location $loc
-                    Rook-Run-InBandGenerator -commandId $commandId -command "$command"
+                    PolarisTerminal-Run-InBandGenerator -commandId $commandId -command "$command"
                 }).AddParameters(@($PWD.Path, $commandId, "$command")) | Out-Null
 
-            $script:threadInner["Rook-Inner-$jobNumber-$batchNumber"] = $psInner
+            $script:threadInner["PolarisTerminal-Inner-$jobNumber-$batchNumber"] = $psInner
             $batchNumber++
 
             @{
@@ -729,10 +729,10 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         }
 
         # Creates the outer job, which waits on all the inner jobs
-        # and then sends the results back to Rook via OSC
+        # and then sends the results back to Polaris Terminal via OSC
         $psOuter = [powershell]::Create()
         $psOuter.RunspacePool = $script:outerRunspacePool
-        $psOuter.AddScript($rookCommon) | Out-Null
+        $psOuter.AddScript($ptermCommon) | Out-Null
         $psOuter.AddScript({
                 param([object[]]$jobs)
 
@@ -756,7 +756,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
                     } catch {
                         $output = "$commandId;1;"
                     }
-                    Rook-Send-GeneratorOutputOsc $output
+                    PolarisTerminal-Send-GeneratorOutputOsc $output
                 }
             }).AddParameters(@($jobs)) | Out-Null
 
@@ -764,16 +764,16 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         # not stopping it as we do not want to block the main thread.
         $async = $psOuter.BeginInvoke()
 
-        $script:threadOuter["Rook-Outer-$jobNumber"] = $psOuter
+        $script:threadOuter["PolarisTerminal-Outer-$jobNumber"] = $psOuter
     }
 
-    function Rook-Stop-ActiveThread {
+    function PolarisTerminal-Stop-ActiveThread {
         $script:threadInner.values | ForEach-Object {
             $_.Stop()
         }
     }
 
-    function Rook-Clean-CompletedThread {
+    function PolarisTerminal-Clean-CompletedThread {
         # Powershell instances states > 2 are terminal.
         # See https://learn.microsoft.com/en-us/dotnet/api/system.management.automation.psinvocationstate
         if ($script:threadInner.Count -gt 0) {
@@ -798,7 +798,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         }
     }
 
-    function Rook-Run-GeneratorCommand {
+    function PolarisTerminal-Run-GeneratorCommand {
         [CmdletBinding()]
         param(
             [parameter(ValueFromRemainingArguments = $true)][string[]]$passedArgs
@@ -807,7 +807,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         $status = $?
         $code = $global:LASTEXITCODE
 
-        # Setting this environment variable prevents rook_precmd from emitting the
+        # Setting this environment variable prevents pterm_precmd from emitting the
         # 'Block started' hook to the Rust app.
         $script:generatorCommand = $true
 
@@ -815,15 +815,15 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         # (which doesn't really exist in powershell, but :shrug:), we need
         # to properly handle them here like we do in bashzshfish
 
-        # Converts the passed in args to RookGeneratorCommand objects to group them together
+        # Converts the passed in args to PtermGeneratorCommand objects to group them together
         # note that if an odd number of arguments is passed in, the last arg will be silently ignored
-        [RookGeneratorCommand[]] $jobs = @()
+        [PtermGeneratorCommand[]] $jobs = @()
         for ($i = 0; $i -lt $passedArgs.Length; $i += 2) {
             $commandId = $passedArgs[$i]
             $command = $passedArgs[$i + 1]
 
             if ($null -ne $command) {
-                $jobs += [RookGeneratorCommand]@{
+                $jobs += [PtermGeneratorCommand]@{
                     commandId = $commandId
                     command = $command
                 }
@@ -831,15 +831,15 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         }
 
         try {
-            Rook-Run-GeneratorCommandImpl -commands $jobs
+            PolarisTerminal-Run-GeneratorCommandImpl -commands $jobs
         } finally {
-            # NOTE: for some reason the Rook-Restore-ErrorStatus does not work
+            # NOTE: for some reason the PolarisTerminal-Restore-ErrorStatus does not work
             # for this function, so we are inlining it in here.
             $global:LASTEXITCODE = $code
             if ($status -eq $false) {
                 $PSCmdlet.WriteError([System.Management.Automation.ErrorRecord]::new(
                         [Exception]::new("$([char]0x00)"),
-                        'rook-reset-error',
+                        'polaris-terminal-reset-error',
                         [System.Management.Automation.ErrorCategory]::NotSpecified,
                         $null
                     ))
@@ -850,7 +850,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
 
     # Computes native shell completions for a command line and emits them over the OSC 9280 wire
     # protocol.
-    function Rook-Run-GeneratorCommand-NativeCompletion {
+    function PolarisTerminal-Run-GeneratorCommand-NativeCompletion {
         [CmdletBinding()]
         param([string]$hexEncodedLine)
 
@@ -860,7 +860,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
 
         Write-Host -NoNewline "$([char]0x1b)]9280;A$oscEnd"
         try {
-            $line = Rook-Decode-HexString $hexEncodedLine
+            $line = PolarisTerminal-Decode-HexString $hexEncodedLine
 
             # An empty line has no useful completions.
             if (-not [string]::IsNullOrEmpty($line)) {
@@ -879,11 +879,11 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
                     Write-Host -NoNewline "$([char]0x1b)]9280;S;$replacementStartBytes,$($replacementEndBytes - $replacementStartBytes)$oscEnd"
                 }
                 foreach ($match in $completion.CompletionMatches) {
-                    Write-Host -NoNewline "$([char]0x1b)]9280;C;$(Rook-Encode-HexString $match.CompletionText)$oscEnd"
+                    Write-Host -NoNewline "$([char]0x1b)]9280;C;$(PolarisTerminal-Encode-HexString $match.CompletionText)$oscEnd"
                     if (-not [string]::IsNullOrEmpty($match.ToolTip) -and $match.ToolTip -ne $match.CompletionText) {
                         # Cmdlet/parameter tooltips can span multiple lines; collapse to one line.
                         $description = ($match.ToolTip -split '\r?\n' | Where-Object { $_.Trim() -ne '' }) -join ' '
-                        Write-Host -NoNewline "$([char]0x1b)]9280;D?description;$(Rook-Encode-HexString $description)$oscEnd"
+                        Write-Host -NoNewline "$([char]0x1b)]9280;D?description;$(PolarisTerminal-Encode-HexString $description)$oscEnd"
                     }
                 }
             }
@@ -896,7 +896,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
             if ($status -eq $false) {
                 $PSCmdlet.WriteError([System.Management.Automation.ErrorRecord]::new(
                         [Exception]::new("$([char]0x00)"),
-                        'rook-reset-error',
+                        'polaris-terminal-reset-error',
                         [System.Management.Automation.ErrorCategory]::NotSpecified,
                         $null
                     ))
@@ -904,7 +904,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         }
     }
 
-    function Rook-Render-Prompt {
+    function PolarisTerminal-Render-Prompt {
         param([bool]$status, [int]$code, [bool]$isGeneratorCommand)
 
         # If this is a generator command, we do not want to recompute
@@ -922,13 +922,13 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         }
 
         # Compute prompt and cache it as the last rendered prompt
-        $basePrompt = & $global:_rookOriginalPrompt
+        $basePrompt = & $global:_ptermOriginalPrompt
         $script:lastRenderedPrompt = $basePrompt
 
         return $basePrompt
     }
 
-    function Rook-Decorate-Prompt {
+    function PolarisTerminal-Decorate-Prompt {
         param([string]$basePrompt)
 
         $e = "$([char]0x1b)"
@@ -936,7 +936,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         # Wrap prompt in Prompt Marker OSCs
         $startPromptMarker = "$e]133;A$oscEnd"
         $startRPromptMarker = "$e]133;P;k=r$oscEnd"
-        if ("$env:ROOK_HONOR_PS1" -eq '0') {
+        if ("$env:POLARIS_TERMINAL_HONOR_PS1" -eq '0') {
             $endPromptMarker = "$e]133;B$oscEnd$oscResetGrid"
         } else {
             $endPromptMarker = "$e]133;B$oscEnd"
@@ -961,7 +961,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
     $script:dontRunPrecmdForPrompt = $false
     # Redraws the prompt. Since our prompt also triggers the precmd hook
     # we need to signal that we do not want that to happen
-    function Rook-Redraw-Prompt {
+    function PolarisTerminal-Redraw-Prompt {
         param()
 
         $y = $Host.UI.RawUI.CursorPosition.Y
@@ -973,27 +973,27 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         }
     }
 
-    function Rook-Prompt {
+    function PolarisTerminal-Prompt {
         param()
 
         # We need to capture all the data related to exit codes and such
         # as soon as possible for a few reasons
         # 1. We need to make sure that these values are as fresh as possible
-        #    and are not impacted by our Rook- functions
-        # 2. After we finish running Rook-Precmd and Rook-Render-Prompt, we want to set these values
+        #    and are not impacted by our Polaris Terminal- functions
+        # 2. After we finish running PolarisTerminal-Precmd and PolarisTerminal-Render-Prompt, we want to set these values
         #    back to what they were originally
         $status = $?
         $code = $LASTEXITCODE
         $isGeneratorCommand = [bool]($script:generatorCommand -eq $true)
 
         if ($script:dontRunPrecmdForPrompt -ne $true) {
-            Rook-Precmd -status $status -code $code
+            PolarisTerminal-Precmd -status $status -code $code
         }
 
         $script:preexecHandled = $false
 
-        $renderedPrompt = Rook-Render-Prompt -status $status -code $code -isGeneratorCommand $isGeneratorCommand
-        $decoratedPrompt = Rook-Decorate-Prompt -basePrompt $renderedPrompt
+        $renderedPrompt = PolarisTerminal-Render-Prompt -status $status -code $code -isGeneratorCommand $isGeneratorCommand
+        $decoratedPrompt = PolarisTerminal-Decorate-Prompt -basePrompt $renderedPrompt
         $extraLines = ($decoratedPrompt -split "$([char]0x0a)").Length - 1
         Set-PSReadLineOption -ExtraPromptLineCount $extraLines
 
@@ -1006,31 +1006,31 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         return $decoratedPrompt
     }
 
-    if ((Test-Path env:ROOK_INITIAL_WORKING_DIR) -and -not [String]::IsNullOrEmpty($env:ROOK_INITIAL_WORKING_DIR)) {
-        Set-Location $env:ROOK_INITIAL_WORKING_DIR 2> $null
-        Remove-Item -Path env:ROOK_INITIAL_WORKING_DIR
+    if ((Test-Path env:POLARIS_TERMINAL_INITIAL_WORKING_DIR) -and -not [String]::IsNullOrEmpty($env:POLARIS_TERMINAL_INITIAL_WORKING_DIR)) {
+        Set-Location $env:POLARIS_TERMINAL_INITIAL_WORKING_DIR 2> $null
+        Remove-Item -Path env:POLARIS_TERMINAL_INITIAL_WORKING_DIR
     }
 
     # In some cases, the Clear-Host command will not interface properly with the blocklist.
     # Clear-Host defers to whatever the 'clear' command is defined, and if that command
-    # is not set up to work with Rook (or has funky other behaviors) it can cause problems.
+    # is not set up to work with Polaris Terminal (or has funky other behaviors) it can cause problems.
     #
     # Specific examples:
     # - The default /usr/bin/clear on mac creates a giant, empty block to clear content
     #   off of the screen.
     # - if miniconda is installed on an osx system, the miniconda 'clear' command will be
-    #   invoked for 'Clear-Host', which does not play with Rook and winds up doing nothing.
+    #   invoked for 'Clear-Host', which does not play with Polaris Terminal and winds up doing nothing.
 
     # Because of the above, we explicitly override both 'Clear-Host' and 'clear' to
-    # instead send a DCS command to Rook instructing it to clear the blocklist.
+    # instead send a DCS command to Polaris Terminal instructing it to clear the blocklist.
     # We are explicitly NOT calling the underlying clear implementation:
     # 1. B/c traditional clear sends an escape sequence that ends up creating an
     #    empty block that is the full height of the screen.
     # 1. B/c our other bootstrap scripts (bash, zsh, fish) do not.
 
     # If we ever want to call the underlying clear command, we could do so by:
-    # 1. Capturing it with '$_rook_original_clear = (Get-Command Clear-Host).Definition'
-    # 2. Invoking it with 'Invoke-Expression $_rook_original_clear'
+    # 1. Capturing it with '$_pterm_original_clear = (Get-Command Clear-Host).Definition'
+    # 2. Invoking it with 'Invoke-Expression $_pterm_original_clear'
 
     # TODO(PLAT-781): On windows, these two functions should both clear the visible screen
     # AND the scrollback
@@ -1038,25 +1038,25 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         $inputBufferMsg = @{
             hook = 'Clear'
             value = @{
-                session_id = $global:_rookSessionId
+                session_id = $global:_ptermSessionId
             }
         }
-        Rook-Send-JsonMessage $inputBufferMsg
+        PolarisTerminal-Send-JsonMessage $inputBufferMsg
     }
 
     function clear() {
         $inputBufferMsg = @{
             hook = 'Clear'
             value = @{
-                session_id = $global:_rookSessionId
+                session_id = $global:_ptermSessionId
             }
         }
-        Rook-Send-JsonMessage $inputBufferMsg
+        PolarisTerminal-Send-JsonMessage $inputBufferMsg
     }
 
-    function Rook-Finish-Bootstrap {
+    function PolarisTerminal-Finish-Bootstrap {
         param([decimal]$rcStartTime, [decimal]$rcEndTime)
-        Rook-Configure-PSReadLine
+        PolarisTerminal-Configure-PSReadLine
 
         # This is the closest we can get in PowerShell to a proper preexec hook. We wrap the
         # invocation of PSConsoleHostReadline, and call our preexec hook before returning the
@@ -1066,7 +1066,7 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         $function:global:PSConsoleHostReadLine = {
             $line = & $script:oldPSConsoleHostReadLine
 
-            Rook-Preexec "$line"
+            PolarisTerminal-Preexec "$line"
 
             $line
         }
@@ -1081,9 +1081,9 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
             # automatically by PowerShell internals. Runspace is for user-submitted/configured stuff.
             # However, Runspace still includes stuff like the prompt function, PostCommandLookupAction,
             # and the stuff we set during this bootstrap. So, add a condition to prevent preexec from
-            # triggering in those cases. Note that we prefix our own functions with the "Rook-" prefix
+            # triggering in those cases. Note that we prefix our own functions with the "Polaris Terminal-" prefix
             # so that we can ignore them here.
-            if ($EventArgs.CommandOrigin -ne 'Runspace' -or ($commandLine -match '^prompt$|^Rook-')) {
+            if ($EventArgs.CommandOrigin -ne 'Runspace' -or ($commandLine -match '^prompt$|^Polaris Terminal-')) {
                 return
             }
             $script:commandNotFound = $true
@@ -1091,23 +1091,23 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
 
         # This sets up our wrapper around $function:prompt, which runs the precmd hook
         # and computes the user's custom prompt.
-        $function:global:prompt = (Get-Command Rook-Prompt).ScriptBlock
-        Rook-Bootstrapped -rcStartTime $rcStartTime -rcEndTime $rcEndTime
+        $function:global:prompt = (Get-Command PolarisTerminal-Prompt).ScriptBlock
+        PolarisTerminal-Bootstrapped -rcStartTime $rcStartTime -rcEndTime $rcEndTime
     }
 
     ###########################################################
     # NOTE: NO non-bootstrap / non-user calls below this line #
     ###########################################################
 
-    # Send a precmd message to the terminal to differentiate between the rook
+    # Send a precmd message to the terminal to differentiate between the polaris-terminal
     # bootstrap logic pasted into the PTY and the output of shell startup files.
-    Rook-Precmd -status $global:? -code $global:LASTEXITCODE
+    PolarisTerminal-Precmd -status $global:? -code $global:LASTEXITCODE
 
-    Export-ModuleMember -Function clear, Clear-Host, Get-EpochTime, Rook-Finish-Update, Rook-Handle-DistUpgrade, Rook-Run-GeneratorCommand, Rook-Run-GeneratorCommand-NativeCompletion, Rook-Finish-Bootstrap
+    Export-ModuleMember -Function clear, Clear-Host, Get-EpochTime, PolarisTerminal-Finish-Update, PolarisTerminal-Handle-DistUpgrade, PolarisTerminal-Run-GeneratorCommand, PolarisTerminal-Run-GeneratorCommand-NativeCompletion, PolarisTerminal-Finish-Bootstrap
 }
 
 # Finally, get ready to source the user's RC files. This must be done in the global scope (not
-# inside Rook-Module) in order to obey the expected scoping in PowerShell's typical startup process.
+# inside PolarisTerminal-Module) in order to obey the expected scoping in PowerShell's typical startup process.
 . {
     $rcStartTime = Get-EpochTime
     # Source the user's RC files
@@ -1124,11 +1124,11 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
         }
     }
 
-    # Append additional PATH entries if provided via ROOK_PATH_APPEND.
+    # Append additional PATH entries if provided via POLARIS_TERMINAL_PATH_APPEND.
     # This happens after we source RC files in case they reset PATH.
-    if (-not [String]::IsNullOrEmpty($env:ROOK_PATH_APPEND)) {
-        $env:PATH = '{0}{1}{2}' -f $env:PATH, [IO.Path]::PathSeparator, $env:ROOK_PATH_APPEND
-        Remove-Item -Path env:ROOK_PATH_APPEND
+    if (-not [String]::IsNullOrEmpty($env:POLARIS_TERMINAL_PATH_APPEND)) {
+        $env:PATH = '{0}{1}{2}' -f $env:PATH, [IO.Path]::PathSeparator, $env:POLARIS_TERMINAL_PATH_APPEND
+        Remove-Item -Path env:POLARIS_TERMINAL_PATH_APPEND
     }
 
     # This is a workaround for oh-my-posh's "transient prompt" feature. When enabled, it causes the
@@ -1148,13 +1148,13 @@ $null = New-Module -Name Rook-Module -ScriptBlock {
 
     # Capture the current prompt (potentially modified by a profile),
     # and then reset the prompt to our current noop prompt.
-    $global:_rookOriginalPrompt = $function:global:prompt
+    $global:_ptermOriginalPrompt = $function:global:prompt
 
-    Rook-Finish-Bootstrap -rcStartTime $rcStartTime -rcEndTime $rcEndTime
+    PolarisTerminal-Finish-Bootstrap -rcStartTime $rcStartTime -rcEndTime $rcEndTime
     Remove-Variable -Name enterHandler, ctrlcHandler, rcStartTime, rcEndTime -Scope global -ErrorAction Ignore
 
     # Restore the process's original execution policy now that the user's RC files have been loaded.
-    if ($global:_rook_PSProcessExecPolicy -ne $null) {
-        Set-ExecutionPolicy -Scope Process -ExecutionPolicy $global:_rook_PSProcessExecPolicy
+    if ($global:_pterm_PSProcessExecPolicy -ne $null) {
+        Set-ExecutionPolicy -Scope Process -ExecutionPolicy $global:_pterm_PSProcessExecPolicy
     }
 }

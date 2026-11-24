@@ -1,9 +1,9 @@
-use rookui::elements::{Flex, MouseStateHandle, ParentElement};
-use rookui::fonts::Weight;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element};
+use ptermui::elements::{Flex, MouseStateHandle, ParentElement};
+use ptermui::fonts::Weight;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element};
 
-use super::{RookDriveItem, RookDriveItemId};
+use super::{PtermDriveItem, PtermDriveItemId};
 use crate::appearance::Appearance;
 use crate::cloud_object::CloudObjectMetadata;
 use crate::drive::index::DriveIndexAction;
@@ -12,13 +12,13 @@ use crate::notebooks::CloudNotebook;
 use crate::themes::theme::Fill;
 
 #[derive(Clone)]
-pub struct RookDriveNotebook {
+pub struct PtermDriveNotebook {
     id: CloudObjectTypeAndId,
     notebook: CloudNotebook,
     is_ai_document: bool,
 }
 
-impl RookDriveNotebook {
+impl PtermDriveNotebook {
     pub fn new(id: CloudObjectTypeAndId, notebook: CloudNotebook, is_ai_document: bool) -> Self {
         Self {
             id,
@@ -28,7 +28,7 @@ impl RookDriveNotebook {
     }
 }
 
-impl RookDriveItem for RookDriveNotebook {
+impl PtermDriveItem for PtermDriveNotebook {
     fn display_name(&self) -> Option<String> {
         if self.notebook.model().title.is_empty() {
             None
@@ -82,8 +82,8 @@ impl RookDriveItem for RookDriveNotebook {
         Some(Flex::column().with_child(title).finish())
     }
 
-    fn rook_drive_id(&self) -> RookDriveItemId {
-        RookDriveItemId::Object(self.id)
+    fn pterm_drive_id(&self) -> PtermDriveItemId {
+        PtermDriveItemId::Object(self.id)
     }
 
     fn sync_status_icon(
@@ -103,7 +103,7 @@ impl RookDriveItem for RookDriveNotebook {
         None
     }
 
-    fn clone_box(&self) -> Box<dyn RookDriveItem> {
+    fn clone_box(&self) -> Box<dyn PtermDriveItem> {
         Box::new(self.clone())
     }
 }

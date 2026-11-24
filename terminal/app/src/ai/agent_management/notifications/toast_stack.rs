@@ -1,20 +1,22 @@
 use std::time::Duration;
 
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::elements::{
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::elements::{
     Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DispatchEventResult, Element, EventHandler, Flex, Hoverable, MouseStateHandle,
     OffsetPositioning, Padding, ParentElement, PositionedElementAnchor,
     PositionedElementOffsetBounds, Radius, SavePosition, Shrinkable, Stack,
 };
-use rookui::keymap::Keystroke;
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::keyboard_shortcut::KeyboardShortcut;
-use rookui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::keymap::Keystroke;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::keyboard_shortcut::KeyboardShortcut;
+use ptermui::{
+    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 
 use crate::ai::agent_management::notifications::item_rendering::{
     NotificationRenderContext, OnExpandClick, create_notification_artifact_buttons_view,
@@ -367,7 +369,7 @@ fn render_toast(
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let theme = appearance.theme();
-    let on_expand: OnExpandClick = Box::new(move |ctx: &mut rookui::EventContext| {
+    let on_expand: OnExpandClick = Box::new(move |ctx: &mut ptermui::EventContext| {
         ctx.dispatch_typed_action(AgentNotificationToastAction::ToggleMessageExpanded(id));
     });
     let keybinding_hint = keystroke.map(|ks| render_keybinding_hint(ks, appearance));

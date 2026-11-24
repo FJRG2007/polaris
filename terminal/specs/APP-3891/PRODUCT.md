@@ -6,9 +6,9 @@ Allow users to paste screenshots into the CLI agent rich input (e.g. when compos
 
 ## Problem
 
-When using CLI agents like Claude Code through Rook's rich input, users cannot share visual context (screenshots, UI mockups, error dialogs) with the agent. The only workaround is to save the image to disk, note the file path, and manually type a reference to it — which breaks the conversational flow.
+When using CLI agents like Claude Code through Polaris Terminal's rich input, users cannot share visual context (screenshots, UI mockups, error dialogs) with the agent. The only workaround is to save the image to disk, note the file path, and manually type a reference to it — which breaks the conversational flow.
 
-Rook's agent mode already supports pasting images as attachment chips, but the CLI agent rich input did not render chips or deliver images on submission.
+Polaris Terminal's agent mode already supports pasting images as attachment chips, but the CLI agent rich input did not render chips or deliver images on submission.
 
 ## Goals
 
@@ -22,7 +22,7 @@ Rook's agent mode already supports pasting images as attachment chips, but the C
 - Drag-and-drop image files into the CLI agent rich input (should work for free via existing infrastructure, but not explicitly targeted or tested).
 - Supporting CLI agents that cannot read images from the clipboard (e.g. agents with no Ctrl+V image support).
 - Inline image preview/thumbnails within the rich input — chips show filename only, matching agent mode.
-- Sending images to Rook's own agent mode backend through this path (that uses a separate server-side flow).
+- Sending images to Polaris Terminal's own agent mode backend through this path (that uses a separate server-side flow).
 
 ## Figma
 
@@ -50,7 +50,7 @@ Figma: none provided. The UI reuses existing attachment chip rendering from agen
 
 ### Delivery mechanism
 
-Images are delivered by simulating what a user would do manually: for each attached image, Rook writes the image data to the system clipboard and sends Ctrl+V (`0x16`) to the PTY. The CLI agent (e.g. Claude Code) reads the image from the clipboard natively.
+Images are delivered by simulating what a user would do manually: for each attached image, Polaris Terminal writes the image data to the system clipboard and sends Ctrl+V (`0x16`) to the PTY. The CLI agent (e.g. Claude Code) reads the image from the clipboard natively.
 
 - A 500ms delay is inserted between each image paste to give the CLI agent time to read from the clipboard before it's overwritten with the next image. This was tested empirically in prototype - we need a relatively significant delay here for the CLI agent to pick up the paste correctly.
 - After all images are pasted, the text prompt is sent using the agent-specific submission strategy (inline, bracketed paste, or delayed enter).
@@ -59,7 +59,7 @@ Images are delivered by simulating what a user would do manually: for each attac
 
 ### 1. Save images to temp files and include file paths in the prompt text
 
-The first approach implemented was to decode each attached image from base64, write it to a temp file on disk (e.g. `/var/folders/.../rook-cli-image-1776199745040956000.png`), and prepend a `[Attached images: /path/to/file]` block to the prompt text.
+The first approach implemented was to decode each attached image from base64, write it to a temp file on disk (e.g. `/var/folders/.../polaris-terminal-cli-image-1776199745040956000.png`), and prepend a `[Attached images: /path/to/file]` block to the prompt text.
 
 **Why we didn't choose this:**
 - The temp file paths are ugly and OS-specific (`/var/folders/...` on macOS).

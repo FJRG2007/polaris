@@ -1,20 +1,20 @@
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::icons::Icon;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rookui_core::elements::{
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::icons::Icon;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui_core::elements::{
     Border, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Empty, Flex, FormattedTextElement, Hoverable, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, ParentElement, Radius, Stack,
 };
-use rookui_core::fonts::Weight;
-use rookui_core::keymap::Keystroke;
-use rookui_core::platform::Cursor;
-use rookui_core::prelude::Align;
-use rookui_core::text_layout::TextAlignment;
-use rookui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
-use rookui_core::{
+use ptermui_core::fonts::Weight;
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::platform::Cursor;
+use ptermui_core::prelude::Align;
+use ptermui_core::text_layout::TextAlignment;
+use ptermui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui_core::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
     ViewContext,
 };
@@ -62,7 +62,7 @@ impl OfferVariant {
     pub(crate) fn primary_label(self) -> &'static str {
         match self {
             OfferVariant::HeadStart => "Unlock the full AI experience",
-            OfferVariant::ChooseHowToStart => "Use Rook with AI",
+            OfferVariant::ChooseHowToStart => "Use Polaris Terminal with AI",
         }
     }
 
@@ -72,7 +72,7 @@ impl OfferVariant {
                 "Get more monthly usage, expanded cloud agent access, and collaboration features."
             }
             OfferVariant::ChooseHowToStart => {
-                "Rook Agent works locally or in the cloud with frontier and OSS models. Proactively fix terminal errors, implement changes, and ship verified code."
+                "Polaris Terminal Agent works locally or in the cloud with frontier and OSS models. Proactively fix terminal errors, implement changes, and ship verified code."
             }
         }
     }
@@ -107,7 +107,7 @@ impl OfferVariant {
             OfferVariant::HeadStart => &[
                 "Limited monthly AI usage for occasional tasks",
                 "Access to premium and open-source models",
-                "Use the Rook Agent locally and in the cloud",
+                "Use the Polaris Terminal Agent locally and in the cloud",
             ],
             OfferVariant::ChooseHowToStart => &[],
         }
@@ -132,7 +132,7 @@ impl OfferVariant {
             OfferVariant::HeadStart => "get_more_ai",
             // Telemetry identifier, not user-facing copy: kept stable across the
             // card's copy changes so existing dashboards don't lose continuity.
-            OfferVariant::ChooseHowToStart => "use_rook_with_ai",
+            OfferVariant::ChooseHowToStart => "use_pterm_with_ai",
         }
     }
 }
@@ -142,7 +142,7 @@ pub enum OfferSlideAction {
     SelectPrimary,
     SelectSetUpLater,
     Back,
-    GetRooking,
+    GetPterming,
     CopyUpgradeUrl,
     PasteAuthTokenFromClipboard,
 }
@@ -166,7 +166,7 @@ pub struct OfferSlide {
     primary_mouse_state: MouseStateHandle,
     secondary_mouse_state: MouseStateHandle,
     back_button: button::Button,
-    get_rooking_button: button::Button,
+    get_pterming_button: button::Button,
     selected_choice: OfferChoice,
     scroll_state: ClippedScrollStateHandle,
     show_auth_prompt_bar: bool,
@@ -184,7 +184,7 @@ impl OfferSlide {
             primary_mouse_state: MouseStateHandle::default(),
             secondary_mouse_state: MouseStateHandle::default(),
             back_button: button::Button::default(),
-            get_rooking_button: button::Button::default(),
+            get_pterming_button: button::Button::default(),
             selected_choice: OfferChoice::default(),
             scroll_state: ClippedScrollStateHandle::new(),
             show_auth_prompt_bar: false,
@@ -267,7 +267,7 @@ impl OfferSlide {
                 .with_spacing(10.);
             for feature in features {
                 let check = ConstrainedBox::new(Box::new(
-                    Icon::CheckSkinny.to_rookui_icon(Fill::Solid(green)),
+                    Icon::CheckSkinny.to_ptermui_icon(Fill::Solid(green)),
                 ))
                 .with_width(14.)
                 .with_height(14.)
@@ -348,15 +348,15 @@ impl OfferSlide {
             },
         );
         let enter = Keystroke::parse("enter").unwrap_or_default();
-        let get_rooking = self.get_rooking_button.render(
+        let get_pterming = self.get_pterming_button.render(
             appearance,
             button::Params {
-                content: button::Content::Label("Get Rooking".into()),
+                content: button::Content::Label("Get Pterming".into()),
                 theme: &button::themes::Primary,
                 options: button::Options {
                     keystroke: Some(enter),
                     on_click: Some(Box::new(|ctx, _app, _pos| {
-                        ctx.dispatch_typed_action(OfferSlideAction::GetRooking);
+                        ctx.dispatch_typed_action(OfferSlideAction::GetPterming);
                     })),
                     ..button::Options::default(appearance)
                 },
@@ -368,7 +368,7 @@ impl OfferSlide {
             .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(back)
-            .with_child(get_rooking)
+            .with_child(get_pterming)
             .finish()
     }
 
@@ -519,7 +519,7 @@ impl OfferSlide {
         self.select_choice(choices[next_index], ctx);
     }
 
-    fn get_rooking(&mut self, ctx: &mut ViewContext<Self>) {
+    fn get_pterming(&mut self, ctx: &mut ViewContext<Self>) {
         match self.selected_choice {
             OfferChoice::Primary => self.request_upgrade(ctx),
             OfferChoice::SetUpLater => self.set_up_later(ctx),
@@ -583,7 +583,7 @@ impl OnboardingSlide for OfferSlide {
         self.move_selection(1, ctx);
     }
     fn on_enter(&mut self, ctx: &mut ViewContext<Self>) {
-        self.get_rooking(ctx);
+        self.get_pterming(ctx);
     }
 }
 
@@ -597,7 +597,7 @@ impl TypedActionView for OfferSlide {
                 self.select_choice(OfferChoice::SetUpLater, ctx);
             }
             OfferSlideAction::Back => self.back(ctx),
-            OfferSlideAction::GetRooking => self.get_rooking(ctx),
+            OfferSlideAction::GetPterming => self.get_pterming(ctx),
             OfferSlideAction::CopyUpgradeUrl => {
                 ctx.emit(OfferSlideEvent::CopyUpgradeUrlRequested);
             }

@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 #[cfg(feature = "local_tty")]
-use rookui::{AppContext, ModelContext};
-use rookui::{Entity, SingletonEntity};
+use ptermui::{AppContext, ModelContext};
+use ptermui::{Entity, SingletonEntity};
 #[cfg(feature = "local_tty")]
 use settings::Setting as _;
 
@@ -471,7 +471,7 @@ impl AvailableShells {
         // to search.
         #[cfg(windows)]
         {
-            use rook_util::path::windows;
+            use pterm_util::path::windows;
 
             paths_to_search.extend(windows::powershell_7_install_paths());
             paths_to_search.push(windows::powershell_5_install_path());
@@ -609,7 +609,7 @@ impl AvailableShells {
         value: AvailableShell,
         ctx: &mut ModelContext<Self>,
     ) -> anyhow::Result<()> {
-        use rook_core::features::FeatureFlag;
+        use pterm_core::features::FeatureFlag;
 
         use super::session_settings::SessionSettings;
         SessionSettings::handle(ctx).update(ctx, |settings, ctx| {
@@ -629,7 +629,7 @@ impl AvailableShells {
         paths_to_search: &[PathBuf],
         fallback_path: Option<&Path>,
     ) -> Vec<AvailableShell> {
-        use rook_core::features::FeatureFlag;
+        use pterm_core::features::FeatureFlag;
 
         if !FeatureFlag::ShellSelector.is_enabled() {
             return vec![
@@ -727,7 +727,7 @@ impl AvailableShells {
     fn locate_msys2_executables() -> Vec<PathBuf> {
         use std::env;
 
-        use rook_core::features::FeatureFlag;
+        use pterm_core::features::FeatureFlag;
 
         let mut paths = Vec::new();
 
@@ -928,7 +928,7 @@ impl AvailableShells {
     /// already discovered. Because that discovery supplements the process
     /// `PATH` with well-known install locations (such as `/opt/homebrew/bin`
     /// on macOS), this lookup can find shells that a plain `PATH` search via
-    /// [`AvailableShell::try_from`] would miss when Rook is launched outside
+    /// [`AvailableShell::try_from`] would miss when Polaris Terminal is launched outside
     /// an interactive shell.
     ///
     /// Comparison is case-sensitive on Unix. On Windows, where file names are
@@ -986,7 +986,7 @@ impl Entity for AvailableShells {
 impl SingletonEntity for AvailableShells {}
 
 #[cfg(feature = "local_tty")]
-pub fn register(app: &mut impl rookui::AddSingletonModel) {
+pub fn register(app: &mut impl ptermui::AddSingletonModel) {
     #[cfg(windows)]
     app.add_singleton_model(super::wsl::WslInfo::new);
     app.add_singleton_model(AvailableShells::new);

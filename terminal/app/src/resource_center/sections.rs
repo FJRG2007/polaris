@@ -1,6 +1,6 @@
-use rook_core::context_flag::ContextFlag;
-use rook_core::features::FeatureFlag;
-use rookui::ViewContext;
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::features::FeatureFlag;
+use ptermui::ViewContext;
 
 use super::{
     ContentItem, ContentSectionData, FeatureItem, FeatureSection, FeatureSectionData,
@@ -37,13 +37,13 @@ pub fn sections(ctx: &mut ViewContext<ResourceCenterMainView>) -> Vec<Section> {
             ),
             FeatureItem::new(
                 "Open command palette",
-                "Access all of Rook via the keyboard.",
+                "Access all of Polaris Terminal via the keyboard.",
                 Tip::Action(TipAction::CommandPalette),
                 ctx,
             ),
             FeatureItem::new(
                 "Set your theme",
-                "Make Rook your own by choosing a theme.",
+                "Make Polaris Terminal your own by choosing a theme.",
                 Tip::Action(TipAction::ThemePicker),
                 ctx,
             ),
@@ -51,31 +51,31 @@ pub fn sections(ctx: &mut ViewContext<ResourceCenterMainView>) -> Vec<Section> {
     };
     sections.push(Section::Feature(get_started));
 
-    let maximize_rook = FeatureSectionData {
-        section_name: FeatureSection::MaximizeRook,
-        items: maximize_rook_items(ctx),
+    let maximize_pterm = FeatureSectionData {
+        section_name: FeatureSection::MaximizePterm,
+        items: maximize_pterm_items(ctx),
     };
-    sections.push(Section::Feature(maximize_rook));
+    sections.push(Section::Feature(maximize_pterm));
 
     let advanced_setup = ContentSectionData {
         section_name: FeatureSection::AdvancedSetup,
         items: vec![
             ContentItem {
                 title: "Use your custom prompt",
-                description: "Set up Rook to honor your PS1 setting",
+                description: "Set up Polaris Terminal to honor your PS1 setting",
                 url: "https://docs.rook.dev/terminal/appearance/prompt",
                 button_label: "View documentation",
             },
             ContentItem {
-                title: "Integrate Rook with your IDE",
-                description: "Configure Rook to launch from your most used development tools",
+                title: "Integrate Polaris Terminal with your IDE",
+                description: "Configure Polaris Terminal to launch from your most used development tools",
                 url: "https://docs.rook.dev/terminal/integrations-and-plugins",
                 button_label: "View documentation",
             },
             ContentItem {
-                title: "How Rook uses Rook",
-                description: "Learn how Rook's engineering team uses their favorite features",
-                url: "https://www.rook.dev/blog/how-rook-uses-rook",
+                title: "How Polaris Terminal uses Polaris Terminal",
+                description: "Learn how Polaris Terminal's engineering team uses their favorite features",
+                url: "https://www.rook.dev/blog/how-polaris-terminal-uses-polaris-terminal",
                 button_label: "Read article",
             },
         ],
@@ -85,17 +85,17 @@ pub fn sections(ctx: &mut ViewContext<ResourceCenterMainView>) -> Vec<Section> {
     sections
 }
 
-fn maximize_rook_items(ctx: &mut ViewContext<ResourceCenterMainView>) -> Vec<FeatureItem> {
-    let mut maximize_rook_items = vec![];
+fn maximize_pterm_items(ctx: &mut ViewContext<ResourceCenterMainView>) -> Vec<FeatureItem> {
+    let mut maximize_pterm_items = vec![];
 
-    maximize_rook_items.push(FeatureItem::new(
+    maximize_pterm_items.push(FeatureItem::new(
         "Command search",
         "Find and run previously executed commands, workflows, and more.",
         Tip::Action(TipAction::CommandSearch),
         ctx,
     ));
 
-    maximize_rook_items.push(FeatureItem::new(
+    maximize_pterm_items.push(FeatureItem::new(
         "AI command search",
         "Generate shell commands with natural language.",
         Tip::Action(TipAction::AiCommandSearch),
@@ -103,7 +103,7 @@ fn maximize_rook_items(ctx: &mut ViewContext<ResourceCenterMainView>) -> Vec<Fea
     ));
 
     if ContextFlag::CreateNewSession.is_enabled() {
-        maximize_rook_items.push(FeatureItem::new(
+        maximize_pterm_items.push(FeatureItem::new(
             "Split panes",
             "Split tabs into multiple panes to make your ideal layout.",
             Tip::Action(TipAction::SplitPane),
@@ -112,7 +112,7 @@ fn maximize_rook_items(ctx: &mut ViewContext<ResourceCenterMainView>) -> Vec<Fea
     }
 
     if ContextFlag::LaunchConfigurations.is_enabled() {
-        maximize_rook_items.push(FeatureItem::new(
+        maximize_pterm_items.push(FeatureItem::new(
             "Launch configuration",
             "Save your current configuration of windows, tabs, and panes.",
             Tip::Action(TipAction::SaveNewLaunchConfig),
@@ -120,5 +120,5 @@ fn maximize_rook_items(ctx: &mut ViewContext<ResourceCenterMainView>) -> Vec<Fea
         ));
     }
 
-    maximize_rook_items
+    maximize_pterm_items
 }

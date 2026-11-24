@@ -3,16 +3,16 @@ use std::path::{Path, PathBuf};
 
 use ai::skills::{ParsedSkill, SkillPathOrigin, SkillReference, parse_bundled_skill};
 use futures::TryStreamExt;
-use rook_core::channel::ChannelState;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_core::features::FeatureFlag;
-use rook_core::safe_warn;
-use rook_core::ui::icons::Icon;
-use rook_errors::report_error;
-use rook_util::host_id::HostId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rookui::{AppContext, SingletonEntity};
+use pterm_core::channel::ChannelState;
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_core::features::FeatureFlag;
+use pterm_core::safe_warn;
+use pterm_core::ui::icons::Icon;
+use pterm_errors::report_error;
+use pterm_util::host_id::HostId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use ptermui::{AppContext, SingletonEntity};
 
 use super::SkillDescriptor;
 use crate::ai::mcp::{McpIntegration, TemplatableMCPServerManager};
@@ -26,7 +26,7 @@ pub enum BundledSkillActivation {
     Always,
     /// Active only in the TUI frontend.
     TuiOnly,
-    /// Active only when a specific Rook feature is enabled.
+    /// Active only when a specific Polaris Terminal feature is enabled.
     RequiresFeature(FeatureFlag),
     /// Active only when a specific MCP server is running.
     RequiresMcp(McpIntegration),
@@ -175,16 +175,16 @@ struct BundledSkillDefinition {
     icon: Icon,
 }
 
-/// Skills bundled with Rook for a single host.
+/// Skills bundled with Polaris Terminal for a single host.
 #[derive(Debug, Default)]
 pub struct BundledSkill {
     definitions: HashMap<String, BundledSkillDefinition>,
 }
 
 impl BundledSkill {
-    /// Detect all skill definitions bundled with Rook for the local host.
+    /// Detect all skill definitions bundled with Polaris Terminal for the local host.
     pub async fn detect() -> Self {
-        let Some(resources_dir) = rook_core::paths::bundled_resources_dir() else {
+        let Some(resources_dir) = pterm_core::paths::bundled_resources_dir() else {
             return Self::default();
         };
         Self::detect_in_resources_dir(resources_dir).await
@@ -195,7 +195,7 @@ impl BundledSkill {
     ///
     /// Called directly by the remote-server daemon, whose resources live at
     /// the global install location rather than inside an app bundle (which
-    /// is what [`rook_core::paths::bundled_resources_dir`] resolves).
+    /// is what [`pterm_core::paths::bundled_resources_dir`] resolves).
     pub(crate) async fn detect_in_resources_dir(resources_dir: PathBuf) -> Self {
         let (mut definitions, figma_definitions) = futures::join!(
             load_bundled_skill_definitions(&resources_dir),
@@ -342,7 +342,7 @@ impl BundledSkill {
     }
 }
 
-/// Load skill definitions bundled with Rook.
+/// Load skill definitions bundled with Polaris Terminal.
 async fn load_bundled_skill_definitions(
     resources_dir: &Path,
 ) -> HashMap<String, BundledSkillDefinition> {
@@ -449,11 +449,11 @@ fn display_optional_path(path: Option<PathBuf>) -> String {
 /// Builds the context map for bundled skill variable substitution.
 ///
 /// Supported variables:
-/// - `{{rook_server_url}}` - The server root URL (e.g., `https://api.rook.dev`)
-/// - `{{rook_cli_binary_name}}` - The CLI binary name (e.g., `rook` or `rook-cli`)
-/// - `{{rookctrl_binary_name}}` - The channel-specific Rook Control command name
-/// - `{{rookctrl_wrapper_path}}` - Path to the bundled Rook Control wrapper
-/// - `{{rook_url_scheme}}` - The URL scheme (e.g., `rook`, `rookdev`, `rookpreview`)
+/// - `{{pterm_server_url}}` - The server root URL (e.g., `https://api.rook.dev`)
+/// - `{{pterm_cli_binary_name}}` - The CLI binary name (e.g., `polaris-terminal` or `polaris-terminal-cli`)
+/// - `{{ptermctrl_binary_name}}` - The channel-specific Polaris Terminal Control command name
+/// - `{{ptermctrl_wrapper_path}}` - Path to the bundled Polaris Terminal Control wrapper
+/// - `{{pterm_url_scheme}}` - The URL scheme (e.g., `polaris-terminal`, `polaris-terminal-dev`, `polaris-terminal-preview`)
 /// - `{{settings_schema_path}}` - Path to the bundled JSON settings schema
 /// - `{{skill_dir}}` - Path to the bundled skill's directory
 /// - `{{settings_file_path}}` - Path to the user's settings TOML file
@@ -468,27 +468,27 @@ pub(crate) fn build_bundled_skill_context(
 ) -> HashMap<String, String> {
     [
         (
-            "rook_server_url".to_owned(),
+            "pterm_server_url".to_owned(),
             ChannelState::server_root_url().into_owned(),
         ),
         (
-            "rook_cli_binary_name".to_owned(),
+            "pterm_cli_binary_name".to_owned(),
             ChannelState::channel().cli_command_name().to_owned(),
         ),
         (
-            "rookctrl_binary_name".to_owned(),
-            ChannelState::channel().rookctrl_command_name().to_owned(),
+            "ptermctrl_binary_name".to_owned(),
+            ChannelState::channel().ptermctrl_command_name().to_owned(),
         ),
         (
-            "rookctrl_wrapper_path".to_owned(),
+            "ptermctrl_wrapper_path".to_owned(),
             resources_dir
                 .join("bin")
-                .join(ChannelState::channel().rookctrl_command_name())
+                .join(ChannelState::channel().ptermctrl_command_name())
                 .display()
                 .to_string(),
         ),
         (
-            "rook_url_scheme".to_owned(),
+            "pterm_url_scheme".to_owned(),
             ChannelState::url_scheme().to_owned(),
         ),
         (
@@ -502,24 +502,24 @@ pub(crate) fn build_bundled_skill_context(
         (
             "gui_settings_file_path".to_owned(),
             display_optional_path(
-                rook_core::paths::gui_config_local_dir()
+                pterm_core::paths::gui_config_local_dir()
                     .map(|config_dir| config_dir.join("settings.toml")),
             ),
         ),
         (
             "tui_settings_file_path".to_owned(),
-            rook_core::paths::tui_config_local_dir()
+            pterm_core::paths::tui_config_local_dir()
                 .join("settings.toml")
                 .display()
                 .to_string(),
         ),
         (
             "gui_mcp_config_file_path".to_owned(),
-            display_optional_path(rook_core::paths::gui_mcp_config_file_path()),
+            display_optional_path(pterm_core::paths::gui_mcp_config_file_path()),
         ),
         (
             "tui_mcp_config_file_path".to_owned(),
-            rook_core::paths::tui_mcp_config_file_path()
+            pterm_core::paths::tui_mcp_config_file_path()
                 .display()
                 .to_string(),
         ),
@@ -538,11 +538,11 @@ pub(crate) fn build_bundled_skill_context(
 
 /// Returns the icon for a bundled skill, given its directory-based ID.
 /// Skills with a known brand (e.g. `pr-comments` → GitHub) get a
-/// branded icon; everything else falls back to the Rook logo.
+/// branded icon; everything else falls back to the Polaris Terminal logo.
 pub(crate) fn icon_for_bundled_skill(skill_id: &str) -> Icon {
     match skill_id {
         "pr-comments" => Icon::Github,
-        _ => Icon::RookLogoLight,
+        _ => Icon::PtermLogoLight,
     }
 }
 
@@ -559,7 +559,7 @@ pub(crate) fn activation_for_bundled_skill(
             BundledSkillActivation::RequiresFile(resources_dir.join("settings_schema.json"))
         }
         "tui-migrate-setup" => BundledSkillActivation::TuiOnly,
-        "rookctrl" => BundledSkillActivation::RequiresFeature(FeatureFlag::RookControlCli),
+        "ptermctrl" => BundledSkillActivation::RequiresFeature(FeatureFlag::PtermControlCli),
         // Gate the Factory MCP skill on the same flag that attaches the
         // Factory MCP server, so the skill and the server it documents roll
         // out together.

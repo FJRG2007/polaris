@@ -4,12 +4,12 @@ use std::sync::Arc;
 
 use anyhow::{Context as _, Result};
 use channel_versions::ChannelVersions;
-use rook_errors::report_error;
+use pterm_errors::report_error;
 
 use crate::channel::{Channel, ChannelState};
 use crate::server::server_api::{FETCH_CHANNEL_VERSIONS_TIMEOUT, ServerApi};
 
-// Fetches channel versions asynchronously from the Rook server. If the Rook server request fails,
+// Fetches channel versions asynchronously from the Polaris Terminal server. If the Polaris Terminal server request fails,
 // then fetches from GCP JSON storage as a fallback.
 pub async fn fetch_channel_versions(
     nonce: &str,
@@ -17,7 +17,7 @@ pub async fn fetch_channel_versions(
     include_changelogs: bool,
     is_daily: bool,
 ) -> Result<ChannelVersions> {
-    if let Ok(path) = env::var("ROOK_CHANNEL_VERSIONS_PATH") {
+    if let Ok(path) = env::var("POLARIS_TERMINAL_CHANNEL_VERSIONS_PATH") {
         // Load channel versions from local filesystem. Used for testing both
         // autoupdate and changelog behavior.
         let path = shellexpand::tilde(&path);
@@ -29,7 +29,7 @@ pub async fn fetch_channel_versions(
     let channel_versions = server_api
         .fetch_channel_versions(include_changelogs, is_daily)
         .await
-        .context("Failed to retrieve channel versions from Rook server");
+        .context("Failed to retrieve channel versions from Polaris Terminal server");
     match channel_versions {
         channel_versions @ Ok(_) => channel_versions,
         Err(err) => {
@@ -39,7 +39,7 @@ pub async fn fetch_channel_versions(
                 // our Sentry logs).
                 Channel::Dev | Channel::Preview => report_error!(err),
                 _ => log::warn!(
-                    "Failed to retrieve channel versions from Rook server, falling \
+                    "Failed to retrieve channel versions from Polaris Terminal server, falling \
                 back to GCP JSON storage."
                 ),
             }
@@ -48,10 +48,10 @@ pub async fn fetch_channel_versions(
     }
 }
 
-// Synchronously fetches updated Rook [`ChannelVersions`] from GCP JSON storage. This will soon
-// be deprecated in favor of retrieving updated channel versions from the Rook Server.
+// Synchronously fetches updated Polaris Terminal [`ChannelVersions`] from GCP JSON storage. This will soon
+// be deprecated in favor of retrieving updated channel versions from the Polaris Terminal Server.
 // Note, in order to run against a test file you can use the "channel_versions_test.json" file
-// and update the file using gsutil cp channel_versions_test.json gs://rook-releases/channel_versions_test.json
+// and update the file using gsutil cp channel_versions_test.json gs://polaris-terminal-releases/channel_versions_test.json
 async fn fetch_channel_versions_from_json_storage(
     client: &http_client::Client,
     nonce: &str,

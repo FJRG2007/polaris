@@ -2,22 +2,22 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use itertools::Itertools;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_editor::editor::NavigationKey;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_editor::editor::NavigationKey;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Empty, EventHandler,
     Flex, Hoverable, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, ScrollbarWidth, Shrinkable, Stack, Text,
 };
-use rookui::fonts::FamilyId;
-use rookui::geometry::vector::vec2f;
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::text::Span;
-use rookui::ui_components::toggle_menu::{ToggleMenuItem, ToggleMenuStateHandle};
-use rookui::{
+use ptermui::fonts::FamilyId;
+use ptermui::geometry::vector::vec2f;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::text::Span;
+use ptermui::ui_components::toggle_menu::{ToggleMenuItem, ToggleMenuStateHandle};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -599,7 +599,7 @@ impl WorkflowArgSelector {
     fn render_search_icon(&self, appearance: &Appearance) -> Box<dyn Element> {
         ConstrainedBox::new(
             icons::Icon::SearchSmall
-                .to_rookui_icon(appearance.theme().active_ui_text_color())
+                .to_ptermui_icon(appearance.theme().active_ui_text_color())
                 .finish(),
         )
         .with_width(12.)
@@ -854,7 +854,7 @@ impl WorkflowArgSelector {
                         ScrollbarWidth::Auto,
                         theme.disabled_text_color(theme.background()).into(),
                         theme.main_text_color(theme.background()).into(),
-                        rookui::elements::Fill::None,
+                        ptermui::elements::Fill::None,
                     )
                     .finish(),
                 )

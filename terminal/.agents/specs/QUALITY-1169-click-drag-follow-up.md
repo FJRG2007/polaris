@@ -7,7 +7,7 @@
 the captured cursor, drag trails must survive both canonical single-call and
 split-call pointer sequences, and scrollbar interaction behavior must be
 explicit rather than an accidental full-circle flash. The change remains
-client-side in `FJRG2007/rook`; no server action schema or artifact API change
+client-side in `FJRG2007/polaris`; no server action schema or artifact API change
 is required.
 
 **User-visible invariants:**

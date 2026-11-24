@@ -1,6 +1,6 @@
-use rookui::integration::{AssertionOutcome, TestStep};
-use rookui::windowing::WindowManager;
-use rookui::{App, SingletonEntity, WindowId, async_assert};
+use ptermui::integration::{AssertionOutcome, TestStep};
+use ptermui::windowing::WindowManager;
+use ptermui::{App, SingletonEntity, WindowId, async_assert};
 use settings::Setting;
 
 use crate::integration_testing::step::new_step_with_default_assertions;

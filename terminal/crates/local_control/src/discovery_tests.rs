@@ -18,7 +18,7 @@ fn broker_socket_reference_is_bound_to_instance_identity() {
     let record = InstanceRecord::for_current_process(
         Some(ControlEndpoint::localhost(4000)),
         "local",
-        "dev.rook.RookLocal",
+        "dev.polaris.PolarisTerminalLocal",
         Some("test".to_owned()),
         crate::protocol::ActionKind::implemented_metadata(),
     );
@@ -38,7 +38,7 @@ fn registered_instance_round_trips_discovery_record() {
     let record = InstanceRecord::for_current_process(
         Some(ControlEndpoint::localhost(4000)),
         "local",
-        "dev.rook.RookLocal",
+        "dev.polaris.PolarisTerminalLocal",
         Some("test".to_owned()),
         crate::protocol::ActionKind::implemented_metadata(),
     );
@@ -54,7 +54,7 @@ fn incompatible_protocol_record_is_ignored() {
     let mut record = InstanceRecord::for_current_process(
         Some(ControlEndpoint::localhost(4000)),
         "local",
-        "dev.rook.RookLocal",
+        "dev.polaris.PolarisTerminalLocal",
         Some("test".to_owned()),
         crate::protocol::ActionKind::implemented_metadata(),
     );
@@ -119,7 +119,7 @@ fn stale_process_record_is_pruned() {
     let mut record = InstanceRecord::for_current_process(
         Some(ControlEndpoint::localhost(4000)),
         "local",
-        "dev.rook.RookLocal",
+        "dev.polaris.PolarisTerminalLocal",
         Some("test".to_owned()),
         crate::protocol::ActionKind::implemented_metadata(),
     );
@@ -148,7 +148,7 @@ fn multiple_live_process_records_are_discovered() {
     let mut first_record = InstanceRecord::for_current_process(
         Some(ControlEndpoint::localhost(4000)),
         "local",
-        "dev.rook.RookLocal",
+        "dev.polaris.PolarisTerminalLocal",
         Some("test".to_owned()),
         crate::protocol::ActionKind::implemented_metadata(),
     );
@@ -156,7 +156,7 @@ fn multiple_live_process_records_are_discovered() {
     let mut second_record = InstanceRecord::for_current_process(
         Some(ControlEndpoint::localhost(4001)),
         "local",
-        "dev.rook.RookLocal",
+        "dev.polaris.PolarisTerminalLocal",
         Some("test".to_owned()),
         crate::protocol::ActionKind::implemented_metadata(),
     );
@@ -188,7 +188,7 @@ fn records_from_other_channels_are_ignored() {
     let record = InstanceRecord::for_current_process(
         Some(ControlEndpoint::localhost(4000)),
         "dev",
-        "dev.rook.Rook-Dev",
+        "dev.polaris.PolarisTerminal-Dev",
         Some("test".to_owned()),
         crate::protocol::ActionKind::implemented_metadata(),
     );
@@ -206,7 +206,7 @@ fn serialized_discovery_record_does_not_contain_raw_credential_material() {
     let record = InstanceRecord::for_current_process(
         Some(ControlEndpoint::localhost(4000)),
         "local",
-        "dev.rook.RookLocal",
+        "dev.polaris.PolarisTerminalLocal",
         Some("test".to_owned()),
         crate::protocol::ActionKind::implemented_metadata(),
     );
@@ -221,7 +221,7 @@ fn disabled_record_does_not_expose_actionable_authority() {
     let record = InstanceRecord::for_current_process(
         None,
         "local",
-        "dev.rook.RookLocal",
+        "dev.polaris.PolarisTerminalLocal",
         Some("test".to_owned()),
         crate::protocol::ActionKind::implemented_metadata(),
     );
@@ -234,7 +234,7 @@ fn rejects_unsafe_or_divergent_discovery_authority() {
     let mut record = InstanceRecord::for_current_process(
         Some(ControlEndpoint::localhost(4000)),
         "local",
-        "dev.rook.RookLocal",
+        "dev.polaris.PolarisTerminalLocal",
         Some("test".to_owned()),
         crate::protocol::ActionKind::implemented_metadata(),
     );
@@ -269,7 +269,7 @@ fn discovery_directory_is_owner_only_on_unix() {
     let record = InstanceRecord::for_current_process(
         Some(ControlEndpoint::localhost(4000)),
         "local",
-        "dev.rook.RookLocal",
+        "dev.polaris.PolarisTerminalLocal",
         Some("test".to_owned()),
         crate::protocol::ActionKind::implemented_metadata(),
     );
@@ -292,7 +292,7 @@ fn discovery_record_is_owner_only_on_unix() {
     let record = InstanceRecord::for_current_process(
         Some(ControlEndpoint::localhost(4000)),
         "local",
-        "dev.rook.RookLocal",
+        "dev.polaris.PolarisTerminalLocal",
         Some("test".to_owned()),
         crate::protocol::ActionKind::implemented_metadata(),
     );

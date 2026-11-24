@@ -2,21 +2,21 @@ use std::default::Default;
 use std::fs;
 use std::fs::remove_file;
 
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::{
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::{
     Container, CornerRadius, CrossAxisAlignment, Flex, MainAxisSize, MouseStateHandle,
     ParentElement, Radius, SavePosition, Shrinkable, Text,
 };
-use rookui::fonts::Weight;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::fonts::Weight;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::appearance::Appearance;
 use crate::server::telemetry::TelemetryEvent;
 use crate::settings::{ThemeSettings, active_theme_kind};
-use crate::themes::theme::{RookTheme, ThemeKind};
+use crate::themes::theme::{PtermTheme, ThemeKind};
 use crate::user_config::util::from_yaml;
 use crate::{send_telemetry_from_ctx, user_config};
 
@@ -76,11 +76,11 @@ impl ThemeDeletionBody {
         // Check if the theme directory exists
         if fs::metadata(&dir).is_ok()
             && let Some(ThemeKind::Custom(custom_theme)) = &self.theme_kind
-            && let Ok(theme_from_yaml) = from_yaml::<RookTheme>(custom_theme.path())
+            && let Ok(theme_from_yaml) = from_yaml::<PtermTheme>(custom_theme.path())
         {
             // If theme has an image
             if let Some(image) = theme_from_yaml.background_image() {
-                // Only delete the image if it is in the ./rook/themes directory.
+                // Only delete the image if it is in the ./polaris-terminal/themes directory.
                 // We don't want to delete images from other parts of the user's filesystem.
                 match image.source() {
                     AssetSource::LocalFile { path, .. } => {

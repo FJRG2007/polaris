@@ -1,6 +1,6 @@
 use anyhow::Context as _;
-use rook_cli::mcp::MCPSpec;
-use rook_core::features::FeatureFlag;
+use pterm_cli::mcp::MCPSpec;
+use pterm_core::features::FeatureFlag;
 use serde_json::{Map, Value};
 
 use crate::ai::mcp::TemplatableMCPServer;
@@ -11,7 +11,7 @@ use crate::ai::mcp::TemplatableMCPServer;
 /// If user input includes wrapper shapes like `{ "mcpServers": { ... } }`, we unpack them.
 ///
 /// Notes:
-/// - UUID specs are coerced into `{"<uuid>": {"rook_id": "<uuid>"}}`.
+/// - UUID specs are coerced into `{"<uuid>": {"pterm_id": "<uuid>"}}`.
 /// - We do light validation to catch obvious config errors before sending the request.
 pub(super) fn build_mcp_servers_from_specs(
     specs: &[MCPSpec],
@@ -32,7 +32,7 @@ pub(super) fn build_mcp_servers_from_specs(
                     name.clone(),
                     Value::Object({
                         let mut obj = Map::new();
-                        obj.insert("rook_id".to_string(), Value::String(name));
+                        obj.insert("pterm_id".to_string(), Value::String(name));
                         obj
                     }),
                 )?;
@@ -43,7 +43,7 @@ pub(super) fn build_mcp_servers_from_specs(
                     id.clone(),
                     Value::Object({
                         let mut obj = Map::new();
-                        obj.insert("rook_id".to_string(), Value::String(id.clone()));
+                        obj.insert("pterm_id".to_string(), Value::String(id.clone()));
                         obj
                     }),
                 )?;
@@ -137,32 +137,32 @@ fn validate_server_config(server_name: &str, config: &Value) -> anyhow::Result<(
         anyhow::anyhow!("MCP server '{server_name}' config must be a JSON object")
     })?;
 
-    let has_rook_id = obj.contains_key("rook_id");
+    let has_pterm_id = obj.contains_key("pterm_id");
     let has_command = obj.contains_key("command");
     let has_url = obj.contains_key("url");
 
-    let kind_count = usize::from(has_rook_id) + usize::from(has_command) + usize::from(has_url);
+    let kind_count = usize::from(has_pterm_id) + usize::from(has_command) + usize::from(has_url);
     if kind_count != 1 {
         anyhow::bail!(
-            "MCP server '{server_name}' must have exactly one of: 'rook_id', 'command', or 'url'"
+            "MCP server '{server_name}' must have exactly one of: 'pterm_id', 'command', or 'url'"
         );
     }
 
-    if has_rook_id {
-        let rook_id = obj.get("rook_id").and_then(Value::as_str).ok_or_else(|| {
-            anyhow::anyhow!("MCP server '{server_name}' field 'rook_id' must be a string")
+    if has_pterm_id {
+        let pterm_id = obj.get("pterm_id").and_then(Value::as_str).ok_or_else(|| {
+            anyhow::anyhow!("MCP server '{server_name}' field 'pterm_id' must be a string")
         })?;
 
-        // A rook_id is either a managed MCP server UUID or, behind
+        // A pterm_id is either a managed MCP server UUID or, behind
         // `FeatureFlag::WellKnownMcpIds`, a well-known id (e.g. "linear").
         // The server owns the set of recognized ids, so the client only
         // requires a non-empty value.
         if !FeatureFlag::WellKnownMcpIds.is_enabled() {
-            uuid::Uuid::parse_str(rook_id).with_context(|| {
-                format!("MCP server '{server_name}' field 'rook_id' must be a UUID")
+            uuid::Uuid::parse_str(pterm_id).with_context(|| {
+                format!("MCP server '{server_name}' field 'pterm_id' must be a UUID")
             })?;
-        } else if rook_id.trim().is_empty() {
-            anyhow::bail!("MCP server '{server_name}' field 'rook_id' must be non-empty");
+        } else if pterm_id.trim().is_empty() {
+            anyhow::bail!("MCP server '{server_name}' field 'pterm_id' must be non-empty");
         }
     }
 

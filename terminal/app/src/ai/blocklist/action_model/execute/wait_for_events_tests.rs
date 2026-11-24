@@ -4,8 +4,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use rook_core::features::FeatureFlag;
-use rookui::{App, EntityId};
+use pterm_core::features::FeatureFlag;
+use ptermui::{App, EntityId};
 
 use super::{
     AnyActionExecution, CLIENT_WATCHDOG_SAFETY_MARGIN, DEFAULT_ORCHESTRATED_IDLE_TIMEOUT_SECONDS,

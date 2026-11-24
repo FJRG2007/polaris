@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use rookui::{AppContext, ModelContext};
+use ptermui::{AppContext, ModelContext};
 use uuid::Uuid;
 
 use super::TemplatableMCPServerManager;
@@ -43,7 +43,7 @@ impl TemplatableMCPServerManager {
         None
     }
 
-    /// Updates a TemplatableMCPServer in Rook Drive.
+    /// Updates a TemplatableMCPServer in Polaris Terminal Drive.
     ///
     /// This is a no-op in WASM, as MCP servers are not supported in WASM.
     pub fn update_templatable_mcp_server(
@@ -54,7 +54,7 @@ impl TemplatableMCPServerManager {
         log::warn!("Templatable MCP server update not supported in WASM");
     }
 
-    /// Gets all TemplatableMCPServers currently in Rook Drive.
+    /// Gets all TemplatableMCPServers currently in Polaris Terminal Drive.
     ///
     /// This is a no-op in WASM, as MCP servers are not supported in WASM.
     pub fn get_all_templatable_mcp_servers(&self) -> Vec<&TemplatableMCPServer> {
@@ -71,7 +71,7 @@ impl TemplatableMCPServerManager {
         None
     }
 
-    /// Creates a new TemplatableMCPServer in Rook Drive.
+    /// Creates a new TemplatableMCPServer in Polaris Terminal Drive.
     ///
     /// This is a no-op in WASM, as MCP servers are not supported in WASM.
     pub fn create_templatable_mcp_server(
@@ -84,7 +84,7 @@ impl TemplatableMCPServerManager {
         log::warn!("Creating a TemplatableMCPServer is not supported in WASM");
     }
 
-    /// Deletes a TemplatableMCPServer from Rook Drive.
+    /// Deletes a TemplatableMCPServer from Polaris Terminal Drive.
     ///
     /// This is a no-op in WASM, as MCP servers are not supported in WASM.
     pub fn delete_templatable_mcp_server(&mut self, _uuid: Uuid, _ctx: &mut ModelContext<Self>) {
@@ -159,7 +159,7 @@ impl TemplatableMCPServerManager {
     pub fn delete_credentials_from_secure_storage(
         &mut self,
         _sync_id: Uuid,
-        _app: &mut rookui::AppContext,
+        _app: &mut ptermui::AppContext,
     ) {
         log::warn!("Deleting credentials for MCP servers is not supported in WASM")
     }

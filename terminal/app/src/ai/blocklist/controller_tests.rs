@@ -7,8 +7,8 @@ use ai::api_keys::{
     GeapCredentialsState,
 };
 use chrono::Local;
-use rook_core::features::FeatureFlag;
-use rookui::{App, SingletonEntity, ViewHandle};
+use pterm_core::features::FeatureFlag;
+use ptermui::{App, SingletonEntity, ViewHandle};
 use uuid::Uuid;
 use warp_multi_agent_api::response_event;
 
@@ -43,8 +43,8 @@ use crate::workspaces::workspace::{
 
 /// A workload identity provider resource name shaped like a real one, used only to satisfy
 /// [`current_geap_policy_for_any_team`]'s non-empty-audience check.
-const GEAP_TEST_AUDIENCE: &str = "//iam.googleapis.com/projects/123456/locations/global/workloadIdentityPools/rook-pool/providers/rook-provider";
-const GEAP_TEST_SA_EMAIL: &str = "rook-geap@test-project.iam.gserviceaccount.com";
+const GEAP_TEST_AUDIENCE: &str = "//iam.googleapis.com/projects/123456/locations/global/workloadIdentityPools/polaris-terminal-pool/providers/polaris-terminal-provider";
+const GEAP_TEST_SA_EMAIL: &str = "polaris-terminal-geap@test-project.iam.gserviceaccount.com";
 
 fn new_ambient_agent_task_id() -> AmbientAgentTaskId {
     Uuid::new_v4().to_string().parse().unwrap()

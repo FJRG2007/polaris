@@ -1,4 +1,4 @@
-use rook_core::telemetry::TelemetryEventDesc;
+use pterm_core::telemetry::TelemetryEventDesc;
 
 #[derive(Debug)]
 enum TelemetryEventPropertyError {
@@ -16,7 +16,7 @@ enum TelemetryEventPropertyError {
 #[cfg(not(target_family = "wasm"))]
 fn telemetry_events_have_nonempty_name_and_description() -> Result<(), TelemetryEventPropertyError>
 {
-    for event in rook_core::telemetry::all_events() {
+    for event in pterm_core::telemetry::all_events() {
         if event.name().is_empty() {
             return Err(TelemetryEventPropertyError::EmptyName(event));
         }

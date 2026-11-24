@@ -46,6 +46,15 @@ use grep::GrepExecutor;
 #[cfg(feature = "local_fs")]
 use mime_guess::from_path;
 use parking_lot::FairMutex;
+use pterm_core::execution_mode::AppExecutionMode;
+#[cfg(feature = "local_fs")]
+use pterm_files::{FileModel, TextFileReadResult};
+#[cfg(feature = "local_fs")]
+use pterm_util::file::FileLoadError;
+#[cfg(feature = "local_fs")]
+use pterm_util::file_type::is_buffer_binary;
+use ptermui::r#async::{Spawnable, SpawnableOutput};
+use ptermui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 use read_documents::ReadDocumentsExecutor;
 pub(super) use read_files::ReadFilesExecutor;
 use read_mcp_resource::ReadMCPResourceExecutor;
@@ -56,15 +65,6 @@ pub use request_file_edits::{
     RequestFileEditsExecutor, RequestFileEditsFormatKind, RequestFileEditsTelemetryEvent,
 };
 pub(crate) use request_file_edits::{FileReadResult, MalformedFinalLineProxyEvent, apply_edits};
-use rook_core::execution_mode::AppExecutionMode;
-#[cfg(feature = "local_fs")]
-use rook_files::{FileModel, TextFileReadResult};
-#[cfg(feature = "local_fs")]
-use rook_util::file::FileLoadError;
-#[cfg(feature = "local_fs")]
-use rook_util::file_type::is_buffer_binary;
-use rookui::r#async::{Spawnable, SpawnableOutput};
-use rookui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 pub use run_agents::{RunAgentsExecutor, RunAgentsExecutorEvent, RunAgentsSpawningSnapshot};
 #[cfg(test)]
 pub use run_agents::{compose_run_agents_child_prompt, run_agents_to_start_agent_mode};
@@ -1297,11 +1297,11 @@ async fn should_read_as_binary(path: &std::path::Path) -> bool {
     is_file_content_binary_async(path).await
 }
 
-/// Async sibling of [`rook_util::file_type::is_file_content_binary`]. Reads
+/// Async sibling of [`pterm_util::file_type::is_file_content_binary`]. Reads
 /// the first 1 KiB of `path` asynchronously and returns `true` if the content
 /// looks binary according to [`is_buffer_binary`]. Returns `true` on any I/O
 /// error so callers default to the binary code path. Kept local to this
-/// module so `rook_util` doesn't need to grow an `async_fs` dependency.
+/// module so `pterm_util` doesn't need to grow an `async_fs` dependency.
 #[cfg(feature = "local_fs")]
 async fn is_file_content_binary_async(path: &std::path::Path) -> bool {
     const CHUNK_SIZE: usize = 1024;

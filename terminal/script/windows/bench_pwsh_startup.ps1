@@ -1,4 +1,4 @@
-# Measures how long a new PowerShell session takes to become usable, the way Rook starts it:
+# Measures how long a new PowerShell session takes to become usable, the way Polaris Terminal starts it:
 # under ConPTY with the init command from pwsh_init_shell.ps1, then sourcing the bootstrap once
 # the shell reports InitShell. Prints, per run, the time to InitShell, to Bootstrapped, and to
 # the first prompt after it. Run it from the repository root:
@@ -12,7 +12,7 @@ param(
     [string]$InitScriptFile,
     [int]$Runs = 3
 )
-# Reproduces Rook's PowerShell startup under ConPTY: spawn with the init -Command, wait for the
+# Reproduces Polaris Terminal's PowerShell startup under ConPTY: spawn with the init -Command, wait for the
 # InitShell OSC, write " . '<bootstrap>'\r", wait for the Bootstrapped OSC.
 Add-Type -TypeDefinition @'
 using System;
@@ -87,12 +87,12 @@ public static class ConPtyBench {
 '@
 
 if (-not $InitScriptFile) {
-    # Rebuild Rook's init -Command the same way bootstrap.rs does: drop comment/blank lines, join with ';'.
+    # Rebuild Polaris Terminal's init -Command the same way bootstrap.rs does: drop comment/blank lines, join with ';'.
     $InitScriptFile = Join-Path $PSScriptRoot '../../app/assets/bundled/bootstrap/pwsh_init_shell.ps1'
 }
 $Bootstrap = (Resolve-Path -LiteralPath $Bootstrap).Path
 $init = (Get-Content -LiteralPath $InitScriptFile | Where-Object { $_.Trim() -and -not $_.TrimStart().StartsWith('#') }) -join ';'
-$init = $init.Replace('@@ROOK_SESSION_ID@@', '12345')
+$init = $init.Replace('@@POLARIS_TERMINAL_SESSION_ID@@', '12345')
 $quoted = '"' + $init.Replace('"', '\"') + '"'
 $cmd = "`"$Shell`" -NoLogo -NoProfile -NoExit -Command $quoted"
 $line = " . '" + $Bootstrap.Replace("'", "''") + "'`r"

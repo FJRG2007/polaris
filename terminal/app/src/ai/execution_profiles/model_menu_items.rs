@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use itertools::Itertools;
-use rook_core::ui::Icon;
-use rookui::elements::{
+use pterm_core::ui::Icon;
+use ptermui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, ParentElement, SavePosition, Shrinkable,
     Text,
 };
-use rookui::fonts::{Properties, Style};
-use rookui::{Action, AppContext, Element, SingletonEntity as _};
+use ptermui::fonts::{Properties, Style};
+use ptermui::{Action, AppContext, Element, SingletonEntity as _};
 
 use crate::ai::custom_model_routers::is_custom_router_id;
 use crate::ai::llms::{
@@ -130,7 +130,7 @@ fn make_item_fields<A: Action + Clone>(
                 let icon_container = Container::new(
                     ConstrainedBox::new(
                         leading_icon
-                            .to_rookui_icon(appearance.theme().foreground())
+                            .to_ptermui_icon(appearance.theme().foreground())
                             .finish(),
                     )
                     .with_height(appearance.ui_font_size())
@@ -157,7 +157,7 @@ fn make_item_fields<A: Action + Clone>(
                 if let Some(icon) = trailing_credential_icon {
                     let credential_icon = Container::new(
                         ConstrainedBox::new(
-                            icon.to_rookui_icon(appearance.theme().disabled_ui_text_color())
+                            icon.to_ptermui_icon(appearance.theme().disabled_ui_text_color())
                                 .finish(),
                         )
                         .with_height(appearance.ui_font_size())

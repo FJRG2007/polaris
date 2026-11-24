@@ -2,10 +2,10 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use async_channel::Sender;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{Entity, ModelContext, ModelHandle};
 use repo_metadata::repository::{RepositorySubscriber, SubscriberId};
 use repo_metadata::{Repository, RepositoryUpdate, RepositoryWatchMode};
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{Entity, ModelContext, ModelHandle};
 
 use super::{GitRepoStatusEvent, GitStatusMetadata};
 use crate::code_review::diff_state::diff_metadata_against_head;
@@ -181,7 +181,7 @@ impl LocalGitRepoStatusModel {
         repo_path: &Path,
         current_branch_name: &str,
     ) -> GitBranchTrackingStatus {
-        let upstream = rook_util::git::run_git_command(
+        let upstream = pterm_util::git::run_git_command(
             repo_path,
             &["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
         )
@@ -200,7 +200,7 @@ impl LocalGitRepoStatusModel {
             return GitBranchTrackingStatus::new(current_branch_name.to_string(), None, 0, 0);
         };
 
-        let counts = rook_util::git::run_git_command(
+        let counts = pterm_util::git::run_git_command(
             repo_path,
             &[
                 "rev-list",

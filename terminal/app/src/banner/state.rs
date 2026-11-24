@@ -1,4 +1,4 @@
-use rookui::Entity;
+use ptermui::Entity;
 use serde::{Deserialize, Serialize};
 
 #[derive(

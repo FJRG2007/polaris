@@ -3,8 +3,8 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 
-use rookui_core::r#async::executor::Background;
-use rookui_core::{Entity, SingletonEntity};
+use ptermui_core::r#async::executor::Background;
+use ptermui_core::{Entity, SingletonEntity};
 use thiserror::Error;
 
 use crate::{LogFileWriter, SimpleLogger};
@@ -38,10 +38,11 @@ pub fn resolve_log_path(namespace: &str, relative_path: impl AsRef<Path>) -> Pat
 
 /// Returns the base log directory for a given namespace name.
 fn log_directory_path(namespace: &str) -> PathBuf {
-    let base_dir = rook_core::paths::secure_state_dir().unwrap_or_else(rook_core::paths::state_dir);
+    let base_dir =
+        pterm_core::paths::secure_state_dir().unwrap_or_else(pterm_core::paths::state_dir);
     if cfg!(windows) {
         base_dir
-            .join(rook_core::paths::ROOK_LOGS_DIR)
+            .join(pterm_core::paths::POLARIS_TERMINAL_LOGS_DIR)
             .join(namespace)
     } else {
         base_dir.join(namespace)
@@ -128,7 +129,7 @@ impl LogManager {
     /// This is the entry point used by callers that produce high-volume logs
     /// over long-lived sessions — primarily MCP server stderr/stdout capture,
     /// where a single chatty server could otherwise grow its log file
-    /// unboundedly across a multi-day session (FJRG2007/rook#7723).
+    /// unboundedly across a multi-day session (FJRG2007/polaris#7723).
     pub fn register_with_rotation(
         &mut self,
         namespace: &str,
