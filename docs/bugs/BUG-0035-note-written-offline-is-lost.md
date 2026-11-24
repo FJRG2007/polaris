@@ -150,5 +150,19 @@ send carries a key of its own (`sendKey` on `mailComposeSchema`); the server
 claims it before queueing (`queueSendOnce`, table `MailSendKey`, kept 30 days),
 so a replay whose answer was lost is answered with the message already queued
 and it goes once. Once taken it waits out the reader's undo window like any
-send. A draft closed while offline is still not kept on the device, and files
-cannot be attached offline.
+send. Files cannot be attached offline.
+
+## Mail drafts closed offline
+
+A draft closed while its save could not reach Polaris used to be lost with the
+composer. Now whatever the server does not hold yet (`DraftSaves.pending`) is
+kept on the device (`mail/offline-drafts.ts`, kind `mail.draft`, newest words
+only per draft), and so is what a tab closed mid-draft held (`keepOnUnload`).
+It sits above the mailbox with a pencil, can be opened again (the kept copy
+leaves the queue and the composer saves it from there, files and From
+included) or discarded, and is saved to Drafts when Polaris answers. A new
+message carries the composer's key (`draftKey` on `mailDraftSchema`):
+`saveDraftOnce` claims it in `MailSendKey`, so a save repeated after a lost
+answer writes over the same draft, and a draft that has since been queued or
+sent is left alone rather than put back to being a draft. A save the composer
+gets through itself, or a send, forgets any older kept copy.

@@ -1,5 +1,5 @@
 /**
- * The launcher page's bridge, `window.polarisLauncher`: six calls and nothing
+ * The launcher page's bridge, `window.polarisLauncher`: seven calls and nothing
  * else - the same for the window's own panel and for the instance's `/launcher`
  * page (main checks which page is asking), so the preload stays small (`shared/launcher` bundles to its channel
  * names; its ranking is tree-shaken out).
@@ -14,6 +14,7 @@ const bridge: PolarisLauncher = {
     run: (id) => ipcRenderer.invoke(LAUNCHER_CHANNELS.run, id),
     hide: () => ipcRenderer.invoke(LAUNCHER_CHANNELS.hide),
     clearClipboard: () => ipcRenderer.invoke(LAUNCHER_CHANNELS.clearClipboard),
+    addons: () => ipcRenderer.invoke(LAUNCHER_CHANNELS.addons),
     onOpened: (listener) => {
         ipcRenderer.on(LAUNCHER_CHANNELS.opened, () => listener());
     }

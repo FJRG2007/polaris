@@ -11,6 +11,7 @@ interface DesktopLauncherBridge {
     hide(): Promise<void>;
     open(href: string): Promise<void>;
     onOpened(listener: () => void): void;
+    addons(): Promise<unknown>;
 }
 
 declare global {
@@ -37,6 +38,7 @@ export function LauncherSearch({
 }) {
     const host = useMemo<SearchHost>(() => {
         const bridge = typeof window === "undefined" ? undefined : window.polarisLauncher;
+        const addons = bridge?.addons;
         // Feature-detected call by call: a desktop build that predates one of
         // them still gets everything else.
         return {
@@ -51,7 +53,8 @@ export function LauncherSearch({
                 else window.location.assign(href);
             },
             close: () => void bridge?.hide?.(),
-            onOpened: (listener) => bridge?.onOpened?.(listener)
+            onOpened: (listener) => bridge?.onOpened?.(listener),
+            addons: typeof addons === "function" ? () => addons() : undefined
         };
     }, []);
     return <CommandPalette host={host} isAdmin={isAdmin} appIds={appIds} held={held} installed={installed} />;

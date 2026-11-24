@@ -43,6 +43,11 @@ export function addonShortcutsNow(): AddonShortcuts {
     return shortcuts;
 }
 
+/** What the add-on bridge answers (`addons.get`), for the launcher's search; null until the manager has started. */
+export async function addonsSnapshotNow(): Promise<unknown> {
+    return manager ? manager.snapshot() : null;
+}
+
 /**
  * Read what is installed and plugged again and put the tray's add-on items up
  * to date. One look at a time; a change heard during one is looked at after it.

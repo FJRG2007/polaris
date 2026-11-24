@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 import { ed25519 } from "@noble/curves/ed25519.js";
+import { ADDON_CATALOG_KEYS } from "@polaris/core/device-addons";
 
 export interface TrustedKey {
     readonly id: string;
@@ -15,7 +16,7 @@ export interface TrustedKey {
     readonly publicKey: string;
 }
 
-export const TRUSTED_KEYS: readonly TrustedKey[] = [{ id: "addons-2026-11", publicKey: "20ace90f4e0160264f6a05faeabe54478953849fb442ecd0708e850a4c5a846e" }];
+export const TRUSTED_KEYS: readonly TrustedKey[] = ADDON_CATALOG_KEYS;
 
 /** `catalog.json.sig`: which key signed it and the signature, base64. */
 export const signatureFileSchema = z.object({

@@ -18,7 +18,7 @@
  * back is a press, not typing.
  */
 
-import { addonShortcutsNow, registerAddonViewScheme, startDeviceAddons, stopDeviceAddons } from "./addons/electron";
+import { addonShortcutsNow, addonsSnapshotNow, registerAddonViewScheme, startDeviceAddons, stopDeviceAddons } from "./addons/electron";
 import { HOST_UPDATE_ACCESS_PATH, readSettingsProbe, readUpdateAccess, settingsRoute, type HostPageOutcome, type LocalSettingsState, type SettingsPlace, type SettingsProbe } from "@/shared/settings-route";
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
@@ -1001,7 +1001,7 @@ function start(): void {
         // sessions list groups it with this app (native-host/service.ts).
         startNativeHost({ primary: () => current, server });
 
-        launcher.startLauncher({ server, showPolaris, addons: () => addonShortcutsNow().installed });
+        launcher.startLauncher({ server, showPolaris, addons: () => addonShortcutsNow().installed, addonsSnapshot: addonsSnapshotNow });
         // Device add-ons start after the window, never before it: with none
         // installed this reads one small file and starts nothing.
         setTimeout(() => startDeviceAddons((path) => showPolaris(path)), 3_000).unref();

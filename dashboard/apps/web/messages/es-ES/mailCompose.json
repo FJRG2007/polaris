@@ -61,10 +61,12 @@
             "replyAll": "Responder a todos",
             "forward": "Reenviar"
         },
-        "keptOffline": "Guardado en este dispositivo. Se envía al volver Polaris."
+        "keptOffline": "Guardado en este dispositivo. Se envía al volver Polaris.",
+        "draftKeptOffline": "Borrador guardado en este dispositivo. Pasa a Borradores al volver Polaris.",
+        "draftNotKept": "No se pudo contactar con Polaris y este dispositivo no pudo guardar el borrador."
     },
     "offline": {
-        "title": "Pendientes de enviar",
+        "title": "En este dispositivo",
         "noSubject": "(sin asunto)",
         "to": "para {name}",
         "toMany": "para {name} y {count, plural, one {# más} other {# más}}",
@@ -74,6 +76,12 @@
         "discard": "Descartar",
         "discardTitle": "¿Descartar este mensaje?",
         "discardQuestion": "¿Descartar «{subject}»? Nunca se envió.",
-        "discardBody": "Solo está en este dispositivo, así que no se puede recuperar."
+        "discardBody": "Solo está en este dispositivo, así que no se puede recuperar.",
+        "draftWaiting": "Borrador, se guarda al volver Polaris",
+        "draftNotSaved": "No guardado",
+        "open": "Abrir",
+        "discardDraftTitle": "¿Descartar este borrador?",
+        "discardDraftQuestion": "¿Descartar el borrador «{subject}»?",
+        "discardDraftBody": "Nunca llegó a Borradores y solo está en este dispositivo, así que no se puede recuperar."
     }
 }

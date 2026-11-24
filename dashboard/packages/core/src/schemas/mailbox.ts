@@ -469,7 +469,10 @@ export const mailDraftSchema = z.object({
     inReplyToId: z.string().uuid().nullable().default(null),
     forward: z.boolean().default(false),
     sendAt: z.coerce.date().nullable().default(null),
-    requestReceipt: z.boolean().default(false)
+    requestReceipt: z.boolean().default(false),
+    /** A key of the composer's own, so a draft written while Polaris could not
+     *  be reached, and saved again when it answers, is still one draft. */
+    draftKey: z.string().uuid().optional()
 });
 
 /* -------------------------------------------------------------------------- */

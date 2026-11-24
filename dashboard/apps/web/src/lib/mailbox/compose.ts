@@ -203,6 +203,55 @@ export async function queueSendOnce(
 }
 
 /**
+ * `saveDraft` for a composer that may write the same draft more than once
+ * without ever hearing back - a draft kept on a device while Polaris could not
+ * be reached, saved again when it answers.
+ *
+ * The key names the draft before it has an id: the first save claims it and
+ * creates the draft, every later one writes over that same draft. A draft
+ * that has moved on - queued, sending, sent - is left as it is: words kept on
+ * a device are older than a message somebody went on to send.
+ */
+export async function saveDraftOnce(
+    userId: string,
+    input: ComposeInput,
+    draftKey: string
+): Promise<string> {
+    if (input.draftId) {
+        const id = await ownedDraftId(userId, input.draftId);
+        return (await stillADraft(id)) ? saveDraft(userId, { ...input, draftId: id }) : id;
+    }
+    const now = new Date();
+    await prisma.mailSendKey.deleteMany({ where: { expiresAt: { lt: now } } });
+    try {
+        await prisma.mailSendKey.create({
+            data: { key: draftKey, userId, expiresAt: new Date(now.getTime() + SEND_KEY_DAYS * 86_400_000) }
+        });
+    } catch (caught) {
+        if ((caught as { code?: string } | null)?.code !== "P2002") throw caught;
+        const taken = await prisma.mailSendKey.findUnique({ where: { key: draftKey } });
+        if (!taken || taken.userId !== userId) throw new MailAccessError();
+        if (!taken.draftId) throw new SendInProgressError();
+        const id = await ownedDraftId(userId, taken.draftId);
+        return (await stillADraft(id)) ? saveDraft(userId, { ...input, draftId: id }) : id;
+    }
+    try {
+        const draftId = await saveDraft(userId, input);
+        await prisma.mailSendKey.update({ where: { key: draftKey }, data: { draftId } });
+        return draftId;
+    } catch (caught) {
+        await prisma.mailSendKey.delete({ where: { key: draftKey } }).catch(() => undefined);
+        throw caught;
+    }
+}
+
+/** Whether a draft is still being written, rather than queued or gone out. */
+async function stillADraft(draftId: string): Promise<boolean> {
+    const draft = await prisma.mailDraft.findUnique({ where: { id: draftId }, select: { state: true } });
+    return draft?.state === "draft";
+}
+
+/**
  * Take it back out of the queue.
  *
  * Only possible while it is still queued: a message being sent, or sent, is

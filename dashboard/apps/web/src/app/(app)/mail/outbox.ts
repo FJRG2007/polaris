@@ -80,10 +80,10 @@ export function isRefused(outcome: object): outcome is Refused {
 }
 
 /** Write the draft, answering with its id. */
-export function saveDraft(fields: DraftFields, id: string | null) {
+export function saveDraft(fields: DraftFields, id: string | null, draftKey?: string) {
     return ask(
         "/api/mail/drafts",
-        json("POST", { id, ...fields }),
+        json("POST", { id, ...fields, ...(draftKey ? { draftKey } : {}) }),
         savedSchema,
         "That draft could not be saved."
     );

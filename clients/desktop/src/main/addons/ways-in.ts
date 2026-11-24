@@ -4,13 +4,24 @@
  * device is plugged in now. Pure, for the tests.
  */
 
-import { addonDevicePresent, type AddonManifest, type UsbDevice } from "@polaris/core/device-addons";
+import { addonDevicePresent, addonSettingTargets, type AddonManifest, type UsbDevice } from "@polaris/core/device-addons";
 
 export interface AddonShortcut {
     readonly id: string;
     readonly name: string;
     /** The add-on's page in the host's Settings. */
     readonly path: string;
+    /** Its groups of settings and its settings, each a place on that page, for the launcher. */
+    readonly places: readonly AddonPlace[];
+}
+
+/** One group or setting on an add-on's page, labelled in English like the rest of the app. */
+export interface AddonPlace {
+    readonly label: string;
+    /** The page with the place's anchor, so the host scrolls to it. */
+    readonly path: string;
+    /** Other words that find it. */
+    readonly words: readonly string[];
 }
 
 export interface AddonShortcuts {
@@ -26,14 +37,20 @@ export function addonPagePath(id: string): string {
 }
 
 export function addonShortcuts(
-    installed: readonly { readonly id: string; readonly enabled: boolean; readonly manifest: Pick<AddonManifest, "name" | "claims"> | null; }[],
+    installed: readonly { readonly id: string; readonly enabled: boolean; readonly manifest: Pick<AddonManifest, "name" | "claims" | "settings" | "groups"> | null; }[],
     devices: readonly UsbDevice[] | null
 ): AddonShortcuts {
     const all: AddonShortcut[] = [];
     const plugged: AddonShortcut[] = [];
     for (const addon of installed) {
         if (!addon.manifest) continue;
-        const shortcut = { id: addon.id, name: addon.manifest.name, path: addonPagePath(addon.id) };
+        const path = addonPagePath(addon.id);
+        const places = addonSettingTargets(addon.manifest, "en-US").map((target) => ({
+            label: target.section ? `${target.section} - ${target.label}` : target.label,
+            path: `${path}#${target.anchor}`,
+            words: target.words
+        }));
+        const shortcut = { id: addon.id, name: addon.manifest.name, path, places };
         all.push(shortcut);
         if (addon.enabled && devices && addonDevicePresent(addon.manifest, devices)) plugged.push(shortcut);
     }

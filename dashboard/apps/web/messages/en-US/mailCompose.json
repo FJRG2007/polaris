@@ -61,10 +61,12 @@
             "replyAll": "Reply all",
             "forward": "Forward"
         },
-        "keptOffline": "Saved on this device. Sends when Polaris is back."
+        "keptOffline": "Saved on this device. Sends when Polaris is back.",
+        "draftKeptOffline": "Draft saved on this device. Goes to Drafts when Polaris is back.",
+        "draftNotKept": "Polaris could not be reached and this device could not keep the draft."
     },
     "offline": {
-        "title": "Waiting to send",
+        "title": "Kept on this device",
         "noSubject": "(no subject)",
         "to": "to {name}",
         "toMany": "to {name} and {count, plural, one {# more} other {# more}}",
@@ -74,6 +76,12 @@
         "discard": "Discard",
         "discardTitle": "Discard this message?",
         "discardQuestion": "Discard \"{subject}\"? It was never sent.",
-        "discardBody": "It is only on this device, so it cannot be brought back."
+        "discardBody": "It is only on this device, so it cannot be brought back.",
+        "draftWaiting": "Draft, saved when Polaris is back",
+        "draftNotSaved": "Draft not saved",
+        "open": "Open",
+        "discardDraftTitle": "Discard this draft?",
+        "discardDraftQuestion": "Discard the draft \"{subject}\"?",
+        "discardDraftBody": "It never reached Drafts and is only on this device, so it cannot be brought back."
     }
 }

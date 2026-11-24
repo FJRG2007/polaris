@@ -199,6 +199,24 @@ export const addonCatalogSchema = z.object({
 
 export type AddonCatalog = z.infer<typeof addonCatalogSchema>;
 
+
+/**
+ * Where the signed catalog is published - the Polaris repository's
+ * `device-addons` release, the same for every host - and its signature beside
+ * it (`<url>.sig`).
+ */
+export const ADDON_CATALOG_URL = "https://github.com/FJRG2007/polaris/releases/download/device-addons/catalog.json";
+
+/**
+ * The public halves of the keys the catalog may be signed with (raw Ed25519,
+ * hex). Several may be trusted at once, so a key is replaced by shipping its
+ * successor before the catalog moves to it. The desktop app and the dashboard
+ * read the same list.
+ */
+export const ADDON_CATALOG_KEYS: readonly { readonly id: string; readonly publicKey: string }[] = [
+    { id: "addons-2026-11", publicKey: "20ace90f4e0160264f6a05faeabe54478953849fb442ecd0708e850a4c5a846e" }
+];
+
 /** The largest catalog a client reads. */
 export const ADDON_CATALOG_MAX_BYTES = 1024 * 1024;
 
@@ -394,4 +412,46 @@ export function addonSettingSections(manifest: Pick<AddonManifest, "settings" | 
         if (settings.length > 0) sections.push({ group, settings });
     }
     return sections;
+}
+
+/** Where one setting is drawn on its add-on's page (the element's `id`), for a link straight to it. */
+export function addonSettingAnchor(key: string): string {
+    return `setting-${key}`;
+}
+
+/** Where one group of settings is drawn on its add-on's page (the section's `id`). */
+export function addonGroupAnchor(key: string): string {
+    return `group-${key}`;
+}
+
+/** A place on an add-on's page a search result can lead to: a group of settings or one setting. */
+export interface AddonSettingTarget {
+    readonly kind: "group" | "setting";
+    readonly key: string;
+    /** The element's `id` on the add-on's page. */
+    readonly anchor: string;
+    readonly label: string;
+    /** The group a setting is drawn in, or null for a group and for a setting in none. */
+    readonly section: string | null;
+    /** Other words that find it: its hint, a choice's options, a group's settings. */
+    readonly words: readonly string[];
+}
+
+/** Every group and setting of an add-on, in the order its page draws them, in the reader's language. */
+export function addonSettingTargets(manifest: Pick<AddonManifest, "settings" | "groups">, locale: string): AddonSettingTarget[] {
+    const targets: AddonSettingTarget[] = [];
+    for (const { group, settings } of addonSettingSections(manifest)) {
+        const section = group ? addonText(group.label, locale) : null;
+        const labels = settings.map((setting) => addonText(setting.label, locale));
+        if (group && section) {
+            const words = [...(group.hint ? [addonText(group.hint, locale)] : []), ...labels];
+            targets.push({ kind: "group", key: group.key, anchor: addonGroupAnchor(group.key), label: section, section: null, words });
+        }
+        settings.forEach((setting, index) => {
+            const options = setting.kind === "choice" ? setting.options.map((option) => addonText(option.label, locale)) : [];
+            const words = [...(setting.hint ? [addonText(setting.hint, locale)] : []), ...options];
+            targets.push({ kind: "setting", key: setting.key, anchor: addonSettingAnchor(setting.key), label: labels[index]!, section, words });
+        });
+    }
+    return targets;
 }

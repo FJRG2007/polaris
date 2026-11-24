@@ -87,6 +87,8 @@ export interface SignedSeed {
     readonly body?: string;
     readonly inReplyToId?: string | null;
     readonly draftId?: string | null;
+    /** A draft kept on this device - see `ComposerSeed.kept`. */
+    readonly kept?: object;
 }
 
 /**
@@ -112,7 +114,9 @@ export function withSignature(
     identity: Pick<MailIdentityView, "signature"> | undefined
 ): string {
     const body = keepSignatureDelimiter(seed.body ?? "");
-    if (seed.draftId) return body;
+    // A draft already has whatever signature it was given - one kept on this
+    // device as much as one in Drafts.
+    if (seed.draftId || seed.kept) return body;
 
     const signature = (identity?.signature || account?.signature || "").trim();
     if (!signature) return body;

@@ -74,6 +74,9 @@ import {
 } from "lucide-react";
 import * as outbox from "./outbox";
 import { keepSend } from "./offline-sends";
+import { draftSaved, draftWrite, keepDraft, type KeptDraft } from "./offline-drafts";
+import { newClientKey } from "@/lib/offline/outbox";
+import { keepOnUnload } from "@/lib/offline/app-writes";
 import { rememberSender } from "./default-sender";
 import { useDisplayFormat } from "@/components/display-format";
 import {
@@ -131,11 +134,17 @@ interface Attached {
 
 /** Where a draft is written, for the composer's `draftSaves` queue. A request of
  *  its own rather than a server action, because it fires on a timer - see
- *  `outbox`. */
-const writeDraft: DraftWriter = async (fields, id) => {
-    const outcome = await outbox.saveDraft(fields, id);
-    return outbox.isRefused(outcome) ? null : outcome.draftId;
-};
+ *  `outbox`. A new message carries the composer's key, so a save whose answer
+ *  never came back does not write a second draft; once saved, nothing older of
+ *  it kept on this device is left to save. */
+function draftWriter(draftKey: string): DraftWriter {
+    return async (fields, id) => {
+        const outcome = await outbox.saveDraft(fields, id, id ? undefined : draftKey);
+        if (outbox.isRefused(outcome)) return null;
+        draftSaved({ id: outcome.draftId, draftKey });
+        return outcome.draftId;
+    };
+}
 
 /** A route's answer, when there is one to read. */
 function parsed(body: string): unknown {
@@ -201,6 +210,8 @@ export function Composer() {
         if (viewing) setViewerWanted(true);
     }, [viewing]);
     const saves = useRef<DraftSaves | null>(null);
+    /** The composer's own key for its draft - see `offline-drafts`. */
+    const draftKey = useRef("");
     const [sendAt, setSendAt] = useState<Date | null>(null);
     const [queued, setQueued] = useState<{ draftId: string; until: number } | null>(null);
     const [problem, setProblem] = useState("");
@@ -263,7 +274,11 @@ export function Composer() {
         if (seeded.current === composing) return;
         seeded.current = composing;
         const account = composing.accountId ?? accounts[0]?.id ?? "";
-        const identity = (identities[account] ?? []).find((one) => one.isDefault);
+        const kept = composing.kept;
+        const identity = kept
+            ? (identities[account] ?? []).find((one) => one.id === kept.identityId)
+            : (identities[account] ?? []).find((one) => one.isDefault);
+        draftKey.current = kept?.draftKey ?? newClientKey();
         setAccountId(account);
         setIdentityId(identity?.id ?? "");
         setTo([...(composing.to ?? [])]);
@@ -279,12 +294,13 @@ export function Composer() {
         // Only an answer has history to trim, and a reopened draft only while
         // its quote is still nothing but the quote.
         const split = composing.inReplyToId
-            ? trimComposerBody(body, Boolean(composing.draftId))
+            ? trimComposerBody(body, Boolean(composing.draftId || kept))
             : null;
         setBody(split ? split.head : body);
         setTrimmed(split?.tail ?? "");
         setExpanded(false);
-        setFiles([]);
+        setFiles(kept ? [...kept.files] : []);
+        filesNow.current = kept ? [...kept.files] : [];
         setViewing(null);
         carriedIds.current = [];
         saves.current = draftSaves(
@@ -296,18 +312,19 @@ export function Composer() {
                 bcc: [...(composing.bcc ?? [])],
                 subject: composing.subject ?? "",
                 body,
-                attachmentIds: [],
+                attachmentIds: kept ? kept.files.map((file) => file.id) : [],
                 inReplyToId: composing.inReplyToId ?? null,
                 forward: composing.forward ?? false
             },
             composing.draftId ?? null,
-            writeDraft
+            draftWriter(draftKey.current),
+            Boolean(kept)
         );
         setSendAt(null);
         setQueued(null);
         setProblem("");
         setPosture("docked");
-        setOwnLine(!composing.draftId);
+        setOwnLine(!composing.draftId && !kept);
         // The caret goes to the message only when there is nobody left to name:
         // a reply arrives addressed, so writing is all that is left. A forward
         // and a new message arrive with an empty To, and taking the caret out of
@@ -354,7 +371,8 @@ export function Composer() {
     // alone, for the reason the seeding above is.
     useEffect(() => {
         const draftId = composing?.draftId;
-        if (!draftId) {
+        // A kept draft brought its files with it, newer than the server's.
+        if (!draftId || composing.kept) {
             setLoadingFiles(false);
             filesLoad.current = null;
             return;
@@ -417,6 +435,36 @@ export function Composer() {
 
     const dirty =
         to.length > 0 || subject.trim() !== "" || message.trim() !== "" || files.length > 0;
+
+    /** The draft as it stands, for a tab that closes before it is saved. */
+    const standing = useRef<KeptDraft | null>(null);
+    standing.current =
+        composing && accountId && dirty && !queued
+            ? {
+                  accountId,
+                  identityId: identityId || null,
+                  to,
+                  cc,
+                  bcc,
+                  subject,
+                  body: message,
+                  attachmentIds: files.map((file) => file.id),
+                  inReplyToId: composing.inReplyToId ?? null,
+                  forward: forwarding,
+                  id: saves.current?.id() ?? null,
+                  draftKey: draftKey.current,
+                  files
+              }
+            : null;
+    // What is not saved yet is kept on this device if the tab goes away first,
+    // and saved to Drafts when Polaris answers.
+    useEffect(() => {
+        if (!composing) return;
+        return keepOnUnload(() => {
+            const draft = standing.current;
+            return draft && saves.current?.pending(draft) ? draftWrite(draft) : null;
+        });
+    }, [composing]);
 
     // The draft, a few seconds after typing stops. Skipped while nothing has been
     // typed - an opened-and-closed composer should not leave an empty draft.
@@ -616,6 +664,9 @@ export function Composer() {
                 // Polaris did not answer: kept on this device and sent when it
                 // does, like a chat message. The composer closes as on any send.
                 if (outbox.isRefused(outcome) && outcome.unreachable && (await keepSend(outgoing))) {
+                    // The send has it now: a copy kept as a draft would be a
+                    // second one.
+                    draftSaved({ id: draftId, draftKey: draftKey.current });
                     rememberSender(shelf, accountId);
                     openComposer(null);
                     toast.show({ title: t("compose.keptOffline") });
@@ -627,6 +678,7 @@ export function Composer() {
                     return;
                 }
                 saves.current?.adopt(outcome.draftId, fields);
+                draftSaved({ id: outcome.draftId, draftKey: draftKey.current });
                 setQueued({ draftId: outcome.draftId, until: new Date(outcome.sendAt).getTime() });
                 // The mailbox somebody actually wrote from is the one the next
                 // message starts on, wherever they write it from.
@@ -723,11 +775,20 @@ export function Composer() {
                 inReplyToId: composing?.inReplyToId ?? null,
                 forward: forwarding
             };
-            const id = await saves.current?.save(fields);
-            if (id) await fileDraftOnServerAction(id);
+            const id = (await saves.current?.save(fields)) ?? null;
+            // Polaris did not take it: kept on this device and saved to Drafts
+            // when it answers, rather than lost with the composer.
+            if (saves.current?.pending(fields)) {
+                const kept = await keepDraft({ ...fields, id, draftKey: draftKey.current, files: filesNow.current });
+                toast.show({ title: t(kept ? "compose.draftKeptOffline" : "compose.draftNotKept") });
+                return;
+            }
+            if (id) await fileDraftOnServerAction(id).catch(() => undefined);
             refreshMailbox();
         })();
     }, [
+        toast,
+        t,
         openComposer,
         queued,
         accountId,

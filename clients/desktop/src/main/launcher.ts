@@ -65,7 +65,15 @@ export interface LauncherHost {
     /** Show the Polaris window at a path of the Polaris in use. */
     readonly showPolaris: (path?: string) => void;
     /** The device add-ons installed here, each with its page in Settings, for "Configure <name>". */
-    readonly addons?: () => readonly { readonly id: string; readonly name: string; readonly path: string; }[];
+    readonly addons?: () => readonly {
+        readonly id: string;
+        readonly name: string;
+        readonly path: string;
+        /** Its groups of settings and settings, each leading to that place on its page. */
+        readonly places?: readonly { readonly label: string; readonly path: string; readonly words: readonly string[]; }[];
+    }[];
+    /** The add-on bridge's snapshot, so the instance's palette lists them with their settings in the reader's language. */
+    readonly addonsSnapshot?: () => Promise<unknown>;
 }
 
 let host: LauncherHost | null = null;
@@ -257,9 +265,12 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
                 add({ kind: "polaris", title: entry.label, subtitle: entry.context }, () => host?.showPolaris(entry.href), entryKey(entry));
             }
             for (const page of rankedMatches(query, PAGES.map((page) => ({ ...page, context: "Polaris" })), 3, pageKey, uses)) addPage(page);
-            const addonPages = (host?.addons?.() ?? []).map((addon) => ({ label: `Configure ${addon.name}`, path: addon.path, context: addon.name }));
-            for (const page of rankedMatches(query, addonPages, 3, pageKey, uses)) {
-                add({ kind: "page", title: page.label, subtitle: "Device add-on - opens its settings" }, () => host?.showPolaris(page.path), pageKey(page));
+            const addonPages = (host?.addons?.() ?? []).flatMap((addon) => [
+                { label: `Configure ${addon.name}`, path: addon.path, context: addon.name, subtitle: "Device add-on - opens its settings" },
+                ...(addon.places ?? []).map((place) => ({ label: `${addon.name} - ${place.label}`, path: place.path, context: place.words.join(" "), subtitle: `Setting of ${addon.name}` }))
+            ]);
+            for (const page of rankedMatches(query, addonPages, PER_KIND, pageKey, uses)) {
+                add({ kind: "page", title: page.label, subtitle: page.subtitle }, () => host?.showPolaris(page.path), pageKey(page));
             }
         }
         const commandKey = (command: SystemCommand) => `system:${command.id}`;
@@ -745,6 +756,11 @@ export function startLauncher(given: LauncherHost): void {
         if (useKey) recordLauncherUse(useKey);
         action();
         return true;
+    });
+    ipcMain.handle(LAUNCHER_CHANNELS.addons, async (event) => {
+        // The instance's own palette only: the window's own panel lists them from `addons` above.
+        if (!fromLauncher(event) || !remote) return null;
+        return (await host?.addonsSnapshot?.().catch(() => null)) ?? null;
     });
     ipcMain.handle(LAUNCHER_CHANNELS.hide, (event) => {
         if (fromLauncher(event)) hide();
