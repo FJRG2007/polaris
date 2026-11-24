@@ -2599,7 +2599,7 @@
         "attention": "{count, plural, one {# needs attention} other {# need attention}}",
         "connectors": "Connectors",
         "skills": "Skills",
-        "tools": "Tools"
+        "tools": "Your tools"
     },
     "rewind": {
         "action": "Rewind here",

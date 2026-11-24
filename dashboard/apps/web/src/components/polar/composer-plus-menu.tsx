@@ -20,6 +20,7 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuSub,
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
@@ -36,6 +37,14 @@ export type PlusMenuAttach =
           readonly onFiles: (files: File[]) => void;
           readonly onFailed: (message: string) => void;
       };
+
+/** A view of the session the menu opens, as Claude Code's "+" opens its panes. */
+export interface PlusMenuView {
+    readonly id: string;
+    readonly label: string;
+    readonly icon: ReactNode;
+    readonly onSelect: () => void;
+}
 
 /** Whether the shortcut is Ctrl+U (or Cmd+U on a Mac), and nothing else held. */
 export function isAttachShortcut(event: {
@@ -92,6 +101,7 @@ export function ComposerPlusMenu({
     slashable,
     onSlash,
     disabled = false,
+    views = [],
     registerOpenFiles
 }: {
     attach: PlusMenuAttach;
@@ -102,6 +112,8 @@ export function ComposerPlusMenu({
     slashable: boolean;
     onSlash: () => void;
     disabled?: boolean;
+    /** The session's panes - files, preview, terminal - for a Code session. */
+    views?: readonly PlusMenuView[];
     /** Hands the composer the file picker, for Ctrl+U. */
     registerOpenFiles?: (open: (() => void) | null) => void;
 }) {
@@ -229,6 +241,13 @@ export function ComposerPlusMenu({
                             </DropdownMenuItem>
                         </DropdownMenuSubContent>
                     </DropdownMenuSub>
+                    {views.length > 0 ? <DropdownMenuSeparator /> : null}
+                    {views.map((view) => (
+                        <DropdownMenuItem key={view.id} onSelect={view.onSelect}>
+                            {view.icon}
+                            <span className="min-w-0 truncate">{view.label}</span>
+                        </DropdownMenuItem>
+                    ))}
                 </DropdownMenuContent>
             </DropdownMenu>
         </>

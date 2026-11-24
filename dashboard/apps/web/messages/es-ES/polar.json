@@ -2592,7 +2592,7 @@
         "open": "Añadir archivos, comandos y más",
         "files": "Añadir archivos o fotos",
         "filesKey": "Ctrl+U",
-        "folder": "Añadir carpeta",
+        "folder": "Subir carpeta",
         "slash": "Comandos con /",
         "slashBusy": "Cuadro con texto",
         "plugins": "Plugins",

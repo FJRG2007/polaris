@@ -18,6 +18,7 @@ nothing in `dashboard/apps/web/src/components/polar` implements it. A row marked
 | "+" menu: Add folder | desktop | Has - same menu |
 | "+" menu: Slash commands | desktop | Has - same menu opens the "/" list |
 | "+" menu: Plugins / Connectors / Skills, with "needs attention" | desktop | Has - submenu to settings, counts connectors that need sign-in |
+| "+" menu opens the panes (Browser, Files, Terminal, ...) | desktop | Has - a session's "+" opens Files, Preview, Browser (own container), Changes, Terminal in `polar-code-workspace.tsx` |
 | @mention files | desktop | Unverified |
 | Attachments by drag and drop and paste | desktop | Has - `polar-panel.tsx` |
 | Suggested prompt (Tab) | desktop | Has in Chat (`composer.suggestion`), Code unverified |

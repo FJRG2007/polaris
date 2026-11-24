@@ -21,7 +21,7 @@ import type { VoiceAvailability } from "@/lib/polar/voice-call";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { BorderBeam } from "@/components/polar/motion/border-beam";
 import { useCallback, useRef, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
-import { ComposerPlusMenu, isAttachShortcut } from "@/components/polar/composer-plus-menu";
+import { ComposerPlusMenu, isAttachShortcut, type PlusMenuView } from "@/components/polar/composer-plus-menu";
 import { ImproveButton } from "@/components/polar/improve-button";
 import { AttachmentList, type AttachmentData } from "@/components/polar/elements/attachments";
 import { DictationButton, VoiceModeButton, type VoiceNotice } from "@/components/polar/polar-voice";
@@ -87,6 +87,7 @@ export function PolarComposer({
     attach,
     attachId,
     voiceMode,
+    views,
     submit,
     streaming = false,
     hidden = false,
@@ -120,6 +121,8 @@ export function PolarComposer({
     /** The id the attach button sits under, for a command that presses it. */
     attachId?: string;
     voiceMode: ComposerVoiceMode;
+    /** The session's panes the "+" menu opens, for a Code session. */
+    views?: readonly PlusMenuView[];
     submit: {
         busy: boolean;
         disabled: boolean;
@@ -223,6 +226,7 @@ export function PolarComposer({
                                 onValueChange("/");
                                 own.current?.focus();
                             }}
+                            views={views}
                             registerOpenFiles={registerOpenFiles}
                         />
                         <DictationButton
