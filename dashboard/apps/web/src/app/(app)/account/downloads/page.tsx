@@ -26,6 +26,7 @@ import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { listApiKeys } from "@polaris/auth";
 import { TvOffer } from "./tv-offer";
+import { ThisDeviceApp } from "@/components/this-app/this-device-app";
 import { Skeleton } from "@polaris/ui";
 import { DownloadsPage as DownloadsView } from "@polaris/ui/account-downloads/downloads-page";
 import { requireUser } from "@/lib/session";
@@ -98,6 +99,7 @@ export default async function DownloadsPage() {
         <DownloadsView
             repo={repo}
             serverUrl={serverUrl}
+            thisDevice={<ThisDeviceApp />}
             webApp={<InstallAppOffer />}
             tv={
                 <TvOffer

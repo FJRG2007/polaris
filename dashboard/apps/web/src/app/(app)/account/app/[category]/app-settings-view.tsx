@@ -4,12 +4,14 @@
  * One category of the desktop or phone app's own settings, drawn from the shared schema
  * (`@polaris/core/app-settings`) and read and written through the app's bridge.
  *
- * Every read is local - the app answers over IPC, no network - and the last
- * answer is kept for the session, so moving between categories draws at once
- * and only swaps a value that changed. A change shows immediately and is put
- * back when the app refuses it. The app says when a value changed anywhere
- * else (its tray, its own page, another window), and the page reads again then
- * and whenever it comes back into view.
+ * The rows, their names and their explanations are known before the app is
+ * asked anything, so they draw at once; the values come from the last answer
+ * kept on this device and are swapped only where the app's answer differs
+ * (`useAppSettingsValues`). A value this device has never seen is a
+ * placeholder on that one control. A change shows immediately and is put back
+ * when the app refuses it. The app says when a value changed anywhere else (its
+ * tray, its own page, another window), and the page reads again then and
+ * whenever it comes back into view.
  *
  * The phone app lists fewer categories (`APP_PHONE_CATEGORIES`) and keeps no
  * values the page changes: its General category opens a screen of the app or
@@ -24,29 +26,37 @@ import { HostsManager } from "@/components/this-app/hosts-manager";
 import { phoneAppSettings, phoneHosts, type PhoneAppSettings } from "@/lib/mobile-bridge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useNetworkState } from "@enigmax/primitives/react/network";
-import { readDesktopUpdateCheck, type DesktopUpdateCheck, type PolarisDesktop } from "@/lib/desktop-bridge";
+import type { PolarisDesktop } from "@/lib/desktop-bridge";
 import { MaxUsersRow, OverlayGames, ResetOverlay, VoiceWidgetPreview } from "./voice-widget-preview";
+import { useAppSettingsValues } from "@/components/this-app/app-settings-values";
 import { Button, buttonVariants, Card, CardBody, ConfirmDeleteDialog, Select, Skeleton, Switch, useToast } from "@polaris/ui";
 
-/** The last snapshot the app gave, so a category opened next draws without waiting. */
-let lastSnapshot: core.AppSettingsSnapshot | null = null;
-
-/** Only for tests: forget the kept snapshot. */
-export function forgetAppSettingsSnapshot(): void {
-    lastSnapshot = null;
-}
+export { forgetAppSettingsSnapshot } from "@/components/this-app/app-settings-values";
 
 const MODIFIER_KEYS = ["Control", "Alt", "Shift", "Meta"];
 
-/** Whether a setting is listed: every switch it sits under, all the way up, is on. */
-export function settingShown(entry: core.AppSettingEntry, snapshot: core.AppSettingsSnapshot): boolean {
+/** Whether a setting is listed: every switch it sits under, all the way up, is on (none is, before the app's values arrive). */
+export function settingShown(entry: core.AppSettingEntry, snapshot: core.AppSettingsSnapshot | null): boolean {
     let parent = entry.dependsOn;
     for (let depth = 0; parent && depth < 8; depth++) {
-        if (snapshot[parent as core.AppSettingKey] !== true) return false;
+        if (snapshot?.[parent as core.AppSettingKey] !== true) return false;
         parent = (core.APP_SETTINGS as readonly core.AppSettingEntry[]).find((item) => item.key === parent)?.dependsOn;
     }
     return true;
+}
+
+/** A whole category: its title, its line, and its rows. Drawn the same by the page and its loading state. */
+export function AppSettingsScreen({ category }: { category: core.AppSettingCategory }) {
+    const t = useTranslations("appSettings");
+    return (
+        <div className="mx-auto flex max-w-2xl flex-col gap-4">
+            <div>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t(`categories.${category}.title`)}</h1>
+                <AppSettingsIntro category={category} />
+            </div>
+            <AppSettingsView category={category} />
+        </div>
+    );
 }
 
 /** The line under the category's title: the phone app's own when the page runs in it. */
@@ -93,103 +103,41 @@ export function AppSettingsView({ category }: { category: core.AppSettingCategor
     }
     // An app that manages its hosts here draws them from its own list, at once.
     if (category === "hosts" && bridge.appSettings.hosts) return <HostsManager hosts={bridge.appSettings.hosts} />;
-    return <InApp bridge={bridge} settings={bridge.appSettings} category={category} />;
+    return <InApp settings={bridge.appSettings} category={category} />;
 }
 
 function InApp({
-    bridge,
     settings,
     category
 }: {
-    bridge: PolarisDesktop;
     settings: NonNullable<PolarisDesktop["appSettings"]>;
     category: core.AppSettingCategory;
 }) {
     const t = useTranslations("appSettings");
-    const toast = useToast();
-    const [snapshot, setSnapshot] = useState<core.AppSettingsSnapshot | null>(lastSnapshot);
-    const [unavailable, setUnavailable] = useState(false);
+    const { snapshot, unavailable, refresh, change, keep } = useAppSettingsValues(settings, category);
 
-    const keep = useCallback((next: core.AppSettingsSnapshot) => {
-        lastSnapshot = next;
-        setSnapshot(next);
-    }, []);
-
-    const refresh = useCallback(async () => {
-        const next = core.readAppSettings(await settings.get().catch(() => null));
-        if (next) {
-            keep(next);
-            setUnavailable(false);
-        } else if (!lastSnapshot) setUnavailable(true);
-    }, [settings, keep]);
-
-    useEffect(() => {
-        void refresh();
-        const stop = settings.onChange(() => void refresh());
-        const visible = () => {
-            if (document.visibilityState === "visible") void refresh();
-        };
-        const focused = () => void refresh();
-        window.addEventListener("focus", focused);
-        document.addEventListener("visibilitychange", visible);
-        return () => {
-            stop();
-            window.removeEventListener("focus", focused);
-            document.removeEventListener("visibilitychange", visible);
-        };
-    }, [settings, refresh]);
-
-    /** Show the change now, and put the value back when the app refuses it. */
-    const change = useCallback(
-        (next: core.AppSettingChange) => {
-            const before = lastSnapshot;
-            if (!before || before[next.key] === next.value) return;
-            keep({ ...before, [next.key]: next.value });
-            void settings
-                .set(next)
-                .catch(() => null)
-                .then((answer) => {
-                    const after = core.readAppSettings(answer);
-                    if (after) return keep(after);
-                    keep(before);
-                    toast.show({ title: t("saveFailed") });
-                });
-        },
-        [settings, keep, toast, t]
-    );
-
-    if (!snapshot) {
-        if (unavailable) {
-            return (
-                <Card>
-                    <CardBody className="flex flex-col items-start gap-3">
-                        <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
-                        <Button size="sm" variant="secondary" onClick={() => void refresh()}>
-                            {t("retry")}
-                        </Button>
-                    </CardBody>
-                </Card>
-            );
-        }
+    // Never seen on this device and the app did not answer: say so, with the rows' place kept.
+    if (!snapshot && unavailable) {
         return (
             <Card>
-                <CardBody className="flex flex-col gap-4" aria-busy="true">
-                    {core.appSettingsIn(category).map((entry) => (
-                        <Skeleton key={entry.key} className="h-9 w-full" />
-                    ))}
-                    {core.appSettingsIn(category).length === 0 && <Skeleton className="h-9 w-full" />}
+                <CardBody className="flex flex-col items-start gap-3">
+                    <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
+                    <Button size="sm" variant="secondary" onClick={() => void refresh()}>
+                        {t("retry")}
+                    </Button>
                 </CardBody>
             </Card>
         );
     }
 
+    // A row that only applies under another, or on a device that has its feature, waits for the app's values; the rest draw now.
     const entries = core
         .appSettingsIn(category)
-        .filter((entry) => core.appSettingOffered(entry, snapshot.features) && settingShown(entry, snapshot));
+        .filter((entry) => core.appSettingOffered(entry, snapshot?.features ?? []) && settingShown(entry, snapshot));
 
     return (
         <div className="flex flex-col gap-4">
-            {category === "voice" && snapshot.voiceWidget && <VoiceWidgetPreview snapshot={snapshot} />}
+            {category === "voice" && snapshot?.voiceWidget && <VoiceWidgetPreview snapshot={snapshot} />}
             {entries.length > 0 && (
                 <Card>
                     <CardBody className="flex flex-col gap-4">
@@ -206,12 +154,12 @@ function InApp({
                     </CardBody>
                 </Card>
             )}
-            {category === "voice" && snapshot.voiceWidget && (
+            {category === "voice" && snapshot?.voiceWidget && (
                 <OverlayGames snapshot={snapshot} settings={settings} onSnapshot={keep} />
             )}
             {category === "voice" && <ResetOverlay settings={settings} onSnapshot={keep} />}
             {category === "clipboard" && <ClearClipboard settings={settings} />}
-            {category === "advanced" && snapshot.restartPending && (
+            {category === "advanced" && snapshot?.restartPending && (
                 <Card>
                     <CardBody className="flex flex-wrap items-center justify-between gap-3">
                         <p className="min-w-0 text-sm text-muted-foreground">{t("restart.pending")}</p>
@@ -223,13 +171,12 @@ function InApp({
             )}
             {category === "hosts" && (
                 <Hosts
-                    servers={snapshot.servers}
-                    server={snapshot.server}
+                    servers={snapshot?.servers ?? null}
+                    server={snapshot?.server ?? null}
                     hint={t("hosts.manageHint")}
                     onManage={() => void settings.manageHosts()}
                 />
             )}
-            {category === "updates" && <Updates bridge={bridge} version={snapshot.version} />}
         </div>
     );
 }
@@ -254,22 +201,37 @@ function SettingRow({
     onSnapshot
 }: {
     entry: core.AppSettingEntry;
-    snapshot: core.AppSettingsSnapshot;
+    /** Null while this device has never seen a value: the control is a placeholder. */
+    snapshot: core.AppSettingsSnapshot | null;
     settings: NonNullable<PolarisDesktop["appSettings"]>;
     onChange: (change: core.AppSettingChange) => void;
     onSnapshot: (next: core.AppSettingsSnapshot) => void;
 }) {
     const t = useTranslations("appSettings");
     const key = entry.key as core.AppSettingKey;
-    const label =
-        key === "launcher" ? t("items.launcher.label", { key: snapshot.launcherKey }) : t(`items.${key}.label`);
+    let label: string = t(`items.${key}.label`);
+    if (key === "launcher") {
+        label = snapshot ? t("items.launcher.label", { key: snapshot.launcherKey }) : t("items.launcher.plain");
+    }
     let hint: string = t(`items.${key}.hint`);
-    if (key === "launcherClipboard" && !snapshot.launcherClipboardPersists) hint = t("clipboard.memoryOnly");
+    if (key === "launcherClipboard" && snapshot && !snapshot.launcherClipboardPersists) hint = t("clipboard.memoryOnly");
     // A key somebody chose replaces the default keys the hint names.
-    if (key === "voiceWidget" && snapshot.overlayLockBinding && snapshot.overlayLockKey) {
+    if (key === "voiceWidget" && snapshot?.overlayLockBinding && snapshot.overlayLockKey) {
         hint = t("items.voiceWidget.hintKey", { key: snapshot.overlayLockKey });
     }
 
+    if (!snapshot) {
+        return (
+            <Row label={label} hint={hint}>
+                <Skeleton
+                    aria-label={label}
+                    aria-busy="true"
+                    data-placeholder={key}
+                    className={entry.kind === "toggle" ? "h-5 w-9 rounded-full" : "h-8 w-32"}
+                />
+            </Row>
+        );
+    }
     if (entry.kind === "shortcut" && key === "overlayLockBinding") {
         const setOverlayShortcut = settings.setOverlayShortcut;
         if (!setOverlayShortcut) return null;
@@ -513,7 +475,8 @@ function Hosts({
     hint,
     onManage
 }: {
-    servers: core.AppSettingsSnapshot["servers"];
+    /** Null while this device has never seen the list: a placeholder line in its place. */
+    servers: core.AppSettingsSnapshot["servers"] | null;
     server: string | null;
     /** What the app's own hosts screen is called where it opens: a window on a computer, a screen on a phone. */
     hint: string;
@@ -523,7 +486,9 @@ function Hosts({
     return (
         <Card>
             <CardBody className="flex flex-col gap-4">
-                {servers.length === 0 ? (
+                {servers === null ? (
+                    <Skeleton aria-busy="true" className="h-5 w-48" />
+                ) : servers.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t("hosts.none")}</p>
                 ) : (
                     <ul className="flex flex-col gap-3">
@@ -553,92 +518,6 @@ function Hosts({
                     <Button size="sm" variant="secondary" onClick={onManage}>
                         {t("hosts.manage")}
                     </Button>
-                </Row>
-            </CardBody>
-        </Card>
-    );
-}
-
-type UpdateState = { readonly kind: "idle" } | { readonly kind: "checking" } | DesktopUpdateCheck;
-
-function Updates({ bridge, version }: { bridge: PolarisDesktop; version: string }) {
-    const t = useTranslations("appSettings");
-    const [state, setState] = useState<UpdateState>({ kind: "idle" });
-    // Opened from the window's cache with no connection: a check or a download
-    // page cannot answer, so they wait for one and say so. A restart into an
-    // update already downloaded needs none.
-    const { online } = useNetworkState();
-
-    // An update already downloaded, or one that finishes while the page is open.
-    useEffect(() => {
-        let live = true;
-        void bridge
-            .updateReady?.()
-            .then((ready) => {
-                if (live && ready) setState({ kind: "ready", version: ready.version });
-            })
-            .catch(() => undefined);
-        const stop = bridge.onUpdateReady?.((ready) => {
-            if (ready) setState({ kind: "ready", version: ready.version });
-        });
-        return () => {
-            live = false;
-            stop?.();
-        };
-    }, [bridge]);
-
-    const message = (() => {
-        switch (state.kind) {
-            case "idle":
-                return null;
-            case "checking":
-                return t("updates.checking");
-            case "current":
-                return t("updates.current");
-            case "downloading":
-                return t("updates.downloading", { version: state.version });
-            case "ready":
-                return t("updates.ready", { version: state.version });
-            case "available":
-                return t("updates.available", { version: state.version });
-            case "failed":
-                return t("updates.failed");
-            case "unsupported":
-                return t("updates.unsupported");
-        }
-    })();
-    const busy = state.kind === "checking" || state.kind === "downloading";
-    const waiting = !online && state.kind !== "ready";
-
-    return (
-        <Card>
-            <CardBody className="flex flex-col gap-3">
-                <Row label={t("updates.version", { version: version || bridge.version })} hint={waiting ? t("updates.offline") : message}>
-                    {state.kind === "ready" && bridge.installUpdate ? (
-                        <Button size="sm" onClick={() => void bridge.installUpdate?.()}>
-                            {t("updates.restart")}
-                        </Button>
-                    ) : state.kind === "available" && !waiting ? (
-                        <Link href="/account/downloads" className={buttonVariants({ size: "sm" })}>
-                            {t("updates.download")}
-                        </Link>
-                    ) : bridge.checkForUpdates ? (
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            aria-disabled={busy || waiting}
-                            onClick={() => {
-                                if (busy || waiting) return;
-                                setState({ kind: "checking" });
-                                void bridge
-                                    .checkForUpdates?.()
-                                    .catch(() => null)
-                                    .then((found) => setState(readDesktopUpdateCheck(found)));
-                            }}
-                        >
-                            {t("updates.check")}
-                        </Button>
-                    ) : null}
                 </Row>
             </CardBody>
         </Card>
@@ -708,7 +587,6 @@ function InPhone({ settings, category }: { settings: PhoneAppSettings; category:
             />
         );
     }
-    if (category === "updates") return <PhoneUpdates settings={settings} snapshot={snapshot} />;
     return (
         <Card>
             <CardBody className="flex flex-col gap-4">
@@ -724,67 +602,6 @@ function InPhone({ settings, category }: { settings: PhoneAppSettings; category:
                     </Row>
                 ))}
                 {snapshot.actions.length === 0 && <p className="text-sm text-muted-foreground">{t("phone.none")}</p>}
-            </CardBody>
-        </Card>
-    );
-}
-
-type PhoneUpdateState = { readonly kind: "idle"; } | { readonly kind: "checking"; } | core.AppPhoneUpdateCheck;
-
-function PhoneUpdates({ settings, snapshot }: { settings: PhoneAppSettings; snapshot: core.AppPhoneSnapshot; }) {
-    const t = useTranslations("appSettings");
-    const [state, setState] = useState<PhoneUpdateState>({ kind: "idle" });
-    // From the cache with no connection the check cannot answer: it waits for one.
-    const { online } = useNetworkState();
-    const live = useRef(true);
-    useEffect(() => {
-        live.current = true;
-        return () => {
-            live.current = false;
-        };
-    }, []);
-
-    const message = (() => {
-        if (snapshot.updates === "store") return t("updates.unsupported");
-        switch (state.kind) {
-            case "idle":
-                return null;
-            case "checking":
-                return t("updates.checking");
-            case "current":
-                return t("updates.current");
-            case "available":
-                return t("phone.updateOffered", { version: state.version });
-            case "store":
-                return t("updates.unsupported");
-            case "failed":
-                return t("updates.failed");
-        }
-    })();
-    const busy = state.kind === "checking";
-    const waiting = !online && snapshot.updates === "check";
-
-    return (
-        <Card>
-            <CardBody className="flex flex-col gap-3">
-                <Row label={t("updates.version", { version: snapshot.version })} hint={waiting ? t("updates.offline") : message}>
-                    {snapshot.updates === "check" && (
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            aria-disabled={busy || waiting}
-                            onClick={() => {
-                                if (busy || waiting) return;
-                                setState({ kind: "checking" });
-                                void settings.checkForUpdates().then((answer) => {
-                                    if (live.current) setState(answer);
-                                });
-                            }}
-                        >
-                            {t("updates.check")}
-                        </Button>
-                    )}
-                </Row>
             </CardBody>
         </Card>
     );

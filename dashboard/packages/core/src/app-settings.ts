@@ -23,8 +23,7 @@ export const APP_SETTING_CATEGORIES = [
     "clipboard",
     "voice",
     "hosts",
-    "advanced",
-    "updates"
+    "advanced"
 ] as const;
 
 export type AppSettingCategory = (typeof APP_SETTING_CATEGORIES)[number];
@@ -341,12 +340,12 @@ export function appSettingsTarget(state: {
 }
 
 /**
- * The categories the phone app lists, of the same group: its servers, its
- * version, and the rest of what it keeps on the phone (notifications,
- * language, Vault autofill) under General. The other categories are the
- * desktop app's alone.
+ * The categories the phone app lists, of the same group: its servers, and the
+ * rest of what it keeps on the phone (notifications, language, Vault autofill)
+ * under General. The other categories are the desktop app's alone; the app's
+ * version and its updates are on Downloads.
  */
-export const APP_PHONE_CATEGORIES = ["general", "hosts", "updates"] as const satisfies readonly AppSettingCategory[];
+export const APP_PHONE_CATEGORIES = ["general", "hosts"] as const satisfies readonly AppSettingCategory[];
 
 export type AppPhoneCategory = (typeof APP_PHONE_CATEGORIES)[number];
 

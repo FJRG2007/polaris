@@ -565,6 +565,9 @@ async function canUpdateHost(window: BrowserWindow | null, origin: string): Prom
  * host that answers that it has no such screen the hosts window says so, with
  * the update when this person may run it.
  */
+/** The host's Downloads, where this app's version and updates are. */
+const DOWNLOADS_PATH = "/account/downloads";
+
 async function openSettings(place: SettingsPlace = "general"): Promise<void> {
     const page = main && !main.isDestroyed() ? main : null;
     const origin = current;
@@ -1139,8 +1142,15 @@ function start(): void {
         installScreenShare(server);
         games.start();
 
+        /**
+         * Where an update is fetched: Downloads on the host, which shows this
+         * app's version, the download's progress and its restart; the release
+         * page only when there is no host page to open it on.
+         */
+        const openDownloads = (update: Update) =>
+            current && !loadError ? showPolaris(DOWNLOADS_PATH) : openExternal(update.page);
         const announce = (update: Update) => {
-            const open = () => openExternal(update.page);
+            const open = () => openDownloads(update);
             // The window in front draws the restart button itself: no notice
             // on top of it. A page that does not (an older Polaris, the address
             // form) gets the notice, as do the other windows' pages through the
@@ -1186,7 +1196,7 @@ function start(): void {
         const first = (updateWatch = watchForUpdates((update) => {
             menuUpdate = {
                 version: update.version,
-                open: () => openExternal(update.page),
+                open: () => openDownloads(update),
                 ...(update.restart ? { restart: update.restart } : {})
             };
             refreshMenu();
