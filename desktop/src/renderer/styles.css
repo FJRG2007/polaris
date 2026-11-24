@@ -811,46 +811,165 @@ button.icon [data-icon] {
     }
 }
 
-/* The settings: the categories beside the page of the one chosen, as Settings
-   > This app lays them out on the host. One column on the first run (only the
-   address form) and in a narrow window, where the categories scroll across. */
+/* The settings, laid out the way Polaris draws Settings: the header with the
+   search across the top, the Settings list down the side under its group
+   heading, and the chosen page in the column the host's pages use, its rows in
+   a card. One column on the first run (only the address form), and on a
+   narrow window, where the list scrolls across under the header. */
+.settings-page {
+    min-height: 100vh;
+    padding: 0;
+}
+
 .panel {
     position: relative;
+}
+
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--ground);
+}
+
+.topbar-brand {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    width: 216px;
+    min-width: 0;
+}
+
+.topbar-brand .mark {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+}
+
+.topbar-brand h1 {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: var(--text-heading);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.search {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    max-width: 36rem;
+    height: 32px;
+    margin: 0 auto;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--muted);
+    cursor: text;
+}
+
+.search[hidden] {
+    display: none;
+}
+
+.search:focus-within {
+    border-color: var(--accent);
+}
+
+.search svg {
+    flex: none;
+    width: 15px;
+    height: 15px;
+}
+
+.search input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text);
+    font: inherit;
+}
+
+.search input::-webkit-search-cancel-button {
+    cursor: pointer;
 }
 
 .layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
 }
 
 body:not(.first-run) .layout {
-    grid-template-columns: 200px minmax(0, 1fr);
-    align-items: start;
+    grid-template-columns: 232px minmax(0, 1fr);
+    align-content: start;
+    min-height: calc(100vh - 48px);
+}
+
+.sidebar {
+    position: sticky;
+    top: 48px;
+    align-self: start;
+    height: calc(100vh - 48px);
+    min-width: 0;
+    padding: 16px 8px;
+    overflow-y: auto;
+    border-inline-end: 1px solid var(--line);
+}
+
+.sidebar[hidden] {
+    display: none;
+}
+
+.nav-group {
+    margin: 0;
+    padding: 0 8px 4px;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: var(--text-label);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .categories {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    position: sticky;
-    top: 0;
     min-width: 0;
-}
-
-.categories[hidden] {
-    display: none;
 }
 
 .categories button {
     justify-content: flex-start;
     min-width: 0;
+    height: 32px;
     border: 0;
     border-radius: 6px;
     background: none;
     color: var(--muted);
-    padding: 0 0.625rem;
-    text-align: left;
+    padding: 0 8px;
+    text-align: start;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -867,51 +986,149 @@ body:not(.first-run) .layout {
 }
 
 .pages {
+    width: 100%;
+    max-width: calc(42rem + 48px);
     min-width: 0;
+    margin: 0 auto;
+    padding: 24px;
 }
 
-.pages > section > .section-title:first-child {
-    margin: 0 0 12px;
+.first-run .pages {
+    max-width: calc(30rem + 48px);
+    padding-top: 40px;
 }
 
-@media (max-width: 600px) {
+.page-title {
+    margin: 0 0 16px;
+    color: var(--text);
+    font-size: var(--text-title);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.first-run .page-title {
+    display: none;
+}
+
+.searching .pages > section:not([hidden]) ~ section .page-title {
+    margin-top: 28px;
+}
+
+.pages .settings-list {
+    padding: 8px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+}
+
+.pages .settings-list .setting {
+    margin: 0 -8px;
+    padding: 8px;
+}
+
+.pages .settings-list[hidden],
+[data-search-miss] {
+    display: none !important;
+}
+
+.notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    margin: 0 0 16px;
+    padding: 12px 16px;
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.notice[hidden],
+.empty-state[hidden],
+.search-empty[hidden] {
+    display: none;
+}
+
+.notice p {
+    flex: 1 1 16rem;
+    min-width: 0;
+    margin: 0;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+}
+
+.empty-state p {
+    margin: 0;
+}
+
+@media (max-width: 640px) {
+    .topbar-brand {
+        width: auto;
+    }
+
+    body:not(.first-run) .topbar-brand h1 {
+        display: none;
+    }
+
     body:not(.first-run) .layout {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sidebar {
+        position: static;
+        height: auto;
+        padding: 8px 16px;
+        overflow: visible;
+        border-inline-end: 0;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .nav-group {
+        display: none;
     }
 
     .categories {
         flex-direction: row;
         overflow-x: auto;
-        position: static;
     }
 
     .categories button {
         flex: none;
     }
+
+    .pages {
+        padding: 16px;
+    }
 }
 
 /* Laid over the Polaris window (`openLocalSheet`): the whole window, the way
-   the host's own Settings fill it, under the strip the window is dragged by. */
+   the host's own Settings fill it. The header is the strip the window is
+   dragged by, as the host's is, and keeps clear of the window's own buttons. */
 .sheet {
-    min-height: 100vh;
-    padding: 0;
     background: var(--ground);
 }
 
-.sheet::before {
-    content: "";
-    position: fixed;
-    inset: 0 0 auto;
-    height: 48px;
+.sheet .topbar {
     app-region: drag;
+    padding-inline-end: 152px;
 }
 
-.sheet .panel {
-    box-sizing: border-box;
-    width: min(960px, 100%);
-    min-height: 100vh;
-    margin: 0 auto;
-    padding: 56px 24px 24px;
+.sheet.mac .topbar {
+    padding-inline: 84px 16px;
+}
+
+.sheet .topbar input,
+.sheet .topbar button {
+    app-region: no-drag;
 }
 
 .sheet .panel:not([data-loading]) {
@@ -919,9 +1136,7 @@ body:not(.first-run) .layout {
 }
 
 .sheet-close {
-    position: absolute;
-    top: 52px;
-    right: 24px;
+    flex: none;
 }
 
 @keyframes sheet-in {

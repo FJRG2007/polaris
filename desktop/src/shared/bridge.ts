@@ -18,6 +18,7 @@
 import type { AppKeyPress, AppSettingChange } from "@polaris/core/app-settings";
 import type { StrokeInput } from "./annotate";
 import type { ServerRow } from "./servers";
+import type { HostPageOutcome, LocalSettingsState } from "./settings-route";
 import type { InstallRequest, InstallResult } from "./install-tools";
 import type { Relaunch } from "./relaunch";
 import type { UpdateReady } from "./update-ready";
@@ -464,7 +465,14 @@ export interface PolarisLocal {
     readonly connect: {
         /** The address in use, why it could not be opened if it could not, and
          *  every server kept. */
-        state(): Promise<{ readonly address: string | null; readonly error: string | null; readonly servers: readonly ServerRow[]; }>;
+        state(): Promise<{
+            readonly address: string | null;
+            readonly error: string | null;
+            readonly servers: readonly ServerRow[];
+            /** The place to open and why this page is open instead of the host's
+             *  Settings. Absent on an app from before it. */
+            readonly settings?: LocalSettingsState;
+        }>;
         /** Open an address, adding it to the list with the name given, if any. */
         submit(address: string, name?: string): Promise<Outcome>;
         /** Whether a typed address is a Polaris, asked while it is typed. */
@@ -526,6 +534,9 @@ export interface PolarisLocal {
         restartToUpdate(): Promise<Outcome>;
         /** Open the download page of the version found; false when there is none. */
         openUpdatePage(): Promise<boolean>;
+        /** Open a host page (`readHostPath`) in the Polaris window, or say why
+         *  it could not. */
+        openOnHost?(path: string): Promise<HostPageOutcome>;
     };
     readonly apiKey: {
         state(): Promise<{ readonly server: string; readonly canKeep: boolean; }>;
@@ -858,6 +869,7 @@ export const CHANNELS = {
     connectUpdateDownloaded: "local:connect-update-downloaded",
     connectRestart: "local:connect-restart",
     connectUpdatePage: "local:connect-update-page",
+    connectOpenOnHost: "local:connect-open-on-host",
     keyState: "local:key-state",
     keySubmit: "local:key-submit",
     keyCancel: "local:key-cancel",

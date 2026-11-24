@@ -9,22 +9,39 @@
         <title>Polaris</title>
         <link rel="stylesheet" href="styles.css" />
     </head>
-    <body>
+    <body class="settings-page">
         <div id="panel" class="panel" data-loading>
-        <button id="close-sheet" class="icon sheet-close" type="button" aria-label="Close" title="Close" hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
-            </svg>
-        </button>
-        <header class="brand">
-            <img class="mark" src="mark.svg" alt="" />
-            <h1 id="title">Open your Polaris</h1>
+        <header class="topbar">
+            <div class="topbar-brand">
+                <img class="mark" src="mark.svg" alt="" />
+                <h1 id="title">Open your Polaris</h1>
+            </div>
+            <label id="search-box" class="search" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m20 20-3.5-3.5" />
+                </svg>
+                <input id="settings-search" type="search" placeholder="Search settings" aria-label="Search settings" spellcheck="false" autocomplete="off" />
+            </label>
+            <button id="close-sheet" class="icon sheet-close" type="button" aria-label="Close" title="Close" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                </svg>
+            </button>
         </header>
         <div class="layout">
-            <nav id="tabs" class="categories" role="tablist" aria-label="Settings" hidden></nav>
-            <div id="pages" class="pages">
+            <nav id="nav" class="sidebar" aria-label="Settings" hidden>
+                <p class="nav-group">This app</p>
+                <div id="tabs" class="categories" role="tablist" aria-orientation="vertical"></div>
+            </nav>
+            <main id="pages" class="pages">
+                <div id="reason" class="notice" role="status" hidden>
+                    <p id="reason-text"></p>
+                    <div id="reason-acts" class="acts"></div>
+                </div>
                 <p id="failure" class="banner bad" role="alert" hidden></p>
+                <p id="search-empty" class="hint search-empty" hidden>No settings match your search.</p>
                 <section id="servers-page" role="tabpanel">
                     <div class="section-head">
                         <p class="section-title">Your hosts</p>
@@ -209,7 +226,7 @@
                         <button id="restart-pending-now" class="primary" type="button">Restart now</button>
                     </div>
                 </section>
-            </div>
+            </main>
         </div>
         </div>
         <dialog id="send-dialog" class="wide" aria-labelledby="send-title">
