@@ -17,6 +17,9 @@ import { CORE_RS_NATIVE, mainNode, node } from "./node-build.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist");
+// `@polaris/core` sources live under `dashboard/`, whose dependencies CI never
+// installs; their bare imports (zod) resolve from the app's own `node_modules`.
+const nodePaths = [join(ROOT, "node_modules")];
 
 rmSync(DIST, { recursive: true, force: true });
 
@@ -36,6 +39,7 @@ await build({
     platform: "browser",
     target: "chrome140",
     format: "iife",
+    nodePaths,
     // The pages carry zod for checking the fields as they are typed.
     minify: true,
     logLevel: "info",
