@@ -45,12 +45,19 @@
         "featured": "Featured",
         "shelves": {
             "polaris": "Polaris apps",
-            "community": "From other developers"
+            "community": "From other developers",
+            "addons": "Device add-ons"
         },
         "empty": {
             "title": "Nothing to deploy yet",
             "body": "Apps from other developers that Polaris can run for you will be listed here.",
             "polaris": "Open Polaris apps"
+        },
+        "kinds": {
+            "label": "Show",
+            "all": "All",
+            "apps": "Apps",
+            "addons": "Add-ons"
         }
     },
     "uninstall": {
@@ -84,7 +91,9 @@
         "unavailable": "Not available yet",
         "locked": "Needs permission",
         "lockedHint": "Installing apps needs permission to manage apps. Ask an admin.",
-        "preview": "{name} preview"
+        "preview": "{name} preview",
+        "kindApp": "App",
+        "kindAddon": "Add-on"
     },
     "wizard": {
         "title": "Install {name}",

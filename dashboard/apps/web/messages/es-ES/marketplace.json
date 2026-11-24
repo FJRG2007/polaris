@@ -45,12 +45,19 @@
         "featured": "Destacadas",
         "shelves": {
             "polaris": "Apps de Polaris",
-            "community": "De otros desarrolladores"
+            "community": "De otros desarrolladores",
+            "addons": "Complementos de dispositivo"
         },
         "empty": {
             "title": "Nada que desplegar aún",
             "body": "Aquí aparecerán las apps de otros desarrolladores que Polaris puede ejecutar por ti.",
             "polaris": "Abrir apps de Polaris"
+        },
+        "kinds": {
+            "label": "Mostrar",
+            "all": "Todo",
+            "apps": "Apps",
+            "addons": "Complementos"
         }
     },
     "uninstall": {
@@ -84,7 +91,9 @@
         "unavailable": "Aún no disponible",
         "locked": "Requiere permiso",
         "lockedHint": "Instalar apps requiere permiso para gestionarlas. Pídeselo a un admin.",
-        "preview": "Vista de {name}"
+        "preview": "Vista de {name}",
+        "kindApp": "App",
+        "kindAddon": "Complemento"
     },
     "wizard": {
         "title": "Instalar {name}",

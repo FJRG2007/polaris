@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { appIds } from "@/views/app-page";
+import { addonIds } from "@/views/addon-page";
 import { SITE_LOCALES } from "@/data/builders";
 import { apiPages } from "@/data/api-pages";
 import { undocumentedRoutes } from "@/views/api-docs";
@@ -19,7 +20,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
         "docs/",
         ...apiPages(siteData().api.groups, undocumentedRoutes().length).map((page) => page.path),
         ...siteData().docs.en.map((page) => `docs/${page.slug}/`),
-        ...appIds("en").map((id) => `marketplace/${id}/`)
+        ...appIds("en").map((id) => `marketplace/${id}/`),
+        ...addonIds("en").map((id) => `marketplace/addons/${id}/`)
     ];
     const url = (locale: "en" | "es", page: string) => SITE_ORIGIN + asset(href(locale, page));
     return pages.flatMap((page) =>

@@ -56,9 +56,33 @@
     },
     "market": {
         "title": "Tienda",
-        "intro": "Cada app del catálogo, como la lista el panel. Las integradas vienen en cada instalación; el resto se instala pulsando un botón.",
+        "intro": "Cada app del catálogo, como la lista el panel. Las integradas vienen en cada instalación; el resto se instala pulsando un botón. Los complementos de dispositivo, que instala la app de escritorio en tu equipo, aparecen aparte.",
         "installPolaris": "Instalar Polaris",
-        "installHint": "Las apps se instalan desde tu propio Polaris, en un clic."
+        "installHint": "Las apps se instalan desde tu propio Polaris, en un clic.",
+        "addon": {
+            "platforms": "Funciona en",
+            "devices": "Dispositivos compatibles",
+            "version": "Versión",
+            "minApp": "Necesita la app de escritorio",
+            "minAppValue": "{version} o posterior",
+            "category": "Categoría",
+            "installTitle": "Cómo instalarlo",
+            "installSteps": [
+                "Instala la app de escritorio de Polaris en el equipo al que conectas el dispositivo.",
+                "En la app, abre Ajustes, luego Esta app y luego Complementos.",
+                "Busca {name} y pulsa Instalar."
+            ],
+            "installHint": "Los complementos son del equipo, no de un servidor: una vez instalados van con cualquier Polaris, sin sesión y sin conexión.",
+            "getDesktop": "Descargar la app",
+            "platform": {
+                "win32-x64": "Windows (x64)",
+                "win32-arm64": "Windows (Arm)",
+                "darwin-x64": "macOS (Intel)",
+                "darwin-arm64": "macOS (Apple silicon)",
+                "linux-x64": "Linux (x64)",
+                "linux-arm64": "Linux (Arm)"
+            }
+        }
     },
     "downloads": {
         "title": "Descargas",

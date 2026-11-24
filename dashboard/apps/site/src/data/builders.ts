@@ -147,6 +147,97 @@ export function siteShelves(apps: readonly SiteApp[]): { shelf: StoreShelf; apps
 }
 
 /* -------------------------------------------------------------------------- */
+/* Device add-ons                                                              */
+/* -------------------------------------------------------------------------- */
+
+/** What the marketplace lists: everything, only Polaris apps, or only device add-ons. */
+export type MarketKind = "all" | "apps" | "addons";
+
+export const MARKET_KINDS: readonly MarketKind[] = ["all", "apps", "addons"];
+
+/** An add-on category's id in the shared category bar, kept apart from the apps' own. */
+export const ADDON_CATEGORY_PREFIX = "addon:";
+
+/**
+ * One device add-on of the published catalog (docs/device-addons.md), read at
+ * build time from the same `device-addons/<id>/manifest.json` CI signs, in one
+ * locale. Its summary and changelog are the publisher's own words.
+ */
+export interface SiteAddon {
+    readonly id: string;
+    readonly name: string;
+    readonly publisher: string;
+    /** "By {publisher}", in the dashboard's words. */
+    readonly byline: string;
+    readonly summary: string;
+    /** `addon:<category>`, as the category bar names it. */
+    readonly category: string;
+    readonly categoryLabel: string;
+    readonly version: string;
+    readonly minAppVersion: string;
+    /** The systems it ships for, in words. */
+    readonly platforms: readonly string[];
+    /** The devices it drives, by name. */
+    readonly devices: readonly string[];
+    /** What installing it allows, in the dashboard's words. */
+    readonly permissions: readonly string[];
+    readonly changelog: string;
+    /** Its icon under `addon-icons/`, or null for the package mark. */
+    readonly icon: string | null;
+}
+
+/** The dashboard's own words for add-ons in the marketplace. */
+export interface AddonWords {
+    readonly kinds: Readonly<Record<MarketKind | "label", string>>;
+    readonly shelf: string;
+    readonly kindApp: string;
+    readonly kindAddon: string;
+    /** The search box's placeholder while only add-ons are listed. */
+    readonly search: string;
+    readonly publisher: string;
+    readonly permissions: string;
+    readonly changelog: string;
+    readonly noPermissions: string;
+}
+
+const ADDON_FIELDS: readonly SearchField<SiteAddon>[] = [
+    { text: (addon) => addon.name, weight: 3 },
+    { text: (addon) => addon.summary, weight: 2 },
+    { text: (addon) => [addon.publisher, ...addon.devices], weight: 1 },
+    { text: (addon) => addon.categoryLabel, weight: 1 }
+];
+
+/** The add-on categories present, in the order they first appear. */
+export function addonCategories(addons: readonly SiteAddon[]): { id: string; label: string }[] {
+    const seen = new Map<string, string>();
+    for (const addon of addons)
+        if (!seen.has(addon.category)) seen.set(addon.category, addon.categoryLabel);
+    return [...seen].map(([id, label]) => ({ id, label }));
+}
+
+/** Whether a picked category leaves the apps or the add-ons in the list. */
+export function kindShows(kind: MarketKind, category: string, of: "apps" | "addons"): boolean {
+    if (kind !== "all" && kind !== of) return false;
+    if (!category) return true;
+    return category.startsWith(ADDON_CATEGORY_PREFIX) === (of === "addons");
+}
+
+/** The add-ons a search, category and order leave, as `filterSiteApps` does for apps. */
+export function filterSiteAddons(
+    addons: readonly SiteAddon[],
+    filter: { query: string; category: string; sort: StoreSort; locale: SiteLocale }
+): SiteAddon[] {
+    const inCategory = filter.category
+        ? addons.filter((addon) => addon.category === filter.category)
+        : [...addons];
+    const term = filter.query.trim();
+    const matched = term ? searchItems(inCategory, term, ADDON_FIELDS) : inCategory;
+    if (filter.sort !== "name") return matched;
+    const collator = new Intl.Collator(filter.locale, { sensitivity: "base" });
+    return [...matched].sort((left, right) => collator.compare(left.name, right.name));
+}
+
+/* -------------------------------------------------------------------------- */
 /* README                                                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -560,6 +651,9 @@ export interface LocaleData {
     /** The apps every Polaris comes with, in the dashboard's order. */
     readonly builtIn: readonly BuiltInSiteApp[];
     readonly builtInWords: BuiltInWords;
+    /** The device add-ons of the published catalog, in its order. */
+    readonly addons: readonly SiteAddon[];
+    readonly addonWords: AddonWords;
     readonly replaces: readonly ReplacesRow[];
     readonly showcase: readonly ShowcaseSection[];
 }

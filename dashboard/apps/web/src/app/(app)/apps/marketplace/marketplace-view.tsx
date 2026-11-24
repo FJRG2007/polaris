@@ -88,6 +88,8 @@ import {
 } from "./store-card";
 import * as store from "@polaris/ui/store-card";
 import { StoreFilters, StoreNoMatch, StoreSection } from "@polaris/ui/store-layout";
+import { ADDON_CATEGORIES, type AddonCategory } from "@polaris/core/device-addons";
+import { AddonsShelf } from "@/app/(app)/account/addons/addons-view";
 import {
     Badge,
     Button,
@@ -99,6 +101,7 @@ import {
     EmptyState,
     Input,
     PageHeader,
+    SegmentedControl,
     Select
 } from "@polaris/ui";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
@@ -120,6 +123,17 @@ export function statusLabel(t: Words, status: string): string {
 /** An install as the grid is handed it, with whether this reader may uninstall it
  *  (`uninstallAccess`, the check the uninstall action makes). */
 export type StoreInstallRow = InstalledAppReaderView & { readonly canUninstall?: boolean };
+
+/** What the Marketplace lists: everything, only apps, or only device add-ons. */
+type StoreKind = "all" | "apps" | "addons";
+
+const STORE_KINDS: readonly StoreKind[] = ["all", "apps", "addons"];
+
+/** An add-on category in the shared category bar, kept apart from the apps' own. */
+type AddonCategoryFilter = `addon:${AddonCategory}`;
+
+const addonCategoryOf = (value: string): AddonCategory | null =>
+    value.startsWith("addon:") ? (value.slice(6) as AddonCategory) : null;
 
 export function MarketplaceView({
     installed,
@@ -152,6 +166,7 @@ export function MarketplaceView({
 }) {
     const t = useTranslations("marketplace");
     const tc = useTranslations("components");
+    const ta = useTranslations("account");
     const words = useTranslations("catalog");
     const navLabel = useNavLabel();
     const locale = useLocale();
@@ -159,8 +174,22 @@ export function MarketplaceView({
     const [deploying, setDeploying] = useState<AppManifest | null>(null);
     const [removing, setRemoving] = useState<StoreInstallRow | null>(null);
     const [query, setQuery] = useState(initialQuery);
-    const [category, setCategory] = useState<StoreCategory>("all");
+    const [picked, setPicked] = useState<StoreCategory | AddonCategoryFilter>("all");
     const [sort, setSort] = useState<StoreSort>("featured");
+    // Device add-ons belong to the reader's own computer, not to a server, so they
+    // are offered on the reader's Marketplace and never on the Polaris apps screen.
+    const withAddons = scope === "deployable";
+    const [kind, setKind] = useState<StoreKind>("all");
+    const addonCategory = addonCategoryOf(picked);
+    const showsApps = !withAddons || (kind !== "addons" && addonCategory === null);
+    const showsAddons = withAddons && kind !== "apps" && (picked === "all" || addonCategory !== null);
+    // An add-on category lists no apps; for the app filters it reads as all of them.
+    const category: StoreCategory = addonCategory === null ? (picked as StoreCategory) : "all";
+    const pickKind = (next: StoreKind) => {
+        setKind(next);
+        if (next === "apps" && addonCategory !== null) setPicked("all");
+        if (next === "addons" && addonCategory === null) setPicked("all");
+    };
 
     // In the reader's words, so the cards and the search say what they read. An
     // app or a category named after a screen takes the rail's label for it.
@@ -174,10 +203,10 @@ export function MarketplaceView({
     );
     const categories = useMemo(() => storeCategories(all), [all]);
     const shown = useMemo(
-        () => filterStoreApps(all, { query, category, sort, locale }),
-        [all, query, category, sort, locale]
+        () => (showsApps ? filterStoreApps(all, { query, category, sort, locale }) : []),
+        [all, showsApps, query, category, sort, locale]
     );
-    const browsing = !query.trim() && category === "all";
+    const browsing = !query.trim() && picked === "all" && showsApps;
     // An app somebody already has is not advertised to them: its card is in the
     // grid below, and a second one would be the same card, menu and all, twice.
     const featured = useMemo(() => {
@@ -191,7 +220,7 @@ export function MarketplaceView({
     // the switcher's, not the store's, so they leave the grid while one is picked.
     const toListing = useBuiltInListing();
     const builtIns = useMemo((): BuiltInListing[] => {
-        if (scope !== "polaris" || category !== "all") return [];
+        if (scope !== "polaris" || category !== "all" || !showsApps) return [];
         const needle = query.trim().toLocaleLowerCase(locale);
         const listed = builtInApps()
             .map(toListing)
@@ -203,7 +232,7 @@ export function MarketplaceView({
         return sort === "name"
             ? listed.sort((a, b) => a.name.localeCompare(b.name, locale))
             : listed;
-    }, [scope, query, category, sort, locale, toListing]);
+    }, [scope, query, category, showsApps, sort, locale, toListing]);
 
     // Polaris's own apps update on their own, and their cards say so the way a
     // phone's store does. Asked after the grid has painted, and only by a reader
@@ -262,8 +291,29 @@ export function MarketplaceView({
             onInstall={() => (app.deployTemplate ? setDeploying(app) : install(app))}
             onConfigure={() => setWizardApp(app)}
             onUninstall={setRemoving}
+            kindLabel={withAddons ? t("card.kindApp") : undefined}
         />
     );
+
+    const addonsShelf = showsAddons ? (
+        <AddonsShelf
+            query={query}
+            category={addonCategory ?? ""}
+            byName={sort === "name"}
+            label={t("view.shelves.addons")}
+            kind={t("card.kindAddon")}
+        />
+    ) : null;
+
+    const kindSwitch = withAddons ? (
+        <SegmentedControl
+            value={kind}
+            onValueChange={pickKind}
+            aria-label={t("view.kinds.label")}
+            className="w-fit max-w-full"
+            options={STORE_KINDS.map((value) => ({ value, label: t(`view.kinds.${value}`) }))}
+        />
+    ) : null;
 
     const header = (
         <PageHeader
@@ -290,6 +340,7 @@ export function MarketplaceView({
                         ) : null
                     }
                 />
+                {addonsShelf}
             </div>
         );
 
@@ -297,23 +348,35 @@ export function MarketplaceView({
         <div className="flex min-w-0 flex-col gap-6">
             {header}
 
+            {kindSwitch}
+
             <StoreFilters
                 query={query}
                 onQueryChange={setQuery}
                 sort={sort}
                 onSortChange={setSort}
                 sorts={STORE_SORTS.map((value) => ({ value, label: t(`view.sort.${value}`) }))}
-                category={category}
-                onCategoryChange={setCategory}
-                categories={(["all", ...categories] as StoreCategory[]).map((value) => ({
-                    value,
-                    label:
-                        value === "all"
-                            ? t("view.allCategories")
-                            : categoryLabel(words, value, navLabel)
-                }))}
+                category={picked}
+                onCategoryChange={setPicked}
+                categories={[
+                    ...(["all", ...(kind === "addons" ? [] : categories)] as StoreCategory[]).map(
+                        (value) => ({
+                            value: value as StoreCategory | AddonCategoryFilter,
+                            label:
+                                value === "all"
+                                    ? t("view.allCategories")
+                                    : categoryLabel(words, value, navLabel)
+                        })
+                    ),
+                    ...(withAddons && kind !== "apps"
+                        ? ADDON_CATEGORIES.map((value) => ({
+                              value: `addon:${value}` as AddonCategoryFilter,
+                              label: ta(`addons.category.${value}`)
+                          }))
+                        : [])
+                ]}
                 words={{
-                    search: t("view.search"),
+                    search: kind === "addons" ? ta("addons.filters.search") : t("view.search"),
                     sortLabel: t("view.sortLabel"),
                     categories: t("view.categories")
                 }}
@@ -360,7 +423,7 @@ export function MarketplaceView({
                 </StoreSection>
             )}
 
-            {shown.length === 0 && builtIns.length === 0 ? (
+            {!showsApps ? null : shown.length === 0 && builtIns.length === 0 ? (
                 <StoreNoMatch>{t("view.noMatch")}</StoreNoMatch>
             ) : (
                 shelvesWith(storeShelves(shown), builtIns.length > 0).map((group) => (
@@ -379,6 +442,8 @@ export function MarketplaceView({
                     </StoreSection>
                 ))
             )}
+
+            {addonsShelf}
 
             {wizardApp && <InstallWizard app={wizardApp} onClose={() => setWizardApp(null)} />}
             {deploying?.deployTemplate && (
@@ -692,7 +757,8 @@ function StoreCard({
     settingsHref,
     onInstall,
     onConfigure,
-    onUninstall
+    onUninstall,
+    kindLabel
 }: {
     app: AppManifest;
     installs: StoreInstallRow[];
@@ -711,6 +777,8 @@ function StoreCard({
     onInstall: () => void;
     onConfigure: () => void;
     onUninstall: (item: StoreInstallRow) => void;
+    /** The "App" badge, where device add-ons share the grid. */
+    kindLabel?: string;
 }) {
     const t = useTranslations("marketplace");
     const words = useTranslations("catalog");
@@ -790,6 +858,7 @@ function StoreCard({
             summary={app.summary}
             badges={
                 <>
+                    {kindLabel ? <Badge>{kindLabel}</Badge> : null}
                     <Badge>{categoryLabel(words, app.category, navLabel)}</Badge>
                     {app.capabilities.map((capability) => (
                         <Badge key={capability} className="text-muted-foreground">

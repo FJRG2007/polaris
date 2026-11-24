@@ -36,6 +36,8 @@ export default async function Page({ params }: Props) {
                 install={`${href(locale)}#start`}
                 locale={locale}
                 words={siteData().locales[locale].store}
+                addons={siteData().locales[locale].addons}
+                addonWords={siteData().locales[locale].addonWords}
             />
         </div>
     );
