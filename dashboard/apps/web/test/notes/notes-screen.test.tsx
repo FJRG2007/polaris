@@ -14,7 +14,8 @@ import type { NoteSummary, NoteView } from "@/lib/notes/note-service";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh() {}, push() {} }),
-    usePathname: () => "/notes"
+    usePathname: () => "/notes",
+    useSearchParams: () => new URLSearchParams()
 }));
 vi.mock("@/components/access/share-dialog", () => ({ ShareDialog: () => null }));
 vi.mock("@/app/(app)/notes/actions", () => ({}));

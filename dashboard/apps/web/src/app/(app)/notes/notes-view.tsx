@@ -16,12 +16,12 @@ import { saveFile } from "@/components/transfers/move-file";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
 import NextLink from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { NoteMoveDialog } from "./note-move-dialog";
 import { NoteShareDialog } from "./note-share-dialog";
 import { ShareDialog } from "@/components/access/share-dialog";
-import { canWrite, NoteTree, type ShelfData } from "./note-tree";
+import { canWrite, NoteTree, showNote, type ShelfData } from "./note-tree";
 import { ManageTemplatesDialog, SaveAsTemplateDialog, TemplatePickerDialog } from "./note-templates";
 import type { NoteTemplateSummary } from "@/lib/notes/template-service";
 import { RelativeTime } from "@/components/relative-time";
@@ -51,21 +51,28 @@ import { reachability, subscribeReachability } from "@/lib/reachability";
 import {
     NOTE_CONFLICT,
     keepNoteTextOnUnload,
+    NOTE_CREATE,
+    NOTE_DELETE,
+    NOTE_MOVE,
+    NOTE_TEXT,
     readNoteSent,
     saveNoteText,
+    useNoteWrites,
     waitingNoteText,
+    writeNote,
     type NoteTextPayload
 } from "./offline-writes";
+import { deletedHere, failedPlacement, localNote, withNoteWrites } from "./offline-tree";
 
 /** How long a note sits untouched before it is written. Long enough not to
  *  write on every keystroke, short enough that closing the tab is safe. */
 const SAVE_AFTER = 800;
 
 export function NotesView({
-    shelves,
-    note,
-    shared = null,
-    backlinks = []
+    shelves: served,
+    note: servedNote,
+    shared: servedShared = null,
+    backlinks: servedBacklinks = []
 }: {
     shelves: readonly ShelfData[];
     note: NoteView | null;
@@ -76,6 +83,18 @@ export function NotesView({
 }) {
     const t = useTranslations("notes");
     const router = useRouter();
+    // What this device still holds for notes, laid over what the server sent:
+    // a note made, moved or deleted offline is drawn that way until it is sent.
+    const writes = useNoteWrites(() => router.refresh());
+    const shelves = useMemo(() => withNoteWrites(served, writes.entries), [served, writes.entries]);
+    // The note in the address. One made on this device and not on the server
+    // yet is opened from what it was made with: the page the server sent (or
+    // the one the device kept) has some other note, or none.
+    const wanted = useSearchParams()?.get("note") ?? null;
+    const local = wanted && wanted !== servedNote?.id ? localNote(writes.entries, writes.made, wanted) : null;
+    const note = local ?? (servedNote && !deletedHere(writes.entries, servedNote.id) ? servedNote : null);
+    const shared = local || !note ? null : servedShared;
+    const backlinks = local || !note ? [] : servedBacklinks;
     const [title, setTitle] = useState(note?.title ?? "");
     const [body, setBody] = useState(note?.body ?? "");
     const [saving, setSaving] = useState(false);
@@ -169,7 +188,7 @@ export function NotesView({
             stored.current = { title, body };
             setSaving(true);
             setError("");
-            const outcome = await saveNoteText({ noteId: note.id, ...written, base: note.updatedAt });
+            const outcome = await saveNoteText({ noteId: note.id, ...written, base: local ? null : note.updatedAt });
             setSaving(false);
             if ("now" in outcome) {
                 // This device keeps nothing (a private window): sent at once, as before.
@@ -191,7 +210,7 @@ export function NotesView({
             void reloadWaiting();
         }, SAVE_AFTER);
         return () => clearTimeout(timer);
-    }, [note, dirty, title, body, router, shared, reloadWaiting]);
+    }, [note, local, dirty, title, body, router, shared, reloadWaiting]);
 
     // What the editor holds and has not saved, as of the last render: read when
     // the page goes away or another note opens, inside the pause before a save.
@@ -199,7 +218,12 @@ export function NotesView({
     useEffect(() => {
         unsaved.current = () =>
             note && shared !== "view" && (title !== stored.current.title || body !== stored.current.body)
-                ? { noteId: note.id, title: title.trim() || t("tree.untitled"), body, base: note.updatedAt }
+                ? {
+                      noteId: note.id,
+                      title: title.trim() || t("tree.untitled"),
+                      body,
+                      base: local ? null : note.updatedAt
+                  }
                 : null;
     });
     useEffect(() => keepNoteTextOnUnload(() => unsaved.current()), []);
@@ -222,11 +246,18 @@ export function NotesView({
         router.refresh();
     };
 
+    // Made, moved or deleted here and not sent: only ever kept when Polaris
+    // did not answer, so it is waiting by definition.
+    const placing = writes.entries.some(
+        (entry) => entry.target === note?.id && entry.kind !== NOTE_TEXT && entry.state === "pending"
+    );
+    const notPlaced = failedPlacement(writes.entries, note?.id ?? null);
     const waitingOffline =
-        waiting?.state === "pending" &&
-        (waiting.attempts > 0 ||
-            !reach.reachable ||
-            (typeof navigator !== "undefined" && navigator.onLine === false));
+        placing ||
+        (waiting?.state === "pending" &&
+            (waiting.attempts > 0 ||
+                !reach.reachable ||
+                (typeof navigator !== "undefined" && navigator.onLine === false)));
     const act = async (run: () => Promise<{ error?: string }>) => {
         const result = await runAction(run, setError);
         if (!result?.error) router.refresh();
@@ -301,7 +332,7 @@ export function NotesView({
                                 bare
                                 className="h-auto flex-1 text-2xl font-semibold"
                             />
-                            {!shared && (
+                            {!shared && !local && (
                                 <button
                                     type="button"
                                     aria-label={
@@ -341,7 +372,7 @@ export function NotesView({
                                     {t("view.sharedWithYou")}
                                 </Badge>
                             ) : null}
-                            {!shared && (
+                            {!shared && !local && (
                                 <button
                                     type="button"
                                     aria-label={t("view.shareNote")}
@@ -352,7 +383,7 @@ export function NotesView({
                                     <Share2 className="size-4" />
                                 </button>
                             )}
-                            {!shared && noteShelf && canWrite(noteShelf) && (
+                            {!shared && !local && noteShelf && canWrite(noteShelf) && (
                                 <button
                                     type="button"
                                     aria-label={t("templates.useAsTemplate")}
@@ -363,6 +394,7 @@ export function NotesView({
                                     <LayoutTemplate className="size-4" />
                                 </button>
                             )}
+                            {!local && (
                             <button
                                 type="button"
                                 aria-label={t("view.exportNote")}
@@ -377,7 +409,8 @@ export function NotesView({
                             >
                                 <Download className="size-4" />
                             </button>
-                            {!shared && (
+                            )}
+                            {!shared && !local && (
                                 <button
                                     type="button"
                                     aria-label={t("view.archiveNote")}
@@ -429,6 +462,33 @@ export function NotesView({
                                 })
                             )}
                         </p>
+
+                        {notPlaced && (
+                            <div
+                                role="alert"
+                                className="flex flex-wrap items-center gap-2 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                            >
+                                <AlertCircle className="size-4 shrink-0" />
+                                <span className="min-w-0 flex-1">
+                                    {notPlaced.reason ||
+                                        (notPlaced.kind === NOTE_CREATE
+                                            ? t("offline.notMade")
+                                            : notPlaced.kind === NOTE_MOVE
+                                              ? t("offline.notMoved")
+                                              : t("offline.notDeleted"))}
+                                </span>
+                                <Button size="sm" variant="ghost" onClick={() => void appWrites.retry(notPlaced)}>
+                                    {t("offline.retry")}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => void appWrites.discard(notPlaced.key)}
+                                >
+                                    {t("offline.discard")}
+                                </Button>
+                            </div>
+                        )}
 
                         {waiting?.state === "failed" && (
                             <div
@@ -530,9 +590,10 @@ export function NotesView({
                             }
                             confirmLabel={t("view.deleteTitle")}
                             onConfirm={async () => {
-                                await runAction(() => actions.deleteNoteAction(note.id), setError);
+                                const result = await writeNote(NOTE_DELETE, { noteId: note.id }, setError);
                                 setConfirmDelete(false);
-                                router.push("/notes");
+                                if (result?.error) return setError(result.error);
+                                if (result) showNote(router, null, Boolean(result.queued));
                             }}
                         />
                     </>
@@ -547,8 +608,9 @@ export function NotesView({
                     noteId={moving}
                     from={placeOf(shelves, moving)}
                     onMove={async (target) => {
-                        const result = await actions.moveNoteAction({ noteId: moving, ...target });
-                        if (!result.error) router.refresh();
+                        const result = await writeNote(NOTE_MOVE, { noteId: moving, ...target }, setError);
+                        if (!result) return {};
+                        if (!result.error && !result.queued) router.refresh();
                         return result;
                     }}
                 />
@@ -658,18 +720,15 @@ export function NewNoteButton({ templates = [] }: { templates?: readonly NoteTem
     const [error, setError] = useState("");
     const [picking, setPicking] = useState(false);
     const write = async (templateId: string | null) => {
-        const result = await runAction(
-            () =>
-                actions.createNoteAction({
-                    title: t("tree.untitled"),
-                    body: "",
-                    ...(templateId ? { templateId } : {})
-                }),
+        const result = await writeNote(
+            NOTE_CREATE,
+            { title: t("tree.untitled"), body: "", ...(templateId ? { templateId } : {}) },
             setError
         );
         setPicking(false);
-        if (result?.id) router.push(`/notes?note=${result.id}`);
-        else router.refresh();
+        if (result?.error) setError(result.error);
+        if (result?.id) showNote(router, result.id, Boolean(result.queued));
+        else if (!result?.queued) router.refresh();
     };
     return (
         <>

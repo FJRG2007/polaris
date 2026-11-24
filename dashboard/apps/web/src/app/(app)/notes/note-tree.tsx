@@ -41,8 +41,10 @@ import {
     shortcutPressed
 } from "@polaris/ui";
 import {
+    AlertCircle,
     Archive,
     ChevronRight,
+    Clock,
     CornerDownRight,
     Download,
     FilePlus2,
@@ -62,6 +64,8 @@ import {
     LayoutTemplate
 } from "lucide-react";
 import { TemplatePickerDialog } from "./note-templates";
+import type { TreeNote } from "./offline-tree";
+import { NOTE_CREATE, NOTE_DELETE, NOTE_MOVE, writeNote } from "./offline-writes";
 import type { NoteTemplateSummary } from "@/lib/notes/template-service";
 
 /** One shelf, as the page read it. */
@@ -159,6 +163,31 @@ function rowKeys(
 
 const shelfKey = (shelf: ShelfData) => shelf.space?.id ?? OWN;
 
+/**
+ * Open a note, or the notes screen with none (`noteId` null). One that is only
+ * on this device (`onDevice`: made here and not sent, or a write just kept) is
+ * opened in place: asking the server for a page about it would find nothing, or
+ * nobody at all, and the screen already has what it needs to draw it.
+ */
+export function showNote(router: { push(href: string): void }, noteId: string | null, onDevice: boolean): void {
+    const href = noteId ? `/notes?note=${noteId}` : "/notes";
+    if (onDevice) window.history.pushState(null, "", href);
+    else router.push(href);
+}
+
+/** A note write answered with an error, for a caller that shows one. Kept
+ *  offline answers no error, and the screen draws it from the device. */
+async function placeNote(
+    kind: typeof NOTE_MOVE | typeof NOTE_DELETE,
+    payload: Record<string, unknown>
+): Promise<{ error?: string; queued?: true }> {
+    let failed = "";
+    const result = await writeNote(kind, payload, (message) => {
+        failed = message;
+    });
+    return result ?? { error: failed };
+}
+
 /** Whether a role may change what is on a shelf. The private one is always
  *  yours; a space's guests read and no more. */
 export function canWrite(shelf: ShelfData): boolean {
@@ -231,30 +260,32 @@ export function NoteTree({
         });
     };
 
-    const act = async (run: () => Promise<{ error?: string }>) => {
+    const act = async (run: () => Promise<{ error?: string; queued?: true }>) => {
         const result = await runAction(run, setError);
-        if (!result?.error) router.refresh();
+        if (result?.error) setError(result.error);
+        // Kept on this device: drawn from there, nothing new to fetch.
+        else if (result && !result.queued) router.refresh();
         return result;
     };
 
-    const open = (id: string) => router.push(`/notes?note=${id}`);
+    const unsent = useMemo(
+        () => new Set(shelves.flatMap((shelf) => shelf.notes.filter((note) => (note as TreeNote).unsent).map((note) => note.id))),
+        [shelves]
+    );
+    const open = (id: string) => showNote(router, id, unsent.has(id));
 
     const [picking, setPicking] = useState<NewNotePlace | null>(null);
 
     const write = async (where: NewNotePlace, templateId: string | null) => {
-        const result = await runAction(
-            () =>
-                actions.createNoteAction({
-                    title: t("tree.untitled"),
-                    body: "",
-                    ...where,
-                    ...(templateId ? { templateId } : {})
-                }),
+        const result = await writeNote(
+            NOTE_CREATE,
+            { title: t("tree.untitled"), body: "", ...where, ...(templateId ? { templateId } : {}) },
             setError
         );
         setPicking(null);
-        if (result?.id) open(result.id);
-        else router.refresh();
+        if (result?.error) setError(result.error);
+        if (result?.id) showNote(router, result.id, Boolean(result.queued));
+        else if (!result?.queued) router.refresh();
     };
 
     /** A shelf with templates asks which to start from; one without writes a
@@ -284,14 +315,17 @@ export function NoteTree({
         if (!moving) return;
         if (moving.kind === "note") {
             await act(() =>
-                actions.moveNoteAction({
-                    noteId: moving.id,
-                    // Out to the top of wherever it landed: a note dropped into a
-                    // folder is filed there, not nested under whatever was.
-                    parentId: null,
-                    spaceId: target.spaceId,
-                    folderId: target.folderId
-                })
+                placeNote(
+                    NOTE_MOVE,
+                    {
+                        noteId: moving.id,
+                        // Out to the top of wherever it landed: a note dropped into a
+                        // folder is filed there, not nested under whatever was.
+                        parentId: null,
+                        spaceId: target.spaceId,
+                        folderId: target.folderId
+                    }
+                )
             );
             return;
         }
@@ -841,7 +875,7 @@ function Branch({
     onImport: (shelf: { spaceId: string | null; folderId: string | null }) => void;
     onMoveNote: (noteId: string) => void;
     onShareNote: (noteId: string) => void;
-    onAct: (run: () => Promise<{ error?: string }>) => Promise<{ error?: string } | null>;
+    onAct: (run: () => Promise<{ error?: string; queued?: true }>) => Promise<{ error?: string } | null>;
     onRemove: (target: {
         kind: "folder" | "space";
         id: string;
@@ -1075,6 +1109,21 @@ function Branch({
     );
 }
 
+/** Whether a note row has a write still on this device: a clock while it waits
+ *  for Polaris, an alert when Polaris did not take it. */
+function OfflineMark({ state }: { state: TreeNote["offline"] }) {
+    const t = useTranslations("notes");
+    if (!state) return null;
+    const label = state === "failed" ? t("tree.notSent") : t("tree.waiting");
+    const Icon = state === "failed" ? AlertCircle : Clock;
+    return (
+        <span title={label} className={cn("ms-auto shrink-0", state === "failed" ? "text-danger" : "text-muted-foreground")}>
+            <Icon className="size-3" aria-hidden />
+            <span className="sr-only">{label}</span>
+        </span>
+    );
+}
+
 /** A note and everything nested under it. */
 function NoteBranch({
     shelf,
@@ -1111,7 +1160,7 @@ function NoteBranch({
     }) => void;
     onMoveNote: (noteId: string) => void;
     onShareNote: (noteId: string) => void;
-    onAct: (run: () => Promise<{ error?: string }>) => Promise<{ error?: string } | null>;
+    onAct: (run: () => Promise<{ error?: string; queued?: true }>) => Promise<{ error?: string } | null>;
     onDragStart: (dragged: Dragged) => void;
     onDragEnd: () => void;
 }) {
@@ -1132,7 +1181,7 @@ function NoteBranch({
                             rowKeys(event, {
                                 onRename: writable ? () => onStartRename(key) : undefined,
                                 onDelete: writable
-                                    ? () => void onAct(() => actions.deleteNoteAction(note.id))
+                                    ? () => void onAct(() => placeNote(NOTE_DELETE, { noteId: note.id }))
                                     : undefined
                             })
                         }
@@ -1190,6 +1239,7 @@ function NoteBranch({
                                     >
                                         {note.title}
                                     </span>
+                                    <OfflineMark state={(note as TreeNote).offline} />
                                 </span>
                                 {note.excerpt && (
                                     <span
@@ -1265,7 +1315,9 @@ function NoteBranch({
                         </ContextMenuItem>
                         <ContextMenuItem
                             variant="danger"
-                            onSelect={() => void onAct(() => actions.deleteNoteAction(note.id))}
+                            onSelect={() =>
+                                void onAct(() => placeNote(NOTE_DELETE, { noteId: note.id }))
+                            }
                         >
                             <Trash2 className="size-3.5" />
                             {t("tree.delete")}
