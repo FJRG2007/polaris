@@ -106,7 +106,8 @@ describe("Epic Games", () => {
             path: "epic:Fortnite",
             launch: { kind: "uri", uri: "com.epicgames.launcher://apps/fn%3A4fe75bbc5a674f4f9b356b5c90567da5%3AFortnite?action=launch&silent=true" },
             icon: join(fortnite, "FortniteGame/Binaries/Win64/FortniteLauncher.exe"),
-            folder: fortnite
+            folder: fortnite,
+            store: "epic:fn:4fe75bbc5a674f4f9b356b5c90567da5"
         });
         expect(stores.isVettedLaunchUri((game as { launch: { uri: string; }; }).launch.uri)).toBe(true);
     });
@@ -176,7 +177,8 @@ describe("Steam", () => {
                 path: "steam:730",
                 launch: { kind: "uri", uri: "steam://rungameid/730" },
                 icon: join(steam, "appcache", "librarycache", "730_icon.jpg"),
-                folder: join(second, "steamapps", "common", "Counter-Strike Global Offensive")
+                folder: join(second, "steamapps", "common", "Counter-Strike Global Offensive"),
+                store: "steam:730"
             }
         ]);
     });
@@ -226,7 +228,8 @@ describe("GOG", () => {
                 path: "gog:1207664663",
                 launch: { kind: "exe", path: join(game, "bin\\x64\\witcher3.exe"), cwd: game },
                 icon: join(game, "bin\\x64\\witcher3.exe"),
-                folder: game
+                folder: game,
+                store: "gog:1207664663"
             }
         ]);
     });
