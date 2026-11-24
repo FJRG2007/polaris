@@ -1,10 +1,10 @@
 //! Dispatch wrapper that routes between the legacy and v2 billing & usage
 //! pages.
 
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::ChildView;
-use rookui::{AppContext, Element, Entity, SingletonEntity, View, ViewContext, ViewHandle};
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::ChildView;
+use ptermui::{AppContext, Element, Entity, SingletonEntity, View, ViewContext, ViewHandle};
 
 use super::SettingsSection;
 use super::billing_and_usage_page::{BillingAndUsagePageEvent, BillingAndUsagePageView};

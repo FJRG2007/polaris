@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rookui::keymap::BindingId;
+use ptermui::keymap::BindingId;
 
 use super::*;
 

@@ -39,7 +39,7 @@ When the agent is mid-response the user often already knows what they want to as
 
 ### Auto-queue toggle
 
-6. A toggle button appears in the rooking indicator (status bar) when the agent is responding, gated behind `QueueSlashCommand`.
+6. A toggle button appears in the pterming indicator (status bar) when the agent is responding, gated behind `QueueSlashCommand`.
 7. The button uses a `ClockPlus` icon; when active the icon is accent-colored, otherwise disabled-colored.
 8. Keyboard shortcut: `Cmd+Shift+J` (Mac) / `Ctrl+Shift+J` (Linux/Windows).
 9. When the toggle is on and the user submits any input (regular prompt, slash command, or skill command) while the conversation is in progress, the input is queued instead of sent immediately.

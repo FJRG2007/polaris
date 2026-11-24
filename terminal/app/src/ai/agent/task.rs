@@ -10,7 +10,7 @@ use field_mask::{FieldMaskError, FieldMaskOperation};
 use helper::{MessageExt, SubagentExt, ToolCallExt};
 use itertools::Itertools;
 use prost_types::FieldMask;
-use rook_errors::report_error;
+use pterm_errors::report_error;
 use uuid::Uuid;
 use warp_multi_agent_api::message::Message;
 use warp_multi_agent_api::message::tool_call::subagent::Metadata;
@@ -493,12 +493,12 @@ impl Task {
         }
     }
 
-    pub fn is_rook_documentation_search_subagent(&self) -> bool {
+    pub fn is_pterm_documentation_search_subagent(&self) -> bool {
         match &self.data {
             TaskImpl::Server(server_data) => server_data
                 .subagent_params
                 .as_ref()
-                .is_some_and(|params| params.call.is_rook_documentation_search()),
+                .is_some_and(|params| params.call.is_pterm_documentation_search()),
             TaskImpl::Optimistic(_) => false,
         }
     }

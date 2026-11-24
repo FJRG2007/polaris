@@ -1,18 +1,18 @@
 ---
 name: terminal-gui-ui-guidelines
-description: GUI desktop app only. Catalog of guidelines for writing UI code in the Rook client. Read whenever doing any UI work in this repo, up front before writing the change, so the relevant guidelines shape the implementation.
+description: GUI desktop app only. Catalog of guidelines for writing UI code in the Polaris Terminal client. Read whenever doing any UI work in this repo, up front before writing the change, so the relevant guidelines shape the implementation.
 ---
 
 # terminal-gui-ui-guidelines
-**Scope — GUI desktop app only.** This skill applies to Rook's **GUI** desktop front-end (the `app/` crate on the RookUI pixel/GPU framework). It does **not** apply to the headless **TUI** front-end (`crates/rook_tui`; cell-grid `TuiElement` library under `crates/rookui_core/src/elements/tui`), which has its own components, tests, and change-verification workflow. For TUI work, see the `terminal-tui-ui-guidelines`, `terminal-tui-testing`, and `terminal-tui-verify-change` skills instead.
+**Scope — GUI desktop app only.** This skill applies to Polaris Terminal's **GUI** desktop front-end (the `app/` crate on the PtermUI pixel/GPU framework). It does **not** apply to the headless **TUI** front-end (`crates/pterm_tui`; cell-grid `TuiElement` library under `crates/ptermui_core/src/elements/tui`), which has its own components, tests, and change-verification workflow. For TUI work, see the `terminal-tui-ui-guidelines`, `terminal-tui-testing`, and `terminal-tui-verify-change` skills instead.
 
-This skill is a growing catalog of guidelines for working on Rook's UI code. Each guideline captures a lesson that would otherwise be re-learned through review — typically because an agent or contributor reinvented a component, drifted from the design system, or bypassed a shared abstraction.
+This skill is a growing catalog of guidelines for working on Polaris Terminal's UI code. Each guideline captures a lesson that would otherwise be re-learned through review — typically because an agent or contributor reinvented a component, drifted from the design system, or bypassed a shared abstraction.
 
 **How to use this skill:**
 
 - Read through the guidelines below once at the start of any UI task, then keep them in mind while implementing. The list is short enough to scan.
 - Each guideline is self-contained. Not every one will apply to every task — use judgment. But if a guideline *does* apply, follow it.
-- When in doubt, prefer reusing an existing abstraction over introducing a new one. The Rook UI has accumulated a well-factored set of shared components and themes; new one-offs almost always drift.
+- When in doubt, prefer reusing an existing abstraction over introducing a new one. The Polaris Terminal UI has accumulated a well-factored set of shared components and themes; new one-offs almost always drift.
 
 For work on the settings modal (`app/src/settings_view/`) — a settings page, a `SettingsWidget`, or anything that affects settings search — also read the `terminal-gui-settings-ui` skill, which covers the page-title, widget-gating, and widget-splitting rules specific to that surface.
 

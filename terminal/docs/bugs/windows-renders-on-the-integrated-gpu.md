@@ -39,11 +39,11 @@ Linux and FreeBSD keep the upstream default.
 
 Override with `system.prefer_low_power_gpu` in settings.
 
-`app/src/settings/gpu.rs`, `app/src/crash_recovery.rs`, `crates/rook_cli/src/lib.rs`, `app/src/workspace/view/crash_recovery.rs`.
+`app/src/settings/gpu.rs`, `app/src/crash_recovery.rs`, `crates/pterm_cli/src/lib.rs`, `app/src/workspace/view/crash_recovery.rs`.
 
 ## Verification
 
-The cause is confirmed end to end: the log shows the selection, the sort function explains it, and the setting that drives it was at its default. The improvement itself has not been measured on a running build - to check it, open Rook and confirm the log reads `Using Dx12 DiscreteGpu (NVIDIA GeForce RTX 5090)`.
+The cause is confirmed end to end: the log shows the selection, the sort function explains it, and the setting that drives it was at its default. The improvement itself has not been measured on a running build - to check it, open Polaris Terminal and confirm the log reads `Using Dx12 DiscreteGpu (NVIDIA GeForce RTX 5090)`.
 
 ## What this does not cover
 

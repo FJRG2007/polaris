@@ -1,5 +1,5 @@
-use rookui::elements::ChildView;
-use rookui::{Element, Entity, ModelHandle, View, ViewContext, ViewHandle};
+use ptermui::elements::ChildView;
+use ptermui::{Element, Entity, ModelHandle, View, ViewContext, ViewHandle};
 
 use crate::ai::blocklist::agent_view::AgentViewController;
 use crate::search::data_source::Query;
@@ -120,7 +120,7 @@ impl View for InlinePromptsMenuView {
         "InlinePromptsMenuView"
     }
 
-    fn render(&self, _app: &rookui::AppContext) -> Box<dyn Element> {
+    fn render(&self, _app: &ptermui::AppContext) -> Box<dyn Element> {
         ChildView::new(&self.menu_view).finish()
     }
 }

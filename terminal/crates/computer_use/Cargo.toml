@@ -15,7 +15,7 @@ test-util = []
 
 [dependencies]
 anyhow.workspace = true
-rook_errors.workspace = true
+pterm_errors.workspace = true
 async-trait.workspace = true
 cfg-if.workspace = true
 clap.workspace = true
@@ -46,7 +46,7 @@ objc2-core-foundation.workspace = true
 # specific process without moving the global cursor.
 objc2-core-graphics = { workspace = true, features = ["libc"] }
 tempfile.workspace = true
-rookui_core.workspace = true
+ptermui_core.workspace = true
 # The avfoundation video recorder (`mac/recording.rs`) shells out to a supervised
 # ffmpeg subprocess, mirroring `linux/recording.rs`: tokio `process`/`time` drive
 # the spawn + finalize timeouts, `nix` sends SIGINT to finalize the container,
@@ -63,7 +63,7 @@ nix = { workspace = true, features = ["signal"] }
 tokio = { workspace = true, features = ["io-util", "process", "time"] }
 url.workspace = true
 uuid.workspace = true
-rookui_core.workspace = true
+ptermui_core.workspace = true
 # `xinput` provides the XI2 (MPX) device hierarchy used for background per-window control,
 # `composite` provides off-screen window capture for background window screenshots.
 x11rb = { workspace = true, features = ["composite", "xinput", "xtest"] }
@@ -71,7 +71,7 @@ zbus.workspace = true
 
 [target.'cfg(target_os = "windows")'.dependencies]
 image.workspace = true
-rookui_core.workspace = true
+ptermui_core.workspace = true
 windows = { workspace = true, features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",

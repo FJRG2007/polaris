@@ -6,16 +6,16 @@ The TUI transcript previously rendered every agent tool call as a static dim row
 
 How the surrounding system works:
 
-- `crates/rook_tui/src/agent_block.rs` — `TuiAIBlock::sections` extracts `AIAgentOutputMessageType::Action` messages into `TuiAIBlockSection::ToolCall(Box<AIAgentAction>)`. `RequestFileEdits` is special-cased: it gets a stateful `TuiFileEditsView` child view (`crates/rook_tui/src/tui_file_edits_view.rs`).
+- `crates/pterm_tui/src/agent_block.rs` — `TuiAIBlock::sections` extracts `AIAgentOutputMessageType::Action` messages into `TuiAIBlockSection::ToolCall(Box<AIAgentAction>)`. `RequestFileEdits` is special-cased: it gets a stateful `TuiFileEditsView` child view (`crates/pterm_tui/src/tui_file_edits_view.rs`).
 - `app/src/ai/blocklist/action_model.rs:606` — `BlocklistAIActionModel::get_action_status` is the source of truth for per-action status, returning `AIActionStatus` (`Preprocessing`, `Queued`, `Blocked`, `RunningAsync`, `Finished(Arc<AIAgentActionResult>)`). The model emits `BlocklistAIActionEvent` on every status transition (same file, lines 1431-1452).
 - `crates/ai/src/agent/action_result/mod.rs` — per-tool result enums carry Success/Error/Cancelled plus payloads usable for counts (e.g. `SearchCodebaseResult::Success { files }`, `RunAgentsResult::Launched/Denied/Failure`).
-- `app/src/tui_export.rs` — the only surface through which `rook_tui` consumes app types.
+- `app/src/tui_export.rs` — the only surface through which `pterm_tui` consumes app types.
 
 ## Implementation
 
 ### Display state
 
-`crates/rook_tui/src/tool_call_labels.rs` defines `ToolCallDisplayState` and collapses `Option<&AIActionStatus>`, the exchange's output-streaming flag, and (for shell-command rows) the backing terminal block's `CommandBlockState` into it. A resolved block state supersedes the status entirely — `Running` → `Running`; `Finished` → `Cancelled` (SIGINT) / `Succeeded` (`was_successful`) / `Failed` per exit code (see footnote 1). Otherwise:
+`crates/pterm_tui/src/tool_call_labels.rs` defines `ToolCallDisplayState` and collapses `Option<&AIActionStatus>`, the exchange's output-streaming flag, and (for shell-command rows) the backing terminal block's `CommandBlockState` into it. A resolved block state supersedes the status entirely — `Running` → `Running`; `Finished` → `Cancelled` (SIGINT) / `Succeeded` (`was_successful`) / `Failed` per exit code (see footnote 1). Otherwise:
 
 - `None` while the exchange output is still streaming → `Constructing`: the tool call's arguments are still streaming in and may be empty/partial, so labels never interpolate them. Each tool has an arg-free loading label in `label_for_action`, indexed on the GUI's loading copy (`common.rs` `LOAD_OUTPUT_MESSAGE_*`, e.g. "Generating command…", "Grepping…", "Finding files…", "Reading files…", "Searching codebase…", "Preparing question…"). This mirrors the GUI's `get_action_status(id).is_none() && status.is_streaming()` gating (and fixes the blank-args window the GUI itself still has for Grep/FileGlob).
 - `None` (stream finished) / `Preprocessing` / `Queued` → `Pending`
@@ -86,7 +86,7 @@ Footnotes:
 
 ### Rendering and styling
 
-`render_tool_call_section(action, status, output_streaming, block_state, app)` in `crates/rook_tui/src/agent_block_sections.rs` renders a `TuiFlex::row()` of a two-cell status-glyph gutter followed by the label, so a wrapping label keeps a hanging indent under its own first column. The glyph mirrors the GUI's inline action icons (`action_icon` in `app/src/ai/blocklist/block/view_impl/output.rs:3501`, `inline_action_icons.rs`), per display state (`tool_call_glyph` in `crates/rook_tui/src/tool_call_labels.rs`):
+`render_tool_call_section(action, status, output_streaming, block_state, app)` in `crates/pterm_tui/src/agent_block_sections.rs` renders a `TuiFlex::row()` of a two-cell status-glyph gutter followed by the label, so a wrapping label keeps a hanging indent under its own first column. The glyph mirrors the GUI's inline action icons (`action_icon` in `app/src/ai/blocklist/block/view_impl/output.rs:3501`, `inline_action_icons.rs`), per display state (`tool_call_glyph` in `crates/pterm_tui/src/tool_call_labels.rs`):
 
 - Constructing / Pending → `○` in `TuiUiBuilder::dim_text_style()` (GUI: grey circle)
 - AwaitingApproval → `■` in `TuiUiBuilder::attention_glyph_style()` (`terminal_colors().normal.yellow`; GUI: yellow stop)
@@ -97,20 +97,20 @@ Footnotes:
 
 State lives in the glyph, so the label keeps `TuiUiBuilder::primary_text_style()` (normal foreground) for every state except Constructing / Pending, which use `dim_text_style()` until execution starts (GUI parity: labels are not tinted by outcome; only queued/streaming-not-first rows dim).
 
-`TuiText` (`crates/rookui_core/src/elements/tui/text.rs`) additionally supports multiple styled runs via `TuiText::from_spans`, flowing as one wrapped paragraph with per-run styles patching over the base style. The tool-call row itself uses two single-style texts in the flex row; `from_spans` exists for upcoming rows that need mid-line colored fragments (e.g. the file-edits `+a −r` counts).
+`TuiText` (`crates/ptermui_core/src/elements/tui/text.rs`) additionally supports multiple styled runs via `TuiText::from_spans`, flowing as one wrapped paragraph with per-run styles patching over the base style. The tool-call row itself uses two single-style texts in the flex row; `from_spans` exists for upcoming rows that need mid-line colored fragments (e.g. the file-edits `+a −r` counts).
 
 ### Status plumbing and re-render
 
-- `TuiAIBlock` stores the `ModelHandle<BlocklistAIActionModel>` and looks up `get_action_status(&action.id)` at render time for each tool-call section (`crates/rook_tui/src/agent_block.rs`). It also holds the surface's `Arc<FairMutex<TerminalModel>>`: for every shell-command action it resolves the backing block's ground truth via `command_block_state` (lookup by `block_for_ai_action_id`, with the snapshot result's `block_id` as fallback).
-- `TuiTranscriptView` subscribes to `BlocklistAIActionEvent`; on any transition it finds the agent block whose output contains that action id (`TuiAIBlock::renders_action`), calls `mark_rich_content_dirty(view_id)`, and notifies (`crates/rook_tui/src/transcript_view.rs`). Dirty-marking is required because label text changes can change wrapped height, and block heights are cached in the block list. Each block maintains a `HashSet` of its action ids (populated by `sync_action_views` as output streams in, mirroring the GUI `AIBlock`'s `requested_action_ids`), so the per-event check is an O(1) set lookup per block rather than an output-message scan.
+- `TuiAIBlock` stores the `ModelHandle<BlocklistAIActionModel>` and looks up `get_action_status(&action.id)` at render time for each tool-call section (`crates/pterm_tui/src/agent_block.rs`). It also holds the surface's `Arc<FairMutex<TerminalModel>>`: for every shell-command action it resolves the backing block's ground truth via `command_block_state` (lookup by `block_for_ai_action_id`, with the snapshot result's `block_id` as fallback).
+- `TuiTranscriptView` subscribes to `BlocklistAIActionEvent`; on any transition it finds the agent block whose output contains that action id (`TuiAIBlock::renders_action`), calls `mark_rich_content_dirty(view_id)`, and notifies (`crates/pterm_tui/src/transcript_view.rs`). Dirty-marking is required because label text changes can change wrapped height, and block heights are cached in the block list. Each block maintains a `HashSet` of its action ids (populated by `sync_action_views` as output streams in, mirroring the GUI `AIBlock`'s `requested_action_ids`), so the per-event check is an O(1) set lookup per block rather than an output-message scan.
 - `app/src/tui_export.rs` additionally exports `AIActionStatus`, `BlocklistAIActionEvent`, and the request/result types the label logic and its tests consume; `app/src/ai/blocklist/mod.rs` re-exports `AIActionStatus` and `BlocklistAIActionEvent` publicly.
 
 ## Testing and validation
 
-- `crates/rook_tui/src/tool_call_labels_tests.rs` — a single lifecycle test asserting the label text changes as one action moves through constructing → pending → awaiting approval → running → cancelled/failed, plus the block-state overrides for a snapshot result (no block / running / exit 0 / exit 1 / exit 130). Per-tool string variants are intentionally not unit-tested; the table above is the source of truth for copy.
-- `crates/rook_tui/src/agent_block_tests.rs` — transcript rendering asserts label text, glyph prefixes, per-state glyph/label colors (`tool_call_row_glyph_and_colors_reflect_state`), and message ordering through the real `BlocklistAIActionModel` fixture.
-- `crates/rookui_core/src/elements/tui/text_tests.rs` — span construction: per-span styles patching the base style, wrapping across span boundaries, hard newlines inside spans, and empty spans occupying no rows.
-- `cargo nextest run -p rook_tui`, `cargo nextest run -p rookui_core --features tui`, `./script/format --check`, and presubmit-style clippy on `rook` + `rook_tui` all pass.
+- `crates/pterm_tui/src/tool_call_labels_tests.rs` — a single lifecycle test asserting the label text changes as one action moves through constructing → pending → awaiting approval → running → cancelled/failed, plus the block-state overrides for a snapshot result (no block / running / exit 0 / exit 1 / exit 130). Per-tool string variants are intentionally not unit-tested; the table above is the source of truth for copy.
+- `crates/pterm_tui/src/agent_block_tests.rs` — transcript rendering asserts label text, glyph prefixes, per-state glyph/label colors (`tool_call_row_glyph_and_colors_reflect_state`), and message ordering through the real `BlocklistAIActionModel` fixture.
+- `crates/ptermui_core/src/elements/tui/text_tests.rs` — span construction: per-span styles patching the base style, wrapping across span boundaries, hard newlines inside spans, and empty spans occupying no rows.
+- `cargo nextest run -p pterm_tui`, `cargo nextest run -p ptermui_core --features tui`, `./script/format --check`, and presubmit-style clippy on `polaris-terminal` + `pterm_tui` all pass.
 
 No parallelization was used: the change is a single-crate feature plus a small export surface, implemented sequentially.
 

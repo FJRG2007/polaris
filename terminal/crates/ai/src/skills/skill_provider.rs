@@ -1,20 +1,20 @@
 //! Skill provider definitions and utilities.
 //!
-//! This module defines the supported skill providers (i.e. Agents, Claude, Codex, Rook) and their
+//! This module defines the supported skill providers (i.e. Agents, Claude, Codex, Polaris Terminal) and their
 //! associated skills directory paths. It provides utilities for looking up providers
 //! from paths and vice versa.
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use dirs::home_dir;
-use rook_core::ui::color::CLAUDE_ORANGE;
-use rook_core::ui::icons::Icon;
-use rook_core::ui::theme::Fill;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_core::ui::color::CLAUDE_ORANGE;
+use pterm_core::ui::icons::Icon;
+use pterm_core::ui::theme::Fill;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString, VariantNames};
 
-/// Represents a skill provider/origin (Agents, Claude, Codex, or Rook).
+/// Represents a skill provider/origin (Agents, Claude, Codex, or Polaris Terminal).
 #[derive(
     Debug,
     Clone,
@@ -29,7 +29,7 @@ use strum_macros::{Display, EnumString, VariantNames};
     VariantNames,
 )]
 pub enum SkillProvider {
-    Rook,
+    Pterm,
     Agents,
     Claude,
     Codex,
@@ -63,7 +63,7 @@ pub enum SkillScope {
     Home,
     /// Skills from a project directory (e.g., `./repo/.agents/skills`).
     Project,
-    /// Bundled skills distributed with Rook.
+    /// Bundled skills distributed with Polaris Terminal.
     Bundled,
 }
 
@@ -83,12 +83,12 @@ impl SkillProvider {
             SkillProvider::Gemini => Icon::GeminiLogo,
             SkillProvider::Droid => Icon::DroidLogo,
             SkillProvider::OpenCode => Icon::OpenCodeLogo,
-            SkillProvider::Rook
+            SkillProvider::Pterm
             | SkillProvider::Agents
             | SkillProvider::Cursor
             | SkillProvider::Copilot
             | SkillProvider::Github
-            | SkillProvider::Kiro => Icon::RookLogoLight,
+            | SkillProvider::Kiro => Icon::PtermLogoLight,
         }
     }
 
@@ -111,8 +111,8 @@ pub static SKILL_PROVIDER_DEFINITIONS: LazyLock<Vec<SkillProviderDefinition>> =
                 skills_path: PathBuf::from(".agents").join("skills"),
             },
             SkillProviderDefinition {
-                provider: SkillProvider::Rook,
-                skills_path: PathBuf::from(".rook").join("skills"),
+                provider: SkillProvider::Pterm,
+                skills_path: PathBuf::from(".polaris/terminal").join("skills"),
             },
             SkillProviderDefinition {
                 provider: SkillProvider::Claude,
@@ -164,8 +164,8 @@ pub fn provider_rank(provider: SkillProvider) -> usize {
 }
 
 pub fn home_skills_path(provider: SkillProvider) -> Option<PathBuf> {
-    if provider == SkillProvider::Rook {
-        return rook_core::paths::rook_home_skills_dir();
+    if provider == SkillProvider::Pterm {
+        return pterm_core::paths::pterm_home_skills_dir();
     }
     let definition = SKILL_PROVIDER_DEFINITIONS
         .iter()

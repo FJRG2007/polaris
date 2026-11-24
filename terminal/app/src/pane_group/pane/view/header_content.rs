@@ -3,11 +3,11 @@
 //! This module provides the infrastructure for backing views to declaratively
 //! specify their header content without worrying about draggable behavior.
 
-use rook_core::ui::theme::Fill;
-use rookui::elements::{DraggableState, MouseStateHandle};
-use rookui::fonts::Properties;
-use rookui::text_layout::ClipConfig;
-use rookui::{AppContext, Element};
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{DraggableState, MouseStateHandle};
+use ptermui::fonts::Properties;
+use ptermui::text_layout::ClipConfig;
+use ptermui::{AppContext, Element};
 
 /// Closure that renders sharing controls (share button, view-only indicator) for a pane header.
 /// Accepts optional icon color and button size overrides.

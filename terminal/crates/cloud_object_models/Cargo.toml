@@ -30,11 +30,11 @@ settings_value = { workspace = true, features = ["derive"] }
 uuid.workspace = true
 url.workspace = true
 warp-workflows.workspace = true
-rook_cli.workspace = true
-rook_core.workspace = true
-rook_errors.workspace = true
-rook_graphql.workspace = true
-rook_util.workspace = true
+pterm_cli.workspace = true
+pterm_core.workspace = true
+pterm_errors.workspace = true
+pterm_graphql.workspace = true
+pterm_util.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 cloud_object_persistence.workspace = true

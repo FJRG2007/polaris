@@ -2,18 +2,18 @@
 
 use chrono::{DateTime, Local};
 use itertools::Itertools;
-use rook_core::features::FeatureFlag;
-use rook_core::semantic_selection::SemanticSelection;
-use rook_core::ui::appearance::Appearance;
-use rook_errors::report_error;
-use rookui::r#async::Timer;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::MouseStateHandle;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::UiComponent;
-use rookui::units::IntoLines;
-use rookui::{AppContext, Element, ModelHandle, SingletonEntity, ViewContext};
+use pterm_core::features::FeatureFlag;
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_core::ui::appearance::Appearance;
+use pterm_errors::report_error;
+use ptermui::r#async::Timer;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::MouseStateHandle;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::units::IntoLines;
+use ptermui::{AppContext, Element, ModelHandle, SingletonEntity, ViewContext};
 use session_sharing_protocol::common::{
     ParticipantId, ParticipantList, ParticipantPresenceUpdate, Role, RoleRequestId,
     RoleRequestResponse, SessionId, WindowSize,
@@ -1234,7 +1234,7 @@ impl TerminalView {
                 for viewer in active_viewers {
                     if let Some(existing_viewer) = shared_session.viewers().get(viewer.id()) {
                         // A change to the viewer's ACL may have originated from
-                        // rook-server, so we need to update the avatar's role.
+                        // polaris-terminal-server, so we need to update the avatar's role.
                         existing_viewer.avatar.update(ctx, |avatar, ctx| {
                             if avatar.role() != viewer.role {
                                 avatar.set_role(viewer.role);

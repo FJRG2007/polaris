@@ -19,7 +19,7 @@ fn upload_target_deserializes_null_headers_and_fields_as_empty() {
 }
 
 /// Each `kind` here is a discriminator from the `UploadFieldValue` schema in
-/// rook-server's `public_api/openapi.yaml`. A mismatch fails the whole target,
+/// polaris-terminal-server's `public_api/openapi.yaml`. A mismatch fails the whole target,
 /// so every presigned POST upload would break.
 #[test]
 fn upload_field_value_deserializes_every_server_kind() {
@@ -104,7 +104,7 @@ fn external_reference_artifact_serializes_to_expected_wire_format() {
 fn external_reference_artifact_includes_optional_title_and_metadata() {
     let artifact = Artifact::ExternalReference {
         reference_type: "GITHUB_PR".to_string(),
-        url: "https://github.com/FJRG2007/rook/pull/1".to_string(),
+        url: "https://github.com/FJRG2007/polaris/pull/1".to_string(),
         title: Some("My pull request".to_string()),
         metadata: Some(serde_json::json!({"key": "val"})),
     };
@@ -115,7 +115,7 @@ fn external_reference_artifact_includes_optional_title_and_metadata() {
             "artifact_type": "EXTERNAL_REFERENCE",
             "data": {
                 "reference_type": "GITHUB_PR",
-                "url": "https://github.com/FJRG2007/rook/pull/1",
+                "url": "https://github.com/FJRG2007/polaris/pull/1",
                 "title": "My pull request",
                 "metadata": {"key": "val"}
             }

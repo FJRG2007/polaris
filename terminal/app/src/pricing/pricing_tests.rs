@@ -1,4 +1,4 @@
-use rook_graphql::billing::{OveragesPricing, PricingInfo};
+use pterm_graphql::billing::{OveragesPricing, PricingInfo};
 
 use super::PricingInfoModel;
 

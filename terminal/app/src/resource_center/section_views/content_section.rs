@@ -1,9 +1,9 @@
 use pathfinder_color::ColorU;
-use rookui::elements::{
+use ptermui::elements::{
     ConstrainedBox, Container, Element, Empty, Flex, MouseStateHandle, ParentElement, Shrinkable,
 };
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use super::{
     CHEVRON_ICON_SIZE, DESCRIPTION_FONT_SIZE, ICON_PADDING, ITEM_PADDING_BOTTOM, SECTION_SPACING,

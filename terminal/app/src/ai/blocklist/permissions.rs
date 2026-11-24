@@ -2,14 +2,14 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use anyhow::Result;
-use rook_completer::parsers::simple::{command_without_leading_env_vars, decompose_command};
-use rook_core::execution_mode::AppExecutionMode;
-use rook_core::features::FeatureFlag;
-use rook_core::settings::Setting;
-use rook_core::user_preferences::GetUserPreferences;
-use rook_errors::{report_error, report_if_error};
-use rook_util::path::EscapeChar;
-use rookui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
+use pterm_completer::parsers::simple::{command_without_leading_env_vars, decompose_command};
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_core::features::FeatureFlag;
+use pterm_core::settings::Setting;
+use pterm_core::user_preferences::GetUserPreferences;
+use pterm_errors::{report_error, report_if_error};
+use pterm_util::path::EscapeChar;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 
 use super::BlocklistAIHistoryModel;
@@ -211,7 +211,7 @@ impl BlocklistAIPermissions {
             cli_agent_model: profile_data.cli_agent_model.clone(),
             computer_use_model: profile_data.computer_use_model.clone(),
             context_window_limit: profile_data.context_window_limit,
-            autosync_plans_to_rook_drive: profile_data.autosync_plans_to_rook_drive,
+            autosync_plans_to_pterm_drive: profile_data.autosync_plans_to_pterm_drive,
             web_search_enabled: profile_data.web_search_enabled,
         }
     }
@@ -701,7 +701,7 @@ impl BlocklistAIPermissions {
         self.can_read_files(Some(conversation_id), paths, terminal_view_id, scope, ctx)
     }
 
-    /// Returns whether or not Rook can auto-read the given files (e.g. for codebase indexing).
+    /// Returns whether or not Polaris Terminal can auto-read the given files (e.g. for codebase indexing).
     pub fn can_read_files(
         &self,
         conversation_id: Option<&AIConversationId>,

@@ -1,4 +1,4 @@
-use rookui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
+use ptermui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
 
 use super::view::PaneView;
 use super::{
@@ -92,16 +92,16 @@ impl PaneContent for AIDocumentPane {
                 AIDocumentEvent::CloseRequested => {
                     group.close_pane_with_confirmation(pane_id, ctx);
                 }
-                AIDocumentEvent::ViewInRookDrive(id) => {
-                    ctx.emit(crate::pane_group::Event::ViewInRookDrive(*id));
+                AIDocumentEvent::ViewInPtermDrive(id) => {
+                    ctx.emit(crate::pane_group::Event::ViewInPtermDrive(*id));
                 }
                 #[cfg(feature = "local_fs")]
-                AIDocumentEvent::OpenCodeInRook {
+                AIDocumentEvent::OpenCodeInPterm {
                     source,
                     layout,
                     line_col,
                 } => {
-                    ctx.emit(crate::pane_group::Event::OpenCodeInRook {
+                    ctx.emit(crate::pane_group::Event::OpenCodeInPterm {
                         source: source.clone(),
                         layout: *layout,
                         line_col: *line_col,

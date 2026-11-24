@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Installs the rook_channel_config binary at a pinned revision.
+# Installs the pterm_channel_config binary at a pinned revision.
 #
 # This script acts as a lockfile: the REVISION variable pins the exact version
 # of the config binary to the code that reads its output. Update REVISION when
@@ -12,7 +12,7 @@
 
 REPO="ssh://git@github.com/warpdotdev/warp-channel-config.git"
 REVISION="97a199b5bba11af9c7d3bd43dfb3669316d1f0f8"
-BIN_NAME="rook-channel-config"
+BIN_NAME="polaris-terminal-channel-config"
 
 # Check for repo access before attempting to `cargo install` the binary.
 if ! git ls-remote --exit-code "${REPO}" HEAD >/dev/null 2>&1; then

@@ -2,15 +2,15 @@ use std::cell::Cell;
 use std::sync::Arc;
 
 use markdown_parser::{FormattedTextStyles, Hyperlink};
+use ptermui_core::assets::asset_cache::AssetSource;
+use ptermui_core::color::ColorU;
+use ptermui_core::elements::ListIndentLevel;
+use ptermui_core::fonts::FamilyId;
+use ptermui_core::geometry::rect::RectF;
+use ptermui_core::geometry::vector::vec2f;
+use ptermui_core::text_layout::TextFrame;
+use ptermui_core::units::{IntoPixels, Pixels};
 use rangemap::RangeSet;
-use rookui_core::assets::asset_cache::AssetSource;
-use rookui_core::color::ColorU;
-use rookui_core::elements::ListIndentLevel;
-use rookui_core::fonts::FamilyId;
-use rookui_core::geometry::rect::RectF;
-use rookui_core::geometry::vector::vec2f;
-use rookui_core::text_layout::TextFrame;
-use rookui_core::units::{IntoPixels, Pixels};
 use string_offset::CharOffset;
 use sum_tree::SumTree;
 use vec1::{Vec1, vec1};
@@ -927,7 +927,7 @@ fn test_multiselect_autoscroll_bounding_box() {
     );
 }
 
-// 18:09:15 [INFO] [rook_editor::render::model] Initial tree:
+// 18:09:15 [INFO] [pterm_editor::render::model] Initial tree:
 // -------- 0.00px / 0 characters --------
 // Hidden (3067 characters, 87 lines, 20.00px tall)
 // -------- 20.00px / 3067 characters --------
@@ -1030,7 +1030,7 @@ fn test_dedupe_hidden_ranges_logged_tree_is_unchanged() {
     assert_eq!(initial, resulting);
 }
 
-// 18:09:14 [INFO] [rook_editor::render::model] Initial tree:
+// 18:09:14 [INFO] [pterm_editor::render::model] Initial tree:
 // -------- 0.00px / 0 characters --------
 // Hidden (3066 characters, 87 lines, 20.00px tall)
 // -------- 20.00px / 3067 characters --------
@@ -1155,17 +1155,17 @@ fn make_test_cell_layout() -> CellLayout {
         line_char_ranges: vec![CharOffset::from(0)..CharOffset::from(3)],
         line_widths: vec![30.0],
         line_caret_positions: vec![vec![
-            rookui_core::text_layout::CaretPosition {
+            ptermui_core::text_layout::CaretPosition {
                 position_in_line: 0.0,
                 start_offset: 0,
                 last_offset: 0,
             },
-            rookui_core::text_layout::CaretPosition {
+            ptermui_core::text_layout::CaretPosition {
                 position_in_line: 10.0,
                 start_offset: 1,
                 last_offset: 1,
             },
-            rookui_core::text_layout::CaretPosition {
+            ptermui_core::text_layout::CaretPosition {
                 position_in_line: 20.0,
                 start_offset: 2,
                 last_offset: 2,

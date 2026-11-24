@@ -1,14 +1,14 @@
 use pathfinder_geometry::vector::vec2f;
-use rookui::elements::{
+use ptermui::elements::{
     Align, ClippedScrollStateHandle, ClippedScrollable, Container, CornerRadius, Element, Empty,
     Fill, Flex, Hoverable, Icon, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement,
     Radius, Shrinkable,
 };
-use rookui::platform::Cursor;
-use rookui::presenter::ChildView;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::platform::Cursor;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WindowId,
 };
@@ -133,9 +133,9 @@ impl ResourceCenterMainView {
                             }
                             None => !is_tips_completed && !is_onboarded,
                         },
-                        // Expand Maximize Rook section once user has completed welcome tips,
+                        // Expand Maximize Polaris Terminal section once user has completed welcome tips,
                         // and keep open after users have completed/skipped all tips
-                        FeatureSection::MaximizeRook => match ChannelState::app_version() {
+                        FeatureSection::MaximizePterm => match ChannelState::app_version() {
                             Some(version) => {
                                 match Settings::has_changelog_been_shown(version, ctx) {
                                     true => is_tips_completed || is_onboarded,
@@ -390,7 +390,7 @@ impl ResourceCenterMainView {
                 .with_text_and_icon_label(
                     TextAndIcon::new(
                         TextAndIconAlignment::IconFirst,
-                        "Invite a friend to Rook",
+                        "Invite a friend to Polaris Terminal",
                         Icon::new(SEND_SVG_PATH, appearance.theme().accent()),
                         MainAxisSize::Max,
                         MainAxisAlignment::Center,

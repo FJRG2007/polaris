@@ -1,13 +1,13 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rookui::Element;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::Element;
+use ptermui::elements::{
     Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Shrinkable, Stack,
     Text,
 };
-use rookui::fonts::{Properties, Weight};
+use ptermui::fonts::{Properties, Weight};
 
 use crate::settings_view::billing_and_usage::billing_cycle_usage_common::{
     BarSegment, BillingUsageMouseStates, ROW_BORDER_RADIUS, ROW_BORDER_WIDTH, TOOLTIP_GAP,

@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::vec2f;
-use rook_completer::completer::Description;
-use rook_core::features::FeatureFlag;
-use rookui::elements::{
+use pterm_completer::completer::Description;
+use pterm_core::features::FeatureFlag;
+use ptermui::elements::{
     AnchorPair, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DispatchEventResult, Element, EventHandler, Flex, OffsetPositioning, OffsetType, ParentAnchor,
     ParentElement, ParentOffsetBounds, PositionedElementOffsetBounds, PositioningAxis, Radius,
     Shrinkable, Stack, Text, XAxisAnchor,
 };
-use rookui::fonts::Weight;
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, EntityId, SingletonEntity, ViewHandle};
+use ptermui::fonts::Weight;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, EntityId, SingletonEntity, ViewHandle};
 use vim::vim::{VimMode, VimState};
 
 use crate::ai::llms::{LLMPreferences, should_show_key_icon_for_model};
@@ -47,17 +47,17 @@ pub(super) fn render_vim_status(vim_state: &VimState, appearance: &Appearance) -
     let theme = appearance.theme();
     let ansi_colors = theme.terminal_colors().bright;
     let icon = match vim_state.mode {
-        VimMode::Normal => Icon::VimNormalMode.to_rookui_icon(ansi_colors.green.into()),
+        VimMode::Normal => Icon::VimNormalMode.to_ptermui_icon(ansi_colors.green.into()),
         VimMode::Insert => {
             use crate::themes::theme::Blend;
-            Icon::VimInsertMode.to_rookui_icon(
+            Icon::VimInsertMode.to_ptermui_icon(
                 theme
                     .background()
                     .blend(&theme.foreground().with_opacity(50)),
             )
         }
-        VimMode::Visual(_) => Icon::VimVisualMode.to_rookui_icon(ansi_colors.blue.into()),
-        VimMode::Replace => Icon::VimReplaceMode.to_rookui_icon(ansi_colors.red.into()),
+        VimMode::Visual(_) => Icon::VimVisualMode.to_ptermui_icon(ansi_colors.blue.into()),
+        VimMode::Replace => Icon::VimReplaceMode.to_ptermui_icon(ansi_colors.red.into()),
     };
     Container::new(
         Flex::row()

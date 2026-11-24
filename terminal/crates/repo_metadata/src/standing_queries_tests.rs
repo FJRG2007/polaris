@@ -21,7 +21,7 @@ fn records_provider_skill_files_and_project_rules() {
     let mut results = StandingQueryResults::default();
     let skills_provider = repo_path(".agents/skills");
     let skill_file = repo_path(".agents/skills/review/SKILL.md");
-    let root_rule = repo_path("ROOK.md");
+    let root_rule = repo_path("POLARIS_TERMINAL.md");
     let nested_rule = repo_path("packages/api/AGENTS.md");
 
     results.record_path(&skills_provider, true, &definitions);
@@ -89,10 +89,10 @@ fn support_file_beneath_skill_does_not_synthesize_provider_update() {
     assert!(results.project_skills().next().is_none());
 }
 
-/// Emulates the open `AGENTS.md` discovery contract that non-Rook agents follow:
+/// Emulates the open `AGENTS.md` discovery contract that non-Polaris Terminal agents follow:
 /// walk from a working directory up to the repository root, collecting any
-/// `AGENTS.md` rule files via the same predicate Rook uses to index project
-/// rules. Guards the `ROOK.md` → `AGENTS.md` rename so the repo-root agent
+/// `AGENTS.md` rule files via the same predicate Polaris Terminal uses to index project
+/// rules. Guards the `POLARIS_TERMINAL.md` → `AGENTS.md` rename so the repo-root agent
 /// context file stays present, non-empty, and discoverable.
 #[test]
 fn repo_root_agents_md_is_discovered_by_rule_file_contract() {
@@ -103,11 +103,11 @@ fn repo_root_agents_md_is_discovered_by_rule_file_contract() {
     let repo_root = manifest_dir
         .ancestors()
         .find(|ancestor| ancestor.join(".git").exists())
-        .expect("repo_metadata crate should live inside the rook git checkout");
+        .expect("repo_metadata crate should live inside the polaris-terminal git checkout");
 
     // Walk from the crate dir up to (and including) the repo root, collecting
     // every `AGENTS.md` the rule-file predicate recognizes — the same
-    // nearest-file-up-the-tree contract a conformant non-Rook agent uses.
+    // nearest-file-up-the-tree contract a conformant non-Polaris Terminal agent uses.
     let discovered: Vec<PathBuf> = manifest_dir
         .ancestors()
         .take_while(|ancestor| ancestor.starts_with(repo_root))
@@ -128,9 +128,9 @@ fn repo_root_agents_md_is_discovered_by_rule_file_contract() {
         "repo-root AGENTS.md should not be empty"
     );
 
-    // Clean rename: the repo no longer ships a root ROOK.md.
+    // Clean rename: the repo no longer ships a root POLARIS_TERMINAL.md.
     assert!(
-        !repo_root.join("ROOK.md").exists(),
-        "repo-root ROOK.md should have been renamed to AGENTS.md"
+        !repo_root.join("POLARIS_TERMINAL.md").exists(),
+        "repo-root POLARIS_TERMINAL.md should have been renamed to AGENTS.md"
     );
 }

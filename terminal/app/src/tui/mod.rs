@@ -1,6 +1,6 @@
-//! The headless `rook-tui` front-end's app-side entry point.
+//! The headless `polaris-terminal-tui` front-end's app-side entry point.
 //!
-//! `rook_tui` boots the real headless Rook app via [`crate::run_tui`]. Once
+//! `pterm_tui` boots the real headless Polaris Terminal app via [`crate::run_tui`]. Once
 //! shared initialization is done, [`init`] registers the [`TuiLoginModel`] that
 //! the TUI observes, mounts the TUI immediately (so it renders right away), and
 //! leaves device authorization behind an explicit welcome-screen action. The
@@ -15,8 +15,8 @@ pub use mcp::{
     TuiMcpServerStatus, TuiMcpSnapshot, TuiMcpSyncedTemplateProvenance, TuiMcpTemplateVariable,
     TuiMcpTransport, TuiMcpVariableValue,
 };
-use rook_core::telemetry::TelemetryEvent as _;
-use rookui::{AppContext, Entity, SingletonEntity};
+use pterm_core::telemetry::TelemetryEvent as _;
+use ptermui::{AppContext, Entity, SingletonEntity};
 use telemetry::{
     AbandonmentPhase, AuthenticationEntrypoint, TuiOnboardingTelemetry, TuiOnboardingTelemetryEvent,
 };
@@ -30,7 +30,7 @@ use crate::auth::auth_state::AuthState;
 use crate::auth::{self, AuthStateProvider};
 use crate::tui_onboarding_markers::TuiOnboardingMarkers;
 
-/// Login state of the headless TUI, observed by the `rook_tui` root view to
+/// Login state of the headless TUI, observed by the `pterm_tui` root view to
 /// decide whether to show the login placeholder or the input UI.
 pub enum TuiLoginPhase {
     /// No validated user identity is available, so the login welcome remains visible.
@@ -65,7 +65,7 @@ enum TuiAuthBrowserFlow {
 }
 
 /// Singleton holding the TUI's [`TuiLoginPhase`]. Updated by [`init`]'s auth
-/// flow and read by the `rook_tui` root view.
+/// flow and read by the `pterm_tui` root view.
 pub struct TuiLoginModel {
     phase: TuiLoginPhase,
     browser_flow: TuiAuthBrowserFlow,
@@ -345,14 +345,14 @@ fn tui_verification_url(verification_url: &str, user_code: &str) -> String {
     if !has_user_code {
         query.append_pair("user_code", user_code);
     }
-    query.append_pair("source", "rook-agent-cli");
+    query.append_pair("source", "polaris-terminal-agent-cli");
     drop(query);
     verification_url.into()
 }
 
 fn activate_global_mcp_servers(ctx: &mut AppContext) {
     FileBasedMCPManager::handle(ctx).update(ctx, |manager, ctx| {
-        manager.activate_global_rook_servers(ctx);
+        manager.activate_global_pterm_servers(ctx);
     });
 }
 
@@ -386,7 +386,7 @@ fn start_tui_device_login_with_entrypoint(
         authorize_device(ctx);
     }
 }
-/// Logs out the current TUI user and sends them to Rook web's logged-out flow.
+/// Logs out the current TUI user and sends them to Polaris Terminal web's logged-out flow.
 pub fn log_out_tui(ctx: &mut AppContext) {
     auth::log_out(ctx);
     TuiOnboardingMarkers::handle(ctx).update(ctx, |markers, ctx| {
@@ -429,7 +429,7 @@ fn set_login_phase(ctx: &mut AppContext, phase: TuiLoginPhase) {
 
 fn send_tui_onboarding_event(event: Option<TuiOnboardingTelemetryEvent>, ctx: &mut AppContext) {
     if let Some(event) = event {
-        rook_core::send_telemetry_from_app_ctx!(event, ctx);
+        pterm_core::send_telemetry_from_app_ctx!(event, ctx);
     }
 }
 

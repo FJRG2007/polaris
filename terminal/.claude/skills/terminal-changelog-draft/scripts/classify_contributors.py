@@ -24,8 +24,8 @@ KNOWN_BOTS = frozenset(
         "github-actions[bot]",
         "codecov",
         "codecov[bot]",
-        "rook-bot",
-        "rook-bot[bot]",
+        "polaris-terminal-bot",
+        "polaris-terminal-bot[bot]",
     }
 )
 

@@ -43,7 +43,7 @@ the file tree does not. That inconsistency is part of the bug.
 
 - Computing a synthetic greatest common ancestor for unrelated sibling paths
   (e.g., `~/code/a` + `~/code/b` must NOT collapse to `~/code`).
-- Changing how Rook detects git repositories or resolves terminal cwds to
+- Changing how Polaris Terminal detects git repositories or resolves terminal cwds to
   repo roots upstream in `WorkingDirectoriesModel`.
 - Changing the remote-repo root insertion policy
   (`insert_or_update_remote_root`) — remote pushes continue to use their
@@ -86,7 +86,7 @@ that stay as two roots:
 - `~/code/a` + `~/other`
 - `/a` + `/ab`
 
-Rook does not synthesize a new common root (like `~/code` or `/`) that is not
+Polaris Terminal does not synthesize a new common root (like `~/code` or `/`) that is not
 already an active path.
 
 ### Invariant 3: auto-expand the chain to each absorbed descendant
@@ -246,7 +246,7 @@ root.
 ## Validation
 
 1. **Rust unit tests** for the shared `group_roots_by_common_ancestor`
-   helper (`crates/rook_util`): verify each invariant 1–2 and every edge
+   helper (`crates/pterm_util`): verify each invariant 1–2 and every edge
    case above, using concrete path inputs and asserting the resulting
    surviving-root list and absorbed-descendant map.
 2. **`FileTreeView` view tests** (`app/src/code/file_tree/view/view_tests.rs`,

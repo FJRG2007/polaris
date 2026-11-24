@@ -1,13 +1,13 @@
 use anyhow::Result;
 use comfy_table::Cell;
-use rook_cli::GlobalOptions;
-use rook_cli::agent::OutputFormat;
-use rook_cli::memory_store::{
+use pterm_cli::GlobalOptions;
+use pterm_cli::agent::OutputFormat;
+use pterm_cli::memory_store::{
     CreateMemoryArgs, DeleteMemoryArgs, GetStoreArgs, ListMemoriesArgs, ListStoreAgentsArgs,
     ListVersionsArgs, MemoryCommand, MemoryStoreCommand, UpdateMemoryArgs, UpdateStoreArgs,
 };
-use rookui::platform::TerminationMode;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use ptermui::platform::TerminationMode;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use serde::Serialize;
 
 use crate::ai::agent_sdk::output::{self, TableFormat};
@@ -313,7 +313,7 @@ impl MemoryStoreCommandRunner {
     }
 }
 
-impl rookui::Entity for MemoryStoreCommandRunner {
+impl ptermui::Entity for MemoryStoreCommandRunner {
     type Event = ();
 }
 

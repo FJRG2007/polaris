@@ -1,7 +1,7 @@
-use rookui::Element;
-use rookui::elements::MouseStateHandle;
+use ptermui::Element;
+use ptermui::elements::MouseStateHandle;
 
-use super::{RookDriveItem, RookDriveItemId};
+use super::{PtermDriveItem, PtermDriveItemId};
 use crate::appearance::Appearance;
 use crate::cloud_object::{CloudObjectMetadata, Space};
 use crate::drive::DriveObjectType;
@@ -9,18 +9,18 @@ use crate::drive::index::DriveIndexAction;
 use crate::themes::theme::Fill;
 
 #[derive(Clone)]
-pub struct RookDriveSpace {
+pub struct PtermDriveSpace {
     space: Space,
 }
 
-impl RookDriveSpace {
+impl PtermDriveSpace {
     #[allow(dead_code)]
     pub fn new(space: Space) -> Self {
         Self { space }
     }
 }
 
-impl RookDriveItem for RookDriveSpace {
+impl PtermDriveItem for PtermDriveSpace {
     fn display_name(&self) -> Option<String> {
         None
     }
@@ -45,8 +45,8 @@ impl RookDriveItem for RookDriveSpace {
         None
     }
 
-    fn rook_drive_id(&self) -> RookDriveItemId {
-        RookDriveItemId::Space(self.space)
+    fn pterm_drive_id(&self) -> PtermDriveItemId {
+        PtermDriveItemId::Space(self.space)
     }
 
     fn sync_status_icon(
@@ -58,11 +58,11 @@ impl RookDriveItem for RookDriveSpace {
         None
     }
 
-    fn clone_box(&self) -> Box<dyn RookDriveItem> {
+    fn clone_box(&self) -> Box<dyn PtermDriveItem> {
         Box::new(self.clone())
     }
 
-    fn action_summary(&self, _app: &rookui::AppContext) -> Option<String> {
+    fn action_summary(&self, _app: &ptermui::AppContext) -> Option<String> {
         None
     }
 }

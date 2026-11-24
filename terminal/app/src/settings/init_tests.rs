@@ -1,10 +1,10 @@
 use instant::Duration;
-use rook_core::features::FeatureFlag;
-use rook_core::settings::macros::define_settings_group;
-use rook_core::settings::{SupportedPlatforms, SyncToCloud};
-use rook_core::user_preferences::GetUserPreferences as _;
-use rookui::SingletonEntity;
-use rookui_extras::user_preferences;
+use pterm_core::features::FeatureFlag;
+use pterm_core::settings::macros::define_settings_group;
+use pterm_core::settings::{SupportedPlatforms, SyncToCloud};
+use pterm_core::user_preferences::GetUserPreferences as _;
+use ptermui::SingletonEntity;
+use ptermui_extras::user_preferences;
 use settings::{PrivatePreferences, PublicPreferences, Setting, SettingsManager};
 use settings_value::SettingsValue;
 
@@ -47,7 +47,7 @@ define_settings_group!(MigrationTestSettings, settings: [
 
 /// Registers separate InMemoryPreferences singletons for public and private
 /// stores, then adds a SettingsManager and the test settings group.
-fn init_test_app(ctx: &mut rookui::AppContext) {
+fn init_test_app(ctx: &mut ptermui::AppContext) {
     ctx.add_singleton_model(move |_| {
         PublicPreferences::new(Box::<user_preferences::in_memory::InMemoryPreferences>::default())
     });
@@ -60,7 +60,7 @@ fn init_test_app(ctx: &mut rookui::AppContext) {
 
 #[test]
 fn test_migration_copies_public_settings_from_native_store() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         // Enable the settings file so `preferences_for_setting` routes
         // public setting writes to the Model singleton (not the private store).
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
@@ -123,7 +123,7 @@ fn test_migration_copies_public_settings_from_native_store() {
 
 #[test]
 fn test_migration_writes_marker_to_native_store() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         app.update(init_test_app);
 
         // No marker before migration.
@@ -152,7 +152,7 @@ fn test_migration_writes_marker_to_native_store() {
 
 #[test]
 fn test_migration_skips_settings_absent_from_native_store() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
         app.update(init_test_app);
 
@@ -196,7 +196,7 @@ fn test_migration_skips_settings_absent_from_native_store() {
 
 #[test]
 fn test_migration_handles_string_setting() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         app.update(init_test_app);
 
         // Seed a JSON-encoded string value in the native store.
@@ -224,7 +224,7 @@ fn test_migration_handles_string_setting() {
 
 #[test]
 fn test_migration_does_not_rerun_when_marker_present() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
         let temp_dir = tempfile::tempdir().unwrap();
         let settings_file_path = temp_dir.path().join("settings.toml");
@@ -264,7 +264,7 @@ fn test_migration_does_not_rerun_when_marker_present() {
 
 #[test]
 fn test_migration_not_needed_when_settings_file_exists() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
         let temp_dir = tempfile::tempdir().unwrap();
         let settings_file_path = temp_dir.path().join("settings.toml");
@@ -283,7 +283,7 @@ fn test_migration_not_needed_when_settings_file_exists() {
 
 #[test]
 fn test_migration_with_multiple_setting_types() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
 
         app.update(init_test_app);
@@ -377,9 +377,9 @@ fn test_migration_with_multiple_setting_types() {
 // serde fallback is never reached and values are lost.
 
 mod notifications_migration {
-    use rook_core::settings::macros::define_settings_group;
-    use rook_core::settings::{SupportedPlatforms, SyncToCloud};
-    use rookui_extras::user_preferences;
+    use pterm_core::settings::macros::define_settings_group;
+    use pterm_core::settings::{SupportedPlatforms, SyncToCloud};
+    use ptermui_extras::user_preferences;
     use settings::{PrivatePreferences, PublicPreferences, SettingsManager};
 
     use crate::terminal::session_settings::NotificationsSettings;
@@ -397,7 +397,7 @@ mod notifications_migration {
         },
     ]);
 
-    pub fn init_notifications_migration_test_app(ctx: &mut rookui::AppContext) {
+    pub fn init_notifications_migration_test_app(ctx: &mut ptermui::AppContext) {
         ctx.add_singleton_model(move |_| {
             PublicPreferences::new(
                 Box::<user_preferences::in_memory::InMemoryPreferences>::default(),
@@ -463,7 +463,7 @@ fn test_notifications_from_file_value_rejects_serde_format_duration() {
 
 #[test]
 fn test_migration_preserves_notifications_mode() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
 
         app.update(init_notifications_migration_test_app);
@@ -500,7 +500,7 @@ fn test_migration_preserves_notifications_mode() {
 
 #[test]
 fn test_migration_preserves_custom_long_running_threshold() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
 
         app.update(init_notifications_migration_test_app);

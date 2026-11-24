@@ -1,9 +1,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rook_core::settings::Setting as _;
-use rook_terminal::model::escape_sequences::{BRACKETED_PASTE_END, BRACKETED_PASTE_START};
-use rookui::{App, AppContext, SingletonEntity, ViewContext};
+use pterm_core::settings::Setting as _;
+use pterm_terminal::model::escape_sequences::{BRACKETED_PASTE_END, BRACKETED_PASTE_START};
+use ptermui::{App, AppContext, SingletonEntity, ViewContext};
 
 use super::super::{AIBlockMetadata, RichContentMetadata, RichContentType};
 use super::*;
@@ -393,7 +393,7 @@ fn cli_agent_footer_renders_for_viewer_of_shared_cloud_agent_session() {
 }
 
 #[test]
-fn cli_agent_footer_does_not_render_for_rook_tui_session() {
+fn cli_agent_footer_does_not_render_for_pterm_tui_session() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
 
@@ -406,7 +406,7 @@ fn cli_agent_footer_does_not_render_for_rook_tui_session() {
                 sessions.set_session(
                     view.id(),
                     CLIAgentSession {
-                        agent: CLIAgent::RookTui,
+                        agent: CLIAgent::PtermTui,
                         status: CLIAgentSessionStatus::InProgress,
                         session_context: CLIAgentSessionContext::default(),
                         input_state: CLIAgentInputState::Closed,

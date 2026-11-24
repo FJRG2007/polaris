@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use rookui::{App, ModelContext, ModelHandle};
+use ptermui::{App, ModelContext, ModelHandle};
 use warp_multi_agent_api as api;
 
 use super::*;

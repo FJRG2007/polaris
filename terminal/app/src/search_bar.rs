@@ -1,9 +1,9 @@
-use rookui::elements::{
+use ptermui::elements::{
     Border, ChildView, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DispatchEventResult, EventHandler, Flex, Icon, ParentElement, Radius, Shrinkable,
 };
-use rookui::ui_components::components::{Coords, UiComponentStyles};
-use rookui::{Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::ui_components::components::{Coords, UiComponentStyles};
+use ptermui::{Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
 
 use crate::appearance::Appearance;
 use crate::editor::EditorView;
@@ -42,7 +42,7 @@ impl View for SearchBar {
         "SearchBar"
     }
 
-    fn render(&self, app: &rookui::AppContext) -> Box<dyn Element> {
+    fn render(&self, app: &ptermui::AppContext) -> Box<dyn Element> {
         let styles = {
             let appearance = Appearance::as_ref(app);
             let context_styles = UiComponentStyles {

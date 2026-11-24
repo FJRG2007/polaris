@@ -2,17 +2,17 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::vec2f;
-use rook_cli::agent::Harness;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_if_error;
-use rook_managed_secrets::client::SecretOwner;
-use rookui::elements::{
+use pterm_cli::agent::Harness;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_if_error;
+use pterm_managed_secrets::client::SecretOwner;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, OffsetPositioning, ParentAnchor, ParentElement as _,
     ParentOffsetBounds, Stack,
 };
-use rookui::{
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -530,8 +530,8 @@ impl AuthSecretSelector {
         OffsetPositioning::offset_from_save_position_element(
             MAIN_MENU_SAVE_POSITION_ID.to_string(),
             vec2f(offset_x, 0.),
-            rookui::elements::PositionedElementOffsetBounds::WindowByPosition,
-            rookui::elements::PositionedElementAnchor::BottomLeft,
+            ptermui::elements::PositionedElementOffsetBounds::WindowByPosition,
+            ptermui::elements::PositionedElementAnchor::BottomLeft,
             ChildAnchor::BottomLeft,
         )
     }
@@ -768,7 +768,7 @@ impl View for AuthSecretSelector {
         stack.add_child(ChildView::new(&self.button).finish());
 
         if self.is_menu_open {
-            let main_menu = rookui::elements::SavePosition::new(
+            let main_menu = ptermui::elements::SavePosition::new(
                 ChildView::new(&self.menu).finish(),
                 MAIN_MENU_SAVE_POSITION_ID,
             )

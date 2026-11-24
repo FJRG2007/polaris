@@ -16,8 +16,8 @@ use std::sync::Arc;
 
 use chrono::Duration;
 use parking_lot::FairMutex;
-use rookui::r#async::executor::Background;
-use rookui::{App, AppContext, EntityId, ModelHandle, SingletonEntity};
+use ptermui::r#async::executor::Background;
+use ptermui::{App, AppContext, EntityId, ModelHandle, SingletonEntity};
 use settings::Setting as _;
 
 use super::*;

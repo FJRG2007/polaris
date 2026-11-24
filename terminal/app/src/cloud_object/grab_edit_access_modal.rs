@@ -1,9 +1,9 @@
-use rookui::elements::{Container, Element, MouseStateHandle, Text};
-use rookui::fonts::{Properties, Style, Weight};
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::UiComponent;
-use rookui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::elements::{Container, Element, MouseStateHandle, Text};
+use ptermui::fonts::{Properties, Style, Weight};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::appearance::Appearance;
 use crate::ui_components::buttons::close_button;

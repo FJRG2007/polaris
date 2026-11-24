@@ -10,7 +10,7 @@ SSH-ing to the same host each spin up a separate server process.
 
 1. **Survival**: the server must survive SSH disconnections and remain available for
    reconnect for up to 10 minutes.
-2. **Multiplexing**: multiple Rook tabs SSH-ing to the same host must share a single
+2. **Multiplexing**: multiple Polaris Terminal tabs SSH-ing to the same host must share a single
    underlying server process.
 3. **Reconnect**: when an SSH connection drops, the client must automatically detect
    this and reconnect to the existing server.
@@ -19,7 +19,7 @@ SSH-ing to the same host each spin up a separate server process.
 
 ## Relevant Code
 
-- `crates/rook_cli/src/lib.rs` — `WorkerCommand::RemoteServerProxy` / `RemoteServerDaemon`
+- `crates/pterm_cli/src/lib.rs` — `WorkerCommand::RemoteServerProxy` / `RemoteServerDaemon`
 - `app/src/remote_server/mod.rs` — platform dispatch (`run_proxy`, `run_daemon`)
 - `app/src/remote_server/unix/` — Unix-specific daemon and proxy implementation
 - `app/src/remote_server/server_model.rs` — platform-agnostic `ServerModel`
@@ -45,7 +45,7 @@ Split the binary into two subcommands:
 
 A Unix domain socket (`.sock`) is a local IPC channel provided by the OS kernel —
 fast, no network involved, and only accessible on the same machine. The proxy
-connects to `~/.rook[-channel]/remote-server/server.sock`.
+connects to `~/.polaris-terminal[-channel]/remote-server/server.sock`.
 
 ### Architecture
 
@@ -93,7 +93,7 @@ all connections in a `HashMap<ConnectionId, Sender<ServerMessage>>`. The
 **Requirement 3 — Reconnect**: deferred to a follow-up. See Follow-ups below.
 
 **Requirement 4 — Session isolation**: each accepted connection runs in its own
-task on RookUI's background executor with a dedicated `async_channel` sender.
+task on PtermUI's background executor with a dedicated `async_channel` sender.
 `ServerModel.send_server_message` routes responses to the matching sender by
 `ConnectionId`; no response can reach a different connection's channel.
 
@@ -101,7 +101,7 @@ task on RookUI's background executor with a dedicated `async_channel` sender.
 
 ### Proxy mode (`remote-server-proxy`)
 
-`WorkerCommand::RemoteServerProxy` in `rook_cli/src/lib.rs` dispatches to
+`WorkerCommand::RemoteServerProxy` in `pterm_cli/src/lib.rs` dispatches to
 `unix::run_proxy()`.
 
 1. Acquires an exclusive advisory `flock` on `server.pid` to serialise concurrent
@@ -120,8 +120,8 @@ task on RookUI's background executor with a dedicated `async_channel` sender.
 `WorkerCommand::RemoteServerDaemon` dispatches to `unix::run_daemon()`.
 
 The accept loop lives in the `run_daemon_app` closure (in `unix/mod.rs`), which
-has access to RookUI's `ModelContext`. It binds an `async_io::Async<UnixListener>`,
-then for each accepted connection spawns a task on the RookUI background executor
+has access to PtermUI's `ModelContext`. It binds an `async_io::Async<UnixListener>`,
+then for each accepted connection spawns a task on the PtermUI background executor
 that runs a `futures::select!` loop over two channels:
 
 - **Inbound**: reads `ClientMessage`s from the socket and dispatches them to
@@ -144,7 +144,7 @@ the returned `SpawnedFutureHandle` is stored in `ServerModel.grace_timer_cancel`
 timer fires it calls `ctx.terminate_app` to exit the process. `register_connection` aborts
 the handle when a new connection arrives, cancelling the shutdown. The race between expiry
 and a new connection is not an issue: both `register_connection` and `deregister_connection`
-are dispatched through `ModelSpawner` onto the single-threaded RookUI main loop, so they
+are dispatched through `ModelSpawner` onto the single-threaded PtermUI main loop, so they
 cannot interleave.
 
 ### Transport abstraction

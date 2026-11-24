@@ -4,11 +4,11 @@ Figma: none provided
 
 ## Summary
 
-Persist the last state of the fast-forward button for agent conversations across app restarts using Rook's existing session restoration flow. If a restored conversation had fast forward enabled before quit, it should come back enabled after launch; if it was disabled before quit, it should come back disabled.
+Persist the last state of the fast-forward button for agent conversations across app restarts using Polaris Terminal's existing session restoration flow. If a restored conversation had fast forward enabled before quit, it should come back enabled after launch; if it was disabled before quit, it should come back disabled.
 
 ## Problem
 
-Fast forward is currently a per-conversation control during an active session, but that choice is lost when Rook restarts. Users who intentionally enabled or disabled fast forward for a conversation have to remember and re-apply that choice after session restoration, which makes restored agent conversations feel inconsistent and unreliable.
+Fast forward is currently a per-conversation control during an active session, but that choice is lost when Polaris Terminal restarts. Users who intentionally enabled or disabled fast forward for a conversation have to remember and re-apply that choice after session restoration, which makes restored agent conversations feel inconsistent and unreliable.
 
 ## Goals
 
@@ -33,7 +33,7 @@ Figma: none provided
 ### Core behavior
 
 - Fast-forward state is remembered per agent conversation.
-- Session restoration is the source of truth for when this behavior applies. If Rook restores a conversation on launch, the restored conversation should use the same fast-forward state it had when the app last saved session state.
+- Session restoration is the source of truth for when this behavior applies. If Polaris Terminal restores a conversation on launch, the restored conversation should use the same fast-forward state it had when the app last saved session state.
 - The remembered state should apply whether the restored conversation is shown in the standard terminal/blocklist UI or reopened into fullscreen agent view.
 
 ### State rules
@@ -45,7 +45,7 @@ Figma: none provided
 
 ### Timing expectations
 
-- If the user toggles fast forward and then quits or restarts Rook without taking another conversation action, the newly selected state should still be restored.
+- If the user toggles fast forward and then quits or restarts Polaris Terminal without taking another conversation action, the newly selected state should still be restored.
 - The user should not need to send another message, receive another response, or otherwise advance the conversation for the new fast-forward state to stick.
 
 ### Feature flag behavior
@@ -69,8 +69,8 @@ Figma: none provided
 - Unit tests covering persistence and restoration of the per-conversation fast-forward state.
 - A restoration-focused test showing that a persisted conversation round-trips through SQLite-backed restore with the expected fast-forward mode.
 - Manual verification:
-  - enable fast forward, restart Rook, confirm it stays enabled
-  - disable fast forward, restart Rook, confirm it stays disabled
+  - enable fast forward, restart Polaris Terminal, confirm it stays enabled
+  - disable fast forward, restart Polaris Terminal, confirm it stays disabled
   - repeat with multiple restored conversations and fullscreen agent view
 
 ## Open Questions

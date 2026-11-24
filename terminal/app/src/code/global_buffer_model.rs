@@ -9,20 +9,20 @@ use bimap::BiMap;
 use futures_util::stream::AbortHandle;
 use lsp::types::TextDocumentContentChangeEvent;
 use lsp::{LspManagerModel, LspServerLogLevel, LspServerModel};
+use pterm_core::features::FeatureFlag;
+use pterm_core::safe_error;
+use pterm_editor::content::buffer::{Buffer, ToBufferCharOffset};
+use pterm_editor::content::diff::{TextDiff, text_diff};
+use pterm_editor::content::edit::PreciseDelta;
+use pterm_editor::content::version::BufferVersion;
+use pterm_util::content_version::ContentVersion;
+use pterm_util::file::{FileId, FileLoadError, FileSaveError};
+use pterm_util::host_id::HostId;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::r#async::Timer;
+use ptermui::{Entity, ModelContext, ModelHandle, SingletonEntity, WeakModelHandle};
 use remote_server::manager::RemoteServerManager;
-use rook_core::features::FeatureFlag;
-use rook_core::safe_error;
-use rook_editor::content::buffer::{Buffer, ToBufferCharOffset};
-use rook_editor::content::diff::{TextDiff, text_diff};
-use rook_editor::content::edit::PreciseDelta;
-use rook_editor::content::version::BufferVersion;
-use rook_util::content_version::ContentVersion;
-use rook_util::file::{FileId, FileLoadError, FileSaveError};
-use rook_util::host_id::HostId;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::r#async::Timer;
-use rookui::{Entity, ModelContext, ModelHandle, SingletonEntity, WeakModelHandle};
 use string_offset::{ByteOffset, CharOffset};
 use vec1::vec1;
 
@@ -31,10 +31,10 @@ use super::buffer_location::{LocalOrRemotePath, SyncClock};
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {
         use lsp::LspManagerModelEvent;
-        use rook_files::{FileModelEvent, FileModel};
-        use rook_editor::content::text::IndentBehavior;
-        use rook_editor::content::text::IndentUnit;
-        use rook_editor::content::buffer::EditOrigin;
+        use pterm_files::{FileModelEvent, FileModel};
+        use pterm_editor::content::text::IndentBehavior;
+        use pterm_editor::content::text::IndentUnit;
+        use pterm_editor::content::buffer::EditOrigin;
     }
 }
 
@@ -1077,7 +1077,7 @@ impl GlobalBufferModel {
         // Subscribe to buffer events for LSP sync.
         let path_clone = path.clone();
         ctx.subscribe_to_model(&buffer, move |me, _, event, ctx| {
-            use rook_editor::content::buffer::BufferEvent;
+            use pterm_editor::content::buffer::BufferEvent;
 
             let Some(state) = me.buffers.get(&file_id) else {
                 return;
@@ -1216,7 +1216,7 @@ impl GlobalBufferModel {
 
         let path_clone = path.to_path_buf();
         ctx.subscribe_to_model(&buffer, move |me, _, event, ctx| {
-            use rook_editor::content::buffer::BufferEvent;
+            use pterm_editor::content::buffer::BufferEvent;
 
             let Some(state) = me.buffers.get(&file_id) else {
                 me.log_lsp_sync_debug(
@@ -1364,7 +1364,7 @@ impl GlobalBufferModel {
         line_numbers: Vec<usize>,
         ctx: &mut ModelContext<Self>,
     ) -> Option<Vec<(usize, String)>> {
-        use rook_editor::content::text::LineCount;
+        use pterm_editor::content::text::LineCount;
 
         if line_numbers.is_empty() {
             return Some(Vec::new());
@@ -1699,7 +1699,7 @@ impl GlobalBufferModel {
             let client = client.clone();
             let path_for_edit = path_str.clone();
             ctx.subscribe_to_model(&buffer, move |me, _, event, ctx| {
-                use rook_editor::content::buffer::BufferEvent;
+                use pterm_editor::content::buffer::BufferEvent;
                 if let BufferEvent::ContentChanged { delta, origin, .. } = event {
                     // Skip server-originated changes to prevent echo loop.
                     // Server pushes applied via insert_at_char_offset_ranges
@@ -2044,7 +2044,7 @@ impl GlobalBufferModel {
     // ── Public accessors ──────────────────────────────────────────────
 
     /// Returns the buffer text content for a given `FileId`.
-    pub fn content_for_file(&self, file_id: FileId, ctx: &rookui::AppContext) -> Option<String> {
+    pub fn content_for_file(&self, file_id: FileId, ctx: &ptermui::AppContext) -> Option<String> {
         let state = self.buffers.get(&file_id)?;
         let buffer = state.buffer.upgrade(ctx)?;
         Some(buffer.as_ref(ctx).text().into_string())
@@ -2429,14 +2429,14 @@ impl GlobalBufferModel {
     pub(crate) fn seed_remote_buffer_for_test(
         &mut self,
         host_id: HostId,
-        path: rook_util::standardized_path::StandardizedPath,
+        path: pterm_util::standardized_path::StandardizedPath,
         content: &str,
         server_version: u64,
         ctx: &mut ModelContext<Self>,
     ) -> BufferState {
         let remote_path = RemotePath::new(host_id, path);
         let location = LocalOrRemotePath::Remote(remote_path.clone());
-        let file_id = rook_util::file::FileId::new();
+        let file_id = pterm_util::file::FileId::new();
         let buffer = ctx.add_model(|_| Buffer::default());
         let version = ContentVersion::new();
         buffer.update(ctx, |buf, ctx| {

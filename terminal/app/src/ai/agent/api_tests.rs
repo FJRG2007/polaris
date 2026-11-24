@@ -1,4 +1,4 @@
-use rook_core::channel::{Channel, ChannelState};
+use pterm_core::channel::{Channel, ChannelState};
 
 use super::{RequestParams, ServerConversationToken};
 use crate::ai::agent::ServerOutputId;

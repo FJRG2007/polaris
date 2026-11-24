@@ -5,7 +5,7 @@ use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
 use futures::io::BufReader;
 use futures::{AsyncRead, AsyncWrite};
-use rookui_core::r#async::executor::{Background, BackgroundTask};
+use ptermui_core::r#async::executor::{Background, BackgroundTask};
 
 use super::protocol::{
     ConnectionAddress, ProtocolError, Request, Response, receive_message, send_message,

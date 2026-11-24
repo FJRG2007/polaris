@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use rook_core::features::FeatureFlag;
-use rookui::App;
+use pterm_core::features::FeatureFlag;
+use ptermui::App;
 
 use super::ui_helpers::context_window_snap_values;
 use crate::LaunchMode;

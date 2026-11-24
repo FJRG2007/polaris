@@ -1,5 +1,5 @@
 use anyhow::{Ok, Result};
-use rookui::keymap::Keystroke;
+use ptermui::keymap::Keystroke;
 use vec1::vec1;
 
 use crate::keyboard::{PersistedTrigger, REMOVED_KEYBINDING_SERIALIZATION, UserDefinedKeybinding};

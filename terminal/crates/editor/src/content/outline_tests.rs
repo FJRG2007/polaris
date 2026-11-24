@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rookui_core::App;
+use ptermui_core::App;
 use string_offset::CharOffset;
 
 use crate::content::buffer::Buffer;

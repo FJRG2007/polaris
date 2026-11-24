@@ -11,11 +11,11 @@
 use std::sync::Arc;
 
 use instant::Instant;
+use pterm_core::{HostId, SessionId, send_telemetry_from_ctx};
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::{ModelContext, SingletonEntity};
 use remote_server::manager::{RemoteServerManager, RemoteServerManagerEvent};
-use rook_core::{HostId, SessionId, send_telemetry_from_ctx};
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::{ModelContext, SingletonEntity};
 
 use super::{
     BackendOrigin, CommitChainMode, DiffMetadata, DiffMode, DiffOperation, DiffState,
@@ -52,7 +52,7 @@ pub struct RemoteDiffStateModel {
     tracked_diff_load_start_time: Option<Instant>,
 }
 
-impl rookui::Entity for RemoteDiffStateModel {
+impl ptermui::Entity for RemoteDiffStateModel {
     type Event = DiffStateModelEvent;
 }
 
@@ -286,7 +286,7 @@ impl RemoteDiffStateModel {
             Ok((metadata, state, diffs)) => self.apply_snapshot(metadata, state, diffs, ctx),
             Err(error) => {
                 self.tracked_diff_load_start_time = None;
-                rook_core::safe_error!(
+                pterm_core::safe_error!(
                     safe: ("RemoteDiffStateModel: failed to decode diff state snapshot"),
                     full: ("RemoteDiffStateModel: failed to decode diff state snapshot: {error}")
                 );
@@ -308,7 +308,7 @@ impl RemoteDiffStateModel {
             Ok(Some(metadata)) => self.apply_metadata_update(&metadata, ctx),
             Ok(None) => {}
             Err(error) => {
-                rook_core::safe_error!(
+                pterm_core::safe_error!(
                     safe: ("RemoteDiffStateModel: failed to decode diff state metadata update"),
                     full: ("RemoteDiffStateModel: failed to decode diff state metadata update: {error}")
                 );
@@ -326,7 +326,7 @@ impl RemoteDiffStateModel {
                 self.apply_file_delta(file_path, diff, metadata, ctx)
             }
             Err(error) => {
-                rook_core::safe_error!(
+                pterm_core::safe_error!(
                     safe: ("RemoteDiffStateModel: failed to decode diff state file delta"),
                     full: ("RemoteDiffStateModel: failed to decode diff state file delta: {error}")
                 );

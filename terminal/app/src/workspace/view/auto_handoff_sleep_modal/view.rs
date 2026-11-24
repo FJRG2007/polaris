@@ -1,15 +1,15 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::Fill;
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::{
     Align, CacheOption, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Expanded, Flex, Image, MainAxisSize, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -24,7 +24,7 @@ const HERO_HEIGHT: f32 = 92.;
 const HERO_IMAGE_PATH: &str = "async/png/onboarding/auto_handoff_sleep_banner.png";
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",
@@ -182,7 +182,7 @@ impl AutoHandoffSleepModal {
 
     fn render_description(appearance: &Appearance) -> Box<dyn Element> {
         Text::new(
-            "Give Rook the option to automatically move active local agents to the cloud when \
+            "Give Polaris Terminal the option to automatically move active local agents to the cloud when \
              your computer sleeps.",
             appearance.ui_font_family(),
             14.,
@@ -237,7 +237,7 @@ impl View for AutoHandoffSleepModal {
         "AutoHandoffSleepModal"
     }
 
-    fn on_focus(&mut self, _focus_ctx: &rookui::FocusContext, ctx: &mut ViewContext<Self>) {
+    fn on_focus(&mut self, _focus_ctx: &ptermui::FocusContext, ctx: &mut ViewContext<Self>) {
         ctx.focus_self();
     }
 

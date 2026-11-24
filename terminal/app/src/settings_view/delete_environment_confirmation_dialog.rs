@@ -1,6 +1,6 @@
-use rookui::elements::{ChildView, Container, Dismiss, Empty};
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::elements::{ChildView, Container, Dismiss, Empty};
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 

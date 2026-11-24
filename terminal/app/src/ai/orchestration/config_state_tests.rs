@@ -18,7 +18,7 @@ fn toggle_to_local_sanitizes_disabled_codex() {
         Some("codex"),
         &RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: false,
             runner_id: String::new(),
         },
@@ -41,7 +41,7 @@ fn local_round_trip_preserves_remote_computer_use() {
         Some("oz"),
         &RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: true,
             runner_id: String::new(),
         },
@@ -66,7 +66,7 @@ fn toggle_to_local_preserves_claude() {
         Some("claude"),
         &RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: false,
             runner_id: String::new(),
         },
@@ -106,7 +106,7 @@ fn runner_id_round_trips_through_config() {
         harness_type: "oz".to_string(),
         execution_mode: OrchestrationExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             runner_id: "runner-7".to_string(),
         },
     };

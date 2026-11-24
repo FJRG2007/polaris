@@ -7,17 +7,17 @@ use onboarding::callout::{
 };
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::{AnsiColor, AnsiColors, Details, Fill, RookTheme, TerminalColors};
-use rookui_core::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::{AnsiColor, AnsiColors, Details, Fill, PtermTheme, TerminalColors};
+use ptermui_core::elements::{
     ChildAnchor, ChildView, ConstrainedBox, Container, Flex, MainAxisAlignment, MainAxisSize,
     OffsetPositioning, ParentElement, PositionedElementAnchor, PositionedElementOffsetBounds, Rect,
     SavePosition, Stack,
 };
-use rookui_core::fonts::{Cache, FamilyId, Weight};
-use rookui_core::prelude::CrossAxisAlignment;
-use rookui_core::ui_components::components::UiComponent;
-use rookui_core::{
+use ptermui_core::fonts::{Cache, FamilyId, Weight};
+use ptermui_core::prelude::CrossAxisAlignment;
+use ptermui_core::ui_components::components::UiComponent;
+use ptermui_core::{
     AddWindowOptions, AppContext, AssetProvider, Element, Entity, SingletonEntity as _,
     TypedActionView, View, ViewContext, ViewHandle, platform,
 };
@@ -173,12 +173,12 @@ impl TypedActionView for OnboardingExampleView {
 
 fn main() -> Result<()> {
     // Initialize logging for the onboarding binary.
-    rook_logging::init(rook_logging::LogConfig {
+    pterm_logging::init(pterm_logging::LogConfig {
         log_destination: None,
         ..Default::default()
     })?;
 
-    let app_builder = rookui::platform::AppBuilder::new(
+    let app_builder = ptermui::platform::AppBuilder::new(
         platform::AppCallbacks::default(),
         Box::new(ASSETS),
         None,
@@ -224,8 +224,8 @@ fn adeberry_colors() -> TerminalColors {
     TerminalColors::new(ADEBERRY_NORMAL_COLORS, ADEBERRY_BRIGHT_COLORS)
 }
 
-fn adeberry() -> RookTheme {
-    RookTheme::new(
+fn adeberry() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x1D2022FF)),
         ColorU::from_u32(0xE4EEF5FF),
         Fill::Solid(ColorU::from_u32(0x6C96B4FF)),
@@ -237,7 +237,7 @@ fn adeberry() -> RookTheme {
     )
 }
 
-fn build_appearance(theme: RookTheme, ctx: &mut AppContext) -> Appearance {
+fn build_appearance(theme: PtermTheme, ctx: &mut AppContext) -> Appearance {
     let ui_font_family =
         load_default_ui_font_family(ctx).expect("unable to load default ui font family");
 

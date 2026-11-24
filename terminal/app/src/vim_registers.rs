@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use rookui::clipboard::ClipboardContent;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use ptermui::clipboard::ClipboardContent;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 use settings::Setting as _;
 use vim::vim::MotionType;
 

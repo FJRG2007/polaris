@@ -10,9 +10,9 @@ use ai::index::locations::CodeContextLocation;
 use anyhow::{Context as _, anyhow};
 use futures_util::stream::AbortHandle;
 use instant::Instant;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::agent::SearchCodebaseFailureReason;

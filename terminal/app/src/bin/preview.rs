@@ -3,19 +3,19 @@
 #![cfg_attr(feature = "release_bundle", windows_subsystem = "windows")]
 
 use anyhow::Result;
-use rook_core::channel::{Channel, ChannelState};
-use rook_core::features;
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_core::features;
 
-// Simple wrapper around rook::run() for feature preview channel builds.
+// Simple wrapper around polaris_terminal::run() for feature preview channel builds.
 fn main() -> Result<()> {
     ChannelState::set(
         ChannelState::new(
             Channel::Preview,
-            rook_channel_config::load_config!("preview"),
+            pterm_channel_config::load_config!("preview"),
         )
         .with_additional_features(features::PREVIEW_FLAGS)
         .with_additional_features(&[features::FeatureFlag::ForceLogin]),
     );
 
-    rook::run()
+    polaris_terminal::run()
 }

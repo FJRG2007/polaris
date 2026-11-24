@@ -3,18 +3,20 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use command::blocking::Command;
-use rook::features::FeatureFlag;
-use rook::integration_testing::code_review::{
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::code_review::{
     ScrollRegion, assert_code_review_anchor, assert_code_review_line_text,
     assert_code_review_loaded, assert_code_review_scroll_region, assert_min_hidden_sections,
     expand_first_hidden_section_and_assert_full_reveal, scroll_code_review_to_deleted_range,
     scroll_code_review_to_footer, scroll_code_review_to_header, scroll_code_review_to_line,
 };
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use rook::integration_testing::view_getters::{single_terminal_view_for_tab, workspace_view};
-use rook::workspace::WorkspaceAction;
-use rookui_core::integration::{AssertionCallback, TestStep};
-use rookui_core::{App, WindowId, async_assert};
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::integration_testing::view_getters::{
+    single_terminal_view_for_tab, workspace_view,
+};
+use polaris_terminal::workspace::WorkspaceAction;
+use ptermui_core::integration::{AssertionCallback, TestStep};
+use ptermui_core::{App, WindowId, async_assert};
 
 use super::new_builder;
 use crate::Builder;
@@ -157,7 +159,10 @@ fn code_review_scroll_anchor_builder(
                 .expect("should write initial committed contents");
             run_git(&repo_dir, &["init", "-b", "main"]);
             run_git(&repo_dir, &["config", "user.email", "test@example.com"]);
-            run_git(&repo_dir, &["config", "user.name", "Rook Integration Test"]);
+            run_git(
+                &repo_dir,
+                &["config", "user.name", "Polaris Terminal Integration Test"],
+            );
             run_git(&repo_dir, &["add", TEST_FILE_NAME]);
             run_git(&repo_dir, &["commit", "-m", "Initial commit"]);
 
@@ -315,7 +320,10 @@ pub fn test_code_review_scroll_preserved_deleted_range() -> Builder {
                 .expect("should write initial committed contents");
             run_git(&repo_dir, &["init", "-b", "main"]);
             run_git(&repo_dir, &["config", "user.email", "test@example.com"]);
-            run_git(&repo_dir, &["config", "user.name", "Rook Integration Test"]);
+            run_git(
+                &repo_dir,
+                &["config", "user.name", "Polaris Terminal Integration Test"],
+            );
             run_git(&repo_dir, &["add", TEST_FILE_NAME]);
             run_git(&repo_dir, &["commit", "-m", "Initial commit"]);
 
@@ -395,7 +403,10 @@ pub fn test_code_review_scroll_preserved_header_range() -> Builder {
                 .expect("should write initial committed contents");
             run_git(&repo_dir, &["init", "-b", "main"]);
             run_git(&repo_dir, &["config", "user.email", "test@example.com"]);
-            run_git(&repo_dir, &["config", "user.name", "Rook Integration Test"]);
+            run_git(
+                &repo_dir,
+                &["config", "user.name", "Polaris Terminal Integration Test"],
+            );
             run_git(&repo_dir, &["add", TEST_FILE_NAME]);
             run_git(&repo_dir, &["commit", "-m", "Initial commit"]);
 
@@ -488,7 +499,10 @@ pub fn test_code_review_scroll_preserved_footer_range() -> Builder {
 
             run_git(&repo_dir, &["init", "-b", "main"]);
             run_git(&repo_dir, &["config", "user.email", "test@example.com"]);
-            run_git(&repo_dir, &["config", "user.name", "Rook Integration Test"]);
+            run_git(
+                &repo_dir,
+                &["config", "user.name", "Polaris Terminal Integration Test"],
+            );
             run_git(&repo_dir, &["add", FIRST_FILE_NAME, SECOND_FILE_NAME]);
             run_git(&repo_dir, &["commit", "-m", "Initial commit"]);
 
@@ -582,7 +596,10 @@ pub fn test_code_review_scroll_preserved_second_file() -> Builder {
 
             run_git(&repo_dir, &["init", "-b", "main"]);
             run_git(&repo_dir, &["config", "user.email", "test@example.com"]);
-            run_git(&repo_dir, &["config", "user.name", "Rook Integration Test"]);
+            run_git(
+                &repo_dir,
+                &["config", "user.name", "Polaris Terminal Integration Test"],
+            );
             run_git(&repo_dir, &["add", FIRST_FILE_NAME, SECOND_FILE_NAME]);
             run_git(&repo_dir, &["commit", "-m", "Initial commit"]);
 
@@ -677,7 +694,10 @@ pub fn test_code_review_double_click_fully_expands_hidden_section() -> Builder {
                 .expect("should write initial committed contents");
             run_git(&repo_dir, &["init", "-b", "main"]);
             run_git(&repo_dir, &["config", "user.email", "test@example.com"]);
-            run_git(&repo_dir, &["config", "user.name", "Rook Integration Test"]);
+            run_git(
+                &repo_dir,
+                &["config", "user.name", "Polaris Terminal Integration Test"],
+            );
             run_git(&repo_dir, &["add", TEST_FILE_NAME]);
             run_git(&repo_dir, &["commit", "-m", "Initial commit"]);
 

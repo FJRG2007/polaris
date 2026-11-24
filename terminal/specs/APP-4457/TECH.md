@@ -56,8 +56,8 @@ Keep existing active-block-present tests unchanged so normal live-sharing behavi
 
 Validation commands:
 
-- `cargo nextest run -p rook --lib test_loading_scrollback`
-- `cargo nextest run -p rook --lib test_append_followup_scrollback`
+- `cargo nextest run -p polaris-terminal --lib test_loading_scrollback`
+- `cargo nextest run -p polaris-terminal --lib test_append_followup_scrollback`
 - `git --no-pager diff --check -- app/src/terminal/model/blocks.rs app/src/terminal/model/block.rs app/src/terminal/shared_session/mod.rs app/src/terminal/shared_session/mod_tests.rs app/src/terminal/shared_session/viewer/event_loop_tests.rs specs/APP-4457/TECH.md`
 
 Do not use `cargo fmt --all` or file-specific `cargo fmt`. If formatting is required before review, use the repo-standard `cargo fmt`.

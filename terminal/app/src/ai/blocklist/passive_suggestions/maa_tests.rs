@@ -22,7 +22,7 @@ fn splits_at_char_boundaries_within_budget() {
 
 #[test]
 fn detects_paths_in_head_and_tail_of_capped_block_contents() {
-    let dir = std::env::temp_dir().join(format!("rook_maa_tests_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("pterm_maa_tests_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     for file in ["head.rs", "mid.rs", "tail.rs"] {

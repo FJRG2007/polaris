@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use rook_core::features::FeatureFlag;
-use rookui::units::{IntoPixels, Pixels};
-use rookui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity, WindowId};
+use pterm_core::features::FeatureFlag;
+use ptermui::units::{IntoPixels, Pixels};
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity, WindowId};
 use settings::Setting as _;
 
 use super::styles::{HEADER_BORDER, HEADER_ROW_HEIGHT};

@@ -18,9 +18,9 @@ The goal is to give tab-layout-dependent bindings a single source of truth for t
 - `app/src/workspace/mod.rs:772-797` — registration of `workspace:move_tab_left` / `workspace:move_tab_right` with static descriptions.
 - `app/src/workspace/mod.rs:892-899` — registration of `workspace:close_tabs_right_active_tab` with a static description.
 - `app/src/tab.rs:266-356` — `modify_tab_menu_items` and `close_tab_menu_items`, which already branch on `uses_vertical_tabs` inline.
-- `crates/rookui_core/src/keymap.rs:64-116` — `BindingDescription` definition and the `in_context` lookup API.
-- `crates/rookui_core/src/keymap.rs:145-221` — `BindingLens`, `EditableBinding`, `EditableBindingLens`.
-- `crates/rookui_core/src/core/app.rs:1718-1726` — `AppContext::description_for_custom_action`, used by the menu bar to resolve a custom action's description.
+- `crates/ptermui_core/src/keymap.rs:64-116` — `BindingDescription` definition and the `in_context` lookup API.
+- `crates/ptermui_core/src/keymap.rs:145-221` — `BindingLens`, `EditableBinding`, `EditableBindingLens`.
+- `crates/ptermui_core/src/core/app.rs:1718-1726` — `AppContext::description_for_custom_action`, used by the menu bar to resolve a custom action's description.
 - `app/src/app_menus.rs:486-511` — `make_new_tab_menu`, where `CustomAction::CloseTabsRight`, `MoveTabLeft`, and `MoveTabRight` are wired.
 - `app/src/app_menus.rs:1163-1186` — `custom_action_updater`, the per-menu-item update callback that pulls `description.in_context(MAC_MENUS_CONTEXT)` into `MenuItemPropertyChanges.name` on every menu open.
 - `app/src/util/bindings.rs:714-782` — `CommandBinding` and its `from_binding` / `From<BindingLens<'_>>` / `From<EditableBindingLens<'_>>` constructors. These are the cache-population entry points that clone `BindingDescription` into a reusable value type.
@@ -66,11 +66,11 @@ The immediate bug is small. The structural risk is that there are four cache-pop
 
 ## Proposed changes
 
-Add first-class support for dynamic description overrides in `rookui_core::keymap`. Make `CommandBinding::from_lens(lens, ctx)` the only way to materialize a `CommandBinding` from a lens, so the compiler forces every cache-population site to pass `&AppContext` and resolve dynamic description overrides at construction time. Define the three tab-layout overrides next to the binding registrations, and teach the menu-bar updater to resolve dynamically too.
+Add first-class support for dynamic description overrides in `ptermui_core::keymap`. Make `CommandBinding::from_lens(lens, ctx)` the only way to materialize a `CommandBinding` from a lens, so the compiler forces every cache-population site to pass `&AppContext` and resolve dynamic description overrides at construction time. Define the three tab-layout overrides next to the binding registrations, and teach the menu-bar updater to resolve dynamically too.
 
 ### 1. Framework: optional dynamic override on `BindingDescription`
 
-In `crates/rookui_core/src/keymap.rs`:
+In `crates/ptermui_core/src/keymap.rs`:
 
 - Add a new private field `dynamic_override: Option<Arc<dyn Fn(&AppContext) -> Option<String> + Send + Sync>>` to `BindingDescription`. Using a boxed closure (via `Arc` so `Clone` stays cheap) lets registrations define resolvers inline with captured state, rather than forcing every dynamic binding to have a free function.
 - Replace the `#[derive(PartialEq, Eq, Debug)]` on `BindingDescription` with manual impls. The derived impls don't work because `Arc<dyn Fn>` is neither `PartialEq` nor `Debug`. The manual `PartialEq`/`Eq` compares the static `description` + `custom` overrides and ignores `dynamic_override`; this is safe because the only consumers of description equality (the dedup loops in `settings_view/keybindings.rs` and `resource_center/keybindings_page.rs`) operate on post-materialization `CommandBinding`s whose `dynamic_override` is always `None`. The manual `Debug` impl prints `dynamic_override: "<dynamic>"` when present.
@@ -79,7 +79,7 @@ In `crates/rookui_core/src/keymap.rs`:
 - Add `BindingDescription::has_dynamic_override(&self) -> bool` for cache-population code that only needs to know whether to materialize.
 - Keep `in_context` unchanged. It still returns `&str` and still returns the static default even for bindings with a dynamic override. That keeps the non-context read paths compiling during migration and gives downstream consumers a safe static fallback if a cache was somehow populated without resolution.
 
-`BindingDescription` is defined in the same crate as `AppContext` (`crates/rookui_core/src/core/app.rs`), and `AppContext` already owns the `keystroke_matcher: Matcher` that holds bindings. There is no layering or crate-graph concern here.
+`BindingDescription` is defined in the same crate as `AppContext` (`crates/ptermui_core/src/core/app.rs`), and `AppContext` already owns the `keystroke_matcher: Matcher` that holds bindings. There is no layering or crate-graph concern here.
 
 ### 2. App layer: inline override closures at registration
 
@@ -137,7 +137,7 @@ The menu bar is the only surface that can safely call `resolve` at render time, 
 
 ### 6. Tests
 
-Add unit tests in `crates/rookui_core/src/keymap_test.rs` exercising:
+Add unit tests in `crates/ptermui_core/src/keymap_test.rs` exercising:
 
 - `BindingDescription::new("static").resolve(ctx, Default)` returns `Cow::Borrowed("Static")` (preserves title-casing).
 - `BindingDescription::new("static").with_dynamic_override(|_| Some("dynamic".into())).resolve(ctx, Default)` returns `Cow::Owned("Dynamic")`.
@@ -175,7 +175,7 @@ Add an integration-ish test alongside `CommandBinding::from_lens` in `app/src/ut
 ```mermaid
 flowchart TD
     R[EditableBinding registration in workspace/mod.rs<br/>static + with_dynamic_override override]
-    KM[rookui_core Matcher / Keymap]
+    KM[ptermui_core Matcher / Keymap]
     R --> KM
 
     subgraph Cache-population surfaces have AppContext
@@ -233,7 +233,7 @@ Cons: leaves the command palette and keybindings pages inconsistent. Only a marg
 
 ### Conclusion
 
-Approach C (the one specified above) is the only option that makes the cache-population invariant compile-time-enforced while keeping per-binding logic co-located with the registration. The framework change is bounded (≈ 40 lines in `rookui_core` plus a four-site app migration) and the resulting API is reusable for any future dynamic binding label.
+Approach C (the one specified above) is the only option that makes the cache-population invariant compile-time-enforced while keeping per-binding logic co-located with the registration. The framework change is bounded (≈ 40 lines in `ptermui_core` plus a four-site app migration) and the resulting API is reusable for any future dynamic binding label.
 
 ## Risks and mitigations
 
@@ -277,7 +277,7 @@ Mitigation: `resolve` title-cases any dynamic override before returning it, matc
 
 ### Unit tests
 
-- `crates/rookui_core/src/keymap_test.rs`:
+- `crates/ptermui_core/src/keymap_test.rs`:
   - `BindingDescription::new("foo").resolve(&ctx, Default)` returns `Cow::Borrowed("Foo")`.
   - `BindingDescription::new("foo").with_dynamic_override(|_| Some("bar".into())).resolve(&ctx, Default)` returns `Cow::Owned("Bar")`.
   - `has_dynamic_override()` returns true after `with_dynamic_override`.
@@ -288,9 +288,9 @@ Mitigation: `resolve` title-cases any dynamic override before returning it, matc
 ### Targeted test run
 
 ```bash
-cargo nextest run -p rook_app
-cargo nextest run -p rookui_core
-cargo test --doc -p rookui_core
+cargo nextest run -p pterm_app
+cargo nextest run -p ptermui_core
+cargo test --doc -p ptermui_core
 ```
 
 ### Manual validation

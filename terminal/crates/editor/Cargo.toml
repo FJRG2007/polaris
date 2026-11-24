@@ -1,9 +1,9 @@
 [package]
-name = "rook_editor"
-authors = ["Rook Contributors"]
+name = "pterm_editor"
+authors = ["Polaris Terminal Contributors"]
 version = "0.1.0"
 edition = "2024"
-description = "Text editing for Rook"
+description = "Text editing for Polaris Terminal"
 exclude = ["test_data/*",]
 publish.workspace = true
 license.workspace = true
@@ -50,10 +50,10 @@ pathfinder_color = "0.5.0"
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
 vec1.workspace = true
-rookui_core.workspace = true
-rook_core.workspace = true
-rook_errors.workspace = true
-rook_util.workspace = true
+ptermui_core.workspace = true
+pterm_core.workspace = true
+pterm_errors.workspace = true
+pterm_util.workspace = true
 rayon.workspace = true
 line-ending.workspace = true
 vim.workspace = true
@@ -64,8 +64,8 @@ rust-embed.workspace = true
 enclose = "1.1.8"
 env_logger.workspace = true
 sum_tree = { workspace = true, features = ["test-util"] }
-rook_core = { workspace = true, features = ["test-util"] }
-rookui = { workspace = true, features = ["test-util"] }
+pterm_core = { workspace = true, features = ["test-util"] }
+ptermui = { workspace = true, features = ["test-util"] }
 criterion = { version = "0.5.1", features = ["html_reports"] }
 
 [[bench]]

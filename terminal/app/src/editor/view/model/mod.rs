@@ -19,13 +19,13 @@ use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use num_traits::SaturatingSub;
-use rook_errors::report_error;
-use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::text::TextBuffer;
-use rookui::text::point::Point;
-use rookui::text::word_boundaries::WordBoundariesPolicy;
-use rookui::text_layout::TextStyle;
-use rookui::{AppContext, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::text::TextBuffer;
+use ptermui::text::point::Point;
+use ptermui::text::word_boundaries::WordBoundariesPolicy;
+use ptermui::text_layout::TextStyle;
+use ptermui::{AppContext, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity};
 pub use selections::{
     DrawableSelection, LocalDrawableSelectionData, LocalPendingSelection, LocalSelection,
     LocalSelections, MarkedTextState, RemoteDrawableSelectionData, SelectAction, Selection,
@@ -508,7 +508,7 @@ impl EditorModel {
         let delta = &text[start.as_usize()..end.as_usize()];
         match (was_selecting, is_selecting) {
             (false, false) => {
-                AccessibilityContent::new_without_help(delta, RookA11yRole::UserAction)
+                AccessibilityContent::new_without_help(delta, PtermA11yRole::UserAction)
             }
             (_, true) => {
                 // Note that Range is start <= x < end, and in our case, when deciding what was the action
@@ -532,10 +532,10 @@ impl EditorModel {
                 } else {
                     "unselected"
                 };
-                AccessibilityContent::new(delta, format!(", {action}"), RookA11yRole::UserAction)
+                AccessibilityContent::new(delta, format!(", {action}"), PtermA11yRole::UserAction)
             }
             (true, false) => {
-                AccessibilityContent::new_without_help("Unselected", RookA11yRole::UserAction)
+                AccessibilityContent::new_without_help("Unselected", PtermA11yRole::UserAction)
             }
         }
     }
@@ -2295,7 +2295,7 @@ impl EditorModel {
         ctx.emit_a11y_content(AccessibilityContent::new(
             self.selected_text(ctx),
             ", deleted",
-            RookA11yRole::UserAction,
+            PtermA11yRole::UserAction,
         ));
         self.change_selections(new_selections, ctx);
         self.insert("", None, ctx);
@@ -2319,7 +2319,7 @@ impl EditorModel {
         ctx.emit_a11y_content(AccessibilityContent::new(
             self.selected_text(ctx),
             ", deleted",
-            RookA11yRole::UserAction,
+            PtermA11yRole::UserAction,
         ));
         self.change_selections(new_selections, ctx);
         self.insert("", None, ctx);

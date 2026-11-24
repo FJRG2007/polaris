@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
+use pterm_util::remote_path::RemotePath;
 use remote_server::manager::RemoteServerManagerEvent;
-use rook_util::remote_path::RemotePath;
 
 use super::InternalRemoteDiffState;
 use crate::auth::AuthStateProvider;
@@ -23,7 +23,7 @@ impl RemoteDiffStateModel {
         Self {
             remote_path: RemotePath::new(
                 remote_server::HostId::new("test-host".to_string()),
-                rook_util::standardized_path::StandardizedPath::try_new("/test/repo")
+                pterm_util::standardized_path::StandardizedPath::try_new("/test/repo")
                     .expect("test repo path should be valid and absolute"),
             ),
             mode,
@@ -131,13 +131,13 @@ fn test_metadata(branch: &str) -> DiffMetadata {
     }
 }
 
-fn initialize_test_app(app: &mut rookui::App) {
+fn initialize_test_app(app: &mut ptermui::App) {
     app.add_singleton_model(|_| AuthStateProvider::new_for_test());
     app.add_singleton_model(AppTelemetryContextProvider::new_context_provider);
 }
 #[test]
 fn apply_snapshot_loaded_with_diffs() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -162,7 +162,7 @@ fn apply_snapshot_loaded_with_diffs() {
 
 #[test]
 fn get_committed_branch_files_response_emits_domain_files() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -215,7 +215,7 @@ fn get_committed_branch_files_response_emits_domain_files() {
 
 #[test]
 fn apply_snapshot_loaded_preserves_content_at_base_in_event() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -270,7 +270,7 @@ fn apply_snapshot_loaded_preserves_content_at_base_in_event() {
 
 #[test]
 fn apply_snapshot_loaded_without_diffs_becomes_error() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         initialize_test_app(&mut app);
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
@@ -291,7 +291,7 @@ fn apply_snapshot_loaded_without_diffs_becomes_error() {
 
 #[test]
 fn apply_snapshot_not_in_repository() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -311,7 +311,7 @@ fn apply_snapshot_not_in_repository() {
 
 #[test]
 fn apply_snapshot_error_stores_message() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         initialize_test_app(&mut app);
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
@@ -331,7 +331,7 @@ fn apply_snapshot_error_stores_message() {
 
 #[test]
 fn mark_disconnected_transitions_state_and_emits_connection_lost() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -378,7 +378,7 @@ fn mark_disconnected_transitions_state_and_emits_connection_lost() {
 
 #[test]
 fn apply_metadata_first_time_sets_branch() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -399,7 +399,7 @@ fn apply_metadata_first_time_sets_branch() {
 
 #[test]
 fn apply_metadata_branch_change_updates_branch() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -420,7 +420,7 @@ fn apply_metadata_branch_change_updates_branch() {
 
 #[test]
 fn apply_file_delta_ignored_when_not_loaded() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -442,7 +442,7 @@ fn apply_file_delta_ignored_when_not_loaded() {
 
 #[test]
 fn apply_file_delta_adds_file() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -469,7 +469,7 @@ fn apply_file_delta_adds_file() {
 
 #[test]
 fn apply_snapshot_preserves_repo_relative_file_paths() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -499,7 +499,7 @@ fn apply_snapshot_preserves_repo_relative_file_paths() {
 fn apply_snapshot_emits_event_with_repo_relative_paths() {
     // Subscribers to NewDiffsComputed should see repo-relative paths so they
     // can index into the loaded state by the same key.
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -551,7 +551,7 @@ fn apply_snapshot_emits_event_with_repo_relative_paths() {
 
 #[test]
 fn apply_file_delta_preserves_repo_relative_file_path() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -583,7 +583,7 @@ fn apply_file_delta_preserves_repo_relative_file_path() {
 fn apply_file_delta_emits_event_with_repo_relative_path() {
     // The SingleFileUpdated event payload should also use the repo-relative
     // path so subscribers can match against the stored state by key.
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -629,7 +629,7 @@ fn apply_file_delta_emits_event_with_repo_relative_path() {
 
 #[test]
 fn apply_file_delta_preserves_content_at_base_in_event() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -681,7 +681,7 @@ fn apply_file_delta_preserves_content_at_base_in_event() {
 
 #[test]
 fn apply_file_delta_none_removes_file() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let existing = GitDiffData {
             files: vec![FileDiff {
                 file_path: "src/old.rs".to_string(),
@@ -827,7 +827,7 @@ fn empty_branch_names_become_none() {
 
 #[test]
 fn host_disconnected_for_matching_host_transitions_to_disconnected() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -868,7 +868,7 @@ fn host_disconnected_for_matching_host_transitions_to_disconnected() {
 
 #[test]
 fn host_disconnected_for_other_host_is_ignored() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -892,7 +892,7 @@ fn session_disconnected_is_ignored_by_session_agnostic_model() {
     // Per-session lifecycle events are no longer the model's concern; the
     // manager picks a connected client at RPC dispatch time and only
     // host-level connect/disconnect drive state transitions.
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let handle = app.add_model(|_ctx| {
             RemoteDiffStateModel::new_for_test(
                 DiffMode::Head,
@@ -901,7 +901,7 @@ fn session_disconnected_is_ignored_by_session_agnostic_model() {
             )
         });
         let event = RemoteServerManagerEvent::SessionDisconnected {
-            session_id: rook_core::SessionId::default(),
+            session_id: pterm_core::SessionId::default(),
             host_id: remote_server::HostId::new("test-host".to_string()),
             exit_status: None,
             was_reconnect_attempt: false,

@@ -5,7 +5,7 @@
 #
 # Usage: compile_icon <channel> <app_bundle_path>
 #   channel: The release channel (e.g., stable)
-#   app_bundle_path: Path to the .app bundle (e.g., Rook.app)
+#   app_bundle_path: Path to the .app bundle (e.g., Polaris Terminal.app)
 
 set -e
 

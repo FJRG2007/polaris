@@ -1,7 +1,7 @@
 //! Shared message producers for displaying attached blocks/text context.
 
-use rook_core::features::FeatureFlag;
-use rookui::keymap::Keystroke;
+use pterm_core::features::FeatureFlag;
+use ptermui::keymap::Keystroke;
 
 use crate::ai::blocklist::agent_view::{AgentMessageBarMouseStates, AgentViewController};
 use crate::ai::blocklist::{BlocklistAIContextModel, BlocklistAIInputModel};

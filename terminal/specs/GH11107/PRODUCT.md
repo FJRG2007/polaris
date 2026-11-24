@@ -22,18 +22,18 @@ The current Agent Modality first-time tutorial shows four sequential callouts be
 ## Figma
 Figma: none provided. This change uses the existing onboarding callout component and consolidates existing callout content.
 ## Behavior
-1. When a first-time user enters the Agent Driven Development tutorial with Agent Modality enabled, Rook shows exactly two sequential callouts.
+1. When a first-time user enters the Agent Driven Development tutorial with Agent Modality enabled, Polaris Terminal shows exactly two sequential callouts.
 1. First-time Agent Driven Development users do not see the tab config/session config modal between completing onboarding slides and starting the callout tutorial.
 1. First-time Agent Driven Development users are not required to choose a session type, project setup, worktree setup, or startup tab config before the callout tutorial starts.
-1. If the user selected a project in the onboarding slides, Rook should continue using that selection for the tutorial/project initialization path without re-asking through the tab config modal.
+1. If the user selected a project in the onboarding slides, Polaris Terminal should continue using that selection for the tutorial/project initialization path without re-asking through the tab config modal.
 1. Manual session configuration remains available from its existing non-FTUE entrypoints.
 2. The two-callout sequence is:
    - Callout 1: terminal input with natural language support.
-   - Callout 2: Rook's agent experience.
+   - Callout 2: Polaris Terminal's agent experience.
 3. Callout 1 teaches that the terminal input can be used for terminal commands and can also support natural language requests for the agent.
 4. Callout 1 includes the natural language detection explanation:
    - Natural language detection is off by default when the user's setting is initially off.
-   - If enabled, Rook can autodetect plain-English agent requests typed into terminal input.
+   - If enabled, Polaris Terminal can autodetect plain-English agent requests typed into terminal input.
    - The user can override auto-detection with the configured input-mode toggle keybinding.
 5. If natural language detection was initially off, Callout 1 includes a checkbox labeled `Enable Natural Language Detection`.
 6. The natural language detection checkbox reflects the current setting value while the callout is visible.
@@ -72,6 +72,6 @@ Figma: none provided. This change uses the existing onboarding callout component
    - A completion event is recorded with the user's completion type.
    - Removed callouts should not be reported as displayed.
 21. The shortened flow should not regress non-Agent-Modality onboarding. Universal Input onboarding should continue to use its existing flow.
-22. If onboarding is triggered while Rook is running in a mode that cannot show onboarding, no callouts are shown, matching existing behavior.
+22. If onboarding is triggered while Polaris Terminal is running in a mode that cannot show onboarding, no callouts are shown, matching existing behavior.
 23. If a tutorial is already active, starting the tutorial again should continue to be ignored rather than creating duplicate callouts.
 24. The callout UI uses the existing component styling, theme colors, progress dots, button styling, and layout behavior. This change is a content and flow reduction, not a visual redesign.

@@ -2,11 +2,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use ai::LLMId;
-use rook_core::telemetry::testing::MockTelemetryContextProvider;
-use rook_core::ui::appearance::Appearance;
-use rookui_core::elements::Empty;
-use rookui_core::platform::WindowStyle;
-use rookui_core::{App, AppContext, Element, Entity, ModelHandle, TypedActionView, View as _};
+use pterm_core::telemetry::testing::MockTelemetryContextProvider;
+use pterm_core::ui::appearance::Appearance;
+use ptermui_core::elements::Empty;
+use ptermui_core::platform::WindowStyle;
+use ptermui_core::{App, AppContext, Element, Entity, ModelHandle, TypedActionView, View as _};
 
 use super::{OfferChoice, OfferSlide, OfferSlideAction, OfferVariant, OnboardingSlide as _};
 use crate::model::{OnboardingAuthState, OnboardingStateModel};
@@ -20,7 +20,7 @@ impl Entity for EventObserver {
     type Event = ();
 }
 
-impl rookui_core::View for EventObserver {
+impl ptermui_core::View for EventObserver {
     fn ui_name() -> &'static str {
         "EventObserver"
     }
@@ -81,7 +81,7 @@ fn head_start_copy_and_telemetry_names_match_spec() {
         &[
             "Limited monthly AI usage for occasional tasks",
             "Access to premium and open-source models",
-            "Use the Rook Agent locally and in the cloud",
+            "Use the Polaris Terminal Agent locally and in the cloud",
         ]
     );
     assert_eq!(variant.slide_name(), "head_start");
@@ -98,10 +98,10 @@ fn choose_how_to_start_copy_and_telemetry_names_match_spec() {
         variant.subtitle(),
         Some("To use AI, start with a plan or one-time credit packs.")
     );
-    assert_eq!(variant.primary_label(), "Use Rook with AI");
+    assert_eq!(variant.primary_label(), "Use Polaris Terminal with AI");
     assert_eq!(
         variant.primary_description(),
-        "Rook Agent works locally or in the cloud with frontier and OSS models. Proactively fix terminal errors, implement changes, and ship verified code."
+        "Polaris Terminal Agent works locally or in the cloud with frontier and OSS models. Proactively fix terminal errors, implement changes, and ship verified code."
     );
     assert_eq!(variant.secondary_label(), "Set up AI later");
     assert_eq!(
@@ -111,7 +111,7 @@ fn choose_how_to_start_copy_and_telemetry_names_match_spec() {
     assert!(variant.included_features().is_empty());
     assert_eq!(variant.slide_name(), "choose_how_to_start");
     assert_eq!(variant.account_class(), "free_standard");
-    assert_eq!(variant.primary_action(), "use_rook_with_ai");
+    assert_eq!(variant.primary_action(), "use_pterm_with_ai");
 }
 
 #[test]
@@ -200,10 +200,10 @@ fn classified_offer_renders_in_every_selection_state() {
                 slide.update(&mut app, |slide, ctx| slide.handle_action(&action, ctx));
             }
 
-            // "Get Rooking" on the primary raises the auth prompt bar, which
+            // "Get Pterming" on the primary raises the auth prompt bar, which
             // renders stacked over the slide.
             slide.update(&mut app, |slide, ctx| {
-                slide.handle_action(&OfferSlideAction::GetRooking, ctx)
+                slide.handle_action(&OfferSlideAction::GetPterming, ctx)
             });
             assert!(
                 slide.read(&app, |slide, _| slide.show_auth_prompt_bar),
@@ -215,7 +215,7 @@ fn classified_offer_renders_in_every_selection_state() {
 }
 
 /// Selecting the primary card must not open the upgrade page; only "Get
-/// Rooking" does.
+/// Pterming" does.
 #[test]
 fn selecting_the_primary_card_does_not_launch_upgrade() {
     App::test((), |mut app| async move {
@@ -241,7 +241,7 @@ fn selecting_the_primary_card_does_not_launch_upgrade() {
         assert!(!slide.read(&app, |slide, _| slide.show_auth_prompt_bar));
 
         slide.update(&mut app, |slide, ctx| {
-            slide.handle_action(&OfferSlideAction::GetRooking, ctx)
+            slide.handle_action(&OfferSlideAction::GetPterming, ctx)
         });
         assert!(slide.read(&app, |slide, _| slide.show_auth_prompt_bar));
     });
@@ -278,7 +278,7 @@ fn arrow_keys_move_through_both_options() {
 }
 
 #[test]
-fn get_rooking_on_set_up_later_emits_exactly_one_event() {
+fn get_pterming_on_set_up_later_emits_exactly_one_event() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
         app.update(MockTelemetryContextProvider::register);
@@ -304,7 +304,7 @@ fn get_rooking_on_set_up_later_emits_exactly_one_event() {
 
         slide.update(&mut app, |slide, ctx| {
             slide.handle_action(&OfferSlideAction::SelectSetUpLater, ctx);
-            slide.handle_action(&OfferSlideAction::GetRooking, ctx);
+            slide.handle_action(&OfferSlideAction::GetPterming, ctx);
         });
 
         let recorded = events.borrow().clone();

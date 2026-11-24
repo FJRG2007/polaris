@@ -48,7 +48,7 @@ If the conversation was produced by Oz and there is no active execution:
   - Tombstone: shown.
   - Followup input: hidden or non-editable.
   - CTA: show `Continue locally`.
-  - Clicking the CTA forks the cloud conversation into a local Rook conversation and continues locally, without mutating the original shared conversation.
+  - Clicking the CTA forks the cloud conversation into a local Polaris Terminal conversation and continues locally, without mutating the original shared conversation.
 ### Third-party harness
 If the conversation was produced by a third-party harness and there is no active execution:
 - User has edit access:
@@ -76,7 +76,7 @@ If the conversation was produced by a third-party harness and there is no active
 | Third-party | Edit | Active execution | Hidden | Hidden while execution is active | None | User watches or interacts with the live third-party cloud execution UI. |
 | Third-party | View only | Active execution | Hidden | Hidden while execution is active | None | User watches the live third-party cloud execution UI without ended-state affordances. |
 | Oz | Edit | No active execution | Hidden | Shown and editable | None | User submits a followup that continues the same cloud conversation. |
-| Oz | View only | No active execution | Shown | Hidden or non-editable | `Continue locally` | User forks into a local Rook conversation before continuing. |
+| Oz | View only | No active execution | Shown | Hidden or non-editable | `Continue locally` | User forks into a local Polaris Terminal conversation before continuing. |
 | Third-party | Edit | No active execution | Shown | Hidden until continuation starts | `Continue` | User continues via the existing third-party cloud followup execution flow. |
 | Third-party | View only | No active execution | Shown | Hidden or non-editable | None | User can inspect the transcript but cannot continue from this UI. |
 | Unknown | Any or unknown | No active execution | Shown | Hidden or non-editable | None | Client waits for metadata before showing mutation affordances. |
@@ -85,7 +85,7 @@ Preferred CTA copy:
 - Oz, view-only: `Continue locally`
 - Third-party, edit access: `Continue`
 Tooltips can clarify the distinction:
-- Oz local continuation CTA: “Fork this conversation into a local Rook session.”
+- Oz local continuation CTA: “Fork this conversation into a local Polaris Terminal session.”
 - Third-party continue CTA: “Continue this cloud conversation.”
 Avoid showing “Continue locally” for third-party harnesses, because local continuation is unsupported and misleading.
 ## Edge cases

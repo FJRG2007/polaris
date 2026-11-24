@@ -1,4 +1,4 @@
-use rook_graphql::ai::{
+use pterm_graphql::ai::{
     AICreditAvailability as GqlAICreditAvailability,
     AICreditAvailabilityDenialReason as GqlDenialReason, AICreditAvailabilitySource as GqlSource,
 };

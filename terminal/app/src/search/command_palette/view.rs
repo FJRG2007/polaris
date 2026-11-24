@@ -4,18 +4,18 @@ use std::sync::Arc;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use rook_core::send_telemetry_from_app_ctx;
-use rook_util::path::LineAndColumnArg;
-use rookui::elements::{
+use pterm_core::send_telemetry_from_app_ctx;
+use pterm_util::path::LineAndColumnArg;
+use ptermui::elements::{
     Align, Border, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, CornerRadius, Dismiss, DispatchEventResult, Empty, EventHandler, Fill, Flex,
     ParentElement, Radius, SavePosition, Shrinkable,
 };
-use rookui::event::KeyState;
-use rookui::keymap::BindingId;
-use rookui::platform::keyboard::KeyCode;
-use rookui::units::{IntoPixels, Pixels};
-use rookui::{
+use ptermui::event::KeyState;
+use ptermui::keymap::BindingId;
+use ptermui::platform::keyboard::KeyCode;
+use ptermui::units::{IntoPixels, Pixels};
+use ptermui::{
     AppContext, Element, Entity, EntityId, FocusContext, ModelHandle, SingletonEntity,
     TypedActionView, ViewContext, ViewHandle, WindowId,
 };
@@ -44,7 +44,7 @@ use crate::server::telemetry::{LaunchConfigUiLocation, TelemetryEvent};
 use crate::session_management::SessionSource;
 use crate::settings::CtrlTabBehavior;
 use crate::terminal::keys_settings::KeysSettings;
-use crate::themes::theme::RookTheme;
+use crate::themes::theme::PtermTheme;
 use crate::view_components::DismissibleToast;
 use crate::workspace::{ForkedConversationDestination, WorkspaceAction, active_terminal_in_window};
 use crate::{ToastStack, send_telemetry_from_ctx};
@@ -94,8 +94,8 @@ pub enum Event {
     InvokeEnvironmentVariables { id: SyncId },
     /// Open a notebook identified by `id`.
     OpenNotebook { id: SyncId },
-    /// View the relevant object in the Rook Drive sidebar.
-    ViewInRookDrive { id: CloudObjectTypeAndId },
+    /// View the relevant object in the Polaris Terminal Drive sidebar.
+    ViewInPtermDrive { id: CloudObjectTypeAndId },
     /// Open a file at the given path.
     OpenFile {
         path: String,
@@ -163,7 +163,7 @@ impl TypedActionView for View {
     }
 }
 
-impl rookui::View for View {
+impl ptermui::View for View {
     fn ui_name() -> &'static str {
         "CommandPaletteView"
     }
@@ -395,7 +395,7 @@ impl View {
                 | (PaletteMode::LaunchConfig, QueryFilter::LaunchConfigurations)
                 | (PaletteMode::Files, QueryFilter::Files)
                 | (PaletteMode::Conversations, QueryFilter::Conversations)
-                | (PaletteMode::RookDrive, QueryFilter::Drive)
+                | (PaletteMode::PtermDrive, QueryFilter::Drive)
         )
     }
 
@@ -688,7 +688,7 @@ impl View {
         })
     }
 
-    fn render_palette_list(&self, theme: &RookTheme, app: &AppContext) -> Box<dyn Element> {
+    fn render_palette_list(&self, theme: &PtermTheme, app: &AppContext) -> Box<dyn Element> {
         match self.search_bar_state.as_ref(app).query_result_renderers() {
             None => Empty::new().finish(),
             Some(renderers) if renderers.is_empty() => {
@@ -901,8 +901,8 @@ impl View {
                 ctx.emit(Event::InvokeEnvironmentVariables { id })
             }
             CommandPaletteItemAction::OpenNotebook { id } => ctx.emit(Event::OpenNotebook { id }),
-            CommandPaletteItemAction::ViewInRookDrive { id } => {
-                ctx.emit(Event::ViewInRookDrive { id })
+            CommandPaletteItemAction::ViewInPtermDrive { id } => {
+                ctx.emit(Event::ViewInPtermDrive { id })
             }
             CommandPaletteItemAction::NewSession { source } => {
                 self.dispatch_typed_action_on_view(source.action().deref(), ctx);
@@ -1015,11 +1015,11 @@ impl View {
         self.close(ctx, Some(result_action.result_type()));
     }
 
-    /// Dispatches `action` to the correct window and [`rookui::View`] by using the current state of
+    /// Dispatches `action` to the correct window and [`ptermui::View`] by using the current state of
     /// the [`BindingSource`] model.
     fn dispatch_typed_action_on_view(
         &self,
-        action: &dyn rookui::Action,
+        action: &dyn ptermui::Action,
         ctx: &mut ViewContext<Self>,
     ) {
         send_telemetry_from_ctx!(

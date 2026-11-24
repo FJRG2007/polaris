@@ -3,23 +3,23 @@ use std::sync::Arc;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::color::contrast::MinimumAllowedContrast;
-use rook_core::ui::color::{ContrastingColor, coloru_with_opacity};
-use rook_core::ui::theme::color::internal_colors;
-use rook_core::ui::theme::{AnsiColorIdentifier, Fill};
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::color::contrast::MinimumAllowedContrast;
+use pterm_core::ui::color::{ContrastingColor, coloru_with_opacity};
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_core::ui::theme::{AnsiColorIdentifier, Fill};
+use ptermui::elements::{
     Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DEFAULT_UI_LINE_HEIGHT_RATIO, Flex, Hoverable, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, OffsetPositioning, Padding, ParentAnchor, ParentElement as _,
     ParentOffsetBounds, Radius, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::Keystroke;
-use rookui::platform::Cursor;
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::Keystroke;
+use ptermui::platform::Cursor;
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, BlurContext, Element, Entity, EventContext, FocusContext, Gradient,
     SingletonEntity as _, TypedActionView, View, ViewContext,
 };
@@ -772,7 +772,7 @@ impl View for ActionButton {
                     })
                     .unwrap_or(Fill::Solid(text_color));
                 row.add_child(
-                    ConstrainedBox::new(icon.to_rookui_icon(icon_fill).finish())
+                    ConstrainedBox::new(icon.to_ptermui_icon(icon_fill).finish())
                         .with_width(icon_size)
                         .with_height(icon_size)
                         .finish(),
@@ -840,7 +840,9 @@ impl View for ActionButton {
                 row.add_child(
                     Container::new(
                         ConstrainedBox::new(
-                            Icon::ChevronDown.to_rookui_icon(text_color.into()).finish(),
+                            Icon::ChevronDown
+                                .to_ptermui_icon(text_color.into())
+                                .finish(),
                         )
                         .with_width(icon_size)
                         .with_height(icon_size)

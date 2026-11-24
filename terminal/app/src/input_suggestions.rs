@@ -8,13 +8,13 @@ use chrono::{DateTime, Local};
 use fuzzy_match::match_indices;
 use itertools::Itertools;
 use pathfinder_geometry::vector::vec2f;
-use rook_completer::completer::{
+use pterm_completer::completer::{
     MatchType, PathSeparators, PreparedSuggestion, Suggestion, SuggestionResults, SuggestionType,
 };
-use rook_core::features::FeatureFlag;
-use rook_core::ui::theme::AnsiColorIdentifier;
-use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::theme::AnsiColorIdentifier;
+use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::elements::{
     Align, AnchorPair, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DispatchEventResult, DropShadow, Element, Empty, EventHandler, Expanded,
     Flex, Highlight, Hoverable, Icon, MouseStateHandle, OffsetPositioning, OffsetType,
@@ -23,9 +23,9 @@ use rookui::elements::{
     ScrollbarWidth, Shrinkable, SizeConstraintCondition, SizeConstraintSwitch, Stack, Text,
     UniformList, UniformListState, XAxisAnchor, YAxisAnchor,
 };
-use rookui::fonts::{Cache, Properties, Weight};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{Cache, Properties, Weight};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, WeakViewHandle,
 };
 use warp_command_signatures::IconType;
@@ -617,13 +617,13 @@ impl InputSuggestions {
                 ctx.emit_a11y_content(AccessibilityContent::new(
                     format!("Suggestion: {text}.\n"),
                     desc,
-                    RookA11yRole::MenuItemRole,
+                    PtermA11yRole::MenuItemRole,
                 ));
             }
             (Some(text), None) => {
                 ctx.emit_a11y_content(AccessibilityContent::new_without_help(
                     format!("Suggestion: {text}.\n"),
-                    RookA11yRole::MenuItemRole,
+                    PtermA11yRole::MenuItemRole,
                 ));
             }
             _ => {}
@@ -647,7 +647,7 @@ impl InputSuggestions {
         if let Some(text) = self.get_selected_item_text() {
             ctx.emit_a11y_content(AccessibilityContent::new_without_help(
                 format!("Selected: {text}"),
-                RookA11yRole::MenuItemRole,
+                PtermA11yRole::MenuItemRole,
             ));
         }
     }
@@ -672,7 +672,7 @@ impl InputSuggestions {
     ) {
         ctx.emit_a11y_content(AccessibilityContent::new_without_help(
             "Closed suggestions.",
-            RookA11yRole::UserAction,
+            PtermA11yRole::UserAction,
         ));
         ctx.emit(Event::CloseSuggestion {
             should_restore_buffer_before_history_up,
@@ -836,7 +836,7 @@ impl InputSuggestions {
                                     Properties::default()
                                         .weight(appearance.monospace_font_weight()),
                                 )
-                                .autosize_text(rook_core::ui::builder::MIN_FONT_SIZE)
+                                .autosize_text(pterm_core::ui::builder::MIN_FONT_SIZE)
                                 .with_color(main_text);
 
                                 let matches = item.matches.clone();
@@ -1114,7 +1114,7 @@ impl View for InputSuggestions {
             // TODO use bindings from user settings
             "Navigate with tab and shift-tab, and confirm with enter. Execute selected command \
                 with command + enter. Esc leaves the suggestions menu.",
-            RookA11yRole::MenuRole,
+            PtermA11yRole::MenuRole,
         ))
     }
 }

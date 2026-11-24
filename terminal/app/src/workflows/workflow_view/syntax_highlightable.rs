@@ -3,11 +3,11 @@ use std::ops::Range;
 use std::time::Duration;
 
 use async_channel::Sender;
-use rook_completer::completer::SuggestionTypeName;
-use rook_completer::signatures::CommandRegistry;
-use rook_core::ui::theme::AnsiColorIdentifier;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{Entity, ModelContext, SingletonEntity, ViewHandle};
+use pterm_completer::completer::SuggestionTypeName;
+use pterm_completer::signatures::CommandRegistry;
+use pterm_core::ui::theme::AnsiColorIdentifier;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{Entity, ModelContext, SingletonEntity, ViewHandle};
 use string_offset::ByteOffset;
 
 use crate::appearance::Appearance;

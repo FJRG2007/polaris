@@ -2,15 +2,15 @@
 
 Branch: `harry/fix-hoverable-hit-box`.
 
-Base: [`origin/master` at `d459702`](https://github.com/FJRG2007/rook/tree/d45970299fb02c8c9295ca766d4cd86530066458).
+Base: [`origin/master` at `d459702`](https://github.com/FJRG2007/polaris/tree/d45970299fb02c8c9295ca766d4cd86530066458).
 
-Research snapshot: [`eba8ef7`](https://github.com/FJRG2007/rook/tree/eba8ef71648f49028052e7a8dfc7803900ee4b82).
+Research snapshot: [`eba8ef7`](https://github.com/FJRG2007/polaris/tree/eba8ef71648f49028052e7a8dfc7803900ee4b82).
 
 ## Context
 
-TUI event dispatch currently passes an `area` from the root through every parent to every child. Layout has already measured the tree, so dispatch does not repeat measurement; it repeats the arrangement walk using cached child sizes. `TuiFlex`, for example, caches `child_sizes` during layout and reconstructs child rectangles during render, cursor lookup, and dispatch ([`flex.rs:253-424 @ eba8ef7`](https://github.com/FJRG2007/rook/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/crates/rookui_core/src/elements/tui/flex.rs#L253-L424)). `TuiViewportedList` similarly reconstructs each visible item slot for all three operations ([`viewported_list.rs:338-401 @ eba8ef7`](https://github.com/FJRG2007/rook/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/crates/rookui_core/src/elements/tui/viewported_list.rs#L338-L401)).
+TUI event dispatch currently passes an `area` from the root through every parent to every child. Layout has already measured the tree, so dispatch does not repeat measurement; it repeats the arrangement walk using cached child sizes. `TuiFlex`, for example, caches `child_sizes` during layout and reconstructs child rectangles during render, cursor lookup, and dispatch ([`flex.rs:253-424 @ eba8ef7`](https://github.com/FJRG2007/polaris/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/terminal/crates/ptermui_core/src/elements/tui/flex.rs#L253-L424)). `TuiViewportedList` similarly reconstructs each visible item slot for all three operations ([`viewported_list.rs:338-401 @ eba8ef7`](https://github.com/FJRG2007/polaris/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/terminal/crates/ptermui_core/src/elements/tui/viewported_list.rs#L338-L401)).
 
-The reported bug exposes the weakness of making the dispatched area the element's geometry. A start-aligned flex child is measured to its content width but is rendered and dispatched with the full cross-axis slot ([`flex.rs:213-243 @ eba8ef7`](https://github.com/FJRG2007/rook/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/crates/rookui_core/src/elements/tui/flex.rs#L213-L243)). Consequently, the collapsible thinking header's `TuiHoverable` treats blank columns after the text and chevron as part of its target. The branch currently compensates by caching the hoverable child's last measured size and intersecting it with the parent-provided area ([`hoverable.rs:44-178 @ eba8ef7`](https://github.com/FJRG2007/rook/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/crates/rookui_core/src/elements/tui/hoverable.rs#L44-L178)). That fixes this element but leaves retained geometry as a `TuiHoverable` special case and still requires parents to reconstruct and forward correct placement.
+The reported bug exposes the weakness of making the dispatched area the element's geometry. A start-aligned flex child is measured to its content width but is rendered and dispatched with the full cross-axis slot ([`flex.rs:213-243 @ eba8ef7`](https://github.com/FJRG2007/polaris/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/terminal/crates/ptermui_core/src/elements/tui/flex.rs#L213-L243)). Consequently, the collapsible thinking header's `TuiHoverable` treats blank columns after the text and chevron as part of its target. The branch currently compensates by caching the hoverable child's last measured size and intersecting it with the parent-provided area ([`hoverable.rs:44-178 @ eba8ef7`](https://github.com/FJRG2007/polaris/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/terminal/crates/ptermui_core/src/elements/tui/hoverable.rs#L44-L178)). That fixes this element but leaves retained geometry as a `TuiHoverable` special case and still requires parents to reconstruct and forward correct placement.
 
 The GUI framework already has the desired contract:
 
@@ -19,9 +19,9 @@ The GUI framework already has the desired contract:
 - `Scene::visible_rect` applies active clipping, while `Scene::is_covered` checks hit records on higher normal or overlay layers.
 - Paint primitives and explicit surfaces record hit regions; structural wrappers do not become opaque merely because they participate in layout.
 
-See [`elements/gui/mod.rs:106-179 @ eba8ef7`](https://github.com/FJRG2007/rook/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/crates/rookui_core/src/elements/gui/mod.rs#L106-L179), [`elements/gui/hoverable.rs:405-431 @ eba8ef7`](https://github.com/FJRG2007/rook/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/crates/rookui_core/src/elements/gui/hoverable.rs#L405-L431), and [`scene.rs:416-505 @ eba8ef7`](https://github.com/FJRG2007/rook/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/crates/rookui_core/src/scene.rs#L416-L505).
+See [`elements/gui/mod.rs:106-179 @ eba8ef7`](https://github.com/FJRG2007/polaris/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/terminal/crates/ptermui_core/src/elements/gui/mod.rs#L106-L179), [`elements/gui/hoverable.rs:405-431 @ eba8ef7`](https://github.com/FJRG2007/polaris/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/terminal/crates/ptermui_core/src/elements/gui/hoverable.rs#L405-L431), and [`scene.rs:416-505 @ eba8ef7`](https://github.com/FJRG2007/polaris/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/terminal/crates/ptermui_core/src/scene.rs#L416-L505).
 
-The TUI implementation will adopt that model. Elements use signed absolute terminal-space coordinates for placement, retained geometry, and child composition. Ratatui's unsigned buffer-local coordinates are a private paint-backend detail: `TuiPaintSurface` maps absolute positions into whichever buffer it owns. `TuiClipped` renders a complete child into a temporary ratatui buffer rooted at `(0, 0)` and copies only the visible rows into the destination buffer ([`clipped.rs:61-139 @ eba8ef7`](https://github.com/FJRG2007/rook/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/crates/rookui_core/src/elements/tui/clipped.rs#L61-L139)); its scratch surface privately maps the child's unchanged absolute origin to that local buffer origin.
+The TUI implementation will adopt that model. Elements use signed absolute terminal-space coordinates for placement, retained geometry, and child composition. Ratatui's unsigned buffer-local coordinates are a private paint-backend detail: `TuiPaintSurface` maps absolute positions into whichever buffer it owns. `TuiClipped` renders a complete child into a temporary ratatui buffer rooted at `(0, 0)` and copies only the visible rows into the destination buffer ([`clipped.rs:61-139 @ eba8ef7`](https://github.com/FJRG2007/polaris/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/terminal/crates/ptermui_core/src/elements/tui/clipped.rs#L61-L139)); its scratch surface privately maps the child's unchanged absolute origin to that local buffer origin.
 
 ## End-to-end flow
 
@@ -51,7 +51,7 @@ Add signed, cell-based screen and scene geometry alongside ratatui's private uns
 
 Pointer events remain unsigned terminal positions because crossterm only reports visible cells. Converting a pointer position to signed scene coordinates is lossless. Signed origins are required for logical content above or left of a viewport; clipping converts those logical bounds into visible terminal bounds.
 
-Update `TuiElement` in [`elements/tui/mod.rs:169-256 @ eba8ef7`](https://github.com/FJRG2007/rook/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/crates/rookui_core/src/elements/tui/mod.rs#L169-L256) to mirror GUI:
+Update `TuiElement` in [`elements/tui/mod.rs:169-256 @ eba8ef7`](https://github.com/FJRG2007/polaris/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/terminal/crates/ptermui_core/src/elements/tui/mod.rs#L169-L256) to mirror GUI:
 
 ```rust
 pub trait TuiElement {
@@ -101,7 +101,7 @@ The existing `present` pass remains between layout and paint. It is geometry-ind
 
 ### Paint context and paint surfaces
 
-Extend `TuiPaintContext` in [`elements/tui/mod.rs:105-167 @ eba8ef7`](https://github.com/FJRG2007/rook/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/crates/rookui_core/src/elements/tui/mod.rs#L105-L167) with:
+Extend `TuiPaintContext` in [`elements/tui/mod.rs:105-167 @ eba8ef7`](https://github.com/FJRG2007/polaris/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/terminal/crates/ptermui_core/src/elements/tui/mod.rs#L105-L167) with:
 
 - a mutable `TuiScene`;
 - helpers that attach the active z-index to an absolute screen position;
@@ -140,7 +140,7 @@ Scene clipping does not proxy or intercept ratatui buffer writes. Outside `TuiCl
 
 ### TUI hit scene
 
-Add a TUI-specific retained scene under `crates/rookui_core/src/elements/tui/`. It mirrors the GUI scene's input semantics without taking over terminal rendering:
+Add a TUI-specific retained scene under `crates/ptermui_core/src/elements/tui/`. It mirrors the GUI scene's input semantics without taking over terminal rendering:
 
 - ordered normal and overlay layers;
 - an active-layer stack;
@@ -190,11 +190,11 @@ Changing start-aligned children from full-slot paint rectangles to retained cont
 
 ### Presenter, scene lifetime, and child views
 
-Extend `TuiPresenter` in [`presenter/tui.rs:73-226 @ eba8ef7`](https://github.com/FJRG2007/rook/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/crates/rookui_core/src/presenter/tui.rs#L73-L226) to retain the scene produced with `last_element`. Publish the newly painted element tree and scene together only after root layout and paint complete. Replace `last_element_mut` with a dispatch-state API, or borrow the presenter's disjoint element, scene, and child-view-map fields directly, so runtime dispatch cannot obtain an element tree without its paired scene.
+Extend `TuiPresenter` in [`presenter/tui.rs:73-226 @ eba8ef7`](https://github.com/FJRG2007/polaris/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/terminal/crates/ptermui_core/src/presenter/tui.rs#L73-L226) to retain the scene produced with `last_element`. Publish the newly painted element tree and scene together only after root layout and paint complete. Replace `last_element_mut` with a dispatch-state API, or borrow the presenter's disjoint element, scene, and child-view-map fields directly, so runtime dispatch cannot obtain an element tree without its paired scene.
 
 Dispatch uses that pair without querying the current terminal size. If no completed scene exists, pointer dispatch returns unhandled.
 
-`TuiChildView` gains retained `size` and `origin`, matching GUI `ChildView` ([`presenter.rs:806-868 @ eba8ef7`](https://github.com/FJRG2007/rook/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/crates/rookui_core/src/presenter.rs#L806-L868)). Layout caches the embedded view's size. Paint caches the host node's screen origin and paints the registered child through the active `TuiPaintContext`, so the child receives the same transform, clip, and scene. Dispatch still temporarily establishes the child view as the action origin before traversing its retained element subtree.
+`TuiChildView` gains retained `size` and `origin`, matching GUI `ChildView` ([`presenter.rs:806-868 @ eba8ef7`](https://github.com/FJRG2007/polaris/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/terminal/crates/ptermui_core/src/presenter.rs#L806-L868)). Layout caches the embedded view's size. Paint caches the host node's screen origin and paints the registered child through the active `TuiPaintContext`, so the child receives the same transform, clip, and scene. Dispatch still temporarily establishes the child view as the action origin before traversing its retained element subtree.
 
 An updated child view is rendered, laid out, and painted before the new tree/scene pair becomes dispatchable. Dispatch never combines a freshly replaced child element with geometry from its predecessor.
 
@@ -211,7 +211,7 @@ Move dispatch-time access to `rendered_views` and the retained scene into `TuiEv
 
 Nested scratch-buffer mappings do not need to be replayed during dispatch: their accumulated translation is already reflected in each element's retained screen origin. Ordinary pointer handling first uses the visible/uncovered hit-test helper, then converts the event position to local coordinates. Pointer-capture paths may use the unbounded signed local conversion after a gesture began inside the element.
 
-Remove `area` and the layout context from `TuiElement::dispatch_event`. The runtime path in [`runtime/mod.rs:109-174 @ eba8ef7`](https://github.com/FJRG2007/rook/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/crates/rookui_core/src/runtime/mod.rs#L109-L174) constructs the event context from the presenter's last element tree, retained scene, and child-view map.
+Remove `area` and the layout context from `TuiElement::dispatch_event`. The runtime path in [`runtime/mod.rs:109-174 @ eba8ef7`](https://github.com/FJRG2007/polaris/blob/eba8ef71648f49028052e7a8dfc7803900ee4b82/terminal/crates/ptermui_core/src/runtime/mod.rs#L109-L174) constructs the event context from the presenter's last element tree, retained scene, and child-view map.
 
 Dispatch follows GUI structural broadcast:
 
@@ -252,7 +252,7 @@ The trait change must land atomically with all production implementations:
 6. Migrate geometry-owning parents: flex, container, constrained box, viewported list, scrollable, and clipped.
 7. Migrate `TuiChildView`, presenter scene retention, and runtime event-context construction.
 8. Replace the hoverable workaround and adapt the branch's regression tests to retained geometry.
-9. Migrate `rook_tui` implementations, including editor and terminal block elements.
+9. Migrate `pterm_tui` implementations, including editor and terminal block elements.
 
 Do not retain an area-passing compatibility dispatch method. A partial migration would permit old and new geometry sources to disagree and would leave the framework contract ambiguous.
 
@@ -296,10 +296,10 @@ Do not retain an area-passing compatibility dispatch method. A partial migration
 
 ### Commands
 
-- `cargo nextest run -p rookui_core --features tui`
-- `cargo nextest run -p rook_tui`
-- `cargo check -p rookui_core --features tui`
-- `cargo check -p rook_tui`
+- `cargo nextest run -p ptermui_core --features tui`
+- `cargo nextest run -p pterm_tui`
+- `cargo check -p ptermui_core --features tui`
+- `cargo check -p pterm_tui`
 - `./script/format`
 - Run the clippy command selected by `./script/presubmit` for the affected workspace targets.
 

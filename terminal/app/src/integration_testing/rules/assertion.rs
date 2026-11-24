@@ -1,5 +1,5 @@
-use rookui::integration::{AssertionCallback, AssertionWithDataCallback};
-use rookui::{AppContext, SingletonEntity, async_assert, async_assert_eq};
+use ptermui::integration::{AssertionCallback, AssertionWithDataCallback};
+use ptermui::{AppContext, SingletonEntity, async_assert, async_assert_eq};
 
 use crate::ai::facts::CloudAIFactModel;
 use crate::ai::facts::view::AIFactPage;

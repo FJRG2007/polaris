@@ -9,16 +9,16 @@ use std::hash::{Hash, Hasher};
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_cli::agent::Harness;
-use rook_core::channel::ChannelState;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::color::coloru_with_opacity;
-use rook_core::ui::theme::color::internal_colors;
-use rook_core::ui::theme::{Fill, RookTheme};
-use rookui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
-use rookui::elements::{
+use pterm_cli::agent::Harness;
+use pterm_core::channel::ChannelState;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::color::coloru_with_opacity;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_core::ui::theme::{Fill, PtermTheme};
+use ptermui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
+use ptermui::elements::{
     Align, AnchorPair, ChildAnchor, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, DEFAULT_UI_LINE_HEIGHT_RATIO, Element, Empty,
     Fill as ElementFill, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
@@ -26,12 +26,12 @@ use rookui::elements::{
     PositionedElementOffsetBounds, PositioningAxis, Radius, SavePosition, ScrollbarWidth, Stack,
     Text, XAxisAnchor, YAxisAnchor,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::{Cursor, LineStyle};
-use rookui::text_layout::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::{Cursor, LineStyle};
+use ptermui::text_layout::{
     ClipConfig, ClipDirection, ClipStyle, DEFAULT_TOP_BOTTOM_RATIO, StyleAndFont, TextStyle,
 };
-use rookui::{
+use ptermui::{
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -103,7 +103,7 @@ const PILL_BAR_SCROLLBAR_GAP: f32 = 1.;
 const PILL_BAR_SCROLLBAR_GUTTER: f32 = PILL_BAR_SCROLLBAR_GAP + PILL_BAR_SCROLLBAR_WIDTH + 2.;
 
 /// Stable palette used to color child agent avatars deterministically by name.
-fn pill_palette(theme: &RookTheme) -> [ColorU; 6] {
+fn pill_palette(theme: &PtermTheme) -> [ColorU; 6] {
     [
         theme.ansi_fg_blue(),
         theme.ansi_fg_magenta(),
@@ -114,7 +114,7 @@ fn pill_palette(theme: &RookTheme) -> [ColorU; 6] {
     ]
 }
 
-pub(crate) fn pill_avatar_color(name: &str, theme: &RookTheme) -> ColorU {
+pub(crate) fn pill_avatar_color(name: &str, theme: &PtermTheme) -> ColorU {
     let palette = pill_palette(theme);
     let mut hasher = DefaultHasher::new();
     name.hash(&mut hasher);
@@ -134,7 +134,7 @@ pub(crate) fn pill_initial(name: &str) -> char {
 /// surfaces.
 pub(crate) fn render_orchestrator_avatar_disc(
     size: f32,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     render_avatar_disc(
@@ -151,7 +151,7 @@ pub(crate) fn render_orchestrator_avatar_disc(
 pub(crate) fn render_agent_avatar_disc(
     name: &str,
     size: f32,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     render_avatar_disc(
@@ -1518,7 +1518,7 @@ fn render_hover_card(
     //
     // Use `dirs::home_dir()` (cross-platform: `$HOME` on unix,
     // `%USERPROFILE%` on Windows) to find the home prefix, then defer to
-    // the shared `rook_util::path::user_friendly_path` helper so the cwd
+    // the shared `pterm_util::path::user_friendly_path` helper so the cwd
     // displays as `~/foo` regardless of OS — and matches the same
     // tilde-substitution behaviour used by the tab title, prompt header,
     // and pwd chip.
@@ -1530,7 +1530,7 @@ fn render_hover_card(
         .filter(|s| !s.is_empty())
         .map(|cwd| {
             Text::new(
-                rook_util::path::user_friendly_path(&cwd, home_dir_str).into_owned(),
+                pterm_util::path::user_friendly_path(&cwd, home_dir_str).into_owned(),
                 appearance.ui_font_family(),
                 appearance.monospace_font_size() - 1.,
             )
@@ -1657,7 +1657,7 @@ fn render_hover_card(
         .with_padding_top(HOVER_CARD_VERTICAL_PADDING)
         .with_padding_bottom(HOVER_CARD_VERTICAL_PADDING)
         .with_background(bg)
-        .with_border(rookui::elements::Border::all(1.).with_border_fill(outline))
+        .with_border(ptermui::elements::Border::all(1.).with_border_fill(outline))
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)))
         .finish();
 
@@ -1675,11 +1675,11 @@ fn render_hover_card(
 /// the card and the side panel can't drift.
 fn render_status_badge(
     status: &ConversationStatus,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let (icon, color) = status.status_icon_and_color(theme, StatusColorStyle::Standard);
-    let icon_el = ConstrainedBox::new(icon.to_rookui_icon(color.into()).finish())
+    let icon_el = ConstrainedBox::new(icon.to_ptermui_icon(color.into()).finish())
         .with_width(12.)
         .with_height(12.)
         .finish();
@@ -1730,10 +1730,10 @@ fn render_chip(
     label: String,
     icon_color: ColorU,
     text_color: ColorU,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
-    let icon_el = ConstrainedBox::new(icon.to_rookui_icon(icon_color.into()).finish())
+    let icon_el = ConstrainedBox::new(icon.to_ptermui_icon(icon_color.into()).finish())
         .with_width(12.)
         .with_height(12.)
         .finish();
@@ -1820,11 +1820,14 @@ fn render_breadcrumb_pill(
         } else {
             pill_rest_bg
         };
-        let chevron =
-            ConstrainedBox::new(Icon::ChevronLeft.to_rookui_icon(text_color.into()).finish())
-                .with_width(PILL_ICON_SIZE)
-                .with_height(PILL_ICON_SIZE)
-                .finish();
+        let chevron = ConstrainedBox::new(
+            Icon::ChevronLeft
+                .to_ptermui_icon(text_color.into())
+                .finish(),
+        )
+        .with_width(PILL_ICON_SIZE)
+        .with_height(PILL_ICON_SIZE)
+        .finish();
         let label_text = Text::new(
             label,
             appearance.ui_font_family(),
@@ -1892,7 +1895,7 @@ fn subtree_rollup_badge_slot_width(
 /// child's subtree, tinted with the subtree's aggregated status color.
 fn render_subtree_rollup_badge(
     rollup: &LoadedSubtreeRollup,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let (_, color) = rollup
@@ -1964,7 +1967,7 @@ fn render_pin_button(
         Icon::Pin
     };
     let button = Hoverable::new(mouse_state, move |hover_state| {
-        let glyph = ConstrainedBox::new(icon.to_rookui_icon(icon_color.into()).finish())
+        let glyph = ConstrainedBox::new(icon.to_ptermui_icon(icon_color.into()).finish())
             .with_width(glyph_size)
             .with_height(glyph_size)
             .finish();
@@ -1997,7 +2000,7 @@ fn render_pill(
     overflow_mouse_state: MouseStateHandle,
     pin_button_mouse_state: MouseStateHandle,
     menu_is_open_for_this: bool,
-    self_terminal_view_id: rookui::EntityId,
+    self_terminal_view_id: ptermui::EntityId,
     app: &AppContext,
 ) -> Box<dyn Element> {
     let appearance = Appearance::as_ref(app);
@@ -2042,7 +2045,7 @@ fn render_pill(
     let pill_text_color = internal_colors::fg_overlay_6(theme).into_solid();
 
     // `Hoverable::new`'s build closure is `FnOnce` (see
-    // `crates/rookui_core/src/elements/hoverable.rs`). We can therefore move
+    // `crates/ptermui_core/src/elements/hoverable.rs`). We can therefore move
     // `label` into the closure by value rather than cloning it on every
     // build.
     let pill_body = Hoverable::new(mouse_state, move |hover_state| {
@@ -2315,7 +2318,7 @@ fn render_overflow_button(
     mouse_state: MouseStateHandle,
     conversation_id: AIConversationId,
     text_color: Fill,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Box<dyn Element> {
     let button = Hoverable::new(mouse_state, move |hover_state| {
         // The button's own surface gets a subtle filled background when
@@ -2326,7 +2329,7 @@ fn render_overflow_button(
         } else {
             None
         };
-        let icon = ConstrainedBox::new(Icon::DotsVertical.to_rookui_icon(text_color).finish())
+        let icon = ConstrainedBox::new(Icon::DotsVertical.to_ptermui_icon(text_color).finish())
             .with_width(PILL_ICON_SIZE)
             .with_height(PILL_ICON_SIZE)
             .finish();
@@ -2440,7 +2443,7 @@ fn render_avatar_lockup_box(disc: Box<dyn Element>) -> Box<dyn Element> {
 fn render_pill_avatar(
     avatar_color: ColorU,
     glyph: AvatarGlyph,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     render_avatar_slot(render_avatar_lockup_box(render_avatar_disc(
@@ -2481,7 +2484,7 @@ fn render_avatar_with_status_overlay(
     status: ConversationStatus,
     is_remote_child: bool,
     pill_background: ColorU,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let avatar = render_avatar_lockup_box(render_avatar_disc(
@@ -2516,7 +2519,7 @@ fn render_avatar_disc(
     avatar_color: ColorU,
     glyph: AvatarGlyph,
     size: f32,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let disc = ConstrainedBox::new(
@@ -2546,7 +2549,7 @@ fn render_avatar_disc(
                 .finish()
         }
         AvatarGlyph::Icon(icon) => {
-            ConstrainedBox::new(icon.to_rookui_icon(theme.background()).finish())
+            ConstrainedBox::new(icon.to_ptermui_icon(theme.background()).finish())
                 .with_width(glyph_size)
                 .with_height(glyph_size)
                 .finish()
@@ -2594,7 +2597,7 @@ const CRUMB_HORIZONTAL_PADDING: f32 = 6.;
 /// `parent_crumb_mouse_state` must be a `MouseStateHandle` owned by the caller
 /// (e.g. on a TerminalView field) so hover and click events persist across
 /// renders. Inline `MouseStateHandle::default()` would zero state every frame
-/// and silently break clicks (per the RookUI mouse-state guidance).
+/// and silently break clicks (per the PtermUI mouse-state guidance).
 pub fn render_orchestration_breadcrumbs(
     agent_view_controller: &AgentViewController,
     parent_crumb_mouse_state: MouseStateHandle,
@@ -2659,7 +2662,7 @@ pub fn render_orchestration_breadcrumbs(
         .unwrap_or("Agent");
     let child_label = child_name.to_string();
 
-    // Parent crumb uses the Rook logo on a neutral disc to match the
+    // Parent crumb uses the Polaris Terminal logo on a neutral disc to match the
     // orchestrator pill in the pill bar.
     let parent_spec = CrumbSpec {
         conversation_id: parent_id,
@@ -2682,7 +2685,7 @@ pub fn render_orchestration_breadcrumbs(
     let chevron_color = internal_colors::text_sub(theme, theme.background());
     let chevron = ConstrainedBox::new(
         Icon::ChevronRight
-            .to_rookui_icon(chevron_color.into())
+            .to_ptermui_icon(chevron_color.into())
             .finish(),
     )
     .with_width(16.)
@@ -2761,7 +2764,7 @@ fn render_crumb(
     spec: CrumbSpec,
     mouse_state: Option<MouseStateHandle>,
     self_terminal_view_id: EntityId,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let conversation_id = spec.conversation_id;
@@ -2868,7 +2871,7 @@ fn build_crumb_inner(
     avatar_glyph: AvatarGlyph,
     is_active: bool,
     is_hovered: bool,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let text_color = if is_active || is_hovered {

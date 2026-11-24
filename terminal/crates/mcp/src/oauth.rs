@@ -2,14 +2,14 @@ use std::collections::HashMap;
 
 use futures::future::BoxFuture;
 use oauth2::{RefreshToken, TokenResponse as _};
+use pterm_core::channel::ChannelState;
+use pterm_errors::report_error;
+use ptermui_extras::secure_storage::AppContextExt as _;
 use rmcp::transport::auth::{
     AuthClient, AuthorizationManager, AuthorizationRequest, CredentialStore,
     InMemoryCredentialStore, OAuthClientConfig, OAuthState, StoredCredentials,
 };
 use rmcp::transport::{AuthError, AuthorizationSession};
-use rook_core::channel::ChannelState;
-use rook_errors::report_error;
-use rookui_extras::secure_storage::AppContextExt as _;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -111,7 +111,7 @@ impl OAuthCallbackReceiver {
 }
 
 /// A credential store that wraps [`InMemoryCredentialStore`] and persists token
-/// updates to Rook's secure storage via a channel.
+/// updates to Polaris Terminal's secure storage via a channel.
 ///
 /// When rmcp auto-refreshes an expired access token at runtime, the rotated
 /// tokens are only saved to the in-memory store by default. This wrapper
@@ -186,7 +186,7 @@ impl CredentialStore for PersistingCredentialStore {
 }
 
 /// Installs a [`PersistingCredentialStore`] on the given auth manager so that
-/// runtime token auto-refreshes are written back to Rook's secure storage.
+/// runtime token auto-refreshes are written back to Polaris Terminal's secure storage.
 ///
 /// A background tokio task is spawned to receive credential updates and persist
 /// them via the provided callback. The task terminates when the auth manager (and
@@ -324,7 +324,7 @@ pub async fn make_authenticated_client(
             log::warn!(
                 "File-based MCP server {uuid} requires OAuth authentication; \
                  skipping in headless mode. To use this server, authenticate it \
-                 in the Rook desktop app first."
+                 in the Polaris Terminal desktop app first."
             );
         }
         // Naming the alternatives matters more than it looks: a cloud agent
@@ -333,9 +333,9 @@ pub async fn make_authenticated_client(
         // act on.
         return Err(AuthError::AuthorizationFailed(
             "This MCP server asked for interactive OAuth, which cannot run in a headless or \
-             cloud agent. Either attach the server as a Rook-managed MCP so the platform \
+             cloud agent. Either attach the server as a Polaris Terminal-managed MCP so the platform \
              supplies its credentials, or configure a static credential header backed by a \
-             managed secret. Authenticating the server in the Rook desktop app also works for \
+             managed secret. Authenticating the server in the Polaris Terminal desktop app also works for \
              runs on that same machine."
                 .to_string(),
         ));
@@ -393,7 +393,9 @@ pub async fn make_authenticated_client(
         // Try dynamic client registration.
         let mut oauth_state = OAuthState::Unauthorized(auth_manager);
         oauth_state
-            .start_authorization(AuthorizationRequest::new(&redirect_uri).with_client_name("Rook"))
+            .start_authorization(
+                AuthorizationRequest::new(&redirect_uri).with_client_name("Polaris Terminal"),
+            )
             .await?;
         oauth_state
     };
@@ -447,13 +449,13 @@ pub async fn make_authenticated_client(
 
 /// Loads credentials from secure storage at the provided key.
 pub fn load_credentials_from_secure_storage<T: DeserializeOwned + Default>(
-    app: &mut rookui::AppContext,
+    app: &mut ptermui::AppContext,
     key: &str,
 ) -> T {
     app.secure_storage()
         .read_value(key)
         .inspect_err(|err| {
-            if !matches!(err, rookui_extras::secure_storage::Error::NotFound) {
+            if !matches!(err, ptermui_extras::secure_storage::Error::NotFound) {
                 log::warn!("Failed to read MCP credentials from secure storage: {err:#}");
             }
         })
@@ -464,7 +466,7 @@ pub fn load_credentials_from_secure_storage<T: DeserializeOwned + Default>(
 
 /// Writes credentials to secure storage at the provided key.
 pub fn write_to_secure_storage<T: Serialize>(
-    app: &mut rookui::AppContext,
+    app: &mut ptermui::AppContext,
     key: &str,
     credentials: &T,
 ) {

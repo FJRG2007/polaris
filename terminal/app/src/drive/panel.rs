@@ -1,11 +1,11 @@
 use futures::Future;
-use rook_errors::report_error;
-use rookui::elements::{
+use pterm_errors::report_error;
+use ptermui::elements::{
     Align, Flex, Hoverable, MouseStateHandle, ParentElement, SavePosition, Shrinkable,
 };
-use rookui::presenter::ChildView;
-use rookui::windowing::{StateEvent, WindowManager};
-use rookui::{
+use ptermui::presenter::ChildView;
+use ptermui::windowing::{StateEvent, WindowManager};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -16,7 +16,7 @@ use super::drive_helpers::{
     has_feature_gated_anonymous_user_reached_workflow_limit,
 };
 use super::index::{DriveIndex, DriveIndexAction, DriveIndexEvent};
-use super::items::RookDriveItemId;
+use super::items::PtermDriveItemId;
 use super::{CloudObjectTypeAndId, DriveObjectType};
 use crate::ai::document::ai_document_model::AIDocumentId;
 use crate::ai::facts::CloudAIFactModel;
@@ -39,12 +39,12 @@ use crate::workspaces::user_workspaces::UserWorkspaces;
 pub const MIN_SIDEBAR_WIDTH: f32 = 250.;
 pub const MAX_SIDEBAR_WIDTH_RATIO: f32 = 0.75;
 
-pub const ROOK_DRIVE_POSITION_ID: &str = "rook_drive";
+pub const POLARIS_TERMINAL_DRIVE_POSITION_ID: &str = "pterm_drive";
 
-/// The sidebar that houses Rook Drive.
+/// The sidebar that houses Polaris Terminal Drive.
 /// `DrivePanel` is different from `DriveIndex` in that it is responsible for
-/// how Rook Drive interacts with the workspace and the rest of the app, whereas
-/// `DriveIndex` is the main rook drive view and responsible for the internals of Rook Drive.
+/// how Polaris Terminal Drive interacts with the workspace and the rest of the app, whereas
+/// `DriveIndex` is the main polaris-terminal drive view and responsible for the internals of Polaris Terminal Drive.
 pub struct DrivePanel {
     index_view: ViewHandle<DriveIndex>,
     mouse_state_handles: MouseStateHandles,
@@ -87,7 +87,7 @@ pub enum DrivePanelEvent {
     OpenNotebook(NotebookSource),
     OpenEnvVarCollection(EnvVarCollectionSource),
     OpenWorkflowInPane(WorkflowOpenSource, WorkflowViewMode),
-    FocusRookDrive,
+    FocusPtermDrive,
     AttachPlanAsContext(AIDocumentId),
 }
 
@@ -320,7 +320,7 @@ impl DrivePanel {
             DriveIndexEvent::OpenWorkflowModalWithCloudWorkflow(workflow_id) => {
                 self.open_workflow_modal_with_existing(*workflow_id, ctx)
             }
-            DriveIndexEvent::FocusRookDrive => ctx.emit(DrivePanelEvent::FocusRookDrive),
+            DriveIndexEvent::FocusPtermDrive => ctx.emit(DrivePanelEvent::FocusPtermDrive),
             DriveIndexEvent::OpenSharedObjectsCreationDeniedModal(object_type, team_uid) => ctx
                 .emit(DrivePanelEvent::OpenSharedObjectsCreationDeniedModal(
                     *object_type,
@@ -474,7 +474,7 @@ impl DrivePanel {
 
     pub fn set_selected_object(
         &mut self,
-        id: Option<RookDriveItemId>,
+        id: Option<PtermDriveItemId>,
         ctx: &mut ViewContext<Self>,
     ) {
         self.index_view.update(ctx, |index_view, ctx| {
@@ -614,7 +614,7 @@ impl DrivePanel {
 
     pub fn expand_section_for_drive_item_id(
         &mut self,
-        item_id: RookDriveItemId,
+        item_id: PtermDriveItemId,
         ctx: &mut ViewContext<Self>,
     ) {
         self.index_view.update(ctx, |index, ctx| {
@@ -622,21 +622,25 @@ impl DrivePanel {
         })
     }
 
-    /// This functions scrolls the relevant Rook Drive item into view.
-    pub fn scroll_item_into_view(&mut self, item_id: RookDriveItemId, ctx: &mut ViewContext<Self>) {
+    /// This functions scrolls the relevant Polaris Terminal Drive item into view.
+    pub fn scroll_item_into_view(
+        &mut self,
+        item_id: PtermDriveItemId,
+        ctx: &mut ViewContext<Self>,
+    ) {
         self.index_view.update(ctx, |index, ctx| {
             index.scroll_item_into_view(item_id, ctx);
         })
     }
 
-    /// This functions sets the index of a focused Rook Drive item.
+    /// This functions sets the index of a focused Polaris Terminal Drive item.
     pub fn set_focused_index(&mut self, focused_index: Option<usize>, ctx: &mut ViewContext<Self>) {
         self.index_view.update(ctx, |index, ctx| {
             index.set_focused_index(focused_index, true, ctx);
         })
     }
 
-    pub fn set_focused_item(&mut self, item_id: RookDriveItemId, ctx: &mut ViewContext<Self>) {
+    pub fn set_focused_item(&mut self, item_id: PtermDriveItemId, ctx: &mut ViewContext<Self>) {
         self.index_view.update(ctx, |index, ctx| {
             ctx.focus(&self.index_view);
             index.set_focused_item(item_id, true, ctx);
@@ -650,27 +654,27 @@ impl DrivePanel {
         source: SharingDialogSource,
         ctx: &mut ViewContext<Self>,
     ) {
-        let rook_drive_item_id = RookDriveItemId::Object(object_id);
+        let pterm_drive_item_id = PtermDriveItemId::Object(object_id);
         self.index_view.update(ctx, |index, ctx| {
-            index.set_focused_item(rook_drive_item_id, true, ctx);
-            index.toggle_share_dialog(&rook_drive_item_id, invitee_email, source, ctx);
+            index.set_focused_item(pterm_drive_item_id, true, ctx);
+            index.toggle_share_dialog(&pterm_drive_item_id, invitee_email, source, ctx);
         });
     }
 
-    pub fn has_rook_drive_initialized_sections(
+    pub fn has_pterm_drive_initialized_sections(
         &self,
         app: &AppContext,
     ) -> impl Future<Output = ()> + use<> {
         self.index_view.as_ref(app).has_initialized_sections()
     }
 
-    pub fn reset_focused_index_in_rook_drive(
+    pub fn reset_focused_index_in_pterm_drive(
         &mut self,
         should_scroll: bool,
         ctx: &mut ViewContext<Self>,
     ) {
         self.index_view.update(ctx, |index, ctx| {
-            index.reset_focused_index_in_rook_drive(should_scroll, ctx);
+            index.reset_focused_index_in_pterm_drive(should_scroll, ctx);
         })
     }
 
@@ -693,7 +697,7 @@ impl DrivePanel {
 
 impl View for DrivePanel {
     fn ui_name() -> &'static str {
-        "RookDrivePanel"
+        "PtermDrivePanel"
     }
 
     fn on_focus(&mut self, focus_ctx: &FocusContext, ctx: &mut ViewContext<Self>) {
@@ -702,14 +706,14 @@ impl View for DrivePanel {
         }
     }
 
-    fn render(&self, _app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, _app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         let body = Hoverable::new(
             self.mouse_state_handles.focus_panel_mouse_state.clone(),
             |_| {
                 Align::new(
                     SavePosition::new(
                         ChildView::new(&self.index_view).finish(),
-                        ROOK_DRIVE_POSITION_ID,
+                        POLARIS_TERMINAL_DRIVE_POSITION_ID,
                     )
                     .finish(),
                 )
@@ -724,7 +728,7 @@ impl View for DrivePanel {
 
         let mut col = Flex::column();
         col.add_child(Shrinkable::new(1., body).finish());
-        col.with_main_axis_size(rookui::elements::MainAxisSize::Max)
+        col.with_main_axis_size(ptermui::elements::MainAxisSize::Max)
             .finish()
     }
 }
@@ -742,7 +746,7 @@ impl TypedActionView for DrivePanel {
             DrivePanelAction::FocusDriveIndex => {
                 ctx.focus(&self.index_view);
                 // should_scroll is set to false here in order to not let menu clicks autoscroll WD index
-                self.reset_focused_index_in_rook_drive(false, ctx);
+                self.reset_focused_index_in_pterm_drive(false, ctx);
             }
         }
     }

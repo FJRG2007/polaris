@@ -1,6 +1,6 @@
+use pterm_util::remote_path::RemotePath;
+use ptermui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 use remote_server::manager::{RemoteServerManager, RemoteServerManagerEvent};
-use rook_util::remote_path::RemotePath;
-use rookui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use super::GitHubRepoEvent;
 use crate::remote_server::proto;

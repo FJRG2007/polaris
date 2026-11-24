@@ -7,14 +7,14 @@ use std::time::Duration;
 
 use futures::TryFutureExt;
 use inquire::{InquireError, Select};
-use rook_cli::agent::Harness;
-use rook_cli::environment::{EnvironmentCreateArgs, EnvironmentUpdateArgs};
-use rook_cli::scope::{ObjectScope, TeamSelection};
-use rookui::r#async::FutureExt;
-use rookui::{AppContext, GetSingletonModelHandle, SingletonEntity as _, UpdateModel};
+use pterm_cli::agent::Harness;
+use pterm_cli::environment::{EnvironmentCreateArgs, EnvironmentUpdateArgs};
+use pterm_cli::scope::{ObjectScope, TeamSelection};
+use ptermui::r#async::FutureExt;
+use ptermui::{AppContext, GetSingletonModelHandle, SingletonEntity as _, UpdateModel};
 
 use crate::ai::agent::conversation::ServerAIConversationMetadata;
-use crate::ai::agent_sdk::driver::{AgentDriverError, ROOK_DRIVE_SYNC_TIMEOUT};
+use crate::ai::agent_sdk::driver::{AgentDriverError, POLARIS_TERMINAL_DRIVE_SYNC_TIMEOUT};
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::cloud_environments::CloudAmbientAgentEnvironment;
 use crate::ai::llms::{LLMId, LLMPreferences, is_model_allowed_for_scope};
@@ -258,14 +258,14 @@ where
     }
 }
 
-/// Refresh Rook Drive before executing an operation.
-pub fn refresh_rook_drive(
+/// Refresh Polaris Terminal Drive before executing an operation.
+pub fn refresh_pterm_drive(
     ctx: &AppContext,
 ) -> impl Future<Output = anyhow::Result<()>> + Send + 'static + use<> {
     UpdateManager::as_ref(ctx)
         .initial_load_complete()
-        .with_timeout(ROOK_DRIVE_SYNC_TIMEOUT)
-        .map_err(|_| anyhow::anyhow!("Timed out waiting for Rook Drive to sync"))
+        .with_timeout(POLARIS_TERMINAL_DRIVE_SYNC_TIMEOUT)
+        .map_err(|_| anyhow::anyhow!("Timed out waiting for Polaris Terminal Drive to sync"))
 }
 
 /// Fetch the conversation's server metadata and validate that its harness matches the caller's
@@ -337,7 +337,7 @@ pub enum EnvironmentChoice {
 
 impl EnvironmentChoice {
     /// Resolve the environment to use when creating an agent integration.
-    /// Rook Drive *must* have been synced first.
+    /// Polaris Terminal Drive *must* have been synced first.
     pub fn resolve_for_create(
         args: EnvironmentCreateArgs,
         ctx: &AppContext,
@@ -376,7 +376,8 @@ impl EnvironmentChoice {
 
             // If there are no synced environments, require the user to create one or use --no-environment.
             if options.len() == 1 {
-                let cli_name = rook_cli::binary_name().unwrap_or_else(|| "rook".to_string());
+                let cli_name =
+                    pterm_cli::binary_name().unwrap_or_else(|| "polaris-terminal".to_string());
                 return Err(ResolveConfigurationError::Other(anyhow::anyhow!(
                     "No environments are configured for this account.\n\
 You can create an environment with `{cli_name} environment create`.\n\
@@ -403,7 +404,7 @@ Without an environment, the agent will not be able to access private repositorie
 
     /// Resolve the environment to use when updating an agent integration. If the user did not
     /// request any changes to the environment, this returns `Ok(None)`.
-    /// Rook Drive *must* have been synced first.
+    /// Polaris Terminal Drive *must* have been synced first.
     pub fn resolve_for_update(
         args: EnvironmentUpdateArgs,
         ctx: &AppContext,

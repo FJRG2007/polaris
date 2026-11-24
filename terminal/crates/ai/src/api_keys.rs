@@ -6,10 +6,10 @@ use std::time::{Duration, SystemTime};
 #[cfg(not(target_family = "wasm"))]
 use futures::channel::oneshot;
 use indexmap::IndexMap;
-use rook_core::send_telemetry_from_ctx;
-use rook_errors::report_error;
-use rookui_core::{Entity, ModelContext, SingletonEntity};
-use rookui_extras::secure_storage::{self, AppContextExt};
+use pterm_core::send_telemetry_from_ctx;
+use pterm_errors::report_error;
+use ptermui_core::{Entity, ModelContext, SingletonEntity};
+use ptermui_extras::secure_storage::{self, AppContextExt};
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use url::Url;
@@ -48,7 +48,7 @@ pub enum ApiKeyManagerEvent {
 /// User-provided API keys for AI providers.
 ///
 /// These are used for "Bring Your Own API Key" functionality, allowing
-/// users to use their own API keys instead of Rook's.
+/// users to use their own API keys instead of Polaris Terminal's.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ApiKeys {

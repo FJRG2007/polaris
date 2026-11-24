@@ -4,8 +4,8 @@ pub use cloud_object_models::{
     RunAgentsPermission, WriteToPtyPermission,
 };
 use markdown_parser::{FormattedTextFragment, FormattedTextInline};
-use rook_core::features::FeatureFlag;
-use rookui::{AppContext, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::{AppContext, SingletonEntity};
 
 use super::llms::{LLMContextWindow, LLMInfo, LLMPreferences, LLMProvider};
 use crate::cloud_object::model::generic_string_model::StringModel;
@@ -278,7 +278,7 @@ impl StringModel for AIExecutionProfile {
             })
     }
 
-    fn renders_in_rook_drive(&self) -> bool {
+    fn renders_in_pterm_drive(&self) -> bool {
         false
     }
 }

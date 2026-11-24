@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 
-use rookui::Element;
-use rookui::elements::{
+use ptermui::Element;
+use ptermui::elements::{
     Align, ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisSize, MouseStateHandle,
     ParentElement, Shrinkable,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 
 use crate::appearance::Appearance;
 use crate::terminal::view::{InlineBannerId, TerminalAction};
@@ -147,7 +147,7 @@ impl CodebaseIndexSpeedbumpBannerState {
         let info_icon = Container::new(
             ConstrainedBox::new(
                 Icon::Info
-                    .to_rookui_icon(theme.active_ui_text_color())
+                    .to_ptermui_icon(theme.active_ui_text_color())
                     .finish(),
             )
             .with_width(appearance.ui_font_size() * 1.2)

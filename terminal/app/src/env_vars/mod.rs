@@ -2,7 +2,7 @@ pub use cloud_object_models::{
     CloudEnvVarCollection, CloudEnvVarCollectionModel, EnvVar, EnvVarCollection, EnvVarValue,
 };
 use itertools::Itertools;
-use rook_util::path::ShellFamily;
+use pterm_util::path::ShellFamily;
 
 pub mod active_env_var_collection_data;
 pub mod env_var_collection_block;
@@ -14,8 +14,8 @@ use crate::cloud_object::model::json_model::JsonModel;
 use crate::cloud_object::{
     GenericStringObjectFormat, GenericStringObjectUniqueKey, JsonObjectType, Revision,
 };
-use crate::drive::items::RookDriveItem;
-use crate::drive::items::env_var_collection::RookDriveEnvVarCollection;
+use crate::drive::items::PtermDriveItem;
+use crate::drive::items::env_var_collection::PtermDriveEnvVarCollection;
 use crate::server::ids::SyncId;
 use crate::server::sync_queue::QueueItem;
 use crate::terminal::shell::ShellType;
@@ -143,7 +143,7 @@ impl StringModel for EnvVarCollection {
         true
     }
 
-    fn renders_in_rook_drive(&self) -> bool {
+    fn renders_in_pterm_drive(&self) -> bool {
         true
     }
 
@@ -155,13 +155,13 @@ impl StringModel for EnvVarCollection {
         true
     }
 
-    fn to_rook_drive_item(
+    fn to_pterm_drive_item(
         &self,
         id: SyncId,
         _appearance: &Appearance,
         env_var_collection: &CloudEnvVarCollection,
-    ) -> Option<Box<dyn RookDriveItem>> {
-        Some(Box::new(RookDriveEnvVarCollection::new(
+    ) -> Option<Box<dyn PtermDriveItem>> {
+        Some(Box::new(PtermDriveEnvVarCollection::new(
             CloudObjectTypeAndId::GenericStringObject {
                 object_type: GenericStringObjectFormat::Json(JsonObjectType::EnvVarCollection),
                 id,
@@ -182,7 +182,7 @@ pub fn serialize_variables_for_shell<'s, I: IntoIterator<Item = (&'s str, &'s En
     shell_type: ShellType,
 ) -> String {
     match shell_type {
-        // Rook doesn't support newlines in fish so we can't use env syntax
+        // Polaris Terminal doesn't support newlines in fish so we can't use env syntax
         ShellType::Fish => {
             serialize_variables_internal(pairs, "set -x ", " ", ";", " ", shell_type.into())
         }

@@ -1,12 +1,12 @@
 use onboarding::slides::{AgentAutonomy, AgentDevelopmentSettings};
 use onboarding::{SelectedSettings, SessionDefault, UICustomizationSettings};
-use rook_errors::report_if_error;
-use rookui::{AppContext, SingletonEntity as _};
+use pterm_errors::report_if_error;
+use ptermui::{AppContext, SingletonEntity as _};
 use settings::Setting as _;
 
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::execution_profiles::{ActionPermission, WriteToPtyPermission};
-use crate::drive::settings::RookDriveSettings;
+use crate::drive::settings::PtermDriveSettings;
 use crate::settings::ai::DefaultSessionMode;
 use crate::settings::{AISettings, CodeSettings, UsageDisplayUnit};
 use crate::workspace::tab_settings::TabSettings;
@@ -20,8 +20,8 @@ pub(crate) fn apply_account_first_onboarding_settings(
     team_context: TeamContextForOperation,
     app: &mut AppContext,
 ) {
-    // Every authenticated account-first user gets the Rook Agent surface,
-    // including standard-free accounts with no included Rook credits. Skipping
+    // Every authenticated account-first user gets the Polaris Terminal Agent surface,
+    // including standard-free accounts with no included Polaris Terminal credits. Skipping
     // account creation is the only outcome that leaves Agent disabled.
     let is_ai_enabled = match account_class {
         None => false,
@@ -82,8 +82,8 @@ pub(crate) fn apply_account_first_onboarding_settings(
 
 /// Applies onboarding settings based on the user's selected mode.
 ///
-/// `has_account` indicates whether the user has (or is creating) a real Rook
-/// account. Rook's AI features run on a Rook account, so agent intent only
+/// `has_account` indicates whether the user has (or is creating) a real Polaris Terminal
+/// account. Polaris Terminal's AI features run on a Polaris Terminal account, so agent intent only
 /// enables AI when `has_account` is true; skipping login leaves AI off.
 pub(crate) fn apply_onboarding_settings(
     selected_settings: &SelectedSettings,
@@ -101,8 +101,8 @@ pub(crate) fn apply_onboarding_settings(
             if let Some(ui) = ui_customization {
                 apply_ui_customization_settings(ui, true, app);
             }
-            // Agent intent means the user wants AI, but Rook's AI features run
-            // on a Rook account, so AI is only enabled once they have one.
+            // Agent intent means the user wants AI, but Polaris Terminal's AI features run
+            // on a Polaris Terminal account, so AI is only enabled once they have one.
             // Skipping login leaves AI off even for agent intent (including the
             // bring-your-own-agents `disable_oz` path).
             has_account
@@ -156,11 +156,11 @@ fn apply_ui_customization_settings(
         );
     });
 
-    RookDriveSettings::handle(app).update(app, |settings, ctx| {
+    PtermDriveSettings::handle(app).update(app, |settings, ctx| {
         report_if_error!(
             settings
-                .enable_rook_drive
-                .set_value(ui.show_rook_drive, ctx)
+                .enable_pterm_drive
+                .set_value(ui.show_pterm_drive, ctx)
         );
     });
 

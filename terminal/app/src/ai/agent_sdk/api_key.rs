@@ -6,18 +6,18 @@ use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
 use comfy_table::Cell;
 use inquire::{Confirm, InquireError, Select};
-use rook_cli::agent::OutputFormat;
-use rook_cli::api_key::{
+use pterm_cli::agent::OutputFormat;
+use pterm_cli::api_key::{
     ApiKeyCommand, ApiKeyExpirationArgs, ApiKeySortByArg, CreateApiKeyArgs, ExpireApiKeyArgs,
     ListApiKeysArgs,
 };
-use rook_cli::{GlobalOptions, SortOrderArg};
-use rook_graphql::mutations::expire_api_key::ExpireApiKeyResult;
-use rook_graphql::mutations::generate_api_key::GenerateApiKeyResult;
-use rook_graphql::queries::api_keys::ApiKeyProperties;
-use rook_graphql::scalars::Time;
-use rookui::platform::TerminationMode;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_cli::{GlobalOptions, SortOrderArg};
+use pterm_graphql::mutations::expire_api_key::ExpireApiKeyResult;
+use pterm_graphql::mutations::generate_api_key::GenerateApiKeyResult;
+use pterm_graphql::queries::api_keys::ApiKeyProperties;
+use pterm_graphql::scalars::Time;
+use ptermui::platform::TerminationMode;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use serde::Serialize;
 
 use super::output::{self, TableFormat};
@@ -108,7 +108,7 @@ impl ApiKeyCommandRunner {
                     },
                     GenerateApiKeyResult::UserFacingError(e) => {
                         return Err(anyhow!(
-                            rook_graphql::client::get_user_facing_error_message(e)
+                            pterm_graphql::client::get_user_facing_error_message(e)
                         ));
                     }
                     GenerateApiKeyResult::Unknown => {
@@ -208,7 +208,7 @@ impl ApiKeyCommandRunner {
                             ExpireApiKeyResult::ExpireApiKeyOutput(output) => output.success,
                             ExpireApiKeyResult::UserFacingError(e) => {
                                 return Err(anyhow!(
-                                    rook_graphql::client::get_user_facing_error_message(e)
+                                    pterm_graphql::client::get_user_facing_error_message(e)
                                 ));
                             }
                             ExpireApiKeyResult::Unknown => {
@@ -230,7 +230,7 @@ impl ApiKeyCommandRunner {
     }
 }
 
-impl rookui::Entity for ApiKeyCommandRunner {
+impl ptermui::Entity for ApiKeyCommandRunner {
     type Event = ();
 }
 
@@ -428,7 +428,7 @@ fn expires_at_from_args(args: ApiKeyExpirationArgs) -> Result<Option<Time>> {
 fn print_created_api_key(
     result: CreatedApiKeyInfo,
     output_format: OutputFormat,
-    json_output: rook_cli::json_filter::JsonOutput,
+    json_output: pterm_cli::json_filter::JsonOutput,
 ) -> Result<()> {
     if json_output.force_json_output() {
         output::print_raw_json(serde_json::to_value(&result)?, &json_output)?;
@@ -451,7 +451,7 @@ fn print_expire_api_key_result(
     key_uid: String,
     expired: bool,
     output_format: OutputFormat,
-    json_output: rook_cli::json_filter::JsonOutput,
+    json_output: pterm_cli::json_filter::JsonOutput,
 ) -> Result<()> {
     let result = ExpiredApiKeyInfo { key_uid, expired };
     if json_output.force_json_output() {

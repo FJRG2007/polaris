@@ -18,7 +18,7 @@ Most relevant entry points before this branch:
 - `app/src/terminal/view.rs` — `scroll_to_match`, `block_completed_event` handling
 - `app/src/view_components/find.rs` — `FindModel` trait + find bar render
 - `app/src/terminal/model/grid/grid_handler.rs` — `find_in_range`, `AbsolutePoint`
-- `crates/rook_features/src/lib.rs` — feature flag registry
+- `crates/pterm_features/src/lib.rs` — feature flag registry
 
 ## Proposed changes
 
@@ -116,9 +116,9 @@ Three small changes outside the find module:
 
 ### Feature flag, build setup
 
-- `crates/rook_features/src/lib.rs` adds `FeatureFlag::AsyncFind` and lists it in `DOGFOOD_FLAGS`.
+- `crates/pterm_features/src/lib.rs` adds `FeatureFlag::AsyncFind` and lists it in `DOGFOOD_FLAGS`.
 - `app/Cargo.toml` adds the corresponding `async_find = []` cargo feature, and `app/src/lib.rs::enabled_features()` maps the cargo feature to the runtime flag.
-- Top-level `Cargo.toml` bumps `rook_terminal.opt-level = 3` in the `dev` profile because the background task's hot loop (DFA matching against thousands of rows) is intolerably slow under `opt-level = 0`.
+- Top-level `Cargo.toml` bumps `pterm_terminal.opt-level = 3` in the `dev` profile because the background task's hot loop (DFA matching against thousands of rows) is intolerably slow under `opt-level = 0`.
 
 ### End-to-end flow
 
@@ -150,7 +150,7 @@ sequenceDiagram
 
 ## Testing and validation
 
-Tests live in `app/src/terminal/find/model/async_find_tests.rs` and run via `cargo nextest run -p rook_terminal` (or the workspace defaults). Each spec invariant from `PRODUCT.md` is covered:
+Tests live in `app/src/terminal/find/model/async_find_tests.rs` and run via `cargo nextest run -p pterm_terminal` (or the workspace defaults). Each spec invariant from `PRODUCT.md` is covered:
 
 - **PRODUCT.md (1, 18) — parity with sync find.** `test_async_find_produces_same_results_as_sync_find` runs sync and async over the same mocked block list and asserts identical match counts and ranges. `test_async_focused_order_matches_sync_most_recent_last` and `test_async_focused_order_matches_sync_most_recent_first` lock down focus traversal order against sync for both sort directions.
 - **PRODUCT.md (2, 3) — scanning indicator.** `test_async_find_status_display` covers the `AsyncFindStatus` Display impl. `is_scanning()` and `match_count()` thread through the existing `view_components/find.rs` render tests via the `FindModel` trait.
@@ -179,7 +179,7 @@ Lint/format:
 
 1. **Stale `Done` messages from a cancelled scan ending a new one prematurely.** The result stream is created per `start_find` call, but `async_channel`s in flight can outlive the cancel. Each spawn captures the controller's `generation` counter; `process_message` is only called when `controller.generation == captured_generation`. (See commit `b4e69a5390 Avoid explicit polling.`)
 
-2. **Lock contention with the ANSI parser writing to the active block's grid.** Mitigated by the `ROWS_PER_CHUNK = 1000` chunking + `MAX_LOCK_DURATION_MS = 5` budget + `yield_now()` in `scan_grid_chunked`. The terminal model lock is a `FairMutex` so the writer cannot starve. Per `ROOK.md`, locking discipline matters: the background task only acquires the lock inside `scan_grid_chunked` and immediately drops it before any await point.
+2. **Lock contention with the ANSI parser writing to the active block's grid.** Mitigated by the `ROWS_PER_CHUNK = 1000` chunking + `MAX_LOCK_DURATION_MS = 5` budget + `yield_now()` in `scan_grid_chunked`. The terminal model lock is a `FairMutex` so the writer cannot starve. Per `POLARIS_TERMINAL.md`, locking discipline matters: the background task only acquires the lock inside `scan_grid_chunked` and immediately drops it before any await point.
 
 3. **Queue/result race on completion.** The `Done` message is emitted by the background task only when `pop()` returned a drained queue (`queue_drained == true`), checked atomically inside the queue's mutex. This avoids the TOCTOU race of a separate `is_empty()` check.
 

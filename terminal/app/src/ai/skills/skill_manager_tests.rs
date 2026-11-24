@@ -3,21 +3,21 @@ use std::fs;
 use std::path::Path;
 
 use ai::skills::{ParsedSkill, SkillProvider, SkillReference, SkillScope, get_provider_for_path};
+use pterm_core::channel::ChannelState;
+use pterm_core::execution_mode::{AppExecutionMode, ExecutionMode};
+use pterm_core::features::FeatureFlag;
+use pterm_util::host_id::HostId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::App;
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::{DirectoryWatcher, RepoMetadataModel};
-use rook_core::channel::ChannelState;
-use rook_core::execution_mode::{AppExecutionMode, ExecutionMode};
-use rook_core::features::FeatureFlag;
-use rook_util::host_id::HostId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::App;
 use tempfile::TempDir;
 use watcher::HomeDirectoryWatcher;
 
 use super::*;
-use crate::rook_managed_paths_watcher::RookManagedPathsWatcher;
+use crate::pterm_managed_paths_watcher::PtermManagedPathsWatcher;
 use crate::settings::AISettings;
 
 // ============================================================================
@@ -88,12 +88,12 @@ fn get_skills_for_working_directory_scopes_subdirectory_skills() {
         let repo_handle = app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let skill_manager_handle = app.add_singleton_model(SkillManager::new);
 
         // Register the repo root so get_root_for_path returns Some.
         let canonical_repo =
-            rook_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo)
+            pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo)
                 .unwrap();
         repo_handle.update(&mut app, |repos, _ctx| {
             repos.insert_test_repo_root(canonical_repo);
@@ -180,7 +180,7 @@ fn remote_home_provider_variants_are_available_for_provider_selection() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
 
         handle.update(&mut app, |manager, _| {
@@ -233,7 +233,7 @@ fn remote_home_provider_variants_are_scoped_to_the_descriptor_host() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
 
         handle.update(&mut app, |manager, _| {
@@ -290,7 +290,7 @@ fn remote_home_skill_replaces_an_overlapping_index_entry() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
 
         handle.update(&mut app, |manager, _| {
@@ -376,12 +376,12 @@ fn get_skills_for_working_directory_name_collision_returns_both() {
         let repo_handle = app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let skill_manager_handle = app.add_singleton_model(SkillManager::new);
 
         // Register the repo root so get_root_for_path returns Some.
         let canonical_repo =
-            rook_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo)
+            pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo)
                 .unwrap();
         repo_handle.update(&mut app, |repos, _ctx| {
             repos.insert_test_repo_root(canonical_repo);
@@ -480,11 +480,11 @@ fn cloud_environment_skills_always_included() {
         let repo_handle = app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let skill_manager_handle = app.add_singleton_model(SkillManager::new);
 
         let canonical_repo_a =
-            rook_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo_a)
+            pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo_a)
                 .unwrap();
         repo_handle.update(&mut app, |repos, _ctx| {
             repos.insert_test_repo_root(canonical_repo_a);
@@ -547,8 +547,8 @@ name: test-skill
 description: Test skill with variables
 ---
 
-Run `{{rook_cli_binary_name}}` to connect to {{rook_server_url}}.
-Use `{{rookctrl_binary_name}}` from {{rookctrl_wrapper_path}}.
+Run `{{pterm_cli_binary_name}}` to connect to {{pterm_server_url}}.
+Use `{{ptermctrl_binary_name}}` from {{ptermctrl_wrapper_path}}.
 "#,
     )
     .unwrap();
@@ -563,10 +563,10 @@ Use `{{rookctrl_binary_name}}` from {{rookctrl_wrapper_path}}.
     assert!(skill.content.contains(&format!(
         "Run `{expected_cli}` to connect to {expected_url}."
     )));
-    let expected_rookctrl = ChannelState::channel().rookctrl_command_name();
-    let expected_wrapper = resources_dir.join("bin").join(expected_rookctrl);
+    let expected_ptermctrl = ChannelState::channel().ptermctrl_command_name();
+    let expected_wrapper = resources_dir.join("bin").join(expected_ptermctrl);
     assert!(skill.content.contains(&format!(
-        "Use `{expected_rookctrl}` from {}.",
+        "Use `{expected_ptermctrl}` from {}.",
         expected_wrapper.display()
     )));
 }
@@ -616,7 +616,7 @@ fn test_read_bundled_skills_preserves_other_content() {
     let resources_dir = temp_dir.path();
     let skills_dir = resources_dir.join("bundled/skills");
 
-    // Create a test skill with both rook and non-rook variables
+    // Create a test skill with both polaris-terminal and non-polaris-terminal variables
     let skill_dir = skills_dir.join("test-skill");
     fs::create_dir_all(&skill_dir).unwrap();
     let skill_file = skill_dir.join("SKILL.md");
@@ -627,7 +627,7 @@ name: test-skill
 description: Test skill with mixed variables
 ---
 
-Use {{other_var}}, {{rook_cli_binary_name}}, and {{skill_dir}} together.
+Use {{other_var}}, {{pterm_cli_binary_name}}, and {{skill_dir}} together.
 "#,
     )
     .unwrap();
@@ -681,16 +681,16 @@ fn test_build_bundled_skill_context() {
     let context = build_bundled_skill_context(resources_dir, &skill_dir);
 
     assert_eq!(context.len(), 13);
-    assert!(context.contains_key("rook_server_url"));
-    assert!(context.contains_key("rook_cli_binary_name"));
-    assert!(context.contains_key("rookctrl_binary_name"));
-    assert!(context.contains_key("rookctrl_wrapper_path"));
-    assert!(context.contains_key("rook_url_scheme"));
+    assert!(context.contains_key("pterm_server_url"));
+    assert!(context.contains_key("pterm_cli_binary_name"));
+    assert!(context.contains_key("ptermctrl_binary_name"));
+    assert!(context.contains_key("ptermctrl_wrapper_path"));
+    assert!(context.contains_key("pterm_url_scheme"));
     assert!(context.contains_key("settings_file_path"));
     assert!(context.contains_key("keybindings_file_path"));
     assert_eq!(
         context.get("gui_settings_file_path").unwrap(),
-        &rook_core::paths::gui_config_local_dir()
+        &pterm_core::paths::gui_config_local_dir()
             .map(|path| path.join("settings.toml"))
             .unwrap_or_default()
             .display()
@@ -698,21 +698,21 @@ fn test_build_bundled_skill_context() {
     );
     assert_eq!(
         context.get("tui_settings_file_path").unwrap(),
-        &rook_core::paths::tui_config_local_dir()
+        &pterm_core::paths::tui_config_local_dir()
             .join("settings.toml")
             .display()
             .to_string()
     );
     assert_eq!(
         context.get("gui_mcp_config_file_path").unwrap(),
-        &rook_core::paths::gui_mcp_config_file_path()
+        &pterm_core::paths::gui_mcp_config_file_path()
             .unwrap_or_default()
             .display()
             .to_string()
     );
     assert_eq!(
         context.get("tui_mcp_config_file_path").unwrap(),
-        &rook_core::paths::tui_mcp_config_file_path()
+        &pterm_core::paths::tui_mcp_config_file_path()
             .display()
             .to_string()
     );
@@ -729,27 +729,27 @@ fn test_build_bundled_skill_context() {
     );
 
     assert_eq!(
-        context.get("rook_server_url").unwrap(),
+        context.get("pterm_server_url").unwrap(),
         &ChannelState::server_root_url().to_string()
     );
     assert_eq!(
-        context.get("rook_cli_binary_name").unwrap(),
+        context.get("pterm_cli_binary_name").unwrap(),
         ChannelState::channel().cli_command_name()
     );
     assert_eq!(
-        context.get("rookctrl_binary_name").unwrap(),
-        ChannelState::channel().rookctrl_command_name()
+        context.get("ptermctrl_binary_name").unwrap(),
+        ChannelState::channel().ptermctrl_command_name()
     );
     assert_eq!(
-        context.get("rookctrl_wrapper_path").unwrap(),
+        context.get("ptermctrl_wrapper_path").unwrap(),
         &resources_dir
             .join("bin")
-            .join(ChannelState::channel().rookctrl_command_name())
+            .join(ChannelState::channel().ptermctrl_command_name())
             .display()
             .to_string()
     );
     assert_eq!(
-        context.get("rook_url_scheme").unwrap(),
+        context.get("pterm_url_scheme").unwrap(),
         ChannelState::url_scheme()
     );
     assert_eq!(
@@ -773,7 +773,7 @@ fn bundled_test_skill(id: &str, description: &str) -> ParsedSkill {
         path: LocalOrRemotePath::Local(format!("/bundled/skills/{id}/SKILL.md").into()),
         content: format!("# {id}"),
         line_range: None,
-        provider: SkillProvider::Rook,
+        provider: SkillProvider::Pterm,
         scope: SkillScope::Bundled,
     }
 }
@@ -860,13 +860,13 @@ fn get_skills_for_working_directory_respects_location() {
         path: LocalOrRemotePath::Remote(RemotePath::new(
             same_host_id.clone(),
             StandardizedPath::try_new(
-                "/home/user/.rook/remote-server/bundled_resources/bundled/skills/remote-bundled/SKILL.md",
+                "/home/user/.polaris/terminal/remote-server/bundled_resources/bundled/skills/remote-bundled/SKILL.md",
             )
             .unwrap(),
         )),
         content: "# remote-bundled".to_string(),
         line_range: None,
-        provider: SkillProvider::Rook,
+        provider: SkillProvider::Pterm,
         scope: SkillScope::Bundled,
     };
 
@@ -893,7 +893,7 @@ fn get_skills_for_working_directory_respects_location() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
         let _bundled_skills = FeatureFlag::BundledSkills.override_enabled(true);
 
@@ -1054,16 +1054,16 @@ fn feature_gated_bundled_skill_is_listed_only_when_enabled() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
         let bundled_skills_guard = FeatureFlag::BundledSkills.override_enabled(true);
-        let rook_control_cli = FeatureFlag::RookControlCli.override_enabled(false);
+        let pterm_control_cli = FeatureFlag::PtermControlCli.override_enabled(false);
 
         handle.update(&mut app, |manager, _| {
             manager.add_bundled_skill_for_testing(
-                "rookctrl",
-                bundled_test_skill("rookctrl", "Control Rook"),
-                BundledSkillActivation::RequiresFeature(FeatureFlag::RookControlCli),
+                "ptermctrl",
+                bundled_test_skill("ptermctrl", "Control Polaris Terminal"),
+                BundledSkillActivation::RequiresFeature(FeatureFlag::PtermControlCli),
             );
             manager.add_bundled_skill_for_testing(
                 "always",
@@ -1079,11 +1079,11 @@ fn feature_gated_bundled_skill_is_listed_only_when_enabled() {
                 .map(|skill| skill.name)
                 .collect::<HashSet<_>>()
         });
-        assert!(!disabled_names.contains("rookctrl"));
+        assert!(!disabled_names.contains("ptermctrl"));
         assert!(disabled_names.contains("always"));
 
-        drop(rook_control_cli);
-        let rook_control_cli_enabled = FeatureFlag::RookControlCli.override_enabled(true);
+        drop(pterm_control_cli);
+        let pterm_control_cli_enabled = FeatureFlag::PtermControlCli.override_enabled(true);
         let enabled_names = handle.read(&app, |manager, ctx| {
             manager
                 .get_skills_for_working_directory(None, ctx)
@@ -1091,9 +1091,9 @@ fn feature_gated_bundled_skill_is_listed_only_when_enabled() {
                 .map(|skill| skill.name)
                 .collect::<HashSet<_>>()
         });
-        assert!(enabled_names.contains("rookctrl"));
+        assert!(enabled_names.contains("ptermctrl"));
         assert!(enabled_names.contains("always"));
-        drop(rook_control_cli_enabled);
+        drop(pterm_control_cli_enabled);
         drop(bundled_skills_guard);
     });
 }
@@ -1110,7 +1110,7 @@ fn tui_only_bundled_skill_is_listed_and_resolved_only_in_tui() {
             app.add_singleton_model(|_| DetectedRepositories::default());
             app.add_singleton_model(RepoMetadataModel::new);
             app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-            app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+            app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
             let handle = app.add_singleton_model(SkillManager::new);
             let _bundled_skills = FeatureFlag::BundledSkills.override_enabled(true);
             let reference = SkillReference::BundledSkillId("tui-migrate-setup".to_owned());
@@ -1147,22 +1147,22 @@ fn tui_migration_skill_has_tui_only_activation() {
     ));
 }
 #[test]
-fn rook_control_bundled_skill_activations_track_rook_control_feature() {
+fn pterm_control_bundled_skill_activations_track_pterm_control_feature() {
     App::test((), |app| async move {
         let settings = app.add_singleton_model(AISettings::new_with_defaults);
-        let rook_control_cli = FeatureFlag::RookControlCli.override_enabled(false);
-        let activations = ["rookctrl"]
+        let pterm_control_cli = FeatureFlag::PtermControlCli.override_enabled(false);
+        let activations = ["ptermctrl"]
             .map(|skill_id| activation_for_bundled_skill(skill_id, Path::new("/resources")));
         for activation in &activations {
             assert!(!settings.read(&app, |_, ctx| activation.is_enabled(ctx)));
         }
 
-        drop(rook_control_cli);
-        let rook_control_cli_enabled = FeatureFlag::RookControlCli.override_enabled(true);
+        drop(pterm_control_cli);
+        let pterm_control_cli_enabled = FeatureFlag::PtermControlCli.override_enabled(true);
         for activation in &activations {
             assert!(settings.read(&app, |_, ctx| activation.is_enabled(ctx)));
         }
-        drop(rook_control_cli_enabled);
+        drop(pterm_control_cli_enabled);
     });
 }
 
@@ -1188,8 +1188,8 @@ fn factory_mcp_bundled_skill_activation_tracks_factory_mcp_feature() {
 }
 
 #[test]
-fn rook_control_direct_read_respects_rook_control_feature() {
-    let reference = SkillReference::BundledSkillId("rookctrl".to_owned());
+fn pterm_control_direct_read_respects_pterm_control_feature() {
+    let reference = SkillReference::BundledSkillId("ptermctrl".to_owned());
 
     App::test((), |mut app| async move {
         app.add_singleton_model(DirectoryWatcher::new);
@@ -1197,15 +1197,15 @@ fn rook_control_direct_read_respects_rook_control_feature() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
-        let rook_control_cli = FeatureFlag::RookControlCli.override_enabled(false);
+        let pterm_control_cli = FeatureFlag::PtermControlCli.override_enabled(false);
 
         handle.update(&mut app, |manager, _| {
             manager.add_bundled_skill_for_testing(
-                "rookctrl",
-                bundled_test_skill("rookctrl", "Control Rook"),
-                BundledSkillActivation::RequiresFeature(FeatureFlag::RookControlCli),
+                "ptermctrl",
+                bundled_test_skill("ptermctrl", "Control Polaris Terminal"),
+                BundledSkillActivation::RequiresFeature(FeatureFlag::PtermControlCli),
             );
         });
 
@@ -1216,12 +1216,12 @@ fn rook_control_direct_read_respects_rook_control_feature() {
             manager.active_skill_by_reference(&reference, ctx).is_none()
         }));
 
-        drop(rook_control_cli);
-        let rook_control_cli_enabled = FeatureFlag::RookControlCli.override_enabled(true);
+        drop(pterm_control_cli);
+        let pterm_control_cli_enabled = FeatureFlag::PtermControlCli.override_enabled(true);
         assert!(handle.read(&app, |manager, ctx| {
             manager.active_skill_by_reference(&reference, ctx).is_some()
         }));
-        drop(rook_control_cli_enabled);
+        drop(pterm_control_cli_enabled);
     });
 }
 #[test]
@@ -1235,7 +1235,7 @@ fn active_skill_by_reference_resolves_exact_remote_identity() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
 
         handle.update(&mut app, |manager, _| {
@@ -1267,7 +1267,7 @@ fn active_skill_by_reference_distinguishes_remote_hosts_with_the_same_display_pa
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
 
         handle.update(&mut app, |manager, _| {
@@ -1298,7 +1298,7 @@ fn active_skill_by_reference_with_origin_returns_typed_lookup_errors() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
         let reference = SkillReference::BundledSkillId("missing".to_string());
 
@@ -1348,7 +1348,7 @@ fn remote_home_skills_are_host_scoped_replaceable_and_path_invokable() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
 
         handle.update(&mut app, |manager, _| {
@@ -1498,7 +1498,7 @@ fn removing_remote_home_skills_preserves_project_skills_below_home() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
 
         handle.update(&mut app, |manager, _| {
@@ -1538,7 +1538,7 @@ fn make_skill(name: &str, provider_dir: &str) -> ParsedSkill {
         path: path.clone(),
         content: format!("# {name}"),
         line_range: None,
-        provider: get_provider_for_path(&path).unwrap_or(SkillProvider::Rook),
+        provider: get_provider_for_path(&path).unwrap_or(SkillProvider::Pterm),
         scope: SkillScope::Project,
     }
 }
@@ -1552,7 +1552,7 @@ fn best_supported_provider_fast_path_returns_deduped_provider() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
 
         let claude_skill = make_skill("deploy", ".claude");
@@ -1578,7 +1578,7 @@ fn best_supported_provider_remaps_to_supported_provider() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
 
         let agents_skill = make_skill("deploy", ".agents");
@@ -1609,7 +1609,7 @@ fn best_supported_provider_falls_back_when_no_match() {
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+        app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
         let handle = app.add_singleton_model(SkillManager::new);
 
         let agents_skill = make_skill("deploy", ".agents");

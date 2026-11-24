@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use rook_util::host_id::HostId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
+use pterm_util::host_id::HostId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
 use thiserror::Error;
 use warp_multi_agent_api as api;
 
@@ -181,7 +181,7 @@ impl From<SkillScope> for api::skill_descriptor::Scope {
 impl From<SkillProvider> for api::skill_descriptor::Provider {
     fn from(scope: SkillProvider) -> Self {
         let provider_type: api::skill_descriptor::provider::Type = match scope {
-            SkillProvider::Rook => api::skill_descriptor::provider::Type::Warp(()),
+            SkillProvider::Pterm => api::skill_descriptor::provider::Type::Warp(()),
             SkillProvider::Agents => api::skill_descriptor::provider::Type::Agents(()),
             SkillProvider::Claude => api::skill_descriptor::provider::Type::Claude(()),
             SkillProvider::Codex => api::skill_descriptor::provider::Type::Codex(()),
@@ -276,7 +276,7 @@ fn convert_provider(
     };
 
     match provider_type {
-        api::skill_descriptor::provider::Type::Warp(_) => Ok(SkillProvider::Rook),
+        api::skill_descriptor::provider::Type::Warp(_) => Ok(SkillProvider::Pterm),
         api::skill_descriptor::provider::Type::Agents(_) => Ok(SkillProvider::Agents),
         api::skill_descriptor::provider::Type::Claude(_) => Ok(SkillProvider::Claude),
         api::skill_descriptor::provider::Type::Codex(_) => Ok(SkillProvider::Codex),

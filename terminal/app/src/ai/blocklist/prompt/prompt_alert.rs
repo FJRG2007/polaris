@@ -1,11 +1,11 @@
 use ai::api_keys::ApiKeyManager;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, FormattedTextElement,
     HighlightedHyperlink, HyperlinkLens, MainAxisAlignment, MainAxisSize, ParentElement,
 };
-use rookui::{
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
     WeakViewHandle,
 };
@@ -401,7 +401,7 @@ impl PromptAlertView {
                         "use your own API keys",
                         WorkspaceAction::ShowSettingsPageWithSearch {
                             search_query: "api".to_string(),
-                            section: Some(SettingsSection::RookAgent),
+                            section: Some(SettingsSection::PtermAgent),
                         },
                     ));
                 }
@@ -512,7 +512,7 @@ impl View for PromptAlertView {
             chip_row.add_child(
                 ConstrainedBox::new(
                     Icon::AlertTriangle
-                        .to_rookui_icon(error_color(appearance.theme()).into())
+                        .to_ptermui_icon(error_color(appearance.theme()).into())
                         .finish(),
                 )
                 .with_width(icon_size)

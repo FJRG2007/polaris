@@ -1,9 +1,9 @@
-use rookui::elements::{
+use ptermui::elements::{
     Align, ChildView, ConstrainedBox, Container, CrossAxisAlignment, Expanded, Flex, ParentElement,
     Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 

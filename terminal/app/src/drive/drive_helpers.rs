@@ -1,7 +1,7 @@
-use rook_server_auth::AuthStateProvider;
-use rook_server_auth::auth_state::AuthState;
-use rook_server_auth::user::PersonalObjectLimits;
-use rookui::{AppContext, SingletonEntity};
+use pterm_server_auth::AuthStateProvider;
+use pterm_server_auth::auth_state::AuthState;
+use pterm_server_auth::user::PersonalObjectLimits;
+use ptermui::{AppContext, SingletonEntity};
 
 use crate::auth::auth_manager::AuthManager;
 use crate::cloud_object::Space;

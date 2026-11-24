@@ -3,34 +3,34 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::vec2f;
-#[cfg(not(target_family = "wasm"))]
-use remote_server::manager::RemoteServerManager;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::icons::ICON_DIMENSIONS;
-use rook_editor::model::CoreEditorModel;
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::icons::ICON_DIMENSIONS;
+use pterm_editor::model::CoreEditorModel;
 #[cfg(feature = "local_fs")]
-use rook_files::{FileModel, FileModelEvent};
+use pterm_files::{FileModel, FileModelEvent};
 #[cfg(feature = "local_fs")]
-use rook_util::file::FileId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::path::user_friendly_path;
-use rook_util::remote_path::RemotePath;
-use rookui::accessibility::{AccessibilityContent, RookA11yRole};
+use pterm_util::file::FileId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::path::user_friendly_path;
+use pterm_util::remote_path::RemotePath;
+use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
 #[cfg(feature = "local_fs")]
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Align, Container, CrossAxisAlignment, DispatchEventResult, Empty, EventHandler, Flex,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, SavePosition, Shrinkable,
     Stack, Text,
 };
-use rookui::keymap::EditableBinding;
-use rookui::presenter::ChildView;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::keymap::EditableBinding;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
+#[cfg(not(target_family = "wasm"))]
+use remote_server::manager::RemoteServerManager;
 
 use super::context_menu::{ContextMenuAction, ContextMenuState, show_rich_editor_context_menu};
 use super::editor::view::{EditorViewEvent, RichTextEditorConfig, RichTextEditorView};
@@ -57,12 +57,12 @@ use crate::terminal::model::session::Session;
 use crate::ui_components::icons::Icon;
 #[cfg(feature = "local_fs")]
 use crate::util::openable_file_type::FileTarget;
-// `renders_in_rook_notebook_viewer` is only consumed by non-wasm views
+// `renders_in_pterm_notebook_viewer` is only consumed by non-wasm views
 // (`code::view` resolves to `view.rs` off-wasm and to `wasm.rs` on-wasm, and the
 // tooltips helper is `local_fs`-gated). Gate the re-export to match, otherwise it
 // is flagged as an unused import on the wasm build where those consumers are absent.
 #[cfg(not(target_family = "wasm"))]
-pub use crate::util::openable_file_type::renders_in_rook_notebook_viewer;
+pub use crate::util::openable_file_type::renders_in_pterm_notebook_viewer;
 pub use crate::util::openable_file_type::{is_jupyter_notebook_file, is_markdown_file};
 use crate::view_components::{MarkdownToggleEvent, MarkdownToggleView};
 use crate::workflows::{WorkflowSource, WorkflowType};
@@ -76,7 +76,7 @@ pub enum MarkdownDisplayMode {
     Raw,
 }
 
-/// View for a read-only notebook backed by a file, rather than Rook Drive.
+/// View for a read-only notebook backed by a file, rather than Polaris Terminal Drive.
 pub struct FileNotebookView {
     /// Cached for displaying the title and breadcrumbs.
     location: Option<FileLocation>,
@@ -117,7 +117,7 @@ pub enum FileNotebookEvent {
     OpenFileWithTarget {
         path: PathBuf,
         target: FileTarget,
-        line_col: Option<rook_util::path::LineAndColumnArg>,
+        line_col: Option<pterm_util::path::LineAndColumnArg>,
     },
 }
 
@@ -226,7 +226,7 @@ pub const TOGGLE_MARKDOWN_DISPLAY_MODE_BINDING_DESCRIPTION: &str =
 pub const TOGGLE_MARKDOWN_DISPLAY_MODE_KEY_BINDING: &str = "cmdorctrl-e";
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_editable_bindings([
         EditableBinding::new(
@@ -946,7 +946,7 @@ impl FileNotebookView {
                             TextAndIcon::new(
                                 TextAndIconAlignment::TextFirst,
                                 "Try again".to_string(),
-                                Icon::Refresh.to_rookui_icon(error_text_color),
+                                Icon::Refresh.to_ptermui_icon(error_text_color),
                                 MainAxisSize::Min,
                                 MainAxisAlignment::Center,
                                 vec2f(16., 16.),
@@ -1033,7 +1033,7 @@ impl View for FileNotebookView {
         "FileNotebookView"
     }
 
-    fn keymap_context(&self, _app: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, _app: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
         if self.shows_markdown_toggle() {
             context.set.insert(MARKDOWN_DISPLAY_MODE_TOGGLE_CONTEXT);
@@ -1044,7 +1044,7 @@ impl View for FileNotebookView {
     fn accessibility_contents(&self, _ctx: &AppContext) -> Option<AccessibilityContent> {
         Some(AccessibilityContent::new_without_help(
             format!("{} notebook", self.title()),
-            RookA11yRole::TextRole,
+            PtermA11yRole::TextRole,
         ))
     }
 
@@ -1285,13 +1285,13 @@ impl BackingView for FileNotebookView {
             let title_text = render_pane_header_title_text(
                 title,
                 appearance,
-                rookui::text_layout::ClipConfig::start(),
+                ptermui::text_layout::ClipConfig::start(),
             );
 
             let title_element: Box<dyn Element> =
                 if let Some(display_path) = self.file_state.path().map(|p| p.display_path()) {
                     use pathfinder_geometry::vector::vec2f;
-                    use rookui::elements::{
+                    use ptermui::elements::{
                         ChildAnchor, Hoverable, OffsetPositioning, ParentAnchor,
                         ParentOffsetBounds, Stack,
                     };
@@ -1340,7 +1340,7 @@ impl BackingView for FileNotebookView {
                 title,
                 title_secondary: None,
                 title_style: None,
-                title_clip_config: rookui::text_layout::ClipConfig::start(),
+                title_clip_config: ptermui::text_layout::ClipConfig::start(),
                 title_max_width: None,
                 left_of_title: None,
                 right_of_title: None,

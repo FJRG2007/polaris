@@ -1,4 +1,4 @@
-use rookui::{App, Entity, SingletonEntity};
+use ptermui::{App, Entity, SingletonEntity};
 
 use super::{ServerExperiment, ServerExperiments};
 use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider};

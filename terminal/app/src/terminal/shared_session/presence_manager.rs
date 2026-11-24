@@ -6,11 +6,11 @@ use futures::future::BoxFuture;
 use futures_util::future::join_all;
 use itertools::{Either, Itertools};
 use pathfinder_color::ColorU;
+use ptermui::assets::asset_cache::{AssetCache, AssetState};
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::image_cache::ImageType;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 use rand::Rng;
-use rookui::assets::asset_cache::{AssetCache, AssetState};
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::image_cache::ImageType;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
 #[cfg(not(target_arch = "wasm32"))]
 use session_sharing_protocol::common::Viewer;
 use session_sharing_protocol::common::{

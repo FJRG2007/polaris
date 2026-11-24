@@ -1,8 +1,8 @@
-use rook_errors::report_if_error;
-use rookui::elements::{CrossAxisAlignment, Fill, Flex, ParentElement, Shrinkable};
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use pterm_errors::report_if_error;
+use ptermui::elements::{CrossAxisAlignment, Fill, Flex, ParentElement, Shrinkable};
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
 
 use crate::appearance::Appearance;
 use crate::editor::{EditorView, Event, SingleLineEditorOptions, TextOptions};
@@ -203,7 +203,7 @@ impl View for StartupShellView {
     }
 
     /// Renders controls to change the default shell for new sessions.
-    fn render(&self, app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
         let ui_builder = appearance.ui_builder();
         let theme = appearance.theme();

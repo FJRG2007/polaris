@@ -1,13 +1,13 @@
 use chrono::Local;
-use rook_core::ui::appearance::Appearance;
-use rook_errors::report_error;
-use rook_graphql::queries::get_conversation_usage::ConversationUsage;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_errors::report_error;
+use pterm_graphql::queries::get_conversation_usage::ConversationUsage;
+use ptermui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty, Flex, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable, Text,
 };
-use rookui::platform::Cursor;
-use rookui::{AppContext, Element, SingletonEntity, View};
+use ptermui::platform::Cursor;
+use ptermui::{AppContext, Element, SingletonEntity, View};
 
 use crate::ai::blocklist::usage::conversation_usage_view::{
     ConversationUsageInfo, ConversationUsageView, DisplayMode,
@@ -139,7 +139,7 @@ impl UsageHistoryEntry {
         };
         let chevron = ConstrainedBox::new(
             chevron_icon
-                .to_rookui_icon(appearance.theme().foreground())
+                .to_ptermui_icon(appearance.theme().foreground())
                 .finish(),
         )
         .with_width(16.)

@@ -1,6 +1,6 @@
 # Product Spec: Double-click the hidden-section bar to fully expand
 
-**Issue:** [FJRG2007/rook#11622](https://github.com/FJRG2007/rook/issues/11622)
+**Issue:** [FJRG2007/polaris#11622](https://github.com/FJRG2007/polaris/issues/11622)
 **Figma:** none
 
 ## Summary

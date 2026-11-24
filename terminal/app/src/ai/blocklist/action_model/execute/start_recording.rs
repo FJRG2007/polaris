@@ -3,8 +3,8 @@ use std::time::SystemTime;
 use ai::agent::action_result::{AIAgentActionResultType, RecordingStarted, StartRecordingResult};
 use futures::FutureExt;
 use futures::future::BoxFuture;
-use rook_core::features::FeatureFlag;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 use uuid::Uuid;
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};

@@ -1,7 +1,7 @@
 # REMOTE-1674: Tech Spec — Agent view entry for web-started 3p harness shared sessions
 
 ## Context
-REMOTE-1674 makes live shared-session viewers enter agent view for third-party harness conversations started outside the Rook desktop flow, such as from the web. This extends the REMOTE-1459 viewer-entry work to cases where the desktop viewer may not have an `AmbientAgentViewModel` with a resolved harness yet.
+REMOTE-1674 makes live shared-session viewers enter agent view for third-party harness conversations started outside the Polaris Terminal desktop flow, such as from the web. This extends the REMOTE-1459 viewer-entry work to cases where the desktop viewer may not have an `AmbientAgentViewModel` with a resolved harness yet.
 Linear: https://linear.app/warpdotdev/issue/REMOTE-1674/make-sure-that-we-enter-the-agent-view-for-3p-harness-conversations
 Current relevant flow:
 - `app/src/terminal/shared_session/shared_handlers.rs (356-435)` applies remote `CLIAgentSessionState`. It creates a pane-scoped `CLIAgentSession`, shows the CLI agent footer, manages rich input, and now has enough signal to infer a 3p harness even without an ambient model.
@@ -41,7 +41,7 @@ Unit tests in `app/src/terminal/view_tests.rs (922-1139)` cover the important in
 - `shared_third_party_viewer_syncs_from_viewer_harness_updated_when_harness_unchanged` verifies `ViewerHarnessUpdated` enters agent view and retags the harness block even when `set_harness` does not emit `HarnessSelected` because the harness is unchanged.
 - `shared_third_party_viewer_syncs_from_cli_agent_state_without_ambient_model` verifies a plain terminal viewer with shared ambient session metadata enters agent view after `apply_cli_agent_state_update`, even with no ambient model.
 Additional validation:
-- `cargo test -p rook shared_third_party_viewer_sync --lib` passes.
+- `cargo test -p polaris-terminal shared_third_party_viewer_sync --lib` passes.
 - Manually start a Claude/Codex/Gemini cloud task from web, open the desktop shared-session viewer, and confirm it lands in agent view with the harness block visible.
 - Repeat a desktop-started 3p shared-session viewer to ensure the `ViewerHarnessUpdated` path works.
 - Repeat an Oz shared-session viewer to confirm no new 3p sync path activates.

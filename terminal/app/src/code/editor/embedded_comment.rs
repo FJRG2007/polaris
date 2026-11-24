@@ -4,19 +4,19 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_editor::content::markdown::MarkdownStyle;
-use rook_editor::editor::EmbeddedItemModel;
-use rook_editor::render::element::{RenderContext, RenderableBlock};
-use rook_editor::render::layout::TextLayout;
-use rook_editor::render::model::viewport::ViewportItem;
-use rook_editor::render::model::{
+use pterm_editor::content::markdown::MarkdownStyle;
+use pterm_editor::editor::EmbeddedItemModel;
+use pterm_editor::render::element::{RenderContext, RenderableBlock};
+use pterm_editor::render::layout::TextLayout;
+use pterm_editor::render::model::viewport::ViewportItem;
+use pterm_editor::render::model::{
     BlockSpacing, EmbeddedItem, EmbeddedItemHTMLRepresentation, EmbeddedItemRichFormat,
     LaidOutEmbeddedItem, RenderState,
 };
-use rook_errors::report_error;
-use rookui::event::DispatchedEvent;
-use rookui::units::Pixels;
-use rookui::{AppContext, EntityId, EventContext, LayoutContext, ViewHandle, WindowId};
+use pterm_errors::report_error;
+use ptermui::event::DispatchedEvent;
+use ptermui::units::Pixels;
+use ptermui::{AppContext, EntityId, EventContext, LayoutContext, ViewHandle, WindowId};
 use serde_yaml::Mapping;
 use uuid::Uuid;
 

@@ -26,7 +26,7 @@ pub mod get_workspaces_metadata_for_user;
 pub mod list_ai_conversations;
 pub mod list_harness_auth_secrets;
 pub mod list_managed_secrets;
-pub mod list_rook_dev_images;
+pub mod list_pterm_dev_images;
 pub mod managed_secret_config;
 pub mod rerank_fragments;
 pub mod setup_failure_debug_authorization;

@@ -2,11 +2,11 @@ use std::path::PathBuf;
 
 use ai::agent::action::{RunAgentsAgentRunConfig, RunAgentsExecutionMode};
 use ai::skills::SkillReference;
-use rook_core::channel::ChannelState;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_core::channel::ChannelState;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
 #[cfg(feature = "local_fs")]
-use rook_util::path::LineAndColumnArg;
-use rookui::{App, SingletonEntity};
+use pterm_util::path::LineAndColumnArg;
+use ptermui::{App, SingletonEntity};
 use settings::Setting;
 
 #[cfg(feature = "local_fs")]
@@ -135,7 +135,7 @@ fn recording_artifact_view_url_requires_task_id() {
 
 #[cfg(feature = "local_fs")]
 #[test]
-fn open_code_action_routes_links_to_configured_editor_and_non_links_to_rook() {
+fn open_code_action_routes_links_to_configured_editor_and_non_links_to_pterm() {
     let linked_source = CodeSource::Link {
         path: PathBuf::from("/workspace/project/src/main.rs"),
         range_start: Some(LineAndColumnArg {
@@ -162,10 +162,10 @@ fn open_code_action_routes_links_to_configured_editor_and_non_links_to_rook() {
 
     let skill_source = CodeSource::Skill {
         reference: SkillReference::Path(LocalOrRemotePath::Local(PathBuf::from(
-            "/workspace/project/.rook/skills/example/SKILL.md",
+            "/workspace/project/.polaris/terminal/skills/example/SKILL.md",
         ))),
         location: LocalOrRemotePath::Local(PathBuf::from(
-            "/workspace/project/.rook/skills/example/SKILL.md",
+            "/workspace/project/.polaris/terminal/skills/example/SKILL.md",
         )),
         origin: crate::ai::skills::SkillOpenOrigin::ReadSkill,
     };
@@ -175,7 +175,7 @@ fn open_code_action_routes_links_to_configured_editor_and_non_links_to_rook() {
             &skill_source,
             crate::util::file::external_editor::settings::EditorLayout::NewTab,
         ),
-        AIBlockEvent::OpenCodeInRook {
+        AIBlockEvent::OpenCodeInPterm {
             source,
             layout: crate::util::file::external_editor::settings::EditorLayout::NewTab,
         } if source == skill_source
@@ -442,7 +442,7 @@ fn remote_arm_propagates_skills_into_skill_references() {
     let mode = run_agents_to_start_agent_mode(
         &RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: true,
             runner_id: String::new(),
         },
@@ -470,7 +470,7 @@ fn remote_arm_propagates_skills_into_skill_references() {
     };
     assert_eq!(skill_references, skills);
     assert_eq!(environment_id, "env-1");
-    assert_eq!(worker_host, "rook");
+    assert_eq!(worker_host, "polaris-terminal");
     assert_eq!(harness_type, "oz");
     assert_eq!(model_id, "auto");
     assert!(computer_use_enabled);
@@ -486,7 +486,7 @@ fn remote_arm_propagates_agent_identity_uid() {
     let mode = run_agents_to_start_agent_mode(
         &RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: false,
             runner_id: String::new(),
         },
@@ -521,7 +521,7 @@ fn remote_arm_with_empty_skills_propagates_empty_vec() {
     let mode = run_agents_to_start_agent_mode(
         &RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: false,
             runner_id: String::new(),
         },
@@ -546,7 +546,7 @@ fn remote_arm_rejects_opencode() {
     let err = run_agents_to_start_agent_mode(
         &RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: false,
             runner_id: String::new(),
         },
@@ -599,7 +599,7 @@ fn remote_arm_propagates_claude_auth_secret_into_mode() {
     let mode = run_agents_to_start_agent_mode(
         &RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: false,
             runner_id: String::new(),
         },
@@ -624,7 +624,7 @@ fn remote_arm_filters_whitespace_auth_secret_name_to_none() {
     let mode = run_agents_to_start_agent_mode(
         &RunAgentsExecutionMode::Remote {
             environment_id: "env-1".to_string(),
-            worker_host: "rook".to_string(),
+            worker_host: "polaris-terminal".to_string(),
             computer_use_enabled: false,
             runner_id: String::new(),
         },

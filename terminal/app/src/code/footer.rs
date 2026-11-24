@@ -8,27 +8,27 @@ use lsp::{
 };
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_core::ui::theme::{AnsiColorIdentifier, Fill as ThemeFill, PtermTheme};
 #[cfg(feature = "local_fs")]
-use repo_metadata::repositories::DetectedRepositories;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::color::internal_colors;
-use rook_core::ui::theme::{AnsiColorIdentifier, Fill as ThemeFill, RookTheme};
-#[cfg(feature = "local_fs")]
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::elements::{
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Dismiss, Empty, Fill, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     OffsetPositioning, Padding, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Rect,
     Shrinkable, Stack,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakModelHandle,
 };
+#[cfg(feature = "local_fs")]
+use repo_metadata::repositories::DetectedRepositories;
 
 #[cfg(feature = "local_fs")]
 use crate::ai::persisted_workspace::PersistedWorkspaceEvent;
@@ -165,7 +165,7 @@ enum LSPServerRenderStatus {
 }
 
 impl LSPServerRenderStatus {
-    fn to_icon_color(&self, theme: &RookTheme) -> ColorU {
+    fn to_icon_color(&self, theme: &PtermTheme) -> ColorU {
         match self {
             LSPServerRenderStatus::Available => AnsiColorIdentifier::Green
                 .to_ansi_color(&theme.terminal_colors().normal)
@@ -283,11 +283,11 @@ impl CodeFooterView {
         })
     }
 
-    fn render_tab_config_info_icon(theme: &RookTheme) -> Box<dyn Element> {
+    fn render_tab_config_info_icon(theme: &PtermTheme) -> Box<dyn Element> {
         Container::new(
             ConstrainedBox::new(
                 Icon::Info
-                    .to_rookui_icon(theme.active_ui_text_color())
+                    .to_ptermui_icon(theme.active_ui_text_color())
                     .finish(),
             )
             .with_width(12.)
@@ -1169,7 +1169,7 @@ impl CodeFooterView {
             mouse_states.open_logs.clone(),
             move || {
                 Icon::Code1
-                    .to_rookui_icon(ThemeFill::Solid(text_color))
+                    .to_ptermui_icon(ThemeFill::Solid(text_color))
                     .finish()
             },
             "Open logs",
@@ -1191,7 +1191,7 @@ impl CodeFooterView {
             mouse_states.restart_server.clone(),
             move || {
                 Icon::RefreshCcw
-                    .to_rookui_icon(ThemeFill::Solid(text_color))
+                    .to_ptermui_icon(ThemeFill::Solid(text_color))
                     .finish()
             },
             "Restart server",
@@ -1236,7 +1236,7 @@ impl CodeFooterView {
             mouse_states.start_server.clone(),
             move || {
                 Icon::Play
-                    .to_rookui_icon(ThemeFill::Solid(text_color))
+                    .to_ptermui_icon(ThemeFill::Solid(text_color))
                     .finish()
             },
             "Start server",
@@ -1258,7 +1258,7 @@ impl CodeFooterView {
             mouse_states.remove_server.clone(),
             move || {
                 Icon::Trash
-                    .to_rookui_icon(ThemeFill::Solid(text_color))
+                    .to_ptermui_icon(ThemeFill::Solid(text_color))
                     .finish()
             },
             "Remove server",
@@ -1281,7 +1281,7 @@ impl CodeFooterView {
             mouse_states.restart_all.clone(),
             move || {
                 Icon::RefreshCcw
-                    .to_rookui_icon(ThemeFill::Solid(text_color))
+                    .to_ptermui_icon(ThemeFill::Solid(text_color))
                     .finish()
             },
             if is_plural {
@@ -1337,7 +1337,7 @@ impl CodeFooterView {
             mouse_states.start_all.clone(),
             move || {
                 Icon::Play
-                    .to_rookui_icon(ThemeFill::Solid(text_color))
+                    .to_ptermui_icon(ThemeFill::Solid(text_color))
                     .finish()
             },
             if !is_plural {
@@ -1365,7 +1365,7 @@ impl CodeFooterView {
             mouse_states.manage_servers.clone(),
             move || {
                 Icon::Gear
-                    .to_rookui_icon(ThemeFill::Solid(text_color))
+                    .to_ptermui_icon(ThemeFill::Solid(text_color))
                     .finish()
             },
             "Manage servers",
@@ -1375,7 +1375,7 @@ impl CodeFooterView {
 
     /// Computes the aggregate indicator color across all tracked servers.
     /// Priority: Failed > Busy > Stopped > Available.
-    fn aggregate_indicator_color(&self, theme: &RookTheme, app: &AppContext) -> ColorU {
+    fn aggregate_indicator_color(&self, theme: &PtermTheme, app: &AppContext) -> ColorU {
         if self.lsp_servers.is_empty() {
             return LSPServerRenderStatus::Stopped.to_icon_color(theme);
         }
@@ -1448,7 +1448,7 @@ impl CodeFooterView {
     }
 
     fn render_status_text(
-        theme: &RookTheme,
+        theme: &PtermTheme,
         appearance: &Appearance,
         message: String,
     ) -> Box<dyn Element> {
@@ -1729,7 +1729,7 @@ impl View for CodeFooterView {
                     Self::render_status_text(
                         theme,
                         appearance,
-                        "Use the Rook Agent to update this config".to_string(),
+                        "Use the Polaris Terminal Agent to update this config".to_string(),
                     ),
                 )
                 .finish(),

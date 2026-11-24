@@ -10,8 +10,8 @@ use std::io::sink;
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::command::ExitCode;
-use rookui::r#async::executor::Background;
+use pterm_core::command::ExitCode;
+use ptermui::r#async::executor::Background;
 
 use super::ansi::{
     CommandFinishedValue, CompletionMetadata, Handler, PrecmdValue, PreexecValue, Processor,
@@ -39,7 +39,7 @@ pub fn block_size() -> BlockSize {
         block_padding: block_padding(),
         max_block_scroll_limit: 1000,
         max_retained_output_lines: 0,
-        rook_prompt_height_lines: 0.6,
+        pterm_prompt_height_lines: 0.6,
     }
 }
 
@@ -114,7 +114,7 @@ fn block_padding() -> BlockPadding {
 /// prompt:
 ///
 /// ```no_run
-/// # use rook::terminal::model::test_utils::TestBlockListBuilder;
+/// # use polaris_terminal::terminal::model::test_utils::TestBlockListBuilder;
 /// let block_list = TestBlockListBuilder::new()
 ///     .with_honor_ps1(true)
 ///     .build();
@@ -126,10 +126,10 @@ fn block_padding() -> BlockPadding {
 /// the channel event proxy:
 ///
 /// ```no_run
-/// # use rook::terminal::event::{BlockType, Event};
-/// # use rook::terminal::event_listener::ChannelEventListener;
-/// # use rook::terminal::model::block::SerializedBlock;
-/// # use rook::terminal::model::test_utils::TestBlockListBuilder;
+/// # use polaris_terminal::terminal::event::{BlockType, Event};
+/// # use polaris_terminal::terminal::event_listener::ChannelEventListener;
+/// # use polaris_terminal::terminal::model::block::SerializedBlock;
+/// # use polaris_terminal::terminal::model::test_utils::TestBlockListBuilder;
 ///
 /// let (events_tx, events_rx) = async_channel::unbounded();
 /// let channel_event_proxy = ChannelEventListener::builder_for_test()
@@ -194,8 +194,8 @@ impl<'a> TestBlockListBuilder<'a> {
             self.block_sizes,
             self.channel_event_proxy,
             Arc::new(Background::default()),
-            false, /* show_rook_bootstrap_input */
-            false, /* show_rook_bootstrap_input */
+            false, /* show_pterm_bootstrap_input */
+            false, /* show_pterm_bootstrap_input */
             false, /* show_memory_stats */
             self.honor_ps1,
             false, /* is_inverted */
@@ -222,7 +222,7 @@ impl Default for TestBlockListBuilder<'_> {
 /// For example, to create a [`Block`] that respects the user's custom prompt:
 ///
 /// ```no_run
-/// # use rook::terminal::model::test_utils::TestBlockBuilder;
+/// # use polaris_terminal::terminal::model::test_utils::TestBlockBuilder;
 /// let block = TestBlockBuilder::new()
 ///     .with_honor_ps1(true)
 ///     .build();
@@ -279,7 +279,7 @@ impl TestBlockBuilder {
             self.event_proxy,
             Arc::new(Background::default()),
             self.bootstrap_stage,
-            false, /* show_rook_bootstrap_input */
+            false, /* show_pterm_bootstrap_input */
             false, /* show_in_band_command_blocks */
             false, /* show_memory_stats */
             self.block_index,

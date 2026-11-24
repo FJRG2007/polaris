@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use rook_core::ui::appearance::Appearance;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rook_util::user_input::UserInput;
-use rookui::elements::ScrollbarWidth;
-use rookui::elements::new_scrollable::ScrollableAppearance;
-use rookui::platform::WindowStyle;
-use rookui::{App, TypedActionView, ViewHandle, WindowId};
+use pterm_core::ui::appearance::Appearance;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use pterm_util::user_input::UserInput;
+use ptermui::elements::ScrollbarWidth;
+use ptermui::elements::new_scrollable::ScrollableAppearance;
+use ptermui::platform::WindowStyle;
+use ptermui::{App, TypedActionView, ViewHandle, WindowId};
 
 use super::{CodeEditorRenderOptions, CodeEditorView, CodeEditorViewAction};
 use crate::AuthStateProvider;

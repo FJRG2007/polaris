@@ -4,7 +4,7 @@ Cloud Mode should show environment setup as part of the agent conversation inste
 The desired outcome is a Cloud Mode startup experience that is readable, debuggable, and consistent with the requested-command UX used elsewhere in Agent Mode.
 ## Problem
 Cloud Mode environments can execute startup commands before the agent sends its first response. Without a dedicated UI, those commands can obscure the user's original request, leak command text into the prompt/input area, generate unrelated passive suggestions, or look like ordinary terminal blocks rather than setup work performed for the cloud agent.
-Users need to understand that Rook is preparing the environment, what commands ran, whether those commands succeeded, and how to inspect details when setup fails or looks slow.
+Users need to understand that Polaris Terminal is preparing the environment, what commands ran, whether those commands succeeded, and how to inspect details when setup fails or looks slow.
 ## Goals
 - Preserve the initial user request in the conversation while the cloud agent environment starts.
 - Show startup progress and setup commands in a visually cohesive Agent Mode surface.
@@ -32,7 +32,7 @@ Reference issue: https://linear.app/warpdotdev/issue/REMOTE-172/use-requested-co
 - The first real AI exchange should not duplicate the same initial prompt/header when an optimistic initial prompt block was already inserted for the live startup flow.
 - Historical replay should remain faithful to persisted conversation data and must not suppress the first AI block query solely because the new live startup UI exists.
 ### Startup progress
-- While Rook is waiting for the cloud agent session to become ready, the status surface should show a shimmering progress message.
+- While Polaris Terminal is waiting for the cloud agent session to become ready, the status surface should show a shimmering progress message.
 - Progress text should map to the known startup phase:
   - `Connecting to Host (Step 1/3)` before the task is claimed.
   - `Creating Environment (Step 2/3)` after the task is claimed but before the harness starts.
@@ -79,7 +79,7 @@ Reference issue: https://linear.app/warpdotdev/issue/REMOTE-172/use-requested-co
 - The entry block icon should reflect the run state: cloud icon for normal/running, clock/loading for startup, warning for failure, info for auth, and cancelled icon for cancellation.
 - Clicking the entry block should navigate back into the Cloud Mode view.
 ### Completion, failure, auth, and cancellation
-- When the cloud agent session becomes ready, Rook should join the shared session and continue showing setup status until the first exchange arrives.
+- When the cloud agent session becomes ready, Polaris Terminal should join the shared session and continue showing setup status until the first exchange arrives.
 - When the agent produces the first exchange, the startup-command summary should switch from running to completed language and command details should collapse.
 - If startup fails before the session is ready, the UI should preserve the initial prompt and show the failure state.
 - If GitHub authentication is required, the UI should preserve the initial prompt and show the auth-required state.

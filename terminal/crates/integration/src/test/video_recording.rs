@@ -2,15 +2,15 @@ use std::future::Future;
 use std::pin::Pin;
 
 use pathfinder_geometry::vector::vec2f;
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::util::ExpectedExitStatus;
-use rook::integration_testing::terminal::{
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::util::ExpectedExitStatus;
+use polaris_terminal::integration_testing::terminal::{
     assert_view_has_text_selection, clear_blocklist_to_remove_bootstrapped_blocks,
     execute_command_for_single_terminal_in_tab, execute_echo_str,
     wait_until_bootstrapped_single_pane_for_tab,
 };
-use rookui_core::event::{Event, ModifiersState};
-use rookui_core::integration::{ARTIFACTS_DIR_ENV_VAR, TestStep};
+use ptermui_core::event::{Event, ModifiersState};
+use ptermui_core::integration::{ARTIFACTS_DIR_ENV_VAR, TestStep};
 
 use crate::Builder;
 
@@ -21,7 +21,7 @@ use crate::Builder;
 /// export all work end-to-end:
 ///
 /// ```sh
-/// ROOKUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS=1 \
+/// PTERMUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS=1 \
 ///   cargo run -p integration --bin integration -- test_video_recording
 /// ```
 ///
@@ -38,7 +38,7 @@ pub fn test_video_recording() -> Builder {
                     let artifacts_root = std::env::var(ARTIFACTS_DIR_ENV_VAR)
                         .map(std::path::PathBuf::from)
                         .unwrap_or_else(|_| {
-                            std::env::temp_dir().join("rook_integration_test_artifacts")
+                            std::env::temp_dir().join("pterm_integration_test_artifacts")
                         });
                     let test_dir = artifacts_root.join("test_video_recording");
 

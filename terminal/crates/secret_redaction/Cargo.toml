@@ -1,5 +1,5 @@
 [package]
-authors = ["Rook Contributors"]
+authors = ["Polaris Terminal Contributors"]
 edition = "2024"
 name = "secret_redaction"
 publish.workspace = true
@@ -14,5 +14,5 @@ regex.workspace = true
 regex-automata.workspace = true
 regex_dfas.workspace = true
 string-offset.workspace = true
-rook_core.workspace = true
-rook_errors.workspace = true
+pterm_core.workspace = true
+pterm_errors.workspace = true

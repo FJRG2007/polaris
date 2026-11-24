@@ -1,21 +1,21 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::Icon;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_error;
-use rook_util::path::LineAndColumnArg;
-use rookui::elements::{
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::Icon;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_error;
+use pterm_util::path::LineAndColumnArg;
+use ptermui::elements::{
     Align, ChildView, ConstrainedBox, Container, CrossAxisAlignment, DragBarSide, Element, Empty,
     Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Resizable,
     ResizableStateHandle, Shrinkable, resizable_state_handle,
 };
-use rookui::fonts::Weight;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -33,7 +33,7 @@ use crate::coding_panel_enablement_state::CodingPanelEnablementState;
 use crate::drive::panel::{
     DrivePanel, DrivePanelEvent, MAX_SIDEBAR_WIDTH_RATIO, MIN_SIDEBAR_WIDTH,
 };
-use crate::drive::settings::RookDriveSettings;
+use crate::drive::settings::PtermDriveSettings;
 use crate::pane_group::pane::view::header::PANE_HEADER_HEIGHT;
 use crate::pane_group::pane::view::header::components::HEADER_EDGE_PADDING;
 use crate::pane_group::working_directories::WorkingDirectory;
@@ -42,7 +42,7 @@ use crate::pane_group::{
 };
 #[cfg(feature = "local_fs")]
 use crate::server::telemetry::CodePanelsFileOpenEntrypoint;
-use crate::server::telemetry::{FileTreeSource, RookDriveSource};
+use crate::server::telemetry::{FileTreeSource, PtermDriveSource};
 use crate::settings::AISettings;
 use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier};
 use crate::terminal::resizable_data::{ModalType, ResizableData};
@@ -65,9 +65,9 @@ use crate::workspace::view::global_search::view::{
 };
 use crate::workspace::view::{
     LEFT_PANEL_AGENT_CONVERSATIONS_BINDING_NAME, LEFT_PANEL_GLOBAL_SEARCH_BINDING_NAME,
-    LEFT_PANEL_PROJECT_EXPLORER_BINDING_NAME, LEFT_PANEL_ROOK_DRIVE_BINDING_NAME,
+    LEFT_PANEL_POLARIS_TERMINAL_DRIVE_BINDING_NAME, LEFT_PANEL_PROJECT_EXPLORER_BINDING_NAME,
     OPEN_GLOBAL_SEARCH_BINDING_NAME, TOGGLE_CONVERSATION_LIST_VIEW_BINDING_NAME,
-    TOGGLE_PROJECT_EXPLORER_BINDING_NAME, TOGGLE_ROOK_DRIVE_BINDING_NAME,
+    TOGGLE_POLARIS_TERMINAL_DRIVE_BINDING_NAME, TOGGLE_PROJECT_EXPLORER_BINDING_NAME,
 };
 
 #[derive(Default)]
@@ -75,7 +75,7 @@ struct MouseStateHandles {
     project_explorer_button: MouseStateHandle,
     conversation_list_view_button: MouseStateHandle,
     global_search_button: MouseStateHandle,
-    rook_drive_button: MouseStateHandle,
+    pterm_drive_button: MouseStateHandle,
     sign_in_button: MouseStateHandle,
 }
 
@@ -83,7 +83,7 @@ struct MouseStateHandles {
 pub enum LeftPanelAction {
     ProjectExplorer,
     GlobalSearch { entry_focus: GlobalSearchEntryFocus },
-    RookDrive,
+    PtermDrive,
     ConversationListView,
     SignIn,
 }
@@ -101,8 +101,8 @@ impl ToolPanelView {
             ToolPanelView::ProjectExplorer | ToolPanelView::GlobalSearch { .. } => {
                 ToolPanelAvailability::Available
             }
-            ToolPanelView::RookDrive => {
-                if RookDriveSettings::is_rook_drive_available(app) {
+            ToolPanelView::PtermDrive => {
+                if PtermDriveSettings::is_pterm_drive_available(app) {
                     ToolPanelAvailability::Available
                 } else {
                     ToolPanelAvailability::RequiresAccount
@@ -128,7 +128,7 @@ impl ToolPanelView {
 pub enum LeftPanelEvent {
     #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
     FileTree(pane_group::Event),
-    RookDrive(DrivePanelEvent),
+    PtermDrive(DrivePanelEvent),
     #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
     OpenFileWithTarget {
         location: LocalOrRemotePath,
@@ -139,7 +139,7 @@ pub enum LeftPanelEvent {
     ShowDeleteConfirmationDialog {
         conversation_id: AIConversationId,
         conversation_title: String,
-        terminal_view_id: Option<rookui::EntityId>,
+        terminal_view_id: Option<ptermui::EntityId>,
     },
     SignInRequested,
 }
@@ -148,14 +148,14 @@ pub enum LeftPanelEvent {
 pub enum ToolPanelView {
     ProjectExplorer,
     GlobalSearch { entry_focus: GlobalSearchEntryFocus },
-    RookDrive,
+    PtermDrive,
     ConversationListView,
 }
 
 /// Encapsulates the active view state to enforce that all mutations go through
 /// `active_view_state::set`, which handles necessary side effects.
 mod active_view_state {
-    use rookui::ViewContext;
+    use ptermui::ViewContext;
 
     use super::ToolPanelView;
 
@@ -194,9 +194,9 @@ mod active_view_state {
 }
 
 pub struct ToolbeltButtonConfig {
-    pub icon: rook_core::ui::Icon,
+    pub icon: pterm_core::ui::Icon,
     /// Optional icon to use when the given toolbelt option is in an active state.
-    pub active_icon: Option<rook_core::ui::Icon>,
+    pub active_icon: Option<pterm_core::ui::Icon>,
     pub tooltip_text: String,
     pub action: LeftPanelAction,
     /// Whether the button should be rendered with an "active" state.
@@ -215,7 +215,7 @@ pub struct LeftPanelView {
     resizable_state_handle: ResizableStateHandle,
     mouse_state_handles: MouseStateHandles,
     close_button_mouse_state: MouseStateHandle,
-    rook_drive_view: ViewHandle<DrivePanel>,
+    pterm_drive_view: ViewHandle<DrivePanel>,
     conversation_list_view: ViewHandle<ConversationListView>,
     active_view: active_view_state::ActiveViewState,
     toolbelt_buttons: Vec<ToolbeltButtonConfig>,
@@ -254,8 +254,8 @@ impl LeftPanelView {
         availability: ToolPanelAvailability,
     ) -> Box<dyn Element> {
         let (title, description) = match (view, availability) {
-            (ToolPanelView::RookDrive, ToolPanelAvailability::RequiresAccount) => (
-                "Sign in to access Rook Drive",
+            (ToolPanelView::PtermDrive, ToolPanelAvailability::RequiresAccount) => (
+                "Sign in to access Polaris Terminal Drive",
                 "Create an account to save and share workflows, notebooks, prompts, and more.",
             ),
             (ToolPanelView::ConversationListView, ToolPanelAvailability::RequiresAccount) => (
@@ -264,12 +264,12 @@ impl LeftPanelView {
             ),
             (ToolPanelView::ConversationListView, ToolPanelAvailability::RequiresAi) => (
                 "Turn on AI to access Agent conversations",
-                "Enable Rook AI to access your conversation history.",
+                "Enable Polaris Terminal AI to access your conversation history.",
             ),
             (
                 ToolPanelView::ProjectExplorer
                 | ToolPanelView::GlobalSearch { .. }
-                | ToolPanelView::RookDrive,
+                | ToolPanelView::PtermDrive,
                 ToolPanelAvailability::RequiresAi,
             )
             | (
@@ -350,11 +350,11 @@ impl LeftPanelView {
                 resizable_state_handle(600.0)
             }
         };
-        let rook_drive_view = ctx.add_typed_action_view(DrivePanel::new);
+        let pterm_drive_view = ctx.add_typed_action_view(DrivePanel::new);
         let conversation_list_view = ctx.add_typed_action_view(ConversationListView::new);
 
-        ctx.subscribe_to_view(&rook_drive_view, |_me, _, event, ctx| {
-            ctx.emit(LeftPanelEvent::RookDrive(event.clone()));
+        ctx.subscribe_to_view(&pterm_drive_view, |_me, _, event, ctx| {
+            ctx.emit(LeftPanelEvent::PtermDrive(event.clone()));
         });
 
         ctx.subscribe_to_view(&conversation_list_view, |_me, _, event, ctx| match event {
@@ -374,7 +374,7 @@ impl LeftPanelView {
             }
         });
 
-        let active_view = views.first().copied().unwrap_or(ToolPanelView::RookDrive);
+        let active_view = views.first().copied().unwrap_or(ToolPanelView::PtermDrive);
         let toolbelt_buttons = views
             .iter()
             .map(|view| Self::create_toolbelt_button_config(view, ctx))
@@ -465,7 +465,7 @@ impl LeftPanelView {
             resizable_state_handle,
             mouse_state_handles: Default::default(),
             close_button_mouse_state: Default::default(),
-            rook_drive_view,
+            pterm_drive_view,
             conversation_list_view,
             active_view: active_view_state::new(active_view),
             toolbelt_buttons,
@@ -577,17 +577,17 @@ impl LeftPanelView {
                     tooltip_keybinding_names,
                 }
             }
-            ToolPanelView::RookDrive => {
+            ToolPanelView::PtermDrive => {
                 let tooltip_keybinding_names = vec![
-                    LEFT_PANEL_ROOK_DRIVE_BINDING_NAME,
-                    TOGGLE_ROOK_DRIVE_BINDING_NAME,
+                    LEFT_PANEL_POLARIS_TERMINAL_DRIVE_BINDING_NAME,
+                    TOGGLE_POLARIS_TERMINAL_DRIVE_BINDING_NAME,
                 ];
 
                 ToolbeltButtonConfig {
-                    icon: Icon::RookDrive,
+                    icon: Icon::PtermDrive,
                     active_icon: None,
-                    tooltip_text: "Rook Drive".to_string(),
-                    action: LeftPanelAction::RookDrive,
+                    tooltip_text: "Polaris Terminal Drive".to_string(),
+                    action: LeftPanelAction::PtermDrive,
                     render_with_active_state: false,
                     tooltip_keybinding: toolbelt_tooltip_keybinding(&tooltip_keybinding_names, ctx),
                     tooltip_keybinding_names,
@@ -614,7 +614,7 @@ impl LeftPanelView {
 
     fn get_or_create_global_search_view_for_pane_group(
         &mut self,
-        pane_group_id: rookui::EntityId,
+        pane_group_id: ptermui::EntityId,
         ctx: &mut ViewContext<Self>,
     ) -> ViewHandle<GlobalSearchView> {
         if let Some(view) = self
@@ -640,7 +640,7 @@ impl LeftPanelView {
 
     fn get_or_create_file_tree_view_for_pane_group(
         &mut self,
-        pane_group_id: rookui::EntityId,
+        pane_group_id: ptermui::EntityId,
         ctx: &mut ViewContext<Self>,
     ) -> ViewHandle<FileTreeView> {
         if let Some(view) = self
@@ -694,16 +694,16 @@ impl LeftPanelView {
         self.active_view.get()
     }
 
-    pub fn is_rook_drive_active(&self) -> bool {
-        self.active_view.get() == ToolPanelView::RookDrive
+    pub fn is_pterm_drive_active(&self) -> bool {
+        self.active_view.get() == ToolPanelView::PtermDrive
     }
 
     pub fn is_file_tree_active(&self) -> bool {
         self.active_view.get() == ToolPanelView::ProjectExplorer
     }
 
-    pub fn rook_drive_view(&self) -> &ViewHandle<DrivePanel> {
-        &self.rook_drive_view
+    pub fn pterm_drive_view(&self) -> &ViewHandle<DrivePanel> {
+        &self.pterm_drive_view
     }
 
     pub(crate) fn auto_expand_active_file_tree_to_most_recent_directory(
@@ -862,10 +862,10 @@ impl LeftPanelView {
                     ctx,
                 );
             }
-            ToolPanelView::RookDrive => {
-                ctx.focus(&self.rook_drive_view);
-                self.rook_drive_view.update(ctx, |view, ctx| {
-                    view.reset_focused_index_in_rook_drive(true, ctx);
+            ToolPanelView::PtermDrive => {
+                ctx.focus(&self.pterm_drive_view);
+                self.pterm_drive_view.update(ctx, |view, ctx| {
+                    view.reset_focused_index_in_pterm_drive(true, ctx);
                 });
             }
             ToolPanelView::ConversationListView => {
@@ -1035,7 +1035,7 @@ impl LeftPanelView {
                 LeftPanelAction::GlobalSearch { .. } => {
                     matches!(self.active_view.get(), ToolPanelView::GlobalSearch { .. })
                 }
-                LeftPanelAction::RookDrive => self.active_view.get() == ToolPanelView::RookDrive,
+                LeftPanelAction::PtermDrive => self.active_view.get() == ToolPanelView::PtermDrive,
                 LeftPanelAction::ConversationListView => {
                     self.active_view.get() == ToolPanelView::ConversationListView
                 }
@@ -1157,21 +1157,21 @@ impl LeftPanelView {
                     send_telemetry_from_ctx!(TelemetryEvent::GlobalSearchOpened, ctx);
                 }
             }
-            LeftPanelAction::RookDrive => {
-                active_view_state::set(self, ToolPanelView::RookDrive, ctx);
+            LeftPanelAction::PtermDrive => {
+                active_view_state::set(self, ToolPanelView::PtermDrive, ctx);
                 if self.active_view_availability(ctx) == ToolPanelAvailability::Available {
                     if force_open {
                         send_telemetry_from_ctx!(
-                            TelemetryEvent::RookDriveOpened {
-                                source: RookDriveSource::ForceOpened,
+                            TelemetryEvent::PtermDriveOpened {
+                                source: PtermDriveSource::ForceOpened,
                                 is_code_mode_v2: true
                             },
                             ctx
                         );
                     } else {
                         send_telemetry_from_ctx!(
-                            TelemetryEvent::RookDriveOpened {
-                                source: RookDriveSource::LeftPanelToolbelt,
+                            TelemetryEvent::PtermDriveOpened {
+                                source: PtermDriveSource::LeftPanelToolbelt,
                                 is_code_mode_v2: true
                             },
                             ctx
@@ -1201,7 +1201,7 @@ impl LeftPanelView {
 
     fn deactivate_file_tree_view_for_pane_group(
         &self,
-        pane_group_id: rookui::EntityId,
+        pane_group_id: ptermui::EntityId,
         ctx: &mut ViewContext<Self>,
     ) {
         if let Some(view) = self
@@ -1289,7 +1289,7 @@ impl View for LeftPanelView {
                         ctx.focus(&view);
                     }
                 }
-                ToolPanelView::RookDrive => ctx.focus(&self.rook_drive_view),
+                ToolPanelView::PtermDrive => ctx.focus(&self.pterm_drive_view),
                 ToolPanelView::ConversationListView => ctx.focus(&self.conversation_list_view),
             }
         }
@@ -1304,7 +1304,7 @@ impl View for LeftPanelView {
                 .conversation_list_view_button
                 .clone(),
             self.mouse_state_handles.global_search_button.clone(),
-            self.mouse_state_handles.rook_drive_button.clone(),
+            self.mouse_state_handles.pterm_drive_button.clone(),
         ];
 
         // If there is only one button in the toolbelt row,
@@ -1357,9 +1357,9 @@ impl View for LeftPanelView {
                     _ => Shrinkable::new(1.0, Container::new(Empty::new().finish()).finish())
                         .finish(),
                 },
-                ToolPanelView::RookDrive => Shrinkable::new(
+                ToolPanelView::PtermDrive => Shrinkable::new(
                     1.0,
-                    Container::new(ChildView::new(&self.rook_drive_view).finish())
+                    Container::new(ChildView::new(&self.pterm_drive_view).finish())
                         .with_padding_left(2.)
                         .with_padding_right(2.)
                         .finish(),
@@ -1406,7 +1406,7 @@ impl View for LeftPanelView {
         })
         .finish();
 
-        if rookui::platform::is_mobile_device() {
+        if ptermui::platform::is_mobile_device() {
             return panel_content;
         }
 

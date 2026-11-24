@@ -5,7 +5,7 @@
 //! [`SettingCallbacks`] preserves setting-specific method resolution.
 
 use anyhow::{Result, anyhow};
-use rookui_core::{
+use ptermui_core::{
     AddSingletonModel, Entity, GetSingletonModelHandle, ModelContext, ModelHandle, SingletonEntity,
     UpdateModel,
 };

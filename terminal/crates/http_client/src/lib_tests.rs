@@ -56,9 +56,9 @@ fn omits_trace_link_header_when_no_span() {
 }
 
 #[test]
-fn request_carries_trace_link_header_on_rook_header_path() {
-    // The header rides the same `include_rook_http_headers` gate as every other
-    // X-Rook-* header (added only inside `add_rook_http_headers`), so building a
+fn request_carries_trace_link_header_on_pterm_header_path() {
+    // The header rides the same `include_pterm_http_headers` gate as every other
+    // X-Polaris Terminal-* header (added only inside `add_pterm_http_headers`), so building a
     // request through the client while a span is active carries it.
     let value = with_active_span(|| {
         let client = Client::new();
@@ -73,6 +73,7 @@ fn request_carries_trace_link_header_on_rook_header_path() {
             .map(|value| value.to_str().unwrap().to_string())
     });
 
-    let value = value.expect("trace-link header should be added on the rook-header path");
+    let value =
+        value.expect("trace-link header should be added on the polaris-terminal-header path");
     assert!(value.starts_with("00-"), "unexpected header value: {value}");
 }

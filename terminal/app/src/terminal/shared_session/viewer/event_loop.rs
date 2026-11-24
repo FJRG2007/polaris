@@ -3,7 +3,7 @@ use std::io::{Sink, sink};
 use std::sync::Arc;
 
 use parking_lot::FairMutex;
-use rookui::{Entity, ModelContext, SingletonEntity, WeakViewHandle};
+use ptermui::{Entity, ModelContext, SingletonEntity, WeakViewHandle};
 use session_sharing_protocol::common::{
     OrderedTerminalEvent, OrderedTerminalEventType, Scrollback, WindowSize,
 };

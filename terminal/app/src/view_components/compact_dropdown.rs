@@ -1,15 +1,15 @@
 use std::marker::PhantomData;
 
 use pathfinder_geometry::vector::vec2f;
-use rookui::elements::{
+use ptermui::elements::{
     Border, ChildAnchor, ConstrainedBox, CornerRadius, CrossAxisAlignment, Flex,
-    Icon as RookUiIcon, MainAxisAlignment, MouseStateHandle, OffsetPositioning, ParentElement,
+    Icon as PtermUiIcon, MainAxisAlignment, MouseStateHandle, OffsetPositioning, ParentElement,
     PositionedElementAnchor, PositionedElementOffsetBounds, Radius, SavePosition, Stack,
 };
-use rookui::presenter::ChildView;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, BlurContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -109,7 +109,7 @@ impl<A: DropdownItemAction> CompactDropdown<A> {
     }
 
     /// Render an icon at the configured icon size.
-    fn render_sized_icon(&self, appearance: &Appearance, icon: RookUiIcon) -> Box<dyn Element> {
+    fn render_sized_icon(&self, appearance: &Appearance, icon: PtermUiIcon) -> Box<dyn Element> {
         let icon_size = self.icon_size.unwrap_or(appearance.ui_font_size());
         ConstrainedBox::new(icon.finish())
             .with_width(icon_size)
@@ -132,12 +132,12 @@ impl<A: DropdownItemAction> CompactDropdown<A> {
                 .override_icon_color()
                 .unwrap_or_else(|| appearance.theme().active_ui_text_color());
             button_label
-                .add_child(self.render_sized_icon(appearance, icon.to_rookui_icon(icon_color)));
+                .add_child(self.render_sized_icon(appearance, icon.to_ptermui_icon(icon_color)));
         }
 
         button_label.add_child(self.render_sized_icon(
             appearance,
-            RookUiIcon::new(
+            PtermUiIcon::new(
                 "bundled/svg/chevron-down.svg",
                 appearance.theme().active_ui_text_color(),
             ),

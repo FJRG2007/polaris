@@ -2,18 +2,18 @@ use std::fmt::Debug;
 
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_core::features::FeatureFlag;
-use rook_core::settings::Setting;
-use rook_errors::report_error;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::settings::Setting;
+use pterm_errors::report_error;
+use ptermui::elements::{
     AcceptedByDropTarget, Align, Border, ChildAnchor, Clipped, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Dismiss, Draggable, DraggableState, Empty, Flex, Hoverable,
     Icon, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds,
     Radius, SavePosition, Shrinkable, Stack, Text,
 };
-use rookui::presenter::ChildView;
-use rookui::{
+use ptermui::presenter::ChildView;
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -795,7 +795,7 @@ impl<P: BackingView> View for PaneHeader<P> {
         let element = match header_content {
             HeaderContent::Standard(mut header) => {
                 // On mobile devices, always show icons since hover effects don't work with touch
-                if rookui::platform::is_mobile_device() {
+                if ptermui::platform::is_mobile_device() {
                     header.options.always_show_icons = true;
                 }
                 self.render_standard_header(header, app)

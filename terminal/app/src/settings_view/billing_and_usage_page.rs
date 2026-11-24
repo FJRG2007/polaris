@@ -7,23 +7,23 @@ use itertools::Itertools;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_graphql::billing::AddonCreditsOption;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_graphql::billing::AddonCreditsOption;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Flex, FormattedTextElement, HighlightedHyperlink, Hoverable, HyperlinkUrl, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, Shrinkable, Text, Wrap,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::prelude::ChildView;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::prelude::ChildView;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, UpdateView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -158,7 +158,7 @@ pub(crate) fn render_premium_upgrade_savings_note(
     )
     .with_hyperlink_font_color(theme.accent().into_solid())
     .register_default_click_handlers_with_action_support(|hyperlink_lens, _, ctx| {
-        if let rookui::elements::HyperlinkLens::Url(url) = hyperlink_lens {
+        if let ptermui::elements::HyperlinkLens::Url(url) = hyperlink_lens {
             ctx.open_url(url);
         }
     })
@@ -521,7 +521,7 @@ impl BillingAndUsagePageView {
                     self.show_toast(CHECKOUT_PENDING_MESSAGE, ToastFlavor::Default, ctx);
                     // Credits are granted via webhook once checkout completes;
                     // `on_page_selected` refreshes billing data when the user
-                    // returns (e.g. via the confirmation page's Open Rook link).
+                    // returns (e.g. via the confirmation page's Open Polaris Terminal link).
                 }
             }
             UserWorkspacesEvent::PurchaseAddonCreditsRejected(err) => {
@@ -1063,7 +1063,7 @@ impl TypedActionView for BillingAndUsagePageView {
             BillingAndUsagePageAction::NavigateToByokSettings => {
                 ctx.dispatch_typed_action_deferred(WorkspaceAction::ShowSettingsPageWithSearch {
                     search_query: "api".to_string(),
-                    section: Some(SettingsSection::RookAgent),
+                    section: Some(SettingsSection::PtermAgent),
                 });
             }
         }
@@ -1536,7 +1536,7 @@ impl BillingAndUsagePageView {
         let theme = appearance.theme();
         ConstrainedBox::new(
             Icon::AlertTriangle
-                .to_rookui_icon(theme.ui_error_color().into())
+                .to_ptermui_icon(theme.ui_error_color().into())
                 .finish(),
         )
         .with_height(16.)
@@ -1620,10 +1620,10 @@ impl BillingAndUsagePageView {
                             fragment.text,
                             None,
                             maybe_action.map(|act| {
-                                Box::new(move |ctx: &mut rookui::EventContext| {
+                                Box::new(move |ctx: &mut ptermui::EventContext| {
                                     ctx.dispatch_typed_action(act.clone());
                                 })
-                                    as Box<dyn Fn(&mut rookui::EventContext)>
+                                    as Box<dyn Fn(&mut ptermui::EventContext)>
                             }),
                             self.exceed_limit_link_mouse_state.clone(),
                         )
@@ -1686,7 +1686,7 @@ impl BillingAndUsagePageView {
         .finish();
 
         let icon = Container::new(
-            ConstrainedBox::new(Icon::Credits.to_rookui_icon(fg).finish())
+            ConstrainedBox::new(Icon::Credits.to_ptermui_icon(fg).finish())
                 .with_height(16.)
                 .with_width(16.)
                 .finish(),
@@ -1757,10 +1757,10 @@ impl BillingAndUsagePageView {
                     .with_hyperlink_font_color(theme.accent().into_solid())
                     .register_default_click_handlers_with_action_support(
                         |hyperlink_lens, event, ctx| match hyperlink_lens {
-                            rookui::elements::HyperlinkLens::Url(url) => {
+                            ptermui::elements::HyperlinkLens::Url(url) => {
                                 ctx.open_url(url);
                             }
-                            rookui::elements::HyperlinkLens::Action(action_ref) => {
+                            ptermui::elements::HyperlinkLens::Action(action_ref) => {
                                 if let Some(action) = action_ref
                                     .as_any()
                                     .downcast_ref::<BillingAndUsagePageAction>()
@@ -2336,7 +2336,7 @@ impl BillingAndUsagePageView {
         workspace_is_delinquent_due_to_payment_issue: bool,
         appearance: &Appearance,
         prorated_request_limits_info: Option<ProratedRequestLimitsInfo>,
-    ) -> Box<dyn rookui::Element> {
+    ) -> Box<dyn ptermui::Element> {
         let mut row = Flex::row();
 
         let show_alert = workspace_is_delinquent_due_to_payment_issue
@@ -2363,7 +2363,7 @@ impl BillingAndUsagePageView {
             row.add_child(
                 ConstrainedBox::new(
                     Icon::AlertTriangle
-                        .to_rookui_icon(appearance.theme().ui_error_color().into())
+                        .to_ptermui_icon(appearance.theme().ui_error_color().into())
                         .finish(),
                 )
                 .with_height(16.)
@@ -2430,7 +2430,7 @@ impl BillingAndUsagePageView {
         workspace_is_delinquent_due_to_payment_issue: bool,
         appearance: &Appearance,
         prorated_request_limits_info: Option<ProratedRequestLimitsInfo>,
-    ) -> Box<dyn rookui::Element> {
+    ) -> Box<dyn ptermui::Element> {
         let request_usage_details = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::End)
             .with_child(self.render_request_usage_count(
@@ -2698,7 +2698,7 @@ impl BillingAndUsagePageView {
                     Container::new(
                         ConstrainedBox::new(
                             Icon::Conversation
-                                .to_rookui_icon(
+                                .to_ptermui_icon(
                                     blended_colors::text_sub(
                                         appearance.theme(),
                                         appearance.theme().surface_1(),
@@ -2764,7 +2764,7 @@ impl BillingAndUsagePageView {
         let icon = Container::new(
             ConstrainedBox::new(
                 Icon::AlertCircle
-                    .to_rookui_icon(blended_colors::text_sub(theme, theme.surface_1()).into())
+                    .to_ptermui_icon(blended_colors::text_sub(theme, theme.surface_1()).into())
                     .finish(),
             )
             .with_width(16.)
@@ -3025,7 +3025,7 @@ impl BillingAndUsagePageView {
             && billing_metadata.customer_type == CustomerType::Enterprise
             && billing_metadata
                 .tier
-                .rook_ai_policy
+                .pterm_ai_policy
                 .is_some_and(|p| p.limit == 0)
         {
             usage.add_child(self.render_enterprise_usage_card(
@@ -3316,10 +3316,10 @@ impl BillingAndUsagePageView {
         } else {
             upgrade_cta = upgrade_cta.register_default_click_handlers_with_action_support(
                 |hyperlink_lens, event, ctx| match hyperlink_lens {
-                    rookui::elements::HyperlinkLens::Url(url) => {
+                    ptermui::elements::HyperlinkLens::Url(url) => {
                         ctx.open_url(url);
                     }
-                    rookui::elements::HyperlinkLens::Action(action_ref) => {
+                    ptermui::elements::HyperlinkLens::Action(action_ref) => {
                         if let Some(action) = action_ref
                             .as_any()
                             .downcast_ref::<BillingAndUsagePageAction>()
@@ -3474,7 +3474,7 @@ impl BillingAndUsagePageView {
                         TextAndIcon::new(
                             TextAndIconAlignment::IconFirst,
                             "Compare plans",
-                            Icon::CoinsStacked.to_rookui_icon(appearance.theme().accent()),
+                            Icon::CoinsStacked.to_ptermui_icon(appearance.theme().accent()),
                             MainAxisSize::Min,
                             MainAxisAlignment::Center,
                             vec2f(14., 14.),
@@ -3536,7 +3536,7 @@ impl BillingAndUsagePageView {
                     TextAndIcon::new(
                         TextAndIconAlignment::IconFirst,
                         "Manage billing",
-                        Icon::CoinsStacked.to_rookui_icon(appearance.theme().accent()),
+                        Icon::CoinsStacked.to_ptermui_icon(appearance.theme().accent()),
                         MainAxisSize::Min,
                         MainAxisAlignment::Center,
                         vec2f(14., 14.),
@@ -3594,7 +3594,7 @@ impl BillingAndUsagePageView {
                     TextAndIcon::new(
                         TextAndIconAlignment::IconFirst,
                         "Open admin panel",
-                        Icon::Users.to_rookui_icon(appearance.theme().accent()),
+                        Icon::Users.to_ptermui_icon(appearance.theme().accent()),
                         MainAxisSize::Min,
                         MainAxisAlignment::Center,
                         vec2f(14., 14.),
@@ -3627,7 +3627,7 @@ impl BillingAndUsagePageView {
                     TextAndIcon::new(
                         TextAndIconAlignment::IconFirst,
                         "Compare plans",
-                        Icon::CoinsStacked.to_rookui_icon(appearance.theme().accent()),
+                        Icon::CoinsStacked.to_ptermui_icon(appearance.theme().accent()),
                         MainAxisSize::Min,
                         MainAxisAlignment::Center,
                         vec2f(14., 14.),

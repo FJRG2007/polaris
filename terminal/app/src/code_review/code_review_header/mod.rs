@@ -1,18 +1,18 @@
 mod header_revamp;
 
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use ptermui::elements::{
     Align, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CrossAxisAlignment, Flex,
     Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Shrinkable, SizeConstraintCondition, SizeConstraintSwitch,
     Stack,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, ModelHandle, ViewHandle};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, ModelHandle, ViewHandle};
 
 use crate::appearance::Appearance;
 use crate::code_review::code_review_view::{
@@ -263,7 +263,7 @@ impl CodeReviewHeader {
         let header_text = Self::get_header_text(diff_state_model, app);
 
         Container::new(
-            rookui::elements::Text::new_inline(
+            ptermui::elements::Text::new_inline(
                 header_text,
                 appearance.ui_font_family(),
                 appearance.ui_font_size() + 2.,
@@ -321,7 +321,7 @@ impl CodeReviewHeader {
                 TextAndIcon::new(
                     TextAndIconAlignment::IconFirst,
                     "Discard all".to_string(),
-                    Icon::ReverseLeft.to_rookui_icon(rook_core::ui::theme::Fill::Solid(
+                    Icon::ReverseLeft.to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(
                         sub_text_color.into_solid(),
                     )),
                     MainAxisSize::Min,
@@ -417,7 +417,7 @@ impl CodeReviewHeader {
             .with_text_and_icon_label(TextAndIcon::new(
                 TextAndIconAlignment::IconFirst,
                 "",
-                Icon::Paperclip.to_rookui_icon(rook_core::ui::theme::Fill::Solid(
+                Icon::Paperclip.to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(
                     theme.main_text_color(theme.background()).into(),
                 )),
                 MainAxisSize::Min,
@@ -437,7 +437,7 @@ impl CodeReviewHeader {
                     .build()
                     .finish()
             })
-            .with_tooltip_position(rookui::ui_components::button::ButtonTooltipPosition::AboveLeft)
+            .with_tooltip_position(ptermui::ui_components::button::ButtonTooltipPosition::AboveLeft)
             .build()
             .on_click(|ctx, _, _| {
                 ctx.dispatch_typed_action(CodeReviewAction::AddDiffSetAsContext(
@@ -462,8 +462,8 @@ impl CodeReviewHeader {
     ) -> Box<dyn Element> {
         let button_container = Container::new(
             ConstrainedBox::new(ChildView::new(header_dropdown_button).finish())
-                .with_height(rook_core::ui::icons::ICON_DIMENSIONS)
-                .with_width(rook_core::ui::icons::ICON_DIMENSIONS)
+                .with_height(pterm_core::ui::icons::ICON_DIMENSIONS)
+                .with_width(pterm_core::ui::icons::ICON_DIMENSIONS)
                 .finish(),
         )
         .with_margin_left(4.)

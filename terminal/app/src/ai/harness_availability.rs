@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use instant::Instant;
-use rook_cli::agent::Harness;
-use rook_core::features::FeatureFlag;
-use rook_core::user_preferences::GetUserPreferences;
-use rook_errors::report_error;
-use rook_managed_secrets::client::SecretOwner;
-use rook_managed_secrets::{ManagedSecretManager, ManagedSecretValue};
-use rookui::{Entity, ModelContext, RequestState, SingletonEntity};
+use pterm_cli::agent::Harness;
+use pterm_core::features::FeatureFlag;
+use pterm_core::user_preferences::GetUserPreferences;
+use pterm_errors::report_error;
+use pterm_managed_secrets::client::SecretOwner;
+use pterm_managed_secrets::{ManagedSecretManager, ManagedSecretValue};
+use ptermui::{Entity, ModelContext, RequestState, SingletonEntity};
 use serde::{Deserialize, Serialize};
 
 use crate::ai::harness_display;
@@ -235,7 +235,7 @@ impl HarnessAvailabilityModel {
             OUT_OF_BAND_REQUEST_RETRY_STRATEGY,
             is_transient_graphql_or_http_error,
             move |me,
-                  result: RequestState<Vec<rook_graphql::managed_secrets::ManagedSecret>>,
+                  result: RequestState<Vec<pterm_graphql::managed_secrets::ManagedSecret>>,
                   ctx| match result {
                 RequestState::RequestSucceeded(secrets) => {
                     let entries = secrets
@@ -421,12 +421,12 @@ fn normalize_harness_display_names(
         .collect()
 }
 
-fn secret_owner_from_space(space: &rook_graphql::object::Space) -> SecretOwner {
+fn secret_owner_from_space(space: &pterm_graphql::object::Space) -> SecretOwner {
     match space.type_ {
-        rook_graphql::object::SpaceType::Team => SecretOwner::Team {
+        pterm_graphql::object::SpaceType::Team => SecretOwner::Team {
             team_uid: space.uid.clone().into_inner(),
         },
-        rook_graphql::object::SpaceType::User => SecretOwner::CurrentUser,
+        pterm_graphql::object::SpaceType::User => SecretOwner::CurrentUser,
     }
 }
 
@@ -437,12 +437,12 @@ fn remove_deleted_auth_secret_entry(
 ) {
     entries.retain(|entry| entry.name.as_str() != name || &entry.owner != owner);
 }
-fn harness_to_graphql_harness(harness: Harness) -> Option<rook_graphql::ai::AgentHarness> {
+fn harness_to_graphql_harness(harness: Harness) -> Option<pterm_graphql::ai::AgentHarness> {
     match harness {
-        Harness::Oz => Some(rook_graphql::ai::AgentHarness::Oz),
-        Harness::Claude => Some(rook_graphql::ai::AgentHarness::ClaudeCode),
-        Harness::Gemini => Some(rook_graphql::ai::AgentHarness::Gemini),
-        Harness::Codex => Some(rook_graphql::ai::AgentHarness::Codex),
+        Harness::Oz => Some(pterm_graphql::ai::AgentHarness::Oz),
+        Harness::Claude => Some(pterm_graphql::ai::AgentHarness::ClaudeCode),
+        Harness::Gemini => Some(pterm_graphql::ai::AgentHarness::Gemini),
+        Harness::Codex => Some(pterm_graphql::ai::AgentHarness::Codex),
         Harness::OpenCode | Harness::Unknown => None,
     }
 }

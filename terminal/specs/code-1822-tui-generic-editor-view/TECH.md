@@ -4,7 +4,7 @@
 
 The TUI already renders and hit-tests editor content through `TuiEditorElement`,
 backed by `CodeEditorModel` in char-cell mode
-(`crates/rook_tui/src/editor_element.rs` and
+(`crates/pterm_tui/src/editor_element.rs` and
 `specs/tui-editor-element/TECH.md`). Before this slice, editable behavior lived in
 `TuiInputView`, which also owns prompt submission, shell mode, inline menus, and
 other application-input policy. Reusing that view for selector search or custom
@@ -21,22 +21,22 @@ The ownership boundary is:
   hidden lines, and retained viewport offset.
 - `TuiEditorElement`: painting, cursor/selection geometry, hit-testing, printable
   input, paste, mouse selection, and wheel events
-  (`crates/rook_tui/src/editor_element.rs` (44-79)).
+  (`crates/pterm_tui/src/editor_element.rs` (44-79)).
 - `editor_interaction.rs`: shared command definitions and bindings, model mutations,
   behavior configuration, kill/yank state, selection action handling, and viewport
-  follow/scroll helpers (`crates/rook_tui/src/editor_interaction.rs` (15-559)).
+  follow/scroll helpers (`crates/pterm_tui/src/editor_interaction.rs` (15-559)).
 - `TuiEditorView`: generic field focus, one-row configuration, content events,
   and programmatic text replacement
-  (`crates/rook_tui/src/editor_view.rs` (37-202)).
+  (`crates/pterm_tui/src/editor_view.rs` (37-202)).
 - `TuiInputView`: prompt submission, contextual Escape,
   shell-mode interception, inline-menu routing, and prompt focus
-  (`crates/rook_tui/src/input/view.rs` (66-604)).
+  (`crates/pterm_tui/src/input/view.rs` (66-604)).
 
 ## Proposed changes
 
 ### Shared command and binding layer
 
-`crates/rook_tui/src/editor_interaction.rs` owns `TuiEditorCommand`, which represents
+`crates/pterm_tui/src/editor_interaction.rs` owns `TuiEditorCommand`, which represents
 model-backed editing semantics:
 
 - character/word deletion;
@@ -59,10 +59,10 @@ whose host owns Up/Down navigation and focus handoff, so registering
 that must propagate. The metadata marks those bindings input-only while both
 consumers still use the shared command variants.
 
-`crates/rook_tui/src/keybindings.rs` remains the TUI-wide aggregation and
+`crates/pterm_tui/src/keybindings.rs` remains the TUI-wide aggregation and
 cross-surface validation layer. It registers both editor targets and binding
 validators but does not define editor commands or key metadata
-(`crates/rook_tui/src/keybindings.rs` (22-115)).
+(`crates/pterm_tui/src/keybindings.rs` (22-115)).
 
 ### Shared editor state and action application
 
@@ -70,7 +70,7 @@ Each editable view owns a `TuiEditorState`. Its single-entry kill buffer backs
 Ctrl-K, Ctrl-U, and Ctrl-Y for both the prompt and generic fields. Kill range
 calculation and deletion remain model semantics on `CodeEditorModel`; the shared
 state only retains the deleted text for yank
-(`crates/rook_tui/src/editor_interaction.rs` (322-468)).
+(`crates/pterm_tui/src/editor_interaction.rs` (322-468)).
 
 `TuiEditorBehavior` is the single consumer configuration for line policy and
 viewport height. `single_line()` rejects hard newlines and uses one visible row;
@@ -155,7 +155,7 @@ flowchart LR
 
 ## Testing and validation
 
-`crates/rook_tui/src/editor_view_tests.rs` covers:
+`crates/pterm_tui/src/editor_view_tests.rs` covers:
 
 - single-line paste truncation;
 - single-line programmatic replacement and newline rejection;
@@ -165,13 +165,13 @@ flowchart LR
 - focus and mouse-selection behavior;
 - programmatic text replacement.
 
-Existing `crates/rook_tui/src/input/view_tests.rs` continues to cover multiline
+Existing `crates/pterm_tui/src/input/view_tests.rs` continues to cover multiline
 paste, command navigation/selection, kill/yank, shell-mode overrides, inline-menu
 routing, mouse selection, and six-row viewport behavior through the shared layer.
 
 Validation commands:
 
 - `./script/format`
-- `cargo nextest run --no-fail-fast -p rook_tui -E 'test(editor_view) or test(input::view::tests)'`
-- `cargo nextest run --no-fail-fast -p rook_tui`
-- `cargo clippy -p rook_tui --tests -- -D warnings`
+- `cargo nextest run --no-fail-fast -p pterm_tui -E 'test(editor_view) or test(input::view::tests)'`
+- `cargo nextest run --no-fail-fast -p pterm_tui`
+- `cargo clippy -p pterm_tui --tests -- -D warnings`

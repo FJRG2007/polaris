@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use rookui_core::integration::{AssertionOutcome, TestStep};
+use ptermui_core::integration::{AssertionOutcome, TestStep};
 
 use super::wait_until_bootstrapped_single_pane_for_tab;
 use crate::Builder;
@@ -18,7 +18,7 @@ pub fn test_preview_config_dir_migration() -> Builder {
     Builder::new()
         .with_setup(|utils| {
             let home = utils.test_dir();
-            let old_dir = home.join(".rook");
+            let old_dir = home.join(".polaris-terminal");
 
             // Populate the old config directory with representative entries.
             fs::create_dir_all(old_dir.join("themes")).expect("create themes dir");
@@ -35,8 +35,8 @@ pub fn test_preview_config_dir_migration() -> Builder {
             // Run the migration. We call the inner helper directly because the
             // integration channel is Integration, not Preview, so the public
             // entry point would no-op.
-            let new_dir = home.join(".rook-preview");
-            rook::integration_testing::preview_config_migration::run_config_dir_symlink_migration(
+            let new_dir = home.join(".polaris-terminal-preview");
+            polaris_terminal::integration_testing::preview_config_migration::run_config_dir_symlink_migration(
                 &old_dir, &new_dir,
             );
         })
@@ -46,11 +46,11 @@ pub fn test_preview_config_dir_migration() -> Builder {
                 .add_named_assertion(
                     "new directory exists and is a real directory",
                     |_app, _window_id| {
-                        let new_dir = home_dir().join(".rook-preview");
+                        let new_dir = home_dir().join(".polaris-terminal-preview");
 
                         if !new_dir.is_dir() {
                             return AssertionOutcome::failure(
-                                ".rook-preview should be a directory".to_string(),
+                                ".polaris-terminal-preview should be a directory".to_string(),
                             );
                         }
                         // It should be a real directory, not a symlink.
@@ -60,7 +60,7 @@ pub fn test_preview_config_dir_migration() -> Builder {
                             .unwrap_or(false);
                         if is_symlink {
                             return AssertionOutcome::failure(
-                                ".rook-preview should not itself be a symlink".to_string(),
+                                ".polaris-terminal-preview should not itself be a symlink".to_string(),
                             );
                         }
                         AssertionOutcome::Success
@@ -70,8 +70,8 @@ pub fn test_preview_config_dir_migration() -> Builder {
                     "expected entries are symlinks pointing to old dir",
                     |_app, _window_id| {
                         let home = home_dir();
-                        let old_dir = home.join(".rook");
-                        let new_dir = home.join(".rook-preview");
+                        let old_dir = home.join(".polaris-terminal");
+                        let new_dir = home.join(".polaris-terminal-preview");
 
                         for name in ["keybindings.yaml", "themes", "workflows", ".mcp.json"] {
                             let link = new_dir.join(name);
@@ -109,7 +109,7 @@ pub fn test_preview_config_dir_migration() -> Builder {
                     },
                 )
                 .add_named_assertion("excluded files were not symlinked", |_app, _window_id| {
-                    let new_dir = home_dir().join(".rook-preview");
+                    let new_dir = home_dir().join(".polaris-terminal-preview");
 
                     for name in [".DS_Store", "._somefile", "settings.toml"] {
                         if new_dir.join(name).exists() {

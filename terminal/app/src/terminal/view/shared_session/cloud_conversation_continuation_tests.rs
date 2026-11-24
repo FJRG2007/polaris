@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use persistence::model::ConversationUsageMetadata;
-use rook_cli::agent::Harness;
-use rook_graphql::object_permissions::AccessLevel;
-use rookui::{App, EntityId, SingletonEntity};
+use pterm_cli::agent::Harness;
+use pterm_graphql::object_permissions::AccessLevel;
+use ptermui::{App, EntityId, SingletonEntity};
 
 use super::*;
 use crate::FeatureFlag;
@@ -661,7 +661,7 @@ fn environment_setup_failure_with_conversation_shows_continue_cta() {
 }
 
 /// Debug routing trusts the server-computed `debug_agent_available` capability
-/// (REMOTE-2661/rook-server#14231) entirely — it is not re-derived from `session_debug_until`
+/// (REMOTE-2661/polaris-terminal-server#14231) entirely — it is not re-derived from `session_debug_until`
 /// or `debug_agent_active` client-side. An older/ineligible server response defaults
 /// `debug_agent_available` to `false`, so a task that otherwise looks eligible (failure-like
 /// state, `ENVIRONMENT_SETUP_FAILED`, an open `session_debug_until` window) must still fail

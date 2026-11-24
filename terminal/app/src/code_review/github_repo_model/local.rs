@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use rook_errors::report_if_error;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{Entity, ModelContext, ModelHandle, SingletonEntity as _};
+use pterm_errors::report_if_error;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{Entity, ModelContext, ModelHandle, SingletonEntity as _};
 use settings::Setting as _;
 
 use super::GitHubRepoEvent;
@@ -186,7 +186,7 @@ impl LocalGitHubRepoModel {
         let repo_path = self.repo_path.clone();
         #[cfg(feature = "local_tty")]
         let path_future = {
-            // Use the shell's interactive PATH so `gh` can be found when Rook
+            // Use the shell's interactive PATH so `gh` can be found when Polaris Terminal
             // was launched outside of a login shell, e.g. from the macOS GUI.
             LocalShellState::handle(ctx).update(ctx, |shell_state, ctx| {
                 shell_state.get_interactive_path_env_var(ctx)
@@ -228,7 +228,7 @@ impl LocalGitHubRepoModel {
         let repo_path = self.repo_path.clone();
         #[cfg(feature = "local_tty")]
         let path_future = {
-            // Use the shell's interactive PATH so `gh` can be found when Rook
+            // Use the shell's interactive PATH so `gh` can be found when Polaris Terminal
             // was launched outside of a login shell, e.g. from the macOS GUI.
             LocalShellState::handle(ctx).update(ctx, |shell_state, ctx| {
                 shell_state.get_interactive_path_env_var(ctx)

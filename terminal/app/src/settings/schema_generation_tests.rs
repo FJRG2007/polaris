@@ -70,7 +70,7 @@ fn generates_a_settings_schema() {
     let schema = settings_schema_json(|_| false).unwrap();
     let schema: serde_json::Value = serde_json::from_str(&schema).unwrap();
 
-    assert_eq!(schema["title"], "Rook Settings");
+    assert_eq!(schema["title"], "Polaris Terminal Settings");
     assert_eq!(schema["type"], "object");
     assert!(schema["properties"].is_object());
 }

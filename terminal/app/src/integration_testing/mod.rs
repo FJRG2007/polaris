@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use rookui::{App, AssetProvider, View, ViewHandle, WindowId};
+use ptermui::{App, AssetProvider, View, ViewHandle, WindowId};
 
 pub mod agent_mode;
 pub mod ai_document;
@@ -26,8 +26,8 @@ pub mod pane_group;
 pub mod persistence;
 #[cfg(target_os = "macos")]
 pub mod preview_config_migration;
+pub mod pterm_drive;
 pub mod remote_server;
-pub mod rook_drive;
 pub mod rules;
 pub mod secret_redaction;
 pub mod settings;

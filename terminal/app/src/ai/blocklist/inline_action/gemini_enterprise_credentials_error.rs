@@ -1,10 +1,10 @@
 use ai::api_keys::{ApiKeyManager, GeapCredentialsState};
-use rook_core::ui::Icon;
-use rookui::elements::{
+use pterm_core::ui::Icon;
+use ptermui::elements::{
     ChildView, ConstrainedBox, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
     ParentElement, Shrinkable, SizeConstraintCondition, SizeConstraintSwitch, Text,
 };
-use rookui::{
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -131,9 +131,9 @@ impl View for GeminiEnterpriseCredentialsErrorView {
         let detail = if self.refresh_succeeded {
             "Your credentials are ready. Retry the request to continue."
         } else if self.refresh_requested {
-            "Rook is refreshing your Google Cloud credentials."
+            "Polaris Terminal is refreshing your Google Cloud credentials."
         } else {
-            "Rook couldn't authenticate with Google Cloud. Refresh your Gemini Enterprise credentials, then retry the request."
+            "Polaris Terminal couldn't authenticate with Google Cloud. Refresh your Gemini Enterprise credentials, then retry the request."
         };
         let header_color = if self.refresh_succeeded {
             theme.ansi_fg_green()
@@ -147,10 +147,10 @@ impl View for GeminiEnterpriseCredentialsErrorView {
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_child(
                     ConstrainedBox::new(if self.refresh_succeeded {
-                        Icon::Check.to_rookui_icon(header_color.into()).finish()
+                        Icon::Check.to_ptermui_icon(header_color.into()).finish()
                     } else {
                         Icon::AlertTriangle
-                            .to_rookui_icon(header_color.into())
+                            .to_ptermui_icon(header_color.into())
                             .finish()
                     })
                     .with_width(icon_size(app))

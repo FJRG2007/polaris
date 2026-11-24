@@ -2,8 +2,8 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use input_classifier::InputType;
-use rook_core::features::FeatureFlag;
-use rookui::{AppContext, ModelHandle, SingletonEntity, WeakViewHandle};
+use pterm_core::features::FeatureFlag;
+use ptermui::{AppContext, ModelHandle, SingletonEntity, WeakViewHandle};
 use session_sharing_protocol::common::{
     CLIAgentSessionState, InputMode, InputType as ProtocolInputType, SelectedAgentModel,
     SelectedConversation, ServerConversationToken, UniversalDeveloperInputContextUpdate,
@@ -23,7 +23,7 @@ use crate::workspaces::user_workspaces::{ResolvedTeamScope, UserWorkspaces};
 /// This function is shared between the viewer and sharer to ensure consistent behavior.
 pub(crate) fn apply_selected_agent_model_update(
     weak_view_handle: &WeakViewHandle<TerminalView>,
-    terminal_view_id: rookui::EntityId,
+    terminal_view_id: ptermui::EntityId,
     selected_model: &SelectedAgentModel,
     _guard: &ActiveRemoteUpdate,
     ctx: &mut AppContext,

@@ -31,7 +31,7 @@ fn installed_when_plugin_present() {
 
     let json = serde_json::json!({
         "plugins": {
-            "rook@rook": [{"version": "1.0.0"}]
+            "polaris-terminal@polaris-terminal": [{"version": "1.0.0"}]
         }
     });
     fs::write(
@@ -48,9 +48,9 @@ fn local_marketplace_override_detects_directory_source() {
     let dir = tempfile::tempdir().unwrap();
     let settings = serde_json::json!({
         "extraKnownMarketplaces": {
-            "rook": {
+            "polaris-terminal": {
                 "source": {
-                    "path": "/Users/example/Developer/claude-code-rook-internal",
+                    "path": "/Users/example/Developer/claude-code-polaris-terminal-internal",
                     "source": "directory"
                 }
             }
@@ -70,8 +70,8 @@ fn local_marketplace_override_ignores_repo_source() {
     let dir = tempfile::tempdir().unwrap();
     let settings = serde_json::json!({
         "extraKnownMarketplaces": {
-            "rook": {
-                "source": "FJRG2007/rook"
+            "polaris-terminal": {
+                "source": "FJRG2007/polaris"
             }
         }
     });
@@ -90,9 +90,9 @@ fn local_marketplace_override_via_trait_uses_claude_config_dir() {
     let dir = tempfile::tempdir().unwrap();
     let settings = serde_json::json!({
         "extraKnownMarketplaces": {
-            "rook": {
+            "polaris-terminal": {
                 "source": {
-                    "path": "../claude-code-rook-internal",
+                    "path": "../claude-code-polaris-terminal-internal",
                     "source": "directory"
                 }
             }
@@ -121,7 +121,7 @@ fn installed_platform_plugin_version_returns_version_when_present() {
 
     let json = serde_json::json!({
         "plugins": {
-            "oz-harness-support@rook": [{"version": MINIMUM_PLATFORM_PLUGIN_VERSION}]
+            "oz-harness-support@polaris-terminal": [{"version": MINIMUM_PLATFORM_PLUGIN_VERSION}]
         }
     });
     fs::write(
@@ -144,7 +144,7 @@ fn platform_plugin_installed_when_platform_plugin_present() {
 
     let json = serde_json::json!({
         "plugins": {
-            "oz-harness-support@rook": [{"version": MINIMUM_PLATFORM_PLUGIN_VERSION}]
+            "oz-harness-support@polaris-terminal": [{"version": MINIMUM_PLATFORM_PLUGIN_VERSION}]
         }
     });
     fs::write(
@@ -165,7 +165,7 @@ fn platform_plugin_needs_update_via_trait_when_version_below_minimum() {
 
     let json = serde_json::json!({
         "plugins": {
-            "oz-harness-support@rook": [{"version": version_below(MINIMUM_PLATFORM_PLUGIN_VERSION)}]
+            "oz-harness-support@polaris-terminal": [{"version": version_below(MINIMUM_PLATFORM_PLUGIN_VERSION)}]
         }
     });
     fs::write(
@@ -192,7 +192,7 @@ fn platform_plugin_does_not_need_update_via_trait_when_current() {
 
     let json = serde_json::json!({
         "plugins": {
-            "oz-harness-support@rook": [{"version": MINIMUM_PLATFORM_PLUGIN_VERSION}]
+            "oz-harness-support@polaris-terminal": [{"version": MINIMUM_PLATFORM_PLUGIN_VERSION}]
         }
     });
     fs::write(
@@ -219,7 +219,7 @@ fn platform_plugin_needs_update_via_trait_when_installed_without_version() {
 
     let json = serde_json::json!({
         "plugins": {
-            "oz-harness-support@rook": [{"scope": "user"}]
+            "oz-harness-support@polaris-terminal": [{"scope": "user"}]
         }
     });
     fs::write(
@@ -245,7 +245,7 @@ fn platform_plugin_not_installed_when_only_notification_plugin_present() {
 
     let json = serde_json::json!({
         "plugins": {
-            "rook@rook": [{"version": "1.0.0"}]
+            "polaris-terminal@polaris-terminal": [{"version": "1.0.0"}]
         }
     });
     fs::write(
@@ -285,7 +285,7 @@ fn not_installed_when_plugin_array_empty() {
 
     let json = serde_json::json!({
         "plugins": {
-            "rook@rook": []
+            "polaris-terminal@polaris-terminal": []
         }
     });
     fs::write(
@@ -340,7 +340,7 @@ fn is_installed_via_trait_with_claude_config_dir_env() {
 
     let json = serde_json::json!({
         "plugins": {
-            "rook@rook": [{"version": "1.0.0"}]
+            "polaris-terminal@polaris-terminal": [{"version": "1.0.0"}]
         }
     });
     fs::write(
@@ -380,7 +380,7 @@ fn installed_version_returns_version_when_present() {
 
     let json = serde_json::json!({
         "plugins": {
-            "rook@rook": [{"version": "1.5.0"}]
+            "polaris-terminal@polaris-terminal": [{"version": "1.5.0"}]
         }
     });
     fs::write(
@@ -400,7 +400,7 @@ fn installed_version_returns_none_when_no_version_field() {
 
     let json = serde_json::json!({
         "plugins": {
-            "rook@rook": [{"scope": "user"}]
+            "polaris-terminal@polaris-terminal": [{"scope": "user"}]
         }
     });
     fs::write(

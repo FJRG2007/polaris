@@ -1,5 +1,5 @@
 [package]
-name = "rook_managed_secrets"
+name = "pterm_managed_secrets"
 version = "0.1.0"
 authors.workspace = true
 publish.workspace = true
@@ -21,11 +21,11 @@ tink-proto = "0.3"
 tink-hybrid = "0.3"
 tracing.workspace = true
 zeroize = "1.8"
-rookui_core.workspace = true
-rook_core.workspace = true
-rook_graphql.workspace = true
+ptermui_core.workspace = true
+pterm_core.workspace = true
+pterm_graphql.workspace = true
 vec1.workspace = true
-rook_isolation_platform.workspace = true
+pterm_isolation_platform.workspace = true
 
 # Pure-Rust HPKE implementation (RFC 9180).
 hpke = { version = "0.13", default-features = false, features = ["alloc", "x25519"] }

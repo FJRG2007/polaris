@@ -6,16 +6,16 @@ use ai::skills::SkillReference;
 use command_corrections::Correction;
 pub use onboarding::OnboardingIntention;
 use pathfinder_geometry::vector::Vector2F;
-use rook_util::user_input::UserInput;
-use rookui::EntityId;
-use rookui::elements::HyperlinkUrl;
-use rookui::event::ModifiersState;
-use rookui::units::Lines;
+use pterm_util::user_input::UserInput;
+use ptermui::EntityId;
+use ptermui::elements::HyperlinkUrl;
+use ptermui::event::ModifiersState;
+use ptermui::units::Lines;
 use session_sharing_protocol::common::Role;
 use session_sharing_protocol::sharer::RoleUpdateReason;
 
 use super::inline_banner::{
-    AwsBedrockLoginBannerAction, AwsCliNotInstalledBannerAction, OpenInRookBannerAction,
+    AwsBedrockLoginBannerAction, AwsCliNotInstalledBannerAction, OpenInPtermBannerAction,
     VimModeBannerAction,
 };
 use super::{
@@ -67,7 +67,7 @@ pub enum OnboardingVersion {
 /// This represents whether entering a subshell for a particular command should become automatic in
 /// the future, or to ask again.
 #[derive(Clone, Debug)]
-pub enum RememberForRookification {
+pub enum RememberForPtermification {
     /// If yes, need to transmit the command itself so it can be persisted to user-defaults
     RememberSubshellCommand(String),
     RememberSSHHost(String),
@@ -75,22 +75,22 @@ pub enum RememberForRookification {
     DoNotRememberSSHHost,
 }
 
-impl RememberForRookification {
+impl RememberForPtermification {
     pub fn as_bool(&self) -> bool {
         match self {
-            RememberForRookification::RememberSubshellCommand(_) => true,
-            RememberForRookification::RememberSSHHost(_) => true,
-            RememberForRookification::DoNotRememberSubshellCommand => false,
-            RememberForRookification::DoNotRememberSSHHost => false,
+            RememberForPtermification::RememberSubshellCommand(_) => true,
+            RememberForPtermification::RememberSSHHost(_) => true,
+            RememberForPtermification::DoNotRememberSubshellCommand => false,
+            RememberForPtermification::DoNotRememberSSHHost => false,
         }
     }
 
     pub fn is_ssh(&self) -> bool {
         match self {
-            RememberForRookification::RememberSSHHost(_) => true,
-            RememberForRookification::DoNotRememberSSHHost => true,
-            RememberForRookification::RememberSubshellCommand(_) => false,
-            RememberForRookification::DoNotRememberSubshellCommand => false,
+            RememberForPtermification::RememberSSHHost(_) => true,
+            RememberForPtermification::DoNotRememberSSHHost => true,
+            RememberForPtermification::RememberSubshellCommand(_) => false,
+            RememberForPtermification::DoNotRememberSubshellCommand => false,
         }
     }
 }
@@ -190,7 +190,7 @@ pub enum TerminalAction {
     RunNativeShellCompletions {
         buffer_text: String,
         results_tx:
-            async_channel::Sender<(Vec<ShellCompletion>, Option<rook_completer::meta::Span>)>,
+            async_channel::Sender<(Vec<ShellCompletion>, Option<pterm_completer::meta::Span>)>,
     },
     KeyDown(String),
     TypedCharacters(String),
@@ -268,12 +268,12 @@ pub enum TerminalAction {
     },
     CopyRichContentSecret(RichContentSecretTooltipInfo),
     ShowInFileExplorer(PathBuf),
-    OpenFileInRook(PathBuf),
+    OpenFileInPterm(PathBuf),
     #[cfg(feature = "local_fs")]
-    OpenCodeInRook {
+    OpenCodeInPterm {
         path: PathBuf,
         layout: crate::util::file::external_editor::settings::EditorLayout,
-        line_col: Option<rook_util::path::LineAndColumnArg>,
+        line_col: Option<pterm_util::path::LineAndColumnArg>,
     },
     OpenWorkflowModal,
     OpenWorkflowModalForAIWorkflow(Workflow),
@@ -284,14 +284,14 @@ pub enum TerminalAction {
     },
     /// Starts a subshell in the active session.
     TriggerSubshellBootstrap,
-    /// If the user says "no" to Rookification, possibly requesting not to be asked again
-    DismissRookifyBanner(RememberForRookification),
+    /// If the user says "no" to Ptermification, possibly requesting not to be asked again
+    DismissPtermifyBanner(RememberForPtermification),
     /// Triggers the banner asking to turn the running block into a subshell. The String is the
     /// command that the user entered.
     ShowSubshellBanner(String),
     InsertMostRecentCommandCorrection,
     AliasExpansionBanner(AliasExpansionBannerAction),
-    OpenInRookBanner(OpenInRookBannerAction),
+    OpenInPtermBanner(OpenInPtermBannerAction),
     OpenBlockFilterEditor(BlockIndex),
     OnboardingFlow(OnboardingVersion),
     ImportSettings,
@@ -342,7 +342,7 @@ pub enum TerminalAction {
     GenerateCodebaseIndex,
     /// This is for debugging, dev only for now
     LoadAgentModeConversation,
-    ShowRookifySettings,
+    ShowPtermifySettings,
     /// Removes a pending attachment (image or file) by index in the unified list.
     DeleteAttachment {
         index: usize,
@@ -388,9 +388,9 @@ pub enum TerminalAction {
     DismissCodeToolbeltTooltip,
     /// Start a Language Server for the current working directory (if supported)
     StartLspServer,
-    /// Start the guided Rook Environment setup flow (inserts the inline setup block).
+    /// Start the guided Polaris Terminal Environment setup flow (inserts the inline setup block).
     SetupCloudEnvironment(Vec<String>),
-    /// Start the guided Rook Environment setup flow immediately (no inline setup block).
+    /// Start the guided Polaris Terminal Environment setup flow immediately (no inline setup block).
     SetupCloudEnvironmentAndStart(Vec<String>),
     /// Show the environment setup mode selector to choose between remote GitHub or local agent flow.
     TriggerEnvironmentSetupSelection(Vec<String>),
@@ -603,9 +603,9 @@ impl fmt::Debug for TerminalAction {
             CopyGridSecret(_) => f.write_str("CopyGridSecret"),
             CopyRichContentSecret(_) => f.write_str("CopyRichContentSecret"),
             ShowInFileExplorer(_) => f.write_str("ShowInFileExplorer"),
-            OpenFileInRook(_) => f.write_str("OpenFileInRook"),
+            OpenFileInPterm(_) => f.write_str("OpenFileInPterm"),
             #[cfg(feature = "local_fs")]
-            OpenCodeInRook { .. } => f.write_str("OpenCodeInRook"),
+            OpenCodeInPterm { .. } => f.write_str("OpenCodeInPterm"),
             OpenWorkflowModal => f.write_str("OpenWorkflowModal"),
             OpenWorkflowModalForAIWorkflow(_) => f.write_str("OpenWorkflowModalForAIWorkflow"),
             OpenWorkflowModalForBlock(block_index) => {
@@ -617,11 +617,11 @@ impl fmt::Debug for TerminalAction {
             OpenBlockListContextMenu => f.write_str("OpenBlockListContextMenu"),
             AskAIAssistant { block_index } => write!(f, "AskAIAssistant({block_index:?})"),
             TriggerSubshellBootstrap => f.write_str("TriggerSubshellBootstrap"),
-            DismissRookifyBanner(remember) => write!(f, "DismissRookifyBanner({remember:?})"),
+            DismissPtermifyBanner(remember) => write!(f, "DismissPtermifyBanner({remember:?})"),
             ShowSubshellBanner(_) => f.write_str("ShowSubshellBanner"),
             InsertMostRecentCommandCorrection => f.write_str("InsertMostRecentCommandCorrection"),
             AliasExpansionBanner(action) => write!(f, "AliasExpansionBanner({action:?}"),
-            OpenInRookBanner(action) => write!(f, "OpenInRookBanner({action:?})"),
+            OpenInPtermBanner(action) => write!(f, "OpenInPtermBanner({action:?})"),
             OpenBlockFilterEditor(block_index) => {
                 write!(f, "OpenBlockFilterEditor({block_index:?})")
             }
@@ -677,7 +677,7 @@ impl fmt::Debug for TerminalAction {
             ShowInitializationBlock => write!(f, "ShowInitializationBlock"),
             GenerateCodebaseIndex => write!(f, "GenerateIndexForRepo"),
             LoadAgentModeConversation => write!(f, "LoadAgentModeConversation"),
-            ShowRookifySettings => write!(f, "ShowRookifySettings"),
+            ShowPtermifySettings => write!(f, "ShowPtermifySettings"),
             DeleteAttachment { index } => write!(f, "DeleteAttachment({index:?})"),
             OpenAttachmentLightbox { index } => {
                 write!(f, "OpenAttachmentLightbox({index:?})")

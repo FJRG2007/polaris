@@ -1,4 +1,4 @@
-use rookui::{Entity, ModelContext, ViewHandle};
+use ptermui::{Entity, ModelContext, ViewHandle};
 
 use crate::editor::{self, EditorView, Point};
 

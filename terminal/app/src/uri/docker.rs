@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 use anyhow::{Result, anyhow};
+use pterm_util::path::{ShellFamily, is_posix_portable_pathname};
+use ptermui::AppContext;
 use regex::Regex;
-use rook_util::path::{ShellFamily, is_posix_portable_pathname};
-use rookui::AppContext;
 use url::Url;
 
 use crate::root_view::SubshellCommandArg;
@@ -28,7 +28,7 @@ impl TryFrom<String> for DockerContainerId {
             ))
         } else if input.chars().any(|c| !c.is_ascii_hexdigit()) {
             Err(anyhow!(
-                "Could not find valid docker container id to open rookified shell"
+                "Could not find valid docker container id to open ptermified shell"
             ))
         } else {
             Ok(DockerContainerId(input))
@@ -44,7 +44,7 @@ impl Display for DockerContainerId {
 
 /// Given a Url with query parameters in the correct format, dispatch an action to create a new tab
 /// (or open a new window if there is no window), then run a command to open a subshell into the
-/// specified Docker container, and then rookify that new subshell.
+/// specified Docker container, and then ptermify that new subshell.
 pub fn open_docker_container(url: &Url, ctx: &mut AppContext) -> Result<()> {
     let query_params: HashMap<String, String> = url
         .query_pairs()
@@ -109,7 +109,7 @@ pub fn open_docker_container(url: &Url, ctx: &mut AppContext) -> Result<()> {
     );
 
     send_telemetry_from_app_ctx!(
-        TelemetryEvent::OpenAndRookifyDockerSubshell { shell_type },
+        TelemetryEvent::OpenAndPtermifyDockerSubshell { shell_type },
         ctx
     );
 

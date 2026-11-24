@@ -15,8 +15,8 @@ diesel = { workspace = true, features = ["sqlite", "chrono"] }
 log.workspace = true
 persistence.workspace = true
 serde.workspace = true
-rook_core.workspace = true
-rook_graphql.workspace = true
+pterm_core.workspace = true
+pterm_graphql.workspace = true
 
 [dev-dependencies]
 cloud_objects = { workspace = true, features = ["test-util"] }

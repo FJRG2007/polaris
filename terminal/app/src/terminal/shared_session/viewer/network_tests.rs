@@ -5,7 +5,7 @@ use async_channel::Sender;
 use async_io::Timer;
 use instant::Instant;
 use parking_lot::FairMutex;
-use rookui::{App, ModelHandle};
+use ptermui::{App, ModelHandle};
 use session_sharing_protocol::viewer::UpstreamMessage;
 
 use super::{Network, PtyBytesBatchStatus, Stage};

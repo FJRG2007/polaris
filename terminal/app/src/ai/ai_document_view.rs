@@ -4,20 +4,20 @@ use std::sync::Arc;
 
 use ai::document::DEFAULT_PLANNING_DOCUMENT_TITLE;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::icons;
-use rook_core::ui::icons::ICON_DIMENSIONS;
-use rook_core::ui::theme::Fill as ThemeFill;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_core::ui::icons;
+use pterm_core::ui::icons::ICON_DIMENSIONS;
+use pterm_core::ui::theme::Fill as ThemeFill;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     ChildAnchor, ChildView, ConstrainedBox, Container, CrossAxisAlignment, Flex, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentElement,
     PositionedElementAnchor, PositionedElementOffsetBounds, SavePosition, Stack,
 };
-use rookui::keymap::{EditableBinding, FixedBinding};
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::button::ButtonTooltipPosition;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::keymap::{EditableBinding, FixedBinding};
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::button::ButtonTooltipPosition;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, id,
 };
@@ -31,7 +31,7 @@ use crate::ai::document::ai_document_model::{
 use crate::ai::document::orchestration_config_block::OrchestrationConfigBlockView;
 use crate::appearance::Appearance;
 use crate::drive::CloudObjectTypeAndId;
-use crate::drive::items::RookDriveItemId;
+use crate::drive::items::PtermDriveItemId;
 use crate::drive::sharing::ShareableObject;
 use crate::editor::InteractionState;
 use crate::menu::{Menu, MenuItem, MenuItemFields};
@@ -82,9 +82,9 @@ pub fn init(app: &mut AppContext) {
 
 #[cfg(feature = "local_fs")]
 use anyhow::Context as _;
-use rook_errors::report_error;
+use pterm_errors::report_error;
 #[cfg(feature = "local_fs")]
-use rook_util::path::LineAndColumnArg;
+use pterm_util::path::LineAndColumnArg;
 
 #[cfg(feature = "local_fs")]
 use crate::code::editor_management::CodeSource;
@@ -103,12 +103,12 @@ pub enum AIDocumentAction {
     Export,
     CopyAsMarkdown,
     OpenVersionMenu,
-    CreateRookDriveNotebook,
+    CreatePtermDriveNotebook,
     RevertToDocumentVersion,
     SendUpdatedPlan,
     CopyLink(String),
     CopyPlanId,
-    ShowInRookDrive,
+    ShowInPtermDrive,
     AttachToActiveSession,
 }
 
@@ -116,9 +116,9 @@ pub enum AIDocumentAction {
 pub enum AIDocumentEvent {
     Pane(PaneEvent),
     CloseRequested,
-    ViewInRookDrive(RookDriveItemId),
+    ViewInPtermDrive(PtermDriveItemId),
     #[cfg(feature = "local_fs")]
-    OpenCodeInRook {
+    OpenCodeInPterm {
         source: CodeSource,
         layout: EditorLayout,
         line_col: Option<LineAndColumnArg>,
@@ -402,7 +402,7 @@ impl AIDocumentView {
             pane_config.refresh_pane_header_overflow_menu_items(ctx)
         });
 
-        // Create sync button mouse state (for Rook Drive syncing)
+        // Create sync button mouse state (for Polaris Terminal Drive syncing)
         let sync_button_mouse_state = MouseStateHandle::default();
 
         // Create Update Agent button
@@ -609,7 +609,7 @@ impl AIDocumentView {
             .and_then(|sync_id| sync_id.into_server());
 
         self.pane_configuration.update(ctx, |pc, ctx| {
-            pc.set_shareable_object(server_id.map(ShareableObject::RookDriveObject), ctx);
+            pc.set_shareable_object(server_id.map(ShareableObject::PtermDriveObject), ctx);
             pc.refresh_pane_header_overflow_menu_items(ctx);
         });
         ctx.notify();
@@ -669,7 +669,9 @@ impl AIDocumentView {
                 let appearance = Appearance::as_ref(app);
                 let ui_builder = appearance.ui_builder().clone();
                 let tooltip = ui_builder
-                    .tool_tip("Save and auto-sync this plan to your Rook Drive".to_string())
+                    .tool_tip(
+                        "Save and auto-sync this plan to your Polaris Terminal Drive".to_string(),
+                    )
                     .build()
                     .finish();
                 let sync_button_mouse_state = self.sync_button_mouse_state.clone();
@@ -685,7 +687,7 @@ impl AIDocumentView {
                 .on_click(|ctx, _, _| {
                     ctx.dispatch_typed_action(
                         PaneHeaderAction::<AIDocumentAction, AIDocumentAction>::CustomAction(
-                            AIDocumentAction::CreateRookDriveNotebook,
+                            AIDocumentAction::CreatePtermDriveNotebook,
                         ),
                     )
                 })
@@ -700,7 +702,7 @@ impl AIDocumentView {
                         Container::new(
                             ConstrainedBox::new(
                                 Icon::RefreshCw04
-                                    .to_rookui_icon(ThemeFill::Solid(color))
+                                    .to_ptermui_icon(ThemeFill::Solid(color))
                                     .finish(),
                             )
                             .with_width(16.)
@@ -722,7 +724,7 @@ impl AIDocumentView {
                 let color = theme.nonactive_ui_detail().into_solid();
                 let ui_builder = appearance.ui_builder().clone();
                 let tooltip_text =
-                    "This plan is synced to your Rook Drive and will auto save any edits you make."
+                    "This plan is synced to your Polaris Terminal Drive and will auto save any edits you make."
                         .to_string();
                 let synced_status_mouse_state = self.synced_status_mouse_state.clone();
                 Container::new(
@@ -731,7 +733,7 @@ impl AIDocumentView {
                             Hoverable::new(synced_status_mouse_state, move |state| {
                                 let icon = {
                                     let icon_elem = Icon::RefreshCw04
-                                        .to_rookui_icon(ThemeFill::Solid(color))
+                                        .to_ptermui_icon(ThemeFill::Solid(color))
                                         .finish();
                                     ConstrainedBox::new(icon_elem)
                                         .with_width(16.)
@@ -747,8 +749,8 @@ impl AIDocumentView {
                                         tooltip,
                                         OffsetPositioning::offset_from_parent(
                                             vec2f(0., 4.),
-                                            rookui::elements::ParentOffsetBounds::WindowByPosition,
-                                            rookui::elements::ParentAnchor::BottomRight,
+                                            ptermui::elements::ParentOffsetBounds::WindowByPosition,
+                                            ptermui::elements::ParentAnchor::BottomRight,
                                             ChildAnchor::TopRight,
                                         ),
                                     );
@@ -954,21 +956,21 @@ impl AIDocumentView {
             EditorViewEvent::OpenFile {
                 path,
                 line_and_column_num,
-                force_open_in_rook,
+                force_open_in_pterm,
             } => {
                 use crate::util::file::external_editor::EditorSettings;
                 use crate::util::openable_file_type::{
                     is_supported_image_file, resolve_file_target,
                 };
 
-                if *force_open_in_rook {
+                if *force_open_in_pterm {
                     let layout = *EditorSettings::as_ref(ctx).open_file_layout;
                     let source = CodeSource::Link {
                         path: path.clone(),
                         range_start: *line_and_column_num,
                         range_end: None,
                     };
-                    ctx.emit(AIDocumentEvent::OpenCodeInRook {
+                    ctx.emit(AIDocumentEvent::OpenCodeInPterm {
                         source,
                         layout,
                         line_col: *line_and_column_num,
@@ -997,7 +999,7 @@ impl AIDocumentView {
     }
 
     /// Bind the underlying editor model to the given window, enabling render/event processing.
-    pub fn bind_window(&self, window_id: rookui::WindowId, ctx: &mut ViewContext<Self>) {
+    pub fn bind_window(&self, window_id: ptermui::WindowId, ctx: &mut ViewContext<Self>) {
         self.editor.update(ctx, |editor_view, ctx| {
             editor_view
                 .model()
@@ -1005,19 +1007,19 @@ impl AIDocumentView {
         });
     }
 
-    fn create_rook_drive_notebook(&self, ctx: &mut ViewContext<Self>) {
+    fn create_pterm_drive_notebook(&self, ctx: &mut ViewContext<Self>) {
         let success = AIDocumentModel::handle(ctx).update(ctx, |model, ctx| {
-            model.sync_to_rook_drive(self.document_id, ctx)
+            model.sync_to_pterm_drive(self.document_id, ctx)
         });
         if !success {
-            report_error!("Failed to create Rook Drive notebook");
+            report_error!("Failed to create Polaris Terminal Drive notebook");
         }
     }
 
     /// Export the current content as a markdown file.
     #[cfg(feature = "local_fs")]
     fn export(&self, ctx: &mut ViewContext<Self>) {
-        use rookui::platform::SaveFilePickerConfiguration;
+        use ptermui::platform::SaveFilePickerConfiguration;
 
         use crate::drive::export::safe_filename;
         let markdown = self.editor.as_ref(ctx).markdown_unescaped(ctx);
@@ -1076,7 +1078,7 @@ impl View for AIDocumentView {
         "AIDocumentView"
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn ptermui::Element> {
         let has_orchestration_config = AIDocumentModel::as_ref(app)
             .get_conversation_id_for_document_id(&self.document_id)
             .and_then(|cid| {
@@ -1106,7 +1108,7 @@ impl View for AIDocumentView {
             .with_padding_left(8.)
             .with_padding_right(8.)
             .finish();
-        content_column.add_child(rookui::elements::Expanded::new(1.0, editor).finish());
+        content_column.add_child(ptermui::elements::Expanded::new(1.0, editor).finish());
 
         let mut stack = Stack::new().with_child(content_column.finish());
 
@@ -1154,7 +1156,7 @@ impl TypedActionView for AIDocumentView {
                     );
                 });
             }
-            AIDocumentAction::CreateRookDriveNotebook => self.create_rook_drive_notebook(ctx),
+            AIDocumentAction::CreatePtermDriveNotebook => self.create_pterm_drive_notebook(ctx),
             AIDocumentAction::CopyLink(link) => {
                 send_telemetry_from_ctx!(
                     TelemetryEvent::ObjectLinkCopied { link: link.clone() },
@@ -1271,12 +1273,12 @@ impl TypedActionView for AIDocumentView {
                 // Update UI to reflect the new query
                 self.update_header_buttons(ctx);
             }
-            AIDocumentAction::ShowInRookDrive => {
+            AIDocumentAction::ShowInPtermDrive => {
                 if let Some(document) =
                     AIDocumentModel::as_ref(ctx).get_current_document(&self.document_id)
                     && let Some(sync_id) = document.sync_id
                 {
-                    ctx.emit(AIDocumentEvent::ViewInRookDrive(RookDriveItemId::Object(
+                    ctx.emit(AIDocumentEvent::ViewInPtermDrive(PtermDriveItemId::Object(
                         CloudObjectTypeAndId::Notebook(sync_id),
                     )));
                 }
@@ -1323,9 +1325,9 @@ impl BackingView for AIDocumentView {
     ) -> Vec<MenuItem<Self::PaneHeaderOverflowMenuAction>> {
         let mut menu_items = vec![];
 
-        // Only show shareable link when the document is synced to Rook Drive
-        if let Some(link) =
-            AIDocumentModel::as_ref(ctx).get_document_rook_drive_object_link(&self.document_id, ctx)
+        // Only show shareable link when the document is synced to Polaris Terminal Drive
+        if let Some(link) = AIDocumentModel::as_ref(ctx)
+            .get_document_pterm_drive_object_link(&self.document_id, ctx)
         {
             menu_items.push(
                 MenuItemFields::new("Copy link")
@@ -1334,9 +1336,9 @@ impl BackingView for AIDocumentView {
                     .into_item(),
             );
             menu_items.push(
-                MenuItemFields::new("Show in Rook Drive")
-                    .with_on_select_action(AIDocumentAction::ShowInRookDrive)
-                    .with_icon(Icon::RookDrive)
+                MenuItemFields::new("Show in Polaris Terminal Drive")
+                    .with_on_select_action(AIDocumentAction::ShowInPtermDrive)
+                    .with_icon(Icon::PtermDrive)
                     .into_item(),
             );
         }

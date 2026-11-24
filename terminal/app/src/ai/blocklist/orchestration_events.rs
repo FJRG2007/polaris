@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::{Entity, ModelContext, SingletonEntity};
 use warp_multi_agent_api as api;
 
 use super::history_model::{

@@ -1,7 +1,7 @@
 //! Rust version of `GenerateAMQuerySuggestionsResponse` and its fields.
 //!
-//! These types correspond to the rook-go types defined in
-//! rook-server/model/types/generate_am_query_suggestions/response.go.
+//! These types correspond to the polaris-terminal-go types defined in
+//! polaris-terminal-server/model/types/generate_am_query_suggestions/response.go.
 //!
 //! Documentation on the types here is directly borrowed from the documentation on the go schema;
 //! see the go schema for the source-of-truth.

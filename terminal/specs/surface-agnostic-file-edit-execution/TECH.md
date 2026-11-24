@@ -131,7 +131,7 @@ The TUI surface registers its own storage through `register_requested_edits` for
 - Executor tests cover the registry lifecycle (`request_file_edits_tests.rs`): preprocess seeding of the registered storage, execution through the registered storage, preprocess failure reporting, `NotReady` without a registered storage, and `discard_pending`.
 
 ```bash
-cargo nextest run -p rook diff_storage request_file_edits
+cargo nextest run -p polaris-terminal diff_storage request_file_edits
 ./script/format
 cargo clippy --workspace --all-targets --all-features --tests -- -D warnings
 ```

@@ -3,9 +3,9 @@
 
 use ai::agent::action::RunAgentsExecutionMode;
 use ai::agent::orchestration_config::{OrchestrationConfig, OrchestrationExecutionMode};
-use rook_cli::agent::Harness;
+use pterm_cli::agent::Harness;
 
-use super::providers::ORCHESTRATION_ROOK_WORKER_HOST;
+use super::providers::ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST;
 use super::validation::should_show_auth_secret_picker;
 use crate::ai::local_harness_setup::local_harness_product_disabled_message;
 
@@ -149,7 +149,7 @@ impl OrchestrationConfigState {
             if !self.execution_mode.is_remote() {
                 self.execution_mode = RunAgentsExecutionMode::Remote {
                     environment_id: String::new(),
-                    worker_host: ORCHESTRATION_ROOK_WORKER_HOST.to_string(),
+                    worker_host: ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST.to_string(),
                     computer_use_enabled: self.remote_computer_use_enabled,
                     runner_id: String::new(),
                 };

@@ -3,8 +3,8 @@
 //! testing.
 
 use super::{
-    DropdownAction, InternalAction, MenuItem, ORCHESTRATION_ROOK_WORKER_HOST, build_menu_items,
-    menu_label_for, normalize_slug,
+    DropdownAction, InternalAction, MenuItem, ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST,
+    build_menu_items, menu_label_for, normalize_slug,
 };
 
 /// Extracts the visible label text out of a `MenuItem::Item`, panicking
@@ -28,52 +28,72 @@ fn item_action(item: &MenuItem<DropdownAction>) -> &DropdownAction {
 }
 
 #[test]
-fn build_menu_items_with_no_defaults_shows_rook_and_custom() {
+fn build_menu_items_with_no_defaults_shows_pterm_and_custom() {
     let items = build_menu_items(None, None, &[]);
-    assert_eq!(items.len(), 2, "expected rook + custom-host entries");
-    assert_eq!(item_label(&items[0]), ORCHESTRATION_ROOK_WORKER_HOST);
+    assert_eq!(
+        items.len(),
+        2,
+        "expected polaris-terminal + custom-host entries"
+    );
+    assert_eq!(
+        item_label(&items[0]),
+        ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST
+    );
     assert_eq!(item_label(&items[1]), "Custom host\u{2026}");
 }
 
 #[test]
 fn build_menu_items_promotes_default_to_top() {
-    // Workspace default sits above rook and gets the "Default" badge,
+    // Workspace default sits above polaris-terminal and gets the "Default" badge,
     // matching the Oz webapp's HostSelector layout.
     let items = build_menu_items(Some("my-corp"), None, &[]);
     assert_eq!(items.len(), 3);
     assert_eq!(item_label(&items[0]), "my-corp");
-    assert_eq!(item_label(&items[1]), ORCHESTRATION_ROOK_WORKER_HOST);
+    assert_eq!(
+        item_label(&items[1]),
+        ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST
+    );
     assert_eq!(item_label(&items[2]), "Custom host\u{2026}");
 }
 
 #[test]
-fn build_menu_items_adds_recent_after_rook() {
+fn build_menu_items_adds_recent_after_pterm() {
     let items = build_menu_items(None, Some("other-host"), &[]);
     assert_eq!(items.len(), 3);
-    assert_eq!(item_label(&items[0]), ORCHESTRATION_ROOK_WORKER_HOST);
+    assert_eq!(
+        item_label(&items[0]),
+        ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST
+    );
     // Recent hosts render as plain slugs (no "(Recent)" suffix).
     assert_eq!(item_label(&items[1]), "other-host");
     assert_eq!(item_label(&items[2]), "Custom host\u{2026}");
 }
 
 #[test]
-fn build_menu_items_dedups_recent_when_it_matches_default_or_rook() {
+fn build_menu_items_dedups_recent_when_it_matches_default_or_pterm() {
     // Same as the workspace default → no duplicate "Recent" row.
     let items = build_menu_items(Some("my-corp"), Some("my-corp"), &[]);
     assert_eq!(items.len(), 3);
     assert_eq!(item_label(&items[0]), "my-corp");
-    assert_eq!(item_label(&items[1]), ORCHESTRATION_ROOK_WORKER_HOST);
+    assert_eq!(
+        item_label(&items[1]),
+        ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST
+    );
     assert_eq!(item_label(&items[2]), "Custom host\u{2026}");
 
-    // Recent == "rook" is also skipped (rook is already a row).
-    let items = build_menu_items(Some("my-corp"), Some("rook"), &[]);
-    assert_eq!(items.len(), 3, "rook recent should not double-add");
+    // Recent == "polaris-terminal" is also skipped (polaris-terminal is already a row).
+    let items = build_menu_items(Some("my-corp"), Some("polaris-terminal"), &[]);
+    assert_eq!(
+        items.len(),
+        3,
+        "polaris-terminal recent should not double-add"
+    );
 }
 #[test]
 fn build_menu_items_adds_connected_hosts_before_recent_and_dedups_known_hosts() {
     let connected_hosts = vec![
         "alpha".to_string(),
-        "rook".to_string(),
+        "polaris-terminal".to_string(),
         "my-corp".to_string(),
         "alpha".to_string(),
         "beta".to_string(),
@@ -81,14 +101,17 @@ fn build_menu_items_adds_connected_hosts_before_recent_and_dedups_known_hosts() 
     let items = build_menu_items(Some("my-corp"), Some("beta"), &connected_hosts);
     assert_eq!(items.len(), 5);
     assert_eq!(item_label(&items[0]), "my-corp");
-    assert_eq!(item_label(&items[1]), ORCHESTRATION_ROOK_WORKER_HOST);
+    assert_eq!(
+        item_label(&items[1]),
+        ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST
+    );
     assert_eq!(item_label(&items[2]), "alpha");
     assert_eq!(item_label(&items[3]), "beta");
     assert_eq!(item_label(&items[4]), "Custom host\u{2026}");
 }
 
 #[test]
-fn build_menu_items_rook_entry_dispatches_select_known_rook() {
+fn build_menu_items_pterm_entry_dispatches_select_known_pterm() {
     let items = build_menu_items(None, None, &[]);
     match item_action(&items[0]) {
         DropdownAction::SelectActionAndClose(action) => {
@@ -98,7 +121,7 @@ fn build_menu_items_rook_entry_dispatches_select_known_rook() {
                 .expect("expected InternalAction");
             match action {
                 InternalAction::SelectKnown(slug) => {
-                    assert_eq!(slug, ORCHESTRATION_ROOK_WORKER_HOST);
+                    assert_eq!(slug, ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST);
                 }
                 other => panic!("expected SelectKnown, got {other:?}"),
             }
@@ -129,9 +152,9 @@ fn menu_label_for_picks_default_badge_when_slug_matches_default() {
 }
 
 #[test]
-fn menu_label_for_returns_plain_slug_for_rook() {
-    let label = menu_label_for(ORCHESTRATION_ROOK_WORKER_HOST, Some("my-corp"));
-    assert_eq!(label, ORCHESTRATION_ROOK_WORKER_HOST);
+fn menu_label_for_returns_plain_slug_for_pterm() {
+    let label = menu_label_for(ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST, Some("my-corp"));
+    assert_eq!(label, ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST);
 }
 
 #[test]
@@ -142,8 +165,14 @@ fn menu_label_for_returns_plain_slug_for_unknown_value() {
 }
 
 #[test]
-fn normalize_slug_trims_whitespace_and_falls_back_to_rook_when_empty() {
+fn normalize_slug_trims_whitespace_and_falls_back_to_pterm_when_empty() {
     assert_eq!(normalize_slug("  my-corp  "), "my-corp");
-    assert_eq!(normalize_slug(""), ORCHESTRATION_ROOK_WORKER_HOST);
-    assert_eq!(normalize_slug("   "), ORCHESTRATION_ROOK_WORKER_HOST);
+    assert_eq!(
+        normalize_slug(""),
+        ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST
+    );
+    assert_eq!(
+        normalize_slug("   "),
+        ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST
+    );
 }

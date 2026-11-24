@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use cloud_object_client::MockObjectClient;
-use rook_graphql::object_permissions::AccessLevel;
-use rookui::{App, SingletonEntity, WindowId};
+use pterm_graphql::object_permissions::AccessLevel;
+use ptermui::{App, SingletonEntity, WindowId};
 use settings::manager::SettingsManager;
 
 use super::*;
@@ -179,7 +179,7 @@ fn test_drive_data_source_correctly_filters_drive_filter() {
 
         let mixer = app.add_model(|_| CommandPaletteMixer::new());
         let data_source_handle =
-            app.add_model(|ctx| rook_drive::DataSource::new(WindowId::new(), ctx));
+            app.add_model(|ctx| pterm_drive::DataSource::new(WindowId::new(), ctx));
         mixer.update(&mut app, |mixer, ctx| {
             // Add the drive data source with the relevant filters
             mixer.add_sync_source(
@@ -227,7 +227,7 @@ fn test_drive_data_source_correctly_filters_no_filter() {
         });
         let mixer = app.add_model(|_| CommandPaletteMixer::new());
         let data_source_handle =
-            app.add_model(|ctx| rook_drive::DataSource::new(WindowId::new(), ctx));
+            app.add_model(|ctx| pterm_drive::DataSource::new(WindowId::new(), ctx));
         mixer.update(&mut app, |mixer, ctx| {
             // Add the drive data source with the relevant filters
             mixer.add_sync_source(
@@ -275,7 +275,7 @@ fn test_drive_data_source_correctly_filters_workflow_filter() {
         });
         let mixer = app.add_model(|_| CommandPaletteMixer::new());
         let data_source_handle =
-            app.add_model(|ctx| rook_drive::DataSource::new(WindowId::new(), ctx));
+            app.add_model(|ctx| pterm_drive::DataSource::new(WindowId::new(), ctx));
         mixer.update(&mut app, |mixer, ctx| {
             // Add the drive data source with the relevant filters
             mixer.add_sync_source(
@@ -325,7 +325,7 @@ fn test_drive_data_source_correctly_filters_notebook_filter() {
         });
         let mixer = app.add_model(|_| CommandPaletteMixer::new());
         let data_source_handle =
-            app.add_model(|ctx| rook_drive::DataSource::new(WindowId::new(), ctx));
+            app.add_model(|ctx| pterm_drive::DataSource::new(WindowId::new(), ctx));
         mixer.update(&mut app, |mixer, ctx| {
             // Add the drive data source with the relevant filters
             mixer.add_sync_source(
@@ -480,7 +480,7 @@ fn test_drive_data_source_only_returns_objects_visible_in_the_window() {
         });
 
         let mixer = app.add_model(|_| CommandPaletteMixer::new());
-        let data_source_handle = app.add_model(|ctx| rook_drive::DataSource::new(window_id, ctx));
+        let data_source_handle = app.add_model(|ctx| pterm_drive::DataSource::new(window_id, ctx));
         mixer.update(&mut app, |mixer, _| {
             mixer.add_sync_source(data_source_handle, [QueryFilter::Workflows]);
         });
@@ -544,7 +544,7 @@ fn test_full_text_drive_data_source_finds_in_window_objects_outranked_by_another
         });
 
         let mixer = app.add_model(|_| CommandPaletteMixer::new());
-        let data_source_handle = app.add_model(|ctx| rook_drive::DataSource::new(window_id, ctx));
+        let data_source_handle = app.add_model(|ctx| pterm_drive::DataSource::new(window_id, ctx));
         mixer.update(&mut app, |mixer, _| {
             mixer.add_sync_source(data_source_handle, [QueryFilter::Workflows]);
         });
@@ -589,7 +589,7 @@ fn test_full_text_drive_data_source_indexes_an_object_that_moves_into_the_window
         });
 
         let mixer = app.add_model(|_| CommandPaletteMixer::new());
-        let data_source_handle = app.add_model(|ctx| rook_drive::DataSource::new(window_id, ctx));
+        let data_source_handle = app.add_model(|ctx| pterm_drive::DataSource::new(window_id, ctx));
         mixer.update(&mut app, |mixer, _| {
             mixer.add_sync_source(data_source_handle, [QueryFilter::Workflows]);
         });
@@ -649,7 +649,7 @@ fn test_full_text_drive_data_source_removes_an_object_that_moves_out_of_the_wind
         });
 
         let mixer = app.add_model(|_| CommandPaletteMixer::new());
-        let data_source_handle = app.add_model(|ctx| rook_drive::DataSource::new(window_id, ctx));
+        let data_source_handle = app.add_model(|ctx| pterm_drive::DataSource::new(window_id, ctx));
         mixer.update(&mut app, |mixer, _| {
             mixer.add_sync_source(data_source_handle, [QueryFilter::Workflows]);
         });
@@ -706,7 +706,7 @@ fn test_full_text_drive_data_source_rebuilds_when_the_windows_team_changes() {
         // The window has no team yet, so the second team's workflow is out of scope.
         let window_id = WindowId::new();
         let mixer = app.add_model(|_| CommandPaletteMixer::new());
-        let data_source_handle = app.add_model(|ctx| rook_drive::DataSource::new(window_id, ctx));
+        let data_source_handle = app.add_model(|ctx| pterm_drive::DataSource::new(window_id, ctx));
         mixer.update(&mut app, |mixer, _| {
             mixer.add_sync_source(data_source_handle, [QueryFilter::Workflows]);
         });
@@ -770,14 +770,14 @@ fn test_drive_data_sources_for_different_windows_stay_independent() {
 
         let first_mixer = app.add_model(|_| CommandPaletteMixer::new());
         let first_data_source =
-            app.add_model(|ctx| rook_drive::DataSource::new(first_window_id, ctx));
+            app.add_model(|ctx| pterm_drive::DataSource::new(first_window_id, ctx));
         first_mixer.update(&mut app, |mixer, _| {
             mixer.add_sync_source(first_data_source, [QueryFilter::Workflows]);
         });
 
         let second_mixer = app.add_model(|_| CommandPaletteMixer::new());
         let second_data_source =
-            app.add_model(|ctx| rook_drive::DataSource::new(second_window_id, ctx));
+            app.add_model(|ctx| pterm_drive::DataSource::new(second_window_id, ctx));
         second_mixer.update(&mut app, |mixer, _| {
             mixer.add_sync_source(second_data_source, [QueryFilter::Workflows]);
         });
@@ -838,7 +838,7 @@ fn test_full_text_drive_data_source_indexes_the_first_directly_shared_object() {
 
         // No shared object exists yet, so the data source starts without the shared space.
         let mixer = app.add_model(|_| CommandPaletteMixer::new());
-        let data_source_handle = app.add_model(|ctx| rook_drive::DataSource::new(window_id, ctx));
+        let data_source_handle = app.add_model(|ctx| pterm_drive::DataSource::new(window_id, ctx));
         mixer.update(&mut app, |mixer, _| {
             mixer.add_sync_source(data_source_handle, [QueryFilter::Workflows]);
         });
@@ -914,7 +914,7 @@ fn test_full_text_drive_data_source_reindexes_when_a_team_stops_being_a_member_t
         });
 
         let mixer = app.add_model(|_| CommandPaletteMixer::new());
-        let data_source_handle = app.add_model(|ctx| rook_drive::DataSource::new(window_id, ctx));
+        let data_source_handle = app.add_model(|ctx| pterm_drive::DataSource::new(window_id, ctx));
         mixer.update(&mut app, |mixer, _| {
             mixer.add_sync_source(data_source_handle, [QueryFilter::Workflows]);
         });

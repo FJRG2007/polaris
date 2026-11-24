@@ -6,11 +6,11 @@ This reference documents third-party coding agent CLIs that Oz cloud agents can 
 
 The `-agents` tagged variants of prebuilt Oz Docker images (e.g. `warpdotdev/dev-base:latest-agents`, `warpdotdev/dev-rust:1.85-agents`) include Claude Code, Codex, and Gemini CLI preinstalled. Base tags (without `-agents`) do not include coding agent CLIs.
 
-> **Note**: Commands below that reference the Rook CLI should use the CLI binary name from the parent skill (the `{{rook_cli_binary_name}}` value).
+> **Note**: Commands below that reference the Polaris Terminal CLI should use the CLI binary name from the parent skill (the `{{pterm_cli_binary_name}}` value).
 
 ## Reporting Artifacts
 
-When a third-party CLI creates a PR or branch, Oz does not automatically detect it. You must explicitly register these artifacts so they appear in the Rook UI.
+When a third-party CLI creates a PR or branch, Oz does not automatically detect it. You must explicitly register these artifacts so they appear in the Polaris Terminal UI.
 
 **Pull Requests**: After a third-party CLI creates a PR, call the `report_pr` tool with the `pr_url` and `branch` parameters. Parse the CLI's output to extract the PR URL and branch name.
 
@@ -32,7 +32,7 @@ When a third-party CLI creates a PR or branch, Oz does not automatically detect 
 ### Oz secret
 
 ```sh
-{{rook_cli_binary_name}} secret create ANTHROPIC_API_KEY --team --value-file key.txt --description "Anthropic API key for Claude Code"
+{{pterm_cli_binary_name}} secret create ANTHROPIC_API_KEY --team --value-file key.txt --description "Anthropic API key for Claude Code"
 ```
 
 ### Example prompt
@@ -69,7 +69,7 @@ Then call the report_pr tool with those values so the PR appears as an artifact.
 ### Oz secret
 
 ```sh
-{{rook_cli_binary_name}} secret create OPENAI_API_KEY --team --value-file key.txt --description "OpenAI API key for Codex CLI"
+{{pterm_cli_binary_name}} secret create OPENAI_API_KEY --team --value-file key.txt --description "OpenAI API key for Codex CLI"
 ```
 
 ### Example prompt
@@ -99,7 +99,7 @@ After Codex finishes, parse the PR URL and branch name from its output and call 
 ### Oz secret
 
 ```sh
-{{rook_cli_binary_name}} secret create GEMINI_API_KEY --team --value-file key.txt --description "Gemini API key for Gemini CLI"
+{{pterm_cli_binary_name}} secret create GEMINI_API_KEY --team --value-file key.txt --description "Gemini API key for Gemini CLI"
 ```
 
 ### Example prompt
@@ -128,7 +128,7 @@ After it finishes, parse the PR URL and branch from the output and call report_p
 ### Oz secret
 
 ```sh
-{{rook_cli_binary_name}} secret create AMP_API_KEY --team --value-file key.txt --description "Amp API key"
+{{pterm_cli_binary_name}} secret create AMP_API_KEY --team --value-file key.txt --description "Amp API key"
 ```
 
 ### Example prompt
@@ -159,7 +159,7 @@ After Amp finishes, parse the PR URL and branch from the output and call report_
 ### Oz secret
 
 ```sh
-{{rook_cli_binary_name}} secret create GH_TOKEN --team --value-file token.txt --description "GitHub PAT with Copilot Requests permission"
+{{pterm_cli_binary_name}} secret create GH_TOKEN --team --value-file token.txt --description "GitHub PAT with Copilot Requests permission"
 ```
 
 ### Example prompt

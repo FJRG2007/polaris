@@ -2,7 +2,7 @@
 param(
     [switch]$Help,
     [switch]$InstallCommonSkills,
-    [string]$CommonSkillsTarget = $env:ROOK_COMMON_SKILLS_INSTALL_TARGET
+    [string]$CommonSkillsTarget = $env:POLARIS_TERMINAL_COMMON_SKILLS_INSTALL_TARGET
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,7 +11,7 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 function Show-Usage {
     Write-Output 'Usage: .\script\windows\bootstrap.ps1 [-Help] [-InstallCommonSkills] [-CommonSkillsTarget <project|global>]'
     Write-Output ''
-    Write-Output 'Prepare this checkout for Rook development on Windows.'
+    Write-Output 'Prepare this checkout for Polaris Terminal development on Windows.'
     Write-Output ''
     Write-Output 'Options:'
     Write-Output '  -Help                 Show this help message.'
@@ -19,14 +19,14 @@ function Show-Usage {
     Write-Output '  -CommonSkillsTarget   Install into project .agents/skills or global ~/.agents/skills.'
     Write-Output ''
     Write-Output 'Environment:'
-    Write-Output '  ROOK_SKIP_COMMON_SKILLS_INSTALL=1'
+    Write-Output '  POLARIS_TERMINAL_SKIP_COMMON_SKILLS_INSTALL=1'
     Write-Output '      Skip installing common agent skills.'
-    Write-Output '  ROOK_COMMON_SKILLS_INSTALL_TARGET=project|global'
+    Write-Output '  POLARIS_TERMINAL_COMMON_SKILLS_INSTALL_TARGET=project|global'
     Write-Output '      Choose the install target when -CommonSkillsTarget is omitted.'
     Write-Output '      Target prompting and duplicate checks are delegated to warpdotdev/common-skills/scripts/install_common_skills.'
-    Write-Output '  ROOK_COMMON_SKILLS_SCRIPTS_DIR=/path/to/common-skills/scripts'
+    Write-Output '  POLARIS_TERMINAL_COMMON_SKILLS_SCRIPTS_DIR=/path/to/common-skills/scripts'
     Write-Output '      Override where common-skills management scripts are loaded from.'
-    Write-Output '  ROOK_COMMON_SKILLS_REF=<git-ref>'
+    Write-Output '  POLARIS_TERMINAL_COMMON_SKILLS_REF=<git-ref>'
     Write-Output '      Override the remote warpdotdev/common-skills ref used when fetching scripts.'
 }
 
@@ -42,7 +42,7 @@ function ConvertTo-CommonSkillsTarget {
 
 
 function Show-BootstrapPreview {
-    Write-Output 'Rook bootstrap is starting for Windows.'
+    Write-Output 'Polaris Terminal bootstrap is starting for Windows.'
     Write-Output 'It will:'
     Write-Output '  - Check for Git for Windows.'
     Write-Output '  - Install Rust if cargo is unavailable.'
@@ -51,8 +51,8 @@ function Show-BootstrapPreview {
 
     if (-not $InstallCommonSkills) {
         Write-Output '  - Skip common agent skills unless -InstallCommonSkills is provided.'
-    } elseif ($env:ROOK_SKIP_COMMON_SKILLS_INSTALL -eq '1') {
-        Write-Output '  - Skip common agent skills because ROOK_SKIP_COMMON_SKILLS_INSTALL=1.'
+    } elseif ($env:POLARIS_TERMINAL_SKIP_COMMON_SKILLS_INSTALL -eq '1') {
+        Write-Output '  - Skip common agent skills because POLARIS_TERMINAL_SKIP_COMMON_SKILLS_INSTALL=1.'
     } elseif ($script:ResolvedCommonSkillsTarget -eq 'global') {
         Write-Output '  - Install or update common agent skills in ~/.agents/skills if needed.'
     } elseif ($script:ResolvedCommonSkillsTarget -eq 'project') {
@@ -171,20 +171,20 @@ Add-DirectoryToPathIfPresent $gitUsrBinDir
 function Resolve-CommonSkillsScript {
     param([string]$ScriptName)
 
-    if ($env:ROOK_COMMON_SKILLS_SCRIPTS_DIR) {
-        $scriptPath = Join-Path $env:ROOK_COMMON_SKILLS_SCRIPTS_DIR $ScriptName
+    if ($env:POLARIS_TERMINAL_COMMON_SKILLS_SCRIPTS_DIR) {
+        $scriptPath = Join-Path $env:POLARIS_TERMINAL_COMMON_SKILLS_SCRIPTS_DIR $ScriptName
         if (Test-Path -PathType Leaf $scriptPath) { return $scriptPath }
-        throw "Could not find $ScriptName in ROOK_COMMON_SKILLS_SCRIPTS_DIR=$env:ROOK_COMMON_SKILLS_SCRIPTS_DIR."
+        throw "Could not find $ScriptName in POLARIS_TERMINAL_COMMON_SKILLS_SCRIPTS_DIR=$env:POLARIS_TERMINAL_COMMON_SKILLS_SCRIPTS_DIR."
     }
 
-    $commonSkillsRef = if ($env:ROOK_COMMON_SKILLS_REF) { $env:ROOK_COMMON_SKILLS_REF } else { 'main' }
-    $rawBaseUrl = if ($env:ROOK_COMMON_SKILLS_RAW_BASE_URL) {
-        $env:ROOK_COMMON_SKILLS_RAW_BASE_URL.TrimEnd('/')
+    $commonSkillsRef = if ($env:POLARIS_TERMINAL_COMMON_SKILLS_REF) { $env:POLARIS_TERMINAL_COMMON_SKILLS_REF } else { 'main' }
+    $rawBaseUrl = if ($env:POLARIS_TERMINAL_COMMON_SKILLS_RAW_BASE_URL) {
+        $env:POLARIS_TERMINAL_COMMON_SKILLS_RAW_BASE_URL.TrimEnd('/')
     } else {
         "https://raw.githubusercontent.com/warpdotdev/common-skills/$commonSkillsRef/scripts"
     }
     $rawUrl = "$rawBaseUrl/$ScriptName"
-    $scriptPath = Join-Path $env:TEMP "rook-$ScriptName"
+    $scriptPath = Join-Path $env:TEMP "polaris-terminal-$ScriptName"
 
     Invoke-WebRequest -Uri $rawUrl -OutFile $scriptPath
     return $scriptPath
@@ -234,7 +234,7 @@ winget install jqlang.jq
 # CMake is needed to build some dependencies, e.g.: sentry-contrib-native.
 winget install -e --id Kitware.CMake
 
-# Protoc is required by prost-build for rook-proto-apis generated crates.
+# Protoc is required by prost-build for polaris-terminal-proto-apis generated crates.
 winget install -e --id Google.Protobuf
 Add-WinGetPackageCommandToPath -CommandName 'protoc' -PackageId 'Google.Protobuf'
 
@@ -256,7 +256,7 @@ if (-not (Get-Command -Name gcloud -Type Application -ErrorAction SilentlyContin
     Start-Process "$env:Temp\GoogleCloudSDKInstaller.exe" -Wait
 }
 
-if ($env:ROOK_SKIP_GCLOUD_AUTH -ne '1') {
+if ($env:POLARIS_TERMINAL_SKIP_GCLOUD_AUTH -ne '1') {
     [string]$identityToken = gcloud auth print-identity-token
     if ($identityToken.Trim().Length -eq 0) {
         Write-Output 'gcloud CLI authentication missing.  Press enter to continue...'

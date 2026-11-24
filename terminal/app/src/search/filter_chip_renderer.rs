@@ -1,10 +1,10 @@
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable, Icon,
     MouseStateHandle, ParentElement, Radius, Text,
 };
-use rookui::platform::Cursor;
-use rookui::{Element, EventContext};
+use ptermui::platform::Cursor;
+use ptermui::{Element, EventContext};
 
 use crate::appearance::Appearance;
 use crate::search::QueryFilter;

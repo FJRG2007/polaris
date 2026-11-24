@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rookui_core::assets::asset_cache::AssetSource;
-use rookui_core::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use ptermui_core::assets::asset_cache::AssetSource;
+use ptermui_core::elements::{
     CacheOption, Dismiss, DispatchEventResult, EventHandler, Image, Shrinkable,
 };
-use rookui_core::keymap::Keystroke;
-use rookui_core::prelude::stack::*;
-use rookui_core::prelude::*;
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::prelude::stack::*;
+use ptermui_core::prelude::*;
 
 use crate::{Component, Options as _, button};
 
@@ -331,17 +331,17 @@ impl button::Theme for ButtonTheme {
         &self,
         button_state: button::State,
         _appearance: &Appearance,
-    ) -> Option<rook_core::ui::theme::Fill> {
+    ) -> Option<pterm_core::ui::theme::Fill> {
         match button_state {
             button::State::Default => None,
-            button::State::Hovered => Some(rook_core::ui::theme::Fill::white().with_opacity(10)),
-            button::State::Pressed => Some(rook_core::ui::theme::Fill::white().with_opacity(15)),
+            button::State::Hovered => Some(pterm_core::ui::theme::Fill::white().with_opacity(10)),
+            button::State::Pressed => Some(pterm_core::ui::theme::Fill::white().with_opacity(15)),
         }
     }
 
     fn text_color(
         &self,
-        _background: Option<rook_core::ui::theme::Fill>,
+        _background: Option<pterm_core::ui::theme::Fill>,
         _appearance: &Appearance,
     ) -> ColorU {
         ColorU::new(255, 255, 255, 255)

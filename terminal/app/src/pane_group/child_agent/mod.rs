@@ -6,9 +6,9 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use rook_cli::agent::Harness;
-use rook_errors::report_error;
-use rookui::{EntityId, SingletonEntity, ViewContext, ViewHandle};
+use pterm_cli::agent::Harness;
+use pterm_errors::report_error;
+use ptermui::{EntityId, SingletonEntity, ViewContext, ViewHandle};
 
 use crate::ai::agent::RenderableAIError;
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};

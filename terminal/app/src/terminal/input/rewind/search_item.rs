@@ -3,16 +3,16 @@
 
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_core::ui::Icon;
-use rook_core::ui::color::coloru_with_opacity;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::color::coloru_with_opacity;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, Highlight, ParentElement, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::scene::{CornerRadius, Radius};
-use rookui::text_layout::ClipConfig;
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::scene::{CornerRadius, Radius};
+use ptermui::text_layout::ClipConfig;
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::ai::agent::AIAgentExchangeId;
 use crate::appearance::Appearance;
@@ -93,7 +93,7 @@ impl SearchItem for RewindSearchItem {
         let color = icon_color(appearance);
 
         let icon = Container::new(
-            ConstrainedBox::new(Icon::ClockRewind.to_rookui_icon(color).finish())
+            ConstrainedBox::new(Icon::ClockRewind.to_ptermui_icon(color).finish())
                 .with_width(appearance.monospace_font_size())
                 .with_height(appearance.monospace_font_size())
                 .finish(),
@@ -135,7 +135,7 @@ impl SearchItem for RewindSearchItem {
         }
 
         // Line 2: Code changes summary
-        let secondary_text_color: rookui::color::ColorU =
+        let secondary_text_color: ptermui::color::ColorU =
             theme.sub_text_color(theme.surface_1()).into();
 
         let changes_element: Box<dyn Element> = if self.is_current {

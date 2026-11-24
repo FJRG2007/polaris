@@ -1,7 +1,7 @@
 use comfy_table::Cell;
-use rook_cli::GlobalOptions;
-use rook_cli::agent::AgentProfileCommand;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_cli::GlobalOptions;
+use pterm_cli::agent::AgentProfileCommand;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use serde::Serialize;
 
 use crate::ai::agent_sdk::output::{self, TableFormat};
@@ -53,12 +53,12 @@ impl ProfilesCommandRunner {
 
             output::print_list(profiles, global_options.output_format);
 
-            ctx.terminate_app(rookui::platform::TerminationMode::ForceTerminate, None);
+            ctx.terminate_app(ptermui::platform::TerminationMode::ForceTerminate, None);
         });
     }
 }
 
-impl rookui::Entity for ProfilesCommandRunner {
+impl ptermui::Entity for ProfilesCommandRunner {
     type Event = ();
 }
 impl SingletonEntity for ProfilesCommandRunner {}

@@ -2,10 +2,10 @@
 name: terminal-review-pr-local
 specializes: review-pr
 specializes_source: warpdotdev/common-skills:.agents/skills/review-pr
-description: Repo-specific review guidance for rook. Only the categories declared overridable by the core review-pr skill may be specialized here.
+description: Repo-specific review guidance for polaris-terminal. Only the categories declared overridable by the core review-pr skill may be specialized here.
 ---
 
-# Repo-specific review guidance for `rook`
+# Repo-specific review guidance for `polaris-terminal`
 
 ## Prerequisite: install the parent skill
 
@@ -26,7 +26,7 @@ skill marks as overridable.
 - Avoid wildcard `_` match arms when an enum can reasonably be matched exhaustively; exhaustive matches are preferred so future variants are surfaced during review.
 - For new or changed feature flags, prefer high-level runtime checks with `FeatureFlag::YourFlag.is_enabled()` over `#[cfg(...)]` unless the code cannot compile without a compile-time gate.
 - Flag nested or redundant `TerminalModel` locking when the call stack may already hold the model lock. Prefer passing locked references down the stack and keeping lock scopes short.
-- In RookUI code, flag inline `MouseStateHandle::default()` usage during render or event handling. Mouse state handles should be created during construction and then cloned/referenced where needed.
+- In PtermUI code, flag inline `MouseStateHandle::default()` usage during render or event handling. Mouse state handles should be created during construction and then cloned/referenced where needed.
 - For user-facing UI changes, mention missing validation only when it is tied to a concrete risk or when the PR changes behavior that should be verified visually.
 
 ## Pre-Verdict Audit: error-reporting form
@@ -43,15 +43,15 @@ Also confirm hot/per-frame or per-message paths use `ReportErrorLogMode::OncePer
 
 ## Behavioral or UI-impacting changes and visual evidence
 
-- If the PR changes anything user-visible (UI components, layout, styling, copy in surfaces users see, terminal/Rook app visuals, or other behavior a user can perceive), analyze both `pr_description.txt` and any PR comments available in the workflow context for attached screenshots, GIFs, or videos demonstrating the change end to end.
+- If the PR changes anything user-visible (UI components, layout, styling, copy in surfaces users see, terminal/Polaris Terminal app visuals, or other behavior a user can perceive), analyze both `pr_description.txt` and any PR comments available in the workflow context for attached screenshots, GIFs, or videos demonstrating the change end to end.
   - Treat markdown image/video embeds (`![...](...)`, `<img ...>`, `<video ...>`), GitHub user-attachment links (e.g. `https://github.com/user-attachments/...`, `https://user-images.githubusercontent.com/...`), Loom links, and similar hosted media as valid evidence.
   - The `Screenshots / Videos` section from `.github/pull_request_template.md` being present but empty does not count as evidence.
   - Unit tests, integration tests, `git diff --check`, code-path descriptions, and other textual explanations may supplement visual evidence but do not replace it when visual proof is required.
 - If the change is behavioral or UI-impacting and no screenshots or videos are attached in the description or comments, you may add an inline or summary-level comment requesting them. Use wording such as: "For this user-facing change, please include screenshots or a screen recording demonstrating it working end to end."
 - Missing visual evidence is blocking only when the request, brief, or spec explicitly required visual proof. In that case, when the change can be manually tested, set the final recommendation in the top-level `body` `## Verdict` section to `Request changes`, even if no other blocking issues were found; the top-level `verdict` field must be `"REJECT"` to match. Otherwise, missing visual evidence is not a finding — ordinary tests and checks are sufficient.
-- Author environment limitations (e.g., headless runner, no desktop, environment can't capture) do not exempt a change that explicitly required visual proof. Suggest capturing the recording from a local desktop run or from a remote environment with desktop/computer-use support (for example, a coding agent such as Oz with [computer use](https://docs.rook.dev/agent-platform/rooks-agent/capabilities-overview/computer-use) enabled). Reply with something like: _"This change is user-facing, so a screenshot or short recording is still required. If a local desktop isn't available, you can capture it from a coding agent that supports computer use (Oz is one option — see [Rook's computer use docs](https://docs.rook.dev/agent-platform/rooks-agent/capabilities-overview/computer-use)) and attach it here."_ Set the verdict to `Request changes`.
+- Author environment limitations (e.g., headless runner, no desktop, environment can't capture) do not exempt a change that explicitly required visual proof. Suggest capturing the recording from a local desktop run or from a remote environment with desktop/computer-use support (for example, a coding agent such as Oz with [computer use](https://docs.rook.dev/agent-platform/pterms-agent/capabilities-overview/computer-use) enabled). Reply with something like: _"This change is user-facing, so a screenshot or short recording is still required. If a local desktop isn't available, you can capture it from a coding agent that supports computer use (Oz is one option — see [Polaris Terminal's computer use docs](https://docs.rook.dev/agent-platform/pterms-agent/capabilities-overview/computer-use)) and attach it here."_ Set the verdict to `Request changes`.
 - Exempt visual evidence only when the user-visible behavior truly cannot be meaningfully shown visually (for example, changes affecting only screen readers or non-visual side effects). If so, briefly state why screenshots or recordings would not be meaningful. When visual proof is required, never exempt based on limitations of the author's environment.
-- TUI caveat: for changes to the headless TUI (`crates/rook_tui` or the cell-grid element library at `crates/rookui_core/src/elements/tui`), acceptable "visual evidence" is a terminal transcript, a `render_to_lines` / `TuiBuffer::to_lines` snapshot diff, or a `./script/run-tui` capture — NOT a `computer_use` screenshot or real-display recording (those are for the GUI desktop app). See the `terminal-tui-verify-change` skill. The `MouseStateHandle` ownership rule still applies to TUI code: the TUI's hover/click elements (`TuiHoverable`, `tui_collapsible`) are built on the shared `MouseStateHandle` and must own the handle outside render (created once, reused) so hover/click state survives rebuilt element trees — so flag inline `MouseStateHandle::default()` there too. Only the GUI's *pixel-based hit-testing* specifics are GUI-only.
+- TUI caveat: for changes to the headless TUI (`crates/pterm_tui` or the cell-grid element library at `crates/ptermui_core/src/elements/tui`), acceptable "visual evidence" is a terminal transcript, a `render_to_lines` / `TuiBuffer::to_lines` snapshot diff, or a `./script/run-tui` capture — NOT a `computer_use` screenshot or real-display recording (those are for the GUI desktop app). See the `terminal-tui-verify-change` skill. The `MouseStateHandle` ownership rule still applies to TUI code: the TUI's hover/click elements (`TuiHoverable`, `tui_collapsible`) are built on the shared `MouseStateHandle` and must own the handle outside render (created once, reused) so hover/click state survives rebuilt element trees — so flag inline `MouseStateHandle::default()` there too. Only the GUI's *pixel-based hit-testing* specifics are GUI-only.
 - If the PR is not user-visible at all (e.g. pure refactor, internal tools, build scripts, backend-only code, tests, or documentation), do not request screenshots or videos.
 
 ## User-facing strings

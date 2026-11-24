@@ -1,7 +1,7 @@
 # APP-4188: Tech Spec
 ## Context
 The git-ops dialog spawns `git` and `gh` subprocesses through `run_git_command` (`app/src/util/git.rs:12`) and `run_gh_command` (`app/src/util/git.rs:663`). Neither sets `PATH` on the child — `run_gh_command` has a macOS-only hardcoded `/opt/homebrew/bin:/usr/local/bin:` prefix, which only helps Homebrew users and misses MacPorts/Nix/etc.
-On Finder/Dock launches, Rook inherits launchd's minimal `PATH`. `git` itself still works (Apple ships `/usr/bin/git`), but hooks `git` invokes — notably LFS `pre-push` → `git-lfs` — fail. `gh` also fails outside Homebrew-default layouts.
+On Finder/Dock launches, Polaris Terminal inherits launchd's minimal `PATH`. `git` itself still works (Apple ships `/usr/bin/git`), but hooks `git` invokes — notably LFS `pre-push` → `git-lfs` — fail. `gh` also fails outside Homebrew-default layouts.
 `LocalShellState::get_interactive_path_env_var` (`app/src/terminal/local_shell/mod.rs:145`) already captures the user's real interactive-shell `PATH` (runs `zsh -i -l` / bash / fish, caches the result). This is how LSP resolves binaries today (`persisted_workspace.rs:1119`), so it's already the repo's idiom.
 ## Proposed changes
 1. **`util/git.rs`: add `run_git_command_with_env(repo, args, path_env: Option<&str>)`** that sets `PATH` on the child when `path_env` is `Some`. Keep `run_git_command(repo, args)` as a thin wrapper passing `None` — no ripple on existing call sites.
@@ -24,7 +24,7 @@ On Finder/Dock launches, Rook inherits launchd's minimal `PATH`. `git` itself st
 No unit tests — the plumbing is a thin `Option<&str>` forward and the real-world condition (launchd minimal `PATH`) isn't reproducible in a test harness. Manual validation per `PRODUCT.md` "Validation". UI regression coverage via `verify-ui-change-in-cloud`.
 ## Risks
 - **First-click latency:** first git-op in a session awaits the shell capture (<1s typical). Absorbed by existing loading state. Prewarming on panel mount is an easy follow-up if it's ever user-visible.
-- **Hook behavior change:** LFS hooks that silently no-op today (because `git-lfs` is missing) will actually run for Finder-launched Rook. Intended per PRODUCT.md.
+- **Hook behavior change:** LFS hooks that silently no-op today (because `git-lfs` is missing) will actually run for Finder-launched Polaris Terminal. Intended per PRODUCT.md.
 ## Follow-ups
 - Prewarm `get_interactive_path_env_var` at code-review panel mount if first-click latency becomes a complaint.
 - Plumb `path_env` through other `run_git_command` call sites (repo_metadata, drive sync, etc.) if they start hitting the same class of failure.

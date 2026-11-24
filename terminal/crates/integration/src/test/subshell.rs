@@ -1,22 +1,22 @@
 use std::collections::HashMap;
 
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::subshell::util::ssh_command;
-use rook::integration_testing::subshell::{
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::subshell::util::ssh_command;
+use polaris_terminal::integration_testing::subshell::{
     assert_subshell_banner_is_showing, assert_subshell_is_bootstrapped,
     enter_local_subshell_command, enter_remote_subshell_command, enter_ssh_password,
     setup_gcloud_sdk, trigger_subshell_bootstrap, wait_for_password_prompt,
 };
-use rook::integration_testing::terminal::util::current_shell_starter_and_version;
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use rook::integration_testing::view_getters::single_input_view_for_tab;
-use rook::root_view::SubshellCommandArg;
-use rook::terminal::rookify::settings::AddedSubshellCommands;
-use rook::terminal::shell::ShellType;
-use rookui_core::integration::{AssertionOutcome, TestStep};
-use rookui_core::windowing::WindowManager;
-use rookui_core::windowing::state::ApplicationStage;
-use rookui_core::{UpdateModel, async_assert};
+use polaris_terminal::integration_testing::terminal::util::current_shell_starter_and_version;
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::integration_testing::view_getters::single_input_view_for_tab;
+use polaris_terminal::root_view::SubshellCommandArg;
+use polaris_terminal::terminal::ptermify::settings::AddedSubshellCommands;
+use polaris_terminal::terminal::shell::ShellType;
+use ptermui_core::integration::{AssertionOutcome, TestStep};
+use ptermui_core::windowing::WindowManager;
+use ptermui_core::windowing::state::ApplicationStage;
+use ptermui_core::{UpdateModel, async_assert};
 use settings::Setting as _;
 
 use super::{Builder, new_builder};
@@ -83,7 +83,7 @@ generate_can_bootstrap_remote_subshell_for_shell!(test_can_bootstrap_remote_bash
 // generate_can_bootstrap_remote_subshell_for_shell!(test_can_bootstrap_remote_fish_subshell, "fish");
 
 // Test the flow of creating a new window and running a command that should create a subshell and
-//  automaticall bootstrapping AKA "rookifying" that subshell.
+//  automaticall bootstrapping AKA "ptermifying" that subshell.
 pub fn test_can_auto_bootstrap() -> Builder {
     const SUBSHELL_COMMAND: &str = "zsh";
 

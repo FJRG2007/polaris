@@ -1,5 +1,5 @@
 use anyhow::Context;
-use rookui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
+use ptermui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
 
 use super::view::PaneView;
 use super::{
@@ -7,7 +7,7 @@ use super::{
     ShareableLinkError,
 };
 use crate::app_state::{EnvVarCollectionPaneSnapshot, LeafContents};
-use crate::drive::items::RookDriveItemId;
+use crate::drive::items::PtermDriveItemId;
 use crate::env_vars::EnvVarCollectionType;
 use crate::env_vars::manager::{EnvVarCollectionManager, EnvVarCollectionSource};
 use crate::env_vars::view::env_var_collection::{EnvVarCollectionEvent, EnvVarCollectionView};
@@ -169,7 +169,7 @@ fn handle_env_var_collection_event(
         EnvVarCollectionEvent::Pane(pane_event) => {
             group.handle_pane_event(pane_id, pane_event, ctx)
         }
-        EnvVarCollectionEvent::ViewInRookDrive(id) => view_in_rook_drive(*id, ctx),
+        EnvVarCollectionEvent::ViewInPtermDrive(id) => view_in_pterm_drive(*id, ctx),
         EnvVarCollectionEvent::Invoke(env_var_collection) => {
             invoke_env_var_collection(env_var_collection.clone(), ctx)
         }
@@ -189,6 +189,6 @@ fn invoke_env_var_collection(
     })
 }
 
-fn view_in_rook_drive(id: RookDriveItemId, ctx: &mut ViewContext<PaneGroup>) {
-    ctx.emit(crate::pane_group::Event::ViewInRookDrive(id))
+fn view_in_pterm_drive(id: PtermDriveItemId, ctx: &mut ViewContext<PaneGroup>) {
+    ctx.emit(crate::pane_group::Event::ViewInPtermDrive(id))
 }

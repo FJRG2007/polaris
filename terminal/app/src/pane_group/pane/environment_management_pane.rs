@@ -1,4 +1,4 @@
-use rookui::{AppContext, ModelHandle, ViewContext, ViewHandle};
+use ptermui::{AppContext, ModelHandle, ViewContext, ViewHandle};
 
 use super::view::PaneView;
 use super::{

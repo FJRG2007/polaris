@@ -5,14 +5,14 @@ use std::io::Write as _;
 
 use anyhow::anyhow;
 use comfy_table::Cell;
-use rook_cli::SortOrderArg;
-use rook_cli::agent::{
+use pterm_cli::SortOrderArg;
+use pterm_cli::agent::{
     AgentCreateArgs, AgentDeleteArgs, AgentGetArgs, AgentListArgs, AgentSortByArg, AgentUpdateArgs,
     OutputFormat,
 };
-use rook_cli::json_filter::JsonOutput;
-use rookui::platform::TerminationMode;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_cli::json_filter::JsonOutput;
+use ptermui::platform::TerminationMode;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use serde::Serialize;
 
 use super::output::TableFormat;
@@ -71,7 +71,7 @@ pub fn delete_agent(
 impl AgentManagementRunner {
     fn spawn_command(
         &self,
-        future: impl rookui::r#async::Spawnable<Output = anyhow::Result<()>>,
+        future: impl ptermui::r#async::Spawnable<Output = anyhow::Result<()>>,
         ctx: &mut ModelContext<Self>,
     ) {
         ctx.spawn(future, |_, result, ctx| match result {
@@ -497,7 +497,7 @@ fn print_single_agent(agent: &AgentResponse, output_format: OutputFormat) -> any
 }
 
 fn print_skills_hint() {
-    let binary_name = rook_cli::binary_name().unwrap_or_else(|| "rook".to_string());
+    let binary_name = pterm_cli::binary_name().unwrap_or_else(|| "polaris-terminal".to_string());
     println!("\n\nLooking for your agent skills? Use `{binary_name} agent skills` instead.");
 }
 
@@ -551,7 +551,7 @@ fn display_list<'a>(values: impl IntoIterator<Item = &'a str>) -> String {
     }
 }
 
-impl rookui::Entity for AgentManagementRunner {
+impl ptermui::Entity for AgentManagementRunner {
     type Event = ();
 }
 

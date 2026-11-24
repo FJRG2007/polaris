@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use futures::FutureExt;
 use futures::future::BoxFuture;
-use rookui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use ptermui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::{
     ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput,
@@ -115,7 +115,7 @@ impl ReadFilesExecutor {
         // Check if this is a remote session with a connected host.
         let session_type = self.active_session.as_ref(ctx).session_type(ctx);
         let host_request_handle = match &session_type {
-            Some(SessionType::RookifiedRemote {
+            Some(SessionType::PtermifiedRemote {
                 host_id: Some(host_id),
             }) => Some(
                 remote_server::manager::RemoteServerManager::as_ref(ctx)
@@ -127,7 +127,7 @@ impl ReadFilesExecutor {
         // Remote session without a usable remote server connection. File reading
         // requires either local access or a connected remote server, neither
         // of which is available.
-        if matches!(session_type, Some(SessionType::RookifiedRemote { .. }))
+        if matches!(session_type, Some(SessionType::PtermifiedRemote { .. }))
             && host_request_handle.is_none()
         {
             return ActionExecution::Sync(AIAgentActionResultType::ReadFiles(

@@ -2,18 +2,18 @@
 
 ## Problem
 
-When the Rook notification plugin can't be auto-installed (SSH session, or a previous install attempt failed), the user currently has no way to learn how to install it manually. We need a modal that shows step-by-step manual installation instructions.
+When the Polaris Terminal notification plugin can't be auto-installed (SSH session, or a previous install attempt failed), the user currently has no way to learn how to install it manually. We need a modal that shows step-by-step manual installation instructions.
 
 ## Current Behavior
 
-- A green "Install Rook plugin" chip appears in the CLI agent footer when the plugin isn't installed (`agent_input_footer/mod.rs:611-633`)
+- A green "Install Polaris Terminal plugin" chip appears in the CLI agent footer when the plugin isn't installed (`agent_input_footer/mod.rs:611-633`)
 - Clicking it runs auto-install via `claude plugin` CLI commands (`plugin_manager/claude.rs:29-37`)
 - On failure: an error toast appears with a link to logs
 - On SSH: the chip visibility has a bug (see below)
 
 ## Chip Visibility Fix (Remote Sessions)
 
-`should_show_install_plugin_button` hides the chip when `manager.is_installed()` returns true. But `is_installed()` reads the **local** filesystem (`~/.claude/plugins/installed_plugins.json`), not the remote machine's. In any remote session (rookified SSH, legacy SSH, Docker via SSH) where Claude Code runs on the remote, this check is wrong:
+`should_show_install_plugin_button` hides the chip when `manager.is_installed()` returns true. But `is_installed()` reads the **local** filesystem (`~/.claude/plugins/installed_plugins.json`), not the remote machine's. In any remote session (ptermified SSH, legacy SSH, Docker via SSH) where Claude Code runs on the remote, this check is wrong:
 
 - Plugin installed locally but not on remote → chip hidden, user stuck with no instructions
 
@@ -27,8 +27,8 @@ The chip has two modes depending on context:
 
 **When:** local session, no prior install failure for this session.
 
-- Chip label: "Install Rook plugin"
-- Chip tooltip: "Install the Rook plugin to enable rich agent notifications within Rook"
+- Chip label: "Install Polaris Terminal plugin"
+- Chip tooltip: "Install the Polaris Terminal plugin to enable rich agent notifications within Polaris Terminal"
 - On click: runs auto-install (existing `handle_install_plugin` flow)
 - On success: chip disappears (listener registers)
 - On failure: transitions to Mode 2 for the rest of the session
@@ -38,7 +38,7 @@ The chip has two modes depending on context:
 **When:** SSH session, OR auto-install previously failed in this session.
 
 - Chip label: "Plugin install instructions"
-- Chip tooltip: "View instructions to install the Rook plugin"
+- Chip tooltip: "View instructions to install the Polaris Terminal plugin"
 - Chip icon: `Icon::Info` (instead of `Icon::Download`)
 - On click: opens a modal with manual installation steps
 
@@ -48,7 +48,7 @@ The chip has two modes depending on context:
 
 Custom modal view following the `CodexModal` pattern (centered overlay, semi-transparent backdrop, Escape to close, click-outside to dismiss via `Dismiss` element).
 
-- Title from `PluginInstallInstructions.title` (e.g. "Install Rook Plugin for Claude Code")
+- Title from `PluginInstallInstructions.title` (e.g. "Install Polaris Terminal Plugin for Claude Code")
 - Subtitle from `PluginInstallInstructions.subtitle`
 - Numbered steps, each with:
   - A short description of what the step does
@@ -60,14 +60,14 @@ Custom modal view following the `CodexModal` pattern (centered overlay, semi-tra
 
 These are in-session slash commands (the user is already running Claude Code).
 
-Step 1: "Add the Rook plugin marketplace repository"
+Step 1: "Add the Polaris Terminal plugin marketplace repository"
 ```
 /plugins marketplace add warpdotdev/claude-code-warp
 ```
 
-Step 2: "Install the Rook plugin"
+Step 2: "Install the Polaris Terminal plugin"
 ```
-/plugins install rook@claude-code-rook
+/plugins install polaris-terminal@claude-code-polaris-terminal
 ```
 
 Step 3: "Reload plugins to activate"
@@ -77,7 +77,7 @@ Step 3: "Reload plugins to activate"
 
 Subtitle: "Ensure that jq is installed on your machine. Then, run these commands inside your Claude Code session."
 
-Auto-install success toast: "Rook plugin installed. Please run /reload-plugins to activate."
+Auto-install success toast: "Polaris Terminal plugin installed. Please run /reload-plugins to activate."
 
 ### Extensibility
 
@@ -114,4 +114,4 @@ Failure state is not persisted. A new terminal session starts fresh in Mode 1 (a
 - **User installs plugin manually mid-session (without using the chip):** The listener will connect on next `SessionStart` event, chip disappears automatically.
 - **User clicks chip in Mode 2 then installs manually:** Modal stays open until dismissed. Chip disappears on next render once listener is present.
 - **Multiple terminal tabs with same agent:** Each tab has its own `AgentInputFooter` with independent failure tracking. This is correct — one tab's failure shouldn't affect another.
-- **Rookified SSH (tmux wrapper):** Even though the local filesystem is accessible via tmux, the agent runs on the remote machine. The `is_remote` flag is set for all SSH sessions (rookified or legacy), so Mode 2 applies to all remote sessions.
+- **Ptermified SSH (tmux wrapper):** Even though the local filesystem is accessible via tmux, the agent runs on the remote machine. The `is_remote` flag is set for all SSH sessions (ptermified or legacy), so Mode 2 applies to all remote sessions.

@@ -3,27 +3,27 @@
 #![cfg_attr(feature = "release_bundle", windows_subsystem = "windows")]
 
 use anyhow::Result;
-use rook_core::AppId;
-use rook_core::channel::{
-    AutoupdateConfig, Channel, ChannelConfig, ChannelState, OzConfig, RookServerConfig,
+use pterm_core::AppId;
+use pterm_core::channel::{
+    AutoupdateConfig, Channel, ChannelConfig, ChannelState, OzConfig, PtermServerConfig,
 };
 
-// Simple wrapper around rook::run() for Rook OSS builds.
+// Simple wrapper around polaris_terminal::run() for Polaris Terminal OSS builds.
 fn main() -> Result<()> {
     let mut state = ChannelState::new(
         Channel::Oss,
         ChannelConfig {
-            app_id: AppId::new("dev", "rook", "RookOss"),
-            logfile_name: "rook-oss.log".into(),
-            server_config: RookServerConfig::without_server(),
+            app_id: AppId::new("dev", "polaris", "PolarisTerminal"),
+            logfile_name: "polaris-terminal.log".into(),
+            server_config: PtermServerConfig::without_server(),
             oz_config: OzConfig::without_server(),
             telemetry_config: None,
             crash_reporting_config: None,
-            // Rook updates from GitHub releases, so the autoupdate menus have
+            // Polaris Terminal updates from GitHub releases, so the autoupdate menus have
             // something to offer. `show_autoupdate_menu_items` gates every one
             // of them - the tab-bar pill's menu, the avatar entries and the
             // resource centre's version line - and with it off the pill opened
-            // an empty menu and "Update and relaunch Rook" was never drawn, so
+            // an empty menu and "Update and relaunch Polaris Terminal" was never drawn, so
             // a downloaded update could not be applied from the UI at all. The
             // branches those menus already carry for `Channel::Oss` were dead
             // code. No base URL: `release_assets_directory_url` hardcodes the
@@ -37,11 +37,11 @@ fn main() -> Result<()> {
         },
     );
     if cfg!(debug_assertions) {
-        state = state.with_additional_features(rook_core::features::DEBUG_FLAGS);
+        state = state.with_additional_features(pterm_core::features::DEBUG_FLAGS);
     }
     ChannelState::set(state);
 
-    rook::run()
+    polaris_terminal::run()
 }
 
 // If we're not using an external plist, embed the following as the Info.plist.
@@ -54,15 +54,15 @@ embed_plist::embed_info_plist_bytes!(r#"
     <key>CFBundleDevelopmentRegion</key>
     <string>English</string>
     <key>CFBundleDisplayName</key>
-    <string>RookOss</string>
+    <string>PolarisTerminal</string>
     <key>CFBundleExecutable</key>
-    <string>rook-oss</string>
+    <string>polaris-terminal</string>
     <key>CFBundleIdentifier</key>
-    <string>dev.rook.RookOss</string>
+    <string>dev.polaris.PolarisTerminal</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>RookOss</string>
+    <string>PolarisTerminal</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -74,7 +74,7 @@ embed_plist::embed_info_plist_bytes!(r#"
     <key>UIDesignRequiresCompatibility</key>
     <true/>
     <key>CFBundleURLTypes</key>
-    <array><dict><key>CFBundleURLName</key><string>Custom App</string><key>CFBundleURLSchemes</key><array><string>rookoss</string></array></dict></array>
+    <array><dict><key>CFBundleURLName</key><string>Custom App</string><key>CFBundleURLSchemes</key><array><string>polaris-terminal</string></array></dict></array>
     <key>NSHumanReadableCopyright</key>
     <string>© 2026, Denver Technologies, Inc</string>
     </dict>

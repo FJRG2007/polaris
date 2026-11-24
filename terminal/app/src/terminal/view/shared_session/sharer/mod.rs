@@ -1,9 +1,9 @@
 pub mod inactivity_modal;
 use async_channel::Sender;
 use inactivity_modal::InactivityModal;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::elements::MouseStateHandle;
-use rookui::{SingletonEntity, ViewContext, ViewHandle};
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::elements::MouseStateHandle;
+use ptermui::{SingletonEntity, ViewContext, ViewHandle};
 
 use crate::terminal::TerminalView;
 use crate::terminal::shared_session::settings::SharedSessionSettings;

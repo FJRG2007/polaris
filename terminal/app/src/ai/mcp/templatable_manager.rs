@@ -18,8 +18,8 @@ pub use native::McpIntegration;
 #[cfg(not(target_family = "wasm"))]
 use parking_lot::Mutex;
 #[cfg(not(target_family = "wasm"))]
-use rookui::ModelSpawner;
-use rookui::{Entity, SingletonEntity};
+use ptermui::ModelSpawner;
+use ptermui::{Entity, SingletonEntity};
 #[cfg(not(target_family = "wasm"))]
 use simple_logger::SimpleLogger;
 use uuid::Uuid;
@@ -91,7 +91,7 @@ pub struct TemplatableMCPServerManager {
     /// UUIDs of MCP servers started via the Oz CLI. We track these so they can be distinguished from
     /// file-based ephemeral MCP servers, which are directory-scoped.
     cli_spawned_server_uuids: HashSet<Uuid>,
-    /// UUIDs of built-in Rook-hosted servers (e.g. the Factory MCP), which are
+    /// UUIDs of built-in Polaris Terminal-hosted servers (e.g. the Factory MCP), which are
     /// spawned automatically from in-code definitions and authenticated with
     /// the logged-in user's session credentials.
     builtin_server_uuids: HashSet<Uuid>,
@@ -290,7 +290,7 @@ impl TemplatableMCPServerManager {
         self.authorization_urls.get(&uuid).map(String::as_str)
     }
     #[cfg(all(not(target_family = "wasm"), feature = "tui"))]
-    pub fn has_credentials(&self, installation_uuid: Uuid, app: &rookui::AppContext) -> bool {
+    pub fn has_credentials(&self, installation_uuid: Uuid, app: &ptermui::AppContext) -> bool {
         if let Some(hash) = FileBasedMCPManager::as_ref(app).get_hash_by_uuid(installation_uuid) {
             return self.file_based_server_credentials.contains_key(&hash);
         }
@@ -298,7 +298,7 @@ impl TemplatableMCPServerManager {
             .is_some_and(|uuid| self.server_credentials.contains_key(&uuid))
     }
     #[cfg(all(not(target_family = "wasm"), feature = "tui"))]
-    pub fn can_log_out(&self, installation_uuid: Uuid, app: &rookui::AppContext) -> bool {
+    pub fn can_log_out(&self, installation_uuid: Uuid, app: &ptermui::AppContext) -> bool {
         self.has_credentials(installation_uuid, app)
             || self
                 .active_servers
@@ -360,7 +360,7 @@ impl TemplatableMCPServerManager {
     pub fn get_active_file_based_servers(
         &self,
         cwd: &std::path::Path,
-        app: &rookui::AppContext,
+        app: &ptermui::AppContext,
     ) -> HashMap<Uuid, &TemplatableMCPServerInfo> {
         FileBasedMCPManager::as_ref(app)
             .get_servers_for_working_directory(cwd, app)
@@ -380,7 +380,7 @@ impl TemplatableMCPServerManager {
             .collect()
     }
 
-    /// Returns built-in Rook-hosted servers (e.g. the Factory MCP) that are
+    /// Returns built-in Polaris Terminal-hosted servers (e.g. the Factory MCP) that are
     /// currently active.
     pub fn get_active_builtin_servers(&self) -> HashMap<Uuid, &TemplatableMCPServerInfo> {
         self.builtin_server_uuids

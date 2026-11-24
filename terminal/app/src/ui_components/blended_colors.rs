@@ -1,1 +1,1 @@
-pub use rook_core::ui::theme::color::internal_colors::*;
+pub use pterm_core::ui::theme::color::internal_colors::*;

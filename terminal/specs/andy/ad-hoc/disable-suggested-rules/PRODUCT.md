@@ -20,7 +20,7 @@ Figma: none provided
 
 6. The toggle is synced to the cloud across devices via the standard global sync mechanism (same behavior as other Active AI settings such as Prompt Suggestions).
 
-7. The setting is scoped to the `agents.rook_agent.active_ai.rule_suggestions_enabled` TOML key. Users who set this key in their settings file have their preference respected on next launch.
+7. The setting is scoped to the `agents.pterm_agent.active_ai.rule_suggestions_enabled` TOML key. Users who set this key in their settings file have their preference respected on next launch.
 
 8. The **Suggested Rules** toggle is disabled (greyed out, not interactive) when the top-level global AI toggle (**Oz**) is off, matching the visual and interaction behavior of all other AI sub-settings.
 

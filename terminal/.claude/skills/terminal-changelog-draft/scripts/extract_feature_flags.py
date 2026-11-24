@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Extract RELEASE_FLAGS, PREVIEW_FLAGS, and DOGFOOD_FLAGS from rook_features.
+"""Extract RELEASE_FLAGS, PREVIEW_FLAGS, and DOGFOOD_FLAGS from pterm_features.
 
-Parses crates/rook_features/src/lib.rs to find the const arrays and extracts
+Parses crates/pterm_features/src/lib.rs to find the const arrays and extracts
 the FeatureFlag variant names. Stdlib only, no pip deps.
 
 Usage:
-    python3 extract_feature_flags.py --file crates/rook_features/src/lib.rs
+    python3 extract_feature_flags.py --file crates/pterm_features/src/lib.rs
 
 Outputs JSON to stdout.
 """
@@ -35,7 +35,7 @@ def main() -> None:
     parser.add_argument(
         "--file",
         required=True,
-        help="Path to rook_features lib.rs",
+        help="Path to pterm_features lib.rs",
     )
     args = parser.parse_args()
 

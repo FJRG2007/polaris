@@ -1,5 +1,5 @@
-use rookui::elements::MouseStateHandle;
-use rookui::{ViewContext, ViewHandle};
+use ptermui::elements::MouseStateHandle;
+use ptermui::{ViewContext, ViewHandle};
 use session_sharing_protocol::common::{Role, WindowSize};
 
 use super::adapter::Participant;

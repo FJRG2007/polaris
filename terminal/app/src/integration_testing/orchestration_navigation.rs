@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use rookui::integration::TestStep;
-use rookui::{SingletonEntity, TypedActionView, async_assert_eq};
+use ptermui::integration::TestStep;
+use ptermui::{SingletonEntity, TypedActionView, async_assert_eq};
 use warp_multi_agent_api as api;
 
 use crate::ai::agent::conversation::{AIConversation, AIConversationId};

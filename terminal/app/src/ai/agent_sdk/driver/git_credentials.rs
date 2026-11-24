@@ -29,12 +29,12 @@ use crate::util::path::resolve_executable;
 /// well ahead of the shortest-lived one-hour token expiry).
 pub(crate) const GIT_CREDENTIALS_REFRESH_INTERVAL: Duration = Duration::from_secs(50 * 60);
 
-const DEFAULT_GIT_NAME: &str = "Rook";
+const DEFAULT_GIT_NAME: &str = "Polaris Terminal";
 /// The fallback author address stamped on commits an agent makes when the
 /// server supplies no identity. Under `.invalid`, which RFC 2606 reserves so it
 /// can never be registered: the rename turned upstream's own domain into
 /// `rook.dev`, which belongs to someone else, and a commit author is permanent.
-const DEFAULT_GIT_EMAIL: &str = "agent@rook.invalid";
+const DEFAULT_GIT_EMAIL: &str = "agent@polaris-terminal.invalid";
 const GITHUB_HOST: &str = "github.com";
 const GH_HOSTS_FILENAME: &str = "hosts.yml";
 const GLAB_HOST: &str = "gitlab.com";
@@ -80,7 +80,7 @@ fn write_secret_file(path: &std::path::Path, content: &str) -> Result<()> {
 }
 
 fn azure_devops_auth_dir(home: &Path) -> PathBuf {
-    home.join(".rook").join(AZURE_DEVOPS_AUTH_DIR)
+    home.join(".polaris-terminal").join(AZURE_DEVOPS_AUTH_DIR)
 }
 
 fn azure_cli_wrapper_path(home: &Path) -> PathBuf {
@@ -592,7 +592,7 @@ pub(crate) fn setup_git_config(credentials: &[GitCredential]) {
 /// Configure the global git user identity from the server-returned credential.
 ///
 /// Uses the first credential's `username`/`email` fields, falling back to the
-/// Rook defaults when either is absent (e.g. service-account principals).
+/// Polaris Terminal defaults when either is absent (e.g. service-account principals).
 pub(crate) fn configure_git_identity(credentials: &[GitCredential]) {
     let (name, email) = identity_of(credentials.first());
     run_git_config("user.name", &name);
@@ -716,7 +716,7 @@ fn apply_refreshed_credentials(response: TaskGitCredentialsResponse) -> Result<b
 ))]
 async fn try_refresh(task_id: &str, ai_client: &Arc<dyn AIClient>) -> Result<bool> {
     let workload_token =
-        rook_isolation_platform::issue_workload_token(Some(Duration::from_secs(5 * 60)))
+        pterm_isolation_platform::issue_workload_token(Some(Duration::from_secs(5 * 60)))
             .await
             .context("Failed to issue workload token for git credentials refresh")?
             .token;
@@ -749,7 +749,7 @@ async fn try_refresh(task_id: &str, ai_client: &Arc<dyn AIClient>) -> Result<boo
 /// completes.
 pub(crate) async fn refresh_loop(task_id: String, ai_client: Arc<dyn AIClient>) {
     loop {
-        rookui::r#async::Timer::after(GIT_CREDENTIALS_REFRESH_INTERVAL).await;
+        ptermui::r#async::Timer::after(GIT_CREDENTIALS_REFRESH_INTERVAL).await;
 
         log::info!("Refreshing git credentials for task {task_id}");
 
@@ -770,7 +770,7 @@ pub(crate) async fn refresh_loop(task_id: String, ai_client: Arc<dyn AIClient>) 
                         attempt + 1,
                         delay.as_secs()
                     );
-                    rookui::r#async::Timer::after(delay).await;
+                    ptermui::r#async::Timer::after(delay).await;
                     attempt += 1;
                 }
                 Ok(false) => {
@@ -788,7 +788,7 @@ pub(crate) async fn refresh_loop(task_id: String, ai_client: Arc<dyn AIClient>) 
                         attempt + 1,
                         delay.as_secs()
                     );
-                    rookui::r#async::Timer::after(delay).await;
+                    ptermui::r#async::Timer::after(delay).await;
                     attempt += 1;
                 }
                 Err(e) => {

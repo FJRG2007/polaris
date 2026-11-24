@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use rook_editor::render::model::LineCount;
-use rookui::{Entity, ModelContext};
+use pterm_editor::render::model::LineCount;
+use ptermui::{Entity, ModelContext};
 
 use super::{
     AttachedReviewComment, AttachedReviewCommentTarget, CommentId, PendingImportedReviewComment,

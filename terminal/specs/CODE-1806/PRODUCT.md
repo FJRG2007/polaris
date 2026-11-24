@@ -4,7 +4,7 @@ Linear: CODE-1806
 
 ## Summary
 
-Users can drag with the mouse over the Rook TUI's transcript view to select the text they see — across agent responses, tool-call rows, and terminal command output alike — and the selection is copied to the system clipboard on mouse release. Today the TUI captures the mouse globally, so neither native terminal selection nor any in-app selection works over the transcript.
+Users can drag with the mouse over the Polaris Terminal TUI's transcript view to select the text they see — across agent responses, tool-call rows, and terminal command output alike — and the selection is copied to the system clipboard on mouse release. Today the TUI captures the mouse globally, so neither native terminal selection nor any in-app selection works over the transcript.
 
 ## Figma
 
@@ -18,7 +18,7 @@ Figma: none provided. Selection highlight uses the terminal-native treatment (re
 
 2. Selected cells render in reverse video (foreground/background swapped), consistent with the input editor's selection highlight. The highlight updates live during the drag.
 
-3. A double-click selects the word under the pointer, using the same word-boundary rules as double-click in the Rook GUI terminal (including smart-select patterns like URLs and file paths, honoring the user's smart-select settings). Dragging after a double-click extends the selection by whole words.
+3. A double-click selects the word under the pointer, using the same word-boundary rules as double-click in the Polaris Terminal GUI terminal (including smart-select patterns like URLs and file paths, honoring the user's smart-select settings). Dragging after a double-click extends the selection by whole words.
 
 4. A triple-click selects the full visual row under the pointer. Dragging after a triple-click extends the selection by whole rows.
 
@@ -46,7 +46,7 @@ Figma: none provided. Selection highlight uses the terminal-native treatment (re
 
 14. Once a drag has started in one surface (transcript or input editor), that surface owns the drag until mouse-up: moving the pointer over the other surface mid-drag neither transfers the drag nor interacts with that surface.
 
-15. Typing does not clear the transcript selection highlight — matching the Rook GUI's agent-input behavior, where an existing selection persists while the user types. The highlight clears only by starting another selection (invariant 13) or via invalidation (invariant 16).
+15. Typing does not clear the transcript selection highlight — matching the Polaris Terminal GUI's agent-input behavior, where an existing selection persists while the user types. The highlight clears only by starting another selection (invariant 13) or via invalidation (invariant 16).
 
 16. Transcript updates preserve selection whenever the originally selected glyphs still exist:
     - Appending agent or terminal output below selected cells does not clear the selection, including while the mouse button is held.

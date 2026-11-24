@@ -1,9 +1,9 @@
-//! General-purpose administrative commands in the Rook CLI.
+//! General-purpose administrative commands in the Polaris Terminal CLI.
 
 use anyhow::{Context, Result};
-use rook_cli::agent::OutputFormat;
-use rookui::platform::TerminationMode;
-use rookui::{AppContext, SingletonEntity};
+use pterm_cli::agent::OutputFormat;
+use ptermui::platform::TerminationMode;
+use ptermui::{AppContext, SingletonEntity};
 use serde::Serialize;
 
 use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
@@ -174,7 +174,7 @@ impl WhoamiOutput {
 /// Singleton model that provides a `ModelContext` for the `whoami` command's async work.
 struct WhoamiRunner;
 
-impl rookui::Entity for WhoamiRunner {
+impl ptermui::Entity for WhoamiRunner {
     type Event = ();
 }
 
@@ -258,7 +258,7 @@ pub fn whoami(ctx: &mut AppContext, output_format: OutputFormat) -> Result<()> {
     Ok(())
 }
 
-/// Log out of Rook using the same logic as the app.
+/// Log out of Polaris Terminal using the same logic as the app.
 pub fn logout(ctx: &mut AppContext) -> Result<()> {
     let auth_state = AuthStateProvider::as_ref(ctx).get();
     if !auth_state.is_logged_in() {

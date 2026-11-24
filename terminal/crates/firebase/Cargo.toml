@@ -1,6 +1,6 @@
 [package]
 name = "firebase"
-authors = ["Rook Contributors"]
+authors = ["Polaris Terminal Contributors"]
 version = "0.1.0"
 edition = "2024"
 description = "Utilities for firebase client APIs"

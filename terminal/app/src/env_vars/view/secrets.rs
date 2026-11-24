@@ -1,17 +1,17 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
 #[cfg(not(target_family = "wasm"))]
-use rookui::SingletonEntity;
-use rookui::elements::{
+use ptermui::SingletonEntity;
+use ptermui::elements::{
     ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, Empty, Fill, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Shrinkable, Stack,
 };
-use rookui::fonts::Weight;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{Element, ViewContext};
+use ptermui::fonts::Weight;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{Element, ViewContext};
 
 use super::env_var_collection::{
     CORE_MAX_WIDTH, EnvVarCollectionAction, EnvVarCollectionView, ROW_SPACING, VariableRowIndex,
@@ -166,7 +166,7 @@ impl EnvVarCollectionView {
         let text_and_icon = TextAndIcon::new(
             TextAndIconAlignment::IconFirst,
             display_name,
-            icon.to_rookui_icon(appearance.theme().active_ui_text_color()),
+            icon.to_ptermui_icon(appearance.theme().active_ui_text_color()),
             MainAxisSize::Max,
             MainAxisAlignment::Center,
             vec2f(16., 16.),

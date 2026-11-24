@@ -32,10 +32,10 @@ pub mod workflow_pane;
 use std::any::Any;
 use std::fmt::Display;
 
-use rook_util::remote_path::RemotePath;
-use rookui::elements::{DispatchEventResult, EventHandler, MouseInBehavior};
-use rookui::presenter::ChildView;
-use rookui::{
+use pterm_util::remote_path::RemotePath;
+use ptermui::elements::{DispatchEventResult, EventHandler, MouseInBehavior};
+use ptermui::presenter::ChildView;
+use ptermui::{
     Action, AppContext, Element, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity,
     View, ViewContext, ViewHandle, WeakModelHandle,
 };
@@ -382,7 +382,7 @@ impl PaneId {
     pub(super) fn deferred_placeholder_pane_id() -> Self {
         Self(IPaneId {
             pane_type: IPaneType::DeferredPlaceholder,
-            pane_view_id: rookui::EntityId::new(),
+            pane_view_id: ptermui::EntityId::new(),
         })
     }
 
@@ -391,7 +391,7 @@ impl PaneId {
     pub fn dummy_pane_id() -> Self {
         Self(IPaneId {
             pane_type: IPaneType::Dummy,
-            pane_view_id: rookui::EntityId::new(),
+            pane_view_id: ptermui::EntityId::new(),
         })
     }
 
@@ -436,8 +436,8 @@ impl PaneId {
         matches!(self.0.pane_type, IPaneType::EnvironmentManagement)
     }
 
-    /// Returns true if this pane contains a Rook Drive object (notebook, workflow, etc.).
-    pub fn is_rook_drive_object_pane(&self) -> bool {
+    /// Returns true if this pane contains a Polaris Terminal Drive object (notebook, workflow, etc.).
+    pub fn is_pterm_drive_object_pane(&self) -> bool {
         matches!(
             self.0.pane_type,
             IPaneType::Notebook
@@ -497,9 +497,9 @@ impl PaneId {
             IPaneType::NetworkLog => {
                 ChildView::<PaneView<NetworkLogView>>::with_id(self.0.pane_view_id).finish()
             }
-            IPaneType::DeferredPlaceholder => rookui::elements::Empty::new().finish(),
+            IPaneType::DeferredPlaceholder => ptermui::elements::Empty::new().finish(),
             #[cfg(test)]
-            IPaneType::Dummy => rookui::elements::Empty::new().finish(),
+            IPaneType::Dummy => ptermui::elements::Empty::new().finish(),
         };
         if *PaneSettings::as_ref(app).focus_panes_on_hover {
             element = EventHandler::new(element)

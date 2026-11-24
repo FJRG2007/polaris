@@ -6,9 +6,9 @@ use cloud_objects::cloud_object::{
 };
 use cloud_objects::ids::GenericStringObjectId;
 use lazy_static::lazy_static;
+use pterm_core::channel::ChannelState;
+use pterm_core::features::FeatureFlag;
 use regex::Regex;
-use rook_core::channel::ChannelState;
-use rook_core::features::FeatureFlag;
 use serde::{Deserialize, Serialize};
 
 use crate::{JsonModel, JsonSerializer};
@@ -385,8 +385,8 @@ pub struct AIExecutionProfile {
 
     pub context_window_limit: Option<u32>,
 
-    /// Whether plans created by the agent should be automatically synced to Rook Drive
-    pub autosync_plans_to_rook_drive: bool,
+    /// Whether plans created by the agent should be automatically synced to Polaris Terminal Drive
+    pub autosync_plans_to_pterm_drive: bool,
 
     /// Whether the agent may use web search when helpful for completing tasks
     pub web_search_enabled: bool,
@@ -415,7 +415,7 @@ impl Default for AIExecutionProfile {
             cli_agent_model: None,
             computer_use_model: None,
             context_window_limit: None,
-            autosync_plans_to_rook_drive: true,
+            autosync_plans_to_pterm_drive: true,
             web_search_enabled: true,
         }
     }
@@ -454,7 +454,7 @@ impl AIExecutionProfile {
             cli_agent_model: None,
             computer_use_model: None,
             context_window_limit: None,
-            autosync_plans_to_rook_drive: false,
+            autosync_plans_to_pterm_drive: false,
             web_search_enabled: true,
         }
     }
@@ -510,7 +510,7 @@ impl AIExecutionProfile {
             cli_agent_model: None,
             computer_use_model: None,
             context_window_limit: None,
-            autosync_plans_to_rook_drive: FeatureFlag::SyncAmbientPlans.is_enabled(),
+            autosync_plans_to_pterm_drive: FeatureFlag::SyncAmbientPlans.is_enabled(),
             web_search_enabled: true,
         }
     }

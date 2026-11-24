@@ -1,22 +1,22 @@
 # Stale PR Follow-up for Requested-Changes Reviews — Tech Spec
 Product spec: `specs/stale-pr-cleanup/PRODUCT.md`
-> Code references pinned to `rook` @ `ac4225c`.
+> Code references pinned to `polaris-terminal` @ `ac4225c`.
 
 ## Problem
-We need a periodic sweep that finds open external-contributor PRs with an active requested-changes review, nudges the author after a window of inactivity, and closes the PR if inactivity continues. There is no "PR went quiet for N days" webhook event, so this is a scheduled scan. It lives in `FJRG2007/rook` as a GitHub Action, mirroring the existing stale-PR cleanup workflow, and posts as `github-actions[bot]` via the default `GITHUB_TOKEN`.
+We need a periodic sweep that finds open external-contributor PRs with an active requested-changes review, nudges the author after a window of inactivity, and closes the PR if inactivity continues. There is no "PR went quiet for N days" webhook event, so this is a scheduled scan. It lives in `FJRG2007/polaris` as a GitHub Action, mirroring the existing stale-PR cleanup workflow, and posts as `github-actions[bot]` via the default `GITHUB_TOKEN`.
 
-## Relevant Code (`rook` @ `ac4225c`)
+## Relevant Code (`polaris-terminal` @ `ac4225c`)
 - `.github/workflows/close_stale_fix_prs.yml` — the pattern to mirror: a daily `schedule:` + `workflow_dispatch:` job running a single pinned `actions/github-script` step that paginates open PRs, filters, comments, and closes via the default `GITHUB_TOKEN`.
 - `.github/workflows/label_external_contributors.yml` — applies the `external-contributor` label to fork PRs on open (skips bots); this is the v1 scope filter.
 - `.github/workflows/check_approvals.yml` — precedent for reading PR review state inside a workflow (`gh pr view --json reviews --jq '.reviews[] | select(.state==...)'`).
 
 ## Approach
-Add one scheduled GitHub Action that mirrors `close_stale_fix_prs.yml`. An `actions/github-script` step does detection, reminders, and closure — its logic factored into a standalone `.github/scripts/` JS module the step `require`s, rather than inline YAML — and reminder state lives in marker comments (no datastore). This was chosen over hosting the scan in the `oz-for-oss` control plane — see "Alternative considered." The only thing the `rook`-hosted GHA gives up is native `oz-for-oss` comment authorship, which `PRODUCT.md` invariant 8 treats as non-functional and deferred.
+Add one scheduled GitHub Action that mirrors `close_stale_fix_prs.yml`. An `actions/github-script` step does detection, reminders, and closure — its logic factored into a standalone `.github/scripts/` JS module the step `require`s, rather than inline YAML — and reminder state lives in marker comments (no datastore). This was chosen over hosting the scan in the `oz-for-oss` control plane — see "Alternative considered." The only thing the `polaris-terminal`-hosted GHA gives up is native `oz-for-oss` comment authorship, which `PRODUCT.md` invariant 8 treats as non-functional and deferred.
 
 ## Proposed Changes
 
 ### 1. New workflow `.github/workflows/stale_requested_changes_prs.yml`
-- Triggers: `schedule:` with cron `7 12 * * *` — fields are `minute hour day-of-month month day-of-week`, so this is **12:07 UTC daily** (GitHub interprets cron in UTC). Minute `7` rather than `:00` avoids GitHub's top-of-hour scheduler congestion and the existing rook crons there. Also `workflow_dispatch:` with a `mode` input (`dry-run` | `reminder-only` | `full`).
+- Triggers: `schedule:` with cron `7 12 * * *` — fields are `minute hour day-of-month month day-of-week`, so this is **12:07 UTC daily** (GitHub interprets cron in UTC). Minute `7` rather than `:00` avoids GitHub's top-of-hour scheduler congestion and the existing polaris-terminal crons there. Also `workflow_dispatch:` with a `mode` input (`dry-run` | `reminder-only` | `full`).
 - Least-privilege `permissions:` — `pull-requests: write`, `issues: write`, `contents: read` (note `close_stale_fix_prs.yml` declares none; do better here).
 - Two steps: a sparse `actions/checkout` (cone limited to `.github/scripts`, `blob:none`) that makes the script available, then an `actions/github-script` step pinned to the same SHA already used by `close_stale_fix_prs.yml` that `require`s `.github/scripts/stale-requested-changes-prs.js` and invokes it with `{ github, context }`. The detection/reminder/closure logic lives in that standalone module for reviewability and `node`-based testing.
 
@@ -36,7 +36,7 @@ Comments and the close call use the default `GITHUB_TOKEN`, so they are authored
 The `mode` input gates writes: `dry-run` logs eligible PRs + intended actions, `reminder-only` posts reminders but never closes, `full` does both. Scheduled runs default to `full` (the no-close-without-final-warning guard in #4 prevents surprise bulk closures of the existing backlog); `dry-run` and `reminder-only` remain available via `workflow_dispatch` for validating changes.
 
 ## Alternative considered: `oz-for-oss`-hosted scan
-Run the scan in the `oz-for-oss` Vercel control plane instead. Upside: comments are natively authored by the `oz-for-oss` App, and it can reuse the Python review-state helpers (`_is_stale_oz_changes_requested_review`, decisive-state handling) rather than re-implementing them in JS. Downside: it moves `rook` PR-closure governance into a separate backend, and its only decisive advantage is the comment identity — which we've deemed non-functional. Deferred; revisit only if `oz-for-oss` comment authorship becomes a hard requirement.
+Run the scan in the `oz-for-oss` Vercel control plane instead. Upside: comments are natively authored by the `oz-for-oss` App, and it can reuse the Python review-state helpers (`_is_stale_oz_changes_requested_review`, decisive-state handling) rather than re-implementing them in JS. Downside: it moves `polaris-terminal` PR-closure governance into a separate backend, and its only decisive advantage is the comment identity — which we've deemed non-functional. Deferred; revisit only if `oz-for-oss` comment authorship becomes a hard requirement.
 
 ## Testing and validation
 Keep it light, consistent with repo norms (`close_stale_fix_prs.yml` ships with no tests).
@@ -52,6 +52,6 @@ Keep it light, consistent with repo norms (`close_stale_fix_prs.yml` ships with 
 - **Author waiting on a maintainer.** Because only author activity resets the timer, a PR the author already responded to can still march to closure. Mitigation: maintainers apply `no-autoclose`; revisit the pause-on-author-response option (`PRODUCT.md` open question) if this proves noisy.
 
 ## Follow-ups
-- **(Non-functional) Author comments as `oz-for-oss`.** Would require minting an `oz-for-oss` App installation token from the App private key placed in `rook` Actions secrets, or calling an `oz-for-oss` endpoint. Deferred; a possible future nicety.
+- **(Non-functional) Author comments as `oz-for-oss`.** Would require minting an `oz-for-oss` App installation token from the App private key placed in `polaris-terminal` Actions secrets, or calling an `oz-for-oss` endpoint. Deferred; a possible future nicety.
 - Generalize beyond `external-contributor` or to additional repos.
 - Optionally backfill a least-privilege `permissions:` block onto `close_stale_fix_prs.yml` while we're here.

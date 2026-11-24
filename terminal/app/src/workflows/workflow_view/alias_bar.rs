@@ -3,17 +3,17 @@ use std::collections::HashMap;
 
 use anyhow::Error;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors::neutral_4;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors::neutral_4;
+use ptermui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Flex, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseState, MouseStateHandle, ParentElement, Radius,
 };
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity as _, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -467,7 +467,7 @@ impl View for AliasBar {
                 TextAndIcon::new(
                     TextAndIconAlignment::IconFirst,
                     "Add alias",
-                    Icon::Plus.to_rookui_icon(
+                    Icon::Plus.to_ptermui_icon(
                         appearance
                             .theme()
                             .main_text_color(appearance.theme().background()),

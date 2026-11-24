@@ -4,10 +4,10 @@ use std::collections::HashMap;
 use std::sync::mpsc::SyncSender;
 
 #[cfg(not(target_family = "wasm"))]
-use rook_cli::agent::Harness;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_errors::report_error;
-use rookui::{
+use pterm_cli::agent::Harness;
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_errors::report_error;
+use ptermui::{
     AppContext, EntityId, ModelHandle, SingletonEntity, ViewContext, ViewHandle, WindowId,
 };
 #[cfg(not(target_family = "wasm"))]
@@ -941,7 +941,7 @@ fn handle_terminal_view_event(
                 // died erased them from the saved session one at a time - a
                 // restart brought back only whichever tab was left. Kept, they
                 // restore with a fresh shell in the same directory.
-                if rookui::windowing::is_os_session_ending() {
+                if ptermui::windowing::is_os_session_ending() {
                     return;
                 }
 
@@ -1088,21 +1088,21 @@ fn handle_terminal_view_event(
             Event::OpenCLIAgentToolbarEditor => {
                 ctx.emit(pane_group::Event::OpenCLIAgentToolbarEditor);
             }
-            Event::OpenFileInRook { path, session } => {
-                ctx.emit(pane_group::Event::OpenFileInRook {
+            Event::OpenFileInPterm { path, session } => {
+                ctx.emit(pane_group::Event::OpenFileInPterm {
                     path: LocalOrRemotePath::Local(path.clone()),
                     session: session.clone(),
                 });
             }
             #[cfg(feature = "local_fs")]
-            Event::PreviewCodeInRook { source } => {
-                ctx.emit(pane_group::Event::PreviewCodeInRook {
+            Event::PreviewCodeInPterm { source } => {
+                ctx.emit(pane_group::Event::PreviewCodeInPterm {
                     source: source.clone(),
                 });
             }
             #[cfg(feature = "local_fs")]
-            Event::OpenCodeInRook { source, layout } => {
-                ctx.emit(pane_group::Event::OpenCodeInRook {
+            Event::OpenCodeInPterm { source, layout } => {
+                ctx.emit(pane_group::Event::OpenCodeInPterm {
                     source: source.clone(),
                     layout: *layout,
                     line_col: if let CodeSource::Link { range_start, .. } = source {
@@ -1193,8 +1193,8 @@ fn handle_terminal_view_event(
             Event::RoleRequestCancelled(role_request_id) => {
                 group.remove_shared_session_role_request(role_request_id.clone(), ctx);
             }
-            Event::OpenRookDriveObjectInPane(uid) => {
-                ctx.emit(pane_group::Event::OpenRookDriveObjectInPane(uid.clone()));
+            Event::OpenPtermDriveObjectInPane(uid) => {
+                ctx.emit(pane_group::Event::OpenPtermDriveObjectInPane(uid.clone()));
             }
             Event::OpenSuggestedAgentModeWorkflowModal { workflow_and_id } => {
                 ctx.emit(pane_group::Event::OpenSuggestedAgentModeWorkflowModal {

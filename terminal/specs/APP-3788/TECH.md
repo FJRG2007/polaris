@@ -34,7 +34,7 @@ pub struct RemoteRepositoryIdentifier {
     pub path: PathBuf,
 }
 ```
-`SessionId` will be moved from `app/src/terminal/model/session.rs` to `rook_core` so that `repo_metadata` can depend on it directly without circular crate dependencies.
+`SessionId` will be moved from `app/src/terminal/model/session.rs` to `pterm_core` so that `repo_metadata` can depend on it directly without circular crate dependencies.
 ### 2. `LocalRepoMetadataModel` (rename of existing model)
 The existing `RepositoryMetadataModel` is renamed to `LocalRepoMetadataModel`. Its API is unchanged:
 * `new(ctx)` — sets up watcher + `DetectedRepositories` subscription.
@@ -154,6 +154,6 @@ Connect the remote sync layer to `RemoteRepoMetadataModel::insert_repository`. U
 * Existing `RepositoryMetadataModel` (now `LocalRepoMetadataModel`) tests remain unchanged.
 * Integration tests in `app/` verify that consumer subscriptions and queries work through the wrapper.
 ## Decisions
-1. **`SessionId` location** — Move `SessionId` to `rook_core` so `repo_metadata` can depend on it directly without circular dependencies.
+1. **`SessionId` location** — Move `SessionId` to `pterm_core` so `repo_metadata` can depend on it directly without circular dependencies.
 2. **Event granularity** — The wrapper emits only unified `RepoMetadataEvent`. Consumers subscribe to the wrapper and filter by `RepositoryIdentifier` variant if they only care about local or remote events.
 3. **Lifecycle of local-specific operations** — Local-only operations (e.g. `load_directory`) keep their current path-based signatures for now. Remote equivalents will be added to the wrapper once the remote client ↔ server sync layer is in place.

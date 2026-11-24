@@ -13,42 +13,42 @@ use itertools::Itertools;
 use languages::{Language, language_by_filename, language_by_local_filename, language_by_name};
 use line_ending::LineEnding;
 use num_traits::SaturatingSub;
-use rangemap::{RangeMap, RangeSet};
-use rook_core::platform::SessionPlatform;
-use rook_core::semantic_selection::SemanticSelection;
-use rook_core::ui::theme::Fill;
-use rook_editor::content::anchor::Anchor;
-use rook_editor::content::buffer::{
+use pterm_core::platform::SessionPlatform;
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_core::ui::theme::Fill;
+use pterm_editor::content::anchor::Anchor;
+use pterm_editor::content::buffer::{
     AutoScrollBehavior, Buffer, BufferEditAction, BufferEvent, BufferSelectAction, EditOrigin,
     InitialBufferState, SelectionOffsets, ShouldAutoscroll, ToBufferCharOffset, ToBufferPoint,
     VimInsertPoint,
 };
-use rook_editor::content::edit::EditDelta;
-use rook_editor::content::find::{SearchConfig, SearchResults};
-use rook_editor::content::hidden_lines_model::HiddenLinesModel;
-use rook_editor::content::selection_model::BufferSelectionModel;
-use rook_editor::content::text::{BufferBlockStyle, IndentBehavior, IndentUnit};
-use rook_editor::content::version::BufferVersion;
-use rook_editor::decoration::DecorationLayer;
-use rook_editor::editor::TextDecoration;
-use rook_editor::model::{CoreEditorModel, PlainTextEditorModel};
-use rook_editor::multiline::{AnyMultilineString, LF, MultilineString};
-use rook_editor::render::model::{
+use pterm_editor::content::edit::EditDelta;
+use pterm_editor::content::find::{SearchConfig, SearchResults};
+use pterm_editor::content::hidden_lines_model::HiddenLinesModel;
+use pterm_editor::content::selection_model::BufferSelectionModel;
+use pterm_editor::content::text::{BufferBlockStyle, IndentBehavior, IndentUnit};
+use pterm_editor::content::version::BufferVersion;
+use pterm_editor::decoration::DecorationLayer;
+use pterm_editor::editor::TextDecoration;
+use pterm_editor::model::{CoreEditorModel, PlainTextEditorModel};
+use pterm_editor::multiline::{AnyMultilineString, LF, MultilineString};
+use pterm_editor::render::model::{
     AutoScrollMode, BlockItem, BlockSpacings, BrokenLinkStyle, CheckBoxStyle, ColumnUnit,
     Decoration, HorizontalRuleStyle, InlineCodeStyle, LineCount, LineDecoration, ParagraphStyles,
     RenderEvent, RenderLineLocation, RenderState, RichTextStyles, StyleUpdateAction, TableStyle,
     UpdateDecorationAfterLayout, WidthSetting,
 };
-use rook_editor::selection::{SelectionMode, SelectionModel, TextDirection, TextUnit};
-use rook_util::standardized_path::StandardizedPath;
-use rookui::elements::{
+use pterm_editor::selection::{SelectionMode, SelectionModel, TextDirection, TextUnit};
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::elements::{
     AnchorPair, OffsetPositioning, OffsetType, PositionedElementOffsetBounds, PositioningAxis,
     XAxisAnchor, YAxisAnchor,
 };
-use rookui::text::TextBuffer;
-use rookui::text::point::Point;
-use rookui::units::{IntoPixels, Pixels};
-use rookui::{AppContext, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity};
+use ptermui::text::TextBuffer;
+use ptermui::text::point::Point;
+use ptermui::units::{IntoPixels, Pixels};
+use ptermui::{AppContext, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity};
+use rangemap::{RangeMap, RangeSet};
 use string_offset::CharOffset;
 use syntax_tree::{ColorMap, DecorationStateEvent, SyntaxTreeState};
 use vec1::{Vec1, vec1};
@@ -357,7 +357,7 @@ impl CodeEditorModel {
     /// Identical to `new` but creates the `RenderState` with
     /// [`LayoutMode::CharCell`] so all soft-wrap positions use monospace
     /// character-count arithmetic rather than font-aware pixel layout.
-    /// `TuiEditorModel` (in `rook_tui`) is a type alias for this type;
+    /// `TuiEditorModel` (in `pterm_tui`) is a type alias for this type;
     /// constructing via this method is what gives the TUI editor all of
     /// `CodeEditorModel`'s features (vim, syntax, diff, hidden lines) for free
     /// while sharing no GUI-rendering infrastructure.
@@ -480,10 +480,10 @@ impl CodeEditorModel {
     /// retains the remaining styles for API compatibility. This stub lives here
     /// so the core editor crate doesn't carry a TUI-specific dependency.
     fn tui_stub_text_styles() -> RichTextStyles {
-        use rookui::elements::{Border, Fill};
-        use rookui::fonts::{FamilyId, Weight};
+        use ptermui::elements::{Border, Fill};
+        use ptermui::fonts::{FamilyId, Weight};
 
-        const TRANSPARENT: rookui::color::ColorU = rookui::color::ColorU {
+        const TRANSPARENT: ptermui::color::ColorU = ptermui::color::ColorU {
             r: 0,
             g: 0,
             b: 0,
@@ -717,7 +717,7 @@ impl CodeEditorModel {
     // Set the following line ranges to be hidden in the editor.
     pub fn set_hidden_lines(
         &mut self,
-        ranges: RangeSet<rook_editor::content::text::LineCount>,
+        ranges: RangeSet<pterm_editor::content::text::LineCount>,
         ctx: &mut ModelContext<Self>,
     ) {
         self.hidden_lines.update(ctx, |model, ctx| {
@@ -732,7 +732,7 @@ impl CodeEditorModel {
     // Set the following hidden line ranges to be visible. This is no-op if the lines are already visible.
     pub fn set_visible_line_range(
         &mut self,
-        range: Range<rook_editor::content::text::LineCount>,
+        range: Range<pterm_editor::content::text::LineCount>,
         ctx: &mut ModelContext<Self>,
     ) {
         let version = self.content().as_ref(ctx).buffer_version();
@@ -1466,7 +1466,7 @@ impl CodeEditorModel {
             let line_count = self.line_count(ctx);
 
             // Calculate the visible line ranges (with context)
-            let mut visible_ranges: RangeSet<rook_editor::content::text::LineCount> =
+            let mut visible_ranges: RangeSet<pterm_editor::content::text::LineCount> =
                 RangeSet::new();
 
             // Add ranges for diffs. `modified_lines` yields 0-based line
@@ -1481,14 +1481,14 @@ impl CodeEditorModel {
             }
 
             // Calculate hidden ranges as the complement of visible ranges
-            let all_lines: Range<rook_editor::content::text::LineCount> =
-                rook_editor::content::text::LineCount::from(0)
-                    ..rook_editor::content::text::LineCount::from(line_count);
+            let all_lines: Range<pterm_editor::content::text::LineCount> =
+                pterm_editor::content::text::LineCount::from(0)
+                    ..pterm_editor::content::text::LineCount::from(line_count);
 
             // Find gaps in the visible ranges
             let hidden_ranges = visible_ranges
                 .gaps(&all_lines)
-                .collect::<RangeSet<rook_editor::content::text::LineCount>>();
+                .collect::<RangeSet<pterm_editor::content::text::LineCount>>();
 
             self.set_hidden_lines(hidden_ranges, ctx);
         }
@@ -2379,10 +2379,10 @@ impl CodeEditorModel {
                 self.update_content(
                     |mut content, ctx| {
                         content.apply_edit(
-                        rook_editor::content::buffer::BufferEditAction::InsertForEachSelection {
+                        pterm_editor::content::buffer::BufferEditAction::InsertForEachSelection {
                             texts: &texts,
                         },
-                        rook_editor::content::buffer::EditOrigin::UserTyped,
+                        pterm_editor::content::buffer::EditOrigin::UserTyped,
                         selection_model,
                         ctx,
                     );
@@ -2413,10 +2413,10 @@ impl CodeEditorModel {
             self.update_content(
                 |mut content, ctx| {
                     content.apply_edit(
-                        rook_editor::content::buffer::BufferEditAction::InsertAtCharOffsetRanges {
+                        pterm_editor::content::buffer::BufferEditAction::InsertAtCharOffsetRanges {
                             edits: &edits,
                         },
-                        rook_editor::content::buffer::EditOrigin::UserTyped,
+                        pterm_editor::content::buffer::EditOrigin::UserTyped,
                         selection_model,
                         ctx,
                     );
@@ -4215,10 +4215,10 @@ impl CoreEditorModel for CodeEditorModel {
     }
 
     // TODO(kevin): Add validation to the content model.
-    fn validate(&self, _ctx: &impl rookui::ModelAsRef) {}
+    fn validate(&self, _ctx: &impl ptermui::ModelAsRef) {}
 
     // Since this is a plain text editor, there is no text styles.
-    fn active_text_style(&self) -> rook_editor::content::text::TextStyles {
+    fn active_text_style(&self) -> pterm_editor::content::text::TextStyles {
         Default::default()
     }
 

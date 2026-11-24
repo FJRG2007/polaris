@@ -15,13 +15,13 @@
 use std::path::Path;
 
 use fuzzy_match::FuzzyMatchResult;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     Container, CrossAxisAlignment, Flex, Highlight, MainAxisSize, ParentElement, Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::text_layout::{ClipConfig, ClipDirection, ClipStyle};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::text_layout::{ClipConfig, ClipDirection, ClipStyle};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::search::ItemHighlightState;

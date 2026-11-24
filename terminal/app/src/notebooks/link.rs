@@ -7,15 +7,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use futures_util::future::Either;
-use rook_util::path::{CleanPathResult, LineAndColumnArg};
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity, WindowId};
+use pterm_util::path::{CleanPathResult, LineAndColumnArg};
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity, WindowId};
 use url::Url;
 
 use super::file::is_markdown_file;
-use crate::drive::OpenRookDriveObjectArgs;
+use crate::drive::OpenPtermDriveObjectArgs;
 use crate::terminal::model::session::Session;
-use crate::uri::parse_url_paths::{RookWebLink, get_item_data_from_rook_link};
+use crate::uri::parse_url_paths::{PtermWebLink, get_item_data_from_pterm_link};
 #[cfg(feature = "local_fs")]
 use crate::util::file::external_editor::EditorSettings;
 #[cfg(feature = "local_fs")]
@@ -36,7 +36,7 @@ pub enum LinkTarget {
         /// The base session when the link was resolved. It's stored here in case it changes
         /// between resolving and opening the link.
         session: Arc<Session>,
-        /// Whether or not this file is a Markdown file viewable in Rook.
+        /// Whether or not this file is a Markdown file viewable in Polaris Terminal.
         is_markdown: bool,
     },
     LocalDirectory {
@@ -257,9 +257,9 @@ impl NotebookLinks {
     pub fn open(&self, link: LinkTarget, ctx: &mut ModelContext<Self>) {
         match link {
             LinkTarget::Url(url) => {
-                if let Some(RookWebLink::DriveObject(args)) = get_item_data_from_rook_link(&url) {
-                    return ctx.emit(LinkEvent::OpenRookDriveLink {
-                        open_rook_drive_args: *args,
+                if let Some(PtermWebLink::DriveObject(args)) = get_item_data_from_pterm_link(&url) {
+                    return ctx.emit(LinkEvent::OpenPtermDriveLink {
+                        open_pterm_drive_args: *args,
                     });
                 }
 
@@ -310,7 +310,7 @@ impl NotebookLinks {
                 is_markdown: true,
                 ..
             } => {
-                // The default action for Markdown file links is to open them in Rook. As a
+                // The default action for Markdown file links is to open them in Polaris Terminal. As a
                 // secondary action, open them in an external app.
                 open_file(path.clone(), *line_and_column, ctx)
             }
@@ -441,8 +441,8 @@ pub enum LinkEvent {
         path: PathBuf,
         session: Arc<Session>,
     },
-    OpenRookDriveLink {
-        open_rook_drive_args: OpenRookDriveObjectArgs,
+    OpenPtermDriveLink {
+        open_pterm_drive_args: OpenPtermDriveObjectArgs,
     },
     /// This event tells the parent pane group to open a new terminal session in the given
     /// directory.
@@ -451,7 +451,7 @@ pub enum LinkEvent {
     /// resolution has changed.
     RefreshLinks,
     #[cfg(feature = "local_fs")]
-    /// Emitted when a file should be opened in Rook (code editor or markdown viewer).
+    /// Emitted when a file should be opened in Polaris Terminal (code editor or markdown viewer).
     OpenFileWithTarget {
         path: PathBuf,
         target: FileTarget,

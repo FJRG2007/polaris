@@ -5,11 +5,11 @@
 
 ## Summary
 
-When Rook is closed and restarted, code editor panes (open files in the built-in editor) and markdown viewer/editor panes should be restored to their previous state, just as terminal tabs, AI conversations, notebooks, and other pane types already are. Today, code editor panes are persisted to SQLite but skipped during restoration, and while markdown file panes are successfully restored, the overall experience for file-based panes has gaps.
+When Polaris Terminal is closed and restarted, code editor panes (open files in the built-in editor) and markdown viewer/editor panes should be restored to their previous state, just as terminal tabs, AI conversations, notebooks, and other pane types already are. Today, code editor panes are persisted to SQLite but skipped during restoration, and while markdown file panes are successfully restored, the overall experience for file-based panes has gaps.
 
 ## Problem
 
-Users who open files in Rook's built-in code editor lose all open editor tabs when they quit and relaunch the app. Those panes are silently dropped during session restoration, which is surprising given that terminal sessions and other pane types are reliably restored. This forces users to manually reopen files, losing their working context.
+Users who open files in Polaris Terminal's built-in code editor lose all open editor tabs when they quit and relaunch the app. Those panes are silently dropped during session restoration, which is surprising given that terminal sessions and other pane types are reliably restored. This forces users to manually reopen files, losing their working context.
 
 ## Goals
 
@@ -31,7 +31,7 @@ Users who open files in Rook's built-in code editor lose all open editor tabs wh
 
 ### Code editor panes
 
-1. **Quit with open code panes.** The user has one or more code editor panes open, some containing multiple file tabs. When the user quits Rook (Cmd+Q or window close), the state of each code pane is persisted, including:
+1. **Quit with open code panes.** The user has one or more code editor panes open, some containing multiple file tabs. When the user quits Polaris Terminal (Cmd+Q or window close), the state of each code pane is persisted, including:
    - The list of open file paths (in tab order).
    - Which tab is active.
    - Whether each tab is a preview tab.
@@ -54,7 +54,7 @@ Users who open files in Rook's built-in code editor lose all open editor tabs wh
 
 ## Success Criteria
 
-1. When the user quits Rook with one or more code editor panes open and relaunches, all code panes are restored in the correct position within the pane tree (correct window, correct tab, correct split position).
+1. When the user quits Polaris Terminal with one or more code editor panes open and relaunches, all code panes are restored in the correct position within the pane tree (correct window, correct tab, correct split position).
 2. Multiple file tabs within a single code pane are all restored, in the correct order, with the correct active tab.
 3. Markdown file panes (`FileNotebookView`) continue to be restored correctly (this is already working and must not regress).
 4. A code pane whose persisted file path no longer exists on disk is still restored (showing an error/empty state) rather than being silently dropped.
@@ -62,7 +62,7 @@ Users who open files in Rook's built-in code editor lose all open editor tabs wh
 
 ## Validation
 
-1. **Manual test — single code pane, single file.** Open a file in the code editor, quit Rook, relaunch. Verify the file is reopened in the same tab/pane position.
+1. **Manual test — single code pane, single file.** Open a file in the code editor, quit Polaris Terminal, relaunch. Verify the file is reopened in the same tab/pane position.
 2. **Manual test — multi-tab code pane.** Open 3 files in the same code pane (as tabs), set the 2nd tab as active, quit, relaunch. Verify all 3 tabs are restored with the 2nd tab active.
 3. **Manual test — split pane with code + terminal.** Have a horizontal split with a terminal on the left and a code editor on the right, quit, relaunch. Verify both panes are restored in the correct split positions.
 4. **Manual test — deleted file.** Open a file, quit, delete the file from disk, relaunch. Verify the code pane still appears (with an error state for the missing file) and does not crash the restoration.

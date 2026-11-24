@@ -8,19 +8,19 @@ use std::time::Duration;
 use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
 use chrono::Local;
 use fuzzy_match::FuzzyMatchResult;
-use repo_metadata::RepoMetadataModel;
-use repo_metadata::repositories::DetectedRepositories;
-use repo_metadata::watcher::DirectoryWatcher;
-use rook_completer::completer::{
+use pterm_completer::completer::{
     EngineFileType, Match, MatchStrategy, MatchedSuggestion, PathSeparators, Priority, Suggestion,
     SuggestionResults, SuggestionType,
 };
-use rook_completer::meta::Span;
-use rook_util::standardized_path::StandardizedPath;
-use rook_util::user_input::UserInput;
-use rookui::platform::WindowStyle;
-use rookui::text::SelectionType;
-use rookui::{App, ReadModel, UpdateView, WindowId};
+use pterm_completer::meta::Span;
+use pterm_util::standardized_path::StandardizedPath;
+use pterm_util::user_input::UserInput;
+use ptermui::platform::WindowStyle;
+use ptermui::text::SelectionType;
+use ptermui::{App, ReadModel, UpdateView, WindowId};
+use repo_metadata::RepoMetadataModel;
+use repo_metadata::repositories::DetectedRepositories;
+use repo_metadata::watcher::DirectoryWatcher;
 use session_sharing_protocol::common::Role;
 use smol_str::SmolStr;
 use unindent::Unindent;
@@ -58,7 +58,7 @@ use crate::editor::{DisplayPoint, EditorAction, Point, TextStyleOperation};
 use crate::input_suggestions::{HistoryOrder, Item};
 use crate::network::NetworkStatus;
 use crate::pricing::PricingInfoModel;
-use crate::rook_managed_paths_watcher::RookManagedPathsWatcher;
+use crate::pterm_managed_paths_watcher::PtermManagedPathsWatcher;
 use crate::search::files::model::FileSearchModel;
 use crate::search::slash_command_menu::static_commands::commands;
 use crate::server::cloud_objects::listener::Listener;
@@ -418,7 +418,7 @@ pub fn initialize_app(app: &mut App) {
         crate::ai::document::ai_document_model::AIDocumentModel::new_for_test()
     });
     app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-    app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+    app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
     app.add_singleton_model(SkillManager::new);
 
     // Add GlobalResourceHandlesProvider for persistence
@@ -2199,7 +2199,7 @@ fn ctrl_t_handoff_cancel_restores_cursor_captured_by_a_real_trigger() {
 
         let started = input.update(&mut app, |input, ctx| {
             input.trigger_external_shell_widget_handoff(
-                "rook_run_external_ctrl_t_widget",
+                "pterm_run_external_ctrl_t_widget",
                 ShellWidgetApplyMode::Splice,
                 true,
                 ctx,
@@ -2218,7 +2218,7 @@ fn ctrl_t_handoff_cancel_restores_cursor_captured_by_a_real_trigger() {
         input.update(&mut app, |input, ctx| {
             input.handle_block_completed_event(
                 BlockCompletedEvent {
-                    block_type: user_block_completed_for_test(" rook_run_external_ctrl_t_widget"),
+                    block_type: user_block_completed_for_test(" pterm_run_external_ctrl_t_widget"),
                     num_secrets_obfuscated: 0,
                     block_index: BlockIndex::zero(),
                     block_id,
@@ -3138,7 +3138,7 @@ fn slash_compact_still_queues_while_in_progress() {
 }
 
 fn selected_inline_history_command(
-    history_menu: &rookui::ViewHandle<super::inline_history::InlineHistoryMenuView>,
+    history_menu: &ptermui::ViewHandle<super::inline_history::InlineHistoryMenuView>,
     app: &App,
 ) -> Option<String> {
     history_menu.read(app, |view, ctx| {
@@ -3589,7 +3589,7 @@ impl CommandExecutor for CancellationTrackingExecutor {
         _current_directory_path: Option<&str>,
         _environment_variables: Option<HashMap<String, String>>,
         _execute_command_options: ExecuteCommandOptions,
-    ) -> anyhow::Result<rook_completer::completer::CommandOutput> {
+    ) -> anyhow::Result<pterm_completer::completer::CommandOutput> {
         anyhow::bail!("no executor command expected")
     }
 
@@ -3644,7 +3644,7 @@ fn aborting_native_completions_after_empty_specs_cancels_session_commands() {
         let input = terminal.read(&app, |terminal, _| terminal.input().clone());
         input.update(&mut app, |input, ctx| {
             input.clear_buffer_and_reset_undo_stack(ctx);
-            input.user_insert("rooktool ./src/", ctx);
+            input.user_insert("ptermtool ./src/", ctx);
             input.input_tab(ctx);
         });
         assert_eventually!(
@@ -3704,9 +3704,9 @@ fn combined_completions_show_file_paths_after_empty_native_results() {
         app.update(|ctx| {
             InputSettings::handle(ctx).update(ctx, |settings, ctx| {
                 settings
-                    .rook_completions_enabled
+                    .pterm_completions_enabled
                     .set_value(true, ctx)
-                    .expect("Rook completions setting must update");
+                    .expect("Polaris Terminal completions setting must update");
                 settings
                     .native_shell_completions_enabled
                     .set_value(true, ctx)
@@ -3736,7 +3736,7 @@ fn combined_completions_show_file_paths_after_empty_native_results() {
 
         input.update(&mut app, |input, ctx| {
             input.clear_buffer_and_reset_undo_stack(ctx);
-            input.user_insert("rooktool ./src/", ctx);
+            input.user_insert("ptermtool ./src/", ctx);
             input.input_tab(ctx);
         });
 
@@ -3762,9 +3762,9 @@ fn combined_completions_preserve_nonempty_native_results() {
         app.update(|ctx| {
             InputSettings::handle(ctx).update(ctx, |settings, ctx| {
                 settings
-                    .rook_completions_enabled
+                    .pterm_completions_enabled
                     .set_value(true, ctx)
-                    .expect("Rook completions setting must update");
+                    .expect("Polaris Terminal completions setting must update");
                 settings
                     .native_shell_completions_enabled
                     .set_value(true, ctx)
@@ -3798,7 +3798,7 @@ fn combined_completions_preserve_nonempty_native_results() {
 
         input.update(&mut app, |input, ctx| {
             input.clear_buffer_and_reset_undo_stack(ctx);
-            input.user_insert("rooktool n", ctx);
+            input.user_insert("ptermtool n", ctx);
             input.input_tab(ctx);
         });
 
@@ -5299,7 +5299,7 @@ fn test_open_slash_command_expands_tilde() {
         initialize_app(&mut app);
 
         let home_dir = dirs::home_dir().expect("home directory must exist");
-        let file_path = home_dir.join("rook_tilde_test_file.txt");
+        let file_path = home_dir.join("pterm_tilde_test_file.txt");
         std::fs::File::create(&file_path).unwrap();
 
         let session_id: SessionId = 1.into();
@@ -5324,7 +5324,7 @@ fn test_open_slash_command_expands_tilde() {
 
         input.update(&mut app, |input, ctx| {
             input.editor.update(ctx, |editor, ctx| {
-                editor.set_buffer_text("/open-file ~/rook_tilde_test_file.txt", ctx)
+                editor.set_buffer_text("/open-file ~/pterm_tilde_test_file.txt", ctx)
             });
         });
 
@@ -9928,7 +9928,7 @@ fn test_custom_terminal_page_scroll_binding_applies_when_prompt_is_focused() {
         app.update(|ctx| {
             ctx.set_custom_trigger(
                 "terminal:scroll_up_one_page".to_owned(),
-                rookui::keymap::Trigger::Keystrokes(vec![
+                ptermui::keymap::Trigger::Keystrokes(vec![
                     Keystroke::parse("shift-pageup").unwrap(),
                 ]),
             );
@@ -10828,8 +10828,8 @@ mod completion_sources_resolution_tests {
     use super::super::{CompletionSources, CompletionsTrigger, resolve_completion_sources};
 
     #[test]
-    fn feature_flag_off_is_rook_only_regardless_of_toggles() {
-        for rook_completions_enabled in [true, false] {
+    fn feature_flag_off_is_pterm_only_regardless_of_toggles() {
+        for pterm_completions_enabled in [true, false] {
             for native_shell_completions_enabled in [true, false] {
                 assert_eq!(
                     resolve_completion_sources(
@@ -10837,20 +10837,20 @@ mod completion_sources_resolution_tests {
                         false,
                         false,
                         CompletionsTrigger::Keybinding,
-                        rook_completions_enabled,
+                        pterm_completions_enabled,
                         native_shell_completions_enabled,
                     ),
-                    CompletionSources::RookOnly,
-                    "flag off must resolve to RookOnly (rook={rook_completions_enabled}, native={native_shell_completions_enabled})"
+                    CompletionSources::PtermOnly,
+                    "flag off must resolve to PtermOnly (polaris-terminal={pterm_completions_enabled}, native={native_shell_completions_enabled})"
                 );
             }
         }
     }
 
     #[test]
-    fn ai_input_is_rook_only_regardless_of_flag_and_toggles() {
+    fn ai_input_is_pterm_only_regardless_of_flag_and_toggles() {
         for feature_flag_enabled in [true, false] {
-            for rook_completions_enabled in [true, false] {
+            for pterm_completions_enabled in [true, false] {
                 for native_shell_completions_enabled in [true, false] {
                     assert_eq!(
                         resolve_completion_sources(
@@ -10858,11 +10858,11 @@ mod completion_sources_resolution_tests {
                             true,
                             false,
                             CompletionsTrigger::Keybinding,
-                            rook_completions_enabled,
+                            pterm_completions_enabled,
                             native_shell_completions_enabled,
                         ),
-                        CompletionSources::RookOnly,
-                        "AI input must resolve to RookOnly (flag={feature_flag_enabled}, rook={rook_completions_enabled}, native={native_shell_completions_enabled})"
+                        CompletionSources::PtermOnly,
+                        "AI input must resolve to PtermOnly (flag={feature_flag_enabled}, polaris-terminal={pterm_completions_enabled}, native={native_shell_completions_enabled})"
                     );
                 }
             }
@@ -10871,18 +10871,18 @@ mod completion_sources_resolution_tests {
 
     #[test]
     fn feature_flag_on_maps_the_four_toggle_states() {
-        let resolve = |rook_completions_enabled, native_shell_completions_enabled| {
+        let resolve = |pterm_completions_enabled, native_shell_completions_enabled| {
             resolve_completion_sources(
                 true,
                 false,
                 false,
                 CompletionsTrigger::Keybinding,
-                rook_completions_enabled,
+                pterm_completions_enabled,
                 native_shell_completions_enabled,
             )
         };
-        assert_eq!(resolve(true, true), CompletionSources::RookThenNative);
-        assert_eq!(resolve(true, false), CompletionSources::RookOnly);
+        assert_eq!(resolve(true, true), CompletionSources::PtermThenNative);
+        assert_eq!(resolve(true, false), CompletionSources::PtermOnly);
         assert_eq!(resolve(false, true), CompletionSources::NativeOnly);
         assert_eq!(resolve(false, false), CompletionSources::None);
     }
@@ -10895,10 +10895,10 @@ mod completion_sources_resolution_tests {
                 false, // not AI input
                 false, // single-line
                 CompletionsTrigger::AsYouType,
-                true, // rook completions on
+                true, // polaris-terminal completions on
                 true, // native shell completions on
             ),
-            CompletionSources::RookOnly
+            CompletionSources::PtermOnly
         );
     }
 
@@ -10911,10 +10911,10 @@ mod completion_sources_resolution_tests {
                 false, // not AI input
                 true,  // multi-line
                 CompletionsTrigger::Keybinding,
-                true, // rook completions on
+                true, // polaris-terminal completions on
                 true, // native shell completions on
             ),
-            CompletionSources::RookOnly
+            CompletionSources::PtermOnly
         );
     }
 }

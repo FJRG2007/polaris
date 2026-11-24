@@ -17,8 +17,8 @@ use notify_debouncer_full::{
     DebounceEventHandler, DebounceEventResult, DebouncedEvent, Debouncer, NoCache,
     new_debouncer_opt,
 };
-use rook_errors::report_error;
-use rookui_core::{Entity, ModelContext};
+use pterm_errors::report_error;
+use ptermui_core::{Entity, ModelContext};
 
 #[derive(Debug)]
 enum BackgroundFileWatcherCommand {
@@ -136,7 +136,7 @@ impl BulkFilesystemWatcherEvent {
 /// on macOS `notify` cannot build a CoreFoundation URL for it and then releases a null `CFError`,
 /// which traps and takes the whole process down. Rejecting it here keeps a caller's bad path from
 /// being a crash. See Sentry issue
-/// [ROOK-CLIENT-DEV-XT3](https://warpdotdev.sentry.io/issues/ROOK-CLIENT-DEV-XT3).
+/// [POLARIS_TERMINAL-CLIENT-DEV-XT3](https://warpdotdev.sentry.io/issues/POLARIS_TERMINAL-CLIENT-DEV-XT3).
 fn ensure_watchable_path(path: &Path) -> Result<PathBuf> {
     if path.as_os_str().is_empty() {
         anyhow::bail!("the filesystem watcher cannot watch an empty path");

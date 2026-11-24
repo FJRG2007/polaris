@@ -1,15 +1,15 @@
 use std::fmt;
 use std::num::NonZeroUsize;
 
-use rook_core::semantic_selection::SemanticSelection;
-use rookui::elements::{
+use pterm_core::semantic_selection::SemanticSelection;
+use ptermui::elements::{
     Container, DispatchEventResult, Element, EventHandler, SavePosition, SelectableArea,
     SelectionHandle, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::presenter::ChildView;
-use rookui::units::Pixels;
-use rookui::{AppContext, EntityId, ModelAsRef, ModelHandle, SingletonEntity, ViewHandle};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::presenter::ChildView;
+use ptermui::units::Pixels;
+use ptermui::{AppContext, EntityId, ModelAsRef, ModelHandle, SingletonEntity, ViewHandle};
 use settings::Setting as _;
 
 use super::input::InputRenderStateModel;
@@ -61,7 +61,7 @@ pub fn should_render_ps1_prompt(terminal_model: &TerminalModel, app: &AppContext
     let session_settings = SessionSettings::as_ref(app);
 
     // In the context of session sharing, these values may differ from the local settings i.e.
-    // if the sharer is using PS1 and the viewer is not (using Rook prompt in non-SLP mode).
+    // if the sharer is using PS1 and the viewer is not (using Polaris Terminal prompt in non-SLP mode).
     // In this case, we still want to render the prompt on the same line (PS1 should ALWAYS be
     // rendered on the same line).
     // Note that the product behavior for session sharing is normally to respect the local settings
@@ -80,7 +80,7 @@ pub fn should_render_prompt_on_same_line(
 ) -> bool {
     // We render the prompt on the same line, in the input editor, if:
     // 1. The user is using a custom prompt (PS1)
-    // 2. The user has the same line prompt setting enabled for their Rook prompt.
+    // 2. The user has the same line prompt setting enabled for their Polaris Terminal prompt.
 
     // If universal developer input is enabled, ignore PS1 rendering logic
     if is_universal_developer_input {
@@ -252,11 +252,13 @@ impl PromptRenderHelper {
                 RemoteServerSetupState::Checking => "Starting shell...".to_string(),
                 RemoteServerSetupState::Installing {
                     progress_percent: Some(p),
-                } => format!("Installing Rook SSH Extension... ({p}%)"),
+                } => format!("Installing Polaris Terminal SSH Extension... ({p}%)"),
                 RemoteServerSetupState::Installing {
                     progress_percent: None,
-                } => "Installing Rook SSH Extension...".to_string(),
-                RemoteServerSetupState::Updating => "Updating Rook SSH Extension...".to_string(),
+                } => "Installing Polaris Terminal SSH Extension...".to_string(),
+                RemoteServerSetupState::Updating => {
+                    "Updating Polaris Terminal SSH Extension...".to_string()
+                }
                 RemoteServerSetupState::Initializing => "Initializing...".to_string(),
                 RemoteServerSetupState::Ready => "Starting shell...".to_string(),
                 // Failed and Unsupported both fall back to the wrapper-only SSH

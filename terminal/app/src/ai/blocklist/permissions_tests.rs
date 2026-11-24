@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use rook_core::execution_mode::ExecutionMode;
-use rook_core::settings::Setting as _;
-use rook_util::path::EscapeChar;
-use rookui::{App, EntityId, ModelHandle, SingletonEntity};
+use pterm_core::execution_mode::ExecutionMode;
+use pterm_core::settings::Setting as _;
+use pterm_util::path::EscapeChar;
+use ptermui::{App, EntityId, ModelHandle, SingletonEntity};
 use uuid::Uuid;
 
 use super::{BlocklistAIHistoryModel, BlocklistAIPermissions};
@@ -494,7 +494,7 @@ fn test_can_write_files_mcp_config_always_denied() {
 
         let mcp_config_paths = vec![
             PathBuf::from("/project/.mcp.json"),
-            PathBuf::from("/project/.rook/.mcp.json"),
+            PathBuf::from("/project/.polaris/terminal/.mcp.json"),
             PathBuf::from("/project/.codex/config.toml"),
         ];
 

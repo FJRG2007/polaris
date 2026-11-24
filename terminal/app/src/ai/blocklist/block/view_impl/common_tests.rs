@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use ai::skills::{ParsedSkill, SkillProvider, SkillScope};
 use itertools::Itertools;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
 #[cfg(feature = "local_fs")]
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::{Empty, MouseStateHandle};
-use rookui::{App, Element};
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::{Empty, MouseStateHandle};
+use ptermui::{App, Element};
 use ui_components::lightbox::{LightboxImage, LightboxImageSource};
 
 use super::{
@@ -16,8 +16,8 @@ use super::{
     LOAD_OUTPUT_MESSAGE_FOR_CREATING_DIFF, LOAD_OUTPUT_MESSAGE_FOR_GENERATING_PLAN,
     VisualMarkdownLightboxCollection, collect_visual_markdown_lightbox_collection,
     compute_visual_section_width, image_tooltip_handles_for_group, inline_image_source_label,
-    is_supported_blocklist_image_source, lightbox_trigger_for_section, query_prefix_highlight_len,
-    render_scrollable_collapsible_content, rooking_footer_height, status_message_naming_model,
+    is_supported_blocklist_image_source, lightbox_trigger_for_section, pterming_footer_height,
+    query_prefix_highlight_len, render_scrollable_collapsible_content, status_message_naming_model,
     text_sections_with_indices,
 };
 #[cfg(feature = "local_fs")]
@@ -164,15 +164,15 @@ fn render_scrollable_collapsible_content_returns_none_when_collapsed() {
 }
 
 #[test]
-fn rooking_footer_height_reserves_a_line_for_the_secondary_element() {
-    // Regression: the rooking indicator's footer is a fixed-height, clipped
+fn pterming_footer_height_reserves_a_line_for_the_secondary_element() {
+    // Regression: the pterming indicator's footer is a fixed-height, clipped
     // container. When an agent tip (or fallback-model explanation) is present it
     // renders on a second line, so the footer must be taller than the
     // single-line case — otherwise the clip (added to keep action chips from
     // overflowing narrow panes) hides the tip entirely.
     let font_size = 13.;
-    let without_tip = rooking_footer_height(font_size, false);
-    let with_tip = rooking_footer_height(font_size, true);
+    let without_tip = pterming_footer_height(font_size, false);
+    let with_tip = pterming_footer_height(font_size, true);
 
     assert!(
         with_tip > without_tip,
@@ -332,7 +332,7 @@ fn blocklist_image_asset_source_uses_cached_resolution_when_available() {
 }
 
 /// `is_supported_blocklist_image_source` should accept the same image extensions
-/// that `rook_util::file_type::is_binary_file` recognises (plus `svg`, which is
+/// that `pterm_util::file_type::is_binary_file` recognises (plus `svg`, which is
 /// text/XML and not in `is_binary_file`). Until #9395 / this fix landed the
 /// blocklist list was only `jpg | jpeg | png | gif | webp | svg`, so inline
 /// references to local `.bmp` / `.tiff` / `.tif` / `.ico` images failed the
@@ -379,7 +379,7 @@ fn names_the_model_before_a_status_message_ellipsis() {
     );
     assert_eq!(
         status_message_naming_model(LOAD_OUTPUT_MESSAGE, "Claude Sonnet 4.5"),
-        "Rooking with Claude Sonnet 4.5..."
+        "Pterming with Claude Sonnet 4.5..."
     );
     assert_eq!(
         status_message_naming_model(LOAD_OUTPUT_MESSAGE_FOR_CREATING_DIFF, "GPT-5.2"),

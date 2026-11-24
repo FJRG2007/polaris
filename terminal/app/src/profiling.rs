@@ -7,7 +7,7 @@
 //!   automatic heap profile generation every 500MB of memory allocated.
 //!
 //! If run from a release bundle, profiles will be written to
-//! [`rook_core::paths::state_dir()`].  Otherwise, profiles will be written
+//! [`pterm_core::paths::state_dir()`].  Otherwise, profiles will be written
 //! to the current working directory.
 
 use cfg_if::cfg_if;
@@ -206,7 +206,7 @@ fn pprof_binary_path() -> anyhow::Result<std::path::PathBuf> {
         if #[cfg(target_os = "macos")] {
             use anyhow::Context as _;
 
-            let app_bundle_dir = std::path::PathBuf::from(rook_core::macos::get_bundle_path().context("Failed to get app bundle path")?);
+            let app_bundle_dir = std::path::PathBuf::from(pterm_core::macos::get_bundle_path().context("Failed to get app bundle path")?);
             Ok(app_bundle_dir.join("Contents/Helpers/pprof"))
         }
         else {
@@ -242,7 +242,7 @@ pub fn teardown() {
         .map_err(Into::into)
         .and_then(write_pprof_report)
     {
-        rook_errors::report_error!(err.context("Failed to write pprof data"));
+        pterm_errors::report_error!(err.context("Failed to write pprof data"));
     }
 }
 
@@ -264,7 +264,7 @@ fn write_pprof_report(report: pprof::Report) -> anyhow::Result<()> {
 fn profile_output_dir() -> std::path::PathBuf {
     cfg_if::cfg_if! {
         if #[cfg(feature = "release_bundle")] {
-            rook_core::paths::secure_state_dir().unwrap_or(rook_core::paths::state_dir())
+            pterm_core::paths::secure_state_dir().unwrap_or(pterm_core::paths::state_dir())
         } else {
             std::env::current_dir().ok().unwrap_or_else(|| {
                 dirs::home_dir().expect("Should not fail to compute both the current directory and the user's home directory")

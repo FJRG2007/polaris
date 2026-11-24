@@ -1,5 +1,5 @@
-use rookui::platform::WindowStyle;
-use rookui::{App, SingletonEntity, ViewHandle};
+use ptermui::platform::WindowStyle;
+use ptermui::{App, SingletonEntity, ViewHandle};
 use session_sharing_protocol::common::{ParticipantId, ParticipantList, SessionId};
 use session_sharing_protocol::sharer::SessionSourceType;
 

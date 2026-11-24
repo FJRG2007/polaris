@@ -2,16 +2,16 @@
 
 ## Problem
 
-The `ReadFiles` agent tool is disabled for remote SSH sessions. `get_supported_tools` skips `ToolType::ReadFiles` when `SessionType::RookifiedRemote`, because the underlying `read_local_file_context` reads files via `async_fs`, `FileModel::read_text_file`, and local image processing — all local-only APIs.
+The `ReadFiles` agent tool is disabled for remote SSH sessions. `get_supported_tools` skips `ToolType::ReadFiles` when `SessionType::PtermifiedRemote`, because the underlying `read_local_file_context` reads files via `async_fs`, `FileModel::read_text_file`, and local image processing — all local-only APIs.
 
-The remote server already runs on the host machine with full filesystem access and has access to the same dependencies (`rook_files`, `rook_util`, `mime_guess`). Rather than building a degraded client-side approximation, we push the file-reading logic to the server so the ReadFiles tool has full feature parity with local: line-range extraction, binary/image support, metadata, and size limits.
+The remote server already runs on the host machine with full filesystem access and has access to the same dependencies (`pterm_files`, `pterm_util`, `mime_guess`). Rather than building a degraded client-side approximation, we push the file-reading logic to the server so the ReadFiles tool has full feature parity with local: line-range extraction, binary/image support, metadata, and size limits.
 
 ## Relevant Code
 
 - `app/src/ai/blocklist/action_model/execute/read_files.rs` — `ReadFilesExecutor`; dispatches to `read_local_file_context`
 - `app/src/ai/blocklist/action_model/execute.rs:941` — `read_local_file_context`; per-file reading logic (metadata, binary detection, text/binary read, image processing, byte limits)
-- `crates/rook_files/src/lib.rs:528` — `FileModel::read_text_file`; line-range extraction and byte-limit truncation
-- `crates/rook_util/src/file_type.rs:46` — `is_binary_file`; extension-based binary detection
+- `crates/pterm_files/src/lib.rs:528` — `FileModel::read_text_file`; line-range extraction and byte-limit truncation
+- `crates/pterm_util/src/file_type.rs:46` — `is_binary_file`; extension-based binary detection
 - `app/src/util/image.rs:96` — `process_image_for_agent`; image processing for LLM context
 - `crates/remote_server/proto/remote_server.proto:234-249` — current `ReadFile`/`ReadFileResponse`/`ReadFileSuccess` proto (too simple)
 - `crates/remote_server/src/client.rs:266` — `RemoteServerClient::read_file`; current simple read
@@ -29,14 +29,14 @@ The remote server already runs on the host machine with full filesystem access a
 1. Resolves the absolute path via `host_native_absolute_path`
 2. Reads metadata via `async_fs::metadata` → `last_modified`, `file_size`
 3. Computes effective byte budget (per-file `MAX_FILE_READ_BYTES` ∩ remaining batch budget)
-4. Binary detection via `is_binary_file` (extension-based, `rook_util::file_type`)
+4. Binary detection via `is_binary_file` (extension-based, `pterm_util::file_type`)
 5. Text path: `FileModel::read_text_file` — reads with line-range extraction and byte-limit truncation, returns segments
 6. Binary path: reads raw bytes, checks MIME via `mime_guess`, runs `process_image_for_agent` for supported images, skips oversized files
 7. Returns `ReadFileContextResult { file_contexts, missing_files }`
 
 **Current `ReadFile` proto** (`remote_server.proto`): `ReadFile { path }` → `ReadFileSuccess { content, exists }`. The server handler just calls `tokio::fs::read_to_string` — no metadata, no line ranges, no size limits, no binary support.
 
-**Tool gating**: `get_supported_tools` excludes `ReadFiles` for `RookifiedRemote` sessions. `get_supported_cli_agent_tools` also excludes it.
+**Tool gating**: `get_supported_tools` excludes `ReadFiles` for `PtermifiedRemote` sessions. `get_supported_cli_agent_tools` also excludes it.
 
 ## Proposed Changes
 
@@ -135,8 +135,8 @@ Follows the same pattern as `write_file` / `delete_file` — sends request, awai
 In the `execute` method, after resolving cwd/shell, check `active_session.session_type(ctx)`:
 
 - **Local / None**: call `read_local_file_context` as today (unchanged).
-- **RookifiedRemote with host_id**: resolve `RemoteServerClient` via `RemoteServerManager::client_for_host`, call `client.read_file_context(...)`, convert `ReadFileContextResponse` → `ReadFileContextResult` (mapping proto `FileContextProto` → `FileContext`, `FailedFileRead` → `missing_files`).
-- **RookifiedRemote without host_id**: fall through to the local `read_local_file_context` path.
+- **PtermifiedRemote with host_id**: resolve `RemoteServerClient` via `RemoteServerManager::client_for_host`, call `client.read_file_context(...)`, convert `ReadFileContextResponse` → `ReadFileContextResult` (mapping proto `FileContextProto` → `FileContext`, `FailedFileRead` → `missing_files`).
+- **PtermifiedRemote without host_id**: fall through to the local `read_local_file_context` path.
 
 The remote client lookup uses a unified code path with no `cfg` gating — `RemoteServerManager` and `RemoteServerClient` compile on all targets including WASM. On WASM, `client_for_host` returns `None` (since `connect_session` is a no-op), so the local path is used automatically.
 
@@ -146,7 +146,7 @@ The `read_remote_file` adapter currently uses the old `ReadFile`/`ReadFileSucces
 
 ### 7. Enable `ReadFiles` in `get_supported_tools` for remote sessions
 
-In `get_supported_tools` (impl.rs:179), add `api::ToolType::ReadFiles` alongside `ApplyFileDiffs` for the `RookifiedRemote { host_id: Some(_) }` arm.
+In `get_supported_tools` (impl.rs:179), add `api::ToolType::ReadFiles` alongside `ApplyFileDiffs` for the `PtermifiedRemote { host_id: Some(_) }` arm.
 
 Also in `get_supported_cli_agent_tools` (impl.rs:234), enable `ReadFiles` for remote sessions with a connected host.
 
@@ -161,7 +161,7 @@ sequenceDiagram
     participant Shared as read_single_file_context
 
     LLM->>Executor: ReadFiles action (file locations)
-    Note over Executor: session_type is RookifiedRemote with host_id
+    Note over Executor: session_type is PtermifiedRemote with host_id
 
     Executor->>Client: read_file_context(files, max_bytes)
     Client->>Server: ReadFileContextRequest { files, max_file_bytes, max_batch_bytes }

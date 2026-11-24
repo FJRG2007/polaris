@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use itertools::Itertools;
-use rook_util::path::ShellFamily;
-use rookui::clipboard::ClipboardContent;
+use pterm_util::path::ShellFamily;
+use ptermui::clipboard::ClipboardContent;
 
 /// Returns a string representation of the ClipboardContent with any paths properly escaped if there is a known shell. If not, do not escape the paths.
 pub fn clipboard_content_with_escaped_paths(

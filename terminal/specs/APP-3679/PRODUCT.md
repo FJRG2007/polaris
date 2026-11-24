@@ -4,7 +4,7 @@ Linear: [APP-3679](https://linear.app/warpdotdev/issue/APP-3679/modal-for-new-wo
 
 ## Summary
 
-Replace the "Create new tab config..." / "New worktree" menu items in both the horizontal and vertical tab bar menus with a "+ New Worktree" button that opens a GUI modal. The modal lets users select a repository, a base branch, and optionally auto-generate the worktree branch name. On submit, it writes a reusable worktree tab config TOML file to `~/.rook/tab_configs/` (which the filesystem watcher picks up for the menu), and immediately opens the worktree as a new tab.
+Replace the "Create new tab config..." / "New worktree" menu items in both the horizontal and vertical tab bar menus with a "+ New Worktree" button that opens a GUI modal. The modal lets users select a repository, a base branch, and optionally auto-generate the worktree branch name. On submit, it writes a reusable worktree tab config TOML file to `~/.polaris-terminal/tab_configs/` (which the filesystem watcher picks up for the menu), and immediately opens the worktree as a new tab.
 
 ## Problem
 
@@ -56,7 +56,7 @@ In the horizontal tab bar, the item appears after any existing tab configs, sepa
 4. Branch picker populates with that repo's git branches; user optionally selects a base branch.
 5. User optionally unchecks "Autogenerate worktree branch name" — if unchecked, the selected branch is used directly; if checked, a placeholder name like `worktree-1` is generated.
 6. User clicks "Open":
-   - A worktree tab config TOML is generated and written to `~/.rook/tab_configs/worktree_{branch_name}.toml`.
+   - A worktree tab config TOML is generated and written to `~/.polaris-terminal/tab_configs/worktree_{branch_name}.toml`.
    - The config is immediately parsed and opened as a new tab (running `git worktree add` and `cd` commands).
    - The filesystem watcher picks up the new file, so it appears in the menu for future use.
 7. User can later click the saved worktree config in the menu to re-run it.
@@ -84,7 +84,7 @@ When the checkbox is checked, a placeholder function generates unique names by i
 1. Both horizontal and vertical tab menus show "+ New Worktree" as the last item with a Plus icon.
 2. Clicking "+ New Worktree" opens a modal matching the Figma design.
 3. The "Open" button is disabled until a repo is selected.
-4. Submitting the modal writes a `.toml` file to `~/.rook/tab_configs/` with the correct worktree commands.
+4. Submitting the modal writes a `.toml` file to `~/.polaris-terminal/tab_configs/` with the correct worktree commands.
 5. The new tab config appears in the menu on subsequent menu opens (via filesystem watcher).
 6. The new tab opens immediately with the correct worktree commands.
 7. The autogenerate checkbox produces unique branch names.
@@ -92,9 +92,9 @@ When the checkbox is checked, a placeholder function generates unique names by i
 
 ## Validation
 
-- Build and run Rook locally; click "+ New Worktree" from both horizontal and vertical tab menus.
+- Build and run Polaris Terminal locally; click "+ New Worktree" from both horizontal and vertical tab menus.
 - Verify the modal layout matches the Figma mock (repo picker, branch picker, checkbox, footer buttons).
-- Select a repo, select a branch, click "Open" — confirm a `.toml` file appears in `~/.rook/tab_configs/` and a new tab opens.
+- Select a repo, select a branch, click "Open" — confirm a `.toml` file appears in `~/.polaris-terminal/tab_configs/` and a new tab opens.
 - Re-open the menu — confirm the saved worktree config appears.
 - Click the saved worktree config — confirm it opens a new tab with the same worktree commands.
 - Verify autogenerate checkbox produces `worktree-1`, `worktree-2`, etc.

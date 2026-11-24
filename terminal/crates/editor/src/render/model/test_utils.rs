@@ -5,12 +5,12 @@ use std::sync::Arc;
 
 use ordered_float::OrderedFloat;
 use parking_lot::Once;
-use rookui_core::color::ColorU;
-use rookui_core::elements::{Border, Fill, ListIndentLevel};
-use rookui_core::fonts::{FamilyId, Weight};
-use rookui_core::geometry::vector::vec2f;
-use rookui_core::text_layout::{CaretPosition, Glyph, Line, Run, TextFrame};
-use rookui_core::units::{IntoPixels, Pixels};
+use ptermui_core::color::ColorU;
+use ptermui_core::elements::{Border, Fill, ListIndentLevel};
+use ptermui_core::fonts::{FamilyId, Weight};
+use ptermui_core::geometry::vector::vec2f;
+use ptermui_core::text_layout::{CaretPosition, Glyph, Line, Run, TextFrame};
+use ptermui_core::units::{IntoPixels, Pixels};
 use vec1::{Vec1, vec1};
 
 use super::{
@@ -239,7 +239,7 @@ pub fn layout(text: &str, styles: &RichTextStyles, max_width: impl IntoPixels) -
                 width: line_width.as_f32(),
                 trailing_whitespace_width: 0.,
                 runs: vec![Run {
-                    font_id: rookui_core::fonts::FontId(0),
+                    font_id: ptermui_core::fonts::FontId(0),
                     styles: Default::default(),
                     glyphs: mem::take(&mut glyphs_acc),
                     width: line_width.as_f32(),
@@ -278,7 +278,7 @@ pub fn layout(text: &str, styles: &RichTextStyles, max_width: impl IntoPixels) -
             width: line_width.as_f32(),
             trailing_whitespace_width: 0.,
             runs: vec![Run {
-                font_id: rookui_core::fonts::FontId(0),
+                font_id: ptermui_core::fonts::FontId(0),
                 styles: Default::default(),
                 glyphs: glyphs_acc,
                 width: line_width.as_f32(),
@@ -314,7 +314,7 @@ pub fn init_logging() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
         let _ = env_logger::builder()
-            .parse_filters("rook_editor=trace")
+            .parse_filters("pterm_editor=trace")
             .is_test(true)
             .try_init();
     });

@@ -7,8 +7,8 @@ use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use command::r#async::Command;
 use itertools::Itertools;
-use rook_completer::completer::CommandOutput;
-use rook_util::path::{convert_msys2_to_windows_native_path, msys2_exe_to_root};
+use pterm_completer::completer::CommandOutput;
+use pterm_util::path::{convert_msys2_to_windows_native_path, msys2_exe_to_root};
 use typed_path::{TypedPath, WindowsPath};
 
 use super::{CommandExecutor, ExecuteCommandOptions};

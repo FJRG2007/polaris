@@ -466,16 +466,16 @@ If snapshot literal churn is large, add small helper constructors for test snaps
 - In `View as = Tabs`, double-click the representative row title and verify it opens tab rename, not pane rename.
 - Hover a named pane row and verify details sidecar content remains generated.
 - Move a named pane to another tab and verify the name moves with it.
-- Restart Rook and verify restored panes keep their custom names.
+- Restart Polaris Terminal and verify restored panes keep their custom names.
 
 ### Suggested command validation
 
 After implementation, run targeted checks before broader presubmit:
 
 ```bash
-cargo test -p rook_app vertical_tabs
-cargo test -p rook_app persistence::sqlite_tests
-cargo test -p rook_app workspace::action_tests
+cargo test -p pterm_app vertical_tabs
+cargo test -p pterm_app persistence::sqlite_tests
+cargo test -p pterm_app workspace::action_tests
 ```
 
 Before opening or updating a PR, follow repository rules for full validation with the prescribed fmt/clippy commands or presubmit flow. Do not run `cargo fmt --all` or file-scoped `cargo fmt`.

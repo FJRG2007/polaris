@@ -1,7 +1,7 @@
 use ai::agent::action_result::AIAgentActionResultType;
 use futures::FutureExt;
 use futures::future::BoxFuture;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 use crate::ai::agent::{AIAgentActionType, UseComputerResult};

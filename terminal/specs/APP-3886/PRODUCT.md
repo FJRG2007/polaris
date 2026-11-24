@@ -7,7 +7,7 @@ Figma: [House of Agents – sidecar design](https://www.figma.com/design/CsBdBW4
 Add a sidecar panel to every actionable item in the tab configs menu that exposes per-item actions: **Make default**, **Edit config**, and **Remove** (**Edit config** and **Remove** will not be shown for non-user-created tab-configs (i.e. terminal & agent)). Unify the "Make default" choice with the existing "Default mode for new sessions" setting so there is a single source of truth for what Cmd+T does. Flatten the Windows-only Terminal shell submenu into top-level menu items so every item can have a sidecar.
 
 ## Problem
-Users can create tab configs but have no lightweight way to manage them from the menu. Editing requires manually navigating to `~/.rook/tab_configs/`, there is no way to delete a config from the UI, and there is no way to set a tab config as the default Cmd+T action. The "Default mode for new sessions" setting only offers Terminal and Agent, with no way to select a tab config.
+Users can create tab configs but have no lightweight way to manage them from the menu. Editing requires manually navigating to `~/.polaris-terminal/tab_configs/`, there is no way to delete a config from the UI, and there is no way to set a tab config as the default Cmd+T action. The "Default mode for new sessions" setting only offers Terminal and Agent, with no way to select a tab config.
 
 ## Goals
 - Surface "Make default", "Edit config", and "Remove" actions via a sidecar on menu items.
@@ -31,7 +31,7 @@ The tab configs menu items become:
 2. **Terminal** (on all platforms; on Windows this will be multiple items for each terminal type, including the default terminal item)
 3. **Additional shell variants** (Windows only — e.g., PowerShell, CMD — listed as individual top-level items instead of nested in a Terminal submenu)
 4. **Cloud Oz** (if AI enabled + AgentView + CloudMode flags)
-5. **User tab configs** (from `~/.rook/tab_configs/` and `~/.rook/default_tab_configs/`)
+5. **User tab configs** (from `~/.polaris-terminal/tab_configs/` and `~/.polaris-terminal/default_tab_configs/`)
 6. Separator
 7. **New worktree config** (submenu with repo-list sidecar — unchanged)
 8. **New Tab Config** (creation action — unchanged)
@@ -46,7 +46,7 @@ When the user hovers over a separator, "New worktree config", or "New Tab Config
 ### Sidecar layout
 The sidecar panel contains:
 1. **Title**: The item name (e.g., "Terminal", "PowerShell", "Oz", or the tab config's `name` field).
-2. **Subtitle**: For user tab configs, the full path to the `.toml` source file displayed in a subdued/secondary text style (e.g., `~/.rook/tab_configs/my_config.toml`). For built-in items, no subtitle.
+2. **Subtitle**: For user tab configs, the full path to the `.toml` source file displayed in a subdued/secondary text style (e.g., `~/.polaris-terminal/tab_configs/my_config.toml`). For built-in items, no subtitle.
 3. **Buttons**: Varies by item type (see below).
 
 ### Sidecar buttons by item type
@@ -91,14 +91,14 @@ The menu item that is currently the default shows a **Cmd+T keybinding indicator
 ### "Edit config" behavior
 Opens the tab config `.toml` file in the user's configured editor, respecting the **"Choose an editor to open files from the code review panel, project explorer, and global search"** setting (`open_code_panels_file_editor`), **not** the "Choose an editor to open file links" setting (`open_file_editor`).
 
-When the editor resolves to Rook, the file opens in a new tab with the file tree open and focused on the config file.
+When the editor resolves to Polaris Terminal, the file opens in a new tab with the file tree open and focused on the config file.
 
 This editor-setting fix also applies to:
 - The existing **"New Tab Config"** button at the bottom of the menu.
 - The **"Open file"** action from tab config error toasts (`OpenTabConfigErrorFile`).
 
 ### "Remove" behavior
-1. A Rook modal (following existing modal prior art, e.g., the close-session confirmation dialog) appears asking the user to confirm deletion, indicating the config name and that the file will be permanently deleted.
+1. A Polaris Terminal modal (following existing modal prior art, e.g., the close-session confirmation dialog) appears asking the user to confirm deletion, indicating the config name and that the file will be permanently deleted.
 2. On confirm, the `.toml` file is deleted from disk.
 3. The filesystem watcher picks up the deletion and removes the config from the menu.
 4. If the removed config was the current default, the setting reverts to `Terminal`.

@@ -47,7 +47,7 @@ secrets:
   - DEPLOY_TOKEN
 mcpServers:
   github:
-    rookId: mcp_placeholder_github
+    ptermId: mcp_placeholder_github
 integrations:
   - type: linear
   - type: slack

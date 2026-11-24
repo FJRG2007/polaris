@@ -1,5 +1,5 @@
 // A protobuf-based API for communication between
-// the Rook client and the remote server binary.
+// the Polaris Terminal client and the remote server binary.
 //
 // Messages are length-prefixed: [4-byte little-endian length][protobuf bytes].
 
@@ -131,7 +131,7 @@ message ServerMessage {
 // ── Initialize handshake
 // Sent by the client immediately after connecting to negotiate the protocol.
 message Initialize {
-  // Optional bearer token used by the daemon for Rook-server requests.
+  // Optional bearer token used by the daemon for Polaris Terminal-server requests.
   // Empty means no credential was available and does not clear an existing
   // daemon credential.
   string auth_token = 1;
@@ -147,7 +147,7 @@ message Initialize {
 // Sent by the client when its bearer credential rotates after initialization.
 // This is a notification (fire-and-forget) — the server does not send a response.
 message Authenticate {
-  // Optional bearer token used by the daemon for Rook-server requests.
+  // Optional bearer token used by the daemon for Polaris Terminal-server requests.
   // Empty means no credential was available and does not clear an existing
   // daemon credential.
   string auth_token = 1;
@@ -248,7 +248,7 @@ message ErrorResponse {
 
 // ── Remote Agent Mode context ─────────────────────────────────────
 
-// Metadata specific to a skill bundled with Rook.
+// Metadata specific to a skill bundled with Polaris Terminal.
 message BundledSkillMetadata {
   // Directory-based skill ID, unique within the bundled catalog.
   string id = 1;

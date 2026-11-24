@@ -1,4 +1,4 @@
-use rookui::{EntityId, WindowId};
+use ptermui::{EntityId, WindowId};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::conversation_navigation::ConversationNavigationData;

@@ -9,7 +9,7 @@ license.workspace = true
 test-util = []
 
 [dependencies]
-rook_errors.workspace = true
+pterm_errors.workspace = true
 log.workspace = true
 
 [dev-dependencies]

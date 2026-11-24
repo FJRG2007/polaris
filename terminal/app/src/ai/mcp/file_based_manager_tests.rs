@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+use pterm_core::features::FeatureFlag;
+use ptermui::{App, Entity, ModelHandle, SingletonEntity as _};
 use repo_metadata::RepoMetadataModel;
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::watcher::DirectoryWatcher;
-use rook_core::features::FeatureFlag;
-use rookui::{App, Entity, ModelHandle, SingletonEntity as _};
 use settings::Setting as _;
 use uuid::Uuid;
 use watcher::HomeDirectoryWatcher;
@@ -19,17 +19,17 @@ use crate::ai::mcp::file_mcp_watcher::{
 };
 use crate::ai::mcp::{FileMCPWatcher, FileMCPWatcherEvent, ParsedTemplatableMCPServerResult};
 use crate::auth::AuthStateProvider;
-use crate::rook_managed_paths_watcher::{RookManagedPathsWatcher, rook_managed_mcp_config_path};
+use crate::pterm_managed_paths_watcher::{PtermManagedPathsWatcher, pterm_managed_mcp_config_path};
 use crate::settings::{AISettings, FocusedTerminalInfo};
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
 // Helper to initialize dependencies and return FileBasedMCPManager handle
-fn setup_app(app: &mut App) -> rookui::ModelHandle<FileBasedMCPManager> {
+fn setup_app(app: &mut App) -> ptermui::ModelHandle<FileBasedMCPManager> {
     app.add_singleton_model(DirectoryWatcher::new);
     app.add_singleton_model(|_| DetectedRepositories::default());
     app.add_singleton_model(RepoMetadataModel::new);
     app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-    app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+    app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
     app.add_singleton_model(FileMCPWatcher::new);
     app.add_singleton_model(AISettings::new_with_defaults);
     app.add_singleton_model(|_| AuthStateProvider::new_for_test());
@@ -143,7 +143,7 @@ fn servers_changed_only_emits_for_effective_source_set_changes() {
         manager.update(&mut app, |manager, ctx| {
             manager.apply_parsed_servers(
                 root_path.clone(),
-                MCPProvider::Rook,
+                MCPProvider::Pterm,
                 parse_mcp_json(json),
                 ctx,
             );
@@ -153,7 +153,7 @@ fn servers_changed_only_emits_for_effective_source_set_changes() {
         manager.update(&mut app, |manager, ctx| {
             manager.apply_parsed_servers(
                 root_path.clone(),
-                MCPProvider::Rook,
+                MCPProvider::Pterm,
                 parse_mcp_json(json),
                 ctx,
             );
@@ -161,12 +161,12 @@ fn servers_changed_only_emits_for_effective_source_set_changes() {
         events.read(&app, |events, _| assert_eq!(events.count, 1));
 
         manager.update(&mut app, |manager, ctx| {
-            manager.remove_servers_for_root_provider(&root_path, MCPProvider::Rook, ctx);
+            manager.remove_servers_for_root_provider(&root_path, MCPProvider::Pterm, ctx);
         });
         events.read(&app, |events, _| assert_eq!(events.count, 2));
 
         manager.update(&mut app, |manager, ctx| {
-            manager.remove_servers_for_root_provider(&root_path, MCPProvider::Rook, ctx);
+            manager.remove_servers_for_root_provider(&root_path, MCPProvider::Pterm, ctx);
         });
         events.read(&app, |events, _| assert_eq!(events.count, 2));
     });
@@ -180,14 +180,14 @@ fn test_config_error_preserves_last_known_good_servers() {
     App::test((), |mut app| async move {
         let manager_handle = setup_app(&mut app);
         manager_handle.update(&mut app, |manager, ctx| {
-            manager.apply_parsed_servers(root_path.clone(), MCPProvider::Rook, parsed, ctx);
+            manager.apply_parsed_servers(root_path.clone(), MCPProvider::Pterm, parsed, ctx);
             assert_eq!(manager.file_based_servers.len(), 1);
 
             manager.handle_watcher_event(
                 &FileMCPWatcherEvent::ConfigError {
                     diagnostic: FileMCPConfigDiagnostic {
                         config_path: config_path.clone(),
-                        provider: MCPProvider::Rook,
+                        provider: MCPProvider::Pterm,
                         kind: FileMCPConfigDiagnosticKind::Parse,
                         message: "invalid JSON".to_string(),
                     },
@@ -432,27 +432,29 @@ fn test_update_file_based_servers_removes_unreferenced_servers() {
     });
 }
 
-/// A Rook-global installation detected from the managed `~/.rook*/.mcp.json`
+/// A Polaris Terminal-global installation detected from the managed `~/.polaris-terminal*/.mcp.json`
 /// watcher uses the home directory as its logical root and still always
 /// auto-spawns.
 #[test]
-fn test_global_rook_server_from_managed_home_root_always_spawns() {
+fn test_global_pterm_server_from_managed_home_root_always_spawns() {
     let _flag_guard = FeatureFlag::FileBasedMcp.override_enabled(true);
-    let Some(rook_mcp_config_path) = rook_managed_mcp_config_path() else {
+    let Some(pterm_mcp_config_path) = pterm_managed_mcp_config_path() else {
         return;
     };
-    let parsed = parse_mcp_json(r#"{"global-rook": {"command": "npx", "args": ["rook"]}}"#);
+    let parsed = parse_mcp_json(
+        r#"{"global-polaris-terminal": {"command": "npx", "args": ["polaris-terminal"]}}"#,
+    );
 
     App::test((), |mut app| async move {
         let manager = setup_app(&mut app);
         let events = subscribe_events(&mut app, &manager);
 
-        // Toggle is off by default; the watcher-produced Rook root should still
-        // be classified as the global Rook config and auto-spawn.
+        // Toggle is off by default; the watcher-produced Polaris Terminal root should still
+        // be classified as the global Polaris Terminal config and auto-spawn.
         manager.update(&mut app, |m, ctx| {
             m.apply_parsed_servers(
-                rook_mcp_config_path.root_path.clone(),
-                MCPProvider::Rook,
+                pterm_mcp_config_path.root_path.clone(),
+                MCPProvider::Pterm,
                 parsed,
                 ctx,
             );
@@ -462,26 +464,26 @@ fn test_global_rook_server_from_managed_home_root_always_spawns() {
             assert_eq!(
                 e.spawned_uuids.len(),
                 1,
-                "Managed Rook MCP config should auto-spawn regardless of toggle"
+                "Managed Polaris Terminal MCP config should auto-spawn regardless of toggle"
             );
         });
 
-        // Flipping the toggle must not despawn the global Rook server.
+        // Flipping the toggle must not despawn the global Polaris Terminal server.
         set_file_based_mcp_enabled(&mut app, true);
         set_file_based_mcp_enabled(&mut app, false);
 
         events.update(&mut app, |e, _| {
             assert!(
                 e.despawned_uuids.is_empty(),
-                "Managed Rook MCP config should never be despawned by toggle changes, got: {:?}",
+                "Managed Polaris Terminal MCP config should never be despawned by toggle changes, got: {:?}",
                 e.despawned_uuids
             );
         });
     });
 }
-/// A globally-scoped non-Rook installation only auto-spawns when the toggle is on.
+/// A globally-scoped non-Polaris Terminal installation only auto-spawns when the toggle is on.
 #[test]
-fn test_global_non_rook_server_respects_toggle() {
+fn test_global_non_pterm_server_respects_toggle() {
     let _flag_guard = FeatureFlag::FileBasedMcp.override_enabled(true);
     let Some(home_dir) = home_dir() else {
         // Skip on platforms where a home dir isn't available (shouldn't happen on
@@ -501,7 +503,7 @@ fn test_global_non_rook_server_respects_toggle() {
         events.update(&mut app, |e, _| {
             assert!(
                 e.spawned_uuids.is_empty(),
-                "Global non-Rook server must not auto-spawn while toggle is off, got: {:?}",
+                "Global non-Polaris Terminal server must not auto-spawn while toggle is off, got: {:?}",
                 e.spawned_uuids
             );
         });
@@ -512,23 +514,23 @@ fn test_global_non_rook_server_respects_toggle() {
             servers[0].uuid()
         });
 
-        // Toggle on: the global non-Rook server should be spawned.
+        // Toggle on: the global non-Polaris Terminal server should be spawned.
         set_file_based_mcp_enabled(&mut app, true);
         events.update(&mut app, |e, _| {
             assert_eq!(
                 e.spawned_uuids,
                 vec![installation_uuid],
-                "Global non-Rook server should spawn when toggle flips on"
+                "Global non-Polaris Terminal server should spawn when toggle flips on"
             );
         });
 
-        // Toggle off: the global non-Rook server should be despawned.
+        // Toggle off: the global non-Polaris Terminal server should be despawned.
         set_file_based_mcp_enabled(&mut app, false);
         events.update(&mut app, |e, _| {
             assert_eq!(
                 e.despawned_uuids,
                 vec![installation_uuid],
-                "Global non-Rook server should despawn when toggle flips off"
+                "Global non-Polaris Terminal server should despawn when toggle flips off"
             );
         });
     });
@@ -549,8 +551,8 @@ fn tui_global_third_party_servers_never_auto_start() {
         set_file_based_mcp_enabled(&mut app, true);
 
         manager.update(&mut app, |manager, ctx| {
-            manager.defer_global_rook_autostart = true;
-            manager.global_rook_servers_activated = false;
+            manager.defer_global_pterm_autostart = true;
+            manager.global_pterm_servers_activated = false;
             manager.apply_parsed_servers(home_dir, MCPProvider::Codex, parsed, ctx);
         });
         set_file_based_mcp_enabled(&mut app, false);
@@ -570,23 +572,25 @@ fn tui_global_third_party_servers_never_auto_start() {
 }
 
 #[test]
-fn tui_global_rook_servers_start_only_after_activation() {
+fn tui_global_pterm_servers_start_only_after_activation() {
     let _flag_guard = FeatureFlag::FileBasedMcp.override_enabled(true);
-    let Some(rook_mcp_config_path) = rook_managed_mcp_config_path() else {
+    let Some(pterm_mcp_config_path) = pterm_managed_mcp_config_path() else {
         return;
     };
-    let parsed = parse_mcp_json(r#"{"global-rook": {"command": "npx", "args": ["global-rook"]}}"#);
+    let parsed = parse_mcp_json(
+        r#"{"global-polaris-terminal": {"command": "npx", "args": ["global-polaris-terminal"]}}"#,
+    );
 
     App::test((), |mut app| async move {
         let manager = setup_app(&mut app);
         let events = subscribe_events(&mut app, &manager);
 
         manager.update(&mut app, |manager, ctx| {
-            manager.defer_global_rook_autostart = true;
-            manager.global_rook_servers_activated = false;
+            manager.defer_global_pterm_autostart = true;
+            manager.global_pterm_servers_activated = false;
             manager.apply_parsed_servers(
-                rook_mcp_config_path.root_path,
-                MCPProvider::Rook,
+                pterm_mcp_config_path.root_path,
+                MCPProvider::Pterm,
                 parsed,
                 ctx,
             );
@@ -596,26 +600,28 @@ fn tui_global_rook_servers_start_only_after_activation() {
         });
 
         manager.update(&mut app, |manager, ctx| {
-            manager.activate_global_rook_servers(ctx);
+            manager.activate_global_pterm_servers(ctx);
         });
         events.read(&app, |events, _| {
             assert_eq!(
                 events.spawned_uuids.len(),
                 1,
-                "post-login activation should start TUI Rook-global servers"
+                "post-login activation should start TUI Polaris Terminal-global servers"
             );
         });
     });
 }
-/// Project-scoped installations (both Rook and third-party) never auto-spawn on
+/// Project-scoped installations (both Polaris Terminal and third-party) never auto-spawn on
 /// detection, and the toggle must not spawn or despawn them either.
 #[test]
 fn test_project_scoped_servers_never_auto_spawn() {
     let _flag_guard = FeatureFlag::FileBasedMcp.override_enabled(true);
-    let repo_path = PathBuf::from("/tmp/rook-test-repo");
+    let repo_path = PathBuf::from("/tmp/polaris-terminal-test-repo");
     let claude_parsed =
         parse_mcp_json(r#"{"proj-claude": {"command": "npx", "args": ["proj-claude"]}}"#);
-    let rook_parsed = parse_mcp_json(r#"{"proj-rook": {"command": "npx", "args": ["proj-rook"]}}"#);
+    let pterm_parsed = parse_mcp_json(
+        r#"{"proj-polaris-terminal": {"command": "npx", "args": ["proj-polaris-terminal"]}}"#,
+    );
 
     App::test((), |mut app| async move {
         let manager = setup_app(&mut app);
@@ -623,7 +629,7 @@ fn test_project_scoped_servers_never_auto_spawn() {
 
         manager.update(&mut app, |m, ctx| {
             m.apply_parsed_servers(repo_path.clone(), MCPProvider::Claude, claude_parsed, ctx);
-            m.apply_parsed_servers(repo_path.clone(), MCPProvider::Rook, rook_parsed, ctx);
+            m.apply_parsed_servers(repo_path.clone(), MCPProvider::Pterm, pterm_parsed, ctx);
         });
 
         // Neither detection should emit a spawn event.
@@ -666,10 +672,12 @@ fn test_project_scoped_servers_never_auto_spawn() {
 #[test]
 fn test_project_scoped_cloud_scan_has_detected_servers_but_empty_wait_set() {
     let _flag_guard = FeatureFlag::FileBasedMcp.override_enabled(true);
-    let repo_path = PathBuf::from("/tmp/rook-test-cloud-repo");
+    let repo_path = PathBuf::from("/tmp/polaris-terminal-test-cloud-repo");
     let claude_parsed =
         parse_mcp_json(r#"{"proj-claude": {"command": "npx", "args": ["proj-claude"]}}"#);
-    let rook_parsed = parse_mcp_json(r#"{"proj-rook": {"command": "npx", "args": ["proj-rook"]}}"#);
+    let pterm_parsed = parse_mcp_json(
+        r#"{"proj-polaris-terminal": {"command": "npx", "args": ["proj-polaris-terminal"]}}"#,
+    );
 
     App::test((), |mut app| async move {
         let manager = setup_app(&mut app);
@@ -677,7 +685,7 @@ fn test_project_scoped_cloud_scan_has_detected_servers_but_empty_wait_set() {
 
         manager.update(&mut app, |m, ctx| {
             m.apply_parsed_servers(repo_path.clone(), MCPProvider::Claude, claude_parsed, ctx);
-            m.apply_parsed_servers(repo_path.clone(), MCPProvider::Rook, rook_parsed, ctx);
+            m.apply_parsed_servers(repo_path.clone(), MCPProvider::Pterm, pterm_parsed, ctx);
             m.handle_cloud_environment_scan_complete(&repo_path, ctx);
         });
 
@@ -705,18 +713,20 @@ fn test_project_scoped_cloud_scan_has_detected_servers_but_empty_wait_set() {
 #[test]
 fn test_auto_started_cloud_scan_uuids_are_in_wait_set() {
     let _flag_guard = FeatureFlag::FileBasedMcp.override_enabled(true);
-    let Some(rook_mcp_config_path) = rook_managed_mcp_config_path() else {
+    let Some(pterm_mcp_config_path) = pterm_managed_mcp_config_path() else {
         return;
     };
-    let root_path = rook_mcp_config_path.root_path;
-    let parsed = parse_mcp_json(r#"{"global-rook": {"command": "npx", "args": ["rook"]}}"#);
+    let root_path = pterm_mcp_config_path.root_path;
+    let parsed = parse_mcp_json(
+        r#"{"global-polaris-terminal": {"command": "npx", "args": ["polaris-terminal"]}}"#,
+    );
 
     App::test((), |mut app| async move {
         let manager = setup_app(&mut app);
         let events = subscribe_events(&mut app, &manager);
 
         manager.update(&mut app, |m, ctx| {
-            m.apply_parsed_servers(root_path.clone(), MCPProvider::Rook, parsed, ctx);
+            m.apply_parsed_servers(root_path.clone(), MCPProvider::Pterm, parsed, ctx);
             m.handle_cloud_environment_scan_complete(&root_path, ctx);
         });
 
@@ -728,21 +738,21 @@ fn test_auto_started_cloud_scan_uuids_are_in_wait_set() {
             assert_eq!(scan.wait_server_uuids, e.spawned_uuids);
             assert!(
                 scan.detected_servers[0].auto_start_eligible,
-                "Global Rook server should be auto-start eligible"
+                "Global Polaris Terminal server should be auto-start eligible"
             );
         });
     });
 }
 
 /// An installation referenced from both a global location and a project location
-/// is considered global (and thus gated only by the toggle for non-Rook providers).
+/// is considered global (and thus gated only by the toggle for non-Polaris Terminal providers).
 #[test]
 fn test_server_referenced_from_both_global_and_project_is_global() {
     let _flag_guard = FeatureFlag::FileBasedMcp.override_enabled(true);
     let Some(home_dir) = home_dir() else {
         return;
     };
-    let repo_path = PathBuf::from("/tmp/rook-test-repo-shared");
+    let repo_path = PathBuf::from("/tmp/polaris-terminal-test-repo-shared");
     let json = r#"{"shared-claude": {"command": "npx", "args": ["shared"]}}"#;
     let global_parsed = parse_mcp_json(json);
     let project_parsed = parse_mcp_json(json);
@@ -792,7 +802,7 @@ fn source_snapshots_preserve_provenance_scope_spawn_root_and_hash_lookup() {
     let Some(home_dir) = home_dir() else {
         return;
     };
-    let repo_path = PathBuf::from("/tmp/rook-test-provenance-repo");
+    let repo_path = PathBuf::from("/tmp/polaris-terminal-test-provenance-repo");
     let json = r#"{"shared-server": {"command": "npx", "args": ["shared"]}}"#;
 
     App::test((), |mut app| async move {
@@ -917,14 +927,17 @@ fn test_update_file_based_servers_removes_server_only_when_no_refs() {
 #[test]
 fn initial_global_scan_result_pending_until_watcher_signals_completion() {
     let _flag_guard = FeatureFlag::FileBasedMcp.override_enabled(true);
-    let Some(rook_mcp_config_path) = rook_managed_mcp_config_path() else {
+    let Some(pterm_mcp_config_path) = pterm_managed_mcp_config_path() else {
         return;
     };
-    let global_root = rook_mcp_config_path.root_path;
-    let project_root = PathBuf::from("/tmp/rook-test-initial-scan-project");
-    let global_parsed = parse_mcp_json(r#"{"global-rook": {"command": "npx", "args": ["rook"]}}"#);
-    let project_parsed =
-        parse_mcp_json(r#"{"proj-rook": {"command": "npx", "args": ["proj-rook"]}}"#);
+    let global_root = pterm_mcp_config_path.root_path;
+    let project_root = PathBuf::from("/tmp/polaris-terminal-test-initial-scan-project");
+    let global_parsed = parse_mcp_json(
+        r#"{"global-polaris-terminal": {"command": "npx", "args": ["polaris-terminal"]}}"#,
+    );
+    let project_parsed = parse_mcp_json(
+        r#"{"proj-polaris-terminal": {"command": "npx", "args": ["proj-polaris-terminal"]}}"#,
+    );
 
     App::test((), |mut app| async move {
         let manager = setup_app(&mut app);
@@ -938,13 +951,13 @@ fn initial_global_scan_result_pending_until_watcher_signals_completion() {
         });
 
         manager.update(&mut app, |m, ctx| {
-            // Global Rook parse: contributes its auto-started UUID when the scan later
+            // Global Polaris Terminal parse: contributes its auto-started UUID when the scan later
             // freezes.
             m.handle_watcher_event(
                 &FileMCPWatcherEvent::ConfigParsed {
                     config_path: global_root.join(".mcp.json"),
                     root_path: global_root.clone(),
-                    provider: MCPProvider::Rook,
+                    provider: MCPProvider::Pterm,
                     servers: global_parsed,
                 },
                 ctx,
@@ -953,9 +966,9 @@ fn initial_global_scan_result_pending_until_watcher_signals_completion() {
             // also must not be counted toward the initial scan.
             m.handle_watcher_event(
                 &FileMCPWatcherEvent::ConfigParsed {
-                    config_path: project_root.join(".rook/.mcp.json"),
+                    config_path: project_root.join(".polaris/terminal/.mcp.json"),
                     root_path: project_root.clone(),
-                    provider: MCPProvider::Rook,
+                    provider: MCPProvider::Pterm,
                     servers: project_parsed,
                 },
                 ctx,
@@ -973,11 +986,11 @@ fn initial_global_scan_result_pending_until_watcher_signals_completion() {
         let spawned_uuid = manager.update(&mut app, |m, _| {
             let servers = m.file_based_servers();
             assert_eq!(servers.len(), 2, "both installations should be tracked");
-            m.global_rook_servers()
+            m.global_pterm_servers()
                 .into_iter()
                 .map(|s| s.uuid())
                 .next()
-                .expect("the global Rook server should be tracked")
+                .expect("the global Polaris Terminal server should be tracked")
         });
 
         manager.update(&mut app, |m, ctx| {
@@ -1002,10 +1015,10 @@ fn initial_global_scan_result_pending_until_watcher_signals_completion() {
 #[test]
 fn initial_global_wait_set_freezes_at_completion() {
     let _flag_guard = FeatureFlag::FileBasedMcp.override_enabled(true);
-    let Some(rook_mcp_config_path) = rook_managed_mcp_config_path() else {
+    let Some(pterm_mcp_config_path) = pterm_managed_mcp_config_path() else {
         return;
     };
-    let global_root = rook_mcp_config_path.root_path;
+    let global_root = pterm_mcp_config_path.root_path;
     let config_path = global_root.join(".mcp.json");
     let first_parsed = parse_mcp_json(r#"{"first": {"command": "npx", "args": ["first"]}}"#);
     let second_parsed = parse_mcp_json(
@@ -1021,7 +1034,7 @@ fn initial_global_wait_set_freezes_at_completion() {
                 &FileMCPWatcherEvent::ConfigParsed {
                     config_path: config_path.clone(),
                     root_path: global_root.clone(),
-                    provider: MCPProvider::Rook,
+                    provider: MCPProvider::Pterm,
                     servers: first_parsed,
                 },
                 ctx,
@@ -1034,7 +1047,7 @@ fn initial_global_wait_set_freezes_at_completion() {
                 &FileMCPWatcherEvent::ConfigParsed {
                     config_path,
                     root_path: global_root,
-                    provider: MCPProvider::Rook,
+                    provider: MCPProvider::Pterm,
                     servers: second_parsed,
                 },
                 ctx,

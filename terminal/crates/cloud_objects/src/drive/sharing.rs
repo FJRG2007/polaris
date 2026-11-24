@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use rook_graphql::object_permissions::AccessLevel;
+use pterm_graphql::object_permissions::AccessLevel;
 use serde::{Deserialize, Serialize};
 use session_sharing_protocol::common::{ProfileData as SessionSharingProfileData, Role};
 
@@ -132,11 +132,11 @@ pub enum Subject {
     AnyoneWithLink(LinkSharingSubjectType),
 }
 
-/// A kind of user. In all cases, there is an underlying Rook account, but it's represented
+/// A kind of user. In all cases, there is an underlying Polaris Terminal account, but it's represented
 /// differently in certain cases.
 #[derive(Debug, Clone)]
 pub enum UserKind {
-    /// A Rook user account, tracked in the [`UserProfiles`] model.
+    /// A Polaris Terminal user account, tracked in the [`UserProfiles`] model.
     Account(UserUid),
     /// A session-sharing participant.
     // TODO(CLD-2283): Remove this once we have Firebase UIDs for shared session participants.

@@ -2,7 +2,7 @@
 ## Context
 The product behavior is defined in `specs/REMOTE-1453/PRODUCT.md`. This spec covers the client-side runtime implementation for resolving service-account `User.globalSkills` during Oz agent startup.
 Relevant existing pieces:
-- `crates/rook_cli/src/skill.rs`: `SkillSpec`, `SkillSpec::from_str`, `SkillSpec::is_full_path`.
+- `crates/pterm_cli/src/skill.rs`: `SkillSpec`, `SkillSpec::from_str`, `SkillSpec::is_full_path`.
 - `app/src/ai/skills/file_watchers/skill_watcher.rs`: scans repository trees for `SKILL.md` files.
 - `app/src/ai/skills/skill_manager.rs`: stores the loaded skills for the active run.
 - `app/src/ai/agent_sdk/driver/environment.rs`: environment repository clone helper used by environment prep.

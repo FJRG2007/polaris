@@ -1,11 +1,11 @@
-use rook_editor::content::buffer::{
+use pterm_editor::content::buffer::{
     AutoScrollBehavior, BufferEditAction, EditOrigin, SelectionOffsets, VimInsertPoint,
 };
-use rook_editor::model::{CoreEditorModel, PlainTextEditorModel};
-use rook_editor::render::model::AutoScrollMode;
-use rook_editor::selection::{TextDirection, TextUnit};
-use rookui::units::IntoPixels;
-use rookui::{SingletonEntity, ViewContext};
+use pterm_editor::model::{CoreEditorModel, PlainTextEditorModel};
+use pterm_editor::render::model::AutoScrollMode;
+use pterm_editor::selection::{TextDirection, TextUnit};
+use ptermui::units::IntoPixels;
+use ptermui::{SingletonEntity, ViewContext};
 use vim::vim::{
     BracketChar, CharacterMotion, Direction, FindCharMotion, FirstNonWhitespaceMotion,
     InsertPosition, LineMotion, ModeTransition, MotionType, VimHandler, VimMode, VimMotion,
@@ -21,7 +21,7 @@ use crate::vim_registers::{RegisterContent, VimRegisters};
 fn selected_text_for_vim_register(
     model: &CodeEditorModel,
     motion_type: MotionType,
-    ctx: &mut rookui::ModelContext<CodeEditorModel>,
+    ctx: &mut ptermui::ModelContext<CodeEditorModel>,
 ) -> String {
     let buffer = model.content().as_ref(ctx);
     let selection_model = model.buffer_selection_model().clone();
@@ -176,7 +176,7 @@ impl VimHandler for CodeEditorView {
     ) {
         // Selection logic is almost the same for all operators, so capture that in a closure first.
         let selection_change =
-            |model: &mut CodeEditorModel, ctx: &mut rookui::ModelContext<CodeEditorModel>| {
+            |model: &mut CodeEditorModel, ctx: &mut ptermui::ModelContext<CodeEditorModel>| {
                 match operand {
                     VimOperand::Motion {
                         motion,

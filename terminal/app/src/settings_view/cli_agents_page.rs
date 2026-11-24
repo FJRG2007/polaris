@@ -1,7 +1,7 @@
 //! The "Third party CLI agents" settings page, shown under the Agents umbrella.
 //!
 //! Everything on this page controls third-party coding agents (Claude Code,
-//! Codex, Gemini CLI) rather than Rook's own AI, so its settings are always
+//! Codex, Gemini CLI) rather than Polaris Terminal's own AI, so its settings are always
 //! interactive regardless of the global AI toggle.
 
 use std::cell::RefCell;
@@ -9,20 +9,20 @@ use std::collections::HashMap;
 
 use enum_iterator::all;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use regex::Regex;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_if_error;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_if_error;
+use ptermui::elements::{
     ChildView, Container, CornerRadius, CrossAxisAlignment, Element, Empty, Flex,
     FormattedTextElement, HighlightedHyperlink, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     ParentElement, Radius, Shrinkable,
 };
-use rookui::keymap::ContextPredicate;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{
+use ptermui::keymap::ContextPredicate;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{
     Action, AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle, id,
 };
+use regex::Regex;
 use settings::{Setting, ToggleableSetting};
 
 use super::ai_shared::{
@@ -360,7 +360,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 context,
                 flags::CLI_AGENT_FOOTER_ENABLED,
             )
-            .with_group(bindings::BindingGroup::RookAi),
+            .with_group(bindings::BindingGroup::PtermAi),
         ],
         app,
     );
@@ -374,7 +374,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 &(context.clone() & id!(flags::CLI_AGENT_FOOTER_ENABLED)),
                 flags::AUTO_TOGGLE_RICH_INPUT_FLAG,
             )
-            .with_group(bindings::BindingGroup::RookAi)
+            .with_group(bindings::BindingGroup::PtermAi)
             .with_enabled(|| FeatureFlag::CLIAgentRichInput.is_enabled()),
             ToggleSettingActionPair::new(
                 "auto open Rich Input when a coding agent session starts",
@@ -384,7 +384,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 &(context.clone() & id!(flags::CLI_AGENT_FOOTER_ENABLED)),
                 flags::AUTO_OPEN_RICH_INPUT_ON_CLI_AGENT_START_FLAG,
             )
-            .with_group(bindings::BindingGroup::RookAi)
+            .with_group(bindings::BindingGroup::PtermAi)
             .with_enabled(|| FeatureFlag::CLIAgentRichInput.is_enabled()),
             ToggleSettingActionPair::new(
                 "auto dismiss Rich Input after prompt submission",
@@ -394,7 +394,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 &(context.clone() & id!(flags::CLI_AGENT_FOOTER_ENABLED)),
                 flags::AUTO_DISMISS_RICH_INPUT_AFTER_SUBMIT_FLAG,
             )
-            .with_group(bindings::BindingGroup::RookAi)
+            .with_group(bindings::BindingGroup::PtermAi)
             .with_enabled(|| FeatureFlag::CLIAgentRichInput.is_enabled()),
         ],
         app,
@@ -516,7 +516,7 @@ impl SettingsWidget for CLIAgentAutoToggleRichInputWidget {
                 on_click_action: None,
                 secondary_text: None,
                 tooltip_override_text: Some(
-                    "Requires the Rook plugin for your coding agent".to_owned(),
+                    "Requires the Polaris Terminal plugin for your coding agent".to_owned(),
                 ),
             }),
             LocalOnlyIconState::for_setting(

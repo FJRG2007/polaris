@@ -2,8 +2,8 @@ use std::future::Future;
 use std::time::Duration;
 
 use anyhow::{Result, anyhow};
-use rookui::r#async::Timer;
-use rookui::{RetryOption, duration_with_jitter};
+use ptermui::r#async::Timer;
+use ptermui::{RetryOption, duration_with_jitter};
 
 use crate::server::graphql::GraphQLError;
 use crate::server::server_api::presigned_upload::HttpStatusError;

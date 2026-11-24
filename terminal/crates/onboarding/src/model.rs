@@ -1,6 +1,6 @@
 use ai::LLMId;
-use rook_core::send_telemetry_from_ctx;
-use rookui_core::{Entity, ModelContext};
+use pterm_core::send_telemetry_from_ctx;
+use ptermui_core::{Entity, ModelContext};
 
 use crate::OnboardingIntention;
 use crate::slides::{AgentAutonomy, AgentDevelopmentSettings, OfferVariant, OnboardingModelInfo};
@@ -13,7 +13,7 @@ pub struct UICustomizationSettings {
     pub show_conversation_history: bool,
     pub show_project_explorer: bool,
     pub show_global_search: bool,
-    pub show_rook_drive: bool,
+    pub show_pterm_drive: bool,
     pub show_code_review_button: bool,
 }
 
@@ -25,7 +25,7 @@ impl UICustomizationSettings {
             show_conversation_history: true,
             show_project_explorer: true,
             show_global_search: true,
-            show_rook_drive: true,
+            show_pterm_drive: true,
             show_code_review_button: true,
         }
     }
@@ -37,7 +37,7 @@ impl UICustomizationSettings {
             show_conversation_history: false,
             show_project_explorer: false,
             show_global_search: false,
-            show_rook_drive: false,
+            show_pterm_drive: false,
             show_code_review_button: false,
         }
     }
@@ -50,7 +50,7 @@ impl UICustomizationSettings {
         (conversation_visible && self.show_conversation_history)
             || self.show_project_explorer
             || self.show_global_search
-            || self.show_rook_drive
+            || self.show_pterm_drive
     }
 }
 
@@ -87,19 +87,19 @@ impl SelectedSettings {
         }
     }
 
-    pub fn is_rook_drive_enabled(&self) -> bool {
+    pub fn is_pterm_drive_enabled(&self) -> bool {
         match self {
             SelectedSettings::AgentDrivenDevelopment {
                 ui_customization, ..
             } => ui_customization
                 .as_ref()
-                .map(|ui| ui.show_rook_drive)
+                .map(|ui| ui.show_pterm_drive)
                 .unwrap_or(true),
             SelectedSettings::Terminal {
                 ui_customization, ..
             } => ui_customization
                 .as_ref()
-                .map(|ui| ui.show_rook_drive)
+                .map(|ui| ui.show_pterm_drive)
                 .unwrap_or(false),
         }
     }
@@ -122,20 +122,20 @@ pub(crate) enum OnboardingStep {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AiSetupChoice {
     #[default]
-    RookAgent,
+    PtermAgent,
     ThirdParty,
 }
 
 impl std::fmt::Display for AiSetupChoice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AiSetupChoice::RookAgent => write!(f, "rook_agent"),
+            AiSetupChoice::PtermAgent => write!(f, "pterm_agent"),
             AiSetupChoice::ThirdParty => write!(f, "third_party"),
         }
     }
 }
 
-/// The access method selected on the "Choose how to access AI" slide (Rook Agent path).
+/// The access method selected on the "Choose how to access AI" slide (Polaris Terminal Agent path).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AiAccessChoice {
     #[default]
@@ -484,7 +484,7 @@ impl OnboardingStateModel {
         self.ui_customization.show_conversation_history = enabled;
         self.ui_customization.show_project_explorer = enabled;
         self.ui_customization.show_global_search = enabled;
-        self.ui_customization.show_rook_drive = enabled;
+        self.ui_customization.show_pterm_drive = enabled;
         ctx.notify();
     }
 
@@ -537,18 +537,18 @@ impl OnboardingStateModel {
         ctx.notify();
     }
 
-    pub(crate) fn set_show_rook_drive(&mut self, value: bool, ctx: &mut ModelContext<Self>) {
-        if self.ui_customization.show_rook_drive == value {
+    pub(crate) fn set_show_pterm_drive(&mut self, value: bool, ctx: &mut ModelContext<Self>) {
+        if self.ui_customization.show_pterm_drive == value {
             return;
         }
         send_telemetry_from_ctx!(
             OnboardingEvent::SettingChanged {
-                setting: "rook_drive".to_string(),
+                setting: "pterm_drive".to_string(),
                 value: value.to_string(),
             },
             ctx
         );
-        self.ui_customization.show_rook_drive = value;
+        self.ui_customization.show_pterm_drive = value;
         ctx.notify();
     }
 
@@ -704,7 +704,7 @@ impl OnboardingStateModel {
         default_model_id: LLMId,
         ctx: &mut ModelContext<Self>,
     ) {
-        use rook_core::features::FeatureFlag;
+        use pterm_core::features::FeatureFlag;
 
         // If the user is past the agent slide, don't change the agent model from underneath them.
         // ThemePicker comes after the agent slides, so it must also be guarded.
@@ -756,7 +756,7 @@ impl OnboardingStateModel {
     }
 
     fn send_completion_telemetry(&self, ctx: &mut ModelContext<Self>) {
-        if rook_core::features::FeatureFlag::AccountFirstOnboarding.is_enabled() {
+        if pterm_core::features::FeatureFlag::AccountFirstOnboarding.is_enabled() {
             send_telemetry_from_ctx!(
                 OnboardingEvent::OnboardingSlidesCompleted {
                     intention: "account_first".to_string(),
@@ -792,7 +792,7 @@ impl OnboardingStateModel {
     }
 
     pub(crate) fn complete(&mut self, ctx: &mut ModelContext<Self>) {
-        if rook_core::features::FeatureFlag::AccountFirstOnboarding.is_enabled() {
+        if pterm_core::features::FeatureFlag::AccountFirstOnboarding.is_enabled() {
             self.send_account_first_action("next", ctx);
         }
         self.send_completion_telemetry(ctx);
@@ -801,7 +801,7 @@ impl OnboardingStateModel {
     }
 
     pub(crate) fn back(&mut self, ctx: &mut ModelContext<Self>) {
-        use rook_core::features::FeatureFlag;
+        use pterm_core::features::FeatureFlag;
         let account_first = FeatureFlag::AccountFirstOnboarding.is_enabled();
         let agent_intention = matches!(self.intention, OnboardingIntention::AgentDrivenDevelopment);
 
@@ -825,7 +825,7 @@ impl OnboardingStateModel {
                 OnboardingStep::Customize => {
                     if agent_intention {
                         match self.ai_setup_choice {
-                            AiSetupChoice::RookAgent => Some(OnboardingStep::AiAccess),
+                            AiSetupChoice::PtermAgent => Some(OnboardingStep::AiAccess),
                             AiSetupChoice::ThirdParty => Some(OnboardingStep::ThirdParty),
                         }
                     } else {
@@ -850,7 +850,7 @@ impl OnboardingStateModel {
     }
 
     pub(crate) fn next(&mut self, ctx: &mut ModelContext<Self>) {
-        use rook_core::features::FeatureFlag;
+        use pterm_core::features::FeatureFlag;
         let account_first = FeatureFlag::AccountFirstOnboarding.is_enabled();
         let is_last_step = matches!(
             self.step,
@@ -888,7 +888,7 @@ impl OnboardingStateModel {
                     }
                 },
                 OnboardingStep::AiSetup => match self.ai_setup_choice {
-                    AiSetupChoice::RookAgent => self.set_step(OnboardingStep::Agent, ctx),
+                    AiSetupChoice::PtermAgent => self.set_step(OnboardingStep::Agent, ctx),
                     AiSetupChoice::ThirdParty => self.set_step(OnboardingStep::ThirdParty, ctx),
                 },
                 OnboardingStep::Customize => self.set_step(OnboardingStep::ThemePicker, ctx),
@@ -914,7 +914,7 @@ impl OnboardingStateModel {
 
         self.step = step;
 
-        let account_first = rook_core::features::FeatureFlag::AccountFirstOnboarding.is_enabled();
+        let account_first = pterm_core::features::FeatureFlag::AccountFirstOnboarding.is_enabled();
         let slide_name = match step {
             OnboardingStep::Intro => {
                 if account_first {
@@ -949,7 +949,7 @@ impl OnboardingStateModel {
     /// The `(step_index, step_count)` shown by the bottom-nav progress dots for the
     /// current step, intention, and flow variant.
     pub(crate) fn progress(&self) -> (usize, usize) {
-        use rook_core::features::FeatureFlag;
+        use pterm_core::features::FeatureFlag;
         if FeatureFlag::AccountFirstOnboarding.is_enabled() {
             return match self.step {
                 OnboardingStep::Intro
@@ -966,13 +966,13 @@ impl OnboardingStateModel {
 
         let is_terminal = matches!(self.intention, OnboardingIntention::Terminal);
 
-        // The Rook Agent path has the extra "Choose how to access AI" step, so it
+        // The Polaris Terminal Agent path has the extra "Choose how to access AI" step, so it
         // is one longer than the third-party-agent path.
-        let is_rook_agent_path =
-            !is_terminal && matches!(self.ai_setup_choice, AiSetupChoice::RookAgent);
+        let is_pterm_agent_path =
+            !is_terminal && matches!(self.ai_setup_choice, AiSetupChoice::PtermAgent);
         let step_count = if is_terminal {
             3
-        } else if is_rook_agent_path {
+        } else if is_pterm_agent_path {
             6
         } else {
             5
@@ -985,7 +985,7 @@ impl OnboardingStateModel {
             OnboardingStep::Customize => {
                 if is_terminal {
                     1
-                } else if is_rook_agent_path {
+                } else if is_pterm_agent_path {
                     4
                 } else {
                     3

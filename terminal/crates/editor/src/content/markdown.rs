@@ -13,9 +13,9 @@ use markdown_parser::{
     FormattedTextLine, OrderedFormattedIndentTextInline,
 };
 use markup5ever::ns;
-use rookui_core::elements::{ListIndentLevel, ListNumbering};
-use rookui_core::text::point::Point;
-use rookui_core::{AppContext, ModelContext, ModelHandle};
+use ptermui_core::elements::{ListIndentLevel, ListNumbering};
+use ptermui_core::text::point::Point;
+use ptermui_core::{AppContext, ModelContext, ModelHandle};
 use string_offset::CharOffset;
 
 use super::buffer::{
@@ -34,7 +34,7 @@ use crate::content::version::BufferVersion;
 /// A Markdown format to serialize a [`Buffer`] into.
 #[derive(Clone, Copy)]
 pub enum MarkdownStyle<'a> {
-    /// The internal Markdown format used in Rook Drive. References are normalized, so the Markdown
+    /// The internal Markdown format used in Polaris Terminal Drive. References are normalized, so the Markdown
     /// only refers to other objects by their IDs, with no other data.
     Internal,
     /// A Markdown format suitable for external use. If an [`AppContext`] is set, it may be used to

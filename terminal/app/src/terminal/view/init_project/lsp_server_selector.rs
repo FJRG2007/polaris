@@ -1,16 +1,16 @@
 use std::path::PathBuf;
 
 use lsp::supported_servers::LSPServerType;
-use rookui::elements::{
+use ptermui::elements::{
     Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Expanded, Flex,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable,
 };
-use rookui::keymap::Keystroke;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::keyboard_shortcut::KeyboardShortcut;
-use rookui::ui_components::text::Span;
-use rookui::{AppContext, Element, SingletonEntity, TypedActionView, ViewContext, ViewHandle};
+use ptermui::keymap::Keystroke;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::keyboard_shortcut::KeyboardShortcut;
+use ptermui::ui_components::text::Span;
+use ptermui::{AppContext, Element, SingletonEntity, TypedActionView, ViewContext, ViewHandle};
 
 use super::{InitProjectBlockAction, InitStepBlock};
 use crate::ai::agent::icons::yellow_stop_icon;

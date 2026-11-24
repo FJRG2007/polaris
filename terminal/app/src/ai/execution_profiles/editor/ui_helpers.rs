@@ -1,13 +1,13 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use ptermui::elements::{
     ChildAnchor, ChildView, ConstrainedBox, Container, CrossAxisAlignment, Dismiss, Flex,
     Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Shrinkable, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, SingletonEntity, ViewHandle};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, SingletonEntity, ViewHandle};
 use thousands::Separable;
 use uuid::Uuid;
 
@@ -177,7 +177,7 @@ fn render_info_section(
     let alert_icon = Container::new(
         ConstrainedBox::new(
             Icon::AlertCircle
-                .to_rookui_icon(
+                .to_ptermui_icon(
                     appearance
                         .theme()
                         .sub_text_color(appearance.theme().surface_2()),
@@ -220,7 +220,7 @@ fn render_permission_row<T: DropdownItemAction>(
 ) -> Box<dyn Element> {
     let icon_elem = Container::new(
         ConstrainedBox::new(
-            icon.to_rookui_icon(appearance.theme().active_ui_text_color())
+            icon.to_ptermui_icon(appearance.theme().active_ui_text_color())
                 .finish(),
         )
         .with_width(16.)
@@ -267,7 +267,7 @@ pub fn render_models_section(
         .with_child(render_filterable_dropdown_row(
             appearance,
             "Base model",
-            "This model serves as the primary engine behind the agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. Rook may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.",
+            "This model serves as the primary engine behind the agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. Polaris Terminal may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.",
             &view.base_model_dropdown,
         ));
 
@@ -445,7 +445,7 @@ pub fn render_permissions_section(
     appearance: &Appearance,
     view: &ExecutionProfileEditorView,
     profile_data: &AIExecutionProfile,
-    app: &rookui::AppContext,
+    app: &ptermui::AppContext,
 ) -> Box<dyn Element> {
     let ai_settings = AISettings::as_ref(app);
     let scope = view.team_context(app);
@@ -717,7 +717,7 @@ fn render_directory_allowlist_section(
     view: &ExecutionProfileEditorView,
     profile_data: &AIExecutionProfile,
     appearance: &Appearance,
-    app: &rookui::AppContext,
+    app: &ptermui::AppContext,
 ) -> Box<dyn Element> {
     let ai_settings = AISettings::as_ref(app);
     let scope = view.team_context(app);
@@ -743,7 +743,7 @@ fn render_command_allowlist_section(
     view: &ExecutionProfileEditorView,
     profile_data: &AIExecutionProfile,
     appearance: &Appearance,
-    app: &rookui::AppContext,
+    app: &ptermui::AppContext,
 ) -> Box<dyn Element> {
     let ai_settings = AISettings::as_ref(app);
     let scope = view.team_context(app);
@@ -770,7 +770,7 @@ fn render_command_denylist_section(
     view: &ExecutionProfileEditorView,
     profile_data: &AIExecutionProfile,
     appearance: &Appearance,
-    app: &rookui::AppContext,
+    app: &ptermui::AppContext,
 ) -> Box<dyn Element> {
     use crate::ai::blocklist::BlocklistAIPermissions;
 
@@ -838,7 +838,7 @@ fn display_mcp_name(uuid: &Uuid, app: &AppContext) -> String {
 fn render_mcp_allowlist_section(
     view: &ExecutionProfileEditorView,
     profile_data: &AIExecutionProfile,
-    app: &rookui::AppContext,
+    app: &ptermui::AppContext,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let ai_settings = AISettings::as_ref(app);
@@ -864,7 +864,7 @@ fn render_mcp_allowlist_section(
 fn render_mcp_denylist_section(
     view: &ExecutionProfileEditorView,
     profile_data: &AIExecutionProfile,
-    app: &rookui::AppContext,
+    app: &ptermui::AppContext,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let ai_settings = AISettings::as_ref(app);
@@ -895,7 +895,7 @@ pub fn render_plan_auto_sync_toggle(
     let icon_elem = Container::new(
         ConstrainedBox::new(
             Icon::Compass
-                .to_rookui_icon(appearance.theme().active_ui_text_color())
+                .to_ptermui_icon(appearance.theme().active_ui_text_color())
                 .finish(),
         )
         .with_width(icon_size)
@@ -914,7 +914,7 @@ pub fn render_plan_auto_sync_toggle(
     .finish();
 
     let desc_elem = Text::new(
-        "The plans this agent creates will be automatically added and synced to Rook Drive."
+        "The plans this agent creates will be automatically added and synced to Polaris Terminal Drive."
             .to_string(),
         appearance.ui_font_family(),
         11.,
@@ -927,7 +927,7 @@ pub fn render_plan_auto_sync_toggle(
     )
     .finish();
 
-    let current_value = profile_data.autosync_plans_to_rook_drive;
+    let current_value = profile_data.autosync_plans_to_pterm_drive;
     let switch = appearance
         .ui_builder()
         .switch(view.plan_auto_sync_switch.clone())
@@ -969,7 +969,7 @@ pub fn render_web_search_toggle(
     let icon_elem = Container::new(
         ConstrainedBox::new(
             Icon::Globe
-                .to_rookui_icon(appearance.theme().active_ui_text_color())
+                .to_ptermui_icon(appearance.theme().active_ui_text_color())
                 .finish(),
         )
         .with_width(icon_size)

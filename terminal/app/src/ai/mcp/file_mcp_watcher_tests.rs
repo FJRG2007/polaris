@@ -5,9 +5,9 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use futures::stream::AbortHandle;
+use ptermui::{App, Entity, ModelHandle};
 use repo_metadata::repositories::RepoDetectionSource;
 use repo_metadata::{RepositoryUpdate, TargetFile};
-use rookui::{App, Entity, ModelHandle};
 use settings::SettingsMode;
 
 use super::{
@@ -87,7 +87,7 @@ fn cleanup_env_vars(vars: &[&str]) {
 fn abort_config_parse_cancels_and_removes_inflight_task() {
     let (file_mcp_tx, _file_mcp_rx) = async_channel::unbounded();
     let config_path = PathBuf::from("/tmp/.mcp.json");
-    let key = (config_path.clone(), MCPProvider::Rook);
+    let key = (config_path.clone(), MCPProvider::Pterm);
     let (abort_handle, _abort_registration) = AbortHandle::new_pair();
     let observed_handle = abort_handle.clone();
     let mut watcher = FileMCPWatcher {
@@ -105,7 +105,7 @@ fn abort_config_parse_cancels_and_removes_inflight_task() {
         pending_scans: HashMap::new(),
     };
 
-    watcher.abort_config_parse(&config_path, MCPProvider::Rook);
+    watcher.abort_config_parse(&config_path, MCPProvider::Pterm);
 
     assert!(observed_handle.is_aborted());
     assert!(!watcher.in_flight_parses.contains_key(&key));
@@ -178,7 +178,7 @@ fn project_initial_scan_covers_each_supported_provider_config() {
     let discovered = providers_in_scope(repo.clone(), repo.clone()).collect::<HashSet<_>>();
 
     for provider in [
-        MCPProvider::Rook,
+        MCPProvider::Pterm,
         MCPProvider::Claude,
         MCPProvider::Codex,
         MCPProvider::Agents,
@@ -194,7 +194,7 @@ fn project_initial_scan_covers_each_supported_provider_config() {
 fn incremental_updates_detect_each_supported_provider_config() {
     let repo = PathBuf::from("/work/repository");
     for provider in [
-        MCPProvider::Rook,
+        MCPProvider::Pterm,
         MCPProvider::Claude,
         MCPProvider::Codex,
         MCPProvider::Agents,
@@ -290,12 +290,12 @@ async fn parse_outcomes_distinguish_missing_invalid_and_valid_configs() {
     let path = directory.path().join(".mcp.json");
 
     assert!(matches!(
-        parse_mcp_config_file(&path, MCPProvider::Rook).await,
+        parse_mcp_config_file(&path, MCPProvider::Pterm).await,
         FileMCPConfigParseOutcome::Missing
     ));
 
     std::fs::write(&path, "{invalid").expect("invalid config should be written");
-    match parse_mcp_config_file(&path, MCPProvider::Rook).await {
+    match parse_mcp_config_file(&path, MCPProvider::Pterm).await {
         FileMCPConfigParseOutcome::Error(diagnostic) => {
             assert_eq!(diagnostic.kind, FileMCPConfigDiagnosticKind::Parse);
         }
@@ -303,13 +303,13 @@ async fn parse_outcomes_distinguish_missing_invalid_and_valid_configs() {
     }
 
     // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::remove_var("ROOK_MCP_TEST_MISSING") };
+    unsafe { std::env::remove_var("POLARIS_TERMINAL_MCP_TEST_MISSING") };
     std::fs::write(
         &path,
-        r#"{"mcpServers":{"test":{"command":"${ROOK_MCP_TEST_MISSING}"}}}"#,
+        r#"{"mcpServers":{"test":{"command":"${POLARIS_TERMINAL_MCP_TEST_MISSING}"}}}"#,
     )
     .expect("missing-env config should be written");
-    match parse_mcp_config_file(&path, MCPProvider::Rook).await {
+    match parse_mcp_config_file(&path, MCPProvider::Pterm).await {
         FileMCPConfigParseOutcome::Error(diagnostic) => {
             assert_eq!(
                 diagnostic.kind,
@@ -324,7 +324,7 @@ async fn parse_outcomes_distinguish_missing_invalid_and_valid_configs() {
         r#"{"mcpServers":{"test":{"command":"test-command"}}}"#,
     )
     .expect("valid config should be written");
-    match parse_mcp_config_file(&path, MCPProvider::Rook).await {
+    match parse_mcp_config_file(&path, MCPProvider::Pterm).await {
         FileMCPConfigParseOutcome::Parsed(servers) => assert_eq!(servers.len(), 1),
         _ => panic!("valid config should produce one server"),
     }
@@ -376,7 +376,7 @@ fn scan_completes_after_the_current_parse_of_a_reparsed_source() {
         r#"{"mcpServers":{"test":{"command":"test-command"}}}"#,
     )
     .expect("valid config should be written");
-    let source = (config_path.clone(), MCPProvider::Rook);
+    let source = (config_path.clone(), MCPProvider::Pterm);
 
     App::test((), |mut app| async move {
         let watcher = setup_watcher(
@@ -402,7 +402,7 @@ fn scan_completes_after_the_current_parse_of_a_reparsed_source() {
                 watcher.update_servers_from_config_file(
                     &config_path,
                     root.clone(),
-                    MCPProvider::Rook,
+                    MCPProvider::Pterm,
                     ctx,
                 );
             }
@@ -412,7 +412,7 @@ fn scan_completes_after_the_current_parse_of_a_reparsed_source() {
         assert_eq!(
             *events.borrow(),
             vec![
-                CollectedEvent::ConfigParsed(MCPProvider::Rook),
+                CollectedEvent::ConfigParsed(MCPProvider::Pterm),
                 CollectedEvent::ScanComplete(PendingScan::InitialGlobal),
             ],
             "only the current parse may report a result or settle the scan"
@@ -434,7 +434,7 @@ fn stale_completion_callback_cannot_reclaim_a_superseded_source() {
         r#"{"mcpServers":{"test":{"command":"test-command"}}}"#,
     )
     .expect("valid config should be written");
-    let key = (config_path.clone(), MCPProvider::Rook);
+    let key = (config_path.clone(), MCPProvider::Pterm);
 
     App::test((), |mut app| async move {
         let watcher = setup_watcher(&mut app, HashMap::new());
@@ -442,14 +442,14 @@ fn stale_completion_callback_cannot_reclaim_a_superseded_source() {
             watcher.update_servers_from_config_file(
                 &config_path,
                 root.clone(),
-                MCPProvider::Rook,
+                MCPProvider::Pterm,
                 ctx,
             );
             let stale_generation = watcher.in_flight_parses[&key].generation;
             watcher.update_servers_from_config_file(
                 &config_path,
                 root.clone(),
-                MCPProvider::Rook,
+                MCPProvider::Pterm,
                 ctx,
             );
             assert_ne!(stale_generation, watcher.in_flight_parses[&key].generation);

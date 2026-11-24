@@ -1,22 +1,22 @@
 use std::collections::HashMap;
 
-use rook::integration_testing::command_search::{
+use polaris_terminal::integration_testing::command_search::{
     assert_command_search_has_results, assert_command_search_is_open,
     assert_history_filter_is_active,
 };
-use rook::integration_testing::input::assert_workflow_info_box_is_open;
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::{
+use polaris_terminal::integration_testing::input::assert_workflow_info_box_is_open;
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::{
     assert_input_editor_contents, wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::view_getters::single_input_view;
-use rook::integration_testing::{self};
-use rook::search::command_search::settings::ShowGlobalWorkflowsInUniversalSearch;
-use rook::sqlite_testing::set_user_and_hostname_for_commands;
-use rook::terminal::input::Input;
-use rook::terminal::model::session::get_local_hostname;
-use rook::terminal::shell::ShellType;
-use rookui_core::{ViewHandle, async_assert};
+use polaris_terminal::integration_testing::view_getters::single_input_view;
+use polaris_terminal::integration_testing::{self};
+use polaris_terminal::search::command_search::settings::ShowGlobalWorkflowsInUniversalSearch;
+use polaris_terminal::sqlite_testing::set_user_and_hostname_for_commands;
+use polaris_terminal::terminal::input::Input;
+use polaris_terminal::terminal::model::session::get_local_hostname;
+use polaris_terminal::terminal::shell::ShellType;
+use ptermui_core::{ViewHandle, async_assert};
 use settings::Setting as _;
 
 use super::{TEST_ONLY_ASSETS, new_builder};
@@ -320,7 +320,7 @@ pub fn test_command_search_loads_history_from_nondefault_histfile_path() -> Buil
 /// histfile commands, effectively "enriching" them with metadata.
 ///
 /// Basically, if a user manually deletes a command from their shell histfile, it should not show
-/// up in Rook -- so we effectively do a "left join" on commands from the histfile with commands
+/// up in Polaris Terminal -- so we effectively do a "left join" on commands from the histfile with commands
 /// loaded from sqlite.
 pub fn test_histfile_left_joined_with_persisted_history() -> Builder {
     new_builder()

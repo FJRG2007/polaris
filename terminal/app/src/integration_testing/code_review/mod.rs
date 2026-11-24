@@ -1,5 +1,5 @@
-use rookui::integration::{AssertionCallback, AssertionOutcome, TestStep};
-use rookui::{App, ViewHandle, WindowId, async_assert};
+use ptermui::integration::{AssertionCallback, AssertionOutcome, TestStep};
+use ptermui::{App, ViewHandle, WindowId, async_assert};
 
 use crate::code_review::code_review_view::{CodeReviewView, CodeReviewVisibleAnchorForTest};
 

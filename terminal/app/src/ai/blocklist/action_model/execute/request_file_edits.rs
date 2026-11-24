@@ -13,8 +13,8 @@ use futures::FutureExt;
 use futures::channel::oneshot;
 use futures::future::BoxFuture;
 use itertools::Itertools;
-use rook_core::send_telemetry_from_ctx;
-use rookui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity as _};
+use pterm_core::send_telemetry_from_ctx;
+use ptermui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity as _};
 pub(crate) use telemetry::MalformedFinalLineProxyEvent;
 #[allow(unused_imports)]
 pub use telemetry::{EditAcceptAndContinueClickedEvent, EditAcceptClickedEvent};
@@ -327,7 +327,7 @@ impl RequestFileEditsExecutor {
         // Set the session type so save/delete/create routes through the
         // correct FileModel backend.
         let diff_session_type = match self.active_session.as_ref(ctx).session_type(ctx) {
-            Some(SessionType::RookifiedRemote {
+            Some(SessionType::PtermifiedRemote {
                 host_id: Some(host_id),
             }) => DiffSessionType::Remote(host_id.clone()),
             _ => DiffSessionType::Local,

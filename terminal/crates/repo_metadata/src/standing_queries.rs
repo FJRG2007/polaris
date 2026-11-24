@@ -6,7 +6,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use rook_util::standardized_path::StandardizedPath;
+use pterm_util::standardized_path::StandardizedPath;
 
 /// Repository-scoped standing query configuration.
 #[derive(Debug, Clone)]
@@ -19,7 +19,10 @@ impl Default for StandingQueryDefinitions {
     fn default() -> Self {
         Self {
             project_skill_provider_paths: Vec::new(),
-            project_rule_file_names: vec!["ROOK.md".to_string(), "AGENTS.md".to_string()],
+            project_rule_file_names: vec![
+                "POLARIS_TERMINAL.md".to_string(),
+                "AGENTS.md".to_string(),
+            ],
         }
     }
 }

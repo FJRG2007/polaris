@@ -1,17 +1,17 @@
 use pathfinder_color::ColorU;
-pub use rookui::AppContext;
-pub use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::elements::{
+pub use ptermui::AppContext;
+pub use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::elements::{
     Align, Border, ChildAnchor, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DropShadow, Element, Flex, Hoverable, MouseStateHandle, OffsetPositioning,
     ParentAnchor, ParentOffsetBounds, Radius, SavePosition, Shrinkable, Text,
 };
-pub use rookui::elements::{ParentElement as _, Stack};
-pub use rookui::geometry::vector::vec2f;
-use rookui::keymap::EditableBinding;
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+pub use ptermui::elements::{ParentElement as _, Stack};
+pub use ptermui::geometry::vector::vec2f;
+use ptermui::keymap::EditableBinding;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -129,7 +129,7 @@ pub enum FindAction {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_editable_bindings([
         EditableBinding::new(
@@ -262,10 +262,10 @@ impl<T: FindModel + Entity<Event = FindEvent> + 'static> Find<T> {
                     self.model.as_ref(ctx).match_count()
                 ),
                 "Use enter and shift-enter to navigate between matches. Escape to quit.",
-                RookA11yRole::UserAction,
+                PtermA11yRole::UserAction,
             )
         } else {
-            AccessibilityContent::new_without_help("No results.", RookA11yRole::UserAction)
+            AccessibilityContent::new_without_help("No results.", PtermA11yRole::UserAction)
         };
         ctx.emit_a11y_content(content);
     }
@@ -381,7 +381,7 @@ impl<T: FindModel + Entity<Event = FindEvent> + 'static> Find<T> {
             };
             let icon = Container::new(
                 ConstrainedBox::new(
-                    icon.to_rookui_icon(appearance.theme().active_ui_text_color())
+                    icon.to_ptermui_icon(appearance.theme().active_ui_text_color())
                         .finish(),
                 )
                 .with_height(size)
@@ -445,7 +445,7 @@ impl<T: FindModel + Entity<Event = FindEvent> + 'static> Find<T> {
             appearance.theme().active_ui_text_color()
         };
         Container::new(
-            ConstrainedBox::new(match_icon.to_rookui_icon(icon_color).finish())
+            ConstrainedBox::new(match_icon.to_ptermui_icon(icon_color).finish())
                 .with_height(height)
                 .with_width(height)
                 .finish(),
@@ -472,7 +472,7 @@ impl<T: FindModel + Entity<Event = FindEvent> + 'static> Find<T> {
         Container::new(
             ConstrainedBox::new(
                 Icon::X
-                    .to_rookui_icon(appearance.theme().active_ui_text_color())
+                    .to_ptermui_icon(appearance.theme().active_ui_text_color())
                     .finish(),
             )
             .with_height(height)
@@ -522,7 +522,7 @@ impl<T: FindModel + Entity<Event = FindEvent> + 'static> View for Find<T> {
         Some(AccessibilityContent::new(
             "Type searched phrase.",
             "Press escape to quit, use enter and shift-enter to navigate between matches",
-            RookA11yRole::TextareaRole,
+            PtermA11yRole::TextareaRole,
         ))
     }
 

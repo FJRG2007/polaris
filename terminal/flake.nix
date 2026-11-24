@@ -1,5 +1,5 @@
 {
-  description = "Rook is an agentic development environment, born out of the terminal (Experimental Nix Support, Linux-only).";
+  description = "Polaris Terminal is an agentic development environment, born out of the terminal (Experimental Nix Support, Linux-only).";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -86,7 +86,7 @@
             in
             # crane writes a root config.toml; buildRustPackage expects the
             # cargoDeps layout to include .cargo/config.toml and Cargo.lock.
-            pkgs.runCommand "rook-terminal-experimental-${version}-cargo-vendor" { } ''
+            pkgs.runCommand "polaris-terminal-terminal-experimental-${version}-cargo-vendor" { } ''
               cp -R ${craneVendorDir}/. "$out"
               chmod u+w "$out"
               mkdir -p "$out/.cargo"
@@ -128,8 +128,8 @@
             "gui"
           ];
 
-          rook-terminal-experimental = rustPlatform.buildRustPackage {
-            pname = "rook-terminal-experimental";
+          polaris-terminal-terminal-experimental = rustPlatform.buildRustPackage {
+            pname = "polaris-terminal-terminal-experimental";
             inherit version;
 
             inherit src;
@@ -152,9 +152,9 @@
 
             cargoBuildFlags = [
               "-p"
-              "rook"
+              "polaris-terminal"
               "--bin"
-              "rook-oss"
+              "polaris-terminal"
             ];
             inherit buildFeatures;
 
@@ -163,7 +163,7 @@
             doCheck = false;
 
             env = {
-              APPIMAGE_NAME = "RookOss-${pkgs.stdenv.hostPlatform.parsed.cpu.name}.AppImage";
+              APPIMAGE_NAME = "PolarisTerminal-${pkgs.stdenv.hostPlatform.parsed.cpu.name}.AppImage";
               LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
               PROTOC = "${pkgs.protobuf}/bin/protoc";
               PROTOC_INCLUDE = "${pkgs.protobuf}/include";
@@ -178,65 +178,65 @@
                 executablePath = lib.makeBinPath (with pkgs; [ xdg-utils ]);
               in
               ''
-                install -Dm755 "$out/bin/rook-oss" "${installDir}/rook-oss"
-                rm -f "$out/bin/rook-oss"
+                install -Dm755 "$out/bin/polaris-terminal" "${installDir}/polaris-terminal"
+                rm -f "$out/bin/polaris-terminal"
 
                 patchShebangs \
                   ./script/prepare_bundled_resources \
                   ./script/copy_conditional_skills
 
-                SETTINGS_SCHEMA_EXECUTABLE="${installDir}/rook-oss" ./script/prepare_bundled_resources \
+                SETTINGS_SCHEMA_EXECUTABLE="${installDir}/polaris-terminal" ./script/prepare_bundled_resources \
                   "${resourcesDir}" \
                   "${releaseChannel}"
 
                 install -Dm644 \
                   "${resourcesDir}/THIRD_PARTY_LICENSES.txt" \
-                  "$out/share/licenses/rook-terminal-experimental/THIRD_PARTY_LICENSES.txt"
+                  "$out/share/licenses/polaris-terminal-terminal-experimental/THIRD_PARTY_LICENSES.txt"
 
-                install -Dm644 LICENSE-AGPL "$out/share/licenses/rook-terminal-experimental/LICENSE-AGPL"
-                install -Dm644 LICENSE-MIT "$out/share/licenses/rook-terminal-experimental/LICENSE-MIT"
+                install -Dm644 LICENSE-AGPL "$out/share/licenses/polaris-terminal-terminal-experimental/LICENSE-AGPL"
+                install -Dm644 LICENSE-MIT "$out/share/licenses/polaris-terminal-terminal-experimental/LICENSE-MIT"
 
-                install -Dm644 app/channels/oss/dev.rook.RookOss.desktop \
-                  "$out/share/applications/dev.rook.RookOss.desktop"
-                substituteInPlace "$out/share/applications/dev.rook.RookOss.desktop" \
-                  --replace-fail "Exec=rook-terminal-oss %U" "Exec=rook-terminal-experimental %U"
+                install -Dm644 app/channels/oss/dev.polaris.PolarisTerminal.desktop \
+                  "$out/share/applications/dev.polaris.PolarisTerminal.desktop"
+                substituteInPlace "$out/share/applications/dev.polaris.PolarisTerminal.desktop" \
+                  --replace-fail "Exec=polaris-terminal-terminal-oss %U" "Exec=polaris-terminal-terminal-experimental %U"
 
                 for size in 16x16 32x32 64x64 128x128 256x256 512x512; do
                   icon="app/channels/oss/icon/no-padding/$size.png"
                   if [ -f "$icon" ]; then
                     install -Dm644 "$icon" \
-                      "$out/share/icons/hicolor/$size/apps/dev.rook.RookOss.png"
+                      "$out/share/icons/hicolor/$size/apps/dev.polaris.PolarisTerminal.png"
                   fi
                 done
 
-                wrapProgram "${installDir}/rook-oss" \
+                wrapProgram "${installDir}/polaris-terminal" \
                   --prefix LD_LIBRARY_PATH : "${libraryPath}" \
                   --prefix PATH : "${executablePath}"
 
                 mkdir -p "$out/bin"
-                ln -s "${installDir}/rook-oss" "$out/bin/rook-oss"
-                ln -s "${installDir}/rook-oss" "$out/bin/rook-terminal-experimental"
+                ln -s "${installDir}/polaris-terminal" "$out/bin/polaris-terminal"
+                ln -s "${installDir}/polaris-terminal" "$out/bin/polaris-terminal-terminal-experimental"
               '';
 
             postFixup = lib.optionalString pkgs.stdenv.isLinux ''
-              wrapped="/opt/warpdotdev/warp-terminal-experimental/.rook-oss-wrapped"
+              wrapped="/opt/warpdotdev/warp-terminal-experimental/.polaris-terminal-oss-wrapped"
               if [ -e "$out$wrapped" ] && ! patchelf --print-needed "$out$wrapped" | grep -q '^libfontconfig\.so\.1$'; then
                 patchelf --add-needed libfontconfig.so.1 "$out$wrapped"
               fi
             '';
 
             meta = {
-              description = "Rook is an agentic development environment, born out of the terminal (Experimental Nix Support, Linux-only).";
+              description = "Polaris Terminal is an agentic development environment, born out of the terminal (Experimental Nix Support, Linux-only).";
               homepage = "https://www.rook.dev";
               license = lib.licenses.agpl3Only;
-              mainProgram = "rook-terminal-experimental";
+              mainProgram = "polaris-terminal-terminal-experimental";
               platforms = systems;
               sourceProvenance = with lib.sourceTypes; [ fromSource ];
             };
           };
         in
         {
-          inherit rook-terminal-experimental;
+          inherit polaris-terminal-terminal-experimental;
         }
       );
 
@@ -295,7 +295,7 @@
         {
           default = pkgs.mkShell {
             inherit nativeBuildInputs buildInputs;
-            APPIMAGE_NAME = "RookOss-${pkgs.stdenv.hostPlatform.parsed.cpu.name}.AppImage";
+            APPIMAGE_NAME = "PolarisTerminal-${pkgs.stdenv.hostPlatform.parsed.cpu.name}.AppImage";
             LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
             PROTOC = "${pkgs.protobuf}/bin/protoc";
             PROTOC_INCLUDE = "${pkgs.protobuf}/include";

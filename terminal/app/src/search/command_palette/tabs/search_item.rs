@@ -1,7 +1,7 @@
 use ordered_float::OrderedFloat;
-use rookui::elements::{ConstrainedBox, Container, Flex, ParentElement, Text};
-use rookui::fonts::{Properties, Weight};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::elements::{ConstrainedBox, Container, Flex, ParentElement, Text};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::search::command_palette::mixer::CommandPaletteItemAction;

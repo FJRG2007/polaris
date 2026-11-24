@@ -22,7 +22,7 @@ use command::blocking::Command;
 use crash_handler::{CrashContext, CrashHandler};
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
-use rook_errors::report_error;
+use pterm_errors::report_error;
 use sentry::protocol::{Attachment, AttachmentType};
 use sentry::{Breadcrumb, Level};
 use serde::{Deserialize, Serialize};
@@ -58,7 +58,7 @@ pub fn init() {
 pub fn uninit() {
     let maybe_guard = { GUARD.lock().take() };
     // Ensure we drop the `MinidumpGuard` after releasing the GUARD mutex. If there's an
-    // error stopping the server, we should log it as a Sentry breadcrumb in the Rook
+    // error stopping the server, we should log it as a Sentry breadcrumb in the Polaris Terminal
     // process, but not forward the breadcrumb to the server process.
     std::mem::drop(maybe_guard);
 }
@@ -120,9 +120,9 @@ pub struct MinidumpGuard {
 pub fn run_server(socket_path: &Path) -> anyhow::Result<()> {
     // For troubleshooting, attempt to log from the minidump server. There's not much we can really
     // do if crash reporting fails, so creating the log file itself is best-effort.
-    let log_dir = rook_core::paths::state_dir().join(rook_core::paths::ROOK_LOGS_DIR);
+    let log_dir = pterm_core::paths::state_dir().join(pterm_core::paths::POLARIS_TERMINAL_LOGS_DIR);
     let _ = std::fs::create_dir_all(&log_dir);
-    let log_path = log_dir.join("rook-minidump.log");
+    let log_path = log_dir.join("polaris-terminal-minidump.log");
     let log_target = File::create(log_path)
         .map(|file| env_logger::Target::Pipe(Box::new(file)))
         .unwrap_or_else(|_| env_logger::Target::Stdout);
@@ -242,7 +242,7 @@ fn send_crash_report(details: Option<String>, dump: Option<minidumper::MinidumpB
 
         Some(Attachment {
             buffer,
-            filename: "rook-minidump.dmp".to_string(),
+            filename: "polaris-terminal-minidump.dmp".to_string(),
             ty: Some(AttachmentType::Minidump),
             ..Default::default()
         })
@@ -272,7 +272,7 @@ impl MinidumpGuard {
             // On macOS, the maximum length of a socket path is fairly short, so use the temp directory.
             std::env::temp_dir().join(socket_name)
         } else {
-            rook_core::paths::state_dir().join(socket_name)
+            pterm_core::paths::state_dir().join(socket_name)
         };
 
         let child =
@@ -308,7 +308,7 @@ impl MinidumpGuard {
         })
         .context("Failed to attach crash signal handler")?;
 
-        // Ensure that the crash server process can ptrace Rook.
+        // Ensure that the crash server process can ptrace Polaris Terminal.
         #[cfg(target_os = "linux")]
         crash_handler.set_ptracer(Some(child.id()));
 

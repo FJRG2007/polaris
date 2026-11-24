@@ -14,7 +14,7 @@ use tracing::Span;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-/// A small webserver to serve the Rook wasm bundle and assets for local development.
+/// A small webserver to serve the Polaris Terminal wasm bundle and assets for local development.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -38,7 +38,7 @@ async fn main() {
 
     let args = Args::parse();
 
-    println!("Serving Rook on http://localhost:{}", args.port);
+    println!("Serving Polaris Terminal on http://localhost:{}", args.port);
     serve(make_router(&args.directory), args.port).await
 }
 
@@ -87,7 +87,7 @@ fn make_router(build_directory: &Path) -> Router {
             "/assets/client/wasm",
             ServeDir::new(build_directory.join("wasm")),
         )
-        // This needs to be kept in sync with rook_util::path::hashed_asset_url.
+        // This needs to be kept in sync with pterm_util::path::hashed_asset_url.
         .nest_service(
             "/assets/client/static",
             ServeDir::new(build_directory.join("assets")),

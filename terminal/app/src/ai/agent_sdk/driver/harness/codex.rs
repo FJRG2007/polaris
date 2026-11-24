@@ -7,12 +7,12 @@ use std::sync::{Arc, OnceLock};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use parking_lot::Mutex;
-use rook_cli::agent::Harness;
-use rook_core::features::FeatureFlag;
-use rook_core::safe_info;
-use rook_errors::report_error;
-use rook_managed_secrets::ManagedSecretValue;
-use rookui::{ModelHandle, ModelSpawner, SingletonEntity};
+use pterm_cli::agent::Harness;
+use pterm_core::features::FeatureFlag;
+use pterm_core::safe_info;
+use pterm_errors::report_error;
+use pterm_managed_secrets::ManagedSecretValue;
+use ptermui::{ModelHandle, ModelSpawner, SingletonEntity};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tempfile::NamedTempFile;
@@ -48,7 +48,7 @@ pub(crate) struct CodexHarness;
 const CODEX_CLI_FORMAT: &str = "codex_cli";
 /// Slash command Codex's TUI recognises as a graceful shutdown.
 const CODEX_EXIT_COMMAND: &str = "/exit";
-/// Allow the Rook-installed Codex plugin hooks to run in vetted driver sessions
+/// Allow the Polaris Terminal-installed Codex plugin hooks to run in vetted driver sessions
 /// without requiring an unattended `/hooks` review step.
 const CODEX_BYPASS_HOOK_TRUST_FLAG: &str = "--dangerously-bypass-hook-trust";
 
@@ -185,7 +185,7 @@ impl ThirdPartyHarness for CodexHarness {
 /// `--dangerously-bypass-approvals-and-sandbox` disables both the sandbox and approval
 /// prompts so the agent can run autonomously.
 /// `--dangerously-bypass-hook-trust` allows the orchestration plugin hooks installed by
-/// Rook to run without a manual hook review in unattended driver sessions. Driver setup
+/// Polaris Terminal to run without a manual hook review in unattended driver sessions. Driver setup
 /// verifies the Codex platform plugin before launching commands with this flag.
 /// `Some(session_id)` indicates that we want to resume that prior session. Unlike claude,
 /// codex does not support assigning a session_id to a new conversation.
@@ -575,7 +575,7 @@ fn prepare_codex_environment_config(
 
 /// Publish configured and eligible bundled skills under
 /// `<harness_working_dir>/.agents/skills`, so Codex sees the same skills
-/// available to the Rook driver.
+/// available to the Polaris Terminal driver.
 ///
 /// Relative source directories are resolved from the workspace root, matching
 /// Oz. The links are published into the harness working directory because
@@ -586,10 +586,10 @@ fn prepare_codex_environment_config(
 /// existing entry with the same name (see
 /// `skill_dirs_publish::publish_skill`), with the conflict-resolution behavior
 /// depending on whether this run is sandboxed (see
-/// `rook_isolation_platform::detect`).
+/// `pterm_isolation_platform::detect`).
 fn publish_skills_for_codex(workspace_root: &Path, harness_working_dir: &Path) {
     let skill_root = harness_working_dir.join(".agents").join("skills");
-    let is_sandbox = rook_isolation_platform::detect().is_some();
+    let is_sandbox = pterm_isolation_platform::detect().is_some();
     let published = super::skill_dirs_publish::publish_skills_for_harness(
         &skill_root,
         workspace_root,

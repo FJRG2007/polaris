@@ -1,11 +1,11 @@
 # The window stops responding while another program writes many files
 
-**Symptom.** Rook goes "Not responding" for anything from 20 seconds to three
+**Symptom.** Polaris Terminal goes "Not responding" for anything from 20 seconds to three
 minutes, then recovers on its own, without anything being typed into it.
 
 ## How it was established
 
-Nothing in Rook's own log explains a stall; the log only shows the hole. The
+Nothing in Polaris Terminal's own log explains a stall; the log only shows the hole. The
 15-second autosave writes a line on the main thread, so a gap in those lines is
 a gap in the main thread:
 
@@ -25,15 +25,15 @@ Windows logged no Application Hang event for any of them.
 ~590 s is almost exactly the ~565 s the stalls add up to, so for the length of
 a stall the main thread is busy the whole time.
 
-**What the work is.** A sampler outside Rook read the main thread's stack every
+**What the work is.** A sampler outside Polaris Terminal read the main thread's stack every
 10 seconds while `IsHungAppWindow` was true (suspend, `GetThreadContext`,
 resume, unwind with dbghelp). It caught a 37-second stall at 13:13:45. Every
 capture had the main thread in `CreateFileW` or `NtClose`, called from the same
-few addresses in `rook-oss.exe`: file handles opened and closed one after
+few addresses in `polaris-terminal.exe`: file handles opened and closed one after
 another, for the whole stall.
 
 The release carried no PDB, so those addresses have no names. What named them
-was asking what was writing files at 13:13. Of the directories open in Rook's
+was asking what was writing files at 13:13. Of the directories open in Polaris Terminal's
 tabs, one had changed:
 
 ```
@@ -42,8 +42,8 @@ C:\...\polaris  1,860,647 files, 316,332 written 13:12:30-13:16:30Z
 ```
 
 A Claude Code session was creating git worktrees in a repository open in a
-Rook tab. The stall at 10:57 matches in the same way: `cargo check`, started by
-rust-analyzer, filled `rook\target\`, which holds ~100,000 files now. The
+Polaris Terminal tab. The stall at 10:57 matches in the same way: `cargo check`, started by
+rust-analyzer, filled `polaris-terminal\target\`, which holds ~100,000 files now. The
 others were not checked against file activity; later writes have since
 replaced the timestamps that would show it.
 
@@ -64,7 +64,7 @@ PDB will confirm it or not.
 
 The code is upstream's, unchanged. It shows here because several Claude
 sessions create worktrees and build artifacts inside repositories that are open
-in Rook tabs.
+in Polaris Terminal tabs.
 
 ## Fix
 

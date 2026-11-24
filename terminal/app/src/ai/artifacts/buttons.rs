@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use rook_core::ui::icons::Icon;
-use rook_core::ui::theme::AnsiColorIdentifier;
-use rookui::elements::{ChildView, Element, Empty, ParentElement, Wrap};
-use rookui::{AppContext, Entity, TypedActionView, View, ViewContext, ViewHandle};
+use pterm_core::ui::icons::Icon;
+use pterm_core::ui::theme::AnsiColorIdentifier;
+use ptermui::elements::{ChildView, Element, Empty, ParentElement, Wrap};
+use ptermui::{AppContext, Entity, TypedActionView, View, ViewContext, ViewHandle};
 
 use super::{Artifact, file_button_label};
 use crate::notebooks::NotebookId;
@@ -139,7 +139,7 @@ fn collect_buttons(
                 notebook_uid,
                 document_uid: _,
             } => {
-                // Only show plan button if synced to Rook Drive (has notebook_uid)
+                // Only show plan button if synced to Polaris Terminal Drive (has notebook_uid)
                 if let Some(notebook_uid) = notebook_uid {
                     let button_text = title.clone().unwrap_or("Untitled Plan".to_string());
                     let theme = theme.clone();

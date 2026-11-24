@@ -5,14 +5,14 @@ use ai::skills::{
     provider_parent_directory_for_skills_root, read_skills,
 };
 use anyhow::Error;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::AppContext;
 use repo_metadata::{RepoMetadataModel, RepositoryIdentifier};
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::AppContext;
 use walkdir::{DirEntry, WalkDir};
 
-use crate::rook_managed_paths_watcher::rook_managed_skill_dirs;
+use crate::pterm_managed_paths_watcher::pterm_managed_skill_dirs;
 
 fn local_or_remote_path_for_repo_path(
     repo_id: &RepositoryIdentifier,
@@ -130,7 +130,7 @@ pub fn is_skill_file(path: &Path) -> bool {
 pub fn extract_skill_parent_directory(
     path: &LocalOrRemotePath,
 ) -> Result<LocalOrRemotePath, Error> {
-    let is_rook_home_skill = path
+    let is_pterm_home_skill = path
         .to_local_path()
         .and_then(Path::file_name)
         .and_then(|name| name.to_str())
@@ -139,8 +139,8 @@ pub fn extract_skill_parent_directory(
             .to_local_path()
             .and_then(Path::parent)
             .and_then(Path::parent)
-            .is_some_and(|parent| rook_managed_skill_dirs().iter().any(|dir| parent == dir));
-    if is_rook_home_skill {
+            .is_some_and(|parent| pterm_managed_skill_dirs().iter().any(|dir| parent == dir));
+    if is_pterm_home_skill {
         return dirs::home_dir()
             .map(LocalOrRemotePath::Local)
             .ok_or_else(|| {
@@ -177,8 +177,8 @@ pub fn is_home_skill_directory(path: &Path) -> bool {
 /// E.g. ~/.agents/skills
 pub fn is_home_provider_path(path: &Path) -> bool {
     SKILL_PROVIDER_DEFINITIONS.iter().any(|provider| {
-        if provider.provider == SkillProvider::Rook {
-            return rook_managed_skill_dirs().iter().any(|dir| path == dir);
+        if provider.provider == SkillProvider::Pterm {
+            return pterm_managed_skill_dirs().iter().any(|dir| path == dir);
         }
         home_skills_path(provider.provider)
             .as_ref()

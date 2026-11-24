@@ -7,7 +7,7 @@ use super::{
 fn deserialize_legacy_environment_without_providers() {
     let json = serde_json::json!({
         "name": "my-env",
-        "github_repos": [{"owner": "warpdotdev", "repo": "rook"}],
+        "github_repos": [{"owner": "warpdotdev", "repo": "polaris-terminal"}],
         "docker_image": "ubuntu:latest",
         "setup_commands": ["echo hello"]
     });
@@ -23,7 +23,7 @@ fn deserialize_legacy_environment_without_providers() {
         vec![SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".into(),
-            "rook".into()
+            "polaris-terminal".into()
         )]
     );
     assert_eq!(
@@ -39,7 +39,7 @@ fn deserialize_environment_without_docker_image() {
     // server may omit the docker image entirely.
     let json = serde_json::json!({
         "name": "no-image-env",
-        "github_repos": [{"owner": "warpdotdev", "repo": "rook"}],
+        "github_repos": [{"owner": "warpdotdev", "repo": "polaris-terminal"}],
         "setup_commands": ["echo hello"]
     });
 
@@ -95,19 +95,29 @@ fn roundtrip_serde_without_docker_image() {
 fn source_repo_checkout_ref_round_trips_and_is_optional() {
     // Present: the field serializes under the `checkout_ref` JSON tag and
     // survives a round trip.
-    let pinned = SourceRepo::new(CodeForge::GitHub, "warpdotdev".into(), "rook".into())
-        .with_checkout_ref(Some("abc123".into()));
+    let pinned = SourceRepo::new(
+        CodeForge::GitHub,
+        "warpdotdev".into(),
+        "polaris-terminal".into(),
+    )
+    .with_checkout_ref(Some("abc123".into()));
     let json = serde_json::to_value(&pinned).unwrap();
     assert_eq!(json.get("checkout_ref").unwrap(), "abc123");
     assert_eq!(serde_json::from_value::<SourceRepo>(json).unwrap(), pinned);
 
     // Absent: the field is omitted from the wire form and defaults to None on
     // deserialize, so existing payloads without it keep working.
-    let unpinned = SourceRepo::new(CodeForge::GitHub, "warpdotdev".into(), "rook".into());
+    let unpinned = SourceRepo::new(
+        CodeForge::GitHub,
+        "warpdotdev".into(),
+        "polaris-terminal".into(),
+    );
     let json = serde_json::to_value(&unpinned).unwrap();
     assert!(!json.as_object().unwrap().contains_key("checkout_ref"));
-    let parsed: SourceRepo =
-        serde_json::from_value(serde_json::json!({"owner": "warpdotdev", "repo": "rook"})).unwrap();
+    let parsed: SourceRepo = serde_json::from_value(
+        serde_json::json!({"owner": "warpdotdev", "repo": "polaris-terminal"}),
+    )
+    .unwrap();
     assert_eq!(parsed.checkout_ref, None);
 }
 
@@ -188,13 +198,13 @@ fn deserialize_azure_devops_environment_builds_git_segment_clone_urls() {
 fn azure_devops_clone_url_encodes_owner_segments() {
     let repo = SourceRepo::new(
         CodeForge::AzureDevOps,
-        "Rook Organization/Test Project".into(),
-        "rook".into(),
+        "Polaris Terminal Organization/Test Project".into(),
+        "polaris-terminal".into(),
     );
 
     assert_eq!(
         repo.https_clone_url(),
-        "https://dev.azure.com/Rook%20Organization/Test%20Project/_git/rook"
+        "https://dev.azure.com/Polaris Terminal%20Organization/Test%20Project/_git/polaris-terminal"
     );
 }
 
@@ -203,12 +213,12 @@ fn azure_devops_clone_url_encodes_repository_segment() {
     let repo = SourceRepo::new(
         CodeForge::AzureDevOps,
         "warpdotdev/test-project".into(),
-        "Rook Repo".into(),
+        "Polaris Terminal Repo".into(),
     );
 
     assert_eq!(
         repo.https_clone_url(),
-        "https://dev.azure.com/warpdotdev/test-project/_git/Rook%20Repo"
+        "https://dev.azure.com/warpdotdev/test-project/_git/Polaris Terminal%20Repo"
     );
 }
 
@@ -263,7 +273,10 @@ fn legacy_environment_serialization_omits_provider_neutral_fields() {
     let env = AmbientAgentEnvironment::new(
         "legacy-env".into(),
         None,
-        vec![GithubRepo::new("warpdotdev".into(), "rook".into())],
+        vec![GithubRepo::new(
+            "warpdotdev".into(),
+            "polaris-terminal".into(),
+        )],
         "ubuntu:latest".into(),
         vec![],
     );
@@ -281,9 +294,9 @@ fn deserialize_mixed_environment_uses_per_repo_forges() {
         "name": "mixed-env",
         "code_forge": "GITHUB",
         "code_forges": ["GITHUB", "GITLAB"],
-        "github_repos": [{"owner": "warpdotdev", "repo": "rook"}],
+        "github_repos": [{"owner": "warpdotdev", "repo": "polaris-terminal"}],
         "source_repos": [
-            {"code_forge": "GITHUB", "owner": "warpdotdev", "repo": "rook"},
+            {"code_forge": "GITHUB", "owner": "warpdotdev", "repo": "polaris-terminal"},
             {"code_forge": "GITLAB", "owner": "platform/backend", "repo": "api"}
         ],
         "docker_image": "ubuntu:latest"
@@ -305,7 +318,7 @@ fn deserialize_mixed_environment_uses_per_repo_forges() {
     assert_eq!(repos[1].code_forge, Some(CodeForge::GitLab));
     assert_eq!(
         repos[0].https_clone_url(),
-        "https://github.com/warpdotdev/rook.git"
+        "https://github.com/warpdotdev/polaris-terminal.git"
     );
     assert_eq!(
         repos[1].https_clone_url(),
@@ -320,7 +333,7 @@ fn mixed_environment_does_not_fill_omitted_repo_forge() {
         "code_forge": "GITHUB",
         "code_forges": ["GITHUB", "GITLAB"],
         "source_repos": [
-            {"code_forge": "GITHUB", "owner": "warpdotdev", "repo": "rook"},
+            {"code_forge": "GITHUB", "owner": "warpdotdev", "repo": "polaris-terminal"},
             {"owner": "platform/backend", "repo": "api"}
         ],
         "docker_image": "ubuntu:latest"
@@ -344,7 +357,7 @@ fn github_plus_unknown_forge_does_not_fill_omitted_repo_forge() {
         "code_forge": "GITHUB",
         "code_forges": ["GITHUB", "BITBUCKET"],
         "source_repos": [
-            {"code_forge": "GITHUB", "owner": "warpdotdev", "repo": "rook"},
+            {"code_forge": "GITHUB", "owner": "warpdotdev", "repo": "polaris-terminal"},
             {"owner": "acme", "repo": "widgets"}
         ],
         "docker_image": "ubuntu:latest"

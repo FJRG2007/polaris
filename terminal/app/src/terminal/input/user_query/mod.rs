@@ -6,8 +6,8 @@ mod search_item;
 mod view;
 
 pub use data_source::SelectUserQuery;
-use rookui::keymap::Keystroke;
-use rookui::platform::OperatingSystem;
+use ptermui::keymap::Keystroke;
+use ptermui::platform::OperatingSystem;
 pub use view::{UserQueryMenuEvent, UserQueryMenuView};
 
 use crate::terminal::input::inline_menu::{

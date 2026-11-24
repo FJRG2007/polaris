@@ -4,12 +4,12 @@ use std::path::{Path, PathBuf};
 
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_core::ui::Icon;
-use rook_core::ui::theme::{AnsiColorIdentifier, Fill};
-use rookui::elements::{ConstrainedBox, Container, Highlight, Text};
-use rookui::fonts::{Properties, Weight};
-use rookui::text_layout::ClipConfig;
-use rookui::{AppContext, Element, SingletonEntity};
+use pterm_core::ui::Icon;
+use pterm_core::ui::theme::{AnsiColorIdentifier, Fill};
+use ptermui::elements::{ConstrainedBox, Container, Highlight, Text};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::text_layout::ClipConfig;
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::search::SearchItem;
@@ -62,7 +62,7 @@ impl SearchItem for RepoSearchItem {
         let icon_size = inline_styles::font_size(appearance);
         let icon_color = inline_styles::icon_color(appearance);
 
-        let icon = ConstrainedBox::new(Icon::Folder.to_rookui_icon(icon_color).finish())
+        let icon = ConstrainedBox::new(Icon::Folder.to_ptermui_icon(icon_color).finish())
             .with_width(icon_size)
             .with_height(icon_size)
             .finish();

@@ -3,19 +3,19 @@ Linear: APP-2527
 Companion product spec: [`specs/APP-2527/PRODUCT.md`](./PRODUCT.md)
 
 ## Context
-Today an expanded MCP tool-call detail is rendered as a single selectable, monospace, pretty-printed JSON string. Both the request arguments and the response are concatenated into one `String` and shown in one `Text` element. We are replacing that body with an interactive, collapsible, theme-colored JSON tree — built as a generic, reusable `rookui`-style component so it can serve other surfaces (MCP resource results, structured agent outputs, etc.) without re-implementation. The collapsed header row, accept/reject flow, and all non-MCP action rendering are unchanged.
+Today an expanded MCP tool-call detail is rendered as a single selectable, monospace, pretty-printed JSON string. Both the request arguments and the response are concatenated into one `String` and shown in one `Text` element. We are replacing that body with an interactive, collapsible, theme-colored JSON tree — built as a generic, reusable `ptermui`-style component so it can serve other surfaces (MCP resource results, structured agent outputs, etc.) without re-implementation. The collapsed header row, accept/reject flow, and all non-MCP action rendering are unchanged.
 
 All references pinned to commit `46265f499a3a32a488f640c0fce7565bb763496f`.
 
 Key existing code:
-- [`app/src/ai/blocklist/inline_action/requested_command.rs` (1393-1484) @ 46265f4](https://github.com/FJRG2007/rook/blob/46265f499a3a32a488f640c0fce7565bb763496f/app/src/ai/blocklist/inline_action/requested_command.rs#L1393-L1484) — `RequestedCommandView::render`'s `should_render_mcp_content` branch. This is the exact block being replaced.
-- [`app/src/ai/blocklist/inline_action/requested_command.rs` (1438-1445) @ 46265f4](https://github.com/FJRG2007/rook/blob/46265f499a3a32a488f640c0fce7565bb763496f/app/src/ai/blocklist/inline_action/requested_command.rs#L1438-L1445) — where `CallMCPToolResult::{Success,Error,Cancelled}` is turned into `result_text`.
-- [`app/src/ai/blocklist/inline_action/requested_command.rs` (475-481) @ 46265f4](https://github.com/FJRG2007/rook/blob/46265f499a3a32a488f640c0fce7565bb763496f/app/src/ai/blocklist/inline_action/requested_command.rs#L475-L481) — `RequestedCommandView` fields including `mcp_content_selection_handle` and `mcp_content_selected_text`. Tree expansion state will be added here.
-- [`app/src/ai/blocklist/block.rs` (2043-2080) @ 46265f4](https://github.com/FJRG2007/rook/blob/46265f499a3a32a488f640c0fce7565bb763496f/app/src/ai/blocklist/block.rs#L2043-L2080) — where `command_text` is built as `MCP Tool: {name} ({display_input})` including integer-coercion via `coerce_integer_args`. The raw `input: serde_json::Value` and `name` are available here.
-- [`app/src/ai/blocklist/action_model/execute/call_mcp_tool.rs` (105-126, 169-286) @ 46265f4](https://github.com/FJRG2007/rook/blob/46265f499a3a32a488f640c0fce7565bb763496f/app/src/ai/blocklist/action_model/execute/call_mcp_tool.rs#L105-L126) — `coerce_integer_args` (`pub(crate)`), already reused by `block.rs`.
-- [`crates/ai/src/agent/action_result/mod.rs` (1056-1077) @ 46265f4](https://github.com/FJRG2007/rook/blob/46265f499a3a32a488f640c0fce7565bb763496f/crates/ai/src/agent/action_result/mod.rs#L1056-L1077) — `CallMCPToolResult::Success { result: rmcp::model::CallToolResult }`, `Error(String)`, `Cancelled`. `CallToolResult` carries `structured_content: Option<serde_json::Value>` and `content: Vec<Content>` (text items).
-- [`crates/rook_core/src/ui/theme/color.rs` (361-424) @ 46265f4](https://github.com/FJRG2007/rook/blob/46265f499a3a32a488f640c0fce7565bb763496f/crates/rook_core/src/ui/theme/color.rs#L361-L424) — `RookTheme` ANSI accessors (`ansi_fg_green/yellow/blue/cyan/magenta`) and `internal_colors::{text_main, text_sub, text_disabled}`.
-- [`app/src/ai/blocklist/inline_action/inline_action_header.rs` (96-107) @ 46265f4](https://github.com/FJRG2007/rook/blob/46265f499a3a32a488f640c0fce7565bb763496f/app/src/ai/blocklist/inline_action/inline_action_header.rs#L96-L107) — existing chevron/expansion plumbing for reference; the generic component uses `Icon::ChevronRight`/`Icon::ChevronDown` from `rookui` directly rather than importing `render_expansion_icon`, to avoid a wrong-direction module dependency.
+- [`app/src/ai/blocklist/inline_action/requested_command.rs` (1393-1484) @ 46265f4](https://github.com/FJRG2007/polaris/blob/46265f499a3a32a488f640c0fce7565bb763496f/terminal/app/src/ai/blocklist/inline_action/requested_command.rs#L1393-L1484) — `RequestedCommandView::render`'s `should_render_mcp_content` branch. This is the exact block being replaced.
+- [`app/src/ai/blocklist/inline_action/requested_command.rs` (1438-1445) @ 46265f4](https://github.com/FJRG2007/polaris/blob/46265f499a3a32a488f640c0fce7565bb763496f/terminal/app/src/ai/blocklist/inline_action/requested_command.rs#L1438-L1445) — where `CallMCPToolResult::{Success,Error,Cancelled}` is turned into `result_text`.
+- [`app/src/ai/blocklist/inline_action/requested_command.rs` (475-481) @ 46265f4](https://github.com/FJRG2007/polaris/blob/46265f499a3a32a488f640c0fce7565bb763496f/terminal/app/src/ai/blocklist/inline_action/requested_command.rs#L475-L481) — `RequestedCommandView` fields including `mcp_content_selection_handle` and `mcp_content_selected_text`. Tree expansion state will be added here.
+- [`app/src/ai/blocklist/block.rs` (2043-2080) @ 46265f4](https://github.com/FJRG2007/polaris/blob/46265f499a3a32a488f640c0fce7565bb763496f/terminal/app/src/ai/blocklist/block.rs#L2043-L2080) — where `command_text` is built as `MCP Tool: {name} ({display_input})` including integer-coercion via `coerce_integer_args`. The raw `input: serde_json::Value` and `name` are available here.
+- [`app/src/ai/blocklist/action_model/execute/call_mcp_tool.rs` (105-126, 169-286) @ 46265f4](https://github.com/FJRG2007/polaris/blob/46265f499a3a32a488f640c0fce7565bb763496f/terminal/app/src/ai/blocklist/action_model/execute/call_mcp_tool.rs#L105-L126) — `coerce_integer_args` (`pub(crate)`), already reused by `block.rs`.
+- [`crates/ai/src/agent/action_result/mod.rs` (1056-1077) @ 46265f4](https://github.com/FJRG2007/polaris/blob/46265f499a3a32a488f640c0fce7565bb763496f/terminal/crates/ai/src/agent/action_result/mod.rs#L1056-L1077) — `CallMCPToolResult::Success { result: rmcp::model::CallToolResult }`, `Error(String)`, `Cancelled`. `CallToolResult` carries `structured_content: Option<serde_json::Value>` and `content: Vec<Content>` (text items).
+- [`crates/pterm_core/src/ui/theme/color.rs` (361-424) @ 46265f4](https://github.com/FJRG2007/polaris/blob/46265f499a3a32a488f640c0fce7565bb763496f/terminal/crates/pterm_core/src/ui/theme/color.rs#L361-L424) — `PtermTheme` ANSI accessors (`ansi_fg_green/yellow/blue/cyan/magenta`) and `internal_colors::{text_main, text_sub, text_disabled}`.
+- [`app/src/ai/blocklist/inline_action/inline_action_header.rs` (96-107) @ 46265f4](https://github.com/FJRG2007/polaris/blob/46265f499a3a32a488f640c0fce7565bb763496f/terminal/app/src/ai/blocklist/inline_action/inline_action_header.rs#L96-L107) — existing chevron/expansion plumbing for reference; the generic component uses `Icon::ChevronRight`/`Icon::ChevronDown` from `ptermui` directly rather than importing `render_expansion_icon`, to avoid a wrong-direction module dependency.
 
 See `PRODUCT.md` for user-visible behavior; this spec does not restate it.
 
@@ -23,10 +23,10 @@ See `PRODUCT.md` for user-visible behavior; this spec does not restate it.
 
 ### A. Widget architecture: where does the tree component live?
 
-**Option A1 — Generic `rookui`-level component (recommended)**
-Add a standalone `JsonTreeView` as a `rookui`-level element in `app/src/ui_components/json_tree.rs` (same layer as other reusable view utilities, avoiding a `serde_json` dependency in the `rookui` crate itself). The component takes a `&serde_json::Value`, a `JsonTreeState` (expansion map), a `JsonTreeColors` (pre-resolved theme colors), and callbacks for toggle/copy, and returns a `Box<dyn Element>`. It has no dependency on agent-specific types.
+**Option A1 — Generic `ptermui`-level component (recommended)**
+Add a standalone `JsonTreeView` as a `ptermui`-level element in `app/src/ui_components/json_tree.rs` (same layer as other reusable view utilities, avoiding a `serde_json` dependency in the `ptermui` crate itself). The component takes a `&serde_json::Value`, a `JsonTreeState` (expansion map), a `JsonTreeColors` (pre-resolved theme colors), and callbacks for toggle/copy, and returns a `Box<dyn Element>`. It has no dependency on agent-specific types.
 
-The `JsonTreeColors` mapping (resolved from `RookTheme` at render time, no hard-coded values):
+The `JsonTreeColors` mapping (resolved from `PtermTheme` at render time, no hard-coded values):
 - key / index → `theme.ansi_fg_cyan()`
 - string value → `theme.ansi_fg_green()`
 - number value → `theme.ansi_fg_yellow()`
@@ -40,7 +40,7 @@ Pros:
 - Testable in isolation without agent scaffolding.
 
 Cons:
-- Requires deciding the right crate layer (app-level component vs. rookui crate) before starting — small upfront decision.
+- Requires deciding the right crate layer (app-level component vs. ptermui crate) before starting — small upfront decision.
 - Slightly more initial setup than embedding inline.
 
 **Option A2 — Inline in `requested_command.rs`**
@@ -78,7 +78,7 @@ Pros:
 - Handles arbitrarily large fully-expanded trees efficiently.
 
 Cons:
-- Substantially more complex: requires a virtualization primitive that doesn't exist in `rookui` today.
+- Substantially more complex: requires a virtualization primitive that doesn't exist in `ptermui` today.
 - MCP payloads are rarely large enough to need this.
 
 **Recommendation: B1**, with a follow-up cap (e.g. "show first N items then a '…show more' row") if real-world payloads prove problematic. The cap can be added entirely inside the `JsonTreeView` component without changing the caller.
@@ -140,7 +140,7 @@ Cons:
 
 ### E. Context menu / Copy JSON implementation
 
-**Option E1 — Custom right-click handler with `rookui` Menu (recommended)**
+**Option E1 — Custom right-click handler with `ptermui` Menu (recommended)**
 Use `Hoverable::with_on_right_click` (already used in other inline actions) to show a `Menu` element containing "Copy" and "Copy JSON" items. Each row in the tree registers its own right-click handler, capturing the `JsonPath` of that row.
 
 Pros:
@@ -173,10 +173,10 @@ The implementation naturally divides into three phases. Each phase is independen
 
 **Files:**
 - `app/src/ui_components/json_tree.rs` (new) — the `JsonTreeView` component. Public surface:
-  - `pub struct JsonTreeColors` — resolved `ColorU`s per value type, built from `RookTheme` per the mapping in Design §A1.
+  - `pub struct JsonTreeColors` — resolved `ColorU`s per value type, built from `PtermTheme` per the mapping in Design §A1.
   - `pub struct JsonTreeState` — two `HashMap<Vec<PathSegment>, bool>` maps: one for node expansion, one for long-string expansion. `PathSegment = Key(String) | Index(usize)`. `Vec<PathSegment>` derives `Hash + Eq` and is used directly as the key (no `Rc` indirection needed). Methods: `is_expanded(path, depth) -> bool` (default: `true` at depth 0, `false` deeper), `toggle(path)`.
   - `const LONG_STRING_THRESHOLD: usize = 120` — strings longer than this character count, or containing a `\n`, are elided by default.
-  - `pub fn render_json_tree(root: &serde_json::Value, root_label: Option<&str>, state: &JsonTreeState, colors: &JsonTreeColors, on_toggle: impl Fn(Vec<PathSegment>), on_copy_json: impl Fn(Vec<PathSegment>, &serde_json::Value), appearance: &Appearance) -> Box<dyn Element>` — builds a `Flex::column` of rows (Design §B1). Each row is a `Flex::row` of: indent spacer (depth × `INDENT_PX = 12.`), chevron (`Icon::ChevronRight` when collapsed, `Icon::ChevronDown` when expanded — standard `rookui` icons, no import from `inline_action`), `FormattedTextElement` of colored key/value spans, and a right-click `Hoverable` (Design §E1) that opens a `Menu` with Copy and Copy JSON items.
+  - `pub fn render_json_tree(root: &serde_json::Value, root_label: Option<&str>, state: &JsonTreeState, colors: &JsonTreeColors, on_toggle: impl Fn(Vec<PathSegment>), on_copy_json: impl Fn(Vec<PathSegment>, &serde_json::Value), appearance: &Appearance) -> Box<dyn Element>` — builds a `Flex::column` of rows (Design §B1). Each row is a `Flex::row` of: indent spacer (depth × `INDENT_PX = 12.`), chevron (`Icon::ChevronRight` when collapsed, `Icon::ChevronDown` when expanded — standard `ptermui` icons, no import from `inline_action`), `FormattedTextElement` of colored key/value spans, and a right-click `Hoverable` (Design §E1) that opens a `Menu` with Copy and Copy JSON items.
 - `app/src/ui_components/mod.rs` — declare `json_tree`.
 - `app/src/ui_components/json_tree_tests.rs` (new, `#[cfg(test)]`) — pure logic tests covering only Phase 1 functionality:
   - Annotation formatting: `{} 0/1/N keys`, `[] 0/1/N items` (Behavior 8, 12).

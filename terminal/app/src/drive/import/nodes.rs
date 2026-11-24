@@ -7,19 +7,19 @@ use anyhow::Result;
 use async_recursion::async_recursion;
 use futures_lite::StreamExt;
 use pathfinder_color::ColorU;
-use rook_errors::report_error;
-use rookui::Element;
-use rookui::elements::{
+use pterm_errors::report_error;
+use ptermui::Element;
+use ptermui::elements::{
     Align, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable,
     MouseStateHandle, ParentElement, Radius, Shrinkable,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
 
 use super::modal_body::{BASE_INDENT, IMPORT_FONT_SIZE, INDENT_MARGIN, ImportModalBodyAction};
 use crate::appearance::Appearance;
 use crate::drive::DriveObjectType;
-use crate::drive::cloud_object_styling::rook_drive_icon_color;
+use crate::drive::cloud_object_styling::pterm_drive_icon_color;
 use crate::notebooks::file::is_markdown_file;
 use crate::server::ids::ClientId;
 use crate::themes::theme::Fill;
@@ -324,10 +324,10 @@ impl FolderNode {
             .render_status_icon(sync_queue_dequeueing, appearance);
 
         let icon_color =
-            override_color.unwrap_or(rook_drive_icon_color(appearance, DriveObjectType::Folder));
+            override_color.unwrap_or(pterm_drive_icon_color(appearance, DriveObjectType::Folder));
         let icon = ConstrainedBox::new(
             Icon::Folder
-                .to_rookui_icon(Fill::Solid(icon_color))
+                .to_ptermui_icon(Fill::Solid(icon_color))
                 .finish(),
         )
         .with_height(IMPORT_FONT_SIZE)
@@ -455,24 +455,24 @@ impl UploadStatus {
     ) -> Box<dyn Element> {
         let status_icon_element = match &self {
             UploadStatus::SavedLocally if !sync_queue_dequeueing => Icon::Laptop
-                .to_rookui_icon(
+                .to_ptermui_icon(
                     appearance
                         .theme()
                         .sub_text_color(appearance.theme().surface_1()),
                 )
                 .finish(),
             UploadStatus::Loading | UploadStatus::SavedLocally => Icon::Refresh
-                .to_rookui_icon(
+                .to_ptermui_icon(
                     appearance
                         .theme()
                         .sub_text_color(appearance.theme().surface_1()),
                 )
                 .finish(),
             UploadStatus::Loaded(_) => Icon::Check
-                .to_rookui_icon(Fill::Solid(ColorU::new(11, 142, 71, 255)))
+                .to_ptermui_icon(Fill::Solid(ColorU::new(11, 142, 71, 255)))
                 .finish(),
             UploadStatus::Error(_) => Icon::AlertTriangle
-                .to_rookui_icon(Fill::Solid(appearance.theme().ui_error_color()))
+                .to_ptermui_icon(Fill::Solid(appearance.theme().ui_error_color()))
                 .finish(),
         };
 
@@ -549,13 +549,13 @@ impl FileNode {
 
         let icon_element = match &self.file_type {
             FileType::Workflow => Icon::Workflow
-                .to_rookui_icon(Fill::Solid(override_color.unwrap_or(
-                    rook_drive_icon_color(appearance, DriveObjectType::Workflow),
+                .to_ptermui_icon(Fill::Solid(override_color.unwrap_or(
+                    pterm_drive_icon_color(appearance, DriveObjectType::Workflow),
                 )))
                 .finish(),
             FileType::Notebook => Icon::Notebook
-                .to_rookui_icon(Fill::Solid(override_color.unwrap_or(
-                    rook_drive_icon_color(
+                .to_ptermui_icon(Fill::Solid(override_color.unwrap_or(
+                    pterm_drive_icon_color(
                         appearance,
                         DriveObjectType::Notebook {
                             is_ai_document: false,

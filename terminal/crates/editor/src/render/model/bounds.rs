@@ -9,9 +9,9 @@
 //! * The **reserved box** is the rectangle containing a block's content, padding, borders, and
 //!   margin - all space reserved for the block.
 
-use rookui_core::geometry::rect::RectF;
-use rookui_core::geometry::vector::{Vector2F, vec2f};
-use rookui_core::units::Pixels;
+use ptermui_core::geometry::rect::RectF;
+use ptermui_core::geometry::vector::{Vector2F, vec2f};
+use ptermui_core::units::Pixels;
 
 use super::BlockSpacing;
 

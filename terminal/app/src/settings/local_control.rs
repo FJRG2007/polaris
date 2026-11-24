@@ -1,12 +1,12 @@
 //! Secure local setting that gates local control.
 //!
 //! This setting is local-only, kept out of the user-visible settings file, and
-//! persisted through Rook's secure storage provider. It is the authoritative
+//! persisted through Polaris Terminal's secure storage provider. It is the authoritative
 //! enablement bit for local control.
 use anyhow::Result;
-use rook_core::channel::{Channel, ChannelState};
-use rookui::{AppContext, ModelContext};
-use rookui_extras::secure_storage;
+use pterm_core::channel::{Channel, ChannelState};
+use ptermui::{AppContext, ModelContext};
+use ptermui_extras::secure_storage;
 use serde::{Deserialize, Serialize};
 use settings::macros::define_settings_group;
 use settings::{SecureSetting, Setting, SupportedPlatforms, SyncToCloud};

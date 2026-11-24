@@ -4,7 +4,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/should-use-structured.sh"
 
-# Legacy fallback for old Rook versions.
+# Legacy fallback for old Polaris Terminal versions.
 if ! should_use_structured; then
     exit 0
 fi

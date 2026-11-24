@@ -1,12 +1,12 @@
-use rookui::elements::{
+use ptermui::elements::{
     Container, CornerRadius, CrossAxisAlignment, Flex, MainAxisSize, MouseStateHandle,
     ParentElement, Radius, Shrinkable, Text,
 };
-use rookui::fonts::Weight;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::fonts::Weight;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::appearance::Appearance;
 use crate::drive::DriveObjectType;
@@ -20,10 +20,10 @@ const BUTTON_BORDER_RADIUS: f32 = 4.;
 const DEFAULT_DELINQUENT_ADMIN_MODAL_SUBHEADER: &str = "Shared drive objects have been restricted due to a subscription payment issue.\n\nPlease update your payment information to restore access.";
 const DEFAULT_DELINQUENT_ADMIN_ENTERPRISE_MODAL_SUBHEADER: &str = "Shared drive objects have been restricted due to a subscription payment issue.\n\nPlease contact support@rook.dev to restore access.";
 const DEFAULT_DELINQUENT_MODAL_SUBHEADER: &str = "Shared drive objects have been restricted due to a subscription payment issue.\n\nPlease contact a team admin to restore access.";
-const DEFAULT_ADMIN_PROSUMER_MODAL_SUBHEADER: &str = "Rook's Pro plan comes with a limited number of shared drive objects.\n\nFor access to unlimited shared drive objects, upgrade to the Turbo plan.";
-const DEFAULT_PROSUMER_MODAL_SUBHEADER: &str = "Rook's Pro plan comes with a limited number of shared drive objects.\n\nFor access to unlimited shared drive objects, contact a team admin to upgrade to the Turbo plan.";
-const DEFAULT_ADMIN_MODAL_SUBHEADER: &str = "Rook's free plan comes with a limited number of shared drive objects.\n\nFor access to unlimited shared drive objects, upgrade to a paid plan.";
-const DEFAULT_MODAL_SUBHEADER: &str = "Rook's free plan comes with a limited number of shared drive objects.\n\nFor access to unlimited shared drive objects, contact a team admin to upgrade to a paid plan.";
+const DEFAULT_ADMIN_PROSUMER_MODAL_SUBHEADER: &str = "Polaris Terminal's Pro plan comes with a limited number of shared drive objects.\n\nFor access to unlimited shared drive objects, upgrade to the Turbo plan.";
+const DEFAULT_PROSUMER_MODAL_SUBHEADER: &str = "Polaris Terminal's Pro plan comes with a limited number of shared drive objects.\n\nFor access to unlimited shared drive objects, contact a team admin to upgrade to the Turbo plan.";
+const DEFAULT_ADMIN_MODAL_SUBHEADER: &str = "Polaris Terminal's free plan comes with a limited number of shared drive objects.\n\nFor access to unlimited shared drive objects, upgrade to a paid plan.";
+const DEFAULT_MODAL_SUBHEADER: &str = "Polaris Terminal's free plan comes with a limited number of shared drive objects.\n\nFor access to unlimited shared drive objects, contact a team admin to upgrade to a paid plan.";
 const VIEW_PLANS_TEXT: &str = "Compare plans";
 const MANAGE_BILLING_BUTTON_TEXT: &str = "Manage billing";
 
@@ -114,19 +114,19 @@ impl View for SharedObjectsCreationDeniedBody {
                     ),
                     (false, true, CustomerType::Prosumer) => {
                         format!(
-                            "Rook's Pro plan comes with a limited number of shared {object_type}s.\n\nFor access to unlimited shared {object_type}s, upgrade to the Build plan."
+                            "Polaris Terminal's Pro plan comes with a limited number of shared {object_type}s.\n\nFor access to unlimited shared {object_type}s, upgrade to the Build plan."
                         )
                     }
                     (false, false, CustomerType::Prosumer) => {
                         format!(
-                            "Rook's Pro plan comes with a limited number of shared {object_type}s.\n\nFor access to unlimited shared {object_type}s, contact a team admin to upgrade to the Build plan."
+                            "Polaris Terminal's Pro plan comes with a limited number of shared {object_type}s.\n\nFor access to unlimited shared {object_type}s, contact a team admin to upgrade to the Build plan."
                         )
                     }
                     (false, true, _) => format!(
-                        "Rook's free plan comes with a limited number of shared {object_type}s.\n\nFor access to unlimited shared {object_type}s, upgrade to a paid plan."
+                        "Polaris Terminal's free plan comes with a limited number of shared {object_type}s.\n\nFor access to unlimited shared {object_type}s, upgrade to a paid plan."
                     ),
                     (false, false, _) => format!(
-                        "Rook's free plan comes with a limited number of shared {object_type}s.\n\nFor access to unlimited shared {object_type}s, contact a team admin to upgrade to a paid plan."
+                        "Polaris Terminal's free plan comes with a limited number of shared {object_type}s.\n\nFor access to unlimited shared {object_type}s, contact a team admin to upgrade to a paid plan."
                     ),
                 }
             }

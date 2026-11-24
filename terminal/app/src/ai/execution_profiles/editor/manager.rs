@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rookui::{Entity, EntityId, ModelContext, SingletonEntity, WindowId};
+use ptermui::{Entity, EntityId, ModelContext, SingletonEntity, WindowId};
 
 use crate::PaneViewLocator;
 use crate::ai::execution_profiles::ExecutionProfileId;

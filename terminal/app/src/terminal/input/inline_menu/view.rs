@@ -3,31 +3,31 @@ use std::sync::LazyLock;
 
 use itertools::Itertools;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::theme::Fill;
-use rook_search_core::inline_menu::{InlineMenuResultsUpdate, InlineMenuSelection};
-use rookui::color::ColorU;
-use rookui::elements::drag_resize::drag_resize_handle;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::theme::Fill;
+use pterm_search_core::inline_menu::{InlineMenuResultsUpdate, InlineMenuSelection};
+use ptermui::color::ColorU;
+use ptermui::elements::drag_resize::drag_resize_handle;
+use ptermui::elements::{
     ChildAnchor, Clipped, DispatchEventResult, DragResizeElement, DragResizeHandle, EventHandler,
     Expanded, Hoverable, MainAxisAlignment, MainAxisSize, MouseInBehavior, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, ResizeEndFn,
     ScrollStateHandle, Scrollable, ScrollableElement, ScrollbarWidth, SizeConstraintCondition,
     SizeConstraintSwitch, Stack, UniformList, UniformListState,
 };
-use rookui::fonts::Weight;
-use rookui::platform::Cursor;
-use rookui::prelude::{
+use ptermui::fonts::Weight;
+use ptermui::platform::Cursor;
+use ptermui::prelude::{
     Align, ChildView, ConstrainedBox, Container, CrossAxisAlignment, Empty, Flex, SavePosition,
     Text,
 };
-use rookui::scene::{Border, CornerRadius, Radius};
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::scene::{Border, CornerRadius, Radius};
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     Action, AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -132,8 +132,8 @@ impl<A: InlineMenuAction> QueryResultRendererExt for QueryResultRenderer<A> {
         is_selected: bool,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        use rookui::elements::{DispatchEventResult, EventHandler, Hoverable};
-        use rookui::platform::Cursor;
+        use ptermui::elements::{DispatchEventResult, EventHandler, Hoverable};
+        use ptermui::platform::Cursor;
 
         if self.search_result.is_static_separator() {
             return self.render_inline_with_highlight_state(ItemHighlightState::Default, true, app);
@@ -190,7 +190,7 @@ impl<A: InlineMenuAction> QueryResultRendererExt for QueryResultRenderer<A> {
         is_static_separator: bool,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        use rookui::elements::{MainAxisSize, Shrinkable};
+        use ptermui::elements::{MainAxisSize, Shrinkable};
 
         let appearance = Appearance::as_ref(app);
         let icon = self.search_result.render_icon(highlight_state, appearance);
@@ -828,7 +828,7 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> InlineMenuView<A, T> {
         let drag_indicator = Hoverable::new(self.drag_indicator_mouse_state.clone(), |_| {
             ConstrainedBox::new(
                 Icon::DragIndicator
-                    .to_rookui_icon(Fill::Solid(
+                    .to_ptermui_icon(Fill::Solid(
                         theme.disabled_text_color(header_bg.into()).into_solid(),
                     ))
                     .finish(),
@@ -932,7 +932,7 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> InlineMenuView<A, T> {
             ScrollbarWidth::Auto,
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .with_overlayed_scrollbar()
         .finish();

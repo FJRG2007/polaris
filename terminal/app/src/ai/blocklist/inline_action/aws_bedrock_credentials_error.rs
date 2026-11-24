@@ -1,12 +1,12 @@
-use rook_core::ui::Icon;
-use rook_errors::report_if_error;
-use rookui::elements::{
+use pterm_core::ui::Icon;
+use pterm_errors::report_if_error;
+use ptermui::elements::{
     ChildView, ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, ParentElement, Shrinkable, SizeConstraintCondition,
     SizeConstraintSwitch, Text,
 };
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, EventContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -129,7 +129,7 @@ impl View for AwsBedrockCredentialsErrorView {
         let make_alert_icon = || {
             ConstrainedBox::new(
                 Icon::AlertTriangle
-                    .to_rookui_icon(error_color(theme).into())
+                    .to_ptermui_icon(error_color(theme).into())
                     .finish(),
             )
             .with_width(icon_size(app))

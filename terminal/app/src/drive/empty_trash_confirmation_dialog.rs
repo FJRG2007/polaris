@@ -1,9 +1,9 @@
-use rookui::elements::MouseStateHandle;
-use rookui::fonts::Weight;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::elements::MouseStateHandle;
+use ptermui::fonts::Weight;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::appearance::Appearance;
 use crate::ui_components::dialog::{Dialog, dialog_styles};

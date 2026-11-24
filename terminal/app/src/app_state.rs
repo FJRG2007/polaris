@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use pathfinder_geometry::rect::RectF;
-use rookui::platform::FullscreenState;
-use rookui::{AppContext, SingletonEntity as _};
+use ptermui::platform::FullscreenState;
+use ptermui::{AppContext, SingletonEntity as _};
 use serde::{Deserialize, Serialize};
 
 use crate::ai::agent::conversation::AIConversationId;
@@ -12,7 +12,7 @@ use crate::ai::agent_conversations_model::AgentManagementFilters;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::{InputConfig, SerializedBlockListItem};
 use crate::code::editor_management::CodeSource;
-use crate::drive::OpenRookDriveObjectSettings;
+use crate::drive::OpenPtermDriveObjectSettings;
 use crate::root_view::quake_mode_window_id;
 use crate::server::ids::{ServerId, SyncId};
 use crate::settings_view::SettingsSection;
@@ -50,9 +50,9 @@ pub struct WindowSnapshot {
     pub fullscreen_state: FullscreenState,
     pub quake_mode: bool,
     pub universal_search_width: Option<f32>,
-    pub rook_ai_width: Option<f32>,
+    pub pterm_ai_width: Option<f32>,
     pub voltron_width: Option<f32>,
-    pub rook_drive_index_width: Option<f32>,
+    pub pterm_drive_index_width: Option<f32>,
     pub left_panel_open: bool,
     pub vertical_tabs_panel_open: bool,
     pub left_panel_width: Option<f32>,
@@ -230,7 +230,7 @@ pub enum NotebookPaneSnapshot {
         ///    server ID.
         notebook_id: Option<SyncId>,
         // Settings for the notebook pane when it's opened (such as a folder to focus upon opening)
-        settings: OpenRookDriveObjectSettings,
+        settings: OpenPtermDriveObjectSettings,
     },
     LocalFileNotebook {
         /// The path to the local file that was open in this pane. This may be `None` if
@@ -269,7 +269,7 @@ pub enum WorkflowPaneSnapshot {
     CloudWorkflow {
         workflow_id: Option<SyncId>,
         // Settings for the workflow pane when it's opened (such as a folder to focus upon opening)
-        settings: OpenRookDriveObjectSettings,
+        settings: OpenPtermDriveObjectSettings,
     },
 }
 
@@ -312,7 +312,7 @@ pub enum CodeReviewPaneSnapshot {
 pub enum LeftPanelDisplayedTab {
     FileTree,
     GlobalSearch,
-    RookDrive,
+    PtermDrive,
     ConversationListView,
 }
 
@@ -321,7 +321,7 @@ impl From<ToolPanelView> for LeftPanelDisplayedTab {
         match view {
             ToolPanelView::ProjectExplorer => LeftPanelDisplayedTab::FileTree,
             ToolPanelView::GlobalSearch { .. } => LeftPanelDisplayedTab::GlobalSearch,
-            ToolPanelView::RookDrive => LeftPanelDisplayedTab::RookDrive,
+            ToolPanelView::PtermDrive => LeftPanelDisplayedTab::PtermDrive,
             ToolPanelView::ConversationListView => LeftPanelDisplayedTab::ConversationListView,
         }
     }

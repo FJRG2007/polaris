@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use rook_core::channel::{Channel, ChannelState};
-use rookui::SingletonEntity as _;
-use rookui_extras::secure_storage::{self, AppContextExt as _};
-use rookui_extras::user_preferences;
+use pterm_core::channel::{Channel, ChannelState};
+use ptermui::SingletonEntity as _;
+use ptermui_extras::secure_storage::{self, AppContextExt as _};
+use ptermui_extras::user_preferences;
 use settings::{PrivatePreferences, PublicPreferences, Setting as _, SettingsManager, SyncToCloud};
 
 use super::{
@@ -97,7 +97,7 @@ fn unset_mode_follows_channel_default() {
 
 #[test]
 fn mode_is_persisted_to_secure_storage() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         app.update(|ctx| {
             ctx.add_singleton_model(|_| {
                 PublicPreferences::new(
@@ -144,7 +144,7 @@ fn mode_is_persisted_to_secure_storage() {
 
 #[test]
 fn mode_does_not_migrate_from_private_preferences() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         app.update(|ctx| {
             ctx.add_singleton_model(|_| {
                 PublicPreferences::new(
@@ -189,7 +189,7 @@ fn mode_is_private_and_never_cloud_synced() {
 
 #[test]
 fn cloud_sync_cannot_disable_local_control() {
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         app.update(|ctx| {
             ctx.add_singleton_model(|_| {
                 PublicPreferences::new(

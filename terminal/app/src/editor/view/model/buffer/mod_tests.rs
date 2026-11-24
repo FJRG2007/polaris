@@ -9,9 +9,9 @@ use std::pin::{Pin, pin};
 use async_channel::Receiver;
 use enclose::enclose;
 use futures::StreamExt;
+use ptermui::color::ColorU;
+use ptermui::{App, ModelHandle};
 use rand::prelude::StdRng;
-use rookui::color::ColorU;
-use rookui::{App, ModelHandle};
 use test::Network;
 
 use super::*;

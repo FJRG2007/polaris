@@ -1,10 +1,10 @@
-use rook_core::settings::Setting;
-use rookui::elements::{
+use pterm_core::settings::Setting;
+use ptermui::elements::{
     Border, Clipped, Container, DropTarget, Element, Flex, Hoverable, ParentElement, SavePosition,
     Stack,
 };
-use rookui::presenter::ChildView;
-use rookui::{AppContext, SingletonEntity};
+use ptermui::presenter::ChildView;
+use ptermui::{AppContext, SingletonEntity};
 
 use super::common::{
     add_command_xray_overlay, add_input_suggestions_overlays, add_voltron_overlay,
@@ -292,9 +292,9 @@ impl Input {
 
 pub mod styles {
     use pathfinder_color::ColorU;
-    use rook_core::ui::theme::RookTheme;
+    use pterm_core::ui::theme::PtermTheme;
 
-    pub fn default_border_color(theme: &RookTheme) -> ColorU {
+    pub fn default_border_color(theme: &PtermTheme) -> ColorU {
         theme.outline().into()
     }
 }

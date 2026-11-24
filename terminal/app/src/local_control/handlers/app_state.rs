@@ -13,11 +13,11 @@ use ::local_control::protocol::{
 };
 use ::local_control::{ActionKind, ControlError, ErrorCode, InstanceId};
 #[cfg(feature = "local_fs")]
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::path::LineAndColumnArg;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::path::LineAndColumnArg;
 #[cfg(feature = "local_fs")]
-use rookui::SingletonEntity;
-use rookui::{AppContext, ModelContext, TypedActionView};
+use ptermui::SingletonEntity;
+use ptermui::{AppContext, ModelContext, TypedActionView};
 use serde_json::json;
 
 #[cfg(feature = "local_fs")]
@@ -38,7 +38,7 @@ use crate::settings_view::SettingsSection;
 #[cfg(feature = "local_fs")]
 use crate::util::file::external_editor::EditorSettings;
 #[cfg(feature = "local_fs")]
-use crate::util::openable_file_type::{EditorLayout, resolve_file_target_to_open_in_rook};
+use crate::util::openable_file_type::{EditorLayout, resolve_file_target_to_open_in_pterm};
 #[cfg(feature = "local_fs")]
 use crate::workspace::PaneViewLocator;
 use crate::workspace::{CommandSearchOptions, InitContent, WorkspaceAction};
@@ -83,11 +83,11 @@ pub(crate) fn handle(
             target,
             ctx,
         ),
-        ActionKind::SurfaceRookDriveOpen => surface_workspace_action(
+        ActionKind::SurfacePtermDriveOpen => surface_workspace_action(
             instance_id,
             action,
-            SurfaceDestination::RookDrive,
-            WorkspaceAction::OpenRookDrive,
+            SurfaceDestination::PtermDrive,
+            WorkspaceAction::OpenPtermDrive,
             target,
             ctx,
         ),
@@ -122,10 +122,10 @@ pub(crate) fn handle(
             surface_command_search_open(instance_id, params, target, ctx)
         }
         ActionKind::SurfaceThemePickerOpen => surface_theme_picker_open(instance_id, target, ctx),
-        ActionKind::SurfaceRookDriveToggle => workspace_action(
+        ActionKind::SurfacePtermDriveToggle => workspace_action(
             instance_id,
             action,
-            WorkspaceAction::ToggleRookDrive,
+            WorkspaceAction::TogglePtermDrive,
             target,
             ctx,
         ),
@@ -687,10 +687,10 @@ fn settings_section(page: String) -> Result<SettingsSection, ControlError> {
             format!("surface.settings.open cannot resolve settings page {page:?}"),
         )
     })?;
-    if section == SettingsSection::RookDrive {
+    if section == SettingsSection::PtermDrive {
         return Err(ControlError::new(
             ErrorCode::UnsupportedAction,
-            "surface.settings.open does not open Rook Drive settings",
+            "surface.settings.open does not open Polaris Terminal Drive settings",
         ));
     }
     Ok(section)
@@ -762,7 +762,7 @@ fn file_open(
     {
         let layout = params.new_tab.then_some(EditorLayout::NewTab);
         let file_target =
-            resolve_file_target_to_open_in_rook(&path, EditorSettings::as_ref(ctx), layout);
+            resolve_file_target_to_open_in_pterm(&path, EditorSettings::as_ref(ctx), layout);
         workspace.update(ctx, |workspace, ctx| {
             workspace.open_file_with_target(
                 path.clone(),
@@ -786,8 +786,8 @@ fn file_open(
 }
 
 /// Resolves the path for `file.open` against the targeted terminal session's working
-/// directory, so a caller running `rookctrl file open README.md` from a session gets the
-/// file the shell would resolve rather than one relative to Rook's own process directory.
+/// directory, so a caller running `ptermctrl file open README.md` from a session gets the
+/// file the shell would resolve rather than one relative to Polaris Terminal's own process directory.
 #[cfg(feature = "local_fs")]
 fn resolve_file_open_path(
     path: &str,

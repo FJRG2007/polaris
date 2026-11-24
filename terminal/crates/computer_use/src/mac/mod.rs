@@ -11,8 +11,8 @@ mod window;
 use async_trait::async_trait;
 use pathfinder_geometry::vector::Vector2I;
 use post::PostTarget;
+use ptermui_core::r#async::Timer;
 pub use recording::Recorder;
-use rookui_core::r#async::Timer;
 use util::{display_scale_factor_for_window, main_display_scale_factor};
 
 use crate::{Action, ActionResult, Options, Target, TargetedAction};

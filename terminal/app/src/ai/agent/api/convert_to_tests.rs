@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use rook_core::command::ExitCode;
+use pterm_core::command::ExitCode;
 use warp_multi_agent_api as api;
 
 use crate::ai::agent::task::TaskId;
@@ -17,7 +17,7 @@ fn git_context_converts_repository_and_pull_request_metadata() {
             branch: Some("feature/repo-pr".to_string()),
         },
         AIAgentContext::Repository {
-            name: "rook-internal".to_string(),
+            name: "polaris-terminal-internal".to_string(),
             owner: Some("warpdotdev".to_string()),
             host: Some("github.com".to_string()),
         },
@@ -36,7 +36,7 @@ fn git_context_converts_repository_and_pull_request_metadata() {
     assert_eq!(git.branch, "feature/repo-pr");
 
     let repository = git.repository.expect("expected repository context");
-    assert_eq!(repository.name, "rook-internal");
+    assert_eq!(repository.name, "polaris-terminal-internal");
     assert_eq!(repository.owner, "warpdotdev");
     assert_eq!(repository.host, "github.com");
 

@@ -7,8 +7,8 @@ use futures::Future;
 use futures::future::join_all;
 use futures_lite::StreamExt;
 use itertools::Itertools;
-use rook_core::command::ExitCode;
-use rookui::{App, ModelHandle};
+use pterm_core::command::ExitCode;
+use ptermui::{App, ModelHandle};
 
 use super::{HistoryEntry, HistoryEvent, PersistedCommand, ShellHost};
 use crate::ai::agent::conversation::AIConversationId;
@@ -213,7 +213,7 @@ fn test_append_commands() {
                 r#"
                     ls
                     pwd
-                    rook --listen --ports=8080,8081
+                    polaris-terminal --listen --ports=8080,8081
                 "#,
             )]);
 
@@ -245,7 +245,7 @@ fn test_append_commands() {
                 assert_eq!(
                     history.commands(session.id()).unwrap_or_default(),
                     vec![
-                        &HistoryEntry::command_only("rook --listen --ports=8080,8081"),
+                        &HistoryEntry::command_only("polaris-terminal --listen --ports=8080,8081"),
                         &HistoryEntry::with_session_id(session.id(), "ls"),
                         &HistoryEntry::with_session_id(session.id(), "pwd"),
                         &HistoryEntry::with_session_id(session.id(), "git status"),
@@ -264,7 +264,7 @@ fn test_append_multiple_sessions() {
             sandbox.with_files(vec![Stub::FileWithContentToBeTrimmed(
                 ".bash_history",
                 r#"
-                    cd rook
+                    cd polaris-terminal
                     cargo run --bin dev
                 "#,
             )]);
@@ -296,7 +296,7 @@ fn test_append_multiple_sessions() {
                 assert_eq!(
                     history.commands(session.id()).unwrap_or_default(),
                     vec![
-                        &HistoryEntry::command_only("cd rook"),
+                        &HistoryEntry::command_only("cd polaris-terminal"),
                         &HistoryEntry::command_only("cargo run --bin dev"),
                         &HistoryEntry::with_session_id(session.id(), "cargo clean"),
                         &HistoryEntry::with_session_id(session.id(), "ls target/"),
@@ -322,7 +322,7 @@ fn test_append_multiple_sessions() {
                 assert_eq!(
                     history.commands(second_session.id()).unwrap_or_default(),
                     vec![
-                        &HistoryEntry::command_only("cd rook"),
+                        &HistoryEntry::command_only("cd polaris-terminal"),
                         &HistoryEntry::command_only("cargo run --bin dev"),
                         &HistoryEntry::with_session_id(session.id(), "cargo clean"),
                         &HistoryEntry::with_session_id(second_session.id(), "ls target/"),
@@ -340,7 +340,7 @@ fn test_len() {
             sandbox.with_files(vec![Stub::FileWithContentToBeTrimmed(
                 ".bash_history",
                 r#"
-                    cd rook
+                    cd polaris-terminal
                     cargo run --bin dev
                     touch
                 "#,
@@ -385,7 +385,7 @@ fn test_len() {
                 assert_eq!(
                     history.commands(session.id()).unwrap_or_default(),
                     vec![
-                        &HistoryEntry::command_only("cd rook"),
+                        &HistoryEntry::command_only("cd polaris-terminal"),
                         &HistoryEntry::command_only("touch"),
                         &HistoryEntry::with_session_id(session.id(), "ls"),
                         &HistoryEntry::with_session_id(session.id(), "echo 'hello'"),
@@ -506,11 +506,11 @@ fn test_multiple_machines() {
             SessionInfo::new_for_test()
                 .with_id(0)
                 .with_shell_type(ShellType::Zsh)
-                .with_session_type(BootstrapSessionType::RookifiedRemote)
+                .with_session_type(BootstrapSessionType::PtermifiedRemote)
                 .with_hostname("prod".to_string())
                 .with_user("user".to_string())
                 .with_ssh_socket_path(PathBuf::from("~/.ssh/12345"))
-                .with_home_dir("/users/rookuser".to_owned()),
+                .with_home_dir("/users/ptermuser".to_owned()),
             Arc::new(TestCommandExecutor::default()),
         ));
 
@@ -518,11 +518,11 @@ fn test_multiple_machines() {
             SessionInfo::new_for_test()
                 .with_id(1)
                 .with_shell_type(ShellType::Zsh)
-                .with_session_type(BootstrapSessionType::RookifiedRemote)
+                .with_session_type(BootstrapSessionType::PtermifiedRemote)
                 .with_hostname("dev".to_string())
                 .with_user("user2".to_string())
                 .with_ssh_socket_path(PathBuf::from("~/.ssh/12345"))
-                .with_home_dir("/users/rookuser".to_owned()),
+                .with_home_dir("/users/ptermuser".to_owned()),
             Arc::new(TestCommandExecutor::default()),
         ));
 

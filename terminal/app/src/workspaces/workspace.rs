@@ -2,12 +2,12 @@ use std::cmp::Ordering;
 use std::path::PathBuf;
 
 use chrono::Utc;
-use regex::Regex;
-use rook_graphql::billing::{AddonCreditAutoReloadStatus, ServiceAgreement, ServiceAgreementType};
-pub use rook_graphql::billing::{
+use pterm_graphql::billing::{AddonCreditAutoReloadStatus, ServiceAgreement, ServiceAgreementType};
+pub use pterm_graphql::billing::{
     AiCreditsUsageAndCostSubjectType, AiCreditsUsageAndCostType, AiCreditsUsageBucket,
     AiCreditsUsageSource,
 };
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use super::gql_convert::{ToAgentModeCommandExecutionPredicates, ToPathBufs};
@@ -194,7 +194,7 @@ impl Workspace {
     /// Returns None if auto-reload is not configured or if the denomination can't be found in pricing options.
     pub fn get_auto_reload_price_cents(
         &self,
-        addon_credits_options: &[rook_graphql::billing::AddonCreditsOption],
+        addon_credits_options: &[pterm_graphql::billing::AddonCreditsOption],
     ) -> Option<i32> {
         let selected_credits = self
             .settings
@@ -326,7 +326,7 @@ pub enum DelinquencyStatus {
 
 /// Rust representation of feature policies from the GraphQL Schema.
 #[derive(Clone, Debug, Copy, Serialize, Deserialize)]
-pub struct RookAiPolicy {
+pub struct PtermAiPolicy {
     pub limit: i64,
     pub is_code_suggestions_toggleable: bool,
     pub is_prompt_suggestions_toggleable: bool,
@@ -520,7 +520,7 @@ pub enum HostEnablementSetting {
 pub struct Tier {
     pub name: String,
     pub description: String,
-    pub rook_ai_policy: Option<RookAiPolicy>,
+    pub pterm_ai_policy: Option<PtermAiPolicy>,
     pub workspace_size_policy: Option<WorkspaceSizePolicy>,
     pub shared_notebooks_policy: Option<SharedNotebooksPolicy>,
     pub shared_workflows_policy: Option<SharedWorkflowsPolicy>,
@@ -768,9 +768,9 @@ impl BillingMetadata {
             || self.delinquency_status == DelinquencyStatus::Unpaid
     }
 
-    // Whether the enterprise customer is our Stable Rook Enterprise team (internal team of Rookers).
-    pub fn is_rook_plan(&self) -> bool {
-        self.tier.name == "Rook Plan"
+    // Whether the enterprise customer is our Stable Polaris Terminal Enterprise team (internal team of Ptermers).
+    pub fn is_pterm_plan(&self) -> bool {
+        self.tier.name == "Polaris Terminal Plan"
     }
 
     pub fn has_active_subscription(&self) -> bool {
@@ -864,7 +864,7 @@ pub struct LlmHostSettings {
     pub enabled: bool,
     pub enablement_setting: HostEnablementSetting,
     /// Full resource name of the GCP workload identity provider that Gemini Enterprise
-    /// (GEAP) credential minting exchanges Rook OIDC JWTs against. Only populated on the
+    /// (GEAP) credential minting exchanges Polaris Terminal OIDC JWTs against. Only populated on the
     /// `GeminiEnterprise` host entry; `None` for other hosts and for workspace caches
     /// written before this field existed.
     #[serde(default)]
@@ -1049,7 +1049,7 @@ pub struct WorkspaceSettings {
     /// The team-level agent attribution setting. When `Enable` or `Disable`, the
     /// user toggle is locked. When `RespectUserSetting` (or absent), the user can choose.
     #[serde(default)]
-    pub enable_rook_attribution: AdminEnablementSetting,
+    pub enable_pterm_attribution: AdminEnablementSetting,
     #[serde(default)]
     pub default_host_slug: Option<String>,
 }
@@ -1208,7 +1208,7 @@ pub struct TeamSettings {
     /// The team-level agent attribution setting. When `Enable` or `Disable`, the
     /// user toggle is locked. When `RespectUserSetting` (or absent), the user can choose.
     #[serde(default)]
-    pub enable_rook_attribution: AdminEnablementSetting,
+    pub enable_pterm_attribution: AdminEnablementSetting,
     #[serde(default)]
     pub default_host_slug: Option<String>,
     pub team_byo: Option<TeamByoSettings>,

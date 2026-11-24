@@ -8,17 +8,17 @@
 //! themes, making labels hard to read. We assert against the *composited* color
 //! (label blended over the chip surface) — what the user actually sees.
 
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::color::contrast::{MinimumAllowedContrast, high_enough_contrast};
-use rook_core::ui::theme::{Details, Fill, RookTheme, mock_terminal_colors};
-use rookui::color::ColorU;
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::color::contrast::{MinimumAllowedContrast, high_enough_contrast};
+use pterm_core::ui::theme::{Details, Fill, PtermTheme, mock_terminal_colors};
+use ptermui::color::ColorU;
 
 use super::readable_chip_label_color;
 
 /// Builds a solid-background/foreground theme (colors as `0xRRGGBBAA`). The
 /// terminal palette does not affect text/surface contrast, so a mock is fine.
-fn theme_with(background: u32, foreground: u32, details: Details) -> RookTheme {
-    RookTheme::new(
+fn theme_with(background: u32, foreground: u32, details: Details) -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(background)),
         ColorU::from_u32(foreground),
         Fill::Solid(ColorU::from_u32(0x2AA198FF)),

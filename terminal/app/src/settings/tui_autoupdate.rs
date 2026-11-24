@@ -2,11 +2,11 @@ use settings::macros::define_settings_group;
 use settings::{SupportedPlatforms, SyncToCloud};
 
 define_settings_group!(TuiAutoupdateSettings, settings: [
-    // Whether the `rook-tui` background update check is enabled.
+    // Whether the `polaris-terminal-tui` background update check is enabled.
     //
     // TUI-only (`surface: Tui`): the GUI has its own autoupdater and update
     // preferences, so this key only appears in (and is read from) the TUI's
-    // settings file. Read once at TUI startup; the `ROOK_TUI_DISABLE_AUTOUPDATE`
+    // settings file. Read once at TUI startup; the `POLARIS_TERMINAL_TUI_DISABLE_AUTOUPDATE`
     // environment variable also disables updates for a single launch.
     autoupdate_enabled: TuiAutoupdateEnabled {
         type: bool,
@@ -16,6 +16,6 @@ define_settings_group!(TuiAutoupdateSettings, settings: [
         surface: settings::SettingSurfaces::TUI,
         private: false,
         toml_path: "general.autoupdate_enabled",
-        description: "Whether Rook Agent CLI checks for updates and automatically installs them when supported by the installation method.",
+        description: "Whether Polaris Terminal Agent CLI checks for updates and automatically installs them when supported by the installation method.",
     },
 ]);

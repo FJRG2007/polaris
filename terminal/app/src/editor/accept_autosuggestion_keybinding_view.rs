@@ -2,17 +2,19 @@
 //! shown inline in the input.
 use lazy_static::lazy_static;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DEFAULT_UI_LINE_HEIGHT_RATIO, Element, Flex, Hoverable, MouseStateHandle, OffsetPositioning,
     ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Stack,
 };
-use rookui::keymap::Keystroke;
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::ui_components::keyboard_shortcut::KeyboardShortcut;
-use rookui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::keymap::Keystroke;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::ui_components::keyboard_shortcut::KeyboardShortcut;
+use ptermui::{
+    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 
 use super::EditorElement;
 use crate::appearance::Appearance;
@@ -303,7 +305,7 @@ impl View for AcceptAutosuggestionKeybinding {
             let chevron_down = Container::new(
                 ConstrainedBox::new(
                     Icon::ArrowDropDown
-                        .to_rookui_icon(Fill::Solid(font_color))
+                        .to_ptermui_icon(Fill::Solid(font_color))
                         .finish(),
                 )
                 .with_height(height_without_border)

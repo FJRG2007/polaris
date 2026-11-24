@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use rook_core::ui::theme::AnsiColorIdentifier;
+use pterm_core::ui::theme::AnsiColorIdentifier;
 
 use super::compute_candidate_paths;
 use crate::workspace::tab_settings::{DirectoryTabColor, DirectoryTabColors};
@@ -83,8 +83,12 @@ fn test_non_existent_paths_are_dropped() {
 #[test]
 fn test_worktree_paths_are_kept() {
     let indexed = vec![
-        PathBuf::from("/users/alice/.rook-dev/worktrees/rook-internal/feature_a"),
-        PathBuf::from("/users/alice/.rook-dev/worktrees/rook-internal/feature_b"),
+        PathBuf::from(
+            "/users/alice/.polaris-terminal-dev/worktrees/polaris-terminal-internal/feature_a",
+        ),
+        PathBuf::from(
+            "/users/alice/.polaris-terminal-dev/worktrees/polaris-terminal-internal/feature_b",
+        ),
         PathBuf::from("/users/alice/code/primary-repo"),
     ];
     let existing = DirectoryTabColors::default();
@@ -94,8 +98,12 @@ fn test_worktree_paths_are_kept() {
     assert_eq!(
         candidates,
         vec![
-            PathBuf::from("/users/alice/.rook-dev/worktrees/rook-internal/feature_a"),
-            PathBuf::from("/users/alice/.rook-dev/worktrees/rook-internal/feature_b"),
+            PathBuf::from(
+                "/users/alice/.polaris-terminal-dev/worktrees/polaris-terminal-internal/feature_a"
+            ),
+            PathBuf::from(
+                "/users/alice/.polaris-terminal-dev/worktrees/polaris-terminal-internal/feature_b"
+            ),
             PathBuf::from("/users/alice/code/primary-repo"),
         ]
     );

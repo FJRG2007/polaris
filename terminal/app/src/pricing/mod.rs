@@ -1,7 +1,7 @@
-use rook_graphql::billing::{
+use pterm_graphql::billing::{
     AddonCreditsOption, OveragesPricing, PlanPricing, PricingInfo, StripeSubscriptionPlan,
 };
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 /// A global model for maintaining pricing information from the server.
 #[derive(Debug)]

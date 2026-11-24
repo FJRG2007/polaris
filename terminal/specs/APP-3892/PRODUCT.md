@@ -4,7 +4,7 @@
 Code review comment and add-as-context buttons should always be visible in the code review panel, even when global AI is disabled. When AI is disabled, users can still send comments to CLI agent terminals (Claude Code, Gemini, etc.). The disabled "Send to Agent" button should clearly communicate *why* it is disabled.
 
 ## Problem
-When the global AI toggle is off (`is_any_ai_enabled` returns false), all comment and add-as-context buttons vanish from the code review panel — header dropdown, per-file headers, and editor gutter buttons. This prevents users from creating or submitting review comments to CLI agents, which do not depend on Rook AI. There is no way to distinguish between "AI is disabled" and "all terminals are busy" when the send button is unavailable.
+When the global AI toggle is off (`is_any_ai_enabled` returns false), all comment and add-as-context buttons vanish from the code review panel — header dropdown, per-file headers, and editor gutter buttons. This prevents users from creating or submitting review comments to CLI agents, which do not depend on Polaris Terminal AI. There is no way to distinguish between "AI is disabled" and "all terminals are busy" when the send button is unavailable.
 
 ## Goals
 - Comment and add-as-context buttons are always visible when their feature flags are enabled, regardless of AI state.
@@ -32,7 +32,7 @@ All of the following buttons are always visible when their respective feature fl
 ### Terminal availability when AI is disabled
 When global AI is disabled:
 - Only terminals running a CLI agent are considered available for review comments.
-- Non-CLI, non-executing Rook terminals are **not** available as destinations.
+- Non-CLI, non-executing Polaris Terminal terminals are **not** available as destinations.
 - If AI is toggled on or off, terminal availability updates immediately.
 
 When global AI is enabled:

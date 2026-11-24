@@ -1,4 +1,4 @@
-use rookui::{AppContext, SingletonEntity};
+use ptermui::{AppContext, SingletonEntity};
 use serde::Serialize;
 
 use super::conversation::AIConversationId;
@@ -18,16 +18,16 @@ impl ForTelemetry for AIAgentCitation {
 
     fn for_telemetry(&self, ctx: &AppContext) -> Option<Self::Output> {
         match self {
-            Self::RookDriveObject { uid } => {
+            Self::PtermDriveObject { uid } => {
                 CloudModel::as_ref(ctx).get_by_uid(uid).map(|object| {
-                    CitationForTelemetry::RookDriveObject {
+                    CitationForTelemetry::PtermDriveObject {
                         object_type: object.object_type(),
                         uid: object.uid(),
                     }
                 })
             }
-            Self::RookDocumentation { path } => {
-                Some(CitationForTelemetry::RookDocs { page: path.clone() })
+            Self::PtermDocumentation { path } => {
+                Some(CitationForTelemetry::PtermDocs { page: path.clone() })
             }
             Self::WebPage { url } => Some(CitationForTelemetry::WebPage { url: url.clone() }),
             Self::AgentMemory {

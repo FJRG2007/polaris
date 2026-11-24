@@ -1,6 +1,6 @@
 # Shared custom inference endpoints
 ## Summary
-Migrate Rook's existing GUI custom-inference endpoint capability to a shared, file-backed definition format that both the GUI and Rook Agent CLI understand. Endpoint credentials remain local secure data, while the existing GUI editor continues to provide native definition management and the TUI exposes credential and connection status only.
+Migrate Polaris Terminal's existing GUI custom-inference endpoint capability to a shared, file-backed definition format that both the GUI and Polaris Terminal Agent CLI understand. Endpoint credentials remain local secure data, while the existing GUI editor continues to provide native definition management and the TUI exposes credential and connection status only.
 ## Goals
 - Preserve the complete existing generic custom-endpoint capability and all existing GUI configurations.
 - Make the same endpoint-definition format available to GUI and TUI settings.
@@ -22,9 +22,9 @@ Figma: none provided. The GUI retains its existing custom-endpoint editor, while
 
 4. Existing GUI custom endpoint definitions and API keys migrate automatically. Existing model identities remain unchanged so saved model selections and execution profiles continue to resolve to the same models.
 
-5. Migration is idempotent. Restarting Rook, retrying after an interrupted write, or receiving settings synchronization events cannot duplicate endpoints, replace an explicit settings collection, or lose an existing API key.
+5. Migration is idempotent. Restarting Polaris Terminal, retrying after an interrupted write, or receiving settings synchronization events cannot duplicate endpoints, replace an explicit settings collection, or lose an existing API key.
 
-6. An explicitly configured empty endpoint collection is authoritative and remains empty; Rook does not re-import legacy endpoints over it.
+6. An explicitly configured empty endpoint collection is authoritative and remains empty; Polaris Terminal does not re-import legacy endpoints over it.
 
 7. The GUI and TUI use their existing settings-mode behavior. They understand the same setting and domain model, but their separate settings files and secure-storage namespaces do not implicitly copy definitions or credentials between the two applications.
 
@@ -36,7 +36,7 @@ Figma: none provided. The GUI retains its existing custom-endpoint editor, while
 
 11. A valid endpoint with a local API key appears as connected. Selecting it replaces the key, and the existing clear action removes the key without removing the endpoint definition.
 
-12. Connection status means only that a non-empty local credential exists. Rook does not claim that the URL is reachable, the credential is accepted, or any configured model exists upstream.
+12. Connection status means only that a non-empty local credential exists. Polaris Terminal does not claim that the URL is reachable, the credential is accepted, or any configured model exists upstream.
 
 13. Endpoint definitions blocked by plan entitlement or workspace policy remain visible for status and credential cleanup but are unavailable for model selection and requests.
 
@@ -52,4 +52,4 @@ Figma: none provided. The GUI retains its existing custom-endpoint editor, while
 
 19. Removing or renaming an endpoint definition immediately prevents its models and credential from being sent. Orphaned secure credentials may remain stored during the migration and rollback period but are never resolved or transmitted without a matching definition.
 
-20. Custom endpoints remain generic. OpenAI Chat Completions-compatible services such as OpenRouter work by supplying an ordinary endpoint definition; Rook does not infer providers from names or URLs.
+20. Custom endpoints remain generic. OpenAI Chat Completions-compatible services such as OpenRouter work by supplying an ordinary endpoint definition; Polaris Terminal does not infer providers from names or URLs.

@@ -1,5 +1,5 @@
 pub use cloud_object_models::EnvVarSecretCommand;
-use rookui::ViewContext;
+use ptermui::ViewContext;
 
 use super::env_var_collection::{EnvVarCollectionView, VariableRowIndex};
 use crate::env_vars::EnvVarValue;

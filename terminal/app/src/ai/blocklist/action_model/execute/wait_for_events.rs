@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use futures::FutureExt;
 use futures::future::BoxFuture;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{Entity, EntityId, ModelContext, SingletonEntity};
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{Entity, EntityId, ModelContext, SingletonEntity};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
@@ -125,7 +125,7 @@ impl WaitForEventsExecutor {
         let watchdog_tool_call_id = tool_call_id.clone();
         let watchdog_handle = ctx.spawn(
             async move {
-                rookui::r#async::Timer::after(timeout).await;
+                ptermui::r#async::Timer::after(timeout).await;
             },
             move |me, (), ctx| {
                 me.fire_watchdog_if_current(

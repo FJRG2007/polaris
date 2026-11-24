@@ -10,12 +10,12 @@ use ai::skills::SkillProvider;
 use enum_iterator::Sequence;
 use markdown_parser::parse_markdown;
 use pathfinder_color::ColorU;
-use rook_cli::agent::Harness;
-use rook_completer::parsers::simple::{all_parsed_commands, top_level_command};
-use rook_editor::content::buffer::Buffer;
-use rook_editor::content::markdown::MarkdownStyle;
-use rook_util::path::EscapeChar;
-use rookui::{AppContext, SingletonEntity};
+use pterm_cli::agent::Harness;
+use pterm_completer::parsers::simple::{all_parsed_commands, top_level_command};
+use pterm_editor::content::buffer::Buffer;
+use pterm_editor::content::markdown::MarkdownStyle;
+use pterm_util::path::EscapeChar;
+use ptermui::{AppContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
@@ -28,7 +28,7 @@ use crate::ui_components::icons::Icon;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// UID for the Uber team.
-/// See https://rook.metabaseapp.com/dashboard/1454?team_id=46347
+/// See https://polaris-terminal.metabaseapp.com/dashboard/1454?team_id=46347
 const UBER_TEAM_UID: &str = "BdVbYjy9LRZcZrYBemSfAF";
 
 /// Gemini brand blue color
@@ -179,8 +179,8 @@ pub enum CLIAgent {
     Grok,
     Kiro,
     Muse,
-    /// Rook's own headless TUI.
-    RookTui,
+    /// Polaris Terminal's own headless TUI.
+    PtermTui,
     /// Represents an unknown/custom CLI agent matched by user-configured regex patterns.
     Unknown,
 }
@@ -204,12 +204,12 @@ impl CLIAgent {
             CLIAgent::Hermes => &["hermes"],
             CLIAgent::Vibe => &["vibe", "vibe-acp"],
             CLIAgent::Antigravity => &["agy", "antigravity"],
-            CLIAgent::RookTui => &[
-                "rook",
-                "rook-preview",
-                "rook-dev",
-                "rook-tui",
-                "rook-tui-oss",
+            CLIAgent::PtermTui => &[
+                "polaris-terminal",
+                "polaris-terminal-preview",
+                "polaris-terminal-dev",
+                "polaris-terminal-tui",
+                "polaris-terminal-tui-oss",
                 "run-tui",
             ],
             CLIAgent::Grok => &["grok"],
@@ -240,7 +240,7 @@ impl CLIAgent {
     }
 
     /// Returns the [`CLIAgent`] corresponding to a cloud-agent [`Harness`] when it represents a
-    /// third-party agent. Returns `None` for [`Harness::Oz`] (Rook's built-in harness has no
+    /// third-party agent. Returns `None` for [`Harness::Oz`] (Polaris Terminal's built-in harness has no
     /// distinct CLI agent identity).
     pub fn from_harness(harness: Harness) -> Option<Self> {
         match harness {
@@ -273,7 +273,7 @@ impl CLIAgent {
             CLIAgent::Grok => "Grok Build",
             CLIAgent::Kiro => "Kiro CLI",
             CLIAgent::Muse => "Muse Code",
-            CLIAgent::RookTui => "Rook TUI",
+            CLIAgent::PtermTui => "Polaris Terminal TUI",
             CLIAgent::Unknown => "CLI Agent",
         }
     }
@@ -302,7 +302,7 @@ impl CLIAgent {
             CLIAgent::Grok => Some(Icon::GrokLogo),
             CLIAgent::Kiro => Some(Icon::KiroLogo),
             CLIAgent::Muse => Some(Icon::MuseLogo),
-            CLIAgent::RookTui => Some(Icon::Rook),
+            CLIAgent::PtermTui => Some(Icon::Pterm),
             CLIAgent::Unknown => None,
         }
     }
@@ -342,7 +342,7 @@ impl CLIAgent {
                 SkillProvider::Claude,
                 SkillProvider::Codex,
             ],
-            CLIAgent::RookTui => &[],
+            CLIAgent::PtermTui => &[],
             CLIAgent::Unknown => &[],
         }
     }
@@ -375,9 +375,9 @@ impl CLIAgent {
         )
     }
 
-    /// Whether Rook should show its CLI-agent footer for this agent.
+    /// Whether Polaris Terminal should show its CLI-agent footer for this agent.
     pub(crate) fn supports_cli_agent_footer(&self) -> bool {
-        !matches!(self, CLIAgent::RookTui)
+        !matches!(self, CLIAgent::PtermTui)
     }
 
     /// Returns the brand color for this CLI agent, or `None` for unknown/custom agents.
@@ -401,7 +401,7 @@ impl CLIAgent {
             CLIAgent::Grok => Some(GROK_COLOR),
             CLIAgent::Kiro => Some(KIRO_PURPLE),
             CLIAgent::Muse => Some(MUSE_COLOR),
-            CLIAgent::RookTui => Some(ColorU::black()),
+            CLIAgent::PtermTui => Some(ColorU::black()),
             CLIAgent::Unknown => None,
         }
     }
@@ -704,7 +704,7 @@ impl From<CLIAgent> for CLIAgentType {
             // No dedicated telemetry variant yet: `CLIAgentType` lives in
             // `server/telemetry/events.rs`.
             CLIAgent::Kiro | CLIAgent::Muse => CLIAgentType::Unknown,
-            CLIAgent::RookTui => CLIAgentType::RookTui,
+            CLIAgent::PtermTui => CLIAgentType::PtermTui,
             CLIAgent::Unknown => CLIAgentType::Unknown,
         }
     }

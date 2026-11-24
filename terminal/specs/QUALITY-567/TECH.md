@@ -15,7 +15,7 @@ Relevant existing code:
 - `app/src/ai/blocklist/agent_view/orchestration_conversation_links.rs` — already exposes `parent_conversation_id` and the existing `parent_conversation_navigation_card` used by the legacy orchestration UI.
 - `app/src/ai/blocklist/history_model.rs` — `BlocklistAIHistoryModel` exposes `child_conversations_of`, `conversation`, and the events the pill bar subscribes to.
 - `app/src/terminal/view.rs:25419` — existing handler stub for `TerminalAction::SwitchAgentViewToConversation`, calling `enter_agent_view_for_conversation` to navigate the same pane.
-- `crates/rook_features/src/lib.rs` — `FeatureFlag` enum and `DOGFOOD_FLAGS`.
+- `crates/pterm_features/src/lib.rs` — `FeatureFlag` enum and `DOGFOOD_FLAGS`.
 
 The feature is gated by a new `FeatureFlag::OrchestrationPillBar`. Existing `Orchestration` and `AgentView` flag behavior is preserved when the new flag is off.
 
@@ -23,14 +23,14 @@ The feature is gated by a new `FeatureFlag::OrchestrationPillBar`. Existing `Orc
 
 ### 1. Feature flag
 
-Add `OrchestrationPillBar` to `FeatureFlag` in `crates/rook_features/src/lib.rs:725`. All new code paths gate on `FeatureFlag::OrchestrationPillBar.is_enabled()`.
+Add `OrchestrationPillBar` to `FeatureFlag` in `crates/pterm_features/src/lib.rs:725`. All new code paths gate on `FeatureFlag::OrchestrationPillBar.is_enabled()`.
 
 ### 2. New view: `OrchestrationPillBar`
 
 New file `app/src/ai/blocklist/agent_view/orchestration_pill_bar.rs` exposes:
 
 - `pub struct OrchestrationPillBar` — implements `View` with `Entity::Event = ()`.
-  - Holds `agent_view_controller: ModelHandle<AgentViewController>` and `mouse_states: HashMap<AIConversationId, MouseStateHandle>` for persistent per-pill hover state (per ROOK.md's `MouseStateHandle` rule — inline `MouseStateHandle::default()` would silently break clicks).
+  - Holds `agent_view_controller: ModelHandle<AgentViewController>` and `mouse_states: HashMap<AIConversationId, MouseStateHandle>` for persistent per-pill hover state (per POLARIS_TERMINAL.md's `MouseStateHandle` rule — inline `MouseStateHandle::default()` would silently break clicks).
   - Subscribes to `BlocklistAIHistoryModel` for `UpdatedConversationStatus`, `AppendedExchange`, `SetActiveConversation`, `StartedNewConversation`, and to removal events to drop stale mouse states.
   - Subscribes to `AgentViewController` for `EnteredAgentView` / `ExitedAgentView` to clear hover state across view transitions.
 - A private `pill_specs(&self, app)` helper that:
@@ -87,7 +87,7 @@ We render breadcrumbs manually rather than reusing `crate::ui_components::breadc
           .finish();
   }
   ```
-  Pinning the header to `PANE_HEADER_HEIGHT` is **load-bearing**, not cosmetic. `Flex::column` passes `max.y = INFINITY` to its non-flex children (`SizeConstraint::child_constraint_along_axis` in `crates/rookui_core/src/presenter.rs:794`). Without the explicit `ConstrainedBox`, the inner `Align` in `render_three_column_header` collapses to the title's small line-box height and the outer row's `CrossAxisAlignment::Stretch` paints children at offset 0 (top) — the title visibly clings to the top of the row instead of being centered. See `crates/rookui_core/src/elements/flex/mod.rs (467-473)` for the cross-axis offset math and `align.rs (77-89)` for Align's infinite-constraint fallback.
+  Pinning the header to `PANE_HEADER_HEIGHT` is **load-bearing**, not cosmetic. `Flex::column` passes `max.y = INFINITY` to its non-flex children (`SizeConstraint::child_constraint_along_axis` in `crates/ptermui_core/src/presenter.rs:794`). Without the explicit `ConstrainedBox`, the inner `Align` in `render_three_column_header` collapses to the title's small line-box height and the outer row's `CrossAxisAlignment::Stretch` paints children at offset 0 (top) — the title visibly clings to the top of the row instead of being centered. See `crates/ptermui_core/src/elements/flex/mod.rs (467-473)` for the cross-axis offset math and `align.rs (77-89)` for Align's infinite-constraint fallback.
 
 ### 7. Mouse state wiring
 
@@ -111,7 +111,7 @@ To verify in a local build, run an orchestrator (e.g. via `/orchestrate`) that s
 
 ### Layout-regression test
 
-Add a unit test next to `OrchestrationPillBar` that lays out the view in a `rookui::App::test` with at least one child conversation, asserting it does not panic. This is the standard "UI components need layout validation tests" requirement from the `create-pr` skill, and it specifically guards the load-bearing `ConstrainedBox::with_height(PANE_HEADER_HEIGHT)` fix in `maybe_add_parent_navigation_card` (see Risks).
+Add a unit test next to `OrchestrationPillBar` that lays out the view in a `ptermui::App::test` with at least one child conversation, asserting it does not panic. This is the standard "UI components need layout validation tests" requirement from the `create-pr` skill, and it specifically guards the load-bearing `ConstrainedBox::with_height(PANE_HEADER_HEIGHT)` fix in `maybe_add_parent_navigation_card` (see Risks).
 
 ### Behavior-driven coverage to consider
 
@@ -122,7 +122,7 @@ Add a unit test next to `OrchestrationPillBar` that lays out the view in a `rook
 ## Risks and mitigations
 
 - **Regression: title vertical centering.** The `Flex::column` wrap introduced by this feature inadvertently broke the title's centering until the header was pinned to `PANE_HEADER_HEIGHT`. The pinning is the only reason centering still works — any future refactor of `maybe_add_parent_navigation_card` that loses the `ConstrainedBox::with_height(PANE_HEADER_HEIGHT)` will regress. Add an inline comment at the call site (already done) and the layout-regression test above.
-- **Mouse state lifetime.** Constructing `MouseStateHandle::default()` inline at render time silently zeros out hover state every frame. Per-pill state lives in the view's `mouse_states` map; the parent crumb's state is sourced from `TerminalViewMouseStates`. This pattern is enforced by the existing ROOK.md guidance.
+- **Mouse state lifetime.** Constructing `MouseStateHandle::default()` inline at render time silently zeros out hover state every frame. Per-pill state lives in the view's `mouse_states` map; the parent crumb's state is sourced from `TerminalViewMouseStates`. This pattern is enforced by the existing POLARIS_TERMINAL.md guidance.
 
 ## Follow-ups
 

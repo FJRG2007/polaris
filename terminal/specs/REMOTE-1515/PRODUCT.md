@@ -3,7 +3,7 @@
 Linear: REMOTE-1515. Figma: none provided.
 
 ## Summary
-Add a `/continue-locally` slash command that forks the active cloud Oz agent conversation into a local Rook conversation from the input. It is a parity entrypoint for the existing "Continue locally" affordances on the conversation-ended tombstone (`app/src/terminal/view/shared_session/conversation_ended_tombstone_view.rs:485-491`) and on the conversation details panel (`app/src/ai/conversation_details_panel.rs:512-520`).
+Add a `/continue-locally` slash command that forks the active cloud Oz agent conversation into a local Polaris Terminal conversation from the input. It is a parity entrypoint for the existing "Continue locally" affordances on the conversation-ended tombstone (`app/src/terminal/view/shared_session/conversation_ended_tombstone_view.rs:485-491`) and on the conversation details panel (`app/src/ai/conversation_details_panel.rs:512-520`).
 
 ## Behavior
 
@@ -17,7 +17,7 @@ Add a `/continue-locally` slash command that forks the active cloud Oz agent con
 
 5. Pressing Enter forks into a split pane to the right of the current pane. Pressing Cmd+Enter (Ctrl+Enter on Linux/Windows) forks into a new tab. The agent input footer mirrors `/fork`'s tip: `Enter new pane` / `Cmd-Enter new tab`.
 
-6. The forked conversation is a local Rook Oz conversation seeded from the cloud run's transcript via the same pipeline as the existing button — same fork prefix, same destination handling. The source cloud run is never modified; the cloud agent continues running (or stays as it was) and the user's local Rook client gets a new local conversation forked from it.
+6. The forked conversation is a local Polaris Terminal Oz conversation seeded from the cloud run's transcript via the same pipeline as the existing button — same fork prefix, same destination handling. The source cloud run is never modified; the cloud agent continues running (or stays as it was) and the user's local Polaris Terminal client gets a new local conversation forked from it.
 
 7. On success, the command shows a dismissible toast `Forked "<source conversation title>"` (titles longer than `MAX_FORK_TOAST_TITLE_LENGTH` are truncated with an ellipsis). This is the same toast as `/fork` — produced by `Workspace::show_fork_toast` — so the user gets a consistent acknowledgement that the cloud-to-local handoff completed regardless of which entrypoint they used.
 

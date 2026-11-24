@@ -1,5 +1,5 @@
-use rookui::integration::{AssertionCallback, AssertionOutcome};
-use rookui::{App, ViewHandle, WindowId, async_assert};
+use ptermui::integration::{AssertionCallback, AssertionOutcome};
+use ptermui::{App, ViewHandle, WindowId, async_assert};
 
 use crate::integration_testing::view_getters::{command_palette_view, workspace_view};
 use crate::palette::PaletteMode;

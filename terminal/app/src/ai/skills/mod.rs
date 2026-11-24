@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use ai::skills::SkillPathOrigin;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
 
 mod telemetry;
 pub use telemetry::{SkillOpenOrigin, SkillTelemetryEvent};

@@ -1,15 +1,15 @@
 use chrono::{DateTime, Datelike, Local, Utc};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DropShadow, Empty, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
     WeakViewHandle,
 };
@@ -542,7 +542,7 @@ impl BillingCycleUsageSectionView {
             );
             inner.add_child(
                 Container::new(
-                    ConstrainedBox::new(Icon::ChevronDown.to_rookui_icon(main_text).finish())
+                    ConstrainedBox::new(Icon::ChevronDown.to_ptermui_icon(main_text).finish())
                         .with_width(12.)
                         .with_height(12.)
                         .finish(),

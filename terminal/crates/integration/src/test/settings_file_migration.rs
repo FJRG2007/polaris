@@ -3,11 +3,11 @@
 
 use std::collections::HashMap;
 
-use rook::features::FeatureFlag;
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use rook::settings::{BlockVisibilitySettings, ScrollSettings};
-use rookui_core::integration::AssertionOutcome;
-use rookui_core::{SingletonEntity, async_assert, async_assert_eq};
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::settings::{BlockVisibilitySettings, ScrollSettings};
+use ptermui_core::integration::AssertionOutcome;
+use ptermui_core::{SingletonEntity, async_assert, async_assert_eq};
 use settings::Setting as _;
 
 use super::{Builder, new_builder};
@@ -65,7 +65,7 @@ pub fn test_settings_file_migration_from_native_store() -> Builder {
                 .add_named_assertion(
                     "TOML settings file should contain the migrated settings",
                     move |_app, _window_id| {
-                        let toml_path = rook::settings::user_preferences_toml_file_path();
+                        let toml_path = polaris_terminal::settings::user_preferences_toml_file_path();
                         let contents = match std::fs::read_to_string(&toml_path) {
                             Ok(c) => c,
                             Err(err) => {

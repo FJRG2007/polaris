@@ -1,16 +1,16 @@
 use instant::Duration;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rookui::accessibility::AccessibilityContent;
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::elements::{
+use ptermui::accessibility::AccessibilityContent;
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Fill, Flex, Hoverable, MainAxisAlignment, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, Stack,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -209,7 +209,7 @@ impl ParticipantAvatarView {
         Container::new(
             ConstrainedBox::new(
                 Icon::Edit
-                    .to_rookui_icon(appearance.theme().foreground())
+                    .to_ptermui_icon(appearance.theme().foreground())
                     .finish(),
             )
             .with_height(8.)
@@ -219,7 +219,7 @@ impl ParticipantAvatarView {
         .with_uniform_padding(2.)
         .with_background(background)
         .with_corner_radius(CornerRadius::with_all(
-            rookui::elements::Radius::Percentage(50.),
+            ptermui::elements::Radius::Percentage(50.),
         ))
         .finish()
     }
@@ -490,10 +490,10 @@ pub fn render_revoke_all_button(
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let edit = Icon::Edit
-        .to_rookui_icon(appearance.theme().foreground())
+        .to_ptermui_icon(appearance.theme().foreground())
         .finish();
     let slash = Icon::Slash
-        .to_rookui_icon(appearance.theme().terminal_colors().normal.red.into())
+        .to_ptermui_icon(appearance.theme().terminal_colors().normal.red.into())
         .finish();
     let mut stack = Stack::new().with_constrain_absolute_children();
 

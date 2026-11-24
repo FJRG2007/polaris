@@ -1,5 +1,5 @@
-use rook_core::features::FeatureFlag;
-use rook_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
+use pterm_core::features::FeatureFlag;
+use pterm_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use strum_macros::{EnumDiscriminants, EnumIter};
@@ -44,7 +44,7 @@ pub enum OnboardingEvent {
         autonomy: Option<String>,
         has_project_path: bool,
         /// How the user is accessing AI when intention is agent_driven:
-        /// "rook_agent" or "third_party". None when intention is not agent_driven.
+        /// "pterm_agent" or "third_party". None when intention is not agent_driven.
         ai_access: Option<String>,
     },
     /// The user clicked the "Get Started" button.
@@ -283,7 +283,7 @@ impl TelemetryEvent for OnboardingEvent {
     }
 
     fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        rook_core::telemetry::enum_events::<Self>()
+        pterm_core::telemetry::enum_events::<Self>()
     }
 }
 
@@ -385,7 +385,7 @@ impl TelemetryEventDesc for OnboardingEventDiscriminant {
     }
 }
 
-rook_core::register_telemetry_event!(OnboardingEvent);
+pterm_core::register_telemetry_event!(OnboardingEvent);
 
 #[cfg(test)]
 #[path = "telemetry_tests.rs"]

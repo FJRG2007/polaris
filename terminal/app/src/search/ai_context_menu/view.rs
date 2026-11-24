@@ -4,28 +4,28 @@ use std::time::Duration;
 
 use async_channel::Sender;
 use itertools::Itertools;
-#[cfg(not(target_family = "wasm"))]
-use repo_metadata::repositories::DetectedRepositories;
-use rook_core::features::FeatureFlag;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use ptermui::elements::{
     AnchorPair, Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Dismiss, Empty, Fill, Flex, Hoverable, Icon, MouseStateHandle, OffsetPositioning, OffsetType,
     ParentElement, PositionedElementOffsetBounds, PositioningAxis, Radius, SavePosition,
     ScrollStateHandle, Scrollable, ScrollableElement, ScrollbarWidth, Shrinkable, Stack, Text,
     UniformList, UniformListState, XAxisAnchor, YAxisAnchor,
 };
-use rookui::platform::Cursor;
-use rookui::windowing::WindowManager;
-use rookui::{
+use ptermui::platform::Cursor;
+use ptermui::windowing::WindowManager;
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle,
 };
+#[cfg(not(target_family = "wasm"))]
+use repo_metadata::repositories::DetectedRepositories;
 use settings::Setting as _;
 
 use super::styles;
 use crate::appearance::Appearance;
 use crate::debounce;
-use crate::drive::settings::RookDriveSettings;
+use crate::drive::settings::PtermDriveSettings;
 #[cfg(not(target_family = "wasm"))]
 use crate::search::ai_context_menu::blocks::data_source::BlockDataSource;
 #[cfg(not(target_family = "wasm"))]
@@ -373,7 +373,7 @@ impl AIContextMenu {
         is_cli_agent_input: bool,
         app: &AppContext,
     ) -> Vec<AIContextMenuCategory> {
-        let show_rook_drive = RookDriveSettings::is_rook_drive_enabled(app);
+        let show_pterm_drive = PtermDriveSettings::is_pterm_drive_enabled(app);
 
         // Compute once — used by CLI agent, AI-mode, and terminal-mode branches.
         let is_active_dir_in_git_repo = {
@@ -422,7 +422,7 @@ impl AIContextMenu {
         // For ambient agent sessions, only show limited categories
         if is_in_ambient_agent {
             let mut categories = vec![];
-            if show_rook_drive {
+            if show_pterm_drive {
                 if FeatureFlag::DriveObjectsAsContext.is_enabled() {
                     categories.push(AIContextMenuCategory::Workflows);
                     categories.push(AIContextMenuCategory::Notebooks);
@@ -458,7 +458,7 @@ impl AIContextMenu {
             {
                 categories.push(AIContextMenuCategory::Code);
             }
-            if show_rook_drive && FeatureFlag::DriveObjectsAsContext.is_enabled() {
+            if show_pterm_drive && FeatureFlag::DriveObjectsAsContext.is_enabled() {
                 categories.push(AIContextMenuCategory::Workflows);
                 categories.push(AIContextMenuCategory::Notebooks);
                 categories.push(AIContextMenuCategory::Plans);
@@ -472,7 +472,7 @@ impl AIContextMenu {
             if FeatureFlag::ConversationsAsContext.is_enabled() {
                 categories.push(AIContextMenuCategory::Conversations);
             }
-            if show_rook_drive {
+            if show_pterm_drive {
                 categories.push(AIContextMenuCategory::Rules);
             }
             categories.push(AIContextMenuCategory::Skills);

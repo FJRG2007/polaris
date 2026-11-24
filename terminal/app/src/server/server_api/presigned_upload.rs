@@ -7,7 +7,7 @@ use anyhow::{Context, Result, anyhow};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 #[cfg(not(target_family = "wasm"))]
 use crc::{CRC_32_ISCSI, Crc};
-pub use rook_server_client::HttpStatusError;
+pub use pterm_server_client::HttpStatusError;
 
 #[cfg(feature = "local_fs")]
 use super::ai::FileArtifactUploadTargetInfo;

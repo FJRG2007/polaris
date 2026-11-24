@@ -1,12 +1,12 @@
 use pathfinder_color::ColorU;
-use rook_editor::editor::NavigationKey;
-use rookui::elements::{
+use pterm_editor::editor::NavigationKey;
+use ptermui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, ParentElement, Radius, Wrap, WrapFill,
 };
-use rookui::fonts::FamilyId;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::FamilyId;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };

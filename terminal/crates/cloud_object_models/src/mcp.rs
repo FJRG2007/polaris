@@ -6,7 +6,7 @@ use cloud_objects::cloud_object::{
 };
 use cloud_objects::ids::GenericStringObjectId;
 use handlebars::get_arguments;
-use rook_errors::report_error;
+use pterm_errors::report_error;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

@@ -1,5 +1,5 @@
 //! Module for test-only convenience methods on `TerminalView`.
-use rookui::ModelHandle;
+use ptermui::ModelHandle;
 
 use crate::terminal::find::TerminalFindModel;
 cfg_if::cfg_if! {
@@ -7,7 +7,7 @@ cfg_if::cfg_if! {
         use std::sync::Arc;
 
         use parking_lot::FairMutex;
-        use rookui::{ViewContext};
+        use ptermui::{ViewContext};
 
         use crate::{
             ai::blocklist::SerializedBlockListItem, pane_group::TerminalViewResources,
@@ -15,7 +15,7 @@ cfg_if::cfg_if! {
         };
         use crate::terminal::model::session::Sessions;
         use crate::terminal::model_events::ModelEventDispatcher;
-        use crate::terminal::view::ROOK_PROMPT_HEIGHT_LINES;
+        use crate::terminal::view::POLARIS_TERMINAL_PROMPT_HEIGHT_LINES;
         use crate::terminal::{SizeInfo, TerminalModel};
 
         use crate::context_chips::prompt_type::PromptType;
@@ -43,7 +43,7 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) -> Self {
         use pathfinder_geometry::vector::vec2f;
-        use rookui::units::{IntoPixels as _, Pixels};
+        use ptermui::units::{IntoPixels as _, Pixels};
 
         use crate::server::server_api::ServerApiProvider;
         use crate::terminal::BlockPadding;
@@ -78,7 +78,7 @@ impl TerminalView {
             size: size_info,
             max_block_scroll_limit,
             max_retained_output_lines: 0,
-            rook_prompt_height_lines: ROOK_PROMPT_HEIGHT_LINES,
+            pterm_prompt_height_lines: POLARIS_TERMINAL_PROMPT_HEIGHT_LINES,
         };
 
         let server_api = ServerApiProvider::new_for_test().get();

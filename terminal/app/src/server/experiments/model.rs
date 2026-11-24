@@ -3,8 +3,8 @@
 use std::collections::HashSet;
 
 use anyhow::Context;
-use rook_errors::report_if_error;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_errors::report_if_error;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 #[cfg(test)]
 pub use tests::TestModel;
 

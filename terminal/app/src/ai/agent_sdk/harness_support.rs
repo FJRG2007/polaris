@@ -1,18 +1,18 @@
-//! `rook harness-support` CLI dispatch and the singleton model all subcommands run async work on.
+//! `polaris-terminal harness-support` CLI dispatch and the singleton model all subcommands run async work on.
 //!
 //! Subcommands:
 //! - [`ping`] — fetches the current run by task ID and prints its info.
 //! - [`report_artifact`] — reports an artifact (e.g. a PR) back to the Oz platform.
 use anyhow::Result;
-use rook_cli::GlobalOptions;
-use rook_cli::agent::OutputFormat;
-use rook_cli::harness_support::{
+use pterm_cli::GlobalOptions;
+use pterm_cli::agent::OutputFormat;
+use pterm_cli::harness_support::{
     FinishTaskArgs, HarnessSupportArgs, HarnessSupportCommand, NotifyUserArgs, ReportArtifactArgs,
     ReportArtifactCommand, ReportExternalReferenceArgs, ReportShutdownArgs, TaskStatus,
 };
-use rook_core::features::FeatureFlag;
-use rookui::platform::TerminationMode;
-use rookui::{AppContext, ModelHandle, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::platform::TerminationMode;
+use ptermui::{AppContext, ModelHandle, SingletonEntity};
 
 use super::common::set_ambient_task_context_from_run_id;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
@@ -320,7 +320,7 @@ fn report_shutdown(
 /// Singleton model for running async harness-support operations.
 struct HarnessSupportRunner;
 
-impl rookui::Entity for HarnessSupportRunner {
+impl ptermui::Entity for HarnessSupportRunner {
     type Event = ();
 }
 

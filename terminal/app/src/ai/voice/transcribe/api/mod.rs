@@ -1,7 +1,7 @@
-//! This module contains Rust types for the Transcribe endpoint in rook-server for voice transcription.
+//! This module contains Rust types for the Transcribe endpoint in polaris-terminal-server for voice transcription.
 //!
 //! These types are manually transposed from the API schema defined in go
-//! (rook-server/model/types/transcribe/(request.go|response.go|common.go)).
+//! (polaris-terminal-server/model/types/transcribe/(request.go|response.go|common.go)).
 //!
 //! Documentation on the types here is directly borrowed from the documentation on the go schema;
 //! see the go schema for the source-of-truth.

@@ -1,20 +1,20 @@
 use pathfinder_color::ColorU;
-use rook_core::features::FeatureFlag;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::RookTheme;
-use rook_core::ui::theme::color::internal_colors;
-use rookui_core::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::PtermTheme;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui_core::elements::{
     Border, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Empty, Flex, FormattedTextElement, Hoverable, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, ParentElement, Radius, Text,
 };
-use rookui_core::fonts::{Properties, Weight};
-use rookui_core::keymap::Keystroke;
-use rookui_core::platform::Cursor;
-use rookui_core::text_layout::TextAlignment;
-use rookui_core::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui_core::{
+use ptermui_core::fonts::{Properties, Weight};
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::platform::Cursor;
+use ptermui_core::text_layout::TextAlignment;
+use ptermui_core::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui_core::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 use ui_components::{Component as _, Options as _, button};
@@ -56,7 +56,7 @@ const TOS_URL: &str = "https://www.rook.dev/terms-of-service";
 
 #[derive(Debug, Clone)]
 struct ThemeOption {
-    theme: RookTheme,
+    theme: PtermTheme,
     mouse_state: MouseStateHandle,
 }
 
@@ -75,7 +75,7 @@ pub struct ThemePickerSlide {
 
 impl ThemePickerSlide {
     pub(crate) fn new(
-        themes: [RookTheme; 4],
+        themes: [PtermTheme; 4],
         onboarding_state: ModelHandle<OnboardingStateModel>,
         ctx: &mut ViewContext<Self>,
     ) -> Self {
@@ -171,13 +171,14 @@ impl ThemePickerSlide {
         // Add the Privacy Settings / Terms of Service disclaimer block below the
         // theme options when the user has selected the terminal intention and
         // won't hit the login slide afterwards. The terminal-intent flow skips
-        // the login slide (which surfaces the same links) unless Rook Drive is
+        // the login slide (which surfaces the same links) unless Polaris Terminal Drive is
         // enabled — in that case the login slide will still run after the theme
         // step and show the disclaimer, so duplicating it here is unnecessary.
         let state = self.onboarding_state.as_ref(app);
         let is_terminal = matches!(state.intention(), OnboardingIntention::Terminal);
-        let rook_drive_enabled = state.ui_customization().show_rook_drive;
-        if !FeatureFlag::AccountFirstOnboarding.is_enabled() && is_terminal && !rook_drive_enabled {
+        let pterm_drive_enabled = state.ui_customization().show_pterm_drive;
+        if !FeatureFlag::AccountFirstOnboarding.is_enabled() && is_terminal && !pterm_drive_enabled
+        {
             content.push(self.render_disclaimer_section(appearance));
         }
 
@@ -226,7 +227,7 @@ impl ThemePickerSlide {
     fn render_theme_options(
         &self,
         appearance: &Appearance,
-        chrome_theme: &RookTheme,
+        chrome_theme: &PtermTheme,
     ) -> Box<dyn Element> {
         let options = (0..self.theme_options.len())
             .map(|index| {
@@ -271,7 +272,11 @@ impl ThemePickerSlide {
         );
 
         let account_first = FeatureFlag::AccountFirstOnboarding.is_enabled();
-        let next_label = if account_first { "Next" } else { "Get Rooking" };
+        let next_label = if account_first {
+            "Next"
+        } else {
+            "Get Pterming"
+        };
 
         let enter = Keystroke::parse("enter").unwrap_or_default();
         let next_button = self.next_button.render(
@@ -312,10 +317,10 @@ impl ThemePickerSlide {
     fn render_theme_option(
         &self,
         appearance: &Appearance,
-        chrome_theme: &RookTheme,
+        chrome_theme: &PtermTheme,
         index: usize,
         theme_name: String,
-        option_theme: &RookTheme,
+        option_theme: &PtermTheme,
         mouse_state: MouseStateHandle,
         interactive: bool,
     ) -> Box<dyn Element> {
@@ -585,7 +590,7 @@ impl ThemePickerSlide {
         let tos_line = Flex::row()
             .with_child(
                 ui_builder
-                    .span("By continuing, you agree to Rook's ")
+                    .span("By continuing, you agree to Polaris Terminal's ")
                     .with_style(disclaimer_styles)
                     .build()
                     .finish(),

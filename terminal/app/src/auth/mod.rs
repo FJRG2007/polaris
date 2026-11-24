@@ -10,7 +10,7 @@ pub mod login_slide;
 pub mod needs_sso_link_view;
 pub mod paste_auth_token_modal;
 mod user_properties;
-pub use rook_server_auth::{auth_state, credentials, user, user_uid};
+pub use pterm_server_auth::{auth_state, credentials, user, user_uid};
 #[cfg(target_family = "wasm")]
 pub mod web_handoff;
 
@@ -20,11 +20,11 @@ pub use auth_manager::AuthManager;
 pub use auth_state::AuthStateProvider;
 use itertools::Itertools;
 pub use login_failure_notification::LoginFailureReason;
-use rook_core::channel::ChannelState;
-use rook_core::user_preferences::GetUserPreferences as _;
-use rook_errors::{report_error, report_if_error};
-use rookui::modals::{AlertDialogWithCallbacks, ModalButton};
-use rookui::{AppContext, SingletonEntity};
+use pterm_core::channel::ChannelState;
+use pterm_core::user_preferences::GetUserPreferences as _;
+use pterm_errors::{report_error, report_if_error};
+use ptermui::modals::{AlertDialogWithCallbacks, ModalButton};
+use ptermui::{AppContext, SingletonEntity};
 #[cfg(feature = "tui")]
 use url::Url;
 pub use user_uid::UserUid;
@@ -69,7 +69,7 @@ pub fn init(app: &mut AppContext) {
     paste_auth_token_modal::init(app);
 }
 
-/// Returns the configured Rook web logout URL.
+/// Returns the configured Polaris Terminal web logout URL.
 ///
 /// Keep this derived from the channel's server root so local and non-production
 /// builds log out of the same web session they use for authentication.
@@ -80,22 +80,22 @@ pub fn web_logout_url() -> String {
     )
 }
 
-/// Returns the configured Rook web logout URL with a validated browser continuation.
+/// Returns the configured Polaris Terminal web logout URL with a validated browser continuation.
 ///
-/// TUI logout only continues to the same Rook web origin's device page. This
+/// TUI logout only continues to the same Polaris Terminal web origin's device page. This
 /// keeps the logout endpoint from becoming an open redirect if an unexpected
 /// device-authorization response reaches the client.
 #[cfg(feature = "tui")]
 pub fn web_logout_url_with_continue(continue_url: &str) -> Option<String> {
-    let mut logout_url =
-        Url::parse(&web_logout_url()).expect("configured Rook web logout URL must be valid");
+    let mut logout_url = Url::parse(&web_logout_url())
+        .expect("configured Polaris Terminal web logout URL must be valid");
     let continue_url = Url::parse(continue_url).ok()?;
     let has_required_query = continue_url
         .query_pairs()
         .any(|(key, value)| key == "user_code" && !value.is_empty())
         && continue_url
             .query_pairs()
-            .any(|(key, value)| key == "source" && value == "rook-agent-cli");
+            .any(|(key, value)| key == "source" && value == "polaris-terminal-agent-cli");
     if continue_url.origin() != logout_url.origin()
         || continue_url.path() != "/device"
         || !continue_url.username().is_empty()
@@ -202,7 +202,7 @@ pub fn maybe_log_out(app: &mut AppContext) {
                 "object"
             };
             info_text_vec.push(format!(
-                "You have {num_unsaved_objects} unsynced Rook Drive {plural}. \
+                "You have {num_unsaved_objects} unsynced Polaris Terminal Drive {plural}. \
             Logging out will cause you to lose the {plural}."
             ));
         }
@@ -242,7 +242,7 @@ pub fn maybe_log_out(app: &mut AppContext) {
         );
 
         // On mac, we show the native platform modal. On platforms that don't support a native modal,
-        // we show the custom rook modal.
+        // we show the custom polaris-terminal modal.
         if cfg!(all(not(target_family = "wasm"), target_os = "macos")) {
             app.show_native_platform_modal(alert_data);
         } else {
@@ -255,7 +255,7 @@ pub fn maybe_log_out(app: &mut AppContext) {
     }
 }
 
-/// Logs out locally and sends the user to Rook web's logout endpoint.
+/// Logs out locally and sends the user to Polaris Terminal web's logout endpoint.
 ///
 /// This is intentionally separate from [`log_out`], which is also used for
 /// non-user-initiated auth recovery paths where opening a browser would be
@@ -283,7 +283,7 @@ pub fn log_out(app: &mut AppContext) {
     AuthManager::handle(app).update(app, |auth_manager, ctx| {
         auth_manager.log_out(ctx);
     });
-    // Detach built-in Rook-hosted MCP servers; they authenticate with the
+    // Detach built-in Polaris Terminal-hosted MCP servers; they authenticate with the
     // credentials that were just cleared.
     #[cfg(not(target_family = "wasm"))]
     TemplatableMCPServerManager::handle(app).update(app, |manager, ctx| {
@@ -354,7 +354,7 @@ pub fn log_out(app: &mut AppContext) {
     }
 
     #[cfg(target_family = "wasm")]
-    crate::platform::wasm::emit_event(crate::platform::wasm::RookEvent::LoggedOut);
+    crate::platform::wasm::emit_event(crate::platform::wasm::PtermEvent::LoggedOut);
 }
 
 // Remove the cloud persisted settings from user defaults.

@@ -2,7 +2,7 @@
 
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
-use rookui::{AppContext, Entity, SingletonEntity};
+use ptermui::{AppContext, Entity, SingletonEntity};
 
 use crate::ai::agent::AIAgentExchangeId;
 use crate::ai::agent::conversation::AIConversationId;

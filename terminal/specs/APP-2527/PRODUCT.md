@@ -1,6 +1,6 @@
 # MCP Tool Call JSON Tree Rendering — Product Spec
 Linear: APP-2527
-Figma: none provided (reference screenshot supplied in the originating request showing a generic collapsible JSON tree with chevron expanders and typed value colors; the visual treatment must follow Rook UI conventions, not the screenshot's exact styling)
+Figma: none provided (reference screenshot supplied in the originating request showing a generic collapsible JSON tree with chevron expanders and typed value colors; the visual treatment must follow Polaris Terminal UI conventions, not the screenshot's exact styling)
 
 ## Summary
 Render the JSON request (arguments) and JSON response of an MCP tool call in the agent UI as an interactive, collapsible tree with chevron expanders and theme-driven colors for keys and values, instead of the current flat pretty-printed JSON blob. Long string values are elided by default and can be expanded in place via a chevron. The underlying JSON tree widget is designed as a generic, reusable UI component.
@@ -10,7 +10,7 @@ When the agent calls an MCP tool, expanding the tool-call detail currently shows
 
 ## Example
 
-The following mock illustrates the intended rendering style for an expanded MCP tool call detail. `▶` is the right-pointing (collapsed) chevron; `▼` is the down-pointing (expanded) chevron. Colors represent value types — keys in cyan/blue, strings in green, numbers in yellow, booleans in magenta, null muted, type annotations in secondary text. Exact palette is determined by Rook theme tokens, not by this mock.
+The following mock illustrates the intended rendering style for an expanded MCP tool call detail. `▶` is the right-pointing (collapsed) chevron; `▼` is the down-pointing (expanded) chevron. Colors represent value types — keys in cyan/blue, strings in green, numbers in yellow, booleans in magenta, null muted, type annotations in secondary text. Exact palette is determined by Polaris Terminal theme tokens, not by this mock.
 
 ```
 Request
@@ -64,7 +64,7 @@ Long string elision (collapsed → expanded):
 17. The tree body scrolls vertically when the expanded tree exceeds the height of the action detail container. A maximum height cap is applied to the tree body (consistent with the existing max-height cap used for command editor bodies) so that a fully expanded tree does not push subsequent blocks off-screen. Scrolling the tree does not interfere with scrolling the outer block list.
 
 ### Typed colors
-18. Keys, and each scalar value type, render in visually distinct colors sourced from the active Rook theme (no hard-coded colors). At minimum these categories are visually distinguishable from each other and from plain body text: object/array keys (and array indices), string values, number values, boolean values, and null values. Container type/size annotations (`{} 4 keys`) render in a muted/secondary text color.
+18. Keys, and each scalar value type, render in visually distinct colors sourced from the active Polaris Terminal theme (no hard-coded colors). At minimum these categories are visually distinguishable from each other and from plain body text: object/array keys (and array indices), string values, number values, boolean values, and null values. Container type/size annotations (`{} 4 keys`) render in a muted/secondary text color.
 19. The colors adapt to the active theme and remain legible against the detail's background in both light and dark themes; they derive from theme tokens so a theme switch updates them without restart.
 20. Punctuation/structural glyphs (braces, brackets, colons, quotes around strings) follow a consistent, readable treatment and must not be mistaken for values.
 

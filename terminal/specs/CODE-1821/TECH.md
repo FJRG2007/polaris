@@ -1,4 +1,4 @@
-# TECH: Rook TUI Conversation Management (CODE-1821)
+# TECH: Polaris Terminal TUI Conversation Management (CODE-1821)
 
 Implements [`PRODUCT.md`](./PRODUCT.md) for [CODE-1821](https://linear.app/warpdotdev/issue/CODE-1821/conversation-management).
 
@@ -6,24 +6,24 @@ Implements [`PRODUCT.md`](./PRODUCT.md) for [CODE-1821](https://linear.app/warpd
 
 This change builds on two parent branches whose APIs are already established:
 
-- [`crates/rook_tui/src/inline_menu.rs @ 053d02e1`](https://github.com/FJRG2007/rook/blob/053d02e1/crates/rook_tui/src/inline_menu.rs) and [`crates/rook_tui/src/input/view.rs @ 053d02e1`](https://github.com/FJRG2007/rook/blob/053d02e1/crates/rook_tui/src/input/view.rs) route navigation, acceptance, dismissal, and rendering through an ordered collection of type-erased TUI inline-menu handles.
-- [`specs/frontend-neutral-conversation-list-policy/TECH.md`](../frontend-neutral-conversation-list-policy/TECH.md) documents the frontend-neutral list policy introduced by the next parent branch. [`AgentConversationsModel @ 0f9eecda`](https://github.com/FJRG2007/rook/blob/0f9eecda/app/src/ai/agent_conversations_model.rs) supplies normalized entries, and the TUI’s `ConversationSelection` classifies them relative to its sole conversation surface.
+- [`crates/pterm_tui/src/inline_menu.rs @ 053d02e1`](https://github.com/FJRG2007/polaris/blob/053d02e1/terminal/crates/pterm_tui/src/inline_menu.rs) and [`crates/pterm_tui/src/input/view.rs @ 053d02e1`](https://github.com/FJRG2007/polaris/blob/053d02e1/terminal/crates/pterm_tui/src/input/view.rs) route navigation, acceptance, dismissal, and rendering through an ordered collection of type-erased TUI inline-menu handles.
+- [`specs/frontend-neutral-conversation-list-policy/TECH.md`](../frontend-neutral-conversation-list-policy/TECH.md) documents the frontend-neutral list policy introduced by the next parent branch. [`AgentConversationsModel @ 0f9eecda`](https://github.com/FJRG2007/polaris/blob/0f9eecda/terminal/app/src/ai/agent_conversations_model.rs) supplies normalized entries, and the TUI’s `ConversationSelection` classifies them relative to its sole conversation surface.
 
 This spec does not repeat those parent-branch designs. This branch owns the `/conversations` menu, its loading/search/update lifecycle, acceptance-time validation, and safe replacement of the TUI’s selected conversation.
 
 The existing restoration path from CODE-1820 provides the starting point:
 
-- [`crates/rook_tui/src/terminal_session_view.rs (589-698) @ 99261042`](https://github.com/FJRG2007/rook/blob/992610422e4e441ae1e4d29de17aebbc5e0a1b23/crates/rook_tui/src/terminal_session_view.rs#L589-L698) loads a conversation by server token and replaces the provisional TUI conversation after loading succeeds.
-- [`app/src/ai/blocklist/history_model/conversation_loader.rs (233-366) @ 99261042`](https://github.com/FJRG2007/rook/blob/992610422e4e441ae1e4d29de17aebbc5e0a1b23/app/src/ai/blocklist/history_model/conversation_loader.rs#L233-L366) loads conversations from memory, local persistence, or the server.
-- [`app/src/ai/blocklist/history_model.rs (1058-1169) @ 99261042`](https://github.com/FJRG2007/rook/blob/992610422e4e441ae1e4d29de17aebbc5e0a1b23/app/src/ai/blocklist/history_model.rs#L1058-L1169) registers restored conversations and owns terminal-surface associations.
-- [`app/src/terminal/conversation_restoration.rs (20-97) @ 99261042`](https://github.com/FJRG2007/rook/blob/992610422e4e441ae1e4d29de17aebbc5e0a1b23/app/src/terminal/conversation_restoration.rs#L20-L97) builds the frontend-neutral command/exchange restoration plan consumed by the TUI.
-- [`crates/rook_tui/src/transcript_view.rs (84-307) @ 99261042`](https://github.com/FJRG2007/rook/blob/992610422e4e441ae1e4d29de17aebbc5e0a1b23/crates/rook_tui/src/transcript_view.rs#L84-L307) materializes restored agent blocks and removes conversation-scoped transcript content.
+- [`crates/pterm_tui/src/terminal_session_view.rs (589-698) @ 99261042`](https://github.com/FJRG2007/polaris/blob/992610422e4e441ae1e4d29de17aebbc5e0a1b23/terminal/crates/pterm_tui/src/terminal_session_view.rs#L589-L698) loads a conversation by server token and replaces the provisional TUI conversation after loading succeeds.
+- [`app/src/ai/blocklist/history_model/conversation_loader.rs (233-366) @ 99261042`](https://github.com/FJRG2007/polaris/blob/992610422e4e441ae1e4d29de17aebbc5e0a1b23/terminal/app/src/ai/blocklist/history_model/conversation_loader.rs#L233-L366) loads conversations from memory, local persistence, or the server.
+- [`app/src/ai/blocklist/history_model.rs (1058-1169) @ 99261042`](https://github.com/FJRG2007/polaris/blob/992610422e4e441ae1e4d29de17aebbc5e0a1b23/terminal/app/src/ai/blocklist/history_model.rs#L1058-L1169) registers restored conversations and owns terminal-surface associations.
+- [`app/src/terminal/conversation_restoration.rs (20-97) @ 99261042`](https://github.com/FJRG2007/polaris/blob/992610422e4e441ae1e4d29de17aebbc5e0a1b23/terminal/app/src/terminal/conversation_restoration.rs#L20-L97) builds the frontend-neutral command/exchange restoration plan consumed by the TUI.
+- [`crates/pterm_tui/src/transcript_view.rs (84-307) @ 99261042`](https://github.com/FJRG2007/polaris/blob/992610422e4e441ae1e4d29de17aebbc5e0a1b23/terminal/crates/pterm_tui/src/transcript_view.rs#L84-L307) materializes restored agent blocks and removes conversation-scoped transcript content.
 
 ## Proposed changes
 
 ### Add the conversation menu model
 
-Add `TuiConversationMenuModel` in `crates/rook_tui/src/conversation_menu.rs`. It owns:
+Add `TuiConversationMenuModel` in `crates/pterm_tui/src/conversation_menu.rs`. It owns:
 
 - Explicit open and closed state.
 - Title-only rows with stable `AgentConversationEntryId` identity.
@@ -37,7 +37,7 @@ The model subscribes to input changes and `AgentConversationsModelEvent`. Every 
 
 ### Query and order eligible entries
 
-Request personal Rook Agent entries from `AgentConversationsModel::get_entries` and classify each through the TUI’s existing conversation-selection policy. Pass eligible entries to the same pure `query_conversation_entries` helper used by the GUI inline menu. The helper owns the 50-entry recent cap, case-insensitive fuzzy matching, score threshold, score/recency ordering, and 500-result search cap. GUI-only directory filtering and frontend-specific row construction remain outside the helper.
+Request personal Polaris Terminal Agent entries from `AgentConversationsModel::get_entries` and classify each through the TUI’s existing conversation-selection policy. Pass eligible entries to the same pure `query_conversation_entries` helper used by the GUI inline menu. The helper owns the 50-entry recent cap, case-insensitive fuzzy matching, score threshold, score/recency ordering, and 500-result search cap. GUI-only directory filtering and frontend-specific row construction remain outside the helper.
 
 With an empty query:
 
@@ -143,7 +143,7 @@ sequenceDiagram
   participant Transcript as TuiTranscriptView
 
   User->>Menu: /conversations
-  Menu->>Model: query classified Rook Agent entries
+  Menu->>Model: query classified Polaris Terminal Agent entries
   Model-->>Menu: eligible normalized rows
   User->>Menu: search and accept
   Menu->>Session: stable entry ID
@@ -151,7 +151,7 @@ sequenceDiagram
   Session->>History: load local ID or server token
   alt rejected, failed, or cancelled
     Session-->>User: retain current conversation
-  else valid Rook Agent conversation
+  else valid Polaris Terminal Agent conversation
     Session->>Transcript: clear previous visible content
     Session->>History: register target
     Session->>Transcript: materialize restoration plan
@@ -166,7 +166,7 @@ sequenceDiagram
 - Input/menu tests continue to verify navigation, acceptance, and dismissal routing through the active menu.
 - UI tests verify the startup restoration cancellation hint.
 - Focused session tests should cover busy rejection, load failure rollback, successful local/server replacement, list cancellation, startup cancellation, and ignored late completion.
-- Run `cargo nextest run -p rook_tui` and focused history/model tests.
+- Run `cargo nextest run -p pterm_tui` and focused history/model tests.
 - Run `./script/format` and the repository clippy invocation before submission.
 
 ## Risks and mitigations

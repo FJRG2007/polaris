@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::ops::{Neg, RangeInclusive};
 
 use pathfinder_color::ColorU;
-use rookui::fonts::{FamilyId, Properties, Weight};
-use rookui::geometry::rect::RectF;
-use rookui::geometry::vector::{Vector2F, vec2f};
-use rookui::{AppContext, Element, EntityId, PaintContext};
+use ptermui::fonts::{FamilyId, Properties, Weight};
+use ptermui::geometry::rect::RectF;
+use ptermui::geometry::vector::{Vector2F, vec2f};
+use ptermui::{AppContext, Element, EntityId, PaintContext};
 
 use super::model::SecretHandle;
 use super::model::ansi::{CursorShape, CursorStyle};
@@ -18,10 +18,10 @@ use crate::terminal::model::blockgrid::{BlockGrid, CursorDisplayPoint};
 use crate::terminal::model::grid::grid_handler::Link;
 use crate::terminal::model::index::Point;
 use crate::terminal::{SizeInfo, color};
-use crate::themes::theme::RookTheme;
+use crate::themes::theme::PtermTheme;
 
 pub struct GridRenderParams {
-    pub rook_theme: RookTheme,
+    pub pterm_theme: PtermTheme,
     pub font_family: FamilyId,
     pub font_size: f32,
     pub font_weight: Weight,
@@ -32,7 +32,7 @@ pub struct GridRenderParams {
     pub cell_size: Vector2F,
     pub use_ligature_rendering: bool,
     /// When true, suppresses cursor rendering for CLI agents when rich input is open. For agents that draw their own cursor (SHOW_CURSOR off),
-    /// the cursor cell is skipped. For agents that let Rook draw the cursor
+    /// the cursor cell is skipped. For agents that let Polaris Terminal draw the cursor
     /// (SHOW_CURSOR on), the `draw_cursor` call and cursor contrast colouring
     /// are suppressed instead.
     pub hide_cursor_cell: bool,
@@ -133,7 +133,7 @@ impl BlockGridRenderer for BlockGrid {
             end_row,
             &block_grid_params.colors,
             &block_grid_params.override_colors,
-            &block_grid_params.grid_render_params.rook_theme,
+            &block_grid_params.grid_render_params.pterm_theme,
             properties,
             block_grid_params.grid_render_params.font_family,
             block_grid_params.grid_render_params.font_size,

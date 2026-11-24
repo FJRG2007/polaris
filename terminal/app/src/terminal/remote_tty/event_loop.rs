@@ -4,8 +4,8 @@ use std::sync::Arc;
 use async_channel::Receiver;
 use futures_util::SinkExt;
 use parking_lot::FairMutex;
-use rook_errors::report_error;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 use serde::Serialize;
 use websocket::{Message, Sink, Stream, WebSocket, WebsocketMessage as _};
 
@@ -191,12 +191,15 @@ impl EventLoop {
     /// Writes environment variables that should be defined in the session
     /// before bootstrapping. This is a subset of the environment variables
     /// defined in `app/src/terminal/local_tty/unix.rs` that are necessary in
-    /// order to dogfood Rook on Web over the remote tty.
+    /// order to dogfood Polaris Terminal on Web over the remote tty.
     async fn write_env_vars(
         sink: &mut impl Sink,
         is_honor_ps1_enabled: bool,
     ) -> anyhow::Result<()> {
-        let honor_ps1_env_var = format!(r#"ROOK_HONOR_PS1="{}";"#, is_honor_ps1_enabled as u8);
+        let honor_ps1_env_var = format!(
+            r#"POLARIS_TERMINAL_HONOR_PS1="{}";"#,
+            is_honor_ps1_enabled as u8
+        );
         sink.send(Message::new_binary(honor_ps1_env_var.as_bytes().to_vec()))
             .await?;
 

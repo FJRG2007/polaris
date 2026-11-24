@@ -4,10 +4,10 @@ use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
 use ai::project_context::model::ProjectContextModel;
 use enum_iterator::Sequence;
 use lsp::supported_servers::LSPServerType;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::{Entity, ModelContext, SingletonEntity as _};
 #[cfg(not(target_family = "wasm"))]
 use repo_metadata::repositories::DetectedRepositories;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::{Entity, ModelContext, SingletonEntity as _};
 
 use crate::ai::persisted_workspace::PersistedWorkspace;
 use crate::settings::CodeSettings;
@@ -53,7 +53,7 @@ pub enum InitStepStatus {
     Pending,
     /// Ready for user interaction (contains data for view to render)
     Ready(InitStepData),
-    /// User initiated action, e.g. AI generating ROOK.md
+    /// User initiated action, e.g. AI generating POLARIS_TERMINAL.md
     Running,
     /// Done (accepted, skipped, or auto-completed)
     Completed(InitActionResult),
@@ -175,7 +175,7 @@ impl InitProjectModel {
     }
 
     /// Check if there are any steps that need user action
-    pub fn should_have_available_steps(path: &Path, ctx: &rookui::AppContext) -> bool {
+    pub fn should_have_available_steps(path: &Path, ctx: &ptermui::AppContext) -> bool {
         // Note that we consider auto-indexing setting to true to satisfy the codebase context step.
         // This avoids the potential race condition with the banner showing just when we start auto-indexing.
         let has_pending_codebase_context = UserWorkspaces::as_ref(ctx)
@@ -521,13 +521,13 @@ impl InitProjectModel {
                     p.file_name()
                         .map(|n| {
                             let name = n.to_string_lossy().to_lowercase();
-                            name == "agents.md" || name == "rook.md"
+                            name == "agents.md" || name == "polaris-terminal.md"
                         })
                         .unwrap_or(false)
                 });
 
                 if has_agents_md {
-                    // Already has AGENTS.md or ROOK.md, mark as completed
+                    // Already has AGENTS.md or POLARIS_TERMINAL.md, mark as completed
                     me.set_step(
                         InitStepKind::ProjectScopedRules,
                         Some(InitStep::new_completed(

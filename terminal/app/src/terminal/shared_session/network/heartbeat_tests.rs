@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use rookui::App;
-use rookui::r#async::Timer;
+use ptermui::App;
+use ptermui::r#async::Timer;
 
 use super::{Event, Heartbeat};
 
@@ -67,7 +67,7 @@ fn test_idle_timeout() {
         // Reset the idle timeout.
         heartbeat.update(
             &mut app,
-            |heartbeat, ctx: &mut rookui::ModelContext<Heartbeat>| {
+            |heartbeat, ctx: &mut ptermui::ModelContext<Heartbeat>| {
                 heartbeat.reset_idle_timeout(ctx)
             },
         );

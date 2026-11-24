@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use rookui::{AppContext, ModelContext};
+use ptermui::{AppContext, ModelContext};
 
 use crate::ai::agent::{AIAgentActionId, SearchCodebaseFailureReason, SearchCodebaseResult};
 use crate::ai::blocklist::SessionContext;

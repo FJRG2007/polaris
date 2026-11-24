@@ -1,7 +1,7 @@
 # APP-4549: Tech Spec — Feedback Bundled Skill Setting
 Linear: [APP-4549](https://linear.app/warpdotdev/issue/APP-4549/add-setting-to-disable-the-feedback-skill)
 ## Context
-`PRODUCT.md` defines the user-visible behavior: add a default-on setting that disables only Rook’s built-in `feedback` bundled skill.
+`PRODUCT.md` defines the user-visible behavior: add a default-on setting that disables only Polaris Terminal’s built-in `feedback` bundled skill.
 The relevant code already has a central bundled-skill activation path:
 - `app/src/ai/skills/skill_manager.rs (20-47)` — `BundledSkillActivation` models whether a bundled skill is active.
 - `app/src/ai/skills/skill_manager.rs (361-389)` — bundled skills are loaded from app resources and assigned an activation condition.
@@ -9,7 +9,7 @@ The relevant code already has a central bundled-skill activation path:
 - `app/src/ai/skills/skill_manager.rs (185-201)` — `get_skills_for_working_directory` appends bundled skills whose activation condition is enabled.
 - `app/src/ai/skills/skill_utils.rs (94-121)` — `list_skills_if_changed` sends available skill descriptors to the agent when the list changes.
 - `app/src/ai/blocklist/action_model/execute/read_skill.rs (36-63)` — `read_skill` resolves `SkillReference::BundledSkillId` through `SkillManager::skill_by_reference`.
-- `app/src/settings/ai.rs (715-1464)` — `AISettings` defines user-level Agent settings, including public TOML-backed settings under `agents.rook_agent.*`.
+- `app/src/settings/ai.rs (715-1464)` — `AISettings` defines user-level Agent settings, including public TOML-backed settings under `agents.pterm_agent.*`.
 - `app/src/settings_view/ai_page.rs (6024-6223)` — the Agent settings “Other” widget renders related Agent toggles using shared helpers.
 - `app/src/bin/generate_settings_schema.rs (146-199)` and `script/prepare_bundled_resources (132-159)` — public settings with `toml_path` are included in the generated settings schema bundled with app resources.
 Bundled skills are copied into the application bundle from `resources/bundled` by `script/prepare_bundled_resources:48`. This change should not try to remove the feedback skill from the bundle at build time; it should make the skill inactive at runtime.
@@ -22,8 +22,8 @@ Bundled skills are copied into the application bundle from `resources/bundled` b
    - Supported platforms: `SupportedPlatforms::ALL`.
    - Sync: `SyncToCloud::Globally(RespectUserSyncSetting::Yes)`.
    - Private: `false`.
-   - Suggested TOML path: `agents.rook_agent.other.feedback_bundled_skill_enabled`.
-   - Description: “Whether Rook’s built-in feedback skill is available to the Rook Agent.”
+   - Suggested TOML path: `agents.pterm_agent.other.feedback_bundled_skill_enabled`.
+   - Description: “Whether Polaris Terminal’s built-in feedback skill is available to the Polaris Terminal Agent.”
 2. Extend bundled skill activation in `app/src/ai/skills/skill_manager.rs`.
    - Add a `BundledSkillActivation` variant for settings-backed feedback activation, for example `FeedbackSkillSetting`.
    - Update `BundledSkillActivation::is_enabled` to consult `AISettings::as_ref(ctx).feedback_bundled_skill_enabled` for that variant.
@@ -32,7 +32,7 @@ Bundled skills are copied into the application bundle from `resources/bundled` b
 3. Add an activation-aware lookup for bundled skill reads.
    - Preserve raw lookup behavior where the UI needs historical metadata for already-rendered outputs.
    - Add a method such as `skill_by_reference_if_active(&self, reference: &SkillReference, ctx: &AppContext) -> Option<&ParsedSkill>`, or update `ReadSkillExecutor` to pattern-match bundled references and call `active_bundled_skill(id, ctx)`.
-   - Use the activation-aware path in `ReadSkillExecutor` so `read_skill` cannot expose `@rook-skill:feedback` content when the setting is disabled.
+   - Use the activation-aware path in `ReadSkillExecutor` so `read_skill` cannot expose `@polaris-terminal-skill:feedback` content when the setting is disabled.
    - Path-based user skills should continue to use `skills_by_path` and should not be affected by the feedback bundled-skill setting.
 4. Add the UI toggle in `app/src/settings_view/ai_page.rs`.
    - Import the generated `FeedbackBundledSkillEnabled` setting type.
@@ -41,7 +41,7 @@ Bundled skills are copied into the application bundle from `resources/bundled` b
    - Handle the action by toggling `AISettings.feedback_bundled_skill_enabled` and notifying the view.
    - Render the toggle in the existing Agent “Other” section using `render_ai_setting_toggle`.
    - Suggested label: “Enable built-in feedback skill”.
-   - Suggested description: “Let Oz use Rook’s built-in skill for turning Rook product feedback into GitHub issues.”
+   - Suggested description: “Let Oz use Polaris Terminal’s built-in skill for turning Polaris Terminal product feedback into GitHub issues.”
    - Update `OtherAIWidget::search_terms` to include feedback, skill, and bundled skill.
 5. Schema and resources.
    - No manual schema file changes should be necessary. The setting should appear in generated schema output through the existing settings inventory path.
@@ -61,19 +61,19 @@ Map tests to the product behavior in `PRODUCT.md`:
 7. Product behavior 9, 12, and 13: update `ai_page_tests` if the existing settings page tests assert widget search/filtering or rendered action coverage for the “Other” widget.
 8. Run `cargo fmt`.
 9. Run targeted tests:
-   - `cargo test -p rook skill_manager_tests`
-   - `cargo test -p rook read_skill_tests`
-   - `cargo test -p rook ai_page_tests`
+   - `cargo test -p polaris-terminal skill_manager_tests`
+   - `cargo test -p polaris-terminal read_skill_tests`
+   - `cargo test -p polaris-terminal ai_page_tests`
    Adjust exact package/test filters if local test names differ.
 10. If this is prepared for PR review, follow repo guidance and run the required formatting and clippy checks before opening or updating a PR.
 ## Risks and mitigations
-- Stale skill context could still reference `@rook-skill:feedback`. Mitigation: guard direct `read_skill` execution with the same activation state used by skill listing.
+- Stale skill context could still reference `@polaris-terminal-skill:feedback`. Mitigation: guard direct `read_skill` execution with the same activation state used by skill listing.
 - The setting could accidentally disable user-authored skills named `feedback`. Mitigation: check only the bundled skill ID, not parsed skill name or path-based references.
 - Other bundled skills could regress if activation is generalized too broadly. Mitigation: add tests that feedback is disabled while another bundled skill remains active.
 - Settings UI copy could imply all feedback mechanisms are disabled. Mitigation: label and description should explicitly say “built-in feedback skill.”
 ## Parallelization
 Do not parallelize the implementation. The setting definition, activation logic, direct read enforcement, and UI toggle are tightly coupled and touch overlapping files, so a single implementer should make the code changes in one checkout on branch `safia/app-4549-add-setting-to-disable-the-feedback-skill`.
 Validation can be parallelized after implementation if desired:
-- Agent A: local execution in `/Users/captainsafia/code/rook`, same branch, owns `skill_manager_tests` and `read_skill_tests`.
-- Agent B: local execution in a separate worktree, for example `/Users/captainsafia/code/rook-app-4549-ui-tests` on branch `safia/app-4549-ui-validation`, owns `ai_page_tests` and settings UI review.
+- Agent A: local execution in `/Users/captainsafia/code/polaris-terminal`, same branch, owns `skill_manager_tests` and `read_skill_tests`.
+- Agent B: local execution in a separate worktree, for example `/Users/captainsafia/code/polaris-terminal-app-4549-ui-tests` on branch `safia/app-4549-ui-validation`, owns `ai_page_tests` and settings UI review.
 If using the optional validation split, Agent B should not modify source files unless asked; it should report failures and suggested fixes back to the main branch owner. The final PR should land as a single branch/PR from `safia/app-4549-add-setting-to-disable-the-feedback-skill`.

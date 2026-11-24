@@ -40,7 +40,7 @@ Two new crates:
 - **`settings_value`** — trait definition, primitive impls, collection impls, Duration impl. Dependencies: `serde`, `serde_json`, `instant`, `schemars`. Optional `derive` feature.
 - **`settings_value_derive`** — proc-macro crate for `#[derive(SettingsValue)]`. Dependencies: `proc-macro2`, `quote`, `syn`.
 
-The `settings` crate depends on `settings_value` (with `derive` feature). The `app` crate depends on it for custom impls. `rookui_core` gets impls behind an optional `settings_value` feature flag.
+The `settings` crate depends on `settings_value` (with `derive` feature). The `app` crate depends on it for custom impls. `ptermui_core` gets impls behind an optional `settings_value` feature flag.
 
 ### Impls by category
 
@@ -62,7 +62,7 @@ The `settings` crate depends on `settings_value` (with `derive` feature). The `a
 
 **Exceptions requiring manual passthrough impls:**
 - `CycleInfo`, `AIRequestQuotaInfo` — contain `DateTime<Utc>` (foreign type, orphan rule prevents implementing `SettingsValue` for it)
-- `rookui_core` types (`Weight`, `ThinStrokes`, `GraphicsBackend`, `AccessibilityVerbosity`, `DisplayIdx`) — kept in a centralized `cfg`-gated module due to optional feature dependency
+- `ptermui_core` types (`Weight`, `ThinStrokes`, `GraphicsBackend`, `AccessibilityVerbosity`, `DisplayIdx`) — kept in a centralized `cfg`-gated module due to optional feature dependency
 
 ### Integration with settings macros
 

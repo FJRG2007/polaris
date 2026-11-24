@@ -1,5 +1,5 @@
 #!/bin/bash
-# Tests for the Rook Gemini CLI plugin hook scripts.
+# Tests for the Polaris Terminal Gemini CLI plugin hook scripts.
 #
 # Validates that each hook script produces correctly structured JSON payloads
 # by piping mock Gemini CLI hook input into the scripts and checking the output.
@@ -116,29 +116,29 @@ echo ""
 echo "--- Protocol version negotiation ---"
 
 # Default: no env var set → falls back to plugin max (1)
-unset ROOK_CLI_AGENT_PROTOCOL_VERSION
+unset POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION
 PAYLOAD=$(build_payload '{"session_id":"s1","cwd":"/tmp"}' "stop")
 assert_json_field "defaults to v1 when env var absent" "$PAYLOAD" ".v" "1"
 
-# Rook declares v1 → use 1
-export ROOK_CLI_AGENT_PROTOCOL_VERSION=1
+# Polaris Terminal declares v1 → use 1
+export POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION=1
 PAYLOAD=$(build_payload '{"session_id":"s1","cwd":"/tmp"}' "stop")
-assert_json_field "v1 when rook declares 1" "$PAYLOAD" ".v" "1"
+assert_json_field "v1 when polaris-terminal declares 1" "$PAYLOAD" ".v" "1"
 
-# Rook declares a higher version than the plugin knows → capped to plugin current
-export ROOK_CLI_AGENT_PROTOCOL_VERSION=99
+# Polaris Terminal declares a higher version than the plugin knows → capped to plugin current
+export POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION=99
 PAYLOAD=$(build_payload '{"session_id":"s1","cwd":"/tmp"}' "stop")
-assert_json_field "capped to plugin current when rook is ahead" "$PAYLOAD" ".v" "1"
+assert_json_field "capped to plugin current when polaris-terminal is ahead" "$PAYLOAD" ".v" "1"
 
-# Rook declares a lower version than the plugin knows → use rook's version
+# Polaris Terminal declares a lower version than the plugin knows → use polaris-terminal's version
 PLUGIN_CURRENT_PROTOCOL_VERSION=5
-export ROOK_CLI_AGENT_PROTOCOL_VERSION=3
+export POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION=3
 PAYLOAD=$(build_payload '{"session_id":"s1","cwd":"/tmp"}' "stop")
-assert_json_field "uses rook version when plugin is ahead" "$PAYLOAD" ".v" "3"
+assert_json_field "uses polaris-terminal version when plugin is ahead" "$PAYLOAD" ".v" "3"
 PLUGIN_CURRENT_PROTOCOL_VERSION=1
 
 # Clean up
-unset ROOK_CLI_AGENT_PROTOCOL_VERSION
+unset POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION
 
 echo ""
 echo "=== should-use-structured.sh ==="
@@ -147,52 +147,52 @@ source "$SCRIPT_DIR/should-use-structured.sh"
 
 echo ""
 echo "--- No protocol version → legacy ---"
-unset ROOK_CLI_AGENT_PROTOCOL_VERSION
-unset ROOK_CLIENT_VERSION
+unset POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION
+unset POLARIS_TERMINAL_CLIENT_VERSION
 should_use_structured
 assert_eq "no protocol version returns false" "1" "$?"
 
 echo ""
 echo "--- Protocol set, no client version → legacy ---"
-export ROOK_CLI_AGENT_PROTOCOL_VERSION=1
-unset ROOK_CLIENT_VERSION
+export POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION=1
+unset POLARIS_TERMINAL_CLIENT_VERSION
 should_use_structured
-assert_eq "missing ROOK_CLIENT_VERSION returns false" "1" "$?"
+assert_eq "missing POLARIS_TERMINAL_CLIENT_VERSION returns false" "1" "$?"
 
 echo ""
 echo "--- Protocol set, dev version → always structured (dev was never broken) ---"
-export ROOK_CLI_AGENT_PROTOCOL_VERSION=1
-export ROOK_CLIENT_VERSION="v0.2026.03.30.08.43.dev_00"
+export POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION=1
+export POLARIS_TERMINAL_CLIENT_VERSION="v0.2026.03.30.08.43.dev_00"
 should_use_structured
 assert_eq "dev version returns true" "0" "$?"
 
 echo ""
 echo "--- Protocol set, broken stable version → legacy ---"
-export ROOK_CLIENT_VERSION="v0.2026.03.25.08.24.stable_05"
+export POLARIS_TERMINAL_CLIENT_VERSION="v0.2026.03.25.08.24.stable_05"
 should_use_structured
 assert_eq "exact broken stable version returns false" "1" "$?"
 
 echo ""
 echo "--- Protocol set, newer stable version → structured ---"
-export ROOK_CLIENT_VERSION="v0.2026.04.01.08.00.stable_00"
+export POLARIS_TERMINAL_CLIENT_VERSION="v0.2026.04.01.08.00.stable_00"
 should_use_structured
 assert_eq "newer stable version returns true" "0" "$?"
 
 echo ""
 echo "--- Protocol set, broken preview version → legacy ---"
-export ROOK_CLIENT_VERSION="v0.2026.03.25.08.24.preview_05"
+export POLARIS_TERMINAL_CLIENT_VERSION="v0.2026.03.25.08.24.preview_05"
 should_use_structured
 assert_eq "exact broken preview version returns false" "1" "$?"
 
 echo ""
 echo "--- Protocol set, newer preview version → structured ---"
-export ROOK_CLIENT_VERSION="v0.2026.04.01.08.00.preview_00"
+export POLARIS_TERMINAL_CLIENT_VERSION="v0.2026.04.01.08.00.preview_00"
 should_use_structured
 assert_eq "newer preview version returns true" "0" "$?"
 
 # Clean up
-unset ROOK_CLI_AGENT_PROTOCOL_VERSION
-unset ROOK_CLIENT_VERSION
+unset POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION
+unset POLARIS_TERMINAL_CLIENT_VERSION
 
 # --- Routing tests ---
 # These test the hook scripts as subprocesses to verify routing behavior.

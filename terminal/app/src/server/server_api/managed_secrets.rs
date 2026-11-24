@@ -3,38 +3,38 @@ use std::collections::HashMap;
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use cynic::{MutationBuilder, QueryBuilder};
-use rook_graphql::managed_secrets::{ManagedSecret, ManagedSecretType};
-use rook_graphql::mutations::create_managed_secret::{
+use pterm_graphql::managed_secrets::{ManagedSecret, ManagedSecretType};
+use pterm_graphql::mutations::create_managed_secret::{
     CreateManagedSecret, CreateManagedSecretInput, CreateManagedSecretResult,
     CreateManagedSecretVariables,
 };
-use rook_graphql::mutations::delete_managed_secret::{
+use pterm_graphql::mutations::delete_managed_secret::{
     DeleteManagedSecret, DeleteManagedSecretInput, DeleteManagedSecretResult,
     DeleteManagedSecretVariables,
 };
-use rook_graphql::mutations::issue_task_identity_token::{
+use pterm_graphql::mutations::issue_task_identity_token::{
     IssueTaskIdentityToken, IssueTaskIdentityTokenInput, IssueTaskIdentityTokenResult,
     IssueTaskIdentityTokenVariables,
 };
-use rook_graphql::mutations::update_managed_secret::{
+use pterm_graphql::mutations::update_managed_secret::{
     UpdateManagedSecret, UpdateManagedSecretInput, UpdateManagedSecretResult,
     UpdateManagedSecretVariables,
 };
-use rook_graphql::object_permissions::{Owner, OwnerType};
-use rook_graphql::queries::list_harness_auth_secrets::{
+use pterm_graphql::object_permissions::{Owner, OwnerType};
+use pterm_graphql::queries::list_harness_auth_secrets::{
     ListHarnessAuthSecrets, ListHarnessAuthSecretsInput, ListHarnessAuthSecretsVariables,
 };
-use rook_graphql::queries::list_managed_secrets::{
+use pterm_graphql::queries::list_managed_secrets::{
     ListManagedSecrets, ListManagedSecretsVariables, ManagedSecretsInput, ManagedSecretsResult,
 };
-use rook_graphql::queries::managed_secret_config::{
+use pterm_graphql::queries::managed_secret_config::{
     GetManagedSecretConfig, GetManagedSecretConfigVariables, UserResult,
 };
-use rook_graphql::queries::task_secrets::{
+use pterm_graphql::queries::task_secrets::{
     ManagedSecretValue, TaskSecrets, TaskSecretsInput, TaskSecretsResult, TaskSecretsVariables,
 };
-pub use rook_managed_secrets::client::{ManagedSecretConfigs, ManagedSecretsClient};
-use rook_managed_secrets::client::{SecretOwner, TaskIdentityToken};
+pub use pterm_managed_secrets::client::{ManagedSecretConfigs, ManagedSecretsClient};
+use pterm_managed_secrets::client::{SecretOwner, TaskIdentityToken};
 
 use super::ServerApi;
 use crate::server::graphql::{get_request_context, get_user_facing_error_message};
@@ -201,10 +201,10 @@ impl ManagedSecretsClient for ServerApi {
 
     async fn list_harness_auth_secrets(
         &self,
-        harness: rook_graphql::ai::AgentHarness,
+        harness: pterm_graphql::ai::AgentHarness,
     ) -> Result<Vec<ManagedSecret>> {
         let Some(harness_input) = Option::<
-            rook_graphql::queries::list_harness_auth_secrets::AgentHarnessInput,
+            pterm_graphql::queries::list_harness_auth_secrets::AgentHarnessInput,
         >::from(harness) else {
             return Ok(vec![]);
         };
@@ -218,13 +218,13 @@ impl ManagedSecretsClient for ServerApi {
         let response = self.send_graphql_request(operation, None).await?;
 
         match response.harness_auth_secrets {
-            rook_graphql::queries::list_harness_auth_secrets::HarnessAuthSecretsResult::HarnessAuthSecretsOutput(output) => {
+            pterm_graphql::queries::list_harness_auth_secrets::HarnessAuthSecretsResult::HarnessAuthSecretsOutput(output) => {
                 Ok(output.managed_secrets)
             }
-            rook_graphql::queries::list_harness_auth_secrets::HarnessAuthSecretsResult::UserFacingError(error) => {
+            pterm_graphql::queries::list_harness_auth_secrets::HarnessAuthSecretsResult::UserFacingError(error) => {
                 Err(anyhow!(get_user_facing_error_message(error)))
             }
-            rook_graphql::queries::list_harness_auth_secrets::HarnessAuthSecretsResult::Unknown => {
+            pterm_graphql::queries::list_harness_auth_secrets::HarnessAuthSecretsResult::Unknown => {
                 Err(anyhow!("Unknown error while listing harness auth secrets"))
             }
         }
@@ -282,7 +282,7 @@ impl ManagedSecretsClient for ServerApi {
 
     async fn issue_task_identity_token(
         &self,
-        options: rook_managed_secrets::client::IdentityTokenOptions,
+        options: pterm_managed_secrets::client::IdentityTokenOptions,
     ) -> Result<TaskIdentityToken> {
         let requested_duration_seconds = options
             .requested_duration

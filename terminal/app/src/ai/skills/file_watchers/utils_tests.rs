@@ -1,3 +1,8 @@
+use pterm_util::host_id::HostId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::App;
 use repo_metadata::entry::{DirectoryEntry, Entry, FileMetadata};
 use repo_metadata::file_tree_store::FileTreeState;
 use repo_metadata::file_tree_update::{
@@ -8,11 +13,6 @@ use repo_metadata::{
     DirectoryWatcher, RepoMetadataModel, RepoMetadataUpdate, RepositoryIdentifier,
     StandingQueryContent, StandingQueryResults, StandingQueryResultsDelta,
 };
-use rook_util::host_id::HostId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::App;
 use virtual_fs::{Stub, VirtualFS};
 
 use super::{
@@ -220,7 +220,13 @@ fn extract_skill_parent_directory_different_providers() {
         return;
     };
     let repo = home_dir.join("repo");
-    let providers = [".rook", ".claude", ".codex", ".cursor", ".gemini"];
+    let providers = [
+        ".polaris/terminal",
+        ".claude",
+        ".codex",
+        ".cursor",
+        ".gemini",
+    ];
     for provider in providers {
         let path = repo
             .join(provider)
@@ -362,7 +368,7 @@ fn is_home_provider_path_true_for_known_providers() {
     let path = home_dir.join(".agents").join("skills");
     assert!(is_home_provider_path(&path));
 
-    if let Some(path) = rook_core::paths::rook_home_skills_dir() {
+    if let Some(path) = pterm_core::paths::pterm_home_skills_dir() {
         assert!(is_home_provider_path(&path));
     }
 
@@ -380,17 +386,17 @@ fn is_home_provider_path_true_for_known_providers() {
 }
 
 #[test]
-fn extract_skill_parent_directory_returns_home_dir_for_rook_home_skill() {
+fn extract_skill_parent_directory_returns_home_dir_for_pterm_home_skill() {
     let Some(home_dir) = dirs::home_dir() else {
         eprintln!("Skipping test: home directory not available");
         return;
     };
-    let Some(rook_home_skills_dir) = rook_core::paths::rook_home_skills_dir() else {
-        eprintln!("Skipping test: Rook home skills directory not available");
+    let Some(pterm_home_skills_dir) = pterm_core::paths::pterm_home_skills_dir() else {
+        eprintln!("Skipping test: Polaris Terminal home skills directory not available");
         return;
     };
 
-    let skill_path = rook_home_skills_dir.join("test-skill").join("SKILL.md");
+    let skill_path = pterm_home_skills_dir.join("test-skill").join("SKILL.md");
     let result = extract_skill_parent_directory(&LocalOrRemotePath::Local(skill_path));
     assert_eq!(result.ok(), Some(LocalOrRemotePath::Local(home_dir)));
 }
@@ -464,7 +470,7 @@ fn find_skill_files_in_tree_finds_root_skills() {
             false,
         ));
         let skill1_dir = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join(".agents/skills/root-skill-1"),
             )
             .unwrap(),
@@ -472,8 +478,8 @@ fn find_skill_files_in_tree_finds_root_skills() {
             ignored: false,
             loaded: true,
         });
-        let rook_skills = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+        let pterm_skills = Entry::Directory(DirectoryEntry {
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join(".agents/skills"),
             )
             .unwrap(),
@@ -481,12 +487,12 @@ fn find_skill_files_in_tree_finds_root_skills() {
             ignored: false,
             loaded: true,
         });
-        let rook_dir = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+        let pterm_dir = Entry::Directory(DirectoryEntry {
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join(".agents"),
             )
             .unwrap(),
-            children: vec![rook_skills],
+            children: vec![pterm_skills],
             ignored: false,
             loaded: true,
         });
@@ -496,7 +502,7 @@ fn find_skill_files_in_tree_finds_root_skills() {
             false,
         ));
         let skill2_dir = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join(".claude/skills/root-skill-2"),
             )
             .unwrap(),
@@ -505,7 +511,7 @@ fn find_skill_files_in_tree_finds_root_skills() {
             loaded: true,
         });
         let claude_skills = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join(".claude/skills"),
             )
             .unwrap(),
@@ -514,7 +520,7 @@ fn find_skill_files_in_tree_finds_root_skills() {
             loaded: true,
         });
         let claude_dir = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join(".claude"),
             )
             .unwrap(),
@@ -524,8 +530,8 @@ fn find_skill_files_in_tree_finds_root_skills() {
         });
 
         let root = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(&repo).unwrap(),
-            children: vec![rook_dir, claude_dir],
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(&repo).unwrap(),
+            children: vec![pterm_dir, claude_dir],
             ignored: false,
             loaded: true,
         });
@@ -535,8 +541,10 @@ fn find_skill_files_in_tree_finds_root_skills() {
             app.add_singleton_model(|_| DetectedRepositories::default());
             let repo_handle = watcher.update(&mut app, |w, ctx| {
                 w.add_directory(
-                    rook_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo)
-                        .unwrap(),
+                    pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                        &repo,
+                    )
+                    .unwrap(),
                     ctx,
                 )
                 .unwrap()
@@ -546,8 +554,10 @@ fn find_skill_files_in_tree_finds_root_skills() {
             let model_handle = app.add_singleton_model(RepoMetadataModel::new);
             model_handle.update(&mut app, |model, ctx| {
                 let key =
-                    rook_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo)
-                        .unwrap();
+                    pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                        &repo,
+                    )
+                    .unwrap();
                 model.insert_test_state(key.clone(), state, ctx);
                 model.insert_test_standing_results(
                     key,
@@ -613,7 +623,7 @@ fn find_skill_files_in_tree_finds_subdirectory_skills() {
             false,
         ));
         let root_skill_dir = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join(".agents/skills/root-skill"),
             )
             .unwrap(),
@@ -621,8 +631,8 @@ fn find_skill_files_in_tree_finds_subdirectory_skills() {
             ignored: false,
             loaded: true,
         });
-        let root_rook_skills = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+        let root_pterm_skills = Entry::Directory(DirectoryEntry {
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join(".agents/skills"),
             )
             .unwrap(),
@@ -630,12 +640,12 @@ fn find_skill_files_in_tree_finds_subdirectory_skills() {
             ignored: false,
             loaded: true,
         });
-        let root_rook = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+        let root_pterm = Entry::Directory(DirectoryEntry {
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join(".agents"),
             )
             .unwrap(),
-            children: vec![root_rook_skills],
+            children: vec![root_pterm_skills],
             ignored: false,
             loaded: true,
         });
@@ -645,7 +655,7 @@ fn find_skill_files_in_tree_finds_subdirectory_skills() {
             false,
         ));
         let frontend_skill_dir = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join("packages/frontend/.agents/skills/frontend-skill"),
             )
             .unwrap(),
@@ -653,8 +663,8 @@ fn find_skill_files_in_tree_finds_subdirectory_skills() {
             ignored: false,
             loaded: true,
         });
-        let frontend_rook_skills = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+        let frontend_pterm_skills = Entry::Directory(DirectoryEntry {
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join("packages/frontend/.agents/skills"),
             )
             .unwrap(),
@@ -662,26 +672,26 @@ fn find_skill_files_in_tree_finds_subdirectory_skills() {
             ignored: false,
             loaded: true,
         });
-        let frontend_rook = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+        let frontend_pterm = Entry::Directory(DirectoryEntry {
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join("packages/frontend/.agents"),
             )
             .unwrap(),
-            children: vec![frontend_rook_skills],
+            children: vec![frontend_pterm_skills],
             ignored: false,
             loaded: true,
         });
         let frontend = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join("packages/frontend"),
             )
             .unwrap(),
-            children: vec![frontend_rook],
+            children: vec![frontend_pterm],
             ignored: false,
             loaded: true,
         });
         let packages = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
                 &repo.join("packages"),
             )
             .unwrap(),
@@ -691,8 +701,8 @@ fn find_skill_files_in_tree_finds_subdirectory_skills() {
         });
 
         let root = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(&repo).unwrap(),
-            children: vec![root_rook, packages],
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(&repo).unwrap(),
+            children: vec![root_pterm, packages],
             ignored: false,
             loaded: true,
         });
@@ -702,8 +712,10 @@ fn find_skill_files_in_tree_finds_subdirectory_skills() {
             app.add_singleton_model(|_| DetectedRepositories::default());
             let repo_handle = watcher.update(&mut app, |w, ctx| {
                 w.add_directory(
-                    rook_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo)
-                        .unwrap(),
+                    pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                        &repo,
+                    )
+                    .unwrap(),
                     ctx,
                 )
                 .unwrap()
@@ -713,8 +725,10 @@ fn find_skill_files_in_tree_finds_subdirectory_skills() {
             let model_handle = app.add_singleton_model(RepoMetadataModel::new);
             model_handle.update(&mut app, |model, ctx| {
                 let key =
-                    rook_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo)
-                        .unwrap();
+                    pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                        &repo,
+                    )
+                    .unwrap();
                 model.insert_test_state(key.clone(), state, ctx);
                 model.insert_test_standing_results(
                     key,
@@ -942,14 +956,16 @@ fn find_skill_files_in_tree_empty_repo() {
         vfs.mkdir("repo/src");
 
         let src = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(&repo.join("src"))
-                .unwrap(),
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(
+                &repo.join("src"),
+            )
+            .unwrap(),
             children: vec![],
             ignored: false,
             loaded: true,
         });
         let root = Entry::Directory(DirectoryEntry {
-            path: rook_util::standardized_path::StandardizedPath::try_from_local(&repo).unwrap(),
+            path: pterm_util::standardized_path::StandardizedPath::try_from_local(&repo).unwrap(),
             children: vec![src],
             ignored: false,
             loaded: true,
@@ -960,8 +976,10 @@ fn find_skill_files_in_tree_empty_repo() {
             app.add_singleton_model(|_| DetectedRepositories::default());
             let repo_handle = watcher.update(&mut app, |w, ctx| {
                 w.add_directory(
-                    rook_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo)
-                        .unwrap(),
+                    pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                        &repo,
+                    )
+                    .unwrap(),
                     ctx,
                 )
                 .unwrap()
@@ -971,8 +989,10 @@ fn find_skill_files_in_tree_empty_repo() {
             let model_handle = app.add_singleton_model(RepoMetadataModel::new);
             model_handle.update(&mut app, |model, ctx| {
                 let key =
-                    rook_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo)
-                        .unwrap();
+                    pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                        &repo,
+                    )
+                    .unwrap();
                 model.insert_test_state(key, state, ctx);
             });
 

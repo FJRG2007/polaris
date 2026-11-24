@@ -14,16 +14,16 @@ use markdown_parser::{
 };
 use num_traits::SaturatingSub;
 use pathfinder_color::ColorU;
+use pterm_core::platform::SessionPlatform;
+use pterm_core::safe_error;
+use pterm_util::content_version::ContentVersion;
+use ptermui_core::elements::ListIndentLevel;
+use ptermui_core::fonts::Weight;
+use ptermui_core::text::point::Point;
+use ptermui_core::text::{TextBuffer, char_slice};
+use ptermui_core::{AppContext, Entity, EntityId, ModelContext, ModelHandle};
 use rand::Rng;
 use rand::distributions::Alphanumeric;
-use rook_core::platform::SessionPlatform;
-use rook_core::safe_error;
-use rook_util::content_version::ContentVersion;
-use rookui_core::elements::ListIndentLevel;
-use rookui_core::fonts::Weight;
-use rookui_core::text::point::Point;
-use rookui_core::text::{TextBuffer, char_slice};
-use rookui_core::{AppContext, Entity, EntityId, ModelContext, ModelHandle};
 use serde_yaml::Mapping;
 use string_offset::{ByteOffset, CharOffset};
 use sum_tree::{SeekBias, SumTree};
@@ -847,7 +847,7 @@ impl Buffer {
         selection_model: ModelHandle<BufferSelectionModel>,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
-        let parse_fn = if rook_core::features::FeatureFlag::MarkdownTables.is_enabled() {
+        let parse_fn = if pterm_core::features::FeatureFlag::MarkdownTables.is_enabled() {
             parse_markdown_with_gfm_tables
         } else {
             parse_markdown
@@ -887,7 +887,7 @@ impl Buffer {
         selection_model: ModelHandle<BufferSelectionModel>,
         ctx: &mut ModelContext<Self>,
     ) -> Result<Self, ipynb_parser::IpynbError> {
-        let gfm_tables = rook_core::features::FeatureFlag::MarkdownTables.is_enabled();
+        let gfm_tables = pterm_core::features::FeatureFlag::MarkdownTables.is_enabled();
         let formatted_text = ipynb_parser::ipynb_to_formatted_text(ipynb, gfm_tables)?;
         Ok(Self::from_formatted_text(
             formatted_text,

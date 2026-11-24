@@ -43,8 +43,8 @@ use futures::future::{BoxFuture, join_all};
 use itertools::Itertools;
 use parking_lot::FairMutex;
 use preprocess::{PendingPreprocessedActions, PreprocessId};
+use ptermui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 pub(crate) use recording_telemetry::RecordingTelemetryEvent;
-use rookui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use self::execute::search_codebase::SearchCodebaseExecutor;
 use self::execute::{
@@ -1478,7 +1478,7 @@ impl BlocklistAIActionModel {
                 let doc_model = AIDocumentModel::handle(ctx);
                 doc_model.update(ctx, |doc_model, doc_ctx| {
                     for (index, doc_context) in created_documents.iter_mut().enumerate() {
-                        // If a user is re-opening a shared session that they previously closed in the current rook session,
+                        // If a user is re-opening a shared session that they previously closed in the current polaris-terminal session,
                         // we should delete the previously created document so that the verseion history doesn't get messed up.
                         doc_model.delete_document(&doc_context.document_id);
 

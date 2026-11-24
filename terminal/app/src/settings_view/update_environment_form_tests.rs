@@ -1,7 +1,7 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{Empty, MouseStateHandle};
-use rookui::platform::WindowStyle;
-use rookui::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{Empty, MouseStateHandle};
+use ptermui::platform::WindowStyle;
+use ptermui::{
     AddSingletonModel, App, AppContext, Element, Entity, SingletonEntity, TypedActionView, View,
     WindowId,
 };
@@ -39,23 +39,34 @@ fn test_parse_repo_input_owner_repo() {
 
 #[test]
 fn test_parse_repo_input_github_url() {
-    let (owner, repo) = UpdateEnvironmentForm::parse_repo_input("https://github.com/rook/rook.git")
-        .expect("expected github url to parse");
-    assert_eq!(owner, "rook");
-    assert_eq!(repo, "rook");
+    let (owner, repo) = UpdateEnvironmentForm::parse_repo_input(
+        "https://github.com/polaris-terminal/polaris-terminal.git",
+    )
+    .expect("expected github url to parse");
+    assert_eq!(owner, "polaris-terminal");
+    assert_eq!(repo, "polaris-terminal");
 }
 
 #[test]
 fn test_parse_repo_inputs_multiple_entries() {
     let parsed = UpdateEnvironmentForm::parse_repo_inputs(
-        "https://github.com/rook/rook, rook/rook-internal\n git@github.com:rook/rook-server",
+        "https://github.com/polaris-terminal/polaris-terminal, polaris-terminal/polaris-terminal-internal\n git@github.com:polaris-terminal/polaris-terminal-server",
     );
     assert_eq!(
         parsed,
         vec![
-            ("rook".to_string(), "rook".to_string()),
-            ("rook".to_string(), "rook-internal".to_string()),
-            ("rook".to_string(), "rook-server".to_string()),
+            (
+                "polaris-terminal".to_string(),
+                "polaris-terminal".to_string()
+            ),
+            (
+                "polaris-terminal".to_string(),
+                "polaris-terminal-internal".to_string()
+            ),
+            (
+                "polaris-terminal".to_string(),
+                "polaris-terminal-server".to_string()
+            ),
         ]
     );
 }
@@ -74,7 +85,7 @@ fn test_build_auth_url_with_next_overrides_existing() {
     let result = UpdateEnvironmentForm::build_auth_url_with_next(
         base_url,
         GithubAuthRedirectTarget::SettingsEnvironments,
-        "rookdev",
+        "polaris-terminal-dev",
     );
     let parsed = Url::parse(&result).expect("result should be valid url");
     let mut next_values = parsed
@@ -85,7 +96,7 @@ fn test_build_auth_url_with_next_overrides_existing() {
     assert_eq!(next_values.len(), 1);
     assert_eq!(
         next_values.pop(),
-        Some("rookdev://settings/environments".to_string())
+        Some("polaris-terminal-dev://settings/environments".to_string())
     );
     assert!(
         parsed
@@ -100,7 +111,7 @@ fn test_build_auth_url_with_next_focus_cloud_mode() {
     let result = UpdateEnvironmentForm::build_auth_url_with_next(
         base_url,
         GithubAuthRedirectTarget::FocusCloudMode,
-        "rooklocal",
+        "polaris-terminal-local",
     );
     let parsed = Url::parse(&result).expect("result should be valid url");
     let next_value = parsed
@@ -109,7 +120,7 @@ fn test_build_auth_url_with_next_focus_cloud_mode() {
         .map(|(_, value)| value.into_owned());
     assert_eq!(
         next_value,
-        Some("rooklocal://action/focus_cloud_mode".to_string())
+        Some("polaris-terminal-local://action/focus_cloud_mode".to_string())
     );
 }
 
@@ -119,7 +130,7 @@ fn test_build_auth_url_with_next_cloud_setup_source() {
     let result = github_auth_url::build_auth_url_with_next(
         base_url,
         GithubAuthRedirectTarget::FocusCloudMode,
-        "rookdev",
+        "polaris-terminal-dev",
         AuthSource::CloudSetup,
     );
     let parsed = Url::parse(&result).expect("result should be valid url");
@@ -129,16 +140,16 @@ fn test_build_auth_url_with_next_cloud_setup_source() {
         .map(|(_, value)| value.into_owned());
     assert_eq!(
         next_value,
-        Some("rookdev://action/focus_cloud_mode?source=cloud_setup".to_string())
+        Some("polaris-terminal-dev://action/focus_cloud_mode?source=cloud_setup".to_string())
     );
 }
 #[test]
 fn test_build_auth_url_with_next_uses_scheme_param() {
-    let base_url = "https://example.com/oauth/connect/github?scheme=rook";
+    let base_url = "https://example.com/oauth/connect/github?scheme=polaris-terminal";
     let result = UpdateEnvironmentForm::build_auth_url_with_next(
         base_url,
         GithubAuthRedirectTarget::FocusCloudMode,
-        "rooklocal",
+        "polaris-terminal-local",
     );
     let parsed = Url::parse(&result).expect("result should be valid url");
     let next_value = parsed
@@ -147,7 +158,7 @@ fn test_build_auth_url_with_next_uses_scheme_param() {
         .map(|(_, value)| value.into_owned());
     assert_eq!(
         next_value,
-        Some("rook://action/focus_cloud_mode".to_string())
+        Some("polaris-terminal://action/focus_cloud_mode".to_string())
     );
 }
 
@@ -614,14 +625,17 @@ fn test_repos_field_error_state_allows_manual_repo_entry() {
                     form,
                     GithubAuthCallState::error("Failed to load GitHub repositories"),
                 );
-                form.repos_input = "warpdotdev/rook-internal".to_string();
+                form.repos_input = "warpdotdev/polaris-terminal-internal".to_string();
                 form.handle_action(&UpdateEnvironmentFormAction::AddRepo, ctx);
             });
 
             let form = view_handle.as_ref(ctx);
             assert_eq!(form.form_state.selected_repos.len(), 1);
             assert_eq!(form.form_state.selected_repos[0].owner, "warpdotdev");
-            assert_eq!(form.form_state.selected_repos[0].repo, "rook-internal");
+            assert_eq!(
+                form.form_state.selected_repos[0].repo,
+                "polaris-terminal-internal"
+            );
             assert!(
                 form.github_dropdown_state.load_error_message.is_some(),
                 "Expected GitHub load error to remain visible after manually adding a repo"
@@ -643,7 +657,7 @@ fn test_render_repos_field_with_selected_repos() {
             view_handle.update(ctx, |form, _| {
                 set_github_auth_call_state(form, GithubAuthCallState::Authed);
                 form.form_state.selected_repos = vec![
-                    GithubRepo::new("warpdotdev".to_string(), "rook-internal".to_string()),
+                    GithubRepo::new("warpdotdev".to_string(), "polaris-terminal-internal".to_string()),
                     GithubRepo::new("facebook".to_string(), "react".to_string()),
                 ];
                 form.remove_repo_mouse_states =
@@ -659,8 +673,8 @@ fn test_render_repos_field_with_selected_repos() {
                 "Expected 'Repo(s)' label in rendered content: {text_content}"
             );
             assert!(
-                text_content.contains("warpdotdev/rook-internal"),
-                "Expected 'warpdotdev/rook-internal' in rendered content: {text_content}"
+                text_content.contains("warpdotdev/polaris-terminal-internal"),
+                "Expected 'warpdotdev/polaris-terminal-internal' in rendered content: {text_content}"
             );
             assert!(
                 text_content.contains("facebook/react"),
@@ -715,7 +729,10 @@ fn test_selected_repos_as_remote_repo_args_formats_owner_repo_strings() {
             });
             view_handle.update(ctx, |form, _| {
                 form.form_state.selected_repos = vec![
-                    GithubRepo::new("warpdotdev".to_string(), "rook-internal".to_string()),
+                    GithubRepo::new(
+                        "warpdotdev".to_string(),
+                        "polaris-terminal-internal".to_string(),
+                    ),
                     GithubRepo::new("facebook".to_string(), "react".to_string()),
                 ];
             });
@@ -726,7 +743,7 @@ fn test_selected_repos_as_remote_repo_args_formats_owner_repo_strings() {
             assert_eq!(
                 args,
                 vec![
-                    "warpdotdev/rook-internal".to_string(),
+                    "warpdotdev/polaris-terminal-internal".to_string(),
                     "facebook/react".to_string(),
                 ]
             );
@@ -746,7 +763,7 @@ fn test_can_suggest_image_for_edit_requires_repos_modified() {
             description: "".to_string(),
             selected_repos: vec![GithubRepo::new(
                 "warpdotdev".to_string(),
-                "rook-internal".to_string(),
+                "polaris-terminal-internal".to_string(),
             )],
             docker_image: "ubuntu:latest".to_string(),
             setup_commands: vec![],
@@ -797,7 +814,7 @@ fn test_can_suggest_image_for_create_does_not_require_repos_modified() {
             view_handle.update(ctx, |form, _| {
                 form.form_state.selected_repos = vec![GithubRepo::new(
                     "warpdotdev".to_string(),
-                    "rook-internal".to_string(),
+                    "polaris-terminal-internal".to_string(),
                 )];
                 form.edit_repos_modified = false;
                 form.suggest_image_last_attempt_key = None;
@@ -891,7 +908,7 @@ fn test_render_docker_image_field_shows_generating_state() {
             view_handle.update(ctx, |form, _| {
                 form.form_state.selected_repos = vec![GithubRepo::new(
                     "warpdotdev".to_string(),
-                    "rook-internal".to_string(),
+                    "polaris-terminal-internal".to_string(),
                 )];
                 let key = form
                     .selected_repos_key()
@@ -926,7 +943,7 @@ fn test_render_docker_image_field_shows_custom_image_warning() {
             view_handle.update(ctx, |form, _| {
                 form.form_state.selected_repos = vec![GithubRepo::new(
                     "warpdotdev".to_string(),
-                    "rook-internal".to_string(),
+                    "polaris-terminal-internal".to_string(),
                 )];
                 let key = form
                     .selected_repos_key()
@@ -973,7 +990,7 @@ fn test_render_docker_image_field_shows_github_auth_required_message() {
             view_handle.update(ctx, |form, _| {
                 form.form_state.selected_repos = vec![GithubRepo::new(
                     "warpdotdev".to_string(),
-                    "rook-internal".to_string(),
+                    "polaris-terminal-internal".to_string(),
                 )];
                 let key = form
                     .selected_repos_key()
@@ -1201,48 +1218,48 @@ fn test_orchestration_modal_form_configuration_renders_footer_actions_without_te
 #[test]
 fn test_parse_docker_hub_url_bare_owner_repo() {
     assert_eq!(
-        UpdateEnvironmentForm::parse_docker_hub_url("rook/base-image"),
-        Some("https://hub.docker.com/r/rook/base-image".to_string())
+        UpdateEnvironmentForm::parse_docker_hub_url("polaris-terminal/base-image"),
+        Some("https://hub.docker.com/r/polaris-terminal/base-image".to_string())
     );
 }
 
 #[test]
 fn test_parse_docker_hub_url_with_tag() {
     assert_eq!(
-        UpdateEnvironmentForm::parse_docker_hub_url("rook/base-image:latest"),
-        Some("https://hub.docker.com/r/rook/base-image".to_string())
+        UpdateEnvironmentForm::parse_docker_hub_url("polaris-terminal/base-image:latest"),
+        Some("https://hub.docker.com/r/polaris-terminal/base-image".to_string())
     );
     assert_eq!(
-        UpdateEnvironmentForm::parse_docker_hub_url("rook/base-image:v1.2.3"),
-        Some("https://hub.docker.com/r/rook/base-image".to_string())
+        UpdateEnvironmentForm::parse_docker_hub_url("polaris-terminal/base-image:v1.2.3"),
+        Some("https://hub.docker.com/r/polaris-terminal/base-image".to_string())
     );
 }
 
 #[test]
 fn test_parse_docker_hub_url_with_digest() {
     assert_eq!(
-        UpdateEnvironmentForm::parse_docker_hub_url("rook/base-image@sha256:abc123"),
-        Some("https://hub.docker.com/r/rook/base-image".to_string())
+        UpdateEnvironmentForm::parse_docker_hub_url("polaris-terminal/base-image@sha256:abc123"),
+        Some("https://hub.docker.com/r/polaris-terminal/base-image".to_string())
     );
 }
 
 #[test]
 fn test_parse_docker_hub_url_explicit_docker_io() {
     assert_eq!(
-        UpdateEnvironmentForm::parse_docker_hub_url("docker.io/rook/base-image"),
-        Some("https://hub.docker.com/r/rook/base-image".to_string())
+        UpdateEnvironmentForm::parse_docker_hub_url("docker.io/polaris-terminal/base-image"),
+        Some("https://hub.docker.com/r/polaris-terminal/base-image".to_string())
     );
     assert_eq!(
-        UpdateEnvironmentForm::parse_docker_hub_url("docker.io/rook/base-image:latest"),
-        Some("https://hub.docker.com/r/rook/base-image".to_string())
+        UpdateEnvironmentForm::parse_docker_hub_url("docker.io/polaris-terminal/base-image:latest"),
+        Some("https://hub.docker.com/r/polaris-terminal/base-image".to_string())
     );
 }
 
 #[test]
 fn test_parse_docker_hub_url_explicit_index_docker_io() {
     assert_eq!(
-        UpdateEnvironmentForm::parse_docker_hub_url("index.docker.io/rook/base-image"),
-        Some("https://hub.docker.com/r/rook/base-image".to_string())
+        UpdateEnvironmentForm::parse_docker_hub_url("index.docker.io/polaris-terminal/base-image"),
+        Some("https://hub.docker.com/r/polaris-terminal/base-image".to_string())
     );
 }
 
@@ -1281,7 +1298,7 @@ fn test_parse_docker_hub_url_official_image_explicit_library_prefix() {
 #[test]
 fn test_parse_docker_hub_url_other_registry_returns_none() {
     assert_eq!(
-        UpdateEnvironmentForm::parse_docker_hub_url("ghcr.io/rook/base-image"),
+        UpdateEnvironmentForm::parse_docker_hub_url("ghcr.io/polaris-terminal/base-image"),
         None
     );
     assert_eq!(
@@ -1303,7 +1320,7 @@ fn test_parse_docker_hub_url_empty_or_whitespace() {
 #[test]
 fn test_parse_docker_hub_url_trims_whitespace() {
     assert_eq!(
-        UpdateEnvironmentForm::parse_docker_hub_url("  rook/base-image  "),
-        Some("https://hub.docker.com/r/rook/base-image".to_string())
+        UpdateEnvironmentForm::parse_docker_hub_url("  polaris-terminal/base-image  "),
+        Some("https://hub.docker.com/r/polaris-terminal/base-image".to_string())
     );
 }

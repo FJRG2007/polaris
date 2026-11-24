@@ -1,28 +1,28 @@
-# Spec: GitHub webhook — clone the originating repo and authorize the agent token for it (rook client/worker side)
+# Spec: GitHub webhook — clone the originating repo and authorize the agent token for it (polaris-terminal client/worker side)
 
-Cross-repo feature. This spec owns the **rook** (client/worker) side only. The
-sibling **rook-server** spec owns populating, persisting, and returning the new
+Cross-repo feature. This spec owns the **polaris-terminal** (client/worker) side only. The
+sibling **polaris-terminal-server** spec owns populating, persisting, and returning the new
 `additional_source_repos` field on the agent run's config snapshot, plus the
 named-agent token scoping/validation. That server spec is already committed at
 <https://github.com/warpdotdev/warp-server/pull/13180>
 (file `.agents/specs/REV-1759-github-webhook-clone-origin-repo.md`). Treat the
 server behavior as this spec's **input contract/dependency** and do not spec
-rook-server internals here.
+polaris-terminal-server internals here.
 
 Linear: <https://linear.app/warpdotdev/issue/REV-1759/github-webhook-clone-the-originating-repo-and-authorize-the-agent>
 Originating thread: <https://slack.com/archives/C0BDQDW8V5E/p1784754450281239>
 
-All file references are pinned to rook commit `47234cc6d8dcd29e06a06162c95ad38fddfa9298`
+All file references are pinned to polaris-terminal commit `47234cc6d8dcd29e06a06162c95ad38fddfa9298`
 (base branch `master`).
 
 ## Summary
 
 When a GitHub webhook event triggers a Factory automation run, the server
-(rook-server spec PR #13180) now records the originating repo on the task's
+(polaris-terminal-server spec PR #13180) now records the originating repo on the task's
 `AgentConfigSnapshot` as an `additional_source_repos` list (provider-neutral
 `SourceRepo` shape: `code_forge`, `owner`, `repo`) and returns it via
 `GET /agent/runs/{id}` inside `agent_config` (serde alias `agent_config` on
-`AmbientAgentTask`). The rook worker currently clones only
+`AmbientAgentTask`). The polaris-terminal worker currently clones only
 `environment.effective_repos()` and is unaware of the origin repo. This spec
 makes the worker consume the server-provided `additional_source_repos`, merge
 and **de-duplicate** them with the environment's effective repos, and use the
@@ -79,7 +79,7 @@ worker that fetches the task, prepares the environment, and runs the agent):
 1. **Default / happy path.** A GitHub-webhook Factory automation run is fetched
    via `get_ambient_agent_task`. Its `agent_config_snapshot.additional_source_repos`
    contains exactly the originating repo (e.g.
-   `{ code_forge: GITHUB, owner: "warpdotdev", repo: "rook" }`). The worker
+   `{ code_forge: GITHUB, owner: "warpdotdev", repo: "polaris-terminal" }`). The worker
    clones that repo **in addition to** every repo in the run's selected
    environment, and the agent's terminal session can read/clone it.
 2. **De-duplication.** If the origin repo is already one of the environment's
@@ -88,7 +88,7 @@ worker that fetches the task, prepares the environment, and runs the agent):
    union contains no duplicate `(forge, lower(owner), lower(repo))` keys.
 3. **Immutability of the persisted environment.** Preparing an environment with
    additional repos does **not** mutate the resolved `AmbientAgentEnvironment`
-   model or write any change back to Rook Drive. Re-reading the environment
+   model or write any change back to Polaris Terminal Drive. Re-reading the environment
    after the run returns the original `source_repos`/`github_repos` unchanged.
 4. **Union used for indexing.** The merged union is the set registered with
    `DetectedRepositories` and indexed by the codebase index manager (Oz harness
@@ -215,7 +215,7 @@ worker that fetches the task, prepares the environment, and runs the agent):
   consumed in `execute_run`/`prepare_environment`). Re-reading the task at
   prepare time would add a second server roundtrip and re-couple prepare to the
   API client. **Chosen: add the field to `AgentDriverOptions`.**
-- **Local (non-`--task-id`) runs.** Local `rook agent run` invocations have no
+- **Local (non-`--task-id`) runs.** Local `polaris-terminal agent run` invocations have no
   server task and therefore no server-provided `additional_source_repos`. The
   field defaults to empty there. **Chosen: empty default for local runs; no CLI
   flag to set it** (it is a server-populated, per-task field, not a user-facing
@@ -336,8 +336,8 @@ worker that fetches the task, prepares the environment, and runs the agent):
 - **Dedupe key casing.** Resolved to `(code_forge, lower(owner), lower(repo))`.
   GitHub owner/repo names are case-insensitive and the server normalizes to the
   canonical casing, but the client dedupe must be case-insensitive to avoid a
-  double-clone when the environment lists `Rookdotdev/Rook` and the webhook
-  reports `FJRG2007/rook`. **Assumption to confirm:** GitLab full namespace
+  double-clone when the environment lists `Ptermdotdev/Polaris Terminal` and the webhook
+  reports `FJRG2007/polaris`. **Assumption to confirm:** GitLab full namespace
   paths are case-sensitive in practice; for GitLab the dedupe still lower-cases
   (acceptable because the server's single-forge + same-owner enforcement means
   a mixed GitHub/GitLab union does not occur in this feature's scope). If a
@@ -387,7 +387,7 @@ worker that fetches the task, prepares the environment, and runs the agent):
    `additional_source_repos` (or matching snake_case) and
    `skip_serializing_if = "Option::is_none"`. A unit test marshals a snapshot
    with one origin repo and asserts the JSON contains
-   `"additional_source_repos":[{"code_forge":"GITHUB","owner":"warpdotdev","repo":"rook"}]`,
+   `"additional_source_repos":[{"code_forge":"GITHUB","owner":"warpdotdev","repo":"polaris-terminal"}]`,
    and that a snapshot without the field deserializes with the field as `None`.
    — `cargo nextest run -p cloud_object_models` (or `cargo test -p cloud_object_models`).
 2. **`is_empty()` updated.** A unit test asserts a snapshot with only
@@ -459,7 +459,7 @@ worker that fetches the task, prepares the environment, and runs the agent):
     `additional_source_repos` is empty, `merge_repos_deduped(env_repos, []) ==
     env_repos` and `prepare_environment` behaves exactly as today (same clone
     set, same auto-cd, same indexing). — `environment_tests.rs`.
-13. **No `rook-proto-apis` change.** Confirm no file under `rook-proto-apis` is
+13. **No `polaris-terminal-proto-apis` change.** Confirm no file under `polaris-terminal-proto-apis` is
     modified by this PR (JSON/JSONB + REST, not protobuf). — PR diff review.
 14. **Repository checks pass.** `./script/format`, `cargo clippy --workspace
     --all-targets --all-features --tests -- -D warnings`, and the relevant
@@ -472,9 +472,9 @@ worker that fetches the task, prepares the environment, and runs the agent):
 
 ## Out of scope
 
-- Any rook-server change (snapshot field population, validation, token
+- Any polaris-terminal-server change (snapshot field population, validation, token
   scoping, forge-mismatch/origin-only rejection, feature flag) — owned by the
-  sibling rook-server spec (PR #13180).
+  sibling polaris-terminal-server spec (PR #13180).
 - Multiple GitHub App installations covering the union (server-side credential
   redesign).
 - A dedicated source-repo token path for origin-only named-agent runs
@@ -484,7 +484,7 @@ worker that fetches the task, prepares the environment, and runs the agent):
   The server's same-owner enforcement makes this unnecessary today.
 - A CLI flag or config-file key for `additional_source_repos` (it is
   server-populated only, per the server spec).
-- Changes to `rook-proto-apis` (none expected; JSON/JSONB + REST only).
+- Changes to `polaris-terminal-proto-apis` (none expected; JSON/JSONB + REST only).
 - Any change to the user-principal (non-named-agent) token path
   (`task_utils.go:247` server-side); GitHub-webhook Factory automations execute
   as the named agent's service-account principal.

@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use chrono::{Duration, Utc};
-use rook_core::settings::Setting;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_core::settings::Setting;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 use crate::ai::request_usage_model::{
     AIRequestUsageModel, AIRequestUsageModelEvent, BonusGrant, BonusGrantScope,
@@ -56,7 +56,7 @@ impl BonusGrantNotificationModel {
         let mut grants_to_persist_to_settings = Vec::new();
 
         for grant in bonus_grants {
-            // Only notify about Rook-granted credits (cost = 0), not user purchases
+            // Only notify about Polaris Terminal-granted credits (cost = 0), not user purchases
             if grant.cost_cents != 0 {
                 continue;
             }

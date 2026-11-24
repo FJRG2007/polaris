@@ -1,15 +1,18 @@
-//! This module contains the code path for the [`rook_cli::Command::DumpDebugInfo`] subcommand.
+//! This module contains the code path for the [`pterm_cli::Command::DumpDebugInfo`] subcommand.
 //!
 //! This is intended to never be used by a vast majority of users. This is only intended for users
-//! who are unable to run Rook and want to provide us, the dev team, with useful debugging
+//! who are unable to run Polaris Terminal and want to provide us, the dev team, with useful debugging
 //! information.
 #[cfg(not(windows))]
 use command::blocking::Command;
-use rook_core::channel::ChannelState;
-use rookui::windowing;
+use pterm_core::channel::ChannelState;
+use ptermui::windowing;
 
 pub(crate) fn run() -> anyhow::Result<()> {
-    println!("Rook version: {:?}", ChannelState::app_version());
+    println!(
+        "Polaris Terminal version: {:?}",
+        ChannelState::app_version()
+    );
 
     #[cfg(not(windows))]
     {
@@ -31,7 +34,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
     #[cfg(not(target_os = "macos"))]
     {
         if let Ok(event_loop) = winit::event_loop::EventLoop::new() {
-            rookui::rendering::wgpu::init_wgpu_instance(Box::new(
+            ptermui::rendering::wgpu::init_wgpu_instance(Box::new(
                 event_loop.owned_display_handle(),
             ));
 
@@ -58,7 +61,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
     {
         use std::ops::Deref as _;
 
-        use rookui::rendering::GPUPowerPreference;
+        use ptermui::rendering::GPUPowerPreference;
         use settings::Setting as _;
 
         use crate::settings::{
@@ -84,7 +87,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
         println!("##################################################");
         println!("# wgpu Adapters");
         println!("##################################################");
-        rookui::r#async::block_on(rookui::rendering::wgpu::print_wgpu_adapters(
+        ptermui::r#async::block_on(ptermui::rendering::wgpu::print_wgpu_adapters(
             gpu_power_preference,
             backend_preference,
             windowing_system,

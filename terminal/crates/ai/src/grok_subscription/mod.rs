@@ -20,9 +20,9 @@ pub mod oauth;
 use std::time::{Duration, SystemTime};
 
 use futures::channel::oneshot;
-use rook_errors::report_error;
-use rookui_core::ModelContext;
-use rookui_core::r#async::Timer;
+use pterm_errors::report_error;
+use ptermui_core::ModelContext;
+use ptermui_core::r#async::Timer;
 
 use self::oauth::TokenResponse;
 use crate::api_keys::{ApiKeyManager, GrokRefreshOutcome, GrokTokens};

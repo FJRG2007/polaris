@@ -39,7 +39,7 @@ mod binary_detection {
         let path = write_file(
             &dir,
             "bundle",
-            b"#!/usr/bin/env bash\n#\n# Builds a Rook binary and bundles it up for distribution.\n\nset -e\n",
+            b"#!/usr/bin/env bash\n#\n# Builds a Polaris Terminal binary and bundles it up for distribution.\n\nset -e\n",
         );
         assert!(!block_on(should_read_as_binary(&path)));
     }
@@ -241,10 +241,15 @@ mod path_shell_quoting {
 
     #[test]
     fn is_file_path_neutralizes_posix_substitutions() {
-        let command =
-            build_is_file_path_command("/tmp/x$(touch /tmp/rook-poc)`id`", ShellType::Bash);
+        let command = build_is_file_path_command(
+            "/tmp/x$(touch /tmp/polaris-terminal-poc)`id`",
+            ShellType::Bash,
+        );
 
-        assert_eq!(command, "test -f '/tmp/x$(touch /tmp/rook-poc)`id`'");
+        assert_eq!(
+            command,
+            "test -f '/tmp/x$(touch /tmp/polaris-terminal-poc)`id`'"
+        );
     }
 
     #[test]

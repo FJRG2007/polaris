@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use parking_lot::FairMutex;
 use pathfinder_geometry::vector::Vector2F;
-use rookui::{AppContext, SingletonEntity};
+use ptermui::{AppContext, SingletonEntity};
 use settings::Setting as _;
 
 use super::event_listener::ChannelEventListener;
@@ -12,7 +12,7 @@ use super::model::block::BlockSize;
 use super::safe_mode_settings::get_secret_obfuscation_mode;
 use super::session_settings::SessionSettings;
 use super::settings::TerminalSettings;
-use super::view::{ROOK_PROMPT_HEIGHT_LINES, create_size_info_for_blocklist};
+use super::view::{POLARIS_TERMINAL_PROMPT_HEIGHT_LINES, create_size_info_for_blocklist};
 use super::{BlockPadding, ShellLaunchState, SizeInfo, TerminalModel, color};
 use crate::PrivacySettings;
 use crate::ai::blocklist::SerializedBlockListItem;
@@ -39,12 +39,12 @@ pub trait TerminalManager: Any {
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
-impl rookui::Entity for Box<dyn TerminalManager> {
+impl ptermui::Entity for Box<dyn TerminalManager> {
     type Event = ();
 }
 
 /// Spacing baked into block heights: the per-block padding, the height
-/// reserved for the rendered Rook prompt (in lines), and whether blocks
+/// reserved for the rendered Polaris Terminal prompt (in lines), and whether blocks
 /// reserve a footer row for the debug memory-stats overlay.
 ///
 /// [`Self::for_gui`] derives the GUI blocklist's spacing from the user's
@@ -53,13 +53,13 @@ impl rookui::Entity for Box<dyn TerminalManager> {
 /// terminal model.
 pub struct BlockSpacing {
     pub block_padding: BlockPadding,
-    pub rook_prompt_height_lines: f32,
+    pub pterm_prompt_height_lines: f32,
     pub show_memory_stats: bool,
 }
 
 impl BlockSpacing {
     /// The GUI blocklist's spacing, derived from the user's settings: padding
-    /// from the terminal-spacing style, the rendered Rook prompt's height, and
+    /// from the terminal-spacing style, the rendered Polaris Terminal prompt's height, and
     /// the debug memory-stats footer toggle.
     pub(super) fn for_gui(ctx: &AppContext) -> Self {
         let appearance = Appearance::as_ref(ctx);
@@ -67,7 +67,7 @@ impl BlockSpacing {
             TerminalSettings::as_ref(ctx).terminal_spacing(appearance.line_height_ratio(), ctx);
         Self {
             block_padding: terminal_spacing.block_padding,
-            rook_prompt_height_lines: ROOK_PROMPT_HEIGHT_LINES,
+            pterm_prompt_height_lines: POLARIS_TERMINAL_PROMPT_HEIGHT_LINES,
             show_memory_stats: DebugSettings::as_ref(ctx).should_show_memory_stats(),
         }
     }
@@ -102,7 +102,7 @@ pub(super) fn compute_block_size(
         max_retained_output_lines: *TerminalSettings::as_ref(ctx)
             .max_retained_output_lines
             .value(),
-        rook_prompt_height_lines: block_spacing.rook_prompt_height_lines,
+        pterm_prompt_height_lines: block_spacing.pterm_prompt_height_lines,
     }
 }
 

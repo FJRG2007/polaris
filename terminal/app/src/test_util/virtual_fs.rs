@@ -2,18 +2,18 @@ use std::path::PathBuf;
 
 pub use virtual_fs::{Dirs, Stub, VirtualFS};
 
-pub trait RookDirs {
+pub trait PtermDirs {
     #[allow(dead_code)]
     fn git_repository_fixture(&self) -> PathBuf {
-        Rook::fixtures().join("git_repository")
+        Pterm::fixtures().join("git_repository")
     }
 }
 
-impl RookDirs for Dirs {}
+impl PtermDirs for Dirs {}
 
-pub struct Rook;
+pub struct Pterm;
 
-impl Rook {
+impl Pterm {
     #[allow(dead_code)]
     pub fn executable() -> PathBuf {
         let mut path = {
@@ -29,7 +29,7 @@ impl Rook {
                 .unwrap_or_else(|| Self::root().join(format!("target/{}", &build)))
         };
 
-        path.push("rook");
+        path.push("polaris-terminal");
         path
     }
 

@@ -11,7 +11,7 @@ Separately, both the tombstone and `ConversationDetailsPanel` unconditionally su
 - `app/src/terminal/view/shared_session/conversation_ended_tombstone_view.rs` — `TombstoneDisplayData`, `from_conversation`, `enrich_from_task` (`#[cfg(not(target_family = "wasm"))]`), `render_metadata_row`, `render_action_buttons`.
 - `app/src/ai/conversation_details_panel.rs` — `ConversationDetailsData::from_task` (~line 310), `ConversationDetailsData::harness`, `ConversationDetailsPanel::continue_locally_conversation_id`. Consistency reference: sets both fields straight from the task.
 - `app/src/ai/ambient_agents/task.rs` — `AmbientAgentTask::run_time()` (`Option<chrono::Duration>`), `credits_used()` (`Option<f32>`), `AgentConfigSnapshot::harness` (`Option<HarnessConfig>`), `HarnessConfig::harness_type` (`Harness`).
-- `crates/rook_cli/src/agent.rs` — `Harness` enum (`Oz`, `Claude`, `Gemini`).
+- `crates/pterm_cli/src/agent.rs` — `Harness` enum (`Oz`, `Claude`, `Gemini`).
 - `format_credits` (`app/src/ai/blocklist/view_util.rs`) and `human_readable_precise_duration` (`app/src/util/time_format.rs`) — already imported by the tombstone.
 
 ## Change
@@ -44,7 +44,7 @@ The constructor now always materializes `artifact_buttons_view` (passing whateve
 
 `ConversationDetailsData::from_task` already populates `harness`, so no upstream wiring changes are required for the panel.
 
-Wasm `Open in Rook` is intentionally untouched: it just opens the same conversation in the desktop client, where the same gate hides `Continue locally`.
+Wasm `Open in Polaris Terminal` is intentionally untouched: it just opens the same conversation in the desktop client, where the same gate hides `Continue locally`.
 
 Notes:
 - All three metadata fields are unguarded: when the task has a value, it wins. When it doesn't, whatever `from_conversation` populated (or default-empty for non-Oz) survives.
@@ -59,7 +59,7 @@ Notes:
 - **Brief flash** as `from_conversation` values render before the async task fetch resolves and overwrites them. Same race the panel has today; acceptable.
 - **`Continue locally` flashes briefly on non-Oz tombstones** before the task fetch resolves. Conscious trade-off: hiding eagerly would also hide the button on local conversations and cloud Oz runs (we don't know the harness yet), which is worse.
 - **Snapshot missing harness on a non-Oz run** mis-shows `Continue locally` because `Some(snapshot) + harness == None` defaults to `Some(Oz)`. In practice the server always populates `harness` when a non-Oz run is dispatched; if that ever changes the gate becomes too permissive.
-- **Wasm**: `enrich_from_task` is `cfg(not wasm)`, so cloud tombstones on web are unchanged. Pre-existing gap shared with the panel. The wasm `Open in Rook` button stays visible because it just routes the user to the desktop tombstone, which then enforces the gate.
+- **Wasm**: `enrich_from_task` is `cfg(not wasm)`, so cloud tombstones on web are unchanged. Pre-existing gap shared with the panel. The wasm `Open in Polaris Terminal` button stays visible because it just routes the user to the desktop tombstone, which then enforces the gate.
 - **Partial task data**: if `run_time()` or `credits_used()` is `None`, we leave whatever `from_conversation` set (avoids blanking Oz when the task is partially populated).
 
 ## Tests

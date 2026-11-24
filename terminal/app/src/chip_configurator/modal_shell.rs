@@ -6,16 +6,16 @@
 //! overlay, while settings consumers can render the sections inline.
 
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Stack,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{Action, Element};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{Action, Element};
 
 use super::{ChipConfigurator, ChipConfiguratorAction};
 use crate::Appearance;
@@ -130,7 +130,7 @@ fn render_header(title: &str, appearance: &Appearance) -> Box<dyn Element> {
         .span(title.to_string())
         .with_style(UiComponentStyles {
             font_size: Some(MODAL_TITLE_FONT_SIZE),
-            font_weight: Some(rookui::fonts::Weight::Bold),
+            font_weight: Some(ptermui::fonts::Weight::Bold),
             ..Default::default()
         })
         .build()
@@ -170,7 +170,7 @@ fn render_section_label(label: &str, appearance: &Appearance) -> Box<dyn Element
         .span(label.to_string())
         .with_style(UiComponentStyles {
             font_size: Some(MODAL_CONTENT_FONT_SIZE),
-            font_weight: Some(rookui::fonts::Weight::Semibold),
+            font_weight: Some(ptermui::fonts::Weight::Semibold),
             ..Default::default()
         })
         .build()

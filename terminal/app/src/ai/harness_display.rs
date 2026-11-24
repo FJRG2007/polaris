@@ -5,9 +5,9 @@
 //! icon, and brand color from here so the two surfaces cannot drift.
 
 use pathfinder_color::ColorU;
-use rook_cli::agent::Harness;
-use rook_core::ui::theme::color::internal_colors;
-use rook_core::ui::theme::{Fill as RookThemeFill, RookTheme};
+use pterm_cli::agent::Harness;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_core::ui::theme::{Fill as PtermThemeFill, PtermTheme};
 
 use crate::ai::agent::conversation::AIAgentHarness;
 use crate::ai::blocklist::CLAUDE_ORANGE;
@@ -17,7 +17,7 @@ use crate::ui_components::icons::Icon;
 /// User-visible display name for a [`Harness`].
 pub fn display_name(harness: Harness) -> &'static str {
     match harness {
-        Harness::Oz => "Rook Agent",
+        Harness::Oz => "Polaris Terminal Agent",
         Harness::Claude => "Claude Code",
         Harness::OpenCode => "OpenCode",
         Harness::Gemini => "Gemini CLI",
@@ -53,23 +53,23 @@ pub fn brand_color(harness: Harness) -> Option<ColorU> {
 
 /// Circle background fill for a [`Harness`] icon rendered in a branded circle.
 /// Matches the treatment used in the vertical-tabs sidebar.
-pub fn circle_background(harness: Harness, theme: &RookTheme) -> RookThemeFill {
+pub fn circle_background(harness: Harness, theme: &PtermTheme) -> PtermThemeFill {
     match harness {
         Harness::Oz => theme.background(),
-        Harness::Claude => RookThemeFill::Solid(CLAUDE_ORANGE),
-        Harness::Codex => RookThemeFill::Solid(OPENAI_COLOR),
-        Harness::Gemini => RookThemeFill::Solid(GEMINI_BLUE),
-        Harness::OpenCode => RookThemeFill::Solid(OPENCODE_COLOR),
+        Harness::Claude => PtermThemeFill::Solid(CLAUDE_ORANGE),
+        Harness::Codex => PtermThemeFill::Solid(OPENAI_COLOR),
+        Harness::Gemini => PtermThemeFill::Solid(GEMINI_BLUE),
+        Harness::OpenCode => PtermThemeFill::Solid(OPENCODE_COLOR),
         Harness::Unknown => internal_colors::fg_overlay_2(theme),
     }
 }
 
 /// Icon fill color when rendered on the branded circle background.
-pub fn icon_fill_on_circle(harness: Harness, theme: &RookTheme) -> RookThemeFill {
+pub fn icon_fill_on_circle(harness: Harness, theme: &PtermTheme) -> PtermThemeFill {
     match harness {
         Harness::Oz => theme.main_text_color(theme.background()),
         Harness::Claude | Harness::Codex | Harness::Gemini | Harness::OpenCode => {
-            RookThemeFill::Solid(ColorU::white())
+            PtermThemeFill::Solid(ColorU::white())
         }
         Harness::Unknown => theme.main_text_color(internal_colors::fg_overlay_2(theme)),
     }

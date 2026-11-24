@@ -7,7 +7,7 @@ Linear: APP-4281
 The prebuilt Linux `oz` CLI is built on the `namespace-profile-ubuntu-20-04` runner (`.github/workflows/create_release.yml:513`, `:668`, `:839`). That toolchain links against glibc 2.31, so the resulting binary carries glibc 2.29-era symbol versions in its dynamic table. When the install script (`crates/remote_server/src/install_remote_server.sh`) drops that binary onto a Linux host whose runtime glibc is older than ~2.29, the dynamic loader refuses to launch it:
 
 ```
-/lib64/libm.so.6: version `GLIBC_2.29' not found (required by /home/wasp-dev/.rook-preview/remote-server/oz-preview)
+/lib64/libm.so.6: version `GLIBC_2.29' not found (required by /home/wasp-dev/.polaris-terminal-preview/remote-server/oz-preview)
 ```
 
 This affects long-lived enterprise distros — RHEL/CentOS 7 (glibc 2.17), RHEL/CentOS 8 (glibc 2.28), Amazon Linux 2 (glibc 2.26), Ubuntu 18.04 (glibc 2.27), Debian 10 (glibc 2.28) — as well as non-glibc systems like Alpine (musl) and Termux (bionic).
@@ -57,7 +57,7 @@ Script (lives at `crates/remote_server/src/preinstall_check.sh`):
 
 ```sh
 #!/usr/bin/env bash
-# Preinstall check for the Rook remote-server binary.
+# Preinstall check for the Polaris Terminal remote-server binary.
 #
 # Emits a structured key=value summary on stdout. Exits 0 on success.
 # A non-zero exit indicates a probe-level failure; the client treats
@@ -386,10 +386,10 @@ stateDiagram-v2
 ### Manual
 
 - Ubuntu 22.04 / Debian 12 (glibc 2.35+): unchanged install / auto-update / connect path. Choice block still appears under `AlwaysAsk` for first-time hosts.
-- RHEL 7 (glibc 2.17), RHEL 8 (glibc 2.28), Amazon Linux 2 (glibc 2.26), Ubuntu 18.04 (glibc 2.27): SSH lands in the legacy flow with no choice block, modal, or error block; `Rook.log` shows the unsupported-host telemetry line.
+- RHEL 7 (glibc 2.17), RHEL 8 (glibc 2.28), Amazon Linux 2 (glibc 2.26), Ubuntu 18.04 (glibc 2.27): SSH lands in the legacy flow with no choice block, modal, or error block; `Polaris Terminal.log` shows the unsupported-host telemetry line.
 - Alpine 3.x (musl): legacy fall-back, telemetry tagged `reason=non_glibc`.
 - Busybox-only minimal container: `status=unknown`, choice block still appears under `AlwaysAsk`. Confirm that today's install-then-fail behavior is preserved (regression check for fail-open).
-- Host with a pre-existing incompatible binary (simulate by `scp`-ing a Linux binary onto an Alpine VM): legacy fall-back; `ssh <host> 'ls ~/.rook-*/remote-server'` afterwards shows the binary was removed.
+- Host with a pre-existing incompatible binary (simulate by `scp`-ing a Linux binary onto an Alpine VM): legacy fall-back; `ssh <host> 'ls ~/.polaris-terminal-*/remote-server'` afterwards shows the binary was removed.
 - macOS remote: unchanged.
 
 ### Presubmit
@@ -424,7 +424,7 @@ Best-effort and logged. The session still falls back to legacy SSH; the worst ca
 
 ## Follow-ups
 
-- The preinstall script is now the natural place to add additional host capability checks: CPU instruction set requirements, free disk space in `~/.rook-XXXX/remote-server`, presence of `curl`/`tar`. Each new check is an additive script-only change plus a parser key.
+- The preinstall script is now the natural place to add additional host capability checks: CPU instruction set requirements, free disk space in `~/.polaris-terminal-XXXX/remote-server`, presence of `curl`/`tar`. Each new check is an additive script-only change plus a parser key.
 - Derive the script's `required_glibc` from the released binary at bundle time instead of a hardcoded value.
 - Ship a second prebuilt Linux CLI built against an older glibc (Ubuntu 18.04 / glibc 2.27) and pick the right artifact based on the script's reported libc version; this is what closes APP-4281's stated goal of "support glibc 2.28."
 - Once telemetry sizes the affected population, surface a one-time, dismissible explanation in the SSH choice area on unsupported hosts so users understand they are on the legacy SSH path by design.

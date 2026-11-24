@@ -1,6 +1,6 @@
 //! Skill resolution for agent runs.
 //!
-//! This module exists primarily for `rook agent run --skill ...` (and related flows) where we need to
+//! This module exists primarily for `polaris-terminal agent run --skill ...` (and related flows) where we need to
 //! resolve a CLI-provided `--skill` specifier (`SkillSpec`) into a concrete `SKILL.md` file and its
 //! parsed instruction body.
 //!
@@ -18,12 +18,12 @@ use ai::skills::{
 };
 use command::r#async::Command as AsyncCommand;
 use command::blocking::Command;
-use rook_cli::skill::SkillSpec;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::{AppContext, SingletonEntity as _};
+use pterm_cli::skill::SkillSpec;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::{AppContext, SingletonEntity as _};
 
 use super::SkillManager;
-use crate::rook_managed_paths_watcher::rook_managed_skill_dirs;
+use crate::pterm_managed_paths_watcher::pterm_managed_skill_dirs;
 
 const SKILL_FILE_NAME: &str = "SKILL.md";
 
@@ -63,8 +63,8 @@ fn resolve_from_skill_dirs_by_directory_scan(
 fn home_skill_dirs_for_resolution() -> Vec<PathBuf> {
     let mut skill_dirs = Vec::new();
     for provider in SKILL_PROVIDER_DEFINITIONS.iter() {
-        if provider.provider == SkillProvider::Rook {
-            for dir in rook_managed_skill_dirs() {
+        if provider.provider == SkillProvider::Pterm {
+            for dir in pterm_managed_skill_dirs() {
                 push_unique_path(&mut skill_dirs, dir);
             }
         } else if let Some(dir) = home_skills_path(provider.provider) {

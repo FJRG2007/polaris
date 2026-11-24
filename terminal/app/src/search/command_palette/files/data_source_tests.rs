@@ -1,9 +1,9 @@
 #![cfg(feature = "local_fs")]
 use std::collections::HashSet;
 
+use ptermui::App;
 use repo_metadata::RepoMetadataModel;
 use repo_metadata::repositories::DetectedRepositories;
-use rookui::App;
 
 use super::*;
 use crate::code::opened_files::OpenedFilesModel;

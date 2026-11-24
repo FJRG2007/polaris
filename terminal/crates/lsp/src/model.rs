@@ -13,13 +13,13 @@ use lsp_types::{
     PublishDiagnosticsParams, WorkDoneProgress,
 };
 #[cfg(not(target_arch = "wasm32"))]
-use rook_core::features::FeatureFlag;
+use pterm_core::features::FeatureFlag;
 #[cfg(not(target_arch = "wasm32"))]
-use rook_errors::report_error;
+use pterm_errors::report_error;
 #[cfg(not(target_arch = "wasm32"))]
-use rookui_core::SingletonEntity;
-use rookui_core::r#async::executor::Background;
-use rookui_core::{Entity, ModelContext};
+use ptermui_core::SingletonEntity;
+use ptermui_core::r#async::executor::Background;
+use ptermui_core::{Entity, ModelContext};
 #[cfg(not(target_arch = "wasm32"))]
 use simple_logger::manager::LogManager;
 

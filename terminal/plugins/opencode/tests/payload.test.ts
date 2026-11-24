@@ -88,41 +88,41 @@ describe("buildPayload", () => {
 })
 
 describe("negotiateProtocolVersion", () => {
-  const originalEnv = process.env.ROOK_CLI_AGENT_PROTOCOL_VERSION
+  const originalEnv = process.env.POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION
 
   afterEach(() => {
     if (originalEnv === undefined) {
-      delete process.env.ROOK_CLI_AGENT_PROTOCOL_VERSION
+      delete process.env.POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION
     } else {
-      process.env.ROOK_CLI_AGENT_PROTOCOL_VERSION = originalEnv
+      process.env.POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION = originalEnv
     }
   })
 
   it("defaults to plugin max when env var absent", () => {
-    delete process.env.ROOK_CLI_AGENT_PROTOCOL_VERSION
+    delete process.env.POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION
     assert.strictEqual(negotiateProtocolVersion(), PLUGIN_MAX_PROTOCOL_VERSION)
   })
 
-  it("v1 when rook declares 1", () => {
-    process.env.ROOK_CLI_AGENT_PROTOCOL_VERSION = "1"
+  it("v1 when polaris-terminal declares 1", () => {
+    process.env.POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION = "1"
     assert.strictEqual(negotiateProtocolVersion(), 1)
   })
 
-  it("capped to plugin max when rook is ahead", () => {
-    process.env.ROOK_CLI_AGENT_PROTOCOL_VERSION = "99"
+  it("capped to plugin max when polaris-terminal is ahead", () => {
+    process.env.POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION = "99"
     assert.strictEqual(negotiateProtocolVersion(), PLUGIN_MAX_PROTOCOL_VERSION)
   })
 
-  it("uses rook version when it is lower than plugin max", () => {
+  it("uses polaris-terminal version when it is lower than plugin max", () => {
     // This test is only meaningful if PLUGIN_MAX > 1.
     // We test the min() logic by checking that version 1 is returned
-    // when rook declares 1 and plugin max is 1.
-    process.env.ROOK_CLI_AGENT_PROTOCOL_VERSION = "1"
+    // when polaris-terminal declares 1 and plugin max is 1.
+    process.env.POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION = "1"
     assert.strictEqual(negotiateProtocolVersion(), 1)
   })
 
   it("handles non-numeric env var gracefully", () => {
-    process.env.ROOK_CLI_AGENT_PROTOCOL_VERSION = "not-a-number"
+    process.env.POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION = "not-a-number"
     assert.strictEqual(negotiateProtocolVersion(), PLUGIN_MAX_PROTOCOL_VERSION)
   })
 })

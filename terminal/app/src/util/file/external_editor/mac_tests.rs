@@ -1,18 +1,18 @@
-use super::is_rook_bundle;
+use super::is_pterm_bundle;
 
 #[test]
-fn is_rook_bundle_recognises_rook_channels() {
-    assert!(is_rook_bundle("dev.rook.Rook"));
-    assert!(is_rook_bundle("dev.rook.RookDev"));
-    assert!(is_rook_bundle("dev.rook.RookPreview"));
-    assert!(is_rook_bundle("dev.rook.RookOss"));
+fn is_pterm_bundle_recognises_pterm_channels() {
+    assert!(is_pterm_bundle("dev.polaris.PolarisTerminal"));
+    assert!(is_pterm_bundle("dev.polaris.PolarisTerminalDev"));
+    assert!(is_pterm_bundle("dev.polaris.PolarisTerminalPreview"));
+    assert!(is_pterm_bundle("dev.polaris.PolarisTerminal"));
 }
 
 #[test]
-fn is_rook_bundle_rejects_other_apps() {
-    assert!(!is_rook_bundle("com.microsoft.VSCode"));
-    assert!(!is_rook_bundle("com.apple.TextEdit"));
-    assert!(!is_rook_bundle("dev.zed.Zed"));
-    assert!(!is_rook_bundle("invalid"));
-    assert!(!is_rook_bundle(""));
+fn is_pterm_bundle_rejects_other_apps() {
+    assert!(!is_pterm_bundle("com.microsoft.VSCode"));
+    assert!(!is_pterm_bundle("com.apple.TextEdit"));
+    assert!(!is_pterm_bundle("dev.zed.Zed"));
+    assert!(!is_pterm_bundle("invalid"));
+    assert!(!is_pterm_bundle(""));
 }

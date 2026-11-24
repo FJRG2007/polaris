@@ -76,9 +76,9 @@ Follows the existing `OpenAutoReloadModal` pattern (`view.rs:18411`, `workspace/
 
 ## 5. Remote Session Detection
 
-`CLIAgentSession` has an `is_remote: bool` field set at session creation from `TerminalView::active_session_is_local()`. This uses `SessionType::RookifiedRemote` and `IsLegacySSHSession` — the same logic as the SSH host chip (`context_chips/builtins.rs:76`).
+`CLIAgentSession` has an `is_remote: bool` field set at session creation from `TerminalView::active_session_is_local()`. This uses `SessionType::PtermifiedRemote` and `IsLegacySSHSession` — the same logic as the SSH host chip (`context_chips/builtins.rs:76`).
 
-This avoids relying on `terminal_model.is_ssh_block()` (which only tracks the pre-rookification login phase) or `is_rookified_ssh()` (which misses legacy SSH). The `is_remote` flag is threaded through `set_session` and `register_listener` at all call sites in `terminal/view.rs`.
+This avoids relying on `terminal_model.is_ssh_block()` (which only tracks the pre-ptermification login phase) or `is_ptermified_ssh()` (which misses legacy SSH). The `is_remote` flag is threaded through `set_session` and `register_listener` at all call sites in `terminal/view.rs`.
 
 ## 6. Two-Mode Chip
 
@@ -99,7 +99,7 @@ This avoids relying on `terminal_model.is_ssh_block()` (which only tracks the pr
 
 `ActionButton` doesn't support changing label/icon after construction, so we create two `ActionButton` views and conditionally render the right one:
 
-- **Auto-install** (existing `install_plugin_button`): "Install Rook plugin" / `Icon::Download` → triggers `handle_install_plugin`
+- **Auto-install** (existing `install_plugin_button`): "Install Polaris Terminal plugin" / `Icon::Download` → triggers `handle_install_plugin`
 - **Manual** (new `plugin_instructions_button`): "Plugin install instructions" / `Icon::Info` → emits `ShowPluginInstallModal`
 
 In `render_cli_mode_footer`, branch on `should_use_manual_install_mode()` to pick which button to render.

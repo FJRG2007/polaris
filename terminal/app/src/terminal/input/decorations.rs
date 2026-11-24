@@ -1,14 +1,14 @@
-//! Rook input editor logic related to decorating the input's text, such as
+//! Polaris Terminal input editor logic related to decorating the input's text, such as
 //! applying syntax highlighting and error underlining.
 
 use std::collections::HashMap;
 use std::ops::Range;
 
-pub use rook_completer::completer::SuggestionTypeName;
-pub use rook_completer::util::parse_current_commands_and_tokens;
-pub use rook_completer::{ParsedTokenData, ParsedTokensSnapshot};
-use rook_core::features::FeatureFlag;
-use rookui::{AppContext, SingletonEntity, ViewContext};
+pub use pterm_completer::completer::SuggestionTypeName;
+pub use pterm_completer::util::parse_current_commands_and_tokens;
+pub use pterm_completer::{ParsedTokenData, ParsedTokensSnapshot};
+use pterm_core::features::FeatureFlag;
+use ptermui::{AppContext, SingletonEntity, ViewContext};
 use settings::Setting as _;
 use string_offset::{ByteOffset, CharOffset};
 

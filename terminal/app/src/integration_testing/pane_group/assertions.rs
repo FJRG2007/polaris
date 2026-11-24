@@ -1,5 +1,5 @@
-use rookui::async_assert_eq;
-use rookui::integration::{AssertionCallback, AssertionOutcome};
+use ptermui::async_assert_eq;
+use ptermui::integration::{AssertionCallback, AssertionOutcome};
 
 use crate::integration_testing::view_getters::pane_group_view;
 

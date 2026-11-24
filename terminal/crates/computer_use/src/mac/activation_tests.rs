@@ -112,7 +112,7 @@ fn end_sessions_for_owner_clears_only_that_owners_entries() {
 
 /// The activation window under test in the callback matrix. Any non-zero value stands in for a
 /// real window number; a different value (`ACTIVATION_WINDOW + 1`) represents another window on
-/// the same previously-frontmost process (e.g. another Rook window the user clicks).
+/// the same previously-frontmost process (e.g. another Polaris Terminal window the user clicks).
 const ACTIVATION_WINDOW: i64 = 4242;
 const OTHER_WINDOW: i64 = ACTIVATION_WINDOW + 1;
 

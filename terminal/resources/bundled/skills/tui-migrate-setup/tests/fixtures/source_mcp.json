@@ -19,7 +19,7 @@
       }
     },
     "managed-installation": {
-      "rook_id": "MANAGED_INSTALLATION_SENTINEL"
+      "pterm_id": "MANAGED_INSTALLATION_SENTINEL"
     }
   }
 }

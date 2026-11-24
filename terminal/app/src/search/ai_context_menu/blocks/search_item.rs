@@ -1,12 +1,12 @@
 use chrono::{DateTime, Local};
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_core::command::ExitCode;
-use rookui::elements::{
+use pterm_core::command::ExitCode;
+use ptermui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, Highlight, Icon, ParentElement, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::search::ai_context_menu::mixer::AIContextMenuSearchableAction;

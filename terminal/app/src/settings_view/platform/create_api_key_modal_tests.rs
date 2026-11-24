@@ -1,7 +1,7 @@
-use rook_core::ui::appearance::Appearance;
-use rook_server_client::auth::AgentIdentity;
-use rookui::App;
-use rookui::platform::WindowStyle;
+use pterm_core::ui::appearance::Appearance;
+use pterm_server_client::auth::AgentIdentity;
+use ptermui::App;
+use ptermui::platform::WindowStyle;
 
 use super::CreateApiKeyModal;
 use crate::auth::AuthStateProvider;

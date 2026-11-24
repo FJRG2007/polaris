@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use enum_iterator::all;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use rookui_core::elements::ListIndentLevel;
+use ptermui_core::elements::ListIndentLevel;
 use string_offset::CharOffset;
 use sum_tree::SumTree;
 
@@ -235,7 +235,7 @@ impl Buffer {
             // Safety: if a previous edit in this batch caused the anchors for this
             // action to cross (start > end), skip the action rather than panicking.
             // This can happen when overlapping DiffDeltas slip through the diff
-            // matching layer (see ROOK-CLIENT-DEV-NYY).
+            // matching layer (see POLARIS_TERMINAL-CLIENT-DEV-NYY).
             if edit_start > edit_end {
                 log::warn!(
                     "Skipping edit action with inverted range {edit_start}..{edit_end} \

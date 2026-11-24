@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::color::ColorU;
-use rookui::elements::{CornerRadius, Radius};
-use rookui::fonts::Weight;
-use rookui::ui_components::components::{UiComponent as _, UiComponentStyles};
-use rookui::ui_components::text::Span;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::color::ColorU;
+use ptermui::elements::{CornerRadius, Radius};
+use ptermui::fonts::Weight;
+use ptermui::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui::ui_components::text::Span;
 
 /// The padding around ACL items in the sharing dialog.
 pub const ACL_ITEM_PADDING: f32 = 16.;

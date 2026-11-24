@@ -3,16 +3,16 @@ use std::iter::FromIterator;
 use std::path::{Component, Path, PathBuf};
 
 use anyhow::Result;
-pub use rook_core::ui::color::blend::Blend;
-use rook_core::ui::color::pick_foreground_color;
-pub use rook_core::ui::theme::*;
-use rookui::assets::asset_cache::AssetSource;
-use rookui::color::ColorU;
-use rookui::elements::{
+pub use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::color::pick_foreground_color;
+pub use pterm_core::ui::theme::*;
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::color::ColorU;
+use ptermui::elements::{
     Align, Border, ConstrainedBox, Container, Element, Empty, Flex, ParentElement, Rect,
     Shrinkable, Stack, Text,
 };
-use rookui::fonts::FamilyId;
+use ptermui::fonts::FamilyId;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::default_themes::*;
@@ -131,8 +131,8 @@ impl std::fmt::Display for ThemeKind {
             ThemeKind::Phenomenon => "Phenomenon",
             ThemeKind::SolarFlare => "Solar Flare",
             ThemeKind::Adeberry => "Adeberry",
-            ThemeKind::SentReferralReward => "Rook Referral",
-            ThemeKind::ReceivedReferralReward => "Referred to Rook",
+            ThemeKind::SentReferralReward => "Polaris Terminal Referral",
+            ThemeKind::ReceivedReferralReward => "Referred to Polaris Terminal",
             ThemeKind::Custom(custom_theme) => custom_theme.name.as_str(),
             ThemeKind::CustomBase16(custom_theme) => custom_theme.name.as_str(),
             ThemeKind::InMemory(in_memory_theme) => in_memory_theme.name.as_str(),
@@ -418,7 +418,7 @@ impl InMemoryThemeOptions {
         self.path = path;
     }
 
-    pub fn theme(&self) -> RookTheme {
+    pub fn theme(&self) -> PtermTheme {
         let bg_color = self.chosen_bg_color();
         let fg_color = pick_foreground_color(bg_color);
         let possible_accent_colors: Vec<ColorU> = self
@@ -437,7 +437,7 @@ impl InMemoryThemeOptions {
             (Details::Lighter, light_mode_colors())
         };
 
-        RookTheme::new(
+        PtermTheme::new(
             bg_color.into(),
             fg_color,
             accent_color.into(),
@@ -458,14 +458,14 @@ impl InMemoryThemeOptions {
 }
 
 #[derive(Debug, Clone)]
-pub struct RookThemeConfig {
-    theme_map: HashMap<ThemeKind, RookTheme>,
+pub struct PtermThemeConfig {
+    theme_map: HashMap<ThemeKind, PtermTheme>,
 }
 
-impl RookThemeConfig {
+impl PtermThemeConfig {
     pub fn new() -> Self {
         // preload with built-in themes
-        let theme_map: HashMap<ThemeKind, RookTheme> = HashMap::from_iter([
+        let theme_map: HashMap<ThemeKind, PtermTheme> = HashMap::from_iter([
             (ThemeKind::SentReferralReward, sent_referral_reward()),
             (
                 ThemeKind::ReceivedReferralReward,
@@ -493,10 +493,10 @@ impl RookThemeConfig {
             (ThemeKind::SolarFlare, solar_flare()),
             (ThemeKind::Adeberry, adeberry()),
         ]);
-        RookThemeConfig { theme_map }
+        PtermThemeConfig { theme_map }
     }
 
-    pub fn add_new_theme(&mut self, theme_name: ThemeKind, theme: RookTheme) {
+    pub fn add_new_theme(&mut self, theme_name: ThemeKind, theme: PtermTheme) {
         self.theme_map.insert(theme_name, theme);
     }
 
@@ -504,16 +504,16 @@ impl RookThemeConfig {
         CustomTheme::new(name, path).into()
     }
 
-    pub fn theme_items(&self) -> impl Iterator<Item = (&ThemeKind, &RookTheme)> {
+    pub fn theme_items(&self) -> impl Iterator<Item = (&ThemeKind, &PtermTheme)> {
         self.theme_map.iter()
     }
 
-    pub fn theme(&self, name: &ThemeKind) -> RookTheme {
+    pub fn theme(&self, name: &ThemeKind) -> PtermTheme {
         self.theme_map.get(name).cloned().unwrap_or_else(dark_theme)
     }
 }
 
-impl Default for RookThemeConfig {
+impl Default for PtermThemeConfig {
     fn default() -> Self {
         Self::new()
     }
@@ -582,8 +582,8 @@ pub struct PromptColors {
     pub input_prompt_ssh: ColorU,
 }
 
-impl From<RookTheme> for PromptColors {
-    fn from(theme: RookTheme) -> Self {
+impl From<PtermTheme> for PromptColors {
+    fn from(theme: PtermTheme) -> Self {
         PromptColors {
             input_prompt_conversation_management: theme.terminal_colors().normal.white.into(),
             input_prompt_pwd: theme.terminal_colors().normal.magenta.into(),
@@ -606,7 +606,7 @@ impl From<RookTheme> for PromptColors {
 }
 
 pub fn render_preview(
-    theme: &RookTheme,
+    theme: &PtermTheme,
     font_family: FamilyId,
     form_factor: Option<f32>,
 ) -> Box<dyn Element> {
@@ -688,9 +688,9 @@ pub fn render_preview(
         thumbnail.add_child(
             Shrinkable::new(
                 1.,
-                rookui::elements::Image::new(
+                ptermui::elements::Image::new(
                     background_image.source(),
-                    rookui::elements::CacheOption::BySize,
+                    ptermui::elements::CacheOption::BySize,
                 )
                 .cover()
                 .finish(),

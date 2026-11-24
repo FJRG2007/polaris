@@ -2,7 +2,7 @@
 //! Repository metadata model singleton.
 //!
 //! This module provides a singleton model that manages repository metadata across
-//! all repositories tracked by Rook.
+//! all repositories tracked by Polaris Terminal.
 
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -14,10 +14,10 @@ use std::sync::Arc;
 
 use futures::channel::oneshot;
 use futures::future::{self, BoxFuture, FutureExt as _};
-use rook_core::{safe_warn, send_telemetry_from_ctx};
-use rook_util::sync::Condition;
-use rookui_core::ModelHandle;
-use rookui_core::r#async::{FutureId, SpawnedFutureHandle};
+use pterm_core::{safe_warn, send_telemetry_from_ctx};
+use pterm_util::sync::Condition;
+use ptermui_core::ModelHandle;
+use ptermui_core::r#async::{FutureId, SpawnedFutureHandle};
 
 /// Represents either a file or directory in a repository.
 #[derive(Debug, Clone)]
@@ -40,7 +40,7 @@ pub struct RepoContents<'a> {
     pub truncated: bool,
 }
 
-use rook_util::standardized_path::StandardizedPath;
+use pterm_util::standardized_path::StandardizedPath;
 
 #[cfg(feature = "local_fs")]
 use crate::entry::LAZY_LOAD_FILE_LIMIT;
@@ -61,7 +61,7 @@ cfg_if::cfg_if! {
         use crate::repositories::{DetectedRepositories, DetectedRepositoriesEvent};
         use crate::watcher::DirectoryWatcher;
         use watcher::{BulkFilesystemWatcher, BulkFilesystemWatcherEvent};
-        use rookui_core::SingletonEntity as _;
+        use ptermui_core::SingletonEntity as _;
 
         /// Duration between filesystem watch events in seconds
         const FILESYSTEM_WATCHER_DEBOUNCE_SECS: u64 = 1;
@@ -69,7 +69,7 @@ cfg_if::cfg_if! {
 }
 
 use ignore::gitignore::Gitignore;
-use rookui_core::ModelContext;
+use ptermui_core::ModelContext;
 
 use crate::file_tree_store::{
     FileTreeDirectoryEntryState, FileTreeEntry, FileTreeEntryState, FileTreeFileMetadata,
@@ -2141,7 +2141,7 @@ impl LocalRepoMetadataModel {
     }
 }
 
-impl rookui_core::Entity for LocalRepoMetadataModel {
+impl ptermui_core::Entity for LocalRepoMetadataModel {
     type Event = RepositoryMetadataEvent;
 }
 

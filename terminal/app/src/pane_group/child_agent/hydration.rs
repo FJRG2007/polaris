@@ -1,5 +1,5 @@
-use rook_errors::report_error;
-use rookui::{SingletonEntity, ViewContext};
+use pterm_errors::report_error;
+use ptermui::{SingletonEntity, ViewContext};
 use session_sharing_protocol::common::SessionId;
 use uuid::Uuid;
 

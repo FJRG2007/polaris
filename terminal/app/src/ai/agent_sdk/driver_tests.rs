@@ -11,19 +11,19 @@ use cloud_object_models::CodeForge;
 use futures::channel::oneshot;
 use futures::executor::block_on;
 use instant::Instant;
-use repo_metadata::{DirectoryWatcher, RepoMetadataEvent, RepoMetadataModel, RepositoryIdentifier};
-use rook_cli::agent::Harness;
-use rook_cli::skill::SkillSpec;
-use rook_cli::{
+use pterm_cli::agent::Harness;
+use pterm_cli::skill::SkillSpec;
+use pterm_cli::{
     OZ_CLI_ENV, OZ_HARNESS_ENV, OZ_PARENT_RUN_ID_ENV, OZ_RUN_ID_ENV, SERVER_ROOT_URL_OVERRIDE_ENV,
     SESSION_SHARING_SERVER_URL_OVERRIDE_ENV, WS_SERVER_URL_OVERRIDE_ENV,
 };
-use rook_core::channel::ChannelState;
-use rook_graphql::ai::AgentTaskState;
-use rook_managed_secrets::ManagedSecretValue;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::r#async::Timer;
-use rookui::{App, SingletonEntity as _};
+use pterm_core::channel::ChannelState;
+use pterm_graphql::ai::AgentTaskState;
+use pterm_managed_secrets::ManagedSecretValue;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::r#async::Timer;
+use ptermui::{App, SingletonEntity as _};
+use repo_metadata::{DirectoryWatcher, RepoMetadataEvent, RepoMetadataModel, RepositoryIdentifier};
 use tempfile::TempDir;
 use warp_multi_agent_api::response_event;
 
@@ -31,9 +31,10 @@ use super::{
     AgentDriver, AgentRunPrompt, CLIAgentSessionStatus, DebugWindowController, IdleTimeoutSender,
     LEGACY_OZ_PARENT_LISTENER_MANAGED_EXTERNALLY_ENV, LEGACY_OZ_PARENT_STATE_ROOT_ENV,
     OZ_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV, OZ_MESSAGE_LISTENER_STATE_ROOT_ENV,
-    PlatformErrorCode, ROOK_MESSAGE_LISTENER_STATE_ROOT_ENV, SDKConversationOutputStatus,
-    build_secret_env_vars, debug_turn_task_state, idle_window_for_cli_session_status,
-    idle_window_for_terminal_status, setup_failure_status_update, terminal_status_log_outcome,
+    POLARIS_TERMINAL_MESSAGE_LISTENER_STATE_ROOT_ENV, PlatformErrorCode,
+    SDKConversationOutputStatus, build_secret_env_vars, debug_turn_task_state,
+    idle_window_for_cli_session_status, idle_window_for_terminal_status,
+    setup_failure_status_update, terminal_status_log_outcome,
 };
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
 use crate::ai::agent::task::TaskId;
@@ -385,7 +386,7 @@ fn idle_timeout_sender_on_commit_runs_before_value_is_delivered() {
 
 fn error_status() -> SDKConversationOutputStatus {
     SDKConversationOutputStatus::Error {
-        error: RenderableAIError::InternalRookError,
+        error: RenderableAIError::InternalPtermError,
     }
 }
 
@@ -527,7 +528,7 @@ fn cancelling_the_idle_timeout_stops_a_later_refresh_from_resurrecting_it() {
 
 #[test]
 fn failed_cli_harness_session_defers_by_idle_on_fail() {
-    // The flag lives on `rook agent run`, so it has to behave the same whichever harness the run
+    // The flag lives on `polaris-terminal agent run`, so it has to behave the same whichever harness the run
     // uses; a failed CLI session is the same "process is the session sharer" situation.
     let idle_on_complete = Some(Duration::from_secs(45 * 60));
     let idle_on_fail = Some(Duration::from_secs(15 * 60));
@@ -717,11 +718,13 @@ fn task_env_vars_propagate_message_listener_state_root_with_legacy_alias() {
         env_vars.get(&OsString::from(OZ_MESSAGE_LISTENER_STATE_ROOT_ENV)),
         Some(&OsString::from("/tmp/message-listener-root"))
     );
-    // The ROOK_ twin is only reachable when the state root is actually set, which is why it is
+    // The POLARIS_TERMINAL_ twin is only reachable when the state root is actually set, which is why it is
     // asserted here rather than in the pairing test: that test does not populate the process
     // env, and making it do so would need `#[serial_test::serial]` to stay race-free.
     assert_eq!(
-        env_vars.get(&OsString::from(ROOK_MESSAGE_LISTENER_STATE_ROOT_ENV)),
+        env_vars.get(&OsString::from(
+            POLARIS_TERMINAL_MESSAGE_LISTENER_STATE_ROOT_ENV
+        )),
         Some(&OsString::from("/tmp/message-listener-root"))
     );
     assert_eq!(
@@ -730,13 +733,13 @@ fn task_env_vars_propagate_message_listener_state_root_with_legacy_alias() {
     );
 }
 
-/// Every `OZ_` variable reaching a harness subprocess has a `ROOK_` twin carrying the same
+/// Every `OZ_` variable reaching a harness subprocess has a `POLARIS_TERMINAL_` twin carrying the same
 /// value. This guard fails when one of a pair is injected without the other.
 ///
 /// The legacy `OZ_PARENT_*` listener names are exempt: they exist only to keep an external
-/// Claude plugin working through its migration and are deliberately not given `ROOK_` twins.
+/// Claude plugin working through its migration and are deliberately not given `POLARIS_TERMINAL_` twins.
 #[test]
-fn task_env_vars_mirror_every_oz_var_to_a_rook_name() {
+fn task_env_vars_mirror_every_oz_var_to_a_pterm_name() {
     const LEGACY_ONLY: [&str; 2] = [
         LEGACY_OZ_PARENT_LISTENER_MANAGED_EXTERNALLY_ENV,
         LEGACY_OZ_PARENT_STATE_ROOT_ENV,
@@ -755,11 +758,11 @@ fn task_env_vars_mirror_every_oz_var_to_a_rook_name() {
             continue;
         }
         paired += 1;
-        let rook_name = OsString::from(format!("ROOK_{suffix}"));
+        let pterm_name = OsString::from(format!("POLARIS_TERMINAL_{suffix}"));
         assert_eq!(
-            env_vars.get(&rook_name),
+            env_vars.get(&pterm_name),
             Some(value),
-            "{name} is injected without a matching ROOK_{suffix} carrying the same value"
+            "{name} is injected without a matching POLARIS_TERMINAL_{suffix} carrying the same value"
         );
     }
     assert!(
@@ -1326,7 +1329,7 @@ fn write_skill_file(repo: &Path, name: &str) {
 }
 
 /// Write a minimal SKILL.md at `{skills_dir}/{name}/SKILL.md`.
-/// This is the flat layout expected by `ROOK_SKILL_DIRS` (no `.agents/skills` wrapper).
+/// This is the flat layout expected by `POLARIS_TERMINAL_SKILL_DIRS` (no `.agents/skills` wrapper).
 fn write_flat_skill(skills_dir: &Path, name: &str) {
     let skill_dir = skills_dir.join(name);
     fs::create_dir_all(&skill_dir).unwrap();
@@ -1337,12 +1340,12 @@ fn write_flat_skill(skills_dir: &Path, name: &str) {
     .unwrap();
 }
 
-/// Verifies that `load_skills_dirs` reads skills from the `ROOK_SKILL_DIRS` environment
+/// Verifies that `load_skills_dirs` reads skills from the `POLARIS_TERMINAL_SKILL_DIRS` environment
 /// variable and registers them in the personal (home) bucket so they are always in scope,
 /// regardless of the current working directory.
 #[test]
 #[serial_test::serial]
-fn rook_skill_dirs_env_loads_skills_as_home_tier() {
+fn pterm_skill_dirs_env_loads_skills_as_home_tier() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
 
@@ -1356,10 +1359,10 @@ fn rook_skill_dirs_env_loads_skills_as_home_tier() {
         write_flat_skill(&skills_dir_a, "env-skill-a2");
         write_flat_skill(&skills_dir_b, "env-skill-b1");
 
-        // Point ROOK_SKILL_DIRS at both directories.
+        // Point POLARIS_TERMINAL_SKILL_DIRS at both directories.
         let skills_dirs_value = format!("{},{}", skills_dir_a.display(), skills_dir_b.display());
         // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe { std::env::set_var("ROOK_SKILL_DIRS", &skills_dirs_value) };
+        unsafe { std::env::set_var("POLARIS_TERMINAL_SKILL_DIRS", &skills_dirs_value) };
 
         let terminal_view = add_window_with_terminal(&mut app, None);
         let driver_handle = app.add_model(|ctx| {
@@ -1382,9 +1385,9 @@ fn rook_skill_dirs_env_loads_skills_as_home_tier() {
         done_rx.await.expect("loading task should complete");
 
         // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe { std::env::remove_var("ROOK_SKILL_DIRS") };
+        unsafe { std::env::remove_var("POLARIS_TERMINAL_SKILL_DIRS") };
 
-        // Skills from ROOK_SKILL_DIRS are home-tier, so they appear for any working directory.
+        // Skills from POLARIS_TERMINAL_SKILL_DIRS are home-tier, so they appear for any working directory.
         // Use None cwd — home skills are included regardless of is_cloud_environment.
         let skill_names = SkillManager::handle(&app).read(&app, |manager: &SkillManager, ctx| {
             manager
@@ -1396,15 +1399,15 @@ fn rook_skill_dirs_env_loads_skills_as_home_tier() {
 
         assert!(
             skill_names.contains(&"env-skill-a1".to_string()),
-            "'env-skill-a1' from ROOK_SKILL_DIRS should be loaded; got: {skill_names:?}"
+            "'env-skill-a1' from POLARIS_TERMINAL_SKILL_DIRS should be loaded; got: {skill_names:?}"
         );
         assert!(
             skill_names.contains(&"env-skill-a2".to_string()),
-            "'env-skill-a2' from ROOK_SKILL_DIRS should be loaded; got: {skill_names:?}"
+            "'env-skill-a2' from POLARIS_TERMINAL_SKILL_DIRS should be loaded; got: {skill_names:?}"
         );
         assert!(
             skill_names.contains(&"env-skill-b1".to_string()),
-            "'env-skill-b1' from ROOK_SKILL_DIRS should be loaded; got: {skill_names:?}"
+            "'env-skill-b1' from POLARIS_TERMINAL_SKILL_DIRS should be loaded; got: {skill_names:?}"
         );
 
         // Verify the skills have Home scope (personal tier).
@@ -1418,17 +1421,17 @@ fn rook_skill_dirs_env_loads_skills_as_home_tier() {
         });
         assert!(
             scope_check,
-            "all ROOK_SKILL_DIRS skills must have SkillScope::Home"
+            "all POLARIS_TERMINAL_SKILL_DIRS skills must have SkillScope::Home"
         );
     });
 }
 
-/// Verifies that relative `ROOK_SKILL_DIRS` entries are resolved against the driver's
+/// Verifies that relative `POLARIS_TERMINAL_SKILL_DIRS` entries are resolved against the driver's
 /// working directory rather than the process's current working directory (which
 /// `prepare_environment` may have changed).
 #[test]
 #[serial_test::serial]
-fn rook_skill_dirs_env_relative_entries_resolve_against_working_dir() {
+fn pterm_skill_dirs_env_relative_entries_resolve_against_working_dir() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
 
@@ -1441,7 +1444,7 @@ fn rook_skill_dirs_env_relative_entries_resolve_against_working_dir() {
         write_flat_skill(&working_dir.join("rel-skills"), "env-skill-rel");
 
         // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe { std::env::set_var("ROOK_SKILL_DIRS", "rel-skills") };
+        unsafe { std::env::set_var("POLARIS_TERMINAL_SKILL_DIRS", "rel-skills") };
 
         let terminal_view = add_window_with_terminal(&mut app, None);
         let driver_handle = app.add_model(|ctx| {
@@ -1464,7 +1467,7 @@ fn rook_skill_dirs_env_relative_entries_resolve_against_working_dir() {
         done_rx.await.expect("loading task should complete");
 
         // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe { std::env::remove_var("ROOK_SKILL_DIRS") };
+        unsafe { std::env::remove_var("POLARIS_TERMINAL_SKILL_DIRS") };
 
         let skill_names = SkillManager::handle(&app).read(&app, |manager: &SkillManager, ctx| {
             manager
@@ -1476,7 +1479,7 @@ fn rook_skill_dirs_env_relative_entries_resolve_against_working_dir() {
 
         assert!(
             skill_names.contains(&"env-skill-rel".to_string()),
-            "'env-skill-rel' should load via a relative ROOK_SKILL_DIRS entry resolved against the driver's working dir; got: {skill_names:?}"
+            "'env-skill-rel' should load via a relative POLARIS_TERMINAL_SKILL_DIRS entry resolved against the driver's working dir; got: {skill_names:?}"
         );
     });
 }
@@ -1489,11 +1492,11 @@ fn rook_skill_dirs_env_relative_entries_resolve_against_working_dir() {
 /// stream to completion.
 fn conversation_with_in_progress_mock_stream(
     app: &mut App,
-    terminal_id: rookui::EntityId,
-    ai_controller: &rookui::ModelHandle<crate::ai::blocklist::BlocklistAIController>,
+    terminal_id: ptermui::EntityId,
+    ai_controller: &ptermui::ModelHandle<crate::ai::blocklist::BlocklistAIController>,
 ) -> (
     crate::ai::agent::conversation::AIConversationId,
-    rookui::ModelHandle<ResponseStream>,
+    ptermui::ModelHandle<ResponseStream>,
 ) {
     let stream_id = ResponseStreamId::new_for_test();
     let conversation_id = BlocklistAIHistoryModel::handle(app).update(app, |history, ctx| {
@@ -1533,7 +1536,7 @@ fn conversation_with_in_progress_mock_stream(
 
 /// Drives `stream` through a successful `Init` + `Finished(Done)` completion via the
 /// real controller subscription, matching a parent turn finishing normally.
-fn complete_mock_stream_successfully(app: &mut App, stream: &rookui::ModelHandle<ResponseStream>) {
+fn complete_mock_stream_successfully(app: &mut App, stream: &ptermui::ModelHandle<ResponseStream>) {
     stream.update(app, |stream, ctx| {
         stream.emit_response_event_for_test(
             warp_multi_agent_api::ResponseEvent {
@@ -1597,9 +1600,9 @@ fn enqueue_buffered_child_message(
 /// commits to an immediate exit on `Success` (`None`) or defers it (`Some`).
 fn driver_wired_for_terminal(
     app: &mut App,
-    terminal_view: rookui::ViewHandle<crate::terminal::TerminalView>,
+    terminal_view: ptermui::ViewHandle<crate::terminal::TerminalView>,
     idle_on_complete: Option<Duration>,
-) -> rookui::ModelHandle<AgentDriver> {
+) -> ptermui::ModelHandle<AgentDriver> {
     let temp = TempDir::new().unwrap();
     let driver_handle = app.add_model(|ctx| {
         let terminal_driver =
@@ -2016,10 +2019,10 @@ fn exit_commit_handle_blocks_injection_before_model_side_cleanup_runs() {
 /// id.
 fn driver_wired_for_resumed_conversation(
     app: &mut App,
-    terminal_view: rookui::ViewHandle<crate::terminal::TerminalView>,
+    terminal_view: ptermui::ViewHandle<crate::terminal::TerminalView>,
     idle_on_complete: Option<Duration>,
     resumed_conversation_id: crate::ai::agent::conversation::AIConversationId,
-) -> rookui::ModelHandle<AgentDriver> {
+) -> ptermui::ModelHandle<AgentDriver> {
     let temp = TempDir::new().unwrap();
     let driver_handle = app.add_model(|ctx| {
         let terminal_driver =

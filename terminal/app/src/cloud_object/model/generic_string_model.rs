@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use cloud_objects::cloud_object::CloudObjectUpsertParams;
 // Re-exported from cloud_objects.
 pub use cloud_objects::cloud_object::{GenericStringModel, Serializer};
-pub use rook_server_client::ids::GenericStringObjectId;
+pub use pterm_server_client::ids::GenericStringObjectId;
 
 use crate::appearance::Appearance;
 use crate::cloud_object::{
@@ -15,7 +15,7 @@ use crate::cloud_object::{
     GenericStringObjectUniqueKey, ObjectType, Revision, UpdateCloudObjectResult,
 };
 use crate::drive::CloudObjectTypeAndId;
-use crate::drive::items::RookDriveItem;
+use crate::drive::items::PtermDriveItem;
 use crate::persistence::ModelEvent;
 use crate::server::cloud_objects::update_manager::InitiatedBy;
 use crate::server::ids::{ServerId, SyncId};
@@ -71,8 +71,8 @@ pub trait StringModel: Clone + Debug + PartialEq + Send + Sync + 'static {
     /// Returns the display name for this model.
     fn display_name(&self) -> String;
 
-    /// Returns whether to render this model as a RookDriveItem.
-    fn renders_in_rook_drive(&self) -> bool {
+    /// Returns whether to render this model as a PtermDriveItem.
+    fn renders_in_pterm_drive(&self) -> bool {
         false
     }
 
@@ -89,14 +89,14 @@ pub trait StringModel: Clone + Debug + PartialEq + Send + Sync + 'static {
     /// Sets the display name for this model
     fn set_display_name(&mut self, _name: &str) {}
 
-    /// Creates a new rook drive item for this model type. Returns None
-    /// if this object does not render in Rook Drive.
-    fn to_rook_drive_item(
+    /// Creates a new polaris-terminal drive item for this model type. Returns None
+    /// if this object does not render in Polaris Terminal Drive.
+    fn to_pterm_drive_item(
         &self,
         _id: SyncId,
         _appearance: &Appearance,
         _object: &Self::CloudObjectType,
-    ) -> Option<Box<dyn RookDriveItem>> {
+    ) -> Option<Box<dyn PtermDriveItem>> {
         None
     }
 
@@ -313,16 +313,17 @@ where
         })
     }
 
-    fn renders_in_rook_drive(&self) -> bool {
-        self.string_model.renders_in_rook_drive()
+    fn renders_in_pterm_drive(&self) -> bool {
+        self.string_model.renders_in_pterm_drive()
     }
 
-    fn to_rook_drive_item(
+    fn to_pterm_drive_item(
         &self,
         id: SyncId,
         appearance: &Appearance,
         object: &GenericCloudObject<GenericStringObjectId, Self>,
-    ) -> Option<Box<dyn RookDriveItem>> {
-        self.string_model.to_rook_drive_item(id, appearance, object)
+    ) -> Option<Box<dyn PtermDriveItem>> {
+        self.string_model
+            .to_pterm_drive_item(id, appearance, object)
     }
 }

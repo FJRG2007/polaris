@@ -1,4 +1,4 @@
-use rookui_core::{App, ModelHandle};
+use ptermui_core::{App, ModelHandle};
 
 use super::Searcher;
 use crate::content::buffer::{

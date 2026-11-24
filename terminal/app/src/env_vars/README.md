@@ -12,9 +12,9 @@ The core data model for EVCs is defined in `mod.rs`. The motivations behind our 
 
 Context: EVCs are built on GenericStringObjects (GSOs). Consequently, there isn't much unique server-side infrastructure dedicated to EVCs — we added a variant to the `Format` enum on the server side and did the same on the client (`JsonObjectType::EnvVarCollection`), and a small DB migration to support the type.
 
-We defined `CloudEnvVarCollection` in `mod.rs`, which implements the `GenericCloudObjectType` trait. This is a mostly boilerplate implementation specifying properties such as EVCs should render in Rook Drive, be linkable/exportable, etc.
+We defined `CloudEnvVarCollection` in `mod.rs`, which implements the `GenericCloudObjectType` trait. This is a mostly boilerplate implementation specifying properties such as EVCs should render in Polaris Terminal Drive, be linkable/exportable, etc.
 
-The implementation of EVCs as a Rook Drive object is in `app/src/drive/items/env_var_collection.rs`, where code for the Rook Drive preview and click action is located.
+The implementation of EVCs as a Polaris Terminal Drive object is in `app/src/drive/items/env_var_collection.rs`, where code for the Polaris Terminal Drive preview and click action is located.
 
 Code relevant to edit collisions and fetching EVCs from the server is in `app/src/server/server_api.rs` and `app/src/server/cloud_objects/update_manager.rs`. We aimed to maintain a similar liveness property to workflows, meaning a concurrent edit made by another user requires one to check out the other's edit before committing their own.
 
@@ -22,7 +22,7 @@ Code relevant to edit collisions and fetching EVCs from the server is in `app/sr
 
 ### Panes
 
-EVCs, like most objects in Rook, are children of a pane. Our implementation is defined in `app/src/pane_group/pane/env_var_collection_pane.rs`, which is essentially identical to other pane implementations. The `EnvVarCollectionPane` is closely coupled with the `EnvVarCollectionManager`, defined in `manager.rs`. The manager is responsible for creating, destroying, and registering all EVC panes, whereas the pane itself contains the EVC view.
+EVCs, like most objects in Polaris Terminal, are children of a pane. Our implementation is defined in `app/src/pane_group/pane/env_var_collection_pane.rs`, which is essentially identical to other pane implementations. The `EnvVarCollectionPane` is closely coupled with the `EnvVarCollectionManager`, defined in `manager.rs`. The manager is responsible for creating, destroying, and registering all EVC panes, whereas the pane itself contains the EVC view.
 
 ### Core UI
 

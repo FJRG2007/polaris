@@ -2,11 +2,11 @@
 
 ## Summary
 
-Add a user setting named `Use latest user prompt as conversation title in tab names` that controls which conversation text Rook shows in vertical tabs for agent conversations.
+Add a user setting named `Use latest user prompt as conversation title in tab names` that controls which conversation text Polaris Terminal shows in vertical tabs for agent conversations.
 
 The setting is disabled by default. In the default disabled state, vertical tabs use conversation titles for both Oz agent conversations and plugin-backed third-party CLI agent sessions. When enabled, vertical tabs use the latest user prompt when one is available, consistently across the same agent conversation types.
 
-The desired outcome is that Rook's default tab-name behavior uses stable, title-like conversation labels, while users who prefer prompt-based labels can explicitly opt into using the latest prompt.
+The desired outcome is that Polaris Terminal's default tab-name behavior uses stable, title-like conversation labels, while users who prefer prompt-based labels can explicitly opt into using the latest prompt.
 
 ## Problem
 
@@ -47,7 +47,7 @@ Use the existing settings UI patterns for a simple toggle.
 
 ### Setting location and default
 
-Rook exposes a setting in the AI settings area, near settings that affect agent input or agent conversation behavior.
+Polaris Terminal exposes a setting in the AI settings area, near settings that affect agent input or agent conversation behavior.
 
 The setting should communicate that it opts into prompt-based agent tab names. Suggested copy:
 
@@ -60,14 +60,14 @@ The setting is disabled by default for all users.
 
 The setting applies only to agent conversations shown as terminal rows in the vertical tabs panel:
 
-- Oz agent conversations, including local agent conversations and cloud agent conversations shown in Rook.
-- Plugin-backed third-party CLI agent sessions, such as supported Claude Code, Codex, or similar sessions where Rook receives structured session metadata from the agent plugin.
+- Oz agent conversations, including local agent conversations and cloud agent conversations shown in Polaris Terminal.
+- Plugin-backed third-party CLI agent sessions, such as supported Claude Code, Codex, or similar sessions where Polaris Terminal receives structured session metadata from the agent plugin.
 
 The setting does not apply to:
 
 - Plain terminal panes.
 - CLI agent sessions detected only from a running command when no plugin-backed session metadata is available.
-- Non-terminal panes such as code panes, notebooks, workflows, settings, files, or Rook Drive objects.
+- Non-terminal panes such as code panes, notebooks, workflows, settings, files, or Polaris Terminal Drive objects.
 
 ### Disabled behavior: use conversation title
 
@@ -143,8 +143,8 @@ The setting only chooses the text used to identify the conversation; it does not
 Fallback behavior should avoid blank vertical-tab labels.
 
 - Empty strings and whitespace-only titles or prompts are treated as missing.
-- If the preferred text type is missing, Rook falls back to the other text type when available.
-- If both title-like metadata and prompt metadata are missing, Rook uses the existing terminal fallback chain.
+- If the preferred text type is missing, Polaris Terminal falls back to the other text type when available.
+- If both title-like metadata and prompt metadata are missing, Polaris Terminal uses the existing terminal fallback chain.
 - A stale previous prompt must not replace a newer conversation title when the setting is disabled and the newer title is available.
 - A stale title must not replace a newer user prompt when the setting is enabled and the newer prompt is available.
 
@@ -158,7 +158,7 @@ For discoverability, search may also include the non-rendered counterpart when a
 
 The setting is a user preference and should persist across app restarts.
 
-If Rook normally syncs comparable AI display preferences across devices, this setting should follow that same sync behavior. If comparable AI display preferences are local-only, this setting should follow that local-only behavior instead.
+If Polaris Terminal normally syncs comparable AI display preferences across devices, this setting should follow that same sync behavior. If comparable AI display preferences are local-only, this setting should follow that local-only behavior instead.
 
 ## Success criteria
 
@@ -195,7 +195,7 @@ If Rook normally syncs comparable AI display preferences across devices, this se
 - **Search**: Search vertical tabs for the visible title/prompt text and verify the correct eligible agent row matches.
 - **Manual override**: Rename a tab or pane, toggle the setting, and verify the manual title remains visible and unchanged.
 - **Regression / plain terminal**: Open a plain terminal pane and verify its vertical-tab label precedence remains unchanged.
-- **Persistence**: Toggle the setting, restart Rook, and verify the setting value and vertical-tabs behavior are preserved.
+- **Persistence**: Toggle the setting, restart Polaris Terminal, and verify the setting value and vertical-tabs behavior are preserved.
 
 ## Open questions
 

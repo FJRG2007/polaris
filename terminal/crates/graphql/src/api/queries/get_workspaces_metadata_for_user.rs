@@ -56,7 +56,7 @@ query GetWorkspacesMetadataForUser($requestContext: RequestContext!) {
             tier {
               name
               description
-              rookAiPolicy {
+              ptermAiPolicy {
                 limit
                 isCodeSuggestionsToggleable
                 isPromptSuggestionsToggleable

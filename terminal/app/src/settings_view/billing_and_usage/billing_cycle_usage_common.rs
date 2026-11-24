@@ -3,14 +3,14 @@ use std::collections::HashMap;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rookui::Element;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::Element;
+use ptermui::elements::{
     Align, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DropShadow, Empty,
     Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable,
     Text,
 };
-use rookui::fonts::{Properties, Weight};
+use ptermui::fonts::{Properties, Weight};
 use thousands::Separable;
 
 use crate::settings_view::billing_and_usage_page_v2::{
@@ -25,7 +25,7 @@ use crate::workspaces::workspace::{
 };
 
 // for a bunch of this (min fill ratio, cost type order, ... )
-// you will find analogous ts code in rook-server
+// you will find analogous ts code in polaris-terminal-server
 pub const ROW_BORDER_RADIUS: f32 = 8.;
 pub const ROW_BORDER_WIDTH: f32 = 1.;
 pub const TOOLTIP_GAP: f32 = 6.;
@@ -176,7 +176,7 @@ pub fn aggregate_segments<'a>(
 /// limits (`VoiceRequestLimit` / `SuggestedCodeDiffsLimit`) rather than the
 /// AI/Compute base credit pool — see
 /// `model/sql/ai_credits_usage_and_cost/get_base_limits_usage.sql` and
-/// `isBaseLimitExhaustedForBucket` in rook-server. Records are written with
+/// `isBaseLimitExhaustedForBucket` in polaris-terminal-server. Records are written with
 /// `cost_type = BASE_LIMIT` and `cost_cents = 0`, so surfacing them here
 /// would inflate the per-row `total_credits` and skew the `used / limit`
 /// math without contributing to anything the user is actually billed for.
@@ -373,7 +373,7 @@ fn render_tooltip_row(
     cost_cents: i64,
     label_color: ColorU,
     value_color: ColorU,
-    font_family: rookui::fonts::FamilyId,
+    font_family: ptermui::fonts::FamilyId,
     bold: bool,
 ) -> Box<dyn Element> {
     let style = if bold {

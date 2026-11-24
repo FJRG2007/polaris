@@ -1,10 +1,10 @@
 use asset_macro::bundled_or_fetched_asset;
 use pathfinder_color::ColorU;
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::color::{OPAQUE, coloru_with_opacity};
-use rook_core::ui::theme::color::CustomDetails;
-use rook_core::ui::theme::{
-    AnsiColor, AnsiColors, Details, Fill, HorizontalGradient, Image, RookTheme, TerminalColors,
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::color::{OPAQUE, coloru_with_opacity};
+use pterm_core::ui::theme::color::CustomDetails;
+use pterm_core::ui::theme::{
+    AnsiColor, AnsiColors, Details, Fill, HorizontalGradient, Image, PtermTheme, TerminalColors,
     VerticalGradient,
 };
 
@@ -259,8 +259,8 @@ pub(super) fn adeberry_colors() -> TerminalColors {
 }
 
 /// Default bundled themes
-pub fn dark_theme() -> RookTheme {
-    RookTheme::new(
+pub fn dark_theme() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x050505FF)),
         ColorU::from_u32(0xffffffff),
         Fill::Solid(ColorU::from_u32(0x19AAD8FF)),
@@ -272,8 +272,8 @@ pub fn dark_theme() -> RookTheme {
     )
 }
 
-pub fn light_theme() -> RookTheme {
-    RookTheme::new(
+pub fn light_theme() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::white()),
         ColorU::new(17, 17, 17, OPAQUE),
         Fill::Solid(ColorU::from_u32(0x00c2ffff)),
@@ -285,8 +285,8 @@ pub fn light_theme() -> RookTheme {
     )
 }
 
-pub(super) fn dracula() -> RookTheme {
-    RookTheme::new(
+pub(super) fn dracula() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x282A36FF)),
         ColorU::from_u32(0xF8F8F2FF),
         Fill::Solid(ColorU::from_u32(0xFF79C6FF)),
@@ -298,8 +298,8 @@ pub(super) fn dracula() -> RookTheme {
     )
 }
 
-pub(super) fn solarized_light() -> RookTheme {
-    RookTheme::new(
+pub(super) fn solarized_light() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0xFDF6E3FF)),
         ColorU::from_u32(0x586E75FF),
         Fill::Solid(ColorU::from_u32(0x66B5A9FF)),
@@ -311,8 +311,8 @@ pub(super) fn solarized_light() -> RookTheme {
     )
 }
 
-pub(super) fn solarized_dark() -> RookTheme {
-    RookTheme::new(
+pub(super) fn solarized_dark() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x002B36FF)),
         ColorU::from_u32(0xF8F8F2FF),
         Fill::Solid(ColorU::from_u32(0xCB4B16FF)),
@@ -324,8 +324,8 @@ pub(super) fn solarized_dark() -> RookTheme {
     )
 }
 
-pub(super) fn gruvbox_dark() -> RookTheme {
-    RookTheme::new(
+pub(super) fn gruvbox_dark() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x282828FF)),
         ColorU::from_u32(0xEBDBB2FF),
         Fill::Solid(ColorU::from_u32(0xFC802DFF)),
@@ -337,8 +337,8 @@ pub(super) fn gruvbox_dark() -> RookTheme {
     )
 }
 
-pub(super) fn gruvbox_light() -> RookTheme {
-    RookTheme::new(
+pub(super) fn gruvbox_light() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0xFBF1C7FF)),
         ColorU::from_u32(0x3C3836FF),
         Fill::Solid(ColorU::from_u32(0xAD3B14FF)),
@@ -351,8 +351,8 @@ pub(super) fn gruvbox_light() -> RookTheme {
 }
 
 /// Bundled gradient themes
-pub(super) fn cyber_wave() -> RookTheme {
-    RookTheme::new(
+pub(super) fn cyber_wave() -> PtermTheme {
+    PtermTheme::new(
         Fill::VerticalGradient(VerticalGradient::new(
             ColorU::black().blend(&coloru_with_opacity(ColorU::from_u32(0x00C2FFFF), 20)),
             ColorU::black(),
@@ -370,8 +370,8 @@ pub(super) fn cyber_wave() -> RookTheme {
     )
 }
 
-pub(super) fn willow_dream() -> RookTheme {
-    RookTheme::new(
+pub(super) fn willow_dream() -> PtermTheme {
+    PtermTheme::new(
         Fill::VerticalGradient(VerticalGradient::new(
             ColorU::from_u32(0x206169FF),
             ColorU::from_u32(0x022F27FF),
@@ -389,8 +389,8 @@ pub(super) fn willow_dream() -> RookTheme {
     )
 }
 
-pub(super) fn fancy_dracula() -> RookTheme {
-    RookTheme::new(
+pub(super) fn fancy_dracula() -> PtermTheme {
+    PtermTheme::new(
         Fill::VerticalGradient(VerticalGradient::new(
             ColorU::from_u32(0x252630FF),
             ColorU::from_u32(0x3D3F4FFF),
@@ -408,8 +408,8 @@ pub(super) fn fancy_dracula() -> RookTheme {
     )
 }
 
-pub(super) fn phenomenon() -> RookTheme {
-    RookTheme::new(
+pub(super) fn phenomenon() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x121212FF)),
         ColorU::from_u32(0xFAF9F6FF),
         Fill::Solid(ColorU::from_u32(0x2E5D9EFF)),
@@ -425,8 +425,8 @@ pub(super) fn phenomenon() -> RookTheme {
 }
 
 /// Bundled themes with background images
-pub(super) fn jellyfish() -> RookTheme {
-    RookTheme::new(
+pub(super) fn jellyfish() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x1B1718FF)),
         ColorU::white(),
         Fill::Solid(ColorU::from_u32(0x538682FF)),
@@ -441,8 +441,8 @@ pub(super) fn jellyfish() -> RookTheme {
     )
 }
 
-pub(super) fn koi() -> RookTheme {
-    RookTheme::new(
+pub(super) fn koi() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x211719FF)),
         ColorU::white(),
         Fill::Solid(ColorU::from_u32(0xFF3131FF)),
@@ -457,8 +457,8 @@ pub(super) fn koi() -> RookTheme {
     )
 }
 
-pub(super) fn leafy() -> RookTheme {
-    RookTheme::new(
+pub(super) fn leafy() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::black()),
         ColorU::white(),
         Fill::Solid(ColorU::from_u32(0x55972DFF)),
@@ -473,8 +473,8 @@ pub(super) fn leafy() -> RookTheme {
     )
 }
 
-pub(super) fn marble() -> RookTheme {
-    RookTheme::new(
+pub(super) fn marble() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0xE3E3E3FF)),
         ColorU::black(),
         Fill::Solid(ColorU::from_u32(0x585858FF)),
@@ -489,11 +489,11 @@ pub(super) fn marble() -> RookTheme {
     )
 }
 
-pub(super) fn pink_city() -> RookTheme {
+pub(super) fn pink_city() -> PtermTheme {
     let details = CustomDetails {
         ..CustomDetails::lighter_details()
     };
-    RookTheme::new(
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0xFBEFF6FF)),
         ColorU::black(),
         Fill::Solid(ColorU::from_u32(0xE10087FF)),
@@ -508,8 +508,8 @@ pub(super) fn pink_city() -> RookTheme {
     )
 }
 
-pub(super) fn snowy() -> RookTheme {
-    RookTheme::new(
+pub(super) fn snowy() -> PtermTheme {
+    PtermTheme::new(
         Fill::VerticalGradient(VerticalGradient::new(
             ColorU::from_u32(0xFFFFFFFF),
             ColorU::from_u32(0xDEE6EBFF),
@@ -527,8 +527,8 @@ pub(super) fn snowy() -> RookTheme {
     )
 }
 
-pub(super) fn red_rock() -> RookTheme {
-    RookTheme::new(
+pub(super) fn red_rock() -> PtermTheme {
+    PtermTheme::new(
         Fill::VerticalGradient(VerticalGradient::new(
             ColorU::from_u32(0x211719FF)
                 .blend(&coloru_with_opacity(ColorU::from_u32(0x4C3435FF), 45)),
@@ -548,8 +548,8 @@ pub(super) fn red_rock() -> RookTheme {
     )
 }
 
-pub(super) fn dark_city() -> RookTheme {
-    RookTheme::new(
+pub(super) fn dark_city() -> PtermTheme {
+    PtermTheme::new(
         Fill::VerticalGradient(VerticalGradient::new(
             ColorU::from_u32(0x01181FFF)
                 .blend(&coloru_with_opacity(ColorU::from_u32(0x1A363FFF), 45)),
@@ -569,8 +569,8 @@ pub(super) fn dark_city() -> RookTheme {
     )
 }
 
-pub(super) fn sent_referral_reward() -> RookTheme {
-    RookTheme::new(
+pub(super) fn sent_referral_reward() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x334567FF)),
         ColorU::white(),
         Fill::Solid(ColorU::from_u32(0xCD51FFFF)),
@@ -581,12 +581,12 @@ pub(super) fn sent_referral_reward() -> RookTheme {
             source: bundled_or_fetched_asset!("jpg/sent_referral_reward_bg.jpg"),
             opacity: 100,
         }),
-        Some("Rook Referral".to_string()),
+        Some("Polaris Terminal Referral".to_string()),
     )
 }
 
-pub(super) fn solar_flare() -> RookTheme {
-    RookTheme::new(
+pub(super) fn solar_flare() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x1B1C18FF)),
         ColorU::from_u32(0xDDE6EEFF),
         Fill::Solid(ColorU::from_u32(0x34895CFF)),
@@ -601,8 +601,8 @@ pub(super) fn solar_flare() -> RookTheme {
     )
 }
 
-pub(super) fn adeberry() -> RookTheme {
-    RookTheme::new(
+pub(super) fn adeberry() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x1D2022FF)),
         ColorU::from_u32(0xE4EEF5FF),
         Fill::Solid(ColorU::from_u32(0x6C96B4FF)),
@@ -614,8 +614,8 @@ pub(super) fn adeberry() -> RookTheme {
     )
 }
 
-pub(super) fn received_referral_reward() -> RookTheme {
-    RookTheme::new(
+pub(super) fn received_referral_reward() -> PtermTheme {
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0xFFFFFFFF)),
         ColorU::black(),
         Fill::Solid(ColorU::from_u32(0xCD51FFFF)),

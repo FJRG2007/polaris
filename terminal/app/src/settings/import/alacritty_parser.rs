@@ -5,9 +5,9 @@ use std::path::PathBuf;
 use async_recursion::async_recursion;
 use async_trait::async_trait;
 use pathfinder_color::ColorU;
-use rook_core::ui::color::hex_color::coloru_from_hex_string;
-use rook_core::ui::theme::{AnsiColor, AnsiColors, RookTheme, TerminalColors};
-use rookui::fonts::FontInfo;
+use pterm_core::ui::color::hex_color::coloru_from_hex_string;
+use pterm_core::ui::theme::{AnsiColor, AnsiColors, PtermTheme, TerminalColors};
+use ptermui::fonts::FontInfo;
 use serde::Deserialize;
 
 use super::config::{
@@ -290,7 +290,7 @@ impl AlacrittyTheme {
         } else {
             let bright = terminal_colors.bright;
             let accent = calculate_accent_color(background, foreground, cursor_color, bright);
-            Ok(ThemeType::Single(RookTheme::new(
+            Ok(ThemeType::Single(PtermTheme::new(
                 background.into(),
                 foreground.into(),
                 accent.into(),
@@ -305,7 +305,7 @@ impl AlacrittyTheme {
 }
 
 impl AlacrittyColors {
-    /// Returns terminal colors with Rook's default colors substituted in for any
+    /// Returns terminal colors with Polaris Terminal's default colors substituted in for any
     /// missing terminal colors.
     fn into_ansi_with_default(self, default: AnsiColors) -> Result<AnsiColors, ThemeError> {
         Ok(AnsiColors {

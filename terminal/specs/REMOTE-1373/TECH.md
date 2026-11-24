@@ -6,13 +6,13 @@ Two related gaps for Claude Code cloud runs: (1) a fresh Claude sandbox resuming
 ```mermaid
 sequenceDiagram
     participant User
-    participant CLI as rook CLI
-    participant Srv as rook-server
+    participant CLI as polaris-terminal CLI
+    participant Srv as polaris-terminal-server
     participant Wrk as oz-agent-worker
     participant Sand as Sandbox CLI
     participant GCS
     participant Cld as claude
-    User->>CLI: rook agent run --harness claude --conversation X
+    User->>CLI: polaris-terminal agent run --harness claude --conversation X
     CLI->>Srv: list_ai_conversation_metadata([X]) → CLAUDE_CODE
     Note over Wrk,Sand: Cloud-to-cloud followups (Slack/Linear) reach the sandbox via the existing\nworker→sandbox path; this PR only changes how the sandbox CLI consumes the id.
     Wrk->>Sand: oz agent run --task-id <t> --harness claude --conversation X --sandboxed
@@ -31,11 +31,11 @@ sequenceDiagram
 ```
 Local resume is the user's CLI doing the fetch, rehydrate, and launch directly. Cloud spawn-with-resume from the Rust CLI (`run-cloud --conversation`) is intentionally out of scope for this PR — see the follow-ups section.
 ## Implementation
-### Client CLI — `rook-internal`
+### Client CLI — `polaris-terminal-internal`
 #### CLI arg shape
-`RunAgentArgs` in `crates/rook_cli/src/agent.rs` accepts both `--task-id` and `--conversation` simultaneously. Eventually we want them mutually exclusive (`--task-id` already implies a server-side task whose `conversation_id` is the conversation to resume), but the worker still appends `--conversation <id>` alongside `--task-id` to the embedded CLI for Slack/Linear followups, so adding a `conflicts_with` on `--task-id` would break those during the rollout window. The enforcement is deferred to a follow-up that lands after the worker stops appending `--conversation`. When both are set, the runtime merge in `setup_and_run_driver` prefers the explicit `--conversation` value over the task's stored `conversation_id`.
+`RunAgentArgs` in `crates/pterm_cli/src/agent.rs` accepts both `--task-id` and `--conversation` simultaneously. Eventually we want them mutually exclusive (`--task-id` already implies a server-side task whose `conversation_id` is the conversation to resume), but the worker still appends `--conversation <id>` alongside `--task-id` to the embedded CLI for Slack/Linear followups, so adding a `conflicts_with` on `--task-id` would break those during the rollout window. The enforcement is deferred to a follow-up that lands after the worker stops appending `--conversation`. When both are set, the runtime merge in `setup_and_run_driver` prefers the explicit `--conversation` value over the task's stored `conversation_id`.
 #### Shared harness validation
-`fetch_and_validate_conversation_harness` in `app/src/ai/agent_sdk/common.rs` fetches conversation metadata via `list_ai_conversation_metadata` and compares its `AIAgentHarness` against the caller's `rook_cli::agent::Harness`. A mismatch returns `AgentDriverError::ConversationHarnessMismatch { conversation_id, expected, got }` before any task/config side effects. The local path (`setup_and_run_driver` in `app/src/ai/agent_sdk/mod.rs`) calls it up front when `--conversation` is passed.
+`fetch_and_validate_conversation_harness` in `app/src/ai/agent_sdk/common.rs` fetches conversation metadata via `list_ai_conversation_metadata` and compares its `AIAgentHarness` against the caller's `pterm_cli::agent::Harness`. A mismatch returns `AgentDriverError::ConversationHarnessMismatch { conversation_id, expected, got }` before any task/config side effects. The local path (`setup_and_run_driver` in `app/src/ai/agent_sdk/mod.rs`) calls it up front when `--conversation` is passed.
 #### Effective conversation id resolution
 `setup_and_run_driver` in `app/src/ai/agent_sdk/mod.rs` resolves the effective conversation id from up to two sources:
 - `--conversation <id>`: validated up front (no task side effects on mismatch).
@@ -76,7 +76,7 @@ pub(crate) enum ResumePayload {
 `AgentDriverError` in `app/src/ai/agent_sdk/driver.rs` gains two variants (both classified in `app/src/ai/agent_sdk/driver/error_classification.rs`):
 - `ConversationHarnessMismatch { conversation_id, expected, got }` → `EnvironmentSetupFailed`.
 - `ConversationResumeStateMissing { harness, conversation_id }` → `ResourceNotFound`. Harness-neutral on purpose; each harness tags the variant with its own label (`"claude"` today).
-### Server — `rook-server`
+### Server — `polaris-terminal-server`
 - `router/handlers/public_api/harness_support.go` registers `GET /harness-support/transcript` on the existing harness-support group (which already runs `ValidateAmbientTask` + `RequireCloudAgent`) and implements `GetTranscriptDownloadHandler`: pulls `AmbientRequestInfo` off the gin context, 400s on missing `info.Task.AgentConversationID`, resolves the principal + conversation data store, and 307-redirects to the URL returned by `conversation_transcript.GetConversationRawTranscriptDownloadURL`. That underlying function already returns `InvalidRequestError` for non-`GenericCLIHarnessTranscript` manifests, so Oz conversations get a 400 for free. The previously-proposed `GET /agent/conversations/:conversation_id/third-party-transcript` route was removed in favor of this one so callers don't have to pass a conversation id and the route lives next to the rest of the harness-support endpoints.
 - `public_api/openapi.yaml` adds the `get` operation under `/harness-support/transcript` (sibling of the existing `post` upload-target operation) with the standard error responses, and `ResolvePromptResponse` gains an optional `resumption_prompt` string with a doc comment explaining the contract. Types are regenerated into `public_api/types/types.gen.go` via `go generate ./public_api/types/`.
 - `logic/ai/ambient_agents/handoff_rehydration.go` introduces `RehydrationAgentKind` (`RehydrationForOz` / `RehydrationForThirdPartyCLI`) and a second prompt body, `HandoffRestoreInstructionsForThirdPartyCLI`, that is ordered as an unconditional pre-turn checklist with explicit verbatim `cat` / `git apply` commands. It also exports `HandoffRestoreUserPromptPreambleForThirdPartyCLI`, a one-line user-turn nudge pointing Claude back at the system-prompt checklist. `ResolveHandoffRehydrationPrompt` and `formatHandoffRehydrationPrompt` take the kind and dispatch on it.
@@ -86,7 +86,7 @@ pub(crate) enum ResumePayload {
 - `test/integration/external_conversation_test.go` includes `TestGetConversationRawTranscriptDownloadURL_OzRejected` (referenced from the new handler's doc comment) covering the Oz 400 path that the handler relies on.
 ### Worker — `oz-agent-worker`
 - `internal/types/messages.go` adds `AgentConversationID *string \`json:"agent_conversation_id,omitempty"\`` on `Task`. This replaces the removed `TaskAssignmentMessage.ConversationID` as the canonical conversation-id source for resumed runs.
-- `internal/common/task_utils.go`'s `AugmentArgsForTask` appends `--conversation <id>` from `task.AgentConversationID` when set, so the embedded rook CLI can resume the conversation's state (Oz or Claude Code). The CLI accepts `--task-id` + `--conversation` together while the deferred `conflicts_with` migration is outstanding (see follow-ups); when both are present, the CLI's runtime merge prefers the explicit `--conversation`.
+- `internal/common/task_utils.go`'s `AugmentArgsForTask` appends `--conversation <id>` from `task.AgentConversationID` when set, so the embedded polaris-terminal CLI can resume the conversation's state (Oz or Claude Code). The CLI accepts `--task-id` + `--conversation` together while the deferred `conflicts_with` migration is outstanding (see follow-ups); when both are present, the CLI's runtime merge prefers the explicit `--conversation`.
 - `internal/worker/worker.go` stops reading the removed `assignment.ConversationID`; the CLI args are built entirely off `task.AgentConversationID` via `AugmentArgsForTask`.
 ## Feature flags
 - `FeatureFlag::CloudConversations` gates `--conversation` on the CLI (unchanged).
@@ -102,13 +102,13 @@ pub(crate) enum ResumePayload {
 - **Old worker + new server**: the server no longer emits the top-level `TaskAssignmentMessage.ConversationID`; old workers that read that field (instead of `task.AgentConversationID`) will stop appending `--conversation` and silently degrade to "no resume" on both fresh `--conversation` invocations AND pre-existing Slack/Linear follow-ups. Follow-ups still run, they just lose conversation continuity until self-hosted workers are rebuilt. Worth sequencing worker rollout ahead of server rollout.
 - **Concurrent resumed runs**: last-write-wins on `<X>/claude_code.json`, same hazard as Oz `--conversation` today; not addressed here.
 ## Testing and validation
-### Unit tests (rook-internal)
+### Unit tests (polaris-terminal-internal)
 - `claude_code_tests.rs`: `--session-id` vs `--resume` flag selection, stdin-redirect + `--dangerously-skip-permissions`, resume writes envelope under current cwd, resume runner skips `create_external_conversation`, `fetch_resume_payload` happy path, `fetch_resume_payload` 404 → `ConversationResumeStateMissing`.
 - `claude_transcript_tests.rs`: `encode_cwd`, `read_envelope` / `write_envelope` round-trips, `write_session_index_entry` create/preserve-others/overwrite-same-session/overwrite-malformed.
 - `harness_support_tests.rs`: `HarnessSupportClient::fetch_transcript` envelope round-trip + transient-error retry.
 - `mod.rs`: harness-mismatch pre-spawn (both directions), `HarnessKind::ThirdParty` populates `resume_payload`.
 ### Integration tests
-- rook-server: `TestResolvePromptHandler_HandoffRehydrationNoPriorExecution` pins empty `prompt` / `system_prompt` / `resumption_prompt` when no prior ended execution exists; `TestGetConversationRawTranscriptDownloadURL_OzRejected` covers the Oz 400 path that the new `GET /harness-support/transcript` handler relies on; existing tests cover the upload side.
+- polaris-terminal-server: `TestResolvePromptHandler_HandoffRehydrationNoPriorExecution` pins empty `prompt` / `system_prompt` / `resumption_prompt` when no prior ended execution exists; `TestGetConversationRawTranscriptDownloadURL_OzRejected` covers the Oz 400 path that the new `GET /harness-support/transcript` handler relies on; existing tests cover the upload side.
 - oz-agent-worker: `AugmentArgsForTask` forwards `--conversation <id>` to the embedded CLI when `task.AgentConversationID` is set, and omits the flag otherwise.
 ### Manual
 1. Short Claude cloud agent → note `<id>`.
@@ -118,6 +118,6 @@ pub(crate) enum ResumePayload {
 - Wire up cloud spawn-with-resume from the Rust CLI: add `conversation_id: Option<String>` to `SpawnAgentRequest`, forward `args.conversation` from `run-cloud --conversation` (with the up-front `fetch_and_validate_conversation_harness` call inside `spawn_future`), and ship as part of the broader local→cloud handoff design. The server already accepts the field and the worker already forwards `task.AgentConversationID`, so the wiring is small; deferring keeps this PR focused on local resume + the worker/server transcript path.
 - Add `conflicts_with = "conversation"` to `--task-id` in `RunAgentArgs` once the worker stops appending `--conversation` alongside `--task-id` for Slack/Linear followups. Until then, both flags can be passed; the runtime merge prefers the explicit `--conversation`.
 - Add a second `ResumePayload` variant + per-harness `fetch_transcript` deserializer when another CLI harness (Gemini / Codex / opencode) gains resume support. The generic surface (raw-bytes fetch on `HarnessSupportClient`, harness-decided `resumption_prompt` injection) is already in place.
-- Reconcile the duplicated `types.Task` fields between rook-server and oz-agent-worker.
+- Reconcile the duplicated `types.Task` fields between polaris-terminal-server and oz-agent-worker.
 - Retry/fallback semantics on `write_envelope` failure (today: hard error).
 - Auto-detect `--harness` from metadata once harness reading moves below the conversation-fetch step in `build_merged_config_and_task` and `ambient.rs`.

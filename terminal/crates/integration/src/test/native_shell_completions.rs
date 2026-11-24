@@ -9,24 +9,24 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use rook::features::FeatureFlag;
-use rook::integration_testing::input::{input_is_empty, tab_completions_menu_is_open};
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::util::{
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::input::{input_is_empty, tab_completions_menu_is_open};
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::util::{
     ExpectedExitStatus, current_shell_starter_and_version,
 };
-use rook::integration_testing::terminal::{
+use polaris_terminal::integration_testing::terminal::{
     clear_blocklist_to_remove_bootstrapped_blocks, execute_command_for_single_terminal_in_tab,
     execute_echo, wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::view_getters::{
+use polaris_terminal::integration_testing::view_getters::{
     single_input_suggestions_view_for_tab, single_input_view_for_tab, single_terminal_view_for_tab,
 };
-use rook::settings::{NativeShellCompletionsEnabled, RookCompletionsEnabled};
-use rook::terminal::model::block::TranscriptScope;
-use rook::terminal::shell::ShellType;
-use rookui_core::async_assert;
-use rookui_core::units::Lines;
+use polaris_terminal::settings::{NativeShellCompletionsEnabled, PtermCompletionsEnabled};
+use polaris_terminal::terminal::model::block::TranscriptScope;
+use polaris_terminal::terminal::shell::ShellType;
+use ptermui_core::async_assert;
+use ptermui_core::units::Lines;
 use settings::Setting as _;
 
 use super::new_builder;
@@ -70,7 +70,7 @@ pub fn test_zsh_native_completions_without_compinit_use_filepaths() -> Builder {
             new_step_with_default_assertions(
                 "Request filepaths without zsh completion initialization",
             )
-            .with_typed_characters(&["rooktool ./native_a"])
+            .with_typed_characters(&["ptermtool ./native_a"])
             .with_keystrokes(&["tab"])
             .set_timeout(Duration::from_secs(30))
             .add_named_assertion(
@@ -101,12 +101,12 @@ fn enable_native_shell_completions_feature() {
     FeatureFlag::NativeShellCompletions.set_enabled(true);
 }
 
-/// Rook completions off, native on, resolving to `CompletionSources::NativeOnly`: the shell is
-/// asked before Rook considers file-path suggestions.
+/// Polaris Terminal completions off, native on, resolving to `CompletionSources::NativeOnly`: the shell is
+/// asked before Polaris Terminal considers file-path suggestions.
 fn native_only_completion_defaults() -> HashMap<String, String> {
     HashMap::from([
         (
-            RookCompletionsEnabled::storage_key().to_string(),
+            PtermCompletionsEnabled::storage_key().to_string(),
             "false".to_string(),
         ),
         (
@@ -116,12 +116,12 @@ fn native_only_completion_defaults() -> HashMap<String, String> {
     ])
 }
 
-/// Both toggles on, resolving to `CompletionSources::RookThenNative`: the bundled specs answer
+/// Both toggles on, resolving to `CompletionSources::PtermThenNative`: the bundled specs answer
 /// first and the shell is asked only when they come back empty.
 fn specs_first_completion_defaults() -> HashMap<String, String> {
     HashMap::from([
         (
-            RookCompletionsEnabled::storage_key().to_string(),
+            PtermCompletionsEnabled::storage_key().to_string(),
             "true".to_string(),
         ),
         (
@@ -140,7 +140,7 @@ fn shell_supports_native_completions() -> bool {
     )
 }
 
-/// Registers a completion for a made-up, spec-less command (`rooktool`), so a request for it can
+/// Registers a completion for a made-up, spec-less command (`ptermtool`), so a request for it can
 /// only be answered by the shell's own machinery. `apple` and `avocado` match the typed `a` prefix
 /// and `banana` does not; two matches sharing no prefix beyond `a` mean Tab opens the menu instead
 /// of extending the line. With `with_marker`, the completion also writes the marker file.
@@ -153,16 +153,16 @@ fn write_specless_completion_rc_files(dir: impl AsRef<Path>, with_marker: bool) 
     write_rc_files_for_test(
         &dir,
         format!(
-            "_rooktool_complete() {{\n  {bash_marker}\
+            "_ptermtool_complete() {{\n  {bash_marker}\
                local cur=${{COMP_WORDS[COMP_CWORD]}}\n  \
                COMPREPLY=( $(compgen -W \"apple avocado banana\" -- \"$cur\") )\n\
              }}\n\
-             complete -F _rooktool_complete rooktool\n"
+             complete -F _ptermtool_complete ptermtool\n"
         ),
         [ShellRcType::Bash],
     );
 
-    // Rook's bootstrap does not initialize zsh's completion system, so `compdef` needs it here.
+    // Polaris Terminal's bootstrap does not initialize zsh's completion system, so `compdef` needs it here.
     let zsh_marker = if with_marker {
         format!("printf 'x' >> \"$HOME/{SHELL_ASKED_MARKER_FILE}\"; ")
     } else {
@@ -173,8 +173,8 @@ fn write_specless_completion_rc_files(dir: impl AsRef<Path>, with_marker: bool) 
         format!(
             "autoload -Uz compinit\n\
              compinit -u\n\
-             _rooktool_complete() {{ {zsh_marker}compadd apple avocado banana }}\n\
-             compdef _rooktool_complete rooktool\n"
+             _ptermtool_complete() {{ {zsh_marker}compadd apple avocado banana }}\n\
+             compdef _ptermtool_complete ptermtool\n"
         ),
         [ShellRcType::Zsh],
     );
@@ -188,11 +188,11 @@ fn write_specless_completion_rc_files(dir: impl AsRef<Path>, with_marker: bool) 
     };
     write_rc_files_for_test(
         &dir,
-        format!("complete -c rooktool -f -a '{fish_candidates}'\n"),
+        format!("complete -c ptermtool -f -a '{fish_candidates}'\n"),
         [ShellRcType::Fish],
     );
 
-    // pwsh is launched `-NoProfile`, but Rook's bootstrap dot-sources the user profile afterward,
+    // pwsh is launched `-NoProfile`, but Polaris Terminal's bootstrap dot-sources the user profile afterward,
     // so a profile written here is still sourced.
     let pwsh_marker = if with_marker {
         format!("  [System.IO.File]::AppendAllText(\"$env:HOME/{SHELL_ASKED_MARKER_FILE}\", 'x')\n")
@@ -202,7 +202,7 @@ fn write_specless_completion_rc_files(dir: impl AsRef<Path>, with_marker: bool) 
     write_rc_files_for_test(
         &dir,
         format!(
-            "Register-ArgumentCompleter -Native -CommandName rooktool -ScriptBlock {{\n  \
+            "Register-ArgumentCompleter -Native -CommandName ptermtool -ScriptBlock {{\n  \
                param($wordToComplete, $commandAst, $cursorPosition)\n\
              {pwsh_marker}  \
                @('apple','avocado','banana') | Where-Object {{ $_ -like \"$wordToComplete*\" }} | ForEach-Object {{\n    \
@@ -214,7 +214,7 @@ fn write_specless_completion_rc_files(dir: impl AsRef<Path>, with_marker: bool) 
     );
 }
 
-/// Overrides `git`'s completion -- a command with a bundled Rook spec -- with an instrumented one
+/// Overrides `git`'s completion -- a command with a bundled Polaris Terminal spec -- with an instrumented one
 /// offering sentinels the spec would never produce, so a test can tell whether the shell was asked
 /// for a spec-backed command. Two sentinels rather than one because a lone match is inserted
 /// straight into the buffer instead of opening the menu.
@@ -265,9 +265,9 @@ fn write_spec_command_marker_override_rc_files(dir: impl AsRef<Path>) {
 
 /// Asserts no user-visible block holds the generator command. Its own block is hidden (zero
 /// height), so a non-zero-height block carrying it is the ghost block this guards against. The name
-/// is normalized to match both `rook_run_generator_command*` and `Rook-Run-GeneratorCommand*`.
+/// is normalized to match both `pterm_run_generator_command*` and `PolarisTerminal-Run-GeneratorCommand*`.
 fn assert_no_visible_generator_block()
--> impl Fn(&mut rookui_core::App, rookui_core::WindowId) -> rookui_core::integration::AssertionOutcome
+-> impl Fn(&mut ptermui_core::App, ptermui_core::WindowId) -> ptermui_core::integration::AssertionOutcome
 {
     move |app, window_id| {
         let terminal_view = single_terminal_view_for_tab(app, window_id, 0);
@@ -284,7 +284,7 @@ fn assert_no_visible_generator_block()
                     command
                         .to_ascii_lowercase()
                         .replace(['_', '-'], "")
-                        .contains("rookrungeneratorcommand")
+                        .contains("ptermrungeneratorcommand")
                 })
                 .collect();
             async_assert!(
@@ -307,8 +307,8 @@ pub fn test_native_shell_completions_menu() -> Builder {
         .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
         .with_step(clear_blocklist_to_remove_bootstrapped_blocks())
         .with_step(
-            new_step_with_default_assertions("Type 'rooktool a' and press tab")
-                .with_typed_characters(&["rooktool a"])
+            new_step_with_default_assertions("Type 'ptermtool a' and press tab")
+                .with_typed_characters(&["ptermtool a"])
                 .with_keystrokes(&["tab"])
                 .set_timeout(Duration::from_secs(30))
                 .add_named_assertion(
@@ -340,8 +340,8 @@ pub fn test_native_shell_completions_menu() -> Builder {
                         input.read(app, |view, ctx| {
                             let buffer = view.buffer_text(ctx);
                             async_assert!(
-                                buffer == "rooktool a",
-                                "expected the input to be left as 'rooktool a', got {buffer:?}"
+                                buffer == "ptermtool a",
+                                "expected the input to be left as 'ptermtool a', got {buffer:?}"
                             )
                         })
                     },
@@ -364,7 +364,7 @@ pub fn test_command_runs_cleanly_after_native_shell_completion() -> Builder {
         .with_step(clear_blocklist_to_remove_bootstrapped_blocks())
         .with_step(
             new_step_with_default_assertions("Request completions for a spec-less command")
-                .with_typed_characters(&["rooktool a"])
+                .with_typed_characters(&["ptermtool a"])
                 .with_keystrokes(&["tab"])
                 .set_timeout(Duration::from_secs(30))
                 .add_named_assertion(
@@ -401,8 +401,8 @@ pub fn test_native_shell_completions_used_when_no_bundled_spec() -> Builder {
         .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
         .with_step(clear_blocklist_to_remove_bootstrapped_blocks())
         .with_step(
-            new_step_with_default_assertions("Type 'rooktool a' and press tab")
-                .with_typed_characters(&["rooktool a"])
+            new_step_with_default_assertions("Type 'ptermtool a' and press tab")
+                .with_typed_characters(&["ptermtool a"])
                 .with_keystrokes(&["tab"])
                 .set_timeout(Duration::from_secs(30))
                 .add_named_assertion(

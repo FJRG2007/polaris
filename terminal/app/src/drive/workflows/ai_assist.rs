@@ -1,8 +1,8 @@
 use itertools::Itertools;
-use rook_graphql::mutations::generate_metadata_for_command::{
+use pterm_graphql::mutations::generate_metadata_for_command::{
     GenerateMetadataForCommandFailureType, GenerateMetadataForCommandSuccess,
 };
-use rookui::{SingletonEntity, ViewContext};
+use ptermui::{SingletonEntity, ViewContext};
 use serde::{Deserialize, Serialize};
 
 use super::arguments::ArgumentsState;

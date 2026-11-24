@@ -1,8 +1,8 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{Flex, ParentElement};
-use rookui::platform::WindowStyle;
-use rookui::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{Flex, ParentElement};
+use ptermui::platform::WindowStyle;
+use ptermui::{
     App, Element, Entity, Presenter, SingletonEntity, TypedActionView, View, WindowInvalidation,
 };
 
@@ -25,7 +25,7 @@ impl View for ErrorCardTestView {
         "CustomRouterErrorCardTestView"
     }
 
-    fn render(&self, app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
         Flex::column()
             .with_child(render_router_error_card(

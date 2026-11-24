@@ -1,21 +1,23 @@
-use rook::cmd_or_ctrl_shift;
-use rook::features::FeatureFlag;
-use rook::integration_testing::command_palette::open_command_palette_and_run_action;
-use rook::integration_testing::notebook::{
+use polaris_terminal::cmd_or_ctrl_shift;
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::command_palette::open_command_palette_and_run_action;
+use polaris_terminal::integration_testing::notebook::{
     assert_notebook_contents, assert_notebook_id, assert_notebook_not_open, assert_notebook_open,
-    assert_open_in_rook_banner_open, create_a_personal_notebook,
+    assert_open_in_pterm_banner_open, create_a_personal_notebook,
     enter_notebook_edit_mode_and_set_markdown, move_notebook_cursor_to_offset, open_notebook,
 };
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::tab::{assert_pane_title, assert_tab_title};
-use rook::integration_testing::terminal::util::ExpectedExitStatus;
-use rook::integration_testing::terminal::{
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::tab::{assert_pane_title, assert_tab_title};
+use polaris_terminal::integration_testing::terminal::util::ExpectedExitStatus;
+use polaris_terminal::integration_testing::terminal::{
     assert_single_terminal_in_tab_bootstrapped, execute_command_for_single_terminal_in_tab,
     wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::view_getters::terminal_view;
-use rook::integration_testing::window::{add_and_save_window, close_window, save_active_window_id};
-use rookui_core::integration::TestStep;
+use polaris_terminal::integration_testing::view_getters::terminal_view;
+use polaris_terminal::integration_testing::window::{
+    add_and_save_window, close_window, save_active_window_id,
+};
+use ptermui_core::integration::TestStep;
 
 use super::{Builder, new_builder};
 
@@ -143,7 +145,7 @@ pub fn test_close_notebook_window() -> Builder {
         )
 }
 
-pub fn test_open_in_rook_banner() -> Builder {
+pub fn test_open_in_pterm_banner() -> Builder {
     new_builder()
         .with_setup(|utils| {
             std::fs::write(utils.test_dir().join("README.md"), "# Hello, world!")
@@ -157,13 +159,13 @@ pub fn test_open_in_rook_banner() -> Builder {
                 ExpectedExitStatus::Success,
                 (),
             )
-            .add_assertion(assert_open_in_rook_banner_open(0, 0)),
+            .add_assertion(assert_open_in_pterm_banner_open(0, 0)),
         )
         .with_step(
-            new_step_with_default_assertions("Click Open in Rook banner")
+            new_step_with_default_assertions("Click Open in Polaris Terminal banner")
                 .with_click_on_saved_position_fn(|app, window_id| {
                     let view = terminal_view(app, window_id, 0, 0);
-                    format!("open_in_rook_banner_button_{}", view.id())
+                    format!("open_in_pterm_banner_button_{}", view.id())
                 }),
         )
         .with_step(

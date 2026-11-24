@@ -1,6 +1,6 @@
-use rook_core::send_telemetry_from_ctx;
-use rook_errors::report_error;
-use rookui_core::{Entity, ModelContext};
+use pterm_core::send_telemetry_from_ctx;
+use pterm_errors::report_error;
+use ptermui_core::{Entity, ModelContext};
 
 use crate::OnboardingIntention;
 use crate::telemetry::OnboardingEvent;

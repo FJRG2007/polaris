@@ -2,7 +2,7 @@
 use std::collections::HashSet;
 
 use ordered_float::OrderedFloat;
-use rookui::{AppContext, Entity, ModelHandle, SingletonEntity};
+use ptermui::{AppContext, Entity, ModelHandle, SingletonEntity};
 
 use crate::AgentConversationsModel;
 use crate::ai::agent_conversations_model::{

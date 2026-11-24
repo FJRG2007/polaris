@@ -3,21 +3,21 @@ use std::sync::Arc;
 
 use async_channel::TryRecvError;
 use parking_lot::Mutex;
-use rook_editor::content::mermaid_diagram::mermaid_asset_source;
-use rook_editor::render::element::RichTextAction;
-use rook_editor::render::model::{
+use pterm_editor::content::mermaid_diagram::mermaid_asset_source;
+use pterm_editor::render::element::RichTextAction;
+use pterm_editor::render::model::{
     BlockItem, BlockSpacing, HitTestBlockType, ImageBlockConfig, Location, RenderEvent,
 };
-use rook_util::user_input::UserInput;
-use rookui::assets::asset_cache::{AssetCache, AssetState};
-use rookui::r#async::block_on;
-use rookui::event::ModifiersState;
-use rookui::image_cache::ImageType;
-use rookui::platform::WindowStyle;
-use rookui::presenter::ChildView;
-use rookui::units::Pixels;
-use rookui::windowing::WindowManager;
-use rookui::{App, Element, Entity, SingletonEntity, TypedActionView, View, ViewHandle, WindowId};
+use pterm_util::user_input::UserInput;
+use ptermui::assets::asset_cache::{AssetCache, AssetState};
+use ptermui::r#async::block_on;
+use ptermui::event::ModifiersState;
+use ptermui::image_cache::ImageType;
+use ptermui::platform::WindowStyle;
+use ptermui::presenter::ChildView;
+use ptermui::units::Pixels;
+use ptermui::windowing::WindowManager;
+use ptermui::{App, Element, Entity, SingletonEntity, TypedActionView, View, ViewHandle, WindowId};
 use string_offset::CharOffset;
 use tempfile::tempdir;
 
@@ -61,7 +61,7 @@ impl View for TestView {
         "TestView"
     }
 
-    fn render(&self, _app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, _app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         ChildView::new(&self.editor).finish()
     }
 }
@@ -146,7 +146,7 @@ async fn reset_editor_with_markdown(
 fn link_offset(
     editor: &RichTextEditorView,
     link_url: &str,
-    ctx: &rookui::AppContext,
+    ctx: &ptermui::AppContext,
 ) -> CharOffset {
     let max_offset = editor.markdown(ctx).chars().count();
     (0..=max_offset)
@@ -164,7 +164,7 @@ fn link_offset(
 
 fn rendered_mermaid_block_range(
     editor: &RichTextEditorView,
-    ctx: &rookui::AppContext,
+    ctx: &ptermui::AppContext,
 ) -> Option<std::ops::Range<CharOffset>> {
     let render_state = editor.model.as_ref(ctx).render_state().clone();
     let render_state = render_state.as_ref(ctx);
@@ -175,7 +175,7 @@ fn rendered_mermaid_block_range(
         let block_end = block_start + block.content_length();
         if matches!(
             block,
-            rook_editor::render::model::BlockItem::MermaidDiagram { .. }
+            pterm_editor::render::model::BlockItem::MermaidDiagram { .. }
         ) {
             return Some(block_start..block_end);
         }
@@ -337,7 +337,7 @@ fn test_appearance_changes() {
 
         // Simulate an appearance change.
         Appearance::handle(&app).update(&mut app, |appearance, ctx| {
-            appearance.set_monospace_font_family(rookui::fonts::FamilyId(123), ctx);
+            appearance.set_monospace_font_family(ptermui::fonts::FamilyId(123), ctx);
             ctx.notify()
         });
 
@@ -348,7 +348,7 @@ fn test_appearance_changes() {
             // The render model's style should be updated.
             assert_eq!(
                 model.styles().code_text.font_family,
-                rookui::fonts::FamilyId(123)
+                ptermui::fonts::FamilyId(123)
             );
         });
 

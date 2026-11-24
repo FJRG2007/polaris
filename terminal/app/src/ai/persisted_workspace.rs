@@ -18,18 +18,18 @@ use lsp::supported_servers::LSPServerType;
 #[cfg(feature = "local_fs")]
 use lsp::{LspManagerModel, LspServerConfig};
 #[cfg(feature = "local_fs")]
+use pterm_core::channel::ChannelState;
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_if_error;
+#[cfg(feature = "local_fs")]
+use pterm_util::{local_or_remote_path::LocalOrRemotePath, standardized_path::StandardizedPath};
+#[cfg(feature = "local_fs")]
+use ptermui::windowing::WindowManager;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
+#[cfg(feature = "local_fs")]
 use repo_metadata::RepoMetadataModel;
 #[cfg(feature = "local_fs")]
 use repo_metadata::repositories::{DetectedRepositories, DetectedRepositoriesEvent};
-#[cfg(feature = "local_fs")]
-use rook_core::channel::ChannelState;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_if_error;
-#[cfg(feature = "local_fs")]
-use rook_util::{local_or_remote_path::LocalOrRemotePath, standardized_path::StandardizedPath};
-#[cfg(feature = "local_fs")]
-use rookui::windowing::WindowManager;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 
 use crate::ai::AIRequestUsageModel;
@@ -824,7 +824,7 @@ impl PersistedWorkspace {
     /// This ensures that the codebase index is up-to-date before the conversation begins.
     fn trigger_incremental_sync_for_conversation(
         &mut self,
-        terminal_view_id: rookui::EntityId,
+        terminal_view_id: ptermui::EntityId,
         ctx: &mut ModelContext<Self>,
     ) {
         if !UserWorkspaces::as_ref(ctx).is_codebase_context_enabled(ctx) {

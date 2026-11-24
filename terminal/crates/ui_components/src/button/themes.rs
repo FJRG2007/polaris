@@ -1,8 +1,8 @@
 use pathfinder_color::ColorU;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::color::coloru_with_opacity;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::color::coloru_with_opacity;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
 
 /// Theming delegate for a button.
 pub trait Theme {

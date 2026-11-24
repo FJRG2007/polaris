@@ -4,28 +4,28 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, anyhow};
 use command::blocking::Command;
-use rook_core::channel::ChannelState;
-use rook_util::path::ShellFamily;
+use pterm_core::channel::ChannelState;
+use pterm_util::path::ShellFamily;
 
 /// Compute the target path where the Oz CLI symlink should be installed, based on channel
 fn oz_install_target_path() -> PathBuf {
     PathBuf::from("/usr/local/bin").join(ChannelState::channel().cli_command_name())
 }
 
-/// Compute the target path where the Rook Control symlink should be installed, based on channel
-fn rookctrl_install_target_path() -> PathBuf {
-    PathBuf::from("/usr/local/bin").join(ChannelState::channel().rookctrl_command_name())
+/// Compute the target path where the Polaris Terminal Control symlink should be installed, based on channel
+fn ptermctrl_install_target_path() -> PathBuf {
+    PathBuf::from("/usr/local/bin").join(ChannelState::channel().ptermctrl_command_name())
 }
 
-/// Compute the source path of the rookctrl wrapper inside the current app bundle.
+/// Compute the source path of the ptermctrl wrapper inside the current app bundle.
 ///
 /// Oz commands are part of the shared executable's normal argument parser, so
-/// Oz can symlink directly to the current executable. Rook Control has a
-/// separate parser selected by the hidden `--rookctrl` flag, so its installed
+/// Oz can symlink directly to the current executable. Polaris Terminal Control has a
+/// separate parser selected by the hidden `--ptermctrl` flag, so its installed
 /// symlink must target the bundled wrapper that injects that flag. Without it,
-/// Rook Control subcommands such as `tab` would reach the normal parser and be
+/// Polaris Terminal Control subcommands such as `tab` would reach the normal parser and be
 /// rejected as unknown.
-fn rookctrl_bundle_source_path() -> Result<PathBuf> {
+fn ptermctrl_bundle_source_path() -> Result<PathBuf> {
     let current_binary =
         std::env::current_exe().context("Failed to get current executable path")?;
     let bundle_root = current_binary
@@ -35,7 +35,7 @@ fn rookctrl_bundle_source_path() -> Result<PathBuf> {
         .ok_or_else(|| anyhow!("Current executable is not inside a bundled app"))?;
     Ok(bundle_root
         .join("Contents/Resources/bin")
-        .join(ChannelState::channel().rookctrl_command_name()))
+        .join(ChannelState::channel().ptermctrl_command_name()))
 }
 fn path_resolves_to(path: &Path, expected_path: &Path) -> bool {
     let Ok(path) = path.canonicalize() else {
@@ -47,12 +47,12 @@ fn path_resolves_to(path: &Path, expected_path: &Path) -> bool {
     path == expected_path
 }
 
-/// Whether the installed Rook Control command resolves to this app bundle's wrapper.
-pub fn is_rookctrl_installed() -> bool {
-    let Ok(source) = rookctrl_bundle_source_path() else {
+/// Whether the installed Polaris Terminal Control command resolves to this app bundle's wrapper.
+pub fn is_ptermctrl_installed() -> bool {
+    let Ok(source) = ptermctrl_bundle_source_path() else {
         return false;
     };
-    path_resolves_to(&rookctrl_install_target_path(), &source)
+    path_resolves_to(&ptermctrl_install_target_path(), &source)
 }
 
 /// Create a symlink with elevated privileges using osascript
@@ -72,7 +72,7 @@ fn create_symlink_with_admin(source: &Path, target: &Path) -> Result<()> {
 
     // Use osascript to run the ln command with admin privileges, with a custom prompt
     let script = format!(
-        "do shell script \"ln -sf {escaped_source} {escaped_target}\" with prompt \"Rook needs administrator privileges to install the command in /usr/local/bin.\" with administrator privileges"
+        "do shell script \"ln -sf {escaped_source} {escaped_target}\" with prompt \"Polaris Terminal needs administrator privileges to install the command in /usr/local/bin.\" with administrator privileges"
     );
 
     log::debug!("Creating symlink with admin privileges");
@@ -108,7 +108,7 @@ fn remove_file_with_admin(target: &Path) -> Result<()> {
     let escaped_target = ShellFamily::Posix.shell_escape(target_str);
 
     let script = format!(
-        "do shell script \"rm {escaped_target}\" with prompt \"Rook needs administrator privileges to uninstall the command from /usr/local/bin.\" with administrator privileges"
+        "do shell script \"rm {escaped_target}\" with prompt \"Polaris Terminal needs administrator privileges to uninstall the command from /usr/local/bin.\" with administrator privileges"
     );
 
     log::debug!("Removing file with admin privileges");
@@ -196,7 +196,7 @@ fn uninstall_symlink(target: &Path, command_name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Install the Oz CLI by symlinking the shared Rook executable into /usr/local/bin.
+/// Install the Oz CLI by symlinking the shared Polaris Terminal executable into /usr/local/bin.
 ///
 /// The normal argument parser dispatches Oz subcommands directly. It also uses
 /// the `oz`-prefixed invocation name to print CLI help rather than launch the
@@ -213,29 +213,36 @@ pub fn uninstall_oz() -> Result<()> {
     uninstall_symlink(&oz_install_target_path(), "Oz command")
 }
 
-/// Install Rook Control by symlinking its bundled wrapper into /usr/local/bin.
+/// Install Polaris Terminal Control by symlinking its bundled wrapper into /usr/local/bin.
 ///
 /// The wrapper contains no control implementation. It resolves this installed
-/// symlink back into the app bundle, launches the shared Rook executable, and
-/// injects `--rookctrl` so startup selects the separate Rook Control parser
+/// symlink back into the app bundle, launches the shared Polaris Terminal executable, and
+/// injects `--ptermctrl` so startup selects the separate Polaris Terminal Control parser
 /// before normal parsing or GUI startup.
-pub fn install_rookctrl() -> Result<()> {
-    let rookctrl_path = rookctrl_install_target_path();
-    let rookctrl_source = rookctrl_bundle_source_path()?;
+pub fn install_ptermctrl() -> Result<()> {
+    let ptermctrl_path = ptermctrl_install_target_path();
+    let ptermctrl_source = ptermctrl_bundle_source_path()?;
 
-    if !rookctrl_source.exists() {
+    if !ptermctrl_source.exists() {
         return Err(anyhow!(
-            "Cannot install Rook Control CLI: bundled wrapper not found at {}",
-            rookctrl_source.display()
+            "Cannot install Polaris Terminal Control CLI: bundled wrapper not found at {}",
+            ptermctrl_source.display()
         ));
     }
 
-    install_symlink(&rookctrl_source, &rookctrl_path, "Rook Control CLI")
+    install_symlink(
+        &ptermctrl_source,
+        &ptermctrl_path,
+        "Polaris Terminal Control CLI",
+    )
 }
 
-/// Uninstall the Rook Control CLI by removing the symlink from /usr/local/bin
-pub fn uninstall_rookctrl() -> Result<()> {
-    uninstall_symlink(&rookctrl_install_target_path(), "Rook Control command")
+/// Uninstall the Polaris Terminal Control CLI by removing the symlink from /usr/local/bin
+pub fn uninstall_ptermctrl() -> Result<()> {
+    uninstall_symlink(
+        &ptermctrl_install_target_path(),
+        "Polaris Terminal Control command",
+    )
 }
 
 #[cfg(test)]

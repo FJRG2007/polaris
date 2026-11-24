@@ -23,7 +23,7 @@ The codebase currently uses `CanonicalizedPath` (a wrapper around `PathBuf` that
 - Pairs with `SessionId` for disambiguation.
 
 ### `typed-path` crate (v0.10.0, already a workspace dependency)
-- Already used in `rook_util::path` for MSYS2/WSL path conversion and in `ai::paths` for cross-platform path joining and normalization.
+- Already used in `pterm_util::path` for MSYS2/WSL path conversion and in `ai::paths` for cross-platform path joining and normalization.
 - Provides `TypedPathBuf` (enum over Unix/Windows path buffers), `TypedPath`, `.normalize()` (removes `.` and `..` without I/O), and platform-aware path operations.
 
 ### Path usage in coding features
@@ -34,7 +34,7 @@ The codebase currently uses `CanonicalizedPath` (a wrapper around `PathBuf` that
 ## Proposed Changes
 
 ### 1. Introduce `StandardizedPath`
-New struct in `rook_util::path` (or a new `rook_util::standardized_path` module), wrapping `TypedPathBuf`:
+New struct in `pterm_util::path` (or a new `pterm_util::standardized_path` module), wrapping `TypedPathBuf`:
 
 ```rust
 /// A normalized, platform-aware path that does not require the file to exist.
@@ -163,7 +163,7 @@ For remote paths received over the wire, infer the encoding from the remote OS a
 ### 4. Migration strategy for `CanonicalizedPath`
 
 **Phase 1 (this work):**
-- Add `StandardizedPath` to `rook_util`.
+- Add `StandardizedPath` to `pterm_util`.
 - Add `From<CanonicalizedPath> for StandardizedPath` bridge.
 - Update `RepositoryIdentifier` to use `StandardizedPath` in the `Local` variant.
 - Update `RemoteRepositoryIdentifier.path` from `PathBuf` to `StandardizedPath`.

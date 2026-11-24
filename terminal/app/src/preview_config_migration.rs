@@ -1,9 +1,9 @@
 //! One-time migration that gives the Preview channel its own config
-//! directory (`~/.rook-preview`) on macOS.
+//! directory (`~/.polaris-terminal-preview`) on macOS.
 //!
-//! Historically, Stable and Preview shared `~/.rook` on macOS. To give
+//! Historically, Stable and Preview shared `~/.polaris-terminal` on macOS. To give
 //! Preview its own directory without breaking existing users, this migration
-//! symlinks each top-level entry from `~/.rook` into `~/.rook-preview` on
+//! symlinks each top-level entry from `~/.polaris-terminal` into `~/.polaris-terminal-preview` on
 //! first launch, so existing configuration (keybindings, themes, workflows,
 //! etc.) remains available to Preview.
 //!
@@ -11,23 +11,23 @@
 
 use std::path::Path;
 
-use rook_core::channel::{Channel, ChannelState};
-use rook_core::paths::{ROOK_CONFIG_DIR, data_dir};
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_core::paths::{POLARIS_TERMINAL_CONFIG_DIR, data_dir};
 
 /// Files that should not be symlinked during the Preview config directory
 /// migration. These are intentionally kept separate between Stable and
 /// Preview so each channel has independent settings.
 const MIGRATION_EXCLUDED_FILES: &[&str] = &["settings.toml"];
 
-/// Migrates Preview's config directory from the shared `.rook` location to
-/// `.rook-preview` by creating symlinks from each top-level entry in `.rook`
+/// Migrates Preview's config directory from the shared `.polaris/terminal` location to
+/// `.polaris-terminal-preview` by creating symlinks from each top-level entry in `.polaris/terminal`
 /// into the new directory.
 ///
 /// This runs once — on the first launch after the Preview channel is given
 /// its own config directory. It is a no-op if:
 /// - The channel is not Preview.
-/// - `~/.rook-preview` already exists.
-/// - `~/.rook` does not exist.
+/// - `~/.polaris-terminal-preview` already exists.
+/// - `~/.polaris-terminal` does not exist.
 pub(crate) fn migrate_preview_config_dir_if_needed() {
     if ChannelState::channel() != Channel::Preview {
         return;
@@ -37,9 +37,9 @@ pub(crate) fn migrate_preview_config_dir_if_needed() {
         return;
     };
 
-    let old_dir = home.join(ROOK_CONFIG_DIR);
+    let old_dir = home.join(POLARIS_TERMINAL_CONFIG_DIR);
     // `data_dir()` is already channel-aware; for Preview it resolves to
-    // `~/.rook-preview`.
+    // `~/.polaris-terminal-preview`.
     let new_dir = data_dir();
 
     migrate_config_dir_via_symlinks(&old_dir, &new_dir);
@@ -56,7 +56,7 @@ pub(crate) fn migrate_config_dir_via_symlinks(old_dir: &Path, new_dir: &Path) {
 
     // The existence of new_dir is the migration marker — no separate marker
     // file is needed. Once this directory exists (whether created by the
-    // migration itself or by ensure_rook_watch_roots_exist on a subsequent
+    // migration itself or by ensure_pterm_watch_roots_exist on a subsequent
     // launch), this function is a no-op.
     if new_dir.exists() || !old_dir.exists() {
         return;

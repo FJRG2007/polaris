@@ -7,14 +7,14 @@ use enum_iterator::{Sequence, all};
 use fuzzy_match::match_indices_case_insensitive;
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use regex::Regex;
-use rookui::actions::StandardAction;
-use rookui::keymap::{
+use ptermui::actions::StandardAction;
+use ptermui::keymap::{
     BindingDescription, BindingId, BindingLens, CustomTag, DescriptionContext, EditableBindingLens,
     IsBindingValid, Keystroke, Trigger,
 };
-use rookui::platform::OperatingSystem;
-use rookui::{Action, AppContext, SingletonEntity};
+use ptermui::platform::OperatingSystem;
+use ptermui::{Action, AppContext, SingletonEntity};
+use regex::Regex;
 
 use crate::keyboard::{UserDefinedKeybinding, remove_custom_keybinding, write_custom_keybinding};
 use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier};
@@ -27,7 +27,7 @@ pub const MAC_MENUS_CONTEXT: DescriptionContext = DescriptionContext::Custom("ma
 pub enum CustomAction {
     NewTab,
     NewFile,
-    ShowAboutRook,
+    ShowAboutPterm,
     ShowSettings,
     ConfigureKeybindings,
     ShowAccount,
@@ -100,7 +100,7 @@ pub enum CustomAction {
     ToggleSyncTerminalInputsInCurrentTab,
     DisableSyncTerminalInputs,
     ReopenClosedSession,
-    ToggleRookDrive,
+    TogglePtermDrive,
     AddWindow,
     CloseCurrentSession,
     CloseWindow,
@@ -118,9 +118,9 @@ pub enum CustomAction {
     WindowsPaste,
     #[cfg(windows)]
     WindowsCopy,
-    /// Also applies to legacy Rook AI (toggles the panel)
+    /// Also applies to legacy Polaris Terminal AI (toggles the panel)
     NewAgentModePane,
-    /// Also applies to legacy Rook AI (attaches the selection to the panel editor)
+    /// Also applies to legacy Polaris Terminal AI (attaches the selection to the panel editor)
     AttachSelectionAsAgentModeContext,
     OpenAIFactCollection,
     OpenMCPServerCollection,
@@ -138,8 +138,8 @@ pub enum CustomAction {
 lazy_static! {
     /// Maps for converting from custom tags back to the action enum
     /// This layer of indirection is necessary because the UI framework can't
-    /// know about particular Rook specific actions, so it deals with all actions
-    /// as plain isizes.  Within Rook though we want to deal with them as the enum type.
+    /// know about particular Polaris Terminal specific actions, so it deals with all actions
+    /// as plain isizes.  Within Polaris Terminal though we want to deal with them as the enum type.
     pub static ref CUSTOM_TAG_TO_ACTION: HashMap<isize, CustomAction> = HashMap::from_iter(all::<CustomAction>().map(|action| {
         (action as isize, action)
     }));
@@ -203,7 +203,7 @@ lazy_static! {
     /// compliant. We weren't always diligent about avoiding bindings that could conflict with
     /// character codes, unfortunately some bindings on Mac currently conflict with the PTY. We have
     /// this allowlist to special case these legacy actions for the purposes of binding validation.
-    pub static ref MAC_PTY_NON_COMPLIANT_ACTIONS: HashSet<&'static str> = HashSet::from_iter(["terminal:rookify_subshell", "terminal:open_block_list_context_menu_via_keybinding"]);
+    pub static ref MAC_PTY_NON_COMPLIANT_ACTIONS: HashSet<&'static str> = HashSet::from_iter(["terminal:ptermify_subshell", "terminal:open_block_list_context_menu_via_keybinding"]);
 
     /// Set of actions on Windows that should be considered valid bindings even though they aren't
     /// PTY compliant. Windows users expect pasting to work using both `ctrl-v` and `ctrl-shift-v`,
@@ -391,7 +391,7 @@ pub fn custom_tag_to_keystroke(custom: CustomTag) -> Option<Keystroke> {
             }
         }
         CustomAction::AddWindow => Keystroke::parse(cmd_or_ctrl_shift("n")).ok(),
-        CustomAction::ToggleRookDrive => {
+        CustomAction::TogglePtermDrive => {
             if OperatingSystem::get().is_mac() {
                 Keystroke::parse("cmd-\\").ok()
             } else {
@@ -448,7 +448,7 @@ pub fn custom_tag_to_keystroke(custom: CustomTag) -> Option<Keystroke> {
         CustomAction::RenamePane => Keystroke::parse("f2").ok(),
         CustomAction::NewTerminalTab
         | CustomAction::NewFile
-        | CustomAction::ShowAboutRook
+        | CustomAction::ShowAboutPterm
         | CustomAction::SplitPaneLeft
         | CustomAction::SelectAllBlocks
         | CustomAction::SplitPaneUp
@@ -806,13 +806,13 @@ fn materialize_description(desc: &BindingDescription, ctx: &AppContext) -> Bindi
 
 /// Possible groups a Binding can be part of. The string representation (produced in
 /// [`BindingGroup::as_str`]) is used as the group identifier within
-/// [`rookui::keymap::FixedBinding`] or [`EditableBinding`].
+/// [`ptermui::keymap::FixedBinding`] or [`EditableBinding`].
 #[derive(Copy, Clone, Debug, Sequence)]
 pub enum BindingGroup {
     Settings,
     Close,
     Navigation,
-    RookAi,
+    PtermAi,
     Workflow,
     Notebooks,
     Folders,
@@ -828,7 +828,7 @@ impl BindingGroup {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Settings => "settings",
-            Self::RookAi => "rook_ai",
+            Self::PtermAi => "pterm_ai",
             Self::Navigation => "navigation",
             Self::Workflow => "workflows",
             Self::Notebooks => "notebooks",
@@ -866,8 +866,8 @@ impl BindingGroup {
 /// framework and we can't easily produce the shift-modified version of the key ourselves. In this case the recommended
 /// solution is to to create separate [`Keystroke`]s for the Mac and non-Mac cases. For example:
 /// ```
-/// use rookui::keymap::Keystroke;
-/// use rookui::platform::OperatingSystem;
+/// use ptermui::keymap::Keystroke;
+/// use ptermui::platform::OperatingSystem;
 /// let keystroke = if OperatingSystem::get().is_mac() {
 ///    Keystroke::parse("cmd-[")
 /// } else {

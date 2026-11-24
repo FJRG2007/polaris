@@ -1,5 +1,5 @@
-use rook_cli::agent::Harness;
-use rookui::{App, EntityId};
+use pterm_cli::agent::Harness;
+use ptermui::{App, EntityId};
 
 use super::{
     OrchestrationAvatar, OrchestrationParticipant, agent_display_name_from_id,

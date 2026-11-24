@@ -32,11 +32,11 @@ pub use active_session::ActiveSession;
 pub use global_actions::{
     ForkAIConversationParams, ForkFromExchange, ForkedConversationDestination,
 };
-use rook_core::context_flag::ContextFlag;
-use rookui::AppContext;
-use rookui::accessibility::AccessibilityVerbosity;
-use rookui::elements::DropTargetData;
-use rookui::keymap::{BindingDescription, EditableBinding, FixedBinding};
+use pterm_core::context_flag::ContextFlag;
+use ptermui::AppContext;
+use ptermui::accessibility::AccessibilityVerbosity;
+use ptermui::elements::DropTargetData;
+use ptermui::keymap::{BindingDescription, EditableBinding, FixedBinding};
 use serde::{Deserialize, Serialize};
 pub use util::{PaneViewLocator, TabMovement, active_terminal_in_window};
 pub use view::{
@@ -55,8 +55,8 @@ use crate::util::bindings::{self, CustomAction, cmd_or_ctrl_shift, is_binding_pt
 use crate::{code, modal, notebooks, tab_configs};
 
 // Helper function to access panel header corner radius from other modules
-pub fn panel_header_corner_radius() -> rookui::elements::CornerRadius {
-    rookui::elements::CornerRadius::with_top(rookui::elements::Radius::Pixels(8.))
+pub fn panel_header_corner_radius() -> ptermui::elements::CornerRadius {
+    ptermui::elements::CornerRadius::with_top(ptermui::elements::Radius::Pixels(8.))
 }
 
 pub use global_actions::save_running_blocks;
@@ -66,19 +66,19 @@ pub use toast_stack::{ToastStack, ToastStackEvent};
 
 use crate::workspace::view::{
     LEFT_PANEL_AGENT_CONVERSATIONS_BINDING_NAME, LEFT_PANEL_GLOBAL_SEARCH_BINDING_NAME,
-    LEFT_PANEL_PROJECT_EXPLORER_BINDING_NAME, LEFT_PANEL_ROOK_DRIVE_BINDING_NAME,
+    LEFT_PANEL_POLARIS_TERMINAL_DRIVE_BINDING_NAME, LEFT_PANEL_PROJECT_EXPLORER_BINDING_NAME,
     NEW_AGENT_TAB_BINDING_NAME, NEW_AMBIENT_AGENT_TAB_BINDING_NAME, NEW_FILE_BINDING_NAME,
     NEW_TAB_BINDING_NAME, NEW_TERMINAL_TAB_BINDING_NAME, NEW_WINDOW_BINDING_NAME,
     OPEN_GLOBAL_SEARCH_BINDING_NAME, TOGGLE_CONVERSATION_LIST_VIEW_BINDING_NAME,
-    TOGGLE_NOTIFICATION_MAILBOX_BINDING_NAME, TOGGLE_PROJECT_EXPLORER_BINDING_NAME,
-    TOGGLE_RIGHT_PANEL_BINDING_NAME, TOGGLE_ROOK_DRIVE_BINDING_NAME,
+    TOGGLE_NOTIFICATION_MAILBOX_BINDING_NAME, TOGGLE_POLARIS_TERMINAL_DRIVE_BINDING_NAME,
+    TOGGLE_PROJECT_EXPLORER_BINDING_NAME, TOGGLE_RIGHT_PANEL_BINDING_NAME,
     TOGGLE_TAB_CONFIGS_MENU_BINDING_NAME, TOGGLE_VERTICAL_TABS_PANEL_BINDING_NAME,
 };
 
 pub fn init(app: &mut AppContext) {
     app.add_singleton_model(|_| WorkspaceRegistry::new());
     app.add_singleton_model(|_| cross_window_tab_drag::CrossWindowTabDrag::new());
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
     app.register_binding_validator::<Workspace>(is_binding_pty_compliant);
 
     modal::init(app);
@@ -90,7 +90,7 @@ pub fn init(app: &mut AppContext) {
     hoa_onboarding::init(app);
     tab_configs::session_config_modal::init(app);
     view::launch_modal::oz_launch::init(app);
-    view::openrook_launch_modal::init(app);
+    view::openpterm_launch_modal::init(app);
     view::orchestration_launch_modal::init(app);
     view::agent_cli_launch_modal::init(app);
     view::feature_intro_modal::init(app);
@@ -205,15 +205,15 @@ pub fn init(app: &mut AppContext) {
                 )
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
-                    "workspace:open_openrook_launch_modal",
-                    "[Debug] Open OpenRook Launch Modal",
-                    WorkspaceAction::OpenOpenRookLaunchModal,
+                    "workspace:open_openpterm_launch_modal",
+                    "[Debug] Open OpenPterm Launch Modal",
+                    WorkspaceAction::OpenOpenPtermLaunchModal,
                 )
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
-                    "workspace:reset_openrook_launch_modal_state",
-                    "[Debug] Reset OpenRook Launch Modal State",
-                    WorkspaceAction::ResetOpenRookLaunchModalState,
+                    "workspace:reset_openpterm_launch_modal_state",
+                    "[Debug] Reset OpenPterm Launch Modal State",
+                    WorkspaceAction::ResetOpenPtermLaunchModalState,
                 )
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
@@ -230,13 +230,13 @@ pub fn init(app: &mut AppContext) {
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
                     "workspace:open_agent_cli_launch_modal",
-                    "[Debug] Open Rook Agent CLI Launch Modal",
+                    "[Debug] Open Polaris Terminal Agent CLI Launch Modal",
                     WorkspaceAction::OpenAgentCliLaunchModal,
                 )
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
                     "workspace:reset_agent_cli_launch_modal_state",
-                    "[Debug] Reset Rook Agent CLI Launch Modal State",
+                    "[Debug] Reset Polaris Terminal Agent CLI Launch Modal State",
                     WorkspaceAction::ResetAgentCliLaunchModalState,
                 )
                 .with_context_predicate(id!("Workspace")),
@@ -283,15 +283,15 @@ pub fn init(app: &mut AppContext) {
                 )
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
-                    "workspace:install_opencode_rook_plugin",
-                    "[Debug] Install OpenCode Rook plugin",
-                    WorkspaceAction::InstallOpenCodeRookPlugin,
+                    "workspace:install_opencode_pterm_plugin",
+                    "[Debug] Install OpenCode Polaris Terminal plugin",
+                    WorkspaceAction::InstallOpenCodePtermPlugin,
                 )
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
-                    "workspace:use_local_opencode_rook_plugin",
-                    "[Debug] Use local OpenCode Rook plugin (testing only)",
-                    WorkspaceAction::UseLocalOpenCodeRookPlugin,
+                    "workspace:use_local_opencode_pterm_plugin",
+                    "[Debug] Use local OpenCode Polaris Terminal plugin (testing only)",
+                    WorkspaceAction::UseLocalOpenCodePtermPlugin,
                 )
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
@@ -651,8 +651,8 @@ pub fn init(app: &mut AppContext) {
         .with_custom_action(CustomAction::NewTeamNotebook)
         .with_context_predicate(
             id!("Workspace")
-                & id!(flags::ENABLE_ROOK_DRIVE)
-                & id!("RookDrive_BelongsToTeam")
+                & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE)
+                & id!("PtermDrive_BelongsToTeam")
                 & id!("IsOnline"),
         )
         .with_group(bindings::BindingGroup::Notebooks.as_str()),
@@ -664,7 +664,7 @@ pub fn init(app: &mut AppContext) {
         )
         .with_group(bindings::BindingGroup::Notebooks.as_str())
         .with_custom_action(CustomAction::NewPersonalNotebook)
-        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_ROOK_DRIVE)),
+        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE)),
         EditableBinding::new(
             "workspace:create_team_workflow",
             BindingDescription::new("Create a new team workflow")
@@ -674,9 +674,9 @@ pub fn init(app: &mut AppContext) {
         .with_custom_action(CustomAction::NewTeamWorkflow)
         .with_context_predicate(
             id!("Workspace")
-                & id!(flags::ENABLE_ROOK_DRIVE)
+                & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE)
                 & id!("IsOnline")
-                & id!("RookDrive_BelongsToTeam"),
+                & id!("PtermDrive_BelongsToTeam"),
         )
         .with_group(bindings::BindingGroup::Workflow.as_str()),
         EditableBinding::new(
@@ -687,7 +687,7 @@ pub fn init(app: &mut AppContext) {
         )
         .with_group(bindings::BindingGroup::Workflow.as_str())
         .with_custom_action(CustomAction::NewPersonalWorkflow)
-        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_ROOK_DRIVE)),
+        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE)),
         EditableBinding::new(
             "workspace:create_team_folder",
             BindingDescription::new("Create a new team folder")
@@ -696,9 +696,9 @@ pub fn init(app: &mut AppContext) {
         )
         .with_context_predicate(
             id!("Workspace")
-                & id!(flags::ENABLE_ROOK_DRIVE)
+                & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE)
                 & id!("IsOnline")
-                & id!("RookDrive_BelongsToTeam"),
+                & id!("PtermDrive_BelongsToTeam"),
         )
         .with_group(bindings::BindingGroup::Folders.as_str()),
         EditableBinding::new(
@@ -708,7 +708,9 @@ pub fn init(app: &mut AppContext) {
             WorkspaceAction::CreatePersonalFolder,
         )
         .with_group(bindings::BindingGroup::Folders.as_str())
-        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_ROOK_DRIVE) & id!("IsOnline")),
+        .with_context_predicate(
+            id!("Workspace") & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE) & id!("IsOnline"),
+        ),
         EditableBinding::new(
             NEW_TAB_BINDING_NAME,
             BindingDescription::new("Create new tab"),
@@ -732,7 +734,7 @@ pub fn init(app: &mut AppContext) {
             BindingDescription::new("New Agent Tab"),
             WorkspaceAction::AddAgentTab,
         )
-        .with_group(bindings::BindingGroup::RookAi.as_str())
+        .with_group(bindings::BindingGroup::PtermAi.as_str())
         .with_custom_action(CustomAction::NewAgentTab)
         .with_context_predicate(
             id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED) & !id!("Workspace_PaneDragging"),
@@ -742,7 +744,7 @@ pub fn init(app: &mut AppContext) {
             BindingDescription::new("New Cloud Agent Tab"),
             WorkspaceAction::AddAmbientAgentTab,
         )
-        .with_group(bindings::BindingGroup::RookAi.as_str())
+        .with_group(bindings::BindingGroup::PtermAi.as_str())
         .with_context_predicate(
             id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED) & !id!("Workspace_PaneDragging"),
         )
@@ -755,7 +757,7 @@ pub fn init(app: &mut AppContext) {
             WorkspaceAction::ToggleLeftPanel,
         )
         .with_context_predicate(id!("Workspace"))
-        .with_custom_action(CustomAction::ToggleRookDrive),
+        .with_custom_action(CustomAction::TogglePtermDrive),
         EditableBinding::new(
             TOGGLE_RIGHT_PANEL_BINDING_NAME,
             BindingDescription::new("Toggle code review")
@@ -812,12 +814,12 @@ pub fn init(app: &mut AppContext) {
         .with_mac_key_binding("cmd-shift->")
         .with_linux_or_windows_key_binding("ctrl-shift->"),
         EditableBinding::new(
-            LEFT_PANEL_ROOK_DRIVE_BINDING_NAME,
-            BindingDescription::new("Left Panel: Rook Drive"),
-            WorkspaceAction::ToggleRookDrive,
+            LEFT_PANEL_POLARIS_TERMINAL_DRIVE_BINDING_NAME,
+            BindingDescription::new("Left Panel: Polaris Terminal Drive"),
+            WorkspaceAction::TogglePtermDrive,
         )
         .with_group(bindings::BindingGroup::Navigation.as_str())
-        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_ROOK_DRIVE))
+        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE))
         .with_mac_key_binding("ctrl-4")
         .with_linux_or_windows_key_binding("alt-4"),
         EditableBinding::new(
@@ -838,12 +840,12 @@ pub fn init(app: &mut AppContext) {
         // we use alt because we use ctrl-shift-f for find because ctrl-f needs to be reserved for the shell
         .with_linux_or_windows_key_binding("alt-shift-F"),
         EditableBinding::new(
-            TOGGLE_ROOK_DRIVE_BINDING_NAME,
-            BindingDescription::new("Toggle Rook Drive")
-                .with_custom_description(bindings::MAC_MENUS_CONTEXT, "Rook Drive"),
-            WorkspaceAction::ToggleRookDrive,
+            TOGGLE_POLARIS_TERMINAL_DRIVE_BINDING_NAME,
+            BindingDescription::new("Toggle Polaris Terminal Drive")
+                .with_custom_description(bindings::MAC_MENUS_CONTEXT, "Polaris Terminal Drive"),
+            WorkspaceAction::TogglePtermDrive,
         )
-        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_ROOK_DRIVE)),
+        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE)),
         EditableBinding::new(
             TOGGLE_CONVERSATION_LIST_VIEW_BINDING_NAME,
             BindingDescription::new("Toggle Agent conversation list view").with_custom_description(
@@ -856,7 +858,7 @@ pub fn init(app: &mut AppContext) {
         .with_context_predicate(id!("Workspace") & id!(flags::SHOW_CONVERSATION_HISTORY))
         .with_mac_key_binding("cmd-shift-A")
         .with_linux_or_windows_key_binding("ctrl-shift-A")
-        .with_group(bindings::BindingGroup::RookAi.as_str()),
+        .with_group(bindings::BindingGroup::PtermAi.as_str()),
         EditableBinding::new(
             "workspace:close_panel",
             BindingDescription::new("Close focused panel")
@@ -1081,7 +1083,7 @@ pub fn init(app: &mut AppContext) {
     app.register_editable_bindings([
         EditableBinding::new(
             "workspace:terminate_app",
-            "Quit Rook",
+            "Quit Polaris Terminal",
             WorkspaceAction::TerminateApp,
         )
         .with_context_predicate(id!("Workspace"))
@@ -1186,9 +1188,9 @@ pub fn init(app: &mut AppContext) {
         EditableBinding::new(
             // If you rename this name, please update the name in command_palette/action/data_source.rs
             "workspace:search_drive",
-            "Search Rook Drive",
+            "Search Polaris Terminal Drive",
             WorkspaceAction::OpenPalette {
-                mode: PaletteMode::RookDrive,
+                mode: PaletteMode::PtermDrive,
                 source: PaletteSource::Keybinding,
                 query: None,
             },
@@ -1240,46 +1242,46 @@ pub fn init(app: &mut AppContext) {
 
     if cfg!(not(target_family = "wasm")) {
         app.register_editable_bindings([EditableBinding::new(
-            "workspace:export_all_rook_drive_objects",
-            "Export all Rook Drive objects",
-            WorkspaceAction::ExportAllRookDriveObjects,
+            "workspace:export_all_pterm_drive_objects",
+            "Export all Polaris Terminal Drive objects",
+            WorkspaceAction::ExportAllPtermDriveObjects,
         )
         .with_group(bindings::BindingGroup::Settings.as_str())
-        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_ROOK_DRIVE))]);
+        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE))]);
     }
 
-    // Oz and Rook Control CLI install/uninstall actions (macOS only)
+    // Oz and Polaris Terminal Control CLI install/uninstall actions (macOS only)
     #[cfg(target_os = "macos")]
     {
         app.register_editable_bindings([
             EditableBinding::new(
                 "workspace:install_cli",
-                "Install Oz CLI globally for use outside of Rook",
+                "Install Oz CLI globally for use outside of Polaris Terminal",
                 WorkspaceAction::InstallOz,
             )
             .with_group(bindings::BindingGroup::Settings.as_str())
             .with_context_predicate(id!("Workspace")),
             EditableBinding::new(
                 "workspace:uninstall_cli",
-                "Undo global Oz CLI installation (oz will still work within Rook)",
+                "Undo global Oz CLI installation (oz will still work within Polaris Terminal)",
                 WorkspaceAction::UninstallOz,
             )
             .with_group(bindings::BindingGroup::Settings.as_str())
             .with_context_predicate(id!("Workspace")),
         ]);
-        if FeatureFlag::RookControlCli.is_enabled() {
+        if FeatureFlag::PtermControlCli.is_enabled() {
             app.register_editable_bindings([
                 EditableBinding::new(
-                    "workspace:install_rookctrl",
-                    "Install Rook Control CLI globally for use outside of Rook",
-                    WorkspaceAction::InstallRookctrl,
+                    "workspace:install_ptermctrl",
+                    "Install Polaris Terminal Control CLI globally for use outside of Polaris Terminal",
+                    WorkspaceAction::InstallPtermctrl,
                 )
                 .with_group(bindings::BindingGroup::Settings.as_str())
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
-                    "workspace:uninstall_rookctrl",
-                    "Undo global Rook Control CLI installation (rookctrl will still work within Rook)",
-                    WorkspaceAction::UninstallRookctrl,
+                    "workspace:uninstall_ptermctrl",
+                    "Undo global Polaris Terminal Control CLI installation (ptermctrl will still work within Polaris Terminal)",
+                    WorkspaceAction::UninstallPtermctrl,
                 )
                 .with_group(bindings::BindingGroup::Settings.as_str())
                 .with_context_predicate(id!("Workspace")),
@@ -1298,9 +1300,9 @@ pub fn init(app: &mut AppContext) {
             )
             .with_context_predicate(id!("Workspace") & !id!("UpdateToastVisible"))
             .with_group(bindings::BindingGroup::Settings.as_str())
-            // Note that while the changelog resides in RookEssentials, we should gate access to
-            // the changelog based on whether RookEssentials is an available view.
-            .with_enabled(|| ContextFlag::RookEssentials.is_enabled()),
+            // Note that while the changelog resides in PtermEssentials, we should gate access to
+            // the changelog based on whether PtermEssentials is an available view.
+            .with_enabled(|| ContextFlag::PtermEssentials.is_enabled()),
             // When the update toast is visible, register the keybinding as well.
             EditableBinding::new(
                 "workspace:view_changelog",
@@ -1311,7 +1313,7 @@ pub fn init(app: &mut AppContext) {
             .with_group(bindings::BindingGroup::Settings.as_str())
             .with_custom_action(CustomAction::ViewChangelog)
             .with_linux_or_windows_key_binding(format!("alt-{}", cmd_or_ctrl_shift("o")))
-            .with_enabled(|| ContextFlag::RookEssentials.is_enabled()),
+            .with_enabled(|| ContextFlag::PtermEssentials.is_enabled()),
         ]);
     }
 
@@ -1328,18 +1330,18 @@ pub fn init(app: &mut AppContext) {
         )
         .with_enabled(|| FeatureFlag::AgentMode.is_enabled())
         .with_context_predicate(id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED))
-        .with_group(bindings::BindingGroup::RookAi.as_str())
+        .with_group(bindings::BindingGroup::PtermAi.as_str())
         .with_custom_action(CustomAction::NewAgentModePane),
         EditableBinding::new(
             "workspace:toggle_ai_assistant",
-            "Toggle Rook AI",
+            "Toggle Polaris Terminal AI",
             WorkspaceAction::ToggleAIAssistant,
         )
         .with_enabled(|| !FeatureFlag::AgentMode.is_enabled())
         .with_context_predicate(id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED))
-        .with_group(bindings::BindingGroup::RookAi.as_str())
+        .with_group(bindings::BindingGroup::PtermAi.as_str())
         // We use the same custom action as AM so that we don't have
-        // two mac menu items for AM vs Rook AI since they are mutually exclusive.
+        // two mac menu items for AM vs Polaris Terminal AI since they are mutually exclusive.
         .with_custom_action(CustomAction::NewAgentModePane),
     ]);
 
@@ -1356,8 +1358,8 @@ pub fn init(app: &mut AppContext) {
         .with_custom_action(CustomAction::NewTeamEnvVars)
         .with_context_predicate(
             id!("Workspace")
-                & id!(flags::ENABLE_ROOK_DRIVE)
-                & id!("RookDrive_BelongsToTeam")
+                & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE)
+                & id!("PtermDrive_BelongsToTeam")
                 & id!("IsOnline"),
         )
         .with_group(bindings::BindingGroup::EnvVarCollection.as_str()),
@@ -1372,17 +1374,19 @@ pub fn init(app: &mut AppContext) {
         )
         .with_group(bindings::BindingGroup::EnvVarCollection.as_str())
         .with_custom_action(CustomAction::NewPersonalEnvVars)
-        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_ROOK_DRIVE)),
+        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE)),
         EditableBinding::new(
             "workspace:create_personal_ai_prompt",
             BindingDescription::new("Create a new personal prompt")
                 .with_custom_description(bindings::MAC_MENUS_CONTEXT, "New Personal Prompt"),
             WorkspaceAction::CreatePersonalAIPrompt,
         )
-        .with_group(bindings::BindingGroup::RookAi.as_str())
+        .with_group(bindings::BindingGroup::PtermAi.as_str())
         .with_custom_action(CustomAction::NewPersonalAIPrompt)
         .with_context_predicate(
-            id!("Workspace") & id!(flags::ENABLE_ROOK_DRIVE) & id!(flags::IS_ANY_AI_ENABLED),
+            id!("Workspace")
+                & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE)
+                & id!(flags::IS_ANY_AI_ENABLED),
         ),
         EditableBinding::new(
             "workspace:create_team_ai_prompt",
@@ -1390,12 +1394,12 @@ pub fn init(app: &mut AppContext) {
                 .with_custom_description(bindings::MAC_MENUS_CONTEXT, "New Team Prompt"),
             WorkspaceAction::CreateTeamAIPrompt,
         )
-        .with_group(bindings::BindingGroup::RookAi.as_str())
+        .with_group(bindings::BindingGroup::PtermAi.as_str())
         .with_custom_action(CustomAction::NewTeamAIPrompt)
         .with_context_predicate(
             id!("Workspace")
-                & id!(flags::ENABLE_ROOK_DRIVE)
-                & id!("RookDrive_BelongsToTeam")
+                & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE)
+                & id!("PtermDrive_BelongsToTeam")
                 & id!("IsOnline")
                 & id!(flags::IS_ANY_AI_ENABLED),
         ),
@@ -1424,14 +1428,16 @@ pub fn init(app: &mut AppContext) {
             "Import To Personal Drive",
             WorkspaceAction::ImportToPersonalDrive,
         )
-        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_ROOK_DRIVE)),
+        .with_context_predicate(id!("Workspace") & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE)),
         EditableBinding::new(
             "workspace:import_to_team_drive",
             "Import To Team Drive",
             WorkspaceAction::ImportToTeamDrive,
         )
         .with_context_predicate(
-            id!("Workspace") & id!(flags::ENABLE_ROOK_DRIVE) & id!("RookDrive_BelongsToTeam"),
+            id!("Workspace")
+                & id!(flags::ENABLE_POLARIS_TERMINAL_DRIVE)
+                & id!("PtermDrive_BelongsToTeam"),
         ),
     ]);
 
@@ -1473,7 +1479,7 @@ pub fn init(app: &mut AppContext) {
         .with_enabled(|| FeatureFlag::AIRules.is_enabled())
         .with_custom_action(CustomAction::OpenAIFactCollection)
         .with_context_predicate(id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED))
-        .with_group(bindings::BindingGroup::RookAi.as_str()),
+        .with_group(bindings::BindingGroup::PtermAi.as_str()),
     ]);
 
     app.register_editable_bindings([EditableBinding::new(
@@ -1487,7 +1493,7 @@ pub fn init(app: &mut AppContext) {
     })
     .with_custom_action(CustomAction::OpenMCPServerCollection)
     .with_context_predicate(id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED))
-    .with_group(bindings::BindingGroup::RookAi.as_str())]);
+    .with_group(bindings::BindingGroup::PtermAi.as_str())]);
 
     app.register_editable_bindings([EditableBinding::new(
         "workspace:jump_to_latest_toast",
@@ -1498,7 +1504,7 @@ pub fn init(app: &mut AppContext) {
     .with_context_predicate(id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED))
     .with_mac_key_binding("cmd-shift-G")
     .with_linux_or_windows_key_binding("ctrl-shift-G")
-    .with_group(bindings::BindingGroup::RookAi.as_str())]);
+    .with_group(bindings::BindingGroup::PtermAi.as_str())]);
 
     app.register_editable_bindings([EditableBinding::new(
         TOGGLE_NOTIFICATION_MAILBOX_BINDING_NAME,
@@ -1509,7 +1515,7 @@ pub fn init(app: &mut AppContext) {
     .with_context_predicate(id!("Workspace"))
     .with_mac_key_binding("cmd-shift-U")
     .with_linux_or_windows_key_binding("ctrl-shift-U")
-    .with_group(bindings::BindingGroup::RookAi.as_str())]);
+    .with_group(bindings::BindingGroup::PtermAi.as_str())]);
 
     add_open_setting_pages_as_editable_binding(app);
     add_overflow_menu_items_as_editable_binding(app);
@@ -1523,11 +1529,11 @@ pub fn init(app: &mut AppContext) {
     .with_context_predicate(id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED))
     .with_mac_key_binding("cmd-shift-M")
     .with_linux_or_windows_key_binding("ctrl-shift-M")
-    .with_group(bindings::BindingGroup::RookAi.as_str())]);
+    .with_group(bindings::BindingGroup::PtermAi.as_str())]);
 }
 
 fn add_open_setting_pages_as_editable_binding(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     // Add the ability to open setting modals to the command palette.
     app.register_editable_bindings([
@@ -1587,12 +1593,12 @@ fn add_open_setting_pages_as_editable_binding(app: &mut AppContext) {
         EditableBinding::new(
             "workspace:show_settings_about_page",
             BindingDescription::new("Open Settings: About")
-                .with_custom_description(bindings::MAC_MENUS_CONTEXT, "About Rook"),
+                .with_custom_description(bindings::MAC_MENUS_CONTEXT, "About Polaris Terminal"),
             WorkspaceAction::ShowSettingsPage(SettingsSection::About),
         )
         .with_group(bindings::BindingGroup::Settings.as_str())
         .with_context_predicate(id!("Workspace"))
-        .with_custom_action(CustomAction::ShowAboutRook),
+        .with_custom_action(CustomAction::ShowAboutPterm),
         EditableBinding::new(
             "workspace:show_settings_teams_page",
             BindingDescription::new("Open Settings: Teams")
@@ -1610,17 +1616,17 @@ fn add_open_setting_pages_as_editable_binding(app: &mut AppContext) {
         .with_group(bindings::BindingGroup::Settings.as_str())
         .with_context_predicate(id!("Workspace")),
         EditableBinding::new(
-            "workspace:show_settings_rookify_page",
-            BindingDescription::new("Open Settings: Rookify")
-                .with_custom_description(bindings::MAC_MENUS_CONTEXT, "Configure Rookify..."),
-            WorkspaceAction::ShowSettingsPage(SettingsSection::Rookify),
+            "workspace:show_settings_ptermify_page",
+            BindingDescription::new("Open Settings: Ptermify")
+                .with_custom_description(bindings::MAC_MENUS_CONTEXT, "Configure Ptermify..."),
+            WorkspaceAction::ShowSettingsPage(SettingsSection::Ptermify),
         )
         .with_group(bindings::BindingGroup::Settings.as_str())
         .with_context_predicate(id!("Workspace")),
         EditableBinding::new(
             "workspace:show_ai_settings_page",
             BindingDescription::new("Open Settings: AI"),
-            WorkspaceAction::ShowSettingsPage(SettingsSection::RookAgent),
+            WorkspaceAction::ShowSettingsPage(SettingsSection::PtermAgent),
         )
         .with_enabled(|| FeatureFlag::AgentMode.is_enabled())
         .with_group(bindings::BindingGroup::Settings.as_str())
@@ -1672,7 +1678,7 @@ fn add_open_setting_pages_as_editable_binding(app: &mut AppContext) {
 }
 
 fn add_overflow_menu_items_as_editable_binding(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     // Add the ability to open all overflow menu items to the command palette.
     app.register_editable_bindings([
@@ -1704,7 +1710,7 @@ fn add_overflow_menu_items_as_editable_binding(app: &mut AppContext) {
         #[cfg(not(target_family = "wasm"))]
         EditableBinding::new(
             "workspace:view_logs",
-            "View Rook logs",
+            "View Polaris Terminal logs",
             WorkspaceAction::ViewLogs,
         )
         .with_context_predicate(id!("Workspace")),

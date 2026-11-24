@@ -1,25 +1,25 @@
 ---
 name: terminal-tui-ui-guidelines
-description: Guidelines for writing Rook headless TUI (crates/rook_tui) UI code with the cell-grid TuiElement library. Read before any TUI UI work.
+description: Guidelines for writing Polaris Terminal headless TUI (crates/pterm_tui) UI code with the cell-grid TuiElement library. Read before any TUI UI work.
 ---
 
 # terminal-tui-ui-guidelines
-Guidelines for writing UI code in Rook's **headless TUI** front-end. This is the TUI counterpart to `terminal-gui-ui-guidelines` (which covers the pixel-based GUI desktop app). Read this once at the start of any TUI UI task, then keep it in mind while implementing.
+Guidelines for writing UI code in Polaris Terminal's **headless TUI** front-end. This is the TUI counterpart to `terminal-gui-ui-guidelines` (which covers the pixel-based GUI desktop app). Read this once at the start of any TUI UI task, then keep it in mind while implementing.
 
 The TUI is a distinct front-end from the GUI desktop app. Do **not** carry over GUI assumptions (pixels, mouse-pixel hit-testing, GPU/WGSL, `.app` bundles, design-system button *pixel* themes, launch modals). If a GUI guideline is about pixel layout or GPU rendering, it does not apply here.
 
 ## Where TUI UI code lives
 
-- **Front-end views/screens:** `crates/rook_tui` — per-channel console binaries (e.g. `crates/rook_tui/src/bin`). Run/observe the TUI with `./script/run-tui`. There is no `.app` bundle, no GPU/WGSL, and no mouse-pixel model.
-- **Element library:** `crates/rookui_core/src/elements/tui`, behind the `tui` cargo feature. This is a *parallel* cell-grid element vocabulary, separate from the GUI `Element`/`View` library.
+- **Front-end views/screens:** `crates/pterm_tui` — per-channel console binaries (e.g. `crates/pterm_tui/src/bin`). Run/observe the TUI with `./script/run-tui`. There is no `.app` bundle, no GPU/WGSL, and no mouse-pixel model.
+- **Element library:** `crates/ptermui_core/src/elements/tui`, behind the `tui` cargo feature. This is a *parallel* cell-grid element vocabulary, separate from the GUI `Element`/`View` library.
 
-**Shared with the GUI** (do reuse): the Entity/model core in `rook_core`/`rookui` — `App`/`Entity`/`AppContext`/`ViewContext`, the actions system, `Appearance`/theming, `FeatureFlag` runtime checks (`FeatureFlag::X.is_enabled()` works in both front-ends), telemetry, and logging.
+**Shared with the GUI** (do reuse): the Entity/model core in `pterm_core`/`ptermui` — `App`/`Entity`/`AppContext`/`ViewContext`, the actions system, `Appearance`/theming, `FeatureFlag` runtime checks (`FeatureFlag::X.is_enabled()` works in both front-ends), telemetry, and logging.
 
-**Different from the GUI** (do NOT use here): the GUI `Element`/`View` types, pixel geometry, and GPU/WGSL rendering or pixel-drawn button themes. The TUI has its own `crates/rook_tui/Cargo.toml`; the compile-time Cargo-feature bridge in `app/Cargo.toml` + `app/src/lib.rs enabled_features()` is GUI-app-specific and does not gate TUI code. (The TUI *does* have hover/click: `TuiHoverable` and `tui_collapsible` reuse the shared `MouseStateHandle`, so own that handle outside render just like the GUI — only pixel-based hit-testing is GUI-only.)
+**Different from the GUI** (do NOT use here): the GUI `Element`/`View` types, pixel geometry, and GPU/WGSL rendering or pixel-drawn button themes. The TUI has its own `crates/pterm_tui/Cargo.toml`; the compile-time Cargo-feature bridge in `app/Cargo.toml` + `app/src/lib.rs enabled_features()` is GUI-app-specific and does not gate TUI code. (The TUI *does* have hover/click: `TuiHoverable` and `tui_collapsible` reuse the shared `MouseStateHandle`, so own that handle outside render just like the GUI — only pixel-based hit-testing is GUI-only.)
 
 ## The `TuiElement` trait
 
-Defined in `crates/rookui_core/src/elements/tui/mod.rs`. An element measures itself, then paints into a sub-rectangle of a cell buffer:
+Defined in `crates/ptermui_core/src/elements/tui/mod.rs`. An element measures itself, then paints into a sub-rectangle of a cell buffer:
 
 - `layout(&mut self, constraint: TuiConstraint, ctx: &mut TuiLayoutContext, app: &AppContext) -> TuiSize` — measure against a constraint and return a size within it. `app` gives shared read access to the core (mirrors the GUI's `Element::layout`).
 - `render(&self, area: TuiRect, buffer: &mut TuiBuffer, ctx: &mut TuiPaintContext)` — paint into `area` of `buffer`. `area`'s size is what `layout` returned, clamped to what was available.
@@ -30,7 +30,7 @@ Defined in `crates/rookui_core/src/elements/tui/mod.rs`. An element measures its
 
 ## Composition vocabulary
 
-Re-exported from `crates/rookui_core/src/elements/tui/mod.rs`:
+Re-exported from `crates/ptermui_core/src/elements/tui/mod.rs`:
 
 - **Layout containers:** `TuiFlex` (`TuiFlex::row()` / `TuiFlex::column()`, with `.child(...)`, `.flex_child(...)`, `.with_cross_axis_alignment(...)`), `TuiContainer`, and `TuiConstrainedBox` (e.g. `.with_max_cols(N)`).
 - **Content:** `TuiText` (`.with_style(style)`, `.truncate()`, `TuiText::from_spans([...])`).
@@ -42,13 +42,13 @@ Re-exported from `crates/rookui_core/src/elements/tui/mod.rs`:
 
 Styles are `TuiStyle` values (`Color`, `Modifier` — e.g. `Modifier::BOLD`, `Modifier::DIM`) painted into a `TuiBuffer` of `Cell`s. Terminal cells have no alpha, so styles are solid.
 
-**Prefer the semantic style helpers on `TuiUiBuilder`** (`crates/rook_tui/src/tui_builder.rs`) over hardcoding colors — this mirrors the GUI guideline about reusing themes. Construct it per render with `TuiUiBuilder::from_app(app)`, then ask for semantic styles: `primary_text_style()`, `muted_text_style()`, `dim_text_style()`, `error_text_style()`, `success_glyph_style()`, `accent_border_style()`, `input_text_style()`, etc. The builder owns the theme→style recipes so views ask for "primary text" / "muted text" instead of deriving colors from the theme by hand. Do not reach for raw ANSI slots (e.g. `Color::White`) directly — those are tuned for dark backgrounds and wash out on light themes.
+**Prefer the semantic style helpers on `TuiUiBuilder`** (`crates/pterm_tui/src/tui_builder.rs`) over hardcoding colors — this mirrors the GUI guideline about reusing themes. Construct it per render with `TuiUiBuilder::from_app(app)`, then ask for semantic styles: `primary_text_style()`, `muted_text_style()`, `dim_text_style()`, `error_text_style()`, `success_glyph_style()`, `accent_border_style()`, `input_text_style()`, etc. The builder owns the theme→style recipes so views ask for "primary text" / "muted text" instead of deriving colors from the theme by hand. Do not reach for raw ANSI slots (e.g. `Color::White`) directly — those are tuned for dark backgrounds and wash out on light themes.
 
 ## Events and keybindings
 
 Crossterm input is converted (in `crate::runtime`) to `TuiEvent` and dispatched through the element tree via `dispatch_event`; text-cursor placement flows through `cursor_position`.
 
-Keybindings follow the GUI convention: each TUI view module exposes a top-level `init(app)` that registers its bindings, aggregated in `crates/rook_tui/src/keybindings.rs` and called once at TUI startup. Fixed/reserved bindings (e.g. ctrl-c) are tagged with the `tui` group (`TUI_BINDING_GROUP`); editable, user-remappable bindings are named with a `tui:` prefix. GUI bindings never fire in the TUI — predicate-scoped bindings never match TUI keymap contexts, and predicate-less ones dispatch action types no TUI view handles — and debug-time validators (`register_binding_validators`) enforce that any keystroke binding matching a TUI view's context is TUI-owned.
+Keybindings follow the GUI convention: each TUI view module exposes a top-level `init(app)` that registers its bindings, aggregated in `crates/pterm_tui/src/keybindings.rs` and called once at TUI startup. Fixed/reserved bindings (e.g. ctrl-c) are tagged with the `tui` group (`TUI_BINDING_GROUP`); editable, user-remappable bindings are named with a `tui:` prefix. GUI bindings never fire in the TUI — predicate-scoped bindings never match TUI keymap contexts, and predicate-less ones dispatch action types no TUI view handles — and debug-time validators (`register_binding_validators`) enforce that any keystroke binding matching a TUI view's context is TUI-owned.
 
 ## Example: composing a small element tree
 
@@ -61,7 +61,7 @@ let muted = builder.muted_text_style();
 
 let column = TuiFlex::column()
     .child(
-        TuiText::new("Rook Agent")
+        TuiText::new("Polaris Terminal Agent")
             .with_style(title_style)
             .truncate()
             .finish(),
@@ -73,7 +73,7 @@ TuiConstrainedBox::new(column.finish())
     .finish()
 ```
 
-Verify API names against the element library (`crates/rookui_core/src/elements/tui/mod.rs`) and `TuiUiBuilder` (`crates/rook_tui/src/tui_builder.rs`); don't invent methods. Don't treat existing `crates/rook_tui` view code as canonical examples — much of it is early prototyping and isn't the pattern to copy going forward.
+Verify API names against the element library (`crates/ptermui_core/src/elements/tui/mod.rs`) and `TuiUiBuilder` (`crates/pterm_tui/src/tui_builder.rs`); don't invent methods. Don't treat existing `crates/pterm_tui` view code as canonical examples — much of it is early prototyping and isn't the pattern to copy going forward.
 
 ## Reference
 

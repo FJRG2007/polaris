@@ -13,13 +13,13 @@ pub use cloud_object_models::{
     DEFAULT_COMMAND_EXECUTION_DENYLIST,
 };
 use indexmap::IndexMap;
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_if_error;
+use ptermui::platform::OperatingSystem;
+use ptermui::platform::keyboard::KeyCode;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel, WeakViewHandle};
 use regex::Regex;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_if_error;
-use rookui::platform::OperatingSystem;
-use rookui::platform::keyboard::KeyCode;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel, WeakViewHandle};
 use serde::de::Deserializer;
 use serde::{Deserialize, Serialize};
 use settings::{
@@ -225,8 +225,8 @@ impl VoiceInputToggleKey {
     /// Converts the voice input toggle key to a Keystroke representation.
     /// Since these are standalone modifier keys, we construct the Keystroke directly
     /// rather than using `parse()` (which always requires a non-modifier key to be included).
-    pub fn keystroke(&self) -> Option<rookui::keymap::Keystroke> {
-        use rookui::keymap::Keystroke;
+    pub fn keystroke(&self) -> Option<ptermui::keymap::Keystroke> {
+        use ptermui::keymap::Keystroke;
 
         let keystroke = match self {
             VoiceInputToggleKey::None => return None,
@@ -569,7 +569,7 @@ settings::macros::implement_setting_for_enum!(
     SyncToCloud::Globally(RespectUserSyncSetting::Yes),
     surface: settings::SettingSurfaces::GUI,
     private: false,
-    toml_path: "agents.rook_agent.other.thinking_display_mode",
+    toml_path: "agents.pterm_agent.other.thinking_display_mode",
     description: "Controls how agent thinking traces are displayed after streaming.",
 );
 
@@ -634,11 +634,11 @@ settings::macros::implement_setting_for_enum!(
     SyncToCloud::Globally(RespectUserSyncSetting::Yes),
     surface: settings::SettingSurfaces::GUI,
     private: false,
-    toml_path: "agents.rook_agent.other.orchestration_message_display_mode",
+    toml_path: "agents.pterm_agent.other.orchestration_message_display_mode",
     description: "Controls how child-agent messages are displayed.",
 );
 
-/// Which unit the usage entry displays in Rook Agent CLI.
+/// Which unit the usage entry displays in Polaris Terminal Agent CLI.
 #[derive(
     Default,
     Debug,
@@ -652,7 +652,7 @@ settings::macros::implement_setting_for_enum!(
     settings_value::SettingsValue,
 )]
 #[schemars(
-    description = "Which unit the usage entry displays in Rook Agent CLI.",
+    description = "Which unit the usage entry displays in Polaris Terminal Agent CLI.",
     rename_all = "snake_case"
 )]
 pub enum TuiUsageDisplayMode {
@@ -671,7 +671,7 @@ settings::macros::implement_setting_for_enum!(
     surface: settings::SettingSurfaces::TUI,
     private: false,
     toml_path: "agents.usage_display_mode",
-    description: "Which unit the usage entry displays in Rook Agent CLI: credits or provider cost.",
+    description: "Which unit the usage entry displays in Polaris Terminal Agent CLI: credits or provider cost.",
 );
 
 /// Unit for GUI usage and spend displays.
@@ -704,7 +704,7 @@ settings::macros::implement_setting_for_enum!(
     SyncToCloud::Globally(RespectUserSyncSetting::Yes),
     surface: settings::SettingSurfaces::GUI,
     private: false,
-    toml_path: "agents.rook_agent.other.usage_display_unit",
+    toml_path: "agents.pterm_agent.other.usage_display_unit",
     description: "Which unit the GUI's usage/spend displays show: credits or dollars.",
     feature_flag: FeatureFlag::PricingTransparency,
 );
@@ -718,7 +718,7 @@ impl UsageDisplayUnit {
     }
 }
 
-/// One configurable item in the Rook Agent CLI statusline.
+/// One configurable item in the Polaris Terminal Agent CLI statusline.
 #[derive(
     Debug,
     serde::Serialize,
@@ -732,7 +732,7 @@ impl UsageDisplayUnit {
     settings_value::SettingsValue,
 )]
 #[schemars(
-    description = "A configurable item in the Rook Agent CLI statusline.",
+    description = "A configurable item in the Polaris Terminal Agent CLI statusline.",
     rename_all = "snake_case"
 )]
 #[serde(rename_all = "snake_case")]
@@ -800,7 +800,7 @@ impl TuiStatuslineItem {
     }
 }
 
-/// Ordered and enabled items in the Rook Agent CLI statusline.
+/// Ordered and enabled items in the Polaris Terminal Agent CLI statusline.
 #[derive(
     Debug,
     serde::Serialize,
@@ -948,7 +948,7 @@ settings::macros::implement_setting_for_enum!(
     SyncToCloud::Globally(RespectUserSyncSetting::Yes),
     surface: settings::SettingSurfaces::GUI,
     private: false,
-    toml_path: "agents.rook_agent.other.default_prompt_submission_mode",
+    toml_path: "agents.pterm_agent.other.default_prompt_submission_mode",
     description: "Default behavior when submitting a new prompt while the agent is still responding.",
     feature_flag: FeatureFlag::QueueSlashCommand,
 );
@@ -1010,7 +1010,7 @@ settings::macros::implement_setting_for_enum!(
     SyncToCloud::Globally(RespectUserSyncSetting::Yes),
     surface: settings::SettingSurfaces::GUI,
     private: false,
-    toml_path: "agents.rook_agent.other.long_running_command_submission_mode",
+    toml_path: "agents.pterm_agent.other.long_running_command_submission_mode",
     description: "What happens when a prompt is submitted while an agent controls an agent-requested long-running command.",
     feature_flag: FeatureFlag::QueueSlashCommand,
 );
@@ -1218,7 +1218,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::No),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.is_any_ai_enabled",
+        toml_path: "agents.pterm_agent.is_any_ai_enabled",
         description: "Controls whether all AI features are enabled.",
     },
     // This field should not be referenced directly to lookup active AI enablement -- use the
@@ -1230,7 +1230,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::No),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.active_ai.enabled",
+        toml_path: "agents.pterm_agent.active_ai.enabled",
         description: "Controls whether proactive AI features like suggestions are enabled.",
     },
     // This field should not be referenced directly to lookup autodetection enablement -- use the
@@ -1242,7 +1242,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::ALL,
         private: false,
-        toml_path: "agents.rook_agent.input.ai_auto_detection_enabled",
+        toml_path: "agents.pterm_agent.input.ai_auto_detection_enabled",
         description: "Controls whether AI automatically detects natural language input.",
     },
     // This field should not be referenced directly -- use the
@@ -1257,7 +1257,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.input.nld_in_terminal_enabled",
+        toml_path: "agents.pterm_agent.input.nld_in_terminal_enabled",
         description: "Controls whether natural language detection is enabled in the terminal input.",
     },
     autodetection_command_denylist: AICommandDenylist {
@@ -1267,7 +1267,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.input.ai_command_denylist",
+        toml_path: "agents.pterm_agent.input.ai_command_denylist",
         description: "Commands to exclude from AI natural language autodetection.",
     },
     // This field should not be referenced directly to lookup intelligent autosuggestion enablement
@@ -1279,7 +1279,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.active_ai.intelligent_autosuggestions_enabled",
+        toml_path: "agents.pterm_agent.active_ai.intelligent_autosuggestions_enabled",
         description: "Controls whether AI-powered intelligent autosuggestions are enabled.",
     }
     // This field should not be referenced directly to lookup Prompt Suggestions
@@ -1294,7 +1294,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.active_ai.agent_mode_query_suggestions_enabled",
+        toml_path: "agents.pterm_agent.active_ai.agent_mode_query_suggestions_enabled",
         description: "Controls whether prompt suggestions are shown in agent mode.",
     }
 
@@ -1307,7 +1307,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.active_ai.code_suggestions_enabled",
+        toml_path: "agents.pterm_agent.active_ai.code_suggestions_enabled",
         description: "Controls whether AI code suggestions are enabled.",
     }
     // This field should not be referenced directly to lookup natural language autosuggestions
@@ -1320,7 +1320,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.active_ai.natural_language_autosuggestions_enabled",
+        toml_path: "agents.pterm_agent.active_ai.natural_language_autosuggestions_enabled",
         description: "Controls whether ghosted text autosuggestions are shown for AI input queries.",
         feature_flag: FeatureFlag::PredictAMQueries,
     }
@@ -1334,7 +1334,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.active_ai.shared_block_title_generation_enabled",
+        toml_path: "agents.pterm_agent.active_ai.shared_block_title_generation_enabled",
         description: "Controls whether titles are auto-generated when sharing blocks.",
     }
     // This field should not be referenced directly to lookup git operations AI autogen
@@ -1346,7 +1346,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.active_ai.git_operations_autogen_enabled",
+        toml_path: "agents.pterm_agent.active_ai.git_operations_autogen_enabled",
         description: "Controls whether AI auto-generates commit messages and PR title/body in the code review dialogs.",
     }
     // This field should not be referenced directly to lookup Rule Suggestions
@@ -1358,7 +1358,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.active_ai.rule_suggestions_enabled",
+        toml_path: "agents.pterm_agent.active_ai.rule_suggestions_enabled",
         description: "Controls whether the agent suggests rules to save after responses.",
         feature_flag: FeatureFlag::SuggestedRules,
     }
@@ -1542,7 +1542,7 @@ define_settings_group!(AISettings, settings: [
         surface: settings::SettingSurfaces::TUI,
         private: false,
         toml_path: "agents.statusline",
-        description: "Controls the order and visibility of Rook Agent CLI statusline items.",
+        description: "Controls the order and visibility of Polaris Terminal Agent CLI statusline items.",
     },
     // Whether or not the profile-level command autoexecution speedbump has been shown.
     //
@@ -1615,7 +1615,7 @@ define_settings_group!(AISettings, settings: [
         surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "cloud_platform.third_party_api_keys.aws_bedrock_credentials_enabled",
-        description: "Whether Rook should use your local AWS credentials for Bedrock-enabled requests.",
+        description: "Whether Polaris Terminal should use your local AWS credentials for Bedrock-enabled requests.",
     }
     // Whether to automatically run the AWS login command when Bedrock credentials are expired.
     //
@@ -1677,7 +1677,7 @@ define_settings_group!(AISettings, settings: [
         surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "cloud_platform.third_party_api_keys.gemini_enterprise_credentials_enabled",
-        description: "Whether Rook should route eligible requests through your workspace's Gemini Enterprise Google Cloud project.",
+        description: "Whether Polaris Terminal should route eligible requests through your workspace's Gemini Enterprise Google Cloud project.",
     }
     // Whether or not the user wants agent mode requests to use their saved rules.
     memory_enabled: MemoryEnabled {
@@ -1690,16 +1690,16 @@ define_settings_group!(AISettings, settings: [
         toml_path: "agents.knowledge.rules_enabled",
         description: "Whether the agent uses your saved rules during requests.",
     }
-    // Whether rook drive context should be included in AI requests
-    rook_drive_context_enabled: RookDriveContextEnabled {
+    // Whether polaris-terminal drive context should be included in AI requests
+    pterm_drive_context_enabled: PtermDriveContextEnabled {
         type: bool,
         default: true,
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.knowledge.rook_drive_context_enabled",
-        description: "Whether Rook Drive context is included in AI requests.",
+        toml_path: "agents.knowledge.pterm_drive_context_enabled",
+        description: "Whether Polaris Terminal Drive context is included in AI requests.",
     }
 
     // Whether the codebase speedbump banner has been permanently dismissed for a given repo path.
@@ -1814,7 +1814,7 @@ define_settings_group!(AISettings, settings: [
     }
 
     // This is not a user-visible setting - it's merely a one-time flag to track if the
-    // Rook Agent CLI launch modal has been shown to the user.
+    // Polaris Terminal Agent CLI launch modal has been shown to the user.
     //
     // We model it as a setting so it's only shown once to a given user regardless of the number of
     // devices they use.
@@ -1861,21 +1861,21 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.other.should_show_oz_updates_in_zero_state",
+        toml_path: "agents.pterm_agent.other.should_show_oz_updates_in_zero_state",
         description: "Whether the \"What's new\" section is shown in the agent view.",
     }
 
-    // Whether or not the user has enabled fallback to Rook credits for user-provided models.
-    can_use_rook_credits_for_fallback: CanUseRookCreditsForFallback {
+    // Whether or not the user has enabled fallback to Polaris Terminal credits for user-provided models.
+    can_use_pterm_credits_for_fallback: CanUsePtermCreditsForFallback {
         type: bool,
         default: false,
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::ALL,
         private: false,
-        storage_key: "CanUseRookCreditsWithByok",
-        toml_path: "cloud_platform.third_party_api_keys.can_use_rook_credits_with_byok",
-        description: "Whether Rook credits can be used as a fallback for user-provided models.",
+        storage_key: "CanUsePtermCreditsWithByok",
+        toml_path: "cloud_platform.third_party_api_keys.can_use_pterm_credits_with_byok",
+        description: "Whether Polaris Terminal credits can be used as a fallback for user-provided models.",
     }
 
     should_render_use_agent_footer_for_user_commands: ShouldRenderUseAgentToolbarForUserCommands {
@@ -1885,7 +1885,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.other.should_render_use_agent_toolbar_for_user_commands",
+        toml_path: "agents.pterm_agent.other.should_render_use_agent_toolbar_for_user_commands",
         description: "Whether to show the \"Use Agent\" footer for terminal commands.",
     }
 
@@ -2016,22 +2016,22 @@ define_settings_group!(AISettings, settings: [
         toml_path: "general.default_tab_config_path",
     }
 
-    // Whether computer use is enabled for cloud agent conversations started from the Rook app.
+    // Whether computer use is enabled for cloud agent conversations started from the Polaris Terminal app.
     // This setting is only used when the AI autonomy setting is AlwaysAsk or not set.
     cloud_agent_computer_use_enabled: CloudAgentComputerUseEnabled {
         type: bool,
-        default: rook_core::channel::ChannelState::channel().is_dogfood(),
+        default: pterm_core::channel::ChannelState::channel().is_dogfood(),
         supported_platforms: SupportedPlatforms::DESKTOP,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.other.cloud_agent_computer_use_enabled",
+        toml_path: "agents.pterm_agent.other.cloud_agent_computer_use_enabled",
         description: "Whether computer use is enabled for cloud agent conversations.",
     }
 
 
     // Whether file-based MCP servers from third-party AI tools (e.g. Claude, Codex) should
-    // be automatically detected and spawned. Rook-native config files (.rook/.mcp.json) are
+    // be automatically detected and spawned. Polaris Terminal-native config files (.polaris/terminal/.mcp.json) are
     // always detected and spawned, regardless of this setting.
     file_based_mcp_enabled: FileBasedMcpEnabled {
         type: bool,
@@ -2070,7 +2070,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.input.include_agent_commands_in_history",
+        toml_path: "agents.pterm_agent.input.include_agent_commands_in_history",
         description: "Whether agent-executed commands are included in command history.",
     }
 
@@ -2082,7 +2082,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::ALL,
         private: false,
-        toml_path: "agents.rook_agent.other.auto_approve_bypasses_command_denylist",
+        toml_path: "agents.pterm_agent.other.auto_approve_bypasses_command_denylist",
         description: "Whether auto-approve bypasses the command denylist.",
     }
 
@@ -2094,7 +2094,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.other.show_conversation_history",
+        toml_path: "agents.pterm_agent.other.show_conversation_history",
         description: "Whether conversation history appears in the tools panel.",
     }
 
@@ -2107,7 +2107,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.other.show_agent_notifications",
+        toml_path: "agents.pterm_agent.other.show_agent_notifications",
         description: "Whether agent notifications are shown.",
     }
 
@@ -2138,7 +2138,7 @@ define_settings_group!(AISettings, settings: [
 
     // Whether Oz should add attribution (co-author line) to commit messages and PRs.
     // This is the user-level preference; it may be overridden by the window's team's
-    // `enable_rook_attribution` AdminEnablementSetting (see
+    // `enable_pterm_attribution` AdminEnablementSetting (see
     // `UserWorkspaces::get_agent_attribution_setting`).
     agent_attribution_enabled: AgentAttributionEnabled {
         type: bool,
@@ -2147,8 +2147,8 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::No),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.other.agent_attribution_enabled",
-        description: "Whether the Rook Agent adds an attribution co-author line to commit messages and pull requests it creates.",
+        toml_path: "agents.pterm_agent.other.agent_attribution_enabled",
+        description: "Whether the Polaris Terminal Agent adds an attribution co-author line to commit messages and pull requests it creates.",
     }
 
     should_force_disable_cloud_handoff: ShouldForceDisableCloudHandoff {
@@ -2158,7 +2158,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.other.should_force_disable_cloud_handoff",
+        toml_path: "agents.pterm_agent.other.should_force_disable_cloud_handoff",
         description: "Whether to force-disable local-to-cloud handoff.",
     }
 
@@ -2169,7 +2169,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.other.should_force_disable_ampersand_handoff",
+        toml_path: "agents.pterm_agent.other.should_force_disable_ampersand_handoff",
         description: "Whether to force-disable the & prefix for cloud handoff compose mode.",
     }
 
@@ -2180,8 +2180,8 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         surface: settings::SettingSurfaces::GUI,
         private: false,
-        toml_path: "agents.rook_agent.other.auto_handoff_on_sleep_enabled",
-        description: "Whether Rook automatically hands off local agent conversations to cloud when the computer is about to sleep.",
+        toml_path: "agents.pterm_agent.other.auto_handoff_on_sleep_enabled",
+        description: "Whether Polaris Terminal automatically hands off local agent conversations to cloud when the computer is about to sleep.",
     }
 
     // This is not a user-visible setting - it's merely a one-time flag to track if the
@@ -2316,48 +2316,48 @@ impl AISettings {
             return None;
         }
         let path = std::path::Path::new(path_str);
-        crate::user_config::RookConfig::as_ref(app)
+        crate::user_config::PtermConfig::as_ref(app)
             .tab_configs()
             .iter()
             .find(|config| config.source_path.as_deref().is_some_and(|p| p == path))
             .cloned()
     }
 
-    pub fn is_active_ai_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_active_ai_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_any_ai_enabled(app)
             && *self.is_active_ai_enabled_internal
             && AppExecutionMode::as_ref(app).allows_active_ai()
     }
 
-    pub fn is_prompt_suggestions_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_prompt_suggestions_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.prompt_suggestions_enabled_internal
     }
 
-    pub fn is_rule_suggestions_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_rule_suggestions_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.rule_suggestions_enabled_internal
     }
 
-    pub fn is_code_suggestions_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_code_suggestions_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.code_suggestions_enabled_internal
     }
 
-    pub fn is_natural_language_autosuggestions_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_natural_language_autosuggestions_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.natural_language_autosuggestions_enabled_internal
     }
 
-    pub fn is_shared_block_title_generation_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_shared_block_title_generation_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.shared_block_title_generation_enabled_internal
     }
 
-    pub fn is_git_operations_autogen_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_git_operations_autogen_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.git_operations_autogen_enabled_internal
     }
 
-    pub fn is_intelligent_autosuggestions_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_intelligent_autosuggestions_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.intelligent_autosuggestions_enabled_internal
     }
 
-    pub fn is_voice_input_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_voice_input_enabled(&self, app: &ptermui::AppContext) -> bool {
         // Voice input is conditionally-compiled because it requires additional dependencies on some platforms.
         cfg!(feature = "voice_input")
             && self.is_any_ai_enabled(app)
@@ -2374,7 +2374,7 @@ impl AISettings {
     ///
     /// If `FeatureFlag::AgentView` is enabled, this specifically gates NLD enablement in the agent
     /// view only.
-    pub fn is_ai_autodetection_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_ai_autodetection_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_any_ai_enabled(app) && *self.ai_autodetection_enabled_internal
     }
 
@@ -2383,19 +2383,19 @@ impl AISettings {
     /// This is only used when `FeatureFlag::AgentView` is enabled.
     /// If the user has not explicitly set this setting, it defaults to the value of
     /// `ai_autodetection_enabled_internal`.
-    pub fn is_nld_in_terminal_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_nld_in_terminal_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_any_ai_enabled(app) && *self.nld_in_terminal_enabled_internal
     }
 
-    pub fn is_memory_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_memory_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_any_ai_enabled(app) && *self.memory_enabled
     }
 
-    pub fn is_rook_drive_context_enabled(&self, app: &rookui::AppContext) -> bool {
-        self.is_any_ai_enabled(app) && *self.rook_drive_context_enabled
+    pub fn is_pterm_drive_context_enabled(&self, app: &ptermui::AppContext) -> bool {
+        self.is_any_ai_enabled(app) && *self.pterm_drive_context_enabled
     }
 
-    pub fn is_file_based_mcp_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_file_based_mcp_enabled(&self, app: &ptermui::AppContext) -> bool {
         if !FeatureFlag::FileBasedMcp.is_enabled() || !self.is_any_ai_enabled(app) {
             return false;
         }
@@ -2410,14 +2410,14 @@ impl AISettings {
         *self.file_based_mcp_enabled
     }
 
-    pub fn is_orchestration_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_orchestration_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_any_ai_enabled(app)
     }
 
     /// Returns true when local-to-cloud handoff is effectively enabled.
     /// False when the user/org has disabled it, cloud conversations are off,
     /// or AI is globally off.
-    pub fn is_cloud_handoff_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_cloud_handoff_enabled(&self, app: &ptermui::AppContext) -> bool {
         if !self.is_any_ai_enabled(app) || *self.should_force_disable_cloud_handoff {
             return false;
         }
@@ -2436,11 +2436,11 @@ impl AISettings {
             crate::workspaces::workspace::AdminEnablementSetting::Disable
         )
     }
-    pub fn is_ampersand_handoff_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_ampersand_handoff_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_cloud_handoff_enabled(app) && !*self.should_force_disable_ampersand_handoff
     }
 
-    pub fn is_auto_handoff_on_sleep_enabled(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_auto_handoff_on_sleep_enabled(&self, app: &ptermui::AppContext) -> bool {
         self.is_cloud_handoff_enabled(app)
             && self
                 .auto_handoff_on_sleep_enabled

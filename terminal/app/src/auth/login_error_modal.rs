@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
 use pathfinder_color::ColorU;
-use rookui::elements::{
+use ptermui::elements::{
     Align, Border, ConstrainedBox, Container, CornerRadius, Flex, ParentElement, Shrinkable,
 };
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::ui_components::text::Span;
-use rookui::{AppContext, Element, SingletonEntity as _};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::ui_components::text::Span;
+use ptermui::{AppContext, Element, SingletonEntity as _};
 
 use crate::appearance::Appearance;
 use crate::modal::MODAL_CORNER_RADIUS;

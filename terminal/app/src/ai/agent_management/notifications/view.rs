@@ -1,19 +1,21 @@
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_error;
-use rookui::elements::new_scrollable::{ScrollableAppearance, SingleAxisConfig};
-use rookui::elements::{
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_error;
+use ptermui::elements::new_scrollable::{ScrollableAppearance, SingleAxisConfig};
+use ptermui::elements::{
     Border, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Dismiss, DispatchEventResult, Element, Empty, EventHandler,
     Fill as ElementFill, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     NewScrollable, Padding, ParentElement, Radius, SavePosition, ScrollTarget,
     ScrollToPositionMode, ScrollbarWidth, Shrinkable,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::FixedBinding;
-use rookui::keymap::macros::id;
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::fonts::Weight;
+use ptermui::keymap::FixedBinding;
+use ptermui::keymap::macros::id;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
+    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 
 use crate::ai::agent_management::notifications::item::NotificationFilter;
 use crate::ai::agent_management::notifications::item_rendering::{
@@ -57,7 +59,7 @@ impl Entity for NotificationMailboxView {
 
 #[derive(Debug, Clone)]
 pub enum NotificationMailboxViewEvent {
-    NavigateToTerminal { terminal_view_id: rookui::EntityId },
+    NavigateToTerminal { terminal_view_id: ptermui::EntityId },
     Dismissed,
 }
 

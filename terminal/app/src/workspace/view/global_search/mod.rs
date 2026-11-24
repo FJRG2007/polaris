@@ -1,5 +1,5 @@
-use rook_ripgrep::search::Submatch;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_ripgrep::search::Submatch;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
 
 pub struct SearchConfig {
     pub use_regex: bool,

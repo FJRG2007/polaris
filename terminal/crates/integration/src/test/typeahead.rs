@@ -1,16 +1,16 @@
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::util::current_shell_starter_and_version;
-use rook::integration_testing::terminal::{
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::util::current_shell_starter_and_version;
+use polaris_terminal::integration_testing::terminal::{
     assert_active_block_output_for_single_terminal_in_tab, assert_input_editor_contents,
     assert_long_running_block_executing_for_single_terminal_in_tab,
     assert_no_visible_background_blocks, wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::view_getters::single_terminal_view_for_tab;
-use rook::terminal::model::block::TranscriptScope;
-use rook::terminal::model::terminal_model::BlockIndex;
-use rook::terminal::shell::{Shell, ShellType};
-use rookui_core::integration::{AssertionCallback, AssertionOutcome, TestStep};
-use rookui_core::{async_assert, async_assert_eq};
+use polaris_terminal::integration_testing::view_getters::single_terminal_view_for_tab;
+use polaris_terminal::terminal::model::block::TranscriptScope;
+use polaris_terminal::terminal::model::terminal_model::BlockIndex;
+use polaris_terminal::terminal::shell::{Shell, ShellType};
+use ptermui_core::integration::{AssertionCallback, AssertionOutcome, TestStep};
+use ptermui_core::{async_assert, async_assert_eq};
 
 use super::{Builder, new_builder};
 use crate::util::skip_if_powershell_core_2303;
@@ -65,7 +65,7 @@ macro_rules! check_command {
     };
 }
 
-/// Tests that the shell reports its input buffer to the Rook typeahead model after
+/// Tests that the shell reports its input buffer to the Polaris Terminal typeahead model after
 /// a long-running command completes.
 pub fn test_input_reporting_posix_shells() -> Builder {
     // When the shell can report its input buffer, we can handle typeahead with
@@ -205,10 +205,10 @@ pub fn test_background_output() -> Builder {
     use std::io::Write;
     use std::os::unix::prelude::OpenOptionsExt;
 
+    use polaris_terminal::integration_testing::block::assert_background_output;
+    use polaris_terminal::integration_testing::terminal::execute_command_for_single_terminal_in_tab;
+    use polaris_terminal::integration_testing::terminal::util::ExpectedExitStatus;
     use regex::Regex;
-    use rook::integration_testing::block::assert_background_output;
-    use rook::integration_testing::terminal::execute_command_for_single_terminal_in_tab;
-    use rook::integration_testing::terminal::util::ExpectedExitStatus;
 
     let (starter, _) = current_shell_starter_and_version();
     let (spawn_command, kill_command) = match starter.shell_type() {

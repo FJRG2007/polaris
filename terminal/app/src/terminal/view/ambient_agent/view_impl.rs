@@ -3,14 +3,14 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use rook_cli::agent::Harness;
-use rook_core::features::FeatureFlag;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::appearance::Appearance;
-use rook_terminal::model::BlockId;
-use rookui::elements::Align;
-use rookui::prelude::{Empty, Vector2F};
-use rookui::{
+use pterm_cli::agent::Harness;
+use pterm_core::features::FeatureFlag;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::appearance::Appearance;
+use pterm_terminal::model::BlockId;
+use ptermui::elements::Align;
+use ptermui::prelude::{Empty, Vector2F};
+use ptermui::{
     AppContext, Element, EntityId, ModelHandle, SingletonEntity, ViewContext, ViewHandle,
 };
 
@@ -965,7 +965,7 @@ impl TerminalView {
     /// Prefers cloud `AmbientAgentTask` data when this terminal view has an
     /// associated task ID. Otherwise falls back to populating the panel from
     /// the active local `AIConversation`, so the same panel can surface
-    /// conversation metadata for non-cloud Rook Agent runs (APP-3595).
+    /// conversation metadata for non-cloud Polaris Terminal Agent runs (APP-3595).
     pub(in crate::terminal::view) fn fetch_and_update_conversation_details_panel(
         &mut self,
         ctx: &mut ViewContext<Self>,

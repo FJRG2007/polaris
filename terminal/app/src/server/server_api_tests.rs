@@ -77,7 +77,10 @@ fn transient_5xx_still_retries() {
 fn at_capacity_header_wraps_capacity_error_and_still_carries_status() {
     let err = error_from_mock_response(
         403,
-        &[(ROOK_ERROR_CODE_HEADER, ROOK_ERROR_CODE_AT_CAPACITY)],
+        &[(
+            POLARIS_TERMINAL_ERROR_CODE_HEADER,
+            POLARIS_TERMINAL_ERROR_CODE_AT_CAPACITY,
+        )],
         r#"{"error": "at capacity", "running_agents": 5}"#,
     );
 
@@ -95,7 +98,10 @@ fn at_capacity_header_wraps_capacity_error_and_still_carries_status() {
 fn out_of_credits_429_wraps_quota_limit_and_stays_transient() {
     let err = error_from_mock_response(
         429,
-        &[(ROOK_ERROR_CODE_HEADER, ROOK_ERROR_CODE_OUT_OF_CREDITS)],
+        &[(
+            POLARIS_TERMINAL_ERROR_CODE_HEADER,
+            POLARIS_TERMINAL_ERROR_CODE_OUT_OF_CREDITS,
+        )],
         r#"{"userDisplayMessage": "You're out of credits"}"#,
     );
 

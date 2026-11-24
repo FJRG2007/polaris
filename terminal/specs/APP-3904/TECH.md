@@ -23,7 +23,7 @@ The `ExpandEditToPane` feature flag controls how code diff views are opened:
 - **Disabled**: The diff opens in a new tab.
 
 When the sidebar renders tab rows, `PaneProps::new` resolves all display properties from the visible pane. For a temporary replacement, the visible pane is the `CodeDiffPane`, so the sidebar shows:
-- Icon: `RookIcon::Diff` (instead of the original terminal/agent icon)
+- Icon: `PtermIcon::Diff` (instead of the original terminal/agent icon)
 - Title: "Requested Edit" (hardcoded in `CodeDiffPane::from_view`)
 - Type: `TypedPane::CodeDiff` (loses all terminal-specific metadata like conversation title, working directory, git branch)
 - Badge/subtitle: empty

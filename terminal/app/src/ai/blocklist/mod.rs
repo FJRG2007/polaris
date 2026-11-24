@@ -37,7 +37,7 @@ pub(crate) mod codebase_index_speedbump_banner;
 pub(crate) mod telemetry_banner;
 pub(crate) mod view_util;
 
-// Consumed by `tui_export` for the `rook_tui` frontend.
+// Consumed by `tui_export` for the `pterm_tui` frontend.
 #[cfg_attr(not(feature = "tui"), allow(unused_imports))]
 pub use action_model::AIActionStatus;
 pub(crate) use action_model::recording_controller::RecordingController;
@@ -45,7 +45,7 @@ pub(crate) use action_model::recording_controller::RecordingController;
 pub(crate) use action_model::recording_finalize::{
     FinalizeReason, finalize_recording_for_conversation,
 };
-// Consumed by `tui_export` for the `rook_tui` frontend.
+// Consumed by `tui_export` for the `pterm_tui` frontend.
 #[cfg(feature = "tui")]
 pub use action_model::{
     AskUserQuestionExecutor, NewConversationDecision, RequestFileEditsExecutor,
@@ -58,10 +58,10 @@ pub(crate) use action_model::{
     FileReadResult, ReadFileContextResult, RequestFileEditsFormatKind, apply_edits,
     read_local_file_context,
 };
-// Consumed by `tui_export` for the `rook_tui` frontend.
+// Consumed by `tui_export` for the `pterm_tui` frontend.
 #[cfg(feature = "tui")]
 pub use action_model::{RunAgentsExecutor, RunAgentsExecutorEvent, RunAgentsSpawningSnapshot};
-// Consumed by `tui_export` for the `rook_tui` frontend's child-agent
+// Consumed by `tui_export` for the `pterm_tui` frontend's child-agent
 // materializer, in addition to the GUI pane-group dispatch.
 #[cfg_attr(
     any(target_family = "wasm", not(feature = "tui")),

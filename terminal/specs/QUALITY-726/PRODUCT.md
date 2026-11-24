@@ -7,7 +7,7 @@ Remote cloud agents are already viewed through shared-session viewers, and local
 1. A viewer opening a parent/orchestrator session can inspect the orchestrator and all direct child agents from the existing orchestration pill bar.
 2. Sharing a parent session makes the direct child sessions accessible from that parent session.
 3. Opening a direct child session link stays scoped to that child session.
-4. The parent-scoped pill bar appears consistently in native Rook and the web/WASM shared-session viewer, with platform-specific affordances following the existing pill bar behavior.
+4. The parent-scoped pill bar appears consistently in native Polaris Terminal and the web/WASM shared-session viewer, with platform-specific affordances following the existing pill bar behavior.
 5. The behavior is consistent across local-local, local-remote, remote-remote, and remote-local orchestration topologies from the viewer’s perspective.
 ## Figma
 Figma: none provided. Use the existing orchestration pill bar behavior and visual treatment. This spec does not redefine the pill bar’s layout, status badges, hover cards, ordering, truncation, or other interaction details.
@@ -27,11 +27,11 @@ Figma: none provided. Use the existing orchestration pill bar behavior and visua
 11. Sharing or opening a direct child session does not implicitly share or navigate to the parent or sibling child sessions.
 12. Direct child links may still show human-readable names for agents referenced in that child’s transcript. Agent names are considered orchestration metadata that may be mutually visible between parent and child sessions when those sessions are otherwise accessible.
 ### Viewer entrypoints and pill bar presence
-13. When a user starts or opens a remote orchestrator from the `/cloud-agent` flow in native Rook, the resulting shared-session viewer is parent-scoped and shows the existing orchestration pill bar when the orchestrator has direct children.
+13. When a user starts or opens a remote orchestrator from the `/cloud-agent` flow in native Polaris Terminal, the resulting shared-session viewer is parent-scoped and shows the existing orchestration pill bar when the orchestrator has direct children.
 14. When a user opens an orchestrator session from the Oz web UI, the web viewer is parent-scoped and shows the existing orchestration pill bar when the orchestrator has direct children.
-15. When a user opens a `rook://shared_session/...` or web shared-session link for an orchestrator, native Rook or the web viewer opens a parent-scoped view and shows the existing orchestration pill bar when the orchestrator has direct children.
+15. When a user opens a `polaris-terminal://shared_session/...` or web shared-session link for an orchestrator, native Polaris Terminal or the web viewer opens a parent-scoped view and shows the existing orchestration pill bar when the orchestrator has direct children.
 16. When a user explicitly shares a local orchestrator session, the resulting parent session link opens a parent-scoped view and shows the existing orchestration pill bar when the orchestrator has direct children.
-17. When a user opens a direct child session link in native Rook or on the web, Rook opens the child-scoped shared-session view. The child-scoped view does not show the parent/orchestrator pill, sibling child pills, or parent orchestration navigation.
+17. When a user opens a direct child session link in native Polaris Terminal or on the web, Polaris Terminal opens the child-scoped shared-session view. The child-scoped view does not show the parent/orchestrator pill, sibling child pills, or parent orchestration navigation.
 18. “Open in desktop” or equivalent handoff actions preserve the link target. A parent link remains parent-scoped after handoff; a child link remains child-scoped after handoff.
 19. Shared-session viewers that are created internally so a parent pill can display a remote child do not create additional visible browser tabs, windows, or user-facing links by themselves.
 20. If the viewer joins a parent-scoped session before any child has been spawned, the pill bar appears after the first direct child becomes known. A short delay is acceptable.

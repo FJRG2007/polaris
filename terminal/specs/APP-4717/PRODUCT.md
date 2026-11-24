@@ -23,7 +23,7 @@ Figma: none provided. Reference is Cursor's queue UI, which shows an Enter-to-se
    - Enter-only conditions (non-empty buffer, CLI-agent rich input open) hide the hint and suppress Enter but do not disable the Send-now buttons.
 6. If the buffer contains any content (including whitespace-only content), Enter behaves exactly as it does today and the hint is hidden.
 7. Header hint:
-   - The panel header shows an ⏎ keycap followed by "to send" next to the "N queued" label, matching the look and spacing of Rook's existing keystroke hints (e.g. "? for help"). The "to send" text uses the same color as the "N queued" label; the keycap glyph is dimmer (disabled-text styling) so it reads as a secondary affordance.
+   - The panel header shows an ⏎ keycap followed by "to send" next to the "N queued" label, matching the look and spacing of Polaris Terminal's existing keystroke hints (e.g. "? for help"). The "to send" text uses the same color as the "N queued" label; the keycap glyph is dimmer (disabled-text styling) so it reads as a secondary affordance.
    - The hint is visible exactly when an empty-buffer Enter would send the top row, and hidden otherwise (non-empty buffer, no sendable top row, sending unavailable per 5, panel hidden, or any case in 8–10). The hint and the Enter behavior must never disagree.
 8. Whenever the panel is not rendered (no queue, inline menu like slash commands or the model selector is open, feature flag off), Enter keeps its existing behavior and no hint is shown.
 9. While a queued row is in inline edit mode, Enter commits that edit as today (focus is in the row's editor, not the input). The header hint is hidden during an inline edit.

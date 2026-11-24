@@ -2,7 +2,7 @@
 
 ## Summary
 
-Users can delete Rook-managed harness auth secrets directly from the auth secret selector chip menu. The delete affordance appears as a right-aligned `X` button on each existing secret row, opens a confirmation modal, removes the secret from the server after confirmation, updates the menu state, and confirms success or failure with a toast.
+Users can delete Polaris Terminal-managed harness auth secrets directly from the auth secret selector chip menu. The delete affordance appears as a right-aligned `X` button on each existing secret row, opens a confirmation modal, removes the secret from the server after confirmation, updates the menu state, and confirms success or failure with a toast.
 
 ## Figma
 
@@ -12,10 +12,10 @@ Figma: none provided. The prompt includes screenshots of the auth selector delet
 
 1. The feature applies to the auth secret selector chip menu shown for non-Oz cloud harnesses after auth-secret FTUX has been completed.
 
-2. When the auth secret selector chip menu opens, each existing Rook-managed secret row shows:
+2. When the auth secret selector chip menu opens, each existing Polaris Terminal-managed secret row shows:
    - The secret name on the left.
    - A right-aligned `X` button on the same row.
-   - Hover, selected, spacing, icon, and text styling consistent with existing Rook menus.
+   - Hover, selected, spacing, icon, and text styling consistent with existing Polaris Terminal menus.
 
 3. The `X` button appears only on existing managed-secret rows. It does not appear on:
    - The header row.
@@ -32,7 +32,7 @@ Figma: none provided. The prompt includes screenshots of the auth selector delet
    - Title: "Delete secret".
    - Description: "Are you sure you want to delete {SECRET_NAME}? This action cannot be undone. Any agents or environments referencing this secret will no longer have access to it."
    - Buttons: "Cancel" and "Delete".
-   - Layout and destructive styling consistent with existing Rook confirmation dialogs and the provided mock.
+   - Layout and destructive styling consistent with existing Polaris Terminal confirmation dialogs and the provided mock.
 
 7. Choosing "Cancel", dismissing the modal, or otherwise closing it leaves the secret untouched and does not start a delete request. Choosing "Delete" starts deletion for the secret named in the modal.
 

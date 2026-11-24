@@ -36,7 +36,7 @@ The mocks contain several inconsistencies that are resolved as follows:
 
 1. **"Code editor" pane**: The mock shows a pane titled "Code editor" with a generic `</>` icon and subtitle "Multiple files". There is no separate "Code editor" pane type — this is the Code pane (file editor). The correct title is the active file name (e.g., `view_ui.rs`), and the subtitle should read `and N more` when multiple tabs are open.
 2. **"Testing block unfurling"**: The mock uses a file icon but shows "Last updated 5 mins ago by Zach Bai" metadata, which is notebook-specific. This item is a Notebook pane. The icon should be the notebook/file icon, and the metadata is correct for notebooks.
-3. **Settings directory line**: The expanded mock shows `~/rook-internal` as the description line for Settings. Settings has no meaningful working directory. The description line should show the active settings page name instead.
+3. **Settings directory line**: The expanded mock shows `~/polaris-terminal-internal` as the description line for Settings. Settings has no meaningful working directory. The description line should show the active settings page name instead.
 4. **"No unsaved changes" text**: The expanded mock shows explicit "No unsaved changes" text for a file pane. This text should not appear. Instead, only show the unsaved-changes dot indicator when the file IS dirty; show nothing when clean.
 
 ## User experience
@@ -171,7 +171,7 @@ The section renders as a set of selectable options (same style as "Pane title as
 
 **Expanded (default — "Pane title as: Command"):**
 - **Title:** Same as compact title. Optionally includes the unread-activity dot (see Indicators below).
-- **Description (line 2):** Working directory path (e.g., `~/rook-internal`).
+- **Description (line 2):** Working directory path (e.g., `~/polaris-terminal-internal`).
 - **Metadata (line 3):**
   - Left: `[git-branch icon] branch-name`
   - Right: diff stats badge (`+N -M`, green/red colored) if the working tree has changes; PR badge (`[GitHub icon] #NNNN`) if a pull request is associated.
@@ -186,7 +186,7 @@ The section renders as a set of selectable options (same style as "Pane title as
 
 **Single file open — Compact:**
 - **Title:** Filename (e.g., `shared_sessions.rs`). Includes unsaved-changes dot if dirty.
-- **Subtitle:** File path (e.g., `/peterrajani/rook-internal/src`).
+- **Subtitle:** File path (e.g., `/peterrajani/polaris-terminal-internal/src`).
 
 **Single file open — Expanded:**
 - **Title:** Filename. Includes unsaved-changes dot if dirty.

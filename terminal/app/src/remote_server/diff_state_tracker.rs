@@ -10,9 +10,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use itertools::Itertools;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle};
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle};
 
 use super::protocol::RequestId;
 use super::server_model::ConnectionId;

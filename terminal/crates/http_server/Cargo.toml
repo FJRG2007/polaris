@@ -12,6 +12,6 @@ log.workspace = true
 tokio.workspace = true
 tower.workspace = true
 tower-http = { workspace = true, features = ["trace", "cors"] } 
-rookui_core.workspace = true
-rook_core.workspace = true
-rook_errors.workspace = true
+ptermui_core.workspace = true
+pterm_core.workspace = true
+pterm_errors.workspace = true

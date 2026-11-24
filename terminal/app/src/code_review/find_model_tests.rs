@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use pterm_core::ui::appearance::Appearance;
+use pterm_editor::content::buffer::InitialBufferState;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use ptermui::elements::Empty;
+use ptermui::platform::WindowStyle;
+use ptermui::{App, Element as _, ModelHandle, SingletonEntity, ViewHandle};
 use repo_metadata::repositories::DetectedRepositories;
-use rook_core::ui::appearance::Appearance;
-use rook_editor::content::buffer::InitialBufferState;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rookui::elements::Empty;
-use rookui::platform::WindowStyle;
-use rookui::{App, Element as _, ModelHandle, SingletonEntity, ViewHandle};
 use string_offset::CharOffset;
 
 use super::*;
@@ -36,12 +36,12 @@ use crate::workspaces::user_workspaces::UserWorkspaces;
 #[derive(Default)]
 struct TestView;
 
-impl rookui::Entity for TestView {
+impl ptermui::Entity for TestView {
     type Event = ();
 }
 
-impl rookui::View for TestView {
-    fn render(&self, _: &rookui::AppContext) -> Box<dyn rookui::Element> {
+impl ptermui::View for TestView {
+    fn render(&self, _: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         Empty::new().finish()
     }
 
@@ -50,7 +50,7 @@ impl rookui::View for TestView {
     }
 }
 
-impl rookui::TypedActionView for TestView {
+impl ptermui::TypedActionView for TestView {
     type Action = ();
 }
 

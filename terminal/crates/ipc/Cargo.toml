@@ -1,5 +1,5 @@
 [package]
-authors = ["Rook Contributors"]
+authors = ["Polaris Terminal Contributors"]
 edition = "2024"
 name = "ipc"
 version = "0.1.0"
@@ -18,7 +18,7 @@ rand.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
-rookui_core.workspace = true
+ptermui_core.workspace = true
 
 [dev-dependencies]
 parking_lot.workspace = true

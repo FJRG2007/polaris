@@ -1,5 +1,5 @@
 use anyhow::Error;
-use rookui::App;
+use ptermui::App;
 
 use super::*;
 use crate::editor::EditOrigin;

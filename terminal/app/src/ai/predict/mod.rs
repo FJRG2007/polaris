@@ -1,6 +1,6 @@
-//! This module contains all code relevant to Agent Predict within Rook.
+//! This module contains all code relevant to Agent Predict within Polaris Terminal.
 //!
-//! Agent Predict attempts to predict the next action the user will take in Rook.
+//! Agent Predict attempts to predict the next action the user will take in Polaris Terminal.
 
 pub(crate) mod generate_ai_input_suggestions;
 pub(crate) mod generate_am_query_suggestions;

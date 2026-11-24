@@ -112,8 +112,8 @@ mod run {
 
     use command::Output;
     use command::r#async::Command;
-    use rook_completer::completer::{CommandExitStatus, CommandOutput};
-    use rook_core::command::ExitCode;
+    use pterm_completer::completer::{CommandExitStatus, CommandOutput};
+    use pterm_core::command::ExitCode;
 
     use super::{LocalGitQuery, format_branch_status};
 

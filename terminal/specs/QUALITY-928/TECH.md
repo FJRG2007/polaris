@@ -10,7 +10,7 @@ answers two questions for any orchestrator the user has open:
 
 **The concrete problem this work addresses:** when a cloud-hosted orchestrator
 calls `run_agents`, the children execute in a separate sandbox that the local
-Rook client never created. For a shared-session viewer of that orchestrator the
+Polaris Terminal client never created. For a shared-session viewer of that orchestrator the
 client's process also never created the children. In both cases the children
 must be discovered by the client rather than found in its local state.
 
@@ -34,7 +34,7 @@ per-child state. Pane materialization and the restore seed path land in M2,
 which builds directly on this foundation.
 
 Everything below is gated by `FeatureFlag::OrchestrationUnifiedStack`
-(`crates/rook_features/src/lib.rs:715`, listed in `DOGFOOD_FLAGS`). With the
+(`crates/pterm_features/src/lib.rs:715`, listed in `DOGFOOD_FLAGS`). With the
 flag off, the client takes the separate owner and viewer paths described in §8.
 
 The moving parts:
@@ -253,7 +253,7 @@ watching it as a shared-session viewer. For the **child** it means whether the
 child runs in-process (local) or as a separate cloud task (remote,
 `is_remote_child = true`).
 
-**1. Local parent / local child.** The parent is a local Rook agent and the
+**1. Local parent / local child.** The parent is a local Polaris Terminal agent and the
 child is spawned in-process. `create_hidden_child_agent_conversation` creates a
 real child conversation (`is_remote = false`) with a hidden terminal pane, and
 it is persisted normally. Discovery needs no server round trip — the executor
@@ -263,7 +263,7 @@ the database, `restore_missing_child_agent_panes_for_parent` finds it in
 takes the local branch: a hidden terminal pane restoring the child conversation.
 Task-driven dispatch is not involved.
 
-**2. Local parent / remote child.** The parent is a local Rook agent; the child
+**2. Local parent / remote child.** The parent is a local Polaris Terminal agent; the child
 is dispatched to a cloud runner. The child conversation is a placeholder with
 `is_remote_child = true` and is not persisted. Discovery is live:
 `child_agent_started` on the parent's ancestor SSE →

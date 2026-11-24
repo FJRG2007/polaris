@@ -272,11 +272,11 @@ pub trait Actor: Send + Sync + 'static {
 ///
 /// A real recorder is available on Linux (X11) and macOS (avfoundation); every
 /// other platform, and any `test-util` build, gets a no-op recorder that reports
-/// recording as unsupported. On macOS, setting `ROOK_MOCK_RECORDER` opts into a
+/// recording as unsupported. On macOS, setting `POLARIS_TERMINAL_MOCK_RECORDER` opts into a
 /// mock recorder for UI testing (see `mock`).
 pub fn create_recorder() -> Box<dyn Recorder> {
     #[cfg(macos)]
-    if std::env::var_os("ROOK_MOCK_RECORDER").is_some() {
+    if std::env::var_os("POLARIS_TERMINAL_MOCK_RECORDER").is_some() {
         return Box::new(mock::Recorder::new());
     }
     if cfg!(feature = "test-util") {
@@ -731,7 +731,7 @@ impl PointerSession {
 
     /// Records a press or coordinate-carrying pointer sample resolved at
     /// `point`. A press (`Down`) sets the active button and last point; a move
-    /// or scroll sample updates the last point (the pointer physically rooked
+    /// or scroll sample updates the last point (the pointer physically ptermed
     /// there before the wheel turned) without touching the active button. A
     /// new press while a button is already active replaces it (the prior
     /// incomplete press is closed as a held drag by the classifier).

@@ -6,7 +6,7 @@ publish.workspace = true
 license.workspace = true
 
 [dependencies]
-rook_errors.workspace = true
+pterm_errors.workspace = true
 anyhow = { workspace = true }
 async-channel = { workspace = true }
 futures = { workspace = true }
@@ -18,7 +18,7 @@ instant = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
 rubato = "0.16.1"
-rookui_core.workspace = true
+ptermui_core.workspace = true
 
 [features]
 # No features; compiled when the app enables its `voice` feature which depends on this crate

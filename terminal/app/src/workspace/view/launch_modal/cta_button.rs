@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use rookui::ViewContext;
+use ptermui::ViewContext;
 
 use super::Slide;
 use crate::server::telemetry::TelemetryEvent;

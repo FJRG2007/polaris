@@ -13,8 +13,8 @@ use std::time::Duration;
 
 use background_task::spawn_find_task;
 use parking_lot::FairMutex;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{EntityId, ModelContext};
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{EntityId, ModelContext};
 use sum_tree::SeekBias;
 use work_queue::FindWorkQueue;
 
@@ -1351,7 +1351,7 @@ pub fn collect_block_info(block_list: &BlockList, config: &AsyncFindConfig) -> V
     while let Some(item) = cursor.item() {
         match item {
             BlockHeightItem::Block(height)
-                if height.into_lines() > rookui::units::Lines::zero() =>
+                if height.into_lines() > ptermui::units::Lines::zero() =>
             {
                 let summary = cursor.start();
                 block_info.push(BlockInfo::Terminal {
@@ -1361,7 +1361,7 @@ pub fn collect_block_info(block_list: &BlockList, config: &AsyncFindConfig) -> V
             }
             BlockHeightItem::RichContent(rich_content_item)
                 if rich_content_item.last_laid_out_height.into_lines()
-                    > rookui::units::Lines::zero() =>
+                    > ptermui::units::Lines::zero() =>
             {
                 block_info.push(BlockInfo::RichContent {
                     view_id: rich_content_item.view_id,

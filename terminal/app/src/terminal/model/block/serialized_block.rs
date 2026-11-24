@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Local, TimeZone as _};
-use rook_core::command::ExitCode;
+use pterm_core::command::ExitCode;
 use serde::{Deserialize, Serialize};
 use serde_bytes_repr::{ByteFmtDeserializer, ByteFmtSerializer};
 
@@ -191,7 +191,7 @@ pub struct SerializedBlock {
 
     pub shell_host: Option<ShellHost>,
 
-    /// JSON-serialized representation of the Rook prompt snapshot (Context Chips). Note that this
+    /// JSON-serialized representation of the Polaris Terminal prompt snapshot (Context Chips). Note that this
     /// is different from PS1 and RPROMPT1
     pub prompt_snapshot: Option<String>,
 

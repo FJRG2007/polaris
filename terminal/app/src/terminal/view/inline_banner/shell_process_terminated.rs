@@ -1,5 +1,5 @@
-use rookui::Element;
-use rookui::elements::Text;
+use ptermui::Element;
+use ptermui::elements::Text;
 
 use super::{
     InlineBannerContent, InlineBannerIcon, InlineBannerStyle, render_inline_block_list_banner,
@@ -22,7 +22,7 @@ pub fn render_shell_process_terminated_banner(
                     color_override: Some(appearance.theme().foreground().into_solid()),
                 }),
                 content: Some(vec![Text::new(
-                    "The output from Rook's initialization script is visible above to assist with debugging.",
+                    "The output from Polaris Terminal's initialization script is visible above to assist with debugging.",
                     appearance.ui_font_family(),
                     appearance.ui_font_size(),
                 )]),

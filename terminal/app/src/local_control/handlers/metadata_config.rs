@@ -6,8 +6,8 @@ use ::local_control::protocol::{
     TabTarget, TargetSelector, ThemeNameParams, WindowTarget,
 };
 use ::local_control::{ActionKind, ControlError, ErrorCode, InstanceId};
-use rook_core::ui::theme::AnsiColorIdentifier;
-use rookui::{ModelContext, SingletonEntity as _, WindowId};
+use pterm_core::ui::theme::AnsiColorIdentifier;
+use ptermui::{ModelContext, SingletonEntity as _, WindowId};
 use serde_json::json;
 use settings::Setting as _;
 
@@ -25,7 +25,7 @@ use crate::pane_group::PaneId;
 use crate::settings::{AccessibilitySettings, FontSettings, InputSettings, ThemeSettings};
 use crate::tab::SelectedTabColor;
 use crate::themes::theme::{SelectedSystemThemes, ThemeKind};
-use crate::user_config::RookConfig;
+use crate::user_config::PtermConfig;
 use crate::window_settings::ZoomLevel;
 
 pub(crate) fn tab_rename(
@@ -664,7 +664,7 @@ fn theme_kind_for_name(
     name: &str,
     ctx: &ModelContext<LocalControlBridge>,
 ) -> Result<ThemeKind, ControlError> {
-    let matches = RookConfig::as_ref(ctx)
+    let matches = PtermConfig::as_ref(ctx)
         .theme_config()
         .theme_items()
         .filter_map(|(kind, _)| (public_theme_name(kind) == name).then_some(kind.clone()))
@@ -740,13 +740,13 @@ fn u32_setting_value(key: &str, value: &serde_json::Value) -> Result<u32, Contro
 fn accessibility_verbosity_value(
     key: &str,
     value: &serde_json::Value,
-) -> Result<rookui::accessibility::AccessibilityVerbosity, ControlError> {
+) -> Result<ptermui::accessibility::AccessibilityVerbosity, ControlError> {
     match string_setting_value(key, value)?.as_str() {
         "Verbose" | "verbose" | "VERBOSE" => {
-            Ok(rookui::accessibility::AccessibilityVerbosity::Verbose)
+            Ok(ptermui::accessibility::AccessibilityVerbosity::Verbose)
         }
         "Concise" | "concise" | "CONCISE" => {
-            Ok(rookui::accessibility::AccessibilityVerbosity::Concise)
+            Ok(ptermui::accessibility::AccessibilityVerbosity::Concise)
         }
         _ => Err(ControlError::new(
             ErrorCode::InvalidParams,

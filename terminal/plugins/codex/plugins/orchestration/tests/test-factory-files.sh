@@ -3,14 +3,14 @@
 # Smoke test for the mirrored factory-files skill.
 #
 # The skill tree under skills/factory-files is a byte-for-byte copy of
-# resources/bundled/skills/factory-files in FJRG2007/rook at the commit named
+# resources/bundled/skills/factory-files in FJRG2007/polaris at the commit named
 # in this plugin's README. Correctness of the Factory file format is owned by
-# rook-server, and the skill's own behavioural corpus lives in rook; this
+# polaris-terminal-server, and the skill's own behavioural corpus lives in polaris-terminal; this
 # checks the two things a copy can get wrong on its way over: arriving
 # incomplete, and arriving with a local copy of the format that should not
 # exist.
 #
-# There is no offline mode to exercise. CI has no rook-server, so the runnable
+# There is no offline mode to exercise. CI has no polaris-terminal-server, so the runnable
 # assertion here is that the validator reports a tree as NOT validated rather
 # than guessing at a verdict.
 
@@ -79,7 +79,7 @@ schemaVersion: v1alpha1
 name: mirror-smoke
 repositories:
   - owner: warpdotdev
-    name: rook
+    name: polaris-terminal
 agentDefaults:
   model: auto
 YAML
@@ -105,7 +105,7 @@ case "$output" in
 esac
 
 case "$output" in
-    *"Validated with the rook-server parser"*)
+    *"Validated with the polaris-terminal-server parser"*)
         fail "a run with no server claimed a server verdict" "$output"
         ;;
     *)

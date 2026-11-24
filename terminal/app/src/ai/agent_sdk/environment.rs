@@ -4,21 +4,21 @@ use comfy_table::Cell;
 use cynic::QueryBuilder;
 use inquire::error::InquireError;
 use inquire::{Confirm, Select};
-use rook_cli::GlobalOptions;
-use rook_cli::agent::OutputFormat;
-use rook_cli::environment::{EnvironmentCommand, ImageCommand};
-use rook_cli::scope::ObjectScope;
-use rook_graphql::queries::get_oauth_connect_tx_status::OauthConnectTxStatus;
-use rook_graphql::queries::list_rook_dev_images::{
-    ListRookDevImages, ListRookDevImagesResult, ListRookDevImagesVariables,
+use pterm_cli::GlobalOptions;
+use pterm_cli::agent::OutputFormat;
+use pterm_cli::environment::{EnvironmentCommand, ImageCommand};
+use pterm_cli::scope::ObjectScope;
+use pterm_graphql::queries::get_oauth_connect_tx_status::OauthConnectTxStatus;
+use pterm_graphql::queries::list_pterm_dev_images::{
+    ListPtermDevImages, ListPtermDevImagesResult, ListPtermDevImagesVariables,
 };
-use rook_graphql::queries::user_repo_auth_status::UserRepoAuthStatusEnum;
-use rookui::r#async::FutureExt;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_graphql::queries::user_repo_auth_status::UserRepoAuthStatusEnum;
+use ptermui::r#async::FutureExt;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use serde::Serialize;
 
 use crate::CloudObjectTypeAndId;
-use crate::ai::agent_sdk::driver::ROOK_DRIVE_SYNC_TIMEOUT;
+use crate::ai::agent_sdk::driver::POLARIS_TERMINAL_DRIVE_SYNC_TIMEOUT;
 use crate::ai::agent_sdk::oauth_flow::poll_oauth_until_terminal;
 use crate::ai::agent_sdk::output::{self, TableFormat};
 use crate::ai::cloud_environments::{
@@ -36,7 +36,8 @@ use crate::server::server_api::ServerApiProvider;
 use crate::util::time_format::format_approx_duration_from_now_utc;
 use crate::workspaces::user_profiles::UserProfiles;
 
-const ROOK_DEV_ENVIRONMENTS_REPO: &str = "https://github.com/warpdotdev/warp-dev-environments";
+const POLARIS_TERMINAL_DEV_ENVIRONMENTS_REPO: &str =
+    "https://github.com/warpdotdev/warp-dev-environments";
 
 /// Parse repo strings in the format "owner/repo" into GithubRepo objects.
 fn parse_repos(repo_strings: Vec<String>) -> anyhow::Result<Vec<GithubRepo>> {
@@ -146,12 +147,12 @@ impl EnvironmentCommandRunner {
     fn list_images(&self, global_options: GlobalOptions, ctx: &mut ModelContext<Self>) {
         let server_api = ServerApiProvider::as_ref(ctx).get();
 
-        let operation = ListRookDevImages::build(ListRookDevImagesVariables {});
+        let operation = ListPtermDevImages::build(ListPtermDevImagesVariables {});
         let fetch_images = async move { server_api.send_graphql_request(operation, None).await };
 
         ctx.spawn(fetch_images, move |_, result, ctx| match result {
-            Ok(response) => match response.list_rook_dev_images {
-                ListRookDevImagesResult::ListRookDevImagesOutput(output) => {
+            Ok(response) => match response.list_pterm_dev_images {
+                ListPtermDevImagesResult::ListPtermDevImagesOutput(output) => {
                     let image_infos: Vec<_> = output
                         .images
                         .into_iter()
@@ -167,14 +168,14 @@ impl EnvironmentCommandRunner {
                         OutputFormat::Text | OutputFormat::Pretty
                     ) {
                         println!(
-                            "All Rook dev images contain Python and Node. For more information, see: {}\n",
-                            ROOK_DEV_ENVIRONMENTS_REPO
+                            "All Polaris Terminal dev images contain Python and Node. For more information, see: {}\n",
+                            POLARIS_TERMINAL_DEV_ENVIRONMENTS_REPO
                         );
                     }
                     output::print_list(image_infos, global_options.output_format);
-                    ctx.terminate_app(rookui::platform::TerminationMode::ForceTerminate, None);
+                    ctx.terminate_app(ptermui::platform::TerminationMode::ForceTerminate, None);
                 }
-                ListRookDevImagesResult::UserFacingError(_) | ListRookDevImagesResult::Unknown => {
+                ListPtermDevImagesResult::UserFacingError(_) | ListPtermDevImagesResult::Unknown => {
                     super::report_fatal_error(anyhow::anyhow!("Failed to fetch images"), ctx);
                 }
             },
@@ -187,12 +188,12 @@ impl EnvironmentCommandRunner {
     fn list(&self, global_options: GlobalOptions, ctx: &mut ModelContext<Self>) {
         let initial_sync = UpdateManager::as_ref(ctx)
             .initial_load_complete()
-            .with_timeout(ROOK_DRIVE_SYNC_TIMEOUT);
+            .with_timeout(POLARIS_TERMINAL_DRIVE_SYNC_TIMEOUT);
 
         ctx.spawn(initial_sync, move |_, result, ctx| {
             if result.is_err() {
                 super::report_fatal_error(
-                    anyhow::anyhow!("Timed out waiting for Rook Drive to sync"),
+                    anyhow::anyhow!("Timed out waiting for Polaris Terminal Drive to sync"),
                     ctx,
                 );
                 return;
@@ -251,19 +252,19 @@ impl EnvironmentCommandRunner {
 
             output::print_list(environment_infos, global_options.output_format);
 
-            ctx.terminate_app(rookui::platform::TerminationMode::ForceTerminate, None);
+            ctx.terminate_app(ptermui::platform::TerminationMode::ForceTerminate, None);
         });
     }
 
     fn get(&mut self, id: String, ctx: &mut ModelContext<Self>) {
         let initial_sync = UpdateManager::as_ref(ctx)
             .initial_load_complete()
-            .with_timeout(ROOK_DRIVE_SYNC_TIMEOUT);
+            .with_timeout(POLARIS_TERMINAL_DRIVE_SYNC_TIMEOUT);
 
         ctx.spawn(initial_sync, move |_, result, ctx| {
             if result.is_err() {
                 super::report_fatal_error(
-                    anyhow::anyhow!("Timed out waiting for Rook Drive to sync"),
+                    anyhow::anyhow!("Timed out waiting for Polaris Terminal Drive to sync"),
                     ctx,
                 );
                 return;
@@ -274,7 +275,7 @@ impl EnvironmentCommandRunner {
                 Ok(sid) => sid,
                 Err(_) => {
                     ctx.terminate_app(
-                        rookui::platform::TerminationMode::ForceTerminate,
+                        ptermui::platform::TerminationMode::ForceTerminate,
                         Some(Err(anyhow::anyhow!("Environment {} not found", id))),
                     );
                     return;
@@ -285,10 +286,10 @@ impl EnvironmentCommandRunner {
 
             if let Some(environment) = environment {
                 Self::print_environment_details(&environment.model().string_model);
-                ctx.terminate_app(rookui::platform::TerminationMode::ForceTerminate, None);
+                ctx.terminate_app(ptermui::platform::TerminationMode::ForceTerminate, None);
             } else {
                 ctx.terminate_app(
-                    rookui::platform::TerminationMode::ForceTerminate,
+                    ptermui::platform::TerminationMode::ForceTerminate,
                     Some(Err(anyhow::anyhow!("Environment {} not found", id))),
                 );
             }
@@ -331,7 +332,7 @@ impl EnvironmentCommandRunner {
         match err {
             InquireError::OperationCanceled | InquireError::OperationInterrupted => {
                 eprintln!("Environment creation canceled.");
-                ctx.terminate_app(rookui::platform::TerminationMode::ForceTerminate, None);
+                ctx.terminate_app(ptermui::platform::TerminationMode::ForceTerminate, None);
                 true
             }
             _ => false,
@@ -346,15 +347,15 @@ impl EnvironmentCommandRunner {
         const CUSTOM_IMAGE_OPTION: &str = "Custom Docker image";
 
         let server_api = ServerApiProvider::as_ref(ctx).get();
-        let operation = ListRookDevImages::build(ListRookDevImagesVariables {});
+        let operation = ListPtermDevImages::build(ListPtermDevImagesVariables {});
         let fetch_images = async move { server_api.send_graphql_request(operation, None).await };
 
         ctx.spawn(fetch_images, move |_, result, ctx| match result {
-            Ok(response) => match response.list_rook_dev_images {
-                ListRookDevImagesResult::ListRookDevImagesOutput(output) => {
+            Ok(response) => match response.list_pterm_dev_images {
+                ListPtermDevImagesResult::ListPtermDevImagesOutput(output) => {
                     if output.images.is_empty() {
                         super::report_fatal_error(
-                            anyhow::anyhow!("No Rook dev images available."),
+                            anyhow::anyhow!("No Polaris Terminal dev images available."),
                             ctx,
                         );
                         return;
@@ -365,7 +366,7 @@ impl EnvironmentCommandRunner {
                     );
                     println!(
                         "All warpdotdev images contain Python and Node, in addition to language-specific tooling. For more info: {}\n",
-                        ROOK_DEV_ENVIRONMENTS_REPO
+                        POLARIS_TERMINAL_DEV_ENVIRONMENTS_REPO
                     );
 
                     let mut image_choices: Vec<String> =
@@ -406,7 +407,7 @@ impl EnvironmentCommandRunner {
 
                     continuation(final_image, ctx);
                 }
-                ListRookDevImagesResult::UserFacingError(_) | ListRookDevImagesResult::Unknown => {
+                ListPtermDevImagesResult::UserFacingError(_) | ListPtermDevImagesResult::Unknown => {
                     super::report_fatal_error(
                         anyhow::anyhow!("Failed to fetch list of base images"),
                         ctx,
@@ -427,7 +428,7 @@ impl EnvironmentCommandRunner {
         docker_image: Option<String>,
         github_repos: Vec<GithubRepo>,
         setup_commands: Vec<String>,
-        scope: rook_cli::scope::ObjectScope,
+        scope: pterm_cli::scope::ObjectScope,
         ctx: &mut ModelContext<Self>,
     ) {
         if let Some(image) = docker_image {
@@ -465,17 +466,17 @@ impl EnvironmentCommandRunner {
         docker_image: String,
         github_repos: Vec<GithubRepo>,
         setup_commands: Vec<String>,
-        scope: rook_cli::scope::ObjectScope,
+        scope: pterm_cli::scope::ObjectScope,
         ctx: &mut ModelContext<Self>,
     ) {
         let initial_sync = UpdateManager::as_ref(ctx)
             .initial_load_complete()
-            .with_timeout(ROOK_DRIVE_SYNC_TIMEOUT);
+            .with_timeout(POLARIS_TERMINAL_DRIVE_SYNC_TIMEOUT);
 
         ctx.spawn(initial_sync, move |_, result, ctx| {
             if result.is_err() {
                 super::report_fatal_error(
-                    anyhow::anyhow!("Timed out waiting for Rook Drive to sync"),
+                    anyhow::anyhow!("Timed out waiting for Polaris Terminal Drive to sync"),
                     ctx,
                 );
                 return;
@@ -522,7 +523,7 @@ impl EnvironmentCommandRunner {
 
         if attempt > MAX_AUTH_ATTEMPTS {
             ctx.terminate_app(
-                rookui::platform::TerminationMode::ForceTerminate,
+                ptermui::platform::TerminationMode::ForceTerminate,
                 Some(Err(anyhow::anyhow!(
                     "Exceeded maximum number of authorization attempts ({}). Please try again later.",
                     MAX_AUTH_ATTEMPTS
@@ -583,7 +584,7 @@ impl EnvironmentCommandRunner {
                     if private_repo_owners.len() > 1 {
                         let owners_str = private_repo_owners.into_iter().collect::<Vec<_>>().join(", ");
                         ctx.terminate_app(
-                            rookui::platform::TerminationMode::ForceTerminate,
+                            ptermui::platform::TerminationMode::ForceTerminate,
                             Some(Err(anyhow::anyhow!(
                                 "All private repositories in an environment must belong to the same owner. Found multiple owners: {}.\nIf you need support for private repos from multiple owners, please submit a GitHub issue.",
                                 owners_str
@@ -645,7 +646,7 @@ impl EnvironmentCommandRunner {
                                         }
                                         Ok(OauthConnectTxStatus::Failed) => {
                                             ctx.terminate_app(
-                                                rookui::platform::TerminationMode::ForceTerminate,
+                                                ptermui::platform::TerminationMode::ForceTerminate,
                                                 Some(Err(anyhow::anyhow!(
                                                     "GitHub authorization failed. Please try again."
                                                 ))),
@@ -653,7 +654,7 @@ impl EnvironmentCommandRunner {
                                         }
                                         Ok(OauthConnectTxStatus::Expired) => {
                                             ctx.terminate_app(
-                                                rookui::platform::TerminationMode::ForceTerminate,
+                                                ptermui::platform::TerminationMode::ForceTerminate,
                                                 Some(Err(anyhow::anyhow!(
                                                     "GitHub authorization expired. Please try again."
                                                 ))),
@@ -663,7 +664,7 @@ impl EnvironmentCommandRunner {
                                         | Ok(OauthConnectTxStatus::InProgress) => {
                                             // Should not be returned by poll_oauth_until_terminal.
                                             ctx.terminate_app(
-                                                rookui::platform::TerminationMode::ForceTerminate,
+                                                ptermui::platform::TerminationMode::ForceTerminate,
                                                 Some(Err(anyhow::anyhow!(
                                                     "Unexpected non-terminal OAuth status returned"
                                                 ))),
@@ -671,7 +672,7 @@ impl EnvironmentCommandRunner {
                                         }
                                         Err(err) => {
                                             ctx.terminate_app(
-                                                rookui::platform::TerminationMode::ForceTerminate,
+                                                ptermui::platform::TerminationMode::ForceTerminate,
                                                 Some(Err(anyhow::anyhow!(
                                                     "Error polling OAuth status: {err}"
                                                 ))),
@@ -686,14 +687,14 @@ impl EnvironmentCommandRunner {
                             println!("\nAuthorize access here: {auth_url}\n");
                             println!("After authorizing, please re-run this command.");
                             ctx.terminate_app(
-                                rookui::platform::TerminationMode::ForceTerminate,
+                                ptermui::platform::TerminationMode::ForceTerminate,
                                 None,
                             );
                         }
                         (None, Some(_)) => {
                             // Server returned txId without authUrl - unexpected.
                             ctx.terminate_app(
-                                rookui::platform::TerminationMode::ForceTerminate,
+                                ptermui::platform::TerminationMode::ForceTerminate,
                                 Some(Err(anyhow::anyhow!(
                                     "Server error: did not receive auth URL for OAuth flow"
                                 ))),
@@ -702,7 +703,7 @@ impl EnvironmentCommandRunner {
                         (None, None) => {
                             // No auth URL or txId provided, but we have auth issues.
                             ctx.terminate_app(
-                                rookui::platform::TerminationMode::ForceTerminate,
+                                ptermui::platform::TerminationMode::ForceTerminate,
                                 Some(Err(anyhow::anyhow!(
                                     "Cannot {} environment: authorization required but no auth flow provided by server",
                                     operation_name
@@ -713,7 +714,7 @@ impl EnvironmentCommandRunner {
                 }
                 Err(e) => {
                     ctx.terminate_app(
-                        rookui::platform::TerminationMode::ForceTerminate,
+                        ptermui::platform::TerminationMode::ForceTerminate,
                         Some(Err(e.context("Failed to check GitHub auth status"))),
                     );
                 }
@@ -765,7 +766,7 @@ impl EnvironmentCommandRunner {
             {
                 let server_id = result.server_id.unwrap();
                 println!("Environment created successfully with ID: {server_id}");
-                ctx.terminate_app(rookui::platform::TerminationMode::ForceTerminate, None);
+                ctx.terminate_app(ptermui::platform::TerminationMode::ForceTerminate, None);
             }
         });
     }
@@ -807,13 +808,13 @@ impl EnvironmentCommandRunner {
                             Ok(false) | Err(InquireError::OperationCanceled | InquireError::OperationInterrupted) => {
                                 println!("Environment {action} canceled.");
                                 ctx.terminate_app(
-                                    rookui::platform::TerminationMode::ForceTerminate,
+                                    ptermui::platform::TerminationMode::ForceTerminate,
                                     None,
                                 );
                             }
                             Err(err) => {
                                 ctx.terminate_app(
-                                    rookui::platform::TerminationMode::ForceTerminate,
+                                    ptermui::platform::TerminationMode::ForceTerminate,
                                     Some(Err(anyhow::anyhow!("Error prompting for confirmation: {err}"))),
                                 );
                             }
@@ -824,7 +825,7 @@ impl EnvironmentCommandRunner {
                 }
                 Err(_) => {
                     ctx.terminate_app(
-                        rookui::platform::TerminationMode::ForceTerminate,
+                        ptermui::platform::TerminationMode::ForceTerminate,
                         Some(Err(anyhow::anyhow!(
                             "Aborting environment {action} because integration usage could not be determined. Re-run with --force to override."
                         ))),
@@ -851,12 +852,12 @@ impl EnvironmentCommandRunner {
     ) {
         let initial_sync = UpdateManager::as_ref(ctx)
             .initial_load_complete()
-            .with_timeout(ROOK_DRIVE_SYNC_TIMEOUT);
+            .with_timeout(POLARIS_TERMINAL_DRIVE_SYNC_TIMEOUT);
 
         ctx.spawn(initial_sync, move |_, result, ctx| {
             if result.is_err() {
                 super::report_fatal_error(
-                    anyhow::anyhow!("Timed out waiting for Rook Drive to sync"),
+                    anyhow::anyhow!("Timed out waiting for Polaris Terminal Drive to sync"),
                     ctx,
                 );
                 return;
@@ -868,7 +869,7 @@ impl EnvironmentCommandRunner {
                 Err(_) => {
                     let error = anyhow::anyhow!("Environment {} not found", id);
                     ctx.terminate_app(
-                        rookui::platform::TerminationMode::ForceTerminate,
+                        ptermui::platform::TerminationMode::ForceTerminate,
                         Some(Err(error)),
                     );
                     return;
@@ -879,7 +880,7 @@ impl EnvironmentCommandRunner {
             let Some(environment) = environment else {
                 let error = anyhow::anyhow!("Environment {} not found", id);
                 ctx.terminate_app(
-                    rookui::platform::TerminationMode::ForceTerminate,
+                    ptermui::platform::TerminationMode::ForceTerminate,
                     Some(Err(error)),
                 );
                 return;
@@ -1010,7 +1011,7 @@ impl EnvironmentCommandRunner {
                     OperationSuccessType::Success => {
                         println!("Environment updated successfully!\n");
                         Self::print_environment_details(&updated_env);
-                        ctx.terminate_app(rookui::platform::TerminationMode::ForceTerminate, None);
+                        ctx.terminate_app(ptermui::platform::TerminationMode::ForceTerminate, None);
                     }
                     _ => {
                         super::report_fatal_error(
@@ -1026,12 +1027,12 @@ impl EnvironmentCommandRunner {
     fn delete(&mut self, id: String, force: bool, ctx: &mut ModelContext<Self>) {
         let initial_sync = UpdateManager::as_ref(ctx)
             .initial_load_complete()
-            .with_timeout(ROOK_DRIVE_SYNC_TIMEOUT);
+            .with_timeout(POLARIS_TERMINAL_DRIVE_SYNC_TIMEOUT);
 
         ctx.spawn(initial_sync, move |_, result, ctx| {
             if result.is_err() {
                 super::report_fatal_error(
-                    anyhow::anyhow!("Timed out waiting for Rook Drive to sync"),
+                    anyhow::anyhow!("Timed out waiting for Polaris Terminal Drive to sync"),
                     ctx,
                 );
                 return;
@@ -1043,7 +1044,7 @@ impl EnvironmentCommandRunner {
                 Err(_) => {
                     let error = anyhow::anyhow!("Environment {} not found", id);
                     ctx.terminate_app(
-                        rookui::platform::TerminationMode::ForceTerminate,
+                        ptermui::platform::TerminationMode::ForceTerminate,
                         Some(Err(error)),
                     );
                     return;
@@ -1054,7 +1055,7 @@ impl EnvironmentCommandRunner {
             let Some(environment) = environment else {
                 let error = anyhow::anyhow!("Environment {} not found", id);
                 ctx.terminate_app(
-                    rookui::platform::TerminationMode::ForceTerminate,
+                    ptermui::platform::TerminationMode::ForceTerminate,
                     Some(Err(error)),
                 );
                 return;
@@ -1090,7 +1091,7 @@ impl EnvironmentCommandRunner {
                 match result.success_type {
                     OperationSuccessType::Success => {
                         println!("Environment deleted successfully");
-                        ctx.terminate_app(rookui::platform::TerminationMode::ForceTerminate, None);
+                        ctx.terminate_app(ptermui::platform::TerminationMode::ForceTerminate, None);
                     }
                     _ => {
                         super::report_fatal_error(
@@ -1104,7 +1105,7 @@ impl EnvironmentCommandRunner {
     }
 }
 
-impl rookui::Entity for EnvironmentCommandRunner {
+impl ptermui::Entity for EnvironmentCommandRunner {
     type Event = ();
 }
 impl SingletonEntity for EnvironmentCommandRunner {}

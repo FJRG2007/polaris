@@ -23,10 +23,10 @@ use std::time::Duration;
 use futures::FutureExt as _;
 use futures::future::BoxFuture;
 use instant::Instant;
+use ptermui::r#async::executor::Background;
+use ptermui::r#async::{FutureExt as _, Timer};
+use ptermui::{ModelSpawner, SingletonEntity};
 use rand::Rng as _;
-use rookui::r#async::executor::Background;
-use rookui::r#async::{FutureExt as _, Timer};
-use rookui::{ModelSpawner, SingletonEntity};
 use tokio::sync::{mpsc, oneshot};
 
 use super::AgentDriver;

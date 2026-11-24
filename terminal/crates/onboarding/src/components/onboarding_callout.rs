@@ -2,20 +2,20 @@ use std::borrow::Cow;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::color::coloru_with_opacity;
-use rook_core::ui::color::contrast::relative_luminance;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::phenomenon::PhenomenonStyle;
-use rookui_core::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::color::coloru_with_opacity;
+use pterm_core::ui::color::contrast::relative_luminance;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::phenomenon::PhenomenonStyle;
+use ptermui_core::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DropShadow, Flex,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Rect,
 };
-use rookui_core::fonts::Weight;
-use rookui_core::keymap::Keystroke;
-use rookui_core::prelude::*;
-use rookui_core::ui_components::checkbox::Checkbox as RookCheckbox;
-use rookui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui_core::fonts::Weight;
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::prelude::*;
+use ptermui_core::ui_components::checkbox::Checkbox as PtermCheckbox;
+use ptermui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
 use ui_components::button::Button as ButtonComponent;
 use ui_components::{Component, MouseEventHandler, Options as _, button};
 
@@ -248,7 +248,7 @@ impl OnboardingCallout {
         let foreground_color = PhenomenonStyle::foreground();
         let subtle_border = Fill::Solid(PhenomenonStyle::subtle_border());
 
-        let checkbox_element = RookCheckbox::new(
+        let checkbox_element = PtermCheckbox::new(
             self.checkbox_mouse_state.clone(),
             UiComponentStyles {
                 font_size: checkbox_size,

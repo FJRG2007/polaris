@@ -6,18 +6,18 @@ use anyhow::Result;
 use futures::StreamExt as _;
 use instant::Instant;
 use num_traits::SaturatingSub;
+use pterm_errors::report_error;
+use pterm_ripgrep::search::{Match as RipgrepMatch, Submatch};
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::remote_path::RemotePath;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{Entity, ModelContext, ModelSpawner, SingletonEntity};
 use regex::escape;
 use remote_server::HostId;
 use remote_server::manager::{HostRequestError, RemoteServerManager, RipgrepSearchParams};
 use remote_server::proto::RipgrepSearchSuccess;
 use remote_server::protocol::RequestId;
-use rook_errors::report_error;
-use rook_ripgrep::search::{Match as RipgrepMatch, Submatch};
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::remote_path::RemotePath;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{Entity, ModelContext, ModelSpawner, SingletonEntity};
 use string_offset::ByteOffset;
 
 use crate::workspace::view::global_search::view::GlobalSearchEvent;
@@ -224,7 +224,7 @@ impl GlobalSearch {
             search_id,
             SearchSource::Local,
             async move {
-                let result = Self::run_rook_ripgrep_cli(
+                let result = Self::run_pterm_ripgrep_cli(
                     search_id,
                     pattern,
                     roots,
@@ -240,7 +240,7 @@ impl GlobalSearch {
                     }),
                     Err(err) => {
                         report_error!(
-                            err.context("GlobalSearch: rook_ripgrep CLI search failed or aborted")
+                            err.context("GlobalSearch: pterm_ripgrep CLI search failed or aborted")
                         );
                         None
                     }
@@ -403,7 +403,7 @@ impl GlobalSearch {
         }
     }
 
-    async fn run_rook_ripgrep_cli(
+    async fn run_pterm_ripgrep_cli(
         search_id: u32,
         pattern: String,
         roots: Vec<PathBuf>,
@@ -413,13 +413,13 @@ impl GlobalSearch {
     ) -> Result<usize> {
         let roots_display: Vec<_> = roots.iter().map(|r| r.display().to_string()).collect();
         log::info!(
-            "GlobalSearch: starting rook_ripgrep CLI search with pattern={pattern}, roots={:?}",
+            "GlobalSearch: starting pterm_ripgrep CLI search with pattern={pattern}, roots={:?}",
             roots_display
         );
 
         let patterns = &[pattern];
         let stream =
-            rook_ripgrep::search::search_streaming(patterns, &roots, ignore_case, multiline)?;
+            pterm_ripgrep::search::search_streaming(patterns, &roots, ignore_case, multiline)?;
         futures::pin_mut!(stream);
 
         let mut total_match_count: usize = 0;

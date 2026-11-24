@@ -11,7 +11,7 @@ fn authorize_url_contains_required_params() {
     assert!(url.contains("code_challenge_method=S256"));
     assert!(url.contains("scope=openid"));
     assert!(url.contains("plan=generic"));
-    assert!(url.contains("referrer=rook"));
+    assert!(url.contains("referrer=polaris-terminal"));
     // The redirect URI must be percent-encoded and match the registered value.
     assert!(url.contains("redirect_uri=http%3A%2F%2F127.0.0.1%3A56121%2Fcallback"));
     assert!(url.contains(&format!("state={}", pkce.state)));
@@ -49,7 +49,7 @@ fn manual_code_exchange_rejects_blank_code() {
     let exchange = ManualCodeExchange {
         verifier: "verifier".to_string(),
     };
-    let result = rookui_core::r#async::block_on(exchange.exchange("   "));
+    let result = ptermui_core::r#async::block_on(exchange.exchange("   "));
     assert!(result.is_err());
 }
 
@@ -98,7 +98,7 @@ fn cancelling_loopback_wait_releases_listener() {
         cancellation.cancel();
 
         let (release_tx, _release_rx) = async_channel::bounded(1);
-        let result = rookui_core::r#async::block_on(run_oauth_flow(
+        let result = ptermui_core::r#async::block_on(run_oauth_flow(
             listener,
             PkceParams::generate(),
             cancellation,
@@ -142,7 +142,7 @@ fn release_signal_lets_a_caller_rebind_without_joining_the_result() {
     });
 
     let result_thread = std::thread::spawn(move || {
-        rookui_core::r#async::block_on(run_oauth_flow(
+        ptermui_core::r#async::block_on(run_oauth_flow(
             listener,
             PkceParams::generate(),
             cancellation,
@@ -150,7 +150,7 @@ fn release_signal_lets_a_caller_rebind_without_joining_the_result() {
         ))
     });
 
-    rookui_core::r#async::block_on(release_rx.recv())
+    ptermui_core::r#async::block_on(release_rx.recv())
         .expect("release signal should fire once the listener is dropped");
     TcpListener::bind(address).expect("released listener should free its port immediately");
 
@@ -189,7 +189,7 @@ fn loopback_callback_is_delivered_after_the_listener_closes() {
     });
 
     let (release_tx, _release_rx) = async_channel::bounded(1);
-    let result = rookui_core::r#async::block_on(run_oauth_flow(
+    let result = ptermui_core::r#async::block_on(run_oauth_flow(
         listener,
         PkceParams::generate(),
         cancellation,

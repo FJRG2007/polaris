@@ -1,23 +1,23 @@
 # OSC 8 hyperlinks — implementation plan
 
-Source issue: [FJRG2007/rook#6393](https://github.com/FJRG2007/rook/issues/6393).
+Source issue: [FJRG2007/polaris#6393](https://github.com/FJRG2007/polaris/issues/6393).
 Behavior: see [`product.md`](product.md).
 
 ## Context
 
-OSC 8 is the cross-terminal escape sequence for attaching a URL to a span of cells (`ESC ] 8 ; params ; URI ST` … visible text … `ESC ] 8 ; ; ST`). Rook parses OSC sequences via its alacritty/vte fork but currently has no `b"8"` arm — the bytes are dropped on the `_ => unhandled(params)` floor and the visible text becomes plain, unclickable output.
+OSC 8 is the cross-terminal escape sequence for attaching a URL to a span of cells (`ESC ] 8 ; params ; URI ST` … visible text … `ESC ] 8 ; ; ST`). Polaris Terminal parses OSC sequences via its alacritty/vte fork but currently has no `b"8"` arm — the bytes are dropped on the `_ => unhandled(params)` floor and the visible text becomes plain, unclickable output.
 
-**ANSI processor** — `app/src/terminal/model/ansi/mod.rs:811-1230` is the OSC dispatch (`fn osc_dispatch`). It is a long match on the first param: `b"0" | b"2"`, `b"4"`, `b"9"`, `b"10" | b"11" | b"12"`, `b"50"`, `b"52"`, `b"104"`, `b"110-112"`, `b"133"` (prompt markers), `b"777"`, `b"1337"` (iTerm images), and several Rook-specific OSC numbers. Each arm calls into the `Handler` trait. The dispatcher itself stays stateless; per-stream state lives on the implementer.
+**ANSI processor** — `app/src/terminal/model/ansi/mod.rs:811-1230` is the OSC dispatch (`fn osc_dispatch`). It is a long match on the first param: `b"0" | b"2"`, `b"4"`, `b"9"`, `b"10" | b"11" | b"12"`, `b"50"`, `b"52"`, `b"104"`, `b"110-112"`, `b"133"` (prompt markers), `b"777"`, `b"1337"` (iTerm images), and several Polaris Terminal-specific OSC numbers. Each arm calls into the `Handler` trait. The dispatcher itself stays stateless; per-stream state lives on the implementer.
 
-**Handler trait** — `app/src/terminal/model/ansi/handler.rs:27-…`. Long trait with required and default methods. Default methods are used for hooks that not every implementor cares about (`prompt_marker`, `pluggable_notification`, the Rook DCS hook callbacks). Today's implementors: `GridHandler` (`app/src/terminal/model/grid/ansi_handler.rs:159`), `BlockGrid` (`app/src/terminal/model/blockgrid.rs:704`), `Block` (`app/src/terminal/model/block.rs:2906`), `AltScreen` (`app/src/terminal/model/alt_screen.rs:371`), `EarlyOutputHandler` (`app/src/terminal/model/early_output.rs:298`), and the test `MockHandler` (`app/src/terminal/model/ansi/mod_test.rs:24`).
+**Handler trait** — `app/src/terminal/model/ansi/handler.rs:27-…`. Long trait with required and default methods. Default methods are used for hooks that not every implementor cares about (`prompt_marker`, `pluggable_notification`, the Polaris Terminal DCS hook callbacks). Today's implementors: `GridHandler` (`app/src/terminal/model/grid/ansi_handler.rs:159`), `BlockGrid` (`app/src/terminal/model/blockgrid.rs:704`), `Block` (`app/src/terminal/model/block.rs:2906`), `AltScreen` (`app/src/terminal/model/alt_screen.rs:371`), `EarlyOutputHandler` (`app/src/terminal/model/early_output.rs:298`), and the test `MockHandler` (`app/src/terminal/model/ansi/mod_test.rs:24`).
 
-**Shared ANSI types** — `crates/rook_terminal/src/model/ansi/control_sequence_parameters.rs`. `Attr`, `Mode`, `CursorStyle`, `PromptMarker` etc. live here and are re-exported by `app/src/terminal/model/ansi/mod.rs:21` (`pub use rook_terminal::model::ansi::control_sequence_parameters::*;`). New shared types (`Hyperlink`) belong here so both the parser and the trait can name them.
+**Shared ANSI types** — `crates/pterm_terminal/src/model/ansi/control_sequence_parameters.rs`. `Attr`, `Mode`, `CursorStyle`, `PromptMarker` etc. live here and are re-exported by `app/src/terminal/model/ansi/mod.rs:21` (`pub use pterm_terminal::model::ansi::control_sequence_parameters::*;`). New shared types (`Hyperlink`) belong here so both the parser and the trait can name them.
 
 **Cell storage — both representations are in play.** A common simplification is "block list = `FlatStorage`, alt-screen = 2D `Cell+Row`," but the block list actually uses **both** at different points in a cell's lifecycle. Hyperlinks therefore have to be wired through both, with the migration path between them preserving the id.
 
-- **Live (active) rows: 2D `Cell` + `Row`.** As output streams in, `GridHandler` writes into the visible 2D grid built from `Cell` (`crates/rook_terminal/src/model/grid/cell.rs:144`) and `Row`. `Cell` is 24 bytes and deliberately tightly packed (the comment at `cell.rs:122` calls out that adding bytes to `Cell` itself bumps the struct to 32 bytes — a 33% memory hit). Optional rare attributes go in `CellExtra` (`cell.rs:113-120`), a boxed side allocation that already holds `cell_with_zero_width` and `end_of_prompt`. Hyperlinks belong in `CellExtra`, not in the base `Cell`. This is also the only representation `AltScreen` uses — alt-screen apps don't migrate to scrollback.
-- **Scrollback / finished rows: `FlatStorage`.** Once a block finishes (`GridHandler::finish` at `grid_handler.rs:1621-1643`, which calls `resize_storage(1, …)` to push everything in when the `MaximizeFlatStorage` flag is on) — and during normal operation, when rows scroll out of the visible 2D grid into history — content moves into `FlatStorage` (`crates/rook_terminal/src/model/grid/flat_storage/`). It uses a run-length-encoded `AttributeMap<T>` per attribute: `FgColorMap` and `BgAndStyleMap` (`flat_storage/style.rs:18-21`). RLE deduplicates long runs of cells that share the same value into a single map entry — a good fit for hyperlinks, where one OSC 8 span typically covers many adjacent cells with the same id.
-- **Migration.** The 2D-to-flat path lives in `GridHandler::resize_storage` and the row-eviction code under `crates/rook_terminal/src/model/grid/`. Anywhere a `Cell` is converted into the flat representation (search for `From<&Cell>` impls in `flat_storage/style.rs:55-67` for the existing pattern), the conversion needs to read `cell.hyperlink_id()` and append it to the new `AttributeMap<Option<HyperlinkId>>` we're adding (§3a). The reverse path (flat → grid for resize/reflow that re-materializes rows) needs to do the inverse. Missing this in either direction silently strips clickability when a block scrolls or finishes, which is a regression on product invariant 12.
+- **Live (active) rows: 2D `Cell` + `Row`.** As output streams in, `GridHandler` writes into the visible 2D grid built from `Cell` (`crates/pterm_terminal/src/model/grid/cell.rs:144`) and `Row`. `Cell` is 24 bytes and deliberately tightly packed (the comment at `cell.rs:122` calls out that adding bytes to `Cell` itself bumps the struct to 32 bytes — a 33% memory hit). Optional rare attributes go in `CellExtra` (`cell.rs:113-120`), a boxed side allocation that already holds `cell_with_zero_width` and `end_of_prompt`. Hyperlinks belong in `CellExtra`, not in the base `Cell`. This is also the only representation `AltScreen` uses — alt-screen apps don't migrate to scrollback.
+- **Scrollback / finished rows: `FlatStorage`.** Once a block finishes (`GridHandler::finish` at `grid_handler.rs:1621-1643`, which calls `resize_storage(1, …)` to push everything in when the `MaximizeFlatStorage` flag is on) — and during normal operation, when rows scroll out of the visible 2D grid into history — content moves into `FlatStorage` (`crates/pterm_terminal/src/model/grid/flat_storage/`). It uses a run-length-encoded `AttributeMap<T>` per attribute: `FgColorMap` and `BgAndStyleMap` (`flat_storage/style.rs:18-21`). RLE deduplicates long runs of cells that share the same value into a single map entry — a good fit for hyperlinks, where one OSC 8 span typically covers many adjacent cells with the same id.
+- **Migration.** The 2D-to-flat path lives in `GridHandler::resize_storage` and the row-eviction code under `crates/pterm_terminal/src/model/grid/`. Anywhere a `Cell` is converted into the flat representation (search for `From<&Cell>` impls in `flat_storage/style.rs:55-67` for the existing pattern), the conversion needs to read `cell.hyperlink_id()` and append it to the new `AttributeMap<Option<HyperlinkId>>` we're adding (§3a). The reverse path (flat → grid for resize/reflow that re-materializes rows) needs to do the inverse. Missing this in either direction silently strips clickability when a block scrolls or finishes, which is a regression on product invariant 12.
 
 **Auto-detected URL flow — the model that the OSC 8 plumbing should mirror:**
 - Detection lives in `app/src/terminal/model/grid/grid_handler.rs` via `pub fn url_at_point(&self, displayed_point: Point) -> Option<Link>` at line 596 and `Link` at line 143 (`{ range: RangeInclusive<Point>, is_empty: bool }`). `Link: ContainsPoint` (line 169).
@@ -31,7 +31,7 @@ A WIP foundation (`Hyperlink` type + parser + Handler hook + OSC 8 dispatch arm 
 
 The implementation is broken into the layers below, listed bottom-up. Each layer can be merged independently behind the `OscHyperlinks` feature flag described in (6); the ordering in **Parallelization** below maps each layer to its dependencies.
 
-### 1. ANSI types — `crates/rook_terminal/src/model/ansi/control_sequence_parameters.rs`
+### 1. ANSI types — `crates/pterm_terminal/src/model/ansi/control_sequence_parameters.rs`
 
 Add a `Hyperlink { id: Option<String>, uri: String }` value type, a `HyperlinkParseError`, and `Hyperlink::parse_osc_params(params: &[&[u8]]) -> Result<Option<Self>, HyperlinkParseError>`.
 
@@ -77,7 +77,7 @@ Add a default-impl method on `Handler`:
 fn set_hyperlink(&mut self, _hyperlink: Option<Hyperlink>) {}
 ```
 
-The default-impl pattern matches `prompt_marker`, `pluggable_notification`, and the Rook DCS hook callbacks; existing implementors continue to compile unchanged and only the implementors that need to actually attach hyperlinks to cells (3) override it.
+The default-impl pattern matches `prompt_marker`, `pluggable_notification`, and the Polaris Terminal DCS hook callbacks; existing implementors continue to compile unchanged and only the implementors that need to actually attach hyperlinks to cells (3) override it.
 
 In `osc_dispatch`, add a `b"8"` arm next to `b"9"`/`b"133"`:
 
@@ -93,7 +93,7 @@ b"8" => match Hyperlink::parse_osc_params(&params[1..]) {
 The implementation needs a deduplicated registry keyed by an opaque small-integer `HyperlinkId` so cells store a 4-byte handle rather than a per-cell `Arc<Hyperlink>`. The registry is per-grid (block-scoped on `BlockList`, screen-scoped on `AltScreen`).
 
 ```rust
-// New module: crates/rook_terminal/src/model/grid/hyperlink_registry.rs
+// New module: crates/pterm_terminal/src/model/grid/hyperlink_registry.rs
 pub struct HyperlinkId(NonZeroU32);
 pub struct HyperlinkRegistry { /* HashMap<Hyperlink, HyperlinkId> + Vec<Hyperlink> */ }
 impl HyperlinkRegistry {
@@ -110,9 +110,9 @@ impl HyperlinkRegistry {
 
 Both storage representations need wiring (the block list uses 2D `Cell+Row` for live rows and `FlatStorage` for scrollback; see Context). The order below matches the order a cell traverses them:
 
-**3a. Live rows: extend `Cell` / `Row`.** Extend `CellExtra` (`crates/rook_terminal/src/model/grid/cell.rs:113`) with `hyperlink_id: Option<HyperlinkId>` and add accessors `Cell::hyperlink_id() / Cell::set_hyperlink_id()`. The 24-byte budget for `Cell` itself is preserved because the new field lives in the boxed extra. Resetting a cell preserves `EndOfPromptMarker`; the `hyperlink_id` slot is cleared along with the rest of the cell's content (per the §3d table). This is the only representation `AltScreen` ever uses, and the *first* representation block-list output uses while the block is live.
+**3a. Live rows: extend `Cell` / `Row`.** Extend `CellExtra` (`crates/pterm_terminal/src/model/grid/cell.rs:113`) with `hyperlink_id: Option<HyperlinkId>` and add accessors `Cell::hyperlink_id() / Cell::set_hyperlink_id()`. The 24-byte budget for `Cell` itself is preserved because the new field lives in the boxed extra. Resetting a cell preserves `EndOfPromptMarker`; the `hyperlink_id` slot is cleared along with the rest of the cell's content (per the §3d table). This is the only representation `AltScreen` ever uses, and the *first* representation block-list output uses while the block is live.
 
-**3b. Scrollback: extend `FlatStorage`.** Add a third `AttributeMap<Option<HyperlinkId>>` parallel to `FgColorMap`/`BgAndStyleMap` in `crates/rook_terminal/src/model/grid/flat_storage/mod.rs`. RLE deduplicates long runs of cells that share the same id into one map entry. A new `flat_storage/hyperlink.rs` mirroring `flat_storage/style.rs` is the natural shape.
+**3b. Scrollback: extend `FlatStorage`.** Add a third `AttributeMap<Option<HyperlinkId>>` parallel to `FgColorMap`/`BgAndStyleMap` in `crates/pterm_terminal/src/model/grid/flat_storage/mod.rs`. RLE deduplicates long runs of cells that share the same id into one map entry. A new `flat_storage/hyperlink.rs` mirroring `flat_storage/style.rs` is the natural shape.
 
 **3b-bis. Migration between the two representations.** When rows scroll out of the visible 2D grid into scrollback, or when a block finishes and `GridHandler::finish` (`grid_handler.rs:1621-1643`) calls `resize_storage(1, …)` to push everything to flat, every existing `Cell → flat_storage` conversion path needs to also carry the `hyperlink_id`. Concretely, the existing `From<&Cell> for BgAndStyle` impl (`flat_storage/style.rs:55-62`) is the model: we add an analogous `From<&Cell> for Option<HyperlinkId>` impl in the new `flat_storage/hyperlink.rs`, and update the row-flush / row-eviction code that calls these `From` impls so the new map gets populated alongside the existing two. The reverse path — flat → 2D row materialization for resize/reflow — already exists for color/style; we extend it to read the new map and stamp the resulting `Cell::set_hyperlink_id`. Missing either direction silently strips clickability when a block scrolls or finishes, which is a regression on product invariant 12; an integration test pumps an OSC 8 span into a small-height grid, scrolls it past the top of the visible region, and asserts hover/click still work in scrollback.
 
@@ -214,11 +214,11 @@ The existing `Link` (`grid_handler.rs:143`) is a single `RangeInclusive<Point>` 
 
 ### 6. Feature flag
 
-`FeatureFlag::OscHyperlinks` (added per `ROOK.md`'s feature-flag guide, defaulted on for dogfood) gates **OSC 8 specific** behavior only: when off, `osc_dispatch`'s `b"8"` arm calls `unhandled(params)` and the rest of layers (3)–(5)/(6a)/(7) never sees an OSC 8 hyperlink.
+`FeatureFlag::OscHyperlinks` (added per `POLARIS_TERMINAL.md`'s feature-flag guide, defaulted on for dogfood) gates **OSC 8 specific** behavior only: when off, `osc_dispatch`'s `b"8"` arm calls `unhandled(params)` and the rest of layers (3)–(5)/(6a)/(7) never sees an OSC 8 hyperlink.
 
 The flag's compile-time wiring is restricted to the `b"8"` arm and the layer (5) `Hyperlink` variant of `GridHighlightedLink`. This lets the team revert OSC 8 in one place if a regression appears.
 
-### 6a. Session persistence (Rook Drive, history, shared sessions)
+### 6a. Session persistence (Polaris Terminal Drive, history, shared sessions)
 
 The three persistence formats have different shapes. Rather than one strategy, here's a per-format compatibility table — both directions (old client reading new payload, and new client reading old payload) — with a concrete migration plan for each.
 
@@ -235,19 +235,19 @@ Block output is already stored as `stylized_output: String` (a Diesel `Binary`-b
 - **New client → old payload (backward compat):** also fine — new clients read the same ANSI string, OSC 8 sequences re-parse, hyperlinks are restored. Blocks written before the feature shipped come back clickable too, for free.
 - The `HyperlinkRegistry` itself is **not** persisted in sqlite — it's reconstructed from the byte stream on load. Saves us a column and a migration, and matches how every other terminal-state attribute (color, bold, etc.) is handled today.
 
-#### 6a-ii. Rook Drive (cloud objects, shared sessions)
+#### 6a-ii. Polaris Terminal Drive (cloud objects, shared sessions)
 
-Rook Drive blocks store the same `SerializedBlock` shape (`app/src/terminal/model/block.rs:474-480`), with `stylized_output: String`. Same reasoning as sqlite: OSC 8 bytes round-trip transparently in the string and re-parse on load.
+Polaris Terminal Drive blocks store the same `SerializedBlock` shape (`app/src/terminal/model/block.rs:474-480`), with `stylized_output: String`. Same reasoning as sqlite: OSC 8 bytes round-trip transparently in the string and re-parse on load.
 
 - **Forward and backward compat both ride for free** for the byte-stream encoding. No protocol-version bump is needed for blocks whose hyperlink state can be recovered from `stylized_output`.
-- **Risk: a future representation change.** If Rook Drive ever moves from the byte-stream encoding to a structured per-cell encoding (e.g. for performance), the cell-side `hyperlink_id` field becomes the wire field of record. The `serde(default, skip_serializing_if)` defaults above already cover both directions. We name this in the spec so anyone making that representation change tests both compatibility directions.
+- **Risk: a future representation change.** If Polaris Terminal Drive ever moves from the byte-stream encoding to a structured per-cell encoding (e.g. for performance), the cell-side `hyperlink_id` field becomes the wire field of record. The `serde(default, skip_serializing_if)` defaults above already cover both directions. We name this in the spec so anyone making that representation change tests both compatibility directions.
 
 #### 6a-iii. Session-sharing protocol (`session-sharing-protocol` workspace crate)
 
 > **Follow-up — out of scope for this PR.** This PR does not modify the
 > `session-sharing-protocol` crate or snapshot/replay handling, so OSC 8
 > hyperlinks are **not** preserved over live shared sessions yet. The plan
-> below is the design for that follow-up. (Local history and Rook Drive
+> below is the design for that follow-up. (Local history and Polaris Terminal Drive
 > persistence in §6a-i / §6a-ii need no protocol change — the OSC 8 bytes
 > round-trip through the stored output and re-parse on load.)
 
@@ -270,11 +270,11 @@ The protocol's serialization (whichever framing — protobuf, MessagePack, JSON-
 #### Tests
 
 - **sqlite round-trip** (`app/src/persistence/block_list.rs` test module): persist a block with `stylized_output` containing an OSC 8 sequence; reload from sqlite; assert the reloaded `Block` has cells with non-None `hyperlink_id` and the URI matches.
-- **Rook Drive round-trip:** simulate the cloud serialization round-trip and verify the same.
+- **Polaris Terminal Drive round-trip:** simulate the cloud serialization round-trip and verify the same.
 - **Old-client read-of-new-payload (session-sharing):** a CI matrix test that pins the old client to a tag-before-this-PR, runs the new client as the producer, and asserts the old client renders cells correctly (just not clickable). Lives in `crates/integration` and runs as part of the protocol-compat CI job.
 - **New-client read-of-old-payload (session-sharing):** the inverse — new client consumes a recorded session from before the PR; asserts the deserializer doesn't error and cells render plain.
 
-The sqlite and Rook Drive round-trips (§6a-i / §6a-ii) work in this PR because they ride the existing byte stream. The session-sharing event/snapshot work above is deferred to a follow-up.
+The sqlite and Polaris Terminal Drive round-trips (§6a-i / §6a-ii) work in this PR because they ride the existing byte stream. The session-sharing event/snapshot work above is deferred to a follow-up.
 
 ### 7. AI context
 
@@ -321,7 +321,7 @@ sequenceDiagram
 
 Each numbered item below maps to a product invariant from `product.md`.
 
-**Unit tests — parser** (`crates/rook_terminal/src/model/ansi/control_sequence_parameters.rs`, `#[cfg(test)] mod hyperlink_parse_tests`).
+**Unit tests — parser** (`crates/pterm_terminal/src/model/ansi/control_sequence_parameters.rs`, `#[cfg(test)] mod hyperlink_parse_tests`).
 - Open / open-with-id / close / single-empty-field-close / unknown-keys-ignored / malformed-param / multi-`:` param separators / **`uri_with_semicolons_is_rejoined`** (mandatory; see §1) / non-UTF-8 URI → invariants 1, 2, 3, 15.
 
 **Unit tests — dispatch** (`app/src/terminal/model/ansi/mod_test.rs`, alongside the existing `parse_osc9_*` tests).
@@ -342,7 +342,7 @@ Each numbered item below maps to a product invariant from `product.md`.
 
 **Unit tests — model lookups.** `hyperlink_at_point` returns the contiguous run of cells around `point` that share the same `HyperlinkId`, expanding left and right while the next cell is adjacent and carries the same id → invariants 5, 10. The lookup explicitly does **not** jump across non-adjacent cells even when `HyperlinkId` matches; cross-run grouping is out of scope.
 
-**Integration tests** (`crates/integration/`, following the patterns in the `rook-integration-test` skill).
+**Integration tests** (`crates/integration/`, following the patterns in the `polaris-terminal-integration-test` skill).
 - **`osc8_open_close.rs`** — pipe an OSC 8 open + visible text + close to a fake PTY, assert the cells carry a hyperlink, hover one, observe `PointingHand` cursor and tooltip showing the URI → invariants 1, 5, 17.
 - **`osc8_implicit_close_at_block_boundary.rs`** — open a hyperlink before a `precmd` / new prompt, assert the next block's cells do not carry the hyperlink → invariant 10.
 - **`osc8_copy_text_vs_link.rs`** — select across a hyperlink and copy: clipboard contains visible text (no OSC 8 escape bytes) → invariant 8.
@@ -351,7 +351,7 @@ Each numbered item below maps to a product invariant from `product.md`.
 Cmd+click → `open_url` coverage previously relied on a per-cell position cache stamped during grid rendering; that cache was removed (too risky for the render hot path), so synthetic-click integration tests are not included. Click behavior needs a different test mechanism (follow-up).
 
 **Manual verification (recorded in PR description with a short clip).**
-- Run `printf '\e]8;;https://rook.dev\e\\Open Rook\e]8;;\e\\\n'` in a Rook block; hover, observe pointer; Cmd+click, observe browser open.
+- Run `printf '\e]8;;https://rook.dev\e\\Open Polaris Terminal\e]8;;\e\\\n'` in a Polaris Terminal block; hover, observe pointer; Cmd+click, observe browser open.
 - Run `wizcli` (or any CLI that emits OSC 8 — `gcc`, `make`, modern `git`) and exercise the live link.
 - Run `cat` on a file containing a hyperlink across a wrapped line to confirm reflow on resize keeps the click intact.
 - Run a TUI in alt-screen mode that emits OSC 8 (e.g. `lazygit`) to confirm parity with block-list behavior.
@@ -362,11 +362,11 @@ Cmd+click → `open_url` coverage previously relied on a per-cell position cache
 - **Cell-size budget.** `cell.rs:122` is explicit that growing `Cell` past 24 bytes is a 33% memory hit. The `HyperlinkId` lives in `CellExtra` exactly to avoid this; the only `Cell`-shaped change is to `CellExtra`'s box, which is already optional and pays only when present.
 - **URIs containing `;` are addressed in the parser contract,** not as a deferred mitigation. See §1: the URI field is the `b";"`-rejoin of all `params[1..]` slice elements, and a `uri_with_semicolons_is_rejoined` unit test is required.
 - **Existing handler implementors not overriding `set_hyperlink`.** Default no-op means OSC 8 is silently dropped on those surfaces (e.g. `EarlyOutputHandler`). Acceptable: those surfaces don't render clickable output today either. They can be wired later without a behavior change for users.
-- **Persistence compatibility, three formats, three different stories.** sqlite history and Rook Drive round-trip OSC 8 transparently because the format is already the raw ANSI byte stream — no schema or protocol change. Session-sharing is event-streamed and gains a new `SetHyperlink` event; old clients must skip unknown events (audited per-framing in §6a-iii) and a CI matrix locks in both directions of the compat. If skip-unknown turns out to be unavailable, the fallback is a client-capability negotiation that downgrades when paired with a pre-PR client.
+- **Persistence compatibility, three formats, three different stories.** sqlite history and Polaris Terminal Drive round-trip OSC 8 transparently because the format is already the raw ANSI byte stream — no schema or protocol change. Session-sharing is event-streamed and gains a new `SetHyperlink` event; old clients must skip unknown events (audited per-framing in §6a-iii) and a CI matrix locks in both directions of the compat. If skip-unknown turns out to be unavailable, the fallback is a client-capability negotiation that downgrades when paired with a pre-PR client.
 
 ## Parallelization
 
-- Layer (1) — parser + types — is a single rook_terminal-crate change with no app dependencies.
+- Layer (1) — parser + types — is a single pterm_terminal-crate change with no app dependencies.
 - Layer (2) — Handler hook + dispatch — depends on (1) only.
 - Layer (3a) and (3b) can run in parallel after (1). (3c) depends on (2) and the chosen (3a/3b) for the surface it covers.
 - Layer (4) depends on (3).
@@ -378,7 +378,7 @@ The natural agent split is: one on (1)+(2)+parser tests; one on (3a); one on (3b
 
 ## Follow-ups
 
-- **Cross-run id grouping.** Treating two non-contiguous OSC 8 emissions with the same `id` as one logical link span. Requires a multi-range link type (something like `HyperlinkSpan { id: HyperlinkId, ranges: Vec<RangeInclusive<Point>> }`) and a generalization of `GridHighlightedLink` and the hover/click code to operate on a set of ranges. Deferred because (a) the common case is a single contiguous span, (b) Rook's existing `Link` and the highlighted-link UI assume one contiguous range, and (c) the user-facing benefit is small relative to the breadth of code that would change.
+- **Cross-run id grouping.** Treating two non-contiguous OSC 8 emissions with the same `id` as one logical link span. Requires a multi-range link type (something like `HyperlinkSpan { id: HyperlinkId, ranges: Vec<RangeInclusive<Point>> }`) and a generalization of `GridHighlightedLink` and the hover/click code to operate on a set of ranges. Deferred because (a) the common case is a single contiguous span, (b) Polaris Terminal's existing `Link` and the highlighted-link UI assume one contiguous range, and (c) the user-facing benefit is small relative to the breadth of code that would change.
 - **Underline-on-hover styling** for OSC 8 spans. Today the spec defers to existing SGR styling. Once the hover state is wired, an additional `Flags::HYPERLINK_HOVER` flag plus a small render change is a clean follow-on.
 - **Copy as markdown / terminal bytes.** Dedicated export actions — "copy as markdown" (`[visible](uri)`) and "copy as terminal bytes" (re-emitting normalized OSC 8 wrappers) — are out of scope for this iteration (product invariant 13).
-- **Outgoing OSC 8.** Emitting hyperlinks from Rook's own UI when piping output through the terminal is out of scope for this issue.
+- **Outgoing OSC 8.** Emitting hyperlinks from Polaris Terminal's own UI when piping output through the terminal is out of scope for this issue.

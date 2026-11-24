@@ -2,21 +2,21 @@ use std::path::{Path, PathBuf};
 
 use ai::api_keys::{ApiKeyManager, ApiKeyManagerEvent};
 use itertools::Itertools;
-use regex::Regex;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     Align, Border, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, CrossAxisAlignment, Expanded, Flex, Highlight, MouseStateHandle, ParentElement,
     PartialClickableElement, ScrollbarWidth, Text,
 };
-use rookui::fonts::Properties;
-use rookui::platform::Cursor;
-use rookui::ui_components::slider::SliderStateHandle;
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{
+use ptermui::fonts::Properties;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::slider::SliderStateHandle;
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle,
 };
+use regex::Regex;
 use thousands::Separable;
 
 use crate::ai::blocklist::BlocklistAIPermissions;
@@ -67,8 +67,8 @@ fn render_upgrade_footer(
     let text_color = theme.main_text_color(surface);
 
     let info_icon = ConstrainedBox::new(
-        rook_core::ui::Icon::Info
-            .to_rookui_icon(text_color)
+        pterm_core::ui::Icon::Info
+            .to_ptermui_icon(text_color)
             .finish(),
     )
     .with_width(16.)
@@ -1597,7 +1597,7 @@ impl View for ExecutionProfileEditorView {
             ScrollbarWidth::Auto,
             appearance.theme().nonactive_ui_detail().into(),
             appearance.theme().active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .finish()
     }
@@ -1798,7 +1798,7 @@ impl TypedActionView for ExecutionProfileEditorView {
             }
             ExecutionProfileEditorViewAction::SetPlanAutoSync { enabled } => {
                 AIExecutionProfilesModel::handle(ctx).update(ctx, |profiles_model, ctx| {
-                    profiles_model.set_autosync_plans_to_rook_drive(
+                    profiles_model.set_autosync_plans_to_pterm_drive(
                         &self.profile_id,
                         *enabled,
                         ctx,
@@ -1824,17 +1824,17 @@ impl BackingView for ExecutionProfileEditorView {
     fn handle_pane_header_overflow_menu_action(
         &mut self,
         _action: &Self::PaneHeaderOverflowMenuAction,
-        _ctx: &mut rookui::ViewContext<Self>,
+        _ctx: &mut ptermui::ViewContext<Self>,
     ) {
         self.handle_action(_action, _ctx)
     }
 
-    fn close(&mut self, ctx: &mut rookui::ViewContext<Self>) {
+    fn close(&mut self, ctx: &mut ptermui::ViewContext<Self>) {
         self.save_profile_name_if_valid(ctx);
         ctx.emit(ExecutionProfileEditorViewEvent::Pane(PaneEvent::Close));
     }
 
-    fn focus_contents(&mut self, ctx: &mut rookui::ViewContext<Self>) {
+    fn focus_contents(&mut self, ctx: &mut ptermui::ViewContext<Self>) {
         self.focus(ctx);
     }
 
@@ -1847,7 +1847,7 @@ impl BackingView for ExecutionProfileEditorView {
             title: HEADER_TEXT.into(),
             title_secondary: None,
             title_style: None,
-            title_clip_config: rookui::text_layout::ClipConfig::start(),
+            title_clip_config: ptermui::text_layout::ClipConfig::start(),
             title_max_width: None,
             left_of_title: None,
             right_of_title: None,

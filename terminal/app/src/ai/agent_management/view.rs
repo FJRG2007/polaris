@@ -6,28 +6,28 @@ use fuzzy_match::match_indices_case_insensitive;
 use lazy_static::lazy_static;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::icons::Icon;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::new_scrollable::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::icons::Icon;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::new_scrollable::{
     NewScrollableElement, ScrollableAppearance, SingleAxisConfig,
 };
-use rookui::elements::{
+use ptermui::elements::{
     Align, Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Element, Empty, Expanded, Flex, Hoverable, List, ListState, MainAxisSize,
     MouseStateHandle, NewScrollable, OffsetPositioning, Padding, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, Rect, ScrollStateHandle, ScrollbarWidth, Shrinkable,
     SizeConstraintCondition, SizeConstraintSwitch, Stack, Text, Wrap,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::platform::Cursor;
-use rookui::scene::DropShadow;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::Cursor;
+use ptermui::scene::DropShadow;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -121,7 +121,7 @@ pub fn init(app: &mut AppContext) {
     app.register_fixed_bindings([FixedBinding::new(
         cmd_or_ctrl_shift("f"),
         AgentManagementViewAction::FocusSearch,
-        rookui::keymap::macros::id!(AgentManagementView::ui_name()),
+        ptermui::keymap::macros::id!(AgentManagementView::ui_name()),
     )]);
 }
 
@@ -2010,7 +2010,7 @@ impl AgentManagementView {
 
         let loading_icon = ConstrainedBox::new(
             Icon::Refresh
-                .to_rookui_icon(theme.sub_text_color(theme.surface_1()))
+                .to_ptermui_icon(theme.sub_text_color(theme.surface_1()))
                 .finish(),
         )
         .with_height(icon_size)
@@ -2054,7 +2054,7 @@ impl AgentManagementView {
 
         let loading_icon = ConstrainedBox::new(
             Icon::Loading
-                .to_rookui_icon(Fill::Solid(internal_colors::neutral_6(theme)))
+                .to_ptermui_icon(Fill::Solid(internal_colors::neutral_6(theme)))
                 .finish(),
         )
         .with_height(appearance.ui_font_size() + 2.)
@@ -2114,7 +2114,7 @@ impl AgentManagementView {
         let appearance = Appearance::as_ref(app);
         let icon = ConstrainedBox::new(
             Icon::FilterOff
-                .to_rookui_icon(appearance.theme().nonactive_ui_text_color())
+                .to_ptermui_icon(appearance.theme().nonactive_ui_text_color())
                 .finish(),
         )
         .with_width(24.)
@@ -2153,7 +2153,7 @@ impl AgentManagementView {
             axis_config,
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .with_vertical_scrollbar(ScrollableAppearance::new(ScrollbarWidth::None, false))
         .with_always_handle_events_first(false)

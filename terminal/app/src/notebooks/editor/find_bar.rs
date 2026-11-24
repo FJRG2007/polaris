@@ -3,21 +3,21 @@ use std::time::Duration;
 
 use async_channel::Sender;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::r#async::debounce;
-use rook_editor::render::model::{AutoScrollMode, Decoration};
-use rook_editor::search::{SearchEvent, Searcher};
-use rookui::accessibility::{AccessibilityContent, ActionAccessibilityContent, RookA11yRole};
-use rookui::elements::{
+use pterm_core::r#async::debounce;
+use pterm_editor::render::model::{AutoScrollMode, Decoration};
+use pterm_editor::search::{SearchEvent, Searcher};
+use ptermui::accessibility::{AccessibilityContent, ActionAccessibilityContent, PtermA11yRole};
+use ptermui::elements::{
     Border, ChildAnchor, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Empty, Flex, MouseStateHandle, OffsetPositioning, ParentElement, PositionedElementAnchor,
     PositionedElementOffsetBounds, Radius, Rect, Shrinkable, Stack,
 };
-use rookui::platform::Cursor;
-use rookui::presenter::ChildView;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::toggle_button::ToggleButton;
-use rookui::{
+use ptermui::platform::Cursor;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::toggle_button::ToggleButton;
+use ptermui::{
     AppContext, BlurContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity,
     TypedActionView, View, ViewContext, ViewHandle,
 };
@@ -251,7 +251,7 @@ impl FindBar {
             .ui_builder()
             .button(ButtonVariant::Text, mouse_state_handle)
             // The fill here doesn't matter, since it's overridden by the button text color.
-            .with_icon_label(icon.to_rookui_icon(crate::themes::theme::Fill::white()))
+            .with_icon_label(icon.to_ptermui_icon(crate::themes::theme::Fill::white()))
             .with_style(base_styles)
             .with_hovered_styles(UiComponentStyles {
                 background: Some(appearance.theme().foreground_button_color().into()),
@@ -348,7 +348,7 @@ impl View for FindBar {
         "FindBar"
     }
 
-    fn render(&self, app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
         let searcher = self.searcher.as_ref(app);
         let theme = appearance.theme();
@@ -356,10 +356,14 @@ impl View for FindBar {
         let has_matches = searcher.match_count() > 0;
 
         let find_icon = Container::new(
-            ConstrainedBox::new(Icon::Find.to_rookui_icon(theme.active_ui_detail()).finish())
-                .with_height(editor_height)
-                .with_width(editor_height)
-                .finish(),
+            ConstrainedBox::new(
+                Icon::Find
+                    .to_ptermui_icon(theme.active_ui_detail())
+                    .finish(),
+            )
+            .with_height(editor_height)
+            .with_width(editor_height)
+            .finish(),
         )
         .with_padding_left(12.)
         .with_padding_top(16.)
@@ -553,7 +557,7 @@ impl TypedActionView for FindBar {
         };
         Some(AccessibilityContent::new_without_help(
             text,
-            RookA11yRole::UserAction,
+            PtermA11yRole::UserAction,
         ))
         .into()
     }

@@ -1,5 +1,5 @@
-use rookui::integration::TestStep;
-use rookui::{SingletonEntity, async_assert, async_assert_eq};
+use ptermui::integration::TestStep;
+use ptermui::{SingletonEntity, async_assert, async_assert_eq};
 
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::{CloudObjectEventEntrypoint, CloudObjectLocation, Space};
@@ -43,7 +43,7 @@ pub fn go_online() -> TestStep {
 }
 
 pub fn join_a_workspace() -> TestStep {
-    TestStep::new("Join a Rook Drive workspace")
+    TestStep::new("Join a Polaris Terminal Drive workspace")
         .with_action(move |app, _, _| {
             UserWorkspaces::handle(app).update(app, |user_workspaces, ctx| {
                 let workspace_uid = "workspace_uid123456789".to_string().into();

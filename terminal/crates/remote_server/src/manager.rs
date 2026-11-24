@@ -5,16 +5,16 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures::channel::oneshot;
+use pterm_core::SessionId;
+#[cfg(not(target_family = "wasm"))]
+use pterm_core::channel::ChannelState;
+use pterm_errors::report_error;
+use pterm_util::remote_path::{RemoteNavigationResult, RemotePath};
+use pterm_util::standardized_path::StandardizedPath;
+#[cfg(not(target_family = "wasm"))]
+use ptermui_core::r#async::FutureExt as _;
+use ptermui_core::{Entity, ModelContext, ModelSpawner, SingletonEntity};
 use repo_metadata::RepoMetadataUpdate;
-use rook_core::SessionId;
-#[cfg(not(target_family = "wasm"))]
-use rook_core::channel::ChannelState;
-use rook_errors::report_error;
-use rook_util::remote_path::{RemoteNavigationResult, RemotePath};
-use rook_util::standardized_path::StandardizedPath;
-#[cfg(not(target_family = "wasm"))]
-use rookui_core::r#async::FutureExt as _;
-use rookui_core::{Entity, ModelContext, ModelSpawner, SingletonEntity};
 use serde::Serialize;
 
 use crate::HostId;
@@ -320,7 +320,7 @@ pub struct RemoteCodebaseIndexStatusWithPath {
 /// They also carry a [`ControlPath`] identifying the SSH
 /// `ControlMaster` socket for this session and who owns the master. On
 /// explicit teardown (after the user's shell exits),
-/// `deregister_session` runs `ssh -O exit` against `RookManaged`
+/// `deregister_session` runs `ssh -O exit` against `PtermManaged`
 /// masters, forcing them to terminate without waiting for half-closed
 /// multiplexed channels to finish cleanup on the remote side.
 /// `UserOwned` masters (the SSH wrapper attached to a master the user
@@ -1230,7 +1230,7 @@ impl HostRequestHandle {
     }
 
     /// Generates a commit message via AI on the remote host (the daemon
-    /// computes the diff locally and calls the Rook content endpoint).
+    /// computes the diff locally and calls the Polaris Terminal content endpoint).
     pub async fn git_generate_commit_message(
         &self,
         repo_path: &StandardizedPath,
@@ -1344,7 +1344,7 @@ pub struct RemoteServerManager {
     /// Only used off-wasm (timers and detached tasks aren't available on
     /// wasm), so the field is allowed to be dead there.
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
-    executor: Arc<rookui_core::r#async::executor::Background>,
+    executor: Arc<ptermui_core::r#async::executor::Background>,
 }
 
 impl Entity for RemoteServerManager {
@@ -2242,7 +2242,7 @@ impl RemoteServerManager {
         auth_context: &RemoteServerAuthContext,
         codebase_index_limits: Option<CodebaseIndexLimits>,
         spawner: &ModelSpawner<Self>,
-        executor: &Arc<rookui_core::r#async::executor::Background>,
+        executor: &Arc<ptermui_core::r#async::executor::Background>,
     ) -> Result<InitializeHandshake, ConnectAndHandshakeError> {
         // Phase 1: Connect (establish streams, create client).
         let Connection {
@@ -2374,7 +2374,7 @@ impl RemoteServerManager {
     /// 1. Remove the session entry. Dropping the `RemoteSessionState`
     ///    drops the transport's owned `Child`, which SIGKILLs the
     ///    `ssh … remote-server-proxy` subprocess via `kill_on_drop`.
-    /// 2. If the session's `control_path` is [`ControlPath::RookManaged`],
+    /// 2. If the session's `control_path` is [`ControlPath::PtermManaged`],
     ///    spawn a background task that runs `ssh -O exit` against it.
     ///
     /// The `Child` is owned by the manager's state, *not* by
@@ -2409,7 +2409,7 @@ impl RemoteServerManager {
         let prev = self.sessions.remove(&session_id);
 
         // Extract the ControlMaster socket (if any) so we can force
-        // Rook-managed masters to exit below. Safe to do under the
+        // Polaris Terminal-managed masters to exit below. Safe to do under the
         // "caller already observed ExitShell" assumption documented
         // above.
         #[cfg(not(target_family = "wasm"))]
@@ -2443,7 +2443,7 @@ impl RemoteServerManager {
         ctx.emit(RemoteServerManagerEvent::SessionDeregistered { session_id });
 
         // Force the local SSH ControlMaster to exit after teardown.
-        // `stop_control_master` only acts on Rook-managed masters and
+        // `stop_control_master` only acts on Polaris Terminal-managed masters and
         // leaves user-owned masters running. Spawned detached because
         // the ssh subcommand may take a moment to complete and we don't
         // want to block the main thread on it.

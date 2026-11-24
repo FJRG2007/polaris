@@ -1,6 +1,6 @@
-use rookui_core::assets::asset_cache::{AssetCache, AssetSource, AssetState};
-use rookui_core::image_cache::ImageType;
-use rookui_core::{App, SingletonEntity};
+use ptermui_core::assets::asset_cache::{AssetCache, AssetSource, AssetState};
+use ptermui_core::image_cache::ImageType;
+use ptermui_core::{App, SingletonEntity};
 
 use super::*;
 use crate::render::layout::TextLayout;

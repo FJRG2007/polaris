@@ -1,5 +1,5 @@
-use rookui::integration::{AssertionCallback, AssertionWithDataCallback};
-use rookui::{App, ViewHandle, async_assert, async_assert_eq};
+use ptermui::integration::{AssertionCallback, AssertionWithDataCallback};
+use ptermui::{App, ViewHandle, async_assert, async_assert_eq};
 
 use crate::integration_testing::cloud_object::assert_metadata_revision;
 use crate::integration_testing::view_getters::workflow_view;

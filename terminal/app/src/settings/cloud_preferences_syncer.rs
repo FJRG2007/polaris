@@ -5,14 +5,14 @@ use std::time::Duration;
 
 use cloud_object_models::JsonSerializer;
 use lazy_static::lazy_static;
-use rook_core::r#async::debounce;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_core::settings::ChangeEventReason;
-use rook_core::user_preferences::GetUserPreferences;
-use rook_errors::report_if_error;
-use rookui::r#async::Timer;
-use rookui::{Entity, ModelContext, ModelHandle, SingletonEntity};
-use rookui_extras::user_preferences::toml_backed::TomlBackedUserPreferences;
+use pterm_core::r#async::debounce;
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_core::settings::ChangeEventReason;
+use pterm_core::user_preferences::GetUserPreferences;
+use pterm_errors::report_if_error;
+use ptermui::r#async::Timer;
+use ptermui::{Entity, ModelContext, ModelHandle, SingletonEntity};
+use ptermui_extras::user_preferences::toml_backed::TomlBackedUserPreferences;
 use settings::{Setting as _, SyncToCloud};
 
 use super::PrivacySettings;
@@ -108,7 +108,7 @@ pub fn initialize_cloud_preferences_syncer(
     )
 }
 
-/// Handles syncing CloudPreferences (the Rook Drive objects) and local Settings models that
+/// Handles syncing CloudPreferences (the Polaris Terminal Drive objects) and local Settings models that
 /// have been created using the define_settings_group macro.
 pub struct CloudPreferencesSyncer {
     // A channel used for debouncing local settings updates so that we don't spam the
@@ -185,7 +185,7 @@ const PREFERENCES_DEBOUNCE_PERIOD: Duration = Duration::from_millis(500);
 
 impl CloudPreferencesSyncer {
     // Retry preferences every five minutes until they are successfully synced.
-    // Only enabled for users in the rook drive preferences experiment.
+    // Only enabled for users in the polaris-terminal drive preferences experiment.
     const RETRY_POLL: Duration = Duration::from_secs(60 * 5);
 
     #[cfg(test)]
@@ -500,7 +500,7 @@ impl CloudPreferencesSyncer {
 
         PrivacySettings::handle(ctx).update(ctx, |privacy_settings, ctx| {
             // Note that this also blocks on update_manager.initial_load_complete()
-            privacy_settings.maybe_sync_with_rook_drive_prefs(ctx);
+            privacy_settings.maybe_sync_with_pterm_drive_prefs(ctx);
         });
     }
 
@@ -649,7 +649,7 @@ impl CloudPreferencesSyncer {
                 // Update local pref to match cloud pref unless we are doing a forced preferences sync.
                 self.maybe_sync_cloud_pref_to_local(&storage_key, ctx)
             } else if !LEGACY_CLOUD_SETTINGS_STORAGE_KEYS.contains(&storage_key.as_str()) {
-                // For all settings except legacy cloud-synced settings, we sync them immediately to rook drive on
+                // For all settings except legacy cloud-synced settings, we sync them immediately to polaris-terminal drive on
                 // initial load.
                 keys_to_sync_to_cloud.push(storage_key);
             } else {

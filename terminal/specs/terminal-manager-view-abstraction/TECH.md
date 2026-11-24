@@ -6,9 +6,9 @@ The local TTY terminal manager now has a reusable construction path for terminal
 
 The pre-change local manager was tightly coupled to `TerminalView`:
 
-- [`app/src/terminal/writeable_pty/terminal_manager_util.rs:23 @ 0b2273da`](https://github.com/FJRG2007/rook/blob/0b2273da3443eacc8d78b748f37962427e968fe5/app/src/terminal/writeable_pty/terminal_manager_util.rs#L23) wired `PtyController` directly to `ViewHandle<TerminalView>` and matched `terminal::view::Event` variants for PTY writes, resize, command execution, and native completions.
-- [`app/src/terminal/local_tty/terminal_manager.rs:139 @ 0b2273da`](https://github.com/FJRG2007/rook/blob/0b2273da3443eacc8d78b748f37962427e968fe5/app/src/terminal/local_tty/terminal_manager.rs#L139) stored `ViewHandle<TerminalView>` directly and called GUI-specific lifecycle hooks for shell startup, spawn failures, shell launch-data updates, and Unix terminal-attributes/password-prompt handling.
-- [`app/src/terminal/terminal_manager.rs:24 @ 0b2273da`](https://github.com/FJRG2007/rook/blob/0b2273da3443eacc8d78b748f37962427e968fe5/app/src/terminal/terminal_manager.rs#L24) exposed `view() -> ViewHandle<TerminalView>` from the object-safe `TerminalManager` trait, so callers recovered the GUI view from the boxed manager.
+- [`app/src/terminal/writeable_pty/terminal_manager_util.rs:23 @ 0b2273da`](https://github.com/FJRG2007/polaris/blob/0b2273da3443eacc8d78b748f37962427e968fe5/terminal/app/src/terminal/writeable_pty/terminal_manager_util.rs#L23) wired `PtyController` directly to `ViewHandle<TerminalView>` and matched `terminal::view::Event` variants for PTY writes, resize, command execution, and native completions.
+- [`app/src/terminal/local_tty/terminal_manager.rs:139 @ 0b2273da`](https://github.com/FJRG2007/polaris/blob/0b2273da3443eacc8d78b748f37962427e968fe5/terminal/app/src/terminal/local_tty/terminal_manager.rs#L139) stored `ViewHandle<TerminalView>` directly and called GUI-specific lifecycle hooks for shell startup, spawn failures, shell launch-data updates, and Unix terminal-attributes/password-prompt handling.
+- [`app/src/terminal/terminal_manager.rs:24 @ 0b2273da`](https://github.com/FJRG2007/polaris/blob/0b2273da3443eacc8d78b748f37962427e968fe5/terminal/app/src/terminal/terminal_manager.rs#L24) exposed `view() -> ViewHandle<TerminalView>` from the object-safe `TerminalManager` trait, so callers recovered the GUI view from the boxed manager.
 
 The current design splits the terminal manager responsibilities into three layers:
 
@@ -85,7 +85,7 @@ pub struct TerminalManager<S> {
 }
 ```
 
-`TerminalManager<S>::create_model(...)` is the canonical local terminal construction API. It owns the local terminal session construction order, creates the manager-owned channels/models/controllers internally, calls one surface setup callback that returns `(surface, post_wire)`, wires the surface to the `PtyController` through `wire_up_pty_controller_with_surface`, runs `post_wire`, boxes the manager as a RookUI model, schedules shell determination, and returns `(manager_model, surface)`.
+`TerminalManager<S>::create_model(...)` is the canonical local terminal construction API. It owns the local terminal session construction order, creates the manager-owned channels/models/controllers internally, calls one surface setup callback that returns `(surface, post_wire)`, wires the surface to the `PtyController` through `wire_up_pty_controller_with_surface`, runs `post_wire`, boxes the manager as a PtermUI model, schedules shell determination, and returns `(manager_model, surface)`.
 
 The surface factory callback receives only the components a surface needs:
 
@@ -97,7 +97,7 @@ The surface factory callback receives only the components a surface needs:
 - terminal colors
 - current terminal size
 
-The manager stores the remaining startup and lifetime components itself, including the event-loop sender/receiver, channel event proxy, `PtyController`, `RemoteServerController`, and shell-starter source. Shell determination later consumes that stored startup state from the manager after it has been registered as a RookUI model.
+The manager stores the remaining startup and lifetime components itself, including the event-loop sender/receiver, channel event proxy, `PtyController`, `RemoteServerController`, and shell-starter source. Shell determination later consumes that stored startup state from the manager after it has been registered as a PtermUI model.
 
 The surface setup callback can return a deferred `post_wire` closure for surface-specific wiring. The constructor runs that closure after the PTY controller is wired and the manager has been assembled. This keeps ordering-sensitive post-wiring inside the manager-owned construction flow without requiring the generic manager core to import `TerminalView`.
 
@@ -161,8 +161,8 @@ For `TerminalView`, these hooks preserve existing password notification and SSH 
 Run formatting and compile checks:
 
 - `./script/format`
-- `cargo check -p rook`
-- `cargo clippy -p rook --all-targets --tests -- -D warnings`
+- `cargo check -p polaris-terminal`
+- `cargo clippy -p polaris-terminal --all-targets --tests -- -D warnings`
 
 Run focused tests covering:
 
@@ -174,7 +174,7 @@ Run focused tests covering:
 Validation performed during implementation:
 
 - `./script/format`
-- `cargo check -p rook`
+- `cargo check -p polaris-terminal`
 
 ## Parallelization
 

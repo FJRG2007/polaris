@@ -1,6 +1,6 @@
 use fuzzy_match::match_indices_case_insensitive;
 use ordered_float::OrderedFloat;
-use rookui::{AppContext, Entity, EntityId, SingletonEntity};
+use ptermui::{AppContext, Entity, EntityId, SingletonEntity};
 
 use crate::ai::execution_profiles::ExecutionProfileId;
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;

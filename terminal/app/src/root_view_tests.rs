@@ -3,11 +3,11 @@ use onboarding::{
     AgentOnboardingView, OfferVariant, OnboardingAuthState, OnboardingIntention, SelectedSettings,
     UICustomizationSettings,
 };
-use rook_core::features::FeatureFlag;
-use rook_core::user_preferences::GetUserPreferences as _;
-use rookui::elements::Empty;
-use rookui::platform::WindowStyle;
-use rookui::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::user_preferences::GetUserPreferences as _;
+use ptermui::elements::Empty;
+use ptermui::platform::WindowStyle;
+use ptermui::{
     App, AppContext, Element, Entity, EntityId, SingletonEntity, TypedActionView, View, ViewHandle,
 };
 use session_sharing_protocol::common::SessionId;
@@ -167,7 +167,7 @@ fn refreshing_pending_onboarding_choices_replaces_stale_settings() {
             show_conversation_history: false,
             show_project_explorer: true,
             show_global_search: false,
-            show_rook_drive: false,
+            show_pterm_drive: false,
             show_code_review_button: true,
         }),
         cli_agent_toolbar_enabled: true,

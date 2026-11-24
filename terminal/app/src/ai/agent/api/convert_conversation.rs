@@ -16,7 +16,7 @@ use ai::agent::action_result::{
 use ai::skills::{ParsedSkill, SkillPathOrigin};
 use chrono::{DateTime, Local, TimeZone};
 use persistence::model::AgentConversationData;
-use rook_core::command::ExitCode;
+use pterm_core::command::ExitCode;
 use warp_multi_agent_api as api;
 use warp_multi_agent_api::ask_user_question_result::answer_item::Answer as AskUserQuestionAnswer;
 
@@ -46,7 +46,7 @@ use crate::ai::agent::{
 use crate::ai::block_context::BlockContext;
 use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentVersion};
 use crate::ai::llms::LLMId;
-use crate::ai_assistant::execution_context::{RookAiExecutionContext, RookAiOsContext};
+use crate::ai_assistant::execution_context::{PtermAiExecutionContext, PtermAiOsContext};
 use crate::terminal::model::block::BlockId;
 use crate::terminal::model::terminal_model::BlockIndex;
 
@@ -194,8 +194,8 @@ pub(crate) fn convert_input_context(context: Option<&api::InputContext>) -> Arc<
     // Convert operating system and shell to execution environment
     if let (Some(os), Some(shell)) = (&context.operating_system, &context.shell) {
         result.push(AIAgentContext::ExecutionEnvironment(
-            RookAiExecutionContext {
-                os: RookAiOsContext {
+            PtermAiExecutionContext {
+                os: PtermAiOsContext {
                     category: if os.platform.is_empty() {
                         None
                     } else {

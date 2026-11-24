@@ -1,23 +1,23 @@
 //! Editor view for creating and editing local custom model routers.
 //!
-//! Opened as a side-pane from the Rook Agent settings page when the user clicks
+//! Opened as a side-pane from the Polaris Terminal Agent settings page when the user clicks
 //! "Add router" or "Edit" on an existing router card. Writes changes to
-//! `~/.rook/custom_model_routers/` via [`RookConfig::save_custom_model_router`].
+//! `~/.polaris-terminal/custom_model_routers/` via [`PtermConfig::save_custom_model_router`].
 
 use itertools::Itertools;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use rookui::elements::{
+use ptermui::elements::{
     ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Empty, Expanded, Fill as UiFill, Flex, FormattedTextElement,
     HighlightedHyperlink, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     ParentElement, Radius, ScrollbarWidth, Text,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::segmented_control::{
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::segmented_control::{
     LabelConfig, RenderableOptionConfig, SegmentedControl, SegmentedControlEvent,
 };
-use rookui::{
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -38,7 +38,7 @@ use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
 use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
 #[cfg(feature = "local_fs")]
-use crate::user_config::RookConfig;
+use crate::user_config::PtermConfig;
 use crate::view_components::FilterableDropdown;
 use crate::view_components::action_button::{
     ActionButton, ButtonSize, PrimaryTheme, SecondaryTheme,
@@ -110,7 +110,7 @@ struct PromptRuleRow {
 
 pub struct CustomRouterEditorView {
     existing: Option<CustomModelRouter>,
-    pane_configuration: rookui::ModelHandle<PaneConfiguration>,
+    pane_configuration: ptermui::ModelHandle<PaneConfiguration>,
     focus_handle: Option<PaneFocusHandle>,
     scroll_state: ClippedScrollStateHandle,
 
@@ -374,7 +374,7 @@ impl CustomRouterEditorView {
         view
     }
 
-    pub fn pane_configuration(&self) -> rookui::ModelHandle<PaneConfiguration> {
+    pub fn pane_configuration(&self) -> ptermui::ModelHandle<PaneConfiguration> {
         self.pane_configuration.clone()
     }
 
@@ -538,7 +538,7 @@ impl CustomRouterEditorView {
                 }
             };
             let ep = self.existing.as_ref().and_then(|r| r.source_path.clone());
-            if let Err(e) = RookConfig::save_custom_model_router(&name, &yaml, ep.as_deref()) {
+            if let Err(e) = PtermConfig::save_custom_model_router(&name, &yaml, ep.as_deref()) {
                 self.save_error = Some(format!("Write error: {e}"));
                 ctx.notify();
                 return;
@@ -690,7 +690,7 @@ impl CustomRouterEditorView {
             );
             let rules_copy = FormattedText::new([
                 FormattedTextLine::Line(vec![FormattedTextFragment::plain_text(
-                    "Rules are custom prompts that describe when to use a specific model. Rook intelligently matches your tasks against these rules.",
+                    "Rules are custom prompts that describe when to use a specific model. Polaris Terminal intelligently matches your tasks against these rules.",
                 )]),
                 FormattedTextLine::Line(vec![FormattedTextFragment::plain_text(
                     "Rules are matched top to bottom — rules higher in the list take precedence over those below.",
@@ -753,7 +753,7 @@ impl CustomRouterEditorView {
             FormattedTextLine::Line(vec![
                 FormattedTextFragment::bold("Complexity-based"),
                 FormattedTextFragment::plain_text(
-                    " routing chooses a model based on Rook's classification of the task's difficulty.",
+                    " routing chooses a model based on Polaris Terminal's classification of the task's difficulty.",
                 ),
             ]),
             FormattedTextLine::Line(vec![
@@ -831,7 +831,7 @@ impl CustomRouterEditorView {
 
         // Error
         if let Some(msg) = &self.save_error {
-            let err_color = rook_core::ui::theme::Fill::Solid(appearance.theme().ui_error_color());
+            let err_color = pterm_core::ui::theme::Fill::Solid(appearance.theme().ui_error_color());
             col.add_child(
                 Container::new(
                     Text::new(msg.clone(), appearance.ui_font_family(), 12.)
@@ -874,7 +874,7 @@ impl View for CustomRouterEditorView {
             ScrollbarWidth::Auto,
             appearance.theme().nonactive_ui_detail().into(),
             appearance.theme().active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .finish()
     }
@@ -953,7 +953,7 @@ impl BackingView for CustomRouterEditorView {
             title: HEADER_TEXT.into(),
             title_secondary: None,
             title_style: None,
-            title_clip_config: rookui::text_layout::ClipConfig::start(),
+            title_clip_config: ptermui::text_layout::ClipConfig::start(),
             title_max_width: None,
             left_of_title: None,
             right_of_title: None,
@@ -1039,7 +1039,7 @@ fn repopulate_filterable<F>(
 
 /// Inner helper: fills a [`FilterableDropdown`] with rich model items.
 fn fill_filterable_dropdown<F>(
-    ctx: &mut rookui::ViewContext<FilterableDropdown<CustomRouterEditorAction>>,
+    ctx: &mut ptermui::ViewContext<FilterableDropdown<CustomRouterEditorAction>>,
     dropdown: &mut FilterableDropdown<CustomRouterEditorAction>,
     selected_id: &str,
     make_action: F,
@@ -1227,7 +1227,7 @@ fn rule_icon_button(
     // Inline the builder closure (rather than binding it to a `let`) so the
     // compiler infers the higher-ranked closure lifetime `Hoverable` requires.
     let hoverable = Hoverable::new(mouse_state, move |_| {
-        ConstrainedBox::new(icon.to_rookui_icon(color).finish())
+        ConstrainedBox::new(icon.to_ptermui_icon(color).finish())
             .with_width(RULE_ICON_BUTTON_SIZE)
             .with_height(RULE_ICON_BUTTON_SIZE)
             .finish()

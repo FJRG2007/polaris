@@ -1,8 +1,8 @@
-use rookui::elements::{
+use ptermui::elements::{
     Border, ChildView, Container, CornerRadius, DropTarget, Element, Flex, Hoverable,
     ParentElement, Radius, SavePosition, Stack,
 };
-use rookui::{AppContext, SingletonEntity};
+use ptermui::{AppContext, SingletonEntity};
 use settings::Setting;
 
 use super::Input;

@@ -7,8 +7,8 @@ use chrono::Utc;
 use futures::channel::oneshot;
 use pathfinder_geometry::vector::vec2f;
 use persistence::model::ConversationUsageMetadata;
-use rookui::platform::WindowStyle;
-use rookui::{App, EntityId, TypedActionView, ViewHandle};
+use ptermui::platform::WindowStyle;
+use ptermui::{App, EntityId, TypedActionView, ViewHandle};
 use session_sharing_protocol::sharer::SessionSourceType;
 use warp_multi_agent_api::{self as api, client_action as api_client_action};
 
@@ -2007,7 +2007,7 @@ fn test_deep_linked_ambient_continuation_refreshes_when_task_data_arrives() {
 
         terminal.update(&mut app, |view, ctx| {
             // Mirrors opening a cloud conversation directly (for example, a
-            // Rook-on-Web deep link) before AgentConversationsModel has loaded
+            // Polaris Terminal-on-Web deep link) before AgentConversationsModel has loaded
             // the ambient task. The restored pane only has the task id from
             // conversation metadata, so it first renders the conservative
             // ended-session UI.
@@ -2590,7 +2590,7 @@ fn test_copy_shared_session_link_does_not_write_clipboard_when_session_pending()
         // Write a sentinel to the clipboard so we can detect if it is overwritten.
         terminal.update(&mut app, |_, ctx| {
             ctx.clipboard()
-                .write(rookui::clipboard::ClipboardContent::plain_text(
+                .write(ptermui::clipboard::ClipboardContent::plain_text(
                     "sentinel".to_string(),
                 ));
         });

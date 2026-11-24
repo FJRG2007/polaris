@@ -4,7 +4,7 @@ use crate::terminal::event_listener::ChannelEventListener;
 use crate::terminal::model::block::{BlockSize, SerializedBlock};
 use crate::terminal::shell::ShellType;
 use crate::terminal::BlockPadding;
-use crate::theme::RookTheme;
+use crate::theme::PtermTheme;
 
 use super::*;
 
@@ -24,7 +24,7 @@ impl PtyController {
                 let _ = tx.send(());
             })),
         });
-        let _ = rookui::r#async::block_on(rx);
+        let _ = ptermui::r#async::block_on(rx);
     }
 }
 
@@ -42,7 +42,7 @@ fn terminal_model(background_executor: Arc<Background>) -> Arc<FairMutex<Termina
             max_block_scroll_limit: 1000,
             prompt_height: 1.,
         },
-        List::from(&RookTheme::default().into()),
+        List::from(&PtermTheme::default().into()),
         ChannelEventListener::new_for_test(),
         background_executor,
         false,

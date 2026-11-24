@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use anyhow::Context as _;
-use rook_cli::mcp::MCPSpec;
-use rook_core::features::FeatureFlag;
+use pterm_cli::mcp::MCPSpec;
+use pterm_core::features::FeatureFlag;
 use serde_json::{Map, Value};
 
 use crate::ai::ambient_agents::AgentConfigSnapshot;
@@ -102,8 +102,8 @@ fn supported_keys_context() -> String {
 /// Convert an unwrapped `mcp_servers` map into runtime MCP specs for AgentDriver.
 ///
 /// Behavior:
-/// - Entries with a UUID `rook_id` become `MCPSpec::Uuid`.
-/// - Entries with any other non-empty `rook_id` (e.g. `"linear"`) become `MCPSpec::WellKnown`
+/// - Entries with a UUID `pterm_id` become `MCPSpec::Uuid`.
+/// - Entries with any other non-empty `pterm_id` (e.g. `"linear"`) become `MCPSpec::WellKnown`
 ///   when `FeatureFlag::WellKnownMcpIds` is enabled (and are rejected otherwise);
 ///   the server owns the set of recognized ids and unknown ids are skipped at resolution.
 /// - Entries with `command`/`url` remain as inline JSON (`MCPSpec::Json`) containing the unwrapped server map.
@@ -119,19 +119,19 @@ pub fn mcp_specs_from_mcp_servers(
             .as_object()
             .ok_or_else(|| anyhow::anyhow!("MCP server '{name}' config must be a JSON object"))?;
 
-        if let Some(rook_id) = obj.get("rook_id").and_then(Value::as_str) {
-            if let Ok(uuid) = uuid::Uuid::parse_str(rook_id) {
+        if let Some(pterm_id) = obj.get("pterm_id").and_then(Value::as_str) {
+            if let Ok(uuid) = uuid::Uuid::parse_str(pterm_id) {
                 uuids.push(uuid);
             } else if !FeatureFlag::WellKnownMcpIds.is_enabled() {
                 return Err(anyhow::anyhow!(
-                    "MCP server '{name}' field 'rook_id' must be a UUID"
+                    "MCP server '{name}' field 'pterm_id' must be a UUID"
                 ));
-            } else if rook_id.trim().is_empty() {
+            } else if pterm_id.trim().is_empty() {
                 return Err(anyhow::anyhow!(
-                    "MCP server '{name}' field 'rook_id' must be non-empty"
+                    "MCP server '{name}' field 'pterm_id' must be non-empty"
                 ));
             } else {
-                well_known.push(rook_id.to_string());
+                well_known.push(pterm_id.to_string());
             }
         } else {
             json_map.insert(name.clone(), config.clone());

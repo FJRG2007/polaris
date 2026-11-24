@@ -10,10 +10,10 @@
 *Root cause / approach:* At `d02e147360b9183444928c6037e11a462c0f98b1`, `TuiTerminalSessionView::init` registers `tui:orchestration_tabs:focus_input` only for `shift-down`, and `render_orchestration_tab_footer` advertises `Shift + ↓`. The terminal-session action `FocusDefaultInteractionTarget` already clears tab focus and focuses the default input owner via `set_orchestration_tab_focus(false, ctx)`. Add a second `down` binding to that action while retaining `shift-down`. Add a terminal-session-scoped editable Escape binding/action that obtains the tab bar's configured `main_tab` key, calls the existing `switch_to_orchestration_tab`/`switch_to_orchestration_conversation` path with `keep_tab_focus = false`, and therefore switches to the root session when a child is selected or simply returns focus to the input when the root is already selected. Expose the main-tab key through the retained tab-bar API rather than duplicating tab-bar configuration in the session view. Update the terminal orchestration footer from `Shift + ↓` to `↓`; do not add an Escape hint.
 
 *Affected files:*
-- `crates/rook_tui/src/terminal_session_view.rs` — terminal-session bindings, Escape action, and main-session focus transition.
-- `crates/rook_tui/src/tab_bar.rs` — read-only accessor for the configured main-tab key.
-- `crates/rook_tui/src/orchestration_tab_bar.rs` — Down footer copy; existing shared navigation bindings remain unchanged.
-- `crates/rook_tui/src/terminal_session_view_tests.rs` (and/or focused TUI keybinding tests) — binding, focus, session-switch, and footer regression coverage.
+- `crates/pterm_tui/src/terminal_session_view.rs` — terminal-session bindings, Escape action, and main-session focus transition.
+- `crates/pterm_tui/src/tab_bar.rs` — read-only accessor for the configured main-tab key.
+- `crates/pterm_tui/src/orchestration_tab_bar.rs` — Down footer copy; existing shared navigation bindings remain unchanged.
+- `crates/pterm_tui/src/terminal_session_view_tests.rs` (and/or focused TUI keybinding tests) — binding, focus, session-switch, and footer regression coverage.
 
 *Open questions resolved:*
 - Down focus behavior is limited to the focused orchestration-tab context and must not change ordinary input-editor Down behavior.
@@ -28,6 +28,6 @@
 2. Add a regression test for the Escape binding/action in a fixture with a root session and at least one child session: with a child selected and the tab bar focused, dispatch Escape and verify the focused session becomes the root/main session, `orchestration_tabs_focused` is false, and the root input view owns focus.
 3. Cover the root-selected edge case: dispatch Escape while the main/root tab is already selected and verify the selected session remains unchanged while tab focus is cleared and the input view receives focus.
 4. Render the terminal orchestration footer in a focused-tab state and assert it advertises `↓` for sending a message, does not contain `Shift + ↓`, and contains no Escape/`esc` hint. Existing left/right/Tab and Shift+left/Shift+right navigation bindings continue to be present and scoped to the tab-focused context.
-5. Run the focused unit suite and ensure it passes, including the new regression tests: `cargo test -p rook_tui`.
+5. Run the focused unit suite and ensure it passes, including the new regression tests: `cargo test -p pterm_tui`.
 6. Run the repository presubmit without errors: `./script/presubmit`.
 7. Because this changes a user-facing TUI surface, exercise the live orchestration tab flow with computer-use verification: capture visual proof while the tab bar is focused showing the `↓` footer hint, press Down and confirm the input receives focus without changing the selected agent, press Escape from a child tab and confirm the main agent/input is focused, and repeat Escape with the main tab selected to confirm it only focuses input. Attach the resulting screenshot proof to the task/PR.

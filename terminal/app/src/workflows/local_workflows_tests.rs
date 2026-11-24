@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use rookui::App;
+use ptermui::App;
 
 use super::*;
 
 fn initialize_app(app: &App) {
-    app.add_singleton_model(RookConfig::mock);
+    app.add_singleton_model(PtermConfig::mock);
 }
 
 #[test]

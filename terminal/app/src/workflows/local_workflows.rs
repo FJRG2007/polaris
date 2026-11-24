@@ -2,16 +2,16 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use rook_util::path::ShellFamily;
+use pterm_util::path::ShellFamily;
 #[cfg(not(target_family = "wasm"))]
-use rookui::platform::OperatingSystem;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use ptermui::platform::OperatingSystem;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 use warp_workflows::workflows as global_workflows;
 
 use super::WorkflowSource;
 use super::workflow::Workflow;
 use crate::terminal::model::session::Session;
-use crate::user_config::RookConfig;
+use crate::user_config::PtermConfig;
 #[cfg(feature = "local_fs")]
 use crate::user_config::load_workflows;
 
@@ -25,7 +25,7 @@ pub enum UseCache {
     No,
 }
 
-/// Singleton model that loads and caches local (non-RookDrive) workflows.
+/// Singleton model that loads and caches local (non-PtermDrive) workflows.
 pub struct LocalWorkflows {
     app_workflows: Vec<Workflow>,
 
@@ -38,17 +38,17 @@ impl LocalWorkflows {
     pub fn new(_ctx: &mut ModelContext<Self>) -> Self {
         Self {
             app_workflows: app_workflows(),
-            global_workflows: global_workflows().into_iter().map(Workflow::from).collect(), // convert from public-facing Workflow type to rook-internal Workflow type
+            global_workflows: global_workflows().into_iter().map(Workflow::from).collect(), // convert from public-facing Workflow type to polaris-terminal-internal Workflow type
             project_workflows: Default::default(),
         }
     }
 
-    /// Returns an iterator over hardcoded "application" workflows included in the Rook binary.
+    /// Returns an iterator over hardcoded "application" workflows included in the Polaris Terminal binary.
     pub fn app_workflows(&self) -> impl Iterator<Item = &Workflow> {
         self.app_workflows.iter()
     }
 
-    /// Returns an iterator over the static set of workflows for 3rd party tools loaded from Rook's
+    /// Returns an iterator over the static set of workflows for 3rd party tools loaded from Polaris Terminal's
     /// workflows GitHub repo.
     pub fn global_workflows(
         &self,
@@ -81,7 +81,7 @@ impl LocalWorkflows {
         })
     }
 
-    /// Returns an iterator over file-based workflows loaded from the `.rook/workflows` directory in
+    /// Returns an iterator over file-based workflows loaded from the `.polaris/terminal/workflows` directory in
     /// the `working_directory`.
     ///
     /// The loaded workflows vector is cached.
@@ -135,7 +135,7 @@ impl LocalWorkflows {
                     .map(|workflow| (WorkflowSource::Project, workflow)),
             )
             .chain(
-                RookConfig::as_ref(ctx)
+                PtermConfig::as_ref(ctx)
                     .local_user_workflows()
                     .iter()
                     .map(|workflow| (WorkflowSource::Local, workflow)),
@@ -176,15 +176,13 @@ fn app_workflows() -> Vec<Workflow> {
     }
 }
 
-/// Loads project-level workflows (if any) from the rook config directory in the current working
+/// Loads project-level workflows (if any) from the polaris-terminal config directory in the current working
 /// directory.
 #[cfg(feature = "local_fs")]
 pub(super) fn load_project_workflows(path: &Path) -> Vec<Workflow> {
     match git2::Repository::discover(path) {
         Ok(repository) => repository.workdir().map_or(Vec::new(), |workdir| {
-            load_workflows(&workflows_dir(
-                workdir.join(rook_core::paths::ROOK_CONFIG_DIR),
-            ))
+            load_workflows(&workflows_dir(workdir.join(".polaris").join("terminal")))
         }),
         Err(_) => Vec::new(),
     }
@@ -209,21 +207,21 @@ pub fn tail_command_for_shell(shell_family: ShellFamily, path: &PathBuf) -> Stri
 
 #[cfg(not(target_family = "wasm"))]
 pub fn prompt_chip_logging_workflow(shell_family: ShellFamily) -> Option<Workflow> {
-    if !rook_core::channel::ChannelState::enable_debug_features() {
+    if !pterm_core::channel::ChannelState::enable_debug_features() {
         return None;
     }
     let log_file_path = crate::context_chips::logging::log_file_path().ok()?;
     Some(Workflow::Command {
         name: "Tail prompt chip log".into(),
         command: tail_command_for_shell(shell_family, &log_file_path),
-        tags: vec!["rook".into(), "debug".into()],
+        tags: vec!["polaris-terminal".into(), "debug".into()],
         description: Some(
             "Shows the diagnostic log of shell commands run by prompt context chips (dogfood only)"
                 .into(),
         ),
         arguments: vec![],
         source_url: None,
-        author: Some("Rook".into()),
+        author: Some("Polaris Terminal".into()),
         author_url: None,
         shells: vec![],
         environment_variables: None,

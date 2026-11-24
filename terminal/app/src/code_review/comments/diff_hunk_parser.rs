@@ -2,7 +2,7 @@
 
 use ai::agent::action::CommentSide;
 use num_traits::SaturatingSub;
-use rook_editor::render::model::LineCount;
+use pterm_editor::render::model::LineCount;
 
 use crate::code::editor::line::EditorLineLocation;
 use crate::code_review::comments::LineDiffContent;

@@ -1,13 +1,13 @@
 use chrono::{DateTime, Local};
 use ordered_float::OrderedFloat;
-use rook_core::ui::builder::MIN_FONT_SIZE;
-use rookui::elements::{
+use pterm_core::ui::builder::MIN_FONT_SIZE;
+use ptermui::elements::{
     Align, ConstrainedBox, Container, CrossAxisAlignment, Flex, Highlight, Icon, MainAxisAlignment,
     MainAxisSize, ParentElement, Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::ai::blocklist::AIQueryHistoryOutputStatus;
 use crate::appearance::Appearance;

@@ -324,14 +324,15 @@ fn muse_is_supported_via_default_listener() {
 }
 
 #[test]
-fn rook_tui_notifications_are_supported() {
-    assert!(is_agent_supported(&CLIAgent::RookTui));
-    let mut handler = create_handler(&CLIAgent::RookTui).expect("should create handler");
-    let stop_body = r#"{"v":1,"agent":"rook-tui","event":"stop","session_id":"sess-42"}"#;
+fn pterm_tui_notifications_are_supported() {
+    assert!(is_agent_supported(&CLIAgent::PtermTui));
+    let mut handler = create_handler(&CLIAgent::PtermTui).expect("should create handler");
+    let stop_body =
+        r#"{"v":1,"agent":"polaris-terminal-tui","event":"stop","session_id":"sess-42"}"#;
     let parsed_stop = handler
         .try_parse(Some(CLI_AGENT_NOTIFICATION_SENTINEL), stop_body, false)
         .expect("should parse stop");
-    assert_eq!(parsed_stop.agent, CLIAgent::RookTui);
+    assert_eq!(parsed_stop.agent, CLIAgent::PtermTui);
     assert_eq!(parsed_stop.event, CLIAgentEventType::Stop);
     assert!(handler.handle_event(parsed_stop).is_some());
 }

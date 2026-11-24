@@ -1,8 +1,8 @@
 use std::sync::mpsc;
 
-use rook_core::ui::appearance::Appearance;
-use rookui::platform::WindowStyle;
-use rookui::{AddSingletonModel, App, EntityId, ModelHandle, ViewContext, ViewHandle};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::platform::WindowStyle;
+use ptermui::{AddSingletonModel, App, EntityId, ModelHandle, ViewContext, ViewHandle};
 
 use super::NotebookManager;
 use crate::ai::blocklist::BlocklistAIHistoryModel;

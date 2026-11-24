@@ -1,6 +1,6 @@
 # Product Spec: Tab search matches tab group names
 
-**Issue:** [FJRG2007/rook#14689](https://github.com/FJRG2007/rook/issues/14689)
+**Issue:** [FJRG2007/polaris#14689](https://github.com/FJRG2007/polaris/issues/14689)
 **Figma:** none provided
 
 ## Summary

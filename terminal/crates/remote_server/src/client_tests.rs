@@ -1,6 +1,6 @@
 use futures::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
-use rook_core::SessionId;
-use rookui_core::r#async::executor;
+use pterm_core::SessionId;
+use ptermui_core::r#async::executor;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 use super::*;

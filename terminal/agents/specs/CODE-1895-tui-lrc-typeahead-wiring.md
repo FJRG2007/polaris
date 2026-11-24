@@ -2,15 +2,15 @@
 
 Ticket: https://linear.app/warpdotdev/issue/CODE-1895/tui-characters-typed-during-an-lrc-are-discarded-instead-of-being
 Originating thread: https://warpdotdev.slack.com/archives/C0BDQDW8V5E/p1784552071087109
-Target repo: FJRG2007/rook (the Rook client)
+Target repo: FJRG2007/polaris (the Polaris Terminal client)
 All code references below are commit-pinned to `abea51cd1e102b363935f1b25ef03d335bc7b36f`.
 
 == PRODUCT ==
 
-*Summary:* In the Rook TUI (`crates/rook_tui`), characters typed while a
+*Summary:* In the Polaris Terminal TUI (`crates/pterm_tui`), characters typed while a
 user-controlled long-running command (LRC) is running (e.g. `sleep 5`) are
 currently discarded when the command finishes. They should instead be inserted
-into the TUI input editor when the LRC completes — matching the Rook GUI and
+into the TUI input editor when the LRC completes — matching the Polaris Terminal GUI and
 general shell typeahead behavior (bash/zsh buffer keystrokes typed during a
 command and flush them into the next prompt). The typeahead accumulation already
 exists in the *shared* terminal model; the TUI is simply missing the view-side
@@ -80,7 +80,7 @@ same `TerminalModel`):
 - `EarlyOutput` models output received while no block is running and accumulates
   typeahead, in one of two modes (`TypeaheadMode`) chosen in `init_session`:
   `ShellReported` (the shell reports its input buffer via a DCS/OSC hook —
-  `ansi::Handler::input_buffer`) or `InputMatching` (Rook matches PTY-echoed
+  `ansi::Handler::input_buffer`) or `InputMatching` (Polaris Terminal matches PTY-echoed
   chars against user input recorded via `push_user_input`).
   `crates/../app/src/terminal/model/early_output.rs:50 @ abea51c` (struct),
   `:26-35 @ abea51c` (`TypeaheadMode`), `:108-168 @ abea51c`
@@ -115,19 +115,19 @@ same `TerminalModel`):
   happens — but the two view-side hooks are missing:
 - (a) *Never inserts.* The TUI already receives `ModelEvent::Typeahead` but its
   handler only redraws — it never reads the accumulated typeahead into the input
-  editor: `crates/rook_tui/src/terminal_session_view.rs:1077-1100 @ abea51c`
+  editor: `crates/pterm_tui/src/terminal_session_view.rs:1077-1100 @ abea51c`
   (the `ModelEvent::Typeahead` arm at `:1096` is grouped into a `ctx.notify()`).
   The input editor is a shared `CodeEditorModel` created at
-  `crates/rook_tui/src/terminal_session_view.rs:812-813 @ abea51c` and owned by
-  `TuiInputView` (`crates/rook_tui/src/input/view.rs:150-154 @ abea51c`).
+  `crates/pterm_tui/src/terminal_session_view.rs:812-813 @ abea51c` and owned by
+  `TuiInputView` (`crates/pterm_tui/src/input/view.rs:150-154 @ abea51c`).
 - (b) *Never reports keystrokes.* While an LRC owns input, keys route to
-  `TuiInputTarget::Pty` (`crates/rook_tui/src/terminal_use.rs:65-88 @ abea51c`,
+  `TuiInputTarget::Pty` (`crates/pterm_tui/src/terminal_use.rs:65-88 @ abea51c`,
   `123-133 @ abea51c`) and are forwarded as
   `TuiTerminalSessionAction::ForwardUserPtyBytes`
-  (`crates/rook_tui/src/terminal_content_element.rs:129-181 @ abea51c`), whose
+  (`crates/pterm_tui/src/terminal_content_element.rs:129-181 @ abea51c`), whose
   handler is a raw passthrough that writes to the PTY and never calls
   `push_user_input`:
-  `crates/rook_tui/src/terminal_session_view.rs:2979-2985 @ abea51c`. So
+  `crates/pterm_tui/src/terminal_session_view.rs:2979-2985 @ abea51c`. So
   `InputMatching` shells cannot match typeahead in the TUI.
 
 *Design.*
@@ -148,7 +148,7 @@ same `TerminalModel`):
   `TuiInputTarget::Pty` and the agent editor is hidden; on `BlockCompleted` the
   TUI runs `resume_after_user_controlled_command` + `update_process_input_focus`
   and returns input to `AgentEditor`
-  (`crates/rook_tui/src/terminal_session_view.rs:1078-1081 @ abea51c`). Inserting
+  (`crates/pterm_tui/src/terminal_session_view.rs:1078-1081 @ abea51c`). Inserting
   into the `CodeEditorModel` is safe even while it is hidden — it becomes visible
   when input returns to the editor on completion. — *Chosen:* insert into the
   existing `input_editor_model`, mirroring the GUI (which likewise inserts into
@@ -183,7 +183,7 @@ same `TerminalModel`):
    (`app/src/terminal/input.rs:8894-8904 @ abea51c`) on its zero-based CRDT
    editor.
 4. *TUI observe-and-insert.* In
-   `crates/rook_tui/src/terminal_session_view.rs`, split `ModelEvent::Typeahead`
+   `crates/pterm_tui/src/terminal_session_view.rs`, split `ModelEvent::Typeahead`
    out of the notify-only arm (`:1091-1098`) into a new
    `handle_typeahead_event(ctx)` that: calls
    `self.terminal_model.lock().take_typeahead_for_input()`; on `Some((text, n))`
@@ -243,7 +243,7 @@ covered with tests across the shared model and both front-ends.
   assertion.
 
 *Validation & verification criteria* (must ALL pass before merge):
-1. *Repro fixed (ShellReported), verifies behavior #1.* A `crates/rook_tui` test
+1. *Repro fixed (ShellReported), verifies behavior #1.* A `crates/pterm_tui` test
    (per `tui-testing`) drives a completed user-controlled block with accumulated
    typeahead `echo hi` and a `ModelEvent::Typeahead`, then asserts the input
    editor (`CodeEditorModel`) content == `echo hi` with the cursor at the end.
@@ -253,7 +253,7 @@ covered with tests across the shared model and both front-ends.
    unchanged. Named alongside the test in #1.
 3. *AI-exclusion test, verifies #3.* Typeahead entered during a block carrying
    `agent_interaction_metadata` is NOT inserted (input editor stays empty) — a
-   `crates/rook_tui` test, and/or a `TerminalModel::take_typeahead_for_input`
+   `crates/pterm_tui` test, and/or a `TerminalModel::take_typeahead_for_input`
    unit test returning `None` for the agent-requested case.
 4. *Incremental overwrite test, verifies #5.* Two `Typeahead` events (`ec`, then
    `echo hi`) result in an input buffer of `echo hi`, not `ececho hi`.

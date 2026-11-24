@@ -4,9 +4,9 @@ use ai::agent::action::{AIAgentActionType, FileEdit};
 use ai::diff_validation::ParsedDiff;
 use chrono::{DateTime, Utc};
 use parking_lot::FairMutex;
-use rook_core::features::FeatureFlag;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::super::controller::{BlocklistAIController, BlocklistAIControllerEvent};
 use crate::ai::agent::api::generate_multi_agent_output;
@@ -38,12 +38,12 @@ cfg_if::cfg_if! {
         use std::{path::PathBuf, time::Duration};
         use crate::ai::blocklist::{read_local_file_context, BlocklistAIPermissions};
         use crate::workspaces::user_workspaces::TeamScope;
-        use rook_terminal::shell::ShellLaunchData;
+        use pterm_terminal::shell::ShellLaunchData;
         use crate::util::link_detection::{detect_file_paths, DetectedLinkType};
         use crate::util::openable_file_type::is_binary_file;
         use ai::agent::FileLocations;
-        use rookui::AppContext;
-        use rookui::r#async::FutureExt as AsyncFutureExt;
+        use ptermui::AppContext;
+        use ptermui::r#async::FutureExt as AsyncFutureExt;
         use itertools::Itertools;
     }
 }

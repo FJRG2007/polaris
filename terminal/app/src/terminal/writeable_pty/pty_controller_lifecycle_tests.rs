@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use parking_lot::{FairMutex, Mutex};
-use rookui::App;
+use ptermui::App;
 
 use super::*;
 use crate::terminal::event_listener::ChannelEventListener;
@@ -154,7 +154,7 @@ fn native_shell_completions_queues_the_generator_command_for_the_active_sessions
             assert_eq!(*shell_type, ShellType::Fish);
             assert_eq!(
                 command,
-                " rook_run_generator_command_native_completions 676974206368"
+                " pterm_run_generator_command_native_completions 676974206368"
             );
         });
 

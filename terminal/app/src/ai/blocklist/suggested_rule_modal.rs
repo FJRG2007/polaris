@@ -1,15 +1,15 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rook_editor::editor::NavigationKey;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_editor::editor::NavigationKey;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, Flex, OffsetPositioning, ParentElement,
     PositionedElementAnchor, PositionedElementOffsetBounds, Radius, ScrollbarWidth,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::FixedBinding;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::FixedBinding;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -40,7 +40,7 @@ const HEADER_TEXT: &str = "Suggested rule";
 const MAX_EDITOR_HEIGHT: f32 = 240.;
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",
@@ -580,7 +580,7 @@ impl SuggestedRuleView {
                             ScrollbarWidth::Auto,
                             appearance.theme().nonactive_ui_detail().into(),
                             appearance.theme().active_ui_detail().into(),
-                            rookui::elements::Fill::None,
+                            ptermui::elements::Fill::None,
                         )
                         .finish(),
                     )

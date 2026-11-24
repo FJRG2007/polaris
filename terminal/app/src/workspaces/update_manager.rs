@@ -4,9 +4,9 @@ use std::sync::mpsc::SyncSender;
 use anyhow::{Context, Result};
 use futures::channel::oneshot::{self, Receiver};
 use futures::stream::AbortHandle;
-use rook_errors::{report_error, report_if_error};
-use rookui::r#async::Timer;
-use rookui::{
+use pterm_errors::{report_error, report_if_error};
+use ptermui::r#async::Timer;
+use ptermui::{
     Entity, ModelContext, ModelHandle, RequestState, SingletonEntity, duration_with_jitter,
 };
 

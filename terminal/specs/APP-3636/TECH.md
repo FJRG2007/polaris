@@ -53,12 +53,12 @@ The editor's `@` detection may be gated on AI mode. The CLI agent input does cal
 When input starts with `!` (bash mode), the `@` trigger must still work at positions after the prefix. The existing `@` detection is position-based (tracks the byte offset of the `@` character) and should work regardless of preceding content. No special handling needed.
 
 ## Testing and Validation
-- Verify `@` opens the context menu with files/folders and code symbols (no Rook-specific categories) in CLI agent rich input.
+- Verify `@` opens the context menu with files/folders and code symbols (no Polaris Terminal-specific categories) in CLI agent rich input.
 - Verify `@foo` filters files by name.
 - Verify selecting a file inserts the repo-relative path as plain text.
 - Verify `@` works after `!` prefix in the buffer.
 - Verify all inserted content submits correctly to the PTY.
-- Verify no regressions in normal Rook agent input (`@` context still works as before).
+- Verify no regressions in normal Polaris Terminal agent input (`@` context still works as before).
 
 ## Follow-ups
 - Support `@` context in SSH/remote sessions (requires remote file discovery).

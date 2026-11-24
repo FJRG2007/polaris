@@ -7,19 +7,19 @@ use std::sync::Arc;
 use async_channel::Sender;
 use base64::Engine;
 use itertools::Either;
-use rook_completer::meta::Span;
-use rook_core::command::ExitCode;
-use rook_core::features::FeatureFlag;
-use rook_core::semantic_selection::SemanticSelection;
-use rook_errors::report_error;
-pub use rook_terminal::event::ExitReason;
-use rook_terminal::event::validate_and_decode_in_band_command_output_to_bytes;
-pub use rook_terminal::model::{BlockIndex, RangeInModel};
-use rook_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
-use rookui::AppContext;
-use rookui::assets::asset_cache::Asset;
-use rookui::r#async::executor::Background;
-use rookui::image_cache::ImageType;
+use pterm_completer::meta::Span;
+use pterm_core::command::ExitCode;
+use pterm_core::features::FeatureFlag;
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_errors::report_error;
+pub use pterm_terminal::event::ExitReason;
+use pterm_terminal::event::validate_and_decode_in_band_command_output_to_bytes;
+pub use pterm_terminal::model::{BlockIndex, RangeInModel};
+use pterm_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
+use ptermui::AppContext;
+use ptermui::assets::asset_cache::Asset;
+use ptermui::r#async::executor::Background;
+use ptermui::image_cache::ImageType;
 use serde::Serialize;
 use session_sharing_protocol::common::{
     AICommandMetadata, OrderedTerminalEventType, ParticipantId,
@@ -68,7 +68,7 @@ use crate::terminal::model::ansi::{
     ClearValue, CommandFinishedValue, CompletionMetadata, ExitShellValue,
     ExternalShellWidgetSelectionValue, Handler, InitShellValue, InitSubshellValue,
     PreInteractiveSSHSessionValue, PrecmdValue, PreexecValue, PromptMetadata, SSHValue,
-    SourcedRcFileForRookValue,
+    SourcedRcFileForPtermValue,
 };
 use crate::terminal::model::bootstrap::BootstrapStage;
 use crate::terminal::model::completions::{ShellCompletion, ShellCompletionUpdate};
@@ -356,7 +356,7 @@ enum IsReceivingHook {
     No,
 }
 
-/// Information needed to render a rookify "success" block upon successful subshell bootstrap.
+/// Information needed to render a ptermify "success" block upon successful subshell bootstrap.
 #[derive(Debug, Clone)]
 pub struct SubshellSuccessBlockInfo {
     /// The ID of the newly bootstrapped subshell session.
@@ -576,7 +576,7 @@ pub struct SubshellInitializationInfo {
     pub spawning_command: String,
 
     /// `true` if the subshell bootstrap was triggered by an RC file snippet that emits the
-    /// `SourcedRcFileForRook` DCS.
+    /// `SourcedRcFileForPterm` DCS.
     pub was_triggered_by_rc_file_snippet: bool,
 
     /// The subshell was triggered from an EVC invocation
@@ -952,7 +952,7 @@ impl SelectedBlocks {
 pub enum TerminalInputState {
     /// Alt-screen on which programs like vim run is visible.
     AltScreen,
-    /// Rook Input View is visible.
+    /// Polaris Terminal Input View is visible.
     InputEditor,
     /// Block-list is visible but input will go to the running command.
     LongRunningCommand,
@@ -2307,7 +2307,7 @@ impl TerminalModel {
     pub fn set_custom_title(&mut self, custom_title: Option<String>) {
         self.custom_title.clone_from(&custom_title);
         // If the custom title set by the user is None, we "reset" to whatever the title was set by
-        // the shell / Rook itself.
+        // the shell / Polaris Terminal itself.
         self.send_title_event(match custom_title {
             Some(_) => custom_title,
             None => self.title.clone(),
@@ -2455,7 +2455,7 @@ impl TerminalModel {
     /// a line of output that is not a known SSH output, we consider that to be some mild evidence that
     /// login is complete. Though, because that output line might be a false alarm (i.e., it could be
     /// an SSH banner OR a line like "Permission denied."), we wait some amount of time and check again
-    /// before indicating we're ready for rookification.
+    /// before indicating we're ready for ptermification.
     pub fn check_for_end_of_ssh_login(&mut self, confirmation_check: bool) {
         let Some(mut ssh_login_state) = self.notify_on_end_of_ssh_login.clone() else {
             return;
@@ -2477,7 +2477,9 @@ impl TerminalModel {
         match ssh::util::check_ssh_login_state(&block_output) {
             SshLoginState::LastLogin | SshLoginState::PromptDetected => {
                 self.event_proxy
-                    .send_app_event(Event::DetectedEndOfSshLogin(SshLoginStatus::ReadyToRookify));
+                    .send_app_event(Event::DetectedEndOfSshLogin(
+                        SshLoginStatus::ReadyToPtermify,
+                    ));
 
                 ssh_login_state.notification_state = SshLoginNotificationState::Completed;
             }
@@ -2487,7 +2489,7 @@ impl TerminalModel {
                     if ssh_login_state.notification_state == SshLoginNotificationState::Monitoring {
                         self.event_proxy
                             .send_app_event(Event::DetectedEndOfSshLogin(
-                                SshLoginStatus::RecheckBeforeRookifying,
+                                SshLoginStatus::RecheckBeforePtermifying,
                             ));
 
                         // We want to avoid emitting redundant events for the initial check.
@@ -2497,7 +2499,7 @@ impl TerminalModel {
                 } else {
                     self.event_proxy
                         .send_app_event(Event::DetectedEndOfSshLogin(
-                            SshLoginStatus::ReadyToRookify,
+                            SshLoginStatus::ReadyToPtermify,
                         ));
 
                     ssh_login_state.notification_state = SshLoginNotificationState::Completed;
@@ -2628,7 +2630,7 @@ impl ansi::Handler for TerminalModel {
         delegate!(self.set_cursor_shape(shape));
     }
 
-    fn set_hyperlink(&mut self, hyperlink: Option<rook_terminal::model::ansi::Hyperlink>) {
+    fn set_hyperlink(&mut self, hyperlink: Option<pterm_terminal::model::ansi::Hyperlink>) {
         delegate!(self.set_hyperlink(hyperlink));
     }
 
@@ -2882,7 +2884,7 @@ impl ansi::Handler for TerminalModel {
         delegate!(self.configure_charset(index, charset));
     }
 
-    fn set_color(&mut self, index: usize, color: rookui::color::ColorU) {
+    fn set_color(&mut self, index: usize, color: ptermui::color::ColorU) {
         self.override_colors[index] = Some(color);
     }
 
@@ -3119,7 +3121,7 @@ impl ansi::Handler for TerminalModel {
             if value.external_control_master {
                 log::info!(
                     "SSH wrapper attached to an external ControlMaster at {}; \
-                     Rook will not tear it down on session exit",
+                     Polaris Terminal will not tear it down on session exit",
                     value.socket_path.display()
                 );
             }
@@ -3223,7 +3225,7 @@ impl ansi::Handler for TerminalModel {
         }
     }
 
-    fn sourced_rc_file(&mut self, data: SourcedRcFileForRookValue) {
+    fn sourced_rc_file(&mut self, data: SourcedRcFileForPtermValue) {
         // If the blocklist is already bootstrapped, the user's RC file must be sourced in a
         // subshell.
         if self.block_list.is_bootstrapped() {
@@ -3241,7 +3243,7 @@ impl ansi::Handler for TerminalModel {
                 }
                 None => {
                     report_error!(
-                        "Received invalid shell name in SourcedRCFileForRookValue",
+                        "Received invalid shell name in SourcedRCFileForPtermValue",
                         extra: { "shell" => %data.shell }
                     );
                 }

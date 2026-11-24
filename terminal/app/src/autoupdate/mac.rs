@@ -17,10 +17,10 @@ use futures_lite::future;
 use instant::Instant;
 use nix::errno::Errno;
 use nix::unistd::{fchown, getgid, getuid};
-use rook_core::macos::get_bundle_path;
-use rook_core::safe_error;
-use rook_errors::report_error;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_core::macos::get_bundle_path;
+use pterm_core::safe_error;
+use pterm_errors::report_error;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 
 use super::{DownloadReady, release_assets_directory_url};
 use crate::appearance::AppearanceManager;
@@ -42,7 +42,7 @@ const OLD_EXECUTABLE_FILE_NAME: &str = "old";
 const PERMISSIONS_TMP_FILE_NAME: &str = "permission_test";
 
 fn old_executable_file_path() -> PathBuf {
-    rook_core::paths::state_dir().join(OLD_EXECUTABLE_FILE_NAME)
+    pterm_core::paths::state_dir().join(OLD_EXECUTABLE_FILE_NAME)
 }
 
 /// Removes the old executable dir from the app bundle. This is necessary because after an
@@ -135,24 +135,26 @@ pub(super) fn relaunch() -> Result<()> {
     let bundle_path = PathBuf::from(get_bundle_path()?);
     // Set the -n option to open a new instance of the app even if one is
     // running so we still launch the new version even if the user was running
-    // multiple instances of Rook.
+    // multiple instances of Polaris Terminal.
     let mut launch_command = OsString::from("/usr/bin/open -n ");
     launch_command.push(bundle_path.as_os_str());
     // Pass a flag to the app to let it know it was restarted as part of the
     // autoupdate process.
-    launch_command.push(format!(" --args {}", rook_cli::finish_update_flag()));
+    launch_command.push(format!(" --args {}", pterm_cli::finish_update_flag()));
     // If we're testing with a local copy of channel_versions.json, have the
     // newly-started binary also reference that same file (so we can test
     // displaying an updated changelog after an autoupdate).
-    if let Ok(path) = env::var("ROOK_CHANNEL_VERSIONS_PATH") {
-        launch_command.push(format!(" --env ROOK_CHANNEL_VERSIONS_PATH={path}"));
+    if let Ok(path) = env::var("POLARIS_TERMINAL_CHANNEL_VERSIONS_PATH") {
+        launch_command.push(format!(
+            " --env POLARIS_TERMINAL_CHANNEL_VERSIONS_PATH={path}"
+        ));
     }
 
-    // We need to make sure that the current Rook process is no longer running
+    // We need to make sure that the current Polaris Terminal process is no longer running
     // before we spawn the new one, otherwise we can end up showing multiple
     // icons in the macOS dock.  To do this, we use an intermediary /bin/sh
     // process that watches for this process to terminate, and then spawns a
-    // new Rook process.
+    // new Polaris Terminal process.
     //
     // Wait until the current process is no longer running, checking every
     // 200ms.  Once the current process has terminated, launch the new one.
@@ -187,7 +189,7 @@ pub async fn cleanup(update_id: &str) {
 /// This helps prevent accumulation of old update directories from failed downloads,
 /// race conditions, or incomplete cleanups.
 pub async fn cleanup_all_except(preserve_update_id: Option<&str>) {
-    let mut autoupdate_dir = rook_core::paths::cache_dir();
+    let mut autoupdate_dir = pterm_core::paths::cache_dir();
     autoupdate_dir.push("autoupdate");
 
     if !autoupdate_dir.exists() {
@@ -244,7 +246,7 @@ pub async fn cleanup_all_except(preserve_update_id: Option<&str>) {
     }
 }
 
-/// Determines if the user needs authorization in order to update Rook.
+/// Determines if the user needs authorization in order to update Polaris Terminal.
 async fn needs_authorization(bundle_path: &Path) -> Result<bool> {
     // For the bundle path itself, check permissions without creating a test file so as to not
     // interfere with code signing.
@@ -269,8 +271,8 @@ async fn needs_authorization(bundle_path: &Path) -> Result<bool> {
 }
 
 /// Determines if a directory is writable as part of an update. This means:
-/// * Rook can create files in the directory
-/// * Rook can modify the permissions of created files
+/// * Polaris Terminal can create files in the directory
+/// * Polaris Terminal can modify the permissions of created files
 async fn is_directory_writable(directory: &Path) -> Result<bool> {
     // Just because we have writability access does not mean we can set the correct owner/group.
     // Test if we can set the owner/group on a temporarily created file. If we can, then we can
@@ -305,14 +307,14 @@ async fn is_directory_writable(directory: &Path) -> Result<bool> {
 }
 
 /// Verifies that the staged bundle path has a valid macOS code signature, and that its
-/// team identifier matches Rook's team identifier.
+/// team identifier matches Polaris Terminal's team identifier.
 async fn verify_code_signature(component: &str, path: &Path) -> Result<()> {
     // Verify the signature of the staged update bundle with team identifier
     let codesign_verify_output = Command::new("/usr/bin/codesign")
         .arg("-v")
         .arg(format!(
             "-R=certificate leaf[subject.OU] = \"{}\"",
-            rook_core::macos::APPLE_TEAM_ID
+            pterm_core::macos::APPLE_TEAM_ID
         ))
         .arg(path)
         .output()
@@ -405,7 +407,7 @@ async fn apply_update(channel: Channel, version_info: &VersionInfo, update_id: &
         .await
         .is_ok()
     {
-        // If we performed this process already but didn't relaunch Rook, the old executable will
+        // If we performed this process already but didn't relaunch Polaris Terminal, the old executable will
         // still be located in the user application data directory.  In that case, leave it there.
         log::info!("Already autoupdated without relaunching; ignoring executable from old bundle");
     } else {
@@ -545,7 +547,7 @@ async fn download_and_extract_binary(
     // updates.
     if let Err(err) = unmount_dmg(mountpoint).await {
         let err = err.context("Error unmounting dmg for update");
-        rook_errors::report_error!(&err);
+        pterm_errors::report_error!(&err);
     }
 
     // Ensure that the new app we just downloaded has both integrity (e.g. no corrupted files)
@@ -670,7 +672,7 @@ async fn download_dmg(
 }
 
 fn get_download_dir(update_id: &str) -> PathBuf {
-    let mut dir = rook_core::paths::cache_dir();
+    let mut dir = pterm_core::paths::cache_dir();
     dir.push("autoupdate");
     dir.push(update_id);
     dir
@@ -688,8 +690,8 @@ async fn mount_dmg(dmg_dir: &Path, update_id: &str) -> Result<PathBuf> {
     hdiutil_cmd.args(["attach", "-mountpoint"]);
     hdiutil_cmd.arg(&volume);
     // Explanation of flags:
-    // -nobrowse: Do not show the Rook DMG in Finder or similar apps.
-    // -noautoopen: Do not open the Rook DMG in Finder.
+    // -nobrowse: Do not show the Polaris Terminal DMG in Finder or similar apps.
+    // -noautoopen: Do not open the Polaris Terminal DMG in Finder.
     // -readonly: For safety, we mount read-only since there's no need to modify the new app version.
     // -autofsck: Ensure that the DMG contents are verified. This is on by default for quarantined images, but macOS
     //    doesn't necessarily recognize our download as such.
@@ -748,12 +750,12 @@ fn dmg_name(channel: Channel) -> String {
 
 fn app_name_prefix(channel: Channel) -> &'static str {
     match channel {
-        Channel::Stable => "Rook",
-        Channel::Preview => "RookPreview",
-        Channel::Local => "rook",
+        Channel::Stable => "Polaris Terminal",
+        Channel::Preview => "PolarisTerminalPreview",
+        Channel::Local => "polaris-terminal-local",
         Channel::Integration => "integration",
-        Channel::Dev => "RookDev",
-        Channel::Oss => "rook-oss",
+        Channel::Dev => "PolarisTerminalDev",
+        Channel::Oss => "polaris-terminal",
     }
 }
 
@@ -761,10 +763,10 @@ fn executable_name(channel: Channel) -> &'static str {
     match channel {
         Channel::Stable => "stable",
         Channel::Preview => "preview",
-        Channel::Local => "rook",
+        Channel::Local => "polaris-terminal-local",
         Channel::Integration => "integration",
         Channel::Dev => "dev",
-        Channel::Oss => "rook-oss",
+        Channel::Oss => "polaris-terminal",
     }
 }
 

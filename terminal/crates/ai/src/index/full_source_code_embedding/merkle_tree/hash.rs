@@ -38,17 +38,17 @@ impl FromStr for NodeHash {
     }
 }
 
-impl From<NodeHash> for rook_graphql::full_source_code_embedding::NodeHash {
+impl From<NodeHash> for pterm_graphql::full_source_code_embedding::NodeHash {
     fn from(value: NodeHash) -> Self {
-        rook_graphql::full_source_code_embedding::NodeHash(value.0.to_string())
+        pterm_graphql::full_source_code_embedding::NodeHash(value.0.to_string())
     }
 }
 
-impl TryFrom<rook_graphql::full_source_code_embedding::NodeHash> for NodeHash {
+impl TryFrom<pterm_graphql::full_source_code_embedding::NodeHash> for NodeHash {
     type Error = Error;
 
     fn try_from(
-        value: rook_graphql::full_source_code_embedding::NodeHash,
+        value: pterm_graphql::full_source_code_embedding::NodeHash,
     ) -> Result<Self, Self::Error> {
         Ok(Self(MerkleHash::from_str(&value.0)?))
     }
@@ -102,17 +102,17 @@ impl FromStr for ContentHash {
     }
 }
 
-impl From<ContentHash> for rook_graphql::full_source_code_embedding::ContentHash {
+impl From<ContentHash> for pterm_graphql::full_source_code_embedding::ContentHash {
     fn from(value: ContentHash) -> Self {
-        rook_graphql::full_source_code_embedding::ContentHash(value.0.to_string())
+        pterm_graphql::full_source_code_embedding::ContentHash(value.0.to_string())
     }
 }
 
-impl TryFrom<rook_graphql::full_source_code_embedding::ContentHash> for ContentHash {
+impl TryFrom<pterm_graphql::full_source_code_embedding::ContentHash> for ContentHash {
     type Error = Error;
 
     fn try_from(
-        value: rook_graphql::full_source_code_embedding::ContentHash,
+        value: pterm_graphql::full_source_code_embedding::ContentHash,
     ) -> Result<Self, Self::Error> {
         Ok(Self(MerkleHash::from_str(&value.0)?))
     }

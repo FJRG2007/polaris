@@ -16,9 +16,9 @@ pub(super) mod proxy;
 use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;
 
-use rook_errors::report_error;
-use rookui::SingletonEntity;
-use rookui::r#async::executor;
+use pterm_errors::report_error;
+use ptermui::SingletonEntity;
+use ptermui::r#async::executor;
 
 use super::server_model::{ConnectionId, ServerModel};
 use crate::{TelemetryEvent, send_telemetry_from_app_ctx};
@@ -47,7 +47,7 @@ pub fn run_daemon(identity_key: String) -> anyhow::Result<()> {
 /// Called from `launch()` inside the headless AppBuilder callback.
 /// Binds the Unix domain socket, writes the PID file, spawns the
 /// accept loop, and registers the `ServerModel` singleton.
-pub(crate) fn launch_daemon(identity_key: &str, ctx: &mut rookui::AppContext) {
+pub(crate) fn launch_daemon(identity_key: &str, ctx: &mut ptermui::AppContext) {
     let socket_path = proxy::socket_path(identity_key);
     let pid_path = proxy::pid_path(identity_key);
 
@@ -84,7 +84,7 @@ pub(crate) fn launch_daemon(identity_key: &str, ctx: &mut rookui::AppContext) {
     // The flush sends directly to Rudderstack using a baked-in write
     // key — no user auth token is required.
     let timing_data =
-        rook_core::interval_timer::IntervalTimer::handle(ctx).update(ctx, |timer, _| {
+        pterm_core::interval_timer::IntervalTimer::handle(ctx).update(ctx, |timer, _| {
             timer.mark_interval_end("DAEMON_SOCKET_BOUND");
             timer.compute_stats()
         });
@@ -150,7 +150,7 @@ pub(crate) fn launch_daemon(identity_key: &str, ctx: &mut rookui::AppContext) {
 pub(super) async fn handle_daemon_connection(
     conn_id: ConnectionId,
     stream: async_io::Async<std::os::unix::net::UnixStream>,
-    spawner: rookui::ModelSpawner<ServerModel>,
+    spawner: ptermui::ModelSpawner<ServerModel>,
     exec: std::sync::Arc<executor::Background>,
 ) {
     use futures::AsyncReadExt as _;

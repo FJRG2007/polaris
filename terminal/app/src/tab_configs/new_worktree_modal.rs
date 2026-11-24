@@ -1,21 +1,23 @@
 use std::path::PathBuf;
 
-use rookui::elements::{
+use ptermui::elements::{
     Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Element,
     Fill as ElementFill, Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, Padding,
     ParentElement, Radius, Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::checkbox::Checkbox;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::checkbox::Checkbox;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
+    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 
 /// Registers keybindings for the new-worktree modal (ESC to close).
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
     app.register_fixed_bindings(vec![FixedBinding::new(
         "escape",
         NewWorktreeModalAction::Escape,
@@ -23,7 +25,7 @@ pub fn init(app: &mut AppContext) {
     )]);
 }
 
-use rook_core::ui::theme::color::internal_colors;
+use pterm_core::ui::theme::color::internal_colors;
 
 use crate::ai::persisted_workspace::PersistedWorkspace;
 use crate::appearance::Appearance;
@@ -356,8 +358,8 @@ impl View for NewWorktreeModal {
 
             // X close icon
             let close_icon = ConstrainedBox::new(
-                rook_core::ui::Icon::X
-                    .to_rookui_icon(theme.sub_text_color(theme.background()))
+                pterm_core::ui::Icon::X
+                    .to_ptermui_icon(theme.sub_text_color(theme.background()))
                     .finish(),
             )
             .with_width(CLOSE_ICON_SIZE)
@@ -371,7 +373,7 @@ impl View for NewWorktreeModal {
                 .with_child(esc_badge)
                 .finish();
 
-            let close_hoverable = rookui::elements::Hoverable::new(
+            let close_hoverable = ptermui::elements::Hoverable::new(
                 self.close_button_mouse_state.clone(),
                 move |_state| close_button,
             )

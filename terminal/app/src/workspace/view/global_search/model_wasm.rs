@@ -1,5 +1,5 @@
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::{Entity, ModelContext};
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::{Entity, ModelContext};
 
 use crate::workspace::view::global_search::SearchConfig;
 use crate::workspace::view::global_search::view::GlobalSearchEvent;

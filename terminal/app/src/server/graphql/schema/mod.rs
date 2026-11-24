@@ -1,10 +1,10 @@
 pub mod util;
 use anyhow::{Result, bail};
-use rook_graphql::generic_string_object::GenericStringObjectFormat;
-use rook_graphql::mutations::update_generic_string_object::{
+use pterm_graphql::generic_string_object::GenericStringObjectFormat;
+use pterm_graphql::mutations::update_generic_string_object::{
     GenericStringObjectUpdate, UpdateGenericStringObjectResult,
 };
-use rook_graphql::object::ObjectUpdateSuccess;
+use pterm_graphql::object::ObjectUpdateSuccess;
 pub use util::{action_type_to_gql_action_type, object_action_history_from_gql};
 
 use crate::cloud_object::{
@@ -16,10 +16,10 @@ use crate::cloud_object::{
 use crate::server::graphql::get_user_facing_error_message;
 
 fn boxed_rejected_generic_string_object<T>(
-    object: rook_graphql::generic_string_object::GenericStringObject,
+    object: pterm_graphql::generic_string_object::GenericStringObject,
 ) -> Result<Box<dyn ServerObject>>
 where
-    T: TryFromGql<GqlType = rook_graphql::generic_string_object::GenericStringObject>
+    T: TryFromGql<GqlType = pterm_graphql::generic_string_object::GenericStringObject>
         + ServerObject
         + 'static,
 {

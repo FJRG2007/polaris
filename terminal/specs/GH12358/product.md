@@ -1,13 +1,13 @@
 # Product Spec: Select WSL distributions in tab configs
 
-**Issue:** [FJRG2007/rook#12358](https://github.com/FJRG2007/rook/issues/12358)
+**Issue:** [FJRG2007/polaris#12358](https://github.com/FJRG2007/polaris/issues/12358)
 
 **Figma:** none provided
 
 ## Summary
 
 On Windows, a terminal or agent pane in a tab config can select an installed WSL
-distribution and open as a native Rook WSL session. This supports mixed layouts in
+distribution and open as a native Polaris Terminal WSL session. This supports mixed layouts in
 which different panes use different distributions or host shells, without asking
 users to run `wsl.exe` as a startup command.
 
@@ -29,14 +29,14 @@ commands = ["cargo run"]
 
 Tab configs can currently select a host shell executable such as `pwsh`, `zsh`, or
 `bash`, but they cannot identify a WSL distribution. Using `wsl.exe` as a command
-does not create the same session as Rook's built-in WSL launcher and can run later
+does not create the same session as Polaris Terminal's built-in WSL launcher and can run later
 startup commands before the guest shell is ready. This is especially limiting for
 multi-pane Windows layouts that span host shells and one or more WSL distributions.
 
 ## Goals
 
 - Let each terminal or agent pane name one installed WSL distribution.
-- Use Rook's native WSL session and bootstrap behavior.
+- Use Polaris Terminal's native WSL session and bootstrap behavior.
 - Give WSL startup directories deterministic guest-path semantics.
 - Fail clearly instead of silently opening a host default shell.
 - Preserve all existing `shell = "..."` tab configs.
@@ -48,7 +48,7 @@ multi-pane Windows layouts that span host shells and one or more WSL distributio
 - Adding WSL selection to cloud panes, split nodes, or the separate launch-config
   file format.
 - Installing, importing, starting, stopping, renaming, or setting the default WSL
-  distribution from Rook.
+  distribution from Polaris Terminal.
 - Adding structured selectors for SSH, containers, MSYS2, or other environments.
 - Accepting Windows paths as aliases for WSL pane directories.
 
@@ -70,23 +70,23 @@ multi-pane Windows layouts that span host shells and one or more WSL distributio
    table key is also a structural config error.
 
 4. `distribution` is a literal WSL identity, not a Handlebars parameter. It must
-   exactly match the case-sensitive distribution name discovered by Rook (for
-   example, `Ubuntu-24.04` does not match `ubuntu-24.04`). Rook does not trim,
+   exactly match the case-sensitive distribution name discovered by Polaris Terminal (for
+   example, `Ubuntu-24.04` does not match `ubuntu-24.04`). Polaris Terminal does not trim,
    case-fold, match aliases, or use a distribution UUID.
 
 5. The structured WSL form never selects the Windows default WSL distribution
    implicitly: `distribution` cannot be omitted. A pane with no `shell` field may
-   still open WSL when WSL is already the user's Rook default, which is unchanged
+   still open WSL when WSL is already the user's Polaris Terminal default, which is unchanged
    legacy behavior.
 
-6. On Windows, opening a valid WSL pane creates the same native Rook WSL session as
-   selecting that distribution from Rook's shell selector. Rook launches the
-   distribution's supported default shell, performs normal Rook bootstrap, and
+6. On Windows, opening a valid WSL pane creates the same native Polaris Terminal WSL session as
+   selecting that distribution from Polaris Terminal's shell selector. Polaris Terminal launches the
+   distribution's supported default shell, performs normal Polaris Terminal bootstrap, and
    does not enter `wsl.exe` as a visible command in a host-shell pane.
 
 7. An installed but stopped distribution is available. Opening the tab may start
    that distribution as part of normal WSL initialization. If the exact configured
-   name is not in Rook's discovered installed-distribution list, Rook shows an error
+   name is not in Polaris Terminal's discovered installed-distribution list, Polaris Terminal shows an error
    naming the configured distribution and creates no part of the tab; it never
    substitutes a host shell or another WSL distribution.
 
@@ -104,14 +104,14 @@ multi-pane Windows layouts that span host shells and one or more WSL distributio
    error that explains the accepted WSL syntax.
 
 10. Omitting `directory` starts the WSL pane in the selected distribution user's
-    home directory. Before creating any pane, Rook resolves each configured WSL
+    home directory. Before creating any pane, Polaris Terminal resolves each configured WSL
     directory to the Windows-host path required by the PTY and verifies that it is
-    a directory. If resolution fails or the directory does not exist, Rook shows a
+    a directory. If resolution fails or the directory does not exist, Polaris Terminal shows a
     clear error containing the pane/config context and creates no part of the tab.
-    Rook never runs configured commands in a fallback directory.
+    Polaris Terminal never runs configured commands in a fallback directory.
 
 11. A WSL pane's `commands` are queued in their declared order and the first command
-    is submitted only after that pane completes Rook shell bootstrap and its first
+    is submitted only after that pane completes Polaris Terminal shell bootstrap and its first
     post-bootstrap prompt is ready. Each later command starts after the previous
     command succeeds; a failed command stops the remaining queue, matching existing
     tab-config command behavior.
@@ -123,7 +123,7 @@ multi-pane Windows layouts that span host shells and one or more WSL distributio
 
 13. A multi-pane tab may mix host-shell panes, WSL panes using the same or different
     distributions, and cloud panes. Each WSL leaf gets an independent native WSL
-    session and uses its own distribution and directory. Rook validates every WSL
+    session and uses its own distribution and directory. Polaris Terminal validates every WSL
     selection and directory before creating the tab, so one preflight error cannot
     leave a partial layout behind.
 

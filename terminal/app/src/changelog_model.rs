@@ -5,9 +5,9 @@ use std::sync::Arc;
 use channel_versions::{Changelog, MarkdownSection};
 use itertools::Itertools;
 use markdown_parser::{FormattedText, parse_markdown};
-use rookui::assets::asset_cache::{AssetCache, AssetSource};
-use rookui::image_cache::ImageType;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::assets::asset_cache::{AssetCache, AssetSource};
+use ptermui::image_cache::ImageType;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 use crate::autoupdate::{self};
 use crate::channel::{Channel, ChannelState};
@@ -132,7 +132,7 @@ impl ChangelogModel {
             _ => return,
         };
 
-        // For RookPreview, add a section at the beginning describing
+        // For PolarisTerminalPreview, add a section at the beginning describing
         // preview-exclusive flags.
         if ChannelState::channel() == Channel::Preview && !PREVIEW_FLAGS.is_empty() {
             let preview_flags_vec: Vec<String> = PREVIEW_FLAGS

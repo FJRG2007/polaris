@@ -11,7 +11,7 @@ define_settings_group!(SshSettings,
             surface: settings::SettingSurfaces::GUI,
             private: false,
             storage_key: "ReuseExistingSshControlMaster",
-            toml_path: "rookify.ssh.reuse_existing_control_master",
+            toml_path: "ptermify.ssh.reuse_existing_control_master",
             description: "Whether the legacy SSH wrapper attaches to an existing SSH ControlMaster for the destination host instead of always creating its own.",
         },
     ]

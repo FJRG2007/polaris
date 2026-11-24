@@ -2,11 +2,11 @@
 use remote_server::manager::RemoteServerManager;
 // Re-export everything from the `remote_server` crate so existing
 // `crate::remote_server::*` imports in `app` continue to work.
+#[cfg(not(target_family = "wasm"))]
+use pterm_server_client::auth::AuthEvent;
+#[cfg(not(target_family = "wasm"))]
+use ptermui::SingletonEntity as _;
 pub use remote_server::*;
-#[cfg(not(target_family = "wasm"))]
-use rook_server_client::auth::AuthEvent;
-#[cfg(not(target_family = "wasm"))]
-use rookui::SingletonEntity as _;
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::{AIRequestUsageModel, AIRequestUsageModelEvent};
@@ -38,7 +38,7 @@ pub mod unix;
 
 #[cfg(not(target_family = "wasm"))]
 fn current_codebase_index_limits(
-    ctx: &rookui::AppContext,
+    ctx: &ptermui::AppContext,
 ) -> remote_server::proto::CodebaseIndexLimits {
     let limits = AIRequestUsageModel::as_ref(ctx).codebase_context_limits();
     remote_server::proto::CodebaseIndexLimits {
@@ -73,7 +73,7 @@ pub fn run_daemon(_identity_key: String) -> anyhow::Result<()> {
 /// Forwards app auth-token rotation and privacy preference change events
 /// to the remote-server manager.
 #[cfg(not(target_family = "wasm"))]
-pub fn wire_auth_token_rotation(ctx: &mut rookui::AppContext) {
+pub fn wire_auth_token_rotation(ctx: &mut ptermui::AppContext) {
     let codebase_index_limits = current_codebase_index_limits(ctx);
     RemoteServerManager::handle(ctx).update(ctx, |manager, _| {
         manager.update_codebase_index_limits(Some(codebase_index_limits));

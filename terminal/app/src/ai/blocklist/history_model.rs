@@ -10,9 +10,9 @@ use chrono::{DateTime, Local, NaiveDateTime};
 #[cfg(feature = "local_fs")]
 use diesel::SqliteConnection;
 use itertools::Itertools as _;
-use rook_cli::agent::Harness;
-use rook_core::features::FeatureFlag;
-use rookui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
+use pterm_cli::agent::Harness;
+use pterm_core::features::FeatureFlag;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use warp_multi_agent_api::client_action::{Action, StartNewConversation};
@@ -55,7 +55,7 @@ pub use conversation_loader::{
     CLIAgentConversation, CloudConversationData,
     convert_persisted_conversation_to_ai_conversation_with_metadata, load_conversation_from_server,
 };
-use rook_errors::report_error;
+use pterm_errors::report_error;
 
 /// Mirrors [`crate::persistence::agent::MAX_PERSISTED_CONVERSATION_COUNT`].
 /// Moot at steady state because the disk-side prune already keeps the

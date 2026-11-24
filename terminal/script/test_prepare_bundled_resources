@@ -6,7 +6,7 @@ WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
-FAKE_EXECUTABLE="$TEMP_DIR/rook"
+FAKE_EXECUTABLE="$TEMP_DIR/polaris-terminal"
 cat > "$FAKE_EXECUTABLE" <<'EOF'
 #!/usr/bin/env bash
 if [[ "$1" != "dump-settings-schema" || -z "$2" ]]; then

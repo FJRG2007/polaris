@@ -5,29 +5,29 @@ use std::sync::LazyLock;
 use std::time::Duration;
 
 use pathfinder_geometry::vector::vec2f;
-use regex::Regex;
-use rook_core::context_flag::ContextFlag;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::theme::RookTheme;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::{report_error, report_if_error};
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::elements::{
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::theme::PtermTheme;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::{report_error, report_if_error};
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::elements::{
     Align, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Empty, Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Rect, Shrinkable,
     Stack, Text,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::ContextPredicate;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::switch::{SwitchStateHandle, TooltipConfig};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::ContextPredicate;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::switch::{SwitchStateHandle, TooltipConfig};
+use ptermui::{
     Action, AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView,
     UpdateModel, View, ViewContext, ViewHandle, id,
 };
+use regex::Regex;
 use settings::Setting as _;
 
 use super::privacy::{AddRegexModal, AddRegexModalEvent};
@@ -65,8 +65,8 @@ const FONT_SIZE: f32 = 12.;
 
 const SAFE_MODE_TITLE: &str = "Secret redaction";
 static SAFE_MODE_DESCRIPTION: LazyLock<&'static str> = LazyLock::new(|| {
-    "When this setting is enabled, Rook will scan blocks, the contents of \
-        Rook Drive objects, and Oz prompts for potential sensitive \
+    "When this setting is enabled, Polaris Terminal will scan blocks, the contents of \
+        Polaris Terminal Drive objects, and Oz prompts for potential sensitive \
         information and prevent saving or sending this data to any \
         servers. You can customize this list via regexes."
 });
@@ -76,18 +76,18 @@ const USER_SECRET_REGEX_DESCRIPTION: &str = "Use regex to define additional secr
     to make it case-insensitive.";
 const TELEMETRY_DESCRIPTION_OLD: &str = "App analytics help us make the product better for you. We only collect \
     app usage metadata, never console input or output.";
-const TELEMETRY_TITLE: &str = "Help improve Rook";
+const TELEMETRY_TITLE: &str = "Help improve Polaris Terminal";
 const TELEMETRY_DESCRIPTION: &str = "App analytics help us make the product better for you. We may collect \
-    certain console interactions to improve Rook's AI capabilities.";
-const TELEMETRY_DOCS_URL: &str = "https://docs.rook.dev/support-and-community/privacy-and-security/privacy#what-telemetry-data-does-rook-collect-and-why";
+    certain console interactions to improve Polaris Terminal's AI capabilities.";
+const TELEMETRY_DOCS_URL: &str = "https://docs.rook.dev/support-and-community/privacy-and-security/privacy#what-telemetry-data-does-polaris-terminal-collect-and-why";
 
 const DATA_MANAGEMENT_TITLE: &str = "Manage your data";
-const DATA_MANAGEMENT_DESCRIPTION: &str = "At any time, you may choose to delete your Rook account permanently. \
-    You will no longer be able to use Rook.";
+const DATA_MANAGEMENT_DESCRIPTION: &str = "At any time, you may choose to delete your Polaris Terminal account permanently. \
+    You will no longer be able to use Polaris Terminal.";
 const DATA_MANAGEMENT_LINK_TEXT: &str = "Visit the data management page";
 
 const PRIVACY_POLICY_TITLE: &str = "Privacy policy";
-const PRIVACY_POLICY_LINK_TEXT: &str = "Read Rook's privacy policy";
+const PRIVACY_POLICY_LINK_TEXT: &str = "Read Polaris Terminal's privacy policy";
 
 pub fn data_management_url(custom_token: Option<&str>) -> String {
     match custom_token {
@@ -1081,7 +1081,7 @@ impl SecretRedactionWidget {
         let info_icon = Container::new(
             ConstrainedBox::new(
                 Icon::Info
-                    .to_rookui_icon(
+                    .to_ptermui_icon(
                         appearance
                             .theme()
                             .hint_text_color(appearance.theme().background()),
@@ -1121,7 +1121,7 @@ impl SecretRedactionWidget {
         TextAndIcon::new(
             TextAndIconAlignment::IconFirst,
             text,
-            Icon::Plus.to_rookui_icon(appearance.theme().active_ui_text_color()),
+            Icon::Plus.to_ptermui_icon(appearance.theme().active_ui_text_color()),
             MainAxisSize::Min,
             MainAxisAlignment::SpaceBetween,
             vec2f(16., 16.),
@@ -1435,7 +1435,7 @@ impl SettingsWidget for AppAnalyticsWidget {
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
-        // Builds without a telemetry config (e.g. OpenRook) cannot ship
+        // Builds without a telemetry config (e.g. OpenPterm) cannot ship
         // telemetry, so the toggle would be a no-op. Hide it in that case.
         if !ChannelState::is_telemetry_available() {
             return false;
@@ -1548,7 +1548,7 @@ impl SettingsWidget for AppAnalyticsWidget {
             Align::new(
                 ui_builder
                     .link(
-                        "Read more about Rook's use of data".into(),
+                        "Read more about Polaris Terminal's use of data".into(),
                         Some(TELEMETRY_DOCS_URL.into()),
                         None,
                         self.docs_link_mouse_state.clone(),
@@ -1579,7 +1579,7 @@ impl SettingsWidget for CrashReportsWidget {
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
-        // Builds without a crash reporting config (e.g. OpenRook) cannot ship
+        // Builds without a crash reporting config (e.g. OpenPterm) cannot ship
         // crash reports, so the toggle would be a no-op. Hide it in that case.
         if !ChannelState::is_crash_reporting_available() {
             return false;
@@ -1726,7 +1726,7 @@ impl SettingsWidget for CloudConversationStorageWidget {
                         if is_checked {
                             "Agent conversations can be shared with others and are retained \
                             when you log in on different devices. This data is only stored \
-                            for product functionality, and Rook will not use it for analytics."
+                            for product functionality, and Polaris Terminal will not use it for analytics."
                         } else {
                             "Agent conversations are only stored locally on your machine, are \
                             lost upon logout, and cannot be shared. Note: conversation data \
@@ -1789,7 +1789,7 @@ impl SettingsWidget for NetworkLogWidget {
                 ui_builder
                     .paragraph(
                         "We've built a native console that allows you to view all communications \
-                        from Rook to external servers to ensure you feel comfortable that your \
+                        from Polaris Terminal to external servers to ensure you feel comfortable that your \
                         work is always kept safe."
                             .to_owned(),
                     )
@@ -2022,6 +2022,6 @@ mod styles {
     pub const DESCRIPTION_LINE_MARGIN_BOTTOM: f32 = 6.;
 }
 
-fn description_text_color(theme: &RookTheme) -> rook_core::ui::theme::Fill {
+fn description_text_color(theme: &PtermTheme) -> pterm_core::ui::theme::Fill {
     theme.sub_text_color(theme.surface_2())
 }

@@ -1,12 +1,12 @@
 #!/bin/bash
-# SessionStart: tells Rook a Gemini CLI session began.
+# SessionStart: tells Polaris Terminal a Gemini CLI session began.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/should-use-structured.sh"
 should_use_structured || exit 0
 
 if ! command -v jq >/dev/null 2>&1; then
-    printf '%s\n' '{"systemMessage": "Rook notifications need jq. Install it with your package manager (brew install jq, apt install jq, winget install jqlang.jq)."}'
+    printf '%s\n' '{"systemMessage": "Polaris Terminal notifications need jq. Install it with your package manager (brew install jq, apt install jq, winget install jqlang.jq)."}'
     exit 0
 fi
 

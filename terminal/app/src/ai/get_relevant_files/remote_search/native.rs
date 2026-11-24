@@ -12,11 +12,11 @@ use ::ai::index::full_source_code_embedding::{
 };
 use ::ai::index::locations::CodeContextLocation;
 use itertools::Itertools;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use remote_server::proto::{
     FragmentMetadata as ProtoFragmentMetadata, LineRange, ReadFileContextFile,
     ReadFileContextRequest, ReadFileContextResponse, file_context_proto,
 };
-use rookui::{AppContext, ModelContext, SingletonEntity};
 use string_offset::ByteOffset;
 
 use crate::ai::agent::{

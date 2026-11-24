@@ -1,11 +1,11 @@
 # PRODUCT.md — Per-tab theme overrides driven by directory and launch configurations
 
-Issue: https://github.com/FJRG2007/rook/issues/478
-Related: https://github.com/FJRG2007/rook/issues/2618 (set rook theme in launch configuration)
+Issue: https://github.com/FJRG2007/polaris/issues/478
+Related: https://github.com/FJRG2007/polaris/issues/2618 (set polaris-terminal theme in launch configuration)
 
 ## Summary
 
-The Rook theme is a single global value today (`appearance.themes.theme` in
+The Polaris Terminal theme is a single global value today (`appearance.themes.theme` in
 `settings.toml`); switching it affects every open tab at once. Users have asked
 for years (`#478`, 55+ upvotes; `#2618`) for tabs to render with different
 themes when they represent different contexts — different projects, local vs.
@@ -146,7 +146,7 @@ bit-for-bit identical to today.
    tab falls through to the next layer in the resolution order.
 
 6. Adding, editing, or removing entries in `directory_overrides` while
-   Rook is running re-evaluates every open tab. Tabs whose effective theme
+   Polaris Terminal is running re-evaluates every open tab. Tabs whose effective theme
    changes redraw; tabs whose effective theme is unchanged do not.
 
 7. A theme name in `directory_overrides` that does not resolve to a known
@@ -155,7 +155,7 @@ bit-for-bit identical to today.
    skipped for matching purposes, and the rest of the map continues to
    work.
 
-7a. **`directory_overrides` is stored locally and never synced to Rook's
+7a. **`directory_overrides` is stored locally and never synced to Polaris Terminal's
     cloud.** Directory paths can encode employer, customer, and project
     names (`~/Work/<client>/<engagement>/...`); cloud-syncing the keys
     would push that organizational context off-machine. Users on
@@ -166,7 +166,7 @@ bit-for-bit identical to today.
     map is local-only.
 
 7b. **Diagnostic output never contains raw `directory_overrides` keys.**
-    Local logs are routinely shared with Rook support and copied into
+    Local logs are routinely shared with Polaris Terminal support and copied into
     bug reports, so even local diagnostics can leak path keys. The
     invariant is: any warning or telemetry emitted by the
     `directory_overrides` machinery refers to an offending entry by a
@@ -331,7 +331,7 @@ bit-for-bit identical to today.
 ## User-visible failure modes
 
 - **Unknown theme name** — anywhere it appears, the entry is skipped at
-  apply time, a one-line warning is written to the Rook log identifying
+  apply time, a one-line warning is written to the Polaris Terminal log identifying
   the source (launch configuration filename + tab title or index for
   launch-config sources; **redacted entry identifier** for
   `directory_overrides` sources, never the raw path key — see #7b),

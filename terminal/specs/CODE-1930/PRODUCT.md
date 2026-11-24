@@ -4,7 +4,7 @@ Linear: [CODE-1930 — TUI: replace BYOK slash commands with a /api-keys inline 
 
 ## Summary
 
-The Rook TUI provides one `/api-keys` slash command that opens an inline menu for viewing, filtering, setting, replacing, and clearing supported AI-provider credentials. The same menu also exposes the TUI-local Rook credit fallback setting and embeds the existing browser-based X premium/SuperGrok connection flow.
+The Polaris Terminal TUI provides one `/api-keys` slash command that opens an inline menu for viewing, filtering, setting, replacing, and clearing supported AI-provider credentials. The same menu also exposes the TUI-local Polaris Terminal credit fallback setting and embeds the existing browser-based X premium/SuperGrok connection flow.
 
 ## Figma
 
@@ -19,13 +19,13 @@ The Figma provider-list frame is not authoritative where it leaves `/api-keys` i
 - Replace the two provider-key slash commands with one discoverable management surface.
 - Let users inspect connection state and manage every TUI-supported provider without running a nested TUI command.
 - Preserve the existing public command-line flags and Grok authorization behavior.
-- Reuse the existing Rook credit fallback setting across GUI and TUI code while retaining each frontend's independent persisted value.
+- Reuse the existing Polaris Terminal credit fallback setting across GUI and TUI code while retaining each frontend's independent persisted value.
 - Prevent a displayed or preloaded API key from being copied or rendered as plaintext.
 
 ## Non-goals
 
 - Sharing provider credentials between the GUI and TUI secure-storage namespaces.
-- Synchronizing the Rook credit fallback value between GUI and TUI settings files.
+- Synchronizing the Polaris Terminal credit fallback value between GUI and TUI settings files.
 - Changing which providers support pasted keys, changing provider request routing, or validating provider keys with a new network request.
 - Changing the Grok OAuth protocol, token refresh behavior, callback port, browser authorization page, or server contract.
 - Adding custom endpoint or OpenRouter management to the TUI menu.
@@ -56,7 +56,7 @@ The Figma provider-list frame is not authoritative where it leaves `/api-keys` i
    2. `Google API key`
    3. `OpenAI API key`
    4. `X premium or SuperGrok subscription`
-   5. `Rook credit fallback`
+   5. `Polaris Terminal credit fallback`
 
 8. Each provider row includes its current state:
    - A stored pasted key or usable Grok access token displays `(Connected)`.
@@ -86,23 +86,23 @@ The Figma provider-list frame is not authoritative where it leaves `/api-keys` i
 
 15. Typing while the main menu is open updates a case-insensitive provider-name filter. The typed text is a menu query and is never submitted as an agent prompt.
 
-16. Filtering applies only to the four provider rows. The `Rook credit fallback` row remains pinned below the filtered provider results.
+16. Filtering applies only to the four provider rows. The `Polaris Terminal credit fallback` row remains pinned below the filtered provider results.
 
 17. Clearing the input restores all four provider rows.
 
-18. If no provider matches, the menu still shows the pinned Rook credit fallback row; it does not render an empty provider placeholder.
+18. If no provider matches, the menu still shows the pinned Polaris Terminal credit fallback row; it does not render an empty provider placeholder.
 
 19. Filtering preserves the highlighted provider when it remains visible. If it disappears, the nearest visible selectable row becomes highlighted.
 
-### Rook credit fallback
+### Polaris Terminal credit fallback
 
-20. The Rook credit fallback row displays the current TUI-local setting value as `(on)` or `(off)` and the description:
-   `in the event of an error, requests may be routed to use Rook credits. Rook will prioritize using your API keys over Rook credits.`
+20. The Polaris Terminal credit fallback row displays the current TUI-local setting value as `(on)` or `(off)` and the description:
+   `in the event of an error, requests may be routed to use Polaris Terminal credits. Polaris Terminal will prioritize using your API keys over Polaris Terminal credits.`
 
 21. The setting uses the same shared setting definition, default, request behavior, and persistence infrastructure as the GUI setting, but GUI and TUI persist independent values in their normal frontend-specific settings files.
 
-22. When the Rook credit fallback row is highlighted, the interaction footer displays only:
-   - `enter to toggle rook credit fallback`
+22. When the Polaris Terminal credit fallback row is highlighted, the interaction footer displays only:
+   - `enter to toggle polaris-terminal credit fallback`
    - `esc to close menu`
 
 23. Enter toggles and persists the TUI-local fallback value. The menu remains open and the row updates in place.

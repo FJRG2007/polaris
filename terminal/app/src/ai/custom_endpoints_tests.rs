@@ -2,8 +2,8 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use ai::api_keys::CustomEndpointSchema;
-use rookui::{App, SingletonEntity as _};
-use rookui_extras::secure_storage;
+use ptermui::{App, SingletonEntity as _};
+use ptermui_extras::secure_storage;
 use settings::Setting as _;
 
 use super::*;

@@ -4,7 +4,7 @@
 mod tests;
 use ::local_control::protocol::{TabCreateParams, TabType, TargetSelector};
 use ::local_control::{ActionKind, ControlError, ErrorCode, InstanceId};
-use rookui::{ModelContext, TypedActionView};
+use ptermui::{ModelContext, TypedActionView};
 use serde::Serialize;
 
 use crate::local_control::LocalControlBridge;

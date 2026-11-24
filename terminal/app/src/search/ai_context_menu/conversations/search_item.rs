@@ -1,10 +1,10 @@
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rookui::elements::{
+use ptermui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, Highlight, Icon, ParentElement, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use super::ConversationContextItem;
 use crate::appearance::Appearance;

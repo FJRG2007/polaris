@@ -1,4 +1,4 @@
-use rookui::{App, SingletonEntity};
+use ptermui::{App, SingletonEntity};
 
 use super::editor_display_name;
 use crate::auth::UserUid;

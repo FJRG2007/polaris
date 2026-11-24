@@ -1,12 +1,12 @@
 #[cfg(feature = "local_fs")]
 use std::path::PathBuf;
 
-use rookui::elements::{
+use ptermui::elements::{
     ChildView, ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisAlignment,
     MainAxisSize, ParentElement, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::{AppContext, Element, Entity, SingletonEntity, View, ViewContext, ViewHandle};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{AppContext, Element, Entity, SingletonEntity, View, ViewContext, ViewHandle};
 
 use crate::ai::custom_model_routers::{CustomModelRouter, CustomModelRouting};
 use crate::ai::llms::{LLMId, LLMPreferences};
@@ -185,7 +185,7 @@ impl View for CustomRouterView {
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(
                 Container::new(
-                    ConstrainedBox::new(Icon::Dataflow.to_rookui_icon(sub_color).finish())
+                    ConstrainedBox::new(Icon::Dataflow.to_ptermui_icon(sub_color).finish())
                         .with_width(12.)
                         .with_height(12.)
                         .finish(),
@@ -218,10 +218,10 @@ impl View for CustomRouterView {
         )
         .with_background(appearance.theme().surface_2())
         .with_border(
-            rookui::elements::Border::new(1.).with_border_fill(appearance.theme().outline()),
+            ptermui::elements::Border::new(1.).with_border_fill(appearance.theme().outline()),
         )
-        .with_corner_radius(rookui::elements::CornerRadius::with_all(
-            rookui::elements::Radius::Pixels(4.),
+        .with_corner_radius(ptermui::elements::CornerRadius::with_all(
+            ptermui::elements::Radius::Pixels(4.),
         ))
         .with_horizontal_padding(16.)
         .with_vertical_padding(12.)
@@ -230,7 +230,7 @@ impl View for CustomRouterView {
 }
 
 #[cfg(feature = "local_fs")]
-impl rookui::TypedActionView for CustomRouterView {
+impl ptermui::TypedActionView for CustomRouterView {
     type Action = CustomRouterViewAction;
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
@@ -249,7 +249,7 @@ impl rookui::TypedActionView for CustomRouterView {
 fn render_targets_row(
     routing: &CustomModelRouting,
     appearance: &Appearance,
-    sub_color: rook_core::ui::theme::Fill,
+    sub_color: pterm_core::ui::theme::Fill,
     _is_ai_enabled: bool,
     app: &AppContext,
 ) -> Box<dyn Element> {
@@ -342,7 +342,7 @@ fn render_model_line(
     label: impl Into<String>,
     model_id: impl Into<String>,
     appearance: &Appearance,
-    sub_color: rook_core::ui::theme::Fill,
+    sub_color: pterm_core::ui::theme::Fill,
 ) -> Box<dyn Element> {
     Flex::row()
         .with_cross_axis_alignment(CrossAxisAlignment::Center)
@@ -371,7 +371,7 @@ pub fn render_router_error_card(
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let theme = appearance.theme();
-    let error_fill = rook_core::ui::theme::Fill::Solid(theme.ui_error_color());
+    let error_fill = pterm_core::ui::theme::Fill::Solid(theme.ui_error_color());
     let sub = theme.sub_text_color(theme.surface_2());
     let file_name = file_name.into();
     let error_message = error_message.into();
@@ -380,7 +380,7 @@ pub fn render_router_error_card(
         .with_cross_axis_alignment(CrossAxisAlignment::Center)
         .with_child(
             Container::new(
-                ConstrainedBox::new(Icon::AlertTriangle.to_rookui_icon(error_fill).finish())
+                ConstrainedBox::new(Icon::AlertTriangle.to_ptermui_icon(error_fill).finish())
                     .with_width(14.)
                     .with_height(14.)
                     .finish(),
@@ -422,9 +422,9 @@ pub fn render_router_error_card(
             .finish(),
     )
     .with_background(theme.surface_2())
-    .with_border(rookui::elements::Border::new(1.).with_border_fill(error_fill))
-    .with_corner_radius(rookui::elements::CornerRadius::with_all(
-        rookui::elements::Radius::Pixels(4.),
+    .with_border(ptermui::elements::Border::new(1.).with_border_fill(error_fill))
+    .with_corner_radius(ptermui::elements::CornerRadius::with_all(
+        ptermui::elements::Radius::Pixels(4.),
     ))
     .with_horizontal_padding(16.)
     .with_vertical_padding(10.)

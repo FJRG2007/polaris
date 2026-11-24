@@ -1,5 +1,5 @@
-use rook_errors::report_if_error;
-use rookui::{App, SingletonEntity as _};
+use pterm_errors::report_if_error;
+use ptermui::{App, SingletonEntity as _};
 use settings::Setting as _;
 
 use super::{ParsedSlashCommandInput, SlashCommandEntryState};
@@ -554,8 +554,8 @@ fn test_submit_queued_prompt_detects_slash_command() {
 /// window after `cd`-ing out of the repo until detection resolved.
 #[test]
 fn repository_gated_command_drops_when_leaving_repository() {
+    use pterm_util::standardized_path::StandardizedPath;
     use repo_metadata::repositories::DetectedRepositories;
-    use rook_util::standardized_path::StandardizedPath;
 
     use crate::terminal::input::tests::simulate_directory_for_completion;
     use crate::terminal::model::session::SessionInfo;
@@ -627,8 +627,8 @@ fn repository_gated_command_drops_when_leaving_repository() {
 fn repository_gated_command_stays_within_repository() {
     use std::fs;
 
+    use pterm_util::standardized_path::StandardizedPath;
     use repo_metadata::repositories::DetectedRepositories;
-    use rook_util::standardized_path::StandardizedPath;
 
     use crate::terminal::input::tests::simulate_directory_for_completion;
     use crate::terminal::model::session::SessionInfo;

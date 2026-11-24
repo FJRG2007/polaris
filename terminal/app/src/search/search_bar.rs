@@ -1,14 +1,14 @@
 use std::collections::HashSet;
 
 use itertools::{Either, Itertools};
-use rook_editor::editor::NavigationKey;
-use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::elements::{
+use pterm_editor::editor::NavigationKey;
+use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::elements::{
     Clipped, ConstrainedBox, Container, CrossAxisAlignment, Flex, ParentElement, Shrinkable, Text,
 };
-use rookui::fonts::{FamilyId, Properties, Style, Weight};
-use rookui::presenter::ChildView;
-use rookui::{
+use ptermui::fonts::{FamilyId, Properties, Style, Weight};
+use ptermui::presenter::ChildView;
+use ptermui::{
     Action, AppContext, Element, Entity, FocusContext, ModelContext, ModelHandle, SingletonEntity,
     TypedActionView, View, ViewContext, ViewHandle,
 };
@@ -691,7 +691,7 @@ impl<T: Action + Clone> SearchBar<T> {
             for loading_filter in loading_filters.into_iter() {
                 ctx.emit_a11y_content(AccessibilityContent::new_without_help(
                     format!("Loading {} suggestions", loading_filter.display_name()),
-                    RookA11yRole::MenuItemRole,
+                    PtermA11yRole::MenuItemRole,
                 ));
             }
 
@@ -702,7 +702,7 @@ impl<T: Action + Clone> SearchBar<T> {
             ctx.emit_a11y_content(AccessibilityContent::new(
                 "Error finding results",
                 data_source_err.user_facing_error(),
-                RookA11yRole::MenuItemRole,
+                PtermA11yRole::MenuItemRole,
             ));
             return;
         }
@@ -712,12 +712,12 @@ impl<T: Action + Clone> SearchBar<T> {
             let a11y_content = match selected_result.accessibility_help_message() {
                 None => AccessibilityContent::new_without_help(
                     a11y_content_text,
-                    RookA11yRole::MenuItemRole,
+                    PtermA11yRole::MenuItemRole,
                 ),
                 Some(help_message) => AccessibilityContent::new(
                     a11y_content_text,
                     help_message,
-                    RookA11yRole::MenuItemRole,
+                    PtermA11yRole::MenuItemRole,
                 ),
             };
             ctx.emit_a11y_content(a11y_content);
@@ -909,7 +909,7 @@ impl<T: Action + Clone> View for SearchBar<T> {
             let magnifying_glass = Container::new(
                 ConstrainedBox::new(
                     Icon::Search
-                        .to_rookui_icon(blended_colors::text_sub(theme, theme.surface_2()).into())
+                        .to_ptermui_icon(blended_colors::text_sub(theme, theme.surface_2()).into())
                         .finish(),
                 )
                 .with_height(size)

@@ -220,17 +220,17 @@ export OZ_PARENT_RUN_ID="parent-run-456"
 echo ""
 echo "=== plugin manifests ==="
 assert_file_exists "marketplace manifest exists" "$REPO_ROOT/.agents/plugins/marketplace.json"
-assert_file_exists "rook plugin manifest exists" "$REPO_ROOT/plugins/rook/.codex-plugin/plugin.json"
+assert_file_exists "polaris-terminal plugin manifest exists" "$REPO_ROOT/plugins/polaris-terminal/.codex-plugin/plugin.json"
 assert_file_exists "oz plugin manifest exists" "$REPO_ROOT/plugins/orchestration/.codex-plugin/plugin.json"
-assert_file_exists "rook hook config exists" "$REPO_ROOT/plugins/rook/hooks/hooks.json"
+assert_file_exists "polaris-terminal hook config exists" "$REPO_ROOT/plugins/polaris-terminal/hooks/hooks.json"
 assert_file_exists "oz hook config exists" "$REPO_ROOT/plugins/orchestration/hooks/hooks.json"
 assert_file_exists "github workflow exists" "$REPO_ROOT/.github/workflows/test.yml"
-assert_json_field "marketplace name" "$(cat "$REPO_ROOT/.agents/plugins/marketplace.json")" ".name" "codex-rook"
-assert_json_field "rook plugin name" "$(cat "$REPO_ROOT/plugins/rook/.codex-plugin/plugin.json")" ".name" "rook"
+assert_json_field "marketplace name" "$(cat "$REPO_ROOT/.agents/plugins/marketplace.json")" ".name" "codex-polaris-terminal"
+assert_json_field "polaris-terminal plugin name" "$(cat "$REPO_ROOT/plugins/polaris-terminal/.codex-plugin/plugin.json")" ".name" "polaris-terminal"
 assert_json_field "oz plugin name" "$(cat "$REPO_ROOT/plugins/orchestration/.codex-plugin/plugin.json")" ".name" "orchestration"
-assert_contains "rook hooks use PLUGIN_ROOT" "$(cat "$REPO_ROOT/plugins/rook/hooks/hooks.json")" '${PLUGIN_ROOT}/scripts/on-session-start.sh'
-assert_contains "rook hooks include prompt submit" "$(cat "$REPO_ROOT/plugins/rook/hooks/hooks.json")" '${PLUGIN_ROOT}/scripts/on-prompt-submit.sh'
-assert_contains "rook hooks include post tool use" "$(cat "$REPO_ROOT/plugins/rook/hooks/hooks.json")" '${PLUGIN_ROOT}/scripts/on-post-tool-use.sh'
+assert_contains "polaris-terminal hooks use PLUGIN_ROOT" "$(cat "$REPO_ROOT/plugins/polaris-terminal/hooks/hooks.json")" '${PLUGIN_ROOT}/scripts/on-session-start.sh'
+assert_contains "polaris-terminal hooks include prompt submit" "$(cat "$REPO_ROOT/plugins/polaris-terminal/hooks/hooks.json")" '${PLUGIN_ROOT}/scripts/on-prompt-submit.sh'
+assert_contains "polaris-terminal hooks include post tool use" "$(cat "$REPO_ROOT/plugins/polaris-terminal/hooks/hooks.json")" '${PLUGIN_ROOT}/scripts/on-post-tool-use.sh'
 assert_contains "oz hooks use PLUGIN_ROOT" "$(cat "$REPO_ROOT/plugins/orchestration/hooks/hooks.json")" '${PLUGIN_ROOT}/scripts/drain-mailbox.sh UserPromptSubmit'
 assert_contains "oz hooks include session end" "$(cat "$REPO_ROOT/plugins/orchestration/hooks/hooks.json")" '${PLUGIN_ROOT}/scripts/on-session-end.sh'
 

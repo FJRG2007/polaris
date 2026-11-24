@@ -1,7 +1,7 @@
-//! Context chips built into Rook
+//! Context chips built into Polaris Terminal
 
 use chrono::Local;
-use rook_util::path::user_friendly_path;
+use pterm_util::path::user_friendly_path;
 
 use super::ChipValue;
 use super::context_chip::{GeneratorContext, ShellCommand, ShellCommandGenerator};
@@ -92,7 +92,7 @@ pub fn ssh_session(ctx: &GeneratorContext) -> Option<ChipValue> {
     if session.is_ssh_wrapper_session()
         || matches!(
             session.session_type(),
-            crate::terminal::model::session::SessionType::RookifiedRemote { .. }
+            crate::terminal::model::session::SessionType::PtermifiedRemote { .. }
         )
     {
         let user = session.user();

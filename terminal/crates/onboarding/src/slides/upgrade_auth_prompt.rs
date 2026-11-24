@@ -1,12 +1,12 @@
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::icons::Icon;
-use rookui_core::Element;
-use rookui_core::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::icons::Icon;
+use ptermui_core::Element;
+use ptermui_core::elements::{
     Border, ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisSize, MouseStateHandle,
     ParentElement,
 };
-use rookui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
-use rookui_core::ui_components::link::OnClickFn;
+use ptermui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui_core::ui_components::link::OnClickFn;
 
 pub(super) fn render_upgrade_auth_prompt_bar(
     appearance: &Appearance,
@@ -22,7 +22,7 @@ pub(super) fn render_upgrade_auth_prompt_bar(
     let theme = appearance.theme();
     let bar_bg = theme.surface_1();
     let bar_bg_solid = bar_bg.into_solid();
-    let text_color = rook_core::ui::theme::color::internal_colors::text_sub(theme, bar_bg_solid);
+    let text_color = pterm_core::ui::theme::color::internal_colors::text_sub(theme, bar_bg_solid);
     let ui_builder = appearance.ui_builder();
 
     let text_styles = UiComponentStyles {
@@ -36,7 +36,7 @@ pub(super) fn render_upgrade_auth_prompt_bar(
     };
 
     let icon = ConstrainedBox::new(Box::new(
-        Icon::AlertCircle.to_rookui_icon(text_color.into()),
+        Icon::AlertCircle.to_ptermui_icon(text_color.into()),
     ))
     .with_width(ICON_SIZE)
     .with_height(ICON_SIZE)
@@ -108,7 +108,7 @@ pub(super) fn render_upgrade_auth_prompt_bar(
         Container::new(row)
             .with_background(bar_bg)
             .with_border(Border::top(1.).with_border_color(
-                rook_core::ui::theme::color::internal_colors::neutral_4(theme),
+                pterm_core::ui::theme::color::internal_colors::neutral_4(theme),
             ))
             .with_horizontal_padding(16.)
             .finish(),

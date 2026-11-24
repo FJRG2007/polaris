@@ -3,8 +3,8 @@ use std::collections::hash_map::Entry;
 use std::path::{Path, PathBuf};
 
 use ai::skills::SkillReference;
-use rook_util::path::LineAndColumnArg;
-use rookui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity, ViewHandle, WindowId};
+use pterm_util::path::LineAndColumnArg;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity, ViewHandle, WindowId};
 use serde::{Deserialize, Serialize};
 
 use super::buffer_location::LocalOrRemotePath;
@@ -113,7 +113,7 @@ pub enum CodeSource {
     },
     /// Opened from an active AI agent conversation.
     AIAction { id: AIAgentActionId },
-    /// Opened from project rules (ROOK.md) file.
+    /// Opened from project rules (POLARIS_TERMINAL.md) file.
     ProjectRules { location: LocalOrRemotePath },
     /// Opened from file tree (local or remote).
     FileTree { location: LocalOrRemotePath },

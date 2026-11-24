@@ -8,21 +8,21 @@ use ai::agent::{
     AskUserQuestionSession, QuestionDraft,
 };
 use itertools::Itertools;
-use rook_core::ui::theme::RookTheme;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::elements::new_scrollable::SingleAxisConfig;
-use rookui::elements::{
+use pterm_core::ui::theme::PtermTheme;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::elements::new_scrollable::SingleAxisConfig;
+use ptermui::elements::{
     Border, ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DEFAULT_UI_LINE_HEIGHT_RATIO, Fill, Flex, FormattedTextElement,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Point, Radius, Stack, Text,
 };
-use rookui::event::DispatchedEvent;
-use rookui::geometry::vector::Vector2F;
-use rookui::keymap::{FixedBinding, Keystroke};
-use rookui::ui_components::components::Coords;
-use rookui::units::Pixels;
-use rookui::{
+use ptermui::event::DispatchedEvent;
+use ptermui::geometry::vector::Vector2F;
+use ptermui::keymap::{FixedBinding, Keystroke};
+use ptermui::ui_components::components::Coords;
+use ptermui::units::Pixels;
+use ptermui::{
     AfterLayoutContext, AppContext, Element, Entity, EntityId, EventContext, FocusContext,
     LayoutContext, ModelHandle, PaintContext, SingletonEntity, SizeConstraint, TypedActionView,
     View, ViewContext, ViewHandle,
@@ -89,7 +89,7 @@ fn ask_user_question_header_height(appearance: &Appearance, app: &AppContext) ->
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     // Scope these shortcuts to the active ask-user-question block so arrow/submit keys don't leak
     // into surrounding views.
@@ -172,7 +172,7 @@ struct AskUserQuestionInteractiveViews {
 /// Header state for the collapsed/expanded completion summary.
 struct AskUserQuestionCompletionState {
     label: String,
-    status_icon: rookui::elements::Icon,
+    status_icon: ptermui::elements::Icon,
 }
 
 /// Stateful inline-action view that renders questionnaire UI and coordinates with the action model.
@@ -866,7 +866,7 @@ impl AskUserQuestionView {
         questions: &[AskUserQuestionItem],
         answers: Option<&[AskUserQuestionAnswerItem]>,
         label: String,
-        status_icon: rookui::elements::Icon,
+        status_icon: ptermui::elements::Icon,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
@@ -959,7 +959,7 @@ impl AskUserQuestionView {
     fn render_question_text(
         question_text: &str,
         appearance: &Appearance,
-        theme: &RookTheme,
+        theme: &PtermTheme,
     ) -> Box<dyn Element> {
         let text_color = theme.foreground().into();
         Container::new(render_text_with_markdown_support(
@@ -983,7 +983,7 @@ impl AskUserQuestionView {
         &self,
         question_text: &str,
         appearance: &Appearance,
-        theme: &RookTheme,
+        theme: &PtermTheme,
     ) -> Box<dyn Element> {
         Self::wrap_scrollable_body(
             Self::render_question_text(question_text, appearance, theme),
@@ -1018,9 +1018,9 @@ impl AskUserQuestionView {
         question_text: Box<dyn Element>,
         options: Box<dyn Element>,
         scroll_state: ClippedScrollStateHandle,
-        theme: &RookTheme,
+        theme: &PtermTheme,
     ) -> Box<dyn Element> {
-        let scrollable = rookui::elements::NewScrollable::vertical(
+        let scrollable = ptermui::elements::NewScrollable::vertical(
             SingleAxisConfig::Clipped {
                 handle: scroll_state,
                 child: Self::body_column(question_text, options),
@@ -1044,7 +1044,7 @@ impl AskUserQuestionView {
         question: &AskUserQuestionItem,
         draft: Option<&QuestionDraft>,
         appearance: &Appearance,
-        theme: &RookTheme,
+        theme: &PtermTheme,
         app: &AppContext,
     ) -> Box<dyn Element> {
         let current = AskUserQuestionCurrent { question, draft };
@@ -1086,7 +1086,7 @@ impl AskUserQuestionView {
     fn render_nav_footer(
         &self,
         appearance: &Appearance,
-        theme: &RookTheme,
+        theme: &PtermTheme,
         app: &AppContext,
     ) -> Box<dyn Element> {
         let counter = format!(
@@ -1175,7 +1175,7 @@ impl View for AskUserQuestionView {
         }
     }
 
-    fn keymap_context(&self, app: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
         // These context flags are what activate the fixed bindings registered in init().
         if matches!(self.session.phase(), AskUserQuestionPhase::Editing)

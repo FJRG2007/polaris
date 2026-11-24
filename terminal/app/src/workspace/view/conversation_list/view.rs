@@ -3,23 +3,23 @@ use std::ops::Range;
 use std::sync::{Arc, Mutex};
 
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::features::FeatureFlag;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::Icon;
-use rook_editor::editor::NavigationKey;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::Icon;
+use pterm_editor::editor::NavigationKey;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Element, Fill, Flex, FormattedTextElement, Hoverable, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, OffsetPositioning, Padding, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, SavePosition, ScrollStateHandle, Scrollable, ScrollableElement,
     ScrollbarWidth, Shrinkable, Stack, Text, UniformList, UniformListState,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::keymap::macros::*;
-use rookui::platform::Cursor;
-use rookui::text_layout::TextAlignment;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::keymap::macros::*;
+use ptermui::platform::Cursor;
+use ptermui::text_layout::TextAlignment;
+use ptermui::{
     AppContext, BlurContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WindowId,
 };
@@ -781,7 +781,7 @@ fn render_zero_state(
 
     let chat_icon = ConstrainedBox::new(
         Icon::ChatDashed
-            .to_rookui_icon(theme.sub_text_color(theme.background()))
+            .to_ptermui_icon(theme.sub_text_color(theme.background()))
             .finish(),
     )
     .with_width(24.)
@@ -825,7 +825,7 @@ fn render_zero_state(
                 .with_child(
                     ConstrainedBox::new(
                         Icon::Plus
-                            .to_rookui_icon(theme.main_text_color(theme.background()))
+                            .to_ptermui_icon(theme.main_text_color(theme.background()))
                             .finish(),
                     )
                     .with_width(14.)
@@ -908,7 +908,7 @@ fn render_section_header(
     };
     let chevron = ConstrainedBox::new(
         chevron_icon
-            .to_rookui_icon(theme.sub_text_color(theme.background()))
+            .to_ptermui_icon(theme.sub_text_color(theme.background()))
             .finish(),
     )
     .with_width(12.)

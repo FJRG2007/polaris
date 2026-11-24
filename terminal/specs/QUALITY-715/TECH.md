@@ -1,7 +1,7 @@
 # QUALITY-715: Do not auto-open details panel for orchestration child shared sessions
 # Context
 Linear issue: https://linear.app/warpdotdev/issue/QUALITY-715/dont-open-agent-info-side-panel-by-default. The issue has no additional description or comments; the required behavior is that opening a shared session child agent from the parent's orchestration UI should not show the conversation details side panel by default. Regular shared session viewers, including direct links to a child shared session, should keep the current default and open the panel.
-The relevant implementation is in the Rook client worktree at `/Users/matthew/src/dont-open-agent-info-sidepane/rook` on branch `matthew/dont-open-agent-info-sidepane`. No `rook-server` or `rook-proto-apis` changes are expected for the preferred client-side fix.
+The relevant implementation is in the Polaris Terminal client worktree at `/Users/matthew/src/dont-open-agent-info-sidepane/polaris-terminal` on branch `matthew/dont-open-agent-info-sidepane`. No `polaris-terminal-server` or `polaris-terminal-proto-apis` changes are expected for the preferred client-side fix.
 The side panel is `ConversationDetailsPanel`, owned by `TerminalView`. `TerminalView` tracks `is_conversation_details_panel_open` and `has_auto_opened_conversation_details_panel` in `app/src/terminal/view.rs:2830`. The panel renders only when `is_conversation_details_panel_open` is true and `can_show_conversation_details_ui_from_model` says details are available (`app/src/terminal/view.rs:26677`). The toggle action updates the same boolean and fetches panel data (`app/src/terminal/view.rs:26095`), so the feature should only change initial auto-open behavior, not remove the ability to open the panel manually.
 Shared ambient agent session viewers currently auto-open the panel from `TerminalView::on_session_share_joined` after the viewer joins an ambient-agent shared session (`app/src/terminal/view/shared_session/view_impl.rs:687`). That method calls `maybe_auto_open_conversation_details_panel` for every `SessionSourceType::AmbientAgent` when `FeatureFlag::CloudMode` is enabled (`app/src/terminal/view/shared_session/view_impl.rs:708`). `maybe_auto_open_conversation_details_panel` unconditionally sets `is_conversation_details_panel_open = true` the first time it runs (`app/src/terminal/view/ambient_agent/view_impl.rs:960`).
 One shared-session child path is driven by `OrchestrationViewerModel` and `PaneGroup`. `OrchestrationViewerModel::apply_children_fetch` polls `GET /agent/runs?ancestor_run_id={parent_task_id}`, creates a local child `AIConversation`, links it to the parent, marks it as `is_viewing_shared_session`, and emits `EnsureSharedSessionViewerChildPane` when a child `session_id` becomes available (`app/src/terminal/shared_session/viewer/orchestration_viewer_model.rs:228`). `PaneGroup::ensure_shared_session_viewer_child_pane` creates a hidden shared-session viewer for that child session, restores the child conversation, and enters agent view with `AgentViewEntryOrigin::SharedSessionSelection` (`app/src/pane_group/mod.rs:3428`). The child viewer then reaches the same `on_session_share_joined` auto-open path as any other ambient shared session (`app/src/terminal/shared_session/viewer/terminal_manager.rs:799`), which is why the panel currently opens by default for child views.
@@ -56,7 +56,7 @@ Implement Option A. Suppression should be an explicit property of the `TerminalV
 8. Do not change `on_session_share_joined`'s ambient-agent check for regular viewers. The default auto-open behavior for direct child links and non-child ambient shared sessions remains driven by the existing `FeatureFlag::CloudMode` and `SessionSourceType::AmbientAgent` condition.
 9. Do not add a server or proto field for this fix.
 # Testing and validation
-Add unit coverage in the Rook client.
+Add unit coverage in the Polaris Terminal client.
 1. In `app/src/terminal/view/shared_session/view_impl_tests.rs` or a nearby `TerminalView` test module, add a test that sets the new suppress policy, calls `maybe_auto_open_conversation_details_panel`, and asserts:
    - `is_conversation_details_panel_open` remains false,
    - `has_auto_opened_conversation_details_panel` becomes true,
@@ -68,12 +68,12 @@ Add unit coverage in the Rook client.
 6. Add or update a regular shared ambient viewer test in `app/src/terminal/view/shared_session/view_impl_tests.rs` that proves a non-child ambient shared session still auto-opens the panel by default.
 7. Ensure manual-toggle assertions create a state where conversation details are actually available, otherwise a toggle may set `is_conversation_details_panel_open` without rendering useful panel content.
 8. Run focused tests first:
-   - `cargo test -p rook-app terminal::view::shared_session::view_impl_tests`
-   - `cargo test -p rook-app pane_group::mod_tests`
-9. Run the relevant broader client validation required for a Rook client PR after focused tests pass. If local runtime makes a full presubmit impractical, run the repo-standard Rust formatting/check/test commands that cover the touched modules and document any skipped command with the reason.
+   - `cargo test -p polaris-terminal-app terminal::view::shared_session::view_impl_tests`
+   - `cargo test -p polaris-terminal-app pane_group::mod_tests`
+9. Run the relevant broader client validation required for a Polaris Terminal client PR after focused tests pass. If local runtime makes a full presubmit impractical, run the repo-standard Rust formatting/check/test commands that cover the touched modules and document any skipped command with the reason.
 Manual validation:
 1. Start or use an orchestrated cloud-agent shared session that has at least one child agent with a `session_id`.
-2. Open the parent shared session in the Rook desktop viewer.
+2. Open the parent shared session in the Polaris Terminal desktop viewer.
 3. Confirm the parent/non-child ambient session still opens with the conversation details panel by default.
 4. Select a child from the orchestration pill UI for a server-discovered child and confirm the child view opens with the main transcript visible and the conversation details panel closed.
 5. Repeat with a local-parent child path if available, such as a local parent agent that creates a child through StartAgent/local orchestration, and confirm its shared-session child view also opens with the panel closed.
@@ -89,4 +89,4 @@ If the work grows to include direct child-session links, then split the work int
 - Risk: missing a parent-owned child creation path would leave the panel open. Mitigation: cover `ensure_shared_session_viewer_child_pane`, and only add broader local-parent coverage if a concrete local-parent shared-session viewer path is found to reach the auto-open code.
 - Risk: over-broad suppression would change direct child links. Mitigation: never derive suppression from child metadata alone; direct-link tests must assert the panel still opens by default.
 # PR notes
-Create the PR from branch `matthew/dont-open-agent-info-sidepane` in the Rook client repo. The PR should reference QUALITY-715, describe the client-only change, and include the focused test results plus manual validation. If no documentation changes are needed, state that the behavior is an internal default-state adjustment with no user-facing docs impact.
+Create the PR from branch `matthew/dont-open-agent-info-sidepane` in the Polaris Terminal client repo. The PR should reference QUALITY-715, describe the client-only change, and include the focused test results plus manual validation. If no documentation changes are needed, state that the behavior is an internal default-state adjustment with no user-facing docs impact.

@@ -1,14 +1,14 @@
 //! The "Editor and Code Review" settings page, shown under the Code umbrella.
 
-use rook_core::settings::{Setting as _, ToggleableSetting as _};
-use rook_errors::report_if_error;
-use rookui::elements::Element;
+use pterm_core::settings::{Setting as _, ToggleableSetting as _};
+use pterm_errors::report_if_error;
+use ptermui::elements::Element;
 #[cfg(feature = "local_fs")]
-use rookui::elements::{ChildView, Empty};
-use rookui::keymap::ContextPredicate;
-use rookui::ui_components::components::UiComponent;
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{
+use ptermui::elements::{ChildView, Empty};
+use ptermui::keymap::ContextPredicate;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{
     Action, AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -695,7 +695,7 @@ impl SettingsWidget for AutoSaveToggleWidget {
                 })
                 .finish(),
             Some(
-                "Automatically saves changes in the Rook text editor as you type and when the editor loses focus."
+                "Automatically saves changes in the Polaris Terminal text editor as you type and when the editor loses focus."
                     .into(),
             ),
         )

@@ -1,16 +1,16 @@
-use rook::cmd_or_ctrl_shift;
-use rook::integration_testing::terminal::util::current_shell_starter_and_version;
-use rook::integration_testing::terminal::{
+use polaris_terminal::cmd_or_ctrl_shift;
+use polaris_terminal::integration_testing::terminal::util::current_shell_starter_and_version;
+use polaris_terminal::integration_testing::terminal::{
     assert_context_menu_is_open, initialize_secret_regexes,
     wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::view_getters::single_terminal_view_for_tab;
-use rook::settings_view::{PrivacyPageAction, SettingsAction};
-use rook::terminal::GridType;
-use rook::terminal::model::index::Point;
-use rook::terminal::model::terminal_model::{BlockIndex, WithinBlock, WithinModel};
-use rook::terminal::shell::ShellType;
-use rookui_core::{async_assert, async_assert_eq};
+use polaris_terminal::integration_testing::view_getters::single_terminal_view_for_tab;
+use polaris_terminal::settings_view::{PrivacyPageAction, SettingsAction};
+use polaris_terminal::terminal::GridType;
+use polaris_terminal::terminal::model::index::Point;
+use polaris_terminal::terminal::model::terminal_model::{BlockIndex, WithinBlock, WithinModel};
+use polaris_terminal::terminal::shell::ShellType;
+use ptermui_core::{async_assert, async_assert_eq};
 
 use super::new_builder;
 use crate::Builder;

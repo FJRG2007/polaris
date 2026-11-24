@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use futures::future::BoxFuture;
-use rook_util::host_id::HostId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui_core::{AppContext, Entity, ModelContext, SingletonEntity};
+use pterm_util::host_id::HostId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui_core::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use super::GlobalRules;
 
@@ -14,8 +14,8 @@ cfg_if::cfg_if! {
         use repo_metadata::{
             RepoMetadataEvent, RepoMetadataModel, RepositoryIdentifier, StandingQueryContent,
         };
-        use rook_util::remote_path::RemotePath;
-        use rook_util::standardized_path::StandardizedPath;
+        use pterm_util::remote_path::RemotePath;
+        use pterm_util::standardized_path::StandardizedPath;
     }
 }
 
@@ -56,13 +56,13 @@ pub struct ProjectRule {
 #[derive(Debug, Clone)]
 struct RuleAtPath {
     parent_path: LocalOrRemotePath,
-    rook_md: Option<ProjectRule>,
+    pterm_md: Option<ProjectRule>,
     agents_md: Option<ProjectRule>,
 }
 
 impl RuleAtPath {
     fn respected_rule(&self) -> Option<&ProjectRule> {
-        self.rook_md.as_ref().or(self.agents_md.as_ref())
+        self.pterm_md.as_ref().or(self.agents_md.as_ref())
     }
 }
 
@@ -96,7 +96,7 @@ impl ProjectRules {
     #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
     fn rule_paths(&self) -> impl Iterator<Item = &LocalOrRemotePath> {
         self.rules.iter().flat_map(|rule| {
-            rule.rook_md
+            rule.pterm_md
                 .iter()
                 .chain(rule.agents_md.iter())
                 .map(|rule| &rule.path)
@@ -111,11 +111,11 @@ impl ProjectRules {
     fn retain_rule_paths(&mut self, retained_paths: &HashSet<LocalOrRemotePath>) {
         self.rules.retain_mut(|rule| {
             if rule
-                .rook_md
+                .pterm_md
                 .as_ref()
                 .is_some_and(|rule| !retained_paths.contains(&rule.path))
             {
-                rule.rook_md = None;
+                rule.pterm_md = None;
             }
             if rule
                 .agents_md
@@ -124,7 +124,7 @@ impl ProjectRules {
             {
                 rule.agents_md = None;
             }
-            rule.rook_md.is_some() || rule.agents_md.is_some()
+            rule.pterm_md.is_some() || rule.agents_md.is_some()
         });
     }
     /// Finds the set of rules that are active in the given path and the set that are available to be applied.
@@ -173,8 +173,8 @@ impl ProjectRules {
 
         match existing_rule {
             Some(rule) => {
-                if file_name.to_lowercase() == "rook.md" {
-                    rule.rook_md = rule_file;
+                if file_name.to_lowercase() == "polaris-terminal.md" {
+                    rule.pterm_md = rule_file;
                 } else if file_name.to_lowercase() == "agents.md" {
                     rule.agents_md = rule_file;
                 }
@@ -182,11 +182,11 @@ impl ProjectRules {
             None => {
                 let mut rule = RuleAtPath {
                     parent_path: parent,
-                    rook_md: None,
+                    pterm_md: None,
                     agents_md: None,
                 };
-                if file_name.to_lowercase() == "rook.md" {
-                    rule.rook_md = rule_file;
+                if file_name.to_lowercase() == "polaris-terminal.md" {
+                    rule.pterm_md = rule_file;
                 } else if file_name.to_lowercase() == "agents.md" {
                     rule.agents_md = rule_file;
                 }
@@ -197,7 +197,7 @@ impl ProjectRules {
 }
 
 /// Singleton model that keeps track of mapping between paths and rule files
-/// Currently supports ROOK.md files, but designed to be extensible
+/// Currently supports POLARIS_TERMINAL.md files, but designed to be extensible
 #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
 #[derive(Default)]
 pub struct ProjectContextModel {
@@ -579,9 +579,9 @@ impl ProjectContextModel {
     /// Returns the rules applicable to `path`, layering global rules on top of
     /// any project rules discovered up the directory tree.
     ///
-    /// Precedence is `global > project ROOK.md > project AGENTS.md`. Globals
+    /// Precedence is `global > project POLARIS_TERMINAL.md > project AGENTS.md`. Globals
     /// are always included (when present) regardless of project state; the
-    /// existing in-directory `ROOK.md > AGENTS.md` shadow inside
+    /// existing in-directory `POLARIS_TERMINAL.md > AGENTS.md` shadow inside
     /// [`RuleAtPath::respected_rule`] still applies to project rules.
     ///
     /// This is the entry point used by `BlocklistAIContextModel` when packing

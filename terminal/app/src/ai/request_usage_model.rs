@@ -5,11 +5,11 @@ use anyhow::Context as _;
 use chrono::{DateTime, Local, Utc};
 use futures::channel::oneshot::{self, Receiver};
 use instant::Instant;
-use rook_core::user_preferences::GetUserPreferences as _;
-use rook_errors::report_error;
-pub use rook_graphql::billing::BonusGrantType;
-use rook_graphql::scalars::time::ServerTimestamp;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use pterm_core::user_preferences::GetUserPreferences as _;
+use pterm_errors::report_error;
+pub use pterm_graphql::billing::BonusGrantType;
+use pterm_graphql::scalars::time::ServerTimestamp;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 
 use crate::BlocklistAIHistoryModel;
@@ -601,7 +601,7 @@ impl AIRequestUsageModel {
         });
 
         // If you have provided your own API key or connected a Grok
-        // subscription, it doesn't matter if you are out of rook-provided requests.
+        // subscription, it doesn't matter if you are out of polaris-terminal-provided requests.
         let has_byo_credentials = Self::has_usable_member_byo_inference_path(scope, ctx);
 
         has_base_plan_ai_requests

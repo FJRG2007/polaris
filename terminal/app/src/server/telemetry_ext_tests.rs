@@ -1,5 +1,5 @@
 use chrono::Utc;
-use rookui::telemetry::{Event, EventPayload};
+use ptermui::telemetry::{Event, EventPayload};
 use serde_json::json;
 
 use super::*;

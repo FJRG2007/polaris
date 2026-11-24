@@ -1,8 +1,8 @@
 //! Close handlers for local-control window, tab, and pane actions.
 use ::local_control::protocol::{TabCloseMode, TabCloseParams, TabTarget};
 use ::local_control::{Action, ActionKind, ControlError, ErrorCode, InstanceId, RequestEnvelope};
-use rookui::ModelContext;
-use rookui::platform::TerminationMode;
+use ptermui::ModelContext;
+use ptermui::platform::TerminationMode;
 
 use crate::local_control::LocalControlBridge;
 use crate::local_control::handlers::ack;

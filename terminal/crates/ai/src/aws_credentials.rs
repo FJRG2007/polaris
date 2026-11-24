@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
 use chrono::{DateTime, Local};
-use rook_core::ui::Icon;
+use pterm_core::ui::Icon;
 use warp_multi_agent_api as api;
 
 /// Temporary AWS credentials loaded from the AWS SDK.
@@ -93,13 +93,13 @@ impl AwsCredentialsState {
             ),
             Self::Disabled => (
                 "AWS Bedrock Disabled".to_string(),
-                "Rook will not load your AWS CLI credentials until AWS Bedrock is enabled by you or your workspace admin"
+                "Polaris Terminal will not load your AWS CLI credentials until AWS Bedrock is enabled by you or your workspace admin"
                     .to_string(),
                 Icon::Key,
             ),
             Self::Refreshing => (
                 "Refreshing credentials...".to_string(),
-                "Loading your AWS CLI credentials into Rook".to_string(),
+                "Loading your AWS CLI credentials into Polaris Terminal".to_string(),
                 Icon::RefreshCw04,
             ),
             Self::Loaded {

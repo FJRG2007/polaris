@@ -5,8 +5,8 @@ use std::future::Future;
 use std::sync::Arc;
 
 use futures::channel::oneshot;
-use rook_graphql::ai::{AgentTaskState, PlatformErrorCode};
-use rookui::{Entity, EntityId, ModelContext, SingletonEntity};
+use pterm_graphql::ai::{AgentTaskState, PlatformErrorCode};
+use ptermui::{Entity, EntityId, ModelContext, SingletonEntity};
 use session_sharing_protocol::common::SessionId;
 use update_queue::LocalTaskUpdateQueue;
 
@@ -584,11 +584,11 @@ pub(crate) fn classify_renderable_error(
         RenderableAIError::ServerOverloaded => (
             AgentTaskState::Error,
             Some(TaskStatusUpdate::with_error_code(
-                "Rook is temporarily overloaded. Please try again shortly.",
+                "Polaris Terminal is temporarily overloaded. Please try again shortly.",
                 PlatformErrorCode::ResourceUnavailable,
             )),
         ),
-        RenderableAIError::InternalRookError => (
+        RenderableAIError::InternalPtermError => (
             AgentTaskState::Error,
             Some(TaskStatusUpdate::with_error_code(
                 "An internal error occurred during the conversation. Please try again.",
@@ -683,7 +683,7 @@ fn map_cli_session_status(
         } => {
             // User-actionable errors (bad credentials, org restrictions, billing) map to
             // FAILED. Everything else (rate limits, server errors, model errors, etc.)
-            // maps to ERROR since they are typically Anthropic's or Rook's fault.
+            // maps to ERROR since they are typically Anthropic's or Polaris Terminal's fault.
             // The list of error types on Claude Code comes from https://code.claude.com/docs/en/hooks#stopfailure-input
             let task_state = match error_type.as_deref() {
                 Some("authentication_failed" | "oauth_org_not_allowed" | "billing_error") => {

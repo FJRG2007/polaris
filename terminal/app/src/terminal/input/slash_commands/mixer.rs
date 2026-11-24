@@ -1,4 +1,4 @@
-use rookui::{Entity, ModelContext, ModelHandle};
+use ptermui::{Entity, ModelContext, ModelHandle};
 
 use crate::search::SyncDataSource;
 use crate::search::data_source::{Query, QueryFilter};

@@ -15,16 +15,16 @@ This spec covers implementing `/skills` support in the CLI agent rich input comp
 - `app/src/terminal/cli_agent.rs` — `CLIAgent` enum
 
 ## Current State
-The CLI agent rich input (opened via Ctrl-G or the Compose button) is a plain text editor that writes its buffer to the PTY on submit. It reuses the same `Input` view and editor as the normal Rook input, but in a constrained mode. On enter, `input_enter()` detects `CLIAgentSessionsModel::is_input_open()` and emits `Event::SubmitCLIAgentInput` with the raw buffer text, which is written to the PTY.
+The CLI agent rich input (opened via Ctrl-G or the Compose button) is a plain text editor that writes its buffer to the PTY on submit. It reuses the same `Input` view and editor as the normal Polaris Terminal input, but in a constrained mode. On enter, `input_enter()` detects `CLIAgentSessionsModel::is_input_open()` and emits `Event::SubmitCLIAgentInput` with the raw buffer text, which is written to the PTY.
 
-The slash commands menu and skill selector already exist and work in the normal Rook input. The slash menu (`InlineSlashCommandView`) uses a `SearchMixer` with three data sources:
+The slash commands menu and skill selector already exist and work in the normal Polaris Terminal input. The slash menu (`InlineSlashCommandView`) uses a `SearchMixer` with three data sources:
 1. `SlashCommandDataSource` (sync) — static commands like `/agent`, `/new`, `/skills`. Stored in `active_commands_by_id`.
-2. `saved_prompts_data_source` (async) — saved prompts from Rook Drive.
+2. `saved_prompts_data_source` (async) — saved prompts from Polaris Terminal Drive.
 3. `ZeroStateDataSource` (sync) — zero-state items combining commands and skills.
 
 Individual skills appear as `AcceptSlashCommandOrSavedPrompt::Skill` items, produced by the data source querying `SkillManager`. The `/skills` command opens a dedicated `InlineSkillSelectorView`.
 
-Currently, all static commands and all skills are shown regardless of whether CLI agent input is active. Rook-specific commands like `/agent` and `/new` don't make sense for CLI agents, and non-native skills can't be interpreted by the CLI agent.
+Currently, all static commands and all skills are shown regardless of whether CLI agent input is active. Polaris Terminal-specific commands like `/agent` and `/new` don't make sense for CLI agents, and non-native skills can't be interpreted by the CLI agent.
 
 ## Proposed Changes
 
@@ -53,7 +53,7 @@ CLIAgent::Droid   → [SkillProvider::Droid, SkillProvider::Agents]
 CLIAgent::Unknown → [] (no skills shown)
 ```
 
-The `SkillSelectorDataSource` and `SlashCommandDataSource` (which also surfaces skills) need to filter results based on the active CLI agent's supported providers. When `CLIAgentSessionsModel::is_input_open()` is true, look up the active agent, get its supported providers, and filter out skills whose `ParsedSkill::provider` is not in the list. Non-native skills (including bundled Rook skills) are hidden entirely.
+The `SkillSelectorDataSource` and `SlashCommandDataSource` (which also surfaces skills) need to filter results based on the active CLI agent's supported providers. When `CLIAgentSessionsModel::is_input_open()` is true, look up the active agent, get its supported providers, and filter out skills whose `ParsedSkill::provider` is not in the list. Non-native skills (including bundled Polaris Terminal skills) are hidden entirely.
 
 **Selection behavior**: No branching needed — all skills in the menu are natively supported, so the existing behavior of inserting `/{skill-name} ` works as-is.
 
@@ -75,10 +75,10 @@ The `/skills` command must be allowlisted when filtering static commands. If acc
 ## Testing and Validation
 - Verify `/` opens the menu with only `/skills` and natively supported skills (no `/agent`, `/new`, etc.).
 - Verify only natively supported skills appear (e.g., `.claude/` skills for Claude Code, `.agents/` skills for Codex).
-- Verify non-native skills (including bundled Rook skills) are hidden from the CLI agent input menu.
+- Verify non-native skills (including bundled Polaris Terminal skills) are hidden from the CLI agent input menu.
 - Verify selecting a skill inserts `/{skill-name} ` for passthrough.
 - Verify all inserted content submits correctly to the PTY.
-- Verify no regressions in normal Rook agent input (slash menu and skills still work as before).
+- Verify no regressions in normal Polaris Terminal agent input (slash menu and skills still work as before).
 
 ## Follow-ups
 - Surface native CLI agent slash commands (e.g., Claude Code's `/compact`, `/model`) in the menu (APP-3641).

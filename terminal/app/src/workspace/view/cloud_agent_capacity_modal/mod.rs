@@ -2,22 +2,22 @@ use asset_macro::bundled_or_fetched_asset;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::channel::ChannelState;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_graphql::billing::StripeSubscriptionPlan;
-use rookui::elements::{
+use pterm_core::channel::ChannelState;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_graphql::billing::StripeSubscriptionPlan;
+use ptermui::elements::{
     Align, CacheOption, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DropShadow, Expanded, Flex, FormattedTextElement, HighlightedHyperlink, Image,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, Stack,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::FixedBinding;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::fonts::Weight;
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 use thousands::Separable;
 
 use crate::auth::AuthStateProvider;
@@ -51,7 +51,7 @@ pub enum CloudAgentCapacityModalVariant {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",
@@ -251,7 +251,7 @@ impl CloudAgentCapacityModal {
                                 Container::new(
                                     ConstrainedBox::new(
                                         Icon::CheckCircleBroken
-                                            .to_rookui_icon(Fill::Solid(theme.ansi_fg_green()))
+                                            .to_ptermui_icon(Fill::Solid(theme.ansi_fg_green()))
                                             .finish(),
                                     )
                                     .with_width(14.)

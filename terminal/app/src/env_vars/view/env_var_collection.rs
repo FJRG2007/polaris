@@ -1,19 +1,19 @@
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Align, AnchorPair, ChildAnchor, Clipped, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CrossAxisAlignment, DispatchEventResult, EventHandler, Fill, Flex,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, OffsetType, ParentAnchor,
     ParentElement, ParentOffsetBounds, PositioningAxis, SavePosition, ScrollbarWidth, Shrinkable,
     Stack, XAxisAnchor, YAxisAnchor,
 };
-use rookui::keymap::EditableBinding;
-use rookui::platform::Cursor;
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::keymap::EditableBinding;
+use ptermui::platform::Cursor;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, BlurContext, Element, Entity, FocusContext, ModelAsRef, ModelHandle,
     SingletonEntity, TypedActionView, View, ViewContext, ViewHandle, WindowId, id,
 };
@@ -24,7 +24,7 @@ use crate::ai::blocklist::block::secret_redaction::find_secrets_in_text_with_lev
 use crate::cloud_object::breadcrumbs::ContainingObject;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::{CloudObjectEventEntrypoint, Owner};
-use crate::drive::items::RookDriveItemId;
+use crate::drive::items::PtermDriveItemId;
 use crate::drive::sharing::{ContentEditability, ShareableObject};
 use crate::editor::EditorView;
 use crate::env_vars::active_env_var_collection_data::{
@@ -70,7 +70,8 @@ const SECTION_SPACING: f32 = 16.;
 
 // Variable rows
 pub(super) const ROW_SPACING: f32 = 8.;
-pub const EDUCATION_TEXT: &str = "Add secret or command. Rook never stores external secrets";
+pub const EDUCATION_TEXT: &str =
+    "Add secret or command. Polaris Terminal never stores external secrets";
 const VARIABLE_FONT_SIZE: f32 = 13.;
 const DESCRIPTION_EDITOR_CUTOFF: f32 = 30.;
 const DESCRIPTION_BOTTOM_MARGIN: f32 = 12.;
@@ -305,7 +306,7 @@ pub struct EnvVarCollectionView {
 pub enum EnvVarCollectionEvent {
     Pane(PaneEvent),
     UpdatedEnvVarCollection(SyncId),
-    ViewInRookDrive(RookDriveItemId),
+    ViewInPtermDrive(PtermDriveItemId),
     Invoke(EnvVarCollectionType),
 }
 #[derive(Debug, Clone)]
@@ -341,7 +342,7 @@ pub enum EnvVarCollectionAction {
     ForceClose,
     CloseUnsavedChangesDialog,
     // Breadcrumbs action
-    ViewInRookDrive(RookDriveItemId),
+    ViewInPtermDrive(PtermDriveItemId),
 }
 
 /// Defines the view for a collection of environment variables
@@ -663,7 +664,7 @@ impl EnvVarCollectionView {
         if let Some(server_id) = env_var_collection.id.into_server() {
             self.pane_configuration.update(ctx, |pane_config, ctx| {
                 pane_config
-                    .set_shareable_object(Some(ShareableObject::RookDriveObject(server_id)), ctx);
+                    .set_shareable_object(Some(ShareableObject::PtermDriveObject(server_id)), ctx);
             });
         }
 
@@ -959,7 +960,7 @@ impl EnvVarCollectionView {
                 self.update_breadcrumbs(ctx);
                 self.pane_configuration.update(ctx, |pane_config, ctx| {
                     pane_config.set_shareable_object(
-                        Some(ShareableObject::RookDriveObject(*server_id)),
+                        Some(ShareableObject::PtermDriveObject(*server_id)),
                         ctx,
                     );
                 });
@@ -1094,8 +1095,8 @@ impl EnvVarCollectionView {
             });
     }
 
-    fn view_in_rook_drive(&mut self, id: RookDriveItemId, ctx: &mut ViewContext<Self>) {
-        ctx.emit(EnvVarCollectionEvent::ViewInRookDrive(id));
+    fn view_in_pterm_drive(&mut self, id: PtermDriveItemId, ctx: &mut ViewContext<Self>) {
+        ctx.emit(EnvVarCollectionEvent::ViewInPtermDrive(id));
     }
 
     // This is a public re-export of close since it's a trait method
@@ -1282,7 +1283,7 @@ impl View for EnvVarCollectionView {
         }
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
         let theme = appearance.theme();
         let mut content = Flex::column();
@@ -1305,9 +1306,11 @@ impl View for EnvVarCollectionView {
                             self.breadcrumbs.clone(),
                             appearance,
                             |ctx, _, breadcrumb| {
-                                ctx.dispatch_typed_action(EnvVarCollectionAction::ViewInRookDrive(
-                                    breadcrumb.kind.into_item_id(),
-                                ));
+                                ctx.dispatch_typed_action(
+                                    EnvVarCollectionAction::ViewInPtermDrive(
+                                        breadcrumb.kind.into_item_id(),
+                                    ),
+                                );
                             },
                         ))
                         .with_horizontal_margin(CORE_HORIZONATAL_MARGIN)
@@ -1535,7 +1538,7 @@ impl TypedActionView for EnvVarCollectionView {
                 self.update_open_modal_state(ctx);
                 ctx.notify();
             }
-            EnvVarCollectionAction::ViewInRookDrive(id) => self.view_in_rook_drive(*id, ctx),
+            EnvVarCollectionAction::ViewInPtermDrive(id) => self.view_in_pterm_drive(*id, ctx),
         }
     }
 }

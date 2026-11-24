@@ -4,16 +4,16 @@ use std::time::Duration;
 
 use anyhow::{Result, anyhow};
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::color::internal_colors;
-use rookui_core::assets::asset_cache::{AssetCache, AssetSource, AssetState};
-use rookui_core::r#async::Timer;
-use rookui_core::elements::Stack;
-use rookui_core::image_cache::ImageType;
-use rookui_core::keymap::FixedBinding;
-use rookui_core::prelude::*;
-use rookui_core::{AssetProvider, SingletonEntity, Tracked, platform};
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui_core::assets::asset_cache::{AssetCache, AssetSource, AssetState};
+use ptermui_core::r#async::Timer;
+use ptermui_core::elements::Stack;
+use ptermui_core::image_cache::ImageType;
+use ptermui_core::keymap::FixedBinding;
+use ptermui_core::prelude::*;
+use ptermui_core::{AssetProvider, SingletonEntity, Tracked, platform};
 use rust_embed::RustEmbed;
 use ui_components::lightbox::{self, LightboxImage, LightboxImageSource, NavigationDirection};
 use ui_components::{Component as _, Options, button, dialog, switch, tooltip};
@@ -35,13 +35,13 @@ impl AssetProvider for Assets {
     }
 }
 
-fn main() -> rookui_core::platform::app::TerminationResult {
+fn main() -> ptermui_core::platform::app::TerminationResult {
     // Initialize the TLS provider so reqwest can make HTTPS requests.
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .expect("must be able to initialize crypto provider for TLS support");
 
-    let app_builder = rookui::platform::AppBuilder::new(
+    let app_builder = ptermui::platform::AppBuilder::new(
         platform::AppCallbacks::default(),
         Box::new(ASSETS),
         None,
@@ -55,7 +55,7 @@ fn main() -> rookui_core::platform::app::TerminationResult {
             "Noto Sans".to_string()
         };
 
-        let font_family = rookui_core::fonts::Cache::handle(ctx).update(ctx, |cache, _ctx| {
+        let font_family = ptermui_core::fonts::Cache::handle(ctx).update(ctx, |cache, _ctx| {
             cache.load_system_font(&font_name).unwrap()
         });
         ctx.add_singleton_model(|ctx| {
@@ -65,7 +65,7 @@ fn main() -> rookui_core::platform::app::TerminationResult {
         });
 
         {
-            use rookui_core::keymap::macros::*;
+            use ptermui_core::keymap::macros::*;
             let lightbox_open = id!("RootView") & id!("RootView_LightboxOpen");
             ctx.register_fixed_bindings([
                 FixedBinding::new(
@@ -83,7 +83,7 @@ fn main() -> rookui_core::platform::app::TerminationResult {
             ]);
         }
 
-        ctx.add_window(rookui_core::AddWindowOptions::default(), RootView::new);
+        ctx.add_window(ptermui_core::AddWindowOptions::default(), RootView::new);
     })
 }
 
@@ -175,7 +175,7 @@ impl View for RootView {
         "RootView"
     }
 
-    fn keymap_context(&self, _: &AppContext) -> rookui_core::keymap::Context {
+    fn keymap_context(&self, _: &AppContext) -> ptermui_core::keymap::Context {
         let mut context = Self::default_keymap_context();
         if *self.dialog_open {
             context.set.insert("RootView_DialogOpen");
@@ -241,7 +241,7 @@ impl RootView {
                 options: switch::Options {
                     hover_border_size: Some(10.),
                     label: Some(Box::new(move |appearance: &Appearance| {
-                        rookui_core::elements::Text::new(
+                        ptermui_core::elements::Text::new(
                             "Switch",
                             appearance.ui_font_family(),
                             appearance.ui_font_size(),
@@ -261,7 +261,7 @@ impl RootView {
             tooltip::Params {
                 label: "Tooltip label".into(),
                 options: tooltip::Options {
-                    keyboard_shortcut: Some(rookui_core::keymap::Keystroke {
+                    keyboard_shortcut: Some(ptermui_core::keymap::Keystroke {
                         ctrl: true,
                         key: "k".to_string(),
                         ..Default::default()
@@ -283,7 +283,7 @@ impl RootView {
                         content: button::Content::Label("Primary".into()),
                         theme: &button::themes::Primary,
                         options: button::Options {
-                            keystroke: Some(rookui_core::keymap::Keystroke {
+                            keystroke: Some(ptermui_core::keymap::Keystroke {
                                 ctrl: true,
                                 key: "k".to_string(),
                                 ..Default::default()
@@ -305,7 +305,7 @@ impl RootView {
                         content: button::Content::Label("Secondary".into()),
                         theme: &button::themes::Secondary,
                         options: button::Options {
-                            keystroke: Some(rookui_core::keymap::Keystroke {
+                            keystroke: Some(ptermui_core::keymap::Keystroke {
                                 cmd: true,
                                 key: "enter".to_string(),
                                 ..Default::default()
@@ -328,7 +328,7 @@ impl RootView {
                         theme: &button::themes::Primary,
                         options: button::Options {
                             disabled: true,
-                            keystroke: Some(rookui_core::keymap::Keystroke {
+                            keystroke: Some(ptermui_core::keymap::Keystroke {
                                 shift: true,
                                 key: "d".to_string(),
                                 ..Default::default()
@@ -369,7 +369,7 @@ impl RootView {
                         theme: &button::themes::Primary,
                         options: button::Options {
                             size: button::Size::Small,
-                            keystroke: Some(rookui_core::keymap::Keystroke {
+                            keystroke: Some(ptermui_core::keymap::Keystroke {
                                 ctrl: true,
                                 key: "k".to_string(),
                                 ..Default::default()
@@ -392,7 +392,7 @@ impl RootView {
                         theme: &button::themes::Secondary,
                         options: button::Options {
                             size: button::Size::Small,
-                            keystroke: Some(rookui_core::keymap::Keystroke {
+                            keystroke: Some(ptermui_core::keymap::Keystroke {
                                 cmd: true,
                                 key: "enter".to_string(),
                                 ..Default::default()
@@ -416,7 +416,7 @@ impl RootView {
                         options: button::Options {
                             disabled: true,
                             size: button::Size::Small,
-                            keystroke: Some(rookui_core::keymap::Keystroke {
+                            keystroke: Some(ptermui_core::keymap::Keystroke {
                                 shift: true,
                                 key: "d".to_string(),
                                 ..Default::default()
@@ -439,7 +439,7 @@ impl RootView {
                         theme: &button::themes::Secondary,
                         options: button::Options {
                             size: button::Size::Small,
-                            keystroke: Some(rookui_core::keymap::Keystroke {
+                            keystroke: Some(ptermui_core::keymap::Keystroke {
                                 key: "escape".to_string(),
                                 ..Default::default()
                             }),
@@ -499,7 +499,7 @@ impl RootView {
                     on_dismiss: Some(Arc::new(|ctx, _app| {
                         ctx.dispatch_typed_action(Action::CloseDialog);
                     })),
-                    dismiss_keystroke: Some(rookui_core::keymap::Keystroke {
+                    dismiss_keystroke: Some(ptermui_core::keymap::Keystroke {
                         key: "escape".to_string(),
                         ..Default::default()
                     }),
@@ -566,7 +566,7 @@ impl RootView {
                 }),
                 current_image_state,
                 options: lightbox::Options {
-                    dismiss_keystroke: Some(rookui_core::keymap::Keystroke {
+                    dismiss_keystroke: Some(ptermui_core::keymap::Keystroke {
                         key: "escape".to_string(),
                         ..Default::default()
                     }),
@@ -600,7 +600,7 @@ impl RootView {
                 }),
                 current_image_state,
                 options: lightbox::Options {
-                    dismiss_keystroke: Some(rookui_core::keymap::Keystroke {
+                    dismiss_keystroke: Some(ptermui_core::keymap::Keystroke {
                         key: "escape".to_string(),
                         ..Default::default()
                     }),

@@ -8,7 +8,7 @@
 mod telemetry;
 mod transition;
 
-use rook_core::features::FeatureFlag;
+use pterm_core::features::FeatureFlag;
 pub use telemetry::LifecycleRecoveryRecord;
 pub(in crate::terminal) use telemetry::LifecycleTelemetryEvent;
 use telemetry::LifecycleTelemetryLimiter;

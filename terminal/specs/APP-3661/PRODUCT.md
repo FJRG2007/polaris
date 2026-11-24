@@ -2,7 +2,7 @@
 
 ## Problem
 
-We're releasing a new version of the Rook notification plugin for Claude Code (v2.0.0). Existing users on v1.1.0 won't automatically receive the update because Claude Code's plugin update system is unreliable. We need Rook to detect outdated plugin versions and prompt users to update.
+We're releasing a new version of the Polaris Terminal notification plugin for Claude Code (v2.0.0). Existing users on v1.1.0 won't automatically receive the update because Claude Code's plugin update system is unreliable. We need Polaris Terminal to detect outdated plugin versions and prompt users to update.
 
 ## Current Chip Behavior
 
@@ -19,8 +19,8 @@ There is no concept of an "outdated" plugin. A user on v1.1.0 will never see a p
 
 When the plugin is installed but on an old version, show an update chip:
 
-- Label: "Update Rook plugin"
-- Tooltip: "A new version of the Rook plugin is available"
+- Label: "Update Polaris Terminal plugin"
+- Tooltip: "A new version of the Polaris Terminal plugin is available"
 - Same green styling and dismiss (X) button as the install chip
 - On local sessions: clicking runs the update automatically
 - On SSH or after a failed auto-update: clicking opens a modal with manual update steps
@@ -29,7 +29,7 @@ The update chip replaces the install chip in the same position — they never ap
 
 ## How Version Detection Works
 
-The plugin reports its own version via a `plugin_version` field in the `SessionStart` event when it connects. Rook compares this against a minimum required version. This works identically for local and remote sessions — no filesystem check needed for update detection.
+The plugin reports its own version via a `plugin_version` field in the `SessionStart` event when it connects. Polaris Terminal compares this against a minimum required version. This works identically for local and remote sessions — no filesystem check needed for update detection.
 
 A missing `plugin_version` (from a plugin that predates version reporting) is treated as outdated.
 
@@ -46,9 +46,9 @@ A missing `plugin_version` (from a plugin that predates version reporting) is tr
 
 ## Auto-Update (Local Sessions)
 
-On click, Rook runs `marketplace add` (to refresh the local clone) + `plugin update` via the CLI. Same UX pattern as auto-install: persistent toast while running, success/failure toast on completion. A post-update sanity check verifies the on-disk version actually changed.
+On click, Polaris Terminal runs `marketplace add` (to refresh the local clone) + `plugin update` via the CLI. Same UX pattern as auto-install: persistent toast while running, success/failure toast on completion. A post-update sanity check verifies the on-disk version actually changed.
 
-On success: "Rook plugin updated. Please run /reload-plugins to activate."
+On success: "Polaris Terminal plugin updated. Please run /reload-plugins to activate."
 On failure: transition to manual mode (modal) for the rest of the session.
 
 ## Manual Update (SSH / Failed Auto-Update)

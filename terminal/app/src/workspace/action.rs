@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use rook_util::path::LineAndColumnArg;
-use rookui::accessibility::AccessibilityVerbosity;
-use rookui::geometry::rect::RectF;
-use rookui::geometry::vector::Vector2F;
-use rookui::platform::Cursor;
-use rookui::platform::keyboard::KeyCode;
-use rookui::{EntityId, WeakViewHandle, WindowId};
+use pterm_util::path::LineAndColumnArg;
+use ptermui::accessibility::AccessibilityVerbosity;
+use ptermui::geometry::rect::RectF;
+use ptermui::geometry::vector::Vector2F;
+use ptermui::platform::Cursor;
+use ptermui::platform::keyboard::KeyCode;
+use ptermui::{EntityId, WeakViewHandle, WindowId};
 use session_sharing_protocol::common::SessionId;
 use ui_components::lightbox;
 
@@ -28,7 +28,7 @@ use crate::ai::blocklist::PendingAttachment;
 use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentVersion};
 use crate::auth::auth_manager::LoginGatedFeature;
 use crate::drive::CloudObjectTypeAndId;
-use crate::drive::items::RookDriveItemId;
+use crate::drive::items::PtermDriveItemId;
 use crate::palette::PaletteMode;
 use crate::pane_group::PaneGroup;
 use crate::prompt::editor_modal::OpenSource as PromptEditorOpenSource;
@@ -318,7 +318,7 @@ pub enum WorkspaceAction {
     ToggleErrorUnderlining,
     ToggleSyntaxHighlighting,
     CheckForUpdate,
-    ExportAllRookDriveObjects,
+    ExportAllPtermDriveObjects,
     SetA11yVerbosityLevel(AccessibilityVerbosity),
     ToggleNotifications,
     ToggleTabColor {
@@ -370,14 +370,14 @@ pub enum WorkspaceAction {
         cursor_position: Vector2F,
     },
     DropGroup,
-    /// Toggles the left panel. In Code Mode V1 this toggles Rook Drive.
+    /// Toggles the left panel. In Code Mode V1 this toggles Polaris Terminal Drive.
     /// In Code Mode V2 this toggles the left panel which contains both the project explorer and
-    /// Rook Drive. This happens as explicit action from the user.
+    /// Polaris Terminal Drive. This happens as explicit action from the user.
     ToggleLeftPanel,
-    /// Toggles directly to the Rook Drive tab of the left panel in Code Mode V2
-    ToggleRookDrive,
-    /// Unconditionally opens Rook Drive.
-    OpenRookDrive,
+    /// Toggles directly to the Polaris Terminal Drive tab of the left panel in Code Mode V2
+    TogglePtermDrive,
+    /// Unconditionally opens Polaris Terminal Drive.
+    OpenPtermDrive,
     /// Toggles the right panel. This happens as an explicit action from the user.
     ToggleRightPanel,
     /// Opens the code review panel (right panel) without toggling. If already open,
@@ -442,7 +442,7 @@ pub enum WorkspaceAction {
     SignupAnonymousUser,
     SignInAnonymousWebUser,
     OpenLink(String),
-    /// On WASM, opens a given URL in the desktop Rook app (if installed) or redirects to download page.
+    /// On WASM, opens a given URL in the desktop Polaris Terminal app (if installed) or redirects to download page.
     #[cfg(target_family = "wasm")]
     OpenLinkOnDesktop(url::Url),
     ReopenClosedSession,
@@ -468,7 +468,7 @@ pub enum WorkspaceAction {
     /// Moves focus to the panel on the right
     FocusRightPanel,
     /// An action to view a newly created/edited workflow in WD from the toast
-    ViewObjectInRookDrive(RookDriveItemId),
+    ViewObjectInPtermDrive(PtermDriveItemId),
     /// Open the object's sharing settings in WD.
     OpenObjectSharingSettings {
         object_id: CloudObjectTypeAndId,
@@ -485,7 +485,7 @@ pub enum WorkspaceAction {
     },
     TerminateApp,
     CloseWindow,
-    /// Help the user call the Rook executable with the [`crate::args::DEBUG_DUMP_FLAG`].
+    /// Help the user call the Polaris Terminal executable with the [`crate::args::DEBUG_DUMP_FLAG`].
     DumpDebugInfo,
     /// Log review comment send eligibility for panes in the active tab.
     LogReviewCommentSendStatusForActiveTab,
@@ -647,7 +647,7 @@ pub enum WorkspaceAction {
     /// Open the workspace modal for creating a new managed auth secret.
     /// Dispatched by orchestration card pickers' "New API key…" item.
     OpenCreateAuthSecretModal {
-        harness: rook_cli::agent::Harness,
+        harness: pterm_cli::agent::Harness,
     },
     /// Summarize the active AI conversation in the focused pane.
     SummarizeAIConversation {
@@ -661,12 +661,12 @@ pub enum WorkspaceAction {
     /// Uninstall the Oz CLI command from /usr/local/bin
     #[cfg(target_os = "macos")]
     UninstallOz,
-    /// Install the Rook Control CLI command to /usr/local/bin
+    /// Install the Polaris Terminal Control CLI command to /usr/local/bin
     #[cfg(target_os = "macos")]
-    InstallRookctrl,
-    /// Uninstall the Rook Control CLI command from /usr/local/bin
+    InstallPtermctrl,
+    /// Uninstall the Polaris Terminal Control CLI command from /usr/local/bin
     #[cfg(target_os = "macos")]
-    UninstallRookctrl,
+    UninstallPtermctrl,
     UndoRevertInCodeReviewPane {
         window_id: WindowId,
         view_id: EntityId,
@@ -722,22 +722,22 @@ pub enum WorkspaceAction {
     /// Reset the Oz launch modal dismissed state (for debugging)
     #[cfg(debug_assertions)]
     ResetOzLaunchModalState,
-    /// Open the OpenRook Launch Modal (for debugging)
+    /// Open the OpenPterm Launch Modal (for debugging)
     #[cfg(debug_assertions)]
-    OpenOpenRookLaunchModal,
-    /// Reset the OpenRook launch modal dismissed state (for debugging)
+    OpenOpenPtermLaunchModal,
+    /// Reset the OpenPterm launch modal dismissed state (for debugging)
     #[cfg(debug_assertions)]
-    ResetOpenRookLaunchModalState,
+    ResetOpenPtermLaunchModalState,
     /// Open the Orchestration Launch Modal (for debugging)
     #[cfg(debug_assertions)]
     OpenOrchestrationLaunchModal,
     /// Reset the orchestration launch modal dismissed state (for debugging)
     #[cfg(debug_assertions)]
     ResetOrchestrationLaunchModalState,
-    /// Open the Rook Agent CLI Launch Modal (for debugging)
+    /// Open the Polaris Terminal Agent CLI Launch Modal (for debugging)
     #[cfg(debug_assertions)]
     OpenAgentCliLaunchModal,
-    /// Reset the Rook Agent CLI launch modal dismissed state (for debugging)
+    /// Reset the Polaris Terminal Agent CLI launch modal dismissed state (for debugging)
     #[cfg(debug_assertions)]
     ResetAgentCliLaunchModalState,
     /// Open the Feature Intro Modal (for debugging)
@@ -762,12 +762,12 @@ pub enum WorkspaceAction {
     /// Reset the free AI removal modal seen state (for debugging)
     #[cfg(debug_assertions)]
     ResetFreeAiRemovalModalState,
-    /// Install the opencode-rook plugin from GitHub into the global opencode config.
+    /// Install the opencode-polaris-terminal plugin from GitHub into the global opencode config.
     #[cfg(debug_assertions)]
-    InstallOpenCodeRookPlugin,
-    /// Use a local checkout of the opencode-rook plugin (for testing/development).
+    InstallOpenCodePtermPlugin,
+    /// Use a local checkout of the opencode-polaris-terminal plugin (for testing/development).
     #[cfg(debug_assertions)]
-    UseLocalOpenCodeRookPlugin,
+    UseLocalOpenCodePtermPlugin,
     /// Take a process sample of the app (equivalent to Activity Monitor > Sample Process).
     #[cfg(target_os = "macos")]
     SampleProcess,
@@ -1009,7 +1009,7 @@ impl WorkspaceAction {
             | CopyVersion(_)
             | DownloadNewVersion
             | ConfigureKeybindingSettings { .. }
-            | ExportAllRookDriveObjects
+            | ExportAllPtermDriveObjects
             | ShowSettings
             | ShowSettingsPage(_)
             | ShowSettingsPageWithSearch { .. }
@@ -1079,8 +1079,8 @@ impl WorkspaceAction {
             | DragGroup { .. }
             | StartGroupDrag(_)
             | ToggleLeftPanel
-            | ToggleRookDrive
-            | OpenRookDrive
+            | TogglePtermDrive
+            | OpenPtermDrive
             | ClosePanel
             | ToggleRightPanel
             | OpenCodeReviewPanel(..)
@@ -1145,7 +1145,7 @@ impl WorkspaceAction {
             | AttemptLoginGatedAIUpgrade
             | UndoTrash(_)
             | OpenFilePath { .. }
-            | ViewObjectInRookDrive(_)
+            | ViewObjectInPtermDrive(_)
             | OpenObjectSharingSettings { .. }
             | TerminateApp
             | SignInAnonymousWebUser
@@ -1215,8 +1215,8 @@ impl WorkspaceAction {
             | DebugResetAwsBedrockLoginBannerDismissed
             | OpenOzLaunchModal
             | ResetOzLaunchModalState
-            | OpenOpenRookLaunchModal
-            | ResetOpenRookLaunchModalState
+            | OpenOpenPtermLaunchModal
+            | ResetOpenPtermLaunchModalState
             | OpenOrchestrationLaunchModal
             | ResetOrchestrationLaunchModalState
             | OpenAgentCliLaunchModal
@@ -1228,8 +1228,8 @@ impl WorkspaceAction {
             | TriggerAutoHandoffToCloud
             | OpenFreeAiRemovalModal
             | ResetFreeAiRemovalModalState
-            | InstallOpenCodeRookPlugin
-            | UseLocalOpenCodeRookPlugin => false,
+            | InstallOpenCodePtermPlugin
+            | UseLocalOpenCodePtermPlugin => false,
             #[cfg(not(target_family = "wasm"))]
             ViewLogs => false,
             #[cfg(target_os = "macos")]
@@ -1237,7 +1237,7 @@ impl WorkspaceAction {
             #[cfg(target_os = "macos")]
             InstallOz | UninstallOz => false,
             #[cfg(target_os = "macos")]
-            InstallRookctrl | UninstallRookctrl => false,
+            InstallPtermctrl | UninstallPtermctrl => false,
             #[cfg(feature = "local_fs")]
             FileRenamed { .. } => false, // File rename doesn't change workspace state
             #[cfg(feature = "local_fs")]

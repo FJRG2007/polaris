@@ -1,17 +1,17 @@
 ---
 name: terminal-add-feature-flag
-description: Add a new feature flag to gate code changes in the Rook codebase.
+description: Add a new feature flag to gate code changes in the Polaris Terminal codebase.
 ---
 
 # terminal-add-feature-flag
-Add a new feature flag to gate code changes in the Rook codebase.
+Add a new feature flag to gate code changes in the Polaris Terminal codebase.
 
 ## Overview
 
-Feature flags in Rook are compile-time flags that allow features to be selectively enabled for different channels (e.g.: Dev, Stable). They use a small runtime plumbing layer that checks if a flag is enabled.
+Feature flags in Polaris Terminal are compile-time flags that allow features to be selectively enabled for different channels (e.g.: Dev, Stable). They use a small runtime plumbing layer that checks if a flag is enabled.
 
 ## TUI note
-The `FeatureFlag` enum (`rook_core/src/features.rs`) and the runtime `FeatureFlag::X.is_enabled()` check are SHARED by both front-ends: the GUI desktop app (`app/`) and the headless TUI (`crates/rook_tui`). The Cargo-feature steps in this skill (`app/Cargo.toml`, `app/src/lib.rs`) are GUI-app-specific. Prefer runtime `is_enabled()` checks so a flag works in both front-ends with no per-binary wiring. Only if you truly need a compile-time Cargo feature in the TUI, wire it into `crates/rook_tui/Cargo.toml` as well. Test the TUI with `./script/run-tui`.
+The `FeatureFlag` enum (`pterm_core/src/features.rs`) and the runtime `FeatureFlag::X.is_enabled()` check are SHARED by both front-ends: the GUI desktop app (`app/`) and the headless TUI (`crates/pterm_tui`). The Cargo-feature steps in this skill (`app/Cargo.toml`, `app/src/lib.rs`) are GUI-app-specific. Prefer runtime `is_enabled()` checks so a flag works in both front-ends with no per-binary wiring. Only if you truly need a compile-time Cargo feature in the TUI, wire it into `crates/pterm_tui/Cargo.toml` as well. Test the TUI with `./script/run-tui`.
 
 ## Steps
 
@@ -24,7 +24,7 @@ your_feature_name = []
 ```
 
 ### 2. Add to FeatureFlag enum
-Add a new variant to the `FeatureFlag` enum in `rook_core/src/features.rs`:
+Add a new variant to the `FeatureFlag` enum in `pterm_core/src/features.rs`:
 
 ```rust
 #[derive(Sequence)]
@@ -86,7 +86,7 @@ EditableBinding::new(
 
 ## Rolling Out to Stable
 
-When ready to enable the feature for all Rook Stable users, add it to the `default` array in `app/Cargo.toml`:
+When ready to enable the feature for all Polaris Terminal Stable users, add it to the `default` array in `app/Cargo.toml`:
 
 ```toml
 [features]

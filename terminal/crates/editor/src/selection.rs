@@ -1,10 +1,10 @@
 use std::ops::Range;
 
 use num_traits::SaturatingSub;
-use rookui_core::text::TextBuffer;
-use rookui_core::text::point::Point;
-use rookui_core::text::word_boundaries::WordBoundariesPolicy;
-use rookui_core::{AppContext, Entity, ModelAsRef, ModelContext, ModelHandle};
+use ptermui_core::text::TextBuffer;
+use ptermui_core::text::point::Point;
+use ptermui_core::text::word_boundaries::WordBoundariesPolicy;
+use ptermui_core::{AppContext, Entity, ModelAsRef, ModelContext, ModelHandle};
 use string_offset::CharOffset;
 use vec1::Vec1;
 

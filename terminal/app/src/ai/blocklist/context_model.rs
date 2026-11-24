@@ -7,9 +7,9 @@ use std::sync::Arc;
 
 use ai::project_context::model::ProjectContextModel;
 use parking_lot::FairMutex;
-use rook_core::features::FeatureFlag;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::{
+use pterm_core::features::FeatureFlag;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::{
     AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity, WeakModelHandle,
 };
 

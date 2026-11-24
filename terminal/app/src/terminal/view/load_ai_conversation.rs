@@ -6,11 +6,11 @@ use std::sync::Arc;
 use ai::document::DEFAULT_PLANNING_DOCUMENT_TITLE;
 use itertools::Itertools;
 use prost::Message;
-use rook_core::channel::ChannelState;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rookui::units::IntoPixels;
-use rookui::{EntityId, ModelHandle, SingletonEntity, ViewContext};
+use pterm_core::channel::ChannelState;
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use ptermui::units::IntoPixels;
+use ptermui::{EntityId, ModelHandle, SingletonEntity, ViewContext};
 use vec1::Vec1;
 use warp_multi_agent_api as api;
 
@@ -98,7 +98,7 @@ pub enum ConversationRestorationInNewPaneType {
         /// True when the fork is paired with a follow-up prompt or summarize that
         /// will be sent immediately after restore.
         /// We skip the `couldn't find original conversation directory` ephemeral
-        /// hint in that case so the rooking indicator (gated on
+        /// hint in that case so the pterming indicator (gated on
         /// `ephemeral_message_model.current_message().is_none()` in
         /// `BlocklistAIStatusBar::render`) isn't suppressed by the hint.
         has_initial_query: bool,

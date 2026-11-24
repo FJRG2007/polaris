@@ -4,10 +4,10 @@ use super::*;
 
 #[test]
 fn test_firebase_domain() {
-    let firebase_domain = "rook-server-staging.firebaseapp.com";
+    let firebase_domain = "polaris-terminal-server-staging.firebaseapp.com";
     assert_regex_match_found(regexes::FIREBASE_AUTH_DOMAIN, firebase_domain);
 
-    let bad_firebase_domain = "rook-server-staging_.firebaseapp.com";
+    let bad_firebase_domain = "polaris-terminal-server-staging_.firebaseapp.com";
     assert_regex_match_not_found(regexes::FIREBASE_AUTH_DOMAIN, bad_firebase_domain);
 }
 
@@ -117,11 +117,11 @@ fn test_ip_address() {
     let false_ip_address = "Grid::scan_dirty_cells_for_secrets";
     let double_colon = "::";
     let ip_in_sentence = "Could not connect to 143.63.215.9";
-    let rook_version_number = "v0.2023.08.01.08.04.dev_00";
+    let pterm_version_number = "v0.2023.08.01.08.04.dev_00";
     assert_regex_match_found(regexes::IPV4_ADDRESS, ipv4_address);
     assert_regex_match_found(regexes::IPV4_ADDRESS, ip_in_sentence);
     assert_regex_match_not_found(regexes::IPV4_ADDRESS, ivp6_address);
-    assert_regex_match_not_found(regexes::IPV4_ADDRESS, rook_version_number);
+    assert_regex_match_not_found(regexes::IPV4_ADDRESS, pterm_version_number);
 
     assert_regex_match_found(regexes::IPV6_ADDRESS, ivp6_address);
     assert_regex_match_not_found(regexes::IPV6_ADDRESS, ipv4_address);

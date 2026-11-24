@@ -6,22 +6,22 @@ use std::sync::Arc;
 
 use fuzzy_match::{FuzzyMatchResult, match_indices_case_insensitive};
 use itertools::Itertools;
-use rook_core::ui::builder::UiBuilder;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::editor::NavigationKey;
-use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::color::ColorU;
-use rookui::elements::{
+use pterm_core::ui::builder::UiBuilder;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::editor::NavigationKey;
+use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::color::ColorU;
+use ptermui::elements::{
     Align, ConstrainedBox, Container, CrossAxisAlignment, DispatchEventResult, Element,
     EventHandler, Fill, Flex, Highlight, Hoverable, LEFT_PADDING as SCROLLABLE_LEFT_PADDING,
     MainAxisSize, MouseStateHandle, ParentElement, ScrollStateHandle, Scrollable,
     ScrollableElement, ScrollbarWidth, Shrinkable, Text, UniformList, UniformListState,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::text_layout::TextStyle;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::text_layout::TextStyle;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, WeakViewHandle,
 };
 use warp_workflows::workflows as global_workflows;
@@ -33,8 +33,8 @@ use crate::cloud_object::model::persistence::CloudModel;
 use crate::editor::Event as EditorEvent;
 use crate::send_telemetry_from_ctx;
 use crate::server::telemetry::TelemetryEvent;
-use crate::themes::theme::{self, Blend, RookTheme};
-use crate::user_config::{RookConfig, RookConfigUpdateEvent};
+use crate::themes::theme::{self, Blend, PtermTheme};
+use crate::user_config::{PtermConfig, PtermConfigUpdateEvent};
 use crate::util::bindings::CustomAction;
 use crate::voltron::{VoltronFeatureViewMeta, VoltronMetadata};
 use crate::workflows::WorkflowType;
@@ -51,7 +51,7 @@ const WORKFLOW_LIST_PADDING_MIDDLE: f32 = 5.;
 pub const WORKFLOW_SUBTEXT_FONT_SIZE: f32 = 14.0;
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings(vec![
         FixedBinding::new("up", WorkflowsViewAction::Up, id!("WorkflowsView")),
@@ -171,7 +171,7 @@ impl WorkflowViewType {
             WorkflowViewType::Team => "Showing team workflows".into(),
         };
 
-        AccessibilityContent::new_without_help(a11y_content, RookA11yRole::UserAction)
+        AccessibilityContent::new_without_help(a11y_content, PtermA11yRole::UserAction)
     }
 }
 
@@ -336,7 +336,7 @@ impl SelectionState {
         }
     }
 
-    fn background_color(&self, theme: &RookTheme) -> theme::Fill {
+    fn background_color(&self, theme: &PtermTheme) -> theme::Fill {
         match self {
             SelectionState::Unselected => theme.surface_2(),
             SelectionState::Selected => theme.surface_2().blend(&theme.accent_overlay()),
@@ -372,7 +372,7 @@ impl CategoriesView {
             Self::categorize_workflows(
                 global_workflows()
                     .into_iter()
-                    .map(Workflow::from) // convert from the public-facing Workflow type to the rook-internal Workflow type
+                    .map(Workflow::from) // convert from the public-facing Workflow type to the polaris-terminal-internal Workflow type
                     .map(WorkflowType::Local)
                     .map(Arc::new),
             ),
@@ -403,8 +403,8 @@ impl CategoriesView {
             ctx.notify();
         });
 
-        ctx.subscribe_to_model(&RookConfig::handle(ctx), |me, _, event, ctx| {
-            if let RookConfigUpdateEvent::LocalUserWorkflows = event {
+        ctx.subscribe_to_model(&PtermConfig::handle(ctx), |me, _, event, ctx| {
+            if let PtermConfigUpdateEvent::LocalUserWorkflows = event {
                 me.update_workflows(ctx);
             }
         });
@@ -720,7 +720,7 @@ impl CategoriesView {
             );
             ctx.emit_a11y_content(AccessibilityContent::new_without_help(
                 a11y_content_text,
-                RookA11yRole::MenuItemRole,
+                PtermA11yRole::MenuItemRole,
             ));
         }
     }
@@ -764,7 +764,7 @@ impl CategoriesView {
                 .link(
                     "creating your own workflow".into(),
                     Some(
-                        "https://docs.rook.dev/knowledge-and-collaboration/rook-drive/workflows"
+                        "https://docs.rook.dev/knowledge-and-collaboration/polaris-terminal-drive/workflows"
                             .into(),
                     ),
                     None,
@@ -1154,7 +1154,7 @@ impl CategoriesView {
     }
 
     fn update_workflows(&mut self, ctx: &mut ViewContext<Self>) {
-        let workflows = RookConfig::as_ref(ctx)
+        let workflows = PtermConfig::as_ref(ctx)
             .local_user_workflows()
             .iter()
             .map(Clone::clone)
@@ -1210,7 +1210,7 @@ impl View for CategoriesView {
         Some(AccessibilityContent::new(
             "Workflows",
             "Search or use arrow up and arrow down keys to navigate and find a workflow. Use enter to confirm the workflow and esc to quit.",
-            RookA11yRole::MenuRole,
+            PtermA11yRole::MenuRole,
         ))
     }
 

@@ -1,4 +1,4 @@
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 #[derive(Clone)]
 pub struct TeamTesterStatus {}

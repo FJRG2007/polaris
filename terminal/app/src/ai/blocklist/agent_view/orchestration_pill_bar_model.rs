@@ -5,8 +5,8 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
-use rookui::elements::ClippedScrollStateHandle;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::elements::ClippedScrollStateHandle;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::blocklist::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};

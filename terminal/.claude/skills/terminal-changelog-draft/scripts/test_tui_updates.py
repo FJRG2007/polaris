@@ -107,7 +107,7 @@ class TuiUpdatesTest(unittest.TestCase):
                         "category": "TUI",
                         "text": "Added inline menus",
                         "pr_number": 123,
-                        "url": "https://github.com/FJRG2007/rook/pull/123",
+                        "url": "https://github.com/FJRG2007/polaris/pull/123",
                     }
                 ]
             }
@@ -116,7 +116,7 @@ class TuiUpdatesTest(unittest.TestCase):
             release["tui_updates"],
             [
                 "Added inline menus "
-                "([#123](https://github.com/FJRG2007/rook/pull/123))"
+                "([#123](https://github.com/FJRG2007/polaris/pull/123))"
             ],
         )
 

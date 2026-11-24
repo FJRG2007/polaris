@@ -5,8 +5,8 @@ use std::sync::{Arc, Mutex};
 
 use chrono::Local;
 use futures::channel::oneshot;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::App;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::App;
 use tempfile::NamedTempFile;
 
 use super::*;

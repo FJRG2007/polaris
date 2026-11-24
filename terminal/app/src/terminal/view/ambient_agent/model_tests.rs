@@ -1,4 +1,4 @@
-use rookui::App;
+use ptermui::App;
 use url::Url;
 
 use super::*;
@@ -19,7 +19,7 @@ fn team_request_scope() -> RequestTeamScope {
     RequestTeamScope::from_scope(&TeamContextForOperation::new_for_test(7.into()))
 }
 
-fn add_model(app: &mut App) -> rookui::ModelHandle<AmbientAgentViewModel> {
+fn add_model(app: &mut App) -> ptermui::ModelHandle<AmbientAgentViewModel> {
     let terminal_view = add_window_with_terminal(app, None);
     let terminal_view_id = terminal_view.id();
     app.add_model(|ctx| {
@@ -64,7 +64,7 @@ fn record_ambient_execution_ended_clears_active_session_and_enables_followup() {
 }
 
 fn install_default_agent_mode_model(
-    model: &rookui::ModelHandle<AmbientAgentViewModel>,
+    model: &ptermui::ModelHandle<AmbientAgentViewModel>,
     app: &mut App,
     info: LLMInfo,
 ) {
@@ -400,7 +400,8 @@ fn github_auth_url_for_initial_run_includes_focus_cloud_mode_next() {
                 anyhow::Error::new(ClientError {
                     error: "auth required".to_string(),
                     auth_url: Some(
-                        "https://example.com/oauth/connect/github?scheme=rookdev".to_string(),
+                        "https://example.com/oauth/connect/github?scheme=polaris-terminal-dev"
+                            .to_string(),
                     ),
                 }),
                 ctx,
@@ -417,7 +418,9 @@ fn github_auth_url_for_initial_run_includes_focus_cloud_mode_next() {
                 .map(|(_, value)| value.into_owned());
             assert_eq!(
                 next,
-                Some("rookdev://action/focus_cloud_mode?source=cloud_setup".to_string())
+                Some(
+                    "polaris-terminal-dev://action/focus_cloud_mode?source=cloud_setup".to_string()
+                )
             );
         });
     });

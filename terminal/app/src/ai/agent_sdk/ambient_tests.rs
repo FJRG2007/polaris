@@ -1,12 +1,12 @@
 //! Unit tests for ambient agent CLI argument mapping and message helpers.
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use rook_cli::SortOrderArg;
-use rook_cli::json_filter::JsonOutput;
-use rook_cli::task::{
+use pterm_cli::SortOrderArg;
+use pterm_cli::json_filter::JsonOutput;
+use pterm_cli::task::{
     ArtifactTypeArg, ExecutionLocationArg, ListTasksArgs, RunSortByArg, RunSourceArg, RunStateArg,
 };
-use rook_server_client::HttpStatusError;
+use pterm_server_client::HttpStatusError;
 
 use super::*;
 use crate::server::server_api::ai::{
@@ -188,12 +188,12 @@ fn task_id_from_run_id_ignores_non_task_ids() {
 #[serial_test::serial]
 fn task_id_for_message_send_prefers_sender_run_id() {
     // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::set_var(rook_cli::OZ_RUN_ID_ENV, OTHER_TASK_ID) };
+    unsafe { std::env::set_var(pterm_cli::OZ_RUN_ID_ENV, OTHER_TASK_ID) };
     let task_id = task_id_for_message_send(TASK_ID)
         .expect("valid task id")
         .expect("task id");
     // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::remove_var(rook_cli::OZ_RUN_ID_ENV) };
+    unsafe { std::env::remove_var(pterm_cli::OZ_RUN_ID_ENV) };
 
     assert_eq!(task_id.to_string(), TASK_ID);
 }
@@ -202,12 +202,12 @@ fn task_id_for_message_send_prefers_sender_run_id() {
 #[serial_test::serial]
 fn task_id_for_message_send_falls_back_to_oz_run_id() {
     // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::set_var(rook_cli::OZ_RUN_ID_ENV, TASK_ID) };
+    unsafe { std::env::set_var(pterm_cli::OZ_RUN_ID_ENV, TASK_ID) };
     let task_id = task_id_for_message_send("local-child-run")
         .expect("valid env task id")
         .expect("task id");
     // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::remove_var(rook_cli::OZ_RUN_ID_ENV) };
+    unsafe { std::env::remove_var(pterm_cli::OZ_RUN_ID_ENV) };
 
     assert_eq!(task_id.to_string(), TASK_ID);
 }
@@ -216,10 +216,10 @@ fn task_id_for_message_send_falls_back_to_oz_run_id() {
 #[serial_test::serial]
 fn task_id_from_oz_run_id_env_rejects_invalid_value() {
     // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::set_var(rook_cli::OZ_RUN_ID_ENV, "not-a-task-id") };
+    unsafe { std::env::set_var(pterm_cli::OZ_RUN_ID_ENV, "not-a-task-id") };
     let err = task_id_from_oz_run_id_env().expect_err("invalid task id");
     // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::remove_var(rook_cli::OZ_RUN_ID_ENV) };
+    unsafe { std::env::remove_var(pterm_cli::OZ_RUN_ID_ENV) };
 
     assert!(err.to_string().contains("Invalid OZ_RUN_ID"));
 }
@@ -235,7 +235,7 @@ fn http_error(status: u16, body: &str) -> anyhow::Error {
 fn operation_not_supported_error() -> anyhow::Error {
     http_error(
         422,
-        r#"{"type":"https://docs.rook.dev/errors/operation_not_supported","title":"normalized conversations are only supported for Rook-native transcripts"}"#,
+        r#"{"type":"https://docs.rook.dev/errors/operation_not_supported","title":"normalized conversations are only supported for Polaris Terminal-native transcripts"}"#,
     )
 }
 
@@ -265,7 +265,7 @@ fn normalized_conversation_unsupported_matches_type_regardless_of_title() {
 fn normalized_conversation_unsupported_rejects_title_only_rfc7807() {
     assert!(!is_normalized_conversation_unsupported(&http_error(
         422,
-        r#"{"title":"normalized conversations are only supported for Rook-native transcripts"}"#,
+        r#"{"title":"normalized conversations are only supported for Polaris Terminal-native transcripts"}"#,
     )));
 }
 
@@ -273,7 +273,7 @@ fn normalized_conversation_unsupported_rejects_title_only_rfc7807() {
 fn normalized_conversation_unsupported_rejects_arbitrary_substrings() {
     assert!(!is_normalized_conversation_unsupported(&http_error(
         422,
-        "https://docs.rook.dev/errors/operation_not_supported normalized conversations are only supported for Rook-native transcripts",
+        "https://docs.rook.dev/errors/operation_not_supported normalized conversations are only supported for Polaris Terminal-native transcripts",
     )));
     assert!(!is_normalized_conversation_unsupported(&http_error(
         422,
@@ -288,7 +288,7 @@ fn normalized_conversation_unsupported_rejects_arbitrary_substrings() {
 fn normalized_conversation_unsupported_rejects_wrong_problem_type() {
     assert!(!is_normalized_conversation_unsupported(&http_error(
         422,
-        r#"{"type":"https://docs.rook.dev/errors/invalid_request","title":"normalized conversations are only supported for Rook-native transcripts"}"#,
+        r#"{"type":"https://docs.rook.dev/errors/invalid_request","title":"normalized conversations are only supported for Polaris Terminal-native transcripts"}"#,
     )));
 }
 
@@ -296,7 +296,7 @@ fn normalized_conversation_unsupported_rejects_wrong_problem_type() {
 fn normalized_conversation_unsupported_rejects_non_422_status() {
     assert!(!is_normalized_conversation_unsupported(&http_error(
         404,
-        r#"{"type":"https://docs.rook.dev/errors/operation_not_supported","title":"normalized conversations are only supported for Rook-native transcripts"}"#,
+        r#"{"type":"https://docs.rook.dev/errors/operation_not_supported","title":"normalized conversations are only supported for Polaris Terminal-native transcripts"}"#,
     )));
 }
 

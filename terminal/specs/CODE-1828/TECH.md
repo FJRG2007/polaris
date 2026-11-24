@@ -1,18 +1,18 @@
 # Token / cost transparency in the TUI — TECH
 
-Parent: [CODE-1828](https://linear.app/warpdotdev/issue/CODE-1828/token-cost-transparency). Sub-issues: [CODE-1831](https://linear.app/warpdotdev/issue/CODE-1831/tui-footer-token-usage-entry-with-click-to-toggle-cost) (footer entry) and [CODE-1832](https://linear.app/warpdotdev/issue/CODE-1832/tui-token-usage-next-to-the-loading-indicator-end-of-response-summary) (loading indicator + end-of-response summary row, blocked on PR [#13442](https://github.com/FJRG2007/rook/pull/13442)).
+Parent: [CODE-1828](https://linear.app/warpdotdev/issue/CODE-1828/token-cost-transparency). Sub-issues: [CODE-1831](https://linear.app/warpdotdev/issue/CODE-1831/tui-footer-token-usage-entry-with-click-to-toggle-cost) (footer entry) and [CODE-1832](https://linear.app/warpdotdev/issue/CODE-1832/tui-token-usage-next-to-the-loading-indicator-end-of-response-summary) (loading indicator + end-of-response summary row, blocked on PR [#13442](https://github.com/FJRG2007/polaris/pull/13442)).
 
 ## Context
 
 Per the [Figma mocks](https://www.figma.com/design/yg5nbPZuGoAszHS3Rhvehu/TUI?node-id=323-17499&t=ZINACTiPr1Rk74Dn-0) (frames `323:17499` tokens, `323:17553` hover, `323:17607` cost):
 
 - The footer's right side shows a token entry between the branch and diff stats: `… ↬ main • 4 tok • +31 -12`. Clicking it toggles tokens ⇄ dollar cost (`$0.03`); no third state exists in the mocks.
-- A completed agent response ends with a dim (`bright.black`) summary row: `∷ 1s • 4 tokens`. While streaming, the token count accompanies the `⋮ Rooking (Ns)` indicator added by PR #13442 (unmerged; also adds the TUI animation machinery).
+- A completed agent response ends with a dim (`bright.black`) summary row: `∷ 1s • 4 tokens`. While streaming, the token count accompanies the `⋮ Pterming (Ns)` indicator added by PR #13442 (unmerged; also adds the TUI animation machinery).
 
 State before the proposed changes (historical):
 
-- `crates/rook_tui/src/terminal_session_view.rs:317-364` — `render_footer` shows only the ctrl-c hint (left) and model name + cwd (right). No mouse handling, no tokens/cost.
-- `crates/rook_tui/src/agent_block.rs`, `agent_block_sections.rs` — agent block sections are Input / PlainText / ToolCall / Thinking only; no per-exchange usage or duration row.
+- `crates/pterm_tui/src/terminal_session_view.rs:317-364` — `render_footer` shows only the ctrl-c hint (left) and model name + cwd (right). No mouse handling, no tokens/cost.
+- `crates/pterm_tui/src/agent_block.rs`, `agent_block_sections.rs` — agent block sections are Input / PlainText / ToolCall / Thinking only; no per-exchange usage or duration row.
 - No token-count or dollar formatting helper exists anywhere in the TUI or app crate (`format_credits` in `app/src/ai/blocklist/view_util.rs:145` formats credits, not tokens/dollars).
 
 Data plumbing that already exists app-side (unused by the TUI):
@@ -32,15 +32,15 @@ Data plumbing that already exists app-side (unused by the TUI):
 - Export `ConversationUsageTotals` through `tui_export.rs` — `BlocklistAIHistoryEvent` is already exported.
 - No per-exchange capture is needed: the summary row consumes the existing block-level accessors (`credits_spent_for_last_block()`, `wall_to_wall_response_time_since_last_query()` — the same sources as the GUI footer's "Credits spent (last response)" and `TimingInfo`).
 
-### 2. Shared TUI component (`crates/rook_tui/src/usage.rs`, new)
+### 2. Shared TUI component (`crates/pterm_tui/src/usage.rs`, new)
 
 The reusable piece both sub-issues consume:
 
 - Credits render via the GUI's `format_credits` (`2.5 credits`); `format_cost(cost_in_cents)` → `$0.03` (two decimals).
-- `UsageToggle` — the hover/click wrapper around the footer entry (`TuiHoverable` from `crates/rookui_core/src/elements/tui/`), owned by `TuiTerminalSessionView`. The credits⇄cost display mode itself is the file-backed, TUI-only `agents.usage_display_mode` setting (`TuiUsageDisplayMode` in `AISettings`, `surface: Tui`, never cloud-synced), so the choice persists across TUI sessions and hot-reloads with the settings file. The `MouseStateHandle` must be owned by the view, not created inline during render.
+- `UsageToggle` — the hover/click wrapper around the footer entry (`TuiHoverable` from `crates/ptermui_core/src/elements/tui/`), owned by `TuiTerminalSessionView`. The credits⇄cost display mode itself is the file-backed, TUI-only `agents.usage_display_mode` setting (`TuiUsageDisplayMode` in `AISettings`, `surface: Tui`, never cloud-synced), so the choice persists across TUI sessions and hot-reloads with the settings file. The `MouseStateHandle` must be owned by the view, not created inline during render.
 - **Deliberate mock deviation**: the Figma footer entry reads `4 tok`, but no token semantic survives contact with reality (see section 1), so the entry shows GUI-consistent credits instead — flagged for design review on CODE-1831.
 - Styles come from `TuiUiBuilder` (`dim_text_style`/`muted_text_style`), using contrast-adaptive theme foreground recipes so the footer remains legible on light and custom backgrounds.
-- Hover affordance brightens from `muted_text_style` to `primary_text_style`. A pointing-hand mouse pointer (the mock's hover cursor) is **explicitly out of scope for this PR** and tracked as a fast follow in [CODE-1837](https://linear.app/warpdotdev/issue/CODE-1837/tui-pointing-hand-cursor-on-hover-over-the-footer-usage-entry-osc-22): it needs OSC 22 pointer-shape plumbing in the TUI core (a working, PTY-verified implementation is preserved in this branch's history at commit `348484d57`) plus host-terminal support that Rook's own terminal lacks today (in progress on `ian/rook-terminal-osc22-pointer-shape`).
+- Hover affordance brightens from `muted_text_style` to `primary_text_style`. A pointing-hand mouse pointer (the mock's hover cursor) is **explicitly out of scope for this PR** and tracked as a fast follow in [CODE-1837](https://linear.app/warpdotdev/issue/CODE-1837/tui-pointing-hand-cursor-on-hover-over-the-footer-usage-entry-osc-22): it needs OSC 22 pointer-shape plumbing in the TUI core (a working, PTY-verified implementation is preserved in this branch's history at commit `348484d57`) plus host-terminal support that Polaris Terminal's own terminal lacks today (in progress on `ian/polaris-terminal-terminal-osc22-pointer-shape`).
 
 ### 3. Footer entry (CODE-1831, `terminal_session_view.rs`)
 
@@ -49,16 +49,16 @@ The reusable piece both sub-issues consume:
 
 ### 4. Last-response summary in the indicator slot (CODE-1832, stacked PR)
 
-- Mock re-read (frames `323:17216` streaming, `323:17499` completed): usage is **hidden while streaming** (the `4 tok • +14 -54` element is `opacity: 0` next to the live `⋮ Rooking (1s)` row) and appears only in the completed state as `∷ 1s • …` — the indicator's resting form in the same slot. So the Rooking row ships unchanged, and on completion the slot swaps to a static summary row.
-- `render_response_summary(duration, block_credits, app)` in `rooking_indicator.rs` (the row is the indicator family's resting form): `∷ {N}s • {credits}` in `muted_text_style` (mock `#8e8e8e`), credits via the GUI's `format_credits`, the credits segment omitted until any are reported (> 0).
-- Wired in `TuiTerminalSessionView::render`: in-progress → Rooking row (unchanged); otherwise, when `wall_to_wall_response_time_since_last_query()` is available (requires a finished exchange, so new conversations stay clean), render the summary with `credits_spent_for_last_block()`. Repaints reuse CODE-1831's `ConversationUsageMetadataUpdated` subscription plus the status-change repaint that already removes the Rooking row.
+- Mock re-read (frames `323:17216` streaming, `323:17499` completed): usage is **hidden while streaming** (the `4 tok • +14 -54` element is `opacity: 0` next to the live `⋮ Pterming (1s)` row) and appears only in the completed state as `∷ 1s • …` — the indicator's resting form in the same slot. So the Pterming row ships unchanged, and on completion the slot swaps to a static summary row.
+- `render_response_summary(duration, block_credits, app)` in `pterming_indicator.rs` (the row is the indicator family's resting form): `∷ {N}s • {credits}` in `muted_text_style` (mock `#8e8e8e`), credits via the GUI's `format_credits`, the credits segment omitted until any are reported (> 0).
+- Wired in `TuiTerminalSessionView::render`: in-progress → Pterming row (unchanged); otherwise, when `wall_to_wall_response_time_since_last_query()` is available (requires a finished exchange, so new conversations stay clean), render the summary with `credits_spent_for_last_block()`. Repaints reuse CODE-1831's `ConversationUsageMetadataUpdated` subscription plus the status-change repaint that already removes the Pterming row.
 - The mock's per-exchange transcript rows for *historical* blocks would need per-block stamping app-side; deferred as a follow-up if product wants history parity (data exists only for the last block today).
 
 ## Testing and validation
 
-- Unit tests in sibling `_tests.rs` files per repo convention: `usage_tests.rs` (cost formatting edge cases, credits text parity with the GUI's `format_credits`, credits⇄cost toggle, shared clone state) and `rooking_indicator_tests.rs` (summary row renders `∷ 5s • 2.5 credits` with no repaint scheduling; credits segment omitted for `None`/zero).
+- Unit tests in sibling `_tests.rs` files per repo convention: `usage_tests.rs` (cost formatting edge cases, credits text parity with the GUI's `format_credits`, credits⇄cost toggle, shared clone state) and `pterming_indicator_tests.rs` (summary row renders `∷ 5s • 2.5 credits` with no repaint scheduling; credits segment omitted for `None`/zero).
 - App-side tests in `conversation_tests.rs`: `usage_totals` reads the cumulative server credits snapshot (replace, not sum) and accumulates provider cost across requests.
-- Commands: `cargo nextest run -p rook_tui`, `cargo nextest run -p rook` (touched test files), `cargo clippy -p rook_tui --all-targets -- -D warnings`, `./script/format` — all must pass before each PR (presubmit requirement).
+- Commands: `cargo nextest run -p pterm_tui`, `cargo nextest run -p polaris-terminal` (touched test files), `cargo clippy -p pterm_tui --all-targets -- -D warnings`, `./script/format` — all must pass before each PR (presubmit requirement).
 - Manual: `./script/run-tui`; send a prompt; verify the footer credits entry appears and updates, click toggles `2.5 credits` ⇄ `$0.03` and back, summary row appears after completion; compare against Figma frames `323:17499`/`323:17607` (noting the deliberate tok→credits deviation).
 
 ## Parallelization

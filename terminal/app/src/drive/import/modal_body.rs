@@ -2,16 +2,16 @@ use std::path::PathBuf;
 
 use futures_util::stream::AbortHandle;
 use pathfinder_geometry::vector::vec2f;
-use rook_errors::report_error;
-use rookui::elements::{
+use pterm_errors::report_error;
+use ptermui::elements::{
     Align, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, ParentElement, Radius,
 };
-use rookui::platform::Cursor;
-use rookui::platform::file_picker::FilePickerError;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::platform::Cursor;
+use ptermui::platform::file_picker::FilePickerError;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
@@ -36,7 +36,7 @@ pub(super) const INDENT_MARGIN: f32 = 22.;
 pub(super) const BASE_INDENT: f32 = 30.;
 
 const FILE_TYPE_DOCS_URL: &str =
-    "https://docs.rook.dev/knowledge-and-collaboration/rook-drive#import-and-export";
+    "https://docs.rook.dev/knowledge-and-collaboration/polaris-terminal-drive#import-and-export";
 const SUPPORTED_FILE_TYPE_TEXT: &str = "md, yaml, yml";
 
 #[cfg(test)]
@@ -84,7 +84,7 @@ pub enum ImportModalBodyEvent {
 pub struct ImportModalBody {
     state: ImportState,
     in_progress_handle: Option<AbortHandle>,
-    // Queue to handle requests to upload objects to rook drive.
+    // Queue to handle requests to upload objects to polaris-terminal drive.
     // All updates should go through the queue rather than calling
     // UpdateManager directly.
     import_queue: ModelHandle<ImportQueue>,
@@ -388,7 +388,7 @@ impl ImportModalBody {
                 TextAndIcon::new(
                     TextAndIconAlignment::TextFirst,
                     "Choose files...".to_string(),
-                    Icon::Import.to_rookui_icon(
+                    Icon::Import.to_ptermui_icon(
                         appearance
                             .theme()
                             .main_text_color(appearance.theme().accent_button_color()),

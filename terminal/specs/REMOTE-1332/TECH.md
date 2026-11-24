@@ -2,9 +2,9 @@
 Product spec: `specs/REMOTE-1332/PRODUCT.md`
 
 ## Problem
-Cloud agent runs using third-party harnesses (e.g. Claude Code) produce workspace changes and terminal output, but neither is available to the Rook client after the run completes. The client needs two capabilities:
+Cloud agent runs using third-party harnesses (e.g. Claude Code) produce workspace changes and terminal output, but neither is available to the Polaris Terminal client after the run completes. The client needs two capabilities:
 
-1. **Workspace snapshot upload**: a driver-managed end-of-run step that captures git diffs and arbitrary files from the agent environment and uploads them to GCS via presigned URLs, keyed by run and execution. Immediately before reading the declarations file, the driver invokes a bash generator script (`snapshot-declarations.sh`, shipped in `rook-agent-docker`) that enumerates all git repositories under the agent's workspace and emits JSONL `repo` entries into the declarations file.
+1. **Workspace snapshot upload**: a driver-managed end-of-run step that captures git diffs and arbitrary files from the agent environment and uploads them to GCS via presigned URLs, keyed by run and execution. Immediately before reading the declarations file, the driver invokes a bash generator script (`snapshot-declarations.sh`, shipped in `polaris-terminal-agent-docker`) that enumerates all git repositories under the agent's workspace and emits JSONL `repo` entries into the declarations file.
 2. **Block snapshot hydration**: client-side logic to download the serialized terminal TUI state of a harness conversation and display it inline when the user opens the conversation.
 
 Both features span the agent SDK driver, the server's public API, GCS storage, and the client's conversation loader and terminal view restoration paths.
@@ -18,10 +18,10 @@ Both features span the agent SDK driver, the server's public API, GCS storage, a
 - `app/src/server/server_api/harness_support.rs` — `SnapshotUploadRequest`, `SnapshotUploadResponse` (a `Vec<UploadTarget>` aligned by index with the request's `files`), `get_snapshot_upload_targets()`, `upload_to_target()` helper.
 
 ### Declarations-file generation and local-dev plumbing
-- `../rook-agent-docker/snapshot-declarations.sh` (new) — bash generator invoked at the start of the snapshot step. Walks `$PWD` (the Rust driver sets this via `Command::current_dir` to the agent's `working_dir`) or colon-separated `OZ_SNAPSHOT_SCAN_ROOTS`, finds `.git` directories with `find -type d -name .git -prune`, and appends JSONL `{\"version\":1,\"kind\":\"repo\",\"path\":\"<abs-path>\"}` lines to `$OZ_SNAPSHOT_DECLARATIONS_FILE`. The file path env var is required so standalone invocations cannot clobber a shared fallback. The file is never truncated; dedup is seeded from matching JSONL repo lines already emitted by the script so repeated invocations within a run stay additive.
-- `../rook-agent-docker/entrypoint.sh:13` — exports `AGENT_INSTALL_ROOT=...` for existing installation-root consumers and `OZ_SNAPSHOT_DECLARATIONS_SCRIPT=$AGENT_INSTALL_ROOT/snapshot-declarations.sh` so child processes (including the rook agent binary) can invoke the helper by explicit path.
-- `../rook-agent-docker/Dockerfile` and `../rook-agent-docker/Dockerfile.local` — new `COPY snapshot-declarations.sh /snapshot-declarations.sh` directive next to the existing `COPY entrypoint.sh`.
-- `../rook-server/script/oz-local` — new `--docker-dir <dir>` flag that validates `<dir>/snapshot-declarations.sh` exists, resolves `<dir>` to an absolute path, and appends `OZ_SNAPSHOT_DECLARATIONS_SCRIPT=<abs>/snapshot-declarations.sh` to `WORKER_ENV_FLAGS`, which plumbs through `oz-agent-worker`'s `-e` handling into `DirectBackendConfig.Env` and onto the oz process env.
+- `../polaris-terminal-agent-docker/snapshot-declarations.sh` (new) — bash generator invoked at the start of the snapshot step. Walks `$PWD` (the Rust driver sets this via `Command::current_dir` to the agent's `working_dir`) or colon-separated `OZ_SNAPSHOT_SCAN_ROOTS`, finds `.git` directories with `find -type d -name .git -prune`, and appends JSONL `{\"version\":1,\"kind\":\"repo\",\"path\":\"<abs-path>\"}` lines to `$OZ_SNAPSHOT_DECLARATIONS_FILE`. The file path env var is required so standalone invocations cannot clobber a shared fallback. The file is never truncated; dedup is seeded from matching JSONL repo lines already emitted by the script so repeated invocations within a run stay additive.
+- `../polaris-terminal-agent-docker/entrypoint.sh:13` — exports `AGENT_INSTALL_ROOT=...` for existing installation-root consumers and `OZ_SNAPSHOT_DECLARATIONS_SCRIPT=$AGENT_INSTALL_ROOT/snapshot-declarations.sh` so child processes (including the polaris-terminal agent binary) can invoke the helper by explicit path.
+- `../polaris-terminal-agent-docker/Dockerfile` and `../polaris-terminal-agent-docker/Dockerfile.local` — new `COPY snapshot-declarations.sh /snapshot-declarations.sh` directive next to the existing `COPY entrypoint.sh`.
+- `../polaris-terminal-server/script/oz-local` — new `--docker-dir <dir>` flag that validates `<dir>/snapshot-declarations.sh` exists, resolves `<dir>` to an absolute path, and appends `OZ_SNAPSHOT_DECLARATIONS_SCRIPT=<abs>/snapshot-declarations.sh` to `WORKER_ENV_FLAGS`, which plumbs through `oz-agent-worker`'s `-e` handling into `DirectBackendConfig.Env` and onto the oz process env.
 
 ### Client — handoff snapshot attachment download
 - `app/src/ai/agent_sdk/driver/attachments.rs` — `fetch_and_download_handoff_snapshot_attachments()` returns `Option<String>` (the attachments dir iff at least one file landed on disk); per-file outcomes are aggregated into a single INFO/WARN log line. Downloads share the `download_attachment` primitive with `fetch_and_download_attachments`, so both go through the `with_bounded_retry` helper.
@@ -57,7 +57,7 @@ Both features span the agent SDK driver, the server's public API, GCS storage, a
 - `AgentDriver::cleanup()` only tears down cloud providers — there is no workspace snapshot step at end of run.
 - The `harness-support` CLI has `ping` and `report-artifact` subcommands; no workspace snapshot capability exists anywhere in the client.
 - There is no mechanism for generating the declarations file; `entrypoint.sh` computes `AGENT_INSTALL_ROOT` as a shell-local variable and doesn't export a concrete helper path, so downstream processes can't discover Docker-image-bundled helpers.
-- `oz-local` plumbs through `-e KEY=VALUE` flags into `DirectBackendConfig.Env`, but has no dedicated flag for pointing a local-dev run at the `rook-agent-docker` checkout.
+- `oz-local` plumbs through `-e KEY=VALUE` flags into `DirectBackendConfig.Env`, but has no dedicated flag for pointing a local-dev run at the `polaris-terminal-agent-docker` checkout.
 - Block snapshots are not uploaded during harness runs.
 - The `SerializedBlock` type exists for local persistence but has no JSON round-trip support for cloud storage.
 - The conversation loader only handles `AIAgentHarness::Oz` conversations; `ClaudeCode` conversations are logged as warnings and skipped.
@@ -79,7 +79,7 @@ Both features span the agent SDK driver, the server's public API, GCS storage, a
 
 **Pipeline** (`app/src/ai/agent_sdk/driver/snapshot.rs`):
 1. **Gating.** Return early if `FeatureFlag::OzHandoff` is disabled, if `AgentDriver::task_id` is `None`, or if the run was started with `--no-snapshot`. Snapshots only make sense for cloud task runs and must be operator-disableable. `OzHandoff` is the scoped flag for snapshot/handoff behavior; it is decoupled from `FeatureFlag::AgentHarness` (which gates third-party harness CLIs independently).
-2. **Generate declarations file.** `run_declarations_script(working_dir, task_id, script_timeout)` resolves `$OZ_SNAPSHOT_DECLARATIONS_SCRIPT`, spawns it via `tokio::task::spawn_blocking(|| Command::new(..).current_dir(working_dir).env(OZ_SNAPSHOT_DECLARATIONS_FILE, resolved_path).output())`, and awaits the result with a timeout via `rookui::r#async::FutureExt::with_timeout`. The timeout defaults to 1 minute and is configurable via `--snapshot-script-timeout <DURATION>`. Setting `current_dir` anchors the bash script's `$PWD` to the agent's workspace even though the driver process's own CWD may have drifted (the macOS startup path in `app/src/terminal/platform.rs:32` `cd`s to `$HOME`). Setting the file path as an env var keeps the script's output and `resolve_declarations_path(task_id)` in sync on one per-run file. Missing script path env var, missing script file, non-zero exit, and timeout are each logged at `log::error!` and return without aborting the upload — if the declarations file already exists from a prior successful invocation the pipeline still reads it; otherwise the upload is a no-op. The helper lives in its own function (independent of `upload_snapshot_from_declarations`) so future code paths can invoke it at other points in the run lifecycle.
+2. **Generate declarations file.** `run_declarations_script(working_dir, task_id, script_timeout)` resolves `$OZ_SNAPSHOT_DECLARATIONS_SCRIPT`, spawns it via `tokio::task::spawn_blocking(|| Command::new(..).current_dir(working_dir).env(OZ_SNAPSHOT_DECLARATIONS_FILE, resolved_path).output())`, and awaits the result with a timeout via `ptermui::r#async::FutureExt::with_timeout`. The timeout defaults to 1 minute and is configurable via `--snapshot-script-timeout <DURATION>`. Setting `current_dir` anchors the bash script's `$PWD` to the agent's workspace even though the driver process's own CWD may have drifted (the macOS startup path in `app/src/terminal/platform.rs:32` `cd`s to `$HOME`). Setting the file path as an env var keeps the script's output and `resolve_declarations_path(task_id)` in sync on one per-run file. Missing script path env var, missing script file, non-zero exit, and timeout are each logged at `log::error!` and return without aborting the upload — if the declarations file already exists from a prior successful invocation the pipeline still reads it; otherwise the upload is a no-op. The helper lives in its own function (independent of `upload_snapshot_from_declarations`) so future code paths can invoke it at other points in the run lifecycle.
 3. **Read declarations file.** `resolve_declarations_path(task_id)` delegates to the pure `resolve_declarations_path_with_override(task_id, override_path)` helper so tests can exercise the logic without racing on the process-wide env var. Precedence: `$OZ_SNAPSHOT_DECLARATIONS_FILE` (operator/test override) wins; otherwise `/tmp/oz/<task-id>/snapshot-declarations.jsonl` when `task_id` is `Some`; otherwise `/tmp/oz/snapshot-declarations.jsonl`. If the file is missing, unreadable, or empty, log at WARN and return. Never fail the run tail.
 4. **Parse declarations.** One JSON object per non-empty line: `{\"version\":1,\"kind\":\"repo\",\"path\":\"/abs/path\"}` or `{\"version\":1,\"kind\":\"file\",\"path\":\"/abs/path\"}`. Malformed lines (invalid JSON, missing fields, missing or unsupported version, unknown kind, non-absolute path) are logged at WARN and skipped without aborting the upload. Duplicate `(kind, path)` pairs are ignored.
 5. **Reserve filenames.** `unique_filename("snapshot_state.json", ...)` reserves the manifest filename up front; patches use `{idx}_{sanitized_repo_name}.patch`; files use their basename. Collisions get numeric suffixes.
@@ -102,7 +102,7 @@ Both features span the agent SDK driver, the server's public API, GCS storage, a
 - `async fn with_bounded_retry<T, F, Fut>(f: F) -> Result<T>` — generic exponential-backoff retry used by both the snapshot upload pipeline and the handoff download pipeline. The closure is called repeatedly with a fresh `Future` per attempt, so callers that need per-attempt state (e.g. cloning a request body) own that.
 - `fn is_transient_http_error(&anyhow::Error) -> bool` — inspects the formatted error chain for an HTTP status code. 5xx, 408, 429, and errors without a recognizable status (network/timeout/connection) are transient; other 4xx are permanent.
 - Constants: `MAX_ATTEMPTS = 3`, `INITIAL_BACKOFF = 500ms`, `BACKOFF_FACTOR = 2.0`, `BACKOFF_JITTER = 0.3`. No unbounded loop anywhere.
-- Uses `rookui::r#async::Timer::after` + `rookui::duration_with_jitter` for portable async sleep.
+- Uses `ptermui::r#async::Timer::after` + `ptermui::duration_with_jitter` for portable async sleep.
 - Snapshot upload calls this wrapping `upload_to_target`. Handoff download calls it wrapping the `GET` + bytes + write sequence.
 
 **Soft local-gather**:
@@ -139,7 +139,7 @@ Both features span the agent SDK driver, the server's public API, GCS storage, a
 - The manifest upload runs sequentially after the batch completes, so the manifest can reflect the real outcomes.
 - The work runs on the driver's background executor via `ctx.spawn` in `AgentDriver::run()`; no extra threading concerns.
 
-### 2. Declarations-file generation (`rook-agent-docker` and `oz-local`)
+### 2. Declarations-file generation (`polaris-terminal-agent-docker` and `oz-local`)
 
 **`snapshot-declarations.sh`** (new, alongside `entrypoint.sh`):
 ```bash
@@ -169,12 +169,12 @@ for root in "${SCAN_ROOTS[@]}"; do
     done < <(find "$root" -type d -name .git -prune -print 2>/dev/null)
 done
 ```
-- Scan root defaults to `$PWD`, which the Rust driver sets to the agent's `working_dir` (the initial workspace root) via `Command::current_dir`. The driver's own process CWD can drift during startup (e.g. `app/src/terminal/platform.rs:32` `cd`s to `$HOME` on macOS), so relying on `current_dir` rather than the inherited CWD is what keeps the scan anchored to the workspace across all run modes (`/workspace` in containers, `/tmp/oz-workspaces/<task-id>` in direct-backend local dev, `--cwd`-specified dirs for local `rook agent run`).
+- Scan root defaults to `$PWD`, which the Rust driver sets to the agent's `working_dir` (the initial workspace root) via `Command::current_dir`. The driver's own process CWD can drift during startup (e.g. `app/src/terminal/platform.rs:32` `cd`s to `$HOME` on macOS), so relying on `current_dir` rather than the inherited CWD is what keeps the scan anchored to the workspace across all run modes (`/workspace` in containers, `/tmp/oz-workspaces/<task-id>` in direct-backend local dev, `--cwd`-specified dirs for local `polaris-terminal agent run`).
 - `OZ_SNAPSHOT_SCAN_ROOTS` is a colon-separated override for unusual operator setups.
 - The script appends to the declarations file, seeding its dedup set from JSONL repo declarations already emitted by this script so a re-invocation within the same run doesn't re-emit repos it already discovered. This keeps the pipeline additive as future callers trigger mid-run snapshot refreshes. Scripted `repo` entries do not overlap with operator-authored `file` entries, so hand-editing flows stay composable.
 - The Rust driver passes `OZ_SNAPSHOT_DECLARATIONS_FILE=/tmp/oz/<task-id>/snapshot-declarations.jsonl` to the script via `Command::env` so concurrent runs don't clobber each other. The script fails if the env var is absent.
 
-**`entrypoint.sh:13`** — `AGENT_INSTALL_ROOT` assignment remains exported for existing install-root consumers, and `OZ_SNAPSHOT_DECLARATIONS_SCRIPT=$AGENT_INSTALL_ROOT/snapshot-declarations.sh` is exported so the child rook process sees the concrete script path. In containerized runs this resolves to `/snapshot-declarations.sh`.
+**`entrypoint.sh:13`** — `AGENT_INSTALL_ROOT` assignment remains exported for existing install-root consumers, and `OZ_SNAPSHOT_DECLARATIONS_SCRIPT=$AGENT_INSTALL_ROOT/snapshot-declarations.sh` is exported so the child polaris-terminal process sees the concrete script path. In containerized runs this resolves to `/snapshot-declarations.sh`.
 
 **`Dockerfile` and `Dockerfile.local`** — both gain:
 ```
@@ -182,7 +182,7 @@ COPY snapshot-declarations.sh /snapshot-declarations.sh
 ```
 placed next to the existing `COPY entrypoint.sh /entrypoint.sh`.
 
-**`oz-local --docker-dir <dir>`** — new optional flag in `rook-server/script/oz-local`:
+**`oz-local --docker-dir <dir>`** — new optional flag in `polaris-terminal-server/script/oz-local`:
 - Validates `<dir>/snapshot-declarations.sh` exists, fails loudly if not.
 - Resolves `<dir>` to an absolute path via `cd ... && pwd`.
 - Appends `OZ_SNAPSHOT_DECLARATIONS_SCRIPT=<abs>/snapshot-declarations.sh` to the existing `WORKER_ENV_FLAGS` array.
@@ -267,7 +267,7 @@ sequenceDiagram
     participant Driver as AgentDriver::run
     participant Script as snapshot-declarations.sh
     participant FS as Local FS
-    participant Server as Rook Server
+    participant Server as Polaris Terminal Server
     participant GCS as GCS
 
     Note over Driver: Gate on OzHandoff flag + task_id + --no-snapshot
@@ -299,7 +299,7 @@ sequenceDiagram
 sequenceDiagram
     participant Driver as Agent Driver
     participant Runner as Harness Runner
-    participant Server as Rook Server
+    participant Server as Polaris Terminal Server
     participant GCS as GCS
 
     Runner->>Driver: save_conversation(SavePoint)
@@ -313,8 +313,8 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant User as User
-    participant Client as Rook Client
-    participant Server as Rook Server
+    participant Client as Polaris Terminal Client
+    participant Server as Polaris Terminal Server
     participant GCS as GCS
 
     User->>Client: Open CLI agent conversation
@@ -411,6 +411,6 @@ Mitigation:
 - Support for additional harness types beyond Claude Code.
 - Snapshot cleanup: GCS lifecycle policy or explicit cleanup for old snapshot files.
 - Manifest-aware download consistency check: after downloading, parse `snapshot_state.json` and cross-reference with what landed on disk so the rehydration prompt can omit references to missing patches (or flag them to the LLM explicitly).
-- Server-side prompt engineering: make sure the `finish_task` tool doc in `../rook-server/logic/ai/multi_agent/utils/output/tool_call/shared/autonomy/report_output.go:14-47` does not tell the LLM to invoke any upload CLI. Snapshot upload is driver-managed and runs after the LLM is done.
+- Server-side prompt engineering: make sure the `finish_task` tool doc in `../polaris-terminal-server/logic/ai/multi_agent/utils/output/tool_call/shared/autonomy/report_output.go:14-47` does not tell the LLM to invoke any upload CLI. Snapshot upload is driver-managed and runs after the LLM is done.
 - Server-side commit endpoint: consider a future `POST /harness-support/snapshot/finalize` that the driver calls after uploads. It would diff the declared filenames against the GCS prefix listing and record a per-execution `complete|partial|failed` status. Today there is no such gate; a real gate would make server-side enforcement honest. Out of scope for this PR but highlighted for the server-PR owner.
 - Extend the declarations format: future declaration versions can add entry kinds (e.g. `diff` for a pre-computed diff file) or per-repo options as extra JSON fields without changing the current v1 parser contract.

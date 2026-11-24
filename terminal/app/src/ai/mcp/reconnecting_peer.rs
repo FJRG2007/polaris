@@ -3,7 +3,7 @@
 use std::future::Future;
 
 use mcp::tool_call::call_tool_with_deadline;
-use rookui::ModelSpawner;
+use ptermui::ModelSpawner;
 use uuid::Uuid;
 
 use super::TemplatableMCPServerManager;

@@ -16,11 +16,11 @@ pub use convert_from::{
 use futures_lite::Stream;
 pub use r#impl::generate_multi_agent_output;
 use mcp::TemplatableMCPServerInfo;
-use rook_core::channel::{Channel, ChannelState};
-use rook_core::execution_mode::AppExecutionMode;
-use rook_core::features::FeatureFlag;
-use rook_core::user_preferences::GetUserPreferences;
-use rookui::{AppContext, EntityId, SingletonEntity as _};
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_core::features::FeatureFlag;
+use pterm_core::user_preferences::GetUserPreferences;
+use ptermui::{AppContext, EntityId, SingletonEntity as _};
 use serde::Serialize;
 
 use super::{AIAgentInput, MCPContext, MCPServer, RequestMetadata, ServerOutputId, Suggestions};
@@ -134,7 +134,7 @@ pub struct RequestParams {
     pub cli_agent_model: LLMId,
     pub computer_use_model: LLMId,
     pub is_memory_enabled: bool,
-    pub rook_drive_context_enabled: bool,
+    pub pterm_drive_context_enabled: bool,
     pub context_window_limit: Option<u32>,
     pub mcp_context: Option<MCPContext>,
     pub planning_enabled: bool,
@@ -207,7 +207,7 @@ impl RequestParams {
             cli_agent_model: LLMId::from("test-model"),
             computer_use_model: LLMId::from("test-model"),
             is_memory_enabled: false,
-            rook_drive_context_enabled: false,
+            pterm_drive_context_enabled: false,
             context_window_limit: None,
             mcp_context: None,
             planning_enabled: false,
@@ -241,7 +241,7 @@ impl RequestParams {
     ) -> Self {
         let ai_settings = AISettings::as_ref(app);
         let is_memory_enabled = ai_settings.is_memory_enabled(app);
-        let rook_drive_context_enabled = ai_settings.is_rook_drive_context_enabled(app);
+        let pterm_drive_context_enabled = ai_settings.is_pterm_drive_context_enabled(app);
 
         // Build MCP context - either grouped by server or flat lists based on feature flag
         let mcp_context = if FeatureFlag::MCPGroupedServerContext.is_enabled() {
@@ -271,7 +271,7 @@ impl RequestParams {
                     .values(),
             );
 
-            // Include built-in Rook-hosted servers (e.g. the Factory MCP).
+            // Include built-in Polaris Terminal-hosted servers (e.g. the Factory MCP).
             active_servers.extend(templatable_manager.get_active_builtin_servers().values());
 
             let servers: Vec<MCPServer> = active_servers
@@ -341,7 +341,7 @@ impl RequestParams {
                 &request_input.coding_model_id,
             )
         });
-        let allow_use_of_warp_credits = *AISettings::as_ref(app).can_use_rook_credits_for_fallback;
+        let allow_use_of_warp_credits = *AISettings::as_ref(app).can_use_pterm_credits_for_fallback;
 
         let app_execution_mode = AppExecutionMode::as_ref(app);
         let autonomy_level = if app_execution_mode.is_autonomous() {
@@ -411,7 +411,7 @@ impl RequestParams {
             cli_agent_model: request_input.cli_agent_model_id.clone(),
             computer_use_model: request_input.computer_use_model_id.clone(),
             is_memory_enabled,
-            rook_drive_context_enabled,
+            pterm_drive_context_enabled,
             mcp_context,
             planning_enabled: true,
             should_redact_secrets,

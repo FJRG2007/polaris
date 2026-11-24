@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use rook_core::sync_queue::SyncQueueTaskTrait;
+use pterm_core::sync_queue::SyncQueueTaskTrait;
 
 use super::diff_state::{DiffMode, DiffStateError, FileDiffAndContent, LocalDiffStateModel};
 

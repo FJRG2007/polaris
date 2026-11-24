@@ -4,13 +4,13 @@ Linear: [REMOTE-1218](https://linear.app/warpdotdev/issue/REMOTE-1218)
 
 ## 1. Problem
 
-When a non-Oz harness (e.g. Claude Code) runs via the agent driver, `setup_harness` installs the **Rook notification plugin** (`rook@claude-code-rook` from `warpdotdev/claude-code-warp`). Harness runs also need a separate **Oz platform plugin** (`rook-cloud@claude-code-rook` from `warpdotdev/claude-code-warp-internal`) that connects the third-party CLI to the Oz platform — exposing tools, skills, and hooks (e.g. artifact reporting). This is distinct from the notification plugin: the platform plugin is about Oz integration, not just notifications.
+When a non-Oz harness (e.g. Claude Code) runs via the agent driver, `setup_harness` installs the **Polaris Terminal notification plugin** (`polaris-terminal@claude-code-polaris-terminal` from `warpdotdev/claude-code-warp`). Harness runs also need a separate **Oz platform plugin** (`polaris-terminal-cloud@claude-code-polaris-terminal` from `warpdotdev/claude-code-warp-internal`) that connects the third-party CLI to the Oz platform — exposing tools, skills, and hooks (e.g. artifact reporting). This is distinct from the notification plugin: the platform plugin is about Oz integration, not just notifications.
 
 Today, only (a) is installed. We need to also install (b) for all harness runs driven by the agent driver, while keeping (b) out of normal local interactive agent sessions.
 
 ## 2. Relevant Code
 
-- `app/src/ai/agent_sdk/driver.rs:1242-1264` — `setup_harness`: subscribes to CLI session events, installs the rook plugin
+- `app/src/ai/agent_sdk/driver.rs:1242-1264` — `setup_harness`: subscribes to CLI session events, installs the polaris-terminal plugin
 - `app/src/terminal/cli_agent_sessions/plugin_manager/mod.rs` — `CliAgentPluginManager` trait, `plugin_manager_for()` factory
 - `app/src/terminal/cli_agent_sessions/plugin_manager/claude.rs` — `ClaudeCodePluginManager`: install/update via `claude plugin marketplace add` + `claude plugin install`
 - `app/src/ai/agent_sdk/driver/harness/mod.rs:29` — `ThirdPartyHarness` trait
@@ -18,9 +18,9 @@ Today, only (a) is installed. We need to also install (b) for all harness runs d
 
 ### External
 
-- `warpdotdev/claude-code-warp-internal` — private repo containing both the existing `rook` plugin and the `rook-cloud` platform plugin
-- `.claude-plugin/marketplace.json` — declares `rook-cloud` as a marketplace entry: key `rook-cloud@claude-code-rook`, source `./plugins/rook-cloud`
-- `plugins/rook-cloud/skills/oz-report-artifact/` — platform-only skill for reporting PRs back to Oz
+- `warpdotdev/claude-code-warp-internal` — private repo containing both the existing `polaris-terminal` plugin and the `polaris-terminal-cloud` platform plugin
+- `.claude-plugin/marketplace.json` — declares `polaris-terminal-cloud` as a marketplace entry: key `polaris-terminal-cloud@claude-code-polaris-terminal`, source `./plugins/polaris-terminal-cloud`
+- `plugins/polaris-terminal-cloud/skills/oz-report-artifact/` — platform-only skill for reporting PRs back to Oz
 
 ## 3. Current State
 
@@ -31,12 +31,12 @@ Today, only (a) is installed. We need to also install (b) for all harness runs d
 For Claude, `ClaudeCodePluginManager::install()` runs:
 ```
 claude plugin marketplace add warpdotdev/claude-code-warp
-claude plugin install rook@claude-code-rook
+claude plugin install polaris-terminal@claude-code-polaris-terminal
 ```
 
-This installs the **public** `rook` plugin (notifications). There is no concept of a second platform plugin. The `CliAgentPluginManager` trait models a single plugin per CLI agent.
+This installs the **public** `polaris-terminal` plugin (notifications). There is no concept of a second platform plugin. The `CliAgentPluginManager` trait models a single plugin per CLI agent.
 
-The `claude-code-rook-internal` repo already defines the `rook-cloud` marketplace entry and contains the platform plugin, but nothing in rook-internal installs it.
+The `claude-code-polaris-terminal-internal` repo already defines the `polaris-terminal-cloud` marketplace entry and contains the platform plugin, but nothing in polaris-terminal-internal installs it.
 
 ## 4. Proposed Changes
 
@@ -61,16 +61,16 @@ We call this `install_platform_plugin` (not `install_cloud_plugin`) because this
 New constants in `claude.rs`:
 
 ```rust
-const PLATFORM_PLUGIN_KEY: &str = "rook-cloud@claude-code-rook";
+const PLATFORM_PLUGIN_KEY: &str = "polaris-terminal-cloud@claude-code-polaris-terminal";
 const PLATFORM_MARKETPLACE_REPO: &str = "warpdotdev/claude-code-warp-internal";
-const PLATFORM_MARKETPLACE_NAME: &str = "claude-code-rook-internal";
+const PLATFORM_MARKETPLACE_NAME: &str = "claude-code-polaris-terminal-internal";
 ```
 
 Implementation: same pattern as `install()`, just targeting the internal repo/key:
 
 ```
 claude plugin marketplace add warpdotdev/claude-code-warp-internal
-claude plugin install rook-cloud@claude-code-rook
+claude plugin install polaris-terminal-cloud@claude-code-polaris-terminal
 ```
 
 Note: this repo is **private**. The sandbox environment already has GitHub credentials configured (via `$GITHUB_ACCESS_TOKEN` in `entrypoint.sh`), and the `claude plugin marketplace add` command clones the repo via git, so it should work in cloud environments. For local `agent run --harness claude` runs, the user must have GitHub access to the `warpdotdev` org.
@@ -131,27 +131,27 @@ sequenceDiagram
     Setup->>PM: plugin_manager_for(Claude)
     PM-->>Setup: Some(ClaudeCodePluginManager)
 
-    Note over Setup: Install rook plugin (existing)
+    Note over Setup: Install polaris-terminal plugin (existing)
     Setup->>PM: manager.install()
     PM->>CLI: claude plugin marketplace add warpdotdev/claude-code-warp
-    PM->>CLI: claude plugin install rook@claude-code-rook
+    PM->>CLI: claude plugin install polaris-terminal@claude-code-polaris-terminal
 
     Note over Setup: Install platform plugin (new)
     Setup->>PM: manager.install_platform_plugin()
     PM->>CLI: claude plugin marketplace add warpdotdev/claude-code-warp-internal
-    PM->>CLI: claude plugin install rook-cloud@claude-code-rook
+    PM->>CLI: claude plugin install polaris-terminal-cloud@claude-code-polaris-terminal
 
     Setup-->>Driver: Ok(())
     Driver->>Driver: prepare_harness / run_harness
     Driver->>CC: claude --session-id ... < prompt
-    Note over CC: Both plugins active:<br/>rook (notifications) + rook-cloud (Oz platform)
+    Note over CC: Both plugins active:<br/>polaris-terminal (notifications) + polaris-terminal-cloud (Oz platform)
 ```
 
 ## 6. Risks and Mitigations
 
 **Private repo access.** `warpdotdev/claude-code-warp-internal` is private. Cloud environments have GitHub creds via `$GITHUB_ACCESS_TOKEN`. Local `agent run --harness claude` users need org access. **Mitigation:** `install_platform_plugin` is best-effort; failure is logged, not fatal.
 
-**Plugin name collision.** The `rook` and `rook-cloud` plugins are in different marketplace repos. Claude Code's plugin system keys plugins by `<plugin_name>@<marketplace_name>`, so `rook@claude-code-rook` and `rook-cloud@claude-code-rook` are distinct. No collision risk.
+**Plugin name collision.** The `polaris-terminal` and `polaris-terminal-cloud` plugins are in different marketplace repos. Claude Code's plugin system keys plugins by `<plugin_name>@<marketplace_name>`, so `polaris-terminal@claude-code-polaris-terminal` and `polaris-terminal-cloud@claude-code-polaris-terminal` are distinct. No collision risk.
 
 **Install ordering.** We install the notification plugin first, then the platform plugin. If the platform install fails mid-way, the notification plugin is still active. This is the preferred degradation.
 

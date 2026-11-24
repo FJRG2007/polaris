@@ -1,6 +1,6 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{Container, CrossAxisAlignment, Element, Flex, ParentElement, Text};
-use rookui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{Container, CrossAxisAlignment, Element, Flex, ParentElement, Text};
+use ptermui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use super::search_results_common::{
     CollapsibleSearchResultsState, render_collapsible_search_results,

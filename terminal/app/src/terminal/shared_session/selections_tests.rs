@@ -1,6 +1,6 @@
-use rook_core::semantic_selection::SemanticSelection;
-use rookui::App;
-use rookui::text::SelectionType;
+use pterm_core::semantic_selection::SemanticSelection;
+use ptermui::App;
+use ptermui::text::SelectionType;
 
 use crate::terminal::block_filter::BlockFilterQuery;
 use crate::terminal::event_listener::ChannelEventListener;

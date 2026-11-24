@@ -34,31 +34,31 @@ use num_traits::SaturatingSub;
 use parking_lot::Mutex;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-use rook_completer::completer::Description;
-use rook_core::semantic_selection::SemanticSelection;
-use rook_core::{safe_error, send_telemetry_from_ctx};
-use rook_editor::editor::NavigationKey;
-use rook_util::path::ShellFamily;
-use rook_util::user_input::UserInput;
-use rookui::accessibility::{AccessibilityContent, ActionAccessibilityContent, RookA11yRole};
-use rookui::actions::StandardAction;
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_completer::completer::Description;
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_core::{safe_error, send_telemetry_from_ctx};
+use pterm_editor::editor::NavigationKey;
+use pterm_util::path::ShellFamily;
+use pterm_util::user_input::UserInput;
+use ptermui::accessibility::{AccessibilityContent, ActionAccessibilityContent, PtermA11yRole};
+use ptermui::actions::StandardAction;
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     ChildView, Container, CornerRadius, CrossAxisAlignment, DEFAULT_UI_LINE_HEIGHT_RATIO, Flex,
     Hoverable, MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable,
 };
-use rookui::fonts::{Cache as FontCache, FamilyId, Properties, Weight};
-use rookui::keymap::{EditableBinding, FixedBinding, Keystroke, PerPlatformKeystroke};
-use rookui::platform::keyboard::KeyCode;
-use rookui::platform::{Cursor, FilePickerConfiguration, OperatingSystem};
-use rookui::text::TextBuffer;
-use rookui::text::word_boundaries::WordBoundariesPolicy;
-use rookui::text_layout::TextStyle;
-use rookui::ui_components::button::ButtonTooltipPosition;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::windowing::WindowManager;
-use rookui::{
+use ptermui::fonts::{Cache as FontCache, FamilyId, Properties, Weight};
+use ptermui::keymap::{EditableBinding, FixedBinding, Keystroke, PerPlatformKeystroke};
+use ptermui::platform::keyboard::KeyCode;
+use ptermui::platform::{Cursor, FilePickerConfiguration, OperatingSystem};
+use ptermui::text::TextBuffer;
+use ptermui::text::word_boundaries::WordBoundariesPolicy;
+use ptermui::text_layout::TextStyle;
+use ptermui::ui_components::button::ButtonTooltipPosition;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::windowing::WindowManager;
+use ptermui::{
     AppContext, BlurContext, CursorInfo, Element, Entity, EntityId, FocusContext, ModelAsRef,
     ModelContext, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
     WindowId, elements, windowing,
@@ -142,7 +142,7 @@ pub const VOICE_ERROR_TOAST_TEXT: &str = "An error occurred while processing you
 
 pub const MAX_IMAGES_PER_CONVERSATION: usize = 200;
 
-use rookui::clipboard_utils::CLIPBOARD_IMAGE_MIME_TYPES;
+use ptermui::clipboard_utils::CLIPBOARD_IMAGE_MIME_TYPES;
 
 #[derive(Clone, Copy)]
 pub enum AutosuggestionLocation {
@@ -184,7 +184,7 @@ pub const SELECT_UP_ACTION_NAME: &str = "editor_view:select_up";
 pub const SELECT_DOWN_ACTION_NAME: &str = "editor_view:select_down";
 
 pub fn init(ctx: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     ctx.register_fixed_bindings(vec![
         // Below are default bindings that are similar to the behavior in all other text editors.
@@ -407,7 +407,7 @@ pub fn init(ctx: &mut AppContext) {
         // This might seem like a no-op since `ctrl-right` changes desktops on Mac by default.
         // However, many Mac users coming from fish shell have asked for this binding.
         // They've already disabled the desktop change shortcut, and are expecting that this
-        // binding also works in Rook. We should not break their workflow.
+        // binding also works in Polaris Terminal. We should not break their workflow.
         FixedBinding::new(
             "ctrl-right",
             EditorAction::MoveForwardOneWord,
@@ -1398,7 +1398,7 @@ type RenderDecoratorElementsFn = Box<dyn Fn(&AppContext) -> EditorDecoratorEleme
 
 /// Type alias for a closure that allows parent views to add flags to the EditorView's keymap context.
 /// The closure takes the context by mutable reference and can insert additional flags.
-pub type KeymapContextModifierFn = Box<dyn Fn(&mut rookui::keymap::Context, &AppContext)>;
+pub type KeymapContextModifierFn = Box<dyn Fn(&mut ptermui::keymap::Context, &AppContext)>;
 
 /// Enum to choose between different methods of computing the baseline offset for text.
 #[derive(Clone, Debug)]
@@ -1412,7 +1412,7 @@ pub enum BaselinePositionComputationMethod {
 }
 
 // Re-export voice transcription types for backwards compatibility
-use rook_errors::report_error;
+use pterm_errors::report_error;
 
 pub use crate::voice::transcriber::{Transcriber, VoiceTranscriber};
 
@@ -5779,7 +5779,7 @@ impl EditorView {
     }
 
     pub fn move_to_paragraph_start(&mut self, ctx: &mut ViewContext<Self>) {
-        // rook doesn't wrap the text, so basically each line is a paragraph.
+        // polaris-terminal doesn't wrap the text, so basically each line is a paragraph.
         // this moves to the start of the paragraph (and the previous one if used multiple times).
         self.change_selections(ctx, |editor_model, ctx| {
             editor_model.move_cursor(
@@ -8054,7 +8054,7 @@ impl EditorView {
         // from the filesystem (the path transformer, if any, only applies to text insertion).
         let paths_as_strings: Vec<String> = paths.iter().map(|path| path.to_string()).collect();
         let image_filepaths =
-            rookui::clipboard_utils::get_image_filepaths_from_paths(&paths_as_strings);
+            ptermui::clipboard_utils::get_image_filepaths_from_paths(&paths_as_strings);
 
         // If we have image file paths, emit event for parent to handle terminal-specific processing
         let num_image_files = image_filepaths.len();
@@ -8073,7 +8073,7 @@ impl EditorView {
         };
 
         let input =
-            rookui::clipboard_utils::escaped_paths_str(&transformed_paths, self.shell_family);
+            ptermui::clipboard_utils::escaped_paths_str(&transformed_paths, self.shell_family);
 
         self.user_insert(&input, ctx);
     }
@@ -8510,7 +8510,7 @@ impl TypedActionView for EditorView {
     ) -> ActionAccessibilityContent {
         match action {
             EditorAction::UserInsert(text) => ActionAccessibilityContent::Custom(
-                AccessibilityContent::new_without_help(text.to_string(), RookA11yRole::UserAction),
+                AccessibilityContent::new_without_help(text.to_string(), PtermA11yRole::UserAction),
             ),
             EditorAction::SelectLeft
             | EditorAction::SelectToLineEnd
@@ -8545,7 +8545,7 @@ impl TypedActionView for EditorView {
             EditorAction::Paste => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     format!("Pasting: {}", self.clipboard_content(ctx)),
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             _ => ActionAccessibilityContent::from_debug(),
@@ -8653,7 +8653,7 @@ impl TypedActionView for EditorView {
             UnhandledModifierKey(keystroke) => {
                 if self.can_select(ctx) {
                     // This event helps us to keep track of what key bindings users
-                    // try to use in the editor but are currently not available in Rook.
+                    // try to use in the editor but are currently not available in Polaris Terminal.
                     ctx.emit(Event::UnhandledModifierKeyOnEditor(keystroke.clone()))
                 }
             }
@@ -8810,7 +8810,7 @@ impl View for EditorView {
         }
     }
 
-    fn keymap_context(&self, ctx: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, ctx: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         if self.single_cursor_at_buffer_end(false /* respect_line_cap */, ctx) {

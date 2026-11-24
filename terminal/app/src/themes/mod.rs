@@ -7,9 +7,9 @@ pub mod theme_creator_modal;
 pub mod theme_deletion_body;
 pub mod theme_deletion_modal;
 
-use rook_core::ui::theme::RookTheme;
+use pterm_core::ui::theme::PtermTheme;
 
-pub fn onboarding_theme_picker_themes() -> [RookTheme; 4] {
+pub fn onboarding_theme_picker_themes() -> [PtermTheme; 4] {
     [
         default_themes::phenomenon(),
         default_themes::dark_theme(),

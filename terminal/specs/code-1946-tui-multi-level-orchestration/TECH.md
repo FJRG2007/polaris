@@ -1,7 +1,7 @@
-# TECH: Multi-Level Orchestration in the Rook TUI
+# TECH: Multi-Level Orchestration in the Polaris Terminal TUI
 
 Implements [PRODUCT.md](./PRODUCT.md) (approved 2026-08-10). Linear:
-[CODE-1946](https://linear.app/warpdotdev/issue/CODE-1946/design-proposal-multi-level-orchestration-ui-in-the-rook-tui).
+[CODE-1946](https://linear.app/warpdotdev/issue/CODE-1946/design-proposal-multi-level-orchestration-ui-in-the-polaris-terminal-tui).
 GUI reference: `app/src/ai/blocklist/agent_view/orchestration_pill_bar.rs`,
 `app/src/ai/blocklist/orchestration_topology.rs`.
 
@@ -16,7 +16,7 @@ The change keeps the existing layering: semantic topology and selection stay in
 `TuiOrchestrationModel`; presentation stays in `orchestration_tab_bar.rs` + the generic
 `tab_bar.rs`; the session/cloud views wire events, focus, kill, and footers.
 
-### Semantic layer — `crates/rook_tui/src/orchestration_model.rs`
+### Semantic layer — `crates/pterm_tui/src/orchestration_model.rs`
 
 - `TuiOrchestrationSnapshot` now describes one **level**: `anchor_conversation_id`,
   `anchor_label` (`orchestrator` at the root), `anchor_status`
@@ -41,7 +41,7 @@ The change keeps the existing layering: semantic topology and selection stay in
 - `kill_child_agent_subtree` = `kill_descendant_agents` (deepest-first, existing) + the
   per-node kill, gated so flag-off keeps single-node kill (rules 23-26).
 
-### Generic tab bar — `crates/rook_tui/src/tab_bar.rs`
+### Generic tab bar — `crates/pterm_tui/src/tab_bar.rs`
 
 - `TuiTab` gains a trailing adornment (the `▸N` badge; shares the tab's click target,
   rule 14) and a per-tab label cap overriding the config-wide maximum.
@@ -56,7 +56,7 @@ The change keeps the existing layering: semantic topology and selection stay in
   (rule 17); `secondary_edge_target` stays level-scoped (rule 19); `tree_root_key`
   (first breadcrumb, else main tab) backs the Escape binding's return-to-root (rule 20).
 
-### Presentation — `crates/rook_tui/src/orchestration_tab_bar.rs`
+### Presentation — `crates/pterm_tui/src/orchestration_tab_bar.rs`
 
 - `orchestration_tab_bar_config` builds the base (T0) config from the snapshot — anchor
   glyph from the aggregated status, `▸N` badges colored by the explicit design mapping
@@ -109,7 +109,7 @@ The change keeps the existing layering: semantic topology and selection stay in
 ## Validation
 
 Unit tests (render-to-lines per `tui-testing`), all green via
-`cargo nextest run -p rook_tui` (981) and `-p rookui_core` (313), plus `./script/format`
+`cargo nextest run -p pterm_tui` (981) and `-p ptermui_core` (313), plus `./script/format`
 and `cargo clippy -- -D warnings`:
 
 - `orchestration_model_tests.rs` — anchored root level with rollup counts; re-anchoring

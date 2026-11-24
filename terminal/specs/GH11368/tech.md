@@ -1,12 +1,12 @@
-# Technical Spec: Support 'agy' (Antigravity) CLI Agent in Rook
+# Technical Spec: Support 'agy' (Antigravity) CLI Agent in Polaris Terminal
 
 See `specs/GH11368/product.md` for the product spec.
 
-**Issue:** [FJRG2007/rook#11368](https://github.com/FJRG2007/rook/issues/11368)
+**Issue:** [FJRG2007/polaris#11368](https://github.com/FJRG2007/polaris/issues/11368)
 
 ## 1. Problem
 
-Rook lacks native command detection and branding support for the `agy` (Antigravity) CLI agent. Running the agent does not trigger Agent Mode or the associated toolbar.
+Polaris Terminal lacks native command detection and branding support for the `agy` (Antigravity) CLI agent. Running the agent does not trigger Agent Mode or the associated toolbar.
 
 To resolve this, we must wire `CLIAgent::Antigravity` into the terminal's agent detection and branding config. Support for plugins and OSC 777 notifications is intentionally excluded in this milestone.
 
@@ -14,7 +14,7 @@ To resolve this, we must wire `CLIAgent::Antigravity` into the terminal's agent 
 
 - `app/src/terminal/cli_agent.rs` — `CLIAgent` enum with all identity methods: `command_prefix()`, `to_serialized_name()`, `from_serialized_name()`, `from_harness()`, `display_name()`, `icon()`, `supported_skill_providers()`, `skill_command_prefix()`, `supports_bash_mode()`, `brand_color()`, `brand_icon_color()`, `detect()`, and the `From<CLIAgent> for CLIAgentType` telemetry conversion.
 - `crates/input_classifier/src/util.rs` — `ONE_OFF_SHELL_COMMAND_KEYWORDS` that determine shell-vs-natural-language classification.
-- `crates/rook_core/src/ui/icons.rs` — `Icon` enum register and SVG asset mappings.
+- `crates/pterm_core/src/ui/icons.rs` — `Icon` enum register and SVG asset mappings.
 - `app/src/server/telemetry/events.rs` — `CLIAgentType` telemetry enum.
 
 ## 3. Proposed Changes
@@ -56,7 +56,7 @@ static ref ONE_OFF_SHELL_COMMAND_KEYWORDS: HashSet<&'static str> = HashSet::from
 ]);
 ```
 
-### 3c. Add SVG Asset and Icon Registry (`crates/rook_core/src/ui/icons.rs`)
+### 3c. Add SVG Asset and Icon Registry (`crates/pterm_core/src/ui/icons.rs`)
 
 1. Add `AntigravityLogo` to the `Icon` enum.
 2. Map it to the SVG path in the match expression inside `Icon::svg_path()`:
@@ -70,10 +70,10 @@ static ref ONE_OFF_SHELL_COMMAND_KEYWORDS: HashSet<&'static str> = HashSet::from
 1. User types `agy` in their terminal and hits Enter.
 2. The classifier marks it as a command execution.
 3. The shell starts the `agy` process.
-4. Rook identifies the `agy` command via `CLIAgent::detect()` and initiates the Agent Mode layouts and toolbar, with custom branding and icons.
+4. Polaris Terminal identifies the `agy` command via `CLIAgent::detect()` and initiates the Agent Mode layouts and toolbar, with custom branding and icons.
 
 ## 5. Testing and Validation
 
 - **Unit tests**: Verify CLI agent detection works for prefix `agy` in `cli_agent_tests.rs`.
 - **Unit tests**: Verify `"agy"` short-circuits as a one-off shell keyword in `input_classifier` tests, ensuring it bypasses natural language classification.
-- **Manual Verification**: Run Rook locally, trigger `agy`, and verify Agent Mode transition and UI styling.
+- **Manual Verification**: Run Polaris Terminal locally, trigger `agy`, and verify Agent Mode transition and UI styling.

@@ -21,7 +21,7 @@ When an AI agent runs in an SSH session, the `ApplyFileDiffs` tool is disabled b
 - `app/src/ai/blocklist/controller.rs (86-121)` — `SessionContext`
 - `app/src/ai/agent/api/impl.rs (146-206)` — `get_supported_tools`; gates tools on session type
 - `crates/remote_server/src/manager.rs (134-139)` — `RemoteServerManager::client_for_host`
-- `crates/rook_files/src/lib.rs (95-106)` — `FileBackend::Remote`; already supports remote save/delete
+- `crates/pterm_files/src/lib.rs (95-106)` — `FileBackend::Remote`; already supports remote save/delete
 
 ## Current State
 
@@ -29,7 +29,7 @@ When an AI agent runs in an SSH session, the `ApplyFileDiffs` tool is disabled b
 
 **CodeDiffView save/delete/create**: `DiffSessionType` already exists with `Local` and `Remote(HostId)` variants. `set_candidate_diffs` routes to `register_file` (local) or `register_remote_file` (remote). `FileModel` has `FileBackend::Remote` that dispatches save/delete through `RemoteServerClient`. However, `RequestFileEditsExecutor` never sets `diff_session_type` — it defaults to `Local`.
 
-**Agent tool gating**: `get_supported_tools` excludes `ApplyFileDiffs`, `ReadFiles`, and `SearchCodebase` when `session_type` is `RookifiedRemote`. There is no field on `SessionContext` to indicate whether a `RemoteServerClient` is available.
+**Agent tool gating**: `get_supported_tools` excludes `ApplyFileDiffs`, `ReadFiles`, and `SearchCodebase` when `session_type` is `PtermifiedRemote`. There is no field on `SessionContext` to indicate whether a `RemoteServerClient` is available.
 
 **Post-accept context**: After diffs are accepted, `execute` re-reads files from disk via `read_local_file_context` and sends updated content to the LLM. This would require a network round-trip for remote sessions.
 
@@ -146,7 +146,7 @@ Session type is modeled as two distinct enums to separate immutable bootstrap-ti
 ```rust
 pub enum BootstrapSessionType {
     Local,
-    RookifiedRemote,
+    PtermifiedRemote,
 }
 ```
 
@@ -155,7 +155,7 @@ pub enum BootstrapSessionType {
 ```rust
 pub enum SessionType {
     Local,
-    RookifiedRemote { host_id: Option<HostId> },
+    PtermifiedRemote { host_id: Option<HostId> },
 }
 ```
 
@@ -176,10 +176,10 @@ match session_context.session_type() {
             api::ToolType::SearchCodebase,
         ]);
     }
-    Some(SessionType::RookifiedRemote { host_id: Some(_) }) => {
+    Some(SessionType::PtermifiedRemote { host_id: Some(_) }) => {
         supported_tools.push(api::ToolType::ApplyFileDiffs);
     }
-    Some(SessionType::RookifiedRemote { host_id: None }) => {
+    Some(SessionType::PtermifiedRemote { host_id: None }) => {
         // Feature flag off or not yet connected — no remote tools.
     }
 }
@@ -243,7 +243,7 @@ sequenceDiagram
 - **Proto round-trip test**: Add a test in `protocol_tests.rs` for `ReadFile` / `ReadFileResponse` encode/decode.
 - **`handle_read_file` server test**: Verify the handler reads existing files, returns `exists: false` for missing files, and returns an error for unreadable files.
 - **Unit tests for remote path**: Since local and remote share a single codepath, existing `diff_application_tests.rs` covers the core logic. Additional tests can pass a mock `read_file` closure that simulates remote behavior (e.g. returning `ReadError` for connectivity failures) without needing to mock `RemoteServerClient` directly.
-- **Regression**: Run existing `diff_application_tests.rs` and `cargo nextest run -p rook_files` to verify local path is unchanged.
+- **Regression**: Run existing `diff_application_tests.rs` and `cargo nextest run -p pterm_files` to verify local path is unchanged.
 - **Integration**: Manually test agent mode in an SSH session — verify `ApplyFileDiffs` appears in supported tools, diff preview renders correctly, accept/save writes to the remote host, and the LLM receives updated file context after acceptance.
 
 ## Follow-ups

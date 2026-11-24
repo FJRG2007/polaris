@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use rook_util::path::LineAndColumnArg;
-use rookui::keymap::BindingId;
-use rookui::{EntityId, WindowId};
+use pterm_util::path::LineAndColumnArg;
+use ptermui::keymap::BindingId;
+use ptermui::{EntityId, WindowId};
 use strum_macros::IntoStaticStr;
 
 use crate::ai::agent::conversation::AIConversationId;
@@ -28,7 +28,7 @@ pub enum CommandPaletteItemAction {
     OpenNotebook {
         id: SyncId,
     },
-    ViewInRookDrive {
+    ViewInPtermDrive {
         id: CloudObjectTypeAndId,
     },
     InvokeEnvironmentVariables {
@@ -116,7 +116,7 @@ impl CommandPaletteItemAction {
             CommandPaletteItemAction::OpenLaunchConfiguration { .. } => {
                 ItemSummary::LaunchConfiguration
             }
-            CommandPaletteItemAction::ViewInRookDrive { id } => match id {
+            CommandPaletteItemAction::ViewInPtermDrive { id } => match id {
                 CloudObjectTypeAndId::Notebook(_)
                 | CloudObjectTypeAndId::Folder(_)
                 | CloudObjectTypeAndId::GenericStringObject { .. } => ItemSummary::CloudObject,

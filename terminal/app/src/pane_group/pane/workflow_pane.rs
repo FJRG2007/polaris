@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Context;
-use rookui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
+use ptermui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
 use url::Url;
 
 use super::{
@@ -10,8 +10,8 @@ use super::{
     ShareableLinkError,
 };
 use crate::app_state::{LeafContents, WorkflowPaneSnapshot};
-use crate::drive::OpenRookDriveObjectSettings;
-use crate::drive::items::RookDriveItemId;
+use crate::drive::OpenPtermDriveObjectSettings;
+use crate::drive::items::PtermDriveItemId;
 use crate::server::ids::SyncId;
 use crate::workflows::manager::{WorkflowManager, WorkflowOpenSource};
 use crate::workflows::workflow_view::{WorkflowView, WorkflowViewEvent};
@@ -39,7 +39,7 @@ impl WorkflowPane {
 
     pub fn restore(
         workflow_id: Option<SyncId>,
-        settings: OpenRookDriveObjectSettings,
+        settings: OpenPtermDriveObjectSettings,
         ctx: &mut ViewContext<PaneGroup>,
     ) -> anyhow::Result<Self> {
         let window_id = ctx.window_id();
@@ -132,7 +132,7 @@ impl PaneContent for WorkflowPane {
         let workflow_id = self.get_view(app).as_ref(app).workflow_id();
         LeafContents::Workflow(WorkflowPaneSnapshot::CloudWorkflow {
             workflow_id: Some(workflow_id),
-            settings: OpenRookDriveObjectSettings::default(),
+            settings: OpenPtermDriveObjectSettings::default(),
         })
     }
 
@@ -184,7 +184,7 @@ fn handle_workflow_event(
 ) {
     match event {
         WorkflowViewEvent::Pane(pane_event) => group.handle_pane_event(pane_id, pane_event, ctx),
-        WorkflowViewEvent::ViewInRookDrive(id) => view_in_rook_drive(*id, ctx),
+        WorkflowViewEvent::ViewInPtermDrive(id) => view_in_pterm_drive(*id, ctx),
         WorkflowViewEvent::RunWorkflow {
             workflow,
             source,
@@ -224,6 +224,6 @@ fn run_workflow(
     });
 }
 
-fn view_in_rook_drive(id: RookDriveItemId, ctx: &mut ViewContext<PaneGroup>) {
-    ctx.emit(crate::pane_group::Event::ViewInRookDrive(id))
+fn view_in_pterm_drive(id: PtermDriveItemId, ctx: &mut ViewContext<PaneGroup>) {
+    ctx.emit(crate::pane_group::Event::ViewInPtermDrive(id))
 }

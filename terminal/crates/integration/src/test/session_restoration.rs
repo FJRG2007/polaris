@@ -1,25 +1,25 @@
-use rook::features::FeatureFlag;
-use rook::integration_testing::notebook::{
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::notebook::{
     assert_cloud_preference_exists, assert_notebook_contents, assert_notebook_metadata_revision,
 };
-use rook::integration_testing::step::{
+use polaris_terminal::integration_testing::step::{
     new_step_with_default_assertions, new_step_with_default_assertions_for_pane,
 };
-use rook::integration_testing::tab::assert_pane_title;
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use rook::integration_testing::view_getters::single_terminal_view_for_tab;
-use rook::integration_testing::workflow::assert_workflow_metadata_revision;
-use rook::integration_testing::{self};
-use rook::settings::Preference;
-use rook::settings_view::{SettingsSection, SettingsView};
-use rook::sqlite_testing::set_user_and_hostname_for_blocks;
-use rook::terminal::model::session::get_local_hostname;
-use rook::terminal::model::terminal_model::BlockIndex;
-use rook::terminal::shell::ShellType;
-use rook::terminal::{History, ShellHost, TerminalView};
-use rook::workspace::Workspace;
-use rookui_core::integration::{AssertionOutcome, TestStep};
-use rookui_core::{SingletonEntity, ViewHandle, async_assert_eq};
+use polaris_terminal::integration_testing::tab::assert_pane_title;
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::integration_testing::view_getters::single_terminal_view_for_tab;
+use polaris_terminal::integration_testing::workflow::assert_workflow_metadata_revision;
+use polaris_terminal::integration_testing::{self};
+use polaris_terminal::settings::Preference;
+use polaris_terminal::settings_view::{SettingsSection, SettingsView};
+use polaris_terminal::sqlite_testing::set_user_and_hostname_for_blocks;
+use polaris_terminal::terminal::model::session::get_local_hostname;
+use polaris_terminal::terminal::model::terminal_model::BlockIndex;
+use polaris_terminal::terminal::shell::ShellType;
+use polaris_terminal::terminal::{History, ShellHost, TerminalView};
+use polaris_terminal::workspace::Workspace;
+use ptermui_core::integration::{AssertionOutcome, TestStep};
+use ptermui_core::{SingletonEntity, ViewHandle, async_assert_eq};
 use settings::{RespectUserSyncSetting, SyncToCloud};
 
 use super::{Builder, TEST_ONLY_ASSETS, new_builder};
@@ -77,7 +77,7 @@ pub fn test_session_restoration() -> Builder {
 /// always get added. The mock data for this case looks like this:
 /// | command            | output       | shell | user       | host          |
 /// | ------------------ | ------------ | ----- | ---------- | ------------- |
-/// | echo $TERM_PROGRAM | RookTerminal | zsh   | local:user | local:host    |
+/// | echo $TERM_PROGRAM | PtermTerminal | zsh   | local:user | local:host    |
 /// | pwd                | /            | bash  | local:user | local:host    |
 /// | uname              | Linux        | zsh   | andy       | ubuntu-test   |
 /// | mkdir secrets      | secrets      | NULL  | NULL       | NULL          |

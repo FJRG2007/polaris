@@ -8,8 +8,8 @@ mod tests;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 #[cfg(not(target_family = "wasm"))]
-use rookui::SingletonEntity;
-use rookui::{Entity, EntityId, ModelContext, ModelHandle};
+use ptermui::SingletonEntity;
+use ptermui::{Entity, EntityId, ModelContext, ModelHandle};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 use crate::terminal::model::session::active_session::ActiveSession;

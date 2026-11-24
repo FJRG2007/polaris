@@ -1,9 +1,9 @@
-use rookui_core::elements::{
+use ptermui_core::elements::{
     Align, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty, Flex, Icon,
     ParentElement, Radius, Shrinkable, Text,
 };
-use rookui_core::geometry::vector::vec2f;
-use rookui_core::{AppContext, Element, SizeConstraint};
+use ptermui_core::geometry::vector::vec2f;
+use ptermui_core::{AppContext, Element, SizeConstraint};
 
 use super::RenderableBlock;
 use crate::editor::EmbeddedItemModel;
@@ -73,8 +73,8 @@ impl RenderableBlock for RenderableBrokenEmbedding {
     fn layout(
         &mut self,
         model: &crate::render::model::RenderState,
-        ctx: &mut rookui_core::LayoutContext,
-        app: &rookui_core::AppContext,
+        ctx: &mut ptermui_core::LayoutContext,
+        app: &ptermui_core::AppContext,
     ) {
         self.row.layout(
             SizeConstraint::strict(vec2f(
@@ -98,7 +98,7 @@ impl RenderableBlock for RenderableBrokenEmbedding {
         &mut self,
         model: &crate::render::model::RenderState,
         ctx: &mut super::RenderContext,
-        app: &rookui_core::AppContext,
+        app: &ptermui_core::AppContext,
     ) {
         let content = model.content();
         let broken_link = extract_block!(self.viewport_item, content, (block, BlockItem::Embedded(item)) => block.embedded(item));
@@ -150,7 +150,7 @@ impl RenderableBlock for RenderableBrokenEmbedding {
 
         ctx.paint
             .scene
-            .start_layer(rookui_core::ClipBounds::ActiveLayer);
+            .start_layer(ptermui_core::ClipBounds::ActiveLayer);
         self.row
             .paint(ctx.content_to_screen(content_origin), ctx.paint, app);
         ctx.paint.scene.stop_layer();
@@ -158,8 +158,8 @@ impl RenderableBlock for RenderableBrokenEmbedding {
 
     fn after_layout(
         &mut self,
-        ctx: &mut rookui_core::AfterLayoutContext,
-        app: &rookui_core::AppContext,
+        ctx: &mut ptermui_core::AfterLayoutContext,
+        app: &ptermui_core::AppContext,
     ) {
         self.row.after_layout(ctx, app);
     }
@@ -167,8 +167,8 @@ impl RenderableBlock for RenderableBrokenEmbedding {
     fn dispatch_event(
         &mut self,
         _model: &crate::render::model::RenderState,
-        event: &rookui_core::event::DispatchedEvent,
-        ctx: &mut rookui_core::EventContext,
+        event: &ptermui_core::event::DispatchedEvent,
+        ctx: &mut ptermui_core::EventContext,
         app: &AppContext,
     ) -> bool {
         self.row.dispatch_event(event, ctx, app)

@@ -20,16 +20,16 @@ Separately, the shared clipped-scrollable path could re-use stale screen-space c
 - `crates/editor/src/content/text.rs` — `BufferBlockStyle::Table` variant, `TableCache` / `TableBlockCache`, and `table_cell_offset_maps`
 - `crates/editor/src/content/edit.rs` — `layout_table_block`, `measure_table_cells`, per-cell size clamp
 - `crates/editor/src/content/buffer.rs` — table-aware clipboard text extraction and partial-table HTML filtering
-- `crates/rookui_core/src/elements/shared_scrollbar.rs` — shared `ScrollbarAppearance` / `ScrollbarGeometry` and scrollbar math
-- `crates/rookui_core/src/elements/clipped_scrollable.rs` — selection anchor (`anchor_and_adjust_selection_for_scroll`)
-- `crates/rookui_core/src/elements/new_scrollable/mod.rs` — dispatches selection APIs through the anchor helper
-- `crates/rookui_core/src/elements/formatted_text_element.rs` — horizontal bounds check for smart selection
+- `crates/ptermui_core/src/elements/shared_scrollbar.rs` — shared `ScrollbarAppearance` / `ScrollbarGeometry` and scrollbar math
+- `crates/ptermui_core/src/elements/clipped_scrollable.rs` — selection anchor (`anchor_and_adjust_selection_for_scroll`)
+- `crates/ptermui_core/src/elements/new_scrollable/mod.rs` — dispatches selection APIs through the anchor helper
+- `crates/ptermui_core/src/elements/formatted_text_element.rs` — horizontal bounds check for smart selection
 - `app/src/notebooks/editor/mod.rs` — notebook table appearance (scrollbar colors, etc.)
 
 ## Proposed changes
 
-### Shared scrollbar primitives in `rookui_core`
-`crates/rookui_core/src/elements/shared_scrollbar.rs` is the single source of truth for:
+### Shared scrollbar primitives in `ptermui_core`
+`crates/ptermui_core/src/elements/shared_scrollbar.rs` is the single source of truth for:
 - `ScrollbarAppearance` / `ScrollbarGeometry` (overlay scrollbar geometry, thumb bounds, track bounds)
 - Minimum thumb sizing (`MIN_SCROLLBAR_THUMB_LENGTH`)
 - `compute_scrollbar_geometry(...)`
@@ -116,7 +116,7 @@ The cap is applied unconditionally — including when `horizontal_scroll_allowed
 - HTML export in `selected_text_as_html` filters only the ranges that contain a partial table selection, serializing the remaining clean ranges to HTML normally. Only when every range is a partial-table range does it return `None`.
 
 ### Clipped scrollables keep selections anchored to content
-`crates/rookui_core/src/elements/clipped_scrollable.rs`:
+`crates/ptermui_core/src/elements/clipped_scrollable.rs`:
 - `ClippedScrollStateHandle` stores a `selection_scroll_anchor` (original selection + scroll position at the time it was observed).
 - `anchor_and_adjust_selection_for_scroll(selection, axis)` either records the anchor (first time) or shifts the selection by the delta between current scroll and the anchored scroll. Doc comment spells out the three branches (None clears anchor; unmatched Selection installs a new anchor; matched Selection returns a scroll-compensated copy).
 - `clear_selection_scroll_anchor()` resets that state when a fresh mouse-down starts a new interaction.
@@ -148,7 +148,7 @@ Each numbered invariant in `PRODUCT.md` maps to at least one test or verificatio
 - PRODUCT invariant 11 (wheel edge propagation): covered by the `ScrollWheel` handler returning `scroll_horizontally()`'s boolean; manual trackpad pass confirms fall-through.
 - PRODUCT invariant 12 (`MouseMoved` not consumed): covered by the handler returning `false`; manual hover-link check confirms downstream handlers still fire.
 - PRODUCT invariants 13–15 (selection and copy while scrolled): `content::buffer::tests::test_selected_table_copy_uses_visible_plain_text`, `test_partial_table_selection_does_not_export_html`, `test_partial_table_selection_still_exports_html_for_non_table_ranges`, `test_clipboard_table_copy_uses_source_offsets_for_later_formatted_cells`.
-- PRODUCT invariants 13–14 (selection anchor stability): `rookui_core::elements::new_scrollable::scrollable_test` regressions for viewport-coordinate selection APIs, re-anchoring existing selections across horizontal scroll, and clearing the anchor on new mouse-down interactions.
+- PRODUCT invariants 13–14 (selection anchor stability): `ptermui_core::elements::new_scrollable::scrollable_test` regressions for viewport-coordinate selection APIs, re-anchoring existing selections across horizontal scroll, and clearing the anchor on new mouse-down interactions.
 - PRODUCT invariant 13 (double-click word selection across columns): `smart_select_returns_none_when_point_is_outside_horizontal_bounds` (formatted_text_element_tests).
 - PRODUCT invariant 18 (caret reveal during keyboard movement): `render::model::location_tests` (hit-testing after horizontal scroll) and `render::model::mod_tests` (reveal/autoscroll for offsets inside tables).
 - PRODUCT invariants 6 and 13–15 as applied to formatted cells (inline Markdown correctness): `render::model::table_offset_map::tests::test_table_cell_offset_map_handles_bold_and_links`, `test_table_cell_offset_map_handles_backslash_escaped_punctuation`, `test_table_cell_offset_map_handles_nested_styles`.
@@ -162,7 +162,7 @@ Each numbered invariant in `PRODUCT.md` maps to at least one test or verificatio
 ### Pre-merge gates
 - `cargo fmt`
 - `cargo clippy --workspace --all-targets --all-features --tests -- -D warnings`
-- `cargo check -p rook_editor` and `cargo check -p rookui_core`
+- `cargo check -p pterm_editor` and `cargo check -p ptermui_core`
 - Targeted `cargo nextest run --no-fail-fast --workspace ...` for the regressions listed above.
 
 ## Risks and mitigations
@@ -174,7 +174,7 @@ If any table path assumes source and rendered offsets are interchangeable, forma
 If clipped scrollables reuse raw selection rectangles after scroll changes, highlights and copied text target the wrong content. Mitigation: anchor selections via `ClippedScrollStateHandle`, clear the anchor on fresh mouse interactions, and route selection APIs through `anchor_and_adjust_selection_for_scroll()`.
 
 ### Scrollbar behavior diverges between surfaces
-If the editor table path reintroduces bespoke thumb sizing or drag math, it will drift from the rest of RookUI. Mitigation: keep geometry and pointer/scroll conversion in `shared_scrollbar.rs` and call the shared helpers from both the editor table renderer and the `new_scrollable` utilities.
+If the editor table path reintroduces bespoke thumb sizing or drag math, it will drift from the rest of PtermUI. Mitigation: keep geometry and pointer/scroll conversion in `shared_scrollbar.rs` and call the shared helpers from both the editor table renderer and the `new_scrollable` utilities.
 
 ### Clipped child layers interfere with editor hit-testing
 If editor bounds checks use the clipped child layer instead of the editor element bounds, clicks can be rejected before block-level hit-testing runs. Mitigation: use the editor element's own layer bounds in `crates/editor/src/render/element/mod.rs`.

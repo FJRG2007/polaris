@@ -1,4 +1,4 @@
-//! Voltron (https://en.wikipedia.org/wiki/Voltron) in Rook is a code name for the UI element used
+//! Voltron (https://en.wikipedia.org/wiki/Voltron) in Polaris Terminal is a code name for the UI element used
 //! for workflows, ai commands and history search. As @charlespierce pointed out: it's 3 mini lions
 //! (features) coming together to form one super bot (this view). Hence the name. Don't ask me, I
 //! haven't watched it.
@@ -17,20 +17,20 @@ use std::path::PathBuf;
 
 use enclose::enclose;
 use pathfinder_geometry::vector::Vector2F;
-use rook_errors::report_error;
-use rookui::accessibility::AccessibilityContent;
-use rookui::elements::{
+use pterm_errors::report_error;
+use ptermui::accessibility::AccessibilityContent;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Dismiss, DispatchEventResult, Element, EventHandler, Flex, Icon,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, Resizable, ResizableStateHandle, Shrinkable, Stack,
     resizable_state_handle,
 };
-use rookui::geometry::vector::vec2f;
-use rookui::keymap::{Context, FixedBinding};
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::geometry::vector::vec2f;
+use ptermui::keymap::{Context, FixedBinding};
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -57,7 +57,7 @@ const VOLTRON_RIGHT_PADDING: f32 = 15.;
 const EDITOR_PADDING_LEFT: f32 = 14.;
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",
@@ -493,7 +493,7 @@ impl View for Voltron {
         }
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
         let theme = appearance.theme();
         let current_feature = self

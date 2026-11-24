@@ -1,14 +1,14 @@
 # OSC 8 hyperlinks (clickable terminal anchors)
 
-Source issue: [FJRG2007/rook#6393](https://github.com/FJRG2007/rook/issues/6393)
+Source issue: [FJRG2007/polaris#6393](https://github.com/FJRG2007/polaris/issues/6393)
 
 ## Summary
 
-Output that uses the OSC 8 hyperlink escape sequence (`ESC ] 8 ; params ; URI ESC \`) renders as a clickable link in the terminal block, opening the URL on Cmd+click (macOS) / Ctrl+click (Linux/Windows). Today, programs like `wizcli` that print "Click to view scan report" via OSC 8 are visually plain and unclickable in Rook; this spec brings Rook in line with iTerm2, kitty, GNOME Terminal, Windows Terminal, and other terminals that already support the sequence.
+Output that uses the OSC 8 hyperlink escape sequence (`ESC ] 8 ; params ; URI ESC \`) renders as a clickable link in the terminal block, opening the URL on Cmd+click (macOS) / Ctrl+click (Linux/Windows). Today, programs like `wizcli` that print "Click to view scan report" via OSC 8 are visually plain and unclickable in Polaris Terminal; this spec brings Polaris Terminal in line with iTerm2, kitty, GNOME Terminal, Windows Terminal, and other terminals that already support the sequence.
 
 ## Problem
 
-Modern CLIs use OSC 8 to attach a URL to arbitrary visible text. The visible text is often not the URL itself (e.g. "Click to view scan report", "Open dashboard", "Issue #1234"), so Rook's existing regex-based URL auto-detection cannot recover the destination — the URL only exists in the escape sequence. As a result, users have to manually copy the URL from another tool or context, which the issue reporter calls out as a workflow blocker.
+Modern CLIs use OSC 8 to attach a URL to arbitrary visible text. The visible text is often not the URL itself (e.g. "Click to view scan report", "Open dashboard", "Issue #1234"), so Polaris Terminal's existing regex-based URL auto-detection cannot recover the destination — the URL only exists in the escape sequence. As a result, users have to manually copy the URL from another tool or context, which the issue reporter calls out as a workflow blocker.
 
 Figma: none provided.
 
@@ -29,7 +29,7 @@ Figma: none provided.
 
 6. **Click to open.** Cmd+click (macOS) / Ctrl+click (Linux/Windows) on any cell in a hyperlink span opens the URI in the user's default browser, using the same `open_url` path used today for auto-detected URL links — so default-browser routing, telemetry, and "open with" behavior match. Plain (un-modified) click on a hyperlinked cell behaves like a plain click on any other terminal cell (selection / cursor placement); the modifier is required, matching today's URL link UX.
 
-7. **Right-click context menu.** Right-clicking on a hyperlink span shows the same context menu Rook shows today for auto-detected URL links, with at minimum: "Open link", "Copy link" (copies the URI, not the visible text), and the standard text-selection items. The visible text is still selectable and copyable as text via the regular text selection actions.
+7. **Right-click context menu.** Right-clicking on a hyperlink span shows the same context menu Polaris Terminal shows today for auto-detected URL links, with at minimum: "Open link", "Copy link" (copies the URI, not the visible text), and the standard text-selection items. The visible text is still selectable and copyable as text via the regular text selection actions.
 
 8. **Selection and copy.** Selecting text that overlaps a hyperlink span and copying produces the visible text by default, not the URI — the same behavior as iTerm2 and kitty. An explicit "Copy link address" affordance (context menu, see (7)) is the way to get the URI.
 
@@ -45,7 +45,7 @@ Figma: none provided.
 
 12. **Scrollback and history.**
     - Hyperlinks remain clickable in scrollback for the lifetime of the block in the current session.
-    - Restoring a session from local history / Rook Drive preserves the URI on hyperlink spans so they remain clickable in the restored block (the OSC 8 bytes round-trip through the stored block output and re-parse on load). **Shared-session (live multiplayer) preservation is a follow-up, out of scope for this PR** — it requires new session-sharing protocol events that are not included here.
+    - Restoring a session from local history / Polaris Terminal Drive preserves the URI on hyperlink spans so they remain clickable in the restored block (the OSC 8 bytes round-trip through the stored block output and re-parse on load). **Shared-session (live multiplayer) preservation is a follow-up, out of scope for this PR** — it requires new session-sharing protocol events that are not included here.
     - Searching within a block matches against the visible text, not the URI.
 
 13. **Sharing a block.** The default text-copy path never produces OSC 8 escape sequences (invariant 8 wins for that case).
@@ -62,15 +62,15 @@ Figma: none provided.
     - Closing sequence with no prior opening sequence (no-op).
     - Unknown or duplicate `key=value` params (unknown keys ignored; duplicate `id` — last-wins).
     - Empty URI in an opening sequence (treated as a close).
-    - URI containing characters that the spec does not strictly allow but real-world emitters use (e.g. spaces); Rook parses the URI permissively for hover/display, but only opens it on click if it parses as a valid URL — otherwise the click is a no-op and the hover tooltip shows the literal URI so the user can copy it manually.
+    - URI containing characters that the spec does not strictly allow but real-world emitters use (e.g. spaces); Polaris Terminal parses the URI permissively for hover/display, but only opens it on click if it parses as a valid URL — otherwise the click is a no-op and the hover tooltip shows the literal URI so the user can copy it manually.
     - Non-UTF-8 bytes in the URI: the sequence is dropped (no hyperlink span is created); the visible text continues to render normally.
     - Sequences exceeding the VTE OSC parser's buffer: dropped silently, same way other oversized OSC sequences are handled today.
 
-16. **Opening URIs.** OSC 8 URIs are not gated by a scheme allow-list — Rook opens them through the same `open_url` path used for auto-detected URL links (matching terminals like Ghostty, which do not allow-list schemes). `file://` URIs are supported and are not subject to hostname enforcement. A URI is click-activated only if it parses as a valid URL (per (6) and (15)); an unparseable URI is a no-op on click and the tooltip shows the literal URI so the user can copy it manually.
+16. **Opening URIs.** OSC 8 URIs are not gated by a scheme allow-list — Polaris Terminal opens them through the same `open_url` path used for auto-detected URL links (matching terminals like Ghostty, which do not allow-list schemes). `file://` URIs are supported and are not subject to hostname enforcement. A URI is click-activated only if it parses as a valid URL (per (6) and (15)); an unparseable URI is a no-op on click and the tooltip shows the literal URI so the user can copy it manually.
 
 17. **Consistency with adjacent surfaces.** OSC 8 hyperlinks render and behave identically wherever terminal block output is shown today — main terminal blocks, alt-screen apps that emit OSC 8, the agent's terminal panel, and any other surface that runs the existing ANSI processor. The hover, click, copy, and context-menu behaviors above hold in every such surface.
 
 18. **No regression for existing surfaces.**
     - Auto-detected URL links, file path links, and rich-content links continue to work as they do today, with the same hover, click, copy, and context-menu behaviors.
     - Output that does not contain OSC 8 sequences renders byte-for-byte identically before and after this feature ships.
-    - Terminals receiving Rook's *outgoing* PTY traffic (e.g. when Rook itself is the program inside another terminal) see the same bytes they see today; this feature is purely about how Rook interprets OSC 8 bytes coming *from* the PTY.
+    - Terminals receiving Polaris Terminal's *outgoing* PTY traffic (e.g. when Polaris Terminal itself is the program inside another terminal) see the same bytes they see today; this feature is purely about how Polaris Terminal interprets OSC 8 bytes coming *from* the PTY.

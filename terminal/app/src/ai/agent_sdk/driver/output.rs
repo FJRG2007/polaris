@@ -1340,7 +1340,7 @@ pub mod json {
 
 use std::io::{self, BufWriter, Write};
 
-use rook_core::channel::ChannelState;
+use pterm_core::channel::ChannelState;
 
 use crate::ai::agent::{AIAgentText, AIAgentTextSection};
 use crate::code::editor_management::CodeSource;

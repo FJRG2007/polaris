@@ -1,7 +1,7 @@
 use crate::server::ids::ServerId;
 use crate::workspaces::user_workspaces::TeamScope;
 
-/// The team an outbound request is scoped to, as sent in `X-Rook-Team-Uid`.
+/// The team an outbound request is scoped to, as sent in `X-PolarisTerminal-Team-Uid`.
 ///
 /// A [`TeamScope`] is the only way to name one; there is no constructor from a bare `ServerId`,
 /// because a loose uid cannot say which team resolved it, and "no team" is a scope's answer to

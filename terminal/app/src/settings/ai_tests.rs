@@ -1,6 +1,6 @@
 use chrono::Utc;
-use rook_graphql::scalars::time::ServerTimestamp;
-use rookui::{App, SingletonEntity};
+use pterm_graphql::scalars::time::ServerTimestamp;
+use ptermui::{App, SingletonEntity};
 use settings::schema::SettingSchemaEntry;
 use settings::{Setting, SettingSurfaces, SettingsMode};
 
@@ -39,13 +39,13 @@ fn auto_approve_denylist_bypass_defaults_on_and_is_available_in_gui_and_tui_sett
     assert!(*setting.value());
     assert_eq!(
         AutoApproveBypassesCommandDenylist::toml_path(),
-        Some("agents.rook_agent.other.auto_approve_bypasses_command_denylist")
+        Some("agents.pterm_agent.other.auto_approve_bypasses_command_denylist")
     );
 
     let entry = inventory::iter::<SettingSchemaEntry>
         .into_iter()
         .find(|entry| {
-            entry.hierarchy == Some("agents.rook_agent.other")
+            entry.hierarchy == Some("agents.pterm_agent.other")
                 && entry.storage_key == "auto_approve_bypasses_command_denylist"
         })
         .expect("expected auto-approve denylist bypass schema entry");
@@ -524,7 +524,7 @@ fn usage_display_unit_defaults_to_credits_and_round_trips() {
 fn usage_display_unit_toml_path() {
     assert_eq!(
         UsageDisplayUnit::toml_path(),
-        Some("agents.rook_agent.other.usage_display_unit")
+        Some("agents.pterm_agent.other.usage_display_unit")
     );
 }
 

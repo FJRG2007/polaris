@@ -2,13 +2,13 @@
 
 ## Problem
 
-The current SSH wrapper flow creates a `RemoteCommandExecutor` that runs every generator/completion command by opening a new SSH channel through a ControlMaster socket. This is unreliable and stateless. We want to replace it with a persistent remote server binary (`~/.rook/remote-server/oz`) on the remote machine that communicates over stdin/stdout using length-prefixed protobuf messages. The binary is the Oz CLI, installed from the `/download/cli` endpoint if not already present.
+The current SSH wrapper flow creates a `RemoteCommandExecutor` that runs every generator/completion command by opening a new SSH channel through a ControlMaster socket. This is unreliable and stateless. We want to replace it with a persistent remote server binary (`~/.polaris-terminal/remote-server/oz`) on the remote machine that communicates over stdin/stdout using length-prefixed protobuf messages. The binary is the Oz CLI, installed from the `/download/cli` endpoint if not already present.
 
 The challenge is that this introduces two independent async conditions that must both complete before the session is ready: (1) the shell `Bootstrapped` DCS hook, and (2) the remote server `InitializeResponse`. Today the bootstrap path is fully synchronous — `Bootstrapped` DCS immediately triggers `initialize_bootstrapped_session()`. We need to gate that call on both conditions without breaking non-SSH or flag-off flows.
 
 ## Relevant code
 
-- `rook_core/src/features.rs` — `FeatureFlag` enum and `DOGFOOD_FLAGS` array
+- `pterm_core/src/features.rs` — `FeatureFlag` enum and `DOGFOOD_FLAGS` array
 - `app/src/terminal/model/terminal_model.rs:2808-2846` — `bootstrapped()` handler that takes `pending_session_info` and emits `HandlerEvent::Bootstrapped`
 - `app/src/terminal/model/terminal_model.rs:2848-2860` — `pre_interactive_ssh_session()` and `ssh()` handlers
 - `app/src/terminal/model/terminal_model.rs:2862-2908` — `init_shell()` handler
@@ -31,7 +31,7 @@ The challenge is that this introduces two independent async conditions that must
 
 1. **`PreInteractiveSSHSession`** — no-op marker
 2. **`SSH`** — carries `socket_path` (ControlMaster) and `remote_shell`. Stored in `pending_legacy_ssh_session`.
-3. **`InitShell`** — creates `SessionInfo::create_pending()`, consuming `pending_legacy_ssh_session` to populate `IsLegacySSHSession::Yes { socket_path }`. Calls `reinit_shell()` to reset the block list. Rook input becomes visible with "Starting shell...".
+3. **`InitShell`** — creates `SessionInfo::create_pending()`, consuming `pending_legacy_ssh_session` to populate `IsLegacySSHSession::Yes { socket_path }`. Calls `reinit_shell()` to reset the block list. Polaris Terminal input becomes visible with "Starting shell...".
 4. **`Bootstrapped`** — `terminal_model.bootstrapped()` merges pending session info, emits `HandlerEvent::Bootstrapped`. The `ModelEventDispatcher` synchronously calls `sessions.initialize_bootstrapped_session()`, which creates the `RemoteCommandExecutor` from the socket path, stores the session, and emits `SessionBootstrapped`. The view shows the normal prompt.
 
 ### Key constraint
@@ -42,7 +42,7 @@ The challenge is that this introduces two independent async conditions that must
 
 ### 1. New feature flag
 
-Add `RemoteServerSSH` to the `FeatureFlag` enum in `rook_core/src/features.rs`. Add it to `DOGFOOD_FLAGS` for initial rollout.
+Add `RemoteServerSSH` to the `FeatureFlag` enum in `pterm_core/src/features.rs`. Add it to `DOGFOOD_FLAGS` for initial rollout.
 
 ### 2. Remote server setup state machine
 
@@ -65,7 +65,7 @@ enum RemoteServerSetupState {
 
 The setup runs as an async task, using the existing SSH ControlMaster socket (from `IsLegacySSHSession::Yes { socket_path }`) to execute remote commands. The steps are:
 
-1. **Check**: `ssh -o ControlPath={socket} placeholder@placeholder 'test -x ~/.rook/remote-server/oz && ~/.rook/remote-server/oz --version'`
+1. **Check**: `ssh -o ControlPath={socket} placeholder@placeholder 'test -x ~/.polaris-terminal/remote-server/oz && ~/.polaris-terminal/remote-server/oz --version'`
 2. **Install** (if check fails): pipe the following script into `bash -s` over the control socket SSH connection (mirroring how `RemoteCommandExecutor` runs commands today):
 
    ```sh
@@ -76,14 +76,14 @@ The setup runs as an async task, using the existing SSH ControlMaster socket (fr
      aarch64|arm64) pkg=oz-linux-aarch64.tar.gz ;;
      *) echo "unsupported arch: $arch" >&2; exit 2 ;;
    esac
-   mkdir -p "$HOME/.rook/remote-server"
-   curl -fSL "$ROOK_GET_URL?package=$pkg" -o "$HOME/.rook/remote-server/oz.tar.gz"
-   tar -xzf "$HOME/.rook/remote-server/oz.tar.gz" -C "$HOME/.rook/remote-server"
-   chmod +x "$HOME/.rook/remote-server/oz"
+   mkdir -p "$HOME/.polaris-terminal/remote-server"
+   curl -fSL "$POLARIS_TERMINAL_GET_URL?package=$pkg" -o "$HOME/.polaris-terminal/remote-server/oz.tar.gz"
+   tar -xzf "$HOME/.polaris-terminal/remote-server/oz.tar.gz" -C "$HOME/.polaris-terminal/remote-server"
+   chmod +x "$HOME/.polaris-terminal/remote-server/oz"
    ```
 
-   `$ROOK_GET_URL` is substituted at runtime from the configured server root URL (`SERVER_ROOT_URL` env var or its compiled-in default), pointing at `/download/cli`. Exit code 2 is mapped to `ErrorReason::UnsupportedPlatform`. The script is shipped as a constant `&str` in the install module. Parse `curl` stderr for download progress if available.
-3. **Launch**: `ssh -o ControlPath={socket} placeholder@placeholder '~/.rook/remote-server/oz'` — keep the SSH channel open, forwarding stdin/stdout.
+   `$POLARIS_TERMINAL_GET_URL` is substituted at runtime from the configured server root URL (`SERVER_ROOT_URL` env var or its compiled-in default), pointing at `/download/cli`. Exit code 2 is mapped to `ErrorReason::UnsupportedPlatform`. The script is shipped as a constant `&str` in the install module. Parse `curl` stderr for download progress if available.
+3. **Launch**: `ssh -o ControlPath={socket} placeholder@placeholder '~/.polaris-terminal/remote-server/oz'` — keep the SSH channel open, forwarding stdin/stdout.
 4. **Initialize**: Send a `ClientMessage { request_id, initialize: Initialize {} }` (length-prefixed protobuf) to the process's stdin. Read a `ServerMessage { initialize_response }` from stdout. Timeout after 10 seconds.
 
 The async task communicates state changes back to the UI via an event channel.
@@ -117,8 +117,8 @@ When the flag is disabled, or the session is not a legacy SSH session, the exist
 Extend `bootstrapping_shell_message()` in `prompt_render_helper.rs` to show stage-specific messages. The `Sessions` model (or a new model) needs to expose the current `RemoteServerSetupState` for the pending session. The render helper checks this state:
 
 - `RemoteServerSetupState::Checking` → "Starting shell..." (unchanged)
-- `RemoteServerSetupState::Installing { progress_percent: Some(p) }` → "Installing Rook SSH tools... ({p}%)"
-- `RemoteServerSetupState::Installing { progress_percent: None }` → "Installing Rook SSH tools..."
+- `RemoteServerSetupState::Installing { progress_percent: Some(p) }` → "Installing Polaris Terminal SSH tools... ({p}%)"
+- `RemoteServerSetupState::Installing { progress_percent: None }` → "Installing Polaris Terminal SSH tools..."
 - `RemoteServerSetupState::Initializing` → "Initializing..."
 - No remote server state (flag off, non-SSH) → existing behavior
 
@@ -142,7 +142,7 @@ The remote server process is spawned as an SSH channel via ControlMaster. When t
 1. User runs `ssh user@host`.
 2. `PreInteractiveSSHSession` DCS → no-op.
 3. `SSH` DCS → stores socket path in `pending_legacy_ssh_session`.
-4. `InitShell` DCS → creates `SessionInfo::create_pending()` with `IsLegacySSHSession::Yes { socket_path }`. Rook input appears with "Starting shell...". **If `RemoteServerSSH` flag is enabled**: kicks off the async remote server setup task using the socket path from the pending session info.
+4. `InitShell` DCS → creates `SessionInfo::create_pending()` with `IsLegacySSHSession::Yes { socket_path }`. Polaris Terminal input appears with "Starting shell...". **If `RemoteServerSSH` flag is enabled**: kicks off the async remote server setup task using the socket path from the pending session info.
 5. Setup task transitions: Checking → Installing (if needed) → Initializing. Each state change updates the `Sessions` model and triggers a prompt re-render.
 6. `Bootstrapped` DCS → `ModelEventDispatcher` stores the `BootstrappedEvent` instead of immediately initializing the session.
 7. Setup task sends `Event::RemoteServerReady { session_id, Ok(()) }`.

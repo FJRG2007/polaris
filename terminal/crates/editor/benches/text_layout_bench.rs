@@ -3,24 +3,24 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use rayon::ThreadPoolBuilder;
-use rook_editor::content::buffer::{StyledBufferBlock, StyledBufferRun, StyledTextBlock};
-use rook_editor::content::edit::EditDelta;
-use rook_editor::content::text::{BufferBlockStyle, TextStylesWithMetadata};
-use rook_editor::render::layout::TextLayout;
-use rook_editor::render::model::{
+use pterm_editor::content::buffer::{StyledBufferBlock, StyledBufferRun, StyledTextBlock};
+use pterm_editor::content::edit::EditDelta;
+use pterm_editor::content::text::{BufferBlockStyle, TextStylesWithMetadata};
+use pterm_editor::render::layout::TextLayout;
+use pterm_editor::render::model::{
     BrokenLinkStyle, CheckBoxStyle, HorizontalRuleStyle, InlineCodeStyle, ParagraphStyles,
     RenderLayoutOptions, RichTextStyles, TableStyle,
 };
 #[cfg(target_os = "macos")]
-use rookui::platform::mac::FontDB as MacFontDB;
-use rookui_core::App;
-use rookui_core::color::ColorU;
-use rookui_core::elements::{Border, Fill};
+use ptermui::platform::mac::FontDB as MacFontDB;
+use ptermui_core::App;
+use ptermui_core::color::ColorU;
+use ptermui_core::elements::{Border, Fill};
 #[cfg(target_os = "macos")]
-use rookui_core::fonts::Cache as FontCache;
-use rookui_core::fonts::{FamilyId, Weight};
-use rookui_core::units::IntoPixels;
+use ptermui_core::fonts::Cache as FontCache;
+use ptermui_core::fonts::{FamilyId, Weight};
+use ptermui_core::units::IntoPixels;
+use rayon::ThreadPoolBuilder;
 use string_offset::CharOffset;
 
 const BLOCK_COUNT: usize = 4_096;
@@ -136,7 +136,7 @@ fn layout_delta(
     delta: &EditDelta,
     text_layout: &TextLayout<'_>,
     layout_options: &RenderLayoutOptions,
-    app: &rookui_core::AppContext,
+    app: &ptermui_core::AppContext,
 ) {
     black_box(delta.layout_delta(text_layout, None, layout_options, None, app));
 }

@@ -4,10 +4,10 @@ use std::path::PathBuf;
 use chrono::NaiveDateTime;
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{Align, ConstrainedBox, Flex, Highlight, ParentElement, Shrinkable, Text};
-use rookui::fonts::{Properties, Weight};
-use rookui::{AppContext, Element, SingletonEntity};
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{Align, ConstrainedBox, Flex, Highlight, ParentElement, Shrinkable, Text};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::search::action::search_item::styles;

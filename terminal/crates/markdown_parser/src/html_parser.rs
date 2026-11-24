@@ -27,7 +27,7 @@ const PHRASING_ELEMENT_TAGS: &[&str] = &[
     "span", "i", "code", "strong", "em", "br", "a", "s", "u", "ins",
 ];
 
-pub const ROOK_EMBED_ATTRIBUTE_NAME: &str = "data-rook-embedded-item";
+pub const POLARIS_TERMINAL_EMBED_ATTRIBUTE_NAME: &str = "data-polaris-terminal-embedded-item";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ListArg {
@@ -268,7 +268,8 @@ pub fn parse_html(html: &str) -> Result<FormattedText> {
                 result.push_back(match node_name.as_str() {
                     // If it's a code block, process its children node as plain text.
                     "pre" => {
-                        if let Some(val) = get_attribute(&attrs.borrow(), ROOK_EMBED_ATTRIBUTE_NAME)
+                        if let Some(val) =
+                            get_attribute(&attrs.borrow(), POLARIS_TERMINAL_EMBED_ATTRIBUTE_NAME)
                         {
                             FormattedTextLine::Embedded(Mapping::from_iter([(
                                 Value::String("id".to_string()),

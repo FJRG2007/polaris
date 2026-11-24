@@ -1,7 +1,7 @@
 use ai::LLMId;
-use rook_core::features::FeatureFlag;
-use rook_core::telemetry::testing::MockTelemetryContextProvider;
-use rookui_core::{App, Entity, ModelHandle};
+use pterm_core::features::FeatureFlag;
+use pterm_core::telemetry::testing::MockTelemetryContextProvider;
+use ptermui_core::{App, Entity, ModelHandle};
 
 use crate::OnboardingIntention;
 use crate::model::{
@@ -284,7 +284,7 @@ fn account_first_path_uses_agent_ui_defaults() {
             assert!(ui.show_conversation_history);
             assert!(ui.show_project_explorer);
             assert!(ui.show_global_search);
-            assert!(ui.show_rook_drive);
+            assert!(ui.show_pterm_drive);
             assert!(ui.show_code_review_button);
         });
     });
@@ -301,7 +301,7 @@ fn agent_path_routes_through_ai_setup() {
         model.update(&mut app, |model, ctx| model.next(ctx));
         assert_eq!(step(&app, &model), OnboardingStep::AiSetup);
 
-        // The default AI setup choice is the Rook agent.
+        // The default AI setup choice is the Polaris Terminal agent.
         model.update(&mut app, |model, ctx| model.next(ctx));
         assert_eq!(step(&app, &model), OnboardingStep::Agent);
         model.update(&mut app, |model, ctx| model.next(ctx));
@@ -471,7 +471,7 @@ fn agent_intent_keeps_ai_enabled_for_any_setup_choice() {
     App::test((), |mut app| async move {
         let model = add_test_model(&mut app);
 
-        // Default agent intention + "Use Rook Agent" enables AI.
+        // Default agent intention + "Use Polaris Terminal Agent" enables AI.
         model.read(&app, |model, _| assert!(model.settings().is_ai_enabled()));
 
         // "Use third party agents" still keeps AI enabled: agent intent always
@@ -481,9 +481,9 @@ fn agent_intent_keeps_ai_enabled_for_any_setup_choice() {
         });
         model.read(&app, |model, _| assert!(model.settings().is_ai_enabled()));
 
-        // Switching back to Rook Agent also keeps AI enabled.
+        // Switching back to Polaris Terminal Agent also keeps AI enabled.
         model.update(&mut app, |model, ctx| {
-            model.set_ai_setup_choice(AiSetupChoice::RookAgent, ctx)
+            model.set_ai_setup_choice(AiSetupChoice::PtermAgent, ctx)
         });
         model.read(&app, |model, _| assert!(model.settings().is_ai_enabled()));
     });
@@ -519,7 +519,7 @@ fn progress_reports_v3_positions_for_agent_path() {
     App::test((), |mut app| async move {
         let model = add_test_model(&mut app);
 
-        // Rook Agent path: Intention → AiSetup → Agent → AiAccess → Customize → ThemePicker.
+        // Polaris Terminal Agent path: Intention → AiSetup → Agent → AiAccess → Customize → ThemePicker.
         let cases = [
             (OnboardingStep::Intention, (0, 6)),
             (OnboardingStep::AiSetup, (1, 6)),
@@ -545,7 +545,7 @@ fn progress_reports_v3_positions_for_third_party_path() {
         });
 
         // Third-party path has no "Choose how to access AI" step, so it is one
-        // dot shorter than the Rook Agent path.
+        // dot shorter than the Polaris Terminal Agent path.
         let cases = [
             (OnboardingStep::Intention, (0, 5)),
             (OnboardingStep::AiSetup, (1, 5)),

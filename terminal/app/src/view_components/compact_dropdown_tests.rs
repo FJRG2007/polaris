@@ -1,6 +1,6 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::platform::WindowStyle;
-use rookui::{App, View};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::platform::WindowStyle;
+use ptermui::{App, View};
 
 use super::{CompactDropdown, CompactDropdownItem};
 use crate::menu::MenuVariant;

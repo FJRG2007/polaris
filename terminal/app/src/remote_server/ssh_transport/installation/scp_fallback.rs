@@ -89,7 +89,7 @@ pub(super) async fn install(socket_path: &Path) -> Result<(), Error> {
 }
 
 fn remote_server_tarball_cache_root() -> PathBuf {
-    rook_core::paths::cache_dir()
+    pterm_core::paths::cache_dir()
         .join("remote-server")
         .join("tarballs")
 }

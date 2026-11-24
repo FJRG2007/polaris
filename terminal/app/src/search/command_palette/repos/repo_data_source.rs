@@ -1,7 +1,7 @@
 use ai::workspace::WorkspaceMetadata;
 use fuzzy_match::{FuzzyMatchResult, match_indices_case_insensitive};
 use itertools::Itertools;
-use rookui::{AppContext, Entity, SingletonEntity};
+use ptermui::{AppContext, Entity, SingletonEntity};
 
 use super::RepoSearchItem;
 use crate::ai::persisted_workspace::PersistedWorkspace;

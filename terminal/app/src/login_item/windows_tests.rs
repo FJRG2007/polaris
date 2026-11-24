@@ -21,7 +21,7 @@ impl ScratchSubkey {
                 .as_nanos(),
             name,
         );
-        let path = format!(r"Software\Rook\LoginItemTests\{suffix}");
+        let path = format!(r"Software\Polaris Terminal\LoginItemTests\{suffix}");
         RegKey::predef(HKEY_CURRENT_USER)
             .create_subkey(&path)
             .expect("create scratch subkey");
@@ -49,11 +49,11 @@ impl Drop for ScratchSubkey {
 #[test]
 fn register_writes_quoted_path_with_autostart_flag() {
     let scratch = ScratchSubkey::new("register_writes_quoted_path_with_autostart_flag");
-    let exe = PathBuf::from(r"C:\Program Files\Rook\rook.exe");
-    register_run_value_in(HKEY_CURRENT_USER, &scratch.path, "Rook", &exe).unwrap();
+    let exe = PathBuf::from(r"C:\Program Files\Polaris Terminal\polaris-terminal.exe");
+    register_run_value_in(HKEY_CURRENT_USER, &scratch.path, "Polaris Terminal", &exe).unwrap();
     assert_eq!(
-        scratch.read("Rook").as_deref(),
-        Some(r#""C:\Program Files\Rook\rook.exe" --autostart"#)
+        scratch.read("Polaris Terminal").as_deref(),
+        Some(r#""C:\Program Files\Polaris Terminal\polaris-terminal.exe" --autostart"#)
     );
 }
 
@@ -63,20 +63,20 @@ fn register_overwrites_previous_path() {
     register_run_value_in(
         HKEY_CURRENT_USER,
         &scratch.path,
-        "Rook",
-        &PathBuf::from(r"C:\old\rook.exe"),
+        "Polaris Terminal",
+        &PathBuf::from(r"C:\old\polaris-terminal.exe"),
     )
     .unwrap();
     register_run_value_in(
         HKEY_CURRENT_USER,
         &scratch.path,
-        "Rook",
-        &PathBuf::from(r"C:\new\rook.exe"),
+        "Polaris Terminal",
+        &PathBuf::from(r"C:\new\polaris-terminal.exe"),
     )
     .unwrap();
     assert_eq!(
-        scratch.read("Rook").as_deref(),
-        Some(r#""C:\new\rook.exe" --autostart"#)
+        scratch.read("Polaris Terminal").as_deref(),
+        Some(r#""C:\new\polaris-terminal.exe" --autostart"#)
     );
 }
 
@@ -84,18 +84,18 @@ fn register_overwrites_previous_path() {
 fn unregister_is_idempotent() {
     let scratch = ScratchSubkey::new("unregister_is_idempotent");
     // Never registered: unregister should be Ok.
-    unregister_run_value_in(HKEY_CURRENT_USER, &scratch.path, "Rook").unwrap();
+    unregister_run_value_in(HKEY_CURRENT_USER, &scratch.path, "Polaris Terminal").unwrap();
     // Register, then unregister twice.
     register_run_value_in(
         HKEY_CURRENT_USER,
         &scratch.path,
-        "Rook",
-        &PathBuf::from(r"C:\rook.exe"),
+        "Polaris Terminal",
+        &PathBuf::from(r"C:\polaris-terminal.exe"),
     )
     .unwrap();
-    unregister_run_value_in(HKEY_CURRENT_USER, &scratch.path, "Rook").unwrap();
-    unregister_run_value_in(HKEY_CURRENT_USER, &scratch.path, "Rook").unwrap();
-    assert!(scratch.read("Rook").is_none());
+    unregister_run_value_in(HKEY_CURRENT_USER, &scratch.path, "Polaris Terminal").unwrap();
+    unregister_run_value_in(HKEY_CURRENT_USER, &scratch.path, "Polaris Terminal").unwrap();
+    assert!(scratch.read("Polaris Terminal").is_none());
 }
 
 #[test]
@@ -104,24 +104,24 @@ fn unregister_leaves_other_values_alone() {
     register_run_value_in(
         HKEY_CURRENT_USER,
         &scratch.path,
-        "Rook",
-        &PathBuf::from(r"C:\rook.exe"),
+        "Polaris Terminal",
+        &PathBuf::from(r"C:\polaris-terminal.exe"),
     )
     .unwrap();
     register_run_value_in(
         HKEY_CURRENT_USER,
         &scratch.path,
-        "RookPreview",
-        &PathBuf::from(r"C:\rook-preview.exe"),
+        "PolarisTerminalPreview",
+        &PathBuf::from(r"C:\polaris-terminal-preview.exe"),
     )
     .unwrap();
 
-    unregister_run_value_in(HKEY_CURRENT_USER, &scratch.path, "Rook").unwrap();
+    unregister_run_value_in(HKEY_CURRENT_USER, &scratch.path, "Polaris Terminal").unwrap();
 
-    assert!(scratch.read("Rook").is_none());
+    assert!(scratch.read("Polaris Terminal").is_none());
     assert_eq!(
-        scratch.read("RookPreview").as_deref(),
-        Some(r#""C:\rook-preview.exe" --autostart"#)
+        scratch.read("PolarisTerminalPreview").as_deref(),
+        Some(r#""C:\polaris-terminal-preview.exe" --autostart"#)
     );
 }
 
@@ -129,8 +129,8 @@ fn unregister_leaves_other_values_alone() {
 fn unregister_missing_subkey_is_ok() {
     unregister_run_value_in(
         HKEY_CURRENT_USER,
-        r"Software\Rook\LoginItemTests\does-not-exist",
-        "Rook",
+        r"Software\Polaris Terminal\LoginItemTests\does-not-exist",
+        "Polaris Terminal",
     )
     .unwrap();
 }
@@ -143,21 +143,21 @@ fn run_value_is_enabled_needs_the_value() {
         HKEY_CURRENT_USER,
         &run,
         &approved,
-        "Rook"
+        "Polaris Terminal"
     ));
 
     register_run_value_in(
         HKEY_CURRENT_USER,
         &run,
-        "Rook",
-        &PathBuf::from(r"C:\rook.exe"),
+        "Polaris Terminal",
+        &PathBuf::from(r"C:\polaris-terminal.exe"),
     )
     .unwrap();
     assert!(run_value_is_enabled_in(
         HKEY_CURRENT_USER,
         &run,
         &approved,
-        "Rook"
+        "Polaris Terminal"
     ));
 }
 
@@ -168,8 +168,8 @@ fn run_value_is_enabled_honors_task_manager() {
     register_run_value_in(
         HKEY_CURRENT_USER,
         &run,
-        "Rook",
-        &PathBuf::from(r"C:\rook.exe"),
+        "Polaris Terminal",
+        &PathBuf::from(r"C:\polaris-terminal.exe"),
     )
     .unwrap();
     let (approved_key, _) = RegKey::predef(HKEY_CURRENT_USER)
@@ -180,7 +180,7 @@ fn run_value_is_enabled_honors_task_manager() {
         bytes[0] = first_byte;
         approved_key
             .set_raw_value(
-                "Rook",
+                "Polaris Terminal",
                 &winreg::RegValue {
                     bytes,
                     vtype: winreg::enums::RegType::REG_BINARY,
@@ -195,22 +195,22 @@ fn run_value_is_enabled_honors_task_manager() {
         HKEY_CURRENT_USER,
         &run,
         &approved,
-        "Rook"
+        "Polaris Terminal"
     ));
     set_flags(0x03);
     assert!(!run_value_is_enabled_in(
         HKEY_CURRENT_USER,
         &run,
         &approved,
-        "Rook"
+        "Polaris Terminal"
     ));
 }
 
 #[test]
 fn task_name_is_per_user() {
     assert_eq!(
-        task_name("RookOss", "S-1-5-21-1-2-3-1001"),
-        "RookOss Startup Task-S-1-5-21-1-2-3-1001"
+        task_name("PolarisTerminal", "S-1-5-21-1-2-3-1001"),
+        "PolarisTerminal Startup Task-S-1-5-21-1-2-3-1001"
     );
 }
 
@@ -218,9 +218,11 @@ fn task_name_is_per_user() {
 fn task_xml_launches_exe_with_autostart_flag() {
     let xml = task_xml(
         "S-1-5-21-1-2-3-1001",
-        &PathBuf::from(r"C:\Program Files\Rook & Co\rook.exe"),
+        &PathBuf::from(r"C:\Program Files\Polaris Terminal & Co\polaris-terminal.exe"),
     );
-    assert!(xml.contains(r"<Command>C:\Program Files\Rook &amp; Co\rook.exe</Command>"));
+    assert!(xml.contains(
+        r"<Command>C:\Program Files\Polaris Terminal &amp; Co\polaris-terminal.exe</Command>"
+    ));
     assert!(xml.contains("<Arguments>--autostart</Arguments>"));
     assert!(xml.contains("<UserId>S-1-5-21-1-2-3-1001</UserId>"));
     assert!(xml.contains("<ExecutionTimeLimit>PT0S</ExecutionTimeLimit>"));
@@ -235,10 +237,10 @@ fn current_user_sid_is_a_user_sid() {
 /// Runs against the real Task Scheduler, under an app name no install uses.
 #[test]
 fn register_and_unregister_task_round_trip() {
-    let app_name = format!("RookLoginItemTest{}", std::process::id());
+    let app_name = format!("PtermLoginItemTest{}", std::process::id());
     let task_name = task_name(&app_name, &current_user_sid().unwrap());
     let exists = || run_schtasks(&["/Query".as_ref(), "/TN".as_ref(), task_name.as_ref()]).is_ok();
-    let exe = PathBuf::from(r"C:\Program Files\Rook & Co\rook.exe");
+    let exe = PathBuf::from(r"C:\Program Files\Polaris Terminal & Co\polaris-terminal.exe");
 
     register_task(&app_name, &exe).unwrap();
     // Registering again replaces the task rather than failing.

@@ -2,16 +2,16 @@
 ## Context
 The TUI transcript renders terminal blocks and simple AI exchange blocks in canonical terminal block-list order. AI exchange blocks currently render user input plus streamed plain-text output, but action/tool-call messages are invisible in the transcript even though the shared Agent Mode controller already receives and queues those actions.
 Relevant code at `526ade4522df0e65f138c67dcbcb90f1a3ce63e9`:
-- [`crates/rook_tui/src/session.rs`](https://github.com/FJRG2007/rook/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/crates/rook_tui/src/session.rs) — boots the headless app, creates `LocalTtyTerminalManager::<TuiTerminalSessionView>`, and keeps the TUI driver plus terminal manager alive.
-- [`crates/rook_tui/src/terminal_session_view.rs`](https://github.com/FJRG2007/rook/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/crates/rook_tui/src/terminal_session_view.rs) — constructs the production AI stack for the TUI surface: `ActiveSession`, `TuiConversationSelection`, `BlocklistAIContextModel`, `BlocklistAIInputModel`, `BlocklistAIActionModel`, and `BlocklistAIController`.
-- [`crates/rook_tui/src/transcript_view.rs`](https://github.com/FJRG2007/rook/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/crates/rook_tui/src/transcript_view.rs) — subscribes to `BlocklistAIHistoryModel`, creates `TuiAIBlock`s for visible exchanges, and appends them to `TerminalModel::BlockList` as `RichContentType::AIBlock`.
-- [`crates/rook_tui/src/tui_block_list_viewport_source.rs`](https://github.com/FJRG2007/rook/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/crates/rook_tui/src/tui_block_list_viewport_source.rs) — walks the canonical block-list sum tree, measures dirty rich-content views, updates cached heights, and renders terminal blocks plus TUI agent blocks.
-- [`crates/rook_tui/src/agent_block.rs`](https://github.com/FJRG2007/rook/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/crates/rook_tui/src/agent_block.rs) — currently derives `TuiAIBlockSection`s from `output.text_from_agent_output()`, which only yields `AIAgentOutputMessageType::Text` and therefore drops action/tool-call messages.
-- [`app/src/ai/agent/mod.rs`](https://github.com/FJRG2007/rook/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/app/src/ai/agent/mod.rs) — defines `AIAgentOutput`, ordered `AIAgentOutputMessage`s, `AIAgentOutputMessageType::Action(AIAgentAction)`, and helper iterators such as `text_from_agent_output()` and `actions()`.
-- [`app/src/ai/blocklist/block/view_impl/output.rs`](https://github.com/FJRG2007/rook/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/app/src/ai/blocklist/block/view_impl/output.rs) — GUI AI block rendering loops over `output.messages` in order and delegates each message variant to the appropriate renderer.
-- [`app/src/ai/blocklist/controller.rs`](https://github.com/FJRG2007/rook/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/app/src/ai/blocklist/controller.rs) — when a response stream finishes, queues emitted actions through `BlocklistAIActionModel::queue_actions` and later sends completed action results back to the model.
-- [`app/src/ai/blocklist/action_model.rs`](https://github.com/FJRG2007/rook/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/app/src/ai/blocklist/action_model.rs) and [`app/src/ai/blocklist/action_model/execute.rs`](https://github.com/FJRG2007/rook/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/app/src/ai/blocklist/action_model/execute.rs) — own the shared action queue, preprocessing, permission checks, serial/parallel scheduling, cancellation, and per-action execution dispatch.
-- [`app/src/ai/blocklist/action_model/execute/request_file_edits.rs`](https://github.com/FJRG2007/rook/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/app/src/ai/blocklist/action_model/execute/request_file_edits.rs) — currently requires a registered GUI `CodeDiffView` before `RequestFileEdits` can execute.
+- [`crates/pterm_tui/src/session.rs`](https://github.com/FJRG2007/polaris/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/terminal/crates/pterm_tui/src/session.rs) — boots the headless app, creates `LocalTtyTerminalManager::<TuiTerminalSessionView>`, and keeps the TUI driver plus terminal manager alive.
+- [`crates/pterm_tui/src/terminal_session_view.rs`](https://github.com/FJRG2007/polaris/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/terminal/crates/pterm_tui/src/terminal_session_view.rs) — constructs the production AI stack for the TUI surface: `ActiveSession`, `TuiConversationSelection`, `BlocklistAIContextModel`, `BlocklistAIInputModel`, `BlocklistAIActionModel`, and `BlocklistAIController`.
+- [`crates/pterm_tui/src/transcript_view.rs`](https://github.com/FJRG2007/polaris/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/terminal/crates/pterm_tui/src/transcript_view.rs) — subscribes to `BlocklistAIHistoryModel`, creates `TuiAIBlock`s for visible exchanges, and appends them to `TerminalModel::BlockList` as `RichContentType::AIBlock`.
+- [`crates/pterm_tui/src/tui_block_list_viewport_source.rs`](https://github.com/FJRG2007/polaris/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/terminal/crates/pterm_tui/src/tui_block_list_viewport_source.rs) — walks the canonical block-list sum tree, measures dirty rich-content views, updates cached heights, and renders terminal blocks plus TUI agent blocks.
+- [`crates/pterm_tui/src/agent_block.rs`](https://github.com/FJRG2007/polaris/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/terminal/crates/pterm_tui/src/agent_block.rs) — currently derives `TuiAIBlockSection`s from `output.text_from_agent_output()`, which only yields `AIAgentOutputMessageType::Text` and therefore drops action/tool-call messages.
+- [`app/src/ai/agent/mod.rs`](https://github.com/FJRG2007/polaris/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/terminal/app/src/ai/agent/mod.rs) — defines `AIAgentOutput`, ordered `AIAgentOutputMessage`s, `AIAgentOutputMessageType::Action(AIAgentAction)`, and helper iterators such as `text_from_agent_output()` and `actions()`.
+- [`app/src/ai/blocklist/block/view_impl/output.rs`](https://github.com/FJRG2007/polaris/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/terminal/app/src/ai/blocklist/block/view_impl/output.rs) — GUI AI block rendering loops over `output.messages` in order and delegates each message variant to the appropriate renderer.
+- [`app/src/ai/blocklist/controller.rs`](https://github.com/FJRG2007/polaris/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/terminal/app/src/ai/blocklist/controller.rs) — when a response stream finishes, queues emitted actions through `BlocklistAIActionModel::queue_actions` and later sends completed action results back to the model.
+- [`app/src/ai/blocklist/action_model.rs`](https://github.com/FJRG2007/polaris/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/terminal/app/src/ai/blocklist/action_model.rs) and [`app/src/ai/blocklist/action_model/execute.rs`](https://github.com/FJRG2007/polaris/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/terminal/app/src/ai/blocklist/action_model/execute.rs) — own the shared action queue, preprocessing, permission checks, serial/parallel scheduling, cancellation, and per-action execution dispatch.
+- [`app/src/ai/blocklist/action_model/execute/request_file_edits.rs`](https://github.com/FJRG2007/polaris/blob/526ade4522df0e65f138c67dcbcb90f1a3ce63e9/terminal/app/src/ai/blocklist/action_model/execute/request_file_edits.rs) — currently requires a registered GUI `CodeDiffView` before `RequestFileEdits` can execute.
 The current TUI transcript work deliberately uses production-shaped models instead of a separate TUI-only conversation pipeline. This feature should keep that direction: render action messages in the TUI, but continue to execute tool calls through the shared action model.
 ## Proposed changes
 ### End-to-end data flow
@@ -124,7 +124,7 @@ The command event should use `CommandExecutionSource::AI` and `AgentInteractionM
 `RequestFileEdits` renders in the transcript like other tool calls, but it is not executed on non-GUI surfaces in this branch: `RequestFileEditsExecutor::execute` still requires a registered GUI `CodeDiffView` and returns `NotReady` otherwise (`app/src/ai/blocklist/action_model/execute/request_file_edits.rs`).
 Making file edits executable without a GUI review view is handled in the stacked `surface-agnostic-file-edit-execution` follow-up, which routes both surfaces through a shared, non-GUI `PersistDiffModel`. This branch deliberately adds no headless persistence path.
 ### Public TUI export boundary
-Extend `app/src/tui_export.rs` only for types that `rook_tui` must name directly:
+Extend `app/src/tui_export.rs` only for types that `pterm_tui` must name directly:
 - `AIAgentAction`, `AIAgentActionId`, `AIAgentActionType`, and `TaskId` for the `ToolCall` section variant and test fixtures.
 - `AIAgentPtyWriteMode`, `AgentInteractionMetadata`, and `ShellCommandExecutorEvent` for the PTY bridge.
 Do not export action status/result types for this feature. The static stub renderer does not need them.
@@ -134,7 +134,7 @@ Do not render full tool results in this change. Finished tool results continue t
 Do not add TUI approval editors for commands, run-agents configs, or ask-user-question answers. `RunToCompletion` is the first-step execution policy.
 Do not change canonical transcript ordering. Agent blocks remain `RichContentType::AIBlock` entries in `TerminalModel::BlockList`, and terminal blocks continue to render through `render_terminal_block_rows`.
 ## Testing and validation
-Add unit tests in `crates/rook_tui/src/agent_block_tests.rs` for the ordered message adapter:
+Add unit tests in `crates/pterm_tui/src/agent_block_tests.rs` for the ordered message adapter:
 - `Text -> Action -> Text` renders as text, `executed a tool call`, text in that order.
 - Multiple action messages render multiple `ToolCall` stub lines.
 - The `ToolCall` section preserves the action ID and action type in derived content even though rendering only emits the static label.
@@ -145,10 +145,10 @@ The shell-command PTY bridge is covered by compilation only for this branch. `Tu
 File-edit execution is out of scope for this branch (deferred to the stacked follow-up), so no `RequestFileEditsExecutor` persistence tests are added here.
 Run targeted tests first:
 ```bash
-cargo test -p rook_tui agent_block
-cargo test -p rook_tui transcript_view
-cargo test -p rook_tui tui_block_list_viewport_source
-cargo test -p rook request_file_edits
+cargo test -p pterm_tui agent_block
+cargo test -p pterm_tui transcript_view
+cargo test -p pterm_tui tui_block_list_viewport_source
+cargo test -p polaris-terminal request_file_edits
 ```
 Then run formatting and the standard Rust validation for touched crates:
 ```bash

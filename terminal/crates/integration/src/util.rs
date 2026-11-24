@@ -3,13 +3,13 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use itertools::Itertools as _;
-use rook::integration_testing::terminal::util::{
+use polaris_terminal::integration_testing::terminal::util::{
     ExpectedOutput, current_shell_starter_and_version, default_histfile_directory,
 };
-use rook::integration_testing::view_getters;
-use rook::terminal::shell;
-use rook::terminal::shell::ShellType;
-use rookui_core::{App, WindowId};
+use polaris_terminal::integration_testing::view_getters;
+use polaris_terminal::terminal::shell;
+use polaris_terminal::terminal::shell::ShellType;
+use ptermui_core::{App, WindowId};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use version_compare::Version;
@@ -130,7 +130,7 @@ pub fn write_rc_files_for_test<P, C>(
     }
 }
 
-/// Writes the same `rc_contents` for all possible shell types supported by Rook.
+/// Writes the same `rc_contents` for all possible shell types supported by Polaris Terminal.
 pub fn write_all_rc_files_for_test<P, C>(dir: P, rc_contents: C)
 where
     P: AsRef<Path>,

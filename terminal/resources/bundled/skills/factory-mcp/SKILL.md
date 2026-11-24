@@ -1,19 +1,19 @@
 ---
 name: factory-mcp
-description: Use the Rook Factory MCP to hand work to a software factory and collaborate with it — bundle local work and send it to the cloud, find factory tasks from a Slack thread / Linear ticket / description, and pull a task down to test or iterate locally and hand it back
+description: Use the Polaris Terminal Factory MCP to hand work to a software factory and collaborate with it — bundle local work and send it to the cloud, find factory tasks from a Slack thread / Linear ticket / description, and pull a task down to test or iterate locally and hand it back
 ---
 
 # Factory MCP
 
-The canonical Factory workflow is served by the connected `rook-factory` MCP
+The canonical Factory workflow is served by the connected `polaris-terminal-factory` MCP
 server so its instructions stay synchronized with the live tool schemas.
 
 Before invoking a Factory MCP tool:
 
-1. Confirm the `rook-factory` server and its tools are available. If they are
+1. Confirm the `polaris-terminal-factory` server and its tools are available. If they are
    unavailable, stop and tell the user that Factory MCP must be connected and
    authenticated.
-2. Read `skill://rook/factory-mcp/SKILL.md`, then follow the returned skill and
+2. Read `skill://polaris-terminal/factory-mcp/SKILL.md`, then follow the returned skill and
    its referenced resources. If the skill cannot be read, use the server
    instructions and live tool descriptions.
 

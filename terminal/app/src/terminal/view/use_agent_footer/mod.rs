@@ -5,7 +5,7 @@
 //! Gemini CLI, Codex), it displays a specialized footer with additional functionality.
 
 use base64::Engine;
-use rookui::clipboard::{ClipboardContent, ImageData};
+use ptermui::clipboard::{ClipboardContent, ImageData};
 
 use crate::ai::agent::ImageContext;
 use crate::ai::blocklist::agent_view::agent_input_footer::{
@@ -16,7 +16,7 @@ use crate::terminal::shared_session::{
     SharedSessionActionSource, SharedSessionScrollbackType, SharedSessionSource,
 };
 use crate::util::image::{MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT, MIME_SNIFF_BYTES, infer_mime_type};
-mod rookify_footer;
+mod ptermify_footer;
 
 use std::path::Path;
 use std::sync::{Arc, LazyLock};
@@ -24,24 +24,24 @@ use std::time::Duration;
 
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
-use rook_core::features::FeatureFlag;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::settings::Setting;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::color::contrast::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::settings::Setting;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::color::contrast::{
     MinimumAllowedContrast, high_enough_contrast, pick_best_foreground_color,
 };
-use rook_core::ui::theme::Fill as ThemeFill;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_error;
-use rook_terminal::model::escape_sequences::{BRACKETED_PASTE_END, BRACKETED_PASTE_START};
-use rookify_footer::{RookifyFooterView, RookifyFooterViewEvent};
-use rookui::r#async::Timer;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill as ThemeFill;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_error;
+use pterm_terminal::model::escape_sequences::{BRACKETED_PASTE_END, BRACKETED_PASTE_START};
+use ptermify_footer::{PtermifyFooterView, PtermifyFooterViewEvent};
+use ptermui::r#async::Timer;
+use ptermui::elements::{
     ChildView, Container, CrossAxisAlignment, Empty, Expanded, Flex, MainAxisSize, ParentElement,
 };
-use rookui::keymap::Keystroke;
-use rookui::{
+use ptermui::keymap::Keystroke;
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -141,7 +141,7 @@ fn rich_input_submit_strategy(agent: CLIAgent) -> RichInputSubmitStrategy {
         | CLIAgent::Kiro
         | CLIAgent::Goose
         | CLIAgent::Vibe
-        | CLIAgent::RookTui
+        | CLIAgent::PtermTui
         | CLIAgent::Unknown => RichInputSubmitStrategy::Inline,
     }
 }
@@ -279,11 +279,11 @@ impl TerminalView {
             UseAgentToolbarEvent::HideRichInput => {
                 self.close_cli_agent_rich_input_and_disable_auto_toggle(ctx);
             }
-            UseAgentToolbarEvent::Rookify => {
+            UseAgentToolbarEvent::Ptermify => {
                 self.hide_use_agent_footer_in_blocklist(ctx);
                 self.handle_action(&TerminalAction::TriggerSubshellBootstrap, ctx);
                 send_telemetry_from_ctx!(
-                    TelemetryEvent::RookifyFooterAcceptedRookify { is_ssh: false },
+                    TelemetryEvent::PtermifyFooterAcceptedPtermify { is_ssh: false },
                     ctx
                 );
             }
@@ -307,8 +307,8 @@ impl TerminalView {
     ) -> bool {
         let ai_settings = AISettings::as_ref(app);
 
-        // If the rookify footer is active, a subshell was detected and we should show the footer.
-        if self.use_agent_footer.as_ref(app).is_rookify_active(app) {
+        // If the ptermify footer is active, a subshell was detected and we should show the footer.
+        if self.use_agent_footer.as_ref(app).is_ptermify_active(app) {
             return true;
         }
 
@@ -324,7 +324,7 @@ impl TerminalView {
             }
             // For CLI agent commands, only check the CLI agent footer setting.
             // This is independent of the global AI toggle so that users who
-            // disable Rook AI still get the footer for third-party coding agents.
+            // disable Polaris Terminal AI still get the footer for third-party coding agents.
             if !*ai_settings.should_render_cli_agent_footer {
                 return false;
             }
@@ -404,8 +404,8 @@ impl TerminalView {
     }
 
     /// Returns whether the active long-running command in this terminal is
-    /// Rook's own headless TUI (`rook_tui`).
-    pub(super) fn is_running_rook_tui(&self, model: &TerminalModel, ctx: &AppContext) -> bool {
+    /// Polaris Terminal's own headless TUI (`pterm_tui`).
+    pub(super) fn is_running_pterm_tui(&self, model: &TerminalModel, ctx: &AppContext) -> bool {
         let active_block = model.block_list().active_block();
         if !active_block.is_active_and_long_running() {
             return false;
@@ -419,7 +419,7 @@ impl TerminalView {
                     .map(|session| session.shell_family().escape_char())
             })
         });
-        CLIAgent::RookTui.matches_command(&command, escape_char)
+        CLIAgent::PtermTui.matches_command(&command, escape_char)
     }
 
     /// Updates the UI during a long running command to agent "tagged-in state".
@@ -455,7 +455,7 @@ impl TerminalView {
 
         if !self.model.lock().is_alt_screen_active() {
             self.use_agent_footer.update(ctx, |footer, ctx| {
-                footer.clear_rookify(ctx);
+                footer.clear_ptermify(ctx);
             });
             self.hide_use_agent_footer_in_blocklist(ctx);
         }
@@ -1136,8 +1136,8 @@ pub struct UseAgentToolbar {
     // Shared agent input footer (renders CLI agent mode when a CLI session is active).
     agent_input_footer: ViewHandle<AgentInputFooter>,
 
-    // Rookify footer UI (shown when a subshell/SSH command is detected).
-    rookify_footer_view: ViewHandle<RookifyFooterView>,
+    // Ptermify footer UI (shown when a subshell/SSH command is detected).
+    ptermify_footer_view: ViewHandle<PtermifyFooterView>,
 
     // `true` if the user has dismissed the footer.
     //
@@ -1164,7 +1164,7 @@ impl UseAgentToolbar {
             .with_icon(Icon::Agent)
             .with_keybinding(KeystrokeSource::Fixed(USE_AGENT_KEYSTROKE.clone()), ctx)
             .with_size(button_size)
-            .with_tooltip("Ask the Rook agent to assist")
+            .with_tooltip("Ask the Polaris Terminal agent to assist")
             .with_tooltip_alignment(TooltipAlignment::Left)
             .on_click(|ctx| {
                 ctx.dispatch_typed_action(TerminalAction::SetInputModeAgent);
@@ -1178,7 +1178,7 @@ impl UseAgentToolbar {
             .with_icon(Icon::Agent)
             .with_keybinding(KeystrokeSource::Fixed(USE_AGENT_KEYSTROKE.clone()), ctx)
             .with_size(button_size)
-            .with_tooltip("Ask the Rook agent to resume")
+            .with_tooltip("Ask the Polaris Terminal agent to resume")
             .with_tooltip_alignment(TooltipAlignment::Left)
             .on_click(|ctx| {
                 ctx.dispatch_typed_action(TerminalAction::SetInputModeAgent);
@@ -1210,11 +1210,11 @@ impl UseAgentToolbar {
             me.handle_agent_input_footer_event(event, ctx);
         });
 
-        let rookify_footer_view =
-            ctx.add_typed_action_view(|ctx| RookifyFooterView::new(terminal_model.clone(), ctx));
+        let ptermify_footer_view =
+            ctx.add_typed_action_view(|ctx| PtermifyFooterView::new(terminal_model.clone(), ctx));
 
-        ctx.subscribe_to_view(&rookify_footer_view, |me, _, event, ctx| {
-            me.handle_rookify_footer_event(event, ctx);
+        ctx.subscribe_to_view(&ptermify_footer_view, |me, _, event, ctx| {
+            me.handle_ptermify_footer_event(event, ctx);
         });
 
         ctx.subscribe_to_model(model_event_dispatcher, |me, _, event, ctx| {
@@ -1240,7 +1240,7 @@ impl UseAgentToolbar {
             dismiss_button,
             dont_show_again_button,
             agent_input_footer,
-            rookify_footer_view,
+            ptermify_footer_view,
             terminal_model,
             did_user_dismiss: false,
         }
@@ -1290,19 +1290,19 @@ impl UseAgentToolbar {
         }
     }
 
-    fn handle_rookify_footer_event(
+    fn handle_ptermify_footer_event(
         &mut self,
-        event: &RookifyFooterViewEvent,
+        event: &PtermifyFooterViewEvent,
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            RookifyFooterViewEvent::Rookify => {
-                ctx.emit(UseAgentToolbarEvent::Rookify);
+            PtermifyFooterViewEvent::Ptermify => {
+                ctx.emit(UseAgentToolbarEvent::Ptermify);
             }
-            RookifyFooterViewEvent::UseAgent => {
+            PtermifyFooterViewEvent::UseAgent => {
                 ctx.emit(UseAgentToolbarEvent::UseAgent);
             }
-            RookifyFooterViewEvent::Dismiss => {
+            PtermifyFooterViewEvent::Dismiss => {
                 ctx.emit(UseAgentToolbarEvent::Dismiss);
             }
         }
@@ -1311,7 +1311,7 @@ impl UseAgentToolbar {
     pub(in crate::terminal) fn notify_and_notify_children(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.notify();
         self.agent_input_footer.update(ctx, |_, ctx| ctx.notify());
-        self.rookify_footer_view.update(ctx, |_, ctx| ctx.notify());
+        self.ptermify_footer_view.update(ctx, |_, ctx| ctx.notify());
         self.button.update(ctx, |_, ctx| ctx.notify());
         self.give_control_back_button
             .update(ctx, |_, ctx| ctx.notify());
@@ -1331,26 +1331,26 @@ impl UseAgentToolbar {
             .map(|session| session.agent)
     }
 
-    /// Activates the rookify footer. When active, the footer shows the
-    /// rookify view instead of the CLI agent or regular "Use agent" views.
-    pub(in crate::terminal) fn show_rookify(&mut self, ctx: &mut ViewContext<Self>) {
-        self.rookify_footer_view.update(ctx, |view, ctx| {
+    /// Activates the ptermify footer. When active, the footer shows the
+    /// ptermify view instead of the CLI agent or regular "Use agent" views.
+    pub(in crate::terminal) fn show_ptermify(&mut self, ctx: &mut ViewContext<Self>) {
+        self.ptermify_footer_view.update(ctx, |view, ctx| {
             view.show(ctx);
         });
         ctx.notify();
     }
 
-    /// Deactivates the rookify footer so it reverts to its default behavior.
-    pub(in crate::terminal) fn clear_rookify(&mut self, ctx: &mut ViewContext<Self>) {
-        self.rookify_footer_view.update(ctx, |view, ctx| {
+    /// Deactivates the ptermify footer so it reverts to its default behavior.
+    pub(in crate::terminal) fn clear_ptermify(&mut self, ctx: &mut ViewContext<Self>) {
+        self.ptermify_footer_view.update(ctx, |view, ctx| {
             view.clear(ctx);
         });
         ctx.notify();
     }
 
-    /// Returns whether the rookify footer is currently active.
-    pub(in crate::terminal) fn is_rookify_active(&self, app: &AppContext) -> bool {
-        self.rookify_footer_view.as_ref(app).is_active()
+    /// Returns whether the ptermify footer is currently active.
+    pub(in crate::terminal) fn is_ptermify_active(&self, app: &AppContext) -> bool {
+        self.ptermify_footer_view.as_ref(app).is_active()
     }
 
     /// Returns whether there's a current CLI agent (like Claude Code).
@@ -1385,8 +1385,8 @@ pub enum UseAgentToolbarEvent {
     OpenRichInput,
     /// Hide the rich input editor (same as Escape).
     HideRichInput,
-    /// User chose to rookify the subshell.
-    Rookify,
+    /// User chose to ptermify the subshell.
+    Ptermify,
     /// User chose to use the agent.
     UseAgent,
 }
@@ -1401,9 +1401,9 @@ impl View for UseAgentToolbar {
     }
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
-        // If the rookify footer is active, delegate rendering to the rookify footer view.
-        if self.rookify_footer_view.as_ref(app).is_active() {
-            return ChildView::new(&self.rookify_footer_view).finish();
+        // If the ptermify footer is active, delegate rendering to the ptermify footer view.
+        if self.ptermify_footer_view.as_ref(app).is_active() {
+            return ChildView::new(&self.ptermify_footer_view).finish();
         }
 
         // Hide the toolbar entirely when CLI rich input is open,

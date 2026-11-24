@@ -1,4 +1,4 @@
-//! Test-only app initialization used by the external `rook_tui` crate.
+//! Test-only app initialization used by the external `pterm_tui` crate.
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::sync::Arc;
@@ -6,9 +6,9 @@ use std::sync::Arc;
 use ai::api_keys::ApiKeyManager;
 use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
 use chrono::{Duration, Local};
-use rook_core::SessionId;
-use rook_core::execution_mode::{AppExecutionMode, ExecutionMode};
-use rookui::{AppContext, ModelContext, ModelHandle, SingletonEntity as _};
+use pterm_core::SessionId;
+use pterm_core::execution_mode::{AppExecutionMode, ExecutionMode};
+use ptermui::{AppContext, ModelContext, ModelHandle, SingletonEntity as _};
 
 use crate::LaunchMode;
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
@@ -61,7 +61,7 @@ use crate::terminal::session_settings::SessionSettings;
 use crate::terminal::shell::{Shell, ShellType};
 use crate::terminal::{History, HistoryEntry, HistoryEvent};
 use crate::tui_onboarding_markers::TuiOnboardingMarkers;
-use crate::user_config::RookConfig;
+use crate::user_config::PtermConfig;
 #[cfg(feature = "voice_input")]
 use crate::voice::transcriber::VoiceTranscriber;
 use crate::workspaces::team::{MembershipRole, Team, TeamMember};
@@ -251,8 +251,8 @@ pub fn register_tui_input_mode_test_settings(ctx: &mut AppContext) {
     }
     init_and_register_user_preferences(ctx);
     ctx.add_singleton_model(|_| SettingsManager::default());
-    ctx.add_singleton_model(RookConfig::mock);
-    rookui_extras::secure_storage::register_noop("test", ctx);
+    ctx.add_singleton_model(PtermConfig::mock);
+    ptermui_extras::secure_storage::register_noop("test", ctx);
     ctx.add_singleton_model(|_| ServerApiProvider::new_for_test());
     ctx.add_singleton_model(|_| AuthStateProvider::new_for_test());
     AISettings::register_and_subscribe_to_events(ctx);
@@ -322,14 +322,14 @@ pub fn queue_tui_permission_action(
 /// Registers the app models required to construct full TUI session views in tests.
 ///
 /// Registration order mirrors model subscription dependencies.
-pub fn register_tui_session_view_test_singletons(app: &mut rookui::App) {
+pub fn register_tui_session_view_test_singletons(app: &mut ptermui::App) {
     app.add_singleton_model(|ctx| AppExecutionMode::new(ExecutionMode::App, false, ctx));
-    app.update(rook_core::telemetry::testing::MockTelemetryContextProvider::register);
+    app.update(pterm_core::telemetry::testing::MockTelemetryContextProvider::register);
     app.update(init_and_register_user_preferences);
     app.add_singleton_model(|_| SettingsManager::default());
-    app.add_singleton_model(RookConfig::mock);
+    app.add_singleton_model(PtermConfig::mock);
     app.update(|ctx| {
-        rookui_extras::secure_storage::register_noop("test", ctx);
+        ptermui_extras::secure_storage::register_noop("test", ctx);
     });
     app.update(AISettings::register_and_subscribe_to_events);
     app.update(TuiVoiceSettings::register);
@@ -423,7 +423,7 @@ pub fn register_tui_session_view_test_singletons(app: &mut rookui::App) {
     #[cfg(feature = "local_fs")]
     app.add_singleton_model(repo_metadata::RepoMetadataModel::new);
     app.add_singleton_model(
-        crate::rook_managed_paths_watcher::RookManagedPathsWatcher::new_for_testing,
+        crate::pterm_managed_paths_watcher::PtermManagedPathsWatcher::new_for_testing,
     );
     app.add_singleton_model(crate::workflows::local_workflows::LocalWorkflows::new);
     app.add_singleton_model(crate::ai::skills::SkillManager::new);

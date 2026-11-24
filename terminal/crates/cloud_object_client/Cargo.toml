@@ -17,8 +17,8 @@ mockall = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
-rook_core.workspace = true
-rook_graphql.workspace = true
+pterm_core.workspace = true
+pterm_graphql.workspace = true
 
 [features]
 test-util = ["dep:mockall", "cloud_object_models/test-util", "cloud_objects/test-util"]

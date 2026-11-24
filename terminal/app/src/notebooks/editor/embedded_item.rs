@@ -3,34 +3,36 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use itertools::Itertools;
-use markdown_parser::html_parser::ROOK_EMBED_ATTRIBUTE_NAME;
+use markdown_parser::html_parser::POLARIS_TERMINAL_EMBED_ATTRIBUTE_NAME;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_core::ui::appearance::Appearance;
-use rook_editor::content::markdown::MarkdownStyle;
-use rook_editor::content::text::TextStylesWithMetadata;
-use rook_editor::editor::EmbeddedItemModel;
-use rook_editor::extract_block;
-use rook_editor::render::BLOCK_FOOTER_HEIGHT;
-use rook_editor::render::element::{CursorData, CursorDisplayType, RenderContext, RenderableBlock};
-use rook_editor::render::layout::TextLayout;
-use rook_editor::render::model::viewport::ViewportItem;
-use rook_editor::render::model::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_editor::content::markdown::MarkdownStyle;
+use pterm_editor::content::text::TextStylesWithMetadata;
+use pterm_editor::editor::EmbeddedItemModel;
+use pterm_editor::extract_block;
+use pterm_editor::render::BLOCK_FOOTER_HEIGHT;
+use pterm_editor::render::element::{
+    CursorData, CursorDisplayType, RenderContext, RenderableBlock,
+};
+use pterm_editor::render::layout::TextLayout;
+use pterm_editor::render::model::viewport::ViewportItem;
+use pterm_editor::render::model::{
     BlockItem, BlockSpacing, BrokenBlockEmbedding, EMBEDDED_ITEM_FIRST_LINE_HEIGHT, EmbeddedItem,
     EmbeddedItemHTMLRepresentation, EmbeddedItemRichFormat, LaidOutEmbeddedItem, ParagraphStyles,
     RenderState,
 };
-use rookui::elements::{Border, ConstrainedBox, CornerRadius, Empty, Margin, Padding, Radius};
-use rookui::text_layout::TextFrame;
-use rookui::units::{IntoPixels, Pixels};
-use rookui::{AppContext, Element, LayoutContext, SingletonEntity, SizeConstraint};
+use ptermui::elements::{Border, ConstrainedBox, CornerRadius, Empty, Margin, Padding, Radius};
+use ptermui::text_layout::TextFrame;
+use ptermui::units::{IntoPixels, Pixels};
+use ptermui::{AppContext, Element, LayoutContext, SingletonEntity, SizeConstraint};
 use serde_yaml::Mapping;
 use string_offset::ByteOffset;
 
 use crate::cloud_object::CloudObject;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::drive::DriveObjectType;
-use crate::drive::cloud_object_styling::rook_drive_icon_color;
+use crate::drive::cloud_object_styling::pterm_drive_icon_color;
 use crate::server::ids::{HashableId, ToServerId};
 use crate::ui_components::icons::Icon;
 use crate::workflows::workflow::Workflow;
@@ -305,7 +307,7 @@ impl EmbeddedItem for EmbeddedWorkflow {
 
         // If the workflow is no longer accessible or is trashed, set the content to
         // an empty string. But we should still keep the HTML element formatting and
-        // attributes so we could re-parse the ID and metadata when pasted into Rook.
+        // attributes so we could re-parse the ID and metadata when pasted into Polaris Terminal.
         let workflow_content = workflow
             .and_then(|workflow| {
                 if !workflow.is_trashed(cloud_model) {
@@ -321,7 +323,10 @@ impl EmbeddedItem for EmbeddedWorkflow {
             html: EmbeddedItemHTMLRepresentation {
                 element_name: "pre",
                 content: workflow_content,
-                attributes: HashMap::from([(ROOK_EMBED_ATTRIBUTE_NAME, self.hashed_id())]),
+                attributes: HashMap::from([(
+                    POLARIS_TERMINAL_EMBED_ATTRIBUTE_NAME,
+                    self.hashed_id(),
+                )]),
             },
         }
     }
@@ -453,16 +458,16 @@ impl RenderableEmbeddedWorkflow {
         let (icon, icon_color) = if is_agent_mode_prompt {
             (
                 Icon::Prompt,
-                rook_drive_icon_color(appearance, DriveObjectType::AgentModeWorkflow),
+                pterm_drive_icon_color(appearance, DriveObjectType::AgentModeWorkflow),
             )
         } else {
             (
                 Icon::Workflow,
-                rook_drive_icon_color(appearance, DriveObjectType::Workflow),
+                pterm_drive_icon_color(appearance, DriveObjectType::Workflow),
             )
         };
         let workflow_icon = ConstrainedBox::new(
-            icon.to_rookui_icon(icon_color.into())
+            icon.to_ptermui_icon(icon_color.into())
                 .with_opacity(1.0)
                 .finish(),
         )
@@ -611,7 +616,9 @@ impl RenderableBlock for RenderableEmbeddedWorkflow {
             );
         }
 
-        ctx.paint.scene.start_layer(rookui::ClipBounds::ActiveLayer);
+        ctx.paint
+            .scene
+            .start_layer(ptermui::ClipBounds::ActiveLayer);
 
         // Position the block footer right below the content area, flush with its right-hand edge.
         // This gives the footer some padding relative to the visible area with a background.
@@ -626,15 +633,15 @@ impl RenderableBlock for RenderableEmbeddedWorkflow {
         ctx.paint.scene.stop_layer();
     }
 
-    fn after_layout(&mut self, ctx: &mut rookui::AfterLayoutContext, app: &rookui::AppContext) {
+    fn after_layout(&mut self, ctx: &mut ptermui::AfterLayoutContext, app: &ptermui::AppContext) {
         self.footer.after_layout(ctx, app);
     }
 
     fn dispatch_event(
         &mut self,
-        _model: &rook_editor::render::model::RenderState,
-        event: &rookui::event::DispatchedEvent,
-        ctx: &mut rookui::EventContext,
+        _model: &pterm_editor::render::model::RenderState,
+        event: &ptermui::event::DispatchedEvent,
+        ctx: &mut ptermui::EventContext,
         app: &AppContext,
     ) -> bool {
         self.footer.dispatch_event(event, ctx, app)

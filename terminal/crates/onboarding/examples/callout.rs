@@ -5,13 +5,13 @@ use onboarding::components::onboarding_callout::{
     Button as CalloutButton, OnboardingCallout, Options as CalloutOptions, Params as CalloutParams,
     StepStatus,
 };
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::{AnsiColor, AnsiColors, Details, Fill, RookTheme, TerminalColors};
-use rookui_core::color::ColorU;
-use rookui_core::elements::{Rect, Stack};
-use rookui_core::fonts::{Cache, FamilyId, Weight};
-use rookui_core::prelude::*;
-use rookui_core::{AddWindowOptions, AssetProvider, ModelContext, platform};
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::{AnsiColor, AnsiColors, Details, Fill, PtermTheme, TerminalColors};
+use ptermui_core::color::ColorU;
+use ptermui_core::elements::{Rect, Stack};
+use ptermui_core::fonts::{Cache, FamilyId, Weight};
+use ptermui_core::prelude::*;
+use ptermui_core::{AddWindowOptions, AssetProvider, ModelContext, platform};
 use rust_embed::RustEmbed;
 use ui_components::Component as _;
 
@@ -30,7 +30,7 @@ impl AssetProvider for Assets {
 }
 
 fn main() -> platform::app::TerminationResult {
-    let app_builder = rookui::platform::AppBuilder::new(
+    let app_builder = ptermui::platform::AppBuilder::new(
         platform::AppCallbacks::default(),
         Box::new(ASSETS),
         None,
@@ -85,7 +85,7 @@ impl View for RootView {
         let callout = self.callout.render(
             appearance,
             CalloutParams {
-                title: "Meet your Rook input".into(),
+                title: "Meet your Polaris Terminal input".into(),
                 text: "Your terminal input can detect natural language as well as commands.".into(),
                 step: StepStatus::new(1, 2),
                 right_button: CalloutButton {
@@ -119,7 +119,7 @@ impl TypedActionView for RootView {
     fn handle_action(&mut self, _action: &Self::Action, _ctx: &mut ViewContext<Self>) {}
 }
 
-fn mock_theme() -> RookTheme {
+fn mock_theme() -> PtermTheme {
     let normal = AnsiColors::new(
         AnsiColor::from_u32(0x121212FF),
         AnsiColor::from_u32(0xC76156FF),
@@ -142,7 +142,7 @@ fn mock_theme() -> RookTheme {
         AnsiColor::from_u32(0xFFFFFFFF),
     );
 
-    RookTheme::new(
+    PtermTheme::new(
         Fill::Solid(ColorU::from_u32(0x1D2022FF)),
         ColorU::from_u32(0xE4EEF5FF),
         Fill::Solid(ColorU::from_u32(0x6C96B4FF)),
@@ -155,7 +155,7 @@ fn mock_theme() -> RookTheme {
 }
 
 fn build_appearance(
-    theme: RookTheme,
+    theme: PtermTheme,
     ui_font_family: FamilyId,
     ctx: &mut ModelContext<Appearance>,
 ) -> Appearance {

@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use cloud_object_models::CodeForge;
 use instant::Instant;
-use rook_server_client::HttpStatusError;
-use rookui::r#async::executor::Background;
+use pterm_server_client::HttpStatusError;
+use ptermui::r#async::executor::Background;
 
 use super::*;
 use crate::server::server_api::ai::MockAIClient;
@@ -20,8 +20,8 @@ fn request() -> AgentRunEnvironmentSnapshotRequest {
         repositories: vec![RepositoryRevision {
             code_forge: CodeForge::GitHub,
             repo_owner: "warpdotdev".to_string(),
-            repo_name: "rook".to_string(),
-            checkout_path: "rook".to_string(),
+            repo_name: "polaris-terminal".to_string(),
+            checkout_path: "polaris-terminal".to_string(),
             requested_checkout_ref: Some("main".to_string()),
             resolved_head_sha: "0123456789abcdef0123456789abcdef01234567".to_string(),
         }],
@@ -44,7 +44,7 @@ fn request_conversion_uses_expected_wire_shape() {
     assert!(json.get("unresolved_repository_count").is_none());
     assert_eq!(json["repositories"][0]["code_forge"], "GITHUB");
     assert_eq!(json["repositories"][0]["repo_owner"], "warpdotdev");
-    assert_eq!(json["repositories"][0]["checkout_path"], "rook");
+    assert_eq!(json["repositories"][0]["checkout_path"], "polaris-terminal");
     assert_eq!(json["repositories"][0]["requested_checkout_ref"], "main");
     assert_eq!(
         json["repositories"][0]["resolved_head_sha"],

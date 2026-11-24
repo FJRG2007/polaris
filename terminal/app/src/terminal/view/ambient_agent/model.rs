@@ -3,13 +3,13 @@ use std::time::Duration;
 #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
 use futures::channel::oneshot;
 use instant::Instant;
-use rook_cli::agent::Harness;
-use rook_core::features::FeatureFlag;
-use rook_core::send_telemetry_from_ctx;
-use rook_errors::report_error;
-use rook_terminal::model::BlockId;
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity, WeakViewHandle};
+use pterm_cli::agent::Harness;
+use pterm_core::features::FeatureFlag;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_errors::report_error;
+use pterm_terminal::model::BlockId;
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity, WeakViewHandle};
 use session_sharing_protocol::common::SessionId;
 
 use super::AmbientAgentProgressUIState;
@@ -221,7 +221,7 @@ impl AmbientAgentViewModel {
             }
         });
 
-        // Validate the default environment once Rook Drive sync completes.
+        // Validate the default environment once Polaris Terminal Drive sync completes.
         // The environment ID may be restored from settings before environments are synced,
         // so we need to validate it once the initial load is complete.
         let initial_load_complete = UpdateManager::as_ref(ctx).initial_load_complete();
@@ -384,7 +384,7 @@ impl AmbientAgentViewModel {
         }
     }
 
-    /// Validates the environment ID after Rook Drive initial load completes.
+    /// Validates the environment ID after Polaris Terminal Drive initial load completes.
     /// If the environment no longer exists, clears the selection.
     fn validate_environment_after_initial_load(&mut self, ctx: &mut ModelContext<Self>) {
         if let Some(id) = &self.environment_id {
@@ -856,7 +856,7 @@ impl AmbientAgentViewModel {
 
     /// Applies the run configuration for an existing shared ambient session.
     ///
-    /// Viewed sessions can join before Rook Drive has loaded the referenced environment object,
+    /// Viewed sessions can join before Polaris Terminal Drive has loaded the referenced environment object,
     /// especially on web. Preserve the server-provided environment ID anyway so the selector does
     /// not fall back to an unrelated default while waiting for the environment object to arrive.
     fn apply_viewed_task_config_snapshot(
@@ -1068,7 +1068,7 @@ impl AmbientAgentViewModel {
     /// Builds the default `AgentConfigSnapshot` for spawning a cloud agent from this pane.
     ///
     /// Reads the user's preferred model, computer-use autonomy, optional self-hosted
-    /// host (`ROOK_CLOUD_MODE_DEFAULT_HOST`), and the pane's currently-selected env
+    /// host (`POLARIS_TERMINAL_CLOUD_MODE_DEFAULT_HOST`), and the pane's currently-selected env
     /// and harness. Shared by `spawn_agent` and the local-to-cloud handoff path so
     /// both flows route to the same worker host and inherit the same defaults.
     pub(crate) fn build_default_spawn_config(

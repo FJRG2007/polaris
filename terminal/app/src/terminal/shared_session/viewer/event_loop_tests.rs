@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use parking_lot::FairMutex;
-use rook_core::command::ExitCode;
-use rook_core::features::FeatureFlag;
-use rookui::platform::WindowStyle;
-use rookui::units::Lines;
-use rookui::{App, SingletonEntity, ViewHandle};
+use pterm_core::command::ExitCode;
+use pterm_core::features::FeatureFlag;
+use ptermui::platform::WindowStyle;
+use ptermui::units::Lines;
+use ptermui::{App, SingletonEntity, ViewHandle};
 use session_sharing_protocol::common::{
     OrderedTerminalEvent, OrderedTerminalEventType, Scrollback, ScrollbackBlock, WindowSize,
 };

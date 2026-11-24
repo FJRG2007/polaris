@@ -1,19 +1,19 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_editor::editor::NavigationKey;
-pub use rook_terminal::model::block_filter::{
+use pterm_editor::editor::NavigationKey;
+pub use pterm_terminal::model::block_filter::{
     BlockFilterQuery, ContextLines, DEFAULT_CONTEXT_LINES_VALUE,
 };
-use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::elements::{
+use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::elements::{
     Align, Border, ChildAnchor, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Dash, Dismiss, DropShadow, Empty, Flex, Hoverable, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Rect, Shrinkable,
     Stack, Text,
 };
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -428,7 +428,7 @@ impl BlockFilterEditor {
             };
             let icon = Container::new(
                 ConstrainedBox::new(
-                    icon.to_rookui_icon(appearance.theme().active_ui_text_color())
+                    icon.to_ptermui_icon(appearance.theme().active_ui_text_color())
                         .finish(),
                 )
                 .with_height(size)
@@ -594,7 +594,7 @@ impl View for BlockFilterEditor {
             |state| {
                 let context_line_icon = ConstrainedBox::new(
                     Icon::DistributeSpacingVertical
-                        .to_rookui_icon(
+                        .to_ptermui_icon(
                             blended_colors::text_main(
                                 appearance.theme(),
                                 appearance.theme().background(),
@@ -708,7 +708,7 @@ impl View for BlockFilterEditor {
         Some(AccessibilityContent::new(
             "Type searched phrase.",
             "Press escape to quit",
-            RookA11yRole::TextareaRole,
+            PtermA11yRole::TextareaRole,
         ))
     }
 }

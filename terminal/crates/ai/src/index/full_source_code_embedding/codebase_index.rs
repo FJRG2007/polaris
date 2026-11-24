@@ -10,12 +10,12 @@ use chrono::{DateTime, Utc};
 use futures::stream::AbortHandle;
 use ignore::gitignore::Gitignore;
 use instant::Instant;
+use pterm_core::safe_error;
+use pterm_errors::report_error;
+use ptermui_core::{Entity, ModelContext, ModelHandle};
 use repo_metadata::Repository;
 #[cfg(feature = "local_fs")]
 use repo_metadata::entry::{BudgetExceededBehavior, IgnoredPathStrategy};
-use rook_core::safe_error;
-use rook_errors::report_error;
-use rookui_core::{Entity, ModelContext, ModelHandle};
 
 use super::fragment_metadata::{
     FragmentMetadata, LeafToFragmentMetadata, LeafToFragmentMetadataUpdates,
@@ -50,11 +50,11 @@ cfg_if::cfg_if! {
             matches_gitignores,
             full_source_code_embedding::sync_client::CodebaseIndexSyncOperation,
         };
-        use rook_core::send_telemetry_from_ctx;
-        use rook_core::interval_timer::IntervalTimer;
-        use rookui_core::r#async::Timer;
-        use rookui_core::SingletonEntity;
-        use rook_core::sync_queue::SyncQueue;
+        use pterm_core::send_telemetry_from_ctx;
+        use pterm_core::interval_timer::IntervalTimer;
+        use ptermui_core::r#async::Timer;
+        use ptermui_core::SingletonEntity;
+        use pterm_core::sync_queue::SyncQueue;
         use sha2::Digest;
     }
 }
@@ -71,7 +71,7 @@ const MERKLE_TREE_BUILD_TIME: &str = "merkle_tree_build_time";
 const SYNC_TIME: &str = "sync_time";
 
 const SUPPORTED_IGNORES: [&str; 4] = [
-    ".rookindexingignore",
+    ".polaris-terminal-indexingignore",
     ".cursorignore",
     ".cursorindexingignore",
     ".codeiumignore",
@@ -597,7 +597,7 @@ impl CodebaseIndex {
         let mut flushed_fragment_result = FlushFragmentResult::default();
 
         if !changed_files.deletions().is_empty() {
-            if rook_core::channel::ChannelState::enable_debug_features() {
+            if pterm_core::channel::ChannelState::enable_debug_features() {
                 log::info!(
                     "Trying to remove changed files: {:?}",
                     changed_files.deletions()
@@ -663,7 +663,7 @@ impl CodebaseIndex {
         }
 
         if !changed_files.upsertions.is_empty() {
-            if rook_core::channel::ChannelState::enable_debug_features() {
+            if pterm_core::channel::ChannelState::enable_debug_features() {
                 log::debug!(
                     "Trying to upsert changed files: {:?}",
                     &changed_files.upsertions

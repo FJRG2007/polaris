@@ -5,28 +5,28 @@ use anyhow::Result;
 use parking_lot::FairMutex;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_core::features::FeatureFlag;
-use rook_core::ui::theme::Fill;
-use rook_errors::report_error;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::browser::escape_html_attribute;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::theme::Fill;
+use pterm_errors::report_error;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::browser::escape_html_attribute;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Align, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Element,
     Empty, Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Point, Radius,
     SavePosition, ScrollData, ScrollStateHandle, Scrollable, ScrollableElement, ScrollbarWidth,
     Shrinkable, Stack, Text, try_rect_with_z,
 };
-use rookui::event::{DispatchedEvent, ModifiersState};
-use rookui::fonts::{FamilyId, Properties, Style, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::radio_buttons::{
+use ptermui::event::{DispatchedEvent, ModifiersState};
+use ptermui::fonts::{FamilyId, Properties, Style, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::radio_buttons::{
     RadioButtonItem, RadioButtonLayout, RadioButtonStateHandle,
 };
-use rookui::units::{IntoLines, IntoPixels, Lines, Pixels};
-use rookui::{
+use ptermui::units::{IntoLines, IntoPixels, Lines, Pixels};
+use ptermui::{
     AfterLayoutContext, AppContext, ClipBounds, Entity, Event, EventContext, FocusContext,
     LayoutContext, PaintContext, SingletonEntity, SizeConstraint, TypedActionView, View,
     ViewContext, ViewHandle,
@@ -54,7 +54,7 @@ use crate::terminal::ligature_settings::{LigatureSettings, should_use_ligature_r
 use crate::terminal::model::ObfuscateSecrets;
 use crate::terminal::model::terminal_model::BlockIndex;
 use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
-use crate::themes::theme::RookTheme;
+use crate::themes::theme::PtermTheme;
 use crate::ui_components::icons::Icon;
 use crate::util::bindings::CustomAction;
 use crate::view_components::ToastFlavor;
@@ -84,7 +84,7 @@ const COMMAND_OPTION: (&str, DisplaySetting) = ("Command", DisplaySetting::Comma
 const OUTPUT_OPTION: (&str, DisplaySetting) = ("Output", DisplaySetting::Output);
 
 /// This default title is helpful for screen readers.
-const DEFAULT_EMBED_TITLE: &str = "embedded rook block";
+const DEFAULT_EMBED_TITLE: &str = "embedded polaris-terminal block";
 const BLOCK_CREATION_FAILED_MESSAGE: &str = "Something went wrong. Please try again.";
 
 #[derive(PartialEq)]
@@ -156,7 +156,7 @@ pub enum ShareBlockModalAction {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings(vec![
         FixedBinding::custom(
@@ -670,7 +670,7 @@ impl ShareBlockModal {
             } else {
                 text_label.to_string()
             },
-            icon.to_rookui_icon(appearance.theme().active_ui_text_color()),
+            icon.to_ptermui_icon(appearance.theme().active_ui_text_color()),
             MainAxisSize::Max,
             MainAxisAlignment::Center,
             vec2f(16., 16.),
@@ -797,7 +797,7 @@ impl ShareBlockModal {
         let text_and_icon = TextAndIcon::new(
             TextAndIconAlignment::TextFirst,
             "Copy".to_string(),
-            Icon::Copy.to_rookui_icon(appearance.theme().active_ui_text_color()),
+            Icon::Copy.to_ptermui_icon(appearance.theme().active_ui_text_color()),
             MainAxisSize::Max,
             MainAxisAlignment::Center,
             vec2f(16., 16.),
@@ -849,7 +849,7 @@ impl ShareBlockModal {
         let link_generated = matches!(self.request_state, ShareRequestState::Succeeded { .. });
         let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
 
-        // If we're using the combined prompt/command grid, then "show prompt" should only be configurable if using Rook prompt!
+        // If we're using the combined prompt/command grid, then "show prompt" should only be configurable if using Polaris Terminal prompt!
         // Otherwise, we MUST always render the prompt alongside the command (since they're in the same combined grid for PS1).
         let show_prompt_configurable = self
             .model
@@ -1165,7 +1165,7 @@ fn should_send_title_gen_request(ctx: &ViewContext<ShareBlockModal>) -> bool {
 
 struct SingleBlock {
     terminal_model: Arc<FairMutex<TerminalModel>>,
-    theme: RookTheme,
+    theme: PtermTheme,
     font_family: FamilyId,
     font_size: f32,
     line_height_ratio: f32,
@@ -1189,7 +1189,7 @@ impl SingleBlock {
     #[allow(clippy::too_many_arguments)]
     fn new(
         terminal_model: Arc<FairMutex<TerminalModel>>,
-        theme: RookTheme,
+        theme: PtermTheme,
         font_family: FamilyId,
         font_size: f32,
         line_height_ratio: f32,
@@ -1299,7 +1299,7 @@ impl SingleBlock {
         let mut padding_between_prompt_and_cmd_rendered = Lines::zero();
 
         if self.show_prompt {
-            // If we're rendering Rook prompt (above the command).
+            // If we're rendering Polaris Terminal prompt (above the command).
             if !block.honor_ps1() {
                 if let Some(native_prompt_text) = self.native_prompt_text.as_mut()
                     && self.scroll_top - padding_top_rendered <= Lines::zero()

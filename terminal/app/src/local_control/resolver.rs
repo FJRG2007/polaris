@@ -7,7 +7,7 @@ use ::local_control::protocol::{
     ThemeNameParams, WindowTarget,
 };
 use ::local_control::{ActionKind, ControlError, ErrorCode, TargetScope};
-use rookui::{AppContext, ModelContext, TypedActionView, ViewHandle, WindowId};
+use ptermui::{AppContext, ModelContext, TypedActionView, ViewHandle, WindowId};
 
 use crate::local_control::LocalControlBridge;
 use crate::local_control::handlers::metadata::action_metadata_for_name;
@@ -129,7 +129,10 @@ pub(crate) fn require_active_window_id_for_action(
     active_window.ok_or_else(|| {
         ControlError::new(
             ErrorCode::MissingTarget,
-            format!("{} requires an active Rook window", action.as_str()),
+            format!(
+                "{} requires an active Polaris Terminal window",
+                action.as_str()
+            ),
         )
     })
 }
@@ -148,7 +151,7 @@ fn active_or_single_window_id(
         _ => Err(ControlError::new(
             ErrorCode::AmbiguousTarget,
             format!(
-                "{} requires an explicit window selector when no Rook window is active",
+                "{} requires an explicit window selector when no Polaris Terminal window is active",
                 action.as_str()
             ),
         )),

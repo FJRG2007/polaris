@@ -28,9 +28,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use rookui::ModelContext;
+use ptermui::ModelContext;
 #[cfg(not(test))]
-use rookui::SingletonEntity;
+use ptermui::SingletonEntity;
 use session_sharing_protocol::common::SessionId;
 use warp_multi_agent_api as api;
 

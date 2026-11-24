@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use rookui::{App, EntityId, WindowId};
+use ptermui::{App, EntityId, WindowId};
 
 use super::*;
 

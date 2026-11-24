@@ -1,4 +1,4 @@
-use rookui::{AppContext, Entity, ModelContext, ModelHandle};
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle};
 
 #[cfg(feature = "local_fs")]
 mod local;

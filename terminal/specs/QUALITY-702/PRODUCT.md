@@ -91,7 +91,7 @@ When the user changes the harness on a card, the one-shot guard resets and the n
 
 ### Automated
 
-- `cargo check -p rook`
+- `cargo check -p polaris-terminal`
 - `cargo fmt`
 - `cargo clippy --workspace --all-targets --all-features --tests -- -D warnings`
 

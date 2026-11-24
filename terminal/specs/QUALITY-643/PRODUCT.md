@@ -4,7 +4,7 @@ Linear: [QUALITY-643](https://linear.app/warpdotdev/issue/QUALITY-643)
 
 ## Summary
 
-When a user selects a non-Oz harness (Claude Code, Codex) in the orchestration config UI, the model picker should show models that the selected harness actually supports, and the chosen model should reach the harness process. Today the model picker always shows Rook's internal model catalog regardless of harness, and those IDs are not recognized by third-party harness CLIs.
+When a user selects a non-Oz harness (Claude Code, Codex) in the orchestration config UI, the model picker should show models that the selected harness actually supports, and the chosen model should reach the harness process. Today the model picker always shows Polaris Terminal's internal model catalog regardless of harness, and those IDs are not recognized by third-party harness CLIs.
 
 Figma: none provided — changes are behavioral within existing orchestration config UI chrome (plan card and run_agents confirmation card).
 
@@ -14,7 +14,7 @@ Figma: none provided — changes are behavioral within existing orchestration co
 
 1. The harness picker populates from the server-provided `availableHarnesses` list (via `HarnessAvailabilityModel`), not from a hardcoded client-side list. This ensures the desktop matches the web UI and respects admin-configured harness availability.
 
-2. Each harness entry displays its `display_name` from the server with the corresponding brand icon (Rook logo for Oz, Claude logo for Claude Code, OpenAI logo for Codex, Gemini logo for Gemini CLI).
+2. Each harness entry displays its `display_name` from the server with the corresponding brand icon (Polaris Terminal logo for Oz, Claude logo for Claude Code, OpenAI logo for Codex, Gemini logo for Gemini CLI).
 
 3. Enabled harnesses are selectable. Disabled harnesses (admin-disabled via org settings) appear in the list with a visual indicator (e.g. greyed text or a "disabled" badge) but cannot be selected.
 
@@ -24,7 +24,7 @@ Figma: none provided — changes are behavioral within existing orchestration co
 
 ### Model picker content by harness
 
-6. When the harness picker is set to **Oz** (or is empty/unset), the model picker shows the Rook LLM catalog — the same models shown in single-agent mode. This is the current behavior and must not regress.
+6. When the harness picker is set to **Oz** (or is empty/unset), the model picker shows the Polaris Terminal LLM catalog — the same models shown in single-agent mode. This is the current behavior and must not regress.
 
 7. When the harness picker is set to **Claude Code**, the model picker shows:
    - A **"Default model"** entry at the top (value: empty string) meaning "don't override — let the harness use its own default."
@@ -50,7 +50,7 @@ Figma: none provided — changes are behavioral within existing orchestration co
 
 ### Model reset on harness change
 
-12. When the user changes the harness, the model_id resets because each harness has its own disjoint model catalog. The reset target is "Default model" (empty string) for non-Oz harnesses, or the first available Rook LLM for Oz. The only exception is the empty string itself ("Default model"), which can persist across non-Oz harness changes.
+12. When the user changes the harness, the model_id resets because each harness has its own disjoint model catalog. The reset target is "Default model" (empty string) for non-Oz harnesses, or the first available Polaris Terminal LLM for Oz. The only exception is the empty string itself ("Default model"), which can persist across non-Oz harness changes.
 
 ### Loading and empty states
 
@@ -62,7 +62,7 @@ Figma: none provided — changes are behavioral within existing orchestration co
 
 15. The orchestration config block (plan card) and the run_agents confirmation card must show the same harness-specific models, using the same server catalog, and behave identically when the harness changes.
 
-16. The `sync_picker_selections` logic (which syncs picker UI state to the edit state) must correctly match harness-specific model IDs against the harness model list, not against Rook's internal LLM catalog, when a non-Oz harness is active.
+16. The `sync_picker_selections` logic (which syncs picker UI state to the edit state) must correctly match harness-specific model IDs against the harness model list, not against Polaris Terminal's internal LLM catalog, when a non-Oz harness is active.
 
 ### Model ID delivery to harness processes
 
@@ -70,10 +70,10 @@ Figma: none provided — changes are behavioral within existing orchestration co
 
 18. When the user selects a model for **Codex** and agents are launched in **Cloud** mode, the selected model_id (e.g. `"gpt-5.4"`) must be written to `~/.codex/config.toml` as the top-level `model` key before the Codex CLI starts. If the selected model is `"default"`, the `model` key must NOT be written (or must be removed if previously present), allowing Codex to use its own default. In **Local** mode, no model override is written — the user's existing `~/.codex/config.toml` is used as-is.
 
-19. When the user selects a model for **Oz**, the existing model_id propagation behavior (Rook internal LLM preference) must not change.
+19. When the user selects a model for **Oz**, the existing model_id propagation behavior (Polaris Terminal internal LLM preference) must not change.
 
 20. When the "Default model" entry is selected (empty model_id) for any non-Oz harness, no model override is injected — the harness process uses its own default.
 
 ### Auto-launch behavior
 
-21. The `matches_active_config` check (which determines whether a run_agents call auto-launches without user confirmation) must treat harness-specific model_ids the same as Rook model_ids: an exact string match between the request's model_id and the config's model_id.
+21. The `matches_active_config` check (which determines whether a run_agents call auto-launches without user confirmation) must treat harness-specific model_ids the same as Polaris Terminal model_ids: an exact string match between the request's model_id and the config's model_id.

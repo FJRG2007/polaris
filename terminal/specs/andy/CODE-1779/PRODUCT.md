@@ -1,16 +1,16 @@
 # PRODUCT.md — CODE-1779: Drag-and-drop file paths in WSL (and Git Bash)
 
 Linear: https://linear.app/warpdotdev/issue/CODE-1779/windows-drag-and-drop-file-paths-in-wsl
-Upstream: https://github.com/FJRG2007/rook/issues/6191
+Upstream: https://github.com/FJRG2007/polaris/issues/6191
 
 Figma: none provided (no visual design — the change is purely in which string lands in the input buffer)
 
 ## Summary
-When a Rook tab is attached to a Unix-like shell on Windows — WSL, or MSYS2 / Git Bash — dragging a file or folder from Windows Explorer onto Rook should insert a path in that shell's native form, not a Windows-native path. For WSL that's `/mnt/c/Users/andy/Downloads`; for Git Bash that's `/c/Users/andy/Downloads`. WSL already works correctly on the terminal grid when a long-running command is active; this spec covers the input editor (broken for both WSL and Git Bash today) and adds matching behavior for Git Bash.
+When a Polaris Terminal tab is attached to a Unix-like shell on Windows — WSL, or MSYS2 / Git Bash — dragging a file or folder from Windows Explorer onto Polaris Terminal should insert a path in that shell's native form, not a Windows-native path. For WSL that's `/mnt/c/Users/andy/Downloads`; for Git Bash that's `/c/Users/andy/Downloads`. WSL already works correctly on the terminal grid when a long-running command is active; this spec covers the input editor (broken for both WSL and Git Bash today) and adds matching behavior for Git Bash.
 
 ## Behavior
 
-1. Dropping one or more files or folders from Windows Explorer onto the Rook input editor inserts each path in the active session's native form:
+1. Dropping one or more files or folders from Windows Explorer onto the Polaris Terminal input editor inserts each path in the active session's native form:
    - **WSL session** — drive-letter paths are mapped under `/mnt/<drive>/…` with forward slashes.
    - **MSYS2 / Git Bash session** — drive-letter paths are mapped under `/<drive>/…` with forward slashes (MSYS2's POSIX-style path convention, which Git Bash and the MSYS2 runtime translate automatically when invoking native Windows binaries).
    - **All other sessions** — paths are inserted exactly as dropped (see invariant 5).
@@ -33,7 +33,7 @@ When a Rook tab is attached to a Unix-like shell on Windows — WSL, or MSYS2 / 
 
 4. Shell-specific escaping (quoting spaces, special characters) applies on top of the transformed path using the active session's shell family — identical to the non-WSL/non-MSYS2 behavior today.
 
-5. When the active session is neither WSL nor MSYS2/Git Bash (local PowerShell, cmd, SSH into a remote host, Rookified remote, etc.), dropped paths are inserted exactly as they are today. No transformation happens.
+5. When the active session is neither WSL nor MSYS2/Git Bash (local PowerShell, cmd, SSH into a remote host, Ptermified remote, etc.), dropped paths are inserted exactly as they are today. No transformation happens.
 
 6. Image auto-attachment (dragging an image file into Agent Mode / an empty buffer, which attaches it as AI image context) continues to use the original Windows-native path for filesystem reads, regardless of WSL / MSYS2 state. Transformed paths would not be readable from the Windows host.
 
@@ -47,7 +47,7 @@ When a Rook tab is attached to a Unix-like shell on Windows — WSL, or MSYS2 / 
 
 10. Non-regressions:
     - Dropping into any non-terminal editor (notebooks, settings, themes, etc.) is unchanged — no path transformation is applied.
-    - Dropping into a non-WSL, non-MSYS2 terminal session (PowerShell, cmd, SSH, remote Rookified) is unchanged.
+    - Dropping into a non-WSL, non-MSYS2 terminal session (PowerShell, cmd, SSH, remote Ptermified) is unchanged.
     - The terminal-grid long-running-command code paths for both WSL and MSYS2 are unchanged.
     - Dropping image-only content into the input in Agent Mode still attaches the images; nothing about attachment behavior changes.
     - Pasting paths via clipboard is out of scope for this ticket and remains unchanged.

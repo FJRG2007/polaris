@@ -4,18 +4,18 @@ use std::sync::Arc;
 use num_traits::Float as _;
 use parking_lot::FairMutex;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_util::user_input::UserInput;
-use rookui::elements::new_scrollable::{NewScrollableElement, ScrollableAxis};
-use rookui::elements::{Axis, Point as UiPoint, ScrollData, ScrollableElement};
-use rookui::event::{DispatchedEvent, InBoundsExt, KeyState, ModifiersState};
-use rookui::fonts::Properties;
-use rookui::geometry::rect::RectF;
-use rookui::geometry::vector::Vector2F;
-use rookui::platform::keyboard::KeyCode;
-use rookui::text::SelectionType;
-use rookui::units::{IntoLines, IntoPixels, Lines, Pixels};
-use rookui::{
+use pterm_core::features::FeatureFlag;
+use pterm_util::user_input::UserInput;
+use ptermui::elements::new_scrollable::{NewScrollableElement, ScrollableAxis};
+use ptermui::elements::{Axis, Point as UiPoint, ScrollData, ScrollableElement};
+use ptermui::event::{DispatchedEvent, InBoundsExt, KeyState, ModifiersState};
+use ptermui::fonts::Properties;
+use ptermui::geometry::rect::RectF;
+use ptermui::geometry::vector::Vector2F;
+use ptermui::platform::keyboard::KeyCode;
+use ptermui::text::SelectionType;
+use ptermui::units::{IntoLines, IntoPixels, Lines, Pixels};
+use ptermui::{
     AfterLayoutContext, AppContext, ClipBounds, Element, EntityId, Event, EventContext,
     LayoutContext, ModelHandle, PaintContext, SizeConstraint, end_trace, record_trace_event,
     start_trace,
@@ -131,7 +131,7 @@ impl AltScreenElement {
             pane_state: terminal_view_render_context.pane_state,
             active_session_state: terminal_view_render_context.active_session_state,
             grid_render_params: GridRenderParams {
-                rook_theme: appearance.theme().clone(),
+                pterm_theme: appearance.theme().clone(),
                 font_family: appearance.monospace_font_family(),
                 font_size: appearance.monospace_font_size(),
                 font_weight: appearance.monospace_font_weight(),
@@ -260,7 +260,7 @@ impl AltScreenElement {
         ctx.dispatch_typed_action(TerminalAction::Focus);
 
         // On mobile, request soft keyboard so users can input.
-        if rookui::platform::is_mobile_device() {
+        if ptermui::platform::is_mobile_device() {
             ctx.request_soft_keyboard();
         }
 
@@ -512,7 +512,7 @@ impl AltScreenElement {
     fn render_selections(&self, size_info: &SizeInfo, origin: Vector2F, ctx: &mut PaintContext) {
         let text_selection_color = self
             .grid_render_params
-            .rook_theme
+            .pterm_theme
             .text_selection_color()
             .into_solid();
 
@@ -733,7 +733,7 @@ impl Element for AltScreenElement {
             end_row.ceil() as usize,
             &model.colors(),
             &override_colors,
-            &self.grid_render_params.rook_theme,
+            &self.grid_render_params.pterm_theme,
             properties,
             self.grid_render_params.font_family,
             self.grid_render_params.font_size,
@@ -771,7 +771,7 @@ impl Element for AltScreenElement {
                 model.alt_screen().cursor_style(),
                 padding_x,
                 adjusted_grid_origin,
-                self.grid_render_params.rook_theme.cursor().into(),
+                self.grid_render_params.pterm_theme.cursor().into(),
                 ctx,
                 self.terminal_view_id,
                 self.cursor_hint_text.as_mut(),

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 pub use cloud_object_models::{CloudNotebook, CloudNotebookModel, NotebookId, SerializedNotebook};
-use rookui::AppContext;
+use ptermui::AppContext;
 use serde::{Deserialize, Serialize};
 
 use crate::appearance::Appearance;
@@ -22,8 +22,8 @@ use crate::cloud_object::{
     CreateObjectRequest, GenericServerObject, ObjectType, Owner, Revision, UpdateCloudObjectResult,
 };
 use crate::drive::CloudObjectTypeAndId;
-use crate::drive::items::RookDriveItem;
-use crate::drive::items::notebook::RookDriveNotebook;
+use crate::drive::items::PtermDriveItem;
+use crate::drive::items::notebook::PtermDriveNotebook;
 use crate::persistence::ModelEvent;
 use crate::server::cloud_objects::update_manager::InitiatedBy;
 use crate::server::ids::{ServerId, SyncId};
@@ -148,7 +148,7 @@ impl CloudModelType for CloudNotebookModel {
             .await
     }
 
-    fn renders_in_rook_drive(&self) -> bool {
+    fn renders_in_pterm_drive(&self) -> bool {
         true
     }
 
@@ -156,13 +156,13 @@ impl CloudModelType for CloudNotebookModel {
         true
     }
 
-    fn to_rook_drive_item(
+    fn to_pterm_drive_item(
         &self,
         id: SyncId,
         _appearance: &Appearance,
         notebook: &CloudNotebook,
-    ) -> Option<Box<dyn RookDriveItem>> {
-        Some(Box::new(RookDriveNotebook::new(
+    ) -> Option<Box<dyn PtermDriveItem>> {
+        Some(Box::new(PtermDriveNotebook::new(
             self.cloud_object_type_and_id(id),
             notebook.clone(),
             notebook.model().ai_document_id.is_some(),
@@ -207,8 +207,8 @@ pub fn init(app: &mut AppContext) {
 /// * Includes extra context for embedded objects.
 #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
 pub fn export_notebook(data: &str, ctx: &AppContext) -> anyhow::Result<String> {
-    use rook_editor::content::buffer::Buffer;
-    use rook_editor::content::markdown::MarkdownStyle;
+    use pterm_editor::content::buffer::Buffer;
+    use pterm_editor::content::markdown::MarkdownStyle;
 
     // Parse the Markdown directly rather than using [`Buffer::from_markdown`] so that we can
     // report errors to the exporter.

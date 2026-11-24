@@ -8,27 +8,27 @@ use parking_lot::Mutex;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::editor::EditorView;
-use rook_editor::render::element::lens_element::RichTextElementLens;
-use rook_editor::render::element::{RenderableBlock, RichTextElement, VerticalExpansionBehavior};
-use rook_editor::render::model::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::editor::EditorView;
+use pterm_editor::render::element::lens_element::RichTextElementLens;
+use pterm_editor::render::element::{RenderableBlock, RichTextElement, VerticalExpansionBehavior};
+use pterm_editor::render::model::{
     BlockLocation, ExpansionType, LineCount, RenderState, gutter_expansion_button_types,
 };
-use rookui::elements::new_scrollable::{NewScrollableElement, ScrollableAxis};
-use rookui::elements::{
+use ptermui::elements::new_scrollable::{NewScrollableElement, ScrollableAxis};
+use ptermui::elements::{
     Align, Axis, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, Empty, F32Ext, Flex,
     Hoverable, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Point, Radius, ScrollData, Stack, Text, ZIndex,
 };
-use rookui::event::DispatchedEvent;
-use rookui::fonts::FamilyId;
-use rookui::ui_components::components::UiComponent;
-use rookui::units::{IntoPixels, Pixels};
-use rookui::{
+use ptermui::event::DispatchedEvent;
+use ptermui::fonts::FamilyId;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::units::{IntoPixels, Pixels};
+use ptermui::{
     AfterLayoutContext, AppContext, ClipBounds, Element, Event, EventContext, LayoutContext,
     ModelHandle, PaintContext, SingletonEntity, SizeConstraint,
 };
@@ -943,7 +943,7 @@ impl<V: EditorView> EditorWrapper<V> {
             line_number_config.text_color
         };
         let icon = ConstrainedBox::new(
-            rookui::elements::Icon::new(expansion_type.icon().into(), icon_color).finish(),
+            ptermui::elements::Icon::new(expansion_type.icon().into(), icon_color).finish(),
         )
         .with_width(16.)
         .with_height(16.)
@@ -995,7 +995,7 @@ impl<V: EditorView> EditorWrapper<V> {
 
             let container = Container::new(
                 ConstrainedBox::new(
-                    rookui::elements::Icon::new(gutter_button.icon().into(), icon_color).finish(),
+                    ptermui::elements::Icon::new(gutter_button.icon().into(), icon_color).finish(),
                 )
                 .with_width(icon_size)
                 .with_height(icon_size)
@@ -1035,7 +1035,7 @@ impl<V: EditorView> EditorWrapper<V> {
         });
 
         if enabled {
-            button = button.with_cursor(rookui::platform::Cursor::PointingHand);
+            button = button.with_cursor(ptermui::platform::Cursor::PointingHand);
 
             if let Some(on_click_action) = on_click_action {
                 let action = on_click_action.clone();

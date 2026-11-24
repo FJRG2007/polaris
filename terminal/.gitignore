@@ -4,7 +4,7 @@ app/frameworks/dev/Carthage
 app/frameworks/**/*.xcframework
 /target
 /app/target
-/rook.xcworkspace
+/polaris-terminal.xcworkspace
 .idea/
 .DS_Store
 *.icloud
@@ -19,7 +19,7 @@ profile.pb
 chrome_profiler.json
 
 # Don't include any files that we write for testing purposes.
-crates/rook_files/test_data/test_write
+crates/pterm_files/test_data/test_write
 
 # Don't include fonts downloaded by the script used to generate font fallback code.
 script/font_fallback/downloaded_fonts
@@ -38,7 +38,7 @@ script/windows/Output
 [._]sw[a-p]
 
 # Don't include the PTY recording.
-rook.pty.recording
+polaris-terminal.pty.recording
 
 # Don't include captured frames generated locally.
 frame_capture_*.png

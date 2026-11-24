@@ -1,9 +1,9 @@
-use rook_core::features::FeatureFlag;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::appearance::Appearance;
-use rook_errors::report_error;
-use rookui::keymap::Keystroke;
-use rookui::{EntityId, SingletonEntity, ViewContext};
+use pterm_core::features::FeatureFlag;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::appearance::Appearance;
+use pterm_errors::report_error;
+use ptermui::keymap::Keystroke;
+use ptermui::{EntityId, SingletonEntity, ViewContext};
 
 use crate::TelemetryEvent;
 use crate::ai::agent::conversation::AIConversationId;

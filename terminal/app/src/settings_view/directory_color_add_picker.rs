@@ -4,13 +4,13 @@ use std::path::{Path, PathBuf};
 use ai::index::full_source_code_embedding::manager::{
     CodebaseIndexManager, CodebaseIndexManagerEvent,
 };
-use rook_util::path::user_friendly_path;
-use rookui::elements::{
+use pterm_util::path::user_friendly_path;
+use ptermui::elements::{
     Border, ChildView, ConstrainedBox, Container, CrossAxisAlignment, Flex, Hoverable,
     MainAxisSize, MouseStateHandle, ParentElement, Text,
 };
-use rookui::platform::Cursor;
-use rookui::{
+use ptermui::platform::Cursor;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 use settings::Setting;

@@ -2,7 +2,7 @@
 Linear: https://linear.app/warpdotdev/issue/APP-3773/add-support-for-image-uploads-in-the-feedback-skill
 See `PRODUCT.md` for user-facing behavior.
 ## Context
-This feature touches three surfaces: the Rook client's slash-command → skill invocation pipeline, the bundled feedback skill's instructions, and the feedback skill's filing helper script.
+This feature touches three surfaces: the Polaris Terminal client's slash-command → skill invocation pipeline, the bundled feedback skill's instructions, and the feedback skill's filing helper script.
 The skill-invocation entry point is in the slash-command controller. `app/src/ai/blocklist/controller/slash_command.rs:74` builds the context that accompanies every slash-command request:
 ```rust path=null start=null
 let context = input_context_for_request(
@@ -61,4 +61,4 @@ The rest of the skill's workflow (classification, clarifying questions, grounded
 ## Follow-ups
 - If the forced-browser path becomes the dominant filing path due to screenshots being common in feedback, reassess the decision to keep `gh issue create` at all. Unifying on a single path (browser or CLI) reduces user-facing branching in the skill's final response and collapses the test matrix.
 - If another skill later wants the same "caller picks filing method" signal (for example, a future `/bug` or `/support` skill), consider lifting `--use {gh|browser}` into a shared filing helper rather than duplicating the flag semantics per skill.
-- Consider exposing the image-attached placeholder convention as a named sentinel (for example, `<!-- rook-feedback:image-N -->`) if we ever want to post-process the submitted issue to validate that users replaced the placeholders before submission.
+- Consider exposing the image-attached placeholder convention as a named sentinel (for example, `<!-- polaris-terminal-feedback:image-N -->`) if we ever want to post-process the submitted issue to validate that users replaced the placeholders before submission.

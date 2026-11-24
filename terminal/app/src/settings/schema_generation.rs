@@ -2,8 +2,8 @@ use std::io::Write as _;
 use std::path::Path;
 
 use anyhow::{Context as _, Result};
-use rook_core::channel::ChannelState;
-use rook_core::features::FeatureFlag;
+use pterm_core::channel::ChannelState;
+use pterm_core::features::FeatureFlag;
 use schemars::SchemaGenerator;
 use serde_json::{Map, Value};
 use settings::schema::SettingSchemaEntry;
@@ -47,7 +47,7 @@ fn settings_schema_json(is_flag_enabled: impl Fn(FeatureFlag) -> bool) -> Result
             .as_object_mut()
             .expect("setting schema should be an object")
             .insert(
-                "x-rook-surfaces".to_string(),
+                "x-polaris-terminal-surfaces".to_string(),
                 Value::Array(setting_surface_names((entry.surfaces_fn)())),
             );
         let default_json = (entry.file_default_value_fn)();
@@ -85,12 +85,12 @@ fn settings_schema_json(is_flag_enabled: impl Fn(FeatureFlag) -> bool) -> Result
     );
     root.insert(
         "title".to_string(),
-        Value::String("Rook Settings".to_string()),
+        Value::String("Polaris Terminal Settings".to_string()),
     );
     root.insert(
         "description".to_string(),
         Value::String(format!(
-            "JSON Schema for Rook settings ({} channel, {entry_count} settings)",
+            "JSON Schema for Polaris Terminal settings ({} channel, {entry_count} settings)",
             ChannelState::channel()
         )),
     );

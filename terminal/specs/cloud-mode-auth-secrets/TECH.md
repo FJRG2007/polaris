@@ -6,7 +6,7 @@ The cloud mode input V2 composing UI lets users select a non-Oz harness (e.g. Cl
 
 ## Relevant Code
 
-### Client (rook-internal)
+### Client (polaris-terminal-internal)
 
 - `app/src/ai/harness_availability.rs` — `HarnessAvailabilityModel` singleton. Fetches and caches harness availability from the server. **Will be extended** with per-harness auth secret state.
 - `app/src/terminal/view/ambient_agent/harness_selector.rs` — `HarnessSelector` view (`ActionButton` + `Menu<A>`). The auth secret selector chip mirrors this pattern.
@@ -17,7 +17,7 @@ The cloud mode input V2 composing UI lets users select a non-Oz harness (e.g. Cl
 - `app/src/terminal/input/agent.rs` (539-556) — `render_cloud_mode_v2_top_row()`. **Will add** `AuthSecretSelector` chip conditionally.
 - `app/src/server/server_api/managed_secrets.rs` — `ManagedSecretsClient` trait. Has `create_managed_secret` and `list_secrets`. **Will add** `list_harness_auth_secrets`.
 
-### Server (rook-server) — read-only, no changes needed
+### Server (polaris-terminal-server) — read-only, no changes needed
 
 - `graphql/v2/queries/managed_secrets.graphqls` — `harnessAuthSecrets` query, `ListHarnessAuthSecretsInput`, `HarnessAuthSecretsResult`.
 - `graphql/v2/mutations/create_managed_secret.graphqls` — `createManagedSecret` mutation.
@@ -26,7 +26,7 @@ The cloud mode input V2 composing UI lets users select a non-Oz harness (e.g. Cl
 
 ### GraphQL client crate
 
-- `crates/rook_graphql` — cynic-based GraphQL query modules. **Will add** `list_harness_auth_secrets` query module.
+- `crates/pterm_graphql` — cynic-based GraphQL query modules. **Will add** `list_harness_auth_secrets` query module.
 
 ## Current State
 
@@ -39,7 +39,7 @@ The cloud mode input V2 composing UI lets users select a non-Oz harness (e.g. Cl
 
 ### 1. GraphQL query: `harnessAuthSecrets`
 
-**New file**: `crates/rook_graphql/src/queries/list_harness_auth_secrets.rs`
+**New file**: `crates/pterm_graphql/src/queries/list_harness_auth_secrets.rs`
 
 Add a cynic query module for the server's `harnessAuthSecrets` query. The input takes an `AgentHarness` enum; the output reuses the existing `ManagedSecret` fragment.
 
@@ -394,7 +394,7 @@ sequenceDiagram
     participant AmbientAgentVM as AmbientAgentViewModel
     participant HarnessAvail as HarnessAvailabilityModel
     participant FtuxView as AuthSecretFtuxView
-    participant Server as rook-server
+    participant Server as polaris-terminal-server
 
     User->>HarnessSelector: Select "Claude Code"
     HarnessSelector->>AmbientAgentVM: set_harness(Claude)
@@ -454,5 +454,5 @@ sequenceDiagram
 
 - Extend `auth_secret_types_for_harness` when new harnesses (e.g. Gemini, Codex) are added.
 - Support raw-value passthrough (type the API key directly without creating a named secret).
-- Add the "Manage secrets" toast button action to open the Rook Drive secrets pane.
+- Add the "Manage secrets" toast button action to open the Polaris Terminal Drive secrets pane.
 - Consider pre-selecting the most recently used secret when returning to the FTUX or chip.

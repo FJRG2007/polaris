@@ -33,8 +33,8 @@ class SharedSettingPathTests(unittest.TestCase):
         schema = {
             "properties": {
                 "shared_object": {
-                    "x-rook-surfaces": ["gui", "tui"],
-                    "properties": {"value_field": {"x-rook-surfaces": ["gui", "tui"]}},
+                    "x-polaris-terminal-surfaces": ["gui", "tui"],
+                    "properties": {"value_field": {"x-polaris-terminal-surfaces": ["gui", "tui"]}},
                 }
             }
         }

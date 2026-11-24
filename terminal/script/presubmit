@@ -22,20 +22,20 @@ echo "Checking for inline Rust test modules..."
 echo "Inline Rust test module check succeeded..."
 
 echo "Running clippy..."
-# Exclude rook_completer because we run clippy on it with default features (rather than all features) below.
+# Exclude pterm_completer because we run clippy on it with default features (rather than all features) below.
 #
 # TODO(vorporeal): Re-enable the `all-features` flag once we've fixed things.
-cargo clippy --workspace --exclude rook_completer --all-targets --tests -- -D warnings
-# Workspace feature unification enables `rook/tui` through the `rook_tui` package.
+cargo clippy --workspace --exclude pterm_completer --all-targets --tests -- -D warnings
+# Workspace feature unification enables `polaris-terminal/tui` through the `pterm_tui` package.
 # Also lint the default GUI configuration used by `cargo run` and `./script/run`.
-cargo clippy -p rook --all-targets --tests -- -D warnings
-# Run clippy on rook_completer with default, rather than all features enabled, because there is
+cargo clippy -p polaris-terminal --all-targets --tests -- -D warnings
+# Run clippy on pterm_completer with default, rather than all features enabled, because there is
 # feature-gated logic for the WIP completions-on-js implementation.
-cargo clippy -p rook_completer --all-targets --tests -- -D warnings
+cargo clippy -p pterm_completer --all-targets --tests -- -D warnings
 echo "clippy succeeded..."
 
 echo "Running clang-format..."
-./script/run-clang-format.py -r --extensions 'c,h,cpp,m' ./crates/rookui/src/ ./app/src/
+./script/run-clang-format.py -r --extensions 'c,h,cpp,m' ./crates/ptermui/src/ ./app/src/
 echo "clang-format succeeded..."
 
 echo "Running factory-files validator cases..."
@@ -64,9 +64,9 @@ fi
 
 echo "Running tests via nextest..."
 cargo nextest run --no-fail-fast --workspace
-# Run rook_completer tests with the "v2" (completions-on-js) flag enabled. We do this to ensure that
+# Run pterm_completer tests with the "v2" (completions-on-js) flag enabled. We do this to ensure that
 # the v2 completions implementation doesn't regress/rot while it's development is paused.
-cargo nextest run -p rook_completer --features v2
+cargo nextest run -p pterm_completer --features v2
 echo "Running doc tests..."
 cargo test --doc
 echo "Tests succeeded..."

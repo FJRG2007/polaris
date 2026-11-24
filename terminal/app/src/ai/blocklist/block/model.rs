@@ -4,8 +4,8 @@ mod model_impl;
 use chrono::{DateTime, Local, TimeDelta};
 pub use helper::AIBlockModelHelper;
 pub use model_impl::*;
-use rook_core::features::FeatureFlag;
-use rookui::{AppContext, ViewContext};
+use pterm_core::features::FeatureFlag;
+use ptermui::{AppContext, ViewContext};
 use session_sharing_protocol::common::ParticipantId;
 
 use crate::ai::agent::conversation::AIConversationId;
@@ -221,7 +221,7 @@ pub trait AIBlockModel {
 
 #[cfg(any(test, feature = "integration_tests"))]
 pub mod testing {
-    use rookui::{AppContext, ViewContext};
+    use ptermui::{AppContext, ViewContext};
 
     use super::{AIBlockModel, AIBlockOutputStatus, OutputStatusUpdateCallback};
     use crate::ai::agent::conversation::AIConversationId;

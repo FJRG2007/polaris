@@ -21,7 +21,10 @@ fn can_auto_install_is_false_without_codex_plugin() {
 fn install_instructions_are_native_without_codex_plugin() {
     let _guard = FeatureFlag::CodexPlugin.override_enabled(false);
     let instructions = CodexPluginManager::new(None, None, None).install_instructions();
-    assert_eq!(instructions.title, "Enable Rook Notifications for Codex");
+    assert_eq!(
+        instructions.title,
+        "Enable Polaris Terminal Notifications for Codex"
+    );
     assert_eq!(
         instructions.steps[1].command,
         "[tui]\nnotification_condition = \"always\""
@@ -68,7 +71,7 @@ fn install_instructions_has_marketplace_and_plugin_add_steps() {
     );
     assert_eq!(
         instructions.steps[1].command,
-        "codex plugin add rook@codex-rook"
+        "codex plugin add polaris-terminal@codex-polaris-terminal"
     );
     assert_eq!(instructions.steps.len(), 2);
     assert!(!instructions.title.is_empty());
@@ -80,11 +83,11 @@ fn update_instructions_has_marketplace_and_plugin_add_steps() {
     let instructions = CodexPluginManager::new(None, None, None).update_instructions();
     assert_eq!(
         instructions.steps[0].command,
-        "codex plugin marketplace upgrade codex-rook"
+        "codex plugin marketplace upgrade codex-polaris-terminal"
     );
     assert_eq!(
         instructions.steps[1].command,
-        "codex plugin add rook@codex-rook"
+        "codex plugin add polaris-terminal@codex-polaris-terminal"
     );
     assert_eq!(instructions.steps.len(), 2);
     assert!(!instructions.title.is_empty());
@@ -459,7 +462,7 @@ fn write_marketplace_config(dir: &Path, source_type: &str) {
     fs::write(
         dir.join("config.toml"),
         format!(
-            "[marketplaces.codex-rook]\nsource_type = \"{source_type}\"\nsource = \"/tmp/codex-rook\"\n"
+            "[marketplaces.codex-polaris-terminal]\nsource_type = \"{source_type}\"\nsource = \"/tmp/codex-polaris-terminal\"\n"
         ),
     )
     .unwrap();
@@ -492,7 +495,7 @@ fn write_cache_manifest_json(
     let manifest_dir = dir
         .join("plugins")
         .join("cache")
-        .join("codex-rook")
+        .join("codex-polaris-terminal")
         .join(plugin_name)
         .join(version_dir)
         .join(".codex-plugin");

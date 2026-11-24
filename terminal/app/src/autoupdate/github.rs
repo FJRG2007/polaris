@@ -1,8 +1,8 @@
-//! Checking GitHub releases for a newer Rook.
+//! Checking GitHub releases for a newer Polaris Terminal.
 //!
 //! Upstream's update pipeline serves its own release channels and refuses the
 //! `oss` channel outright ("these channels don't ship release artifacts"), which
-//! is the one Rook ships on. Rook publishes to GitHub releases instead, so this
+//! is the one Polaris Terminal ships on. Polaris Terminal publishes to GitHub releases instead, so this
 //! asks GitHub what the latest tag is.
 //!
 //! It only reports. Downloading and installing an update is left to the person,
@@ -17,12 +17,12 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 
 /// Where releases are published. Also what the user is sent to.
-pub const RELEASES_URL: &str = "https://github.com/FJRG2007/rook/releases";
+pub const RELEASES_URL: &str = "https://github.com/FJRG2007/polaris/releases";
 
-const LATEST_RELEASE_API: &str = "https://api.github.com/repos/FJRG2007/rook/releases/latest";
+const LATEST_RELEASE_API: &str = "https://api.github.com/repos/FJRG2007/polaris/releases/latest";
 
 /// The page for one release, which is where someone told to get a specific
-/// version needs to land. The index lists every release Rook has ever had, and
+/// version needs to land. The index lists every release Polaris Terminal has ever had, and
 /// leaving them to pick the right one out of it is the kind of last step that
 /// gets skipped.
 pub fn release_url(tag: &str) -> String {
@@ -48,7 +48,7 @@ const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 ///
 /// Every release is also its own `last_prominent_update`. Upstream's channel
 /// server sets that field on the releases it wants announced, and it is what
-/// shows the "Update Rook" pill in the tab bar; without it a downloaded update
+/// shows the "Update Polaris Terminal" pill in the tab bar; without it a downloaded update
 /// only earns a red dot on the avatar and an entry in its menu. GitHub has no
 /// such field, so nothing was ever prominent, and a ready update was easy to
 /// miss next to Warp showing the button for the same kind of release.
@@ -185,16 +185,16 @@ impl PartialOrd for ReleaseTag {
 pub fn installer_asset_name() -> Option<&'static str> {
     if cfg!(windows) {
         if cfg!(target_arch = "aarch64") {
-            Some("RookOssSetup-arm64.exe")
+            Some("PolarisTerminalSetup-arm64.exe")
         } else if cfg!(target_arch = "x86_64") {
-            Some("RookOssSetup.exe")
+            Some("PolarisTerminalSetup.exe")
         } else {
             None
         }
     } else if cfg!(target_os = "macos") {
-        Some("RookOss.dmg")
+        Some("PolarisTerminal.dmg")
     } else if cfg!(target_os = "linux") && cfg!(target_arch = "x86_64") {
-        Some("RookOss-x86_64.AppImage")
+        Some("PolarisTerminal-x86_64.AppImage")
     } else {
         None
     }
@@ -223,7 +223,7 @@ pub async fn fetch_latest_release_version(client: &http_client::Client) -> Resul
     let response = client
         .get(LATEST_RELEASE_API)
         // GitHub rejects an API request with no user agent.
-        .header("User-Agent", "rook-autoupdate")
+        .header("User-Agent", "polaris-terminal-autoupdate")
         .header("Accept", "application/vnd.github+json")
         .timeout(FETCH_TIMEOUT)
         .send()

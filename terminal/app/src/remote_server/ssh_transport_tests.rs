@@ -1,4 +1,4 @@
-use rookui::r#async::BoxFuture;
+use ptermui::r#async::BoxFuture;
 
 use super::*;
 

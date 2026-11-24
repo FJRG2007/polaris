@@ -40,11 +40,11 @@ use num_traits::FromPrimitive;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
 use persistence::model::AMBIENT_AGENT_PANE_KIND;
-use rook_core::features::FeatureFlag;
-use rook_errors::{report_error, report_if_error};
-use rookui::platform::FullscreenState;
-use rookui::windowing::{MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH};
-use rookui::{AppContext, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_errors::{report_error, report_if_error};
+use ptermui::platform::FullscreenState;
+use ptermui::windowing::{MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH};
+use ptermui::{AppContext, SingletonEntity};
 use uuid::Uuid;
 
 use super::agent::{
@@ -88,7 +88,7 @@ use crate::cloud_object::model::actions::{
 use crate::cloud_object::model::generic_string_model::{CloudStringObject, GenericStringObjectId};
 use crate::cloud_object::{CloudObject, ObjectIdType};
 use crate::code::editor_management::CodeSource;
-use crate::drive::OpenRookDriveObjectSettings;
+use crate::drive::OpenPtermDriveObjectSettings;
 use crate::notebooks::NotebookId;
 use crate::persistence::block_list::{
     delete_orphaned_blocks, get_all_restored_blocks, process_ai_queries_for_nld_history_match,
@@ -123,7 +123,7 @@ diesel::define_sql_function! {
 const CHANNEL_SIZE: usize = 1024;
 const COMMANDS_COUNT_LIMIT: i64 = 10000;
 
-const ROOK_SQLITE_FILE_NAME: &str = "rook.sqlite";
+const POLARIS_TERMINAL_SQLITE_FILE_NAME: &str = "polaris-terminal.sqlite";
 
 /// Runs any migrations and creates the Sqlite database if it doesn't exist.
 /// Reads from the sqlite database to get the app state for session restoration.
@@ -261,7 +261,7 @@ unsafe fn init_logging() {
                 // According to the docs, this error means that the database file was moved (or deleted),
                 // so SQLite can't safely modify it and the rollback journal:
                 //     https://www.sqlite.org/rescode.html#readonly_dbmoved
-                // This is mostly outside of Rook's control (e.g. the user or some system program is
+                // This is mostly outside of Polaris Terminal's control (e.g. the user or some system program is
                 // moving around files in the user data directory), so downgrade to a warning.
                 (_, sqlite3::SQLITE_READONLY_DBMOVED) => log::Level::Warn,
                 _ => log::Level::Error,
@@ -380,7 +380,7 @@ pub(super) fn init_db(scope: &PersistenceScope) -> Result<SqliteConnection> {
 }
 
 fn migrate_old_sqlite_into_secure_container_if_needed(db_path: &Path) {
-    let old_db_path = rook_core::paths::state_dir().join(ROOK_SQLITE_FILE_NAME);
+    let old_db_path = pterm_core::paths::state_dir().join(POLARIS_TERMINAL_SQLITE_FILE_NAME);
     if old_db_path == db_path || !old_db_path.exists() || db_path.exists() {
         return;
     }
@@ -481,19 +481,19 @@ pub fn database_file_path_for_current_scope() -> PathBuf {
 }
 
 fn app_database_file_path() -> PathBuf {
-    rook_core::paths::secure_state_dir()
-        .unwrap_or_else(rook_core::paths::state_dir)
-        .join(ROOK_SQLITE_FILE_NAME)
+    pterm_core::paths::secure_state_dir()
+        .unwrap_or_else(pterm_core::paths::state_dir)
+        .join(POLARIS_TERMINAL_SQLITE_FILE_NAME)
 }
 
 fn tui_database_file_path() -> PathBuf {
-    rook_core::paths::tui_state_dir().join(ROOK_SQLITE_FILE_NAME)
+    pterm_core::paths::tui_state_dir().join(POLARIS_TERMINAL_SQLITE_FILE_NAME)
 }
 
 fn remote_server_daemon_database_file_path(identity_key: &str) -> PathBuf {
     let data_dir = remote_server::setup::remote_server_daemon_data_dir(identity_key);
     let expanded_data_dir = shellexpand::tilde(&data_dir).into_owned();
-    PathBuf::from(expanded_data_dir).join(ROOK_SQLITE_FILE_NAME)
+    PathBuf::from(expanded_data_dir).join(POLARIS_TERMINAL_SQLITE_FILE_NAME)
 }
 
 #[cfg(unix)]
@@ -984,9 +984,9 @@ fn save_app_state(conn: &mut SqliteConnection, app_state: &AppState) -> Result<(
                 origin_y,
                 quake_mode: window.quake_mode,
                 universal_search_width: window.universal_search_width,
-                rook_ai_width: window.rook_ai_width,
+                pterm_ai_width: window.pterm_ai_width,
                 voltron_width: window.voltron_width,
-                rook_drive_index_width: window.rook_drive_index_width,
+                pterm_drive_index_width: window.pterm_drive_index_width,
                 left_panel_open: Some(window.left_panel_open),
                 vertical_tabs_panel_open: Some(window.vertical_tabs_panel_open),
                 fullscreen_state: window.fullscreen_state as i32,
@@ -2286,7 +2286,7 @@ fn read_node(conn: &mut SqliteConnection, node: model::PaneNode) -> Result<PaneN
                         Some(path) => NotebookPaneSnapshot::LocalFileNotebook { path: Some(path) },
                         None => NotebookPaneSnapshot::CloudNotebook {
                             notebook_id,
-                            settings: OpenRookDriveObjectSettings::default(),
+                            settings: OpenPtermDriveObjectSettings::default(),
                         },
                     })
                 }
@@ -2304,7 +2304,7 @@ fn read_node(conn: &mut SqliteConnection, node: model::PaneNode) -> Result<PaneN
 
                     LeafContents::Workflow(WorkflowPaneSnapshot::CloudWorkflow {
                         workflow_id,
-                        settings: OpenRookDriveObjectSettings::default(),
+                        settings: OpenPtermDriveObjectSettings::default(),
                     })
                 }
                 CODE_PANE_KIND => {
@@ -2489,7 +2489,7 @@ fn box_persisted_generic_string_object(
 /// and makes it invalid to write the logic recursively. It's ok it's not in a
 /// transaction because we should be the only connection using the database.
 ///
-/// One notable exception is the case where there may be two rook apps running
+/// One notable exception is the case where there may be two polaris-terminal apps running
 /// in the same bundle. In this case, we may read some garbage, but all that will
 /// happen is the user won't have session restoration.
 ///
@@ -2639,7 +2639,7 @@ fn read_sqlite_data(
 
                     // The origin and size of the bound should be all null or all non-null.
                     // Reject bounds smaller than the platform minimum window size so users
-                    // with an already-corrupted rook.sqlite (see GH#10083) restore to
+                    // with an already-corrupted polaris-terminal.sqlite (see GH#10083) restore to
                     // default geometry instead of a sliver.
                     let bounds = match (
                         window.window_width,
@@ -2703,9 +2703,9 @@ fn read_sqlite_data(
                         quake_mode: window.quake_mode,
                         bounds,
                         universal_search_width: window.universal_search_width,
-                        rook_ai_width: window.rook_ai_width,
+                        pterm_ai_width: window.pterm_ai_width,
                         voltron_width: window.voltron_width,
-                        rook_drive_index_width: window.rook_drive_index_width,
+                        pterm_drive_index_width: window.pterm_drive_index_width,
                         left_panel_open: window_left_panel_open,
                         vertical_tabs_panel_open: window.vertical_tabs_panel_open.unwrap_or(false),
                         fullscreen_state: fullscreen_state_val,

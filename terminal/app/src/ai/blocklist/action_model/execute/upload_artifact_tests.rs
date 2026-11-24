@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use async_channel::unbounded;
-use rookui::{App, EntityId, ModelHandle};
+use ptermui::{App, EntityId, ModelHandle};
 
 use super::*;
 use crate::LaunchMode;

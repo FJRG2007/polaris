@@ -1,14 +1,14 @@
 use pathfinder_color::ColorU;
-use rookui::elements::{
+use ptermui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable, Icon,
     MouseStateHandle, ParentElement, Radius, Text,
 };
-use rookui::platform::Cursor;
-use rookui::{Element, EventContext};
+use ptermui::platform::Cursor;
+use ptermui::{Element, EventContext};
 
 use crate::appearance::Appearance;
 use crate::drive::DriveObjectType;
-use crate::drive::cloud_object_styling::rook_drive_icon_color;
+use crate::drive::cloud_object_styling::pterm_drive_icon_color;
 use crate::search::{FilterChipRenderer as CommonFilterChipRenderer, QueryFilter};
 use crate::util::color::{ContrastingColor, MinimumAllowedContrast};
 
@@ -123,33 +123,33 @@ impl FilterChipRenderer for QueryFilter {
                 .theme()
                 .main_text_color(appearance.theme().surface_2())
                 .into_solid(),
-            QueryFilter::Workflows => rook_drive_icon_color(appearance, DriveObjectType::Workflow),
-            QueryFilter::Notebooks => rook_drive_icon_color(
+            QueryFilter::Workflows => pterm_drive_icon_color(appearance, DriveObjectType::Workflow),
+            QueryFilter::Notebooks => pterm_drive_icon_color(
                 appearance,
                 DriveObjectType::Notebook {
                     is_ai_document: false,
                 },
             ),
-            QueryFilter::Plans => rook_drive_icon_color(
+            QueryFilter::Plans => pterm_drive_icon_color(
                 appearance,
                 DriveObjectType::Notebook {
                     is_ai_document: true,
                 },
             ),
             QueryFilter::EnvironmentVariables => {
-                rook_drive_icon_color(appearance, DriveObjectType::EnvVarCollection)
+                pterm_drive_icon_color(appearance, DriveObjectType::EnvVarCollection)
             }
             QueryFilter::AgentModeWorkflows => {
-                rook_drive_icon_color(appearance, DriveObjectType::AgentModeWorkflow)
+                pterm_drive_icon_color(appearance, DriveObjectType::AgentModeWorkflow)
             }
         }
     }
 }
 
 mod styles {
-    use rookui::elements::{Border, MouseState};
+    use ptermui::elements::{Border, MouseState};
 
-    use crate::themes::theme::{Blend, Fill, RookTheme};
+    use crate::themes::theme::{Blend, Fill, PtermTheme};
 
     /// Size of the border when the query filter is hovered.
     const HOVERED_BORDER_SIZE: f32 = 2.;
@@ -183,7 +183,7 @@ mod styles {
     }
 
     /// Returns the border that should be applied to the query filter.
-    pub fn border(mouse_state: &MouseState, theme: &RookTheme) -> Border {
+    pub fn border(mouse_state: &MouseState, theme: &PtermTheme) -> Border {
         if mouse_state.is_hovered() {
             Border::all(HOVERED_BORDER_SIZE).with_border_fill(theme.accent())
         } else {
@@ -192,7 +192,7 @@ mod styles {
     }
 
     /// Returns the background [`Fill`] that should be applied to the query filter.
-    pub fn background_fill(mouse_state: &MouseState, theme: &RookTheme) -> Fill {
+    pub fn background_fill(mouse_state: &MouseState, theme: &PtermTheme) -> Fill {
         if mouse_state.is_hovered() {
             theme
                 .surface_2()

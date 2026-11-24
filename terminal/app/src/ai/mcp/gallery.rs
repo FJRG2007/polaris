@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::{Entity, ModelContext, SingletonEntity};
 use uuid::Uuid;
 
 use crate::ai::mcp::templatable::{
@@ -129,7 +129,7 @@ impl MCPGalleryManager {
     /// Update gallery items from the server response
     pub fn update_gallery_items(
         &mut self,
-        templates: Vec<rook_graphql::mcp_gallery_template::MCPGalleryTemplate>,
+        templates: Vec<pterm_graphql::mcp_gallery_template::MCPGalleryTemplate>,
         ctx: &mut ModelContext<Self>,
     ) {
         let mut gallery_items = HashMap::new();

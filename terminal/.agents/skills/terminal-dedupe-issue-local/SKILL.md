@@ -2,10 +2,10 @@
 name: terminal-dedupe-issue-local
 specializes: dedupe-issue
 specializes_source: warpdotdev/oz-for-oss:.agents/skills/dedupe-issue
-description: Repo-specific dedupe guidance for rook. Only the categories declared overridable by the core dedupe-issue skill may be specialized here.
+description: Repo-specific dedupe guidance for polaris-terminal. Only the categories declared overridable by the core dedupe-issue skill may be specialized here.
 ---
 
-# Repo-specific dedupe guidance for `rook`
+# Repo-specific dedupe guidance for `polaris-terminal`
 
 ## Prerequisite: install the parent skill
 
@@ -18,9 +18,9 @@ core skill marks as overridable.
 
 ## Repo-specific normalizations
 
-- Strip low-signal title prefixes such as `Bug:`, `Feature:`, `Request:`, `[Bug]`, `[Feature]`, `Rook:`, and platform tags like `[macOS]`, `[Linux]`, or `[Windows]` before comparing titles.
+- Strip low-signal title prefixes such as `Bug:`, `Feature:`, `Request:`, `[Bug]`, `[Feature]`, `Polaris Terminal:`, and platform tags like `[macOS]`, `[Linux]`, or `[Windows]` before comparing titles.
 - Treat app channel/version, OS version, and shell name as supporting evidence, not as duplicate blockers, when the core symptom and reproduction path are otherwise the same.
-- Do not collapse distinct Rook surfaces just because they share a word like "agent", "terminal", "MCP", "settings", "search", or "sync". Require overlap in the actual failing behavior or requested capability.
+- Do not collapse distinct Polaris Terminal surfaces just because they share a word like "agent", "terminal", "MCP", "settings", "search", or "sync". Require overlap in the actual failing behavior or requested capability.
 - For terminal issues, compare shell/session context, command output behavior, prompt rendering, input behavior, and remote/tmux involvement before treating two reports as duplicates.
 - For agent or MCP issues, compare the trigger path, local vs cloud execution, MCP server/tool, visible error, and expected workflow before treating two reports as duplicates.
 - For UI/rendering issues, compare the affected surface and visible symptom. Similar screenshots or recordings are strong duplicate evidence when the title is vague.

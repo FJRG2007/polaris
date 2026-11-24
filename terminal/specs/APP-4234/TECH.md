@@ -6,7 +6,7 @@ The `SshRemoteServer` feature flag gates a new SSH session flow where a persiste
 
 ### Current integration test infra
 
-The existing SSH integration tests (`crates/integration/src/test/ssh.rs`) cover the legacy rookification flow:
+The existing SSH integration tests (`crates/integration/src/test/ssh.rs`) cover the legacy ptermification flow:
 - Connect to a GCP-hosted Ubuntu VM (`ubuntu-14-04`) via IAP tunnel with password auth
 - Helper steps in `app/src/integration_testing/subshell/` — `setup_gcloud_sdk()`, `enter_ssh_command()`, `enter_ssh_password()`, `wait_for_password_prompt()`
 - Builder pattern: `new_builder().with_step(TestStep)` with assertion callbacks
@@ -22,7 +22,7 @@ When `SshRemoteServer` is enabled for a legacy SSH session (`app/src/terminal/wr
 4. Bootstrap is flushed; `RemoteServerCommandExecutor` (`app/src/terminal/model/session/command_executor/remote_server_executor.rs`) is wired as the session's `CommandExecutor`
 5. On CWD change, `navigate_to_directory` fires → returns `is_git` flag + triggers `RepoMetadataSnapshot` push
 
-Key config: `SshExtensionInstallMode::AlwaysInstall` (setting in `app/src/terminal/rookify/settings.rs:85`) bypasses the choice block UI, needed for deterministic test flow.
+Key config: `SshExtensionInstallMode::AlwaysInstall` (setting in `app/src/terminal/ptermify/settings.rs:85`) bypasses the choice block UI, needed for deterministic test flow.
 
 ### Binary deployment problem
 
@@ -36,13 +36,13 @@ Add `script/deploy_remote_server_to_test_vm` that:
 
 1. Cross-compiles the Oz CLI for the test VM target:
    ```
-   cargo build -p rook --bin rook --target x86_64-unknown-linux-musl \
+   cargo build -p polaris-terminal --bin polaris-terminal-local --target x86_64-unknown-linux-musl \
      --profile dev-remote \
      --features release_bundle,crash_reporting,standalone,agent_mode_debug
    ```
    Same build command as `script/deploy_remote_server`.
 
-2. Uploads the binary to `ubuntu-14-04` at `~/.rook-dev/remote-server/oz-dev` via `sshpass` + `scp` through the GCP IAP tunnel (the test VM uses password auth; `sshpass` provides it non-interactively). Uses the same proxy command as the SSH integration tests (`app/src/integration_testing/subshell/util.rs:2`).
+2. Uploads the binary to `ubuntu-14-04` at `~/.polaris-terminal-dev/remote-server/oz-dev` via `sshpass` + `scp` through the GCP IAP tunnel (the test VM uses password auth; `sshpass` provides it non-interactively). Uses the same proxy command as the SSH integration tests (`app/src/integration_testing/subshell/util.rs:2`).
 
 CI calls this script once before launching the integration test suite. Since `check_binary` will find the binary already present, the `RemoteServerController` flow becomes `check_binary → Ok(true) → connect_session`, skipping the CDN-based install.
 
@@ -83,8 +83,8 @@ Steps:
 Validates the full navigate-to-directory flow: create git repo on remote → `cd` into it → `NavigatedToDirectory` response received → session has `host_id` tracked.
 
 After Test A setup, plus:
-8. Create a git repo on the remote via `execute_command("mkdir -p /tmp/rook-test-repo && cd /tmp/rook-test-repo && git init -b main ...")`
-9. `execute_command("cd /tmp/rook-test-repo")` — triggers CWD change → `navigate_to_directory`
+8. Create a git repo on the remote via `execute_command("mkdir -p /tmp/polaris-terminal-test-repo && cd /tmp/polaris-terminal-test-repo && git init -b main ...")`
+9. `execute_command("cd /tmp/polaris-terminal-test-repo")` — triggers CWD change → `navigate_to_directory`
 10. `assert_remote_server_has_navigated(0)` — host_id present for active session
 11. `assert_remote_server_connected(0)` — session still healthy after navigation
 
@@ -101,8 +101,8 @@ After Test A setup, plus:
 Validates `WriteFile` through the `RemoteServerClient` proto API. Uses `write_file_via_remote_server` helper to dispatch the async write from an action callback, then reads the file back via a shell command (which goes through `RemoteServerCommandExecutor::run_command`) to confirm content integrity.
 
 After Test A setup, plus:
-8. `write_file_via_remote_server(0, "/tmp/rook-rs-test-file.txt", "hello from proto")` — writes via proto
-9. `execute_command("cat /tmp/rook-rs-test-file.txt")` — reads back via `RunCommand`, asserts `"hello from proto"`
+8. `write_file_via_remote_server(0, "/tmp/polaris-terminal-rs-test-file.txt", "hello from proto")` — writes via proto
+9. `execute_command("cat /tmp/polaris-terminal-rs-test-file.txt")` — reads back via `RunCommand`, asserts `"hello from proto"`
 10. Clean up and verify executor type
 
 #### Test E — Lazy loading repo metadata (`test_remote_server_lazy_load_directory`)
@@ -111,7 +111,7 @@ Validates the `LoadRepoMetadataDirectory` proto round-trip: navigate to a git re
 
 After Test A setup, plus:
 8. Create a git repo with a `subdir/nested` file on the remote
-9. `cd /tmp/rook-lazy-repo` → triggers `NavigatedToDirectory` and full indexing
+9. `cd /tmp/polaris-terminal-lazy-repo` → triggers `NavigatedToDirectory` and full indexing
 10. `load_repo_metadata_directory_via_remote_server(0, repo_path, "subdir")` — triggers lazy-load proto request
 11. `assert_remote_server_connected(0)` — connection still healthy
 12. `execute_command("cat subdir/nested")` — verifies subdirectory content accessible

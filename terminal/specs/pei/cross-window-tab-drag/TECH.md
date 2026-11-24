@@ -21,7 +21,7 @@ The implementation therefore needs to coordinate source workspace state, target 
 - `app/src/app_state.rs` — `get_app_state` skips serialization while a drag is active.
 - `ui/src/core/app.rs` — `transfer_view_to_window` / `transfer_view_tree_to_window` / `transfer_structural_children`, focus-suppression hooks, view/window ownership state.
 - `ui/src/platform/mod.rs` — `WindowManager::ordered_window_ids`, `cancel_synthetic_drag`, `WindowStyle::PositionedNoFocus`, `TerminationMode::ContentTransferred`.
-- `crates/rookui/src/windowing/winit/window.rs` and `crates/rookui/src/platform/mac/{window.rs,objc/window.m}` — backend implementations of the platform contract.
+- `crates/ptermui/src/windowing/winit/window.rs` and `crates/ptermui/src/platform/mac/{window.rs,objc/window.m}` — backend implementations of the platform contract.
 - `crates/integration/src/test/workspace.rs` — integration coverage for detach, attach, reattach, reverse-handoff, and drop-outside flows; gated on the feature flag rather than the OS.
 
 ## 3. Architecture
@@ -142,7 +142,7 @@ While in `GhostInTarget` the only per-frame work is updating a `Vector2F`, recom
 
 ### 4.4 `Transitioning` is the re-entrancy guard
 
-`DragPhase::Transitioning` is set immediately before any view-tree transfer and cleared after. While the phase is `Transitioning`, `on_drag` short-circuits. The RookUI framework does not support re-entrant drag processing during a view-tree transfer; this phase is what makes that contract observable from the singleton without leaking it into every caller.
+`DragPhase::Transitioning` is set immediately before any view-tree transfer and cleared after. While the phase is `Transitioning`, `on_drag` short-circuits. The PtermUI framework does not support re-entrant drag processing during a view-tree transfer; this phase is what makes that contract observable from the singleton without leaking it into every caller.
 
 ## 5. Drop resolution
 
@@ -250,7 +250,7 @@ Backend specifics belong in the windowing layer. The cross-window drag code expe
 
 - create a window at exact bounds (no system placement)
 - materialize a window without stealing focus from the active typing context (`WindowStyle::PositionedNoFocus`)
-- expose front-to-back ordering of Rook windows for attach targeting (`WindowManager::ordered_window_ids`)
+- expose front-to-back ordering of Polaris Terminal windows for attach targeting (`WindowManager::ordered_window_ids`)
 - continue delivering drag events to the originating window even after that window's z-order or visibility changes
 - close a window with `TerminationMode::ContentTransferred` so transfer-driven closes do not run destructive close semantics
 - cancel any synthetic native drag the platform may have started under the source window when the singleton takes over preview movement (`cancel_synthetic_drag` on macOS, where AppKit otherwise drags the window itself)

@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use chrono::{DateTime, Local};
-use rookui::{AppContext, EntityId, SingletonEntity};
+use ptermui::{AppContext, EntityId, SingletonEntity};
 use serde::{Deserialize, Deserializer, Serialize};
 use uuid::Uuid;
 

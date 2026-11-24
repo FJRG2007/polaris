@@ -5,18 +5,18 @@
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     Align, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss,
     DropShadow, Element, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     ParentElement, Radius, Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::{FixedBinding, Keystroke};
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::{FixedBinding, Keystroke};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::appearance::Appearance;
 use crate::ui_components::icons::Icon;
@@ -80,7 +80,7 @@ pub struct AgentTypeSelector {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings(vec![
         FixedBinding::new(
@@ -224,7 +224,7 @@ impl AgentTypeSelector {
                 (base_background, base_border)
             };
 
-            let avatar_icon = ConstrainedBox::new(icon.to_rookui_icon(icon_color).finish())
+            let avatar_icon = ConstrainedBox::new(icon.to_ptermui_icon(icon_color).finish())
                 .with_width(AVATAR_ICON_SIZE)
                 .with_height(AVATAR_ICON_SIZE)
                 .finish();

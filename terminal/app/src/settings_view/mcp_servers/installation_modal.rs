@@ -1,18 +1,18 @@
 use std::collections::HashMap;
 
 use markdown_parser::parse_markdown;
-use rook_core::ui::external_product_icon::ExternalProductIcon;
-use rook_core::ui::icons::Icon;
-use rookui::elements::{
+use pterm_core::ui::external_product_icon::ExternalProductIcon;
+use pterm_core::ui::icons::Icon;
+use ptermui::elements::{
     Align, Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Flex, FormattedTextElement, HighlightedHyperlink, Hoverable, MainAxisAlignment,
     MouseStateHandle, Padding, ParentElement, Radius, Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::Keystroke;
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::Keystroke;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -273,7 +273,7 @@ impl InstallationModalBody {
                     let mut icon = Container::new(
                         ConstrainedBox::new(
                             Icon::X
-                                .to_rookui_icon(theme.active_ui_text_color())
+                                .to_ptermui_icon(theme.active_ui_text_color())
                                 .finish(),
                         )
                         .with_width(16.)
@@ -415,7 +415,7 @@ impl InstallationModalBody {
     fn render_source_indicator(is_shared: bool, appearance: &Appearance) -> Box<dyn Element> {
         let info_icon = ConstrainedBox::new(
             Icon::Info
-                .to_rookui_icon(appearance.theme().disabled_ui_text_color())
+                .to_ptermui_icon(appearance.theme().disabled_ui_text_color())
                 .finish(),
         )
         .with_width(16.)

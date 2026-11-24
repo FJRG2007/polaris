@@ -20,28 +20,28 @@ Non-goals:
 - Change background computer-use action or screenshot targeting behavior.
 
 ## Behavior
-1. When recording starts with a screen target, Rook records the full X11 display exactly as before.
+1. When recording starts with a screen target, Polaris Terminal records the full X11 display exactly as before.
 
-2. When recording starts with a window target on Linux X11, Rook treats the recording as a foreground-visible window recording:
+2. When recording starts with a window target on Linux X11, Polaris Terminal treats the recording as a foreground-visible window recording:
    - The target window is the recording subject.
    - The encoded video dimensions are based on the target window's dimensions at recording start.
    - Coordinates and actions may still be window-targeted, but the recording contract is that the target must be visible on the display.
 
-3. Before a window-targeted recording begins, Rook attempts to make the target window visible enough to record:
+3. Before a window-targeted recording begins, Polaris Terminal attempts to make the target window visible enough to record:
    - If the target is already visible, recording starts without changing stacking order.
-   - If the target is covered, Rook may raise it above other windows without changing user-facing recording controls.
-   - Rook verifies visibility before reporting recording start success.
+   - If the target is covered, Polaris Terminal may raise it above other windows without changing user-facing recording controls.
+   - Polaris Terminal verifies visibility before reporting recording start success.
 
 4. Visibility verification is best-effort, not a whole-window proof:
-   - Rook must verify representative points within the target window, including the center and edges/corners when the window is large enough.
+   - Polaris Terminal must verify representative points within the target window, including the center and edges/corners when the window is large enough.
    - If those sampled points would not hit the target window after raising, recording fails with an error instead of starting.
    - Passing verification means the target is sufficiently foreground-visible for native recording, not that every pixel is guaranteed unobscured forever.
 
-5. If Rook cannot resolve the target window, the target window has invalid dimensions, or the target window cannot be made foreground-visible, starting the recording fails and no artifact is uploaded.
+5. If Polaris Terminal cannot resolve the target window, the target window has invalid dimensions, or the target window cannot be made foreground-visible, starting the recording fails and no artifact is uploaded.
 
-6. If the target window is covered after recording has started, Rook does not guarantee covered pixels in the final video. Native window recording may show non-target pixels or otherwise follow FFmpeg/X11 behavior. This is accepted for this feature and should be treated as a limitation of visible-window recording.
+6. If the target window is covered after recording has started, Polaris Terminal does not guarantee covered pixels in the final video. Native window recording may show non-target pixels or otherwise follow FFmpeg/X11 behavior. This is accepted for this feature and should be treated as a limitation of visible-window recording.
 
-7. If the target window is resized while recording is active, Rook does not dynamically resize the encoded video. The video follows native FFmpeg `x11grab -window_id` behavior for resize, including fixed initial dimensions and possible early termination or incomplete coverage when the window shrinks, grows, unmaps, or closes.
+7. If the target window is resized while recording is active, Polaris Terminal does not dynamically resize the encoded video. The video follows native FFmpeg `x11grab -window_id` behavior for resize, including fixed initial dimensions and possible early termination or incomplete coverage when the window shrinks, grows, unmaps, or closes.
 
 8. If FFmpeg exits before an explicit stop, reaches a configured duration/size limit, or cannot finalize the file, the user sees the same recording completion/error behavior as existing screen recordings.
 

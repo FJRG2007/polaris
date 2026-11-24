@@ -1,6 +1,6 @@
 # Up-arrow prompt history in the TUI (CODE-1871)
 ## Summary
-Give the headless TUI (`crates/rook_tui`) the same up-arrow prompt-history recall the GUI has: pressing Up while the cursor is on the top line of the prompt input opens an inline menu of the user's previous agent prompts, searchable/filterable by what's already typed, with selection previewing into the input and dismissal restoring the buffer the user started with.
+Give the headless TUI (`crates/pterm_tui`) the same up-arrow prompt-history recall the GUI has: pressing Up while the cursor is on the top line of the prompt input opens an inline menu of the user's previous agent prompts, searchable/filterable by what's already typed, with selection previewing into the input and dismissal restoring the buffer the user started with.
 ## Problem
 In the TUI today, pressing Up runs the cursor-movement action `MoveUp`. When an inline menu (slash commands, `/conversations`, model, skills, MCP) is already open, Up cycles that menu's selection. When no menu is open, Up moves the cursor up one visual row, which is a no-op once the cursor is already on the first visual row of the input. There is no way to recall a previous prompt from the keyboard. The GUI, by contrast, opens an inline prompt-history menu when Up is pressed with the cursor on the first row. This spec closes that gap for the TUI's agent prompt input.
 ## Goals

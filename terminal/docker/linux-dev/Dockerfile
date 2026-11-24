@@ -23,7 +23,7 @@ RUN apt-get update \
             # Open-source Vulkan drivers and OpenGL-related utilities from the
             # mesa project.
             mesa-vulkan-drivers mesa-utils \
-            # protoc, in order to compile rook-proto-apis crates like the MAA API.
+            # protoc, in order to compile polaris-terminal-proto-apis crates like the MAA API.
             protobuf-compiler \
             # Don't ask for confirmation.
             -y
@@ -63,11 +63,11 @@ RUN mkdir -p /run/sshd
 RUN systemctl enable ssh
 EXPOSE 22
 
-# Install the Rust toolchain used to build Rook.
+# Install the Rust toolchain used to build Polaris Terminal.
 COPY rust-toolchain.toml /home/dev/setup/rust-toolchain.toml
 RUN su - dev -c "cd /home/dev/setup && rustup toolchain install"
 
-# Install Rook-on-Linux dependencies.
+# Install Polaris Terminal-on-Linux dependencies.
 COPY script/linux/install_test_deps /home/dev/setup/linux/install_test_deps
 COPY script/linux/install_runtime_deps /home/dev/setup/linux/install_runtime_deps
 COPY script/linux/install_build_deps /home/dev/setup/linux/install_build_deps

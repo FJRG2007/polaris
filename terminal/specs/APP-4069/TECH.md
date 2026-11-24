@@ -1,12 +1,12 @@
 # APP-4069 — SSH Initialization UX
 Linear: [APP-4069 — Initialization UX](https://linear.app/warpdotdev/issue/APP-4069/initialization-ux)
 ## 1. Problem
-When a user SSHes into a remote host, we want to introduce a choice block for users to choose between (1) installing and connecting to the remote server (2) falling back to the existing rookify behaviour.
+When a user SSHes into a remote host, we want to introduce a choice block for users to choose between (1) installing and connecting to the remote server (2) falling back to the existing ptermify behaviour.
 
-To do so, we'll need to block the current bootstrap and connect server flow. Today, the client has a race where: `PtyController` writes the legacy bootstrap script to the PTY synchronously on `InitShell`, while `TerminalView` in parallel kicks off an async background task in `RemoteServerManager` that checks for the remote-server binary, installs it if missing, and initializes the server. Because the bootstrap is written before the check completes, we cannot defer or cancel rookification based on the check result — by the time we know whether the remote server is available, the legacy rookification has already taken effect.
+To do so, we'll need to block the current bootstrap and connect server flow. Today, the client has a race where: `PtyController` writes the legacy bootstrap script to the PTY synchronously on `InitShell`, while `TerminalView` in parallel kicks off an async background task in `RemoteServerManager` that checks for the remote-server binary, installs it if missing, and initializes the server. Because the bootstrap is written before the check completes, we cannot defer or cancel ptermification based on the check result — by the time we know whether the remote server is available, the legacy ptermification has already taken effect.
 This spec resolves the race by deferring the bootstrap write under the control of the remote-server setup outcome, and introduces a **two-option choice block** that appears only when the binary is missing:
-- **Yes, install** — flush the bootstrap, install the binary on the remote, launch + handshake the remote server. Session is fully rookified via the remote-server path.
-- **No, skip** — flush the stashed bootstrap (so the shell is properly initialized) but do not call `connect_session`. The session falls back to ControlMaster rookification without engaging the remote-server path.
+- **Yes, install** — flush the bootstrap, install the binary on the remote, launch + handshake the remote server. Session is fully ptermified via the remote-server path.
+- **No, skip** — flush the stashed bootstrap (so the shell is properly initialized) but do not call `connect_session`. The session falls back to ControlMaster ptermification without engaging the remote-server path.
 
 This spec covers the following two sections:
 - **Part 1 — Blocking and wiring.** A new per-pane `RemoteServerController` owns the state machine that defers the bootstrap, checks the binary via `RemoteServerManager`, and flushes at the right moment.
@@ -24,7 +24,7 @@ This spec covers the following two sections:
 - `app/src/terminal/model_events.rs:105–160, 340–369` — existing Bootstrapped ↔ RemoteServerReady stash-and-wait gate; unchanged.
 - `app/src/terminal/writeable_pty/terminal_manager_util.rs:120` — `init_pty_controller_model` where both `PtyController` and the new `RemoteServerController` are constructed side-by-side.
 - `app/src/terminal/model/session.rs:511–514` — `IsLegacySSHSession` enum used to distinguish sessions we can engage.
-- `crates/rook_features/src/lib.rs:806` — `FeatureFlag::SshRemoteServer`.
+- `crates/pterm_features/src/lib.rs:806` — `FeatureFlag::SshRemoteServer`.
 - `app/src/ai/blocklist/inline_action/ask_user_question_view.rs` — existing block-based dialog we draw visual inspiration from; `HeaderConfig` + `NumberShortcutButtons` are the reusable primitives.
 ## 3. Current state
 Two subscribers react synchronously to `ModelEvent::Handler(AnsiHandlerEvent::InitShell)`:
@@ -32,7 +32,7 @@ Two subscribers react synchronously to `ModelEvent::Handler(AnsiHandlerEvent::In
 - `TerminalView` (in `view.rs:10813–10836`) spawns `RemoteServerManager::connect_session`, which runs check + install + launch + handshake in a single background task.
 Because both subscribers fire on the same tick but the view's work is async, the bootstrap is already written by the time the check result is known. This is the core race.
 `RemoteServerManager::connect_session` today is monolithic: it emits `SetupStateChanged(Checking)` → runs the check → on "not installed" emits `SetupStateChanged(Installing)` and runs the install → on success emits `SetupReady` and proceeds to launch + handshake. There is no way to observe the binary-presence result without also triggering the install.
-`ModelEventDispatcher` already has a stash-and-wait gate that waits for both `Bootstrapped` (from the remote shell sourcing the bootstrap script) and `RemoteServerReady` (forwarded today from `RemoteServerManager::SetupReady`) before calling `complete_bootstrapped_session`. The gate logic itself is unchanged, but its success-signal source moves: today `SetupReady` fires after the install decision but before `start_remote_server` and `client.initialize()` have run, so it is optimistic — launch or handshake can still fail after the gate has already resolved with `ready=true` (because `Bootstrapped` typically arrives while the handshake is still in flight), at which point the session has been committed to the rookified path against a manager that has no connected client. §4.2.1 sources the gate's success signal from `SessionConnected` (emitted only after handshake succeeds at `manager.rs:535`) to fix this.
+`ModelEventDispatcher` already has a stash-and-wait gate that waits for both `Bootstrapped` (from the remote shell sourcing the bootstrap script) and `RemoteServerReady` (forwarded today from `RemoteServerManager::SetupReady`) before calling `complete_bootstrapped_session`. The gate logic itself is unchanged, but its success-signal source moves: today `SetupReady` fires after the install decision but before `start_remote_server` and `client.initialize()` have run, so it is optimistic — launch or handshake can still fail after the gate has already resolved with `ready=true` (because `Bootstrapped` typically arrives while the handshake is still in flight), at which point the session has been committed to the ptermified path against a manager that has no connected client. §4.2.1 sources the gate's success signal from `SessionConnected` (emitted only after handshake succeeds at `manager.rs:535`) to fix this.
 ## 4. Proposed changes
 ### Part 1: Blocking and wiring
 #### 4.1 `RemoteServerController` — per-pane orchestrator
@@ -546,10 +546,10 @@ The `SetupFailed` arm is renamed to `SessionConnectionFailed`, and the `SetupSta
 New file: `app/src/terminal/view/ssh_remote_server_choice_view.rs` (final location TBD alongside existing inline block views).
 A standalone `View` composed of existing block primitives. We don't extract a shared `ChoiceBlockView` abstraction: this is the only two-option choice block in the blocklist today, and `HeaderConfig` + `NumberShortcutButtons` compose cleanly into the view without further factoring. If a second consumer with similar structure arrives, the abstraction can be lifted at that point.
 Structure:
-- **Header** — `HeaderConfig` from `inline_action_header` with title "Install Rook remote server?" and a suitable icon.
-- **Description** — `render_text_with_markdown_support` (the same helper `AskUserQuestionView` uses) briefly explaining that Rook can install a helper binary on the remote host to enable remote-server features.
+- **Header** — `HeaderConfig` from `inline_action_header` with title "Install Polaris Terminal remote server?" and a suitable icon.
+- **Description** — `render_text_with_markdown_support` (the same helper `AskUserQuestionView` uses) briefly explaining that Polaris Terminal can install a helper binary on the remote host to enable remote-server features.
 - **Two numbered buttons via `NumberShortcutButtons`**:
-  - `1.` "Install Rook's SSH extension"
+  - `1.` "Install Polaris Terminal's SSH extension"
   - `2.` "Continue without installing"
 - **Session association** — constructor takes a `SessionId` used in click callbacks. The view is a pure renderer of the two-button prompt and owns no internal state beyond the session ID; dismissal is performed by `TerminalView` removing the block on click.
 **Action enum** on the prompt view:

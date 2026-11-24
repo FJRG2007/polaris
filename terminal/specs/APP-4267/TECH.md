@@ -11,9 +11,9 @@ Mermaid rendering is implemented as an async image asset layered on top of the r
 - `crates/editor/src/content/mermaid_diagram.rs (47-66)` computes Mermaid block dimensions from the loaded SVG and falls back to the default placeholder height while the asset is not loaded.
 - `crates/editor/src/render/element/mermaid.rs (33-66)` renders a Mermaid block by wrapping `Image::new(...).contain().before_load(...)` with the “Rendering Mermaid diagram…” placeholder.
 - `crates/editor/src/render/element/mermaid.rs (68-112)` paints the code-block-like rounded background/border and then paints the image element into the content rect.
-- `crates/rookui_core/src/elements/image.rs (316-358)` currently paints `before_load_element` for `Loading`, `Evicted`, and `FailedToLoad`; the shared image element has no separate failed-state element.
-- `crates/rookui_core/src/assets/asset_cache.rs (284-330)` stores new async assets as `Loading` and spawns the fetch future once per async asset ID.
-- `crates/rookui_core/src/assets/asset_cache.rs (415-486)` promotes async assets to `Loaded` or `FailedToLoad` only when the background future resolves.
+- `crates/ptermui_core/src/elements/image.rs (316-358)` currently paints `before_load_element` for `Loading`, `Evicted`, and `FailedToLoad`; the shared image element has no separate failed-state element.
+- `crates/ptermui_core/src/assets/asset_cache.rs (284-330)` stores new async assets as `Loading` and spawns the fetch future once per async asset ID.
+- `crates/ptermui_core/src/assets/asset_cache.rs (415-486)` promotes async assets to `Loaded` or `FailedToLoad` only when the background future resolves.
 There is already an attached implementation branch, `origin/oz-agent/APP-4267/mermaid-failure-callout`, that adds an `Image::on_load_failure` element and a compact Mermaid failure notice for `AssetState::FailedToLoad`. That direction fits the current architecture, but it should be tightened to cover the product-level timeout behavior: a truly stuck render can remain `AssetState::Loading` forever because the asset cache only transitions when the fetch future resolves.
 ## Proposed changes
 ### 1. Add a Mermaid-specific failed height
@@ -26,14 +26,14 @@ Update `mermaid_diagram_layout` so it distinguishes:
 - `Loading` or `Evicted`: keep the existing default pending height.
 Keep the helper focused on layout sizing; do not add render-element state to the content model.
 ### 2. Add explicit failed-load rendering to `Image`
-In `crates/rookui_core/src/elements/image.rs`, add an optional failed-state element to `Image`:
+In `crates/ptermui_core/src/elements/image.rs`, add an optional failed-state element to `Image`:
 - Store `failed_to_load_element: Option<Box<dyn Element>>`.
 - Add `pub fn on_load_failure(mut self, element: Box<dyn Element>) -> Self`.
 - During `layout` and `after_layout`, lay out both the before-load element and failed-load element when present.
 - During `paint`, render `failed_to_load_element` for `AssetState::FailedToLoad(_)`; if none is provided, preserve current behavior by falling back to `before_load_element`.
 This keeps all existing image callers behavior-compatible while allowing Mermaid to provide a distinct error UI.
 ### 3. Add a loading-timeout path for Mermaid
-`AssetState::FailedToLoad` only covers futures that resolve with an error. To satisfy `PRODUCT.md` Behavior 2 for stuck renders, add a Mermaid render timeout without making every image in Rook time out.
+`AssetState::FailedToLoad` only covers futures that resolve with an error. To satisfy `PRODUCT.md` Behavior 2 for stuck renders, add a Mermaid render timeout without making every image in Polaris Terminal time out.
 Preferred shape:
 - Add an optional timeout API to `Image`, for example `pub fn on_load_timeout(mut self, timeout: Duration, element: Box<dyn Element>) -> Self`.
 - Track load start time by stable asset-source key inside the image element module. Do not reuse the existing animation `started_at`, and do not store the timeout start only on a single `Image` instance because rich-text layout can rebuild the element before the timeout fires.
@@ -41,7 +41,7 @@ Preferred shape:
 - Once the timeout expires, paint the timeout element instead of the before-load element while the asset remains `Loading`.
 - If the asset later becomes `Loaded`, paint the image normally and clear backup elements as the existing loaded path does.
 - If the asset later becomes `FailedToLoad`, prefer the failed-load element.
-If a generic `Image` timeout API feels too broad during implementation, keep the timeout state in `RenderableMermaidDiagram` instead. The important invariant is user-visible: Mermaid cannot show the loading text indefinitely. Avoid wrapping `render_mermaid_to_svg` with `rookui::r#async::FutureExt::with_timeout` as the only timeout mechanism; that helper only times out while the wrapped future yields, and Mermaid rendering is currently a synchronous call inside the async fetch body.
+If a generic `Image` timeout API feels too broad during implementation, keep the timeout state in `RenderableMermaidDiagram` instead. The important invariant is user-visible: Mermaid cannot show the loading text indefinitely. Avoid wrapping `render_mermaid_to_svg` with `ptermui::r#async::FutureExt::with_timeout` as the only timeout mechanism; that helper only times out while the wrapped future yields, and Mermaid rendering is currently a synchronous call inside the async fetch body.
 ### 4. Wire the Mermaid failure and timeout callouts
 In `crates/editor/src/render/element/mermaid.rs`:
 - Build the existing loading placeholder as today, using `model.styles().placeholder_color`.
@@ -60,7 +60,7 @@ Do not add new user-visible toasts. Existing `AssetCache` warning logs for fetch
 Use `cargo nextest run --no-fail-fast --workspace <test identifier>` for focused Rust tests in this repo.
 ### Unit tests
 - Add `crates/editor/src/content/mermaid_diagram_tests.rs` and import it from `mermaid_diagram.rs` with a `#[cfg(test)]` path module. Test that a failed Mermaid asset uses the compact failed height while loading still uses the default pending height.
-- Extend or add `crates/rookui_core/src/elements/image_tests.rs` coverage for:
+- Extend or add `crates/ptermui_core/src/elements/image_tests.rs` coverage for:
   - `AssetState::FailedToLoad` renders the failed-load element when one is provided.
   - `AssetState::FailedToLoad` falls back to `before_load_element` when no failed-load element is provided.
   - A loading image switches from before-load element to timeout element after the configured timeout.

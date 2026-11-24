@@ -16,35 +16,35 @@ use itertools::Itertools;
 use markdown_parser::{FormattedText, FormattedTextInline, TableAlignment};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::channel::ChannelState;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::content::edit::resolve_asset_source_relative_to_directory;
-use rook_editor::content::mermaid_diagram::mermaid_asset_source;
-use rook_util::path::to_relative_path;
-use rookui::assets::asset_cache::{AssetCache, AssetSource, AssetState};
-use rookui::elements::new_scrollable::{ScrollableAppearance, SingleAxisConfig};
-use rookui::elements::shimmering_text::ShimmeringTextStateHandle;
-use rookui::elements::{
+use pterm_core::channel::ChannelState;
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::content::edit::resolve_asset_source_relative_to_directory;
+use pterm_editor::content::mermaid_diagram::mermaid_asset_source;
+use pterm_util::path::to_relative_path;
+use ptermui::assets::asset_cache::{AssetCache, AssetSource, AssetState};
+use ptermui::elements::new_scrollable::{ScrollableAppearance, SingleAxisConfig};
+use ptermui::elements::shimmering_text::ShimmeringTextStateHandle;
+use ptermui::elements::{
     Align, Axis, Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, Empty, EventHandler,
     Expanded, Fill, Flex, FormattedTextElement, HeadingFontSizeMultipliers, Highlight,
-    HighlightedRange, Hoverable, Image as RookImage, MainAxisAlignment, MainAxisSize,
+    HighlightedRange, Hoverable, Image as PtermImage, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, NewScrollable, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth,
     Shrinkable, Stack, Table, TableColumnWidth, TableConfig, TableHeader, TableVerticalSizing,
     Text, Wrap,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::image_cache::{CacheOption, ImageType};
-use rookui::keymap::Keystroke;
-use rookui::platform::Cursor;
-use rookui::text_layout::{ClipConfig, TextAlignment, TextStyle};
-use rookui::ui_components::button::Button;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{Action, AppContext, Element, EventContext, SingletonEntity, View, ViewHandle};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::image_cache::{CacheOption, ImageType};
+use ptermui::keymap::Keystroke;
+use ptermui::platform::Cursor;
+use ptermui::text_layout::{ClipConfig, TextAlignment, TextStyle};
+use ptermui::ui_components::button::Button;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{Action, AppContext, Element, EventContext, SingletonEntity, View, ViewHandle};
 
 use super::output::LinkActionConstructors;
 use super::{add_highlights_to_rich_text, add_highlights_to_text};
@@ -65,7 +65,7 @@ use crate::ai::blocklist::block::{
 };
 use crate::ai::blocklist::code_block::{
     CodeBlockOptions, CodeSnippetButtonHandles, render_code_block_plain,
-    render_code_block_with_rook_text,
+    render_code_block_with_pterm_text,
 };
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
 use crate::ai::blocklist::inline_action::aws_bedrock_credentials_error::AwsBedrockCredentialsErrorView;
@@ -82,7 +82,7 @@ use crate::ai::blocklist::view_util::{
     failed_output_presentation,
 };
 use crate::ai::blocklist::{BlocklistAIActionModel, ShellCommandExecutor, TextLocation};
-use crate::ai::loading::shimmering_rook_loading_text;
+use crate::ai::loading::shimmering_pterm_loading_text;
 use crate::ai::mcp::TemplatableMCPServerManager;
 use crate::code::editor::view::CodeEditorView;
 use crate::code::editor_management::CodeSource;
@@ -110,7 +110,7 @@ pub const STATUS_FOOTER_VERTICAL_PADDING: f32 = 4.;
 pub const WAITING_FOR_USER_INPUT_MESSAGE: &str = "Agent waiting for instructions...";
 const IMAGE_SOURCE_LINK_LINE_INDEX: usize = 1;
 
-pub const LOAD_OUTPUT_MESSAGE: &str = "Rooking...";
+pub const LOAD_OUTPUT_MESSAGE: &str = "Pterming...";
 /// The trailing ellipsis every in-progress status message ends with.
 pub const STATUS_MESSAGE_ELLIPSIS: &str = "...";
 pub const LOAD_OUTPUT_MESSAGE_FOR_ADJUSTING: &str = "Adjusting tasks...";
@@ -157,7 +157,7 @@ const VISUAL_CARD_HEADER_VERTICAL_PADDING: f32 = 8.;
 const VISUAL_CARD_HEADER_HORIZONTAL_PADDING: f32 = 16.;
 const MERMAID_CANVAS_PADDING: f32 = 32.;
 
-pub struct RookingProps<'a, V> {
+pub struct PtermingProps<'a, V> {
     pub model: &'a dyn AIBlockModel<View = V>,
     pub shimmering_text_handle: &'a ShimmeringTextStateHandle,
     pub summarization_start_time: Option<instant::Instant>,
@@ -167,12 +167,12 @@ pub struct RookingProps<'a, V> {
     pub queue_next_prompt_button: Option<ButtonProps<'a>>,
     pub stop_button: Option<ButtonProps<'a>>,
     /// Inline `Check now` affordance displayed alongside `Last seen by agent ...`
-    /// in the rooking indicator. When set, the agent's pending poll future is
+    /// in the pterming indicator. When set, the agent's pending poll future is
     /// short-circuited on click and a fresh snapshot is returned immediately.
     pub force_refresh_button: Option<ForceRefreshButtonProps<'a>>,
     pub action_model: &'a BlocklistAIActionModel,
     pub terminal_model: &'a TerminalModel,
-    pub default_rooking_text: String,
+    pub default_pterming_text: String,
     /// Display name of the model the current exchange reported, when the row is
     /// allowed to name it. Messages for phases that are a model working are
     /// rendered with it; phases that are not, such as running a command, are not.
@@ -188,7 +188,7 @@ pub struct ButtonProps<'a> {
     pub is_active: bool,
 }
 
-/// Props for the auto-approve / fast-forward button in the rooking indicator.
+/// Props for the auto-approve / fast-forward button in the pterming indicator.
 ///
 /// When `is_locked` is set, the button is rendered in its always-on state and
 /// the click handler (plus the action dispatched by the keybinding) are no-ops.
@@ -215,8 +215,8 @@ pub fn status_message_naming_model(message: &str, model_display_name: &str) -> S
     }
 }
 
-pub fn render_rooking_indicator<V: View>(
-    props: RookingProps<'_, V>,
+pub fn render_pterming_indicator<V: View>(
+    props: PtermingProps<'_, V>,
     app: &AppContext,
 ) -> Box<dyn Element> {
     let output_status = props.model.status(app);
@@ -440,7 +440,7 @@ pub fn render_rooking_indicator<V: View>(
                         }
                     }
                 } else {
-                    props.default_rooking_text.clone()
+                    props.default_pterming_text.clone()
                 }
             }
         }
@@ -493,7 +493,7 @@ pub fn render_rooking_indicator<V: View>(
             .with_spacing(4.);
     }
 
-    let rooking_indicator_text = if !should_render_waiting_icon {
+    let pterming_indicator_text = if !should_render_waiting_icon {
         MaybeShimmeringText::Shimmering {
             text: message.into(),
             shimmering_text_handle: props.shimmering_text_handle.clone(),
@@ -513,10 +513,10 @@ pub fn render_rooking_indicator<V: View>(
         _ => None,
     };
 
-    render_rooking_indicator_base(
-        RookingIndicatorProps {
+    render_pterming_indicator_base(
+        PtermingIndicatorProps {
             icon: should_render_waiting_icon.then(|| icons::gray_clock_icon(appearance).finish()),
-            rooking_indicator_text,
+            pterming_indicator_text,
             non_shimmering_text,
             non_shimmering_suffix,
             buttons: if has_buttons {
@@ -539,9 +539,9 @@ pub enum MaybeShimmeringText {
     },
 }
 
-pub struct RookingIndicatorProps {
+pub struct PtermingIndicatorProps {
     pub icon: Option<Box<dyn Element>>,
-    pub rooking_indicator_text: MaybeShimmeringText,
+    pub pterming_indicator_text: MaybeShimmeringText,
     pub non_shimmering_text: Option<String>,
     /// Optional element rendered inline to the right of `non_shimmering_text`. Used
     /// today for the `Check now` affordance next to `Last seen by agent ...`.
@@ -551,16 +551,16 @@ pub struct RookingIndicatorProps {
     pub secondary_element: Option<Box<dyn Element>>,
 }
 
-/// Computes the fixed height of the rooking-indicator footer.
+/// Computes the fixed height of the pterming-indicator footer.
 ///
-/// The rooking text occupies a single line. When a secondary element (an agent
+/// The pterming text occupies a single line. When a secondary element (an agent
 /// tip or fallback-model explanation) is present, it renders on a second line
-/// below the rooking text, so the footer must reserve room for that extra line;
+/// below the pterming text, so the footer must reserve room for that extra line;
 /// otherwise the `Clipped` wrapper — which keeps action chips from overflowing
 /// narrow panes — also clips the secondary line. The extra line accounts for the
 /// secondary element's font size (`monospace_font_size - 3`, see
 /// `render_agent_tip` / `render_fallback_explanation`) plus its 1px top margin.
-fn rooking_footer_height(monospace_font_size: f32, has_secondary_element: bool) -> f32 {
+fn pterming_footer_height(monospace_font_size: f32, has_secondary_element: bool) -> f32 {
     let mut height = STATUS_FOOTER_VERTICAL_PADDING * 2. + monospace_font_size;
     if has_secondary_element {
         height += (monospace_font_size - 3.) + 1.;
@@ -568,17 +568,17 @@ fn rooking_footer_height(monospace_font_size: f32, has_secondary_element: bool) 
     height
 }
 
-/// Helper function to render text in the "rooking..." footer.
+/// Helper function to render text in the "pterming..." footer.
 /// Additional text that does not use the shimmering text animation can be passed in via
 /// `non_shimmering_text` which is useful if you want some part of the text to constantly update
 /// without the animation resetting.
-pub fn render_rooking_indicator_base(
-    props: RookingIndicatorProps,
+pub fn render_pterming_indicator_base(
+    props: PtermingIndicatorProps,
     app: &AppContext,
 ) -> Box<dyn Element> {
-    let RookingIndicatorProps {
+    let PtermingIndicatorProps {
         icon,
-        rooking_indicator_text,
+        pterming_indicator_text,
         non_shimmering_text,
         non_shimmering_suffix,
         buttons,
@@ -586,22 +586,22 @@ pub fn render_rooking_indicator_base(
         secondary_element,
     } = props;
     // Whether a secondary element (an agent tip or fallback-model explanation)
-    // will be rendered on a second line below the rooking text. Captured before
+    // will be rendered on a second line below the pterming text. Captured before
     // `secondary_element` is consumed so the container can reserve room for it.
     let has_secondary_element = secondary_element.is_some();
-    // Unicode code point for the Rook glyph that is embedded in the version of Roboto we bundle
+    // Unicode code point for the Polaris Terminal glyph that is embedded in the version of Roboto we bundle
     // into the app. This code point MUST be rendered using Roboto (the default ui font) or else the
     // glyph may not be rendered.
-    const ROOK_GLYPH: &str = "\u{E500}";
+    const POLARIS_TERMINAL_GLYPH: &str = "\u{E500}";
 
     let appearance = Appearance::as_ref(app);
 
-    let should_indent_tip_for_rook_glyph = matches!(
-        rooking_indicator_text,
+    let should_indent_tip_for_pterm_glyph = matches!(
+        pterming_indicator_text,
         MaybeShimmeringText::Shimmering { .. }
     );
 
-    let text = render_output_status_text(rooking_indicator_text, appearance, app);
+    let text = render_output_status_text(pterming_indicator_text, appearance, app);
 
     let text_content = {
         let mut row = Flex::row().with_child(Shrinkable::new(1., text).finish());
@@ -624,13 +624,13 @@ pub fn render_rooking_indicator_base(
 
     let mut text_col = Flex::column();
     if let Some(sub_element) = secondary_element {
-        // Our rooking indicator text prepends the Rook glyph (and a space) to the label.
+        // Our pterming indicator text prepends the Polaris Terminal glyph (and a space) to the label.
         // If we render the tip directly underneath, it will align to the glyph instead of
-        // the start of the actual rooking text.
-        let sub_element = if should_indent_tip_for_rook_glyph {
+        // the start of the actual pterming text.
+        let sub_element = if should_indent_tip_for_pterm_glyph {
             let font_size = appearance.monospace_font_size() - 3.;
             let glyph_indent = Text::new_inline(
-                format!("{ROOK_GLYPH} "),
+                format!("{POLARIS_TERMINAL_GLYPH} "),
                 appearance.ui_font_family(),
                 font_size,
             )
@@ -692,7 +692,7 @@ pub fn render_rooking_indicator_base(
     } else {
         let mut container = Container::new(
             ConstrainedBox::new(content)
-                .with_height(rooking_footer_height(
+                .with_height(pterming_footer_height(
                     appearance.monospace_font_size(),
                     has_secondary_element,
                 ))
@@ -736,7 +736,7 @@ pub fn render_output_status_text(
         MaybeShimmeringText::Shimmering {
             text,
             shimmering_text_handle,
-        } => shimmering_rook_loading_text(
+        } => shimmering_pterm_loading_text(
             text.to_string(),
             appearance.monospace_font_size() - 2.,
             shimmering_text_handle,
@@ -809,7 +809,7 @@ fn render_hide_responses_button(
         "Hide agent responses"
     };
 
-    render_rooking_indicator_button(
+    render_pterming_indicator_button(
         props.button_handle.clone(),
         appearance,
         text,
@@ -841,7 +841,7 @@ pub fn render_switch_control_to_user_button(
     )
     .finish();
 
-    render_rooking_indicator_button(
+    render_pterming_indicator_button(
         props.button_handle.clone(),
         appearance,
         text,
@@ -865,7 +865,7 @@ fn render_stop_button(props: ButtonProps, appearance: &Appearance) -> Box<dyn El
     )
     .finish();
 
-    render_rooking_indicator_button(
+    render_pterming_indicator_button(
         props.button_handle.clone(),
         appearance,
         stop_icon,
@@ -890,7 +890,7 @@ fn render_queue_next_prompt_button(
     };
     let icon_size = get_icon_size(appearance);
     let icon = Container::new(
-        ConstrainedBox::new(Icon::ClockPlus.to_rookui_icon(icon_color).finish())
+        ConstrainedBox::new(Icon::ClockPlus.to_ptermui_icon(icon_color).finish())
             .with_height(icon_size)
             .with_width(icon_size)
             .finish(),
@@ -903,7 +903,7 @@ fn render_queue_next_prompt_button(
         "Auto-queue next prompt while agent is responding"
     };
 
-    render_rooking_indicator_button(
+    render_pterming_indicator_button(
         props.button_handle.clone(),
         appearance,
         icon,
@@ -932,7 +932,7 @@ fn render_auto_approve_button(
     let icon_size = get_icon_size(appearance);
     let icon = Container::new(
         ConstrainedBox::new(
-            icon.to_rookui_icon(appearance.theme().active_ui_text_color())
+            icon.to_ptermui_icon(appearance.theme().active_ui_text_color())
                 .finish(),
         )
         .with_height(icon_size)
@@ -949,7 +949,7 @@ fn render_auto_approve_button(
         "Auto-approve all agent actions for this task"
     };
 
-    render_rooking_indicator_button(
+    render_pterming_indicator_button(
         props.button_handle.clone(),
         appearance,
         icon,
@@ -975,7 +975,7 @@ fn get_icon_size(appearance: &Appearance) -> f32 {
 }
 
 /// Renders the inline `Check now` affordance displayed alongside
-/// `Last seen by agent ...` in the rooking indicator. On click, short-circuits the
+/// `Last seen by agent ...` in the pterming indicator. On click, short-circuits the
 /// agent's pending poll timer for the given block and delivers a fresh snapshot.
 fn render_force_refresh_inline(
     props: ForceRefreshButtonProps<'_>,
@@ -1039,7 +1039,7 @@ fn render_force_refresh_inline(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn render_rooking_indicator_button<F>(
+fn render_pterming_indicator_button<F>(
     mouse_state: MouseStateHandle,
     appearance: &Appearance,
     content: Box<dyn Element>,
@@ -1060,7 +1060,7 @@ where
         .with_child(content)
         .with_spacing(4.0);
 
-    if !rookui::platform::is_mobile_device() {
+    if !ptermui::platform::is_mobile_device() {
         let keybinding_string = keybinding.map(|k| k.displayed()).unwrap_or_default();
         let keybinding_label = Text::new_inline(
             keybinding_string,
@@ -1817,7 +1817,7 @@ struct VisualMarkdownBlockOptions<A: 'static> {
     alignment: VisualMarkdownAlignment,
     lightbox_trigger: Option<VisualMarkdownLightboxTrigger>,
     /// When `Some(non_empty)`, the rendered image is wrapped in the standard
-    /// Rook tooltip primitive so hovering surfaces the CommonMark image title.
+    /// Polaris Terminal tooltip primitive so hovering surfaces the CommonMark image title.
     /// Mermaid diagrams pass `None` here because CommonMark titles do not
     /// apply to them.
     tooltip: Option<String>,
@@ -2258,7 +2258,7 @@ fn render_visual_markdown_block<A: Action>(
     .with_color(blended_colors::text_sub(theme, theme.surface_2()))
     .finish();
 
-    let image = RookImage::new(asset_source, CacheOption::BySize)
+    let image = PtermImage::new(asset_source, CacheOption::BySize)
         .contain()
         .before_load(placeholder)
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)));
@@ -2291,7 +2291,7 @@ fn render_visual_markdown_block<A: Action>(
         VisualMarkdownAlignment::Center => Align::new(content).finish(),
     };
 
-    // Wrap the rendered image in the standard Rook tooltip when the source
+    // Wrap the rendered image in the standard Polaris Terminal tooltip when the source
     // carried a CommonMark `title`. Branching on `Some(non_empty)` here means
     // untitled images remain un-wrapped, matching `specs/GH849/product.md`
     // invariant 6 (no tooltip for empty or absent titles). The tooltip's
@@ -2308,8 +2308,8 @@ fn render_visual_markdown_block<A: Action>(
             tooltip,
             mouse_state,
             content,
-            rookui::elements::ParentAnchor::TopMiddle,
-            rookui::elements::ChildAnchor::BottomMiddle,
+            ptermui::elements::ParentAnchor::TopMiddle,
+            ptermui::elements::ChildAnchor::BottomMiddle,
             // Small negative Y offset keeps a hairline gap between the
             // tooltip's bottom edge and the image's top edge without
             // floating noticeably above the image.
@@ -2357,7 +2357,7 @@ fn render_visual_card(
     let theme = appearance.theme();
     let header_background = theme.surface_2();
     let header_text_color = blended_colors::text_main(theme, header_background);
-    let header_icon = ConstrainedBox::new(icon.to_rookui_icon(header_text_color.into()).finish())
+    let header_icon = ConstrainedBox::new(icon.to_ptermui_icon(header_text_color.into()).finish())
         .with_width(16.)
         .with_height(16.)
         .finish();
@@ -2576,7 +2576,7 @@ fn render_table_section(
             row_dividers: table_appearance.row_dividers,
             cell_padding,
             header_background: table_appearance.header_background,
-            row_background: rookui::elements::RowBackground {
+            row_background: ptermui::elements::RowBackground {
                 primary: table_appearance.cell_background,
                 alternating: table_appearance.alternate_row_background,
             },
@@ -2680,7 +2680,7 @@ fn render_table_cell(props: TableCellProps, app: &AppContext) -> Box<dyn Element
 struct TableCellProps {
     cell: FormattedTextInline,
     alignment: TableAlignment,
-    font_family: rookui::fonts::FamilyId,
+    font_family: ptermui::fonts::FamilyId,
     font_size: f32,
     font_weight: Weight,
     text_color: ColorU,
@@ -2867,7 +2867,7 @@ pub fn render_code_output_section<A: Action>(
     let allow_execution = props.language.is_none_or(|lang| lang.is_shell());
 
     match props.editor_view {
-        Some(view) => render_code_block_with_rook_text(
+        Some(view) => render_code_block_with_pterm_text(
             CodeBlockOptions {
                 on_open: match (props.open_code_block_action_factory, open_source.clone()) {
                     #[allow(unused)]
@@ -3038,7 +3038,7 @@ pub(crate) fn resolve_absolute_file_path(
     shell_launch_data: Option<&ShellLaunchData>,
     home_dir: PathBuf,
 ) -> Option<PathBuf> {
-    use rook_util::path::CleanPathResult;
+    use pterm_util::path::CleanPathResult;
 
     use crate::util::file::{ShellPathType, absolute_path_if_valid};
 
@@ -3130,7 +3130,7 @@ pub fn render_failed_output(props: FailedOutputProps, app: &AppContext) -> Box<d
         .with_child(
             Container::new(
                 ConstrainedBox::new(
-                    rookui::elements::Icon::new(
+                    ptermui::elements::Icon::new(
                         Icon::AlertTriangle.into(),
                         error_color(appearance.theme()),
                     )
@@ -3181,7 +3181,7 @@ fn out_of_credits_cta_button(
     appearance
         .ui_builder()
         .button(
-            rookui::ui_components::button::ButtonVariant::Outlined,
+            ptermui::ui_components::button::ButtonVariant::Outlined,
             state_handle.clone(),
         )
         .with_style(UiComponentStyles {
@@ -3213,7 +3213,7 @@ fn render_out_of_credits_error(
 
     let icon = Container::new(
         ConstrainedBox::new(
-            rookui::elements::Icon::new(
+            ptermui::elements::Icon::new(
                 Icon::AlertTriangle.into(),
                 error_color(appearance.theme()),
             )
@@ -3287,7 +3287,7 @@ fn render_invalid_api_key_error(
 
     let alert_icon = ConstrainedBox::new(
         Icon::AlertTriangle
-            .to_rookui_icon(error_color(appearance.theme()).into())
+            .to_ptermui_icon(error_color(appearance.theme()).into())
             .finish(),
     )
     .with_width(icon_size(app))
@@ -3310,7 +3310,7 @@ fn render_invalid_api_key_error(
     let settings_button = appearance
         .ui_builder()
         .button(
-            rookui::ui_components::button::ButtonVariant::Outlined,
+            ptermui::ui_components::button::ButtonVariant::Outlined,
             state_handle.clone(),
         )
         .with_style(UiComponentStyles {
@@ -3331,7 +3331,7 @@ fn render_invalid_api_key_error(
         .on_click(move |ctx, _, _| {
             ctx.dispatch_typed_action(WorkspaceAction::ShowSettingsPageWithSearch {
                 search_query: "api keys".to_string(),
-                section: Some(SettingsSection::RookAgent),
+                section: Some(SettingsSection::PtermAgent),
             });
         })
         .finish();
@@ -3458,7 +3458,7 @@ pub(crate) fn render_debug_footer<V: View>(
             appearance
                 .ui_builder()
                 .button(
-                    rookui::ui_components::button::ButtonVariant::Text,
+                    ptermui::ui_components::button::ButtonVariant::Text,
                     props.submit_issue_button_handle,
                 )
                 .with_centered_text_label("Send Feedback".to_string())
@@ -3524,8 +3524,8 @@ pub(crate) fn render_debug_footer<V: View>(
         "Copy debug ID".to_string(),
         props.debug_copy_button_handle,
         copy_button,
-        rookui::elements::ParentAnchor::TopRight,
-        rookui::elements::ChildAnchor::BottomRight,
+        ptermui::elements::ParentAnchor::TopRight,
+        ptermui::elements::ChildAnchor::BottomRight,
         vec2f(0., -8.),
     );
 

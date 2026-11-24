@@ -2,34 +2,34 @@
 See `specs/kevinchevalier/APP-3857/PRODUCT.md` for the product spec.
 
 ## Problem
-Markdown image blocks currently pay for full animated-image decoding even though the markdown renderer does not actually play animations. `RenderableImage` builds a plain `rookui::elements::Image` without `enable_animation_with_start_time`, so the markdown surface effectively shows only the first frame today (`crates/editor/src/render/element/image.rs:13-49`, `crates/rookui_core/src/elements/image.rs:107-172`). However, the shared image asset path still decodes animated GIF/WebP assets into `AnimatedImage { frames: Vec<...> }`, and the resize path then creates resized copies of every decoded frame (`crates/rookui_core/src/image_cache.rs (259-359)`, `crates/rookui_core/src/image_cache.rs (457-511)`). On large assets this produces the multi-GB memory spike seen in `APP-3857`.
+Markdown image blocks currently pay for full animated-image decoding even though the markdown renderer does not actually play animations. `RenderableImage` builds a plain `ptermui::elements::Image` without `enable_animation_with_start_time`, so the markdown surface effectively shows only the first frame today (`crates/editor/src/render/element/image.rs:13-49`, `crates/ptermui_core/src/elements/image.rs:107-172`). However, the shared image asset path still decodes animated GIF/WebP assets into `AnimatedImage { frames: Vec<...> }`, and the resize path then creates resized copies of every decoded frame (`crates/ptermui_core/src/image_cache.rs (259-359)`, `crates/ptermui_core/src/image_cache.rs (457-511)`). On large assets this produces the multi-GB memory spike seen in `APP-3857`.
 
 ## Relevant code
 - `crates/editor/src/content/edit.rs:66-97` — resolves markdown image source strings into `AssetSource`.
 - `crates/editor/src/content/edit.rs:677-759` — converts `BufferBlockItem::Image` into a laid-out `BlockItem::Image` with default markdown image sizing.
-- `crates/editor/src/render/element/image.rs:13-49` — markdown render block that constructs `rookui::elements::Image` from the resolved asset source.
-- `crates/rookui_core/src/elements/image.rs:107-172` — animation only occurs when callers explicitly provide a start time; otherwise the first frame is painted.
-- `crates/rookui_core/src/image_cache.rs (259-359)` — `ImageType::try_from_bytes` currently uses `collect_frames()` for animated GIF and animated WebP inputs.
-- `crates/rookui_core/src/image_cache.rs (457-511)` — animated resize path duplicates every frame at the target render size.
-- `crates/rookui_core/src/image_cache.rs:666-772` — shared image-cache entry point; caches rendered images by asset source hash plus render properties and is where preview-vs-animation behavior can diverge without changing the underlying asset type.
-- `crates/rookui_core/src/assets/asset_cache.rs:284-320` — asset cache keys include both `AssetSource` and `TypeId`; this implementation continues to use the existing `ImageType` asset path and keeps full animated assets there.
+- `crates/editor/src/render/element/image.rs:13-49` — markdown render block that constructs `ptermui::elements::Image` from the resolved asset source.
+- `crates/ptermui_core/src/elements/image.rs:107-172` — animation only occurs when callers explicitly provide a start time; otherwise the first frame is painted.
+- `crates/ptermui_core/src/image_cache.rs (259-359)` — `ImageType::try_from_bytes` currently uses `collect_frames()` for animated GIF and animated WebP inputs.
+- `crates/ptermui_core/src/image_cache.rs (457-511)` — animated resize path duplicates every frame at the target render size.
+- `crates/ptermui_core/src/image_cache.rs:666-772` — shared image-cache entry point; caches rendered images by asset source hash plus render properties and is where preview-vs-animation behavior can diverge without changing the underlying asset type.
+- `crates/ptermui_core/src/assets/asset_cache.rs:284-320` — asset cache keys include both `AssetSource` and `TypeId`; this implementation continues to use the existing `ImageType` asset path and keeps full animated assets there.
 - `app/src/resource_center/section_views/changelog_section.rs:152` — an existing real app surface that explicitly enables animation and therefore must keep the current full-animation path.
-- `crates/rookui_core/src/image_cache_tests.rs (1-261)` and `crates/editor/src/content/markdown_tests.rs (270-337)` — the closest existing test coverage for image decoding/cache behavior and markdown image handling.
+- `crates/ptermui_core/src/image_cache_tests.rs (1-261)` and `crates/editor/src/content/markdown_tests.rs (270-337)` — the closest existing test coverage for image decoding/cache behavior and markdown image handling.
 
 ## Current state
 - Markdown image syntax is parsed as a block item and stored as `BufferBlockItem::Image { alt_text, source }`, then laid out as `BlockItem::Image { asset_source, config, .. }` using the shared editor/render pipeline (`crates/editor/src/content/text.rs:302-373`, `crates/editor/src/content/edit.rs:677-759`).
-- The markdown render element constructs a generic `rookui::elements::Image` with `.contain()` and no animation start time (`crates/editor/src/render/element/image.rs:42-49`).
-- The `Image` element will animate only if a caller explicitly opts in via `enable_animation_with_start_time`; otherwise it repeatedly paints frame 0 (`crates/rookui_core/src/elements/image.rs:107-172`).
-- Despite that static markdown UX, the shared asset loader eagerly decodes animated GIF/WebP files into an in-memory `AnimatedImage` containing all RGBA frames (`crates/rookui_core/src/image_cache.rs (259-359)`).
-- `ImageCache::image` then resizes animated assets by resizing every frame, which creates a second full set of frame buffers at markdown display size (`crates/rookui_core/src/image_cache.rs (457-511)`, `crates/rookui_core/src/image_cache.rs:666-772`).
+- The markdown render element constructs a generic `ptermui::elements::Image` with `.contain()` and no animation start time (`crates/editor/src/render/element/image.rs:42-49`).
+- The `Image` element will animate only if a caller explicitly opts in via `enable_animation_with_start_time`; otherwise it repeatedly paints frame 0 (`crates/ptermui_core/src/elements/image.rs:107-172`).
+- Despite that static markdown UX, the shared asset loader eagerly decodes animated GIF/WebP files into an in-memory `AnimatedImage` containing all RGBA frames (`crates/ptermui_core/src/image_cache.rs (259-359)`).
+- `ImageCache::image` then resizes animated assets by resizing every frame, which creates a second full set of frame buffers at markdown display size (`crates/ptermui_core/src/image_cache.rs (457-511)`, `crates/ptermui_core/src/image_cache.rs:666-772`).
 - This is why the current surface is especially wasteful: markdown gets only a first-frame preview, but pays the memory cost of full animation decode plus resized-frame duplication.
 
 ## Proposed changes
-- Add an explicit animated-image behavior to `rookui::elements::Image`, with two modes:
+- Add an explicit animated-image behavior to `ptermui::elements::Image`, with two modes:
   - `FullAnimation` — current behavior for surfaces that intentionally animate.
   - `FirstFramePreview` — render animated sources as a static first-frame image.
 - Keep `FullAnimation` as the default so existing animated callers continue to work unchanged. Markdown will opt into `FirstFramePreview` at the call site.
-- Keep a single `ImageType` asset path in `crates/rookui_core/src/image_cache.rs`. Animated GIF/WebP assets will continue to decode into `AnimatedImage` in the asset cache, but `ImageCache::image` will materialize `FirstFramePreview` requests as a static first-frame render result instead of resizing every decoded animation frame.
+- Keep a single `ImageType` asset path in `crates/ptermui_core/src/image_cache.rs`. Animated GIF/WebP assets will continue to decode into `AnimatedImage` in the asset cache, but `ImageCache::image` will materialize `FirstFramePreview` requests as a static first-frame render result instead of resizing every decoded animation frame.
 - Thread the new behavior into `ImageCache::image` so the rendered-image cache chooses between a static preview and a full animation from the same underlying `ImageType` asset.
 - Replace the current rendered-image cache key shape with a struct that includes, at minimum:
   - asset source hash
@@ -38,7 +38,7 @@ Markdown image blocks currently pay for full animated-image decoding even though
 
   This avoids collisions where the same source and bounds are requested once as a full animation and once as a static preview.
 - Update `crates/editor/src/render/element/image.rs` so markdown image blocks always construct `Image::new(asset_source).contain().first_frame_preview()` (or equivalent builder naming). No markdown storage, export, or copy behavior changes are needed.
-- Leave explicit animated callers unchanged. `app/src/resource_center/section_views/changelog_section.rs:152` should continue to opt into animation, and the `rookui` animated-image example should still exercise the full-animation path.
+- Leave explicit animated callers unchanged. `app/src/resource_center/section_views/changelog_section.rs:152` should continue to opt into animation, and the `ptermui` animated-image example should still exercise the full-animation path.
 - Do not implement a bounded frame-buffer animation system in this ticket. That is the browser / media-viewer style solution, but it is unnecessary for this markdown surface because markdown does not animate today. The simpler preview-only split matches the current product behavior and removes the blow-up at the source.
 - This mirrors common approaches elsewhere:
   - browser/media stacks like Chromium separate decode from caching and leave room for smarter bounded frame caches
@@ -51,7 +51,7 @@ graph TD
   B --> C[LayoutTask::Image resolves AssetSource]
   C --> D[BlockItem::Image]
   D --> E[RenderableImage]
-  E --> F[rookui::elements::Image with FirstFramePreview]
+  E --> F[ptermui::elements::Image with FirstFramePreview]
   F --> G[ImageCache preview path]
   G --> H[AssetCache.load_asset<ImageType>]
   H --> I[Decode AnimatedImage once]
@@ -77,7 +77,7 @@ graph TD
   - Mitigation: the product spec only requires a stable first visible frame preview, not browser-perfect animation fidelity.
 
 ## Testing and validation
-- Add `rookui_core` unit tests with small animated GIF and animated WebP fixtures:
+- Add `ptermui_core` unit tests with small animated GIF and animated WebP fixtures:
   - preview policy returns `Image::Static`
   - full-animation policy still returns `Image::Animated`
   - preview policy does not regress static formats
@@ -90,7 +90,7 @@ graph TD
   - confirm animated image sources render as stable first-frame previews
 - Run the usual repo validation before implementation is considered done:
   - `cargo fmt`
-  - targeted Rust tests for the touched editor / rookui_core modules
+  - targeted Rust tests for the touched editor / ptermui_core modules
   - wasm build check for this repo, since image/rendering code is shared across desktop and wasm-adjacent targets
 
 ## Follow-ups

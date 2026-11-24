@@ -4,8 +4,8 @@ use std::iter;
 use std::ops::RangeInclusive;
 
 use itertools::Itertools;
-use rookui::units::Lines;
-use rookui::{AppContext, EntityId};
+use ptermui::units::Lines;
+use ptermui::{AppContext, EntityId};
 
 use super::FindOptions;
 use super::rich_content::{FindableRichContentHandle, RichContentMatchId};

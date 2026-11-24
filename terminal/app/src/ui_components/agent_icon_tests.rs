@@ -11,7 +11,7 @@
 //! Adding a new canonical state is a one-enum-variant + one `expected` arm + one `*_inputs`
 //! arm change; the table test below enforces every surface agrees.
 use chrono::Utc;
-use rook_cli::agent::Harness;
+use pterm_cli::agent::Harness;
 
 use super::{
     CLISessionInputs, TerminalIconInputs, agent_conversation_entry_icon_variant,
@@ -73,7 +73,7 @@ impl AgentIconFields {
 enum CanonicalRunState {
     /// Plain terminal, no conversation, no agent activity.
     PlainTerminal,
-    /// Local Rook-native (Oz) conversation, in-progress.
+    /// Local Polaris Terminal-native (Oz) conversation, in-progress.
     LocalOzInProgress,
     /// Cloud-mode Oz run, in-progress.
     CloudOzInProgress,

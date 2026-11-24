@@ -1,9 +1,9 @@
 use std::ops::Range;
 
 use ai::diff_validation::DiffDelta;
+use pterm_editor::content::text::LineCount;
+use pterm_editor::render::model::LineCount as RenderLineCount;
 use rangemap::RangeSet;
-use rook_editor::content::text::LineCount;
-use rook_editor::render::model::LineCount as RenderLineCount;
 
 /// The number of context lines to show before and after each change
 const CONTEXT_LINES: usize = 4;

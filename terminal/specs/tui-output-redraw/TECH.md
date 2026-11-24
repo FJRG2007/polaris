@@ -1,6 +1,6 @@
 # Prevent CLI Agent Frame Redraws from Accumulating on Resize
 ## Context
-Claude Code and similar CLI agents run pseudo-TUI interfaces in the primary screen. When the terminal is resized narrower, the process receives a PTY resize event, redraws its frame, and commonly clears the screen before writing the new frame. In Rook, those old frames can become block output instead of being overwritten, so repeated resizes append multiple historical frames to the active block.
+Claude Code and similar CLI agents run pseudo-TUI interfaces in the primary screen. When the terminal is resized narrower, the process receives a PTY resize event, redraws its frame, and commonly clears the screen before writing the new frame. In Polaris Terminal, those old frames can become block output instead of being overwritten, so repeated resizes append multiple historical frames to the active block.
 This does not appear to be caused by the CLI-agent trailing-blank-line trimming work in `specs/APP-4004/TECH.md` or `specs/APP-4006/TECH.md`. That work changes displayed height and cursor visibility for active CLI-agent blocks. It does not send resize events, change alt-screen state, or append PTY output. The accumulation mechanism is in primary-screen operations that preserve visible rows into scrollback, specifically full-screen clears and primary-screen resize reflow.
 Relevant code:
 - `app/src/terminal/view.rs:14654` — `TerminalView::resize_internal` updates the terminal model before the resize event is emitted to the PTY controller.
@@ -16,7 +16,7 @@ Relevant code:
 - `app/src/terminal/model/grid/ansi_handler.rs:1645` and `app/src/terminal/model/grid/ansi_handler.rs:1674` — `clear_viewport()` computes the visible rows to clear, then calls `scroll_region_up`, which pushes those rows into `flat_storage` before resetting the visible grid.
 - `app/src/terminal/model/grid/grid_handler.rs:310` and `app/src/terminal/model/grid/grid_handler.rs:393` — `GridHandler` already owns display-only state toggled by higher-level block features.
 - `app/src/terminal/model/blockgrid.rs:297`, `app/src/terminal/model/block.rs:1101`, and `app/src/terminal/view.rs:11778` — active CLI-agent state already propagates from `CLIAgentSessionsModelEvent::Started/Ended` into active-block output-grid behavior for trailing blank row trimming.
-The target model is that CLI-agent frame redraws should treat primary-screen frame replacement operations as mutations of the live visible grid, not as scrollback-producing history. That includes primary-screen full erases and primary-screen resize reflow. Rook should not globally adopt this for all primary-screen blocks because Rook’s block model intentionally preserves `clear`-style shell output and ordinary command output in scrollback. The fix should be scoped to active CLI-agent frame redraws.
+The target model is that CLI-agent frame redraws should treat primary-screen frame replacement operations as mutations of the live visible grid, not as scrollback-producing history. That includes primary-screen full erases and primary-screen resize reflow. Polaris Terminal should not globally adopt this for all primary-screen blocks because Polaris Terminal’s block model intentionally preserves `clear`-style shell output and ordinary command output in scrollback. The fix should be scoped to active CLI-agent frame redraws.
 ## Proposed changes
 Add an explicit “primary-screen frame redraws happen in place” mode to the active CLI-agent output grid.
 Implementation shape:
@@ -31,7 +31,7 @@ Implementation shape:
 - Enable `FullGridClearBehavior::Clear` in `TerminalView::handle_cli_agent_sessions_event` when a matching `CLIAgentSessionsModelEvent::Started` arrives. The behavior is one-way for that block; once the block is finished, resize ignores the clear behavior because the output is immutable.
 - Do not reuse `FeatureFlag::TrimTrailingBlankLines` for this behavior. If rollback is desired, add a distinct feature flag; otherwise rely on the CLI-agent-only session scope. The two behaviors address related symptoms but have different terminal semantics.
 Expected data flow:
-1. Pane resize updates Rook’s model and sends a PTY resize to the running process.
+1. Pane resize updates Polaris Terminal’s model and sends a PTY resize to the running process.
 2. Because the active block is marked as a CLI-agent frame-redraw grid, primary-screen resize updates visible grid storage in place instead of first pushing the old visible frame into `flat_storage`.
 3. Claude Code receives the resize and emits a primary-screen full clear plus a new frame.
 4. Because the same mode is enabled, `ClearMode::All` clears the current visible frame in place instead of pushing it into `flat_storage`.
@@ -57,16 +57,16 @@ Recommended wiring tests:
 - A finished block no longer relies on reverting this behavior; finished-grid resize follows the normal scrollback path even if the behavior remains set.
 Manual validation:
 - Capture raw PTY output while resizing Claude Code, if possible, and confirm the redraw contains a full-screen clear such as `ESC[H ESC[2J`.
-- Run Claude Code in Rook, resize the pane narrower several times, and verify the active block overwrites the current frame instead of accumulating prior frames.
-- Repeat a normal shell `clear`/Ctrl-L flow outside a CLI-agent session and verify Rook still preserves the prior primary-screen contents according to existing block semantics.
+- Run Claude Code in Polaris Terminal, resize the pane narrower several times, and verify the active block overwrites the current frame instead of accumulating prior frames.
+- Repeat a normal shell `clear`/Ctrl-L flow outside a CLI-agent session and verify Polaris Terminal still preserves the prior primary-screen contents according to existing block semantics.
 - Resize ordinary primary-screen command output outside a CLI-agent session and verify existing reflow/scrollback behavior is unchanged.
 - Smoke-test Codex/OpenCode CLI-agent sessions to ensure trailing blank trimming and cursor behavior from APP-4004/APP-4006 are unchanged.
 Suggested commands:
 - `cargo test -p app terminal::model::grid::grid_handler_test -- --nocapture` or the narrowest package/test invocation that matches this repo’s current test target names.
 - If implementation touches broader terminal-model behavior, run the relevant terminal model tests before manual verification.
 ## Risks and mitigations
-- Primary-screen full clear and resize reflow have user-visible history semantics in Rook. Mitigation: scope the in-place behavior only to active CLI-agent sessions, and only for `ClearMode::All` plus primary-screen resize while the frame-redraw mode is active.
-- Some CLI agents might intentionally use primary-screen clears to preserve previous output. Mitigation: the behavior applies only while Rook has detected an active CLI-agent session, where full-screen clears are overwhelmingly frame redraws; completed blocks no longer use the in-place resize path.
+- Primary-screen full clear and resize reflow have user-visible history semantics in Polaris Terminal. Mitigation: scope the in-place behavior only to active CLI-agent sessions, and only for `ClearMode::All` plus primary-screen resize while the frame-redraw mode is active.
+- Some CLI agents might intentionally use primary-screen clears to preserve previous output. Mitigation: the behavior applies only while Polaris Terminal has detected an active CLI-agent session, where full-screen clears are overwhelmingly frame redraws; completed blocks no longer use the in-place resize path.
 - Images and secret metadata may outlive in-place-cleared cells if only grid cells are reset. Mitigation: reuse or extend existing clear/eviction helpers so ancillary grid state matches the cleared visible region.
 - Delayed lifecycle events can target the wrong active block. Mitigation: only enable the behavior on session start and do not rely on a later disable event for correctness.
 - Resize ordering may still produce edge cases if a process writes during the gap between model resize and PTY resize delivery. Mitigation: the scoped resize path prevents the main old-frame preservation mechanism; treat backend-before-model resizing as a follow-up only if manual verification still shows accumulation.

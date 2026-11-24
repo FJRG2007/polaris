@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
+use ptermui::platform::WindowStyle;
+use ptermui::presenter::ChildView;
+use ptermui::{App, Element, Entity, TypedActionView, View, ViewHandle, WindowId};
 use repo_metadata::RepoMetadataModel;
 use repo_metadata::repositories::DetectedRepositories;
-use rookui::platform::WindowStyle;
-use rookui::presenter::ChildView;
-use rookui::{App, Element, Entity, TypedActionView, View, ViewHandle, WindowId};
 
 use super::{create_editable_comment_markdown_editor, create_readonly_comment_markdown_editor};
 use crate::appearance::Appearance;
@@ -40,7 +40,7 @@ impl View for TestView {
         "CommentEditorTestView"
     }
 
-    fn render(&self, _app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, _app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         ChildView::new(&self.editor).finish()
     }
 }

@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use anyhow::Error;
-use rook_core::define_settings_group;
-use rook_core::settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud};
-use rook_errors::report_error;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_core::define_settings_group;
+use pterm_core::settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud};
+use pterm_errors::report_error;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 use settings_value::SettingsValue;
 
@@ -26,7 +26,7 @@ define_settings_group!(WorkflowAliases, settings: [
 ]);
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, schemars::JsonSchema, SettingsValue)]
-#[schemars(description = "A shortcut alias for a Rook Drive workflow.")]
+#[schemars(description = "A shortcut alias for a Polaris Terminal Drive workflow.")]
 pub struct WorkflowAlias {
     #[schemars(description = "The alias text that triggers this workflow.")]
     pub alias: String,

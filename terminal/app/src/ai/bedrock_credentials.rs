@@ -13,10 +13,10 @@ use std::time::{Duration, SystemTime};
 
 use ai::api_keys::{ApiKeyManager, AwsCredentials, AwsCredentialsState};
 use anyhow::{Context as _, Result};
-use rook_errors::report_error;
-use rook_managed_secrets::ManagedSecretManager;
-use rook_managed_secrets::client::IdentityTokenOptions;
-use rookui::{ModelSpawner, SingletonEntity};
+use pterm_errors::report_error;
+use pterm_managed_secrets::ManagedSecretManager;
+use pterm_managed_secrets::client::IdentityTokenOptions;
+use ptermui::{ModelSpawner, SingletonEntity};
 use vec1::vec1;
 
 use super::agent_sdk::driver::AgentDriver;
@@ -118,7 +118,7 @@ async fn try_refresh(
 /// for their entire duration.
 ///
 /// On each iteration:
-/// 1. Issue a new OIDC identity token via rook-server.
+/// 1. Issue a new OIDC identity token via polaris-terminal-server.
 /// 2. Call STS `AssumeRoleWithWebIdentity` to get fresh temporary credentials.
 /// 3. Update `ApiKeyManager` with the new credentials.
 ///
@@ -136,7 +136,7 @@ pub(crate) async fn refresh_loop(
     foreground: &ModelSpawner<AgentDriver>,
 ) {
     loop {
-        rookui::r#async::Timer::after(BEDROCK_CREDENTIALS_REFRESH_INTERVAL).await;
+        ptermui::r#async::Timer::after(BEDROCK_CREDENTIALS_REFRESH_INTERVAL).await;
 
         log::info!("Proactively refreshing AWS Bedrock OIDC credentials for task {task_id}");
 
@@ -157,7 +157,7 @@ pub(crate) async fn refresh_loop(
                         attempt + 1,
                         delay.as_secs()
                     );
-                    rookui::r#async::Timer::after(delay).await;
+                    ptermui::r#async::Timer::after(delay).await;
                     attempt += 1;
                 }
                 Err(e) => {

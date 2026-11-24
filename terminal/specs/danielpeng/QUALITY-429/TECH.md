@@ -10,11 +10,11 @@ This required two coordinated changes:
 
 ## Relevant code
 
-- `crates/rookui_extras/src/user_preferences/toml_backed.rs` — TOML preferences backend (`new()`, `reload_from_disk()`)
-- `app/src/settings/init.rs` — `init_public_user_preferences()`, `init()`, `handle_rook_config_change()`
+- `crates/ptermui_extras/src/user_preferences/toml_backed.rs` — TOML preferences backend (`new()`, `reload_from_disk()`)
+- `app/src/settings/init.rs` — `init_public_user_preferences()`, `init()`, `handle_pterm_config_change()`
 - `app/src/settings/mod.rs` — `SettingsFileError` enum
 - `crates/settings/src/manager.rs` — `SettingsManager::reload_all_public_settings()`, `validate_all_public_settings()`
-- `app/src/user_config/mod.rs` — `RookConfigUpdateEvent::SettingsErrors` / `SettingsErrorsCleared`
+- `app/src/user_config/mod.rs` — `PtermConfigUpdateEvent::SettingsErrors` / `SettingsErrorsCleared`
 - `app/src/workspace/view.rs` — `WorkspaceBanner::InvalidSettings`, `render_settings_error_banner()`, `subscribe_to_settings_errors()`
 - `app/src/workspace/action.rs` — `WorkspaceAction::OpenSettingsFile`
 - `app/src/global_resource_handles.rs` — `settings_file_error` field for startup propagation
@@ -34,7 +34,7 @@ This required two coordinated changes:
 - `TomlBackedUserPreferences::new()` returns `(Self, Option<Error>)`. It always succeeds, starting with an empty document on parse failure.
 - `reload_all_public_settings()` returns `Vec<String>` of failed storage keys.
 - `validate_all_public_settings()` provides read-only startup validation.
-- Errors are propagated via `RookConfigUpdateEvent` to the workspace banner system.
+- Errors are propagated via `PtermConfigUpdateEvent` to the workspace banner system.
 
 ## Proposed changes (as implemented)
 
@@ -56,8 +56,8 @@ pub enum SettingsFileError {
 
 #### Error capture — hot-reload path
 
-`handle_rook_config_change()` in `app/src/settings/init.rs`:
-- On `reload_from_disk()` failure → emits `RookConfigUpdateEvent::SettingsErrors(FileParseFailed(...))`
+`handle_pterm_config_change()` in `app/src/settings/init.rs`:
+- On `reload_from_disk()` failure → emits `PtermConfigUpdateEvent::SettingsErrors(FileParseFailed(...))`
 - On success → calls `reload_all_public_settings()`. If failed keys returned → emits `SettingsErrors(InvalidSettings(...))`. If empty → emits `SettingsErrorsCleared`.
 
 #### Error capture — startup path
@@ -68,7 +68,7 @@ pub enum SettingsFileError {
 
 #### Event plumbing
 
-Two new `RookConfigUpdateEvent` variants:
+Two new `PtermConfigUpdateEvent` variants:
 - `SettingsErrors(SettingsFileError)` — emitted when errors are detected
 - `SettingsErrorsCleared` — emitted when a reload succeeds with no errors
 
@@ -77,7 +77,7 @@ Two new `RookConfigUpdateEvent` variants:
 - `WorkspaceBanner::InvalidSettings` variant added to the enum. Returns `true` from `is_dismissible()`.
 - `Workspace` fields: `settings_file_error: Option<SettingsFileError>`, `settings_error_banner_dismissed: bool`.
 - `render_settings_error_banner()` produces `WorkspaceBannerFields` with the appropriate message and an "Open settings file" button.
-- `subscribe_to_settings_errors()` subscribes to `RookConfig` model for `SettingsErrors`/`SettingsErrorsCleared` events.
+- `subscribe_to_settings_errors()` subscribes to `PtermConfig` model for `SettingsErrors`/`SettingsErrorsCleared` events.
 - `WorkspaceAction::OpenSettingsFile` opens `settings.toml` in a code editor pane via `add_tab_for_code_file()`.
 
 ## End-to-end flow
@@ -106,23 +106,23 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant FileWatcher
-    participant RookConfig
-    participant Handler as handle_rook_config_change
+    participant PtermConfig
+    participant Handler as handle_pterm_config_change
     participant Workspace
 
-    FileWatcher->>RookConfig: Settings event
-    RookConfig->>Handler: RookConfigUpdateEvent::Settings
+    FileWatcher->>PtermConfig: Settings event
+    PtermConfig->>Handler: PtermConfigUpdateEvent::Settings
     Handler->>Handler: reload_from_disk() → Err
-    Handler->>RookConfig: emit SettingsErrors(FileParseFailed)
-    RookConfig->>Workspace: SettingsErrors → banner appears
+    Handler->>PtermConfig: emit SettingsErrors(FileParseFailed)
+    PtermConfig->>Workspace: SettingsErrors → banner appears
 
     Note over FileWatcher: User fixes file
-    FileWatcher->>RookConfig: Settings event
-    RookConfig->>Handler: RookConfigUpdateEvent::Settings
+    FileWatcher->>PtermConfig: Settings event
+    PtermConfig->>Handler: PtermConfigUpdateEvent::Settings
     Handler->>Handler: reload_from_disk() → Ok
     Handler->>Handler: reload_all_public_settings() → []
-    Handler->>RookConfig: emit SettingsErrorsCleared
-    RookConfig->>Workspace: SettingsErrorsCleared → banner disappears
+    Handler->>PtermConfig: emit SettingsErrorsCleared
+    PtermConfig->>Workspace: SettingsErrorsCleared → banner disappears
 ```
 
 ## Risks and mitigations
@@ -138,7 +138,7 @@ sequenceDiagram
 - `test_validate_detects_invalid_values` — startup validation catches bad values
 - `test_validate_returns_empty_when_all_valid` — startup validation passes for good values
 
-### Unit tests (`crates/rookui_extras/src/user_preferences/toml_backed_tests.rs`)
+### Unit tests (`crates/ptermui_extras/src/user_preferences/toml_backed_tests.rs`)
 - `test_new_with_invalid_toml_returns_error_and_recovers_on_reload` — parse failure → recovery
 
 ### Integration tests (`crates/integration/src/test/settings_file_errors.rs`)

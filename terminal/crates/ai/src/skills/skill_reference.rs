@@ -1,6 +1,6 @@
 use std::fmt;
 
-use rook_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
 use serde::{Deserialize, Serialize};
 
 /// An unique reference to a skill.
@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub enum SkillReference {
     /// A skill identified by the path to its SKILL.md file.
     Path(LocalOrRemotePath),
-    /// A bundled skill distributed with Rook.
+    /// A bundled skill distributed with Polaris Terminal.
     BundledSkillId(String),
 }
 
@@ -18,8 +18,8 @@ impl SkillReference {
     /// id for a bundled skill.
     ///
     /// Unlike [`Display`](fmt::Display), which renders the canonical
-    /// `@rook-skill:<id>` reference form for bundled skills, this omits the
-    /// internal `@rook-skill:` prefix so bundled-skill copy reads the same way
+    /// `@polaris-terminal-skill:<id>` reference form for bundled skills, this omits the
+    /// internal `@polaris-terminal-skill:` prefix so bundled-skill copy reads the same way
     /// as path-based skill copy. Use this for anything a user sees; keep
     /// `Display` for canonical/round-trippable reference strings.
     pub fn display_label(&self) -> String {
@@ -34,7 +34,7 @@ impl fmt::Display for SkillReference {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             SkillReference::Path(path) => path.display_path().fmt(f),
-            SkillReference::BundledSkillId(id) => write!(f, "@rook-skill:{id}"),
+            SkillReference::BundledSkillId(id) => write!(f, "@polaris-terminal-skill:{id}"),
         }
     }
 }

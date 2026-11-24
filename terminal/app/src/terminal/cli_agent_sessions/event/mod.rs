@@ -4,9 +4,9 @@ mod v1;
 // either it or the upstream one through `is_cli_agent_notification`, but it is
 // re-exported here so those tests keep naming it from one place.
 #[cfg_attr(not(test), allow(unused_imports))]
-pub use rook_core::cli_agent_protocol::CLI_AGENT_NOTIFICATION_SENTINEL;
-pub use rook_core::cli_agent_protocol::is_cli_agent_notification;
-use rook_errors::report_error;
+pub use pterm_core::cli_agent_protocol::CLI_AGENT_NOTIFICATION_SENTINEL;
+pub use pterm_core::cli_agent_protocol::is_cli_agent_notification;
+use pterm_errors::report_error;
 use serde::Deserialize;
 
 use crate::terminal::CLIAgent;
@@ -30,7 +30,7 @@ pub enum CLIAgentEventType {
     Unknown(String),
 }
 
-/// How a CLI agent event reached Rook.
+/// How a CLI agent event reached Polaris Terminal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CLIAgentEventSource {
     /// Structured OSC 777 notification from a rich plugin.
@@ -90,7 +90,7 @@ pub fn parse_event(title: Option<&str>, body: &str) -> Option<CLIAgentEvent> {
         Some(parser) => parser(body),
         None => {
             report_error!(
-                "Received CLI agent event with unsupported schema version. The CLI agent plugin or Rook may need to be updated.",
+                "Received CLI agent event with unsupported schema version. The CLI agent plugin or Polaris Terminal may need to be updated.",
                 extra: { "version" => %version }
             );
             None

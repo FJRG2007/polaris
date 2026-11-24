@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use super::{CliAgentPluginManager, PluginInstructionStep, PluginInstructions};
 
-// Keep in sync with the opencode-rook npm package version.
+// Keep in sync with the opencode-polaris-terminal npm package version.
 // This version is also hardcoded into UPDATE_INSTRUCTIONS below (so the update
 // instructions tell users to pin to this specific version to force OpenCode's
 // plugin cache to re-fetch). Update both together.
@@ -32,8 +32,8 @@ impl CliAgentPluginManager for OpenCodePluginManager {
 }
 
 static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| PluginInstructions {
-    title: "Install Rook Plugin for OpenCode",
-    subtitle: "Add the Rook plugin to your OpenCode configuration, then restart OpenCode.",
+    title: "Install Polaris Terminal Plugin for OpenCode",
+    subtitle: "Add the Polaris Terminal plugin to your OpenCode configuration, then restart OpenCode.",
     steps: &[
         PluginInstructionStep {
             description: "Open or create your opencode.json. This can be in your project root, or the global config path:",
@@ -42,8 +42,8 @@ static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| Plu
             link: None,
         },
         PluginInstructionStep {
-            description: "Add \"@rook-dot-dev/opencode-rook\" to the \"plugin\" array in the top-level JSON object:",
-            command: "\"plugin\": [\"@rook-dot-dev/opencode-rook\"]",
+            description: "Add \"@polaris-terminal-dot-dev/opencode-polaris-terminal\" to the \"plugin\" array in the top-level JSON object:",
+            command: "\"plugin\": [\"@polaris-terminal-dot-dev/opencode-polaris-terminal\"]",
             executable: false,
             link: None,
         },
@@ -52,7 +52,7 @@ static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| Plu
 });
 
 static UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| PluginInstructions {
-    title: "Update Rook Plugin for OpenCode",
+    title: "Update Polaris Terminal Plugin for OpenCode",
     subtitle: "Pin the plugin to the latest version in your opencode.json. OpenCode caches plugins per version spec, so changing the pin forces it to re-fetch on restart.",
     steps: &[
         PluginInstructionStep {
@@ -62,8 +62,8 @@ static UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| Plug
             link: None,
         },
         PluginInstructionStep {
-            description: "Replace the existing \"@rook-dot-dev/opencode-rook\" entry in the \"plugin\" array with the explicit version:",
-            command: "\"plugin\": [\"@rook-dot-dev/opencode-rook@0.1.5\"]",
+            description: "Replace the existing \"@polaris-terminal-dot-dev/opencode-polaris-terminal\" entry in the \"plugin\" array with the explicit version:",
+            command: "\"plugin\": [\"@polaris-terminal-dot-dev/opencode-polaris-terminal@0.1.5\"]",
             executable: false,
             link: None,
         },

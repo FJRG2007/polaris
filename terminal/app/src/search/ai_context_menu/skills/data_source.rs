@@ -1,6 +1,6 @@
 use fuzzy_match::FuzzyMatchResult;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::{AppContext, Entity, SingletonEntity};
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::{AppContext, Entity, SingletonEntity};
 
 use super::search_item::SkillSearchItem;
 use crate::ai::skills::SkillManager;

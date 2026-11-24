@@ -3,20 +3,22 @@ use std::mem;
 use std::ops::Range;
 use std::sync::Arc;
 
-use rook_completer::signatures::CommandRegistry;
-use rook_editor::content::anchor::Anchor;
-use rook_editor::content::buffer::Buffer;
-use rook_editor::content::selection_model::BufferSelectionModel;
-use rook_editor::editor::EmbeddedItemModel;
-use rook_util::user_input::UserInput;
-use rookui::elements::{
+use pterm_completer::signatures::CommandRegistry;
+use pterm_editor::content::anchor::Anchor;
+use pterm_editor::content::buffer::Buffer;
+use pterm_editor::content::selection_model::BufferSelectionModel;
+use pterm_editor::editor::EmbeddedItemModel;
+use pterm_util::user_input::UserInput;
+use ptermui::elements::{
     Align, Border, Container, CrossAxisAlignment, Empty, Flex, MainAxisAlignment, MouseStateHandle,
     ParentElement, Shrinkable,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::UiComponent;
-use rookui::{AppContext, Element, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
+    AppContext, Element, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity,
+};
 use string_offset::{ByteOffset, CharOffset};
 
 use super::embedded_item::EmbeddedWorkflow;

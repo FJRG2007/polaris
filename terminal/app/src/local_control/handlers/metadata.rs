@@ -9,13 +9,13 @@ use ::local_control::protocol::{
 use ::local_control::{
     Action, ActionKind, ActionMetadata, ControlError, ErrorCode, InstanceId, PROTOCOL_VERSION,
 };
-use rook_core::channel::ChannelState;
-use rookui::{AppContext, ModelContext, SingletonEntity, ViewHandle, WindowId};
+use pterm_core::channel::ChannelState;
+use ptermui::{AppContext, ModelContext, SingletonEntity, ViewHandle, WindowId};
 use serde::Serialize;
 use serde_json::{Value, json};
 use settings::Setting as _;
 
-use crate::drive::settings::RookDriveSettings;
+use crate::drive::settings::PtermDriveSettings;
 use crate::features::FeatureFlag;
 use crate::local_control::LocalControlBridge;
 use crate::local_control::resolver::{reject_target_families, require_active_window_id_for_action};
@@ -135,7 +135,7 @@ pub(crate) enum SurfaceDestination {
     CommandSearch,
     ThemePicker,
     Keybindings,
-    RookDrive,
+    PtermDrive,
     ResourceCenter,
     AiAssistant,
     CodeReview,
@@ -155,7 +155,7 @@ impl SurfaceDestination {
         Self::CommandSearch,
         Self::ThemePicker,
         Self::Keybindings,
-        Self::RookDrive,
+        Self::PtermDrive,
         Self::ResourceCenter,
         Self::AiAssistant,
         Self::CodeReview,
@@ -175,7 +175,7 @@ impl SurfaceDestination {
             Self::CommandSearch => "command_search",
             Self::ThemePicker => "theme_picker",
             Self::Keybindings => "keybindings",
-            Self::RookDrive => "rook_drive",
+            Self::PtermDrive => "pterm_drive",
             Self::ResourceCenter => "resource_center",
             Self::AiAssistant => "ai_assistant",
             Self::CodeReview => "code_review",
@@ -312,10 +312,10 @@ pub(crate) fn surface_unavailable_reason(
         | SurfaceDestination::ThemePicker
         | SurfaceDestination::Keybindings
         | SurfaceDestination::ResourceCenter => None,
-        SurfaceDestination::RookDrive if !RookDriveSettings::is_rook_drive_enabled(ctx) => {
-            Some("Rook Drive is disabled")
+        SurfaceDestination::PtermDrive if !PtermDriveSettings::is_pterm_drive_enabled(ctx) => {
+            Some("Polaris Terminal Drive is disabled")
         }
-        SurfaceDestination::RookDrive => None,
+        SurfaceDestination::PtermDrive => None,
         SurfaceDestination::AiAssistant if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) => {
             Some("AI features are disabled")
         }
@@ -354,7 +354,7 @@ pub(crate) fn surface_unavailable_reason(
                 && surface_unavailable_reason(SurfaceDestination::GlobalSearch, ctx).is_some()
                 && surface_unavailable_reason(SurfaceDestination::ConversationList, ctx)
                     .is_some()
-                && surface_unavailable_reason(SurfaceDestination::RookDrive, ctx).is_some() =>
+                && surface_unavailable_reason(SurfaceDestination::PtermDrive, ctx).is_some() =>
         {
             Some("the left panel has no available views")
         }

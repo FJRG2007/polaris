@@ -1,12 +1,12 @@
 //! This module defines CellGlyphCache, a struct which manages the caching of glyph values for cells
-//! when rendering Grids within Rook.
+//! when rendering Grids within Polaris Terminal.
 use std::collections::HashMap;
 
-use rookui::PaintContext;
-use rookui::elements::DEFAULT_LINE_HEIGHT_RATIO;
-use rookui::fonts::{Cache as FontCache, FamilyId, FontId, GlyphId, Properties};
-use rookui::platform::LineStyle;
-use rookui::text_layout::{DEFAULT_TOP_BOTTOM_RATIO, StyleAndFont};
+use ptermui::PaintContext;
+use ptermui::elements::DEFAULT_LINE_HEIGHT_RATIO;
+use ptermui::fonts::{Cache as FontCache, FamilyId, FontId, GlyphId, Properties};
+use ptermui::platform::LineStyle;
+use ptermui::text_layout::{DEFAULT_TOP_BOTTOM_RATIO, StyleAndFont};
 
 /// Stores cached glyph values for characters/strings. Note that we normally only need to look up
 /// characters - we only look up strings in the case of zerowidth characters (which act as modifiers

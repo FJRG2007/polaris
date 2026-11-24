@@ -1,7 +1,7 @@
 use std::num::NonZeroU8;
 use std::ops::Range;
 
-use rookui_core::text::TuiGridPoint;
+use ptermui_core::text::TuiGridPoint;
 use string_offset::CharOffset;
 
 use super::super::test_utils::TEST_STYLES;

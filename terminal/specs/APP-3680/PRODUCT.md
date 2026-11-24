@@ -9,13 +9,13 @@ After completing onboarding, users land in an empty terminal tab with no guidanc
 
 ## Summary
 
-A new modal ("Create your default tab config") appears after onboarding completes, overlayed on the terminal. It collects three inputs — session type, directory, and worktree preference — then creates a persistent tab config TOML in `~/.rook/tab_configs/` and opens it in the current tab.
+A new modal ("Create your default tab config") appears after onboarding completes, overlayed on the terminal. It collects three inputs — session type, directory, and worktree preference — then creates a persistent tab config TOML in `~/.polaris-terminal/tab_configs/` and opens it in the current tab.
 
 ## Goals
 
 - Let users configure their first session immediately after onboarding in a single modal.
 - Support Built in agent (Oz), third-party CLI agents (Claude, Codex, Gemini), and Terminal as session types.
-- Always persist the configuration as a reusable tab config TOML in `~/.rook/tab_configs/`.
+- Always persist the configuration as a reusable tab config TOML in `~/.polaris-terminal/tab_configs/`.
 - Keep the modal implementation reusable so it can be surfaced in other contexts later (e.g., from a menu or command palette).
 
 ## Non-goals
@@ -29,7 +29,7 @@ A new modal ("Create your default tab config") appears after onboarding complete
 
 ### When the modal appears
 
-The modal appears once, immediately after the user completes the onboarding slide flow. It only appears when `OpenRookNewSettingsModes` is enabled — this is the new onboarding path. Users on the old onboarding flow never see this modal. It is rendered as a centered overlay on top of the terminal workspace (not as a full-screen onboarding slide). The user cannot interact with the terminal behind it while the modal is open.
+The modal appears once, immediately after the user completes the onboarding slide flow. It only appears when `OpenPtermNewSettingsModes` is enabled — this is the new onboarding path. Users on the old onboarding flow never see this modal. It is rendered as a centered overlay on top of the terminal workspace (not as a full-screen onboarding slide). The user cannot interact with the terminal behind it while the modal is open.
 
 ### Modal layout (per Figma)
 
@@ -38,11 +38,11 @@ The modal appears once, immediately after the user completes the onboarding slid
 - **Session type:** A row of selectable pill-style buttons that wrap. Options (in order): Built in agent, Claude, Codex, Gemini, Terminal. Only one can be selected at a time. Built in agent is selected by default.
 - **Select directory:** A button that opens a native OS folder picker. Displays the selected path left-aligned (defaults to `~`). Text is semibold, no folder icon.
 - **Enable worktree support:** A checkbox. Disabled with a tooltip ("Select a git repository to enable worktree support") when the selected directory is not a git repository. Unchecked by default.
-- **"Get rooking" button:** Primary action button with Enter keyboard shortcut.
+- **"Get pterming" button:** Primary action button with Enter keyboard shortcut.
 
 ### Session type behavior
 
-Each session type determines what happens when the user clicks "Get rooking":
+Each session type determines what happens when the user clicks "Get pterming":
 
 - **Terminal:** Opens a terminal session in the selected directory. No command is auto-run.
 - **Oz:** Opens the tab into agent view / Oz agent mode (not a CLI command). The tab starts in the selected directory with the Oz agent UI active.
@@ -58,11 +58,11 @@ When checked and a git repo is selected, the session (and tab config, if saved) 
 
 **Disabled state:** The checkbox is visually disabled and non-interactive when the selected directory does not contain a `.git` directory (or is not inside a git repo). A tooltip explains: "Select a git repository to enable worktree support." If the user changes the directory from a git repo to a non-git directory, the checkbox unchecks automatically and becomes disabled.
 
-### "Get rooking"
+### "Get pterming"
 
-Clicking "Get rooking" always saves a tab config and opens it:
+Clicking "Get pterming" always saves a tab config and opens it:
 
-1. Writes a new TOML file to `~/.rook/tab_configs/`. The file is named `startup_config.toml` (or `startup_config_1.toml`, `startup_config_2.toml`, etc. if the name is taken).
+1. Writes a new TOML file to `~/.polaris-terminal/tab_configs/`. The file is named `startup_config.toml` (or `startup_config_1.toml`, `startup_config_2.toml`, etc. if the name is taken).
 2. The TOML file contains:
    - `name = "Startup Config"` (or with a numeric suffix matching the file name).
    - A single `[[panes]]` entry with `type`, `cwd`, and optional `commands` (see "Tab config TOML generation" below).
@@ -151,14 +151,14 @@ cwd = "/absolute/path/to/dir"
 
 ### Keyboard interaction
 
-- **Enter:** Activates "Get rooking" (same as clicking the button).
+- **Enter:** Activates "Get pterming" (same as clicking the button).
 - **Escape:** Closes the modal without taking any action — the user lands on an empty terminal tab.
 - Arrow keys / Tab: Navigate between session type pills and checkboxes.
 
 ### Dismissal
 
 The modal can be dismissed by:
-- Clicking "Get rooking" (takes action).
+- Clicking "Get pterming" (takes action).
 - Pressing Escape (no action taken).
 - Clicking outside the modal (no action taken).
 - There is no explicit close/X button in the Figma.
@@ -170,9 +170,9 @@ The modal's core logic (collecting session type, directory, worktree preference,
 ## Success Criteria
 
 1. After completing onboarding, the modal appears overlayed on the terminal.
-2. Selecting "Terminal" + a directory + "Get rooking" writes a tab config TOML to `~/.rook/tab_configs/` and replaces the current tab with a session in that directory.
-3. Selecting a CLI agent + a directory + "Get rooking" writes a tab config TOML, replaces the current tab, sets the working directory, and auto-runs the agent CLI command.
-4. Selecting "Built in agent" + a directory + "Get rooking" writes a tab config TOML, replaces the current tab, and opens Oz agent view in that directory.
+2. Selecting "Terminal" + a directory + "Get pterming" writes a tab config TOML to `~/.polaris-terminal/tab_configs/` and replaces the current tab with a session in that directory.
+3. Selecting a CLI agent + a directory + "Get pterming" writes a tab config TOML, replaces the current tab, sets the working directory, and auto-runs the agent CLI command.
+4. Selecting "Built in agent" + a directory + "Get pterming" writes a tab config TOML, replaces the current tab, and opens Oz agent view in that directory.
 5. The written TOML appears in the + tab menu.
 6. The worktree checkbox is disabled when the selected directory is not a git repo, and enabled when it is.
 7. Checking worktree + save produces a TOML with `{{worktree_branch_name}}` params and worktree commands.

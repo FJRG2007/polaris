@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use rookui_core::text::TextBuffer;
+use ptermui_core::text::TextBuffer;
 use string_offset::CharOffset;
 
 use crate::vim::WordType;

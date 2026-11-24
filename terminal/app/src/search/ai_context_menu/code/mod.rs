@@ -5,9 +5,9 @@ pub mod search_item;
 #[cfg(not(target_family = "wasm"))]
 use std::path::Path;
 
-use rookui::AppContext;
+use ptermui::AppContext;
 #[cfg(not(target_family = "wasm"))]
-use rookui::SingletonEntity;
+use ptermui::SingletonEntity;
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::outline::{OutlineStatus, RepoOutlines};

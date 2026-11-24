@@ -1,14 +1,14 @@
-use regex::Regex;
-use rook_editor::editor::NavigationKey;
-use rookui::elements::{
+use pterm_editor::editor::NavigationKey;
+use ptermui::elements::{
     ChildView, Container, CrossAxisAlignment, Empty, Expanded, Flex, MainAxisSize,
     MouseStateHandle, ParentElement, Text,
 };
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
+use regex::Regex;
 
 use crate::appearance::Appearance;
 use crate::editor::{

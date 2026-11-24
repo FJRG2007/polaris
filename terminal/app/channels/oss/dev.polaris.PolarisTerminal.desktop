@@ -1,0 +1,23 @@
+[Desktop Entry]
+# The version of the desktop entry spec this conforms to.
+Version=1.0
+
+Type=Application
+
+Name=PolarisTerminal
+GenericName=TerminalEmulator
+
+Exec=polaris-terminal-terminal-oss %U
+StartupWMClass=dev.polaris.PolarisTerminal
+
+Keywords=shell;prompt;command;commandline;cmd;
+
+Icon=dev.polaris.PolarisTerminal
+
+Categories=System;TerminalEmulator;
+
+# Don't run this application within a terminal.
+Terminal=false
+
+# Register ourselves as the handler for polaris-terminal:// URLs.
+MimeType=x-scheme-handler/polaris-terminal;

@@ -1,10 +1,10 @@
-use rook_core::ui::builder::UiBuilder;
-use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::elements::{Align, Container, Element, Flex, MouseStateHandle, ParentElement};
-use rookui::keymap::FixedBinding;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use pterm_core::ui::builder::UiBuilder;
+use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::elements::{Align, Container, Element, Flex, MouseStateHandle, ParentElement};
+use ptermui::keymap::FixedBinding;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::appearance::Appearance;
 
@@ -21,9 +21,9 @@ const TITLE_FONT_SIZE: f32 = 20.;
 const TITLE_MARGIN_BOTTOM: f32 = 25.;
 // Constants for the subtitle
 const SUBTITLE_SENT_REFERRAL: &str =
-    "You earned an exclusive Rook theme for referring someone to Rook.";
+    "You earned an exclusive Polaris Terminal theme for referring someone to Polaris Terminal.";
 const SUBTITLE_RECEIVED_REFERRAL: &str =
-    "You earned an exclusive Rook theme for being referred to Rook.";
+    "You earned an exclusive Polaris Terminal theme for being referred to Polaris Terminal.";
 const SUBTITLE_FONT_SIZE: f32 = 14.;
 const SUBTITLE_MARGIN_BOTTOM: f32 = 40.;
 // Constants for the button
@@ -35,7 +35,7 @@ const BUTTON_MARGIN_BOTTOM: f32 = 14.;
 const ACCESSIBILITY_HELP: &str = "Press enter to open the theme chooser or escape to dismiss.";
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "enter",
@@ -184,7 +184,7 @@ impl View for RewardView {
         Some(AccessibilityContent::new(
             format!("{} {}", TITLE, self.subtitle()),
             ACCESSIBILITY_HELP,
-            RookA11yRole::WindowRole,
+            PtermA11yRole::WindowRole,
         ))
     }
 

@@ -245,7 +245,7 @@ When saving:
 
 When panels move sides, all overlay/popup UI elements associated with them must flip to point toward the center of the screen. This is implemented via helpers that read `HeaderToolbarChipSelection` from `TabSettings` at render time.
 
-**`tools_panel_menu_direction(app) -> MenuDirection`** (`drive/items/item.rs`): Returns `MenuDirection::Right` when the tools panel is on the left, `MenuDirection::Left` when on the right. Used by Rook Drive items, conversation list items, and the sorting button.
+**`tools_panel_menu_direction(app) -> MenuDirection`** (`drive/items/item.rs`): Returns `MenuDirection::Right` when the tools panel is on the left, `MenuDirection::Left` when on the right. Used by Polaris Terminal Drive items, conversation list items, and the sorting button.
 
 **`tabs_panel_side(app) -> PanelPosition`** (`workspace/view.rs`): Returns the side the tabs panel button is on. Used by the detail sidecar, action buttons, and right-click menu.
 
@@ -259,8 +259,8 @@ Flipped elements:
 - **Vertical tabs right-click menu** (`view.rs`): Anchors flip from `BottomLeft`/`TopLeft` to `BottomRight`/`TopRight`.
 - **Conversation list tooltips** (`conversation_list/item.rs`): `tooltip_opens_right` field on `ItemProps` flips `MiddleRight→MiddleLeft`.
 - **Conversation list kebab button + menu** (`conversation_list/item.rs`): Button position flips from `TopRight` to `TopLeft`; `MenuDirection` flips.
-- **Rook Drive item overflow button** (`drive/items/item.rs`): When `overflow_on_left`, the button renders as a `Stack` overlay at `MiddleLeft` (flush with edge) instead of appending to the flex row. This avoids pushing item content.
-- **Rook Drive hover previews and dialogs** (`drive/index.rs`): `add_row_overlay_to_stack` flips the X-axis anchor pair from `(Right, Left)` to `(Left, Right)` and negates the pixel offset.
+- **Polaris Terminal Drive item overflow button** (`drive/items/item.rs`): When `overflow_on_left`, the button renders as a `Stack` overlay at `MiddleLeft` (flush with edge) instead of appending to the flex row. This avoids pushing item content.
+- **Polaris Terminal Drive hover previews and dialogs** (`drive/index.rs`): `add_row_overlay_to_stack` flips the X-axis anchor pair from `(Right, Left)` to `(Left, Right)` and negates the pixel offset.
 - **Panel borders** (`left_panel.rs`, `right_panel.rs`): Border side and `DragBarSide` are driven by `self.panel_position`.
 - **Vertical tabs panel** (`vertical_tabs.rs`): Border and drag bar side are driven by the `side` parameter.
 
@@ -317,6 +317,6 @@ Flipped elements:
 
 - Rename `PaneGroup::left_panel_open` / `right_panel_open` to panel-type-specific names (e.g. `tools_panel_open`, `code_review_panel_open`).
 - Consider a dedicated `show_agent_management` boolean setting.
-- Flip additional secondary elements when on the right side: Rook Drive sorting button menu, create-new button menu, section header dialog positioning.
+- Flip additional secondary elements when on the right side: Polaris Terminal Drive sorting button menu, create-new button menu, section header dialog positioning.
 - Vertical tabs settings popup positioning when the tabs panel is on the right side.
 - New-session dropdown menu and sidecar positioning when the tabs panel is on the right side.

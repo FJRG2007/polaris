@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use rook_editor::model::CoreEditorModel;
-use rook_editor::render::model::{
+use pterm_editor::model::CoreEditorModel;
+use pterm_editor::render::model::{
     BlockItem, HitTestOptions, LineCount, Location, RenderLineLocation,
 };
-use rookui::units::Pixels;
-use rookui::{AppContext, ViewContext};
+use ptermui::units::Pixels;
+use ptermui::{AppContext, ViewContext};
 
 use super::{CodeReviewView, CodeReviewViewState, FILE_HEADER_HEIGHT};
 use crate::code::buffer_location::LocalOrRemotePath;

@@ -1,4 +1,4 @@
-use rookui::App;
+use ptermui::App;
 use tests::buffer::RangesWhenEditing;
 
 use super::*;

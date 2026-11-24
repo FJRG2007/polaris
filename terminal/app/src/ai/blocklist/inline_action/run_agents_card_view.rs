@@ -10,15 +10,15 @@ use ai::agent::action_result::{RunAgentsAgentOutcomeKind, RunAgentsResult};
 use ai::agent::orchestration_config::{OrchestrationConfig, OrchestrationConfigStatus};
 use ai::skills::SkillReference;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::send_telemetry_from_ctx;
-use rook_errors::report_error;
-use rook_graphql::queries::get_runners::RunnerSortBy;
-use rookui::elements::{
+use pterm_core::send_telemetry_from_ctx;
+use pterm_errors::report_error;
+use pterm_graphql::queries::get_runners::RunnerSortBy;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, Container, CornerRadius, CrossAxisAlignment, Empty, Flex,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Stack, Text, Wrap,
 };
-use rookui::keymap::FixedBinding;
-use rookui::{
+use ptermui::keymap::FixedBinding;
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -77,7 +77,7 @@ const RUN_AGENTS_CARD_TITLE: &str = "Can I start additional agents for this task
 const SPAWN_AGENTS_CANCELLED_LABEL: &str = "Spawn agents cancelled";
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -279,7 +279,7 @@ pub struct RunAgentsCardView {
 /// matching.
 ///
 /// 1. Defaults the Oz model to the conversation's base model.
-/// 2. Defaults Remote worker_host to "rook".
+/// 2. Defaults Remote worker_host to "polaris-terminal".
 /// 3. Defaults a Remote environment from settings / recency.
 fn resolve_interactive_defaults(
     orchestration_config_state: &mut OrchestrationConfigState,
@@ -287,10 +287,10 @@ fn resolve_interactive_defaults(
     ctx: &ViewContext<RunAgentsCardView>,
 ) {
     if orchestration_config_state.model_id.is_empty() {
-        let harness = rook_cli::agent::Harness::parse_orchestration_harness(
+        let harness = pterm_cli::agent::Harness::parse_orchestration_harness(
             &orchestration_config_state.harness_type,
         );
-        if matches!(harness, Some(rook_cli::agent::Harness::Oz) | None)
+        if matches!(harness, Some(pterm_cli::agent::Harness::Oz) | None)
             && let Some(base) = block_model.base_model(ctx).map(|id| id.to_string())
         {
             orchestration_config_state.model_id = base;
@@ -306,12 +306,12 @@ fn resolve_interactive_defaults(
         let needs_env = environment_id.is_empty();
         if needs_host {
             // Prefer the workspace default (or the dev env-var override)
-            // over the bare "rook" fallback so self-hosted teams see
+            // over the bare "polaris-terminal" fallback so self-hosted teams see
             // their default pre-selected. Mirrors the Oz webapp's
             // `HostSelector` initial-selection behavior.
             let scope = UserWorkspaces::as_ref(ctx).team_context_for_view(ctx);
             let default_host = oc::resolve_default_host_slug(&scope, ctx)
-                .unwrap_or_else(|| oc::ORCHESTRATION_ROOK_WORKER_HOST.to_string());
+                .unwrap_or_else(|| oc::ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST.to_string());
             orchestration_config_state.set_worker_host(default_host);
         }
         if needs_env && let Some(default_env) = oc::resolve_default_environment_id(ctx) {
@@ -455,7 +455,7 @@ impl RunAgentsCardView {
             ctx.notify();
         });
 
-        // Repopulate the model picker when available Rook LLMs change.
+        // Repopulate the model picker when available Polaris Terminal LLMs change.
         // Only relevant for Oz harness — non-Oz harnesses get their
         // model catalog from HarnessAvailabilityModel, not LLMPreferences.
         ctx.subscribe_to_model(&LLMPreferences::handle(ctx), |me, _, event, ctx| {
@@ -616,10 +616,10 @@ impl RunAgentsCardView {
                 .resolve_from_config(config);
         }
         if new_state.orchestration_config_state.model_id.is_empty() {
-            let harness = rook_cli::agent::Harness::parse_orchestration_harness(
+            let harness = pterm_cli::agent::Harness::parse_orchestration_harness(
                 &new_state.orchestration_config_state.harness_type,
             );
-            if matches!(harness, Some(rook_cli::agent::Harness::Oz) | None)
+            if matches!(harness, Some(pterm_cli::agent::Harness::Oz) | None)
                 && let Some(base) = self.block_model.base_model(ctx).map(|id| id.to_string())
             {
                 new_state.orchestration_config_state.model_id = base;
@@ -814,7 +814,7 @@ impl RunAgentsCardView {
         ) {
             return;
         }
-        let Some(harness) = rook_cli::agent::Harness::parse_orchestration_harness(
+        let Some(harness) = pterm_cli::agent::Harness::parse_orchestration_harness(
             &self
                 .orchestration_edit_state
                 .orchestration_config_state
@@ -923,15 +923,15 @@ impl RunAgentsCardView {
         if self.handles.pickers.host_picker.is_none() {
             let initial_host = match &state.execution_mode {
                 RunAgentsExecutionMode::Remote { worker_host, .. } => worker_host.as_str(),
-                RunAgentsExecutionMode::Local => oc::ORCHESTRATION_ROOK_WORKER_HOST,
+                RunAgentsExecutionMode::Local => oc::ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST,
             };
             let handle = ctx.add_typed_action_view(HostPicker::new);
             // Open upward so the menu doesn't overlap pickers below it,
             // matching the other dropdowns in this card.
             handle.update(ctx, |picker, picker_ctx| {
                 picker.set_menu_position(
-                    rookui::elements::PositionedElementAnchor::TopLeft,
-                    rookui::elements::ChildAnchor::BottomLeft,
+                    ptermui::elements::PositionedElementAnchor::TopLeft,
+                    ptermui::elements::ChildAnchor::BottomLeft,
                     picker_ctx,
                 );
             });
@@ -1118,8 +1118,8 @@ impl RunAgentsCardView {
     ) {
         dropdown_handle.update(ctx, |dropdown, ctx| {
             dropdown.set_menu_position(
-                rookui::elements::PositionedElementAnchor::TopLeft,
-                rookui::elements::ChildAnchor::BottomLeft,
+                ptermui::elements::PositionedElementAnchor::TopLeft,
+                ptermui::elements::ChildAnchor::BottomLeft,
                 ctx,
             );
         });
@@ -1295,9 +1295,9 @@ impl View for RunAgentsCardView {
                 OffsetPositioning::offset_from_save_position_element(
                     Self::get_position_id_for_accept_split_button(&self.position_id_prefix),
                     vec2f(0., 8.),
-                    rookui::elements::PositionedElementOffsetBounds::WindowByPosition,
-                    rookui::elements::PositionedElementAnchor::BottomRight,
-                    rookui::elements::ChildAnchor::TopRight,
+                    ptermui::elements::PositionedElementOffsetBounds::WindowByPosition,
+                    ptermui::elements::PositionedElementAnchor::BottomRight,
+                    ptermui::elements::ChildAnchor::TopRight,
                 ),
             );
         }
@@ -1430,7 +1430,7 @@ impl TypedActionView for RunAgentsCardView {
                     &mut self.orchestration_edit_state.orchestration_config_state,
                     ctx,
                 );
-                if let Some(harness) = rook_cli::agent::Harness::parse_orchestration_harness(
+                if let Some(harness) = pterm_cli::agent::Harness::parse_orchestration_harness(
                     &self
                         .orchestration_edit_state
                         .orchestration_config_state
@@ -1749,7 +1749,7 @@ fn render_editor(
     handles: &RunAgentsCardHandles,
     app: &AppContext,
 ) -> Box<dyn Element> {
-    use rookui::elements::ConstrainedBox;
+    use ptermui::elements::ConstrainedBox;
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();
     let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);

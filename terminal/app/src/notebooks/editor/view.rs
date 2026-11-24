@@ -5,43 +5,45 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use markdown_parser::{FormattedText, parse_html, parse_markdown};
 use pathfinder_geometry::vector::vec2f;
-use rook_editor::content::anchor::Anchor;
-use rook_editor::content::text::{BufferTextStyle, CodeBlockType, TextStyles};
-use rook_editor::content::version::BufferVersion;
-use rook_editor::editor::{EmbeddedItemModel, NavigationKey, RunnableCommandModel, TextDecoration};
-use rook_editor::model::{CoreEditorModel, RichTextEditorModel};
-use rook_editor::render::element::{
+use pterm_editor::content::anchor::Anchor;
+use pterm_editor::content::text::{BufferTextStyle, CodeBlockType, TextStyles};
+use pterm_editor::content::version::BufferVersion;
+use pterm_editor::editor::{
+    EmbeddedItemModel, NavigationKey, RunnableCommandModel, TextDecoration,
+};
+use pterm_editor::model::{CoreEditorModel, RichTextEditorModel};
+use pterm_editor::render::element::{
     DisplayOptions, DisplayStateHandle, RichTextAction, RichTextElement, VerticalExpansionBehavior,
 };
-use rook_editor::render::model::{BlockItem, HitTestBlockType, Location, RenderState};
-use rook_editor::selection::{TextDirection, TextUnit};
-use rook_util::path::LineAndColumnArg;
-use rook_util::user_input::UserInput;
-use rookui::accessibility::{AccessibilityContent, ActionAccessibilityContent, RookA11yRole};
-use rookui::actions::StandardAction;
-use rookui::assets::asset_cache::{AssetCache, AssetHandle, AssetState};
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_editor::render::model::{BlockItem, HitTestBlockType, Location, RenderState};
+use pterm_editor::selection::{TextDirection, TextUnit};
+use pterm_util::path::LineAndColumnArg;
+use pterm_util::user_input::UserInput;
+use ptermui::accessibility::{AccessibilityContent, ActionAccessibilityContent, PtermA11yRole};
+use ptermui::actions::StandardAction;
+use ptermui::assets::asset_cache::{AssetCache, AssetHandle, AssetState};
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     AnchorPair, Axis, Border, ChildAnchor, Clipped, ConstrainedBox, Container, CornerRadius,
     Dismiss, Fill, Flex, Hoverable, Icon, MouseStateHandle, OffsetPositioning, OffsetType,
     ParentAnchor, ParentElement, PositionedElementOffsetBounds, PositioningAxis, Radius,
     ScrollStateHandle, Scrollable, ScrollableElement, ScrollbarWidth, Stack, XAxisAnchor,
     YAxisAnchor,
 };
-use rookui::event::ModifiersState;
-use rookui::fonts::{FallbackFontEvent, FallbackFontModel};
-use rookui::image_cache::ImageType;
-use rookui::keymap::{EditableBinding, FixedBinding, PerPlatformKeystroke};
-use rookui::platform::{Cursor, OperatingSystem};
-use rookui::presenter::ChildView;
+use ptermui::event::ModifiersState;
+use ptermui::fonts::{FallbackFontEvent, FallbackFontModel};
+use ptermui::image_cache::ImageType;
+use ptermui::keymap::{EditableBinding, FixedBinding, PerPlatformKeystroke};
+use ptermui::platform::{Cursor, OperatingSystem};
+use ptermui::presenter::ChildView;
 #[cfg(feature = "local_fs")]
-use rookui::text::word_boundaries::WordBoundariesPolicy;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::units::Pixels;
-use rookui::windowing::WindowManager;
-use rookui::{
+use ptermui::text::word_boundaries::WordBoundariesPolicy;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::units::Pixels;
+use ptermui::windowing::WindowManager;
+use ptermui::{
     AppContext, BlurContext, CursorInfo, Element, Entity, FocusContext, ModelHandle,
     SingletonEntity, TypedActionView, View, ViewContext, ViewHandle, WeakViewHandle, windowing,
 };
@@ -72,7 +74,7 @@ use crate::util::bindings::CustomAction;
 #[cfg(feature = "local_fs")]
 use crate::util::link_detection::{DetectedLinkType, detect_file_paths, get_word_range_at_offset};
 use crate::util::tooltips::{
-    TooltipLink, TooltipRedaction, render_tooltip, should_show_open_in_rook_link,
+    TooltipLink, TooltipRedaction, render_tooltip, should_show_open_in_pterm_link,
 };
 use crate::view_components::DismissibleToast;
 use crate::workspace::WorkspaceAction;
@@ -88,7 +90,7 @@ const MAX_EDITOR_TIP_WIDTH: f32 = 300.;
 const GUTTER_WIDTH: f32 = ICON_DIMENSIONS + 4.;
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     // Context for text entry/navigation/selection:
     // - The editor is focused
@@ -832,7 +834,7 @@ pub enum EditorViewAction {
     Redo,
     OpenBlockInsertionMenu,
     /// Insert a block of the given type after the hovered location.
-    InsertBlock(rook_editor::content::text::BlockType),
+    InsertBlock(pterm_editor::content::text::BlockType),
     Indent,
     Unindent,
     Tab,
@@ -863,11 +865,11 @@ pub enum EditorViewAction {
     OpenEmbeddedObjectSearch,
     RemoveEmbeddingAt(CharOffset),
     MiddleClickPaste,
-    /// Open a file. If open_in_rook is true, open in Rook's code editor; otherwise use external editor.
+    /// Open a file. If open_in_pterm is true, open in Polaris Terminal's code editor; otherwise use external editor.
     OpenFile {
         path: PathBuf,
         line_and_column_num: Option<LineAndColumnArg>,
-        force_open_in_rook: bool,
+        force_open_in_pterm: bool,
     },
     /// Signal from a Mermaid toggle view that the user changed the display mode for a block.
     MermaidDisplayModeSelected {
@@ -916,7 +918,7 @@ enum LayoutAffectingAssetLoad {
 }
 
 fn mermaid_diagram_needs_loaded_layout(
-    config: &rook_editor::render::model::ImageBlockConfig,
+    config: &pterm_editor::render::model::ImageBlockConfig,
     image: &ImageType,
 ) -> bool {
     let ImageType::Svg { svg } = image else {
@@ -942,7 +944,7 @@ pub enum EditorViewEvent {
     OpenFile {
         path: PathBuf,
         line_and_column_num: Option<LineAndColumnArg>,
-        force_open_in_rook: bool,
+        force_open_in_pterm: bool,
     },
     /// Emitted when the user runs a notebook workflow. The parent `NotebookView` is responsible
     /// for sending it to the active terminal.
@@ -1023,7 +1025,7 @@ struct SelectedFilePath {
 #[derive(Default)]
 struct FilePathMouseStateHandles {
     open_file_handle: MouseStateHandle,
-    open_in_rook_handle: MouseStateHandle,
+    open_in_pterm_handle: MouseStateHandle,
 }
 
 pub struct RichTextEditorView {
@@ -1944,7 +1946,7 @@ impl RichTextEditorView {
                 ctx.emit(EditorViewEvent::OpenFile {
                     path: hovered_file_path.path.clone(),
                     line_and_column_num: hovered_file_path.line_and_column_num,
-                    force_open_in_rook: false,
+                    force_open_in_pterm: false,
                 });
             } else {
                 self.open_file_path = Some(hovered_file_path.clone());
@@ -2082,7 +2084,7 @@ impl RichTextEditorView {
     /// Inserts a new `block_type` block after the hovered block.
     pub(super) fn insert_block(
         &mut self,
-        block_type: rook_editor::content::text::BlockType,
+        block_type: pterm_editor::content::text::BlockType,
         ctx: &mut ViewContext<Self>,
     ) {
         enum InsertionMode {
@@ -2135,7 +2137,7 @@ impl RichTextEditorView {
                         model.insert_block_after(insertion_offset + 1, block_type, ctx);
                     }
                     InsertionMode::DeleteSlashAndRestyleLine(cursor_position) => match block_type {
-                        rook_editor::content::text::BlockType::Item(item) => {
+                        pterm_editor::content::text::BlockType::Item(item) => {
                             // Set one more offset position to the left to avoid additional linebreaks.
                             // Note: We can use `set_last_selection_head` because the menu cannot
                             // be opened when there are multiple selections.
@@ -2143,7 +2145,7 @@ impl RichTextEditorView {
                             model.insert_block_item(item, ctx);
                             model.cursor_at(cursor_position + 1, ctx);
                         }
-                        rook_editor::content::text::BlockType::Text(style) => {
+                        pterm_editor::content::text::BlockType::Text(style) => {
                             // Note: We can use `set_last_selection_head` because the menu cannot
                             // be opened when there are multiple selections.
                             model.set_last_selection_head(cursor_position, ctx);
@@ -2514,7 +2516,7 @@ impl RichTextEditorView {
         appearance: &Appearance,
         ctx: &AppContext,
     ) -> Box<dyn Element> {
-        use rookui::EventContext;
+        use ptermui::EventContext;
         type FilePathTooltipLinks = Vec<TooltipLink<Box<dyn Fn(&mut EventContext)>>>;
 
         let path = selected_file_path.path.clone();
@@ -2525,7 +2527,7 @@ impl RichTextEditorView {
             "Open file"
         }
         .to_string();
-        let show_open_in_rook = should_show_open_in_rook_link(&path, ctx);
+        let show_open_in_pterm = should_show_open_in_pterm_link(&path, ctx);
         let path_for_primary = path.clone();
         let modifier = directly_open_link_keybinding_string();
 
@@ -2535,26 +2537,26 @@ impl RichTextEditorView {
                 ctx.dispatch_typed_action(EditorViewAction::OpenFile {
                     path: path_for_primary.clone(),
                     line_and_column_num,
-                    force_open_in_rook: false,
+                    force_open_in_pterm: false,
                 });
             }),
             detail: Some(format!("[{modifier} Click]")),
             mouse_state: self.file_path_mouse_states.open_file_handle.clone(),
         }];
 
-        if show_open_in_rook {
-            let path_for_rook = path.clone();
+        if show_open_in_pterm {
+            let path_for_pterm = path.clone();
             links.push(TooltipLink {
-                text: "Open in Rook".to_string(),
+                text: "Open in Polaris Terminal".to_string(),
                 on_click: Box::new(move |ctx: &mut EventContext| {
                     ctx.dispatch_typed_action(EditorViewAction::OpenFile {
-                        path: path_for_rook.clone(),
+                        path: path_for_pterm.clone(),
                         line_and_column_num,
-                        force_open_in_rook: true,
+                        force_open_in_pterm: true,
                     });
                 }),
                 detail: None,
-                mouse_state: self.file_path_mouse_states.open_in_rook_handle.clone(),
+                mouse_state: self.file_path_mouse_states.open_in_pterm_handle.clone(),
             });
         }
 
@@ -2752,7 +2754,7 @@ impl View for RichTextEditorView {
         stack.finish()
     }
 
-    fn active_cursor_position(&self, ctx: &ViewContext<Self>) -> Option<rookui::CursorInfo> {
+    fn active_cursor_position(&self, ctx: &ViewContext<Self>) -> Option<ptermui::CursorInfo> {
         let model = self.model.as_ref(ctx);
         let render_state = model.render_state().as_ref(ctx);
         let font_size = model.cursor_font_size(ctx);
@@ -2763,7 +2765,7 @@ impl View for RichTextEditorView {
             })
     }
 
-    fn keymap_context(&self, ctx: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, ctx: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         if self.is_editable(ctx) {
@@ -3105,12 +3107,12 @@ impl TypedActionView for RichTextEditorView {
             OpenFile {
                 path,
                 line_and_column_num,
-                force_open_in_rook,
+                force_open_in_pterm,
             } => {
                 ctx.emit(EditorViewEvent::OpenFile {
                     path: path.clone(),
                     line_and_column_num: *line_and_column_num,
-                    force_open_in_rook: *force_open_in_rook,
+                    force_open_in_pterm: *force_open_in_pterm,
                 });
             }
         }
@@ -3137,13 +3139,13 @@ impl TypedActionView for RichTextEditorView {
             EditorViewAction::UserTyped(text) => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     text.clone().into_inner(),
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::Paste | EditorViewAction::MiddleClickPaste => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     format!("Pasting: {}", ctx.clipboard().read().plain_text),
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::Enter
@@ -3156,21 +3158,21 @@ impl TypedActionView for RichTextEditorView {
             | EditorViewAction::Unindent
             | EditorViewAction::Tab => ActionAccessibilityContent::from_debug(),
             EditorViewAction::ShiftTab => ActionAccessibilityContent::Custom(
-                AccessibilityContent::new_without_help("Shift-tab", RookA11yRole::UserAction),
+                AccessibilityContent::new_without_help("Shift-tab", PtermA11yRole::UserAction),
             ),
             EditorViewAction::EditLink | EditorViewAction::CreateOrEditLink => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     "Edit Link",
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::CopyLink => ActionAccessibilityContent::Custom(
-                AccessibilityContent::new_without_help("Copy Link", RookA11yRole::UserAction),
+                AccessibilityContent::new_without_help("Copy Link", PtermA11yRole::UserAction),
             ),
             EditorViewAction::OpenTooltipLink(link) => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     format!("Open link: {}", **link),
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::SecondaryLinkAction(link) => {
@@ -3180,72 +3182,72 @@ impl TypedActionView for RichTextEditorView {
                 );
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     content,
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::DeleteLineLeft => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     "Delete line left",
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::DeleteLineRight => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     "Delete line right",
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::DeleteWordLeft => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     "Delete word left",
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::DeleteWordRight => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     "Delete word right",
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
 
             EditorViewAction::CutLineLeft => ActionAccessibilityContent::Custom(
-                AccessibilityContent::new_without_help("Cut line left", RookA11yRole::UserAction),
+                AccessibilityContent::new_without_help("Cut line left", PtermA11yRole::UserAction),
             ),
             EditorViewAction::CutLineRight => ActionAccessibilityContent::Custom(
-                AccessibilityContent::new_without_help("Cut line right", RookA11yRole::UserAction),
+                AccessibilityContent::new_without_help("Cut line right", PtermA11yRole::UserAction),
             ),
             EditorViewAction::CutWordLeft => ActionAccessibilityContent::Custom(
-                AccessibilityContent::new_without_help("Cut word left", RookA11yRole::UserAction),
+                AccessibilityContent::new_without_help("Cut word left", PtermA11yRole::UserAction),
             ),
             EditorViewAction::CutWordRight => ActionAccessibilityContent::Custom(
-                AccessibilityContent::new_without_help("Cut word right", RookA11yRole::UserAction),
+                AccessibilityContent::new_without_help("Cut word right", PtermA11yRole::UserAction),
             ),
 
             EditorViewAction::ShowCharacterPalette => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     "Show character palette",
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::ShowFindBar => ActionAccessibilityContent::Custom(
-                AccessibilityContent::new_without_help("Show find bar", RookA11yRole::UserAction),
+                AccessibilityContent::new_without_help("Show find bar", PtermA11yRole::UserAction),
             ),
             EditorViewAction::OpenBlockInsertionMenu => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     "Open block-insertion menu",
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::OpenEmbeddedObjectSearch => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     "Open embedded object search menu",
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::InsertBlock(block_type) => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     format!("Insert {} block", BlockType::from(block_type).label()),
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::Bold => self
@@ -3272,23 +3274,26 @@ impl TypedActionView for RichTextEditorView {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new(
                     "De-select command",
                     "Switch from selecting commands to selecting text",
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::CodeBlockTypeSelectedAtOffset {
                 code_block_type, ..
             } => ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                 format!("Change code block language to {code_block_type}"),
-                RookA11yRole::UserAction,
+                PtermA11yRole::UserAction,
             )),
-            EditorViewAction::CopyTextToClipboard { .. } => ActionAccessibilityContent::Custom(
-                AccessibilityContent::new_without_help("Copy code block", RookA11yRole::UserAction),
-            ),
+            EditorViewAction::CopyTextToClipboard { .. } => {
+                ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
+                    "Copy code block",
+                    PtermA11yRole::UserAction,
+                ))
+            }
             EditorViewAction::ToggleTaskList(_) => {
                 // TODO(ben): Is it useful to include the text and/or on/off state here?
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     "Toggle task list",
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             EditorViewAction::Delete
@@ -3346,7 +3351,7 @@ impl TypedActionView for RichTextEditorView {
     }
 }
 
-impl rook_editor::editor::EditorView for RichTextEditorView {
+impl pterm_editor::editor::EditorView for RichTextEditorView {
     type RichTextAction = EditorViewAction;
 
     fn runnable_command_at<'a>(
@@ -3450,7 +3455,7 @@ impl RichTextAction<RichTextEditorView> for EditorViewAction {
         );
         let multiselect = modifiers.alt && FeatureFlag::RichTextMultiselect.is_enabled();
 
-        // The first mouse down to bring focus to a Rook window will not have a corresponding mouse up.
+        // The first mouse down to bring focus to a Polaris Terminal window will not have a corresponding mouse up.
         // We ignore it, and they can click again.
         if is_first_mouse {
             return None;

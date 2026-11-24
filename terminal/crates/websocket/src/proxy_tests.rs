@@ -233,7 +233,7 @@ fn no_proxy_suffix_without_dot() {
     assert!(resolved_proxy_tls("sessions.app.rook.dev").is_none());
     // Exact match too
     assert!(resolved_proxy_tls("rook.dev").is_none());
-    assert!(resolved_proxy_tls("notrook.dev").is_some());
+    assert!(resolved_proxy_tls("notpterm.dev").is_some());
     clear_proxy_env();
 }
 

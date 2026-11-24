@@ -39,7 +39,7 @@ impl<'a> Mouse<'a> {
                 target.x() as i16,
                 target.y() as i16,
             )
-            .map_err(|e| format!("Failed to rook pointer: {e}"))?;
+            .map_err(|e| format!("Failed to polaris-terminal pointer: {e}"))?;
 
         self.conn
             .flush()

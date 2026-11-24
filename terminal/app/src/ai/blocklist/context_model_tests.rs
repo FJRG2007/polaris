@@ -7,11 +7,11 @@ use std::sync::Arc;
 
 use parking_lot::FairMutex;
 #[cfg(feature = "local_fs")]
-use repo_metadata::DirectoryWatcher;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::r#async::executor::Background;
+use ptermui::{App, EntityId, ModelHandle, SingletonEntity};
 #[cfg(feature = "local_fs")]
-use rook_util::standardized_path::StandardizedPath;
-use rookui::r#async::executor::Background;
-use rookui::{App, EntityId, ModelHandle, SingletonEntity};
+use repo_metadata::DirectoryWatcher;
 
 use super::{BlocklistAIContextModel, PendingAttachment, PendingFile};
 use crate::ai::agent::conversation::AIConversationId;
@@ -63,7 +63,7 @@ struct TestConversationSelection {
 impl TestConversationSelection {
     fn new(
         terminal_surface_id: EntityId,
-        _: &mut rookui::ModelContext<Box<dyn ConversationSelection>>,
+        _: &mut ptermui::ModelContext<Box<dyn ConversationSelection>>,
     ) -> Self {
         Self {
             terminal_surface_id,
@@ -76,22 +76,22 @@ impl AgentConversationListPolicy for TestConversationSelection {
     fn classify_entry(
         &self,
         _: &AgentConversationEntry,
-        _: &rookui::AppContext,
+        _: &ptermui::AppContext,
     ) -> AgentConversationListEntryState {
         AgentConversationListEntryState::Unavailable
     }
 }
 
 impl ConversationSelection for TestConversationSelection {
-    fn selected_conversation_id(&self, _: &rookui::AppContext) -> Option<AIConversationId> {
+    fn selected_conversation_id(&self, _: &ptermui::AppContext) -> Option<AIConversationId> {
         self.selected_conversation_id
     }
 
-    fn is_conversation_active(&self, _: &rookui::AppContext) -> bool {
+    fn is_conversation_active(&self, _: &ptermui::AppContext) -> bool {
         self.selected_conversation_id.is_some()
     }
 
-    fn is_conversation_fullscreen(&self, _: &rookui::AppContext) -> bool {
+    fn is_conversation_fullscreen(&self, _: &ptermui::AppContext) -> bool {
         self.selected_conversation_id.is_some()
     }
 
@@ -99,7 +99,7 @@ impl ConversationSelection for TestConversationSelection {
         &mut self,
         conversation_id: AIConversationId,
         _: AgentViewEntryOrigin,
-        ctx: &mut rookui::ModelContext<Box<dyn ConversationSelection>>,
+        ctx: &mut ptermui::ModelContext<Box<dyn ConversationSelection>>,
     ) {
         if self.selected_conversation_id != Some(conversation_id) {
             self.selected_conversation_id = Some(conversation_id);
@@ -110,7 +110,7 @@ impl ConversationSelection for TestConversationSelection {
     fn select_new_conversation(
         &mut self,
         _: AgentViewEntryOrigin,
-        ctx: &mut rookui::ModelContext<Box<dyn ConversationSelection>>,
+        ctx: &mut ptermui::ModelContext<Box<dyn ConversationSelection>>,
     ) {
         if self.selected_conversation_id.take().is_some() {
             ctx.emit(ConversationSelectionEvent::Changed);
@@ -120,7 +120,7 @@ impl ConversationSelection for TestConversationSelection {
     fn try_start_new_conversation(
         &mut self,
         _: AgentViewEntryOrigin,
-        ctx: &mut rookui::ModelContext<Box<dyn ConversationSelection>>,
+        ctx: &mut ptermui::ModelContext<Box<dyn ConversationSelection>>,
     ) -> Result<AIConversationId, EnterAgentViewError> {
         let conversation_id = BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
             history.start_new_conversation(self.terminal_surface_id, false, false, false, ctx)
@@ -131,7 +131,7 @@ impl ConversationSelection for TestConversationSelection {
 
     fn pending_query_autoexecute_override(
         &self,
-        app: &rookui::AppContext,
+        app: &ptermui::AppContext,
     ) -> crate::ai::agent::conversation::AIConversationAutoexecuteMode {
         self.selected_conversation_id
             .as_ref()
@@ -144,7 +144,7 @@ impl ConversationSelection for TestConversationSelection {
 
     fn toggle_pending_query_autoexecute(
         &mut self,
-        ctx: &mut rookui::ModelContext<Box<dyn ConversationSelection>>,
+        ctx: &mut ptermui::ModelContext<Box<dyn ConversationSelection>>,
     ) {
         if let Some(conversation_id) = self.selected_conversation_id {
             BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
@@ -160,7 +160,7 @@ impl ConversationSelection for TestConversationSelection {
     fn handle_history_event(
         &mut self,
         _: &BlocklistAIHistoryEvent,
-        _: &mut rookui::ModelContext<Box<dyn ConversationSelection>>,
+        _: &mut ptermui::ModelContext<Box<dyn ConversationSelection>>,
     ) {
     }
 }
@@ -188,7 +188,7 @@ fn repository_context_reads_github_repo_model() {
         github_repo_model.update(&mut app, |model, ctx| {
             model.set_repository_info_for_test(
                 Some(RepositoryInfo {
-                    name: "rook-internal".to_owned(),
+                    name: "polaris-terminal-internal".to_owned(),
                     owner: Some("warpdotdev".to_owned()),
                     host: Some("github.com".to_owned()),
                 }),
@@ -204,7 +204,7 @@ fn repository_context_reads_github_repo_model() {
             assert_eq!(
                 model.repository_context(ctx),
                 Some(AIAgentContext::Repository {
-                    name: "rook-internal".to_owned(),
+                    name: "polaris-terminal-internal".to_owned(),
                     owner: Some("warpdotdev".to_owned()),
                     host: Some("github.com".to_owned()),
                 })
@@ -382,7 +382,7 @@ fn has_locking_attachment_is_false_with_only_pending_block_id() {
 #[test]
 fn repository_context_from_repository_info_converts_to_agent_context() {
     let repository_info = RepositoryInfo {
-        name: "rook-internal".to_owned(),
+        name: "polaris-terminal-internal".to_owned(),
         owner: Some("warpdotdev".to_owned()),
         host: Some("github.com".to_owned()),
     };
@@ -390,7 +390,7 @@ fn repository_context_from_repository_info_converts_to_agent_context() {
     assert_eq!(
         BlocklistAIContextModel::repository_context_from_repository_info(&repository_info),
         AIAgentContext::Repository {
-            name: "rook-internal".to_owned(),
+            name: "polaris-terminal-internal".to_owned(),
             owner: Some("warpdotdev".to_owned()),
             host: Some("github.com".to_owned()),
         }
@@ -401,7 +401,7 @@ fn repository_context_from_repository_info_converts_to_agent_context() {
 fn pull_request_context_from_pr_info_includes_url() {
     let pr_info = PrInfo {
         number: 123,
-        url: "https://github.com/FJRG2007/rook/pull/123".to_owned(),
+        url: "https://github.com/FJRG2007/polaris/pull/123".to_owned(),
         state: "OPEN".to_owned(),
         draft: true,
         base_branch: "main".to_owned(),
@@ -414,7 +414,7 @@ fn pull_request_context_from_pr_info_includes_url() {
             state: "OPEN".to_owned(),
             draft: true,
             base_branch: "main".to_owned(),
-            url: "https://github.com/FJRG2007/rook/pull/123".to_owned(),
+            url: "https://github.com/FJRG2007/polaris/pull/123".to_owned(),
         })
     );
 }
@@ -423,7 +423,7 @@ fn pull_request_context_from_pr_info_includes_url() {
 fn pull_request_context_from_pr_info_rejects_numbers_that_do_not_fit_agent_context() {
     let pr_info = PrInfo {
         number: i32::MAX as u64 + 1,
-        url: "https://github.com/FJRG2007/rook/pull/2147483648".to_owned(),
+        url: "https://github.com/FJRG2007/polaris/pull/2147483648".to_owned(),
         state: "OPEN".to_owned(),
         draft: false,
         base_branch: "main".to_owned(),
@@ -459,7 +459,7 @@ fn pull_request_context_reads_github_repo_model() {
             model.set_pr_info_for_test(
                 Some(PrInfo {
                     number: 123,
-                    url: "https://github.com/FJRG2007/rook/pull/123".to_owned(),
+                    url: "https://github.com/FJRG2007/polaris/pull/123".to_owned(),
                     state: "OPEN".to_owned(),
                     draft: false,
                     base_branch: "main".to_owned(),
@@ -480,7 +480,7 @@ fn pull_request_context_reads_github_repo_model() {
                     state: "OPEN".to_owned(),
                     draft: false,
                     base_branch: "main".to_owned(),
-                    url: "https://github.com/FJRG2007/rook/pull/123".to_owned(),
+                    url: "https://github.com/FJRG2007/polaris/pull/123".to_owned(),
                 })
             );
         });

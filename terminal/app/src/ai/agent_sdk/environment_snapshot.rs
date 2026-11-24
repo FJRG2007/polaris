@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use cloud_object_models::CodeForge;
-use rookui::r#async::executor::Background;
-use rookui::r#async::{FutureExt as _, Timer};
+use ptermui::r#async::executor::Background;
+use ptermui::r#async::{FutureExt as _, Timer};
 
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::server::retry_strategies::{backoff_after_attempts, is_transient_http_error};

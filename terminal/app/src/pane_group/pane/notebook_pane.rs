@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Context;
-use rookui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
+use ptermui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
 use url::Url;
 
 use super::super::{DefaultSessionModeBehavior, Direction};
@@ -12,8 +12,8 @@ use super::{
 };
 use crate::app_state::{LeafContents, NotebookPaneSnapshot};
 use crate::cloud_object::Space;
-use crate::drive::items::RookDriveItemId;
-use crate::drive::{CloudObjectTypeAndId, OpenRookDriveObjectSettings};
+use crate::drive::items::PtermDriveItemId;
+use crate::drive::{CloudObjectTypeAndId, OpenPtermDriveObjectSettings};
 use crate::notebooks::link::{LinkEvent, NotebookLinks};
 use crate::notebooks::manager::{NotebookManager, NotebookSource};
 use crate::notebooks::notebook::{NotebookEvent, NotebookView};
@@ -43,7 +43,7 @@ impl NotebookPane {
     /// Restore a notebook pane given its cloud notebook ID.
     pub fn restore(
         notebook_id: Option<SyncId>,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         ctx: &mut ViewContext<PaneGroup>,
     ) -> anyhow::Result<Self> {
         let window_id = ctx.window_id();
@@ -77,7 +77,7 @@ impl PaneContent for NotebookPane {
         let notebook_id = self.notebook_view(app).as_ref(app).notebook_id(app);
         LeafContents::Notebook(NotebookPaneSnapshot::CloudNotebook {
             notebook_id,
-            settings: OpenRookDriveObjectSettings::default(),
+            settings: OpenPtermDriveObjectSettings::default(),
         })
     }
 
@@ -174,15 +174,15 @@ pub(super) fn subscribe_to_link_model(
     ctx.subscribe_to_model(handle, move |pane_group, _, event, ctx| match event {
         LinkEvent::OpenFileNotebook { path, session } => {
             // Opening local files is delegated to the parent workspace.
-            ctx.emit(crate::pane_group::Event::OpenFileInRook {
+            ctx.emit(crate::pane_group::Event::OpenFileInPterm {
                 path: crate::code::buffer_location::LocalOrRemotePath::Local(path.clone()),
                 session: session.clone(),
             })
         }
-        LinkEvent::OpenRookDriveLink {
-            open_rook_drive_args,
-        } => ctx.emit(crate::pane_group::Event::OpenRookDriveLink {
-            open_rook_drive_args: open_rook_drive_args.clone(),
+        LinkEvent::OpenPtermDriveLink {
+            open_pterm_drive_args,
+        } => ctx.emit(crate::pane_group::Event::OpenPtermDriveLink {
+            open_pterm_drive_args: open_pterm_drive_args.clone(),
         }),
         LinkEvent::StartLocalSession { path } => {
             pane_group.add_session_in_directory(
@@ -201,7 +201,7 @@ pub(super) fn subscribe_to_link_model(
             target,
             line_col,
         } => {
-            // Emit event to workspace to handle opening in Rook
+            // Emit event to workspace to handle opening in Polaris Terminal
             ctx.emit(crate::pane_group::Event::OpenFileWithTarget {
                 path: path.clone(),
                 target: target.clone(),
@@ -226,7 +226,7 @@ fn handle_notebook_event(
         NotebookEvent::EditWorkflow(id) => {
             ctx.emit(crate::pane_group::Event::OpenCloudWorkflowForEdit(*id))
         }
-        NotebookEvent::ViewInRookDrive(id) => view_in_rook_drive(*id, ctx),
+        NotebookEvent::ViewInPtermDrive(id) => view_in_pterm_drive(*id, ctx),
         NotebookEvent::MoveToSpace {
             cloud_object_type_and_id,
             new_space,
@@ -266,8 +266,8 @@ fn run_notebook_workflow(
     });
 }
 
-fn view_in_rook_drive(id: RookDriveItemId, ctx: &mut ViewContext<PaneGroup>) {
-    ctx.emit(crate::pane_group::Event::ViewInRookDrive(id))
+fn view_in_pterm_drive(id: PtermDriveItemId, ctx: &mut ViewContext<PaneGroup>) {
+    ctx.emit(crate::pane_group::Event::ViewInPtermDrive(id))
 }
 
 fn move_to_space(

@@ -3,8 +3,8 @@ use std::mem;
 use std::ops::Range;
 
 use pathfinder_geometry::vector::Vector2F;
-use rookui::AppContext;
-use rookui::text::point::Point;
+use ptermui::AppContext;
+use ptermui::text::point::Point;
 use serde::{Deserialize, Serialize};
 use string_offset::{ByteOffset, CharOffset};
 use vec1::Vec1;

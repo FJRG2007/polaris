@@ -2,16 +2,16 @@ mod items;
 use std::collections::HashMap;
 
 pub use items::Items;
-use rook_core::context_flag::ContextFlag;
-use rook_core::features::FeatureFlag;
-use rookui::elements::{Container, Flex, MouseStateHandle, ParentElement, Shrinkable, Wrap};
-use rookui::{
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::features::FeatureFlag;
+use ptermui::elements::{Container, Flex, MouseStateHandle, ParentElement, Shrinkable, Wrap};
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     WindowId,
 };
 
 use crate::appearance::Appearance;
-use crate::drive::settings::RookDriveSettings;
+use crate::drive::settings::PtermDriveSettings;
 use crate::search::QueryFilter;
 use crate::search::command_palette::FilterChipRenderer;
 use crate::settings::AISettings;
@@ -81,10 +81,10 @@ impl ZeroState {
         app: &AppContext,
         window_id: WindowId,
     ) -> impl Iterator<Item = QueryFilter> + use<> {
-        let show_rook_drive = RookDriveSettings::is_rook_drive_enabled(app);
+        let show_pterm_drive = PtermDriveSettings::is_pterm_drive_enabled(app);
 
         let mut valid_filters = vec![];
-        if show_rook_drive {
+        if show_pterm_drive {
             valid_filters.push(QueryFilter::Workflows);
             if FeatureFlag::AgentModeWorkflows.is_enabled()
                 && AISettings::as_ref(app).is_any_ai_enabled(app)
@@ -109,7 +109,7 @@ impl ZeroState {
             }
         }
 
-        if show_rook_drive {
+        if show_pterm_drive {
             valid_filters.push(QueryFilter::Drive);
         }
         valid_filters.extend([QueryFilter::Actions, QueryFilter::Sessions]);

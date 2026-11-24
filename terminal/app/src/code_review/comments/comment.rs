@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use chrono::{DateTime, Local};
-use rook_editor::render::model::LineCount;
+use pterm_editor::render::model::LineCount;
 use warp_multi_agent_api::{self as api};
 
 use crate::ai::agent::{CurrentHead, DiffBase};
@@ -11,7 +11,7 @@ use crate::code::editor::line::EditorLineLocation;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum CommentOrigin {
-    /// Comments originally created in the Rook UI.
+    /// Comments originally created in the Polaris Terminal UI.
     #[default]
     Native,
     /// Comments imported from a GitHub pull request.

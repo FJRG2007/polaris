@@ -2,17 +2,17 @@ use std::borrow::Cow;
 use std::rc::Rc;
 
 use pathfinder_color::ColorU;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult,
     EventHandler, Expanded, Flex, FormattedTextElement, Hoverable, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, ParentElement, Radius, Shrinkable, SizeConstraintCondition,
     SizeConstraintSwitch, Text,
 };
-use rookui::fonts::FamilyId;
-use rookui::platform::Cursor;
-use rookui::{AppContext, Element, EventContext, SingletonEntity};
+use ptermui::fonts::FamilyId;
+use ptermui::platform::Cursor;
+use ptermui::{AppContext, Element, EventContext, SingletonEntity};
 
 use crate::ai::blocklist::inline_action::inline_action_icons::icon_size;
 use crate::ui_components::blended_colors;
@@ -112,7 +112,7 @@ pub struct HeaderConfig {
     pub font_family: FamilyId,
     /// Whether to parse the title as markdown when rendering.
     pub use_markdown: bool,
-    pub icon: Option<rookui::elements::Icon>,
+    pub icon: Option<ptermui::elements::Icon>,
     pub badge: Option<String>,
     pub interaction_mode: Option<InteractionMode>,
     pub is_text_selectable: bool,
@@ -147,7 +147,7 @@ impl HeaderConfig {
         self
     }
 
-    pub fn with_icon(mut self, icon: rookui::elements::Icon) -> Self {
+    pub fn with_icon(mut self, icon: ptermui::elements::Icon) -> Self {
         self.icon = Some(icon);
         self
     }

@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use ptermui::App;
 use regex::Regex;
-use rookui::App;
 use serial_test::serial;
 use session_sharing_protocol::sharer::SessionRetentionReason;
 

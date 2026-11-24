@@ -1,4 +1,4 @@
-use rookui::{AppContext, SingletonEntity};
+use ptermui::{AppContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 use settings::Setting as _;
 

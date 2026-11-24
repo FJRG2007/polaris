@@ -1,6 +1,6 @@
 [package]
 name = "input_classifier"
-authors = ["Rook Contributors"]
+authors = ["Polaris Terminal Contributors"]
 edition = "2024"
 build = "build.rs"
 publish.workspace = true
@@ -33,7 +33,7 @@ nld_heuristic_v1 = []
 nld_heuristic_v2 = []
 
 [dependencies]
-rook_errors.workspace = true
+pterm_errors.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
 clap.workspace = true
@@ -56,10 +56,10 @@ rust-embed = { workspace = true, optional = true }
 serde.workspace = true
 smol_str.workspace = true
 tokenizers = { version = "0.21.4", optional = true }
-rook_completer.workspace = true
+pterm_completer.workspace = true
 
 [build-dependencies]
 sha2.workspace = true
 
 [dev-dependencies]
-rook_features.workspace = true
+pterm_features.workspace = true

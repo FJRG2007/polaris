@@ -1,24 +1,24 @@
 use std::time::Duration;
 
-use rook::integration_testing::assertions::{go_offline, go_online, join_a_workspace};
-use rook::integration_testing::command_palette::{
+use polaris_terminal::integration_testing::assertions::{go_offline, go_online, join_a_workspace};
+use polaris_terminal::integration_testing::command_palette::{
     TestStepsExt, open_command_palette_and_run_action,
 };
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::util::ExpectedExitStatus;
-use rook::integration_testing::terminal::{
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::util::ExpectedExitStatus;
+use polaris_terminal::integration_testing::terminal::{
     execute_command_for_single_terminal_in_tab, wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::window::save_active_window_id;
-use rook::integration_testing::workflow::{
+use polaris_terminal::integration_testing::window::save_active_window_id;
+use polaris_terminal::integration_testing::workflow::{
     assert_no_team_workflow_pane_open, assert_no_workflow_pane_open,
     assert_open_team_workflow_pane_count_equals, assert_open_workflow_pane_count_equals,
     assert_workflow_id, create_a_personal_workflow, open_workflow,
 };
-use rook::integration_testing::{self, view_of_type};
-use rook::workflows::CategoriesView;
-use rookui_core::integration::TestStep;
-use rookui_core::{ViewHandle, async_assert_eq};
+use polaris_terminal::integration_testing::{self, view_of_type};
+use polaris_terminal::workflows::CategoriesView;
+use ptermui_core::integration::TestStep;
+use ptermui_core::{ViewHandle, async_assert_eq};
 
 use super::{TEST_ONLY_ASSETS, new_builder};
 use crate::Builder;
@@ -83,13 +83,16 @@ pub fn test_create_team_workflow_pane_from_command_palette() -> Builder {
         )
 }
 
-/// Adds a workflow file, containing two workflows, to a `.rook/workflows`
+/// Adds a workflow file, containing two workflows, to a `.polaris/terminal/workflows`
 /// directory under a git repository and verifies that the workflows appear
 /// in the workflow menu.
 pub fn test_loading_project_workflows() -> Builder {
     new_builder()
         .with_setup(move |utils| {
-            utils.set_env("ROOK_CONFIG_WATCHER_DELAY_MS", Some((10).to_string()));
+            utils.set_env(
+                "POLARIS_TERMINAL_CONFIG_WATCHER_DELAY_MS",
+                Some((10).to_string()),
+            );
         })
         .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
         .with_step(
@@ -100,7 +103,7 @@ pub fn test_loading_project_workflows() -> Builder {
 
                     workflows.read(app, |workflows, _| {
                         // Note that this can be a synchronous assertion because unlike the next assertion,
-                        // we don't have concurrency with a RookConfig watcher thread
+                        // we don't have concurrency with a PtermConfig watcher thread
                         async_assert_eq!(
                             workflows.project_workflows().count(),
                             0,
@@ -124,7 +127,7 @@ pub fn test_loading_project_workflows() -> Builder {
                     "test_workflow.yaml",
                     &utils
                         .test_dir()
-                        .join("repo/.rook/workflows/test_workflow.yaml"),
+                        .join("repo/.polaris/terminal/workflows/test_workflow.yaml"),
                 );
             }),
         )

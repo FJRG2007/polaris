@@ -92,7 +92,7 @@ fn play_button_diameter_scales_with_floor() {
 /// server uses to link a thumbnail back to its video, as a sibling of the video.
 #[test]
 fn thumbnail_path_uses_uid_naming_convention() {
-    let video = PathBuf::from("/tmp/rook-recording-abc.mp4");
+    let video = PathBuf::from("/tmp/polaris-terminal-recording-abc.mp4");
     assert_eq!(
         thumbnail_path(&video, "vid-uid-123"),
         PathBuf::from("/tmp/vid-uid-123-thumb.png")
@@ -104,7 +104,7 @@ fn thumbnail_path_uses_uid_naming_convention() {
 #[tokio::test]
 async fn generate_thumbnail_for_missing_video_errors() {
     let result = generate_video_thumbnail(
-        &PathBuf::from("/nonexistent/rook-recording-missing.mp4"),
+        &PathBuf::from("/nonexistent/polaris-terminal-recording-missing.mp4"),
         DEFAULT_THUMBNAIL_MAX_WIDTH,
         "vid-uid-missing",
     )
@@ -134,7 +134,7 @@ fn solid_frame(width: u32, height: u32, rgb: [u8; 3]) -> RgbaImage {
 #[tokio::test]
 #[ignore]
 async fn generate_thumbnail_for_synthetic_video() {
-    let video = std::env::temp_dir().join("rook-test-recording.mp4");
+    let video = std::env::temp_dir().join("polaris-terminal-test-recording.mp4");
     // 2-second solid-colour video — simple and deterministic.
     let status = tokio::process::Command::new("ffmpeg")
         .args([
@@ -202,7 +202,7 @@ async fn generate_thumbnail_for_synthetic_video() {
 #[tokio::test]
 #[ignore]
 async fn eyetest_thumbnail_glyph_render() {
-    let video = PathBuf::from("/tmp/rook-testsrc.mp4");
+    let video = PathBuf::from("/tmp/polaris-terminal-testsrc.mp4");
     let status = tokio::process::Command::new("ffmpeg")
         .args([
             "-y",
@@ -223,7 +223,7 @@ async fn eyetest_thumbnail_glyph_render() {
         .await
         .expect("thumbnail generation should succeed");
 
-    let eyetest_path = PathBuf::from("/tmp/rook-thumb-eyetest.png");
+    let eyetest_path = PathBuf::from("/tmp/polaris-terminal-thumb-eyetest.png");
     std::fs::copy(&thumb_path, &eyetest_path).expect("copy thumbnail for eye-test");
     let _ = std::fs::remove_file(&thumb_path);
     assert!(eyetest_path.exists(), "eye-test PNG should exist");

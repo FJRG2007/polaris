@@ -5,11 +5,11 @@ Figma: none provided
 
 ## Summary
 
-Add install and update chip support for the Gemini CLI Rook plugin (`gemini-rook`), matching the existing Claude Code chip UX. Enable the listener so Rook processes structured notifications from Gemini sessions (session status, permission requests, task completion).
+Add install and update chip support for the Gemini CLI Polaris Terminal plugin (`gemini-polaris-terminal`), matching the existing Claude Code chip UX. Enable the listener so Polaris Terminal processes structured notifications from Gemini sessions (session status, permission requests, task completion).
 
 ## Problem
 
-The `gemini-rook` extension already exists and uses the same structured OSC 777 notification protocol as Claude Code (`rook://cli-agent` title, JSON body with `agent: "gemini"`). However, Rook currently ignores these notifications because:
+The `gemini-polaris-terminal` extension already exists and uses the same structured OSC 777 notification protocol as Claude Code (`polaris-terminal://cli-agent` title, JSON body with `agent: "gemini"`). However, Polaris Terminal currently ignores these notifications because:
 
 1. `create_handler` in the listener returns `None` for `CLIAgent::Gemini`.
 2. `plugin_manager_for` returns `None` for `CLIAgent::Gemini` — there's no install/update chip.
@@ -24,7 +24,7 @@ The `gemini-rook` extension already exists and uses the same structured OSC 777 
 
 ## Non-Goals
 
-- Changing the gemini-rook plugin itself (it's maintained separately in `warpdotdev/gemini-cli-warp`).
+- Changing the gemini-polaris-terminal plugin itself (it's maintained separately in `warpdotdev/gemini-cli-warp`).
 - Platform plugin / Oz harness support for Gemini (future work).
 
 ## How Gemini CLI Extensions Work
@@ -35,7 +35,7 @@ Gemini CLI has a first-class extension system:
 - **Update**: `gemini extensions update <name>` — pulls the latest version from the source.
 - **Uninstall**: `gemini extensions uninstall <name>`.
 - **Manifest**: Each extension has a `gemini-extension.json` with `name`, `version`, `description`, and hook/MCP/command definitions.
-- **Hooks**: Defined in `hooks/hooks.json` within the extension directory (not in the manifest). The gemini-rook plugin uses `SessionStart`, `AfterAgent`, `Notification`, `BeforeAgent`, and `AfterTool` hooks.
+- **Hooks**: Defined in `hooks/hooks.json` within the extension directory (not in the manifest). The gemini-polaris-terminal plugin uses `SessionStart`, `AfterAgent`, `Notification`, `BeforeAgent`, and `AfterTool` hooks.
 
 Key difference from Claude Code: Gemini extensions install from a GitHub URL directly (no separate marketplace add step). The install and update are each a single CLI command.
 
@@ -54,10 +54,10 @@ When a user starts a Gemini session and the plugin has never connected (no liste
 - On failure, a toast appears with an error, and the user can click the info (ⓘ) button to open manual instructions in a split pane.
 
 **Manual install instructions (split pane):**
-- Title: "Install Rook Plugin for Gemini CLI"
+- Title: "Install Polaris Terminal Plugin for Gemini CLI"
 - Subtitle: "Run the following command, then restart Gemini CLI."
 - Steps:
-  1. "Install the Rook extension" — command: `gemini extensions install https://github.com/warpdotdev/gemini-cli-warp --consent`
+  1. "Install the Polaris Terminal extension" — command: `gemini extensions install https://github.com/warpdotdev/gemini-cli-warp --consent`
 - Post-install notes: "Restart Gemini CLI to activate the plugin."
 
 ### Update Chip
@@ -65,23 +65,23 @@ When a user starts a Gemini session and the plugin has never connected (no liste
 When the plugin is connected but reports a version below `MINIMUM_PLUGIN_VERSION`:
 
 - Label: "Plugin update available"
-- Clicking triggers auto-update via `gemini extensions update gemini-rook`.
-  - The extension name is `gemini-rook` (the installed directory name under `~/.gemini/extensions/`).
+- Clicking triggers auto-update via `gemini extensions update gemini-polaris-terminal`.
+  - The extension name is `gemini-polaris-terminal` (the installed directory name under `~/.gemini/extensions/`).
 - On success, a toast confirms the update and tells the user to restart Gemini.
 - On failure, a toast appears with an error, and the user can click the info (ⓘ) button to open manual instructions in a split pane.
 
 **Manual update instructions (split pane):**
-- Title: "Update Rook Plugin for Gemini CLI"
+- Title: "Update Polaris Terminal Plugin for Gemini CLI"
 - Subtitle: "Run the following command, then restart Gemini CLI."
 - Steps:
-  1. "Update the Rook extension" — command: `gemini extensions update gemini-rook`
+  1. "Update the Polaris Terminal extension" — command: `gemini extensions update gemini-polaris-terminal`
 - Post-install notes: "Restart Gemini CLI to activate the update."
 
 ### Version Detection
 
 Two signals, matching the Claude Code pattern:
 
-1. **Filesystem check**: `~/.gemini/extensions/gemini-rook/gemini-extension.json` — read the `version` field to determine if the plugin is installed and whether it's outdated. Symlinks are followed (supports `gemini extensions link`).
+1. **Filesystem check**: `~/.gemini/extensions/gemini-polaris-terminal/gemini-extension.json` — read the `version` field to determine if the plugin is installed and whether it's outdated. Symlinks are followed (supports `gemini extensions link`).
 2. **Runtime signal**: `plugin_version` field from the `SessionStart` event (emitted by `on-session-start.sh` in the plugin).
 
 The filesystem check eliminates install chip flicker (the chip never appears if the plugin is already on disk) and enables update detection before the plugin connects.
@@ -115,11 +115,11 @@ Same as Claude Code / OpenCode: install chip and update chip have independent di
 
 ## Success Criteria
 
-1. Starting a Gemini CLI session in Rook when the plugin is not installed shows a green install chip.
+1. Starting a Gemini CLI session in Polaris Terminal when the plugin is not installed shows a green install chip.
 2. Clicking the install chip runs `gemini extensions install` and shows a success/failure toast.
 3. After restart, the plugin connects, notifications appear in the inbox, and the chip disappears.
 4. When the plugin reports a version below `MINIMUM_PLUGIN_VERSION`, an update chip appears.
-5. Clicking the update chip runs `gemini extensions update gemini-rook` and shows a success/failure toast.
+5. Clicking the update chip runs `gemini extensions update gemini-polaris-terminal` and shows a success/failure toast.
 6. The info (ⓘ) button opens a split pane with manual instructions (not a modal).
 7. Dismissing the chips works identically to other agents (independent dismiss state, version-tracked update dismiss).
 8. Gemini notifications (stop, blocked, permission request) surface in the agent inbox when HOANotifications is enabled.

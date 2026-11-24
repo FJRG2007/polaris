@@ -1,10 +1,10 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     Border, Container, CrossAxisAlignment, Element, Empty, Fill, Flex, MouseStateHandle,
     ParentElement,
 };
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 
 use crate::ui_components::blended_colors;
 
@@ -32,7 +32,7 @@ pub fn render_tab_selector<F>(
 where
     // The on select function will take in the click event context and the selected label,
     // and will then presumably change the passed in selected label.
-    F: Fn(&str, &mut rookui::EventContext) + 'static + Clone,
+    F: Fn(&str, &mut ptermui::EventContext) + 'static + Clone,
 {
     let mut tabs_row = Flex::row()
         .with_spacing(12.)

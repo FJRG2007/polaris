@@ -48,7 +48,7 @@ fn admin_config_status_flags_only_non_429_4xx() {
 #[test]
 fn mint_identity_token_failure_is_user_retryable() {
     let err = LoadGeapCredentialsError::MintIdentityToken {
-        detail: "rook session expired".to_string(),
+        detail: "polaris-terminal session expired".to_string(),
     };
     assert_eq!(err.recovery_action(), GeapRecoveryAction::Retry);
 }

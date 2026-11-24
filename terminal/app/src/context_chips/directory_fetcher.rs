@@ -1,10 +1,10 @@
 use std::cmp::Ordering;
 
-use rook_completer::completer::{EngineDirEntry, EngineFileType};
-use rook_util::file_type::is_binary_file;
-use rook_util::path::expand_session_home;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{AppContext, Entity, ModelContext};
+use pterm_completer::completer::{EngineDirEntry, EngineFileType};
+use pterm_util::file_type::is_binary_file;
+use pterm_util::path::expand_session_home;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{AppContext, Entity, ModelContext};
 
 use super::display_menu::GenericMenuItem;
 use crate::completer::SessionContext;

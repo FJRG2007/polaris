@@ -218,7 +218,7 @@ struct TapContext {
     is_previous: bool,
     /// The window number this session activated. Only focus events that AppKit addresses to this
     /// exact window are the activation transition we intend to suppress; focus events for any
-    /// other window (including the user clicking a different Rook window) pass through. Both the
+    /// other window (including the user clicking a different Polaris Terminal window) pass through. Both the
     /// previous-process and target-process contexts carry this, but the target context never
     /// suppresses because `is_previous` is false.
     window_number: i64,
@@ -360,7 +360,7 @@ const FIELD_WINDOW_NUMBER_VALID: CGEventField = CGEventField(58);
 /// standard mouse window-under-pointer fields (`91`/`92`) when present; and returns true only
 /// when the event is validly addressed to this session's activated window. Missing, invalid, or
 /// different identities return false so the event passes through — failing open preserves the
-/// user's ability to focus any other window (including other Rook windows) during an active
+/// user's ability to focus any other window (including other Polaris Terminal windows) during an active
 /// background computer-use task.
 ///
 /// Side-effect-free so the callback matrix can be unit-tested with synthetic events.
@@ -404,7 +404,7 @@ fn is_activation_focus_transition(
 /// (see [`is_activation_focus_transition`]); every other event — including focus events for a
 /// different window the user clicked — passes through unchanged. This keeps a background
 /// computer-use target window controllable without raising it, while never trapping the user's
-/// own focus changes to any Rook window.
+/// own focus changes to any Polaris Terminal window.
 unsafe extern "C-unwind" fn tap_callback(
     _proxy: CGEventTapProxy,
     event_type: CGEventType,

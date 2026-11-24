@@ -3,14 +3,14 @@
 #![cfg_attr(feature = "release_bundle", windows_subsystem = "windows")]
 
 use anyhow::Result;
-use rook_core::channel::{Channel, ChannelState};
+use pterm_core::channel::{Channel, ChannelState};
 
-// Simple wrapper around rook::run() for stable channel builds.
+// Simple wrapper around polaris_terminal::run() for stable channel builds.
 fn main() -> Result<()> {
     ChannelState::set(ChannelState::new(
         Channel::Stable,
-        rook_channel_config::load_config!("stable"),
+        pterm_channel_config::load_config!("stable"),
     ));
 
-    rook::run()
+    polaris_terminal::run()
 }

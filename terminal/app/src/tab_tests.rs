@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rookui::platform::keyboard::KeyCode;
+use ptermui::platform::keyboard::KeyCode;
 
 use super::{
     SelectedTabColor, ShortcutModifierKind, TAB_ACTIVATE_BINDING_NAMES,

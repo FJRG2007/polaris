@@ -78,9 +78,9 @@ Claude overrides all four. OpenCode uses the defaults. The defaults return `Err`
 New file. Minimal implementation — just the two required methods plus instructions:
 
 - `can_auto_install()` → `false`
-- `minimum_plugin_version()` → `"0.1.0"` (keep in sync with `opencode-rook` npm package version)
-- `install_instructions()` → static `PluginInstructions` with title "Install Rook Plugin for OpenCode", steps to add `"opencode-rook"` to the `plugin` array in `opencode.json` + restart
-- `update_instructions()` → static `PluginInstructions` with title "Update Rook Plugin for OpenCode", steps to `rm -rf ~/.cache/opencode/node_modules/opencode-rook` + restart
+- `minimum_plugin_version()` → `"0.1.0"` (keep in sync with `opencode-polaris-terminal` npm package version)
+- `install_instructions()` → static `PluginInstructions` with title "Install Polaris Terminal Plugin for OpenCode", steps to add `"opencode-polaris-terminal"` to the `plugin` array in `opencode.json` + restart
+- `update_instructions()` → static `PluginInstructions` with title "Update Polaris Terminal Plugin for OpenCode", steps to `rm -rf ~/.cache/opencode/node_modules/opencode-polaris-terminal` + restart
 
 All auto-operation methods (`is_installed`, `needs_update`, `install`, `update`) use the trait defaults.
 
@@ -136,7 +136,7 @@ For OpenCode, this always returns `true`, so the footer always opens the modal i
 The install chip buttons are created at construction time with hardcoded labels:
 - `install_plugin_button`: "Enable Claude Code notifications" — Claude-specific
 - `plugin_instructions_button`: "Notifications setup instructions"
-- `update_plugin_button`: "Update Rook plugin"
+- `update_plugin_button`: "Update Polaris Terminal plugin"
 - `update_instructions_button`: "Plugin update instructions"
 
 The auto-install button label hardcodes "Claude Code". Make it dynamic using the agent's `display_name()`: format as `"Enable {name} notifications"` where `name` comes from `session.agent.display_name()` (e.g., "Enable Claude Code notifications", "Enable OpenCode notifications"). Since the button is created once at construction, update the label via `set_label` in the render path (or when the session changes), the same way the compose button label is already updated dynamically (`agent_input_footer/mod.rs:374`).
@@ -182,7 +182,7 @@ For Claude (which has `can_auto_install() == true`), this check is skipped — C
 ## 5. End-to-End Flow
 
 ### Install
-1. User starts OpenCode in Rook. Command detection creates a `CLIAgentSession`. The footer's `Started` subscription fires, spawning a debounce timer (`plugin_chip_ready` starts `false`).
+1. User starts OpenCode in Polaris Terminal. Command detection creates a `CLIAgentSession`. The footer's `Started` subscription fires, spawning a debounce timer (`plugin_chip_ready` starts `false`).
 2. Footer renders. `plugin_chip_kind()` finds `plugin_manager_for(OpenCode)` = `Some`. No listener. `can_auto_install()` is `false`. `plugin_chip_ready` is `false` → returns `None`. No chip.
 3. If plugin is installed: `SessionStart` arrives within ~1s, listener is created, `plugin_version` is set, `plugin_chip_ready` reset to `false`. Footer re-renders. Chip never appears.
 4. If plugin is not installed: timer fires after 3s, sets `plugin_chip_ready = true`, calls `ctx.notify()`. `plugin_chip_kind()` returns `Install`. `should_use_manual_mode()` returns `true`. Footer shows the instructions chip.
@@ -195,13 +195,13 @@ For Claude (which has `can_auto_install() == true`), this check is skipped — C
 3. `plugin_chip_kind()`: listener present, `compare_versions("0.1.0", "0.2.0")` is `Less` → `Update`.
 4. `should_use_manual_mode()` returns `true`. Footer shows update instructions chip.
 5. User clicks → modal shows cache-clear + restart steps.
-6. User follows steps. On restart, Bun re-resolves `opencode-rook` from npm (cache was cleared), installs latest. Plugin connects with `"0.2.0"`. Chip disappears.
+6. User follows steps. On restart, Bun re-resolves `opencode-polaris-terminal` from npm (cache was cleared), installs latest. Plugin connects with `"0.2.0"`. Chip disappears.
 
 ## 6. Risks and Mitigations
 **Risk: `PluginInstructionStep.command` contains JSON, not a shell command.**
 **Risk: `PluginInstructionStep.command` contains JSON, not a shell command.** The install modal's copy button copies the `command` field to clipboard. For OpenCode install, this will be a JSON snippet. **Mitigation:** Already fine — the modal copies any string. A JSON snippet is useful to copy even if it's not a terminal command.
 
-**Risk: Stale `MINIMUM_PLUGIN_VERSION`.** The minimum version is compiled into the Rook binary. **Mitigation:** Same as Claude — by design. We only prompt updates when Rook needs new plugin behavior.
+**Risk: Stale `MINIMUM_PLUGIN_VERSION`.** The minimum version is compiled into the Polaris Terminal binary. **Mitigation:** Same as Claude — by design. We only prompt updates when Polaris Terminal needs new plugin behavior.
 
 ## 7. Testing and Validation
 
@@ -235,7 +235,7 @@ For Claude (which has `can_auto_install() == true`), this check is skipped — C
 ## 8. Follow-Ups
 
 - **Auto-install:** If OpenCode adds a plugin management CLI, implement `install()` and `update()` on `OpenCodePluginManager` and flip `can_auto_install()` to `true`.
-- **Publish `opencode-rook` to npm:** Must happen before this feature ships.
+- **Publish `opencode-polaris-terminal` to npm:** Must happen before this feature ships.
 
 ## 9. Files Changed
 

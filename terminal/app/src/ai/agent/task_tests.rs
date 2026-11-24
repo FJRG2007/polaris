@@ -761,11 +761,11 @@ fn test_upsert_message_new_message_requires_current_stream_exchange() {
 }
 
 // =============================================================================
-// Tests for Rook docs subagent classification
+// Tests for Polaris Terminal docs subagent classification
 // =============================================================================
 
 #[test]
-fn test_is_rook_documentation_search_subagent() {
+fn test_is_pterm_documentation_search_subagent() {
     let parent_id = "parent";
     let subtask_id = "subtask";
     let parent_api_task = create_api_task(
@@ -780,6 +780,6 @@ fn test_is_rook_documentation_search_subagent() {
     let subtask_api_task = create_api_subtask(subtask_id, parent_id, vec![]);
     let subtask = Task::new_restored_subtask(subtask_api_task, &parent_api_task, vec![]);
 
-    assert!(subtask.is_rook_documentation_search_subagent());
+    assert!(subtask.is_pterm_documentation_search_subagent());
     assert!(!subtask.is_conversation_search_subagent());
 }

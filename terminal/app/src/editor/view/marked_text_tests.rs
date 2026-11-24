@@ -1,7 +1,7 @@
-use rook_core::features::FeatureFlag;
-use rookui::App;
-use rookui::keymap::Keystroke;
-use rookui::platform::WindowStyle;
+use pterm_core::features::FeatureFlag;
+use ptermui::App;
+use ptermui::keymap::Keystroke;
+use ptermui::platform::WindowStyle;
 use vim::vim::VimMode;
 
 use super::initialize_app;

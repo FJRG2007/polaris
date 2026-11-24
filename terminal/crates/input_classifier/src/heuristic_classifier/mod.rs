@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use async_trait::async_trait;
 use itertools::Itertools as _;
 use natural_language_detection::natural_language_words_score;
-use rook_completer::ParsedTokensSnapshot;
+use pterm_completer::ParsedTokensSnapshot;
 
 use crate::parser::parse_query_into_tokens;
 use crate::util::{
@@ -75,7 +75,7 @@ impl InputClassifier for HeuristicClassifier {
 
     async fn classify_input(
         &self,
-        input: rook_completer::ParsedTokensSnapshot,
+        input: pterm_completer::ParsedTokensSnapshot,
         context: &Context,
     ) -> anyhow::Result<super::ClassificationResult> {
         let word_tokens = parse_query_into_tokens(input.buffer_text.as_str());

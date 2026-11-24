@@ -1,4 +1,4 @@
-use rookui::platform::linux;
+use ptermui::platform::linux;
 use settings::macros::define_settings_group;
 use settings::{SupportedPlatforms, SyncToCloud};
 

@@ -1,21 +1,21 @@
 use chrono::Utc;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rook_server_client::auth::AgentIdentity;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use pterm_server_client::auth::AgentIdentity;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Empty, Expanded, Fill, Flex, FormattedTextElement, HighlightedHyperlink, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, OffsetPositioning, Padding, ParentElement,
     PositionedElementAnchor, PositionedElementOffsetBounds, Radius, SavePosition, Stack, Text,
 };
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::segmented_control::{
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::segmented_control::{
     LabelConfig, RenderableOptionConfig, SegmentedControl,
 };
-use rookui::{
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -49,7 +49,7 @@ impl ApiKeyType {
     fn description(&self) -> &'static str {
         match self {
             ApiKeyType::Personal => {
-                "This API key is tied to your user and can make requests against your Rook account."
+                "This API key is tied to your user and can make requests against your Polaris Terminal account."
             }
             ApiKeyType::Team => {
                 "This API key is tied to your team and can make requests on behalf of your team."
@@ -130,7 +130,7 @@ pub enum CreateApiKeyModalAction {
 pub enum CreateApiKeyModalEvent {
     Close,
     Created {
-        api_key: rook_graphql::queries::api_keys::ApiKeyProperties,
+        api_key: pterm_graphql::queries::api_keys::ApiKeyProperties,
     },
     Error {
         message: String,
@@ -163,7 +163,7 @@ impl CreateApiKeyModal {
                 ..Default::default()
             };
             let mut editor = EditorView::single_line(options, ctx);
-            editor.set_placeholder_text("Rook API Key", ctx);
+            editor.set_placeholder_text("Polaris Terminal API Key", ctx);
             editor
         });
 
@@ -341,7 +341,7 @@ impl CreateApiKeyModal {
         let name = self.name_editor.as_ref(ctx).buffer_text(ctx);
 
         let final_name = if name.trim().is_empty() {
-            "Rook API Key".to_string()
+            "Polaris Terminal API Key".to_string()
         } else {
             name.trim().to_string()
         };
@@ -352,7 +352,7 @@ impl CreateApiKeyModal {
         let expires_at = match self.expiration.days() {
             Some(days) => {
                 let t = Utc::now() + chrono::Duration::days(days);
-                Some(rook_graphql::scalars::Time::from(t))
+                Some(pterm_graphql::scalars::Time::from(t))
             }
             None => None,
         };
@@ -399,20 +399,20 @@ impl CreateApiKeyModal {
             async move { auth_client.create_api_key(final_name, team_id, agent_uid, expires_at).await },
             |me, res, ctx| {
                 match res {
-                    Ok(rook_graphql::mutations::generate_api_key::GenerateApiKeyResult::GenerateApiKeyOutput(output)) => {
+                    Ok(pterm_graphql::mutations::generate_api_key::GenerateApiKeyResult::GenerateApiKeyOutput(output)) => {
                         ctx.emit(CreateApiKeyModalEvent::Created { api_key: output.api_key });
                         me.request_state = RequestState::Succeeded;
                         me.raw_key_copied = false;
                         me.raw_key = Some(output.raw_api_key);
                         ctx.notify();
                     }
-                    Ok(rook_graphql::mutations::generate_api_key::GenerateApiKeyResult::UserFacingError(e)) => {
-                        let msg = rook_graphql::client::get_user_facing_error_message(e);
+                    Ok(pterm_graphql::mutations::generate_api_key::GenerateApiKeyResult::UserFacingError(e)) => {
+                        let msg = pterm_graphql::client::get_user_facing_error_message(e);
                         me.request_state = RequestState::Idle;
                         ctx.emit(CreateApiKeyModalEvent::Error { message: msg });
                         ctx.notify();
                     }
-                    Ok(rook_graphql::mutations::generate_api_key::GenerateApiKeyResult::Unknown) | Err(_) => {
+                    Ok(pterm_graphql::mutations::generate_api_key::GenerateApiKeyResult::Unknown) | Err(_) => {
                         me.request_state = RequestState::Idle;
                         ctx.emit(CreateApiKeyModalEvent::Error { message: "Failed to create API key. Please try again.".to_string() });
                         ctx.notify();
@@ -517,10 +517,10 @@ impl CreateApiKeyModal {
             "Copy"
         };
         let copy_icon = if self.raw_key_copied {
-            rook_core::ui::icons::Icon::Check.to_rookui_icon(appearance.theme().background())
+            pterm_core::ui::icons::Icon::Check.to_ptermui_icon(appearance.theme().background())
         } else {
-            rook_core::ui::icons::Icon::Copy
-                .to_rookui_icon(appearance.theme().active_ui_text_color())
+            pterm_core::ui::icons::Icon::Copy
+                .to_ptermui_icon(appearance.theme().active_ui_text_color())
         };
         let mut copy_button_builder = appearance
             .ui_builder()
@@ -533,8 +533,8 @@ impl CreateApiKeyModal {
                 self.create_button_mouse_state.clone(),
             )
             .with_text_and_icon_label(
-                rookui::ui_components::button::TextAndIcon::new(
-                    rookui::ui_components::button::TextAndIconAlignment::IconFirst,
+                ptermui::ui_components::button::TextAndIcon::new(
+                    ptermui::ui_components::button::TextAndIconAlignment::IconFirst,
                     copy_label,
                     copy_icon,
                     MainAxisSize::Min,
@@ -873,7 +873,7 @@ impl TypedActionView for CreateApiKeyModal {
             CreateApiKeyModalAction::CopyRawKey => {
                 let content = self.raw_key.clone().unwrap_or_default();
                 ctx.clipboard()
-                    .write(rookui::clipboard::ClipboardContent::plain_text(content));
+                    .write(ptermui::clipboard::ClipboardContent::plain_text(content));
                 self.raw_key_copied = true;
                 // Success toast
                 let window_id = ctx.window_id();

@@ -1,11 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
-use rook_cli::WorkerCommand;
-use rook_core::AppId;
-use rook_core::channel::{Channel, ChannelConfig, ChannelState, OzConfig, RookServerConfig};
+use pterm_cli::WorkerCommand;
+use pterm_core::AppId;
+use pterm_core::channel::{Channel, ChannelConfig, ChannelState, OzConfig, PtermServerConfig};
 
 #[derive(Debug, Default, Parser, Clone)]
-#[command(name = "rook-integration")]
+#[command(name = "polaris-terminal-integration")]
 #[clap(args_conflicts_with_subcommands = true)]
 pub struct Args {
     #[command(subcommand)]
@@ -18,15 +18,15 @@ pub fn main() -> Result<()> {
         ChannelConfig {
             app_id: AppId::new(
                 "dev",
-                "rook",
+                "polaris-terminal",
                 if cfg!(target_os = "macos") {
-                    "Rook-Integration"
+                    "PolarisTerminal-Integration"
                 } else {
-                    "RookIntegration"
+                    "PolarisTerminalIntegration"
                 },
             ),
-            logfile_name: "rook_integration.log".into(),
-            server_config: RookServerConfig {
+            logfile_name: "pterm_integration.log".into(),
+            server_config: PtermServerConfig {
                 firebase_auth_api_key: "".into(),
                 // Use an IP in the IANA testing range, with the TCP discard port, to
                 // black-hole server traffic.
@@ -58,17 +58,17 @@ pub fn main() -> Result<()> {
                 // GUI application), do so.  This must occur before init_logging, as the
                 // terminal server sets up its own logger, and attempting to set a second
                 // logger leads to a panic.
-                rook::terminal::local_tty::run_terminal_server(args);
+                polaris_terminal::terminal::local_tty::run_terminal_server(args);
                 return Ok(());
             }
             #[cfg(not(target_family = "wasm"))]
             WorkerCommand::RemoteServerProxy(_) | WorkerCommand::RemoteServerDaemon(_) => {
-                return rook::run();
+                return polaris_terminal::run();
             }
             #[allow(unreachable_patterns)]
             other => panic!("Worker not supported in integration tests: {other:?}"),
         }
     }
 
-    rook::run()
+    polaris_terminal::run()
 }

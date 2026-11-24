@@ -1,4 +1,4 @@
-use rookui::{EntityId, ModelContext, ModelHandle, SingletonEntity};
+use ptermui::{EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::{CLIAgentEvent, CLIAgentSessionsModel};
 use crate::features::FeatureFlag;
@@ -49,7 +49,7 @@ pub fn is_agent_supported(agent: &CLIAgent) -> bool {
             | CLIAgent::OhMyPi
             | CLIAgent::Grok
             | CLIAgent::Muse
-            | CLIAgent::RookTui
+            | CLIAgent::PtermTui
             | CLIAgent::Antigravity
     )
 }
@@ -58,12 +58,12 @@ pub fn is_agent_supported(agent: &CLIAgent) -> bool {
 fn create_handler(agent: &CLIAgent) -> Option<Box<dyn CLIAgentSessionHandler>> {
     match agent {
         // Auggie and Pi are supported via community-maintained plugins
-        // (https://github.com/augmentmoogi/auggie-rook,
+        // (https://github.com/augmentmoogi/auggie-polaris-terminal,
         // https://github.com/badlogic/pi-mono). OhMyPi emits these structured
         // OSC 777 events natively. Droid can be supported by user-configured
         // hooks or future integrations that emit the same events. We don't ship
         // install flows for these agents here — we just listen.
-        // RookTui emits OSC 777 events directly (no external plugin needed).
+        // PtermTui emits OSC 777 events directly (no external plugin needed).
         CLIAgent::Claude
         | CLIAgent::OpenCode
         | CLIAgent::Gemini
@@ -72,7 +72,7 @@ fn create_handler(agent: &CLIAgent) -> Option<Box<dyn CLIAgentSessionHandler>> {
         | CLIAgent::Pi
         | CLIAgent::OhMyPi
         | CLIAgent::Muse
-        | CLIAgent::RookTui
+        | CLIAgent::PtermTui
         | CLIAgent::Antigravity => Some(Box::new(DefaultSessionListener)),
         CLIAgent::Codex | CLIAgent::Grok => {
             Some(Box::new(Osc9FallbackSessionHandler { agent: *agent }))
@@ -168,7 +168,7 @@ pub struct CLIAgentSessionListener {
     inner: Box<dyn CLIAgentSessionHandler>,
 }
 
-impl rookui::Entity for CLIAgentSessionListener {
+impl ptermui::Entity for CLIAgentSessionListener {
     type Event = ();
 }
 

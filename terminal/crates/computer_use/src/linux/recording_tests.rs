@@ -223,7 +223,7 @@ async fn records_window_target_via_native_x11grab_after_raise() {
     );
 
     // Optionally preserve the recording as a visual-evidence artifact when requested.
-    if let Ok(dir) = std::env::var("ROOK_RECORDING_TEST_OUTPUT_DIR") {
+    if let Ok(dir) = std::env::var("POLARIS_TERMINAL_RECORDING_TEST_OUTPUT_DIR") {
         let dest = Path::new(&dir).join("window_target_recording.mp4");
         let _ = std::fs::copy(&output.path, &dest);
     }
@@ -541,7 +541,10 @@ async fn smart_cut_retains_only_selected_frames_in_order() {
         return;
     }
 
-    let dir = std::env::temp_dir().join(format!("rook-cut-test-{}", uuid::Uuid::new_v4()));
+    let dir = std::env::temp_dir().join(format!(
+        "polaris-terminal-cut-test-{}",
+        uuid::Uuid::new_v4()
+    ));
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let source = dir.join("source.mp4");
     write_fixture_source(&source).await;

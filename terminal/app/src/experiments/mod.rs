@@ -1,9 +1,9 @@
-//! A framework for running A/B tests within Rook.
+//! A framework for running A/B tests within Polaris Terminal.
 //!
 //! Before starting, please read the usage guide on Notion. The guide explains
 //! some important constraints that are required for proper use of the framework
 //! that we are not able to assert through automated testing.
-//! https://www.notion.so/rookdev/Experiment-Framework-Guide-88954c36a0c3469ea57b427b58249d5f?pvs=4
+//! https://www.notion.so/polaris-terminal-dev/Experiment-Framework-Guide-88954c36a0c3469ea57b427b58249d5f?pvs=4
 
 mod block_onboarding_layer;
 mod login_layer;
@@ -21,9 +21,9 @@ use dashmap::DashMap;
 pub use improved_palette_search_layer::{IMPROVED_PALETTE_SEARCH_LAYER, ImprovedPaletteSearch};
 use lazy_static::lazy_static;
 pub use login_layer::{AuthFlowInstructions, LOGIN_LAYER};
-use rook_core::user_preferences::GetUserPreferences as _;
-use rook_errors::report_error;
-use rookui::{AppContext, SingletonEntity};
+use pterm_core::user_preferences::GetUserPreferences as _;
+use pterm_errors::report_error;
+use ptermui::{AppContext, SingletonEntity};
 
 use crate::auth::auth_state::AuthStateProvider;
 use crate::channel::{Channel, ChannelState};
@@ -352,7 +352,7 @@ pub trait Experiment<T: Experiment<T>>: FromStr {
 
             #[cfg(feature = "crash_reporting")]
             {
-                let tag_name = format!("rook.experiments.{}", Self::name());
+                let tag_name = format!("polaris-terminal.experiments.{}", Self::name());
                 crate::crash_reporting::set_tag(&tag_name, group.variant());
             }
         }

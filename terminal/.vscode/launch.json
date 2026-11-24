@@ -14,11 +14,11 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'rook'",
+      "name": "Debug executable 'polaris-terminal'",
       "cargo": {
-        "args": ["build", "--bin=rook"],
+        "args": ["build", "--bin=polaris-terminal-local"],
         "filter": {
-          "name": "rook",
+          "name": "polaris-terminal",
           "kind": "bin"
         }
       },
@@ -30,8 +30,8 @@
       "type": "lldb",
       "request": "launch",
       "name": "Debug MacOS executable",
-      "preLaunchTask": "build_rooklocal",
-      "program": "${workspaceFolder}/target/debug/bundle/osx/RookLocal.app/Contents/MacOS/rook",
+      "preLaunchTask": "build_ptermlocal",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/PolarisTerminalLocal.app/Contents/MacOS/polaris-terminal",
       "args": [],
       "cwd": "${workspaceFolder}",
       "sourceLanguages": ["rust"]
@@ -39,11 +39,11 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'rook' with fast_dev",
+      "name": "Debug executable 'polaris-terminal' with fast_dev",
       "cargo": {
-        "args": ["build", "--bin=rook", "--features=fast_dev"],
+        "args": ["build", "--bin=polaris-terminal-local", "--features=fast_dev"],
         "filter": {
-          "name": "rook",
+          "name": "polaris-terminal",
           "kind": "bin"
         }
       },
@@ -54,11 +54,11 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'rook' with with_local_server",
+      "name": "Debug executable 'polaris-terminal' with with_local_server",
       "cargo": {
-        "args": ["build", "--bin=rook", "--features=with_local_server"],
+        "args": ["build", "--bin=polaris-terminal-local", "--features=with_local_server"],
         "filter": {
-          "name": "rook",
+          "name": "polaris-terminal",
           "kind": "bin"
         }
       },
@@ -70,8 +70,8 @@
       "type": "lldb",
       "request": "launch",
       "name": "Debug MacOS executable local session sharing server",
-      "preLaunchTask": "build_rooklocal_localsessionsharing",
-      "program": "${workspaceFolder}/target/debug/bundle/osx/RookLocal.app/Contents/MacOS/rook",
+      "preLaunchTask": "build_ptermlocal_localsessionsharing",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/PolarisTerminalLocal.app/Contents/MacOS/polaris-terminal",
       "args": [],
       "cwd": "${workspaceFolder}",
       "sourceLanguages": ["rust"]
@@ -83,8 +83,8 @@
       "env": {
         "RUST_BACKTRACE": "1"
       },
-      "preLaunchTask": "build_rooklocal_fastdev",
-      "program": "${workspaceFolder}/target/debug/bundle/osx/RookLocal.app/Contents/MacOS/rook",
+      "preLaunchTask": "build_ptermlocal_fastdev",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/PolarisTerminalLocal.app/Contents/MacOS/polaris-terminal",
       "args": [],
       "cwd": "${workspaceFolder}",
       "sourceLanguages": ["rust"]
@@ -93,8 +93,8 @@
       "type": "lldb",
       "request": "launch",
       "name": "Debug MacOS executable with fast_dev + local session sharing server",
-      "preLaunchTask": "build_rooklocal_fastdev_localsessionsharing",
-      "program": "${workspaceFolder}/target/debug/bundle/osx/RookLocal.app/Contents/MacOS/rook",
+      "preLaunchTask": "build_ptermlocal_fastdev_localsessionsharing",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/PolarisTerminalLocal.app/Contents/MacOS/polaris-terminal",
       "args": [],
       "cwd": "${workspaceFolder}",
       "sourceLanguages": ["rust"]
@@ -102,11 +102,11 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in executable 'rook'",
+      "name": "Debug unit tests in executable 'polaris-terminal'",
       "cargo": {
-        "args": ["test", "--no-run", "--bin=rook", "--package=rook"],
+        "args": ["test", "--no-run", "--bin=polaris-terminal-local", "--package=polaris-terminal"],
         "filter": {
-          "name": "rook",
+          "name": "polaris-terminal",
           "kind": "bin"
         }
       },
@@ -119,9 +119,9 @@
       "request": "launch",
       "name": "Debug integration tests in executable 'integration'",
       "cargo": {
-        "args": ["build", "--bin=integration", "--package=rook"],
+        "args": ["build", "--bin=integration", "--package=polaris-terminal"],
         "env": {
-          "ROOKUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS": "1"
+          "PTERMUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS": "1"
         },
         "filter": {
           "name": "integration",
@@ -135,11 +135,11 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'rookui'",
+      "name": "Debug unit tests in library 'ptermui'",
       "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=rookui"],
+        "args": ["test", "--no-run", "--lib", "--package=ptermui"],
         "filter": {
-          "name": "rookui",
+          "name": "ptermui",
           "kind": "lib"
         }
       },

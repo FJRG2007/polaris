@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use instant::Instant;
-use rook_completer::completer::{CommandExitStatus, EngineDirEntry};
-use rookui::r#async::FutureExt as AsyncFutureExt;
+use pterm_completer::completer::{CommandExitStatus, EngineDirEntry};
+use ptermui::r#async::FutureExt as AsyncFutureExt;
 use typed_path::TypedPath;
 
 use crate::completer::SessionContext;

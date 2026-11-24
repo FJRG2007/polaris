@@ -3,10 +3,10 @@ use std::path::PathBuf;
 
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_util::path::LineAndColumnArg;
-use rookui::elements::{Align, ConstrainedBox, Container, Flex, Icon, ParentElement, Text};
-use rookui::fonts::{Properties, Weight};
-use rookui::{AppContext, Element, SingletonEntity};
+use pterm_util::path::LineAndColumnArg;
+use ptermui::elements::{Align, ConstrainedBox, Container, Flex, Icon, ParentElement, Text};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::search::command_palette::mixer::CommandPaletteItemAction;

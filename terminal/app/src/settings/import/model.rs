@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use rook_core::features::FeatureFlag;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 use serde::Serialize;
 use strum::IntoEnumIterator;
 use strum_macros::{EnumDiscriminants, EnumIter};
@@ -48,7 +48,7 @@ impl ImportedConfigModel {
         use strum::IntoEnumIterator;
         self.started = true;
 
-        let loaded_system_fonts = rookui::fonts::Cache::handle(ctx)
+        let loaded_system_fonts = ptermui::fonts::Cache::handle(ctx)
             .update(ctx, |font_cache, ctx| font_cache.all_system_fonts(ctx));
         ctx.spawn(loaded_system_fonts, |_, fonts, ctx| {
             let fonts = fonts

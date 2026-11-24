@@ -1,7 +1,7 @@
 {
-  "name": "@rook-dot-dev/opencode-rook",
+  "name": "@polaris-terminal-dot-dev/opencode-polaris-terminal",
   "version": "0.1.7",
-  "description": "Rook terminal integration for OpenCode — native notifications and more",
+  "description": "Polaris Terminal terminal integration for OpenCode — native notifications and more",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -17,11 +17,11 @@
   "keywords": [
     "opencode",
     "opencode-plugin",
-    "rook",
+    "polaris-terminal",
     "terminal",
     "notifications"
   ],
-  "author": "Rook (https://rook.dev)",
+  "author": "Polaris Terminal (https://rook.dev)",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/warpdotdev/opencode-warp",

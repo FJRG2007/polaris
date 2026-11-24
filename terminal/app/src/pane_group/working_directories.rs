@@ -8,18 +8,18 @@ use std::path::PathBuf;
 
 #[cfg(feature = "local_fs")]
 use indexmap::IndexSet;
+use pterm_core::SessionId;
+#[cfg(feature = "local_fs")]
+use pterm_errors::report_error;
+#[cfg(feature = "local_fs")]
+use pterm_util::remote_path::RemotePath;
+#[cfg(feature = "local_fs")]
+use ptermui::{AppContext, SingletonEntity as _};
+use ptermui::{Entity, EntityId, ModelContext, ModelHandle, ViewHandle};
 #[cfg(feature = "local_fs")]
 use remote_server::manager::RemoteServerManager;
 #[cfg(feature = "local_fs")]
 use repo_metadata::repositories::DetectedRepositories;
-use rook_core::SessionId;
-#[cfg(feature = "local_fs")]
-use rook_errors::report_error;
-#[cfg(feature = "local_fs")]
-use rook_util::remote_path::RemotePath;
-#[cfg(feature = "local_fs")]
-use rookui::{AppContext, SingletonEntity as _};
-use rookui::{Entity, EntityId, ModelContext, ModelHandle, ViewHandle};
 
 use crate::code::buffer_location::LocalOrRemotePath;
 #[cfg(feature = "local_fs")]

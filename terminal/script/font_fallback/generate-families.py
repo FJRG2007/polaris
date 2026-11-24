@@ -1,14 +1,14 @@
 '''
 Generates the `ExternalFontFamily` definitions used in `app/src/font_fallback.rs`.
-These definitions contain the URLs to each external fallback font we use in Rook.
+These definitions contain the URLs to each external fallback font we use in Polaris Terminal.
 Generated code is sent to stdout.
 
 This script will read our cloud storage bucket to retrieve the names of the fonts
 we support, and generate the code required to initialize static references for
 each font family.
 
-Assumes that the fallback fonts in the prod `rook-static-assets` bucket are
-identical to the ones stored in the staging `rook-server-staging-static-assets`
+Assumes that the fallback fonts in the prod `polaris-terminal-static-assets` bucket are
+identical to the ones stored in the staging `polaris-terminal-server-staging-static-assets`
 bucket.
 
 Usage:
@@ -23,14 +23,14 @@ from collections import defaultdict
 
 
 def list_fonts():
-    command = "gcloud storage ls --recursive 'gs://rook-static-assets/fallback-fonts/**.ttf'"
+    command = "gcloud storage ls --recursive 'gs://polaris-terminal-static-assets/fallback-fonts/**.ttf'"
     return subprocess.check_output(command, shell=True, text=True).splitlines()
 
 
 def generate_families(font_uris):
     family_map = defaultdict(list)
     for uri in font_uris:
-        parts = uri.removeprefix("gs://rook-static-assets/fallback-fonts/").split('/')
+        parts = uri.removeprefix("gs://polaris-terminal-static-assets/fallback-fonts/").split('/')
         family_name = parts[0]
         font_name = parts[1]
         family_map[family_name].append(font_name)

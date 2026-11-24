@@ -1,14 +1,14 @@
 //! Renders the AI block "header", which includes a version of the AI "prompt" as it was rendered
 //! when the query was submitted.
-use rook_core::features::FeatureFlag;
-use rook_util::path::user_friendly_path;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_util::path::user_friendly_path;
+use ptermui::elements::{
     ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable,
     Icon as ElementIcon, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius,
     SavePosition, Text,
 };
-use rookui::platform::Cursor;
-use rookui::{AppContext, Element, EntityId, SingletonEntity, ViewHandle};
+use ptermui::platform::Cursor;
+use ptermui::{AppContext, Element, EntityId, SingletonEntity, ViewHandle};
 
 use crate::ai::agent::AIAgentExchangeId;
 use crate::ai::agent::conversation::AIConversationId;
@@ -18,7 +18,7 @@ use crate::ai::blocklist::{
 };
 use crate::appearance::Appearance;
 use crate::terminal::block_list_element::render_hoverable_block_button;
-use crate::terminal::view::{ROOK_PROMPT_HEIGHT_LINES, TerminalAction};
+use crate::terminal::view::{POLARIS_TERMINAL_PROMPT_HEIGHT_LINES, TerminalAction};
 use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
 use crate::view_components::action_button::ActionButton;
@@ -158,7 +158,7 @@ fn render_attached_context_chip(
                         Container::new(
                             ConstrainedBox::new(
                                 Icon::Paperclip
-                                    .to_rookui_icon(block_count_color.into())
+                                    .to_ptermui_icon(block_count_color.into())
                                     .finish(),
                             )
                             .with_height(font_size)
@@ -251,7 +251,7 @@ pub(super) fn render_overflow_menu_button(
 
 /// Returns the font size to be used to render text in the AI block "prompt" line.
 ///
-/// This matches the font size used for the rook prompt in completed command blocks.
+/// This matches the font size used for the polaris-terminal prompt in completed command blocks.
 fn prompt_font_size(appearance: &Appearance) -> f32 {
-    appearance.monospace_font_size() * ROOK_PROMPT_HEIGHT_LINES
+    appearance.monospace_font_size() * POLARIS_TERMINAL_PROMPT_HEIGHT_LINES
 }

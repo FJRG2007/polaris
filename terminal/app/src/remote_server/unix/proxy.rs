@@ -45,7 +45,7 @@ fn daemon_dir(identity_key: &str) -> PathBuf {
 /// from previous daemon versions.
 ///
 /// Old daemons are **not** killed — they may still be serving active
-/// connections from an older Rook client. Removing their socket file
+/// connections from an older Polaris Terminal client. Removing their socket file
 /// prevents new proxies from accidentally connecting to them, and the
 /// daemon's built-in grace timer (10 min with no connections) will shut
 /// it down naturally after the last client disconnects.
@@ -266,7 +266,7 @@ fn flock_wait(fd: std::os::unix::io::RawFd, operation: libc::c_int) -> anyhow::R
 /// stdin/stdout and the socket.
 ///
 /// The proxy is protocol-agnostic — it forwards raw bytes without parsing the
-/// length-prefixed framing.  The framing is handled at the endpoints (Rook
+/// length-prefixed framing.  The framing is handled at the endpoints (Polaris Terminal
 /// client and daemon).
 ///
 /// **Important**: the stdout direction uses a manual read→write→flush loop

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use hashbrown::HashMap;
 use indexmap::IndexMap;
-use rook_util::hashed::Hashed;
+use pterm_util::hashed::Hashed;
 use warp_multi_agent_api as api;
 
 use super::task::helper::{MessageExt, ToolCallExt};

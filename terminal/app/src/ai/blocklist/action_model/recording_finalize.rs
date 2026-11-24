@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use ai::agent::action_result::{RecordingStopped, StopRecordingResult};
 use futures::channel::oneshot;
-use rookui::r#async::Timer;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use ptermui::r#async::Timer;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 pub(crate) use super::recording_controller::FinalizeReason;
 use super::recording_controller::{

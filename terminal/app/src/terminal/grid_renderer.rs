@@ -9,19 +9,19 @@ use std::ops::{Range, RangeInclusive};
 
 use lazy_static::lazy_static;
 use num_traits::Float as _;
-use rook_core::features::FeatureFlag;
-use rook_errors::{ReportErrorLogMode, report_error};
-use rookui::assets::asset_cache::{AssetCache, AssetSource, AssetState};
-use rookui::color::ColorU;
-use rookui::elements::{Border, CornerRadius, DEFAULT_UI_LINE_HEIGHT_RATIO, Fill, Radius};
-use rookui::fonts::{FamilyId, FontId, Properties, Style, Weight};
-use rookui::geometry::rect::RectF;
-use rookui::geometry::vector::{Vector2F, vec2f};
-use rookui::image_cache::{AnimatedImageBehavior, CacheOption, FitType, Image, ImageCache};
-use rookui::platform::LineStyle;
-use rookui::text_layout::{DEFAULT_TOP_BOTTOM_RATIO, Line, StyleAndFont, TextStyle};
-use rookui::units::{IntoLines as _, Lines, Pixels};
-use rookui::{AppContext, Element, EntityId, PaintContext, Scene, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_errors::{ReportErrorLogMode, report_error};
+use ptermui::assets::asset_cache::{AssetCache, AssetSource, AssetState};
+use ptermui::color::ColorU;
+use ptermui::elements::{Border, CornerRadius, DEFAULT_UI_LINE_HEIGHT_RATIO, Fill, Radius};
+use ptermui::fonts::{FamilyId, FontId, Properties, Style, Weight};
+use ptermui::geometry::rect::RectF;
+use ptermui::geometry::vector::{Vector2F, vec2f};
+use ptermui::image_cache::{AnimatedImageBehavior, CacheOption, FitType, Image, ImageCache};
+use ptermui::platform::LineStyle;
+use ptermui::text_layout::{DEFAULT_TOP_BOTTOM_RATIO, Line, StyleAndFont, TextStyle};
+use ptermui::units::{IntoLines as _, Lines, Pixels};
+use ptermui::{AppContext, Element, EntityId, PaintContext, Scene, SingletonEntity};
 use unicode_width::UnicodeWidthChar;
 
 pub use self::cell_glyph_cache::CellGlyphCache;
@@ -42,7 +42,7 @@ use crate::terminal::model::index::Point;
 use crate::terminal::model::selection::SelectionPoint;
 use crate::terminal::model::{ObfuscateSecrets, SecretHandle};
 use crate::terminal::{SizeInfo, color};
-use crate::themes::theme::RookTheme;
+use crate::themes::theme::PtermTheme;
 use crate::util::color::{ContrastingColor, MinimumAllowedContrast};
 
 // The scale factor of the cursor relative to the cursor width.
@@ -291,7 +291,7 @@ pub fn render_grid<'a>(
     end_row: usize,
     colors: &color::List,
     override_colors: &color::OverrideList,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     default_font_properties: Properties,
     font_family: FamilyId,
     font_size: f32,
@@ -471,7 +471,7 @@ fn render_grid_without_ligatures<'a>(
     used_displayed_output_rows: bool,
     colors: &color::List,
     override_colors: &color::OverrideList,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     default_font_properties: Properties,
     font_family: FamilyId,
     font_size: f32,
@@ -591,7 +591,7 @@ fn render_grid_without_ligatures<'a>(
         }
 
         if !foreground_image_ids.is_empty() {
-            ctx.scene.start_layer(rookui::ClipBounds::ActiveLayer);
+            ctx.scene.start_layer(ptermui::ClipBounds::ActiveLayer);
             for image_placement in foreground_image_ids {
                 if let Some((image_metadata, image_placement_data)) = image_metadata
                     .get(&image_placement.image_id)
@@ -645,7 +645,7 @@ fn render_grid_without_ligatures<'a>(
 
             // Skip the cursor cell when CLI agent rich input is open
             // AND the agent draws its own cursor (SHOW_CURSOR is off).
-            // When Rook draws the cursor (SHOW_CURSOR on), we keep the cell
+            // When Polaris Terminal draws the cursor (SHOW_CURSOR on), we keep the cell
             // and only suppress the draw_cursor call.
             if hide_cursor_cell
                 && visible_cursor_shape.is_none()
@@ -985,7 +985,7 @@ fn render_grid_with_ligatures<'a>(
     used_displayed_output_rows: bool,
     colors: &color::List,
     override_colors: &color::OverrideList,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     default_font_properties: Properties,
     font_family: FamilyId,
     font_size: f32,
@@ -1100,7 +1100,7 @@ fn render_grid_with_ligatures<'a>(
         }
 
         if !foreground_image_ids.is_empty() {
-            ctx.scene.start_layer(rookui::ClipBounds::ActiveLayer);
+            ctx.scene.start_layer(ptermui::ClipBounds::ActiveLayer);
             for image_placement in foreground_image_ids {
                 if let Some((image_metadata, image_placement_data)) = image_metadata
                     .get(&image_placement.image_id)
@@ -1188,7 +1188,7 @@ fn render_grid_with_ligatures<'a>(
 
             // Skip the cursor cell when CLI agent rich input is open
             // AND the agent draws its own cursor (SHOW_CURSOR is off).
-            // When Rook draws the cursor (SHOW_CURSOR on), we keep the cell
+            // When Polaris Terminal draws the cursor (SHOW_CURSOR on), we keep the cell
             // and only suppress the draw_cursor call.
             if hide_cursor_cell
                 && visible_cursor_shape.is_none()

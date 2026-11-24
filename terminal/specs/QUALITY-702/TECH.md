@@ -63,7 +63,7 @@ The picker's trigger label is computed directly from `AuthSecretSelection`:
 - `Unset` with a create-new-capable harness → "+ New API key…".
 - `Unset` otherwise → "Inherit key from environment".
 
-The label always uses the dropdown's default text color. A previous iteration tried to override the trigger color to dim the placeholder; that was removed because the override path re-entered the dropdown's view while still inside the dropdown's own dispatched action and tripped rookui's "Circular view update" guard.
+The label always uses the dropdown's default text color. A previous iteration tried to override the trigger color to dim the placeholder; that was removed because the override path re-entered the dropdown's view while still inside the dropdown's own dispatched action and tripped ptermui's "Circular view update" guard.
 
 ## 5. Action trait and handler wiring
 
@@ -128,14 +128,14 @@ Cloud-mode UX is preserved by `input.rs` subscribing to these events and perform
 
 Two cloud-mode behaviors are mirrored on the orchestration cards:
 
-- **Default-selection logic.** `resolve_default_auth_secret_for_harness` only promotes a persisted `last_selected_auth_secret` value; it does not fall back to "first loaded secret". This matches both rook-server's webapp (`HarnessAuthSecretSelector` + `use-agent-form-state.ts`) and cloud-mode's `auth_secret_selector.rs::maybe_restore_auth_secret_from_settings`. Without an explicit choice, the picker stays on `+ New API key…` (or Inherit on harnesses with no managed types).
+- **Default-selection logic.** `resolve_default_auth_secret_for_harness` only promotes a persisted `last_selected_auth_secret` value; it does not fall back to "first loaded secret". This matches both polaris-terminal-server's webapp (`HarnessAuthSecretSelector` + `use-agent-form-state.ts`) and cloud-mode's `auth_secret_selector.rs::maybe_restore_auth_secret_from_settings`. Without an explicit choice, the picker stays on `+ New API key…` (or Inherit on harnesses with no managed types).
 - **Persistence shape.** Selecting a managed key on either card writes to the same `CloudAgentSettings.last_selected_auth_secret` map keyed by `harness.config_name()` that cloud mode reads on its next launch. Selecting Inherit clears that key; switching to `Unset` (via `+ New API key…`) also clears it so cancelling the modal does not leave a stale name persisted.
 
 ## 11. Validation
 
 ### Automated
 
-- `cargo check -p rook`
+- `cargo check -p polaris-terminal`
 - `cargo fmt`
 - `cargo clippy --workspace --all-targets --all-features --tests -- -D warnings`
 

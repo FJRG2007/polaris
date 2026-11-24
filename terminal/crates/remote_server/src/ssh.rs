@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use command::r#async::Command;
-use rookui_core::r#async::FutureExt as _;
+use ptermui_core::r#async::FutureExt as _;
 
 use crate::transport::ControlPath;
 
@@ -54,19 +54,19 @@ pub fn ssh_args(socket_path: &Path) -> Vec<String> {
 /// without waiting for multiplexed channels to finish draining.
 ///
 /// The user's interactive ssh is spawned with `-o ControlMaster=yes` by
-/// `rook_ssh_helper`, so it is both the interactive session and the
+/// `pterm_ssh_helper`, so it is both the interactive session and the
 /// multiplex master. When the user's remote shell exits, that ssh can
 /// hang waiting for half-closed slave channels (e.g. from
 /// `ssh ... remote-server-proxy`) to finish cleanup on the remote
 /// side. Sending `-O exit` bypasses that wait.
 ///
-/// Only [`ControlPath::RookManaged`] masters are acted on: a
+/// Only [`ControlPath::PtermManaged`] masters are acted on: a
 /// [`ControlPath::UserOwned`] master (the SSH wrapper attached to a
 /// master the user already had running) is left untouched, and
 /// [`ControlPath::None`] is a no-op.
 ///
 /// **Only safe to call once the user's shell has already exited** --
-/// for Rook-managed masters this tears down the interactive ssh
+/// for Polaris Terminal-managed masters this tears down the interactive ssh
 /// outright. In practice it is invoked from the `ExitShell` teardown
 /// path on the client.
 ///
@@ -74,7 +74,7 @@ pub fn ssh_args(socket_path: &Path) -> Vec<String> {
 /// time there is nothing useful to do with them.
 pub async fn stop_control_master(control_path: &ControlPath) {
     let socket_path = match control_path {
-        ControlPath::RookManaged(socket_path) => socket_path,
+        ControlPath::PtermManaged(socket_path) => socket_path,
         ControlPath::UserOwned(socket_path) => {
             log::info!(
                 "stop_control_master: leaving user-owned ControlMaster at {} running",

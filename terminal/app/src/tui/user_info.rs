@@ -2,8 +2,8 @@
 //!
 //! Mirrors [`crate::tui::TuiMcpManager`]: one app-side singleton model that
 //! joins data scattered across auth/workspace singletons into a single plain
-//! snapshot the headless `rook_tui` front-end can read without depending on
-//! `rook_server_auth` or the workspace client directly. Both the `/status`
+//! snapshot the headless `pterm_tui` front-end can read without depending on
+//! `pterm_server_auth` or the workspace client directly. Both the `/status`
 //! inline menu and the zero-state login line read it.
 //!
 //! The snapshot is computed live from [`AuthStateProvider`] and
@@ -11,7 +11,7 @@
 //! only drive `Updated` events so observers re-render when auth or workspace
 //! metadata changes.
 
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::auth::AuthStateProvider;
 use crate::auth::auth_manager::AuthManager;
@@ -39,7 +39,7 @@ pub enum TuiUserInfoManagerEvent {
     Updated,
 }
 
-/// Singleton model exposing [`TuiUserInfoSnapshot`] to the `rook_tui` front-end.
+/// Singleton model exposing [`TuiUserInfoSnapshot`] to the `pterm_tui` front-end.
 ///
 /// It subscribes to [`AuthManager`] and [`UserWorkspaces`] so it emits an event
 /// whenever the underlying auth or workspace state changes; the snapshot

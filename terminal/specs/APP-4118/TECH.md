@@ -2,7 +2,7 @@
 Product spec: `specs/APP-4118/PRODUCT.md`
 Parent: APP-3918 (git operations button)
 ## Context
-APP-3918 landed the git-operations split button and wired three dialogs (Commit, Push, Create PR) plus two chains (`CommitAndPush`, `CommitAndCreatePr`). Every AI-backed path in those flows is gated only on `FeatureFlag::GitOperationsInCodeReview`; none of them respect `AISettings::is_any_ai_enabled` or enterprise status. This spec mirrors the `share_block_modal.rs::should_send_title_gen_request` pattern: a dedicated per-feature AI setting, plus a shared `should_send_git_ops_ai_request` helper that folds the feature flag, the per-feature AI toggle, and an enterprise check (with Rook-plan exception and dogfood override) together and routes every AI call site in the git-operations flow through it.
+APP-3918 landed the git-operations split button and wired three dialogs (Commit, Push, Create PR) plus two chains (`CommitAndPush`, `CommitAndCreatePr`). Every AI-backed path in those flows is gated only on `FeatureFlag::GitOperationsInCodeReview`; none of them respect `AISettings::is_any_ai_enabled` or enterprise status. This spec mirrors the `share_block_modal.rs::should_send_title_gen_request` pattern: a dedicated per-feature AI setting, plus a shared `should_send_git_ops_ai_request` helper that folds the feature flag, the per-feature AI toggle, and an enterprise check (with Polaris Terminal-plan exception and dogfood override) together and routes every AI call site in the git-operations flow through it.
 ### Relevant code
 - `app/src/code_review/git_dialog/commit.rs:116-120` — chooses `GENERATING_PLACEHOLDER_TEXT` vs `FALLBACK_PLACEHOLDER_TEXT` based on the feature flag only.
 - `app/src/code_review/git_dialog/commit.rs:209-222` — kicks off `generate_commit_message` on dialog open when there are changes.
@@ -13,8 +13,8 @@ APP-3918 landed the git-operations split button and wired three dialogs (Commit,
 - `app/src/settings/ai.rs:1468-1477` — `AISettings::is_any_ai_enabled` (already folds in auth + remote-session org policy).
 - `app/src/settings/ai.rs:815-823` — `shared_block_title_generation_enabled_internal` setting, shape we are copying for the new `git_operations_autogen_enabled_internal`.
 - `app/src/settings/ai.rs:1536-1538` — `is_shared_block_title_generation_enabled` getter, shape we are copying for the new `is_git_operations_autogen_enabled`.
-- `app/src/terminal/share_block_modal.rs:1161-1174` — `should_send_title_gen_request`, the AI-title-gen gate we are mirroring (`is_active_ai_enabled` via per-feature getter, enterprise check with Rook-plan exception, dogfood override).
-- `app/src/workspaces/workspace.rs:562` — `BillingMetadata::is_rook_plan()` accessor used by the Rook-plan exception.
+- `app/src/terminal/share_block_modal.rs:1161-1174` — `should_send_title_gen_request`, the AI-title-gen gate we are mirroring (`is_active_ai_enabled` via per-feature getter, enterprise check with Polaris Terminal-plan exception, dogfood override).
+- `app/src/workspaces/workspace.rs:562` — `BillingMetadata::is_pterm_plan()` accessor used by the Polaris Terminal-plan exception.
 - `app/src/workspaces/user_workspaces.rs` — `UserWorkspaces`, `current_team` accessor.
 - `crates/graphql/src/api/workspace.rs` — `CustomerType` enum definition (reached via `billing_metadata`).
 ## Current state
@@ -50,16 +50,16 @@ fn should_send_git_ops_ai_request(app: &AppContext) -> bool {
         && (!UserWorkspaces::as_ref(app)
             .current_team()
             .is_some_and(|team| team.billing_metadata.customer_type == CustomerType::Enterprise)
-            // Allow the Rook Stable team to use this.
+            // Allow the Polaris Terminal Stable team to use this.
             || UserWorkspaces::as_ref(app)
                 .current_team()
-                .is_some_and(|team| team.billing_metadata.is_rook_plan())
+                .is_some_and(|team| team.billing_metadata.is_pterm_plan())
             // Override the enterprise check for dogfood builds, as our dogfood team
             // is an enterprise team.
             || ChannelState::channel().is_dogfood())
 }
 ```
-Shared helper (vs inlining like `share_block_modal.rs`) because we call it from both `commit::new_state` and `pr::new_state`, and keeping the enterprise / Rook-plan / dogfood details out of `commit.rs` and `pr.rs` avoids pulling billing + channel imports into those files.
+Shared helper (vs inlining like `share_block_modal.rs`) because we call it from both `commit::new_state` and `pr::new_state`, and keeping the enterprise / Polaris Terminal-plan / dogfood details out of `commit.rs` and `pr.rs` avoids pulling billing + channel imports into those files.
 ### 2a. Gate evaluation
 `should_send_git_ops_ai_request` is called directly at each decision point rather than snapshotted onto dialog state. In `commit::new_state` it is called once to set the initial placeholder and decide whether to kick off open-time autogen. In `commit::start_confirm` and `pr::start_confirm` it is called again at confirm time to decide whether to materialize a `code_review_ai` handle. This is consistent with how the sibling `should_send_title_gen_request` is used.
 ### 3. Gate `commit.rs` open-time autogen
@@ -86,11 +86,11 @@ CommitIntent::CommitAndCreatePr => {
 ```
 ### 6. Imports
 The helper in `git_dialog/mod.rs` needs:
-- `rook_core::features::FeatureFlag`
+- `pterm_core::features::FeatureFlag`
 - `crate::settings::AISettings`
 - `crate::workspaces::user_workspaces::UserWorkspaces`
 - `CustomerType` (match the path used by `share_block_modal.rs:32`)
-- `rook_core::channel::ChannelState` (match the path used by `share_block_modal.rs`)
+- `pterm_core::channel::ChannelState` (match the path used by `share_block_modal.rs`)
 `commit.rs` and `pr.rs` each import `should_send_git_ops_ai_request` from `super`. `commit::new_state` calls it to set the initial placeholder; `commit::start_confirm` and `pr::start_confirm` each call it again at confirm time.
 ## Testing and validation
 No unit tests are added for this change. Validation is manual; maps to Behavior invariants 2, 4–9, 12–14:
@@ -105,10 +105,10 @@ No unit tests are added for this change. Validation is manual; maps to Behavior 
 The existing log line `"Failed to autogenerate commit message"` at `commit.rs:310` is a useful canary: it must not fire in AI-off/enterprise runs of the manual validation (because no request is attempted). Invariant 10 depends on this.
 ## Risks and mitigations
 - **Drift between commit-message autogen and PR-creation gate decisions**: each call to `should_send_git_ops_ai_request` evaluates the same predicate, so open-time autogen (evaluated in `new_state`) and confirm-time PR creation (evaluated in `start_confirm`) both reflect the current AI state at the time they run. Invariant 14a (gate evaluated at dialog-open) holds for the initial placeholder/autogen decision; confirm re-evaluates but in practice the user cannot change AI state between open and confirm in normal usage.
-- **Enterprise detection via `current_team()` returns `None`**: if a signed-in user has no current team, `is_some_and` yields `false` for both the enterprise branch and the Rook-plan branch. The enterprise-guard's outer negation means no-team users pass the gate — same behavior as `should_send_title_gen_request`.
+- **Enterprise detection via `current_team()` returns `None`**: if a signed-in user has no current team, `is_some_and` yields `false` for both the enterprise branch and the Polaris Terminal-plan branch. The enterprise-guard's outer negation means no-team users pass the gate — same behavior as `should_send_title_gen_request`.
 - **Dogfood override on production builds**: `ChannelState::channel().is_dogfood()` is false on Preview/Stable, so the override only fires where it is intended.
 - **Per-feature setting drift**: new `git_operations_autogen_enabled_internal` setting needs to be exposed in the AI settings page alongside the other per-feature toggles — easy to forget. Covered under §1.
 ## Follow-ups
 - Consider adding the same enterprise check to `code_review_view.rs:7104`'s `"Add diff set as context"` gate if product wants a uniform enterprise AI posture across code review (Invariant 15 explicitly scopes this out for now).
 - If telemetry ever needs to distinguish "AI skipped because disabled" from "AI attempted and failed", add an event in the gate's `false` branch — not required by this spec.
-- If other code-review AI call sites (e.g. future review-comment summarization) land, reuse `should_send_git_ops_ai_request` or a sibling helper rather than inlining the enterprise-plus-Rook-plan-plus-dogfood clause again.
+- If other code-review AI call sites (e.g. future review-comment summarization) land, reuse `should_send_git_ops_ai_request` or a sibling helper rather than inlining the enterprise-plus-Polaris Terminal-plan-plus-dogfood clause again.

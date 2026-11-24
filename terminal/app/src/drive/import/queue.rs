@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use rook_errors::report_error;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 use super::nodes::{self, FileId};
 use crate::cloud_object::model::persistence::CloudModel;

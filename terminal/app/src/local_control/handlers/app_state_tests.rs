@@ -66,7 +66,7 @@ fn file_open_resolves_relative_paths_against_the_session_working_directory() {
 #[test]
 fn unavailable_surface_open_returns_structured_error() {
     let flag_guard = FeatureFlag::AgentManagementView.override_enabled(false);
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         let error = app
             .update(|ctx| {
                 ensure_surface_available(

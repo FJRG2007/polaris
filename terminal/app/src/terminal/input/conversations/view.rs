@@ -3,8 +3,8 @@
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
-use rookui::elements::ChildView;
-use rookui::{Element, Entity, ModelHandle, SingletonEntity, View, ViewContext, ViewHandle};
+use ptermui::elements::ChildView;
+use ptermui::{Element, Entity, ModelHandle, SingletonEntity, View, ViewContext, ViewHandle};
 
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent_conversations_model::AgentConversationEntryId;
@@ -199,7 +199,7 @@ impl View for InlineConversationMenuView {
         "InlineConversationMenuView"
     }
 
-    fn render(&self, _app: &rookui::AppContext) -> Box<dyn Element> {
+    fn render(&self, _app: &ptermui::AppContext) -> Box<dyn Element> {
         ChildView::new(&self.menu_view).finish()
     }
 }

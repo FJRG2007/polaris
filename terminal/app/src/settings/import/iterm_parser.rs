@@ -6,11 +6,11 @@ use itertools::Itertools;
 use palette::Srgba;
 use pathfinder_color::ColorU;
 use plist::{Dictionary, Value};
-use rook_core::ui::theme::{AnsiColors, RookTheme, TerminalColors};
-use rookui::DisplayIdx;
-use rookui::fonts::FontInfo;
-use rookui::keymap::Keystroke;
-use rookui::platform::mac::utils::unicode_char_to_key;
+use pterm_core::ui::theme::{AnsiColors, PtermTheme, TerminalColors};
+use ptermui::DisplayIdx;
+use ptermui::fonts::FontInfo;
+use ptermui::keymap::Keystroke;
+use ptermui::platform::mac::utils::unicode_char_to_key;
 
 use super::config::{
     Config, ConfigError, GlobalHotkey, ImportableSetting, ImportedFont, MouseAndScrollReporting,
@@ -30,7 +30,7 @@ extern crate plist;
 const ITERM_DEFAULT_MONOSPACE_FONT_SIZE: &str = "12";
 const ITERM_DEFAULT_MONOSPACE_FONT_FAMILY: &str = "Monaco";
 
-const ROOK_DEFAULT_WORKING_DIRECTORY: ITermWorkingDirectoryStrategy =
+const POLARIS_TERMINAL_DEFAULT_WORKING_DIRECTORY: ITermWorkingDirectoryStrategy =
     ITermWorkingDirectoryStrategy::Simple(ITermWorkingDirectory::ReuseLast);
 
 const PIN_TOP: i64 = 2;
@@ -40,7 +40,7 @@ const PIN_RIGHT: i64 = 7;
 
 bitflags! {
     /// Bit flags for modifier keys. Bit 17 = shift, bit 18 = ctrl, bit 19 = option,
-    /// bit 20 = cmd, bit 21 = numpad (which Rook does not store as a modifier).
+    /// bit 20 = cmd, bit 21 = numpad (which Polaris Terminal does not store as a modifier).
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub struct Flags: u32 {
         const CTRL = 1 << 18;
@@ -76,11 +76,11 @@ impl TryFrom<ITermThemeType> for ThemeType {
         let (default_light, default_dark) = default_iterm_themes();
         match theme_type {
             ITermThemeType::LightAndDark { light, dark } => Ok(ThemeType::LightAndDark {
-                light: light.into_rook_theme(" (Light)", &default_light)?,
-                dark: dark.into_rook_theme(" (Dark)", &default_dark)?,
+                light: light.into_pterm_theme(" (Light)", &default_light)?,
+                dark: dark.into_pterm_theme(" (Dark)", &default_dark)?,
             }),
             ITermThemeType::Single(normal) => Ok(ThemeType::Single(
-                normal.into_rook_theme("", &default_dark)?,
+                normal.into_pterm_theme("", &default_dark)?,
             )),
         }
     }
@@ -115,11 +115,11 @@ impl ITermTheme {
         }
     }
 
-    fn into_rook_theme(
+    fn into_pterm_theme(
         mut self,
         suffix: &'static str,
         default_theme: &ITermTheme,
-    ) -> Result<RookTheme, ThemeError> {
+    ) -> Result<PtermTheme, ThemeError> {
         if self.foreground == default_theme.foreground
             || self.background == default_theme.background
         {
@@ -142,7 +142,7 @@ impl ITermTheme {
 
         let accent = calculate_accent_color(background, foreground, cursor, bright);
 
-        Ok(RookTheme::new(
+        Ok(PtermTheme::new(
             background.into(),
             foreground,
             accent.into(),
@@ -291,7 +291,7 @@ impl TryFrom<ITermKeystroke> for Keystroke {
             alt: modifier_flags.contains(Flags::ALT),
             shift: modifier_flags.contains(Flags::SHIFT),
             cmd: modifier_flags.contains(Flags::CMD),
-            // Neither Rook nor iTerm supports Meta in global hotkeys.
+            // Neither Polaris Terminal nor iTerm supports Meta in global hotkeys.
             meta: false,
             key,
         })
@@ -303,7 +303,7 @@ pub struct ITermGlobalHotkeyWindow {
     keystroke: ITermKeystroke,
     autohide: bool,
     /// Which screen the hotkey window should open on. -1 = any screen,
-    /// -2 = screen with cursor (not supported in Rook), and >= 0 is the index of the screen.
+    /// -2 = screen with cursor (not supported in Polaris Terminal), and >= 0 is the index of the screen.
     screen: i64,
     /// How the quake window displays. 2 is pin to top, 5 is bottom, 6 is left, and 7 is right.
     screen_type: i64,
@@ -669,8 +669,8 @@ impl ParseableConfig for ITermProfile {
     }
 
     fn parse(mut self, fonts: &[FontInfo]) -> Config {
-        // iTerm stores its fonts with internal names and supports styles as default terminal text, whereas Rook changes fonts based on display name.
-        // Only import a font if there is only one font whose iTerm name starts with the display name of a font Rook supports.
+        // iTerm stores its fonts with internal names and supports styles as default terminal text, whereas Polaris Terminal changes fonts based on display name.
+        // Only import a font if there is only one font whose iTerm name starts with the display name of a font Polaris Terminal supports.
         let translated_font_name = fonts
             .iter()
             .find(|font_info| {
@@ -707,7 +707,7 @@ impl ParseableConfig for ITermProfile {
         };
 
         let mouse_and_scroll_reporting = match (self.mouse_reporting, self.scroll_reporting) {
-            // Since this is the Rook default, return None.
+            // Since this is the Polaris Terminal default, return None.
             (true, true) => None,
             (mouse_reporting, scroll_reporting) => Some(MouseAndScrollReporting {
                 mouse_reporting,
@@ -821,12 +821,12 @@ impl ParseableConfig for ITermProfile {
         }
 
         if self.working_directory == default_profile.working_directory
-            || self.working_directory == Some(ROOK_DEFAULT_WORKING_DIRECTORY)
+            || self.working_directory == Some(POLARIS_TERMINAL_DEFAULT_WORKING_DIRECTORY)
         {
             self.working_directory = None;
         }
 
-        // Rook's default is not to open windows with a custom size,
+        // Polaris Terminal's default is not to open windows with a custom size,
         // so there is nothing to check against.
         if self.rows == default_profile.rows {
             self.rows = None;
@@ -834,7 +834,7 @@ impl ParseableConfig for ITermProfile {
         if self.columns == default_profile.columns {
             self.columns = None;
         }
-        // iTerm's presets are the same as Rook's
+        // iTerm's presets are the same as Polaris Terminal's
         if self.transparency == default_profile.transparency {
             self.transparency = None;
         }

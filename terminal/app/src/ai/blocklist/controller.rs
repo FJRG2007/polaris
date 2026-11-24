@@ -21,10 +21,10 @@ use input_context::{input_context_for_request, parse_context_attachments};
 use itertools::Itertools;
 use parking_lot::FairMutex;
 use pending_response_streams::PendingResponseStreams;
-use rook_core::assertions::safe_assert;
-use rook_errors::report_error;
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::{
+use pterm_core::assertions::safe_assert;
+use pterm_errors::report_error;
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::{
     AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity, WeakViewHandle,
 };
 use session_sharing_protocol::common::ParticipantId;
@@ -117,11 +117,11 @@ impl SessionContext {
         &self.current_working_directory
     }
 
-    /// Returns the remote host ID if this is a `RookifiedRemote` session with
+    /// Returns the remote host ID if this is a `PtermifiedRemote` session with
     /// a connected `RemoteServerClient`.
-    pub fn host_id(&self) -> Option<&rook_core::HostId> {
+    pub fn host_id(&self) -> Option<&pterm_core::HostId> {
         match &self.session_type {
-            Some(SessionType::RookifiedRemote { host_id }) => host_id.as_ref(),
+            Some(SessionType::PtermifiedRemote { host_id }) => host_id.as_ref(),
             Some(SessionType::Local) | None => None,
         }
     }
@@ -129,17 +129,20 @@ impl SessionContext {
     /// Returns `true` if this is a remote session (regardless of whether
     /// the remote server client is connected).
     pub fn is_remote(&self) -> bool {
-        matches!(self.session_type, Some(SessionType::RookifiedRemote { .. }))
+        matches!(
+            self.session_type,
+            Some(SessionType::PtermifiedRemote { .. })
+        )
     }
 
     pub fn skill_path_origin(&self) -> SkillPathOrigin {
         match &self.session_type {
-            Some(SessionType::RookifiedRemote {
+            Some(SessionType::PtermifiedRemote {
                 host_id: Some(host_id),
             }) => SkillPathOrigin::Remote {
                 host_id: host_id.clone(),
             },
-            Some(SessionType::RookifiedRemote { host_id: None }) => SkillPathOrigin::Unavailable,
+            Some(SessionType::PtermifiedRemote { host_id: None }) => SkillPathOrigin::Unavailable,
             Some(SessionType::Local) | None => SkillPathOrigin::Local,
         }
     }
@@ -341,12 +344,12 @@ pub struct BlocklistAIController {
     shared_session_state: shared_session::SharedSessionState,
 
     /// Ambient agent task ID attached to this controller. This is a property of the controller, and not an individual
-    /// conversation, because the ambient agent task driver owns the entire Rook window working on a task, and any
+    /// conversation, because the ambient agent task driver owns the entire Polaris Terminal window working on a task, and any
     /// sessions within it. In the future, one task may span several sessions with background processes.
     ambient_agent_task_id: Option<AmbientAgentTaskId>,
 
     /// Per-session directory for downloading file attachments.
-    /// Set by the agent driver based on the workspace directory (e.g. `{working_dir}/.rook/attachments`).
+    /// Set by the agent driver based on the workspace directory (e.g. `{working_dir}/.polaris/terminal/attachments`).
     attachments_download_dir: Option<std::path::PathBuf>,
 
     /// Pending auto-resume tasks that are waiting for network connectivity.

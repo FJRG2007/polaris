@@ -1,14 +1,14 @@
-use rook_cli::agent::Harness;
-use rook_core::settings::Setting;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_cli::agent::Harness;
+use pterm_core::settings::Setting;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     Align, AnchorPair, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DispatchEventResult, DropTarget, Element, Empty, EventHandler, Expanded, Flex, Hoverable,
     MainAxisSize, OffsetPositioning, OffsetType, ParentElement, PositionedElementOffsetBounds,
     PositioningAxis, Radius, SavePosition, Stack, XAxisAnchor, YAxisAnchor,
 };
-use rookui::presenter::ChildView;
-use rookui::{AppContext, SingletonEntity as _, ViewHandle};
+use ptermui::presenter::ChildView;
+use ptermui::{AppContext, SingletonEntity as _, ViewHandle};
 
 use super::common::{
     add_command_xray_overlay, add_input_suggestions_overlays, add_voltron_overlay,
@@ -605,8 +605,8 @@ impl Input {
             let harness = self
                 .ambient_agent_view_model()
                 .map(|m| m.as_ref(app).selected_harness())
-                .unwrap_or(rook_cli::agent::Harness::Oz);
-            if harness != rook_cli::agent::Harness::Oz && !self.should_show_auth_secret_ftux(app) {
+                .unwrap_or(pterm_cli::agent::Harness::Oz);
+            if harness != pterm_cli::agent::Harness::Oz && !self.should_show_auth_secret_ftux(app) {
                 row.add_child(ChildView::new(auth_secret_selector).finish());
             }
         }
@@ -725,11 +725,11 @@ impl Input {
 
 pub mod styles {
     use pathfinder_color::ColorU;
-    use rook_core::ui::theme::RookTheme;
+    use pterm_core::ui::theme::PtermTheme;
 
     use crate::ui_components::blended_colors;
 
-    pub fn default_border_color(theme: &RookTheme) -> ColorU {
+    pub fn default_border_color(theme: &PtermTheme) -> ColorU {
         blended_colors::neutral_2(theme)
     }
 }

@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use parking_lot::FairMutex;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::{Element, Empty, MouseStateHandle};
-use rookui::keymap::Keystroke;
-use rookui::platform::OperatingSystem;
-use rookui::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::{Element, Empty, MouseStateHandle};
+use ptermui::keymap::Keystroke;
+use ptermui::platform::OperatingSystem;
+use ptermui::{
     AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
@@ -846,7 +846,7 @@ fn should_fork_from_last_known_good_state(
         | RenderableAIError::GeminiEnterpriseCredentialsExpiredOrInvalid => false,
         // A shell-exit failure can't resume in this (now-dead) pane, but the user
         // can fork from the last known good state to continue in a fresh one.
-        RenderableAIError::InternalRookError | RenderableAIError::AgentExitedShell { .. } => true,
+        RenderableAIError::InternalPtermError | RenderableAIError::AgentExitedShell { .. } => true,
         RenderableAIError::Other {
             will_attempt_resume,
             ..

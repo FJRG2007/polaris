@@ -3,17 +3,17 @@
 #![cfg_attr(feature = "release_bundle", windows_subsystem = "windows")]
 
 use anyhow::Result;
-use rook_core::channel::{Channel, ChannelState};
-use rook_core::features;
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_core::features;
 
-// Simple wrapper around rook::run() for dev channel builds.
+// Simple wrapper around polaris_terminal::run() for dev channel builds.
 fn main() -> Result<()> {
     ChannelState::set(
-        ChannelState::new(Channel::Dev, rook_channel_config::load_config!("dev"))
+        ChannelState::new(Channel::Dev, pterm_channel_config::load_config!("dev"))
             .with_additional_features(features::DEBUG_FLAGS)
             .with_additional_features(features::DOGFOOD_FLAGS)
             .with_additional_features(features::PREVIEW_FLAGS),
     );
 
-    rook::run()
+    polaris_terminal::run()
 }

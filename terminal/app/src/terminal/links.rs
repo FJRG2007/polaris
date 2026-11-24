@@ -1,7 +1,7 @@
 //! Module containing helper functions for opening links within the terminal.
 
-use rookui::event::ModifiersState;
-use rookui::platform::OperatingSystem;
+use ptermui::event::ModifiersState;
+use ptermui::platform::OperatingSystem;
 
 /// Returns a string denoting the keybinding to directly open a link.
 pub fn directly_open_link_keybinding_string() -> &'static str {

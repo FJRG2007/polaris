@@ -3,8 +3,8 @@
 // `assert!` causes the app to crash before debug info can be exported. Use `integration_assert!` instead.
 #![deny(clippy::assertions_on_constants)]
 
-use rookui::integration::{AssertionCallback, AssertionOutcome, TestStep};
-use rookui::{EntityId, SingletonEntity as _, integration_assert};
+use ptermui::integration::{AssertionCallback, AssertionOutcome, TestStep};
+use ptermui::{EntityId, SingletonEntity as _, integration_assert};
 use warp_multi_agent_api as api;
 
 use super::llm_judge::{LLMJudge, LLMJudgeConfig};
@@ -95,7 +95,7 @@ pub fn assert_latest_exchange_text(
 }
 
 // Make an assertion on the action requested in the exchange at exchange_index.
-/// This is private because `AIAgentActionType` is not public outside the rook app crate
+/// This is private because `AIAgentActionType` is not public outside the polaris-terminal app crate
 /// for use within agent mode evals, so they can't write the `ActionAssertion` directly.
 /// We need to define other functions for specific action assertions that don't expose the type.
 /// TODO: consider exposing `AIAgentActionType`
@@ -1163,7 +1163,7 @@ pub fn assert_conversation_was_summarized() -> AssertionCallback {
 /// Assert that the active conversation did not use prior-conversation
 /// context. From the LLM's perspective this is the `search_conversation_history`
 /// tool; on the client it materializes as a `FetchConversation` action followed
-/// by regular file tools pointed at `/tmp/rook_conversation_search`.
+/// by regular file tools pointed at `/tmp/pterm_conversation_search`.
 pub fn assert_no_prior_conversation_context_usage() -> AssertionCallback {
     Box::new(|app, window_id| {
         let terminal_view = terminal_view(app, window_id, 0, 0);
@@ -1188,7 +1188,7 @@ pub fn assert_no_prior_conversation_context_usage() -> AssertionCallback {
                     }
 
                     let action_text = action.to_string();
-                    if action_text.contains("/tmp/rook_conversation_search") {
+                    if action_text.contains("/tmp/pterm_conversation_search") {
                         return AssertionOutcome::immediate_failure(format!(
                             "Implementation conversation read materialized prior-conversation context in exchange {exchange_index}: {action_text}"
                         ));

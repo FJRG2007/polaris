@@ -1,20 +1,20 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DropShadow, Flex, FormattedTextElement, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Stack,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::FixedBinding;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::fonts::Weight;
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 use serde_json::{Value, json};
 use strum_macros::{EnumDiscriminants, EnumIter};
 
@@ -29,14 +29,15 @@ const CORNER_RADIUS: f32 = 12.;
 const PANEL_PADDING: f32 = 24.;
 const CLOSE_BUTTON_DIAMETER: f32 = 20.;
 
-const NOTICE_TITLE_TEXT: &str = "Rook is no longer providing inference on the free plan.";
-const NOTICE_BODY_TEXT: &str = "To keep using Rook's AI features, please upgrade to a paid plan, \
+const NOTICE_TITLE_TEXT: &str =
+    "Polaris Terminal is no longer providing inference on the free plan.";
+const NOTICE_BODY_TEXT: &str = "To keep using Polaris Terminal's AI features, please upgrade to a paid plan, \
      bring your own API key or endpoint, or log in with your Grok subscription.";
 const NOTICE_BONUS_CREDITS_TEXT: &str = "If you have any unused bonus credits, AI will keep \
      working until these run out.";
 
-const PROMPT_SUGGESTIONS_TITLE_TEXT: &str = "How to use AI features in Rook";
-const PROMPT_SUGGESTIONS_BODY_TEXT: &str = "To use AI features in Rook, subscribe to a paid plan, \
+const PROMPT_SUGGESTIONS_TITLE_TEXT: &str = "How to use AI features in Polaris Terminal";
+const PROMPT_SUGGESTIONS_BODY_TEXT: &str = "To use AI features in Polaris Terminal, subscribe to a paid plan, \
      add an API key (OpenAI, Anthropic, or Google), add a custom inference endpoint (OpenRouter, \
      LiteLLM), or log in using your SuperGrok subscription.";
 
@@ -44,7 +45,7 @@ const PROMPT_SUGGESTIONS_BODY_TEXT: &str = "To use AI features in Rook, subscrib
 /// the layout and CTAs are identical across variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FreeAiRemovalModalVariant {
-    /// One-time notice shown to Free users when Rook-provided AI is removed from their plan.
+    /// One-time notice shown to Free users when Polaris Terminal-provided AI is removed from their plan.
     Notice,
     /// Shown on demand when a Free user activates Prompt Suggestions while out of credits.
     PromptSuggestions,
@@ -84,7 +85,7 @@ impl FreeAiRemovalModalVariant {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",
@@ -112,7 +113,7 @@ struct StateHandles {
     upgrade_button: MouseStateHandle,
 }
 
-/// Notice shown to Free-plan users about the removal of Rook-provided AI. The
+/// Notice shown to Free-plan users about the removal of Polaris Terminal-provided AI. The
 /// `variant` selects the copy: a one-time rollout notice, or an on-demand prompt
 /// when a Free user activates a gated feature (e.g. Prompt Suggestions).
 pub struct FreeAiRemovalModal {
@@ -320,7 +321,7 @@ impl TypedActionView for FreeAiRemovalModal {
                 // the settings page this opens.
                 ctx.dispatch_typed_action_deferred(WorkspaceAction::ShowSettingsPageWithSearch {
                     search_query: "api".to_string(),
-                    section: Some(SettingsSection::RookAgent),
+                    section: Some(SettingsSection::PtermAgent),
                 });
                 ctx.emit(FreeAiRemovalModalEvent::Close);
             }
@@ -402,7 +403,7 @@ impl TelemetryEvent for FreeAiRemovalModalTelemetryEvent {
     }
 
     fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        rook_core::telemetry::enum_events::<Self>()
+        pterm_core::telemetry::enum_events::<Self>()
     }
 }
 
@@ -430,4 +431,4 @@ impl TelemetryEventDesc for FreeAiRemovalModalTelemetryEventDiscriminants {
     }
 }
 
-rook_core::register_telemetry_event!(FreeAiRemovalModalTelemetryEvent);
+pterm_core::register_telemetry_event!(FreeAiRemovalModalTelemetryEvent);

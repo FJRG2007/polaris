@@ -1,17 +1,17 @@
-use rook_core::ui::builder::UiBuilder;
-use rook_core::ui::color::blend::Blend;
-use rook_core::ui::color::darken;
-use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::color::ColorU;
-use rookui::elements::{
+use pterm_core::ui::builder::UiBuilder;
+use pterm_core::ui::color::blend::Blend;
+use pterm_core::ui::color::darken;
+use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::color::ColorU;
+use ptermui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Fill, Flex, Icon,
     MouseStateHandle, ParentElement, Radius, Shrinkable,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::FixedBinding;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::FixedBinding;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
@@ -28,11 +28,11 @@ const ACTION_BUTTON_BORDER_WIDTH: f32 = 2.;
 const ACTION_BUTTON_HORIZONTAL_PADDING: f32 = 8.;
 const ACTION_BUTTON_FONT_SIZE: f32 = 14.;
 
-const AUTH_OVERRIDE_DESCRIPTION: &str = "It looks like you logged into a Rook account through a web browser. If you continue, any personal Rook drive objects and preferences from this anonymous session with be permanently deleted.";
+const AUTH_OVERRIDE_DESCRIPTION: &str = "It looks like you logged into a Polaris Terminal account through a web browser. If you continue, any personal Polaris Terminal drive objects and preferences from this anonymous session with be permanently deleted.";
 const AUTH_OVERRIDE_CONFIRMATION_WARNING: &str = "This cannot be undone.";
 const AUTH_OVERRIDE_INITIAL_STEP_HEADER: &str = "New login detected";
 const AUTH_OVERRIDE_CONFIRM_CONFIRMATION_STEP_HEADER: &str =
-    "Delete personal Rook Drive objects and preferences?";
+    "Delete personal Polaris Terminal Drive objects and preferences?";
 const AUTH_OVERRIDE_BULK_EXPORT_BUTTON_LABEL: &str = "Export your data";
 const AUTH_OVERRIDE_BULK_EXPORT_DESCRIPTION: &str = " to import later.";
 const AUTH_OVERRIDE_CANCEL_BUTTON_LABEL: &str = "Cancel";
@@ -64,7 +64,7 @@ pub struct AuthOverrideWarningBody {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "enter",
@@ -377,8 +377,8 @@ impl View for AuthOverrideWarningBody {
     fn accessibility_contents(&self, _: &AppContext) -> Option<AccessibilityContent> {
         Some(AccessibilityContent::new(
             "New login detected",
-            "Rook has detected a new login from a web browser. Press escape to cancel and continue using Rook without login.",
-            RookA11yRole::HelpRole,
+            "Polaris Terminal has detected a new login from a web browser. Press escape to cancel and continue using Polaris Terminal without login.",
+            PtermA11yRole::HelpRole,
         ))
     }
 

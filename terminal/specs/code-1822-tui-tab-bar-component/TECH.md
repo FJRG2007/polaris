@@ -4,30 +4,30 @@ Product: [specs/code-1822-tui-tab-bar-component/PRODUCT.md](./PRODUCT.md)
 
 ## Context
 The TUI separates retained views from per-frame elements:
-- `crates/rookui_core/src/core/view/tui.rs (19-75)` defines `TuiView`, whose `render` method produces an element tree from retained state.
-- `crates/rookui_core/src/elements/gui/size_constraint_switch.rs (56-164)` is the GUI responsive-layout precedent: it selects a normal child from the current layout constraint and delegates subsequent lifecycle passes to that child.
-- `crates/rookui_core/src/elements/tui/mod.rs (267-354)` defines the TUI element lifecycle.
-- `crates/rookui_core/src/elements/tui/flex.rs (278-472)`, `container.rs`, `text.rs`, and `hoverable.rs` provide the generic composition, styling, text, and pointer primitives needed by a tab bar.
+- `crates/ptermui_core/src/core/view/tui.rs (19-75)` defines `TuiView`, whose `render` method produces an element tree from retained state.
+- `crates/ptermui_core/src/elements/gui/size_constraint_switch.rs (56-164)` is the GUI responsive-layout precedent: it selects a normal child from the current layout constraint and delegates subsequent lifecycle passes to that child.
+- `crates/ptermui_core/src/elements/tui/mod.rs (267-354)` defines the TUI element lifecycle.
+- `crates/ptermui_core/src/elements/tui/flex.rs (278-472)`, `container.rs`, `text.rs`, and `hoverable.rs` provide the generic composition, styling, text, and pointer primitives needed by a tab bar.
 
-The reusable tab abstraction is a retained view in the `rook_tui` front-end, not a tab-specific element. The core element library supplies the same discrete size-constraint switch pattern as the GUI.
+The reusable tab abstraction is a retained view in the `pterm_tui` front-end, not a tab-specific element. The core element library supplies the same discrete size-constraint switch pattern as the GUI.
 
 ## Implementation
 ### GUI-parity size switching
-`crates/rookui_core/src/elements/tui/size_constraint_switch.rs` adds `TuiSizeConstraintSwitch` and `TuiSizeConstraintCondition`.
+`crates/ptermui_core/src/elements/tui/size_constraint_switch.rs` adds `TuiSizeConstraintSwitch` and `TuiSizeConstraintCondition`.
 
 Like the GUI `SizeConstraintSwitch`, it accepts a default prebuilt child plus ordered conditional children. During layout it selects the first child whose width, height, or combined-size condition matches. Every later lifecycle pass delegates to that same selected child.
 
-The switch contains no tab, paging, or application semantics. It is exported from `crates/rookui_core/src/elements/tui/mod.rs`.
+The switch contains no tab, paging, or application semantics. It is exported from `crates/ptermui_core/src/elements/tui/mod.rs`.
 
 ### Generic text ellipsis
-`crates/rookui_core/src/elements/tui/text.rs` adds `TuiText::truncate_with_ellipsis`. The text element truncates inside its assigned display-cell width, preserves grapheme boundaries and span styles, and uses as much of `...` as fits. Tab rendering therefore does not construct pre-truncated strings.
-`crates/rookui_core/src/elements/tui/text_helpers.rs` centralizes Ratatui-compatible display-cell measurement and grapheme-safe string truncation. Existing non-element formatting in `crates/rook_tui/src/tui_column_layout.rs` now uses these helpers instead of maintaining a second character-based truncation implementation.
+`crates/ptermui_core/src/elements/tui/text.rs` adds `TuiText::truncate_with_ellipsis`. The text element truncates inside its assigned display-cell width, preserves grapheme boundaries and span styles, and uses as much of `...` as fits. Tab rendering therefore does not construct pre-truncated strings.
+`crates/ptermui_core/src/elements/tui/text_helpers.rs` centralizes Ratatui-compatible display-cell measurement and grapheme-safe string truncation. Existing non-element formatting in `crates/pterm_tui/src/tui_column_layout.rs` now uses these helpers instead of maintaining a second character-based truncation implementation.
 
 ### Generic flex spacing
-`crates/rookui_core/src/elements/tui/flex.rs` adds `TuiFlex::with_spacing`. Layout reserves the configured number of blank main-axis cells between adjacent fixed or flex children, and rendering uses the same spacing when deriving child slots.
+`crates/ptermui_core/src/elements/tui/flex.rs` adds `TuiFlex::with_spacing`. Layout reserves the configured number of blank main-axis cells between adjacent fixed or flex children, and rendering uses the same spacing when deriving child slots.
 
 ### Retained tab-bar view
-`crates/rook_tui/src/tab_bar.rs` defines:
+`crates/pterm_tui/src/tab_bar.rs` defines:
 - `TuiTab`: stable string key, label, and optional styled leading text.
 - `TuiTabBarStyles`: caller-supplied background, leading-label, chrome, normal-tab, focused-selected, and unfocused-selected styles.
 - `TuiTabBarConfig`: optional product label and main tab, ordered secondary tabs, selected key, focus presentation, page anchor, selected-tab reveal policy, optional maximum label cells, spacing, and styles.
@@ -74,11 +74,11 @@ Keyboard target methods depend only on semantic tab order:
 The caller applies returned keys, updates its authoritative selection/page models, and resynchronizes the view config.
 
 ## Testing and validation
-`crates/rookui_core/src/elements/tui/size_constraint_switch_tests.rs` covers the default child, first-match ordering, and combined width/height selection.
+`crates/ptermui_core/src/elements/tui/size_constraint_switch_tests.rs` covers the default child, first-match ordering, and combined width/height selection.
 
-`crates/rookui_core/src/elements/tui/text_tests.rs` covers constraint-aware ellipsis, grapheme preservation, and span styling.
+`crates/ptermui_core/src/elements/tui/text_tests.rs` covers constraint-aware ellipsis, grapheme preservation, and span styling.
 
-`crates/rook_tui/src/tab_bar_tests.rs` covers:
+`crates/pterm_tui/src/tab_bar_tests.rs` covers:
 - selected-tab reveal at narrow widths and the all-tabs-fit first page;
 - narrow-width ellipsis, visible-label guarantees, and next-control preservation;
 - start, middle, and end overflow-control visibility;
@@ -88,19 +88,19 @@ The caller applies returned keys, updates its authoritative selection/page model
 - duplicate key rejection; and
 - retained mouse-state reuse and removed-key pruning.
 
-`crates/rookui_core/src/elements/tui/text_helpers_tests.rs` covers display-cell measurement and grapheme-safe truncation.
+`crates/ptermui_core/src/elements/tui/text_helpers_tests.rs` covers display-cell measurement and grapheme-safe truncation.
 
-`crates/rookui_core/src/elements/tui/flex_tests.rs` covers configured spacing in row layout and rendering. Existing `crates/rook_tui/src/tui_column_layout_tests.rs` continue to cover the non-element formatting path after its migration to the shared text helpers.
+`crates/ptermui_core/src/elements/tui/flex_tests.rs` covers configured spacing in row layout and rendering. Existing `crates/pterm_tui/src/tui_column_layout_tests.rs` continue to cover the non-element formatting path after its migration to the shared text helpers.
 
 Validation commands:
-- `cargo test -p rookui_core --features tui size_constraint_switch`
-- `cargo test -p rookui_core --features tui ellipsis`
-- `cargo test -p rook_tui tab_bar`
-- `cargo test -p rookui_core --features tui text_helpers`
-- `cargo test -p rook_tui tui_column_layout`
+- `cargo test -p ptermui_core --features tui size_constraint_switch`
+- `cargo test -p ptermui_core --features tui ellipsis`
+- `cargo test -p pterm_tui tab_bar`
+- `cargo test -p ptermui_core --features tui text_helpers`
+- `cargo test -p pterm_tui tui_column_layout`
 - `./script/format`
-- `cargo clippy -p rookui_core --features tui --tests -- -D warnings`
-- `cargo clippy -p rook_tui --tests -- -D warnings`
+- `cargo clippy -p ptermui_core --features tui --tests -- -D warnings`
+- `cargo clippy -p pterm_tui --tests -- -D warnings`
 
 ## Risks and mitigations
 - **Responsive policy leaking into the element library:** the switch knows only about conditions and child lifecycle delegation, matching the GUI primitive.

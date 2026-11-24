@@ -3,7 +3,7 @@
 ## Context
 `specs/REMOTE-1696/PRODUCT.md` defines the user-visible behavior.
 
-The CLI command definitions live in `crates/rook_cli/src/agent.rs`. The old skill-discovery command has moved to `AgentCommand::Skills(ListAgentSkillsArgs)` with an optional `--repo` flag. The app-side dispatcher in `app/src/ai/agent_sdk/mod.rs` sends that variant to `agent_config::list_skills`.
+The CLI command definitions live in `crates/pterm_cli/src/agent.rs`. The old skill-discovery command has moved to `AgentCommand::Skills(ListAgentSkillsArgs)` with an optional `--repo` flag. The app-side dispatcher in `app/src/ai/agent_sdk/mod.rs` sends that variant to `agent_config::list_skills`.
 
 The existing skill-discovery implementation is in `app/src/ai/agent_sdk/agent_config.rs`. It calls `AIClient::list_skills(repo)` and renders repository-discovered `AgentSkillItem` values.
 
@@ -11,10 +11,10 @@ Run listing/getting in `app/src/ai/agent_sdk/ambient.rs (60-116)` is the output 
 
 The public API methods and types flow through `app/src/server/server_api/ai.rs`. The `AIClient` trait exposes skill listing as `list_skills(repo)` and named-agent CRUD as `list_agents`, `list_agents_raw`, `get_agent`, `get_agent_raw`, `create_agent`, `create_agent_raw`, `update_agent`, `update_agent_raw`, and `delete_agent`. The underlying `ServerApi` exposes authenticated GET/POST/PUT/DELETE helpers for public API commands.
 
-The named-agent API reference is in `../rook-server/public_api/openapi.yaml`:
-- `POST /agent/identities` and `GET /agent/identities` at `../rook-server/public_api/openapi.yaml (2709-2781)`.
-- `GET /agent/identities/{uid}`, `PUT /agent/identities/{uid}`, and `DELETE /agent/identities/{uid}` at `../rook-server/public_api/openapi.yaml (2783-2917)`.
-- `CreateAgentRequest`, `UpdateAgentRequest`, `AgentResponse`, and `ListAgentsResponse` at `../rook-server/public_api/openapi.yaml (5399-5539)`.
+The named-agent API reference is in `../polaris-terminal-server/public_api/openapi.yaml`:
+- `POST /agent/identities` and `GET /agent/identities` at `../polaris-terminal-server/public_api/openapi.yaml (2709-2781)`.
+- `GET /agent/identities/{uid}`, `PUT /agent/identities/{uid}`, and `DELETE /agent/identities/{uid}` at `../polaris-terminal-server/public_api/openapi.yaml (2783-2917)`.
+- `CreateAgentRequest`, `UpdateAgentRequest`, `AgentResponse`, and `ListAgentsResponse` at `../polaris-terminal-server/public_api/openapi.yaml (5399-5539)`.
 
 Related named-agent environment work for `REMOTE-1695` adds an optional `environment_id` field to create/update/response models. The current checked-out OpenAPI schema may lag that server behavior, so the implementation keeps optional deserialization tolerant while still accepting `--environment` and `--remove-environment`.
 
@@ -74,9 +74,9 @@ Update references and naming:
 - Add unit tests that list sort flags are rejected for JSON and `--jq` output.
 - Add output tests for named-agent detail text/pretty helpers where they can be tested without a full app context.
 - Run `cargo fmt`.
-- Run targeted Rust tests for `rook_cli` and the new agent SDK module.
+- Run targeted Rust tests for `pterm_cli` and the new agent SDK module.
 - Run a focused clippy command if compile/test scope reveals warnings.
-- Manually validate against an authenticated staging server. On macOS, invoke the app runner with `ROOK_CLI_MODE=1 ./script/run -- <cli args>` so the bundled app parses CLI subcommands rather than GUI URLs. For parallel manual validation, use the built binary with `ROOK_CLI_MODE=1` to avoid concurrent `./script/run` rebundling and codesigning the same app path.
+- Manually validate against an authenticated staging server. On macOS, invoke the app runner with `POLARIS_TERMINAL_CLI_MODE=1 ./script/run -- <cli args>` so the bundled app parses CLI subcommands rather than GUI URLs. For parallel manual validation, use the built binary with `POLARIS_TERMINAL_CLI_MODE=1` to avoid concurrent `./script/run` rebundling and codesigning the same app path.
 - Manual validation should cover create/get/list/delete, update add/remove flags for skills and secrets, description/base-model/environment set and remove flags, invalid environment errors, nonexistent UID errors, update-with-no-flags errors, sort ordering by name and created time, JSON sort-flag rejection, pretty/text/ndjson/json output, and `--jq` scalar output.
 
 ## Parallelization

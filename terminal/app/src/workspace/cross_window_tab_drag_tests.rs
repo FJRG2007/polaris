@@ -7,8 +7,8 @@
 //! is reordering it back in the source window removed the visible drop zone and
 //! made the slot oscillate every frame.
 
-use rookui::WindowId;
-use rookui::geometry::vector::{Vector2F, vec2f};
+use ptermui::WindowId;
+use ptermui::geometry::vector::{Vector2F, vec2f};
 
 use super::CrossWindowTabDrag;
 

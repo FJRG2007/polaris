@@ -26,13 +26,13 @@ function Build-FixtureInstaller {
     $arguments = @(
         (Join-Path $PSScriptRoot 'tui-installer.iss'),
         '/DReleaseChannel=dev',
-        '/DMyAppExeName=rook-tui-dev.exe',
+        '/DMyAppExeName=polaris-terminal-tui-dev.exe',
         "/DTargetProfileDir=$InputDir",
-        '/DMyAppName=RookAgentCLIDev',
+        '/DMyAppName=PtermAgentCLIDev',
         "/DMyAppVersion=$Version",
         '/DArch=x64',
         "/DWindowsAssetsDir=$AssetsDir",
-        '/DCLIName=rook-dev',
+        '/DCLIName=polaris-terminal-dev',
         '/DInstallDirName=tui-dev',
         "/DOutputName=$OutputName",
         "/O$OutputDir"
@@ -54,12 +54,12 @@ function Invoke-Installer {
 
     $arguments = @('/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART')
     if ($Uninstall) {
-        $arguments += "/rook_bin_dir=`"$BinDir`""
+        $arguments += "/pterm_bin_dir=`"$BinDir`""
     } else {
         $arguments += @(
             '/CURRENTUSER',
             "/DIR=`"$InstallDir`"",
-            "/rook_bin_dir=`"$BinDir`"",
+            "/pterm_bin_dir=`"$BinDir`"",
             '/skip_path_update=1'
         )
     }
@@ -73,7 +73,7 @@ if (-not (Get-Command ISCC -ErrorAction SilentlyContinue)) {
     throw 'ISCC is required to test the Windows TUI installer'
 }
 
-$testRoot = Join-Path ([System.IO.Path]::GetTempPath()) "rook tui installer $([guid]::NewGuid())"
+$testRoot = Join-Path ([System.IO.Path]::GetTempPath()) "polaris-terminal tui installer $([guid]::NewGuid())"
 $inputDir = Join-Path $testRoot 'input'
 $assetsDir = Join-Path $testRoot 'assets'
 $outputDir = Join-Path $testRoot 'output'
@@ -85,7 +85,7 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $inputDir 'resources') -Force | Out-Null
     New-Item -ItemType Directory -Path $assetsDir -Force | Out-Null
     Copy-Item "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" (
-        Join-Path $inputDir 'rook-tui-dev.exe'
+        Join-Path $inputDir 'polaris-terminal-tui-dev.exe'
     )
     Write-FixtureFile (Join-Path $inputDir 'resources\marker.txt') 'fixture'
     foreach ($asset in @(
@@ -100,24 +100,24 @@ try {
 
     $version1 = 'v0.2026.07.29.00.00.dev_01'
     $version2 = 'v0.2026.07.29.00.00.dev_02'
-    $installer1 = Build-FixtureInstaller $version1 'RookAgentCLIDevSetup-v1' `
+    $installer1 = Build-FixtureInstaller $version1 'PtermAgentCLIDevSetup-v1' `
         $inputDir $assetsDir $outputDir
-    $installer2 = Build-FixtureInstaller $version2 'RookAgentCLIDevSetup-v2' `
+    $installer2 = Build-FixtureInstaller $version2 'PtermAgentCLIDevSetup-v2' `
         $inputDir $assetsDir $outputDir
 
     Invoke-Installer $installer1 $installDir $binDir
     if ((Get-Content (Join-Path $installDir 'current') -Raw).Trim() -cne $version1) {
         throw 'The first install did not activate v1'
     }
-    $launcherPath = Join-Path $binDir 'rook-dev.cmd'
+    $launcherPath = Join-Path $binDir 'polaris-terminal-dev.cmd'
     if (-not (Test-Path -LiteralPath $launcherPath -PathType Leaf)) {
         throw 'The installer did not create the channel launcher'
     }
     if (-not (Test-Path -LiteralPath (Join-Path $installDir 'icon.ico') -PathType Leaf)) {
-        throw 'The installer did not install the Rook icon'
+        throw 'The installer did not install the Polaris Terminal icon'
     }
 
-    $version1Binary = Join-Path $installDir "versions\$version1\rook-tui-dev.exe"
+    $version1Binary = Join-Path $installDir "versions\$version1\polaris-terminal-tui-dev.exe"
     $runningProcess = Start-Process -FilePath $version1Binary -ArgumentList @(
         '-NoLogo',
         '-NoProfile',
@@ -143,13 +143,13 @@ try {
         throw 'The upgrade removed the running v1 payload'
     }
 
-    $registryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\rook-agent-cli-dev_is1'
+    $registryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\polaris-terminal-agent-cli-dev_is1'
     $registration = Get-ItemProperty -LiteralPath $registryPath
     $registeredVersion = $registration.DisplayVersion
     if ($registeredVersion -cne $version2) {
         throw "ARP registered '$registeredVersion', expected '$version2'"
     }
-    if ($registration.DisplayName -cne "RookAgentCLIDev $version2") {
+    if ($registration.DisplayName -cne "PtermAgentCLIDev $version2") {
         throw "ARP registered unexpected display name '$($registration.DisplayName)'"
     }
 
@@ -157,7 +157,7 @@ try {
     $runningProcess.WaitForExit()
     $runningProcess = $null
     $untrustedBinDir = Join-Path $testRoot 'untrusted command root'
-    $untrustedLauncher = Join-Path $untrustedBinDir 'rook-dev.cmd'
+    $untrustedLauncher = Join-Path $untrustedBinDir 'polaris-terminal-dev.cmd'
     Write-FixtureFile $untrustedLauncher 'must remain'
     Invoke-Installer (Join-Path $installDir 'unins000.exe') $installDir $untrustedBinDir -Uninstall
     if (Test-Path -LiteralPath $launcherPath) {

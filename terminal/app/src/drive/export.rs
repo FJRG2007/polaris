@@ -10,11 +10,11 @@ use aho_corasick::{AhoCorasick, MatchKind};
 use anyhow::{Context, anyhow};
 #[cfg(feature = "local_fs")]
 use futures::AsyncWriteExt;
-use rook_util::path::ShellFamily;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::platform::file_picker::FilePickerError;
-use rookui::platform::{FilePickerConfiguration, OperatingSystem};
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity, WindowId};
+use pterm_util::path::ShellFamily;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::platform::file_picker::FilePickerError;
+use ptermui::platform::{FilePickerConfiguration, OperatingSystem};
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity, WindowId};
 
 use super::CloudObjectTypeAndId;
 use crate::cloud_object::Space;
@@ -29,7 +29,7 @@ use crate::{
     workspace::WorkspaceAction,
 };
 
-/// Singleton model for exporting from Rook Drive.
+/// Singleton model for exporting from Polaris Terminal Drive.
 pub struct ExportManager {
     exports: HashMap<ExportId, Export>,
 }
@@ -52,7 +52,7 @@ pub enum ExportEvent {
     Completed { id: ExportId, path: PathBuf },
 }
 
-/// A single Rook Drive export.
+/// A single Polaris Terminal Drive export.
 struct Export {
     /// The ID of the window that started this export, for showing toasts.
     window_id: WindowId,
@@ -360,7 +360,7 @@ impl ExportManager {
         ctx: &mut ModelContext<Self>,
     ) {
         let id = *export.key();
-        // Don't send the error to Sentry, since it likely includes a user file path and their Rook
+        // Don't send the error to Sentry, since it likely includes a user file path and their Polaris Terminal
         // Drive object name. Also don't report this as an error, since the most likely failure
         // reason is an I/O issue on the user's machine (like being out of disk space, or exporting
         // to a directory they can't write to).

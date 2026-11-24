@@ -4,9 +4,9 @@ Linear: [APP-3721](https://linear.app/warpdotdev/issue/APP-3721)
 
 ## 1. Problem
 
-The `remote_server` crate needs to become a standalone binary that communicates with the Rook client over remote connections with length-delimited protobuf messages. In order to support future coding features like the file tree and code review pane, the remote server needs the rookui App to store and handle `Entity`/`SingletonEntity` models like `RepositoryMetadataModel`.
+The `remote_server` crate needs to become a standalone binary that communicates with the Polaris Terminal client over remote connections with length-delimited protobuf messages. In order to support future coding features like the file tree and code review pane, the remote server needs the ptermui App to store and handle `Entity`/`SingletonEntity` models like `RepositoryMetadataModel`.
 
-This spec covers the foundation: a shared protocol layer, a minimal request/response client, the headless rookui server runtime, and `Initialize` end-to-end validation.
+This spec covers the foundation: a shared protocol layer, a minimal request/response client, the headless ptermui server runtime, and `Initialize` end-to-end validation.
 
 ## 2. Relevant Code
 
@@ -16,11 +16,11 @@ This spec covers the foundation: a shared protocol layer, a minimal request/resp
 - `remote_server/proto/remote_server.proto` — `ClientMessage`/`ServerMessage` envelopes with `Initialize`/`InitializeResponse`
 - `remote_server/build.rs` — prost codegen for the proto
 
-### Headless rookui App infrastructure
-- `crates/rookui/src/platform/app.rs:68-80` — `AppBuilder::new_headless(callbacks, assets, test_driver)` constructor
-- `crates/rookui/src/platform/app.rs:107-155` — `AppBuilder::run(init_fn)` wraps init_fn and enters the event loop
-- `crates/rookui/src/platform/headless/app.rs` — `App::run()` creates mpsc channel, marks main thread, enters `event_loop::run()`
-- `crates/rookui/src/platform/headless/event_loop.rs` — blocking `for event in receiver.iter()` loop processing `RunTask`, `RunCallback`, `Terminate`; includes Ctrl-C handler via `ctrlc::set_handler`
+### Headless ptermui App infrastructure
+- `crates/ptermui/src/platform/app.rs:68-80` — `AppBuilder::new_headless(callbacks, assets, test_driver)` constructor
+- `crates/ptermui/src/platform/app.rs:107-155` — `AppBuilder::run(init_fn)` wraps init_fn and enters the event loop
+- `crates/ptermui/src/platform/headless/app.rs` — `App::run()` creates mpsc channel, marks main thread, enters `event_loop::run()`
+- `crates/ptermui/src/platform/headless/event_loop.rs` — blocking `for event in receiver.iter()` loop processing `RunTask`, `RunCallback`, `Terminate`; includes Ctrl-C handler via `ctrlc::set_handler`
 
 ### Entity/Model system
 - `ui/src/core/entity.rs:39-54` — `Entity` trait (has `type Event`) and `SingletonEntity` trait (provides `handle()` and `as_ref()`)
@@ -45,7 +45,7 @@ This spec covers the foundation: a shared protocol layer, a minimal request/resp
 The current `remote_server` crate has:
 - Proto definition for `ClientMessage`/`ServerMessage` with `Initialize`/`InitializeResponse`
 - `lib.rs` re-exporting generated prost types via `include!(concat!(env!("OUT_DIR"), "/remote_server.rs"))`
-- No `main.rs`, no binary entry point, no I/O code, no rookui dependency
+- No `main.rs`, no binary entry point, no I/O code, no ptermui dependency
 
 ## 4. Proposed Changes
 
@@ -87,7 +87,7 @@ Create `remote_server/src/client.rs` and export from `lib.rs`.
 
 ### 4.3. `main.rs` — headless App entry point
 
-Create `remote_server/src/main.rs`. Add `[[bin]]` target in `Cargo.toml` and add `rookui` as a dependency.
+Create `remote_server/src/main.rs`. Add `[[bin]]` target in `Cargo.toml` and add `ptermui` as a dependency.
 
 ```rust
 fn main() -> anyhow::Result<()> {
@@ -101,7 +101,7 @@ fn main() -> anyhow::Result<()> {
 - `AppCallbacks::default()` — all fields `None`, no custom callbacks needed
 - `Box::new(())` — uses `impl AssetProvider for ()` (no-op, returns errors for all lookups)
 - The headless `App::run()` creates the mpsc event channel, marks the current thread as main, and enters the blocking event loop. The `Background` executor inside the App IS the tokio runtime — there is exactly one runtime in the process.
-- The headless rookui `App` infrastructure is proven in production (the Oz CLI uses it via `AppBuilder::new_headless` + `add_singleton_model` + `ModelSpawner`). It provides the full entity/model runtime with zero rendering overhead.
+- The headless ptermui `App` infrastructure is proven in production (the Oz CLI uses it via `AppBuilder::new_headless` + `add_singleton_model` + `ModelSpawner`). It provides the full entity/model runtime with zero rendering overhead.
 
 **Logging:**
 
@@ -172,7 +172,7 @@ impl SingletonEntity for ServerModel {}
 
 ### 4.5. Design Decision: `ModelSpawner` vs `spawn_stream_local`
 
-Two rookui primitives could bridge background I/O to main-thread model context:
+Two ptermui primitives could bridge background I/O to main-thread model context:
 
 **`ModelSpawner` (chosen):** The background stdin reader task holds a `ModelSpawner<ServerModel>` and calls `spawner.spawn(|model, ctx| model.handle_message(msg, ctx)).await` for each decoded message. The transport loop is explicit code we own — it controls pacing, handles EOF, and manages shutdown. The model is a passive handler that doesn't know where messages come from.
 
@@ -189,10 +189,10 @@ We chose `ModelSpawner` because the remote server's transport layer will likely 
 ### 4.6. Cargo.toml changes
 
 Add to `remote_server/Cargo.toml`:
-- `rookui` dependency (workspace) — for headless App, Entity, ModelContext, ModelSpawner
+- `ptermui` dependency (workspace) — for headless App, Entity, ModelContext, ModelSpawner
 - `anyhow` (workspace) — error handling in main
 - `tokio` features: add `io-std` for stdin/stdout access
-- `async-channel` (workspace) — for all async channels (outbound client channel, server response channel). Avoid `tokio::sync::mpsc` for rookui-layer code.
+- `async-channel` (workspace) — for all async channels (outbound client channel, server response channel). Avoid `tokio::sync::mpsc` for ptermui-layer code.
 - `log` (workspace) — structured logging
 - `env_logger` (workspace) — stderr-only log output
 - `dashmap` (workspace) — for lock-free concurrent request tracking in `RemoteServerClient`
@@ -237,16 +237,16 @@ Add to `remote_server/Cargo.toml`:
 ## 6. Risks and Mitigations
 
 - **Client request/response matching**: Responses can arrive out of order once the server handles multiple message types concurrently. Mitigation: track in-flight requests by `request_id` with a `DashMap<RequestId, oneshot::Sender>`
-- **rookui compile footprint**: Pulling in `rookui` brings transitive deps (fonts, rendering stubs). These are dead code in the headless binary — same tradeoff as the Oz CLI. No runtime cost, only compile time.
+- **ptermui compile footprint**: Pulling in `ptermui` brings transitive deps (fonts, rendering stubs). These are dead code in the headless binary — same tradeoff as the Oz CLI. No runtime cost, only compile time.
 - **Main thread serialization**: All typed request handling runs on the main thread via the event loop. Handlers should be fast (in-memory dispatch and model coordination). Heavy work (filesystem I/O, tree building) must be offloaded to background tasks via `ctx.spawn()` or `ModelSpawner`.
 
 ## 7. Testing and Validation
 
 - **Unit tests for `protocol.rs`**: Round-trip encode/decode for `ClientMessage` and `ServerMessage`. Test edge cases: zero-length messages, maximum length, malformed length prefix, truncated payload.
 - **Unit tests for `RemoteServerClient`**: Use in-memory `tokio::io::duplex` streams to simulate a server. Verify `initialize()` returns the expected `InitializeResponse`. Verify correct `request_id` correlation. Verify `ClientError::Disconnected` on stream close.
-- **Integration test for `Initialize` round trip**: Spawn `rook remote-server` as a child process, create a `RemoteServerClient` over the child's stdin/stdout, call `initialize()`, assert `server_version` is non-empty. The test lives in `app/tests/remote_server_tests.rs` — because the `rook` binary is a `[[bin]]` target in the `app` crate, cargo automatically builds it before running these tests.
+- **Integration test for `Initialize` round trip**: Spawn `polaris-terminal remote-server` as a child process, create a `RemoteServerClient` over the child's stdin/stdout, call `initialize()`, assert `server_version` is non-empty. The test lives in `app/tests/remote_server_tests.rs` — because the `polaris-terminal` binary is a `[[bin]]` target in the `app` crate, cargo automatically builds it before running these tests.
 - **Shutdown test**: Send an `Initialize`, then close the client's write end. Assert the server process exits cleanly (exit code 0).
-- **Build validation**: `cargo build -p rook` produces a binary with the `remote-server` subcommand. `cargo clippy` and `cargo fmt` pass.
+- **Build validation**: `cargo build -p polaris-terminal` produces a binary with the `remote-server` subcommand. `cargo clippy` and `cargo fmt` pass.
 
 ## 8. Follow-ups
 

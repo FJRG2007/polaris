@@ -11,7 +11,7 @@ The vertical tabs panel currently renders every pane as a multi-line card (2–4
 - `app/src/workspace/action.rs` — `WorkspaceAction` enum for dispatching UI events
 - `app/src/workspace/view.rs` — `Workspace` struct fields, `show_new_session_dropdown_menu` pattern for popup overlays
 - `ui/src/ui_components/segmented_control.rs` — `SegmentedControl<T>` view, `RenderableOptionConfig`, `SegmentedControlEvent`
-- `rook_core/src/ui/icons.rs` — `Icon` enum and SVG path mappings
+- `pterm_core/src/ui/icons.rs` — `Icon` enum and SVG path mappings
 - `app/src/ai/conversation_status_ui.rs` — `render_status_element` for agent status badges
 - `app/src/terminal/view/tab_metadata.rs` — `terminal_title_from_shell()`, `display_working_directory()`, `selected_conversation_display_title()`
 - `app/src/terminal/view/pane_impl.rs (926-973)` — `is_ambient_agent_session()`, `selected_conversation_status()`, `selected_conversation_display_title()`
@@ -95,7 +95,7 @@ Flex::row [search_bar (Shrinkable)] [settings_button] [new_tab_button]
 ```
 
 The settings button:
-- Uses `Hoverable` wrapping an icon button with `RookIcon::Settings` (or `Settings04`) at 16×16 in a 20×20 container with 2px padding.
+- Uses `Hoverable` wrapping an icon button with `PtermIcon::Settings` (or `Settings04`) at 16×16 in a 20×20 container with 2px padding.
 - Background is `fg_overlay_3` when `state.show_settings_popup` is true, `fg_overlay_2` on hover, transparent otherwise.
 - `on_click` dispatches `WorkspaceAction::ToggleVerticalTabsSettingsPopup`.
 - Wrap in a `Stack` to position a tooltip ("View options") as an overlay when hovered and popup is closed.
@@ -202,15 +202,15 @@ let (icon, title) = if let Some(view_handle) = terminal_view_handle.as_ref() {
         let icon_element = if let Some(status) = conversation_status {
             render_status_element(&status, 12., appearance)
         } else if is_ambient {
-            RookIcon::OzCloud icon element
+            PtermIcon::OzCloud icon element
         } else {
-            RookIcon::Oz icon element
+            PtermIcon::Oz icon element
         };
         (icon_element, conv_title)
     } else {
         // Non-agent terminal: terminal icon + terminal title (NOT pwd)
         let terminal_title = tv.terminal_title_from_shell();
-        (RookIcon::Terminal icon element, terminal_title)
+        (PtermIcon::Terminal icon element, terminal_title)
     }
 } else {
     // Non-terminal pane: type icon + pane title (already in props.title)

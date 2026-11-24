@@ -5,12 +5,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use itertools::Itertools;
 use parking_lot::Mutex;
+use pterm_completer::completer::{CommandExitStatus, CommandOutput};
+use pterm_core::command::ExitCode;
+use ptermui::{App, SingletonEntity};
+use ptermui_extras::user_preferences;
 #[cfg(feature = "local_fs")]
 use repo_metadata::DirectoryWatcher;
-use rook_completer::completer::{CommandExitStatus, CommandOutput};
-use rook_core::command::ExitCode;
-use rookui::{App, SingletonEntity};
-use rookui_extras::user_preferences;
 use settings::Setting as _;
 
 use super::{ActiveChipSurfaces, ChipUpdateStatus, CurrentPrompt, PromptContext};
@@ -33,7 +33,7 @@ use crate::features::FeatureFlag;
 use crate::menu::MenuItem;
 use crate::server::server_api::ServerApiProvider;
 use crate::server::telemetry::context_provider::AppTelemetryContextProvider;
-use crate::settings::RookPromptSeparator;
+use crate::settings::PtermPromptSeparator;
 #[cfg(windows)]
 use crate::system::SystemInfo;
 use crate::terminal::cli_agent_sessions::{
@@ -72,7 +72,7 @@ fn test_context_menu_items() {
                     ContextChipKind::VirtualEnvironment,
                 ],
                 false,
-                RookPromptSeparator::None,
+                PtermPromptSeparator::None,
             )
         });
         app.add_singleton_model(SessionSettings::new_with_defaults);
@@ -130,7 +130,7 @@ fn test_prompt_to_string() {
                     ContextChipKind::ShellGitBranch,
                 ],
                 false,
-                RookPromptSeparator::None,
+                PtermPromptSeparator::None,
             )
         });
         app.add_singleton_model(SessionSettings::new_with_defaults);
@@ -186,7 +186,7 @@ fn test_fingerprint_skips_contextual_chip_recompute_when_context_is_unchanged() 
             Prompt::mock_with(
                 [ContextChipKind::WorkingDirectory],
                 false,
-                RookPromptSeparator::None,
+                PtermPromptSeparator::None,
             )
         });
         app.add_singleton_model(SessionSettings::new_with_defaults);
@@ -246,7 +246,7 @@ fn test_shell_chip_is_disabled_when_required_executable_is_missing() {
             Prompt::mock_with(
                 [ContextChipKind::ShellGitBranch],
                 false,
-                RookPromptSeparator::None,
+                PtermPromptSeparator::None,
             )
         });
         app.add_singleton_model(SessionSettings::new_with_defaults);
@@ -350,7 +350,7 @@ fn test_invalidating_command_count_unaffected_for_chips_without_invalidate_on_co
             Prompt::mock_with(
                 [ContextChipKind::WorkingDirectory],
                 false,
-                RookPromptSeparator::None,
+                PtermPromptSeparator::None,
             )
         });
         app.add_singleton_model(SessionSettings::new_with_defaults);
@@ -396,7 +396,7 @@ fn test_disabling_chips() {
             Prompt::mock_with(
                 [ContextChipKind::ShellGitBranch],
                 false,
-                RookPromptSeparator::None,
+                PtermPromptSeparator::None,
             )
         });
         app.add_singleton_model(SessionSettings::new_with_defaults);
@@ -511,7 +511,7 @@ fn test_chips_to_run_only_includes_active_surface_configurations() {
             Prompt::mock_with(
                 [ContextChipKind::Username],
                 false,
-                RookPromptSeparator::None,
+                PtermPromptSeparator::None,
             )
         });
         app.add_singleton_model(SessionSettings::new_with_defaults);
@@ -665,7 +665,7 @@ fn test_cli_agent_footer_chips_require_a_visible_supported_footer() {
         );
 
         CLIAgentSessionsModel::handle(&app).update(&mut app, |sessions, ctx| {
-            sessions.set_session(terminal_view_id, session_for(CLIAgent::RookTui), ctx);
+            sessions.set_session(terminal_view_id, session_for(CLIAgent::PtermTui), ctx);
         });
         assert!(cli_footer_chips(&app).is_empty());
 
@@ -755,7 +755,7 @@ fn test_externally_driven_chip_skips_periodic_timer() {
             Prompt::mock_with(
                 [ContextChipKind::ShellGitBranch],
                 false,
-                RookPromptSeparator::None,
+                PtermPromptSeparator::None,
             )
         });
         app.add_singleton_model(SessionSettings::new_with_defaults);
@@ -775,7 +775,7 @@ fn test_externally_driven_chip_skips_periodic_timer() {
         let repo_handle = watcher_handle.update(&mut app, |watcher, ctx| {
             watcher
                 .add_directory(
-                    rook_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                    pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
                         temp_dir.path(),
                     )
                     .unwrap(),
@@ -816,7 +816,7 @@ fn test_git_status_change_updates_chip_value() {
             Prompt::mock_with(
                 [ContextChipKind::ShellGitBranch],
                 false,
-                RookPromptSeparator::None,
+                PtermPromptSeparator::None,
             )
         });
         app.add_singleton_model(SessionSettings::new_with_defaults);
@@ -836,7 +836,7 @@ fn test_git_status_change_updates_chip_value() {
         let repo_handle = watcher_handle.update(&mut app, |watcher, ctx| {
             watcher
                 .add_directory(
-                    rook_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                    pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
                         temp_dir.path(),
                     )
                     .unwrap(),
@@ -887,7 +887,7 @@ fn test_git_status_change_updates_branch_status_chip_value() {
             Prompt::mock_with(
                 [ContextChipKind::GitBranchStatus],
                 false,
-                RookPromptSeparator::None,
+                PtermPromptSeparator::None,
             )
         });
         app.add_singleton_model(SessionSettings::new_with_defaults);
@@ -907,7 +907,7 @@ fn test_git_status_change_updates_branch_status_chip_value() {
         let repo_handle = watcher_handle.update(&mut app, |watcher, ctx| {
             watcher
                 .add_directory(
-                    rook_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                    pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
                         temp_dir.path(),
                     )
                     .unwrap(),
@@ -968,7 +968,7 @@ fn test_git_status_pr_info_updates_github_pr_chip_value() {
             Prompt::mock_with(
                 [ContextChipKind::GithubPullRequest],
                 false,
-                RookPromptSeparator::None,
+                PtermPromptSeparator::None,
             )
         });
         app.add_singleton_model(SessionSettings::new_with_defaults);
@@ -988,7 +988,7 @@ fn test_git_status_pr_info_updates_github_pr_chip_value() {
         let repo_handle = watcher_handle.update(&mut app, |watcher, ctx| {
             watcher
                 .add_directory(
-                    rook_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                    pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
                         temp_dir.path(),
                     )
                     .unwrap(),
@@ -1022,7 +1022,8 @@ fn test_git_status_pr_info_updates_github_pr_chip_value() {
             model.set_pr_info_for_test(
                 Some(PrInfo {
                     number: 123,
-                    url: "https://github.com/rook/rook/pull/123".to_string(),
+                    url: "https://github.com/polaris-terminal/polaris-terminal/pull/123"
+                        .to_string(),
                     state: "OPEN".to_string(),
                     draft: true,
                     base_branch: "main".to_string(),
@@ -1038,7 +1039,7 @@ fn test_git_status_pr_info_updates_github_pr_chip_value() {
             assert_eq!(
                 value,
                 Some(&crate::context_chips::ChipValue::Text(
-                    "https://github.com/rook/rook/pull/123".to_string(),
+                    "https://github.com/polaris-terminal/polaris-terminal/pull/123".to_string(),
                 )),
             );
         });
@@ -1062,7 +1063,8 @@ fn test_git_status_pr_info_updates_github_pr_chip_value() {
             model.set_pr_info_for_test(
                 Some(PrInfo {
                     number: 456,
-                    url: "https://github.com/rook/rook/pull/456".to_string(),
+                    url: "https://github.com/polaris-terminal/polaris-terminal/pull/456"
+                        .to_string(),
                     state: "OPEN".to_string(),
                     draft: false,
                     base_branch: "main".to_string(),

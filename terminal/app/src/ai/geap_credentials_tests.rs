@@ -2,9 +2,9 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use ai::api_keys::ApiKeyManager;
-use rook_managed_secrets::ManagedSecretManager;
-use rookui::{AddSingletonModel, App};
-use rookui_extras::user_preferences;
+use pterm_managed_secrets::ManagedSecretManager;
+use ptermui::{AddSingletonModel, App};
+use ptermui_extras::user_preferences;
 use settings::{PrivatePreferences, PublicPreferences};
 
 use super::*;
@@ -17,8 +17,8 @@ use crate::workspaces::workspace::{HostEnablementSetting, LlmHostSettings, Works
 
 // ── pure helpers ────────────────────────────────────────────────
 
-const TEST_AUDIENCE: &str = "//iam.googleapis.com/projects/123456/locations/global/workloadIdentityPools/rook-pool/providers/rook-provider";
-const TEST_SA_EMAIL: &str = "rook-geap@test-project.iam.gserviceaccount.com";
+const TEST_AUDIENCE: &str = "//iam.googleapis.com/projects/123456/locations/global/workloadIdentityPools/polaris-terminal-pool/providers/polaris-terminal-provider";
+const TEST_SA_EMAIL: &str = "polaris-terminal-geap@test-project.iam.gserviceaccount.com";
 
 #[test]
 fn mint_binding_from_parts_trims_and_normalizes() {
@@ -219,7 +219,7 @@ fn initialize_app(app: &mut App, workspaces: Vec<Workspace>) {
         )
     });
     app.update(|ctx| {
-        rookui_extras::secure_storage::register_noop("test", ctx);
+        ptermui_extras::secure_storage::register_noop("test", ctx);
         ctx.add_singleton_model(ApiKeyManager::new);
     });
 }

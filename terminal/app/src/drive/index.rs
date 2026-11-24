@@ -6,13 +6,13 @@ use futures::Future;
 use itertools::Itertools;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_core::context_flag::ContextFlag;
-use rook_core::settings::Setting;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::{report_error, report_if_error};
-use rook_util::sync::Condition;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::settings::Setting;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::{report_error, report_if_error};
+use pterm_util::sync::Condition;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Align, AnchorPair, Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dash, DropTarget, DropTargetData,
     Empty, Flex, Highlight, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
@@ -21,13 +21,13 @@ use rookui::elements::{
     ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Shrinkable, Stack, Text, XAxisAnchor,
     YAxisAnchor,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::platform::{Cursor, OperatingSystem};
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::units::IntoPixels;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::{Cursor, OperatingSystem};
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::units::IntoPixels;
+use ptermui::{
     AppContext, BlurContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView,
     UpdateView, View, ViewContext, ViewHandle, WindowId,
 };
@@ -43,11 +43,11 @@ use super::empty_trash_confirmation_dialog::{
     EmptyTrashConfirmationDialog, EmptyTrashConfirmationEvent,
 };
 use super::folders::CloudFolder;
-use super::items::RookDriveItemId;
-use super::items::ai_fact_collection::RookDriveAIFactCollection;
-use super::items::item::{ItemStates, RookDriveRow, tools_panel_menu_direction};
-use super::items::mcp_server_collection::RookDriveMCPServerCollection;
-use super::settings::RookDriveSettings;
+use super::items::PtermDriveItemId;
+use super::items::ai_fact_collection::PtermDriveAIFactCollection;
+use super::items::item::{ItemStates, PtermDriveRow, tools_panel_menu_direction};
+use super::items::mcp_server_collection::PtermDriveMCPServerCollection;
+use super::settings::PtermDriveSettings;
 use super::sharing::dialog::{SharingDialog, SharingDialogEvent};
 use super::sharing::{ContentEditability, ShareableObject};
 use super::{CloudObjectTypeAndId, DriveObjectType, DriveSortOrder};
@@ -100,7 +100,7 @@ use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::workspaces::workspace::{Workspace, WorkspaceUid};
 use crate::{ObjectActions, send_telemetry_from_ctx};
 
-const ROOK_DRIVE_TITLE: &str = "Rook Drive";
+const POLARIS_TERMINAL_DRIVE_TITLE: &str = "Polaris Terminal Drive";
 
 // Team zero state consts
 const HINT_HORIZONTAL_PADDING: f32 = 18.;
@@ -177,7 +177,7 @@ const OFFLINE_BANNER_TEXT: &str = "You are offline. Some files will be read only
 
 pub const DRIVE_INDEX_VIEW_POSITION_ID: &str = "drive_index_view_id";
 
-// Sets the speed of the autoscroll that occurs when you drag an item near the Rook Drive border.
+// Sets the speed of the autoscroll that occurs when you drag an item near the Polaris Terminal Drive border.
 pub const AUTOSCROLL_SPEED_MULTIPLIER: f32 = 10.;
 // Sets the distance from a border at which scroll events start to occur.
 pub const AUTOSCROLL_DETECTION_DISTANCE: f32 = 30.0;
@@ -224,7 +224,7 @@ impl DropTargetData for CloudObjectLocation {
     }
 }
 
-struct RenderedRookDriveItemAndChildren {
+struct RenderedPtermDriveItemAndChildren {
     element: Box<dyn Element>,
     num_items: usize, // represents the total number of elements, including the parent and any children
 }
@@ -280,10 +280,10 @@ pub enum DriveIndexAction {
     ToggleSortingMenu,
     ToggleItemOverflowMenu {
         space: Space,
-        rook_drive_item_id: RookDriveItemId,
+        pterm_drive_item_id: PtermDriveItemId,
     },
     ToggleShareDialog {
-        rook_drive_item_id: RookDriveItemId,
+        pterm_drive_item_id: PtermDriveItemId,
     },
     ToggleSpaceOverflowMenu {
         space: Space,
@@ -354,10 +354,10 @@ pub enum DriveIndexAction {
     CloseTrashIndex,
     FocusPreviousItem,
     FocusNextItem,
-    /// Hitting one of the l/r arrow keys on a Rook Drive item.
+    /// Hitting one of the l/r arrow keys on a Polaris Terminal Drive item.
     LeftArrowKey,
     RightArrowKey,
-    /// Hitting enter key on a Rook Drive item.
+    /// Hitting enter key on a Polaris Terminal Drive item.
     EnterKey,
     /// Hitting escape key from trash index returns to main drive index.
     EscapeKey,
@@ -372,7 +372,7 @@ pub enum DriveIndexAction {
     SignupAnonymousUser,
     DismissPersonalObjectLimits,
     /// Dismiss (and remember dismissing) the shared object limit banner shown
-    /// in the Rook Drive sidebar when a plan's notebook/workflow limit is hit.
+    /// in the Polaris Terminal Drive sidebar when a plan's notebook/workflow limit is hit.
     DismissObjectLimitBanner {
         banner_kind: SharedObjectLimitBannerKind,
     },
@@ -483,14 +483,14 @@ pub enum DriveIndexEvent {
         initial_folder_id: Option<SyncId>,
     },
     OpenWorkflowModalWithCloudWorkflow(SyncId),
-    FocusRookDrive,
+    FocusPtermDrive,
     OpenSharedObjectsCreationDeniedModal(DriveObjectType, ServerId),
     AttachPlanAsContext(AIDocumentId),
 }
 
 #[derive(Clone, Default)]
 struct MouseStateHandles {
-    rook_drive_initial_load_mouse_state: MouseStateHandle,
+    pterm_drive_initial_load_mouse_state: MouseStateHandle,
     sorting_button_mouse_state: MouseStateHandle,
     retry_button_mouse_state: MouseStateHandle,
     trash_row_mouse_state: MouseStateHandle,
@@ -517,10 +517,10 @@ struct SpaceMenuState {
     offset: Vector2F,
 }
 
-/// The main view for the Rook Drive sidebar.
+/// The main view for the Polaris Terminal Drive sidebar.
 /// `DriveIndex` is different from `DrivePanel` in that it is responsible for
-/// all the logic within Rook Drive, whereas `DrivePanel` is responsible for
-/// how Rook Drive interacts with the workspace and the rest of the app.
+/// all the logic within Polaris Terminal Drive, whereas `DrivePanel` is responsible for
+/// how Polaris Terminal Drive interacts with the workspace and the rest of the app.
 #[derive(Clone)]
 pub struct DriveIndex {
     window_id: WindowId,
@@ -529,15 +529,15 @@ pub struct DriveIndex {
     menu: ViewHandle<Menu<DriveIndexAction>>,
 
     sharing_dialog: ViewHandle<SharingDialog>,
-    /// Variant of the index, determines whether base Rook Drive or trash is viewed.
+    /// Variant of the index, determines whether base Polaris Terminal Drive or trash is viewed.
     index_variant: DriveIndexVariant,
     /// If None, the context menu is closed. Otherwise, this contains the ID of the object it's open on.
-    menu_object_id_if_open: Option<RookDriveItemId>,
+    menu_object_id_if_open: Option<PtermDriveItemId>,
     /// If Some, the share dialog is open for the given object.
-    share_dialog_open_for_object: Option<RookDriveItemId>,
+    share_dialog_open_for_object: Option<PtermDriveItemId>,
     sections: Vec<DriveIndexSection>,
     /// Selected represents an object that is open in the active pane
-    selected: Option<RookDriveItemId>,
+    selected: Option<PtermDriveItemId>,
     /// The numerical index of the item that is focused in WD (via keyboard)
     focused_index: Option<usize>,
     item_mouse_states: HashMap<Space, Vec<ItemStates>>,
@@ -552,22 +552,22 @@ pub struct DriveIndex {
     sorting_choice: DriveSortOrder,
     auth_state: Arc<AuthState>,
     space_menu_open_for_space: Option<SpaceMenuState>,
-    show_rook_drive_loading_icon: bool,
+    show_pterm_drive_loading_icon: bool,
     should_show_personal_object_limit_status: bool,
     /// A hashmap of location (space/folder) to a list of hashed IDs of objects inside
     /// the space/folder, used for rendering our objects
     sorted_orders_by_location: HashMap<CloudObjectLocation, Vec<ObjectUid>>,
-    /// A sorted list of all the items (spaces + objects) in Rook Drive
+    /// A sorted list of all the items (spaces + objects) in Polaris Terminal Drive
     /// Unlike sorted_orders_by_location, this is not used for rendering
     /// This is used for object focusing and WD keyboard navigation
-    ordered_items: Vec<RookDriveItemId>,
+    ordered_items: Vec<PtermDriveItemId>,
 
     /// Whether or not we have done an initial setting of all the section states.
     /// We need to keep track of this to make sure we don't do any opening actions on WD
     /// from links before everything has been set up.
     has_initialized_sections: Condition,
 
-    /// The number of objects in Rook Drive that have errored.
+    /// The number of objects in Polaris Terminal Drive that have errored.
     /// This value is cached so that we can determine whether to render the "retry all"
     /// objects button in the case of syncing failures.
     num_errored_objects: usize,
@@ -576,17 +576,17 @@ pub struct DriveIndex {
 
     /// Drive item to represent collection of AI facts.
     /// Special-cased to always render at the top of the Personal space section.
-    ai_fact_collection: RookDriveAIFactCollection,
+    ai_fact_collection: PtermDriveAIFactCollection,
     ai_fact_collection_item_mouse_states: ItemStates,
 
     /// Drive item to represent collection of MCP servers.
     /// Special-cased to always render at the top of the Personal space section.
-    mcp_server_collection: RookDriveMCPServerCollection,
+    mcp_server_collection: PtermDriveMCPServerCollection,
     mcp_server_collection_item_mouse_states: ItemStates,
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings(vec![
         FixedBinding::new("up", DriveIndexAction::FocusPreviousItem, id!("DriveIndex")),
@@ -752,7 +752,9 @@ impl DriveIndex {
         if total_teammates == 0 {
             JOIN_OPEN_TEAM_TEXT.to_owned()
         } else {
-            format!("Collaborate with {total_teammates} of your teammates already on Rook.")
+            format!(
+                "Collaborate with {total_teammates} of your teammates already on Polaris Terminal."
+            )
         }
     }
 
@@ -780,7 +782,7 @@ impl DriveIndex {
                 cloud_model
                     .active_cloud_objects_in_location_without_descendents(location, app)
                     .filter(move |cloud_object| {
-                        cloud_object.renders_in_rook_drive()
+                        cloud_object.renders_in_pterm_drive()
                             && user_uid.is_some_and(|uid| {
                                 cloud_object.permissions().has_direct_user_access(uid)
                             })
@@ -793,7 +795,7 @@ impl DriveIndex {
             }
             (DriveIndexVariant::MainIndex, _) => cloud_model
                 .active_cloud_objects_in_location_without_descendents(location, app)
-                .filter(|cloud_object| cloud_object.renders_in_rook_drive())
+                .filter(|cloud_object| cloud_object.renders_in_pterm_drive())
                 .sorted_by(self.sorting_choice.sort_by(
                     cloud_view_model,
                     UpdateTimestamp::Revision,
@@ -852,7 +854,7 @@ impl DriveIndex {
             if let Some(cloud_object) = cloud_model.get_by_uid(&uid) {
                 // Add object to the list
                 let cloud_id = cloud_object.cloud_object_type_and_id();
-                self.ordered_items.push(RookDriveItemId::Object(cloud_id));
+                self.ordered_items.push(PtermDriveItemId::Object(cloud_id));
                 // If the item is a folder and the folder is open, recurse
                 if let CloudObjectTypeAndId::Folder(folder_id) = cloud_id
                     && self
@@ -875,7 +877,7 @@ impl DriveIndex {
         for section in self.sections.clone() {
             if let DriveIndexSection::Space(space) = section {
                 // Add space to the list
-                self.ordered_items.push(RookDriveItemId::Space(space));
+                self.ordered_items.push(PtermDriveItemId::Space(space));
                 // If the space is not collapsed, iterate through the items in the space
                 if let Some(section_state) = self
                     .section_states
@@ -888,9 +890,9 @@ impl DriveIndex {
                             && ContextFlag::ShowMCPServers.is_enabled()
                         {
                             self.ordered_items
-                                .push(RookDriveItemId::MCPServerCollection);
+                                .push(PtermDriveItemId::MCPServerCollection);
                         }
-                        self.ordered_items.push(RookDriveItemId::AIFactCollection);
+                        self.ordered_items.push(PtermDriveItemId::AIFactCollection);
                     }
                     // Sort and add the rest of the items in the space
                     let Some(uids) = self
@@ -904,7 +906,7 @@ impl DriveIndex {
             }
         }
         if self.index_variant == DriveIndexVariant::MainIndex {
-            self.ordered_items.push(RookDriveItemId::Trash);
+            self.ordered_items.push(PtermDriveItemId::Trash);
         }
     }
 
@@ -983,12 +985,12 @@ impl DriveIndex {
             me.handle_empty_trash_confirmation_dialog_event(event, ctx);
         });
 
-        let sorting_choice = *RookDriveSettings::as_ref(ctx).sorting_choice.value();
+        let sorting_choice = *PtermDriveSettings::as_ref(ctx).sorting_choice.value();
 
-        // Hide Rook Drive loading icon once initial load is complete
+        // Hide Polaris Terminal Drive loading icon once initial load is complete
         let initial_load_complete = UpdateManager::as_ref(ctx).initial_load_complete();
         ctx.spawn(initial_load_complete, |me, _, ctx| {
-            me.show_rook_drive_loading_icon = false;
+            me.show_pterm_drive_loading_icon = false;
             me.initialize_section_states(ctx);
             me.has_initialized_sections.set();
             ctx.notify();
@@ -1037,8 +1039,8 @@ impl DriveIndex {
             dropdown
         });
 
-        let ai_fact_collection = RookDriveAIFactCollection::new(ClientId::default());
-        let mcp_server_collection = RookDriveMCPServerCollection::new(ClientId::default());
+        let ai_fact_collection = PtermDriveAIFactCollection::new(ClientId::default());
+        let mcp_server_collection = PtermDriveMCPServerCollection::new(ClientId::default());
 
         Self {
             window_id: ctx.window_id(),
@@ -1061,7 +1063,7 @@ impl DriveIndex {
             sorting_choice,
             auth_state: AuthStateProvider::as_ref(ctx).get().clone(),
             space_menu_open_for_space: None,
-            show_rook_drive_loading_icon: true,
+            show_pterm_drive_loading_icon: true,
             sorted_orders_by_location: Default::default(),
             ordered_items: Default::default(),
             has_initialized_sections: Default::default(),
@@ -1102,7 +1104,11 @@ impl DriveIndex {
         NetworkStatus::as_ref(app).is_online()
     }
 
-    pub fn scroll_item_into_view(&mut self, item_id: RookDriveItemId, ctx: &mut ViewContext<Self>) {
+    pub fn scroll_item_into_view(
+        &mut self,
+        item_id: PtermDriveItemId,
+        ctx: &mut ViewContext<Self>,
+    ) {
         self.clipped_scroll_state.scroll_to_position(ScrollTarget {
             position_id: item_id.drive_row_position_id(),
             mode: ScrollToPositionMode::FullyIntoView,
@@ -1111,7 +1117,7 @@ impl DriveIndex {
     }
 
     /// Sets focused to the index of either the selected object or the first item in WD
-    pub fn reset_focused_index_in_rook_drive(
+    pub fn reset_focused_index_in_pterm_drive(
         &mut self,
         should_scroll: bool,
         ctx: &mut ViewContext<Self>,
@@ -1139,7 +1145,7 @@ impl DriveIndex {
 
     pub fn set_focused_item(
         &mut self,
-        item_id: RookDriveItemId,
+        item_id: PtermDriveItemId,
         should_scroll: bool,
         ctx: &mut ViewContext<Self>,
     ) {
@@ -1212,8 +1218,8 @@ impl DriveIndex {
         if let Event::Close { via_select_item } = event {
             self.reset_menus(ctx);
             if !*via_select_item {
-                ctx.emit(DriveIndexEvent::FocusRookDrive);
-                self.reset_focused_index_in_rook_drive(false, ctx);
+                ctx.emit(DriveIndexEvent::FocusPtermDrive);
+                self.reset_focused_index_in_pterm_drive(false, ctx);
             }
         }
     }
@@ -1278,14 +1284,14 @@ impl DriveIndex {
         ctx.notify();
     }
 
-    /// Expand the section for rook drive item. This is called when we perform deep link to rook
+    /// Expand the section for polaris-terminal drive item. This is called when we perform deep link to polaris-terminal
     /// drive items.
     pub fn expand_section_for_drive_item_id(
         &mut self,
-        item_id: RookDriveItemId,
+        item_id: PtermDriveItemId,
         ctx: &mut ViewContext<DriveIndex>,
     ) {
-        if let RookDriveItemId::Object(object_id) = item_id {
+        if let PtermDriveItemId::Object(object_id) = item_id {
             match object_id {
                 CloudObjectTypeAndId::Notebook(sync_id) => {
                     self.expand_section_for_object(&sync_id.uid().clone(), ctx);
@@ -1355,7 +1361,7 @@ impl DriveIndex {
         let icon = Container::new(
             ConstrainedBox::new(
                 Icon::CreateTeam
-                    .to_rookui_icon(
+                    .to_ptermui_icon(
                         appearance
                             .theme()
                             .main_text_color(appearance.theme().surface_1()),
@@ -1426,7 +1432,7 @@ impl DriveIndex {
             ctx.dispatch_typed_action(DriveIndexAction::ToggleSectionCollapsed(section))
         })
         .on_right_click(move |ctx, _, position| {
-            let position_id = &rook_drive_section_header_position_id(&section);
+            let position_id = &pterm_drive_section_header_position_id(&section);
             let Some(prompt_rect) = ctx.element_position_by_id(position_id) else {
                 return;
             };
@@ -1446,7 +1452,7 @@ impl DriveIndex {
             stack.add_positioned_overlay_child(
                 ChildView::new(&self.menu).finish(),
                 OffsetPositioning::offset_from_save_position_element(
-                    rook_drive_section_header_position_id(&section),
+                    pterm_drive_section_header_position_id(&section),
                     space_menu_state.offset,
                     PositionedElementOffsetBounds::WindowByPosition,
                     PositionedElementAnchor::TopLeft,
@@ -1501,10 +1507,10 @@ impl DriveIndex {
         let mut is_focused = false;
         if let DriveIndexSection::Space(space) = section
             && let Some(focused_index) = self.focused_index
-            && Some(&RookDriveItemId::Space(space)) == self.ordered_items.get(focused_index)
+            && Some(&PtermDriveItemId::Space(space)) == self.ordered_items.get(focused_index)
         {
             container = container.with_background(
-                rook_core::ui::theme::color::internal_colors::fg_overlay_4(appearance.theme()),
+                pterm_core::ui::theme::color::internal_colors::fg_overlay_4(appearance.theme()),
             );
             is_focused = true;
         }
@@ -1512,10 +1518,10 @@ impl DriveIndex {
             Hoverable::new(
                 section_state.header_hover_state.clone(),
                 move |mouse_state| {
-                    // If the item is hovered, set a hover background that matches the hover state of rook drive items.
+                    // If the item is hovered, set a hover background that matches the hover state of polaris-terminal drive items.
                     if mouse_state.is_hovered() && !is_focused || section_state.menu_open {
                         container = container.with_background(
-                            rook_core::ui::theme::color::internal_colors::fg_overlay_2(
+                            pterm_core::ui::theme::color::internal_colors::fg_overlay_2(
                                 appearance.theme(),
                             ),
                         );
@@ -1556,7 +1562,7 @@ impl DriveIndex {
                 ctx.dispatch_typed_action(DriveIndexAction::ToggleSectionCollapsed(section))
             })
             .on_right_click(move |ctx, _, position| {
-                let position_id = &rook_drive_section_header_position_id(&section);
+                let position_id = &pterm_drive_section_header_position_id(&section);
                 let Some(prompt_rect) = ctx.element_position_by_id(position_id) else {
                     return;
                 };
@@ -1576,7 +1582,7 @@ impl DriveIndex {
             left_stack.add_positioned_overlay_child(
                 ChildView::new(&self.menu).finish(),
                 OffsetPositioning::offset_from_save_position_element(
-                    rook_drive_section_header_position_id(&section),
+                    pterm_drive_section_header_position_id(&section),
                     space_menu_state.offset,
                     PositionedElementOffsetBounds::WindowByPosition,
                     PositionedElementAnchor::TopLeft,
@@ -1590,7 +1596,7 @@ impl DriveIndex {
             if self
                 .focused_index
                 .and_then(|idx| self.ordered_items.get(idx))
-                .is_some_and(|item| item == &RookDriveItemId::Space(space_clone))
+                .is_some_and(|item| item == &PtermDriveItemId::Space(space_clone))
             {
                 (
                     blended_colors::text_main(appearance.theme(), appearance.theme().background()),
@@ -1609,7 +1615,7 @@ impl DriveIndex {
             font_color: Some(empty_trash_default_font_color),
             font_size: Some(14.),
             font_family_id: Some(appearance.ui_font_family()),
-            font_weight: Some(rookui::fonts::Weight::Semibold),
+            font_weight: Some(ptermui::fonts::Weight::Semibold),
             padding: Some(Coords::uniform(6.)),
             border_radius: Some(CornerRadius::with_all(Radius::Pixels(6.))),
             ..Default::default()
@@ -1671,7 +1677,7 @@ impl DriveIndex {
                 self.add_dialog_to_stack(
                     &mut right_stack,
                     ChildView::new(&self.empty_trash_confirmation_dialog).finish(),
-                    rook_drive_section_header_position_id(&section).as_str(),
+                    pterm_drive_section_header_position_id(&section).as_str(),
                     app,
                 );
             }
@@ -1701,10 +1707,10 @@ impl DriveIndex {
         let mut is_focused = false;
         if let DriveIndexSection::Space(space) = section
             && let Some(focused_index) = self.focused_index
-            && Some(&RookDriveItemId::Space(space)) == self.ordered_items.get(focused_index)
+            && Some(&PtermDriveItemId::Space(space)) == self.ordered_items.get(focused_index)
         {
             container = container.with_background(
-                rook_core::ui::theme::color::internal_colors::fg_overlay_4(appearance.theme()),
+                pterm_core::ui::theme::color::internal_colors::fg_overlay_4(appearance.theme()),
             );
             is_focused = true;
         }
@@ -1712,10 +1718,10 @@ impl DriveIndex {
         Hoverable::new(
             section_state.header_hover_state.clone(),
             move |mouse_state| {
-                // If the item is hovered, set a hover background that matches the hover state of rook drive items.
+                // If the item is hovered, set a hover background that matches the hover state of polaris-terminal drive items.
                 if mouse_state.is_hovered() && !is_focused || section_state.menu_open {
                     container = container.with_background(
-                        rook_core::ui::theme::color::internal_colors::fg_overlay_2(
+                        pterm_core::ui::theme::color::internal_colors::fg_overlay_2(
                             appearance.theme(),
                         ),
                     );
@@ -1727,7 +1733,7 @@ impl DriveIndex {
         .finish()
     }
 
-    // Todo: move the header rendering into RookDriveItem to consolidate styling logic.
+    // Todo: move the header rendering into PtermDriveItem to consolidate styling logic.
     fn render_section_header(
         &self,
         section: DriveIndexSection,
@@ -1739,7 +1745,7 @@ impl DriveIndex {
             (DriveIndexVariant::MainIndex, DriveIndexSection::Space(space)) => {
                 let title_font_color: ColorU = if self.focused_index.is_some()
                     && self.ordered_items.get(self.focused_index.unwrap())
-                        == Some(&RookDriveItemId::Space(space))
+                        == Some(&PtermDriveItemId::Space(space))
                 {
                     blended_colors::text_main(appearance.theme(), appearance.theme().background())
                 } else {
@@ -1775,7 +1781,7 @@ impl DriveIndex {
             }
             (DriveIndexVariant::Trash, DriveIndexSection::Space(space)) => {
                 let title_font_color = self
-                    .font_color_based_on_focused_state(appearance, RookDriveItemId::Space(space));
+                    .font_color_based_on_focused_state(appearance, PtermDriveItemId::Space(space));
                 Some(self.render_trash_section_header(
                     self.render_section_title(space, title_font_color, appearance, app),
                     &space,
@@ -1795,7 +1801,7 @@ impl DriveIndex {
                 ConstrainedBox::new(header)
                     .with_height(SECTION_HEADER_CONTENT_HEIGHT + SECTION_HEADER_MARGIN_BOTTOM)
                     .finish(),
-                &rook_drive_section_header_position_id(&section),
+                &pterm_drive_section_header_position_id(&section),
             )
             .finish()
         } else {
@@ -1834,9 +1840,10 @@ impl DriveIndex {
     }
 
     fn render_trash_row(&self, appearance: &Appearance, _: &AppContext) -> Box<dyn Element> {
-        let font_color = self.font_color_based_on_focused_state(appearance, RookDriveItemId::Trash);
+        let font_color =
+            self.font_color_based_on_focused_state(appearance, PtermDriveItemId::Trash);
         let icon = Container::new(
-            ConstrainedBox::new(Icon::Trash.to_rookui_icon(font_color.into()).finish())
+            ConstrainedBox::new(Icon::Trash.to_ptermui_icon(font_color.into()).finish())
                 .with_width(SECTION_HEADER_FONT_SIZE)
                 .with_height(SECTION_HEADER_FONT_SIZE)
                 .finish(),
@@ -1883,10 +1890,10 @@ impl DriveIndex {
         // If the trash row is focused, set background
         let mut is_focused = false;
         if let Some(focused_index) = self.focused_index
-            && Some(&RookDriveItemId::Trash) == self.ordered_items.get(focused_index)
+            && Some(&PtermDriveItemId::Trash) == self.ordered_items.get(focused_index)
         {
             container = container.with_background(
-                rook_core::ui::theme::color::internal_colors::fg_overlay_4(appearance.theme()),
+                pterm_core::ui::theme::color::internal_colors::fg_overlay_4(appearance.theme()),
             );
             is_focused = true;
         }
@@ -1898,7 +1905,7 @@ impl DriveIndex {
                 if mouse_state.is_hovered() && !is_focused {
                     container
                         .with_background(
-                            rook_core::ui::theme::color::internal_colors::fg_overlay_2(
+                            pterm_core::ui::theme::color::internal_colors::fg_overlay_2(
                                 appearance.theme(),
                             ),
                         )
@@ -1918,7 +1925,7 @@ impl DriveIndex {
                     .finish(),
             )
             .finish(),
-            "RookDrive_TrashButton",
+            "PtermDrive_TrashButton",
         )
         .finish()
     }
@@ -1929,23 +1936,25 @@ impl DriveIndex {
         appearance: &Appearance,
         app: &AppContext,
     ) -> Option<Box<dyn Element>> {
-        let rook_drive_item_id = RookDriveItemId::AIFactCollection;
-        let is_selected = self.selected == Some(rook_drive_item_id);
+        let pterm_drive_item_id = PtermDriveItemId::AIFactCollection;
+        let is_selected = self.selected == Some(pterm_drive_item_id);
         let mut is_focused = false;
         if let Some(focused_index) = self.focused_index
-            && let Some(&RookDriveItemId::AIFactCollection) = self.ordered_items.get(focused_index)
+            && let Some(&PtermDriveItemId::AIFactCollection) = self.ordered_items.get(focused_index)
         {
             is_focused = true;
         }
 
-        let row = RookDriveRow::new(
+        let row = PtermDriveRow::new(
             Box::new(self.ai_fact_collection.clone()),
             self.ai_fact_collection_item_mouse_states.clone(),
             space,
             0,
             self.menu.clone(),
             false, /* can_move */
-            !self.menu_items(&space, &rook_drive_item_id, app).is_empty(),
+            !self
+                .menu_items(&space, &pterm_drive_item_id, app)
+                .is_empty(),
             false,
             false, /* share_dialog_open */
             is_selected,
@@ -1964,24 +1973,26 @@ impl DriveIndex {
         appearance: &Appearance,
         app: &AppContext,
     ) -> Option<Box<dyn Element>> {
-        let rook_drive_item_id = RookDriveItemId::MCPServerCollection;
-        let is_selected = self.selected == Some(rook_drive_item_id);
+        let pterm_drive_item_id = PtermDriveItemId::MCPServerCollection;
+        let is_selected = self.selected == Some(pterm_drive_item_id);
         let mut is_focused = false;
         if let Some(focused_index) = self.focused_index
-            && let Some(&RookDriveItemId::MCPServerCollection) =
+            && let Some(&PtermDriveItemId::MCPServerCollection) =
                 self.ordered_items.get(focused_index)
         {
             is_focused = true;
         }
 
-        let row = RookDriveRow::new(
+        let row = PtermDriveRow::new(
             Box::new(self.mcp_server_collection.clone()),
             self.mcp_server_collection_item_mouse_states.clone(),
             space,
             0,
             self.menu.clone(),
             false, /* can_move */
-            !self.menu_items(&space, &rook_drive_item_id, app).is_empty(),
+            !self
+                .menu_items(&space, &pterm_drive_item_id, app)
+                .is_empty(),
             false,
             false, /* share_dialog_open */
             is_selected,
@@ -2075,7 +2086,7 @@ impl DriveIndex {
         appearance: &Appearance,
     ) -> Box<dyn Element> {
         let rendered_icon = ConstrainedBox::new(
-            icon.to_rookui_icon(appearance.theme().nonactive_ui_text_color())
+            icon.to_ptermui_icon(appearance.theme().nonactive_ui_text_color())
                 .finish(),
         )
         .with_width(ITEM_FONT_SIZE)
@@ -2423,7 +2434,7 @@ impl DriveIndex {
                     Container::new(
                         ConstrainedBox::new(
                             Icon::CloudOffline
-                                .to_rookui_icon(
+                                .to_ptermui_icon(
                                     appearance
                                         .theme()
                                         .sub_text_color(appearance.theme().surface_2()),
@@ -2526,7 +2537,7 @@ impl DriveIndex {
         let text = Container::new(
             appearance
                 .ui_builder()
-                .span(ROOK_DRIVE_TITLE.to_string())
+                .span(POLARIS_TERMINAL_DRIVE_TITLE.to_string())
                 .with_style(UiComponentStyles {
                     font_family_id: Some(appearance.ui_font_family()),
                     font_size: Some(TITLE_FONT_SIZE),
@@ -2547,8 +2558,8 @@ impl DriveIndex {
 
         let mut title_right_side = Flex::row();
 
-        if self.show_rook_drive_loading_icon && self.is_online(app) {
-            title_right_side.add_child(self.render_rook_drive_loading_icon(appearance));
+        if self.show_pterm_drive_loading_icon && self.is_online(app) {
+            title_right_side.add_child(self.render_pterm_drive_loading_icon(appearance));
         }
 
         // Only show the global retry button if there are errored objects
@@ -2642,7 +2653,7 @@ impl DriveIndex {
                     Container::new(
                         ConstrainedBox::new(
                             Icon::Info
-                                .to_rookui_icon(appearance.theme().nonactive_ui_text_color())
+                                .to_ptermui_icon(appearance.theme().nonactive_ui_text_color())
                                 .finish(),
                         )
                         .with_height(15.)
@@ -2687,7 +2698,7 @@ impl DriveIndex {
             .finish()
     }
 
-    /// Renders a rook drive item within the index. If the item is a folder, we recursively call
+    /// Renders a polaris-terminal drive item within the index. If the item is a folder, we recursively call
     /// this function in order to render the folder's children (if it's open).
     /// This index refers to the idx within a given space, and is needed to render the context menu at the
     /// correct position. If the item should not be shown, this returns [`None`].
@@ -2703,41 +2714,43 @@ impl DriveIndex {
         cloud_model: &CloudModel,
         appearance: &Appearance,
         app: &AppContext,
-    ) -> Option<RenderedRookDriveItemAndChildren> {
-        if !object.renders_in_rook_drive() {
+    ) -> Option<RenderedPtermDriveItemAndChildren> {
+        if !object.renders_in_pterm_drive() {
             return None;
         }
 
         let mut stack = Stack::new();
         let row_object_id = object.cloud_object_type_and_id();
-        let rook_drive_item_id = RookDriveItemId::Object(row_object_id);
+        let pterm_drive_item_id = PtermDriveItemId::Object(row_object_id);
         let access_level = CloudViewModel::as_ref(app).access_level(&row_object_id.uid(), app);
 
-        let share_dialog_open = self.share_dialog_open_for_object == Some(rook_drive_item_id);
+        let share_dialog_open = self.share_dialog_open_for_object == Some(pterm_drive_item_id);
         // If the share dialog is open, we don't want to open the menu for the same object.
         let menu_open =
-            self.menu_object_id_if_open == Some(rook_drive_item_id) && !share_dialog_open;
+            self.menu_object_id_if_open == Some(pterm_drive_item_id) && !share_dialog_open;
         let can_move = self.online_only_operation_allowed(&row_object_id, app)
             && matches!(self.index_variant, DriveIndexVariant::MainIndex)
             && access_level.can_move_drive();
         let mut is_focused = false;
 
-        let is_selected = self.selected == Some(rook_drive_item_id);
+        let is_selected = self.selected == Some(pterm_drive_item_id);
         if let Some(focused_index) = self.focused_index
             && !self.ordered_items.is_empty()
-            && let Some(&RookDriveItemId::Object(cloud_id)) = self.ordered_items.get(focused_index)
+            && let Some(&PtermDriveItemId::Object(cloud_id)) = self.ordered_items.get(focused_index)
         {
             is_focused = row_object_id == cloud_id;
         }
 
-        let row = RookDriveRow::new_from_cloud_object(
+        let row = PtermDriveRow::new_from_cloud_object(
             object,
             item_mouse_states[space_index].clone(),
             space,
             folder_depth,
             self.menu.clone(),
             can_move,
-            !self.menu_items(&space, &rook_drive_item_id, app).is_empty(),
+            !self
+                .menu_items(&space, &pterm_drive_item_id, app)
+                .is_empty(),
             menu_open,
             share_dialog_open,
             is_selected,
@@ -2868,7 +2881,7 @@ impl DriveIndex {
             );
         }
 
-        Some(RenderedRookDriveItemAndChildren {
+        Some(RenderedPtermDriveItemAndChildren {
             element: rendered_item,
             num_items: total_rows_for_item,
         })
@@ -2952,7 +2965,7 @@ impl DriveIndex {
         section: DriveIndexSection,
         is_collapsed: bool,
         appearance: &Appearance,
-    ) -> Box<dyn rookui::Element> {
+    ) -> Box<dyn ptermui::Element> {
         let icon = if is_collapsed {
             Icon::ListCollapsed
         } else {
@@ -2963,7 +2976,7 @@ impl DriveIndex {
                 // Set icon color contrast correctly if a space is focused
                 if self.focused_index.is_some()
                     && self.ordered_items.get(self.focused_index.unwrap())
-                        == Some(&RookDriveItemId::Space(space))
+                        == Some(&PtermDriveItemId::Space(space))
                 {
                     blended_colors::text_main(appearance.theme(), appearance.theme().background())
                         .into()
@@ -2974,9 +2987,9 @@ impl DriveIndex {
             _ => appearance.theme().foreground(),
         };
 
-        // This icon should render the same as other RookDrive icons but with no click or hover states.
+        // This icon should render the same as other PtermDrive icons but with no click or hover states.
         Container::new(
-            ConstrainedBox::new(icon.to_rookui_icon(icon_color).finish())
+            ConstrainedBox::new(icon.to_ptermui_icon(icon_color).finish())
                 .with_width(SECTION_HEADER_FONT_SIZE)
                 .with_height(SECTION_HEADER_FONT_SIZE)
                 .finish(),
@@ -2985,13 +2998,16 @@ impl DriveIndex {
         .finish()
     }
 
-    fn render_rook_drive_loading_icon(&self, appearance: &Appearance) -> Box<dyn rookui::Element> {
+    fn render_pterm_drive_loading_icon(
+        &self,
+        appearance: &Appearance,
+    ) -> Box<dyn ptermui::Element> {
         // Use same padding as icon_button (4px) to center the icon within ICON_DIMENSIONS
         let icon_button_padding = (ICON_DIMENSIONS - LOADING_ICON_WIDTH) / 2.;
         let loading_icon = Container::new(
             ConstrainedBox::new(
                 Icon::Refresh
-                    .to_rookui_icon(
+                    .to_ptermui_icon(
                         appearance
                             .theme()
                             .sub_text_color(appearance.theme().surface_1()),
@@ -3008,14 +3024,14 @@ impl DriveIndex {
 
         let hoverable = Hoverable::new(
             self.mouse_state_handles
-                .rook_drive_initial_load_mouse_state
+                .pterm_drive_initial_load_mouse_state
                 .clone(),
             |mouse_state| {
                 let mut stack = Stack::new().with_child(loading_icon);
                 if mouse_state.is_hovered() {
                     let tooltip = appearance
                         .ui_builder()
-                        .tool_tip(String::from("Syncing Rook Drive"));
+                        .tool_tip(String::from("Syncing Polaris Terminal Drive"));
 
                     stack.add_positioned_overlay_child(
                         tooltip.build().finish(),
@@ -3034,7 +3050,7 @@ impl DriveIndex {
         hoverable.finish()
     }
 
-    fn render_sorting_button(&self, appearance: &Appearance) -> Box<dyn rookui::Element> {
+    fn render_sorting_button(&self, appearance: &Appearance) -> Box<dyn ptermui::Element> {
         let mut button = icon_button_with_context_menu(
             Icon::Sort,
             move |ctx, _, _| ctx.dispatch_typed_action(DriveIndexAction::ToggleSortingMenu),
@@ -3072,7 +3088,7 @@ impl DriveIndex {
         hoverable.finish()
     }
 
-    fn render_retry_button(&self, appearance: &Appearance) -> Box<dyn rookui::Element> {
+    fn render_retry_button(&self, appearance: &Appearance) -> Box<dyn ptermui::Element> {
         let ui_builder = appearance.ui_builder().clone();
 
         icon_button(
@@ -3100,12 +3116,12 @@ impl DriveIndex {
         space: Space,
         state: &DriveIndexSectionState,
         app: &AppContext,
-    ) -> Box<dyn rookui::Element> {
+    ) -> Box<dyn ptermui::Element> {
         let mut button;
         // Set color contrast correctly when focused
         if self.focused_index.is_some()
             && self.ordered_items.get(self.focused_index.unwrap())
-                == Some(&RookDriveItemId::Space(space))
+                == Some(&PtermDriveItemId::Space(space))
         {
             button = highlight(
                 icon_button(
@@ -3178,7 +3194,7 @@ impl DriveIndex {
         appearance: &Appearance,
         state: &DriveIndexSectionState,
         space: Space,
-    ) -> Box<dyn rookui::Element> {
+    ) -> Box<dyn ptermui::Element> {
         let mut button = icon_button(
             appearance,
             Icon::AddTeammates,
@@ -3188,7 +3204,7 @@ impl DriveIndex {
         // Set color contrast correctly when focused
         if self.focused_index.is_some()
             && self.ordered_items.get(self.focused_index.unwrap())
-                == Some(&RookDriveItemId::Space(space))
+                == Some(&PtermDriveItemId::Space(space))
         {
             button = highlight(button, appearance)
         };
@@ -3218,7 +3234,7 @@ impl DriveIndex {
     fn font_color_based_on_focused_state(
         &self,
         appearance: &Appearance,
-        item: RookDriveItemId,
+        item: PtermDriveItemId,
     ) -> ColorU {
         if self.focused_index.is_some()
             && self.ordered_items.get(self.focused_index.unwrap()) == Some(&item)
@@ -3249,9 +3265,9 @@ impl DriveIndex {
     fn refocus_section_index(&mut self, section: &DriveIndexSection, ctx: &mut ViewContext<Self>) {
         if self.focused_index.is_some() {
             if let DriveIndexSection::Space(space) = *section {
-                self.set_focused_item(RookDriveItemId::Space(space), true, ctx);
+                self.set_focused_item(PtermDriveItemId::Space(space), true, ctx);
             }
-            // Need to re-render focused index in Rook Drive after a space has been toggled
+            // Need to re-render focused index in Polaris Terminal Drive after a space has been toggled
             if let Some(focused_index) = self.focused_index {
                 self.update_focused_params(focused_index, CloudModel::as_ref(ctx));
             }
@@ -3393,7 +3409,7 @@ impl DriveIndex {
         ctx.notify();
     }
 
-    /// If the given space is tied to a section in rook drive, ensures that that section is open.
+    /// If the given space is tied to a section in polaris-terminal drive, ensures that that section is open.
     fn open_section_of_space(&mut self, space: Space) {
         if let Some(target_section) = self
             .sections
@@ -3821,7 +3837,7 @@ impl DriveIndex {
         self.initialize_section_states(ctx);
         ctx.notify();
 
-        RookDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
+        PtermDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
             report_if_error!(settings.sorting_choice.set_value(*sorting_choice, ctx));
         });
 
@@ -4010,7 +4026,7 @@ impl DriveIndex {
             |_| {
                 ConstrainedBox::new(
                     Icon::X
-                        .to_rookui_icon(appearance.theme().main_text_color(background_color))
+                        .to_ptermui_icon(appearance.theme().main_text_color(background_color))
                         .finish(),
                 )
                 .with_width(12.)
@@ -4028,13 +4044,17 @@ impl DriveIndex {
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
             .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
             .with_child(
-                Text::new_inline("Rook Drive".to_string(), appearance.ui_font_family(), 14.)
-                    .with_color(theme.main_text_color(background_color).into())
-                    .with_style(Properties {
-                        weight: rookui::fonts::Weight::Bold,
-                        ..Default::default()
-                    })
-                    .finish(),
+                Text::new_inline(
+                    "Polaris Terminal Drive".to_string(),
+                    appearance.ui_font_family(),
+                    14.,
+                )
+                .with_color(theme.main_text_color(background_color).into())
+                .with_style(Properties {
+                    weight: ptermui::fonts::Weight::Bold,
+                    ..Default::default()
+                })
+                .finish(),
             )
             .with_child(Shrinkable::new(1., Empty::new().finish()).finish())
             .with_child(close_icon_button)
@@ -4312,7 +4332,7 @@ impl DriveIndex {
             move |_| {
                 ConstrainedBox::new(
                     Icon::X
-                        .to_rookui_icon(appearance.theme().main_text_color(background_color))
+                        .to_ptermui_icon(appearance.theme().main_text_color(background_color))
                         .finish(),
                 )
                 .with_width(12.)
@@ -4457,12 +4477,12 @@ impl DriveIndex {
     fn menu_items(
         &self,
         space: &Space,
-        rook_drive_item_id: &RookDriveItemId,
+        pterm_drive_item_id: &PtermDriveItemId,
         app: &AppContext,
     ) -> Vec<MenuItem<DriveIndexAction>> {
         match self.index_variant {
-            DriveIndexVariant::MainIndex => self.index_menu_items(space, rook_drive_item_id, app),
-            DriveIndexVariant::Trash => self.trash_menu_items(space, rook_drive_item_id, app),
+            DriveIndexVariant::MainIndex => self.index_menu_items(space, pterm_drive_item_id, app),
+            DriveIndexVariant::Trash => self.trash_menu_items(space, pterm_drive_item_id, app),
         }
     }
 
@@ -4470,11 +4490,11 @@ impl DriveIndex {
     fn index_menu_items(
         &self,
         space: &Space,
-        rook_drive_item_id: &RookDriveItemId,
+        pterm_drive_item_id: &PtermDriveItemId,
         app: &AppContext,
     ) -> Vec<MenuItem<DriveIndexAction>> {
         let mut menu_items = Vec::new();
-        let RookDriveItemId::Object(cloud_object_type_and_id) = rook_drive_item_id else {
+        let PtermDriveItemId::Object(cloud_object_type_and_id) = pterm_drive_item_id else {
             return menu_items;
         };
         let can_move_or_trash = self.online_only_operation_allowed(cloud_object_type_and_id, app);
@@ -4579,7 +4599,7 @@ impl DriveIndex {
                         menu_items.push(
                             MenuItemFields::new("Share")
                                 .with_on_select_action(DriveIndexAction::ToggleShareDialog {
-                                    rook_drive_item_id: *rook_drive_item_id,
+                                    pterm_drive_item_id: *pterm_drive_item_id,
                                 })
                                 .with_icon(Icon::Share)
                                 .into_item(),
@@ -4807,13 +4827,13 @@ impl DriveIndex {
                             menu_items.push(
                                 MenuItemFields::new("Share")
                                     .with_on_select_action(DriveIndexAction::ToggleShareDialog {
-                                        rook_drive_item_id: *rook_drive_item_id,
+                                        pterm_drive_item_id: *pterm_drive_item_id,
                                     })
                                     .with_icon(Icon::Share)
                                     .into_item(),
                             );
                         }
-                        if !rookui::platform::is_mobile_device()
+                        if !ptermui::platform::is_mobile_device()
                             && !ContextFlag::HideOpenOnDesktopButton.is_enabled()
                             && *UserAppInstallDetectionSettings::as_ref(app)
                                 .user_app_installation_detected
@@ -4889,7 +4909,7 @@ impl DriveIndex {
         menu_items
     }
 
-    /// Builder for a menu item to open a Rook Drive object in a pane. The icon and label depend
+    /// Builder for a menu item to open a Polaris Terminal Drive object in a pane. The icon and label depend
     /// on whether the object is editable or not.
     ///
     /// If `prefer_open` is `true`, the item defaults to view/open mode rather than edit mode.
@@ -4907,11 +4927,11 @@ impl DriveIndex {
     fn trash_menu_items(
         &self,
         _space: &Space,
-        rook_drive_item_id: &RookDriveItemId,
+        pterm_drive_item_id: &PtermDriveItemId,
         app: &AppContext,
     ) -> Vec<MenuItem<DriveIndexAction>> {
         let mut menu_items = Vec::new();
-        let RookDriveItemId::Object(cloud_object_type_and_id) = rook_drive_item_id else {
+        let PtermDriveItemId::Object(cloud_object_type_and_id) = pterm_drive_item_id else {
             return menu_items;
         };
 
@@ -4972,28 +4992,28 @@ impl DriveIndex {
     pub fn toggle_item_menu(
         &mut self,
         space: &Space,
-        rook_drive_item_id: &RookDriveItemId,
+        pterm_drive_item_id: &PtermDriveItemId,
         ctx: &mut ViewContext<Self>,
     ) {
         let menu_items: Vec<MenuItem<DriveIndexAction>> =
-            self.menu_items(space, rook_drive_item_id, ctx);
+            self.menu_items(space, pterm_drive_item_id, ctx);
         ctx.update_view(&self.menu, |menu, ctx| {
             menu.set_items(menu_items, ctx);
         });
 
-        self.menu_object_id_if_open = Some(*rook_drive_item_id);
+        self.menu_object_id_if_open = Some(*pterm_drive_item_id);
         ctx.focus(&self.menu);
         ctx.notify();
     }
 
     pub fn toggle_share_dialog(
         &mut self,
-        rook_drive_item_id: &RookDriveItemId,
+        pterm_drive_item_id: &PtermDriveItemId,
         invitee_email: Option<String>,
         source: SharingDialogSource,
         ctx: &mut ViewContext<Self>,
     ) {
-        let RookDriveItemId::Object(cloud_object_type_and_id) = rook_drive_item_id else {
+        let PtermDriveItemId::Object(cloud_object_type_and_id) = pterm_drive_item_id else {
             return;
         };
 
@@ -5010,9 +5030,9 @@ impl DriveIndex {
 
         self.reset_menus(ctx);
         if let Some(server_id) = cloud_object_type_and_id.server_id() {
-            self.share_dialog_open_for_object = Some(*rook_drive_item_id);
+            self.share_dialog_open_for_object = Some(*pterm_drive_item_id);
             self.sharing_dialog.update(ctx, |sharing_dialog, ctx| {
-                sharing_dialog.set_target(Some(ShareableObject::RookDriveObject(server_id)), ctx);
+                sharing_dialog.set_target(Some(ShareableObject::PtermDriveObject(server_id)), ctx);
                 if let Some(invitee_email) = invitee_email {
                     sharing_dialog.add_invitee_email(invitee_email, ctx);
                 }
@@ -5071,7 +5091,7 @@ impl DriveIndex {
 
     pub fn set_selected_object(
         &mut self,
-        id: Option<RookDriveItemId>,
+        id: Option<PtermDriveItemId>,
         ctx: &mut ViewContext<Self>,
     ) {
         self.selected = id;
@@ -5099,17 +5119,17 @@ impl DriveIndex {
                 return;
             };
             match focused_item_id {
-                RookDriveItemId::AIFactCollection => {
+                PtermDriveItemId::AIFactCollection => {
                     if let DriveIndexAction::EnterKey = key {
                         ctx.emit(DriveIndexEvent::OpenAIFactCollection);
                     }
                 }
-                RookDriveItemId::MCPServerCollection => {
+                PtermDriveItemId::MCPServerCollection => {
                     if let DriveIndexAction::EnterKey = key {
                         ctx.emit(DriveIndexEvent::OpenMCPServerCollection);
                     }
                 }
-                RookDriveItemId::Object(cloud_id) => match cloud_id {
+                PtermDriveItemId::Object(cloud_id) => match cloud_id {
                     CloudObjectTypeAndId::Notebook(_) => {
                         if let DriveIndexAction::EnterKey = key {
                             ctx.emit(DriveIndexEvent::OpenObject(*cloud_id))
@@ -5147,7 +5167,7 @@ impl DriveIndex {
                         }
                     }
                 },
-                RookDriveItemId::Space(space) => {
+                PtermDriveItemId::Space(space) => {
                     let section = &DriveIndexSection::Space(*space);
                     match key {
                         DriveIndexAction::EnterKey => self.toggle_section_collapse(section, ctx),
@@ -5160,7 +5180,7 @@ impl DriveIndex {
                         _ => {}
                     }
                 }
-                RookDriveItemId::Trash => {
+                PtermDriveItemId::Trash => {
                     if let DriveIndexAction::EnterKey = key {
                         self.index_variant = DriveIndexVariant::Trash;
                         self.initialize_section_states(ctx);
@@ -5178,7 +5198,7 @@ impl DriveIndex {
     }
 }
 
-pub fn rook_drive_section_header_position_id(section: &DriveIndexSection) -> String {
+pub fn pterm_drive_section_header_position_id(section: &DriveIndexSection) -> String {
     format!("section_position_{section:?}")
 }
 
@@ -5194,7 +5214,7 @@ impl View for DriveIndex {
         }
     }
 
-    fn keymap_context(&self, _ctx: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, _ctx: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         // Disable WD Vim keybindings when a dialog is open
@@ -5207,7 +5227,7 @@ impl View for DriveIndex {
         context
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
         let workspaces = UserWorkspaces::as_ref(app);
 
@@ -5391,7 +5411,7 @@ impl TypedActionView for DriveIndex {
             DriveIndexAction::OpenObject(cloud_object_type_and_id) => {
                 if !matches!(self.index_variant, DriveIndexVariant::Trash) {
                     self.set_selected_object(
-                        Some(RookDriveItemId::Object(*cloud_object_type_and_id)),
+                        Some(PtermDriveItemId::Object(*cloud_object_type_and_id)),
                         ctx,
                     );
                     ctx.emit(DriveIndexEvent::OpenObject(*cloud_object_type_and_id))
@@ -5403,7 +5423,7 @@ impl TypedActionView for DriveIndex {
             } => {
                 if !matches!(self.index_variant, DriveIndexVariant::Trash) {
                     self.set_selected_object(
-                        Some(RookDriveItemId::Object(*cloud_object_type_and_id)),
+                        Some(PtermDriveItemId::Object(*cloud_object_type_and_id)),
                         ctx,
                     );
                     ctx.emit(DriveIndexEvent::OpenWorkflowInPane {
@@ -5478,9 +5498,9 @@ impl TypedActionView for DriveIndex {
             }
             DriveIndexAction::ToggleItemOverflowMenu {
                 space,
-                rook_drive_item_id,
+                pterm_drive_item_id,
             } => {
-                self.toggle_item_menu(space, rook_drive_item_id, ctx);
+                self.toggle_item_menu(space, pterm_drive_item_id, ctx);
             }
             DriveIndexAction::ToggleSpaceOverflowMenu { space, offset } => {
                 self.toggle_space_menu(space, *offset, ctx);
@@ -5598,7 +5618,7 @@ impl TypedActionView for DriveIndex {
                 // If WD is focused, then clicking a folder will set that folder to be focused
                 if self.focused_index.is_some() {
                     self.set_focused_item(
-                        RookDriveItemId::Object(CloudObjectTypeAndId::Folder(*id)),
+                        PtermDriveItemId::Object(CloudObjectTypeAndId::Folder(*id)),
                         true,
                         ctx,
                     );
@@ -5688,7 +5708,7 @@ impl TypedActionView for DriveIndex {
             }
             DriveIndexAction::ToggleDriveItemContextMenu => {
                 if let Some(focused_index) = self.focused_index
-                    && let Some(&rook_drive_item_id) = self.ordered_items.get(focused_index)
+                    && let Some(&pterm_drive_item_id) = self.ordered_items.get(focused_index)
                 {
                     // Retrieve space of the WD item (because context menu options depend on the space)
                     // by finding the last space before the focused item in ordered_items
@@ -5697,7 +5717,7 @@ impl TypedActionView for DriveIndex {
                         .iter()
                         .take(focused_index)
                         .filter_map(|id| {
-                            if let RookDriveItemId::Space(space) = *id {
+                            if let PtermDriveItemId::Space(space) = *id {
                                 Some(space)
                             } else {
                                 None
@@ -5705,7 +5725,7 @@ impl TypedActionView for DriveIndex {
                         })
                         .next_back()
                     {
-                        self.toggle_item_menu(&space, &rook_drive_item_id, ctx);
+                        self.toggle_item_menu(&space, &pterm_drive_item_id, ctx);
                     }
                 }
             }
@@ -5740,9 +5760,11 @@ impl TypedActionView for DriveIndex {
                     user_workspaces.generate_stripe_billing_portal_link(*team_uid, ctx);
                 });
             }
-            DriveIndexAction::ToggleShareDialog { rook_drive_item_id } => {
+            DriveIndexAction::ToggleShareDialog {
+                pterm_drive_item_id,
+            } => {
                 self.toggle_share_dialog(
-                    rook_drive_item_id,
+                    pterm_drive_item_id,
                     None,
                     SharingDialogSource::DriveIndex,
                     ctx,

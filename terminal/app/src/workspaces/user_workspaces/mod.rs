@@ -2,11 +2,11 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::Result;
-use rook_core::features::FeatureFlag;
-use rook_core::settings::{ChangeEventReason, Setting};
-use rook_core::user_preferences::GetUserPreferences;
-use rook_errors::report_error;
-use rookui::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::settings::{ChangeEventReason, Setting};
+use pterm_core::user_preferences::GetUserPreferences;
+use pterm_errors::report_error;
+use ptermui::{
     AppContext, Entity, ModelContext, SingletonEntity, Tracked, ViewContext, WeakViewHandle,
     WindowId,
 };
@@ -157,7 +157,7 @@ pub struct WorkspacesMetadataResponse {
 // independent queries.
 pub struct WorkspacesMetadataWithPricing {
     pub metadata: WorkspacesMetadataResponse,
-    pub pricing_info: Option<rook_graphql::billing::PricingInfo>,
+    pub pricing_info: Option<pterm_graphql::billing::PricingInfo>,
 }
 
 pub struct CreateTeamResponse {
@@ -247,7 +247,7 @@ impl UserWorkspaces {
         };
 
         // One-release migration: moving feature_model_choices off of `LLMPreferences` to `Workspace`.
-        // This means that on the first time the user opens a version of rook without a
+        // This means that on the first time the user opens a version of polaris-terminal without a
         // Workspace.feature_model_choice saved in their sqlite db, we can fall back to reading feature
         // model choices from the old LLMPreferences cache.
         // TODO: delete once it's safe to assume every client has fetched at least once since
@@ -304,7 +304,7 @@ impl UserWorkspaces {
         }
     }
 
-    pub fn rook_agent_cli_upgrade_link(user_id: Option<UserUid>) -> String {
+    pub fn pterm_agent_cli_upgrade_link(user_id: Option<UserUid>) -> String {
         let upgrade_link = user_id.map_or_else(
             || {
                 format!(
@@ -315,7 +315,7 @@ impl UserWorkspaces {
             },
             Self::upgrade_link,
         );
-        format!("{upgrade_link}?source=rook-agent-cli")
+        format!("{upgrade_link}?source=polaris-terminal-agent-cli")
     }
     pub fn admin_billing_link_for_team(team_uid: ServerId) -> String {
         format!(
@@ -503,7 +503,7 @@ impl UserWorkspaces {
         }
     }
 
-    pub fn is_at_tier_limit_for_some_rook_drive_objects(
+    pub fn is_at_tier_limit_for_some_pterm_drive_objects(
         team_uid: ServerId,
         ctx: &AppContext,
     ) -> bool {

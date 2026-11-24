@@ -3,16 +3,16 @@ use std::sync::Arc;
 use enclose::enclose;
 use itertools::Itertools as _;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use rook_core::ui::appearance::Appearance;
-use rook_graphql::billing::AddonCreditsOption;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_graphql::billing::AddonCreditsOption;
+use ptermui::elements::{
     Border, ChildView, Container, CrossAxisAlignment, Empty, Flex, HighlightedHyperlink,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Text,
 };
-use rookui::fonts::Weight;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent as _, UiComponentStyles};
-use rookui::{AppContext, Element, Entity, SingletonEntity as _, View, ViewContext, ViewHandle};
+use ptermui::fonts::Weight;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent as _, UiComponentStyles};
+use ptermui::{AppContext, Element, Entity, SingletonEntity as _, View, ViewContext, ViewHandle};
 
 use crate::features::FeatureFlag;
 use crate::menu::MenuItemFields;
@@ -239,7 +239,7 @@ impl EnableAutoReloadModalBody {
                 "https://docs.rook.dev/support-and-community/plans-and-billing/add-on-credits#id-2.-enable-auto-reload",
             ),
         ];
-        let explanation_text = rookui::elements::FormattedTextElement::new(
+        let explanation_text = ptermui::elements::FormattedTextElement::new(
             FormattedText::new([FormattedTextLine::Line(explanation_fragments)]),
             appearance.ui_font_size(),
             appearance.ui_font_family(),
@@ -250,10 +250,10 @@ impl EnableAutoReloadModalBody {
         .with_hyperlink_font_color(theme.accent().into_solid())
         .register_default_click_handlers_with_action_support(|hyperlink_lens, _event, ctx| {
             match hyperlink_lens {
-                rookui::elements::HyperlinkLens::Url(url) => {
+                ptermui::elements::HyperlinkLens::Url(url) => {
                     ctx.open_url(url);
                 }
-                rookui::elements::HyperlinkLens::Action(_action_ref) => {}
+                ptermui::elements::HyperlinkLens::Action(_action_ref) => {}
             }
         })
         .finish();
@@ -387,7 +387,7 @@ pub enum Action {
     Enable,
 }
 
-impl rookui::TypedActionView for EnableAutoReloadModalBody {
+impl ptermui::TypedActionView for EnableAutoReloadModalBody {
     type Action = Action;
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
@@ -507,7 +507,7 @@ impl Entity for EnableAutoReloadModal {
     type Event = EnableAutoReloadModalEvent;
 }
 
-impl rookui::TypedActionView for EnableAutoReloadModal {
+impl ptermui::TypedActionView for EnableAutoReloadModal {
     type Action = ();
 }
 

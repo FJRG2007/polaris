@@ -2,8 +2,8 @@
 
 use std::io::Write as _;
 
-use rook_cli::mcp::MCPSpec;
-use rook_core::features::FeatureFlag;
+use pterm_cli::mcp::MCPSpec;
+use pterm_core::features::FeatureFlag;
 use serde_json::json;
 
 use crate::ai::ambient_agents::AgentConfigSnapshot;
@@ -140,7 +140,7 @@ fn file_empty_mcp_servers_is_loaded_as_empty_map() {
 fn mcp_servers_map_converts_to_runtime_specs() {
     let contents = json!({
         "mcp_servers": {
-            "existing": { "rook_id": "550e8400-e29b-41d4-a716-446655440000" },
+            "existing": { "pterm_id": "550e8400-e29b-41d4-a716-446655440000" },
             "ephemeral": { "command": "npx", "args": [] }
         }
     })
@@ -157,11 +157,11 @@ fn mcp_servers_map_converts_to_runtime_specs() {
 }
 
 #[test]
-fn well_known_rook_id_converts_to_well_known_spec() {
+fn well_known_pterm_id_converts_to_well_known_spec() {
     let _flag = FeatureFlag::WellKnownMcpIds.override_enabled(true);
     let contents = json!({
         "mcp_servers": {
-            "linear": { "rook_id": "linear" }
+            "linear": { "pterm_id": "linear" }
         }
     })
     .to_string();
@@ -175,19 +175,19 @@ fn well_known_rook_id_converts_to_well_known_spec() {
     assert_eq!(specs.len(), 1);
     assert!(
         matches!(&specs[0], MCPSpec::WellKnown(id) if id == "linear"),
-        "well-known rook_id must become MCPSpec::WellKnown, got {specs:?}"
+        "well-known pterm_id must become MCPSpec::WellKnown, got {specs:?}"
     );
 }
 
 #[test]
-fn any_non_uuid_rook_id_becomes_well_known_spec() {
+fn any_non_uuid_pterm_id_becomes_well_known_spec() {
     // The server owns the set of recognized ids: the client forwards any
-    // non-UUID rook_id for resolution instead of rejecting it, so new ids can
+    // non-UUID pterm_id for resolution instead of rejecting it, so new ids can
     // be introduced server-side without a client change.
     let _flag = FeatureFlag::WellKnownMcpIds.override_enabled(true);
     let map = serde_json::Map::from_iter([(
         "future".to_string(),
-        json!({ "rook_id": "some-future-integration" }),
+        json!({ "pterm_id": "some-future-integration" }),
     )]);
 
     let specs = super::mcp_specs_from_mcp_servers(&map).unwrap();
@@ -196,18 +196,18 @@ fn any_non_uuid_rook_id_becomes_well_known_spec() {
 }
 
 #[test]
-fn empty_rook_id_is_rejected() {
+fn empty_pterm_id_is_rejected() {
     let _flag = FeatureFlag::WellKnownMcpIds.override_enabled(true);
-    let map = serde_json::Map::from_iter([("bogus".to_string(), json!({ "rook_id": "" }))]);
+    let map = serde_json::Map::from_iter([("bogus".to_string(), json!({ "pterm_id": "" }))]);
 
     let err = super::mcp_specs_from_mcp_servers(&map).unwrap_err();
     assert!(format!("{err:#}").contains("must be non-empty"));
 }
 
 #[test]
-fn non_uuid_rook_id_is_rejected_when_flag_disabled() {
+fn non_uuid_pterm_id_is_rejected_when_flag_disabled() {
     let _flag = FeatureFlag::WellKnownMcpIds.override_enabled(false);
-    let map = serde_json::Map::from_iter([("linear".to_string(), json!({ "rook_id": "linear" }))]);
+    let map = serde_json::Map::from_iter([("linear".to_string(), json!({ "pterm_id": "linear" }))]);
 
     let err = super::mcp_specs_from_mcp_servers(&map).unwrap_err();
     assert!(format!("{err:#}").contains("must be a UUID"));

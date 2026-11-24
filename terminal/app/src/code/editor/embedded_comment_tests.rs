@@ -1,5 +1,5 @@
-use rook_editor::content::markdown::MarkdownStyle;
-use rookui::{EntityId, WindowId};
+use pterm_editor::content::markdown::MarkdownStyle;
+use ptermui::{EntityId, WindowId};
 use serde_yaml::{Mapping, Value};
 
 use super::{

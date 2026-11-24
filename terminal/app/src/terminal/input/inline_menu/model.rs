@@ -1,8 +1,8 @@
 //! Generic model for tracking the selected item in an inline menu.
 use std::collections::HashSet;
 
-use rookui::elements::MouseStateHandle;
-use rookui::{Entity, ModelContext};
+use ptermui::elements::MouseStateHandle;
+use ptermui::{Entity, ModelContext};
 
 use crate::search::data_source::QueryFilter;
 use crate::terminal::input::inline_menu::view::InlineMenuAction;

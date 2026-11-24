@@ -86,7 +86,7 @@ If no environment was explicitly selected, rely on the existing selector/default
 Extend `PendingHandoff` with:
 - `auto_submit: Option<PendingCloudLaunch>` containing prompt and attachments;
 - `explicit_environment_id: Option<SyncId>` or an equivalent environment-source marker.
-- a submission phase that can distinguish idle manual compose, optimistically queued auto-submit, and active server dispatch. This can be a field on `PendingHandoff`, a small enum on `AmbientAgentViewModel`, or an equivalent representation, but callers need to know whether the user's prompt is hidden because Rook has queued it.
+- a submission phase that can distinguish idle manual compose, optimistically queued auto-submit, and active server dispatch. This can be a field on `PendingHandoff`, a small enum on `AmbientAgentViewModel`, or an equivalent representation, but callers need to know whether the user's prompt is hidden because Polaris Terminal has queued it.
 `PendingCloudLaunch` should carry both:
 - the spawn-ready prompt and `AttachmentInput`s; and
 - a restoration draft containing the prompt plus pending image/file attachment display state for retry.

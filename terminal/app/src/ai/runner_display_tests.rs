@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rook_graphql::queries::get_runners::{RunnerArch, RunnerMacOsVersion, RunnerOs};
+use pterm_graphql::queries::get_runners::{RunnerArch, RunnerMacOsVersion, RunnerOs};
 
 use super::{RunPlatform, RunnerPlatform, resolve_run_platform};
 use crate::ui_components::icons::Icon;

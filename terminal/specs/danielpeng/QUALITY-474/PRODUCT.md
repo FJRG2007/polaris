@@ -5,14 +5,14 @@ Figma: none provided
 
 ## Summary
 
-When a user edits `settings.toml` while Rook is closed (or changes a setting via the UI while offline), cloud sync currently overwrites their local changes on next startup. This feature detects when the local settings file has diverged from the last-known cloud-synced state and preserves the user's local changes instead of silently replacing them.
+When a user edits `settings.toml` while Polaris Terminal is closed (or changes a setting via the UI while offline), cloud sync currently overwrites their local changes on next startup. This feature detects when the local settings file has diverged from the last-known cloud-synced state and preserves the user's local changes instead of silently replacing them.
 
 ## Problem
 
-Rook's cloud settings sync uses a "cloud wins" strategy on startup: for every synced setting that exists in the cloud, the cloud value overwrites the local value. This is correct when the user hasn't made local changes, but breaks down in two scenarios:
+Polaris Terminal's cloud settings sync uses a "cloud wins" strategy on startup: for every synced setting that exists in the cloud, the cloud value overwrites the local value. This is correct when the user hasn't made local changes, but breaks down in two scenarios:
 
-1. **Offline file edit**: The user edits `settings.toml` while Rook is closed. On next startup, cloud sync overwrites their edit with the (now stale) cloud value.
-2. **Offline UI change**: The user changes a setting via the Rook UI while their internet is offline. The change is written to the file but never uploaded to cloud. On next startup (now online), cloud sync overwrites the local change.
+1. **Offline file edit**: The user edits `settings.toml` while Polaris Terminal is closed. On next startup, cloud sync overwrites their edit with the (now stale) cloud value.
+2. **Offline UI change**: The user changes a setting via the Polaris Terminal UI while their internet is offline. The change is written to the file but never uploaded to cloud. On next startup (now online), cloud sync overwrites the local change.
 
 In both cases the user's most recent intentional change is silently lost.
 
@@ -39,27 +39,27 @@ The user's experience is unchanged. Cloud sync works as it does today: cloud val
 
 ### Offline file edit
 
-1. User closes Rook.
+1. User closes Polaris Terminal.
 2. User edits `settings.toml` in a text editor.
-3. User opens Rook.
-4. Rook detects the file has changed since the last cloud sync.
-5. Rook treats the local file as authoritative: local values are uploaded to cloud, cloud values do not overwrite local.
+3. User opens Polaris Terminal.
+4. Polaris Terminal detects the file has changed since the last cloud sync.
+5. Polaris Terminal treats the local file as authoritative: local values are uploaded to cloud, cloud values do not overwrite local.
 6. The user's edit is preserved and synced to other devices.
 
 ### Offline UI change
 
-1. User has Rook open but is offline.
+1. User has Polaris Terminal open but is offline.
 2. User changes a setting via the UI. The change is saved to the file.
-3. User closes Rook (still offline — the change was never uploaded).
-4. User opens Rook (now online).
-5. Rook detects the file has changed since the last cloud sync.
+3. User closes Polaris Terminal (still offline — the change was never uploaded).
+4. User opens Polaris Terminal (now online).
+5. Polaris Terminal detects the file has changed since the last cloud sync.
 6. Local wins — the user's change is preserved and uploaded to cloud.
 
 ### Broken settings file
 
 1. User introduces a syntax error in `settings.toml`.
-2. User opens Rook.
-3. Rook cannot parse the file. Cloud sync is allowed to restore settings in memory so the app functions.
+2. User opens Polaris Terminal.
+3. Polaris Terminal cannot parse the file. Cloud sync is allowed to restore settings in memory so the app functions.
 4. Flush suppression (already implemented) prevents the broken file from being overwritten on disk.
 5. The settings error banner is shown so the user knows their file has errors.
 6. The user fixes the file. Hot-reload picks up the fix and normal operation resumes.
@@ -67,19 +67,19 @@ The user's experience is unchanged. Cloud sync works as it does today: cloud val
 ### Missing or empty settings file
 
 1. User deletes `settings.toml` (or empties its contents) to reset their settings.
-2. User opens Rook.
-3. Rook detects the file is missing/empty and treats it as "no local state".
+2. User opens Polaris Terminal.
+3. Polaris Terminal detects the file is missing/empty and treats it as "no local state".
 4. Cloud sync restores settings from cloud into memory and recreates the file with those values.
 5. The user's cloud settings are preserved on other devices — local defaults do not overwrite cloud.
 
 ### First launch / fresh install
 
-No stored hash exists. Rook treats this as "no local changes" and cloud wins, which is the same as today's behavior.
+No stored hash exists. Polaris Terminal treats this as "no local changes" and cloud wins, which is the same as today's behavior.
 
 ## Success Criteria
 
-1. When a user edits `settings.toml` while Rook is closed and reopens Rook, their edits are preserved and synced to cloud.
-2. When a user changes a setting via the UI while offline, closes Rook, and reopens while online, their change is preserved and synced to cloud.
+1. When a user edits `settings.toml` while Polaris Terminal is closed and reopens Polaris Terminal, their edits are preserved and synced to cloud.
+2. When a user changes a setting via the UI while offline, closes Polaris Terminal, and reopens while online, their change is preserved and synced to cloud.
 3. When no local changes have been made (file matches last-known cloud-synced state), cloud sync behavior is unchanged from today.
 4. When the settings file is broken (unparsable TOML), cloud sync restores settings in memory. The broken file is not overwritten on disk. The settings error banner is shown.
 5. When the settings file is missing or empty on startup, cloud wins — local defaults do not overwrite cloud values, and the file is recreated from cloud.
@@ -95,7 +95,7 @@ No stored hash exists. Rook treats this as "no local changes" and cloud wins, wh
   - Startup with broken file → cloud restores in memory, file untouched.
   - Startup with missing or empty file (with a stored hash present) → cloud wins, file recreated from cloud values.
   - First launch with no stored hash → cloud wins.
-- **Manual testing**: Edit `settings.toml` while Rook is closed, reopen, verify the edit persists and syncs to another device.
+- **Manual testing**: Edit `settings.toml` while Polaris Terminal is closed, reopen, verify the edit persists and syncs to another device.
 
 ## Open Questions
 

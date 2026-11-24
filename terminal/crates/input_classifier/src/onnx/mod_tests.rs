@@ -1,7 +1,7 @@
 use anyhow::Result;
 use futures::executor::block_on;
-use rook_completer::meta::SpannedItem;
-use rook_completer::{ParsedTokenData, ParsedTokensSnapshot};
+use pterm_completer::meta::SpannedItem;
+use pterm_completer::{ParsedTokenData, ParsedTokensSnapshot};
 
 use super::*;
 

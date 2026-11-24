@@ -1,4 +1,4 @@
-use rookui_core::elements::ListIndentLevel;
+use ptermui_core::elements::ListIndentLevel;
 use sum_tree::SumTree;
 
 use crate::content::cursor::BufferSumTree;

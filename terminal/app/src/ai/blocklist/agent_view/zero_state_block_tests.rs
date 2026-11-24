@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use rook_core::command::ExitCode;
-use rookui::r#async::executor::Background;
+use pterm_core::command::ExitCode;
+use ptermui::r#async::executor::Background;
 
 use super::{display_working_directory, format_session_location, should_render_oz_updates_section};
 use crate::ai::blocklist::agent_view::zero_state_block::current_working_directory_for_zero_state;
@@ -39,7 +39,7 @@ fn prebootstrap_terminal_with_startup_path(startup_path: &str) -> TerminalModel 
 
 /// Advances a pre-bootstrap terminal through a single bootstrapping command so the block lifecycle
 /// coordinator reaches `AwaitingPrecmd`. The completing command moves the bootstrap stage from
-/// `RookInput` to `ScriptExecution` without finishing bootstrap, so the terminal stays
+/// `PtermInput` to `ScriptExecution` without finishing bootstrap, so the terminal stays
 /// pre-bootstrap (the startup-path fallback remains in effect) while a following prompt-only precmd
 /// is accepted and applied to the fresh active block.
 fn advance_prebootstrap_to_script_execution(terminal: &mut TerminalModel) {

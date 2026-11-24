@@ -4,21 +4,21 @@
 use itertools::Itertools;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
-use rook_editor::content::text::{
+use pterm_editor::content::text::{
     BlockType as ContentBlockType, BufferBlockStyle, BufferTextStyle, TextStyles,
     TextStylesWithMetadata,
 };
-use rook_editor::model::RichTextEditorModel;
-use rook_editor::render::model::RenderState;
-use rookui::accessibility::{AccessibilityContent, ActionAccessibilityContent, RookA11yRole};
-use rookui::elements::{
+use pterm_editor::model::RichTextEditorModel;
+use pterm_editor::render::model::RenderState;
+use ptermui::accessibility::{AccessibilityContent, ActionAccessibilityContent, PtermA11yRole};
+use ptermui::elements::{
     AnchorPair, Border, ConstrainedBox, Container, CornerRadius, DropShadow, Flex, MainAxisSize,
     MouseStateHandle, OffsetPositioning, OffsetType, ParentElement, Point,
     PositionedElementOffsetBounds, PositioningAxis, Radius, Rect, XAxisAnchor, YAxisAnchor,
 };
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, SizeConstraint, TypedActionView,
     View, ViewContext, ViewHandle,
 };
@@ -258,7 +258,7 @@ impl View for Omnibar {
         "Omnibar"
     }
 
-    fn render(&self, app: &rookui::AppContext) -> Box<dyn Element> {
+    fn render(&self, app: &ptermui::AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let mut actions = Flex::row().with_main_axis_size(MainAxisSize::Min);
 
@@ -442,12 +442,12 @@ impl TypedActionView for Omnibar {
             OmnibarAction::ConvertBlock(style) => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     format!("Convert to {}", BlockType::from(style).label()),
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             OmnibarAction::OpenLinkEditor => ActionAccessibilityContent::from_debug(),
             OmnibarAction::UnstyleLink => ActionAccessibilityContent::Custom(
-                AccessibilityContent::new_without_help("Remove link", RookA11yRole::UserAction),
+                AccessibilityContent::new_without_help("Remove link", PtermA11yRole::UserAction),
             ),
         }
     }
@@ -483,9 +483,9 @@ impl Compact {
 impl Element for Compact {
     fn layout(
         &mut self,
-        constraint: rookui::SizeConstraint,
-        ctx: &mut rookui::LayoutContext,
-        app: &rookui::AppContext,
+        constraint: ptermui::SizeConstraint,
+        ctx: &mut ptermui::LayoutContext,
+        app: &ptermui::AppContext,
     ) -> Vector2F {
         self.child.layout(
             SizeConstraint {
@@ -500,8 +500,8 @@ impl Element for Compact {
     fn paint(
         &mut self,
         origin: Vector2F,
-        ctx: &mut rookui::PaintContext,
-        app: &rookui::AppContext,
+        ctx: &mut ptermui::PaintContext,
+        app: &ptermui::AppContext,
     ) {
         self.child.paint(origin, ctx, app)
     }
@@ -516,18 +516,18 @@ impl Element for Compact {
 
     fn dispatch_event(
         &mut self,
-        event: &rookui::event::DispatchedEvent,
-        ctx: &mut rookui::EventContext,
-        app: &rookui::AppContext,
+        event: &ptermui::event::DispatchedEvent,
+        ctx: &mut ptermui::EventContext,
+        app: &ptermui::AppContext,
     ) -> bool {
         self.child.dispatch_event(event, ctx, app)
     }
 
-    fn after_layout(&mut self, ctx: &mut rookui::AfterLayoutContext, app: &AppContext) {
+    fn after_layout(&mut self, ctx: &mut ptermui::AfterLayoutContext, app: &AppContext) {
         self.child.after_layout(ctx, app)
     }
 
-    fn z_index(&self) -> Option<rookui::elements::ZIndex> {
+    fn z_index(&self) -> Option<ptermui::elements::ZIndex> {
         self.child.z_index()
     }
 

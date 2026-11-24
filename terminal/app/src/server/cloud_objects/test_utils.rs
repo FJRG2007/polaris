@@ -3,8 +3,8 @@ use std::sync::Arc;
 use std::sync::mpsc::{Receiver, sync_channel};
 
 use cloud_object_client::{MockObjectClient, ObjectClient};
-use rook_core::execution_mode::{AppExecutionMode, ExecutionMode};
-use rookui::{App, ModelHandle, SingletonEntity};
+use pterm_core::execution_mode::{AppExecutionMode, ExecutionMode};
+use ptermui::{App, ModelHandle, SingletonEntity};
 use settings::manager::SettingsManager;
 
 use super::update_manager::UpdateManager;
@@ -17,7 +17,7 @@ use crate::persistence::ModelEvent;
 use crate::server::server_api::ServerApiProvider;
 use crate::server::sync_queue::SyncQueue;
 use crate::server::telemetry::context_provider::AppTelemetryContextProvider;
-use crate::settings::{PrivacySettings, RookDrivePrivacySettings};
+use crate::settings::{PrivacySettings, PtermDrivePrivacySettings};
 use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::update_manager::TeamUpdateManager;
 use crate::workspaces::user_profiles::UserProfiles;
@@ -45,7 +45,7 @@ pub fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| AuthStateProvider::new_for_test());
     app.add_singleton_model(AppTelemetryContextProvider::new_context_provider);
     app.add_singleton_model(AuthManager::new_for_test);
-    RookDrivePrivacySettings::register(app);
+    PtermDrivePrivacySettings::register(app);
     app.update(PrivacySettings::register_singleton);
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(UserWorkspaces::default_mock);

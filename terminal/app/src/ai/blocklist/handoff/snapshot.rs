@@ -3,9 +3,9 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::{SingletonEntity, ViewContext};
 use remote_server::proto::UploadHandoffSnapshotResponse;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::{SingletonEntity, ViewContext};
 
 use crate::ai::agent_sdk::driver::upload_snapshot_for_handoff;
 use crate::ai::blocklist::handoff::touched_repos::{TouchedWorkspace, derive_touched_workspace};

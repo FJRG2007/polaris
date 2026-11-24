@@ -2,14 +2,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures::FutureExt as _;
-use rook_managed_secrets::client::{IdentityTokenOptions, ManagedSecretsClient};
-use rook_server_client::iap::IapIdentityTokenMinter;
-use rookui::r#async::BoxFuture;
+use pterm_managed_secrets::client::{IdentityTokenOptions, ManagedSecretsClient};
+use pterm_server_client::iap::IapIdentityTokenMinter;
+use ptermui::r#async::BoxFuture;
 use vec1::vec1;
 
-/// Mints Rook-signed OIDC identity tokens for the runner-context IAP Workload
+/// Mints Polaris Terminal-signed OIDC identity tokens for the runner-context IAP Workload
 /// Identity Federation flow, backed by the managed-secrets client. Lives in the
-/// app crate so `rook_server_client` need not depend on the managed-secrets
+/// app crate so `pterm_server_client` need not depend on the managed-secrets
 /// stack.
 pub struct ManagedSecretsIapMinter {
     client: Arc<dyn ManagedSecretsClient>,

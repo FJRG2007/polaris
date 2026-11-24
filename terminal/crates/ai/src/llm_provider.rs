@@ -1,5 +1,5 @@
-use rook_core::ui::icons::Icon;
-use rook_errors::report_error;
+use pterm_core::ui::icons::Icon;
+use pterm_errors::report_error;
 use serde::{Deserialize, Serialize};
 
 use crate::api_keys::ApiKeys;
@@ -90,21 +90,23 @@ impl LLMProvider {
     }
 }
 
-impl From<rook_graphql::queries::get_feature_model_choices::LlmProvider> for LLMProvider {
-    fn from(value: rook_graphql::queries::get_feature_model_choices::LlmProvider) -> Self {
+impl From<pterm_graphql::queries::get_feature_model_choices::LlmProvider> for LLMProvider {
+    fn from(value: pterm_graphql::queries::get_feature_model_choices::LlmProvider) -> Self {
         match value {
-            rook_graphql::queries::get_feature_model_choices::LlmProvider::Openai => Self::OpenAI,
-            rook_graphql::queries::get_feature_model_choices::LlmProvider::Anthropic => {
+            pterm_graphql::queries::get_feature_model_choices::LlmProvider::Openai => Self::OpenAI,
+            pterm_graphql::queries::get_feature_model_choices::LlmProvider::Anthropic => {
                 Self::Anthropic
             }
-            rook_graphql::queries::get_feature_model_choices::LlmProvider::Google => Self::Google,
-            rook_graphql::queries::get_feature_model_choices::LlmProvider::Xai => Self::Xai,
-            rook_graphql::queries::get_feature_model_choices::LlmProvider::Unknown => Self::Unknown,
-            rook_graphql::queries::get_feature_model_choices::LlmProvider::Other(value) => {
+            pterm_graphql::queries::get_feature_model_choices::LlmProvider::Google => Self::Google,
+            pterm_graphql::queries::get_feature_model_choices::LlmProvider::Xai => Self::Xai,
+            pterm_graphql::queries::get_feature_model_choices::LlmProvider::Unknown => {
+                Self::Unknown
+            }
+            pterm_graphql::queries::get_feature_model_choices::LlmProvider::Other(value) => {
                 report_error!(
                     "Invalid LlmProvider; update client GraphQL types",
                     extra: { "provider" => %value },
-                    rook_errors::ReportErrorLogMode::OncePerRun
+                    pterm_errors::ReportErrorLogMode::OncePerRun
                 );
                 Self::Unknown
             }
@@ -112,19 +114,19 @@ impl From<rook_graphql::queries::get_feature_model_choices::LlmProvider> for LLM
     }
 }
 
-impl From<rook_graphql::workspace::LlmProvider> for LLMProvider {
-    fn from(value: rook_graphql::workspace::LlmProvider) -> Self {
+impl From<pterm_graphql::workspace::LlmProvider> for LLMProvider {
+    fn from(value: pterm_graphql::workspace::LlmProvider) -> Self {
         match value {
-            rook_graphql::workspace::LlmProvider::Openai => Self::OpenAI,
-            rook_graphql::workspace::LlmProvider::Anthropic => Self::Anthropic,
-            rook_graphql::workspace::LlmProvider::Google => Self::Google,
-            rook_graphql::workspace::LlmProvider::Xai => Self::Xai,
-            rook_graphql::workspace::LlmProvider::Unknown => Self::Unknown,
-            rook_graphql::workspace::LlmProvider::Other(value) => {
+            pterm_graphql::workspace::LlmProvider::Openai => Self::OpenAI,
+            pterm_graphql::workspace::LlmProvider::Anthropic => Self::Anthropic,
+            pterm_graphql::workspace::LlmProvider::Google => Self::Google,
+            pterm_graphql::workspace::LlmProvider::Xai => Self::Xai,
+            pterm_graphql::workspace::LlmProvider::Unknown => Self::Unknown,
+            pterm_graphql::workspace::LlmProvider::Other(value) => {
                 report_error!(
                     "Invalid LlmProvider; update client GraphQL types",
                     extra: { "provider" => %value },
-                    rook_errors::ReportErrorLogMode::OncePerRun
+                    pterm_errors::ReportErrorLogMode::OncePerRun
                 );
                 Self::Unknown
             }

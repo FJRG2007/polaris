@@ -29,8 +29,8 @@ pub fn init() -> anyhow::Result<Initialization> {
 /// hook supplies the authenticated managed-secrets client needed to mint replacements without
 /// broadening tracing initialization to ordinary application processes.
 pub fn start_auth_refresh(
-    client: std::sync::Arc<dyn rook_managed_secrets::client::ManagedSecretsClient>,
-    ctx: &mut rookui::AppContext,
+    client: std::sync::Arc<dyn pterm_managed_secrets::client::ManagedSecretsClient>,
+    ctx: &mut ptermui::AppContext,
 ) {
     native::start_auth_refresh(client, ctx);
 }

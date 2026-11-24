@@ -130,7 +130,10 @@ async fn start_window(
 }
 
 fn new_recording_path() -> Result<(PathBuf, PathBuf, File), RecordingError> {
-    let path = std::env::temp_dir().join(format!("rook-recording-{}.mp4", uuid::Uuid::new_v4()));
+    let path = std::env::temp_dir().join(format!(
+        "polaris-terminal-recording-{}.mp4",
+        uuid::Uuid::new_v4()
+    ));
     let log_path = path.with_extension("log");
     // ffmpeg's progress log goes to a file so its stderr pipe can never fill
     // and stall capture over a long recording.

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use diesel::sqlite::SqliteConnection;
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use rook_core::command::ExitCode;
+use pterm_core::command::ExitCode;
 
 use crate::terminal::ShellHost;
 

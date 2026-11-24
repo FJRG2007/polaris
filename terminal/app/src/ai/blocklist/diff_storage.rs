@@ -24,9 +24,9 @@ use std::sync::Arc;
 use futures::FutureExt;
 use futures::future::{BoxFuture, join_all};
 use itertools::Itertools;
-use rook_editor::multiline::AnyMultilineString;
-use rook_util::file::FileSaveError;
-use rookui::AppContext;
+use pterm_editor::multiline::AnyMultilineString;
+use pterm_util::file::FileSaveError;
+use ptermui::AppContext;
 
 use crate::ai::agent::{
     AnyFileContent, FileContext, FileLocations, RequestFileEditsResult, UpdatedFileContext,

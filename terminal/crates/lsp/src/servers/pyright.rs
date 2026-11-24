@@ -47,7 +47,7 @@ impl PyrightCandidate {
     pub async fn find_installed_binary_config(
         path_env_var: Option<&str>,
     ) -> Option<CustomBinaryConfig> {
-        let install_dir = rook_core::paths::data_dir().join("pyright");
+        let install_dir = pterm_core::paths::data_dir().join("pyright");
         let langserver_js = install_dir.join(Self::LANGSERVER_JS_PATH);
 
         // Check if the JS file exists
@@ -137,7 +137,7 @@ impl LanguageServerCandidate for PyrightCandidate {
     ) -> anyhow::Result<()> {
         log::info!("Installing pyright version {}", metadata.version);
 
-        let install_dir = rook_core::paths::data_dir().join("pyright");
+        let install_dir = pterm_core::paths::data_dir().join("pyright");
 
         // Create the installation directory
         async_fs::create_dir_all(&install_dir)

@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 use uuid::Uuid;
 
 use super::MCPProvider;

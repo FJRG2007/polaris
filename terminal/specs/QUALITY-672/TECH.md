@@ -1,6 +1,6 @@
 # Orchestration Pill Bar Pinning — Tech Spec
 Linear: [QUALITY-672](https://linear.app/warpdotdev/issue/QUALITY-672)
-PR: [#10777](https://github.com/FJRG2007/rook/pull/10777)
+PR: [#10777](https://github.com/FJRG2007/polaris/pull/10777)
 ## Context
 The orchestration pill bar renders a horizontal row of pills above the agent view header — one for the orchestrator and one for each child agent. With long-running parent agents that spawn many children, the row gets long enough that frequently-used child agents scroll off-screen, and the user has no way to keep them anchored.
 The feature adds pinning so frequently-used children stay anchored to the leading section of the bar, with pin state shared across panes and persisted across app restarts.
@@ -18,7 +18,7 @@ The feature adds pinning so frequently-used children stay anchored to the leadin
 - `app/src/lib.rs:~1683` — `BlocklistAIHistoryModel` registered at startup with the restored `multi_agent_conversations` vec.
 - `app/src/auth/mod.rs:213-281` — `log_out()` calls `.reset()` on all singletons that hold user state.
 **Icons**
-- `crates/rook_core/src/ui/icons.rs` — `Icon` enum; new SVGs bundled at `app/assets/bundled/svg/`.
+- `crates/pterm_core/src/ui/icons.rs` — `Icon` enum; new SVGs bundled at `app/assets/bundled/svg/`.
 ## Proposed changes
 ### 1. Per-conversation persistence
 **File**: `crates/persistence/src/model.rs`
@@ -59,7 +59,7 @@ In `log_out`, call `OrchestrationPinModel::handle(app).update(app, |model, _| mo
   - Pin state is also communicated by position (left of the divider).
 **Click-handler scoping (subtle):** Only wrap the avatar/pin-glyph element in `Hoverable` *and* attach the `TogglePin` click handler when `show_pin_glyph` is true. If we wrap unconditionally, the inner `Hoverable` steals clicks during the 300ms `with_hover_in_delay` window — a user clicking the avatar to navigate would land on the toggle. With the conditional wrap, clicks on the avatar (rest state) bubble to the outer pill's navigate handler, and clicks on the pin glyph (hover state) toggle pin.
 ### 4. Icons
-**Files**: `app/assets/bundled/svg/pin-01.svg`, `app/assets/bundled/svg/pin-filled.svg` (new), `crates/rook_core/src/ui/icons.rs`
+**Files**: `app/assets/bundled/svg/pin-01.svg`, `app/assets/bundled/svg/pin-filled.svg` (new), `crates/pterm_core/src/ui/icons.rs`
 Add `Icon::Pin` (outline) and `Icon::PinFilled` (solid) variants, bundled from Figma SVGs.
 ## Testing and validation
 ### Unit tests
@@ -73,14 +73,14 @@ Add `Icon::Pin` (outline) and `Icon::PinFilled` (solid) variants, bundled from F
 - `pinned: true` round-trips correctly.
 ### Manual validation
 - Start two panes with the same parent conversation. Pin a child in pane A → verify the child immediately moves to the leading section in pane B's bar.
-- Pin a child, then quit and relaunch Rook → verify the child is still pinned (persistence).
+- Pin a child, then quit and relaunch Polaris Terminal → verify the child is still pinned (persistence).
 - Hover a pinned child → solid pin glyph appears, hover background; click → unpinned and moves back across the divider.
 - Hover an unpinned child → outline pin glyph appears; click → pinned.
 - Click the avatar area of a pinned child during the hover-in delay window → verify navigation happens (not toggle).
 - Delete a pinned conversation → verify it's removed from the pin set in all panes (no orphan).
 - Log out and log in as a different user → verify pins do not carry over.
 ### Presubmit
-`cargo fmt`, `cargo build -p rook`, `cargo nextest run -p rook orchestration_pin_model`, `cargo clippy -p rook --tests --all-features`.
+`cargo fmt`, `cargo build -p polaris-terminal`, `cargo nextest run -p polaris-terminal orchestration_pin_model`, `cargo clippy -p polaris-terminal --tests --all-features`.
 ## Risks and mitigations
 **Risk: Click during the 300ms hover-in delay toggles pin instead of navigating.** First implementation had this bug.
 *Mitigation:* Inner `Hoverable` (with the toggle handler) is only present when `show_pin_glyph` is true. At rest, clicks bubble to the outer navigate handler. Covered by manual validation; consider an integration test if regressions appear.

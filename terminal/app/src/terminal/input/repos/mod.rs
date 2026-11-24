@@ -6,7 +6,7 @@ mod view;
 
 use std::path::PathBuf;
 
-use rookui::keymap::Keystroke;
+use ptermui::keymap::Keystroke;
 pub use view::{InlineReposMenuEvent, InlineReposMenuView};
 
 use crate::terminal::input::inline_menu::{

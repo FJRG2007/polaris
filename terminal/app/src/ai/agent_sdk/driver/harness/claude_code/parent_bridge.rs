@@ -6,7 +6,7 @@
 //! - `staged/` holds newly observed message IDs from the event stream.
 //! - `surfaced/` holds the fully hydrated records currently exposed to Claude.
 //! - `pending-hook-output.json` plus `pending-hook-output.ack` coordinates the
-//!   handoff between Rook's driver and the Claude hook process.
+//!   handoff between Polaris Terminal's driver and the Claude hook process.
 use std::fmt::Write as _;
 use std::fs;
 use std::io::Write;
@@ -16,8 +16,8 @@ use std::sync::Arc;
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use parking_lot::Mutex;
-use rookui::ModelSpawner;
-use rookui::r#async::SpawnedFutureHandle;
+use ptermui::ModelSpawner;
+use ptermui::r#async::SpawnedFutureHandle;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 use tokio::sync::Mutex as AsyncMutex;
@@ -707,7 +707,7 @@ async fn read_parent_bridge_resume_cursor(
     state_dir: &Path,
 ) -> Result<i64> {
     // The server cursor is the durable cross-client source of truth, but the
-    // bridge also keeps a local cursor for same-machine recovery. If Rook or
+    // bridge also keeps a local cursor for same-machine recovery. If Polaris Terminal or
     // Claude restarts after the bridge has staged events locally but before the
     // server cursor update is visible, the local cursor prevents replaying
     // messages already handed to this Claude session.

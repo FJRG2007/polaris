@@ -34,24 +34,24 @@ use std::collections::{HashMap, HashSet};
 use common::get_highlight_ranges_for_find_matches;
 use itertools::Itertools;
 use pathfinder_color::ColorU;
-use rook_core::features::FeatureFlag;
-use rook_core::semantic_selection::SemanticSelection;
-use rook_core::ui::color::Rgb;
-use rook_core::ui::color::contrast::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_core::ui::color::Rgb;
+use pterm_core::ui::color::contrast::{
     MinimumAllowedContrast, foreground_color_with_minimum_contrast,
 };
-use rook_core::ui::theme::{Fill, RookTheme};
-use rookui::elements::{
+use pterm_core::ui::theme::{Fill, PtermTheme};
+use ptermui::elements::{
     Align, Border, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Expanded, Flex, FormattedTextElement, Highlight, HighlightedRange, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, SavePosition,
     SelectableArea, Text,
 };
-use rookui::fonts::Properties;
-use rookui::platform::Cursor;
-use rookui::text_layout::TextStyle;
-use rookui::ui_components::components::UiComponent;
-use rookui::{AppContext, Element, SingletonEntity, View, ViewContext};
+use ptermui::fonts::Properties;
+use ptermui::platform::Cursor;
+use ptermui::text_layout::TextStyle;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{AppContext, Element, SingletonEntity, View, ViewContext};
 use settings::Setting as _;
 
 use super::secret_redaction::SecretRedactionState;
@@ -92,7 +92,7 @@ use crate::workspace::WorkspaceAction;
 fn create_secret_gray_highlight() -> Highlight {
     Highlight::new().with_text_style(
         TextStyle::new()
-            .with_foreground_color(rookui::color::ColorU::new(128, 128, 128, 255))
+            .with_foreground_color(ptermui::color::ColorU::new(128, 128, 128, 255))
             .with_show_strikethrough(true),
     )
 }
@@ -131,7 +131,7 @@ fn add_slash_command_highlight(
 
         let current_properties = existing.properties();
         let mut bold_properties = current_properties;
-        bold_properties.weight = rookui::fonts::Weight::Bold;
+        bold_properties.weight = ptermui::fonts::Weight::Bold;
 
         Highlight::new()
             .with_text_style(updated_style)
@@ -139,7 +139,7 @@ fn add_slash_command_highlight(
     } else {
         // Create new highlight with default properties and bold weight
         let default_properties = Properties {
-            weight: rookui::fonts::Weight::Bold,
+            weight: ptermui::fonts::Weight::Bold,
             ..Default::default()
         };
         Highlight::new()
@@ -403,7 +403,7 @@ pub(crate) fn add_highlights_to_rich_text(
     find_context: Option<FindContext<'_>>,
     location_index: usize,
     line_count: usize,
-    theme: &RookTheme,
+    theme: &PtermTheme,
     is_selecting: bool,
     is_action: bool,
     app: &AppContext,
@@ -448,7 +448,7 @@ pub(crate) fn add_highlights_to_rich_text(
                     .detected_links
                     .iter()
                     .filter_map(|(range, link)| {
-                        // Stylings like [](https://example.com) would cause rook to panic. We need to filter that out.
+                        // Stylings like [](https://example.com) would cause polaris-terminal to panic. We need to filter that out.
                         if range.is_empty() {
                             return None;
                         }
@@ -649,29 +649,29 @@ pub fn render_citation(
     let theme = appearance.theme();
 
     let (icon, name) = match citation {
-        AIAgentCitation::RookDriveObject { uid } => {
+        AIAgentCitation::PtermDriveObject { uid } => {
             let item = CloudModel::as_ref(app)
                 .get_by_uid(uid)?
-                .to_rook_drive_item(appearance)?;
+                .to_pterm_drive_item(appearance)?;
             (
                 item.icon(appearance, Some(theme.active_ui_text_color())),
                 item.display_name().unwrap_or(String::from("Untitled")),
             )
         }
-        AIAgentCitation::RookDocumentation { .. } => {
-            let icon = Icon::Rook.to_rookui_icon(theme.foreground()).finish();
-            let name = String::from("Rook Docs");
+        AIAgentCitation::PtermDocumentation { .. } => {
+            let icon = Icon::Pterm.to_ptermui_icon(theme.foreground()).finish();
+            let name = String::from("Polaris Terminal Docs");
             (Some(icon), name)
         }
         AIAgentCitation::WebPage { url } => {
             let icon = Icon::LinkExternal
-                .to_rookui_icon(theme.foreground())
+                .to_ptermui_icon(theme.foreground())
                 .finish();
             let name = url.clone();
             (Some(icon), name)
         }
         AIAgentCitation::AgentMemory { content, .. } => {
-            let icon = Icon::Cognition.to_rookui_icon(theme.foreground()).finish();
+            let icon = Icon::Cognition.to_ptermui_icon(theme.foreground()).finish();
             let name = if content.is_empty() {
                 String::from("Memory")
             } else {
@@ -728,7 +728,7 @@ pub fn render_citation(
 /// [`render_autonomy_checkbox_setting_speedbump_footer`].
 pub fn render_autonomy_dropdown_setting_speedbump_footer<A>(
     description: &'static str,
-    dropdown: &rookui::ViewHandle<crate::view_components::dropdown::Dropdown<A>>,
+    dropdown: &ptermui::ViewHandle<crate::view_components::dropdown::Dropdown<A>>,
     settings_link_handle: MouseStateHandle,
     app: &AppContext,
 ) -> Box<dyn Element>
@@ -756,7 +756,7 @@ where
                 .finish(),
             )
             .with_child(
-                Container::new(rookui::elements::ChildView::new(dropdown).finish())
+                Container::new(ptermui::elements::ChildView::new(dropdown).finish())
                     .with_margin_right(8.)
                     .finish(),
             )
@@ -773,7 +773,7 @@ where
                                     ctx.dispatch_typed_action(
                                         WorkspaceAction::ShowSettingsPageWithSearch {
                                             search_query: "Autonomy".to_string(),
-                                            section: Some(SettingsSection::RookAgent),
+                                            section: Some(SettingsSection::PtermAgent),
                                         },
                                     );
                                 })),
@@ -848,7 +848,7 @@ pub fn render_autonomy_checkbox_setting_speedbump_footer(
                                 ctx.dispatch_typed_action(
                                     WorkspaceAction::ShowSettingsPageWithSearch {
                                         search_query: "Autonomy".to_string(),
-                                        section: Some(SettingsSection::RookAgent),
+                                        section: Some(SettingsSection::PtermAgent),
                                     },
                                 );
                             })),
@@ -1274,13 +1274,13 @@ impl View for AIBlock {
         selectable.finish()
     }
 
-    fn on_focus(&mut self, focus_ctx: &rookui::FocusContext, ctx: &mut ViewContext<Self>) {
+    fn on_focus(&mut self, focus_ctx: &ptermui::FocusContext, ctx: &mut ViewContext<Self>) {
         if focus_ctx.is_self_focused() {
             self.focus_subview_if_necessary(ctx);
         }
     }
 
-    fn keymap_context(&self, app: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         if self

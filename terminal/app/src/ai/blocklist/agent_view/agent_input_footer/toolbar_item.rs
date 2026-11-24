@@ -1,4 +1,4 @@
-use rookui::SingletonEntity;
+use ptermui::SingletonEntity;
 use serde::{Deserialize, Serialize};
 
 use super::editor::AgentToolbarEditorMode;
@@ -173,7 +173,7 @@ impl AgentToolbarItemKind {
     /// Whether this item should be included in the toolbar given the current app state.
     /// Feature-flag checks live in `all_available()` / `default_*()`. This method
     /// handles runtime conditions that depend on user settings or workspace state.
-    pub fn is_available(&self, app: &rookui::AppContext) -> bool {
+    pub fn is_available(&self, app: &ptermui::AppContext) -> bool {
         match self {
             Self::HandoffToCloud => AISettings::as_ref(app).is_cloud_handoff_enabled(app),
             // Matches the gating on every other project explorer entry point, so the chip

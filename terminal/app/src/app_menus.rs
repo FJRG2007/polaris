@@ -6,16 +6,16 @@ use ai::workspace::WorkspaceMetadata;
 use csv::Writer;
 use enclose::enclose;
 use itertools::Itertools;
-use rook_core::context_flag::ContextFlag;
-use rook_errors::{report_error, report_if_error};
-use rook_util::path::user_friendly_path;
-use rookui::actions::StandardAction;
-use rookui::keymap::{Keystroke, Trigger};
-use rookui::platform::menu::{
+use pterm_core::context_flag::ContextFlag;
+use pterm_errors::{report_error, report_if_error};
+use pterm_util::path::user_friendly_path;
+use ptermui::actions::StandardAction;
+use ptermui::keymap::{Keystroke, Trigger};
+use ptermui::platform::menu::{
     CustomMenuItem, Menu, MenuBar, MenuItem, MenuItemProperties, MenuItemPropertyChanges,
 };
-use rookui::windowing::WindowManager;
-use rookui::{AppContext, SingletonEntity};
+use ptermui::windowing::WindowManager;
+use ptermui::{AppContext, SingletonEntity};
 use settings::Setting as _;
 use settings::manager::SettingsManager;
 
@@ -33,7 +33,7 @@ use crate::terminal::alt_screen_reporting::AltScreenReporting;
 use crate::terminal::session_settings::SessionSettings;
 use crate::terminal::settings::{SpacingMode, TerminalSettings};
 use crate::undo_close::UndoCloseStack;
-use crate::user_config::RookConfig;
+use crate::user_config::PtermConfig;
 use crate::util::bindings::{self, CustomAction, trigger_to_keystroke};
 use crate::util::links;
 use crate::workspace::sync_inputs::SyncedInputState;
@@ -47,18 +47,18 @@ const DISABLE_SHELL_DEBUG_MODE_MENU_ITEM_NAME: &str =
 const ENABLE_IN_BAND_GENERATORS_MENU_ITEM_NAME: &str = "Enable In-band Generators for New Sessions";
 const DISABLE_IN_BAND_GENERATORS_MENU_ITEM_NAME: &str =
     "Disable in-band generators for new sessions";
-const ENABLE_PTY_RECORDING: &str = "Enable PTY Recording Mode (rook.pty.recording)";
-const DISABLE_PTY_RECORDING: &str = "Disable PTY Recording Mode (rook.pty.recording)";
+const ENABLE_PTY_RECORDING: &str = "Enable PTY Recording Mode (polaris-terminal.pty.recording)";
+const DISABLE_PTY_RECORDING: &str = "Disable PTY Recording Mode (polaris-terminal.pty.recording)";
 const SHOW_BOOTSTRAP_BLOCK_MENU_ITEM_NAME: &str = "Show Initialization Block";
 const HIDE_BOOTSTRAP_BLOCK_MENU_ITEM_NAME: &str = "Hide Initialization Block";
 const SHOW_IN_BAND_COMMAND_BLOCKS_MENU_ITEM_NAME: &str = "Show In-band Command Blocks";
 const HIDE_IN_BAND_COMMAND_BLOCKS_MENU_ITEM_NAME: &str = "Hide In-band Command Blocks";
-const SHOW_SSH_COMMAND_BLOCKS_MENU_ITEM_NAME: &str = "Show Rookified SSH Blocks";
-const HIDE_SSH_COMMAND_BLOCKS_MENU_ITEM_NAME: &str = "Hide Rookified SSH Blocks";
+const SHOW_SSH_COMMAND_BLOCKS_MENU_ITEM_NAME: &str = "Show Ptermified SSH Blocks";
+const HIDE_SSH_COMMAND_BLOCKS_MENU_ITEM_NAME: &str = "Hide Ptermified SSH Blocks";
 const EXPORT_DEFAULT_SETTINGS_CSV_MENU_ITEM_NAME: &str =
     "Export Default Settings as CSV to home dir";
 
-const SETTINGS_CSV_FILE_NAME: &str = "rook_default_settings.csv";
+const SETTINGS_CSV_FILE_NAME: &str = "pterm_default_settings.csv";
 const MAX_RECENT_REPOS_IN_MENU: usize = 10;
 
 /// Creates the root app menu bar
@@ -140,7 +140,7 @@ fn updateable_custom_item_without_checkmark(action: CustomAction, ctx: &AppConte
 
 fn make_new_app_menu(ctx: &AppContext) -> Menu {
     let mut menu_items = vec![updateable_custom_item_without_checkmark(
-        CustomAction::ShowAboutRook,
+        CustomAction::ShowAboutPterm,
         ctx,
     )];
 
@@ -210,18 +210,18 @@ fn make_new_app_menu(ctx: &AppContext) -> Menu {
     menu_items.push(MenuItem::Standard(StandardAction::ShowAllApps));
     menu_items.push(MenuItem::Separator);
     menu_items.push(MenuItem::Custom(CustomMenuItem::new(
-        "Set Rook as Default Terminal",
+        "Set Polaris Terminal as Default Terminal",
         move |ctx| {
             DefaultTerminal::handle(ctx).update(ctx, |default_terminal, ctx| {
-                default_terminal.make_rook_default(ctx)
+                default_terminal.make_pterm_default(ctx)
             });
         },
         move |_props, ctx| {
             let default_terminal = DefaultTerminal::handle(ctx).as_ref(ctx);
             MenuItemPropertyChanges {
                 disabled: Some(
-                    !DefaultTerminal::can_rook_become_default()
-                        || default_terminal.is_rook_default(),
+                    !DefaultTerminal::can_pterm_become_default()
+                        || default_terminal.is_pterm_default(),
                 ),
                 ..Default::default()
             }
@@ -245,7 +245,7 @@ fn make_new_app_menu(ctx: &AppContext) -> Menu {
         None,
     )));
     menu_items.push(MenuItem::Standard(StandardAction::Quit));
-    Menu::new("Rook", menu_items)
+    Menu::new("Polaris Terminal", menu_items)
 }
 
 fn make_new_file_menu(ctx: &AppContext) -> Menu {
@@ -301,7 +301,7 @@ fn make_new_edit_menu(ctx: &AppContext) -> Menu {
     ];
     let group_5 = vec![
         MenuItem::Custom(CustomMenuItem::new(
-            "Use Rook's Prompt",
+            "Use Polaris Terminal's Prompt",
             move |ctx| ctx.dispatch_global_action("app:toggle_user_ps1", &()),
             move |_props, ctx| MenuItemPropertyChanges {
                 checked: Some(
@@ -375,7 +375,7 @@ fn make_new_edit_menu(ctx: &AppContext) -> Menu {
 
 fn make_new_view_menu(ctx: &AppContext) -> Menu {
     let mut items = vec![
-        updateable_custom_item_without_checkmark(CustomAction::ToggleRookDrive, ctx),
+        updateable_custom_item_without_checkmark(CustomAction::TogglePtermDrive, ctx),
         MenuItem::Separator,
         updateable_custom_item_without_checkmark(CustomAction::CommandPalette, ctx),
         updateable_custom_item_without_checkmark(CustomAction::NavigationPalette, ctx),
@@ -608,7 +608,7 @@ fn make_new_drive_menu(ctx: &AppContext) -> Menu {
     ));
     items.extend([
         MenuItem::Separator,
-        updateable_custom_item_without_checkmark(CustomAction::ToggleRookDrive, ctx),
+        updateable_custom_item_without_checkmark(CustomAction::TogglePtermDrive, ctx),
         updateable_custom_item_without_checkmark(CustomAction::SearchDrive, ctx),
         updateable_custom_item_without_checkmark(CustomAction::OpenTeamSettings, ctx),
         updateable_custom_item_without_checkmark(CustomAction::OpenAIFactCollection, ctx),
@@ -931,7 +931,10 @@ fn make_new_help_menu() -> Menu {
         "Help",
         vec![
             feedback_menu_item(),
-            link_menu_item("Rook Documentation...", links::USER_DOCS_URL.into()),
+            link_menu_item(
+                "Polaris Terminal Documentation...",
+                links::USER_DOCS_URL.into(),
+            ),
             link_menu_item("GitHub Issues...", links::GITHUB_ISSUES_URL.into()),
             link_menu_item("Join our Discord community...", links::DISCORD_URL.into()),
         ],
@@ -941,7 +944,7 @@ fn make_new_help_menu() -> Menu {
 fn make_launch_config_menu_items(ctx: &mut AppContext) -> Vec<MenuItem> {
     let mut launch_config_menu_items = vec![];
 
-    let launch_configs = RookConfig::handle(ctx).as_ref(ctx).launch_configs();
+    let launch_configs = PtermConfig::handle(ctx).as_ref(ctx).launch_configs();
     for config in launch_configs {
         launch_config_menu_items.push(MenuItem::Custom(CustomMenuItem::new(
             &config.name,
@@ -1114,7 +1117,7 @@ fn open_new_agent_tab_or_window(ctx: &mut AppContext) {
     }
 }
 
-/// Dispatch event to open a new Rook window
+/// Dispatch event to open a new Polaris Terminal window
 fn open_new_window(ctx: &mut AppContext) {
     ctx.dispatch_global_action("root_view:open_new", &());
     ctx.dispatch_global_action("workspace:save_app", &());

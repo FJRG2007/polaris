@@ -1,7 +1,7 @@
 use futures::channel::oneshot;
-use rook_core::SessionId;
-use rook_util::standardized_path::StandardizedPath;
-use rookui_core::App;
+use pterm_core::SessionId;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui_core::App;
 
 use super::{
     HostRequestError, PendingHostRequest, RemoteServerManager, RemoteServerManagerEvent,

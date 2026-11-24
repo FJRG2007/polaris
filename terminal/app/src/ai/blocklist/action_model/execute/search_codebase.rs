@@ -5,8 +5,8 @@ use futures::FutureExt;
 use futures::channel::oneshot;
 use futures::future::BoxFuture;
 use itertools::Itertools;
-use rook_errors::report_error;
-use rookui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::{
     ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput,

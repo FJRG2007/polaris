@@ -1,15 +1,15 @@
 use itertools::Itertools;
-use rook_core::session_id::SessionId;
-use rook_terminal::bootstrap::SESSION_ID_PLACEHOLDER;
-pub use rook_terminal::bootstrap::{
+use pterm_core::session_id::SessionId;
+use pterm_terminal::bootstrap::SESSION_ID_PLACEHOLDER;
+pub use pterm_terminal::bootstrap::{
     generate_session_id, init_shell_script_for_shell, load_and_escape_script, script_for_shell,
 };
-use rookui::{AppContext, AssetProvider, SingletonEntity};
+use ptermui::{AppContext, AssetProvider, SingletonEntity};
 
 #[cfg(feature = "local_fs")]
 use super::{
     model::session::{BootstrapSessionType, SessionInfo},
-    rookify::settings::{PIPENV_SUBSHELL_COMMAND_REGEX, POETRY_SUBSHELL_COMMAND_REGEX},
+    ptermify::settings::{PIPENV_SUBSHELL_COMMAND_REGEX, POETRY_SUBSHELL_COMMAND_REGEX},
 };
 use crate::env_vars::{EnvVar, EnvVarExt};
 use crate::terminal::session_settings::SessionSettings;
@@ -27,7 +27,7 @@ pub fn is_container_subshell(session_info: &SessionInfo) -> bool {
     })
 }
 
-/// Returns `true` if Rook should use an RC-file based bootstrap (e.g. dump the bootstrap script to
+/// Returns `true` if Polaris Terminal should use an RC-file based bootstrap (e.g. dump the bootstrap script to
 /// a temp file and `source` it) for a newly spawned session with the given `shell_type`, and
 /// associated `session_type` and `subshell_initialization_info`.
 ///
@@ -87,7 +87,7 @@ pub fn should_use_rc_file_bootstrap_method(
                     && shell_type == ShellType::Zsh)
                 || is_msys2
         }
-        BootstrapSessionType::RookifiedRemote => false,
+        BootstrapSessionType::PtermifiedRemote => false,
     }
 }
 
@@ -106,7 +106,7 @@ pub fn init_subshell_command(
         Some(shell_type) => {
             let subshell_script =
                 init_subshell_script_for_shell(shell_type, &crate::ASSETS, vars, session_id, ctx);
-            format!(r#" [ -z $ROOK_BOOTSTRAPPED ] && eval '{subshell_script}'"#)
+            format!(r#" [ -z $POLARIS_TERMINAL_BOOTSTRAPPED ] && eval '{subshell_script}'"#)
         }
         None => init_subshell_script_for_unknown_shell(&crate::ASSETS, session_id),
     }
@@ -129,7 +129,7 @@ fn init_subshell_script_for_shell(
 
     // Prepend environment variable settings to the script
     let env_setup_script = format!(
-        "export ROOK_HONOR_PS1={}; {}",
+        "export POLARIS_TERMINAL_HONOR_PS1={}; {}",
         honor_ps1_env_var_value,
         env_vars
             .iter()

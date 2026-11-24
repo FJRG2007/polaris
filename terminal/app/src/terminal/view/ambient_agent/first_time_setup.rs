@@ -4,16 +4,18 @@
 //! and need to create an environment.
 
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use rook_core::ui::theme::{AnsiColorIdentifier, Fill};
-use rook_errors::report_error;
-use rookui::elements::new_scrollable::SingleAxisConfig;
-use rookui::elements::{
+use pterm_core::ui::theme::{AnsiColorIdentifier, Fill};
+use pterm_errors::report_error;
+use ptermui::elements::new_scrollable::SingleAxisConfig;
+use ptermui::elements::{
     Align, Border, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Element, Expanded, Flex, FormattedTextElement, HighlightedHyperlink,
     NewScrollable, ParentElement, Radius, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{
+    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 
 use crate::ai::ambient_agents::github_auth_url::{AuthSource, GithubAuthRedirectTarget};
 use crate::ai::request_usage_model::AMBIENT_AGENT_TRIAL_CREDIT_THRESHOLD;
@@ -350,7 +352,7 @@ impl View for FirstTimeCloudAgentSetupView {
             },
             appearance.theme().nonactive_ui_detail().into(),
             appearance.theme().active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .finish();
 

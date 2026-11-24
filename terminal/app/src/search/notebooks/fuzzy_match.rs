@@ -1,8 +1,8 @@
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_errors::report_error;
-use rookui::elements::{Highlight, Text};
-use rookui::{AppContext, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui::elements::{Highlight, Text};
+use ptermui::{AppContext, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::cloud_object::CloudObject;

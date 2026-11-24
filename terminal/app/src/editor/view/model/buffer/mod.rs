@@ -17,14 +17,14 @@ use std::str;
 use anyhow::{Result, anyhow};
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use ptermui::color::ColorU;
+use ptermui::text::point::Point;
+use ptermui::text::words::is_default_word_boundary;
+use ptermui::text::{BufferIndex, TextBuffer};
+use ptermui::text_layout::TextStyle;
+use ptermui::{Entity, ModelContext};
 #[cfg(test)]
 use rand::prelude::*;
-use rookui::color::ColorU;
-use rookui::text::point::Point;
-use rookui::text::words::is_default_word_boundary;
-use rookui::text::{BufferIndex, TextBuffer};
-use rookui::text_layout::TextStyle;
-use rookui::{Entity, ModelContext};
 use serde::{Deserialize, Serialize};
 use string_offset::{ByteOffset, CharOffset};
 use sum_tree::{self, Cursor, FilterCursor, SeekBias, SumTree};
@@ -363,9 +363,9 @@ impl TextStyleOperation {
     ///
     /// # Example
     /// ```
-    /// use rookui::color::ColorU;
-    /// use rookui::text_layout::TextStyle;
-    /// use rook::editor::TextStyleOperation;
+    /// use ptermui::color::ColorU;
+    /// use ptermui::text_layout::TextStyle;
+    /// use polaris_terminal::editor::TextStyleOperation;
     /// TextStyleOperation::apply_text_style_operation(
     ///     TextStyle::default(),
     ///     TextStyleOperation::default().set_error_underline_color(ColorU::black()),
@@ -1645,9 +1645,9 @@ impl Buffer {
     ///
     /// # Example
     /// ```ignore
-    /// use rookui::{color::ColorU, App, ModelHandle};
-    /// use rook::Assets;
-    /// use rook::editor::model::buffer::{Buffer, TextStyleOperation, EditOrigin};
+    /// use ptermui::{color::ColorU, App, ModelHandle};
+    /// use polaris_terminal::Assets;
+    /// use polaris_terminal::editor::model::buffer::{Buffer, TextStyleOperation, EditOrigin};
     /// use string_offset::CharOffset;
     /// App::test((), |mut app| async move {
     ///     let buffer_model: &mut ModelHandle<Buffer> =

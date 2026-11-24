@@ -4,7 +4,7 @@ mod search_item;
 mod view;
 
 use ai::document::AIDocumentId;
-use rookui::keymap::Keystroke;
+use ptermui::keymap::Keystroke;
 pub use view::{InlinePlanMenuEvent, InlinePlanMenuView};
 
 use crate::ai::document::ai_document_model::AIDocumentVersion;

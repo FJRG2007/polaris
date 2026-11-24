@@ -1,5 +1,5 @@
-use rookui::elements::MouseStateHandle;
-use rookui::{AppContext, ViewHandle};
+use ptermui::elements::MouseStateHandle;
+use ptermui::{AppContext, ViewHandle};
 
 use crate::code::local_code_editor::LocalCodeEditorView;
 

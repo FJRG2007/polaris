@@ -3,9 +3,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use anyhow::anyhow;
-use rook_graphql::ai::{AgentTaskState, PlatformErrorCode};
-use rookui::App;
-use rookui::r#async::FutureExt as _;
+use pterm_graphql::ai::{AgentTaskState, PlatformErrorCode};
+use ptermui::App;
+use ptermui::r#async::FutureExt as _;
 use session_sharing_protocol::common::SessionId;
 
 use super::super::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
@@ -78,9 +78,9 @@ fn server_overloaded_is_error_with_resource_unavailable() {
 }
 
 #[test]
-fn internal_rook_error_is_error() {
+fn internal_pterm_error_is_error() {
     assert_update(
-        classify_renderable_error(&RenderableAIError::InternalRookError),
+        classify_renderable_error(&RenderableAIError::InternalPtermError),
         AgentTaskState::Error,
         Some(PlatformErrorCode::InternalError),
         Some("internal error"),
@@ -201,7 +201,7 @@ fn map_conversation_status_waiting_for_events_reports_in_progress_with_no_messag
 
         let conversation = AIConversation::new(false, false);
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -361,7 +361,7 @@ fn map_conversation_status_error_classifies_status_error_via_setter() {
 
         let conversation = AIConversation::new(false, false);
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -398,7 +398,7 @@ fn map_conversation_status_error_classifies_status_error_other_as_error() {
     let mut conversation = AIConversation::new(false, false);
     conversation.set_status_for_test(ConversationStatus::Error);
     conversation.set_status_error_for_test(Some(RenderableAIError::other(
-        "Out of credits. Upgrade your Rook plan to continue running cloud agents.",
+        "Out of credits. Upgrade your Polaris Terminal plan to continue running cloud agents.",
         false,
     )));
     assert_update(
@@ -494,14 +494,14 @@ fn fixed_session_id() -> SessionId {
 /// background poll to happen at least once.
 async fn pump_spawned_tasks() {
     for _ in 0..5 {
-        rookui::r#async::Timer::after(Duration::from_millis(2)).await;
+        ptermui::r#async::Timer::after(Duration::from_millis(2)).await;
     }
 }
 
 fn install_model_with_call_counter(
     app: &mut App,
 ) -> (
-    rookui::ModelHandle<LocalAgentTaskSyncModel>,
+    ptermui::ModelHandle<LocalAgentTaskSyncModel>,
     Arc<AtomicUsize>,
 ) {
     register_cli_agent_sessions_model(app);
@@ -548,7 +548,7 @@ fn cli_task_mapping_survives_cli_session_end() {
         let model = app.add_singleton_model(|ctx| {
             LocalAgentTaskSyncModel::new_with_ai_client_for_test(ai_client, ctx)
         });
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
 
         model.update(&mut app, |model, ctx| {
             model.register_cli_session(terminal_view_id, fixed_task_id(), ctx);
@@ -595,8 +595,8 @@ fn install_model_with_constant_result(
     app: &mut App,
     succeed: bool,
 ) -> (
-    rookui::ModelHandle<LocalAgentTaskSyncModel>,
-    rookui::ModelHandle<CLIAgentSessionsModel>,
+    ptermui::ModelHandle<LocalAgentTaskSyncModel>,
+    ptermui::ModelHandle<CLIAgentSessionsModel>,
 ) {
     app.add_singleton_model(|_| BlocklistAIHistoryModel::new(vec![], vec![], &[]));
     let cli_sessions_model = app.add_singleton_model(|_| CLIAgentSessionsModel::new());
@@ -617,9 +617,9 @@ fn install_model_with_constant_result(
 }
 
 fn emit_cli_status(
-    cli_sessions_model: &rookui::ModelHandle<CLIAgentSessionsModel>,
+    cli_sessions_model: &ptermui::ModelHandle<CLIAgentSessionsModel>,
     app: &mut App,
-    terminal_view_id: rookui::EntityId,
+    terminal_view_id: ptermui::EntityId,
     status: CLIAgentSessionStatus,
 ) {
     cli_sessions_model.update(app, |_, ctx| {
@@ -647,7 +647,7 @@ fn wait_for_idle_resolves_immediately_when_task_is_idle() {
 fn wait_for_idle_resolves_after_updates_deliver_and_terminal_state_is_confirmed() {
     App::test((), |mut app| async move {
         let (model, cli_sessions_model) = install_model_with_constant_result(&mut app, true);
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         let task_id = fixed_task_id();
 
         // `register_cli_session` puts an IN_PROGRESS update in flight, and the
@@ -681,7 +681,7 @@ fn wait_for_idle_resolves_after_updates_deliver_and_terminal_state_is_confirmed(
 fn confirmed_terminal_state_remembers_blocked() {
     App::test((), |mut app| async move {
         let (model, cli_sessions_model) = install_model_with_constant_result(&mut app, true);
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         let task_id = fixed_task_id();
 
         model.update(&mut app, |model, ctx| {
@@ -716,7 +716,7 @@ fn confirmed_terminal_state_remembers_blocked() {
 fn failed_delivery_does_not_confirm_terminal_state() {
     App::test((), |mut app| async move {
         let (model, cli_sessions_model) = install_model_with_constant_result(&mut app, false);
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         let task_id = fixed_task_id();
 
         model.update(&mut app, |model, ctx| {
@@ -753,7 +753,7 @@ fn shared_session_link_fires_update_agent_task_with_session_id() {
         let task_id = fixed_task_id();
         conversation.set_run_id(task_id.to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -788,7 +788,7 @@ fn shared_session_link_uses_correct_argument_order() {
         let task_id = fixed_task_id();
         conversation.set_run_id(task_id.to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -839,7 +839,7 @@ fn shared_session_link_skips_viewer_conversations() {
             AIConversation::new(/* is_viewing_shared_session */ true, false);
         conversation.set_run_id(fixed_task_id().to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -873,7 +873,7 @@ fn shared_session_link_skips_remote_child_conversations() {
         conversation.set_run_id(fixed_task_id().to_string());
         conversation.mark_as_remote_child();
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -906,7 +906,7 @@ fn shared_session_link_skips_when_task_id_missing() {
         // No set_run_id call: the conversation has no task_id yet.
         let conversation = AIConversation::new(false, false);
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -969,7 +969,7 @@ fn conversation_server_token_assigned_fires_update_with_conversation_id() {
         conversation.set_run_id(task_id.to_string());
         conversation.set_server_conversation_token("server-conversation-id".to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -1018,7 +1018,7 @@ fn conversation_server_token_assigned_skips_viewer_conversations() {
         conversation.set_run_id(fixed_task_id().to_string());
         conversation.set_server_conversation_token("server-conversation-id".to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -1053,7 +1053,7 @@ fn conversation_server_token_assigned_skips_remote_child_conversations() {
         conversation.set_server_conversation_token("server-conversation-id".to_string());
         conversation.mark_as_remote_child();
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -1094,7 +1094,7 @@ fn preserve_terminal_setup_failure_conversation_reports_token_without_task_state
         conversation.set_task_sync_mode(TaskSyncMode::PreserveTerminalSetupFailure);
         conversation.set_server_conversation_token("debug-conversation-token".to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });
@@ -1146,7 +1146,7 @@ fn conversation_server_token_assigned_skips_without_task_id() {
         let mut conversation = AIConversation::new(false, false);
         conversation.set_server_conversation_token("server-conversation-id".to_string());
         let conversation_id = conversation.id();
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         history_model.update(&mut app, |model, ctx| {
             model.restore_conversations(terminal_view_id, vec![conversation], ctx);
         });

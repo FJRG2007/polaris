@@ -1,6 +1,6 @@
 # Tech Spec: Tab search matches tab group names
 
-**Issue:** [FJRG2007/rook#14689](https://github.com/FJRG2007/rook/issues/14689)
+**Issue:** [FJRG2007/polaris#14689](https://github.com/FJRG2007/polaris/issues/14689)
 
 ## Problem
 
@@ -172,7 +172,7 @@ Gates: `./script/presubmit`, `./script/format --check`, and `cargo clippy --work
 
 ## Group-name match highlighting
 
-`render_grouped_tabs_header` receives the active search query and applies RookUI's
+`render_grouped_tabs_header` receives the active search query and applies PtermUI's
 `Highlight` with bold font weight to matching characters in the displayed name.
 The inline rename editor keeps its existing rendering.
 

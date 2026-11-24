@@ -15,49 +15,50 @@ use http::HeaderValue;
 pub use http::header::AUTHORIZATION;
 use http::header::HeaderName;
 pub use http::{HeaderMap, StatusCode};
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_core::execution_mode;
+use pterm_core::operating_system_info::OperatingSystemInfo;
+use pterm_errors::report_error;
 use reqwest::IntoUrl;
 use reqwest_eventsource::RequestBuilderExt;
-use rook_core::channel::{Channel, ChannelState};
-use rook_core::execution_mode;
-use rook_core::operating_system_info::OperatingSystemInfo;
-use rook_errors::report_error;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::iap::{IapTokenProvider, proxy_auth_header};
 
 pub mod headers {
-    /// Custom Rook header indicating the version of the Rook app.
-    pub const CLIENT_RELEASE_VERSION_HEADER_KEY: &str = "X-Rook-Client-Version";
+    /// Custom Polaris Terminal header indicating the version of the Polaris Terminal app.
+    pub const CLIENT_RELEASE_VERSION_HEADER_KEY: &str = "X-PolarisTerminal-Client-Version";
 
-    /// Custom Rook header indicating the OS category the request was sent from.
-    pub(crate) const ROOK_OS_CATEGORY: &str = "X-Rook-OS-Category";
-    /// Custom Rook header indicating the OS name the request was sent from. On Linux this is the
+    /// Custom Polaris Terminal header indicating the OS category the request was sent from.
+    pub(crate) const POLARIS_TERMINAL_OS_CATEGORY: &str = "X-PolarisTerminal-OS-Category";
+    /// Custom Polaris Terminal header indicating the OS name the request was sent from. On Linux this is the
     /// name of the distribution. On all other platforms it should be equivalent to
-    /// `ROOK_OS_CATEGORY`.
-    pub(crate) const ROOK_OS_NAME: &str = "X-Rook-OS-Name";
-    /// Custom Rook header indicating the version of the operating system. On Linux this is the
+    /// `POLARIS_TERMINAL_OS_CATEGORY`.
+    pub(crate) const POLARIS_TERMINAL_OS_NAME: &str = "X-PolarisTerminal-OS-Name";
+    /// Custom Polaris Terminal header indicating the version of the operating system. On Linux this is the
     /// version of the distribution, not the Linux kernel version.
-    pub(crate) const ROOK_OS_VERSION: &str = "X-Rook-OS-Version";
+    pub(crate) const POLARIS_TERMINAL_OS_VERSION: &str = "X-PolarisTerminal-OS-Version";
 
-    /// Custom Rook header indicating the linux kernel version. This is only sent from Linux.
-    pub(crate) const ROOK_OS_LINUX_KERNEL_VERSION: &str = "X-Rook-OS-Linux-Kernel-Version";
+    /// Custom Polaris Terminal header indicating the linux kernel version. This is only sent from Linux.
+    pub(crate) const POLARIS_TERMINAL_OS_LINUX_KERNEL_VERSION: &str =
+        "X-PolarisTerminal-OS-Linux-Kernel-Version";
 
-    /// Custom Rook header indicating the client role. We don't use the User-Agent header
+    /// Custom Polaris Terminal header indicating the client role. We don't use the User-Agent header
     /// because it can't be set from WASM.
-    pub(crate) const ROOK_CLIENT_ID: &str = "X-Rook-Client-ID";
+    pub(crate) const POLARIS_TERMINAL_CLIENT_ID: &str = "X-PolarisTerminal-Client-ID";
 
-    /// Custom Rook header carrying the client's current OTEL span context in W3C
+    /// Custom Polaris Terminal header carrying the client's current OTEL span context in W3C
     /// `traceparent` wire format. It is deliberately distinct from the standard
     /// `traceparent` header so the server links its request span to the client
     /// span rather than reparenting the server span under the client trace.
-    pub(crate) const TRACE_LINK_HEADER: &str = "X-Rook-Traceparent";
+    pub(crate) const TRACE_LINK_HEADER: &str = "X-PolarisTerminal-Traceparent";
 }
 
 /// The environment variable containing extra HTTP headers to attach to requests.
 /// Only read when the channel is `Channel::Integration`. The value is a newline-separated
 /// list of `Name:Value` pairs, where each pair is split on the first colon.
-const EXTRA_HTTP_HEADERS_ENV_VAR: &str = "ROOK_EXTRA_HTTP_HEADERS";
+const EXTRA_HTTP_HEADERS_ENV_VAR: &str = "POLARIS_TERMINAL_EXTRA_HTTP_HEADERS";
 
 /// A wrapper around a `reqwest::Client` to execute requests. Returns a custom `RequestBuilder` type
 /// that ensures any call to the underlying `reqwest::Client` are properly adapted so that they can
@@ -74,7 +75,7 @@ pub struct Client {
     after_response_received: Option<ResponseHookFn>,
 
     /// If set, provides IAP bearer tokens to attach as `Proxy-Authorization`
-    /// headers on outbound requests to the Rook staging server. Wired in by
+    /// headers on outbound requests to the Polaris Terminal staging server. Wired in by
     /// the app layer on IAP-enabled builds (staging).
     iap_token_provider: Option<Arc<dyn IapTokenProvider>>,
 }
@@ -191,7 +192,7 @@ impl Client {
     fn builder(
         &self,
         wrapped: reqwest::RequestBuilder,
-        include_rook_headers: bool,
+        include_pterm_headers: bool,
         iap_token: Option<String>,
     ) -> RequestBuilder<'_> {
         let mut builder = RequestBuilder {
@@ -201,8 +202,8 @@ impl Client {
             prevent_sleep_reason: None,
         };
 
-        if include_rook_headers {
-            builder = Self::add_rook_http_headers(builder);
+        if include_pterm_headers {
+            builder = Self::add_pterm_http_headers(builder);
         }
 
         if let Some(token) = iap_token {
@@ -214,51 +215,51 @@ impl Client {
     }
 
     pub fn get<U: IntoUrl + Clone>(&self, url: U) -> RequestBuilder<'_> {
-        let include_rook_headers = Self::include_rook_http_headers(url.clone());
+        let include_pterm_headers = Self::include_pterm_http_headers(url.clone());
         let iap_token = self.iap_token_for(url.clone());
-        self.builder(self.wrapped.get(url), include_rook_headers, iap_token)
+        self.builder(self.wrapped.get(url), include_pterm_headers, iap_token)
     }
 
     pub fn post<U: IntoUrl + Clone>(&self, url: U) -> RequestBuilder<'_> {
-        let include_rook_headers = Self::include_rook_http_headers(url.clone());
+        let include_pterm_headers = Self::include_pterm_http_headers(url.clone());
         let iap_token = self.iap_token_for(url.clone());
-        self.builder(self.wrapped.post(url), include_rook_headers, iap_token)
+        self.builder(self.wrapped.post(url), include_pterm_headers, iap_token)
     }
 
     pub fn put<U: IntoUrl + Clone>(&self, url: U) -> RequestBuilder<'_> {
-        let include_rook_headers = Self::include_rook_http_headers(url.clone());
+        let include_pterm_headers = Self::include_pterm_http_headers(url.clone());
         let iap_token = self.iap_token_for(url.clone());
-        self.builder(self.wrapped.put(url), include_rook_headers, iap_token)
+        self.builder(self.wrapped.put(url), include_pterm_headers, iap_token)
     }
 
     pub fn patch<U: IntoUrl + Clone>(&self, url: U) -> RequestBuilder<'_> {
-        let include_rook_headers = Self::include_rook_http_headers(url.clone());
+        let include_pterm_headers = Self::include_pterm_http_headers(url.clone());
         let iap_token = self.iap_token_for(url.clone());
-        self.builder(self.wrapped.patch(url), include_rook_headers, iap_token)
+        self.builder(self.wrapped.patch(url), include_pterm_headers, iap_token)
     }
 
     pub fn delete<U: IntoUrl + Clone>(&self, url: U) -> RequestBuilder<'_> {
-        let include_rook_headers = Self::include_rook_http_headers(url.clone());
+        let include_pterm_headers = Self::include_pterm_http_headers(url.clone());
         let iap_token = self.iap_token_for(url.clone());
-        self.builder(self.wrapped.delete(url), include_rook_headers, iap_token)
+        self.builder(self.wrapped.delete(url), include_pterm_headers, iap_token)
     }
 
     /// Returns the IAP bearer token to attach to a request targeting
-    /// `url`, scoped to the Rook server's origin.
+    /// `url`, scoped to the Polaris Terminal server's origin.
     fn iap_token_for<U: IntoUrl>(&self, url: U) -> Option<String> {
         let provider = self.iap_token_provider.as_ref()?;
         let url = url.into_url().ok()?;
-        if !is_rook_server_origin(&url) {
+        if !is_pterm_server_origin(&url) {
             return None;
         }
         provider.cached_token()
     }
 
-    /// Helper method to determine if the request should include rook-specific headers. The only case
+    /// Helper method to determine if the request should include polaris-terminal-specific headers. The only case
     /// where we should include custom headers is if the request is same-origin and is targetted to our server.
     /// For example, app.rook.dev --> app.rook.dev.
     #[cfg(target_family = "wasm")]
-    fn include_rook_http_headers<U: IntoUrl + Clone>(url: U) -> bool {
+    fn include_pterm_http_headers<U: IntoUrl + Clone>(url: U) -> bool {
         url.into_url().is_ok_and(|url| {
             url.host_str().is_some_and(|dest_host| {
                 let window_hostname = gloo::utils::window()
@@ -276,14 +277,14 @@ impl Client {
     }
 
     #[cfg(not(target_family = "wasm"))]
-    fn include_rook_http_headers<U: IntoUrl + Clone>(_url: U) -> bool {
+    fn include_pterm_http_headers<U: IntoUrl + Clone>(_url: U) -> bool {
         true
     }
 
-    fn add_rook_http_headers(mut builder: RequestBuilder) -> RequestBuilder {
+    fn add_pterm_http_headers(mut builder: RequestBuilder) -> RequestBuilder {
         // Include the client ID header.
         if let Some(client_id) = execution_mode::current_client_id() {
-            builder = builder.header(headers::ROOK_CLIENT_ID, client_id);
+            builder = builder.header(headers::POLARIS_TERMINAL_CLIENT_ID, client_id);
         }
 
         // If there's an app version, include it as an HTTP request header.
@@ -325,12 +326,12 @@ impl Client {
             // Operating system category.
             let category = os_system_info.category().to_string();
             if let Ok(category) = HeaderValue::from_str(&category) {
-                builder = builder.header(headers::ROOK_OS_CATEGORY, category);
+                builder = builder.header(headers::POLARIS_TERMINAL_OS_CATEGORY, category);
             }
 
             // Operating system name.
             builder = builder.header(
-                headers::ROOK_OS_NAME,
+                headers::POLARIS_TERMINAL_OS_NAME,
                 HeaderValue::from_static(os_system_info.name()),
             );
 
@@ -339,7 +340,7 @@ impl Client {
                 .version()
                 .and_then(|version| HeaderValue::from_str(version).ok())
             {
-                builder = builder.header(headers::ROOK_OS_VERSION, version);
+                builder = builder.header(headers::POLARIS_TERMINAL_OS_VERSION, version);
             }
 
             // Linux kernel version.
@@ -347,8 +348,10 @@ impl Client {
                 .linux_kernel_version()
                 .and_then(|kernel_version| HeaderValue::from_str(kernel_version).ok())
             {
-                builder =
-                    builder.header(headers::ROOK_OS_LINUX_KERNEL_VERSION, linux_kernel_version);
+                builder = builder.header(
+                    headers::POLARIS_TERMINAL_OS_LINUX_KERNEL_VERSION,
+                    linux_kernel_version,
+                );
             }
         }
 
@@ -400,7 +403,7 @@ impl Client {
     }
 }
 
-fn is_rook_server_origin(url: &reqwest::Url) -> bool {
+fn is_pterm_server_origin(url: &reqwest::Url) -> bool {
     [
         ChannelState::server_root_url(),
         ChannelState::rtc_http_url(),
@@ -662,7 +665,7 @@ impl<'a> RequestBuilder<'a> {
 }
 
 /// An error returned from `Response::error_for_status` that includes response metadata.
-/// This allows callers to inspect headers (like X-Rook-Error-Code) and the response body when
+/// This allows callers to inspect headers (like X-PolarisTerminal-Error-Code) and the response body when
 /// handling errors.
 #[derive(Debug)]
 pub struct ResponseError {
@@ -785,7 +788,7 @@ impl<'c> oauth2::AsyncHttpClient<'c> for Client {
     fn call(&'c self, request: oauth2::HttpRequest) -> Self::Future {
         Box::pin(async move {
             let uri = request.uri().to_string();
-            let include_rook_headers = Self::include_rook_http_headers(uri.clone());
+            let include_pterm_headers = Self::include_pterm_http_headers(uri.clone());
             let iap_token = self.iap_token_for(uri);
             let builder = reqwest::RequestBuilder::from_parts(
                 self.wrapped.clone(),
@@ -793,7 +796,7 @@ impl<'c> oauth2::AsyncHttpClient<'c> for Client {
             );
 
             let response = self
-                .builder(builder, include_rook_headers, iap_token)
+                .builder(builder, include_pterm_headers, iap_token)
                 .send()
                 .await
                 .map_err(Box::new)?;
@@ -826,10 +829,10 @@ mod origin_tests {
         // Derive the expected origins from `ChannelState` so the assertion holds
         // regardless of which channel config the test build resolves to.
         let server = reqwest::Url::parse(ChannelState::server_root_url().as_ref()).unwrap();
-        assert!(is_rook_server_origin(&server.join("/graphql/v2").unwrap()));
+        assert!(is_pterm_server_origin(&server.join("/graphql/v2").unwrap()));
 
         let rtc = reqwest::Url::parse(ChannelState::rtc_http_url().as_ref()).unwrap();
-        assert!(is_rook_server_origin(
+        assert!(is_pterm_server_origin(
             &rtc.join("/api/v1/agent/events/stream").unwrap()
         ));
     }
@@ -837,7 +840,7 @@ mod origin_tests {
     #[test]
     fn third_party_origin_does_not_match() {
         let url = reqwest::Url::parse("https://evil.example.com/graphql/v2").unwrap();
-        assert!(!is_rook_server_origin(&url));
+        assert!(!is_pterm_server_origin(&url));
     }
 }
 

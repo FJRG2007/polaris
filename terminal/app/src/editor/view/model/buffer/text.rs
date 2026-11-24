@@ -5,8 +5,8 @@ use std::rc::Rc;
 
 use arrayvec::ArrayVec;
 use num_traits::SaturatingSub;
-use rookui::text::point::Point;
-use rookui::text_layout::TextStyle;
+use ptermui::text::point::Point;
+use ptermui::text_layout::TextStyle;
 use string_offset::{ByteOffset, CharOffset};
 use sum_tree::{self, SeekBias, SumTree};
 

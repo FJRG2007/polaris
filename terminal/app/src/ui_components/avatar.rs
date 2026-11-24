@@ -1,11 +1,11 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::external_product_icon::ExternalProductIcon;
-use rook_core::ui::icons::Icon;
-use rookui::elements::{
+use pterm_core::ui::external_product_icon::ExternalProductIcon;
+use pterm_core::ui::icons::Icon;
+use ptermui::elements::{
     self, Align, Border, CacheOption, ChildAnchor, ConstrainedBox, Container, Element, Image,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Stack, Text,
 };
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
 
 use super::red_notification_dot::RedNotificationDot;
 

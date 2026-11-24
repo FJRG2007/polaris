@@ -10,20 +10,20 @@
           "properties": {
             "command_policy": {
               "type": "string",
-              "x-rook-surfaces": ["gui", "tui"]
+              "x-polaris-terminal-surfaces": ["gui", "tui"]
             },
             "file_allowlist": {
               "type": "array",
               "items": {"type": "string"},
-              "x-rook-surfaces": ["tui", "gui"]
+              "x-polaris-terminal-surfaces": ["tui", "gui"]
             },
             "gui_internal": {
               "type": "string",
-              "x-rook-surfaces": ["gui"]
+              "x-polaris-terminal-surfaces": ["gui"]
             },
             "tui_internal": {
               "type": "string",
-              "x-rook-surfaces": ["tui"]
+              "x-polaris-terminal-surfaces": ["tui"]
             }
           }
         }
@@ -34,7 +34,7 @@
       "properties": {
         "theme": {
           "type": "string",
-          "x-rook-surfaces": ["gui"]
+          "x-polaris-terminal-surfaces": ["gui"]
         }
       }
     }

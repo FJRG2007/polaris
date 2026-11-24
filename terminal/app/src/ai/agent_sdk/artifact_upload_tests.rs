@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::{env, fs};
 
 use chrono::Utc;
-use rook_cli::artifact::UploadArtifactArgs;
+use pterm_cli::artifact::UploadArtifactArgs;
 use tempfile::tempdir;
 
 use super::*;

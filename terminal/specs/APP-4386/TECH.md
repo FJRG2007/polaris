@@ -4,7 +4,7 @@ Linear: [APP-4386](https://linear.app/warpdotdev/issue/APP-4386)
 ## Context
 When a user SSHes into a remote host, the client installs the remote server binary by piping `install_remote_server.sh` through `bash -s` on the remote. The script unconditionally uses `curl` (line 43) to download the tarball. On minimal hosts (Alpine, BusyBox, stripped Docker images), `curl` is absent → `bash: line 43: curl: command not found` (exit 127), and the install fails with no recovery path.
 
-Other remote-development editors solve this with a multi-tier fallback strategy: try `curl` on the remote → fall back to `wget` → fall back to downloading locally and uploading via SCP. Rook currently has a single tier: curl only, no fallback.
+Other remote-development editors solve this with a multi-tier fallback strategy: try `curl` on the remote → fall back to `wget` → fall back to downloading locally and uploading via SCP. Polaris Terminal currently has a single tier: curl only, no fallback.
 
 ### Relevant code
 - `crates/remote_server/src/install_remote_server.sh` — the install script; line 43 is the sole `curl` invocation
@@ -225,7 +225,7 @@ The SCP fallback uses a separate, longer timeout:
 pub const SCP_INSTALL_TIMEOUT: Duration = Duration::from_secs(120);
 ```
 The standard `INSTALL_TIMEOUT` (60s) is sufficient for the curl/wget path because the remote host downloads directly from the CDN. The SCP path adds a local download step (~5s) plus an SCP upload that depends entirely on the SSH link bandwidth — embedded devices, VPNs, and high-latency connections can easily exceed 60s for a ~30-50 MB transfer. Each sub-step (`scp_upload`, `run_ssh_script` for extraction) uses the full `SCP_INSTALL_TIMEOUT` individually to avoid splitting a single budget across steps, which would require coordination logic for diminishing remaining time.
-- If the SCP upload or extraction fails, the error surfaces the same way as a normal install failure — `BinaryInstallComplete { result: Err(_) }` — and the session falls back to ControlMaster rookification.
+- If the SCP upload or extraction fails, the error surfaces the same way as a normal install failure — `BinaryInstallComplete { result: Err(_) }` — and the session falls back to ControlMaster ptermification.
 
 ## Testing and validation
 

@@ -9,29 +9,29 @@ use lazy_static::lazy_static;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use regex::Regex;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_error;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_error;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Element, Flex, FormattedTextElement, HighlightedHyperlink, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, SavePosition, ScrollTarget, ScrollToPositionMode,
     Shrinkable, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::presenter::ChildView;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::ui_components::text_input::TextInput;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::ui_components::text_input::TextInput;
+use ptermui::{
     AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use super::SettingsSection;
@@ -146,7 +146,7 @@ lazy_static! {
     static ref DELINQUENCY_BADGE_TEXT_COLOR: ColorU = ColorU::new(0, 0, 0, 190);
 }
 
-fn owner_state_chip_text_color(theme: &themes::theme::RookTheme) -> ColorU {
+fn owner_state_chip_text_color(theme: &themes::theme::PtermTheme) -> ColorU {
     let chip_background = theme
         .background()
         .blend(&theme.accent().with_opacity(OWNER_STATE_CHIP_ACCENT_OPACITY));
@@ -202,7 +202,7 @@ pub enum TeamsPageAction {
     SendEmailInvites {
         team_uid: ServerId,
     },
-    OpenRookDrive,
+    OpenPtermDrive,
     GenerateUpgradeLink {
         team_uid: ServerId,
     },
@@ -316,7 +316,7 @@ impl TryFrom<&TeamsPageAction> for TelemetryEvent {
 #[derive(Clone)]
 pub enum TeamsPageViewEvent {
     TeamsChanged,
-    OpenRookDrive,
+    OpenPtermDrive,
     ShowToast {
         message: String,
         flavor: ToastFlavor,
@@ -589,7 +589,7 @@ impl TypedActionView for TeamsPageView {
                 self.send_email_invites(*team_uid, ctx);
                 ctx.notify();
             }
-            TeamsPageAction::OpenRookDrive => ctx.emit(TeamsPageViewEvent::OpenRookDrive),
+            TeamsPageAction::OpenPtermDrive => ctx.emit(TeamsPageViewEvent::OpenPtermDrive),
             TeamsPageAction::ShowLeaveTeamConfirmationDialog => {
                 let variant = if self.should_show_reload_credits_confirmation(ctx) {
                     CloudActionConfirmationDialogVariant::LeaveTeamReloadCredits
@@ -1066,7 +1066,7 @@ impl TeamsPageView {
                 self.show_error("Failed to toggle team discoverability", Some(err), ctx);
             }
             UserWorkspacesEvent::JoinTeamWithTeamDiscoverySuccess => {
-                // Force refresh of Rook Drive objects after joining a team
+                // Force refresh of Polaris Terminal Drive objects after joining a team
                 UpdateManager::handle(ctx).update(ctx, move |update_manager, ctx| {
                     update_manager.refresh_updated_objects(ctx);
                 });
@@ -1600,7 +1600,7 @@ impl TeamsPageView {
                 ctx,
             );
         });
-        ctx.dispatch_typed_action(&WorkspaceAction::OpenRookDrive);
+        ctx.dispatch_typed_action(&WorkspaceAction::OpenPtermDrive);
     }
 
     fn set_team_member_role(
@@ -2133,7 +2133,7 @@ impl TeamsWidget {
         let alert_icon = Container::new(
             ConstrainedBox::new(
                 Icon::AlertCircle
-                    .to_rookui_icon(active_text.with_opacity(90))
+                    .to_ptermui_icon(active_text.with_opacity(90))
                     .finish(),
             )
             .with_max_height(20.)
@@ -2306,9 +2306,9 @@ impl TeamsWidget {
         has_admin_permissions: bool,
     ) -> Box<dyn Element> {
         let prorated_message = if has_admin_permissions {
-            "You'll be charged for a portion of the team member's usage of Rook."
+            "You'll be charged for a portion of the team member's usage of Polaris Terminal."
         } else {
-            "Your admin will be charged for a portion of the team member's usage of Rook."
+            "Your admin will be charged for a portion of the team member's usage of Polaris Terminal."
         };
 
         let additional_members_cost_money_msg = if let Some((monthly_cost, yearly_cost)) =
@@ -2326,7 +2326,7 @@ impl TeamsWidget {
         let horizontal_padding = 16.;
         let theme = appearance.theme();
         let currency_icon = Container::new(
-            ConstrainedBox::new(Icon::CoinsStacked.to_rookui_icon(theme.accent()).finish())
+            ConstrainedBox::new(Icon::CoinsStacked.to_ptermui_icon(theme.accent()).finish())
                 .with_max_height(20.)
                 .with_max_width(20.)
                 .finish(),
@@ -2595,7 +2595,7 @@ impl TeamsWidget {
                 TextAndIcon::new(
                     TextAndIconAlignment::IconFirst,
                     "Contact support",
-                    Icon::Phone.to_rookui_icon(appearance.theme().accent()),
+                    Icon::Phone.to_ptermui_icon(appearance.theme().accent()),
                     MainAxisSize::Min,
                     MainAxisAlignment::Center,
                     vec2f(14., 14.),
@@ -2624,7 +2624,7 @@ impl TeamsWidget {
                 TextAndIcon::new(
                     TextAndIconAlignment::IconFirst,
                     "Manage billing",
-                    Icon::CoinsStacked.to_rookui_icon(appearance.theme().accent()),
+                    Icon::CoinsStacked.to_ptermui_icon(appearance.theme().accent()),
                     MainAxisSize::Min,
                     MainAxisAlignment::Center,
                     vec2f(14., 14.),
@@ -2656,7 +2656,7 @@ impl TeamsWidget {
                 TextAndIcon::new(
                     TextAndIconAlignment::IconFirst,
                     "Open admin panel",
-                    Icon::Users.to_rookui_icon(appearance.theme().accent()),
+                    Icon::Users.to_ptermui_icon(appearance.theme().accent()),
                     MainAxisSize::Min,
                     MainAxisAlignment::Center,
                     vec2f(14., 14.),
@@ -3215,7 +3215,7 @@ impl TeamsWidget {
             format!("Your plan ({plan_display}) has a maximum capacity of {cap} members.");
 
         let info_icon = Container::new(
-            ConstrainedBox::new(Icon::Info.to_rookui_icon(muted_color).finish())
+            ConstrainedBox::new(Icon::Info.to_ptermui_icon(muted_color).finish())
                 .with_max_height(14.)
                 .with_max_width(14.)
                 .finish(),
@@ -3478,8 +3478,9 @@ impl TeamsWidget {
         let header = self.render_subsubsection_header("By discovery".to_owned(), appearance);
 
         let domain = current_user_email.split('@').nth(1).unwrap_or("");
-        let team_discoverability_instructions =
-            format!("Allow Rook users with an @{domain} email to find and join the team.");
+        let team_discoverability_instructions = format!(
+            "Allow Polaris Terminal users with an @{domain} email to find and join the team."
+        );
         let subtext = self.render_sub_text(
             team_discoverability_instructions,
             appearance,
@@ -3826,7 +3827,7 @@ impl TeamsWidget {
                                 Hoverable::new(handles.action.clone(), move |_mouse_state| {
                                     Container::new(
                                         ConstrainedBox::new(
-                                            icon.to_rookui_icon(
+                                            icon.to_ptermui_icon(
                                                 appearance
                                                     .theme()
                                                     .active_ui_text_color()
@@ -3859,7 +3860,7 @@ impl TeamsWidget {
                             Container::new(
                                 ConstrainedBox::new(
                                     Icon::DotsVertical
-                                        .to_rookui_icon(
+                                        .to_ptermui_icon(
                                             appearance
                                                 .theme()
                                                 .active_ui_text_color()
@@ -4373,9 +4374,11 @@ impl TeamsWidget {
             .with_margin_left(-4.)
             .finish();
             let checkbox_row_text = if let Some(domain) = view.auth_state.user_email_domain() {
-                format!("Allow Rook users with an @{domain} email to find and join the team.")
+                format!(
+                    "Allow Polaris Terminal users with an @{domain} email to find and join the team."
+                )
             } else {
-                "Allow Rook users with the same email domain as you to find and join the team."
+                "Allow Polaris Terminal users with the same email domain as you to find and join the team."
                     .to_string()
             };
             let checkbox_row = Container::new(
@@ -4551,7 +4554,7 @@ impl TeamsWidget {
                 TextAndIcon::new(
                     TextAndIconAlignment::IconFirst,
                     text.to_string(),
-                    Icon::CoinsStacked.to_rookui_icon(icon_color),
+                    Icon::CoinsStacked.to_ptermui_icon(icon_color),
                     MainAxisSize::Min,
                     MainAxisAlignment::Center,
                     vec2f(14., 14.),
@@ -4751,16 +4754,16 @@ impl SettingsWidget for TeamsWidget {
 #[test]
 pub fn test_valid_domains() {
     assert!(!TeamsPageView::is_valid_domain("@rook.dev"));
-    assert!(!TeamsPageView::is_valid_domain("rook,"));
-    assert!(!TeamsPageView::is_valid_domain("rookdev"));
+    assert!(!TeamsPageView::is_valid_domain("polaris-terminal,"));
+    assert!(!TeamsPageView::is_valid_domain("polaris-terminal-dev"));
     assert!(!TeamsPageView::is_valid_domain(".dev"));
-    assert!(!TeamsPageView::is_valid_domain("rook..dev"));
+    assert!(!TeamsPageView::is_valid_domain("polaris-terminal..dev"));
     assert!(!TeamsPageView::is_valid_domain(" "));
-    assert!(!TeamsPageView::is_valid_domain("rook!.dev"));
+    assert!(!TeamsPageView::is_valid_domain("polaris-terminal!.dev"));
     assert!(!TeamsPageView::is_valid_domain("rook.dev>"));
     assert!(!TeamsPageView::is_valid_domain("rook.dev."));
     assert!(TeamsPageView::is_valid_domain("app.rook.dev"));
-    assert!(TeamsPageView::is_valid_domain("rook0.dev0"));
+    assert!(TeamsPageView::is_valid_domain("pterm0.dev0"));
     assert!(TeamsPageView::is_valid_domain("rook.dev"));
     assert!(TeamsPageView::is_valid_domain("miniclip.com"));
 }
@@ -4768,7 +4771,7 @@ pub fn test_valid_domains() {
 #[cfg(test)]
 #[test]
 pub fn test_owner_state_chip_text_contrasts_with_accent_overlay() {
-    let theme_config = themes::theme::RookThemeConfig::new();
+    let theme_config = themes::theme::PtermThemeConfig::new();
 
     for theme_kind in [
         themes::theme::ThemeKind::CyberWave,

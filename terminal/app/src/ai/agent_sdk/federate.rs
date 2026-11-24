@@ -1,14 +1,14 @@
 use std::process;
 
 use anyhow::{Result, anyhow};
-use rook_cli::GlobalOptions;
-use rook_cli::agent::OutputFormat;
-use rook_cli::federate::{FederateCommand, IssueGcpTokenArgs, IssueTokenArgs};
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rook_managed_secrets::ManagedSecretManager;
-use rookui::platform::TerminationMode;
-use rookui::{AppContext, SingletonEntity as _};
+use pterm_cli::GlobalOptions;
+use pterm_cli::agent::OutputFormat;
+use pterm_cli::federate::{FederateCommand, IssueGcpTokenArgs, IssueTokenArgs};
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use pterm_managed_secrets::ManagedSecretManager;
+use ptermui::platform::TerminationMode;
+use ptermui::{AppContext, SingletonEntity as _};
 use serde_json::json;
 
 use super::common::set_ambient_task_context_from_run_id;
@@ -45,12 +45,13 @@ fn issue_token(
     };
 
     ManagedSecretManager::handle(ctx).update(ctx, move |manager, ctx| {
-        let future =
-            manager.issue_task_identity_token(rook_managed_secrets::client::IdentityTokenOptions {
+        let future = manager.issue_task_identity_token(
+            pterm_managed_secrets::client::IdentityTokenOptions {
                 audience,
                 requested_duration: duration,
                 subject_template,
-            });
+            },
+        );
         ctx.spawn(future, move |_, result, ctx| match result {
             Ok(token) => {
                 let token_value = token.token;

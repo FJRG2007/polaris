@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::time::Duration;
 
-use rook_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
+use pterm_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
 use serde::Serialize;
 use serde_json::json;
 use serde_with::SerializeDisplay;
@@ -137,7 +137,7 @@ pub enum CodeReviewContextDestination {
     /// Written directly to the terminal PTY for an active CLI agent.
     #[serde(rename = "pty")]
     Pty,
-    /// Inserted into the Rook AI input buffer as plain text.
+    /// Inserted into the Polaris Terminal AI input buffer as plain text.
     #[serde(rename = "agent_input")]
     AgentInput,
     /// Registered as an AI attachment and referenced from the input.
@@ -146,7 +146,7 @@ pub enum CodeReviewContextDestination {
     /// Inserted into the active command buffer while a command is running.
     #[serde(rename = "active_command_buffer")]
     ActiveCommandBuffer,
-    /// Submitted as an inline code review request through the Rook AI path.
+    /// Submitted as an inline code review request through the Polaris Terminal AI path.
     #[serde(rename = "agent_review")]
     AgentReview,
     /// Inserted into CLI agent rich input.
@@ -527,7 +527,7 @@ impl TelemetryEvent for CodeReviewTelemetryEvent {
     }
 
     fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        rook_core::telemetry::enum_events::<Self>()
+        pterm_core::telemetry::enum_events::<Self>()
     }
 }
 
@@ -619,4 +619,4 @@ impl TelemetryEventDesc for CodeReviewTelemetryEventDiscriminants {
     }
 }
 
-rook_core::register_telemetry_event!(CodeReviewTelemetryEvent);
+pterm_core::register_telemetry_event!(CodeReviewTelemetryEvent);

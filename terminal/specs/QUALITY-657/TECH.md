@@ -1,14 +1,14 @@
 # Associate Orchestration Config with Plan ID — Client Tech Spec
 
 ## Problem
-The Rook desktop client stores orchestration config as a **single value per conversation**. When the server switches to per-plan snapshots (append-only, one per plan — see `rook-server/specs/QUALITY-657/TECH.md`), the client needs to:
+The Polaris Terminal desktop client stores orchestration config as a **single value per conversation**. When the server switches to per-plan snapshots (append-only, one per plan — see `polaris-terminal-server/specs/QUALITY-657/TECH.md`), the client needs to:
 1. Hydrate multiple orchestration configs from conversation history, indexed by `plan_id`.
 2. Render a config block on each plan card showing that plan's config.
 3. Thread `plan_id` through the `RunAgents` request so the auto-launch match check is plan-scoped.
 4. Send per-plan dirty events back to the server.
 
 ## Companion spec
-Server-side changes are documented in `rook-server/specs/QUALITY-657/TECH.md`. The proto changes (`plan_id` on `RunAgents` field 9, append-only `OrchestrationConfigSnapshot` messages) land in `rook-proto-apis` before this work begins. This spec covers only the Rook desktop client (Rust).
+Server-side changes are documented in `polaris-terminal-server/specs/QUALITY-657/TECH.md`. The proto changes (`plan_id` on `RunAgents` field 9, append-only `OrchestrationConfigSnapshot` messages) land in `polaris-terminal-proto-apis` before this work begins. This spec covers only the Polaris Terminal desktop client (Rust).
 
 ## Relevant code
 
@@ -210,7 +210,7 @@ Each config block edit only affects its own plan's config and queues a dirty eve
 ## Coordination with server changes
 
 ### Proto dependency
-The `plan_id` field on `RunAgents` (field 9) must land in `rook-proto-apis` before the client work begins. The `OrchestrationConfigSnapshot` proto already has `plan_id` (field 1) — no proto change needed for that.
+The `plan_id` field on `RunAgents` (field 9) must land in `polaris-terminal-proto-apis` before the client work begins. The `OrchestrationConfigSnapshot` proto already has `plan_id` (field 1) — no proto change needed for that.
 
 ### Backward compatibility
 - **New client + old server**: Server sends `OrchestrationConfigSnapshot` with empty `plan_id` (singleton model). Client ignores empty `plan_id` snapshots → no config hydrated → every `run_agents` call shows a confirmation card. Functionally correct, just no auto-launch.
@@ -218,9 +218,9 @@ The `plan_id` field on `RunAgents` (field 9) must land in `rook-proto-apis` befo
 - **New client + new server**: Full per-plan behavior.
 
 ### Rollout order
-1. Proto PR (`rook-proto-apis`): adds `plan_id` field 9 to `RunAgents`.
-2. Server PR (`rook-server`): implements per-plan append-only snapshots, `plan_id` on `create_orchestration_config` and `run_agents`.
-3. Client PR (`rook`): implements per-plan hydration, config blocks, auto-launch, dirty sync.
+1. Proto PR (`polaris-terminal-proto-apis`): adds `plan_id` field 9 to `RunAgents`.
+2. Server PR (`polaris-terminal-server`): implements per-plan append-only snapshots, `plan_id` on `create_orchestration_config` and `run_agents`.
+3. Client PR (`polaris-terminal`): implements per-plan hydration, config blocks, auto-launch, dirty sync.
 
 Server and client PRs can land in either order after the proto — backward compatibility is maintained in both directions.
 

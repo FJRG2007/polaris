@@ -1,5 +1,5 @@
 use pathfinder_color::ColorU;
-use rookui::fonts::Properties;
+use ptermui::fonts::Properties;
 
 use super::{Renderer, RendererStyles};
 use crate::context_chips::{ChipAvailability, ChipDisabledReason, ContextChipKind};

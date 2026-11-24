@@ -1,13 +1,13 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     Border, Container, Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, Entity, SingletonEntity, View, ViewContext};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, Entity, SingletonEntity, View, ViewContext};
 
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::drive::CloudObjectTypeAndId;
@@ -15,7 +15,7 @@ use crate::terminal::view::telemetry::SharingDialogSource;
 use crate::ui_components::icons::Icon;
 use crate::workspace::WorkspaceAction;
 
-/// A rich onboarding block that prompts the user to share a newly-created personal Rook Drive
+/// A rich onboarding block that prompts the user to share a newly-created personal Polaris Terminal Drive
 /// object.
 pub struct OnboardingDriveSharingBlock {
     object_id: CloudObjectTypeAndId,
@@ -44,9 +44,9 @@ impl Entity for OnboardingDriveSharingBlock {
     type Event = ();
 }
 
-const TITLE_TEXT: &str = "Sharing in Rook Drive";
+const TITLE_TEXT: &str = "Sharing in Polaris Terminal Drive";
 const BODY_TEXT: &[&str] = &[
-    "You can now share drive objects, in Rook or on the web, with anyone - Rook user or not. Click Share in the Rook Drive menu or the pane header to share via link or email.",
+    "You can now share drive objects, in Polaris Terminal or on the web, with anyone - Polaris Terminal user or not. Click Share in the Polaris Terminal Drive menu or the pane header to share via link or email.",
     "You’ll be able to modify the access permissions any time.",
 ];
 
@@ -111,7 +111,7 @@ impl View for OnboardingDriveSharingBlock {
                 TextAndIcon::new(
                     TextAndIconAlignment::IconFirst,
                     button_label,
-                    Icon::Share.to_rookui_icon(appearance.theme().background()),
+                    Icon::Share.to_ptermui_icon(appearance.theme().background()),
                     MainAxisSize::Min,
                     MainAxisAlignment::SpaceEvenly,
                     vec2f(BUTTON_FONT_SIZE, BUTTON_FONT_SIZE),

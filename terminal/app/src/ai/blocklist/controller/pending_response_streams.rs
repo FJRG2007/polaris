@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use rookui::{AppContext, ModelContext, ModelHandle, SingletonEntity};
+use ptermui::{AppContext, ModelContext, ModelHandle, SingletonEntity};
 
 use super::BlocklistAIController;
 use super::response_stream::{ResponseStream, ResponseStreamId};

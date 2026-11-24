@@ -31,8 +31,8 @@ We pass `snapshot_disabled` through the spawn request rather than checking `Priv
 
 **`app/src/settings/ai.rs`**: Add two new entries to `define_settings_group!(AISettings, ...)`, following the pattern of `orchestration_enabled`:
 
-- `cloud_handoff_enabled: CloudHandoffEnabled` — `bool`, default `true`, TOML path `agents.rook_agent.other.cloud_handoff_enabled`, desktop-only, cloud-synced.
-- `ampersand_handoff_enabled: AmpersandHandoffEnabled` — `bool`, default `true`, TOML path `agents.rook_agent.other.ampersand_handoff_enabled`, desktop-only, cloud-synced.
+- `cloud_handoff_enabled: CloudHandoffEnabled` — `bool`, default `true`, TOML path `agents.pterm_agent.other.cloud_handoff_enabled`, desktop-only, cloud-synced.
+- `ampersand_handoff_enabled: AmpersandHandoffEnabled` — `bool`, default `true`, TOML path `agents.pterm_agent.other.ampersand_handoff_enabled`, desktop-only, cloud-synced.
 
 Add two derived helpers on `AISettings`:
 
@@ -87,7 +87,7 @@ Follow the exact pattern of `AgentAttributionWidget` (line 6093) for org-forced-
 - Spawn a cloud agent with cloud convos off → verify `snapshot_disabled: true` appears in the spawn request (network log or `log::info` in `spawn_agent`).
 - Re-enable cloud convos → verify handoff toggle becomes interactive again.
 
-**Compilation**: `cargo check -p rook` and `cargo clippy --workspace --all-targets --all-features --tests -- -D warnings`.
+**Compilation**: `cargo check -p polaris-terminal` and `cargo clippy --workspace --all-targets --all-features --tests -- -D warnings`.
 
 ## Parallelization
 

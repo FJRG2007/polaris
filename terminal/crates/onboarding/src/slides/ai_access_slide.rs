@@ -1,18 +1,18 @@
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rookui_core::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui_core::elements::{
     Border, ClippedScrollStateHandle, Container, CornerRadius, CrossAxisAlignment, Flex,
     FormattedTextElement, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     ParentElement, Radius, Stack,
 };
-use rookui_core::fonts::Weight;
-use rookui_core::keymap::Keystroke;
-use rookui_core::platform::Cursor;
-use rookui_core::prelude::Align;
-use rookui_core::text_layout::TextAlignment;
-use rookui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
-use rookui_core::{
+use ptermui_core::fonts::Weight;
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::platform::Cursor;
+use ptermui_core::prelude::Align;
+use ptermui_core::text_layout::TextAlignment;
+use ptermui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui_core::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
     ViewContext,
 };
@@ -42,8 +42,8 @@ pub enum AiAccessSlideEvent {
     PasteAuthTokenFromClipboardRequested,
 }
 
-/// The "Choose how to access AI" slide (Rook Agent path). Forks between a paid
-/// subscription and a "Set up later" option that lets the user explore Rook's
+/// The "Choose how to access AI" slide (Polaris Terminal Agent path). Forks between a paid
+/// subscription and a "Set up later" option that lets the user explore Polaris Terminal's
 /// built-in AI before committing to a plan.
 pub struct AiAccessSlide {
     onboarding_state: ModelHandle<OnboardingStateModel>,
@@ -115,7 +115,7 @@ impl AiAccessSlide {
             .finish();
 
         let subtitle = FormattedTextElement::from_str(
-            "Save with a recurring plan, or explore Rook's AI before committing.",
+            "Save with a recurring plan, or explore Polaris Terminal's AI before committing.",
             appearance.ui_font_family(),
             16.,
         )
@@ -309,7 +309,7 @@ impl AiAccessSlide {
             .finish();
 
         let description = FormattedTextElement::from_str(
-            "Explore Rook's built-in AI features before committing to a plan, or bring your own \
+            "Explore Polaris Terminal's built-in AI features before committing to a plan, or bring your own \
              inference.",
             appearance.ui_font_family(),
             14.,

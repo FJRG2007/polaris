@@ -9,12 +9,12 @@ Related specs:
 Make rendered Markdown tables scroll horizontally inside their own viewport when they are wider than the surrounding surface, instead of forcing the entire notebook editor or AI block list to scroll horizontally. Selection, cursor, copy, and keyboard navigation continue to work correctly while a table is horizontally scrolled.
 
 ## Problem
-Rook already renders Markdown tables, but wide-table overflow behavior is not consistently defined across the product. Editor-backed notebook tables render in document flow with no table-local horizontal scroll, so wide tables push their containing surface wider. AI block list structured tables do scroll horizontally, but the contract — and the expected selection behavior while scrolled — is not written down. The result is that wide tables are hard to read and selection/cursor behavior while scrolling is easy to regress silently.
+Polaris Terminal already renders Markdown tables, but wide-table overflow behavior is not consistently defined across the product. Editor-backed notebook tables render in document flow with no table-local horizontal scroll, so wide tables push their containing surface wider. AI block list structured tables do scroll horizontally, but the contract — and the expected selection behavior while scrolled — is not written down. The result is that wide tables are hard to read and selection/cursor behavior while scrolling is easy to regress silently.
 
 ## Behavior
 
 ### Scope
-1. This feature applies to rendered Markdown tables in notebook/editor-backed Markdown surfaces and in AI block list table sections created from Markdown table output. Other Rook surfaces that inherit the same editor-backed Markdown table renderer pick up the behavior automatically, but notebook/editor and AI block list are the required launch surfaces.
+1. This feature applies to rendered Markdown tables in notebook/editor-backed Markdown surfaces and in AI block list table sections created from Markdown table output. Other Polaris Terminal surfaces that inherit the same editor-backed Markdown table renderer pick up the behavior automatically, but notebook/editor and AI block list are the required launch surfaces.
 
 ### Overflow rule
 2. When a rendered Markdown table fits within the available content width, it renders normally with no horizontal scrolling behavior. Nothing changes for tables that already fit.

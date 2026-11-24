@@ -1,15 +1,15 @@
 FROM ubuntu:24.04
 
-# Opt into the agent entrypoint's non-root rollout gate (see rook-agent-docker's README).
-ENV ROOK_AGENT_NONROOT=1
+# Opt into the agent entrypoint's non-root rollout gate (see polaris-terminal-agent-docker's README).
+ENV POLARIS_TERMINAL_AGENT_NONROOT=1
 
 ENV RUSTUP_HOME=/usr/local/rustup
 ENV CARGO_HOME=/usr/local/cargo
 ENV TFENV_ROOT=/usr/local/tfenv
 ENV PATH=/usr/local/cargo/bin:/usr/local/go/bin:/usr/local/tfenv/bin:$PATH
 
-# This set of packages is adapted from ./script/bootstrap in rook-internal and rook-server.
-# It doesn't include *everything* (ex. no wgslfmt), but is enough to build and test Rook.
+# This set of packages is adapted from ./script/bootstrap in polaris-terminal-internal and polaris-terminal-server.
+# It doesn't include *everything* (ex. no wgslfmt), but is enough to build and test Polaris Terminal.
 
 # Install system-level packages. These are needed to build on Linux, and/or to run integration tests.
 #
@@ -19,10 +19,10 @@ ENV PATH=/usr/local/cargo/bin:/usr/local/go/bin:/usr/local/tfenv/bin:$PATH
 # existing cluster and create your own role/db, e.g.:
 #   sudo pg_ctlcluster 16 main start
 #   sudo -u postgres createuser -s "$(whoami)" && sudo -u postgres createdb "$(whoami)"
-# postgresql-16-pgvector: rook-server's migrations run `CREATE EXTENSION IF
+# postgresql-16-pgvector: polaris-terminal-server's migrations run `CREATE EXTENSION IF
 # NOT EXISTS vector` (db/migrations/20241011184444_enable_pgvector.sql), so a
 # local cluster needs pgvector to run migrations. The other extensions
-# rook-server uses (pg_trgm, pgcrypto) already ship as part of postgresql-16
+# polaris-terminal-server uses (pg_trgm, pgcrypto) already ship as part of postgresql-16
 # itself, so they need no extra package here.
 RUN set -eux; \
   apt-get update; \
@@ -113,7 +113,7 @@ RUN set -eux; \
   rustup toolchain install; \
   rustup default "$(rustup show active-toolchain | cut -d' ' -f1)"
 
-# Install all dependencies needed to build, run, and test Rook
+# Install all dependencies needed to build, run, and test Polaris Terminal
 COPY ./script ./setup/script
 RUN cd ./setup && ./script/linux/install_test_deps
 

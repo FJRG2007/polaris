@@ -293,31 +293,34 @@ fn repository_identity_selects_the_matching_host() {
     let identities = [
         HostIdentity {
             host: "github.com".to_string(),
-            name: "rook-agent[bot]".to_string(),
+            name: "polaris-terminal-agent[bot]".to_string(),
             email: "bot@users.noreply.github.com".to_string(),
         },
         HostIdentity {
             host: "gitlab.com".to_string(),
-            name: "rook-factory-1".to_string(),
-            email: "1-rook-factory-1@users.noreply.gitlab.com".to_string(),
+            name: "polaris-terminal-factory-1".to_string(),
+            email: "1-polaris-terminal-factory-1@users.noreply.gitlab.com".to_string(),
         },
     ];
 
     let matched = select_host_identity(&identities, "gitlab.com").expect("an identity");
-    assert_eq!(matched.name, "rook-factory-1");
-    assert_eq!(matched.email, "1-rook-factory-1@users.noreply.gitlab.com");
+    assert_eq!(matched.name, "polaris-terminal-factory-1");
+    assert_eq!(
+        matched.email,
+        "1-polaris-terminal-factory-1@users.noreply.gitlab.com"
+    );
 }
 
 #[test]
 fn repository_identity_falls_back_to_the_primary_forge() {
     let identities = [HostIdentity {
         host: "github.com".to_string(),
-        name: "rook-agent[bot]".to_string(),
+        name: "polaris-terminal-agent[bot]".to_string(),
         email: "bot@users.noreply.github.com".to_string(),
     }];
 
     let matched = select_host_identity(&identities, "gitlab.com").expect("an identity");
-    assert_eq!(matched.name, "rook-agent[bot]");
+    assert_eq!(matched.name, "polaris-terminal-agent[bot]");
 
     assert!(select_host_identity(&[], "github.com").is_none());
 }

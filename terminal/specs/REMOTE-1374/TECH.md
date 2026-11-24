@@ -4,7 +4,7 @@ See `specs/REMOTE-1374/PRODUCT.md` for the product spec.
 
 ## 1. Problem
 
-`oz run list` and `oz run get` are wired as `TaskCommand::List` / `TaskCommand::Get` subcommands in `crates/rook_cli/src/task.rs`, and are implemented by `AmbientAgentRunner::{list_tasks,get_task_status}` in `app/src/ai/agent_sdk/ambient.rs`. Today:
+`oz run list` and `oz run get` are wired as `TaskCommand::List` / `TaskCommand::Get` subcommands in `crates/pterm_cli/src/task.rs`, and are implemented by `AmbientAgentRunner::{list_tasks,get_task_status}` in `app/src/ai/agent_sdk/ambient.rs`. Today:
 
 - `ListTasksArgs` exposes only `--limit`.
 - `TaskGetArgs` takes only `task_id` (and `--conversation`, which is out of scope).
@@ -16,9 +16,9 @@ We need to (a) extend `TaskListFilter` to cover every server filter, (b) expand 
 
 ## 2. Relevant Code
 
-- `crates/rook_cli/src/task.rs (1-43)` — `TaskCommand`, `ListTasksArgs`, `TaskGetArgs`.
-- `crates/rook_cli/src/lib.rs:444-500` — `CliCommand::Run(TaskCommand)` wiring and `Args` plumbing.
-- `crates/rook_cli/src/agent.rs:10-30` — the existing `OutputFormat` enum used by the `--output-format` global flag.
+- `crates/pterm_cli/src/task.rs (1-43)` — `TaskCommand`, `ListTasksArgs`, `TaskGetArgs`.
+- `crates/pterm_cli/src/lib.rs:444-500` — `CliCommand::Run(TaskCommand)` wiring and `Args` plumbing.
+- `crates/pterm_cli/src/agent.rs:10-30` — the existing `OutputFormat` enum used by the `--output-format` global flag.
 - `app/src/ai/agent_sdk/mod.rs:125-139` — `dispatch_command` routes `CliCommand::Run` to `run_task`.
 - `app/src/ai/agent_sdk/mod.rs:464-492` — `run_task` translates the subcommand into calls on `ambient::*`.
 - `app/src/ai/agent_sdk/ambient.rs:43-61` — `list_ambient_agent_tasks` / `get_ambient_agent_task_status` entry points from the CLI dispatcher.
@@ -35,7 +35,7 @@ We need to (a) extend `TaskListFilter` to cover every server filter, (b) expand 
 
 The work splits into four layers: CLI args, client-side filter, API client, and output. Keep each layer narrow and testable on its own.
 
-### 3a. CLI args (`crates/rook_cli/src/task.rs`)
+### 3a. CLI args (`crates/pterm_cli/src/task.rs`)
 
 Expand `ListTasksArgs` with one field per product-spec flag. Use clap `ValueEnum` for the enum-typed flags so invalid values fail parsing with a useful error. Keep all new fields `Option<_>` except `--state`, which is `Vec<RunStateArg>` (empty means "no filter").
 
@@ -158,7 +158,7 @@ For JSON, the raw `serde_json::Value` is written with `serde_json::to_string_pre
 
 Unit tests (added as `*_tests.rs` alongside the edited files, per the repo convention):
 
-- `crates/rook_cli/src/task_tests.rs` (new):
+- `crates/pterm_cli/src/task_tests.rs` (new):
   - Parse a full `oz run list` command with every new flag and assert the resulting `ListTasksArgs` fields.
   - Confirm invalid enum values exit with a non-zero clap error.
   - Confirm RFC 3339 parsing rejects malformed timestamps.
@@ -174,7 +174,7 @@ Manual validation against staging:
 - Confirm `--cursor` paginates correctly for each `--sort-by` value.
 - Confirm human-readable error messages and non-zero exit codes when the server rejects the request (invalid cursor, too-old `created_after`, unknown environment ID, etc.).
 
-Presubmit: run `./script/presubmit` (fmt, clippy `-D warnings`, test suite). The touched crates are `rook_cli` and `rook` (app); the test suite should run quickly for these.
+Presubmit: run `./script/presubmit` (fmt, clippy `-D warnings`, test suite). The touched crates are `pterm_cli` and `polaris-terminal` (app); the test suite should run quickly for these.
 
 ## 6. Rollout
 
@@ -196,8 +196,8 @@ Presubmit: run `./script/presubmit` (fmt, clippy `-D warnings`, test suite). The
 
 ## 9. Files Changed
 
-- **Modified**: `crates/rook_cli/src/task.rs` — expand `ListTasksArgs`; add `RunStateArg` / `RunSourceArg` / `ExecutionLocationArg` / `ArtifactTypeArg` / `RunSortByArg` / `RunSortOrderArg` value enums; add `value_parser` wrappers for RFC 3339 timestamps.
-- **New**: `crates/rook_cli/src/task_tests.rs` — clap parsing tests for the new flags.
+- **Modified**: `crates/pterm_cli/src/task.rs` — expand `ListTasksArgs`; add `RunStateArg` / `RunSourceArg` / `ExecutionLocationArg` / `ArtifactTypeArg` / `RunSortByArg` / `RunSortOrderArg` value enums; add `value_parser` wrappers for RFC 3339 timestamps.
+- **New**: `crates/pterm_cli/src/task_tests.rs` — clap parsing tests for the new flags.
 - **Modified**: `app/src/server/server_api/ai.rs` — extend `TaskListFilter`; add `ExecutionLocation`, `ArtifactType`, `RunSortBy`, `RunSortOrder` enums with `as_query_param`; add `list_agent_runs_raw` / `get_agent_run_raw`; move URL construction to a shared `build_list_tasks_url` helper; route to `/agent/runs`.
 - **Modified**: `app/src/server/server_api/ai_tests.rs` — URL-builder tests.
 - **Modified**: `app/src/ai/agent_sdk/mod.rs` — thread `GlobalOptions` from `dispatch_command` into `run_task`.

@@ -23,7 +23,7 @@ use std::cmp::Ordering;
 use std::ops::Range;
 
 use itertools::Itertools;
-pub use rook_util::AsciiDebug;
+pub use pterm_util::AsciiDebug;
 
 pub fn merge_ranges(mut ranges: Vec<Range<usize>>) -> Vec<Range<usize>> {
     let mut i = 1;

@@ -8,11 +8,11 @@ use arborium::tree_sitter::{Parser, Query, QueryCursor, Tree};
 use futures::channel::oneshot;
 use ignore::gitignore::Gitignore;
 use itertools::Itertools;
+use pterm_errors::report_error;
+use pterm_util::standardized_path::StandardizedPath;
 use rayon::prelude::*;
 use repo_metadata::RepositoryUpdate;
 use repo_metadata::entry::{BudgetExceededBehavior, IgnoredPathStrategy, is_file_parsable};
-use rook_errors::report_error;
-use rook_util::standardized_path::StandardizedPath;
 use streaming_iterator::StreamingIterator;
 use syntax_tree::TextSlice;
 
@@ -85,7 +85,7 @@ pub async fn build_outline(
         if sender.send(result).is_err() {
             report_error!(
                 anyhow!("Could not send result of outline generation to background thread"),
-                rook_errors::ReportErrorLogMode::OncePerRun
+                pterm_errors::ReportErrorLogMode::OncePerRun
             );
         }
     });

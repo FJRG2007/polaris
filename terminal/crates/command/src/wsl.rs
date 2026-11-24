@@ -2,7 +2,7 @@
 //! invocations made through this crate's [`Command`](crate::r#async::Command)
 //! and [`Command`](crate::blocking::Command) wrappers.
 //!
-//! Rook ships as a Linux ELF that users routinely run inside WSL.
+//! Polaris Terminal ships as a Linux ELF that users routinely run inside WSL.
 //! WSL's default `appendWindowsPath = true` (in `/etc/wsl.conf`)
 //! puts directories like `/mnt/c/Program Files/Git/cmd/` on `PATH`,
 //! so a bare `Command::new("git")` can resolve to Windows `git.exe`
@@ -27,7 +27,7 @@ use std::sync::OnceLock;
 #[path = "wsl_tests.rs"]
 mod tests;
 
-/// Bare program names whose resolution Rook wants to override under
+/// Bare program names whose resolution Polaris Terminal wants to override under
 /// WSL. Anything not in this list is passed through unchanged.
 const KNOWN_NAMES: &[&str] = &["git", "gh"];
 

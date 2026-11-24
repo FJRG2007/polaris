@@ -8,16 +8,16 @@ use lsp::supported_servers::LSPServerType;
 use lsp_server_selector::{LSPServerInfo, create_lsp_server_selector};
 pub use model::{InitProjectModel, InitProjectModelEvent, InitStepKind};
 use model::{InitStepData, InitStepStatus};
-use rook_core::ui::theme::Fill;
+use pterm_core::ui::theme::Fill;
 #[cfg(feature = "local_fs")]
-use rook_errors::report_error;
-use rookui::elements::{
+use pterm_errors::report_error;
+use ptermui::elements::{
     Border, ChildView, Container, CrossAxisAlignment, Empty, Flex, MouseStateHandle, ParentElement,
     Text,
 };
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -42,11 +42,11 @@ use crate::view_components::DismissibleToast;
 use crate::workspace::ToastStack;
 use crate::{TelemetryEvent, send_telemetry_from_ctx};
 
-const ONBOARDING_TEXT: &str = "Great - let's begin setting up this project! Would you like to give me permission to index this codebase? It allows me to quickly understand context and provide more targeted solutions when working in this codebase. No code is stored on Rook servers.";
+const ONBOARDING_TEXT: &str = "Great - let's begin setting up this project! Would you like to give me permission to index this codebase? It allows me to quickly understand context and provide more targeted solutions when working in this codebase. No code is stored on Polaris Terminal servers.";
 const ALREADY_SETUP_TEXT: &str = "It looks like this project has already been initialized. You can re-generate the AGENTS.md for this codebase by clicking the button below.";
-// Native Rook rules file format.
-pub const FILES_TO_CHECK: [&str; 2] = ["AGENTS.md", "ROOK.md"];
-// File formats that can be linked to ROOK.md.
+// Native Polaris Terminal rules file format.
+pub const FILES_TO_CHECK: [&str; 2] = ["AGENTS.md", "POLARIS_TERMINAL.md"];
+// File formats that can be linked to POLARIS_TERMINAL.md.
 pub const LINKABLE_FILES: [&str; 7] = [
     "CLAUDE.md",
     ".cursorrules",
@@ -497,7 +497,7 @@ impl InitStepBlock {
     /// Renders a success completion state with check icon.
     fn render_success_completion(text: &str, app: &AppContext) -> Box<dyn Element> {
         RenderableAction::new(text, app)
-            .with_icon(Icon::Check.to_rookui_icon(Fill::success()).finish())
+            .with_icon(Icon::Check.to_ptermui_icon(Fill::success()).finish())
             .with_content_item_spacing()
             .render(app)
             .finish()
@@ -506,7 +506,7 @@ impl InitStepBlock {
     /// Renders a skipped/cancelled completion state with X icon.
     fn render_skipped_completion(text: &str, app: &AppContext) -> Box<dyn Element> {
         RenderableAction::new(text, app)
-            .with_icon(Icon::X.to_rookui_icon(Fill::error()).finish())
+            .with_icon(Icon::X.to_ptermui_icon(Fill::error()).finish())
             .with_content_item_spacing()
             .render(app)
             .finish()
@@ -673,7 +673,7 @@ impl InitStepBlock {
         match indexing_result {
             CodebaseIndexingResult::Accepted => {
                 RenderableAction::new("Codebase index started", app)
-                    .with_icon(Icon::Check.to_rookui_icon(Fill::success()).finish())
+                    .with_icon(Icon::Check.to_ptermui_icon(Fill::success()).finish())
                     .with_action_button(
                         Appearance::as_ref(app)
                             .ui_builder()
@@ -829,7 +829,7 @@ impl InitStepBlock {
                 };
                 Self::render_ready_with_buttons(
                     action_view,
-                    "Would you like to create an AGENTS.md file? Rook can create one for you with project specific rules, context, and conventions inferred from your codebase. The agent will use this context as it codes.",
+                    "Would you like to create an AGENTS.md file? Polaris Terminal can create one for you with project specific rules, context, and conventions inferred from your codebase. The agent will use this context as it codes.",
                     app,
                 )
             }
@@ -929,7 +929,7 @@ impl InitStepBlock {
                 button_disabled, ..
             } => {
                 let mut action = RenderableAction::new("Project rules configured", app)
-                    .with_icon(Icon::Check.to_rookui_icon(Fill::success()).finish());
+                    .with_icon(Icon::Check.to_ptermui_icon(Fill::success()).finish());
                 if init_completed {
                     action = action.with_action_button(Self::regenerate_button(
                         &mouse_states.regenerate_button,
@@ -941,7 +941,7 @@ impl InitStepBlock {
             }
             ProjectScopedRulesResult::AlreadyExists { button_disabled } => {
                 let mut action = RenderableAction::new("Project rules already configured", app)
-                    .with_icon(Icon::Check.to_rookui_icon(Fill::success()).finish());
+                    .with_icon(Icon::Check.to_ptermui_icon(Fill::success()).finish());
                 if init_completed {
                     action = action.with_action_button(Self::regenerate_button(
                         &mouse_states.regenerate_button,
@@ -1223,7 +1223,7 @@ impl TypedActionView for InitStepBlock {
             InitProjectBlockAction::GenerateRules => {
                 send_telemetry_from_ctx!(
                     TelemetryEvent::AgentModeSetupProjectScopedRulesAction {
-                        action: AgentModeSetupProjectScopedRulesActionType::GenerateRookMd,
+                        action: AgentModeSetupProjectScopedRulesActionType::GeneratePtermMd,
                     },
                     ctx
                 );
@@ -1235,7 +1235,7 @@ impl TypedActionView for InitStepBlock {
             InitProjectBlockAction::RegenerateRules => {
                 send_telemetry_from_ctx!(
                     TelemetryEvent::AgentModeSetupProjectScopedRulesAction {
-                        action: AgentModeSetupProjectScopedRulesActionType::RegenerateRookMd,
+                        action: AgentModeSetupProjectScopedRulesActionType::RegeneratePtermMd,
                     },
                     ctx
                 );

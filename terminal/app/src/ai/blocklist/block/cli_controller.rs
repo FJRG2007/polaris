@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use instant::Instant;
 use parking_lot::FairMutex;
-use rook_core::send_telemetry_from_ctx;
-use rook_errors::report_error;
-use rookui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use pterm_core::send_telemetry_from_ctx;
+use pterm_errors::report_error;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::BlocklistAIHistoryModel;
@@ -449,7 +449,7 @@ impl CLISubagentController {
     /// Force the currently in-flight poll for the given long-running command block to
     /// resolve immediately with a fresh snapshot, bypassing the agent-set timeout.
     /// Backs the `Check now` affordance surfaced next to the `Last seen by agent ...`
-    /// indicator in the rooking footer.
+    /// indicator in the pterming footer.
     pub fn request_force_refresh(&self, block_id: &BlockId, ctx: &mut ModelContext<Self>) {
         let executor_handle = self.action_model.as_ref(ctx).shell_command_executor(ctx);
         let block_id = block_id.clone();

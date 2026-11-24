@@ -7,7 +7,7 @@
 use std::ops::Range;
 
 use ai::diff_validation::{DiffDelta, DiffType};
-use rook_core::HostId;
+use pterm_core::HostId;
 
 /// The base content and file path for a diff.
 #[derive(Clone)]

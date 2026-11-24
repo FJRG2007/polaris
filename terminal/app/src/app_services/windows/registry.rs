@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 
-use rook_core::channel::ChannelState;
-use rook_errors::report_error;
+use pterm_core::channel::ChannelState;
+use pterm_errors::report_error;
 use windows_registry::{CURRENT_USER, HSTRING};
 
 pub(super) fn register_uri_handler() {
@@ -13,9 +13,9 @@ pub(super) fn register_uri_handler() {
         return;
     };
 
-    // The Windows Registry entry for Rook (assuming the channel is RookLocal):
-    // rooklocal
-    //   (Default) = "RookLocal"
+    // The Windows Registry entry for Polaris Terminal (assuming the channel is PolarisTerminalLocal):
+    // polaris-terminal-local
+    //   (Default) = "PolarisTerminalLocal"
     //   URL Protocol = ""
     //   DefaultIcon
     //      (Default) = "{path_to_channel_icon},0" TODO(CORE-2860): Add icon file path here.
@@ -41,7 +41,7 @@ pub(super) fn register_uri_handler() {
             };
 
             // TODO(CORE-2861): Add the `DefaultIcon` Default value here with the file path to
-            // Rook's icon once we figure out distribution on Windows.
+            // Polaris Terminal's icon once we figure out distribution on Windows.
 
             let command_key = match parent_key.create("shell\\open\\command") {
                 Ok(command_key) => command_key,

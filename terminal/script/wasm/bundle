@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Builds a Rook binary and bundles it up for distribution.
+# Builds a Polaris Terminal binary and bundles it up for distribution.
 
 set -e
 
@@ -136,20 +136,20 @@ mkdir -p "$EXTRAS_DIR"
 
 # Update parameters based on the target release channel.
 #
-# ROOK_BIN is the name of the binary produced by cargo.
-# N.B. The bundled outputs will always be rook.js and rook_bg.wasm.
+# POLARIS_TERMINAL_BIN is the name of the binary produced by cargo.
+# N.B. The bundled outputs will always be polaris-terminal.js and pterm_bg.wasm.
 if [[ $RELEASE_CHANNEL = "local" ]]; then
-  ROOK_BIN="rook"
+  POLARIS_TERMINAL_BIN="polaris-terminal"
   FEATURES="$FEATURES,remote_tty"
 elif [[ $RELEASE_CHANNEL = "dev" ]]; then
-  ROOK_BIN="dev"
+  POLARIS_TERMINAL_BIN="dev"
 elif [[ $RELEASE_CHANNEL = "preview" ]]; then
-  ROOK_BIN="preview"
+  POLARIS_TERMINAL_BIN="preview"
   FEATURES="$FEATURES,preview_channel"
 elif [[ $RELEASE_CHANNEL = "stable" ]]; then
-  ROOK_BIN="stable"
+  POLARIS_TERMINAL_BIN="stable"
 elif [[ $RELEASE_CHANNEL = "oss" ]]; then
-  ROOK_BIN="rook-oss"
+  POLARIS_TERMINAL_BIN="polaris-terminal"
 fi
 
 if [ -n "${FEATURES_OVERRIDE+x}" ]; then
@@ -161,7 +161,7 @@ else
 fi
 
 # These cargo features were removed and replaced by environment variables read
-# by rook-channel-config. Intercept them after merging --features additions so
+# by polaris-terminal-channel-config. Intercept them after merging --features additions so
 # that existing invocations keep working without dropping bundle defaults.
 for mapping in \
     "with_local_server:WITH_LOCAL_SERVER" \
@@ -181,20 +181,20 @@ done
 # then exit.  We use this script to invoke `cargo check` to ensure that we are
 # using the same feature flags and profile that we would be using in production.
 if [[ "$CHECK_ONLY" == "true" ]]; then
-  ASSET_TARGET_DIR="$ASSET_TARGET_DIR" cargo check --target wasm32-unknown-unknown --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --features "$FEATURES"
+  ASSET_TARGET_DIR="$ASSET_TARGET_DIR" cargo check --target wasm32-unknown-unknown --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --features "$FEATURES"
   exit 0
 fi
 
 # Build the wasm binary.
-echo "Building and bundling Rook for channel $RELEASE_CHANNEL"
-ASSET_TARGET_DIR="$ASSET_TARGET_DIR" cargo build --target wasm32-unknown-unknown --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --features "$FEATURES"
+echo "Building and bundling Polaris Terminal for channel $RELEASE_CHANNEL"
+ASSET_TARGET_DIR="$ASSET_TARGET_DIR" cargo build --target wasm32-unknown-unknown --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --features "$FEATURES"
 
 # Generate linked JS and wasm files that can be run in the browser.
-echo "Running wasm-bindgen on $CARGO_TARGET_OUTPUT_DIR/$ROOK_BIN.wasm"
-wasm-bindgen --target web --out-dir "$OUT_DIR" --out-name "rook" --keep-debug --no-typescript "$CARGO_TARGET_OUTPUT_DIR/$ROOK_BIN.wasm"
+echo "Running wasm-bindgen on $CARGO_TARGET_OUTPUT_DIR/$POLARIS_TERMINAL_BIN.wasm"
+wasm-bindgen --target web --out-dir "$OUT_DIR" --out-name "polaris-terminal" --keep-debug --no-typescript "$CARGO_TARGET_OUTPUT_DIR/$POLARIS_TERMINAL_BIN.wasm"
 
-WASM_BINARY_OUT="${OUT_DIR}/rook_bg.wasm"
-WASM_BINARY_DEBUG="${EXTRAS_DIR}/rook_bg.debug.wasm"
+WASM_BINARY_OUT="${OUT_DIR}/pterm_bg.wasm"
+WASM_BINARY_DEBUG="${EXTRAS_DIR}/pterm_bg.debug.wasm"
 
 if [[ "$NO_SPLIT" != "true" ]]; then
   # Run Sentry's wasm-split binary to separate out debug information from the

@@ -12,11 +12,11 @@ use ai::document::DEFAULT_PLANNING_DOCUMENT_TITLE;
 pub use ai::document::{AIDocumentId, AIDocumentVersion};
 use chrono::{DateTime, Local, Utc};
 use itertools::Itertools;
-use rook_editor::model::RichTextEditorModel;
-use rook_editor::render::model::RichTextStyles;
-use rook_errors::{ReportErrorLogMode, report_error};
-use rookui::color::ColorU;
-use rookui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity, WindowId};
+use pterm_editor::model::RichTextEditorModel;
+use pterm_editor::render::model::RichTextStyles;
+use pterm_errors::{ReportErrorLogMode, report_error};
+use ptermui::color::ColorU;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity, WindowId};
 use uuid::Uuid;
 use warp_multi_agent_api as maa_api;
 
@@ -57,13 +57,13 @@ struct AIDocumentSaveRequest {
     document_id: AIDocumentId,
 }
 
-/// The status of saving an AI Document to Rook Drive
+/// The status of saving an AI Document to Polaris Terminal Drive
 pub enum AIDocumentSaveStatus {
-    /// Not being synced with Rook Drive at all
+    /// Not being synced with Polaris Terminal Drive at all
     NotSaved,
-    /// Is being saved to Rook Drive, but has not finished yet
+    /// Is being saved to Polaris Terminal Drive, but has not finished yet
     Saving,
-    /// Has been saved to Rook Drive
+    /// Has been saved to Polaris Terminal Drive
     Saved,
 }
 
@@ -91,7 +91,7 @@ impl AIDocumentUserEditStatus {
 
 const PLAN_FOLDER_NAME: &str = "Plans";
 
-/// Represents a document queued for creation in Rook Drive.
+/// Represents a document queued for creation in Polaris Terminal Drive.
 #[derive(Debug, Clone)]
 struct PendingDocument {
     id: AIDocumentId,
@@ -111,7 +111,7 @@ pub struct AIDocumentEarlierVersion {
 #[derive(Debug, Clone)]
 pub struct AIDocument {
     /// ID to sync with a cloud model with the server.
-    /// Set when a document is saved to Rook Drive.
+    /// Set when a document is saved to Polaris Terminal Drive.
     pub sync_id: Option<SyncId>,
     pub title: String,
     pub version: AIDocumentVersion,
@@ -255,7 +255,7 @@ impl AIDocumentModel {
     /// Sends a request to create a new cloud notebook with the document's contents.
     /// Returns true if the create document request was sent successfully (or if there was already a notebook entry).
     /// Actually creating the notebook is done asynchronously in the background.
-    pub fn sync_to_rook_drive(&mut self, id: AIDocumentId, ctx: &mut ModelContext<Self>) -> bool {
+    pub fn sync_to_pterm_drive(&mut self, id: AIDocumentId, ctx: &mut ModelContext<Self>) -> bool {
         if self.reconcile_document_server_backing(&id, ctx) {
             return true;
         }
@@ -271,7 +271,9 @@ impl AIDocumentModel {
         let content = document.editor.as_ref(ctx).markdown(ctx);
 
         let Some(owner) = Self::get_plan_owner(ctx) else {
-            log::warn!("Failed to get owner while saving AI Document to Rook Drive. Skipping");
+            log::warn!(
+                "Failed to get owner while saving AI Document to Polaris Terminal Drive. Skipping"
+            );
             return false;
         };
 
@@ -332,9 +334,9 @@ impl AIDocumentModel {
                     awaiting_server_backing.push(document_id);
                 }
                 AIDocumentSaveStatus::NotSaved => {
-                    if !self.sync_to_rook_drive(document_id, ctx) {
+                    if !self.sync_to_pterm_drive(document_id, ctx) {
                         report_error!(
-                            "Failed to publish plan document to Rook Drive before child-agent launch.",
+                            "Failed to publish plan document to Polaris Terminal Drive before child-agent launch.",
                             extra: { "document_id" => %document_id }
                         );
                     } else if !self.get_document_save_status(&document_id).is_saved() {
@@ -347,7 +349,7 @@ impl AIDocumentModel {
         awaiting_server_backing
     }
 
-    /// Reconciles a document with an existing server-backed Rook Drive notebook.
+    /// Reconciles a document with an existing server-backed Polaris Terminal Drive notebook.
     fn reconcile_document_server_backing(
         &mut self,
         document_id: &AIDocumentId,
@@ -367,7 +369,7 @@ impl AIDocumentModel {
         true
     }
 
-    /// Reconciles all loaded documents with server-backed Rook Drive notebooks.
+    /// Reconciles all loaded documents with server-backed Polaris Terminal Drive notebooks.
     fn reconcile_all_document_server_backing(&mut self, ctx: &mut ModelContext<Self>) {
         let document_ids = self.documents.keys().copied().collect::<Vec<_>>();
         for document_id in document_ids {
@@ -375,7 +377,7 @@ impl AIDocumentModel {
         }
     }
 
-    /// Refreshes the latest content for a plan whose Rook Drive creation is in progress.
+    /// Refreshes the latest content for a plan whose Polaris Terminal Drive creation is in progress.
     fn refresh_saving_document_content(
         &mut self,
         document_id: &AIDocumentId,
@@ -498,7 +500,7 @@ impl AIDocumentModel {
         // If we're waiting on a Plans folder to complete creation, ensure the Plans folder exists
         // (creating it if needed) and if it has a ServerId, process the pending document queue.
         //
-        // NOTE: this handler runs for *all* Rook Drive object creations, so we must only create the
+        // NOTE: this handler runs for *all* Polaris Terminal Drive object creations, so we must only create the
         // Plans folder when we actually have a plan notebook waiting to be created.
         if !self.pending_document_queue.is_empty() {
             if let Some(owner) = Self::get_plan_owner(ctx) {
@@ -545,7 +547,7 @@ impl AIDocumentModel {
         id
     }
 
-    /// Create a document from an existing Rook Drive notebook.
+    /// Create a document from an existing Polaris Terminal Drive notebook.
     pub fn create_document_from_notebook(
         &mut self,
         ai_document_id: AIDocumentId,
@@ -579,7 +581,7 @@ impl AIDocumentModel {
     }
 
     /// Hydrates a saved plan notebook into the target conversation.
-    pub(in crate::ai) fn hydrate_saved_plan_from_rook_drive(
+    pub(in crate::ai) fn hydrate_saved_plan_from_pterm_drive(
         &mut self,
         ai_document_id: AIDocumentId,
         conversation_id: AIConversationId,
@@ -596,12 +598,12 @@ impl AIDocumentModel {
                 )
             })
             .ok_or_else(|| {
-                format!("Plan document {ai_document_id} was not found in Rook Drive.")
+                format!("Plan document {ai_document_id} was not found in Polaris Terminal Drive.")
             })?;
         let (sync_id, title, content) = notebook;
         if sync_id.into_server().is_none() {
             return Err(format!(
-                "Plan document {ai_document_id} is not backed by a saved Rook Drive notebook."
+                "Plan document {ai_document_id} is not backed by a saved Polaris Terminal Drive notebook."
             ));
         }
 
@@ -923,7 +925,7 @@ impl AIDocumentModel {
         }
     }
 
-    pub fn get_document_rook_drive_object_link(
+    pub fn get_document_pterm_drive_object_link(
         &self,
         id: &AIDocumentId,
         ctx: &AppContext,
@@ -941,7 +943,7 @@ impl AIDocumentModel {
     pub fn get_document_content(
         &self,
         id: &AIDocumentId,
-        ctx: &rookui::AppContext,
+        ctx: &ptermui::AppContext,
     ) -> Option<String> {
         let doc = self.documents.get(id)?;
         Some(doc.editor.as_ref(ctx).markdown_unescaped(ctx))
@@ -1606,7 +1608,7 @@ impl AIDocumentModel {
 }
 
 impl AIDocumentEarlierVersion {
-    pub fn get_content(&self, ctx: &rookui::AppContext) -> String {
+    pub fn get_content(&self, ctx: &ptermui::AppContext) -> String {
         self.editor.as_ref(ctx).markdown_unescaped(ctx)
     }
 }

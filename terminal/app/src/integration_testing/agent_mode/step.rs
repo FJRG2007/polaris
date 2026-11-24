@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use command::blocking::Command;
 use prost::Message;
-use rookui::integration::{AssertionOutcome, TestStep};
-use rookui::{SingletonEntity, async_assert};
+use ptermui::integration::{AssertionOutcome, TestStep};
+use ptermui::{SingletonEntity, async_assert};
 
 use crate::BlocklistAIHistoryModel;
 use crate::ai::agent::conversation::AIConversation;
@@ -301,7 +301,7 @@ fn collect_edited_files(conversation: &AIConversation) -> HashSet<String> {
 /// Returns an assertion that prints the conversation ID to stdout once available.
 /// This assertion will poll until the conversation token is received from the server.
 fn print_conversation_id_assertion()
--> impl FnMut(&mut rookui::App, rookui::WindowId) -> rookui::integration::AssertionOutcome {
+-> impl FnMut(&mut ptermui::App, ptermui::WindowId) -> ptermui::integration::AssertionOutcome {
     |app, window_id| {
         let terminal_view = terminal_view(app, window_id, 0, 0);
         BlocklistAIHistoryModel::handle(app).read(app, |history_model, _| {

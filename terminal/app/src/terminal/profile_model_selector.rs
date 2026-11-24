@@ -6,17 +6,17 @@ use instant::{Duration, Instant};
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rookui::elements::{
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DEFAULT_UI_LINE_HEIGHT_RATIO, DropShadow, Empty, Expanded, Flex, Hoverable, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement as _,
     ParentOffsetBounds, Percentage, PositionedElementAnchor, PositionedElementOffsetBounds, Radius,
     Rect, SavePosition, Stack, Text,
 };
-use rookui::platform::Cursor;
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::platform::Cursor;
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity as _, TypedActionView,
     View, ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -24,11 +24,11 @@ use rookui::{
 const SIDECAR_HORIZONTAL_GAP: f32 = 8.;
 const SIDECAR_POSITION_ID: &str = "model_sidecar_panel";
 
-use rook_cli::agent::Harness;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::color::{Opacity, coloru_with_opacity};
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
+use pterm_cli::agent::Harness;
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::color::{Opacity, coloru_with_opacity};
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
 
 use crate::ai::blocklist::prompt::PromptIconButtonTheme;
 use crate::ai::blocklist::{
@@ -91,7 +91,7 @@ const MODEL_LOCKED_FOR_FOLLOWUP_TOOLTIP: &str = "Follow-ups use the original run
 const MODEL_REQUIRES_EDIT_ACCESS_TOOLTIP: &str = "Request edit access to change model";
 const HARNESS_DEFAULT_MODEL_LABEL: &str = "default";
 
-pub fn calculate_scaled_font_size(appearance: &rook_core::ui::appearance::Appearance) -> f32 {
+pub fn calculate_scaled_font_size(appearance: &pterm_core::ui::appearance::Appearance) -> f32 {
     if FeatureFlag::AgentView.is_enabled() {
         udi_font_size(appearance)
     } else {
@@ -100,7 +100,9 @@ pub fn calculate_scaled_font_size(appearance: &rook_core::ui::appearance::Appear
 }
 
 /// Calculate the maximum width for profile name text (we will clip to this width)
-pub fn calculate_max_profile_name_width(appearance: &rook_core::ui::appearance::Appearance) -> f32 {
+pub fn calculate_max_profile_name_width(
+    appearance: &pterm_core::ui::appearance::Appearance,
+) -> f32 {
     let scaled_font_size = calculate_scaled_font_size(appearance);
     scaled_font_size * MAX_PROFILE_NAME_WIDTH_SCALE_FACTOR
 }
@@ -149,10 +151,10 @@ impl ActionButtonTheme for SelectorChipTheme {
         }
     }
 
-    fn font_properties(&self) -> Option<rookui::fonts::Properties> {
+    fn font_properties(&self) -> Option<ptermui::fonts::Properties> {
         if FeatureFlag::CloudModeInputV2.is_enabled() {
-            Some(rookui::fonts::Properties {
-                weight: rookui::fonts::Weight::Semibold,
+            Some(ptermui::fonts::Properties {
+                weight: ptermui::fonts::Weight::Semibold,
                 ..Default::default()
             })
         } else {
@@ -446,7 +448,7 @@ impl ProfileModelSelector {
                     llm_preferences.hide_llm_popup(terminal_view_id);
                 } else if config.input_type.is_ai() {
                     ctx.spawn(
-                        rookui::r#async::Timer::after(NEW_MODEL_CHOICES_POPUP_DELAY),
+                        ptermui::r#async::Timer::after(NEW_MODEL_CHOICES_POPUP_DELAY),
                         |_, _, ctx| {
                             ctx.notify();
                         },
@@ -535,7 +537,7 @@ impl ProfileModelSelector {
                 .on_click(|ctx| {
                     ctx.dispatch_typed_action(WorkspaceAction::ShowSettingsPageWithSearch {
                         search_query: "api".to_string(),
-                        section: Some(SettingsSection::RookAgent),
+                        section: Some(SettingsSection::PtermAgent),
                     });
                 })
         });
@@ -1624,7 +1626,7 @@ impl ProfileModelSelector {
         let (vertical_padding, horizontal_padding) = self.get_padding_values(scaled_font_size);
 
         let profile_icon = Icon::Psychology
-            .to_rookui_icon(Fill::Solid(text_color))
+            .to_ptermui_icon(Fill::Solid(text_color))
             .finish();
 
         let max_label_width = calculate_max_profile_name_width(appearance);
@@ -1764,7 +1766,7 @@ impl ProfileModelSelector {
         let mut content = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
         if is_lrc {
             let terminal_icon = Icon::Terminal
-                .to_rookui_icon(Fill::Solid(text_color))
+                .to_ptermui_icon(Fill::Solid(text_color))
                 .finish();
             content = content.with_child(
                 Container::new(
@@ -1785,7 +1787,7 @@ impl ProfileModelSelector {
         // (when enabled, clicking opens the inline model selector instead of a dropdown).
         if has_edit_access && !FeatureFlag::InlineMenuHeaders.is_enabled() {
             let chevron_icon = Icon::ChevronDown
-                .to_rookui_icon(Fill::Solid(text_color))
+                .to_ptermui_icon(Fill::Solid(text_color))
                 .finish();
 
             content = content.with_child(
@@ -2090,7 +2092,7 @@ impl ProfileModelSelector {
         let theme = appearance.theme();
         let header = self.render_model_spec_header(
             "Model Specs".to_string(),
-            "Rook’s benchmarks for how well a model performs in our harness, the rate at which it consumes credits, and task speed.".to_string(),
+            "Polaris Terminal’s benchmarks for how well a model performs in our harness, the rate at which it consumes credits, and task speed.".to_string(),
             app,
         );
         let spec = self.render_all_model_spec_values(
@@ -2417,7 +2419,7 @@ impl View for ProfileModelSelector {
             crate::settings::InputSettings::as_ref(app).is_universal_developer_input_enabled(app);
 
         // The popup overflows the viewport on wasm mobile.
-        let is_wasm_mobile = rookui::platform::is_mobile_device();
+        let is_wasm_mobile = ptermui::platform::is_mobile_device();
 
         if !is_wasm_mobile
             && (is_udi_enabled

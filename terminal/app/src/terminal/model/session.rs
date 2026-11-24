@@ -20,16 +20,16 @@ use futures::future::{BoxFuture, Shared};
 use instant::Instant;
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
-use rook_completer::completer::{
+use pterm_completer::completer::{
     CommandExitStatus, CommandOutput, PathSeparators, TopLevelCommandCaseSensitivity,
 };
-use rook_errors::{ErrorExt, register_error};
-use rook_util::path::{
+use pterm_errors::{ErrorExt, register_error};
+use pterm_util::path::{
     ShellFamily, convert_msys2_to_windows_native_path, convert_wsl_to_windows_host_path,
     msys2_exe_to_root,
 };
-use rookui::platform::OperatingSystem;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::platform::OperatingSystem;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 use smol_str::SmolStr;
 use typed_path::{TypedPath, TypedPathBuf, WindowsPath};
 use version_compare::Version;
@@ -42,7 +42,7 @@ use crate::features::FeatureFlag;
 use crate::remote_server::manager::{RemoteServerManager, RemoteServerManagerEvent};
 use crate::server::telemetry::{BootstrappingInfo, TelemetryEvent};
 use crate::terminal::event::{ExecutedExecutorCommandEvent, RemoteServerSetupState};
-use crate::terminal::rookify::SubshellSource;
+use crate::terminal::ptermify::SubshellSource;
 use crate::terminal::shell::{Shell, ShellType};
 use crate::terminal::{History, ShellHost, ShellLaunchData};
 
@@ -100,9 +100,9 @@ fn escape_powershell_single_quotes(path: &OsStr) -> OsString {
     OsString::from_wide(&escaped)
 }
 
-// SessionId is defined in rook_core and re-exported here for backward compatibility.
-use rook_errors::report_error;
-pub use rook_terminal::model::session::{SessionId, get_local_hostname};
+// SessionId is defined in pterm_core and re-exported here for backward compatibility.
+use pterm_errors::report_error;
+pub use pterm_terminal::model::session::{SessionId, get_local_hostname};
 
 /// Information about the sessions within a given terminal pane/top-level
 /// shell.
@@ -398,7 +398,7 @@ impl Sessions {
         let session = Arc::new(session);
         self.sessions.insert(session.id(), session.clone());
 
-        // For rookified-remote sessions, pick up the current host_id from
+        // For ptermified-remote sessions, pick up the current host_id from
         // the manager so session.remote_host_id() is populated without
         // waiting for the next SessionConnected event. The
         // RemoteServerCommandExecutor already has its client baked in, so
@@ -407,7 +407,7 @@ impl Sessions {
         if FeatureFlag::SshRemoteServer.is_enabled()
             && matches!(
                 session_info.session_type,
-                BootstrapSessionType::RookifiedRemote
+                BootstrapSessionType::PtermifiedRemote
             )
             && let Some(host_id) = RemoteServerManager::as_ref(ctx).host_id_for_session(session_id)
         {
@@ -416,7 +416,7 @@ impl Sessions {
 
         let bootstrap_duration_seconds =
             pending_session_start_time.map(|start| start.elapsed().as_secs_f64());
-        let rook_attributed_bootstrap_duration_seconds =
+        let pterm_attributed_bootstrap_duration_seconds =
             match (bootstrap_duration_seconds, rcfiles_duration_seconds) {
                 (Some(total), Some(rcfiles)) => Some(total - rcfiles),
                 _ => None,
@@ -437,7 +437,7 @@ impl Sessions {
                 is_wsl: session.is_wsl(),
                 bootstrap_duration_seconds,
                 rcfiles_duration_seconds,
-                rook_attributed_bootstrap_duration_seconds,
+                pterm_attributed_bootstrap_duration_seconds,
                 is_msys2: session.is_msys2(),
                 terminal_session_id: Some(session.id()),
             }),
@@ -552,7 +552,7 @@ impl Sessions {
 impl From<SessionType> for command_corrections::SessionType {
     fn from(session_type: SessionType) -> Self {
         match session_type {
-            SessionType::RookifiedRemote { .. } => command_corrections::SessionType::Remote,
+            SessionType::PtermifiedRemote { .. } => command_corrections::SessionType::Remote,
             SessionType::Local => command_corrections::SessionType::Local,
         }
     }
@@ -561,20 +561,20 @@ impl From<SessionType> for command_corrections::SessionType {
 impl From<&SessionType> for command_corrections::SessionType {
     fn from(session_type: &SessionType) -> Self {
         match session_type {
-            SessionType::RookifiedRemote { .. } => command_corrections::SessionType::Remote,
+            SessionType::PtermifiedRemote { .. } => command_corrections::SessionType::Remote,
             SessionType::Local => command_corrections::SessionType::Local,
         }
     }
 }
 
-/// Whether a session was established by Rook's in-band SSH wrapper — the shell function our
+/// Whether a session was established by Polaris Terminal's in-band SSH wrapper — the shell function our
 /// bootstrap injects that intercepts `ssh`, sets up a ControlMaster connection, and bootstraps
-/// the remote shell. This applies to all SSH rookification today: the remote-server SSH
+/// the remote shell. This applies to all SSH ptermification today: the remote-server SSH
 /// extension also runs on top of a wrapper session (reusing the ControlMaster socket for its
 /// proxy and for the `RemoteCommandExecutor` fallback).
 ///
-/// `No` covers local sessions, subshells, and remote sessions rookified *without* the wrapper
-/// (e.g. via the auto-rookify RC snippet inside an unwrapped `ssh` session), which carry no
+/// `No` covers local sessions, subshells, and remote sessions ptermified *without* the wrapper
+/// (e.g. via the auto-ptermify RC snippet inside an unwrapped `ssh` session), which carry no
 /// ControlMaster socket.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IsSSHWrapperSession {
@@ -584,7 +584,7 @@ pub enum IsSSHWrapperSession {
         socket_path: PathBuf,
         /// `true` when `socket_path` points at a ControlMaster the user
         /// already had running (the SSH wrapper attached to it instead of
-        /// creating a Rook-owned one). Rook must not tear down such a
+        /// creating a Polaris Terminal-owned one). Polaris Terminal must not tear down such a
         /// master on session exit.
         external_control_master: bool,
     },
@@ -685,7 +685,7 @@ impl SessionInfo {
             matches!(&is_ssh_wrapper_session, IsSSHWrapperSession::Yes { .. }),
         );
 
-        let spawning_session_id = if matches!(session_type, BootstrapSessionType::RookifiedRemote)
+        let spawning_session_id = if matches!(session_type, BootstrapSessionType::PtermifiedRemote)
             || subshell_info.is_some()
         {
             active_block_session_id
@@ -733,7 +733,7 @@ impl SessionInfo {
                 {
                     BootstrapSessionType::Local
                 } else {
-                    BootstrapSessionType::RookifiedRemote
+                    BootstrapSessionType::PtermifiedRemote
                 }
             }
             Err(e) => {
@@ -749,7 +749,7 @@ impl SessionInfo {
         _is_ssh_session: bool,
     ) -> BootstrapSessionType {
         // When the `remote_tty` feature is enabled--the session is always considered remote.
-        BootstrapSessionType::RookifiedRemote
+        BootstrapSessionType::PtermifiedRemote
     }
 
     /// Returns a fully populated [`SessionInfo`] containing data derived from the given
@@ -896,33 +896,35 @@ impl SessionInfo {
 /// which happens *after* the session is bootstrapped.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BootstrapSessionType {
-    /// The session host is the same host where Rook is running.
+    /// The session host is the same host where Polaris Terminal is running.
     Local,
 
-    /// The session host is a different host from where Rook is running.
-    RookifiedRemote,
+    /// The session host is a different host from where Polaris Terminal is running.
+    PtermifiedRemote,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SessionType {
-    /// The session host is the same host where Rook is running.
+    /// The session host is the same host where Polaris Terminal is running.
     Local,
 
-    /// The session host is a different host from where Rook is running.
-    /// Note that we only know this for sure when we Rookify a block.
+    /// The session host is a different host from where Polaris Terminal is running.
+    /// Note that we only know this for sure when we Ptermify a block.
     ///
     /// `host_id` is `Some` when the remote server feature flag is enabled and
     /// `RemoteServerManager` has completed the connection handshake. It is
     /// `None` when the feature flag is off or the connection hasn't been
     /// established yet.
-    RookifiedRemote { host_id: Option<rook_core::HostId> },
+    PtermifiedRemote { host_id: Option<pterm_core::HostId> },
 }
 
 impl From<BootstrapSessionType> for SessionType {
     fn from(bst: BootstrapSessionType) -> Self {
         match bst {
             BootstrapSessionType::Local => SessionType::Local,
-            BootstrapSessionType::RookifiedRemote => SessionType::RookifiedRemote { host_id: None },
+            BootstrapSessionType::PtermifiedRemote => {
+                SessionType::PtermifiedRemote { host_id: None }
+            }
         }
     }
 }
@@ -999,11 +1001,11 @@ impl Session {
         self.session_type.lock().clone()
     }
 
-    /// Updates the `host_id` on a `RookifiedRemote` session type after the
+    /// Updates the `host_id` on a `PtermifiedRemote` session type after the
     /// remote server handshake completes (or clears it on disconnect).
-    pub fn set_remote_host_id(&self, host_id: Option<rook_core::HostId>) {
+    pub fn set_remote_host_id(&self, host_id: Option<pterm_core::HostId>) {
         let mut st = self.session_type.lock();
-        if let SessionType::RookifiedRemote { host_id: ref mut h } = *st {
+        if let SessionType::PtermifiedRemote { host_id: ref mut h } = *st {
             *h = host_id;
         }
     }
@@ -1033,7 +1035,7 @@ impl Session {
                 .info
                 .home_dir
                 .as_deref()
-                .or(rook_util::path::TEST_SESSION_HOME_DIR.as_deref());
+                .or(pterm_util::path::TEST_SESSION_HOME_DIR.as_deref());
         }
 
         self.info.home_dir.as_deref()
@@ -1051,9 +1053,9 @@ impl Session {
         self.info.host_info.clone()
     }
 
-    /// Returns whether this session was established by Rook's in-band SSH wrapper (see
-    /// [`IsSSHWrapperSession`]). Note this stays `false` for remote sessions rookified via
-    /// the auto-rookify RC snippet inside an unwrapped `ssh` session.
+    /// Returns whether this session was established by Polaris Terminal's in-band SSH wrapper (see
+    /// [`IsSSHWrapperSession`]). Note this stays `false` for remote sessions ptermified via
+    /// the auto-ptermify RC snippet inside an unwrapped `ssh` session.
     pub fn is_ssh_wrapper_session(&self) -> bool {
         matches!(
             self.info.is_ssh_wrapper_session,
@@ -1062,7 +1064,7 @@ impl Session {
     }
 
     pub fn is_subshell_or_ssh(&self) -> bool {
-        matches!(self.session_type(), SessionType::RookifiedRemote { .. })
+        matches!(self.session_type(), SessionType::PtermifiedRemote { .. })
             || self.is_ssh_wrapper_session()
             || self.subshell_info().is_some()
     }
@@ -1083,9 +1085,9 @@ impl Session {
     /// representation, or `None` when no conversion is appropriate.
     pub fn windows_path_converter(&self) -> Option<fn(&str) -> String> {
         if self.is_wsl() {
-            Some(rook_util::path::convert_windows_path_to_wsl)
+            Some(pterm_util::path::convert_windows_path_to_wsl)
         } else if self.is_msys2() {
-            Some(rook_util::path::convert_windows_path_to_msys2)
+            Some(pterm_util::path::convert_windows_path_to_msys2)
         } else {
             None
         }
@@ -1500,7 +1502,7 @@ impl Session {
 
     #[cfg(windows)]
     async fn read_history_via_powershell(history_file_path: &OsStr) -> Result<Vec<u8>> {
-        let Some(powershell_command) = rook_util::path::windows::any_powershell_path() else {
+        let Some(powershell_command) = pterm_util::path::windows::any_powershell_path() else {
             return Err(anyhow::anyhow!(
                 "Failed to find powershell executable to read history"
             ));
@@ -1591,7 +1593,7 @@ impl Session {
                 self.read_history_for_local_session(is_kaspersky_running)
                     .await
             }
-            BootstrapSessionType::RookifiedRemote => self.read_history_for_remote_session().await,
+            BootstrapSessionType::PtermifiedRemote => self.read_history_for_remote_session().await,
         }
     }
 
@@ -1687,22 +1689,22 @@ impl Session {
     /// Converts the given directory into a [`typed_path::TypedPathBuf`].
     pub fn convert_directory_to_typed_path_buf(&self, pwd: String) -> TypedPathBuf {
         // We need to determine whether this session requires windows file paths
-        // or unix file paths. This needs to be resilient to rookified ssh. Some examples:
+        // or unix file paths. This needs to be resilient to ptermified ssh. Some examples:
         // - bash on mac ---> unix
         // - powershell on linux ---> unix
         // - powershell on windows ---> windows
         // - wsl on windows ---> unix
-        // - rookified zsh --> unix
+        // - ptermified zsh --> unix
 
         // If the host architecture is unix, we can infer unix file paths. This would break
-        // if we supported rookifying a powershell-on-windows SSH session.
+        // if we supported ptermifying a powershell-on-windows SSH session.
         if cfg!(unix) {
             return TypedPathBuf::from_unix(pwd);
         }
 
         // We assume that we're on Windows.
         match self.shell_family() {
-            // Cases: WSL, MSYS2, rookified bash
+            // Cases: WSL, MSYS2, ptermified bash
             ShellFamily::Posix => TypedPathBuf::from_unix(pwd),
             // Cases: powershell sessions
             ShellFamily::PowerShell => TypedPathBuf::from_windows(pwd),
@@ -1829,7 +1831,7 @@ pub mod testing {
 
         pub fn with_ssh_socket_path(mut self, socket_path: PathBuf) -> Self {
             if let BootstrapSessionType::Local = self.session_type {
-                self.session_type = BootstrapSessionType::RookifiedRemote;
+                self.session_type = BootstrapSessionType::PtermifiedRemote;
             }
             self.is_ssh_wrapper_session = IsSSHWrapperSession::Yes {
                 socket_path,
@@ -1910,7 +1912,7 @@ pub mod testing {
 
         pub fn test_remote() -> Self {
             let info = SessionInfo::new_for_test()
-                .with_session_type(BootstrapSessionType::RookifiedRemote)
+                .with_session_type(BootstrapSessionType::PtermifiedRemote)
                 .with_shell_type(ShellType::Bash); // We only support UNIX-based remote sessions.
             let session_type = SessionType::from(info.session_type.clone());
             Self {

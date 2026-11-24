@@ -1,4 +1,4 @@
-use rookui::accessibility::AccessibilityVerbosity;
+use ptermui::accessibility::AccessibilityVerbosity;
 use settings::macros::define_settings_group;
 use settings::{RespectUserSyncSetting, SupportedPlatforms, SyncToCloud};
 

@@ -1,12 +1,12 @@
-use rook_util::path::user_friendly_path;
-use rookui::elements::{
+use pterm_util::path::user_friendly_path;
+use ptermui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, MainAxisSize,
     MouseStateHandle, ParentElement, Radius, Text,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::button::{ButtonTooltipPosition, ButtonVariant};
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::{ButtonTooltipPosition, ButtonVariant};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::settings::ai::DefaultSessionMode;
@@ -91,9 +91,9 @@ pub(crate) fn render_action_sidecar(
     let primary_text_color = theme.main_text_color(theme.surface_2());
     let button_style = UiComponentStyles {
         font_size: Some(12.),
-        font_weight: Some(rookui::fonts::Weight::Bold),
+        font_weight: Some(ptermui::fonts::Weight::Bold),
         font_color: Some(primary_text_color.into()),
-        padding: Some(rookui::ui_components::components::Coords {
+        padding: Some(ptermui::ui_components::components::Coords {
             top: 4.,
             bottom: 4.,
             left: 8.,
@@ -152,7 +152,7 @@ pub(crate) fn render_action_sidecar(
             .with_style(button_style)
             .build()
             .with_cursor(Cursor::PointingHand)
-            .on_click(move |ctx: &mut rookui::elements::EventContext, _, _| {
+            .on_click(move |ctx: &mut ptermui::elements::EventContext, _, _| {
                 ctx.dispatch_typed_action(make_default_action.clone())
             })
             .finish()
@@ -175,7 +175,7 @@ pub(crate) fn render_action_sidecar(
             .with_style(button_style)
             .build()
             .with_cursor(Cursor::PointingHand)
-            .on_click(move |ctx: &mut rookui::elements::EventContext, _, _| {
+            .on_click(move |ctx: &mut ptermui::elements::EventContext, _, _| {
                 ctx.dispatch_typed_action(WorkspaceAction::TabConfigSidecarEditConfig {
                     path: edit_path.clone(),
                 })
@@ -210,7 +210,7 @@ pub(crate) fn render_action_sidecar(
             })
             .build()
             .with_cursor(Cursor::PointingHand)
-            .on_click(move |ctx: &mut rookui::elements::EventContext, _, _| {
+            .on_click(move |ctx: &mut ptermui::elements::EventContext, _, _| {
                 ctx.dispatch_typed_action(WorkspaceAction::TabConfigSidecarRemoveConfig {
                     name: remove_name.clone(),
                     path: remove_path.clone(),

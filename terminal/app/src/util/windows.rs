@@ -2,7 +2,7 @@ use std::sync::OnceLock;
 use std::{env, path};
 
 use anyhow::{Result, anyhow};
-use rookui::{AppContext, SingletonEntity};
+use ptermui::{AppContext, SingletonEntity};
 
 use crate::system::SystemInfo;
 

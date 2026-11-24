@@ -4,14 +4,14 @@ use std::borrow::Cow;
 use std::time::Duration;
 
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex,
     MainAxisAlignment, MainAxisSize, OffsetPositioning, ParentElement, PositionedElementAnchor,
     PositionedElementOffsetBounds, Radius, Rect, SavePosition, Stack, Text,
 };
-use rookui::{AppContext, Element, WindowId};
+use ptermui::{AppContext, Element, WindowId};
 
 /// The state of a progress step.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -174,7 +174,7 @@ fn render_indicator(state: ProgressStepState, appearance: &Appearance) -> Box<dy
         ProgressStepState::Completed => {
             let check_icon = ConstrainedBox::new(
                 Icon::Check
-                    .to_rookui_icon(theme.main_text_color(background))
+                    .to_ptermui_icon(theme.main_text_color(background))
                     .finish(),
             )
             .with_width(ICON_SIZE)

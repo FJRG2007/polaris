@@ -48,7 +48,7 @@ For vertical tabs, the dropdown is anchored to the `+` button via `offset_from_s
 
 ### 6. New SVG assets and Icon variants
 
-Added `layout-alt-01.svg`, `layout-alt-02.svg`, `layout-alt-03.svg`, `layout-alt-04.svg`, `layout-bottom.svg` to `app/assets/bundled/svg/`. Added corresponding `LayoutAlt01` through `LayoutBottom` variants to `rook_core::ui::Icon`. Currently only `LayoutAlt01` is used; the others are available for future icon differentiation.
+Added `layout-alt-01.svg`, `layout-alt-02.svg`, `layout-alt-03.svg`, `layout-alt-04.svg`, `layout-bottom.svg` to `app/assets/bundled/svg/`. Added corresponding `LayoutAlt01` through `LayoutBottom` variants to `pterm_core::ui::Icon`. Currently only `LayoutAlt01` is used; the others are available for future icon differentiation.
 
 ## End-to-End Flow
 
@@ -64,6 +64,6 @@ Added `layout-alt-01.svg`, `layout-alt-02.svg`, `layout-alt-03.svg`, `layout-alt
 - `app/src/workspace/action.rs` — added `is_vertical_tabs` field
 - `app/src/workspace/view.rs` — new `vertical_tabs_new_session_menu_items()`, updated `toggle_new_session_dropdown_menu`, updated menu positioning in `render()`, updated action handler
 - `app/src/workspace/view/vertical_tabs.rs` — replaced split button with single `+` button, simplified state, made position ID `pub(super)`
-- `rook_core/src/ui/icons.rs` — added `LayoutAlt01`, `LayoutAlt02`, `LayoutAlt03`, `LayoutAlt04`, `LayoutBottom` variants
+- `pterm_core/src/ui/icons.rs` — added `LayoutAlt01`, `LayoutAlt02`, `LayoutAlt03`, `LayoutAlt04`, `LayoutBottom` variants
 - `app/assets/bundled/svg/` — added 5 new layout SVG icons
 - `specs/APP-3578/` — PRODUCT.md and TECH.md

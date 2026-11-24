@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use parking_lot::FairMutex;
-use rookui::r#async::executor::Background;
-use rookui::{App, EntityId};
+use ptermui::r#async::executor::Background;
+use ptermui::{App, EntityId};
 
 use super::{AgentViewConversationSelection, classify_gui_list_entry};
 use crate::ai::agent::conversation::AIConversationId;

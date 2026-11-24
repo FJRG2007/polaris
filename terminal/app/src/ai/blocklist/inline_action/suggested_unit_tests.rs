@@ -1,20 +1,20 @@
 use std::sync::Arc;
 
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use rand::distributions::Alphanumeric;
-use rand::{Rng as _, thread_rng};
-use rook_core::settings::ToggleableSetting;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::settings::ToggleableSetting;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     Align, ConstrainedBox, Container, CrossAxisAlignment, Expanded, Flex, FormattedTextElement,
     HighlightedHyperlink, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement,
     SavePosition, Shrinkable, SizeConstraintCondition, SizeConstraintSwitch, Text,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
 };
+use rand::distributions::Alphanumeric;
+use rand::{Rng as _, thread_rng};
 
 use crate::ai::agent::{AIAgentActionId, AIIdentifiers};
 use crate::ai::predict::prompt_suggestions::{
@@ -169,7 +169,7 @@ impl SuggestedUnitTestsView {
     fn render_icon(&self, appearance: &Appearance) -> Box<dyn Element> {
         Container::new(
             ConstrainedBox::new(
-                rookui::elements::Icon::new(
+                ptermui::elements::Icon::new(
                     Icon::Code2.into(),
                     appearance
                         .theme()

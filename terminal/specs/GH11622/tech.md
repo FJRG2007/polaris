@@ -1,6 +1,6 @@
 # Tech Spec: Double-click the hidden-section bar to fully expand
 
-**Issue:** [FJRG2007/rook#11622](https://github.com/FJRG2007/rook/issues/11622)
+**Issue:** [FJRG2007/polaris#11622](https://github.com/FJRG2007/polaris/issues/11622)
 **Product spec:** `specs/GH11622/product.md`
 
 ## Context
@@ -16,12 +16,12 @@ References are pinned to the pre-feature baseline `a44fbf16` (the parent of the 
 **The precedent for "block click → app action."** The bar lives in `crates/editor`, which cannot name the app's `CodeEditorViewAction`. `RenderableTaskList` (`crates/editor/src/render/element/task_list.rs:30-98`) solves the same problem: it is generic `new<V: EditorView>(.., mouse_state: MouseStateHandle, parent_view: WeakViewHandle<V>)`, wraps its content in a `Hoverable` with `.on_click(|ctx, app, _| { if let Some(a) = V::Action::task_list_clicked(offset, &parent_view, app) { ctx.dispatch_typed_action(a) } })`, `.with_cursor(Cursor::PointingHand)`, and a hover-background closure. The `RichTextAction<V>` trait (`crates/editor/src/render/element/mod.rs:307`, with `task_list_clicked` at `:366`) is the decoupling seam — the editor crate produces an opaque `V::Action`; the app supplies the concrete action.
 
 Supporting APIs:
-- `Hoverable` (`crates/rookui_core/src/elements/hoverable.rs`): `on_click` (`:249`), `on_double_click` (`:279`), `with_cursor` (`:346`), `on_hover` (`:240`). A `Hoverable` that registers a handler **consumes** the press, which is what suppresses the text-selection fall-through.
+- `Hoverable` (`crates/ptermui_core/src/elements/hoverable.rs`): `on_click` (`:249`), `on_double_click` (`:279`), `with_cursor` (`:346`), `on_hover` (`:240`). A `Hoverable` that registers a handler **consumes** the press, which is what suppresses the text-selection fall-through.
 - `RenderState::line_range(&dyn RenderableBlock) -> Option<Range<LineCount>>` (`crates/editor/src/render/model/mod.rs:3258`) gives a block's full line span — the bar's full hidden range.
 - `RenderableHiddenSection::new` is constructed at `crates/editor/src/render/element/mod.rs:908`, inside `renderable_blocks`, where `self.parent_view: WeakViewHandle<V>` is already in scope (it is handed to `RenderableTaskList` at `:857-863`).
 - `BlockItem::Hidden`'s payload `HiddenBlockConfig` (`crates/editor/src/render/model/mod.rs:1598`) carries `line_count`/`content_length`/`block_location` but — unlike `BlockItem::TaskList` — **no** `MouseStateHandle`, which a `Hoverable` needs to persist hover state across frames.
 
-> **Discarded prior work.** The earlier gutter-button + debounce implementation (commit `a3187b1f`: `rookui_core::DeferredCall` and its tests, the platform `double_click_interval` shim, gutter `click_count`/`pending_click_count` plumbing, `full_line_range` on `GutterRange`/`GutterElementType`, and the `click_count` field + defer branch on the action) is dropped in full. The separate-targets design needs none of it: gutter single-click stays instant, and double-click detection comes from `Hoverable` on the bar.
+> **Discarded prior work.** The earlier gutter-button + debounce implementation (commit `a3187b1f`: `ptermui_core::DeferredCall` and its tests, the platform `double_click_interval` shim, gutter `click_count`/`pending_click_count` plumbing, `full_line_range` on `GutterRange`/`GutterElementType`, and the `click_count` field + defer branch on the action) is dropped in full. The separate-targets design needs none of it: gutter single-click stays instant, and double-click detection comes from `Hoverable` on the bar.
 
 ## Proposed changes
 

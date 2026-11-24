@@ -215,7 +215,7 @@ ensure_last_sequence_file() {
     [ -f "$path" ] || : >"$path"
 }
 
-# Set by the Rook driver when it owns the parent-bridge listener and surfaces
+# Set by the Polaris Terminal driver when it owns the parent-bridge listener and surfaces
 # hook output itself. In that mode shell hooks reuse driver state.
 listener_lifecycle_managed_externally() {
     [ "${OZ_PARENT_LISTENER_MANAGED_EXTERNALLY:-0}" = "1" ]

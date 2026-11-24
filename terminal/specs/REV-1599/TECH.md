@@ -1,6 +1,6 @@
 # REV-1599 — Gemini Enterprise (Vertex) BYOLLM client implementation
 
-This document records the **shipped desktop-client implementation** of Gemini Enterprise Agent Platform (GEAP) BYOLLM. It is a posterity reconciliation of client PRs [#12522](https://github.com/FJRG2007/rook/pull/12522), [#12537](https://github.com/FJRG2007/rook/pull/12537), [#12581](https://github.com/FJRG2007/rook/pull/12581), [#12684](https://github.com/FJRG2007/rook/pull/12684), and [#14141](https://github.com/FJRG2007/rook/pull/14141). The server-side API, routing, model registry, and billing contract are specified in `rook-server/specs/REV-1599/TECH.md`.
+This document records the **shipped desktop-client implementation** of Gemini Enterprise Agent Platform (GEAP) BYOLLM. It is a posterity reconciliation of client PRs [#12522](https://github.com/FJRG2007/polaris/pull/12522), [#12537](https://github.com/FJRG2007/polaris/pull/12537), [#12581](https://github.com/FJRG2007/polaris/pull/12581), [#12684](https://github.com/FJRG2007/polaris/pull/12684), and [#14141](https://github.com/FJRG2007/polaris/pull/14141). The server-side API, routing, model registry, and billing contract are specified in `polaris-terminal-server/specs/REV-1599/TECH.md`.
 
 The client implementation supports **local interactive desktop Agent Mode**. Oz/cloud-agent credential minting, per-model location overrides, and an admin-facing setup panel are not client features in this release.
 
@@ -8,13 +8,13 @@ The client implementation supports **local interactive desktop Agent Mode**. Oz/
 
 For a signed-in desktop user, the client obtains a short-lived Google Cloud access token without reading local Google credentials:
 
-1. The client calls `IssueTaskIdentityToken` through the existing authenticated Rook GraphQL session.
-2. rook-server returns a Rook-signed OIDC JWT whose audience is the configured WIF provider resource name.
+1. The client calls `IssueTaskIdentityToken` through the existing authenticated Polaris Terminal GraphQL session.
+2. polaris-terminal-server returns a Polaris Terminal-signed OIDC JWT whose audience is the configured WIF provider resource name.
 3. The client exchanges that JWT at Google Security Token Service (STS) using RFC 8693.
 4. If `gcpSaEmail` is configured, the client calls IAM Credentials `generateAccessToken` to impersonate that service account. Otherwise it uses the federated STS token directly.
 5. The resulting credential is held in memory and attached to eligible Agent Mode requests.
 
-There is no `gcloud auth application-default login` step, local ADC file, `yup-oauth2`, Google refresh token, service-account key, OAuth consent flow, or persisted GEAP credential. The existing Rook session is the root credential for every mint.
+There is no `gcloud auth application-default login` step, local ADC file, `yup-oauth2`, Google refresh token, service-account key, OAuth consent flow, or persisted GEAP credential. The existing Polaris Terminal session is the root credential for every mint.
 
 The engine is compiled out of the WASM client (`app/src/ai/mod.rs`) and runs only on desktop platforms. Cloud-agent support is a follow-up.
 
@@ -35,7 +35,7 @@ The client does not add a second per-request rollout flag. Server-side GEAP avai
 
 - `enabled` — whether the workspace has enabled this host.
 - `enablementSetting` — `ENFORCE` or `RESPECT_USER_SETTING`.
-- `gcpAudience` — the full workload identity provider resource name. It is used as both the Rook JWT audience and the STS `audience` parameter.
+- `gcpAudience` — the full workload identity provider resource name. It is used as both the Polaris Terminal JWT audience and the STS `audience` parameter.
 - `gcpSaEmail` — the optional service account email to impersonate after STS. Empty or absent means direct federated-token use.
 
 The client does not consume the server-only `gcpProjectId` or `gcpLocation` fields. Those determine the customer Vertex destination on the server. The app-side `LlmHostSettings` stores the new optional fields with serde defaults so older local workspace caches remain readable.
@@ -47,7 +47,7 @@ The client does not consume the server-only `gcpProjectId` or `gcpLocation` fiel
 `AISettings::gemini_enterprise_credentials_enabled` is a desktop, cloud-synced setting with a default of `false`. The effective gate is:
 
 1. `FeatureFlag::GeminiEnterprise` is enabled.
-2. The user is signed in (anonymous and logged-out users are always disabled because there is no Rook session from which to mint).
+2. The user is signed in (anonymous and logged-out users are always disabled because there is no Polaris Terminal session from which to mint).
 3. Workspace AI settings and the GEAP host are enabled.
 4. `ENFORCE` enables credentials for every member and makes the member toggle non-editable.
 5. `RESPECT_USER_SETTING` consults the member's toggle; the default is opt-in.
@@ -85,12 +85,12 @@ Failed { error: LoadGeapCredentialsError }
 `app/src/ai/geap_credentials.rs` runs the mint off the request path:
 
 1. Trim and validate `gcpAudience`; select direct WIF or service-account federation from `gcpSaEmail`.
-2. Request a fresh Rook OIDC JWT from `ManagedSecretManager::issue_task_identity_token` for every mint. The JWT is single-use and is not cached across mints.
-3. `POST https://sts.googleapis.com/v1/token` with the token-exchange grant, configured audience, cloud-platform scope, and the Rook JWT as an ID token.
+2. Request a fresh Polaris Terminal OIDC JWT from `ManagedSecretManager::issue_task_identity_token` for every mint. The JWT is single-use and is not cached across mints.
+3. `POST https://sts.googleapis.com/v1/token` with the token-exchange grant, configured audience, cloud-platform scope, and the Polaris Terminal JWT as an ID token.
 4. For service-account federation, `POST https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/{sa_email}:generateAccessToken` with the federated token, cloud-platform scope, and a `3600s` lifetime.
 5. Store the resulting token and expiry in `Loaded`, then arm the next one-shot refresh timer.
 
-The direct-WIF path uses STS `expires_in` when present and otherwise falls back to the Rook JWT expiry. The service-account path parses the IAM response's RFC 3339 `expireTime`.
+The direct-WIF path uses STS `expires_in` when present and otherwise falls back to the Polaris Terminal JWT expiry. The service-account path parses the IAM response's RFC 3339 `expireTime`.
 
 ### Triggers and guards
 
@@ -139,7 +139,7 @@ The credential is request-scoped and lives only in memory on the client. The ser
 
 ## Settings and model-routing UX
 
-### Settings > Rook Agent
+### Settings > Polaris Terminal Agent
 
 The Gemini Enterprise widget renders only when the client feature flag and workspace host availability are both true. It contains:
 
@@ -158,7 +158,7 @@ The Gemini Enterprise widget renders only when the client feature flag and works
 
 The inline model selector and execution-profile model menus use the server-provided `LLMInfo.host_configs` data. A Gemini Enterprise Agent Platform badge/icon appears only when both the effective GEAP credential gate and that model's GEAP host config are enabled. If AWS Bedrock and GEAP are both eligible, Bedrock retains the existing priority.
 
-The model details cost row reports **Inference via Gemini Enterprise Agent Platform** for a concrete model and **Inference may use Gemini Enterprise Agent Platform** for Auto. Its **Manage** action opens the Gemini Enterprise section in `Settings > Rook Agent`. The client does not hard-code a GEAP model registry; model availability and supported native/partner models come from the server's model choices.
+The model details cost row reports **Inference via Gemini Enterprise Agent Platform** for a concrete model and **Inference may use Gemini Enterprise Agent Platform** for Auto. Its **Manage** action opens the Gemini Enterprise section in `Settings > Polaris Terminal Agent`. The client does not hard-code a GEAP model registry; model availability and supported native/partner models come from the server's model choices.
 
 ## Credential-error recovery
 
@@ -174,7 +174,7 @@ The inline action is recovery UX for a server-reported credential failure; it do
 
 ## Security and compatibility invariants
 
-- The only long-lived credential involved is the user's existing Rook session; GEAP access tokens and intermediate tokens are memory-only.
+- The only long-lived credential involved is the user's existing Polaris Terminal session; GEAP access tokens and intermediate tokens are memory-only.
 - Token values are redacted from `Debug`, logs, user-facing error copy, and request-independent state. Provider error detail is retained only for internal classification.
 - Exact binding checks prevent a token minted for a previous account, audience, or service account from being attached after sign-out, account switch, or workspace configuration change.
 - An additive `GEMINI_ENTERPRISE` enum value is handled explicitly by the client's GraphQL and app conversions. Unknown future enum values still use the existing fallback behavior.
@@ -189,7 +189,7 @@ This feature was validated with unit and app-harness coverage in the merged clie
 - Credential-engine tests cover WIF response parsing, direct-WIF and service-account paths, STS/JWT expiry fallback, RFC 3339 expiry parsing, the five-minute lead and 60-second timer floor, in-flight deduplication, binding mismatch, gate changes during mint, previous-token preservation, parked-chain request safety net, and structured error classification.
 - Request tests cover matching attachment, omission for each non-loaded state, previous-token attachment during refresh, binding mismatches, and expired-token attachment.
 - UI/routing tests cover the `Unconfigured` status and admin action, retry-vs-admin error classification, scheduled-refresh copy, GEAP badge eligibility, Bedrock priority, and model details text.
-- Local end-to-end validation used a local rook-server plus a real GCP test project to verify WIF minting, customer-project inference, and the configured service-account path.
+- Local end-to-end validation used a local polaris-terminal-server plus a real GCP test project to verify WIF minting, customer-project inference, and the configured service-account path.
 
 This reconciliation is **testing-exempt: pure documentation/copy**. It changes no runtime code or behavior, so no new regression test or computer-use/UI verification is appropriate. Repository markdown/spec checks remain the applicable validation gate.
 

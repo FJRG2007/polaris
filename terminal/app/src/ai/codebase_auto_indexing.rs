@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 use std::hash::Hash;
 
-use rook_core::features::FeatureFlag;
-use rookui::{AppContext, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::{AppContext, SingletonEntity};
 
 use crate::settings::CodeSettings;
 use crate::workspaces::user_workspaces::UserWorkspaces;

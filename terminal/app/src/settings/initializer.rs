@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use rook_core::features::FeatureFlag;
-use rook_core::settings::Setting;
-use rook_errors::report_if_error;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_core::settings::Setting;
+use pterm_errors::report_if_error;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 use crate::auth::auth_state::AuthState;
 use crate::settings::input::InputBoxType;
@@ -69,7 +69,9 @@ impl SettingsInitializer {
                 if !settings.input_box_type.is_value_explicitly_set()
                     && *settings.input_box_type.value() == InputBoxType::Classic
                 {
-                    log::debug!("Setting default input type to Rook prompt for new user");
+                    log::debug!(
+                        "Setting default input type to Polaris Terminal prompt for new user"
+                    );
                     report_if_error!(
                         settings
                             .input_box_type
@@ -138,7 +140,7 @@ impl SettingsInitializer {
         //
         // TODO(jefflloyd): Remove this approximately 6 weeks from 3/19/26.
         {
-            use rook_core::user_preferences::GetUserPreferences as _;
+            use pterm_core::user_preferences::GetUserPreferences as _;
 
             AISettings::handle(ctx).update(ctx, |ai_settings, ctx| {
                 // If the new setting already has a value in preferences, the

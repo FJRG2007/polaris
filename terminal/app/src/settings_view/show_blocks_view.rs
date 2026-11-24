@@ -3,20 +3,20 @@ use std::sync::Arc;
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset, Local};
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::clipboard::ClipboardContent;
-use rookui::color::ColorU;
-use rookui::elements::{
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::color::ColorU;
+use ptermui::elements::{
     Align, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Dismiss, Expanded, Fill, Flex, Hoverable, Icon, MouseStateHandle, OffsetPositioning,
     ParentAnchor, ParentElement, ParentOffsetBounds, PositionedElementAnchor,
     PositionedElementOffsetBounds, Radius, SavePosition, ScrollStateHandle, Scrollable,
     ScrollableElement, ScrollbarWidth, Shrinkable, Stack, UniformList, UniformListState,
 };
-use rookui::fonts::Weight;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -37,7 +37,7 @@ use crate::view_components::ToastFlavor;
 const SCROLLBAR_WIDTH: ScrollbarWidth = ScrollbarWidth::Auto;
 
 const UNSHARE_BLOCK_CONFIRMATION_DIALOG_TEXT: &str = "Are you sure you want to unshare this block?\n\
-\nIt will no longer be accessible by link and will be permanently deleted from Rook servers.";
+\nIt will no longer be accessible by link and will be permanently deleted from Polaris Terminal servers.";
 
 #[derive(Clone, Debug)]
 struct UserOwnedBlock {

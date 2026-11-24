@@ -4,20 +4,20 @@ use markdown_parser::{
     FormattedText, FormattedTextFragment, FormattedTextLine, FormattedTextStyles, Hyperlink,
 };
 use pathfinder_color::ColorU;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::phenomenon::PhenomenonStyle;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::phenomenon::PhenomenonStyle;
+use ptermui::elements::{
     Align, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty, Flex,
     FormattedTextElement, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius,
     Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::geometry::vector::Vector2F;
-use rookui::keymap::{FixedBinding, Keystroke};
-use rookui::platform::Cursor;
-use rookui::platform::file_picker::{FilePickerConfiguration, FilePickerError};
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::geometry::vector::Vector2F;
+use ptermui::keymap::{FixedBinding, Keystroke};
+use ptermui::platform::Cursor;
+use ptermui::platform::file_picker::{FilePickerConfiguration, FilePickerError};
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, EventContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -117,8 +117,8 @@ impl HoaOnboardingStep {
     }
 }
 
-pub fn init(app: &mut rookui::AppContext) {
-    use rookui::keymap::macros::*;
+pub fn init(app: &mut ptermui::AppContext) {
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "enter",
@@ -477,7 +477,7 @@ impl HoaOnboardingFlow {
 
         let formatted = FormattedText::new([FormattedTextLine::Line(vec![
             FormattedTextFragment::plain_text(
-                "Rook pipes through notifications from any CLI coding agent into a unified notification center that works across all coding agents and harnesses. ",
+                "Polaris Terminal pipes through notifications from any CLI coding agent into a unified notification center that works across all coding agents and harnesses. ",
             ),
             learn_more_fragment,
         ])]);
@@ -567,7 +567,7 @@ impl View for HoaOnboardingFlow {
         "HoaOnboardingFlow"
     }
 
-    fn on_focus(&mut self, _focus_ctx: &rookui::FocusContext, ctx: &mut ViewContext<Self>) {
+    fn on_focus(&mut self, _focus_ctx: &ptermui::FocusContext, ctx: &mut ViewContext<Self>) {
         ctx.focus_self();
     }
 

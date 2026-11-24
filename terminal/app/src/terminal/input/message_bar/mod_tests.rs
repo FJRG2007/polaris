@@ -1,6 +1,6 @@
-use rook_core::ui::Icon;
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::MouseStateHandle;
+use pterm_core::ui::Icon;
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::MouseStateHandle;
 
 use super::{ChipHorizontalAlignment, MessageItem};
 

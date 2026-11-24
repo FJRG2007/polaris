@@ -9,7 +9,7 @@
 use chrono::{DateTime, Local};
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rookui::{AppContext, Entity, EntityId, ModelHandle, SingletonEntity};
+use ptermui::{AppContext, Entity, EntityId, ModelHandle, SingletonEntity};
 
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
 use crate::ai::blocklist::BlocklistAIHistoryModel;

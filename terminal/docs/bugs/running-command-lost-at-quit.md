@@ -1,7 +1,7 @@
 # The command still running at quit is missing from the restored session
 
 **Symptom.** Restore session is on and the tabs come back, but a command that
-was still running when Rook quit - typically an agent such as `claude` left
+was still running when Polaris Terminal quit - typically an agent such as `claude` left
 open when the machine was shut down - is not among them, while everything
 before it returns. The `blocks` table showed why: every `claude` row there is
 one that was exited by hand, and none exists for a session that ended with it

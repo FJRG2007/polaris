@@ -1,12 +1,12 @@
 # Tab Context Menu Copy Metadata — Product Spec
 ## Summary
-Add copy actions to tab and vertical-tabs context menus for metadata Rook already knows about the visible tab or active pane.
+Add copy actions to tab and vertical-tabs context menus for metadata Polaris Terminal already knows about the visible tab or active pane.
 ## Problem
 Vertical tabs surface useful metadata such as branch, working directory, and pull request link, but users must manually select or rederive that information when they want to share it elsewhere. The attached context menu is the natural place to expose quick copy actions because it is already where users manage tabs and active panes.
 ## Goals
 - Show copy actions for branch, tab or pane title, working directory, and pull request link when the relevant metadata is visible and exists.
-- Avoid disabled or empty menu items; if Rook does not have a value, omit the corresponding copy action.
-- Use the same metadata sources that vertical tabs already use, so menu availability matches what Rook knows about the tab or pane.
+- Avoid disabled or empty menu items; if Polaris Terminal does not have a value, omit the corresponding copy action.
+- Use the same metadata sources that vertical tabs already use, so menu availability matches what Polaris Terminal knows about the tab or pane.
 - Support regular tab context menus, vertical-tabs tab context menus, and vertical-tabs pane context menus.
 ## Non-goals
 - Fetch branch or pull request data synchronously when metadata is not already available.
@@ -14,7 +14,7 @@ Vertical tabs surface useful metadata such as branch, working directory, and pul
 - Change how tab titles, branch labels, working directories, or pull request badges are rendered in vertical tabs.
 - Add toast notifications for these copy actions.
 ## User Experience
-When a user opens the context menu, Rook includes a copy metadata section if at least one copyable metadata value is available.
+When a user opens the context menu, Polaris Terminal includes a copy metadata section if at least one copyable metadata value is available.
 Available actions in vertical tabs:
 - Copy branch
 - Copy tab title

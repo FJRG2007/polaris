@@ -8,16 +8,16 @@
 //!   error *and* the user has dismissed the workspace banner.
 //! * Otherwise, a plain bordered "Open settings file" button.
 use pathfinder_color::ColorU;
-use rook_core::ui::color::coloru_with_opacity;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::ui::color::coloru_with_opacity;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     Border, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Element, Empty, Expanded, Flex, Highlight, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, ScrollbarWidth, Text,
     Wrap,
 };
-use rookui::fonts::{FamilyId, Properties, Weight};
-use rookui::platform::Cursor;
+use ptermui::fonts::{FamilyId, Properties, Weight};
+use ptermui::platform::Cursor;
 
 use crate::WorkspaceAction;
 use crate::appearance::Appearance;
@@ -35,10 +35,10 @@ const OPEN_BUTTON_HEIGHT: f32 = 32.;
 const ALERT_ACTION_BUTTON_HEIGHT: f32 = 24.;
 /// Size of the leading icons (search-sm, code-02, alert-circle, oz).
 const FOOTER_ICON_SIZE: f32 = 16.;
-/// Size of the Rook Agent brand mark inside the "Fix with Rook Agent" button. Matches the
+/// Size of the Polaris Terminal Agent brand mark inside the "Fix with Polaris Terminal Agent" button. Matches the
 /// Figma spec and the workspace banner's secondary-button icon sizing.
 const ALERT_OZ_ICON_SIZE: f32 = 14.;
-/// Horizontal padding inside the "Open file" / "Fix with Rook Agent" action buttons.
+/// Horizontal padding inside the "Open file" / "Fix with Polaris Terminal Agent" action buttons.
 /// Matches the workspace banner's secondary button pad.
 const ALERT_BUTTON_HORIZONTAL_PADDING: f32 = 8.;
 /// Spacing between the two action buttons when they fit on one row.
@@ -81,7 +81,7 @@ impl SettingsFooterKind {
 
 /// Per-render-persistent handles for the footer. The `MouseStateHandle`s
 /// back the three clickable surfaces and must be created once and reused
-/// across renders per `ROOK.md`; the scroll state handle serves the same
+/// across renders per `POLARIS_TERMINAL.md`; the scroll state handle serves the same
 /// purpose for the error alert's scrollable text region.
 #[derive(Clone, Default)]
 pub struct SettingsFooterMouseStates {
@@ -108,7 +108,7 @@ pub fn render_open_settings_file_button(
     let ui_font_family = appearance.ui_font_family();
 
     Hoverable::new(mouse_state, move |state| {
-        let icon = ConstrainedBox::new(Icon::Code2.to_rookui_icon(text_fill).finish())
+        let icon = ConstrainedBox::new(Icon::Code2.to_ptermui_icon(text_fill).finish())
             .with_width(FOOTER_ICON_SIZE)
             .with_height(FOOTER_ICON_SIZE)
             .finish();
@@ -187,7 +187,7 @@ pub fn render_settings_error_alert(
 
     let alert_icon = ConstrainedBox::new(
         Icon::AlertCircle
-            .to_rookui_icon(Fill::Solid(text_color))
+            .to_ptermui_icon(Fill::Solid(text_color))
             .finish(),
     )
     .with_width(FOOTER_ICON_SIZE)
@@ -206,7 +206,7 @@ pub fn render_settings_error_alert(
     // action buttons below stay fixed and always actionable. Scrollbar thumb
     // colors are derived from `text_color` (which already contrasts against
     // the yellow alert background) so they remain visible in both themes.
-    // `ClippedScrollable` wants `rookui::elements::Fill` (not the theme
+    // `ClippedScrollable` wants `ptermui::elements::Fill` (not the theme
     // `Fill` used elsewhere in this file), so the three fills below are
     // fully qualified to avoid an import alias.
     let scrollable_text = ConstrainedBox::new(
@@ -214,9 +214,9 @@ pub fn render_settings_error_alert(
             mouse_states.alert_text_scroll_state.clone(),
             text_row,
             ScrollbarWidth::Auto,
-            rookui::elements::Fill::Solid(coloru_with_opacity(text_color, 30)),
-            rookui::elements::Fill::Solid(coloru_with_opacity(text_color, 60)),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::Solid(coloru_with_opacity(text_color, 30)),
+            ptermui::elements::Fill::Solid(coloru_with_opacity(text_color, 60)),
+            ptermui::elements::Fill::None,
         )
         .finish(),
     )
@@ -250,7 +250,7 @@ pub fn render_settings_error_alert(
             ui_font_family,
             text_color,
             mouse_states.alert_fix_with_oz_button.clone(),
-            "Fix with Rook Agent",
+            "Fix with Polaris Terminal Agent",
             Some(Icon::Agent),
             /*bordered=*/ false,
             WorkspaceAction::FixSettingsWithOz { error_description },
@@ -333,7 +333,7 @@ fn render_alert_action_button(
         if let Some(icon) = icon {
             row.add_child(
                 Container::new(
-                    ConstrainedBox::new(icon.to_rookui_icon(Fill::Solid(text_color)).finish())
+                    ConstrainedBox::new(icon.to_ptermui_icon(Fill::Solid(text_color)).finish())
                         .with_width(ALERT_OZ_ICON_SIZE)
                         .with_height(ALERT_OZ_ICON_SIZE)
                         .finish(),

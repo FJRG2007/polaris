@@ -3,18 +3,18 @@ use std::collections::HashMap;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::Icon;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::Icon;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DropShadow,
     Empty, Flex, Hoverable, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::text_layout::ClipConfig;
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::text_layout::ClipConfig;
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::blocklist::agent_view::orchestration_pill_bar::{
@@ -268,7 +268,7 @@ impl ConversationUsageView {
 
         // Collect from category-based fields
         for model in &self.usage_info.models {
-            for (category, &tokens) in &model.rook_token_usage_by_category {
+            for (category, &tokens) in &model.pterm_token_usage_by_category {
                 if tokens > 0 {
                     entries_by_category
                         .entry(category.clone())
@@ -297,7 +297,7 @@ impl ConversationUsageView {
         // Fallback to legacy fields for backwards compatibility
         if entries_by_category.is_empty() {
             for model in &self.usage_info.models {
-                if model.rook_tokens > 0 {
+                if model.pterm_tokens > 0 {
                     entries_by_category
                         .entry(PRIMARY_AGENT_CATEGORY.to_string())
                         .or_default()
@@ -486,7 +486,7 @@ impl ConversationUsageView {
 
                 if *is_byok {
                     model_elements.push(
-                        ConstrainedBox::new(Icon::Key.to_rookui_icon(text_color.into()).finish())
+                        ConstrainedBox::new(Icon::Key.to_ptermui_icon(text_color.into()).finish())
                             .with_width(font_size)
                             .with_height(font_size)
                             .finish(),
@@ -1085,7 +1085,7 @@ fn render_toggle_link(
             .with_color(link_color)
             .with_selectable(false)
             .finish();
-        let icon_element = ConstrainedBox::new(icon.to_rookui_icon(link_color.into()).finish())
+        let icon_element = ConstrainedBox::new(icon.to_ptermui_icon(link_color.into()).finish())
             .with_width(icon_size)
             .with_height(icon_size)
             .finish();
@@ -1154,7 +1154,7 @@ fn render_context_window_other_info_icon(
         let icon_color = appearance
             .theme()
             .sub_text_color(appearance.theme().surface_2());
-        let icon = ConstrainedBox::new(Icon::Info.to_rookui_icon(icon_color).finish())
+        let icon = ConstrainedBox::new(Icon::Info.to_ptermui_icon(icon_color).finish())
             .with_width(icon_size)
             .with_height(icon_size)
             .finish();

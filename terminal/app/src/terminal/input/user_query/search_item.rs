@@ -2,14 +2,14 @@
 
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_core::ui::Icon;
-use rook_core::ui::color::coloru_with_opacity;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{ConstrainedBox, Container, Highlight, Shrinkable, Text};
-use rookui::fonts::{Properties, Weight};
-use rookui::scene::{CornerRadius, Radius};
-use rookui::text_layout::ClipConfig;
-use rookui::{AppContext, Element, SingletonEntity};
+use pterm_core::ui::Icon;
+use pterm_core::ui::color::coloru_with_opacity;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{ConstrainedBox, Container, Highlight, Shrinkable, Text};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::scene::{CornerRadius, Radius};
+use ptermui::text_layout::ClipConfig;
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::ai::agent::AIAgentExchangeId;
 use crate::appearance::Appearance;
@@ -65,7 +65,7 @@ impl SearchItem for UserQuerySearchItem {
         // Once this search item is used by multiple sources,
         // we'll want to set this icon based on which source is generating this item.
         let icon = Container::new(
-            ConstrainedBox::new(Icon::ArrowSplit.to_rookui_icon(color).finish())
+            ConstrainedBox::new(Icon::ArrowSplit.to_ptermui_icon(color).finish())
                 .with_width(appearance.monospace_font_size())
                 .with_height(appearance.monospace_font_size())
                 .finish(),

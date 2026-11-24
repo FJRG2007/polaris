@@ -5,16 +5,16 @@
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::vec2f;
-use rook_cli::agent::Harness;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rook_errors::report_if_error;
-use rookui::elements::{
+use pterm_cli::agent::Harness;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_errors::report_if_error;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, OffsetPositioning, ParentAnchor, ParentElement as _,
     ParentOffsetBounds, Stack,
 };
-use rookui::{
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -223,7 +223,7 @@ impl HarnessSelector {
             button.set_disabled(is_locked_to_oz, ctx);
             button.set_tooltip(
                 Some(if is_locked_to_oz {
-                    "This conversation is with the Rook Agent, so the cloud handoff will also use Rook"
+                    "This conversation is with the Polaris Terminal Agent, so the cloud handoff will also use Polaris Terminal"
                 } else {
                     BUTTON_TOOLTIP
                 }),

@@ -11,7 +11,7 @@ use crate::ManagedSecretValue;
 fn test_import_public_keyset() {
     super::init();
 
-    // A base64-encoded public keyset as returned by rook-server.
+    // A base64-encoded public keyset as returned by polaris-terminal-server.
     let public_key = "COvInMIBEnAKZAo0dHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuSHBrZVB1YmxpY0tleRIqEgYIARABGAIaIHRaibhtYbpEfh2CSpdDPhh/6lCBnfoO3nqBmZ3VQGJyGAMQARjryJzCASAB";
     let upload_key =
         UploadKey::import_public_keyset(public_key).expect("unable to import public keyset");
@@ -142,7 +142,7 @@ fn read_keyset_json(json: &str) -> tink_core::keyset::Handle {
 
 /// Round-trips a `DockerRegistry` secret through the exact AEAD context the Go server
 /// expects (`1:<actor_uid>:<secret_name>:docker_registry`), pinning both the JSON
-/// payload and the context string this repo and rook-server must agree on byte-for-byte.
+/// payload and the context string this repo and polaris-terminal-server must agree on byte-for-byte.
 /// A regression in either `ManagedSecretType::envelope_name` or the JSON field names
 /// would pass every other test in this crate and only surface as the server rejecting
 /// the ciphertext in production.

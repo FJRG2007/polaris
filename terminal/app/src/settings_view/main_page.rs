@@ -4,26 +4,26 @@ use ::settings::{Setting, ToggleableSetting};
 use lazy_static::lazy_static;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::channel::{Channel, ChannelState};
-use rook_core::context_flag::ContextFlag;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::icons::Icon;
-use rook_errors::{report_error, report_if_error};
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::icons::Icon;
+use pterm_errors::{report_error, report_if_error};
 #[cfg(not(target_family = "wasm"))]
-use rook_server_client::iap::{IapCredentialsState, IapManager, IapManagerEvent};
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::{
+use pterm_server_client::iap::{IapCredentialsState, IapManager, IapManagerEvent};
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::{
     Align, Border, CacheOption, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Element, Empty, Flex, Image, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement,
     Radius, Shrinkable, Text,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::ContextPredicate;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::ContextPredicate;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{
     Action, AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle, id,
 };
@@ -52,7 +52,7 @@ use crate::workspaces::workspace::CustomerType;
 use crate::{TelemetryEvent, send_telemetry_from_ctx};
 
 const PHOTO_SIZE: f32 = 40.;
-const REFERRAL_CTA: &str = "Earn rewards by sharing Rook with friends & colleagues";
+const REFERRAL_CTA: &str = "Earn rewards by sharing Polaris Terminal with friends & colleagues";
 const REGULAR_TEXT_FONT_SIZE: f32 = 12.;
 const VERTICAL_MARGIN: f32 = 24.;
 const LOG_OUT_TEXT: &str = "Log out";
@@ -158,7 +158,7 @@ impl From<&MainPageAction> for LoginGatedFeature {
 pub enum MainSettingsPageEvent {
     CheckForUpdate,
     #[allow(dead_code)]
-    OpenRookDrive,
+    OpenPtermDrive,
     SignupAnonymousUser,
 }
 
@@ -389,7 +389,7 @@ impl AccountWidget {
                         TextAndIcon::new(
                             TextAndIconAlignment::IconFirst,
                             "Compare plans",
-                            Icon::CoinsStacked.to_rookui_icon(appearance.theme().accent()),
+                            Icon::CoinsStacked.to_ptermui_icon(appearance.theme().accent()),
                             MainAxisSize::Min,
                             MainAxisAlignment::Center,
                             vec2f(14., 14.),
@@ -647,7 +647,7 @@ impl SettingsWidget for AccountWidget {
             self.render_anonymous_account_info(view.auth_state.as_ref(), appearance)
         } else {
             let profile_image_source = view.auth_state.user_photo_url().map(|url| {
-                asset_cache::url_source_with_persistence(url, &rook_core::paths::cache_dir())
+                asset_cache::url_source_with_persistence(url, &pterm_core::paths::cache_dir())
             });
             self.render_account_info(
                 view,
@@ -854,101 +854,102 @@ impl VersionInfoWidget {
             action: MainPageAction,
         }
 
-        let (status_content, call_to_action_content) =
-            if ContextFlag::PromptForVersionUpdates.is_enabled() {
-                let ansi_red: ColorU = appearance.theme().terminal_colors().bright.red.into();
-                match autoupdate::get_update_state(app) {
-                    AutoupdateStage::NoUpdateAvailable => (
+        let (status_content, call_to_action_content) = if ContextFlag::PromptForVersionUpdates
+            .is_enabled()
+        {
+            let ansi_red: ColorU = appearance.theme().terminal_colors().bright.red.into();
+            match autoupdate::get_update_state(app) {
+                AutoupdateStage::NoUpdateAvailable => (
+                    Some(StatusContent {
+                        text: "Up to date",
+                        color: faded_text_color,
+                    }),
+                    Some(CallToActionContent {
+                        text: "Check for updates",
+                        action: MainPageAction::CheckForUpdate,
+                    }),
+                ),
+                AutoupdateStage::CheckingForUpdate => (
+                    Some(StatusContent {
+                        text: "checking for update...",
+                        color: faded_text_color,
+                    }),
+                    None,
+                ),
+                AutoupdateStage::DownloadingUpdate => (
+                    Some(StatusContent {
+                        text: "downloading update...",
+                        color: faded_text_color,
+                    }),
+                    None,
+                ),
+                AutoupdateStage::UpdateReady { .. } => (
+                    Some(StatusContent {
+                        text: "Update available",
+                        color: ansi_red,
+                    }),
+                    Some(CallToActionContent {
+                        text: "Relaunch Polaris Terminal",
+                        action: MainPageAction::Relaunch,
+                    }),
+                ),
+                AutoupdateStage::Updating { .. } => (
+                    Some(StatusContent {
+                        text: "Updating...",
+                        color: faded_text_color,
+                    }),
+                    None,
+                ),
+                AutoupdateStage::UpdatedPendingRestart { .. } => (
+                    Some(StatusContent {
+                        text: "Installed update",
+                        color: faded_text_color,
+                    }),
+                    Some(CallToActionContent {
+                        text: "Relaunch Polaris Terminal",
+                        action: MainPageAction::Relaunch,
+                    }),
+                ),
+                AutoupdateStage::UnableToUpdateToNewVersion { .. } => {
+                    // On the open-source channel this is the normal outcome,
+                    // not a failure: releases live on GitHub and are
+                    // installed by hand, so it reads as information rather
+                    // than an error in red.
+                    let is_oss = matches!(ChannelState::channel(), Channel::Oss);
+                    (
                         Some(StatusContent {
-                            text: "Up to date",
-                            color: faded_text_color,
+                            text: if is_oss {
+                                "A new version of Polaris Terminal is available"
+                            } else {
+                                "A new version of Polaris Terminal is available but can't be installed"
+                            },
+                            color: if is_oss { faded_text_color } else { ansi_red },
                         }),
                         Some(CallToActionContent {
-                            text: "Check for updates",
-                            action: MainPageAction::CheckForUpdate,
-                        }),
-                    ),
-                    AutoupdateStage::CheckingForUpdate => (
-                        Some(StatusContent {
-                            text: "checking for update...",
-                            color: faded_text_color,
-                        }),
-                        None,
-                    ),
-                    AutoupdateStage::DownloadingUpdate => (
-                        Some(StatusContent {
-                            text: "downloading update...",
-                            color: faded_text_color,
-                        }),
-                        None,
-                    ),
-                    AutoupdateStage::UpdateReady { .. } => (
-                        Some(StatusContent {
-                            text: "Update available",
-                            color: ansi_red,
-                        }),
-                        Some(CallToActionContent {
-                            text: "Relaunch Rook",
-                            action: MainPageAction::Relaunch,
-                        }),
-                    ),
-                    AutoupdateStage::Updating { .. } => (
-                        Some(StatusContent {
-                            text: "Updating...",
-                            color: faded_text_color,
-                        }),
-                        None,
-                    ),
-                    AutoupdateStage::UpdatedPendingRestart { .. } => (
-                        Some(StatusContent {
-                            text: "Installed update",
-                            color: faded_text_color,
-                        }),
-                        Some(CallToActionContent {
-                            text: "Relaunch Rook",
-                            action: MainPageAction::Relaunch,
-                        }),
-                    ),
-                    AutoupdateStage::UnableToUpdateToNewVersion { .. } => {
-                        // On the open-source channel this is the normal outcome,
-                        // not a failure: releases live on GitHub and are
-                        // installed by hand, so it reads as information rather
-                        // than an error in red.
-                        let is_oss = matches!(ChannelState::channel(), Channel::Oss);
-                        (
-                            Some(StatusContent {
-                                text: if is_oss {
-                                    "A new version of Rook is available"
-                                } else {
-                                    "A new version of Rook is available but can't be installed"
-                                },
-                                color: if is_oss { faded_text_color } else { ansi_red },
-                            }),
-                            Some(CallToActionContent {
-                                text: if is_oss {
-                                    "Get it from GitHub"
-                                } else {
-                                    "Update Rook manually"
-                                },
-                                action: MainPageAction::DownloadUpdate,
-                            }),
-                        )
-                    }
-                    AutoupdateStage::UnableToLaunchNewVersion { .. } => (
-                        Some(StatusContent {
-                            text: "A new version of Rook is installed but can't be launched.",
-                            color: ansi_red,
-                        }),
-                        Some(CallToActionContent {
-                            text: "Update Rook manually",
-                            // note: the handler for this action is a no-op
+                            text: if is_oss {
+                                "Get it from GitHub"
+                            } else {
+                                "Update Polaris Terminal manually"
+                            },
                             action: MainPageAction::DownloadUpdate,
                         }),
-                    ),
+                    )
                 }
-            } else {
-                (None, None)
-            };
+                AutoupdateStage::UnableToLaunchNewVersion { .. } => (
+                    Some(StatusContent {
+                        text: "A new version of Polaris Terminal is installed but can't be launched.",
+                        color: ansi_red,
+                    }),
+                    Some(CallToActionContent {
+                        text: "Update Polaris Terminal manually",
+                        // note: the handler for this action is a no-op
+                        action: MainPageAction::DownloadUpdate,
+                    }),
+                ),
+            }
+        } else {
+            (None, None)
+        };
 
         let mut first_row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)

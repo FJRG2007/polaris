@@ -1,6 +1,6 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::fonts::Weight;
-use rookui::ui_components::components::{Coords, UiComponentStyles};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::fonts::Weight;
+use ptermui::ui_components::components::{Coords, UiComponentStyles};
 
 pub const MODAL_WIDTH: f32 = 460.;
 pub const MODAL_HEIGHT: f32 = 300.;

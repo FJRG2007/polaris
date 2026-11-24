@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use ai::agent::action::{AIAgentActionType, ShellCommandDelay};
 use parking_lot::FairMutex;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{CornerRadius, Radius};
-use rookui::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{CornerRadius, Radius};
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, View, ViewContext,
 };
 
@@ -119,7 +119,7 @@ impl View for InlineAgentViewHeader {
         };
         if is_agent_tagged_in {
             let header_background = appearance.theme().surface_2();
-            let icon = Icon::Agent.to_rookui_icon(
+            let icon = Icon::Agent.to_ptermui_icon(
                 blended_colors::text_main(appearance.theme(), header_background).into(),
             );
             let message = if let Some(command) = top_level_command.as_deref() {

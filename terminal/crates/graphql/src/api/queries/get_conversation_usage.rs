@@ -29,7 +29,7 @@ query GetConversationUsage(
             totalProviderCostInCents
             summarized
             tokenUsage { modelId totalTokens }
-            rookTokenUsage { modelId totalTokens tokenUsageByCategory { category tokens } }
+            ptermTokenUsage { modelId totalTokens tokenUsageByCategory { category tokens } }
             byokTokenUsage { modelId totalTokens tokenUsageByCategory { category tokens } }
             toolUsageMetadata {
               runCommandStats { count }
@@ -121,7 +121,7 @@ pub struct ConversationUsageMetadata {
     pub total_provider_cost_in_cents: Option<f64>,
     pub summarized: bool,
     pub token_usage: Vec<ModelTokenUsage>,
-    pub rook_token_usage: Vec<TokenUsage>,
+    pub pterm_token_usage: Vec<TokenUsage>,
     pub byok_token_usage: Vec<TokenUsage>,
     pub tool_usage_metadata: ToolUsageMetadata,
 }
@@ -143,26 +143,26 @@ pub struct ContextWindowSegment {
     pub token_count: i32,
 }
 
-/// Merges rook and byok per-model token usage rows into the persistence-layer
+/// Merges polaris-terminal and byok per-model token usage rows into the persistence-layer
 /// `ModelTokenUsage` shape, preserving per-category breakdowns. Shared by the
 /// usage-history query and the conversation restore path (`crate::ai`).
 pub(crate) fn convert_token_usage(
-    rook_token_usage: &[TokenUsage],
+    pterm_token_usage: &[TokenUsage],
     byok_token_usage: &[TokenUsage],
 ) -> Vec<persistence::model::ModelTokenUsage> {
     let mut usage_by_model: HashMap<String, persistence::model::ModelTokenUsage> = HashMap::new();
 
-    for usage in rook_token_usage {
+    for usage in pterm_token_usage {
         let entry = usage_by_model
             .entry(usage.model_id.clone())
             .or_insert_with(|| persistence::model::ModelTokenUsage {
                 model_id: usage.model_id.clone(),
                 ..Default::default()
             });
-        entry.rook_tokens += u32::try_from(usage.total_tokens).unwrap_or_default();
+        entry.pterm_tokens += u32::try_from(usage.total_tokens).unwrap_or_default();
         for category_breakdown in &usage.token_usage_by_category {
             *entry
-                .rook_token_usage_by_category
+                .pterm_token_usage_by_category
                 .entry(category_breakdown.category.clone())
                 .or_default() += u32::try_from(category_breakdown.tokens).unwrap_or_default();
         }
@@ -202,7 +202,7 @@ impl From<&ConversationUsageMetadata> for persistence::model::ConversationUsageM
             // vertical, milestone 3) -- left `None` rather than fabricated.
             charged_usage_for_last_block: None,
             total_charged_usage: None,
-            token_usage: convert_token_usage(&gql.rook_token_usage, &gql.byok_token_usage),
+            token_usage: convert_token_usage(&gql.pterm_token_usage, &gql.byok_token_usage),
             tool_usage_metadata: (&gql.tool_usage_metadata).into(),
             context_window_segments: gql.context_window_segments.iter().map(Into::into).collect(),
         }

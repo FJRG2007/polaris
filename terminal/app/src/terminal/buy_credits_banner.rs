@@ -5,21 +5,21 @@ use itertools::Itertools as _;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_graphql::billing::AddonCreditsOption;
-use rook_graphql::error::BudgetExceededError;
-use rookui::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_graphql::billing::AddonCreditsOption;
+use pterm_graphql::error::BudgetExceededError;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DropShadow, Expanded, Flex, FormattedTextElement, HighlightedHyperlink,
-    Hoverable, Icon as RookUiIcon, MainAxisAlignment, MainAxisSize, MouseStateHandle,
+    Hoverable, Icon as PtermUiIcon, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement as _, ParentOffsetBounds, Radius, Shrinkable,
     SizeConstraintCondition, SizeConstraintSwitch, Stack, Text,
 };
-use rookui::fonts::Weight;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent as _, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent as _, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity as _, View, ViewContext, ViewHandle,
     WeakViewHandle,
 };
@@ -346,7 +346,7 @@ impl BuyCreditsBanner {
             move |state| {
                 let info_icon_element = Container::new(
                     ConstrainedBox::new(
-                        RookUiIcon::new("bundled/svg/info.svg", sub_text_color).finish(),
+                        PtermUiIcon::new("bundled/svg/info.svg", sub_text_color).finish(),
                     )
                     .with_width(13.)
                     .with_height(13.)
@@ -476,7 +476,7 @@ impl BuyCreditsBanner {
         let alert_icon = Container::new(
             ConstrainedBox::new(
                 Icon::AlertCircle
-                    .to_rookui_icon(theme.foreground())
+                    .to_ptermui_icon(theme.foreground())
                     .finish(),
             )
             .with_height(16.)
@@ -593,7 +593,7 @@ impl BuyCreditsBanner {
         let alert_icon = Container::new(
             ConstrainedBox::new(
                 Icon::AlertCircle
-                    .to_rookui_icon(theme.foreground())
+                    .to_ptermui_icon(theme.foreground())
                     .finish(),
             )
             .with_height(16.)
@@ -667,7 +667,7 @@ impl BuyCreditsBanner {
             Container::new(
                 ConstrainedBox::new(
                     Icon::AlertCircle
-                        .to_rookui_icon(theme.foreground())
+                        .to_ptermui_icon(theme.foreground())
                         .finish(),
                 )
                 .with_height(16.)
@@ -750,8 +750,8 @@ impl BuyCreditsBanner {
                 .with_hyperlink_font_color(theme.accent().into_solid())
                 .register_default_click_handlers_with_action_support(
                     |hyperlink_lens, event, _ctx| match hyperlink_lens {
-                        rookui::elements::HyperlinkLens::Url(_url) => {}
-                        rookui::elements::HyperlinkLens::Action(action_ref) => {
+                        ptermui::elements::HyperlinkLens::Url(_url) => {}
+                        ptermui::elements::HyperlinkLens::Action(action_ref) => {
                             if let Some(action) = action_ref.as_any().downcast_ref::<Action>() {
                                 event.dispatch_typed_action(action.clone());
                             }
@@ -764,7 +764,7 @@ impl BuyCreditsBanner {
             } else {
                 // Default message when not at limit
                 let banner_description = if has_admin_permissions {
-                    "Add more credits to your account to continue using the Rook Agent."
+                    "Add more credits to your account to continue using the Polaris Terminal Agent."
                 } else {
                     "Contact a team admin to purchase more credits to continue."
                 };
@@ -989,7 +989,7 @@ impl View for BuyCreditsBanner {
 
         match display_state {
             BuyCreditsBannerDisplayState::Hidden => {
-                Container::new(rookui::elements::Empty::new().finish()).finish()
+                Container::new(ptermui::elements::Empty::new().finish()).finish()
             }
             BuyCreditsBannerDisplayState::OutOfCredits => {
                 if self.checkout_pending {
@@ -1014,7 +1014,7 @@ pub enum Action {
     ToggleAutoReload,
 }
 
-impl rookui::TypedActionView for BuyCreditsBanner {
+impl ptermui::TypedActionView for BuyCreditsBanner {
     type Action = Action;
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {

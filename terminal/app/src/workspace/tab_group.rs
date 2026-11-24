@@ -1,6 +1,6 @@
 //! Tab group data model. Gated at runtime by `FeatureFlag::GroupedTabs`.
 
-use rookui::elements::DraggableState;
+use ptermui::elements::DraggableState;
 use uuid::Uuid;
 
 use crate::tab::SelectedTabColor;

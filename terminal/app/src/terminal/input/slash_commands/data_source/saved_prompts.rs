@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use futures_lite::future::yield_now;
 use ordered_float::OrderedFloat;
-use rook_core::ui::appearance::Appearance;
-use rookui::fonts::FamilyId;
-use rookui::{AppContext, SingletonEntity};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::fonts::FamilyId;
+use ptermui::{AppContext, SingletonEntity};
 
 use crate::cloud_object::CloudObject;
 use crate::cloud_object::model::persistence::CloudModel;

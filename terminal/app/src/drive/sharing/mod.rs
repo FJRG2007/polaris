@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 
 use chrono::{DateTime, Local};
-use rook_core::channel::ChannelState;
-use rook_core::ui::appearance::Appearance;
-use rookui::color::ColorU;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, SingletonEntity, WeakViewHandle};
+use pterm_core::channel::ChannelState;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::color::ColorU;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, SingletonEntity, WeakViewHandle};
 use session_sharing_protocol::common::SessionId;
 
 use crate::ai::agent::conversation::AIConversationId;
@@ -30,12 +30,12 @@ pub use cloud_objects::drive::sharing::{
     LinkSharingSubjectType, SharingAccessLevel, Subject, TeamKind, UserKind,
 };
 
-/// Identifier for an object that's shareable via the Rook Drive ACL model. Not all sharing in Rook
+/// Identifier for an object that's shareable via the Polaris Terminal Drive ACL model. Not all sharing in Polaris Terminal
 /// is _currently_ tied into this model (e.g. block sharing).
 #[derive(Debug, Clone)]
 pub enum ShareableObject {
-    /// A shareable Rook Drive object.
-    RookDriveObject(ServerId),
+    /// A shareable Polaris Terminal Drive object.
+    PtermDriveObject(ServerId),
     /// A shared terminal session. Shared sessions are identified by the participating terminal
     /// pane.
     Session {
@@ -51,7 +51,7 @@ impl ShareableObject {
     /// The canonical link to this object.
     pub fn link(&self, app: &AppContext) -> Option<String> {
         match self {
-            ShareableObject::RookDriveObject(id) => CloudModel::as_ref(app)
+            ShareableObject::PtermDriveObject(id) => CloudModel::as_ref(app)
                 .get_by_uid(&id.uid())
                 .and_then(|object| object.object_link()),
             ShareableObject::Session {

@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
-use rookui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use ptermui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::CloudWorkflowModel;
 use super::workflow::Workflow;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::{GenericCloudObject, Owner};
-use crate::drive::OpenRookDriveObjectSettings;
+use crate::drive::OpenPtermDriveObjectSettings;
 use crate::pane_group::{PaneContent, WorkflowPane};
 use crate::server::cloud_objects::update_manager::{
     ObjectOperation, OperationSuccessType, UpdateManager, UpdateManagerEvent,
@@ -68,7 +68,7 @@ impl WorkflowManager {
     pub fn create_pane(
         &mut self,
         source: &WorkflowOpenSource,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         mode: WorkflowViewMode,
         window_id: WindowId,
         ctx: &mut ModelContext<Self>,
@@ -123,7 +123,7 @@ impl WorkflowManager {
                             *initial_folder_id,
                             ClientId::default(),
                         ),
-                        &OpenRookDriveObjectSettings::default(),
+                        &OpenPtermDriveObjectSettings::default(),
                         mode,
                         ctx,
                     );

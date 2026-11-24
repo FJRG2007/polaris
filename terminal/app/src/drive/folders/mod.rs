@@ -3,13 +3,13 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 pub use cloud_object_models::{CloudFolder, CloudFolderModel};
-// Re-exported from rook_server_client.
-pub use rook_server_client::ids::FolderId;
+// Re-exported from pterm_server_client.
+pub use pterm_server_client::ids::FolderId;
 
 use super::CloudObjectTypeAndId;
-use super::items::RookDriveItem;
-// Re-exported from rook_server_client.
-use super::items::folder::RookDriveFolder;
+use super::items::PtermDriveItem;
+// Re-exported from pterm_server_client.
+use super::items::folder::PtermDriveFolder;
 use crate::appearance::Appearance;
 use crate::cloud_object::{
     CloudModelType, CloudObjectEventEntrypoint, CloudObjectUpsertParams, CreateCloudObjectResult,
@@ -120,17 +120,17 @@ impl CloudModelType for CloudFolderModel {
             .await
     }
 
-    fn renders_in_rook_drive(&self) -> bool {
+    fn renders_in_pterm_drive(&self) -> bool {
         true
     }
 
-    fn to_rook_drive_item(
+    fn to_pterm_drive_item(
         &self,
         id: SyncId,
         _appearance: &Appearance,
         folder: &CloudFolder,
-    ) -> Option<Box<dyn RookDriveItem>> {
-        Some(Box::new(RookDriveFolder::new(
+    ) -> Option<Box<dyn PtermDriveItem>> {
+        Some(Box::new(PtermDriveFolder::new(
             self.cloud_object_type_and_id(id),
             folder.clone(),
         )))

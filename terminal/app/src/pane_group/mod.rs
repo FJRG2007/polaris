@@ -14,25 +14,25 @@ use markdown_parser::FormattedTextFragment;
 use parking_lot::FairMutex;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_cli::agent::Harness;
-use rook_core::command::ExitCode;
-use rook_core::context_flag::ContextFlag;
-use rook_errors::report_if_error;
-use rook_terminal::focus_env::add_session_focus_env_vars;
-use rook_terminal::shell::{ShellName, ShellType};
+use pterm_cli::agent::Harness;
+use pterm_core::command::ExitCode;
+use pterm_core::context_flag::ContextFlag;
+use pterm_errors::report_if_error;
+use pterm_terminal::focus_env::add_session_focus_env_vars;
+use pterm_terminal::shell::{ShellName, ShellType};
 #[cfg(feature = "local_fs")]
-use rook_util::path::LineAndColumnArg;
-use rook_util::path::convert_wsl_to_windows_host_path;
-use rook_util::remote_path::RemotePath;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::elements::{
+use pterm_util::path::LineAndColumnArg;
+use pterm_util::path::convert_wsl_to_windows_host_path;
+use pterm_util::remote_path::RemotePath;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::elements::{
     ChildView, Clipped, CrossAxisAlignment, DispatchEventResult, Element, EventHandler, Flex,
     MainAxisSize, ParentElement, Shrinkable, Stack,
 };
-use rookui::keymap::{Context, EditableBinding, FixedBinding};
-use rookui::notification::NotificationSendError;
-use rookui::windowing::WindowManager;
-use rookui::{
+use ptermui::keymap::{Context, EditableBinding, FixedBinding};
+use ptermui::notification::NotificationSendError;
+use ptermui::windowing::WindowManager;
+use ptermui::{
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle, WindowId,
 };
@@ -89,8 +89,8 @@ use crate::code::editor_management::CodeSource;
 use crate::code::view::{CodeView, CodeViewAction};
 use crate::code_review::comments::{AttachedReviewComment, PendingImportedReviewComment};
 use crate::code_review::diff_state::DiffMode;
-use crate::drive::items::RookDriveItemId;
-use crate::drive::{CloudObjectTypeAndId, OpenRookDriveObjectArgs};
+use crate::drive::items::PtermDriveItemId;
+use crate::drive::{CloudObjectTypeAndId, OpenPtermDriveObjectArgs};
 use crate::env_vars::EnvVarCollectionType;
 use crate::features::FeatureFlag;
 use crate::launch_configs::launch_config::{self, PaneMode, PaneTemplateType};
@@ -208,7 +208,7 @@ pub use pane::{
     AnyPaneContent, BackingView, PaneConfiguration, PaneConfigurationEvent, PaneContent, PaneEvent,
     PaneHeaderAction, PaneHeaderCustomAction, PaneId, PaneView, TerminalPaneId,
 };
-use rook_errors::report_error;
+use pterm_errors::report_error;
 pub use tree::{Direction, PaneData, PaneFlex, PaneNode, SplitDirection};
 pub use working_directories::{WorkingDirectoriesEvent, WorkingDirectoriesModel};
 
@@ -266,7 +266,7 @@ fn get_minimum_pane_size(app: &AppContext) -> f32 {
 /// 2. Otherwise look up by command name in the already-discovered
 ///    [`AvailableShells`]. Its shell discovery supplements the process `PATH`
 ///    with well-known install locations (e.g. `/opt/homebrew/bin` on macOS,
-///    MSYS2/WSL on Windows) that a raw `PATH` lookup would miss when Rook is
+///    MSYS2/WSL on Windows) that a raw `PATH` lookup would miss when Polaris Terminal is
 ///    launched outside an interactive shell.
 /// 3. As a final fallback, perform a plain `PATH` lookup via
 ///    [`AvailableShell::try_from`] in case the user put something exotic in
@@ -283,7 +283,7 @@ fn resolve_tab_config_shell(name: &str, ctx: &AppContext) -> Option<AvailableShe
 
     AvailableShell::try_from(name).ok()
 }
-const ROOK_SHELL_COMPATIBILITY_DOCS: &str =
+const POLARIS_TERMINAL_SHELL_COMPATIBILITY_DOCS: &str =
     "https://docs.rook.dev/getting-started/supported-shells";
 // Default minimum width for a newly created Agent Mode pane so that it is legible. Called "default"
 // because this value may be too large for small windows. In that case, we fall back to 50% of the
@@ -334,7 +334,7 @@ enum PaneRemovalReason {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
     app.register_binding_validator::<PaneGroup>(is_binding_pty_compliant);
 
     self::pane::init(app);
@@ -552,24 +552,24 @@ pub enum Event {
     OpenPromptEditor,
     OpenAgentToolbarEditor,
     OpenCLIAgentToolbarEditor,
-    /// tell the workspace to open a file within Rook.
-    OpenFileInRook {
+    /// tell the workspace to open a file within Polaris Terminal.
+    OpenFileInPterm {
         /// The file path to open.
         path: LocalOrRemotePath,
         /// The session that the path was opened from.
         session: Arc<Session>,
     },
-    OpenRookDriveLink {
-        open_rook_drive_args: OpenRookDriveObjectArgs,
+    OpenPtermDriveLink {
+        open_pterm_drive_args: OpenPtermDriveObjectArgs,
     },
     #[cfg(feature = "local_fs")]
-    OpenCodeInRook {
+    OpenCodeInPterm {
         source: CodeSource,
         layout: crate::util::file::external_editor::settings::EditorLayout,
         line_col: Option<LineAndColumnArg>,
     },
     #[cfg(feature = "local_fs")]
-    PreviewCodeInRook {
+    PreviewCodeInPterm {
         source: CodeSource,
     },
     OpenCodeDiff {
@@ -607,7 +607,7 @@ pub enum Event {
     FocusPaneInWorkspace {
         locator: PaneViewLocator,
     },
-    ViewInRookDrive(RookDriveItemId),
+    ViewInPtermDrive(PtermDriveItemId),
     MoveToSpace {
         cloud_object_type_and_id: CloudObjectTypeAndId,
         space: Space,
@@ -637,7 +637,7 @@ pub enum Event {
     },
     /// Clears the hovered tab index so it no longer appears as highlighted drop target
     ClearHoveredTabIndex,
-    OpenRookDriveObjectInPane(ObjectUid),
+    OpenPtermDriveObjectInPane(ObjectUid),
     /// Tell the workspace to open the given child agent conversation in a
     /// fresh tab. Bubbled up by `TerminalView::Event::OpenChildAgentInNewTab`
     /// from the orchestration pill bar's 3-dot menu.
@@ -2595,7 +2595,7 @@ impl PaneGroup {
     }
 
     /// Send prompt change bindkey events to all terminal sessions in this pane group. This
-    /// is used for intra-session prompt switching between Rook prompt and PS1.
+    /// is used for intra-session prompt switching between Polaris Terminal prompt and PS1.
     #[cfg_attr(not(feature = "local_tty"), allow(unused_variables))]
     pub fn send_prompt_change_bindkey_to_all_sessions(
         &self,
@@ -2616,7 +2616,7 @@ impl PaneGroup {
                                 if honor_ps1 {
                                     manager.send_switch_to_ps1_bindkey(ctx);
                                 } else {
-                                    manager.send_switch_to_rook_prompt_bindkey(ctx);
+                                    manager.send_switch_to_pterm_prompt_bindkey(ctx);
                                 }
                             }
                         });
@@ -3149,9 +3149,9 @@ impl PaneGroup {
             Banner::<PaneGroupAction>::new_permanently_dismissible(
                 BannerTextContent::formatted_text(vec![
                     FormattedTextFragment::plain_text(
-                        "Rook doesn't currently support your default shell, falling back to zsh.  ",
+                        "Polaris Terminal doesn't currently support your default shell, falling back to zsh.  ",
                     ),
-                    FormattedTextFragment::hyperlink("Learn more", ROOK_SHELL_COMPATIBILITY_DOCS),
+                    FormattedTextFragment::hyperlink("Learn more", POLARIS_TERMINAL_SHELL_COMPATIBILITY_DOCS),
                 ]),
             )
         });
@@ -3916,7 +3916,7 @@ impl PaneGroup {
             });
         }
 
-        // Insert the conversation ended tombstone (includes Open in Rook button on WASM).
+        // Insert the conversation ended tombstone (includes Open in Polaris Terminal button on WASM).
         if terminal_manager.is_some() {
             terminal_view.update(ctx, |view, ctx| {
                 view.insert_conversation_ended_tombstone_with_resolved_cta(ctx);
@@ -5533,7 +5533,7 @@ impl PaneGroup {
         mark_as_viewing_shared_session: bool,
         ctx: &mut ViewContext<Self>,
     ) -> Option<AIConversationId> {
-        // URL-loaded conversation transcripts (e.g. Rook-on-Web deep links)
+        // URL-loaded conversation transcripts (e.g. Polaris Terminal-on-Web deep links)
         // restore from conversation data before the ambient task cache is
         // guaranteed to contain this task. Native continuation usually reaches
         // this path after task-backed navigation, but the restored cloud-mode
@@ -6433,7 +6433,7 @@ impl PaneGroup {
                 .set_conversation_transcript_viewer_status(Some(viewer_status.clone()));
         });
 
-        // Insert the conversation ended tombstone (includes Open in Rook button on WASM)
+        // Insert the conversation ended tombstone (includes Open in Polaris Terminal button on WASM)
         terminal_view.update(ctx, |view, ctx| {
             view.insert_conversation_ended_tombstone_with_resolved_cta(ctx);
         });

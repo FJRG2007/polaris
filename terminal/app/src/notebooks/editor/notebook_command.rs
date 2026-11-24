@@ -8,28 +8,28 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use markdown_parser::markdown_parser::CODE_BLOCK_DEFAULT_MARKDOWN_LANG;
 use pathfinder_color::ColorU;
-use rook_completer::signatures::CommandRegistry;
-use rook_core::r#async::debounce;
-use rook_editor::content::anchor::Anchor;
-use rook_editor::content::buffer::{Buffer, BufferEvent, EditOrigin};
-use rook_editor::content::mermaid_diagram::mermaid_asset_source;
-use rook_editor::content::selection_model::BufferSelectionModel;
-use rook_editor::content::text::{
+use pterm_completer::signatures::CommandRegistry;
+use pterm_core::r#async::debounce;
+use pterm_editor::content::anchor::Anchor;
+use pterm_editor::content::buffer::{Buffer, BufferEvent, EditOrigin};
+use pterm_editor::content::mermaid_diagram::mermaid_asset_source;
+use pterm_editor::content::selection_model::BufferSelectionModel;
+use pterm_editor::content::text::{
     BlockType, BufferBlockStyle, CODE_BLOCK_DEFAULT_DISPLAY_LANG, CODE_BLOCK_SHELL_DISPLAY_LANG,
     CodeBlockType,
 };
-use rook_editor::editor::RunnableCommandModel;
-use rook_util::user_input::UserInput;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::elements::{
+use pterm_editor::editor::RunnableCommandModel;
+use pterm_util::user_input::UserInput;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::elements::{
     Align, Border, Container, CornerRadius, CrossAxisAlignment, Empty, Flex, MainAxisAlignment,
     MouseStateHandle, ParentElement, Radius, Shrinkable, Text,
 };
-use rookui::fonts::Properties;
-use rookui::platform::Cursor;
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Properties;
+use ptermui::platform::Cursor;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, AssetProvider as _, Element, Entity, ModelAsRef, ModelContext, ModelHandle,
     SingletonEntity, ViewHandle, WeakModelHandle, WindowId,
 };
@@ -648,7 +648,7 @@ impl RunnableCommandModel for NotebookCommand {
                         appearance.ui_font_size(),
                     )
                     .with_style(Properties {
-                        weight: rookui::fonts::Weight::Light,
+                        weight: ptermui::fonts::Weight::Light,
                         ..Default::default()
                     })
                     .with_color(

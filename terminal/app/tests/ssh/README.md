@@ -1,10 +1,10 @@
-# Testing Rook Functionality over SSH
+# Testing Polaris Terminal Functionality over SSH
 
 ## Pre-req: Install Docker
 1. `brew install --cask docker`
 2. Open the Docker desktop app. This is necessary to create the symbolic links that will make the `docker` CLI available.
 
-## Running Rook over SSH
+## Running Polaris Terminal over SSH
 There's a workflow called "Build image and start container for SSH testing" in this repo. After that, you may SSH in by running bash@0.0.0.0 or zsh@0.0.0.0. It'll prompt for a password which is `password` for these VMs.
 
 After you've built the image, you can just launch the container again with the second command in the workflow.

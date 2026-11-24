@@ -18,7 +18,7 @@ The orchestration designs establish the view states; the view remains domain-neu
 
 ## Non-goals
 - Adding a tab-specific element to the TUI element library.
-- Knowing about orchestration, conversations, sessions, agents, or Rook-specific navigation.
+- Knowing about orchestration, conversations, sessions, agents, or Polaris Terminal-specific navigation.
 - Owning application selection, keyboard focus, or persisted page anchors.
 - Choosing colors, labels, maximum widths, or keybindings for a caller.
 - Rendering context menus, close buttons, drag reordering, or pinned-tab controls.

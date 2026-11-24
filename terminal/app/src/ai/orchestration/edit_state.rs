@@ -11,8 +11,8 @@
 use std::collections::HashMap;
 
 use ai::agent::action::RunAgentsExecutionMode;
-use rook_cli::agent::Harness;
-use rookui::{AppContext, SingletonEntity};
+use pterm_cli::agent::Harness;
+use ptermui::{AppContext, SingletonEntity};
 
 use super::config_state::{AuthSecretSelection, OrchestrationConfigState};
 use super::providers::{

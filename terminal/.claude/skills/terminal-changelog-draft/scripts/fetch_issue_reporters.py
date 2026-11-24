@@ -4,7 +4,7 @@
 Uses `gh` CLI (must be authenticated) — stdlib only, no pip deps.
 
 Usage:
-    python3 fetch_issue_reporters.py --repo FJRG2007/rook --issues 1234,5678,9012
+    python3 fetch_issue_reporters.py --repo FJRG2007/polaris --issues 1234,5678,9012
 
 Outputs JSON to stdout mapping issue numbers to reporter info.
 """

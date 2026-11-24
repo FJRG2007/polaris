@@ -5,7 +5,7 @@ Product spec: `specs/APP-3893/PRODUCT.md`
 
 This change adds a third source of agent-rule context that sits alongside the existing two:
 
-- **Project rules** — `ROOK.md` / `AGENTS.md` walked up from the working directory. Indexed by `ProjectContextModel`, sent on every query inside `AIAgentContext::ProjectRules`.
+- **Project rules** — `POLARIS_TERMINAL.md` / `AGENTS.md` walked up from the working directory. Indexed by `ProjectContextModel`, sent on every query inside `AIAgentContext::ProjectRules`.
 - **Cloud rules** (`AIFact`s) — created in-app, persisted as cloud objects, and applied server-side when `rules_enabled: true` is set on the request. The client only ships an enable flag; the server has the contents.
 - **File-based global rules** (this feature) — a Markdown file at a well-known home location (`~/.agents/AGENTS.md`). Indexed and shipped by value the same way project rules are.
 
@@ -72,11 +72,11 @@ The implementation deliberately does **not** persist global rule paths to SQLite
 ## Testing and validation
 
 ### Unit tests
-Located in `crates/ai/src/project_context/model_tests.rs`. They populate `ProjectContextModel` through local test helpers (direct test-visible `global_rules.rules` insertion for globals and `path_to_rules` for project rules), so they exercise the layering logic without spinning up the watcher infrastructure (which requires the rookui runtime).
+Located in `crates/ai/src/project_context/model_tests.rs`. They populate `ProjectContextModel` through local test helpers (direct test-visible `global_rules.rules` insertion for globals and `path_to_rules` for project rules), so they exercise the layering logic without spinning up the watcher infrastructure (which requires the ptermui runtime).
 
 - Global rule alone, no project rules → `find_applicable_rules` returns it. Covers PRODUCT invariants 8, 10.
-- Global rule + project `ROOK.md` for the same path → both appear in `active_rules`, ordered global first. Covers invariants 8, 9.
-- Global rule + project `ROOK.md` and `AGENTS.md` in the same dir → project `ROOK.md` shadows project `AGENTS.md`; global is appended. Covers invariant 9.
+- Global rule + project `POLARIS_TERMINAL.md` for the same path → both appear in `active_rules`, ordered global first. Covers invariants 8, 9.
+- Global rule + project `POLARIS_TERMINAL.md` and `AGENTS.md` in the same dir → project `POLARIS_TERMINAL.md` shadows project `AGENTS.md`; global is appended. Covers invariant 9.
 - No rules anywhere → `None`. Covers invariant 10.
 - Global-only → `root_path` falls back to the parent of the global file.
 - Multiple global sources both contribute (uses set-based assertions because `BTreeMap` orders by path).
@@ -104,4 +104,4 @@ Maps directly to the PRODUCT.md behavior section:
 ## Follow-ups
 - Decide whether the `MemoryEnabled` toggle should also gate file-based global rules (currently it does not — see PRODUCT.md invariant 19). Either gate `find_applicable_rules` on the setting in `BlocklistAIContextModel::pending_context`, or add a separate file-rule toggle.
 - Consider exposing the file's content in the Settings row (preview/truncate, like cloud rules) instead of just the path.
-- If we want the rule file open-state to feel editable in-app, surface an "Edit" affordance that opens it in Rook's code editor with a buffer rather than just a file open.
+- If we want the rule file open-state to feel editable in-app, surface an "Edit" affordance that opens it in Polaris Terminal's code editor with a buffer rather than just a file open.

@@ -2,7 +2,7 @@
 // it's used in the implementation of `infer_line_ending`.
 #![allow(clippy::disallowed_methods)]
 
-use rook_core::platform::SessionPlatform;
+use pterm_core::platform::SessionPlatform;
 
 use super::*;
 

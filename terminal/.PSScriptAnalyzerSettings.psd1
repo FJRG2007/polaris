@@ -16,7 +16,7 @@
         # diagnostic controls in pwsh_init_shell.ps1
         'PSAvoidUsingWriteHost'
         # TODO(CORE-2985): Evaluate if we want to turn this on.
-        # Disabling this for now, most of our Rook functions should not be invoked by
+        # Disabling this for now, most of our Polaris Terminal functions should not be invoked by
         # users directly anyway.
         'PSProvideCommentHelp'
     )

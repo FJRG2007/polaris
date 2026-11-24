@@ -50,54 +50,54 @@ use ordered_float::Float;
 use parking_lot::FairMutex;
 #[cfg(feature = "local_fs")]
 use parking_lot::Mutex;
-use regex::Regex;
-use rook_cli::agent::Harness;
-use rook_completer::completer::{
+use pterm_cli::agent::Harness;
+use pterm_completer::completer::{
     self, CompleterOptions, CompletionContext, CompletionsFallbackStrategy, Description,
     ExplicitTabCompletion, MatchStrategy, MatchType, PathSeparators, PreparedSuggestion,
     SuggestionResults,
 };
-use rook_completer::meta::{HasSpan, Span, Spanned};
-use rook_completer::parsers::LiteCommand;
-use rook_completer::parsers::simple::command_at_cursor_position;
-use rook_completer::signatures::CommandRegistry;
-use rook_completer::util::parse_current_commands_and_tokens;
-use rook_core::r#async::debounce;
-use rook_core::context_flag::ContextFlag;
-use rook_core::ui::theme::AnsiColorIdentifier;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::editor::NavigationKey;
-use rook_errors::{report_error, report_if_error};
-use rook_util::path::ShellFamily;
-pub use rookui::WindowId;
-use rookui::accessibility::{AccessibilityContent, ActionAccessibilityContent, RookA11yRole};
+use pterm_completer::meta::{HasSpan, Span, Spanned};
+use pterm_completer::parsers::LiteCommand;
+use pterm_completer::parsers::simple::command_at_cursor_position;
+use pterm_completer::signatures::CommandRegistry;
+use pterm_completer::util::parse_current_commands_and_tokens;
+use pterm_core::r#async::debounce;
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::ui::theme::AnsiColorIdentifier;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::editor::NavigationKey;
+use pterm_errors::{report_error, report_if_error};
+use pterm_util::path::ShellFamily;
+pub use ptermui::WindowId;
+use ptermui::accessibility::{AccessibilityContent, ActionAccessibilityContent, PtermA11yRole};
 #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
-use rookui::r#async::FutureExt as _;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::clipboard::{ClipboardContent, ImageData};
-use rookui::clipboard_utils::CLIPBOARD_IMAGE_MIME_TYPES;
-use rookui::color::ColorU;
-use rookui::elements::{
+use ptermui::r#async::FutureExt as _;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::clipboard::{ClipboardContent, ImageData};
+use ptermui::clipboard_utils::CLIPBOARD_IMAGE_MIME_TYPES;
+use ptermui::color::ColorU;
+use ptermui::elements::{
     Align, AnchorPair, ChildAnchor, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DispatchEventResult, DropTargetData, Element, EventHandler, Flex,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, OffsetType, ParentAnchor,
     ParentElement, PositionedElementOffsetBounds, PositioningAxis, Radius, ResizableStateHandle,
     SavePosition, SelectionHandle, Text, Wrap, XAxisAnchor, YAxisAnchor, resizable_state_handle,
 };
-pub use rookui::elements::{ParentElement as _, Stack};
-pub use rookui::geometry::vector::{Vector2F, vec2f};
-use rookui::keymap::{BindingDescription, EditableBinding, FixedBinding, Keystroke};
-use rookui::platform::OperatingSystem;
-use rookui::presenter::ChildView;
-use rookui::text_layout::TextStyle;
-use rookui::ui_components::chip::Chip;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::units::IntoPixels;
-use rookui::{
+pub use ptermui::elements::{ParentElement as _, Stack};
+pub use ptermui::geometry::vector::{Vector2F, vec2f};
+use ptermui::keymap::{BindingDescription, EditableBinding, FixedBinding, Keystroke};
+use ptermui::platform::OperatingSystem;
+use ptermui::presenter::ChildView;
+use ptermui::text_layout::TextStyle;
+use ptermui::ui_components::chip::Chip;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::units::IntoPixels;
+use ptermui::{
     AppContext, Entity, EntityId, FocusContext, ModelAsRef, ModelHandle, SingletonEntity,
     TypedActionView, View, ViewContext, ViewHandle, ViewUpdateError, WeakViewHandle, end_trace,
     start_trace,
 };
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use session_sharing_protocol::common::{AgentAttachment, ParticipantId, ServerConversationToken};
@@ -121,7 +121,7 @@ use super::prompt_render_helper::{
     PromptRenderHelper, SameLinePromptElements, should_render_prompt_on_same_line,
     should_render_prompt_using_editor_decorator_elements,
 };
-use super::rookify::SubshellSource;
+use super::ptermify::SubshellSource;
 use super::safe_mode_settings::{
     SafeModeSettings, SafeModeSettingsChangedEvent, get_secret_obfuscation_mode,
 };
@@ -336,7 +336,7 @@ use crate::terminal::view::{
 };
 use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
-use crate::user_config::RookConfig;
+use crate::user_config::PtermConfig;
 use crate::util::bindings::{self, CustomAction, keybinding_name_to_normalized_string};
 #[cfg(feature = "local_fs")]
 use crate::util::file::external_editor;
@@ -419,7 +419,7 @@ pub fn get_input_box_top_border_width() -> f32 {
     }
 }
 
-/// The host the cloud-mode selector defaults to: the `ROOK_CLOUD_MODE_DEFAULT_HOST` override when
+/// The host the cloud-mode selector defaults to: the `POLARIS_TERMINAL_CLOUD_MODE_DEFAULT_HOST` override when
 /// set, otherwise the window's team default.
 ///
 /// Takes the selector's handle, not `Input`'s: this runs inside `Input::new` before `Input` is in
@@ -429,7 +429,7 @@ fn effective_default_host(
     host_selector: &WeakViewHandle<HostSelector>,
     app: &AppContext,
 ) -> Option<String> {
-    if let Some(slug) = std::env::var("ROOK_CLOUD_MODE_DEFAULT_HOST")
+    if let Some(slug) = std::env::var("POLARIS_TERMINAL_CLOUD_MODE_DEFAULT_HOST")
         .ok()
         .filter(|slug| !slug.is_empty())
     {
@@ -452,26 +452,26 @@ const AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_TEXT: &str = "Run comma
 
 // Rotating hint text options for new Agent Mode conversations
 const AGENT_MODE_HINT_OPTIONS: &[&str] = &[
-    "Rook anything e.g. Deploy my React app to Vercel and set up environment variables",
-    "Rook anything e.g. Help me debug why my Python tests are failing in CI",
-    "Rook anything e.g. Set up a new microservice with Docker and create the deployment pipeline",
-    "Rook anything e.g. Find and fix the memory leak in my Node.js application",
-    "Rook anything e.g. Create a backup script for my PostgreSQL database and schedule it",
-    "Rook anything e.g. Help me migrate my data from MySQL to PostgreSQL",
-    "Rook anything e.g. Set up monitoring and alerts for my AWS infrastructure",
-    "Rook anything e.g. Build a REST API for my mobile app using FastAPI",
-    "Rook anything e.g. Help me optimize my SQL queries that are running slowly",
-    "Rook anything e.g. Create a GitHub Actions workflow to automatically deploy on merge",
-    "Rook anything e.g. Set up Redis caching for my web application",
-    "Rook anything e.g. Help me troubleshoot why my Kubernetes pods keep crashing",
-    "Rook anything e.g. Build a data pipeline to process CSV files and load them into BigQuery",
-    "Rook anything e.g. Set up SSL certificates and configure HTTPS for my domain",
-    "Rook anything e.g. Help me refactor this legacy code to use modern design patterns",
-    "Rook anything e.g. Create unit tests for my authentication service",
-    "Rook anything e.g. Set up log aggregation with ELK stack for my distributed system",
-    "Rook anything e.g. Help me implement OAuth2 authentication in my Express.js app",
-    "Rook anything e.g. Optimize my Docker images to reduce build times and size",
-    "Rook anything e.g. Set up A/B testing infrastructure for my web application",
+    "Polaris Terminal anything e.g. Deploy my React app to Vercel and set up environment variables",
+    "Polaris Terminal anything e.g. Help me debug why my Python tests are failing in CI",
+    "Polaris Terminal anything e.g. Set up a new microservice with Docker and create the deployment pipeline",
+    "Polaris Terminal anything e.g. Find and fix the memory leak in my Node.js application",
+    "Polaris Terminal anything e.g. Create a backup script for my PostgreSQL database and schedule it",
+    "Polaris Terminal anything e.g. Help me migrate my data from MySQL to PostgreSQL",
+    "Polaris Terminal anything e.g. Set up monitoring and alerts for my AWS infrastructure",
+    "Polaris Terminal anything e.g. Build a REST API for my mobile app using FastAPI",
+    "Polaris Terminal anything e.g. Help me optimize my SQL queries that are running slowly",
+    "Polaris Terminal anything e.g. Create a GitHub Actions workflow to automatically deploy on merge",
+    "Polaris Terminal anything e.g. Set up Redis caching for my web application",
+    "Polaris Terminal anything e.g. Help me troubleshoot why my Kubernetes pods keep crashing",
+    "Polaris Terminal anything e.g. Build a data pipeline to process CSV files and load them into BigQuery",
+    "Polaris Terminal anything e.g. Set up SSL certificates and configure HTTPS for my domain",
+    "Polaris Terminal anything e.g. Help me refactor this legacy code to use modern design patterns",
+    "Polaris Terminal anything e.g. Create unit tests for my authentication service",
+    "Polaris Terminal anything e.g. Set up log aggregation with ELK stack for my distributed system",
+    "Polaris Terminal anything e.g. Help me implement OAuth2 authentication in my Express.js app",
+    "Polaris Terminal anything e.g. Optimize my Docker images to reduce build times and size",
+    "Polaris Terminal anything e.g. Set up A/B testing infrastructure for my web application",
 ];
 
 fn get_agent_mode_new_conversation_hint_text() -> &'static str {
@@ -905,7 +905,7 @@ struct ViewerCommandExecutionRequest {
 /// Where a command execution request originates from.
 #[derive(Clone)]
 pub enum CommandExecutionSource {
-    /// A non-shared command execution request from Rook AI++.
+    /// A non-shared command execution request from Polaris Terminal AI++.
     /// Shared commands use the SharedSession variant instead.
     AI {
         /// Metadata associated with the execution.
@@ -1102,7 +1102,7 @@ pub enum Event {
     },
     OpenSettings(SettingsSection),
     #[cfg(feature = "local_fs")]
-    OpenCodeInRook {
+    OpenCodeInPterm {
         source: CodeSource,
         layout: external_editor::settings::EditorLayout,
     },
@@ -1586,17 +1586,17 @@ fn strip_control_characters(text: &str) -> Cow<'_, str> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CompletionSources {
     None,
-    RookOnly,
+    PtermOnly,
     NativeOnly,
     /// Bundled specs first, asking the shell only if they come back empty.
-    RookThenNative,
+    PtermThenNative,
 }
 
 impl CompletionSources {
-    fn resolve(rook_completions_enabled: bool, native_shell_completions_eligible: bool) -> Self {
-        match (rook_completions_enabled, native_shell_completions_eligible) {
-            (true, true) => Self::RookThenNative,
-            (true, false) => Self::RookOnly,
+    fn resolve(pterm_completions_enabled: bool, native_shell_completions_eligible: bool) -> Self {
+        match (pterm_completions_enabled, native_shell_completions_eligible) {
+            (true, true) => Self::PtermThenNative,
+            (true, false) => Self::PtermOnly,
             (false, true) => Self::NativeOnly,
             (false, false) => Self::None,
         }
@@ -1604,7 +1604,7 @@ impl CompletionSources {
 
     /// Whether the shell's native completions are consulted for this request.
     fn uses_native(self) -> bool {
-        matches!(self, Self::NativeOnly | Self::RookThenNative)
+        matches!(self, Self::NativeOnly | Self::PtermThenNative)
     }
 }
 
@@ -1616,17 +1616,17 @@ fn resolve_completion_sources(
     is_ai_input: bool,
     buffer_text_is_multiline: bool,
     completions_trigger: CompletionsTrigger,
-    rook_completions_enabled: bool,
+    pterm_completions_enabled: bool,
     native_shell_completions_enabled: bool,
 ) -> CompletionSources {
-    let (rook_completions_enabled, native_shell_completions_enabled) = if feature_flag_enabled {
-        (rook_completions_enabled, native_shell_completions_enabled)
+    let (pterm_completions_enabled, native_shell_completions_enabled) = if feature_flag_enabled {
+        (pterm_completions_enabled, native_shell_completions_enabled)
     } else {
         (true, false)
     };
 
     if is_ai_input {
-        return CompletionSources::RookOnly;
+        return CompletionSources::PtermOnly;
     }
 
     let native_shell_completions_eligible = completions_trigger != CompletionsTrigger::AsYouType
@@ -1634,7 +1634,7 @@ fn resolve_completion_sources(
         && !buffer_text_is_multiline // For now, don't use native shell completions for multi-line commands.
         && !is_ai_input;
 
-    CompletionSources::resolve(rook_completions_enabled, native_shell_completions_eligible)
+    CompletionSources::resolve(pterm_completions_enabled, native_shell_completions_eligible)
 }
 
 /// Builds [`SuggestionResults`] from a shell's native-completions reply.
@@ -2116,7 +2116,7 @@ async fn upload_pending_attachments_to_task(
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     if cfg!(feature = "integration_tests") {
         app.register_fixed_bindings([
@@ -2154,7 +2154,7 @@ pub fn init(app: &mut AppContext) {
 
     app.register_editable_bindings([EditableBinding::new(
         "input:insert_network_logging_workflow",
-        "Show Rook network log",
+        "Show Polaris Terminal network log",
         WorkspaceAction::OpenNetworkLogPane,
     )
     .with_enabled(|| ContextFlag::NetworkLogConsole.is_enabled())]);
@@ -2299,7 +2299,7 @@ pub fn init(app: &mut AppContext) {
                 & id!(flags::IS_ANY_AI_ENABLED)
                 & !id!("AIInput"),
         )
-        .with_group(bindings::BindingGroup::RookAi.as_str())
+        .with_group(bindings::BindingGroup::PtermAi.as_str())
         .with_custom_action(CustomAction::AISearch),
         EditableBinding::new(
             START_NEW_CONVERSATION_KEYBINDING_NAME,
@@ -2311,7 +2311,7 @@ pub fn init(app: &mut AppContext) {
             },
         )
         .with_enabled(|| !FeatureFlag::AgentView.is_enabled())
-        .with_group(bindings::BindingGroup::RookAi.as_str())
+        .with_group(bindings::BindingGroup::PtermAi.as_str())
         .with_context_predicate(
             id!("Input") & id!(flags::IS_ANY_AI_ENABLED) & id!("TerminalView_NonEmptyBlockList"),
         )
@@ -2323,7 +2323,7 @@ pub fn init(app: &mut AppContext) {
             InputAction::EnableAutoDetection,
         )
         .with_enabled(|| FeatureFlag::AgentMode.is_enabled())
-        .with_group(bindings::BindingGroup::RookAi.as_str())
+        .with_group(bindings::BindingGroup::PtermAi.as_str())
         .with_context_predicate(
             id!("Input")
                 & id!("UniversalDeveloperInput")
@@ -3468,7 +3468,7 @@ impl Input {
             .app_workflows()
             .cloned()
             .collect_vec();
-        let local_user_workflows = RookConfig::as_ref(ctx).local_user_workflows().clone();
+        let local_user_workflows = PtermConfig::as_ref(ctx).local_user_workflows().clone();
 
         let workflows_search_view = ctx.add_typed_action_view(|ctx| {
             workflows::CategoriesView::new(local_user_workflows, app_workflows, ctx)
@@ -4933,7 +4933,7 @@ impl Input {
     }
 
     /// Cloud handoff is Oz-only. When this pane's active Agent Mode model can't
-    /// run in a Rook cloud (Oz) agent (e.g. a custom-endpoint/BYOK model or
+    /// run in a Polaris Terminal cloud (Oz) agent (e.g. a custom-endpoint/BYOK model or
     /// local custom router), shows an explanatory error toast and returns true
     /// so the `&`, footer-chip, and `/handoff` entry points can bail out up
     /// front instead of failing at spawn time.
@@ -4952,7 +4952,7 @@ impl Input {
         ToastStack::handle(ctx).update(ctx, |ts, ctx| {
             ts.add_ephemeral_toast(
                 DismissibleToast::error(
-                    "Custom models can't run in the cloud. Switch to a Rook model to hand off."
+                    "Custom models can't run in the cloud. Switch to a Polaris Terminal model to hand off."
                         .to_owned(),
                 ),
                 window_id,
@@ -5572,7 +5572,7 @@ impl Input {
 
         self.show_workflows_info_box_on_workflow_selection(
             WorkflowType::Cloud(Box::new(workflow)),
-            WorkflowSource::RookAI,
+            WorkflowSource::PtermAI,
             WorkflowSelectionSource::SlashMenu,
             None,
             ctx,
@@ -6710,7 +6710,7 @@ impl Input {
                 range_end: None,
             };
             // Emit an event to create a new code pane
-            ctx.emit(Event::OpenCodeInRook {
+            ctx.emit(Event::OpenCodeInPterm {
                 source: code_source,
                 layout: *external_editor::EditorSettings::as_ref(ctx)
                     .open_file_layout
@@ -6887,7 +6887,7 @@ impl Input {
                 }
 
                 // Follow the `agent_indicator` pattern (see `app/src/tab.rs`):
-                //  * `None` (no conversation, empty, passive, or untitled) => new conversation => "Rook anything"
+                //  * `None` (no conversation, empty, passive, or untitled) => new conversation => "Polaris Terminal anything"
                 //  * `InProgress`                                           => agent running    => "Steer"
                 //  * Any other status                                       => finished         => "Ask a follow up"
                 match self
@@ -7291,7 +7291,7 @@ impl Input {
         });
     }
 
-    /// Predicts the next action using an AI model and past context on blocks within Rook.
+    /// Predicts the next action using an AI model and past context on blocks within Polaris Terminal.
     /// Populates the autosuggestion with the predicted action, if any. Otherwise, falls back to
     /// existing autosuggestion logic.
     #[cfg_attr(target_family = "wasm", allow(unused_variables))]
@@ -8707,7 +8707,7 @@ impl Input {
         ctx.emit_a11y_content(AccessibilityContent::new(
             accessibility_text,
             "Press shift-tab to select the next workflow argument",
-            RookA11yRole::UserAction,
+            PtermA11yRole::UserAction,
         ));
 
         // Only highlight an argument and show enum suggestions if history suggestions are not active
@@ -8732,7 +8732,7 @@ impl Input {
             .string_model;
 
         if shell_type == ShellType::Fish {
-            // Rook currently doesn't support newlines in Fish, just prepend the vars
+            // Polaris Terminal currently doesn't support newlines in Fish, just prepend the vars
             let mut command = env_vars.export_variables_for_shell(ShellType::Fish);
             command.push(' ');
             Some(command)
@@ -9059,7 +9059,7 @@ impl Input {
 
                 ctx.emit_a11y_content(AccessibilityContent::new_without_help(
                     format!("Executed: {command}"),
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ));
             }
             InputSuggestionsEvent::CloseSuggestion {
@@ -11139,7 +11139,8 @@ impl Input {
                             // the completions finish quickly, since that causes a jittery UX.
                             let _ = ctx.spawn(
                                 async move {
-                                    rookui::r#async::Timer::after(Duration::from_millis(750)).await;
+                                    ptermui::r#async::Timer::after(Duration::from_millis(750))
+                                        .await;
                                     old_buffer_text_original
                                 },
                                 move |input, old_buffer_text_original, ctx| {
@@ -11738,8 +11739,8 @@ impl Input {
                                     .and_then(BlockMetadata::current_working_directory)
                                     .and_then(|pwd| {
                                         // Find git repo and construct absolute path
+                                        use pterm_util::local_or_remote_path::LocalOrRemotePath;
                                         use repo_metadata::repositories::DetectedRepositories;
-                                        use rook_util::local_or_remote_path::LocalOrRemotePath;
                                         let git_repo_path = DetectedRepositories::as_ref(ctx)
                                             .get_root_for_path(&LocalOrRemotePath::Local(
                                                 Path::new(pwd).to_path_buf(),
@@ -11753,7 +11754,7 @@ impl Input {
                                             .map(|session| session.is_wsl())
                                             .unwrap_or(false);
 
-                                        let relative_path = rook_util::path::to_relative_path(
+                                        let relative_path = pterm_util::path::to_relative_path(
                                             is_wsl,
                                             &absolute_path,
                                             Path::new(pwd),
@@ -11830,7 +11831,7 @@ impl Input {
                         None => image_filepaths.clone(),
                     };
                     let paths_str =
-                        rookui::clipboard_utils::escaped_paths_str(&transformed, shell_family);
+                        ptermui::clipboard_utils::escaped_paths_str(&transformed, shell_family);
 
                     self.editor.update(ctx, |editor, ctx| {
                         editor.user_insert(&paths_str, ctx);
@@ -11880,7 +11881,7 @@ impl Input {
 
         // Check if we should insert clipboard text in advance
         let mut already_inserted_text = false;
-        if rookui::clipboard::should_insert_text_on_paste(&content) {
+        if ptermui::clipboard::should_insert_text_on_paste(&content) {
             self.insert_clipboard_text_content(ctx, content.clone());
             already_inserted_text = true;
         }
@@ -11892,7 +11893,7 @@ impl Input {
             self.handle_pasted_image_data(content.clone(), ctx) == 0
         } else if content.num_paths() > 0 {
             // Else, we check the pasted file paths for any images.
-            let image_filepaths = rookui::clipboard_utils::get_image_filepaths_from_paths(
+            let image_filepaths = ptermui::clipboard_utils::get_image_filepaths_from_paths(
                 content.paths.as_deref().unwrap_or(&[]),
             );
             let num_images_expected = image_filepaths.len();
@@ -12651,13 +12652,13 @@ impl Input {
 
         // CLI agent rich input in shell mode (! prefix) should allow completions
         // even though the active block is a long-running command.
-        // However, completions are disabled on rookified remote hosts because
+        // However, completions are disabled on ptermified remote hosts because
         // in-band generators don't work in this context (with CLI agent).
         let is_cli_agent_shell_mode = self.is_locked_in_shell_mode(ctx)
             && CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.terminal_view_id)
             && !self
                 .active_session(ctx)
-                .is_some_and(|s| matches!(s.session_type(), SessionType::RookifiedRemote { .. }));
+                .is_some_and(|s| matches!(s.session_type(), SessionType::PtermifiedRemote { .. }));
 
         // If the cursor is in a valid completion position, go into CompletionSuggestions mode
         if (is_command_grid_active || is_cli_agent_shell_mode) && self.can_query_history(ctx) {
@@ -12703,7 +12704,7 @@ impl Input {
                 input_type.is_ai(),
                 buffer_text.contains('\n'),
                 completions_trigger,
-                *input_settings.rook_completions_enabled,
+                *input_settings.pterm_completions_enabled,
                 *input_settings.native_shell_completions_enabled,
             )
         };
@@ -12751,7 +12752,7 @@ impl Input {
             return;
         }
 
-        if comp_sources == CompletionSources::RookThenNative {
+        if comp_sources == CompletionSources::PtermThenNative {
             let completion_session = completion_context.session.clone();
             let abort_handle = ctx
                 .spawn_abortable(
@@ -13503,7 +13504,7 @@ impl Input {
             if let Some(a11y_text) = self.selected_workflow_a11y_text(ctx) {
                 ctx.emit_a11y_content(AccessibilityContent::new_without_help(
                     a11y_text,
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ));
             }
         } else {
@@ -13585,7 +13586,7 @@ impl Input {
             if trigger == CommandXRayTrigger::Keystroke {
                 ctx.emit_a11y_content(AccessibilityContent::new_without_help(
                     description.a11y_text(),
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ));
             }
             ctx.notify();
@@ -14536,7 +14537,7 @@ impl Input {
     /// without touching the input buffer or triggering NLD / autosuggestion side-effects.
     ///
     /// Cancels the in-flight stream first so slash/skill paths don't trip the in-flight assertion.
-    /// `is_for_same_conversation: true` keeps the conversation status `InProgress` so the rooking
+    /// `is_for_same_conversation: true` keeps the conversation status `InProgress` so the pterming
     /// indicator stays visible.
     pub(crate) fn submit_queued_prompt(
         &mut self,
@@ -15092,7 +15093,7 @@ impl Input {
             && let WorkflowType::Cloud(workflow) = &workflow_state.workflow_type
         {
             send_telemetry_from_ctx!(
-                TelemetryEvent::ExecutedRookDrivePrompt {
+                TelemetryEvent::ExecutedPtermDrivePrompt {
                     id: workflow.id.into_server().map(Into::into),
                     selection_source: workflow_state.workflow_selection_source,
                 },
@@ -16045,7 +16046,7 @@ impl Input {
                                 .cloned(),
                             workflow_selection_source: selected_workflow_state
                                 .workflow_selection_source,
-                            // This is only `Some()` for RookDrive workflows; we don't track
+                            // This is only `Some()` for PtermDrive workflows; we don't track
                             // ID for execution of local workflows because they have no such
                             // unique ID.
                             workflow_id: selected_workflow_state.workflow_type.server_id(),
@@ -16427,7 +16428,7 @@ impl Input {
                 ..Default::default()
             },
         )
-        .with_icon(icon.to_rookui_icon(
+        .with_icon(icon.to_ptermui_icon(
             blended_colors::text_main(appearance.theme(), appearance.theme().background()).into(),
         ))
         .with_close_button(close_button)
@@ -16711,7 +16712,7 @@ impl TypedActionView for Input {
                     INPUT_A11Y_LABEL,
                     // TODO (a11y) use bindings from user settings
                     INPUT_A11Y_HELPER,
-                    RookA11yRole::TextareaRole,
+                    PtermA11yRole::TextareaRole,
                 ))
             }
             _ => ActionAccessibilityContent::Empty,
@@ -16933,7 +16934,7 @@ impl View for Input {
             INPUT_A11Y_LABEL,
             // TODO (a11y) use bindings from user settings
             INPUT_A11Y_HELPER,
-            RookA11yRole::TextareaRole,
+            PtermA11yRole::TextareaRole,
         ))
     }
 
@@ -16956,7 +16957,7 @@ impl View for Input {
         }
     }
 
-    fn keymap_context(&self, app: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> ptermui::keymap::Context {
         let mut ctx = Self::default_keymap_context();
         let ai_settings = AISettings::as_ref(app);
 

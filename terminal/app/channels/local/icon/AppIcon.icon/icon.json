@@ -24,8 +24,8 @@
         {
           "blend-mode" : "normal",
           "glass" : true,
-          "image-name" : "rook-glyph 3.svg",
-          "name" : "rook-glyph 3"
+          "image-name" : "polaris-terminal-glyph 3.svg",
+          "name" : "polaris-terminal-glyph 3"
         }
       ],
       "shadow" : {

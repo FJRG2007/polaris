@@ -6,8 +6,8 @@ use std::ops::Range;
 use anyhow::{Context, Result};
 pub use fold_map::BufferRows;
 use fold_map::FoldMap;
-use rookui::text::point::Point;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle};
+use ptermui::text::point::Point;
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle};
 use string_offset::CharOffset;
 
 use super::buffer::{self, Anchor, Buffer, Edit, StylizedChar, ToCharOffset, ToPoint};

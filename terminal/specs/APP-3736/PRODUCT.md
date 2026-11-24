@@ -23,7 +23,7 @@ Tab configs can already create a worktree when a tab opens, but they cannot decl
 ## Non-goals
 
 - Per-pane close hooks.
-- Guaranteeing cleanup when Rook crashes, is force-quit, or loses power.
+- Guaranteeing cleanup when Polaris Terminal crashes, is force-quit, or loses power.
 - Guaranteeing cleanup after app restore or undo-close. Close behavior is resolved for the live tab instance when the tab opens and is not persisted into workspace snapshots.
 - Managing worktrees created outside the tab config flow.
 - New confirmation UI or modal flow for close cleanup.
@@ -44,7 +44,7 @@ Tab configs may optionally include a top-level `[on_close]` table.
   - `directory` (optional): working directory used for close-time commands.
   - `commands` (required when `[on_close]` is present): ordered shell commands to run when the tab closes.
 - `directory` and `commands` support the same template variables that tab configs already support for `title`, pane `directory`, and pane `commands`.
-- Close-time template expansion uses the values that were used when the tab instance was opened. Rook must not re-prompt for params when the tab closes.
+- Close-time template expansion uses the values that were used when the tab instance was opened. Polaris Terminal must not re-prompt for params when the tab closes.
 - Template rendering follows the same quoting rules as open-time config rendering: `directory` receives unquoted values so paths remain valid, and `commands` receive shell-quoted values.
 
 ### Triggering close behavior
@@ -57,10 +57,10 @@ Tab configs may optionally include a top-level `[on_close]` table.
 
 ### Command execution semantics
 
-- Rook runs `on_close.commands` in order.
-- If a command fails, Rook still closes the tab. Failures are best-effort and do not block close.
-- If a command fails, Rook stops running the remaining close commands for that tab instance, logs the failure, and shows a persistent non-blocking error toast.
-- If Rook cannot access local shell state for cleanup, close commands are skipped, the tab still closes, and Rook shows a persistent non-blocking error toast.
+- Polaris Terminal runs `on_close.commands` in order.
+- If a command fails, Polaris Terminal still closes the tab. Failures are best-effort and do not block close.
+- If a command fails, Polaris Terminal stops running the remaining close commands for that tab instance, logs the failure, and shows a persistent non-blocking error toast.
+- If Polaris Terminal cannot access local shell state for cleanup, close commands are skipped, the tab still closes, and Polaris Terminal shows a persistent non-blocking error toast.
 - For worktree configs, the common pattern is to set `on_close.directory` to the repo root so cleanup does not depend on the tab's live shell state.
 
 ### Worktree example: remove the worktree, keep the branch
@@ -129,10 +129,10 @@ If a worktree config relies on an auto-generated branch name, close behavior use
 
 1. A tab config without `[on_close]` closes with no behavior change from today.
 2. A tab config with `[on_close]` runs its close commands once when the user explicitly closes the tab.
-3. Close-time commands use the resolved values from the tab instance that is closing; Rook does not reopen the param modal.
+3. Close-time commands use the resolved values from the tab instance that is closing; Polaris Terminal does not reopen the param modal.
 4. A worktree config can remove only the worktree on close while leaving the branch untouched.
 5. A worktree config can remove the worktree and then delete the branch on close.
-6. If the worktree removal step fails, Rook still closes the tab immediately, shows a persistent error toast, logs the cleanup failure, and does not run later branch-deletion commands.
+6. If the worktree removal step fails, Polaris Terminal still closes the tab immediately, shows a persistent error toast, logs the cleanup failure, and does not run later branch-deletion commands.
 7. The default tab config template includes a commented example of close cleanup for worktrees.
 8. The bundled `tab-configs` skill documentation describes `[on_close]` and includes both worktree cleanup variants.
 

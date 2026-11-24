@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 
 use cloud_object_models::CodeForge;
 use command::blocking::Command;
-use rook_cli::agent::{RepositoryForge, RepositoryHeadOverride, RepositoryHeadRef};
-use rook_core::command::ExitCode;
+use pterm_cli::agent::{RepositoryForge, RepositoryHeadOverride, RepositoryHeadRef};
+use pterm_core::command::ExitCode;
 use tempfile::TempDir;
 
 use super::{
@@ -91,22 +91,28 @@ fn resolved_head_command_prints_one_line_per_repo() {
     let workspace = Path::new("/workspace");
     let command = unwrap_sh_c_script(&build_resolved_head_command(
         &[
-            clone_request(repo(CodeForge::GitHub, "warpdotdev", "rook"), None),
-            clone_request(repo(CodeForge::GitHub, "warpdotdev", "rook-server"), None),
+            clone_request(
+                repo(CodeForge::GitHub, "warpdotdev", "polaris-terminal"),
+                None,
+            ),
+            clone_request(
+                repo(CodeForge::GitHub, "warpdotdev", "polaris-terminal-server"),
+                None,
+            ),
         ],
         workspace,
     ));
-    let rook_dir = workspace.join("rook");
-    let rook_server_dir = workspace.join("rook-server");
+    let pterm_dir = workspace.join("polaris-terminal");
+    let pterm_server_dir = workspace.join("polaris-terminal-server");
 
     assert!(command.starts_with("set +e\n"));
     assert!(command.contains(&format!(
         "git -C '{}' rev-parse --verify HEAD",
-        rook_dir.to_string_lossy()
+        pterm_dir.to_string_lossy()
     )));
     assert!(command.contains(&format!(
         "git -C '{}' rev-parse --verify HEAD",
-        rook_server_dir.to_string_lossy()
+        pterm_server_dir.to_string_lossy()
     )));
     assert_eq!(command.matches("printf '%s\\n'").count(), 2);
 }
@@ -115,7 +121,7 @@ fn resolved_head_command_prints_one_line_per_repo() {
 fn environment_snapshot_keeps_resolved_heads_in_request_order() {
     let requests = vec![
         clone_request(
-            repo(CodeForge::GitHub, "warpdotdev", "rook"),
+            repo(CodeForge::GitHub, "warpdotdev", "polaris-terminal"),
             Some(RepositoryHeadRef::Branch("main".to_string())),
         ),
         clone_request(
@@ -136,7 +142,7 @@ fn environment_snapshot_keeps_resolved_heads_in_request_order() {
 
     assert_eq!(snapshot.repositories.len(), 2);
     assert_eq!(snapshot.repositories[0].repo_owner, "warpdotdev");
-    assert_eq!(snapshot.repositories[0].checkout_path, "rook");
+    assert_eq!(snapshot.repositories[0].checkout_path, "polaris-terminal");
     assert_eq!(
         snapshot.repositories[0].requested_checkout_ref.as_deref(),
         Some("main")
@@ -200,10 +206,10 @@ fn single_repo_name_returns_repo_when_exactly_one_repo() {
     let repos = vec![SourceRepo::new(
         CodeForge::GitHub,
         "warpdotdev".to_string(),
-        "rook-internal".to_string(),
+        "polaris-terminal-internal".to_string(),
     )];
     let selected_repo = single_repo_name(&repos);
-    assert_eq!(selected_repo, Some("rook-internal".to_string()));
+    assert_eq!(selected_repo, Some("polaris-terminal-internal".to_string()));
 }
 
 fn repo(forge: CodeForge, owner: &str, name: &str) -> SourceRepo {
@@ -212,17 +218,17 @@ fn repo(forge: CodeForge, owner: &str, name: &str) -> SourceRepo {
 
 #[test]
 fn merge_repos_dedupes_case_insensitively_and_preserves_environment_order() {
-    let environment = vec![repo(CodeForge::GitHub, "RookDotDev", "Rook")];
+    let environment = vec![repo(CodeForge::GitHub, "PtermDotDev", "Polaris Terminal")];
     let additional = vec![
-        repo(CodeForge::GitHub, "rookdotdev", "rook"),
-        repo(CodeForge::GitHub, "rookdotdev", "rook-server"),
+        repo(CodeForge::GitHub, "ptermdotdev", "polaris-terminal"),
+        repo(CodeForge::GitHub, "ptermdotdev", "polaris-terminal-server"),
     ];
 
     assert_eq!(
         merge_repos_deduped(environment, additional).unwrap(),
         vec![
-            repo(CodeForge::GitHub, "RookDotDev", "Rook"),
-            repo(CodeForge::GitHub, "rookdotdev", "rook-server"),
+            repo(CodeForge::GitHub, "PtermDotDev", "Polaris Terminal"),
+            repo(CodeForge::GitHub, "ptermdotdev", "polaris-terminal-server"),
         ]
     );
 }
@@ -260,7 +266,7 @@ fn merge_repos_rejects_clone_directory_collisions() {
 
 #[test]
 fn merge_repos_supports_additional_only_and_empty_inputs() {
-    let additional = vec![repo(CodeForge::GitHub, "warpdotdev", "rook")];
+    let additional = vec![repo(CodeForge::GitHub, "warpdotdev", "polaris-terminal")];
     assert_eq!(
         merge_repos_deduped(Vec::new(), additional.clone()).unwrap(),
         additional
@@ -281,12 +287,12 @@ fn single_repo_name_returns_none_for_zero_or_many_repos() {
         SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".to_string(),
-            "rook-internal".to_string(),
+            "polaris-terminal-internal".to_string(),
         ),
         SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".to_string(),
-            "rook-server".to_string(),
+            "polaris-terminal-server".to_string(),
         ),
     ];
     assert_eq!(single_repo_name(&two_repos), None);
@@ -298,7 +304,7 @@ fn parallel_clone_command_runs_repos_in_background_and_waits() {
         SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".to_string(),
-            "rook".to_string(),
+            "polaris-terminal".to_string(),
         ),
         SourceRepo::new(
             CodeForge::GitLab,
@@ -316,14 +322,14 @@ fn parallel_clone_command_runs_repos_in_background_and_waits() {
     );
 
     assert!(command.starts_with("sh -c '"));
-    assert!(command.contains("warpdotdev/rook"));
-    assert!(command.contains("https://github.com/warpdotdev/rook.git"));
+    assert!(command.contains("warpdotdev/polaris-terminal"));
+    assert!(command.contains("https://github.com/warpdotdev/polaris-terminal.git"));
     assert!(command.contains("platform/backend/api"));
     assert!(command.contains("https://gitlab.com/platform/backend/api.git"));
     assert_eq!(command.matches("clone_repo").count(), 3);
     assert_eq!(command.matches("2>&1 &").count(), 2);
     assert!(command.contains("mktemp -d"));
-    assert!(command.contains("rook-clone-logs"));
+    assert!(command.contains("polaris-terminal-clone-logs"));
     assert!(command.contains("trap cleanup_clone_logs EXIT"));
     assert!(command.contains("repo-0.log"));
     assert!(command.contains("repo-1.log"));
@@ -331,7 +337,7 @@ fn parallel_clone_command_runs_repos_in_background_and_waits() {
     assert!(command.contains(">\"$log_file_1\" 2>&1 &"));
     assert!(command.contains("pids=\"$pids $!\""));
     assert!(command.contains("wait \"$pid\""));
-    assert!(command.contains("===== warpdotdev/rook ====="));
+    assert!(command.contains("===== warpdotdev/polaris-terminal ====="));
     assert!(command.contains("cat \"$log_file_0\""));
     assert!(command.contains("===== platform/backend/api ====="));
     assert!(!command.contains("repository revision results"));
@@ -344,7 +350,7 @@ fn parallel_clone_command_threads_checkout_ref_and_pins_after_clone() {
         SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".to_string(),
-            "rook".to_string(),
+            "polaris-terminal".to_string(),
         )
         .with_checkout_ref(Some("abc123".to_string())),
         SourceRepo::new(
@@ -385,7 +391,7 @@ fn parallel_clone_command_fetches_commit_shas_without_cloning_later_history() {
                 SourceRepo::new(
                     CodeForge::GitHub,
                     "warpdotdev".to_string(),
-                    "rook".to_string(),
+                    "polaris-terminal".to_string(),
                 ),
                 Some(RepositoryHeadRef::CommitSha(
                     "0123456789abcdef0123456789abcdef01234567".to_string(),
@@ -395,7 +401,7 @@ fn parallel_clone_command_fetches_commit_shas_without_cloning_later_history() {
                 SourceRepo::new(
                     CodeForge::GitHub,
                     "warpdotdev".to_string(),
-                    "rook-server".to_string(),
+                    "polaris-terminal-server".to_string(),
                 ),
                 Some(RepositoryHeadRef::Branch("develop".to_string())),
             ),
@@ -417,7 +423,7 @@ fn checkout_command_checks_out_fetch_head_not_ref_name() {
     let repo = SourceRepo::new(
         CodeForge::GitHub,
         "warpdotdev".to_string(),
-        "rook".to_string(),
+        "polaris-terminal".to_string(),
     )
     .with_checkout_ref(Some("feature".to_string()));
 
@@ -429,10 +435,10 @@ fn checkout_command_checks_out_fetch_head_not_ref_name() {
     )
     .unwrap();
 
-    let rook_dir = workspace.join("rook");
+    let pterm_dir = workspace.join("polaris-terminal");
     assert!(command.contains(&format!(
         "git -C '{}' fetch --filter=blob:none origin 'feature'",
-        rook_dir.to_string_lossy()
+        pterm_dir.to_string_lossy()
     )));
     assert!(command.contains("checkout --detach FETCH_HEAD"));
     assert!(!command.contains("checkout --detach 'feature'"));
@@ -443,7 +449,7 @@ fn checkout_command_absent_when_no_ref() {
     let repo = SourceRepo::new(
         CodeForge::GitHub,
         "warpdotdev".to_string(),
-        "rook".to_string(),
+        "polaris-terminal".to_string(),
     );
     assert!(
         checkout_command_for(
@@ -461,13 +467,13 @@ fn head_overrides_replace_checkout_ref_only_for_matching_repos() {
         SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".to_string(),
-            "rook".to_string(),
+            "polaris-terminal".to_string(),
         )
         .with_checkout_ref(Some("abc123".to_string())),
         SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".to_string(),
-            "rook-server".to_string(),
+            "polaris-terminal-server".to_string(),
         )
         .with_checkout_ref(Some("old-pin".to_string())),
     ];
@@ -475,7 +481,7 @@ fn head_overrides_replace_checkout_ref_only_for_matching_repos() {
         commit_head_override(
             RepositoryForge::GitHub,
             "warpdotdev",
-            "rook",
+            "polaris-terminal",
             "0123456789abcdef0123456789abcdef01234567",
         ),
         branch_head_override(RepositoryForge::GitHub, "warpdotdev", "unused", "develop"),
@@ -501,7 +507,7 @@ fn clone_requests_use_each_repository_host() {
         SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".to_string(),
-            "rook".to_string(),
+            "polaris-terminal".to_string(),
         ),
         SourceRepo::new(
             CodeForge::GitLab,
@@ -515,13 +521,13 @@ fn clone_requests_use_each_repository_host() {
 
     assert_eq!(
         prepared[0].repo.https_clone_url(),
-        "https://github.com/warpdotdev/rook.git"
+        "https://github.com/warpdotdev/polaris-terminal.git"
     );
     assert_eq!(
         prepared[1].repo.https_clone_url(),
         "https://gitlab.com/platform/backend/api.git"
     );
-    assert!(command.contains("https://github.com/warpdotdev/rook.git"));
+    assert!(command.contains("https://github.com/warpdotdev/polaris-terminal.git"));
     assert!(command.contains("https://gitlab.com/platform/backend/api.git"));
 }
 
@@ -555,7 +561,7 @@ fn clone_requests_reject_a_mixed_repository_missing_forge() {
             SourceRepo::new(
                 CodeForge::GitHub,
                 "warpdotdev".to_string(),
-                "rook".to_string(),
+                "polaris-terminal".to_string(),
             ),
             SourceRepo {
                 code_forge: None,
@@ -593,7 +599,7 @@ fn clone_requests_reject_an_omitted_forge_when_github_is_paired_with_an_unknown_
             SourceRepo::new(
                 CodeForge::GitHub,
                 "warpdotdev".to_string(),
-                "rook".to_string(),
+                "polaris-terminal".to_string(),
             ),
             SourceRepo {
                 code_forge: None,
@@ -629,7 +635,7 @@ fn clone_requests_reject_a_repository_with_an_unrecognized_forge() {
     let repos = vec![SourceRepo::new(
         CodeForge::Unknown,
         "warpdotdev".to_string(),
-        "rook".to_string(),
+        "polaris-terminal".to_string(),
     )];
 
     let error = repository_clone_requests(&repos, &[]).unwrap_err();
@@ -637,7 +643,7 @@ fn clone_requests_reject_a_repository_with_an_unrecognized_forge() {
     assert!(matches!(
         error,
         PrepareEnvironmentError::UnsupportedRepositoryForge { repo_name }
-            if repo_name == "warpdotdev/rook"
+            if repo_name == "warpdotdev/polaris-terminal"
     ));
 }
 
@@ -650,18 +656,18 @@ fn clone_requests_reject_an_unrecognized_forge_repository_even_with_unrelated_ov
         SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".to_string(),
-            "rook".to_string(),
+            "polaris-terminal".to_string(),
         ),
         SourceRepo::new(
             CodeForge::Unknown,
             "warpdotdev".to_string(),
-            "rook-server".to_string(),
+            "polaris-terminal-server".to_string(),
         ),
     ];
     let overrides = vec![commit_head_override(
         RepositoryForge::GitHub,
         "warpdotdev",
-        "rook",
+        "polaris-terminal",
         "0123456789abcdef0123456789abcdef01234567",
     )];
 
@@ -670,7 +676,7 @@ fn clone_requests_reject_an_unrecognized_forge_repository_even_with_unrelated_ov
     assert!(matches!(
         error,
         PrepareEnvironmentError::UnsupportedRepositoryForge { repo_name }
-            if repo_name == "warpdotdev/rook-server"
+            if repo_name == "warpdotdev/polaris-terminal-server"
     ));
 }
 
@@ -683,12 +689,12 @@ fn head_override_validation_treats_an_unrecognized_forge_repository_as_never_mat
     let environment = environment_with_repos(vec![SourceRepo::new(
         CodeForge::Unknown,
         "warpdotdev".to_string(),
-        "rook".to_string(),
+        "polaris-terminal".to_string(),
     )]);
     let override_for_it = commit_head_override(
         RepositoryForge::GitHub,
         "warpdotdev",
-        "rook",
+        "polaris-terminal",
         "0123456789abcdef0123456789abcdef01234567",
     );
 
@@ -703,12 +709,12 @@ fn repository_head_override_validation_rejects_duplicates_and_mismatches() {
     let environment = environment_with_repos(vec![SourceRepo::new(
         CodeForge::GitHub,
         "warpdotdev".to_string(),
-        "rook".to_string(),
+        "polaris-terminal".to_string(),
     )]);
     let github = commit_head_override(
         RepositoryForge::GitHub,
         "warpdotdev",
-        "rook",
+        "polaris-terminal",
         "0123456789abcdef0123456789abcdef01234567",
     );
 
@@ -722,7 +728,7 @@ fn repository_head_override_validation_rejects_duplicates_and_mismatches() {
     let forge_mismatch = commit_head_override(
         RepositoryForge::GitLab,
         "warpdotdev",
-        "rook",
+        "polaris-terminal",
         "0123456789abcdef0123456789abcdef01234567",
     );
     let mismatch_error =
@@ -737,7 +743,7 @@ fn repository_head_override_validation_accepts_partial_multi_repo_sets() {
         SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".to_string(),
-            "rook".to_string(),
+            "polaris-terminal".to_string(),
         ),
         SourceRepo::new(
             CodeForge::GitLab,
@@ -748,7 +754,7 @@ fn repository_head_override_validation_accepts_partial_multi_repo_sets() {
     let partial_overrides = vec![commit_head_override(
         RepositoryForge::GitHub,
         "warpdotdev",
-        "rook",
+        "polaris-terminal",
         "0123456789abcdef0123456789abcdef01234567",
     )];
 
@@ -762,20 +768,20 @@ fn applied_head_overrides_are_threaded_through_the_existing_clone_command() {
         SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".to_string(),
-            "rook".to_string(),
+            "polaris-terminal".to_string(),
         )
         .with_checkout_ref(Some("abc123".to_string())),
         SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".to_string(),
-            "rook-server".to_string(),
+            "polaris-terminal-server".to_string(),
         )
         .with_checkout_ref(Some("old-pin".to_string())),
     ];
     let overrides = vec![branch_head_override(
         RepositoryForge::GitHub,
         "warpdotdev",
-        "rook",
+        "polaris-terminal",
         "develop",
     )];
     let command = build_parallel_clone_command(
@@ -798,12 +804,12 @@ fn applied_commit_override_uses_sha_only_fetch() {
     let repos = vec![SourceRepo::new(
         CodeForge::GitHub,
         "warpdotdev".to_string(),
-        "rook".to_string(),
+        "polaris-terminal".to_string(),
     )];
     let overrides = vec![commit_head_override(
         RepositoryForge::GitHub,
         "warpdotdev",
-        "rook",
+        "polaris-terminal",
         "0123456789abcdef0123456789abcdef01234567",
     )];
     let command = build_parallel_clone_command(
@@ -823,34 +829,40 @@ fn repository_origin_removal_targets_all_environment_repositories() {
         SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".to_string(),
-            "rook".to_string(),
+            "polaris-terminal".to_string(),
         ),
         SourceRepo::new(
             CodeForge::GitHub,
             "warpdotdev".to_string(),
-            "rook-server".to_string(),
+            "polaris-terminal-server".to_string(),
         ),
     ];
 
     let workspace = Path::new("/workspace");
     let command = build_remove_repository_origins_command(&repos, workspace, ShellType::Bash);
 
-    let rook_dir = workspace.join("rook").to_string_lossy().into_owned();
-    let rook_server_dir = workspace.join("rook-server").to_string_lossy().into_owned();
-    assert!(command.contains(&rook_dir));
-    assert!(command.contains(&rook_server_dir));
+    let pterm_dir = workspace
+        .join("polaris-terminal")
+        .to_string_lossy()
+        .into_owned();
+    let pterm_server_dir = workspace
+        .join("polaris-terminal-server")
+        .to_string_lossy()
+        .into_owned();
+    assert!(command.contains(&pterm_dir));
+    assert!(command.contains(&pterm_server_dir));
     assert!(command.contains("remote get-url origin"));
     assert!(command.contains("remote remove origin"));
 }
 
 #[test]
 fn checkout_result_maps_nonzero_exit_to_checkout_failed() {
-    assert!(checkout_result("FJRG2007/rook", "abc123", ExitCode::from(0)).is_ok());
-    let err = checkout_result("FJRG2007/rook", "abc123", ExitCode::from(1)).unwrap_err();
+    assert!(checkout_result("FJRG2007/polaris", "abc123", ExitCode::from(0)).is_ok());
+    let err = checkout_result("FJRG2007/polaris", "abc123", ExitCode::from(1)).unwrap_err();
     assert!(matches!(
         err,
         PrepareEnvironmentError::CheckoutFailed { repo_name, checkout_ref }
-            if repo_name == "FJRG2007/rook" && checkout_ref == "abc123"
+            if repo_name == "FJRG2007/polaris" && checkout_ref == "abc123"
     ));
 }
 
@@ -1370,7 +1382,7 @@ fn factory_clone_is_prepended_when_clone_values_are_present() {
     assert_eq!(
         setup_commands,
         vec![
-            "git clone \"$ROOK_FACTORY_REPO_CLONE_URL\" \"$ROOK_FACTORY_REPO_DIR\"".to_string(),
+            "git clone \"$POLARIS_TERMINAL_FACTORY_REPO_CLONE_URL\" \"$POLARIS_TERMINAL_FACTORY_REPO_DIR\"".to_string(),
             "make setup".to_string(),
         ]
     );
@@ -1392,7 +1404,7 @@ fn factory_clone_defers_to_a_persisted_environment_copy() {
     // not the command's exact shape, so this must still be recognized and
     // left alone rather than duplicated.
     let persisted =
-        "git clone \"$ROOK_FACTORY_REPO_CLONE_URL\" \"$ROOK_FACTORY_REPO_DIR\"".to_string();
+        "git clone \"$POLARIS_TERMINAL_FACTORY_REPO_CLONE_URL\" \"$POLARIS_TERMINAL_FACTORY_REPO_DIR\"".to_string();
     let mut setup_commands = vec![persisted.clone(), "make setup".to_string()];
     super::prepend_factory_definition_clone_for_values(
         "https://t:token@definitions.example.com/team/factory.git",
@@ -1406,7 +1418,7 @@ fn factory_clone_defers_to_a_persisted_environment_copy() {
 fn factory_clone_defers_to_a_persisted_bare_clone_copy() {
     // A persisted copy in the bare (no target dir) shape must also be
     // recognized, since detection is shape-independent.
-    let persisted = "git clone \"$ROOK_FACTORY_REPO_CLONE_URL\"".to_string();
+    let persisted = "git clone \"$POLARIS_TERMINAL_FACTORY_REPO_CLONE_URL\"".to_string();
     let mut setup_commands = vec![persisted.clone(), "make setup".to_string()];
     super::prepend_factory_definition_clone_for_values(
         "https://t:token@definitions.example.com/team/factory.git",

@@ -1,12 +1,12 @@
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::icons::Icon;
-use rookui::elements::{
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::icons::Icon;
+use ptermui::elements::{
     ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Expanded, Fill, Flex,
     Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement as _, Radius, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity as _, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -130,7 +130,7 @@ impl CreateProjectView {
             .with_main_axis_size(MainAxisSize::Max)
             .with_children([
                 Container::new(
-                    ConstrainedBox::new(icon.to_rookui_icon(icon_color).finish())
+                    ConstrainedBox::new(icon.to_ptermui_icon(icon_color).finish())
                         .with_height(font_size)
                         .with_width(font_size)
                         .finish(),

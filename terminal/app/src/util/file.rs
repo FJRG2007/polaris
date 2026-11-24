@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use std::{fs, io};
 
 #[cfg(windows)]
-use rook_util::path::is_network_resource;
-use rook_util::path::{CleanPathResult, LineAndColumnArg};
+use pterm_util::path::is_network_resource;
+use pterm_util::path::{CleanPathResult, LineAndColumnArg};
 
 pub use self::external_editor::{open_file_path_in_external_editor, open_file_path_with_editor};
 use crate::terminal::ShellLaunchData;

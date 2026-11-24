@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use rookui::elements::{ChildView, Flex, ParentElement, SavePosition};
-use rookui::{Action, Element, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::elements::{ChildView, Flex, ParentElement, SavePosition};
+use ptermui::{Action, Element, TypedActionView, View, ViewContext, ViewHandle};
 
 use crate::ui_components::icons::Icon;
 use crate::view_components::action_button::{

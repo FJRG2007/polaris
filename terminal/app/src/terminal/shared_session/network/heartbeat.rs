@@ -6,8 +6,8 @@
 use std::time::Duration;
 
 use futures::stream::AbortHandle;
-use rookui::r#async::Timer;
-use rookui::{Entity, ModelContext};
+use ptermui::r#async::Timer;
+use ptermui::{Entity, ModelContext};
 
 const DEFAULT_PING_FREQUENCY: Duration = Duration::from_secs(5);
 const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(30);

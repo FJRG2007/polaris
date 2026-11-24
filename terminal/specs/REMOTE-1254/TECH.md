@@ -150,7 +150,7 @@ sequenceDiagram
 
 ## 6. Risks and mitigations
 
-**OSC vs protocol session conflict on viewer**: If a viewer somehow receives OSC `SessionStart` events (e.g. rookified SSH where plugin events leak), the local OSC path could clobber the protocol-managed session. Mitigated by an early return in `handle_cli_agent_notification` when `is_shared_session_viewer()` is true — the protocol is the sole source of truth for viewer session lifecycle.
+**OSC vs protocol session conflict on viewer**: If a viewer somehow receives OSC `SessionStart` events (e.g. ptermified SSH where plugin events leak), the local OSC path could clobber the protocol-managed session. Mitigated by an early return in `handle_cli_agent_notification` when `is_shared_session_viewer()` is true — the protocol is the sole source of truth for viewer session lifecycle.
 
 **Echo loops**: Handled by the existing `RemoteUpdateGuard` pattern — all new broadcast subscribers check `guard.should_broadcast()`, and all incoming `apply_*` calls run inside an `ActiveRemoteUpdate` scope.
 

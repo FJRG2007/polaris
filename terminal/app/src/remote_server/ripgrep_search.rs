@@ -50,7 +50,7 @@ pub(super) fn validate_request(msg: RipgrepSearchRequest) -> Result<RipgrepSearc
 pub(super) async fn run_search(
     params: RipgrepSearchParams,
 ) -> anyhow::Result<RipgrepSearchSuccess> {
-    let stream = rook_ripgrep::search::search_streaming(
+    let stream = pterm_ripgrep::search::search_streaming(
         std::slice::from_ref(&params.pattern),
         &params.roots,
         params.ignore_case,
@@ -110,7 +110,7 @@ pub(super) fn search_result_to_response(
 /// Converts a ripgrep match to its proto form without altering line text or
 /// submatch offsets. Response-wide caps bound payload size without corrupting
 /// individual matches.
-fn ripgrep_match_to_proto(m: rook_ripgrep::search::Match) -> RipgrepSearchMatch {
+fn ripgrep_match_to_proto(m: pterm_ripgrep::search::Match) -> RipgrepSearchMatch {
     RipgrepSearchMatch {
         file_path: m.file_path.to_string_lossy().to_string(),
         line_number: m.line_number,

@@ -12,8 +12,8 @@ use std::time::Duration;
 
 use futures::stream::AbortHandle;
 use lsp::LspManagerModel;
-use rookui::r#async::Timer;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use ptermui::r#async::Timer;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::code::local_code_editor::LocalCodeEditorView;
 use crate::terminal::TerminalView;

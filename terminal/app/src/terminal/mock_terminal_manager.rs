@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use parking_lot::FairMutex;
 use pathfinder_geometry::vector::Vector2F;
-use rookui::{AppContext, ModelHandle, SingletonEntity, ViewHandle, WindowId};
+use ptermui::{AppContext, ModelHandle, SingletonEntity, ViewHandle, WindowId};
 
 use super::event_listener::ChannelEventListener;
 use super::model::session::Sessions;
@@ -139,8 +139,8 @@ impl TerminalManager for MockTerminalManager {
 
 #[cfg(test)]
 mod testing {
-    use rookui::platform::WindowStyle;
-    use rookui::{App, Element, SingletonEntity};
+    use ptermui::platform::WindowStyle;
+    use ptermui::{App, Element, SingletonEntity};
 
     use super::*;
     use crate::server::server_api::ServerApiProvider;
@@ -151,21 +151,21 @@ mod testing {
         terminal_view: ViewHandle<TerminalView>,
     }
 
-    impl rookui::Entity for TerminalRootView {
+    impl ptermui::Entity for TerminalRootView {
         type Event = ();
     }
 
-    impl rookui::View for TerminalRootView {
+    impl ptermui::View for TerminalRootView {
         fn ui_name() -> &'static str {
             "TerminalRootView"
         }
 
-        fn render(&self, _app: &rookui::AppContext) -> Box<dyn rookui::Element> {
-            rookui::elements::ChildView::new(&self.terminal_view).finish()
+        fn render(&self, _app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
+            ptermui::elements::ChildView::new(&self.terminal_view).finish()
         }
     }
 
-    impl rookui::TypedActionView for TerminalRootView {
+    impl ptermui::TypedActionView for TerminalRootView {
         type Action = ();
     }
 

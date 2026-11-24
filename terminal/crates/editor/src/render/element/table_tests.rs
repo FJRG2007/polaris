@@ -2,12 +2,12 @@ use std::cell::Cell;
 use std::sync::Arc;
 
 use pathfinder_color::ColorU;
-use rookui_core::elements::{Axis, scroll_delta_for_pointer_movement};
-use rookui_core::fonts::FamilyId;
-use rookui_core::geometry::rect::RectF;
-use rookui_core::geometry::vector::vec2f;
-use rookui_core::text_layout::TextFrame;
-use rookui_core::units::{IntoPixels, Pixels};
+use ptermui_core::elements::{Axis, scroll_delta_for_pointer_movement};
+use ptermui_core::fonts::FamilyId;
+use ptermui_core::geometry::rect::RectF;
+use ptermui_core::geometry::vector::vec2f;
+use ptermui_core::text_layout::TextFrame;
+use ptermui_core::units::{IntoPixels, Pixels};
 use string_offset::CharOffset;
 
 use crate::content::text::{FormattedTable, table_cell_offset_maps};
@@ -211,7 +211,7 @@ fn cells_in_range_entire_table() {
 }
 
 fn single_line_cell_layout(char_count: usize, line_height: f32, line_width: f32) -> CellLayout {
-    use rookui_core::text_layout::CaretPosition;
+    use ptermui_core::text_layout::CaretPosition;
     let mut carets = Vec::with_capacity(char_count);
     let char_width = if char_count > 0 {
         line_width / char_count as f32

@@ -36,36 +36,36 @@ use parking_lot::{FairMutex, Mutex, RwLock};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 pub use pending_user_query_block::{PendingUserQueryBlock, PendingUserQueryBlockEvent};
-#[cfg(not(target_family = "wasm"))]
-use repo_metadata::repositories::DetectedRepositories;
-use rook_core::channel::ChannelState;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::content::buffer::InitialBufferState;
+use pterm_core::channel::ChannelState;
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::content::buffer::InitialBufferState;
 #[cfg(feature = "local_fs")]
-use rook_editor::content::edit::resolve_asset_source_relative_to_directory;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rook_errors::{report_error, report_if_error};
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rook_util::path::ShellFamily;
-use rookui::assets::asset_cache::{AssetCache, AssetSource};
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_editor::content::edit::resolve_asset_source_relative_to_directory;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use pterm_errors::{report_error, report_if_error};
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::path::ShellFamily;
+use ptermui::assets::asset_cache::{AssetCache, AssetSource};
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     ClippedScrollStateHandle, MainAxisAlignment, MainAxisSize, MouseStateHandle, SelectionBound,
     SelectionHandle, TableStateHandle, get_rich_content_position_id,
 };
-use rookui::image_cache::ImageType;
-use rookui::keymap::FixedBinding;
-use rookui::text::SelectionType;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::ui_components::radio_buttons::RadioButtonStateHandle;
-use rookui::{
+use ptermui::image_cache::ImageType;
+use ptermui::keymap::FixedBinding;
+use ptermui::text::SelectionType;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::ui_components::radio_buttons::RadioButtonStateHandle;
+use ptermui::{
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle, WindowId,
 };
+#[cfg(not(target_family = "wasm"))]
+use repo_metadata::repositories::DetectedRepositories;
 use rustc_hash::FxHashSet;
 use serde::Serialize;
 use settings::Setting as _;
@@ -309,7 +309,7 @@ fn user_avatar_info_for_ai_block(
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -934,7 +934,7 @@ pub struct AIBlock {
     controller: ModelHandle<BlocklistAIController>,
     active_session: ModelHandle<ActiveSession>,
     terminal_view_id: EntityId,
-    window_id: rookui::WindowId,
+    window_id: ptermui::WindowId,
 
     /// The current working directory at the time the AI block was created. Note that this
     /// is different from `directory_context`, which represents the directory-related contexts
@@ -2439,7 +2439,7 @@ impl AIBlock {
                         button = button.with_text_and_icon_label(TextAndIcon::new(
                             TextAndIconAlignment::TextFirst,
                             accept_text.clone(),
-                            Icon::CornerDownLeft.to_rookui_icon(appearance.theme().foreground()),
+                            Icon::CornerDownLeft.to_ptermui_icon(appearance.theme().foreground()),
                             MainAxisSize::Max,
                             MainAxisAlignment::SpaceBetween,
                             vec2f(
@@ -2481,7 +2481,7 @@ impl AIBlock {
                         button = button.with_text_and_icon_label(TextAndIcon::new(
                             TextAndIconAlignment::TextFirst,
                             reject_text.clone(),
-                            Icon::CornerDownLeft.to_rookui_icon(appearance.theme().foreground()),
+                            Icon::CornerDownLeft.to_ptermui_icon(appearance.theme().foreground()),
                             MainAxisSize::Max,
                             MainAxisAlignment::SpaceBetween,
                             vec2f(
@@ -3377,7 +3377,7 @@ impl AIBlock {
                 CodeDiffViewEvent::OpenSkill { reference, path } => {
                     #[cfg(feature = "local_fs")]
                     {
-                        ctx.emit(AIBlockEvent::OpenCodeInRook {
+                        ctx.emit(AIBlockEvent::OpenCodeInPterm {
                             source: CodeSource::Skill {
                                 reference: reference.clone(),
                                 location: path.clone(),
@@ -3395,7 +3395,7 @@ impl AIBlock {
                 CodeDiffViewEvent::OpenMCPConfig { path, .. } => {
                     #[cfg(feature = "local_fs")]
                     {
-                        ctx.emit(AIBlockEvent::OpenCodeInRook {
+                        ctx.emit(AIBlockEvent::OpenCodeInPterm {
                             source: CodeSource::Link {
                                 path: path.clone(),
                                 range_start: None,
@@ -4166,7 +4166,7 @@ impl AIBlock {
                 // Synchronous dispatch here can panic with "Circular view update".
                 ctx.dispatch_typed_action_deferred(WorkspaceAction::ShowSettingsPageWithSearch {
                     search_query: "aws bedrock".to_string(),
-                    section: Some(SettingsSection::RookAgent),
+                    section: Some(SettingsSection::PtermAgent),
                 });
             }
         });
@@ -4208,7 +4208,7 @@ impl AIBlock {
                 // Synchronous dispatch here can panic with "Circular view update".
                 ctx.dispatch_typed_action_deferred(WorkspaceAction::ShowSettingsPageWithSearch {
                     search_query: "gemini enterprise".to_string(),
-                    section: Some(SettingsSection::RookAgent),
+                    section: Some(SettingsSection::PtermAgent),
                 });
             }
         });
@@ -6167,7 +6167,7 @@ pub enum AIBlockEvent {
     },
     ToggleCodeDiffVisibility,
 
-    /// Open a Rook Text instance with the requested code diff.
+    /// Open a Polaris Terminal Text instance with the requested code diff.
     OpenCodeWithDiff {
         view: ViewHandle<CodeDiffView>,
     },
@@ -6175,7 +6175,7 @@ pub enum AIBlockEvent {
     #[cfg(feature = "local_fs")]
     OpenDetectedFilePath {
         absolute_path: PathBuf,
-        line_and_column_num: Option<rook_util::path::LineAndColumnArg>,
+        line_and_column_num: Option<pterm_util::path::LineAndColumnArg>,
         target_override: Option<FileTarget>,
     },
     ShowLinkTooltip(RichContentLinkTooltipInfo),
@@ -6229,7 +6229,7 @@ pub enum AIBlockEvent {
     CopiedEmptyText,
     OpenSettings,
     #[cfg(feature = "local_fs")]
-    OpenCodeInRook {
+    OpenCodeInPterm {
         source: CodeSource,
         layout: crate::util::file::external_editor::settings::EditorLayout,
     },
@@ -6352,7 +6352,7 @@ pub enum AIBlockAction {
         is_positive: bool,
     },
     /// Clear the selections of all other views **except** for the source view that dispatched the event.
-    /// The `source_view_id` will be `None` if the event is dispatched by the [`rookui::elements::SelectableArea`]
+    /// The `source_view_id` will be `None` if the event is dispatched by the [`ptermui::elements::SelectableArea`]
     /// instead of a nested view (i.e. code block, requested command, etc.), which means all nested views
     /// should have their selections cleared.
     ClearOtherSelections {
@@ -6374,7 +6374,7 @@ pub enum AIBlockAction {
     StoreRightClickedCommand {
         command: String,
     },
-    OpenCodeInRook {
+    OpenCodeInPterm {
         source: CodeSource,
     },
     ToggleTodoListExpanded(MessageId),
@@ -6388,7 +6388,7 @@ pub enum AIBlockAction {
     DisableRuleSuggestions,
     /// Copy the debug ID to clipboard
     CopyDebugId(String),
-    /// Open Rook feedback documentation
+    /// Open Polaris Terminal feedback documentation
     OpenFeedbackDocs,
     /// Toggle the usage summary footer expansion state
     ToggleIsUsageFooterExpanded,
@@ -6438,7 +6438,7 @@ fn open_code_action_event(
             line_and_column_num: *range_start,
             target_override: None,
         },
-        _ => AIBlockEvent::OpenCodeInRook {
+        _ => AIBlockEvent::OpenCodeInPterm {
             source: source.clone(),
             layout,
         },
@@ -6946,7 +6946,7 @@ impl TypedActionView for AIBlock {
                 // Clear the stored command after copying
                 self.last_right_clicked_command = None;
             }
-            AIBlockAction::OpenCodeInRook {
+            AIBlockAction::OpenCodeInPterm {
                 #[cfg_attr(not(feature = "local_fs"), allow(unused))]
                 source,
             } => {
@@ -7014,7 +7014,7 @@ impl TypedActionView for AIBlock {
             AIBlockAction::ConfigureAwsLoginCommand => {
                 ctx.dispatch_typed_action(&WorkspaceAction::ShowSettingsPageWithSearch {
                     search_query: "aws bedrock".to_string(),
-                    section: Some(SettingsSection::RookAgent),
+                    section: Some(SettingsSection::PtermAgent),
                 });
             }
             AIBlockAction::ToggleImportedCommentCollapsed {
@@ -7221,7 +7221,7 @@ impl TypedActionView for AIBlock {
                     }
                     images.push(ui_components::lightbox::LightboxImage {
                         source: ui_components::lightbox::LightboxImageSource::Resolved {
-                            asset_source: rookui::assets::asset_cache::AssetSource::Raw {
+                            asset_source: ptermui::assets::asset_cache::AssetSource::Raw {
                                 id: asset_id,
                             },
                         },

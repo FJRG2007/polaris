@@ -2,7 +2,7 @@
 
 == PRODUCT ==
 
-*Summary:* Restoring an orchestration conversation in Rook Agent CLI currently restores only the selected parent conversation. Its child-agent conversations remain absent from the retained TUI session registry, so the existing orchestration tab bar cannot display or navigate to them. Restore every locally known, TUI-displayable descendant when the parent is restored through either `--resume` or the conversations menu, while preserving the current GUI and TUI presentation.
+*Summary:* Restoring an orchestration conversation in Polaris Terminal Agent CLI currently restores only the selected parent conversation. Its child-agent conversations remain absent from the retained TUI session registry, so the existing orchestration tab bar cannot display or navigate to them. Restore every locally known, TUI-displayable descendant when the parent is restored through either `--resume` or the conversations menu, while preserving the current GUI and TUI presentation.
 
 *Key design choices:*
 - Reuse the existing frontend-neutral history loaders, `AIConversation` metadata methods, topology walker, and block-restoration plan directly. Add only the missing TUI session materializer; do not introduce a new cross-frontend child descriptor/resolver or coordinator.
@@ -10,7 +10,7 @@
 - Match the GUI's locally known restoration scope. Do not synthesize UI children from `AmbientAgentTask.children` when no local child conversation/topology record exists; that list is currently sufficient for event watching, but not for reconstructing conversation identity, transcript, or all presentation metadata.
 
 *Behavior*:
-1. Restoring a parent orchestration conversation with `rook --resume <server-token>` restores the parent as the focused session and eagerly creates background TUI sessions for every supported, locally known child and nested descendant.
+1. Restoring a parent orchestration conversation with `polaris-terminal --resume <server-token>` restores the parent as the focused session and eagerly creates background TUI sessions for every supported, locally known child and nested descendant.
 2. Selecting the same parent from the TUI conversations menu produces the same restored session tree as `--resume`; the entry point changes neither descendant selection nor hydration behavior.
 3. Restored descendants appear in the existing orchestration tab bar in the same recursive spawn/status order used by live TUI orchestration. The parent remains focused after restoration, and existing keyboard navigation switches to each restored child session without a new UI affordance.
 4. A local Oz descendant is restored into a retained local terminal session with its persisted transcript, name, status, parent linkage, task/run identity, action results, and working directory metadata. Restoration does not send its original prompt again or create a new server task.
@@ -26,12 +26,12 @@
 
 *Context:* All references are pinned to `fd16dceb3f2a9e5e106f19010aa964265ac4f02c`.
 
-- `crates/rook_tui/src/session.rs:256-303` creates one focused bootstrap terminal session and forwards a `--resume` token to `TuiTerminalSessionView::restore_conversation`.
-- `crates/rook_tui/src/terminal_session_view.rs:2490-2645` loads one target, validates it, clears the current parent surface, restores only `vec![conversation]`, restores that transcript, and selects it. The conversations menu and startup origins converge here, so this is the common TUI restore boundary.
-- `crates/rook_tui/src/orchestration_model.rs:160-220` walks all descendants for the tab snapshot, but filters each one through `TuiSessions::session_ids_by_conversation`. The existing test `snapshot_is_shared_across_tree_and_filters_conversations_without_sessions` confirms this condition: topology without retained sessions is intentionally invisible.
-- `crates/rook_tui/src/session_registry.rs:139-239` owns full local terminal sessions and lightweight cloud sessions. Live local Oz children retain a terminal manager/view; live remote children retain `TuiCloudRunView` plus `TuiCloudRunState`.
-- `crates/rook_tui/src/orchestration_model.rs:539-662` initializes live local and remote child conversations, sends a local child's first prompt, and records `child_session_by_conversation`. Restore must reuse the materialized session shapes but must not reuse launch initialization or resend work.
-- `crates/rook_tui/src/cloud_run.rs:12-99` initializes every cloud view as `Dispatching` and only reaches `Spawned` through launch-time `set_spawned`. A restore-specific constructor/state transition is required.
+- `crates/pterm_tui/src/session.rs:256-303` creates one focused bootstrap terminal session and forwards a `--resume` token to `TuiTerminalSessionView::restore_conversation`.
+- `crates/pterm_tui/src/terminal_session_view.rs:2490-2645` loads one target, validates it, clears the current parent surface, restores only `vec![conversation]`, restores that transcript, and selects it. The conversations menu and startup origins converge here, so this is the common TUI restore boundary.
+- `crates/pterm_tui/src/orchestration_model.rs:160-220` walks all descendants for the tab snapshot, but filters each one through `TuiSessions::session_ids_by_conversation`. The existing test `snapshot_is_shared_across_tree_and_filters_conversations_without_sessions` confirms this condition: topology without retained sessions is intentionally invisible.
+- `crates/pterm_tui/src/session_registry.rs:139-239` owns full local terminal sessions and lightweight cloud sessions. Live local Oz children retain a terminal manager/view; live remote children retain `TuiCloudRunView` plus `TuiCloudRunState`.
+- `crates/pterm_tui/src/orchestration_model.rs:539-662` initializes live local and remote child conversations, sends a local child's first prompt, and records `child_session_by_conversation`. Restore must reuse the materialized session shapes but must not reuse launch initialization or resend work.
+- `crates/pterm_tui/src/cloud_run.rs:12-99` initializes every cloud view as `Dispatching` and only reaches `Spawned` through launch-time `set_spawned`. A restore-specific constructor/state transition is required.
 - `app/src/pane_group/child_agent/restoration.rs:20-245` is the GUI prior art. It gets direct child IDs, skips already-owned panes, resolves each child from history or `RestoredAgentConversations`, and then branches into shared-session viewer, task-backed remote, or local hidden-pane materialization.
 - `app/src/pane_group/child_agent/hydration.rs:18-310` keeps remote GUI hydration UI-specific (`LiveAttach`, `LoadTranscript`, or `Fallback`). Those pane/view operations do not belong in the TUI or the shared core.
 - `app/src/pane_group/pane/terminal_pane.rs:322-352` subscribes every attached terminal pane to fullscreen `EnteredAgentView`. Because hidden child panes are attached before their restored conversation enters agent view (`app/src/pane_group/mod.rs:4118-4160`), the GUI's direct-child helper is re-entered for each materialized child and therefore restores locally known nested descendants recursively.
@@ -42,7 +42,7 @@
 
 *Root cause and reproduction:* The defect is a missing TUI materialization step, not missing tab rendering. Both restore entry points insert only the requested parent into one surface. The orchestration snapshot correctly omits descendants that have no retained session. A real end-to-end reproduction could not be run in the spec environment because no seeded parent token with local and cloud children was available. The equivalent code-level reproduction was run with:
 
-`cargo nextest run --manifest-path /workspace/rook/Cargo.toml -p rook_tui snapshot_is_shared_across_tree_and_filters_conversations_without_sessions`
+`cargo nextest run --manifest-path /workspace/polaris-terminal/Cargo.toml -p pterm_tui snapshot_is_shared_across_tree_and_filters_conversations_without_sessions`
 
 It passed (`1 passed, 757 skipped`) and proves the failing precondition: a known child without a session is filtered out of the TUI snapshot. The implementation regression test below must first demonstrate that current parent restore leaves such children unmaterialized, then pass after the fix.
 
@@ -116,14 +116,14 @@ It passed (`1 passed, 757 skipped`) and proves the failing precondition: a known
    - If the parent restore is repeated, the session lookup guards make the operation idempotent. If a different parent replaces it, stale child sessions from the prior tree do not remain visible.
 
 *Affected files (expected):*
-- `crates/rook_tui/src/terminal_session_view.rs`
-- `crates/rook_tui/src/terminal_session_view_tests.rs`
-- `crates/rook_tui/src/orchestration_model.rs`
-- `crates/rook_tui/src/orchestration_model_tests.rs`
-- `crates/rook_tui/src/session_registry.rs`
-- `crates/rook_tui/src/session_registry_tests.rs`
-- `crates/rook_tui/src/cloud_run.rs`
-- `crates/rook_tui/src/cloud_run_view_tests.rs`
+- `crates/pterm_tui/src/terminal_session_view.rs`
+- `crates/pterm_tui/src/terminal_session_view_tests.rs`
+- `crates/pterm_tui/src/orchestration_model.rs`
+- `crates/pterm_tui/src/orchestration_model_tests.rs`
+- `crates/pterm_tui/src/session_registry.rs`
+- `crates/pterm_tui/src/session_registry_tests.rs`
+- `crates/pterm_tui/src/cloud_run.rs`
+- `crates/pterm_tui/src/cloud_run_view_tests.rs`
 
 *Open questions resolved:*
 - *Which descendants?* All locally known descendants, recursively. This matches the GUI's effective recursion and the existing TUI topology model.
@@ -151,38 +151,38 @@ It passed (`1 passed, 757 skipped`) and proves the failing precondition: a known
    - before the implementation the existing snapshot filters the children because no sessions exist;
    - after the implementation the session count is parent plus all supported descendants;
    - the snapshot lists the descendants in recursive pill order and tab navigation resolves each session.
-   Run with `cargo nextest run -p rook_tui restoring_parent_materializes_supported_descendant_sessions`. Verifies behavior 1, 3, 4, 5, and 6.
+   Run with `cargo nextest run -p pterm_tui restoring_parent_materializes_supported_descendant_sessions`. Verifies behavior 1, 3, 4, 5, and 6.
 
-2. *Both restore entry points* — Parameterize the parent restore regression over `TuiConversationRestoreOrigin::Startup` with a server-token target and `TuiConversationRestoreOrigin::ConversationList` with a local target. Assert identical descendant IDs/kinds/order, parent focus, and final `ConversationRestoreState::Idle`. Run the named test(s) with `cargo nextest run -p rook_tui <test-filter>`. Verifies behavior 1 and 2.
+2. *Both restore entry points* — Parameterize the parent restore regression over `TuiConversationRestoreOrigin::Startup` with a server-token target and `TuiConversationRestoreOrigin::ConversationList` with a local target. Assert identical descendant IDs/kinds/order, parent focus, and final `ConversationRestoreState::Idle`. Run the named test(s) with `cargo nextest run -p pterm_tui <test-filter>`. Verifies behavior 1 and 2.
 
-3. *Local Oz hydration* — Add a test that restores a local child with at least one exchange, action result, agent name, task/run ID, status, parent ID, and working directory. Assert the child has a full terminal session, the transcript renders the exchange, restored action results exist, metadata is preserved, and no launch/start-agent executor receives a request. Run with `cargo nextest run -p rook_tui restored_local_oz_child_hydrates_transcript_without_relaunch`. Verifies behavior 4.
+3. *Local Oz hydration* — Add a test that restores a local child with at least one exchange, action result, agent name, task/run ID, status, parent ID, and working directory. Assert the child has a full terminal session, the transcript renders the exchange, restored action results exist, metadata is preserved, and no launch/start-agent executor receives a request. Run with `cargo nextest run -p pterm_tui restored_local_oz_child_hydrates_transcript_without_relaunch`. Verifies behavior 4.
 
-4. *Remote/cloud hydration* — Add tests for at least one remote Oz child and one remote non-Oz harness child. Assert both use `TuiSessionView::Cloud`, begin in `TuiCloudRunStartup::Spawned`, retain conversation/task/run IDs, reconcile the authoritative terminal task status through the one-time task request, render that status and run link, and never display “Starting cloud run…”. Include a regression where the restored local placeholder begins `InProgress` while the fetched remote task is terminal. Run with `cargo nextest run -p rook_tui restored_remote_child`. Verifies behavior 5.
+4. *Remote/cloud hydration* — Add tests for at least one remote Oz child and one remote non-Oz harness child. Assert both use `TuiSessionView::Cloud`, begin in `TuiCloudRunStartup::Spawned`, retain conversation/task/run IDs, reconcile the authoritative terminal task status through the one-time task request, render that status and run link, and never display “Starting cloud run…”. Include a regression where the restored local placeholder begins `InProgress` while the fetched remote task is terminal. Run with `cargo nextest run -p pterm_tui restored_remote_child`. Verifies behavior 5.
 
-5. *Nested descendants* — Seed parent → child → grandchild with mixed local/cloud kinds. Assert all supported descendants get sessions, keep their immediate parent linkage, appear in recursive spawn order, and remain navigable from parent and child snapshots. Run with `cargo nextest run -p rook_tui restored_nested_descendants`. Verifies behavior 6.
+5. *Nested descendants* — Seed parent → child → grandchild with mixed local/cloud kinds. Assert all supported descendants get sessions, keep their immediate parent linkage, appear in recursive spawn order, and remain navigable from parent and child snapshots. Run with `cargo nextest run -p pterm_tui restored_nested_descendants`. Verifies behavior 6.
 
-6. *Idempotency and replacement cleanup* — Restore the same tree twice and assert one session per conversation and no duplicate tabs/consumers. Then restore a different parent and assert prior descendant session projections/consumers are removed, underlying history records remain persisted, and no cloud cancel/delete request occurs. Include a stale-completion case that switches parents before enrichment completes. Run with `cargo nextest run -p rook_tui restore_tree_is_idempotent restore_replacement_discards_stale_child_sessions`. Verifies behavior 7.
+6. *Idempotency and replacement cleanup* — Restore the same tree twice and assert one session per conversation and no duplicate tabs/consumers. Then restore a different parent and assert prior descendant session projections/consumers are removed, underlying history records remain persisted, and no cloud cancel/delete request occurs. Include a stale-completion case that switches parents before enrichment completes. Run with `cargo nextest run -p pterm_tui restore_tree_is_idempotent restore_replacement_discards_stale_child_sessions`. Verifies behavior 7.
 
-7. *No-child no-op* — Restore a parent with no child index. Assert the session count stays one, focus stays on the parent, no cloud/task fetch is triggered by child restoration, and the tab snapshot remains `None`. Run with `cargo nextest run -p rook_tui restoring_parent_without_children_is_noop`. Verifies behavior 8.
+7. *No-child no-op* — Restore a parent with no child index. Assert the session count stays one, focus stays on the parent, no cloud/task fetch is triggered by child restoration, and the tab snapshot remains `None`. Run with `cargo nextest run -p pterm_tui restoring_parent_without_children_is_noop`. Verifies behavior 8.
 
-8. *Unsupported and malformed children degrade independently* — Seed supported siblings around a missing child record, explicit local non-Oz child, shared-session-viewer child, remote child without task/run identity, and a malformed topology cycle. Assert the parent and supported siblings restore, unsupported records create no session, no infinite traversal occurs, and diagnostics identify each skipped child. Run with `cargo nextest run -p rook_tui restore_skips_unsupported_or_malformed_children`. Verifies behavior 9.
+8. *Unsupported and malformed children degrade independently* — Seed supported siblings around a missing child record, explicit local non-Oz child, shared-session-viewer child, remote child without task/run identity, and a malformed topology cycle. Assert the parent and supported siblings restore, unsupported records create no session, no infinite traversal occurs, and diagnostics identify each skipped child. Run with `cargo nextest run -p pterm_tui restore_skips_unsupported_or_malformed_children`. Verifies behavior 9.
 
-9. *Existing shared-seam coverage* — Add/extend TUI tests proving an already-hydrated child and an indexed-but-not-loaded child both flow through the existing history APIs into the same materializer, while classification preserves parent identity and does not create a session for unsupported kinds. Run with `cargo nextest run -p rook_tui restored_child_history_loading`. Supports behavior 4-11.
+9. *Existing shared-seam coverage* — Add/extend TUI tests proving an already-hydrated child and an indexed-but-not-loaded child both flow through the existing history APIs into the same materializer, while classification preserves parent identity and does not create a session for unsupported kinds. Run with `cargo nextest run -p pterm_tui restored_child_history_loading`. Supports behavior 4-11.
 
-10. *GUI no-regression* — Run the existing GUI tests for lazy topology/pane restoration and remote child hydration, including `test_pane_group_restore_loop_keeps_orchestration_topology_and_materializes_child_pane`, the restored remote-child tests in `pane_group::mod_tests`, and `hydrate_remote_child_placeholder_with_cloud_transcript_preserves_placeholder_identity`. No GUI production or test changes are expected. Run with `cargo nextest run -p rook pane_group_restore child_agent_hydration hydrate_remote_child_placeholder`. Verifies behavior 10.
+10. *GUI no-regression* — Run the existing GUI tests for lazy topology/pane restoration and remote child hydration, including `test_pane_group_restore_loop_keeps_orchestration_topology_and_materializes_child_pane`, the restored remote-child tests in `pane_group::mod_tests`, and `hydrate_remote_child_placeholder_with_cloud_transcript_preserves_placeholder_identity`. No GUI production or test changes are expected. Run with `cargo nextest run -p polaris-terminal pane_group_restore child_agent_hydration hydrate_remote_child_placeholder`. Verifies behavior 10.
 
-11. *Server-only scope guard* — Test a parent loaded by server token with no local child topology while task metadata exposes `children` run IDs. Assert event-watching state may record those run IDs through existing streamer behavior, but the TUI creates no synthetic child conversation/session. Run with `cargo nextest run -p rook_tui server_only_resume_does_not_synthesize_child_sessions` and the relevant `orchestration_event_streamer` restore tests. Verifies behavior 11.
+11. *Server-only scope guard* — Test a parent loaded by server token with no local child topology while task metadata exposes `children` run IDs. Assert event-watching state may record those run IDs through existing streamer behavior, but the TUI creates no synthetic child conversation/session. Run with `cargo nextest run -p pterm_tui server_only_resume_does_not_synthesize_child_sessions` and the relevant `orchestration_event_streamer` restore tests. Verifies behavior 11.
 
-12. *Existing TUI orchestration regressions* — Run `cargo nextest run -p rook_tui orchestration_model session_registry cloud_run terminal_session_view` and confirm live local/cloud launch, tab navigation, nested kill, `/new`, focus, and cloud status/link tests still pass.
+12. *Existing TUI orchestration regressions* — Run `cargo nextest run -p pterm_tui orchestration_model session_registry cloud_run terminal_session_view` and confirm live local/cloud launch, tab navigation, nested kill, `/new`, focus, and cloud status/link tests still pass.
 
 13. *Repository checks* — From the repository root, run:
    - `./script/format --check`
    - `./script/check_no_inline_test_modules`
-   - `cargo clippy --workspace --exclude rook_completer --all-targets --tests -- -D warnings`
-   - `cargo clippy -p rook --all-targets --tests -- -D warnings`
-   - `cargo clippy -p rook_completer --all-targets --tests -- -D warnings`
+   - `cargo clippy --workspace --exclude pterm_completer --all-targets --tests -- -D warnings`
+   - `cargo clippy -p polaris-terminal --all-targets --tests -- -D warnings`
+   - `cargo clippy -p pterm_completer --all-targets --tests -- -D warnings`
    - `cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2`
-   - `cargo nextest run -p rook_completer --features v2`
+   - `cargo nextest run -p pterm_completer --features v2`
    - `cargo test --doc`
    These are the documented L/cross-cutting presubmit gates (`./script/presubmit` may be used to run the combined sequence).
 

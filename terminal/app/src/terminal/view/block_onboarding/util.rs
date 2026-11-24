@@ -1,15 +1,15 @@
 use pathfinder_color::ColorU;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, MouseStateHandle,
     ParentElement, Radius, Shrinkable,
 };
-use rookui::fonts::Weight;
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::text_input::TextInput;
-use rookui::{Action, AppContext, Element, SingletonEntity, ViewHandle};
+use ptermui::fonts::Weight;
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::text_input::TextInput;
+use ptermui::{Action, AppContext, Element, SingletonEntity, ViewHandle};
 
 use crate::appearance::Appearance;
 use crate::editor::EditorView;
@@ -155,7 +155,7 @@ pub fn render_input_row<A: Action + Clone>(
     } else {
         ConstrainedBox::new(
             Icon::Check
-                .to_rookui_icon(Fill::Solid(ColorU::new(11, 142, 71, 255)))
+                .to_ptermui_icon(Fill::Solid(ColorU::new(11, 142, 71, 255)))
                 .finish(),
         )
         .with_width(24.)

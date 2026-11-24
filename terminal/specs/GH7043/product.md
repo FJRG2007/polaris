@@ -1,6 +1,6 @@
 # Side-by-Side Diff Layout in the Code Review Pane - Product Spec
-GitHub issue: https://github.com/FJRG2007/rook/issues/7043
-Roadmap reference: https://github.com/FJRG2007/rook/issues/9233 ("Improved code review - Side by side diffs", listed under "Seeking community drivers")
+GitHub issue: https://github.com/FJRG2007/polaris/issues/7043
+Roadmap reference: https://github.com/FJRG2007/polaris/issues/9233 ("Improved code review - Side by side diffs", listed under "Seeking community drivers")
 Figma: none provided
 
 ## Summary
@@ -9,12 +9,12 @@ Add a side-by-side diff layout as an alternative to the existing inline diff in 
 V1 applies only to Code Review. AI block-list diffs, inline banner diffs, and settings-menu surfacing for those surfaces are explicitly deferred to v2.
 
 ## Problem
-Rook renders Code Review file diffs as a single-column inline view: deletions on `-` rows, additions on `+` rows, both interleaved. The Code Review pane consumes editor and diff primitives through `LocalCodeEditorView`, `CodeReviewEditorState`, and `CodeEditorView`, and currently has no layout knob.
+Polaris Terminal renders Code Review file diffs as a single-column inline view: deletions on `-` rows, additions on `+` rows, both interleaved. The Code Review pane consumes editor and diff primitives through `LocalCodeEditorView`, `CodeReviewEditorState`, and `CodeEditorView`, and currently has no layout knob.
 
 Two real costs follow from that:
 
 - Side-by-side is the de-facto standard for diff review across GitHub, GitLab, Phabricator, JetBrains IDEs, VS Code, and tools like Beyond Compare. Users with wide displays expect it, and the absence shows up repeatedly in user feedback, including the request that opened this issue: "since we aren't writing the code ourselves," the reviewer needs to read both versions in parallel rather than reconstructing them mentally from a single column.
-- Rook's review surface is shaped by AI-generated edits more than by hand-written commits. An AI agent regularly produces diffs that touch dozens of unrelated regions in one block. In an inline layout, a 30-line modification with reordered code is hard to follow, because the same logical block appears as `-` lines in one place and `+` lines in another. Side-by-side puts those next to each other.
+- Polaris Terminal's review surface is shaped by AI-generated edits more than by hand-written commits. An AI agent regularly produces diffs that touch dozens of unrelated regions in one block. In an inline layout, a 30-line modification with reordered code is hard to follow, because the same logical block appears as `-` lines in one place and `+` lines in another. Side-by-side puts those next to each other.
 
 The two related open issues - #9017 (word wrap in diff and Markdown) and #9040 (auto line wrap in diff) - assume a single diff layout and argue about wrapping inside it. They are out of scope for this spec but become more useful once a side-by-side layout exists, since wrap behavior interacts with column width.
 
@@ -45,7 +45,7 @@ The two related open issues - #9017 (word wrap in diff and Markdown) and #9040 (
 
 ## Behavior
 
-1. When `code.editor.diff_layout` is unset or `inline`, Code Review diffs in Rook render identically to today. No regression to the default form.
+1. When `code.editor.diff_layout` is unset or `inline`, Code Review diffs in Polaris Terminal render identically to today. No regression to the default form.
 
 2. When `code.editor.diff_layout` is `side_by_side`, Code Review renders with the baseline on the left and the modified file on the right.
    - The split is a 50/50 vertical split with a single 1-pixel divider in the panel chrome.
@@ -119,7 +119,7 @@ The two related open issues - #9017 (word wrap in diff and Markdown) and #9040 (
     - Memory overhead for `SideBySide` is bounded to the additional state needed to render the baseline pane alongside the modified pane.
 
 16. Feature flag gating:
-    - The change ships behind a `SideBySideDiffLayout` `FeatureFlag` defined in `crates/rook_features/src/lib.rs` (the canonical flag enum, re-exported from `app/src/features.rs`) that defaults to off in shipping builds and on in dogfood/preview builds. Once stabilized, the flag is removed and the setting becomes the user-facing control.
+    - The change ships behind a `SideBySideDiffLayout` `FeatureFlag` defined in `crates/pterm_features/src/lib.rs` (the canonical flag enum, re-exported from `app/src/features.rs`) that defaults to off in shipping builds and on in dogfood/preview builds. Once stabilized, the flag is removed and the setting becomes the user-facing control.
     - When the flag is off, the Settings page does not render the "Diff layout" widget, and the setting is treated as `Inline` regardless of stored value.
 
 ## Mockup placeholder

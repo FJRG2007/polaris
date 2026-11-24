@@ -1,7 +1,7 @@
 use pathfinder_geometry::vector::vec2f;
-use rookui::elements::Empty;
-use rookui::platform::WindowStyle;
-use rookui::{
+use ptermui::elements::Empty;
+use ptermui::platform::WindowStyle;
+use ptermui::{
     App, AppContext, Element, Entity, Presenter, TypedActionView, View, WindowInvalidation,
 };
 use search::{MatchMode, SearchQuery};
@@ -94,7 +94,10 @@ fn match_data_countable_zero_is_not_truthy() {
 
 #[test]
 fn subpage_display_names_are_correct() {
-    assert_eq!(SettingsSection::RookAgent.to_string(), "Rook Agent");
+    assert_eq!(
+        SettingsSection::PtermAgent.to_string(),
+        "Polaris Terminal Agent"
+    );
     assert_eq!(SettingsSection::AgentProfiles.to_string(), "Profiles");
     assert_eq!(SettingsSection::AgentMCPServers.to_string(), "MCP servers");
     assert_eq!(SettingsSection::Knowledge.to_string(), "Knowledge");
@@ -115,7 +118,7 @@ fn subpage_display_names_are_correct() {
         "Environments"
     );
     assert_eq!(
-        SettingsSection::RookCloudAgentAPIKeys.to_string(),
+        SettingsSection::PtermCloudAgentAPIKeys.to_string(),
         "API keys"
     );
 }
@@ -138,9 +141,9 @@ const ALL_SECTIONS: &[SettingsSection] = &[
     SettingsSection::Scripting,
     SettingsSection::SharedBlocks,
     SettingsSection::Teams,
-    SettingsSection::RookDrive,
-    SettingsSection::Rookify,
-    SettingsSection::RookAgent,
+    SettingsSection::PtermDrive,
+    SettingsSection::Ptermify,
+    SettingsSection::PtermAgent,
     SettingsSection::AgentProfiles,
     SettingsSection::AgentMCPServers,
     SettingsSection::Knowledge,
@@ -148,14 +151,14 @@ const ALL_SECTIONS: &[SettingsSection] = &[
     SettingsSection::CodeIndexing,
     SettingsSection::EditorAndCodeReview,
     SettingsSection::CloudEnvironments,
-    SettingsSection::RookCloudAgentAPIKeys,
+    SettingsSection::PtermCloudAgentAPIKeys,
 ];
 
 /// Sections whose user-facing Display label has deliberately diverged from the
 /// slug it was seeded from, because the slug is a stored contract that the
 /// rename must not follow.
 const SECTIONS_WITH_RENAMED_DISPLAY_LABELS: &[SettingsSection] =
-    &[SettingsSection::RookCloudAgentAPIKeys];
+    &[SettingsSection::PtermCloudAgentAPIKeys];
 
 #[test]
 fn all_sections_list_is_exhaustive() {
@@ -172,9 +175,9 @@ fn all_sections_list_is_exhaustive() {
             | SettingsSection::Scripting
             | SettingsSection::SharedBlocks
             | SettingsSection::Teams
-            | SettingsSection::RookDrive
-            | SettingsSection::Rookify
-            | SettingsSection::RookAgent
+            | SettingsSection::PtermDrive
+            | SettingsSection::Ptermify
+            | SettingsSection::PtermAgent
             | SettingsSection::AgentProfiles
             | SettingsSection::AgentMCPServers
             | SettingsSection::Knowledge
@@ -182,7 +185,7 @@ fn all_sections_list_is_exhaustive() {
             | SettingsSection::CodeIndexing
             | SettingsSection::EditorAndCodeReview
             | SettingsSection::CloudEnvironments
-            | SettingsSection::RookCloudAgentAPIKeys => section,
+            | SettingsSection::PtermCloudAgentAPIKeys => section,
         };
         ALL_SECTIONS.contains(&known)
     }
@@ -236,28 +239,28 @@ fn renamed_sections_keep_the_slug_they_were_seeded_with() {
     // The section dropped "Oz" from what the user reads, but persisted sessions
     // and `surface.settings.open --page` still speak the original slug.
     assert_eq!(
-        SettingsSection::RookCloudAgentAPIKeys.to_string(),
+        SettingsSection::PtermCloudAgentAPIKeys.to_string(),
         "API keys"
     );
     assert_eq!(
-        SettingsSection::RookCloudAgentAPIKeys.slug(),
+        SettingsSection::PtermCloudAgentAPIKeys.slug(),
         "Oz Cloud API Keys"
     );
 }
 
 #[test]
 fn from_slug_accepts_legacy_spellings() {
-    // Both the legacy "Oz" name and the current "Rook Agent" slug must resolve
-    // to SettingsSection::RookAgent so existing deep links, persisted sessions
+    // Both the legacy "Oz" name and the current "Polaris Terminal Agent" slug must resolve
+    // to SettingsSection::PtermAgent so existing deep links, persisted sessions
     // and external callers keep working after the user-facing rename (see
     // specs/GH1063/product.md, Behavior #8).
     assert_eq!(
         SettingsSection::from_slug("Oz"),
-        Some(SettingsSection::RookAgent)
+        Some(SettingsSection::PtermAgent)
     );
     assert_eq!(
-        SettingsSection::from_slug("RookDrive"),
-        Some(SettingsSection::RookDrive)
+        SettingsSection::from_slug("PtermDrive"),
+        Some(SettingsSection::PtermDrive)
     );
     assert_eq!(
         SettingsSection::from_slug("AgentProfiles"),
@@ -285,23 +288,23 @@ fn from_slug_accepts_legacy_spellings() {
     );
     assert_eq!(
         SettingsSection::from_slug("OzCloudAPIKeys"),
-        Some(SettingsSection::RookCloudAgentAPIKeys)
+        Some(SettingsSection::PtermCloudAgentAPIKeys)
     );
     assert_eq!(
         SettingsSection::from_slug("Oz Cloud API Keys"),
-        Some(SettingsSection::RookCloudAgentAPIKeys)
+        Some(SettingsSection::PtermCloudAgentAPIKeys)
     );
 }
 
 #[test]
 fn from_slug_maps_superseded_page_names_to_the_page_that_replaced_them() {
     // `AI`, `Code` and `MCP Servers` named pages that have since been split or
-    // moved. Persisted sessions and rookctrl callers still use them, so they
+    // moved. Persisted sessions and ptermctrl callers still use them, so they
     // resolve here, at the boundary, rather than existing as sections of their
     // own that every caller would have to remember to normalize.
     assert_eq!(
         SettingsSection::from_slug("AI"),
-        Some(SettingsSection::RookAgent)
+        Some(SettingsSection::PtermAgent)
     );
     assert_eq!(
         SettingsSection::from_slug("Code"),
@@ -330,7 +333,7 @@ use nav::{SettingsNavItem, SettingsUmbrella};
 /// declares. Duplicated here rather than shared so these tests can assert
 /// fixed nav-stop indices against a deliberately trimmed sidebar.
 const AGENT_SUBPAGES: &[SettingsSection] = &[
-    SettingsSection::RookAgent,
+    SettingsSection::PtermAgent,
     SettingsSection::AgentProfiles,
     SettingsSection::AgentMCPServers,
     SettingsSection::Knowledge,
@@ -355,7 +358,7 @@ fn realistic_nav_items() -> Vec<SettingsNavItem> {
             "Cloud platform",
             vec![
                 SettingsSection::CloudEnvironments,
-                SettingsSection::RookCloudAgentAPIKeys,
+                SettingsSection::PtermCloudAgentAPIKeys,
             ],
         )),
         SettingsNavItem::Page(SettingsSection::Teams),
@@ -405,7 +408,7 @@ fn collapsed_umbrella_is_a_single_nav_stop() {
         stops[1],
         NavStop::CollapsedUmbrella {
             nav_index: 1,
-            first_subpage: SettingsSection::RookAgent,
+            first_subpage: SettingsSection::PtermAgent,
             last_subpage: SettingsSection::ThirdPartyCLIAgents,
         }
     ));
@@ -426,7 +429,7 @@ fn collapsed_umbrella_is_a_single_nav_stop() {
         NavStop::CollapsedUmbrella {
             nav_index: 4,
             first_subpage: SettingsSection::CloudEnvironments,
-            last_subpage: SettingsSection::RookCloudAgentAPIKeys,
+            last_subpage: SettingsSection::PtermCloudAgentAPIKeys,
         }
     ));
     assert!(matches!(stops[5], NavStop::Section(SettingsSection::Teams)));
@@ -440,7 +443,7 @@ fn expanded_umbrella_produces_section_stop_per_subpage() {
 
     let stops = build_nav_stops(&nav_items, |_| true);
 
-    // Expect: Account, RookAgent, AgentProfiles, AgentMCPServers, Knowledge,
+    // Expect: Account, PtermAgent, AgentProfiles, AgentMCPServers, Knowledge,
     // ThirdPartyCLIAgents, BillingAndUsage, <Code umbrella>,
     // <Cloud platform umbrella>, Teams.
     let sections: Vec<_> = stops
@@ -454,7 +457,7 @@ fn expanded_umbrella_produces_section_stop_per_subpage() {
         sections,
         vec![
             "Account",
-            "RookAgent",
+            "PtermAgent",
             "AgentProfiles",
             "AgentMCPServers",
             "Knowledge",
@@ -474,8 +477,8 @@ fn collapsed_umbrella_with_filtered_subpages_uses_first_visible_subpage() {
     let nav_items = realistic_nav_items();
 
     let stops = build_nav_stops(&nav_items, |section| {
-        // Hide RookAgent (first AI subpage); keep the rest.
-        section != SettingsSection::RookAgent
+        // Hide PtermAgent (first AI subpage); keep the rest.
+        section != SettingsSection::PtermAgent
     });
 
     let agents_stop = stops
@@ -492,12 +495,12 @@ fn collapsed_umbrella_with_filtered_subpages_uses_first_visible_subpage() {
             assert_eq!(
                 *first_subpage,
                 SettingsSection::AgentProfiles,
-                "RookAgent is hidden by the filter, so the first visible subpage is AgentProfiles"
+                "PtermAgent is hidden by the filter, so the first visible subpage is AgentProfiles"
             );
             assert_eq!(
                 *last_subpage,
                 SettingsSection::ThirdPartyCLIAgents,
-                "last_subpage is unaffected by hiding RookAgent and should remain the last visible subpage"
+                "last_subpage is unaffected by hiding PtermAgent and should remain the last visible subpage"
             );
         }
         _ => unreachable!(),
@@ -643,7 +646,7 @@ fn arrow_down_from_account_with_collapsed_agents_lands_on_first_subpage() {
     let nav_items = realistic_nav_items();
     let stops = build_nav_stops(&nav_items, |_| true);
 
-    // Pressing Down from Account should auto-expand Agents and select RookAgent,
+    // Pressing Down from Account should auto-expand Agents and select PtermAgent,
     // not skip over to BillingAndUsage.
     let next = simulate_cycle(
         &nav_items,
@@ -651,7 +654,7 @@ fn arrow_down_from_account_with_collapsed_agents_lands_on_first_subpage() {
         SettingsSection::Account,
         CycleDirection::Down,
     );
-    assert_eq!(next, SettingsSection::RookAgent);
+    assert_eq!(next, SettingsSection::PtermAgent);
 }
 
 #[test]
@@ -687,7 +690,7 @@ fn arrow_up_into_collapsed_umbrella_respects_search_filter_for_last_subpage() {
 
     // From BillingAndUsage, Up should land on the last *visible* AI subpage
     // (AgentMCPServers), not on the filtered-out Knowledge/ThirdPartyCLIAgents
-    // or on the first subpage RookAgent.
+    // or on the first subpage PtermAgent.
     let next = simulate_cycle(
         &nav_items,
         &stops,
@@ -745,18 +748,18 @@ fn arrow_down_across_adjacent_collapsed_umbrellas() {
 #[test]
 fn arrow_down_collapsed_umbrella_respects_search_filter() {
     let nav_items = realistic_nav_items();
-    // Search filter hides RookAgent and AgentProfiles so the first visible AI
+    // Search filter hides PtermAgent and AgentProfiles so the first visible AI
     // subpage is AgentMCPServers.
     let is_visible = |section: SettingsSection| {
         !matches!(
             section,
-            SettingsSection::RookAgent | SettingsSection::AgentProfiles
+            SettingsSection::PtermAgent | SettingsSection::AgentProfiles
         )
     };
     let stops = build_nav_stops(&nav_items, is_visible);
 
     // From Account, Down should land on AgentMCPServers (first visible
-    // subpage of the still-collapsed Agents umbrella), not on RookAgent /
+    // subpage of the still-collapsed Agents umbrella), not on PtermAgent /
     // AgentProfiles.
     let next = simulate_cycle(
         &nav_items,
@@ -815,7 +818,7 @@ impl SettingsWidget for StubWidget {
 fn stub_widgets_page() -> PageType<TestSettingsView> {
     let widgets: Vec<Box<dyn SettingsWidget<View = TestSettingsView>>> = vec![
         Box::new(StubWidget {
-            terms: "rook agent global ai toggle",
+            terms: "polaris-terminal agent global ai toggle",
         }),
         Box::new(StubWidget {
             terms: "active ai autosuggestions prompt",

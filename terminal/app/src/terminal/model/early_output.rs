@@ -2,8 +2,8 @@ use std::collections::{HashMap, VecDeque};
 use std::mem;
 
 use pathfinder_color::ColorU;
-use rook_errors::report_error;
-use rook_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
+use pterm_errors::report_error;
+use pterm_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
 use string_offset::CharOffset;
 
 use super::ansi;
@@ -26,17 +26,17 @@ mod tests;
 /// The approach we're using to detect user typeahead.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TypeaheadMode {
-    /// The shell reports its input buffer to Rook, and we use that for typeahead.
+    /// The shell reports its input buffer to Polaris Terminal, and we use that for typeahead.
     ShellReported,
-    /// Rook matches user input against characters echoed to the PTY to estimate typeahead.
+    /// Polaris Terminal matches user input against characters echoed to the PTY to estimate typeahead.
     /// This is only used on bash 3.2 and should be removed if we stop supporting
     /// such old bash versions.
     InputMatching,
 }
 
-/// Model for "early" terminal output. Early output is output that Rook receives
+/// Model for "early" terminal output. Early output is output that Polaris Terminal receives
 /// from the PTY while no block is running. In concrete terms, it's output received
-/// after a `BlockFinished` hook but before Rook has written the next command from
+/// after a `BlockFinished` hook but before Polaris Terminal has written the next command from
 /// the input editor to the PTY.
 ///
 /// This output belongs to one of two categories:
@@ -152,8 +152,8 @@ impl EarlyOutput {
                 full: ("Matched {ch:?} as typeahead")
             );
 
-            if rook_core::channel::ChannelState::channel()
-                == rook_core::channel::Channel::Integration
+            if pterm_core::channel::ChannelState::channel()
+                == pterm_core::channel::Channel::Integration
             {
                 log::info!(
                     "Sending input-matched typeahead event for {:?}",
@@ -171,8 +171,8 @@ impl EarlyOutput {
     /// internal count is then updated to match the new typeahead length.
     pub fn advance_typeahead(&mut self) -> Option<(&str, CharOffset)> {
         if self.typeahead.is_empty() {
-            if rook_core::channel::ChannelState::channel()
-                == rook_core::channel::Channel::Integration
+            if pterm_core::channel::ChannelState::channel()
+                == pterm_core::channel::Channel::Integration
             {
                 log::warn!("Tried to advance typeahead, but it was empty");
             }
@@ -210,9 +210,9 @@ impl EarlyOutput {
             // For most user-entered commands, we know when to switch from background
             // output to the active block's command grid because the input editor
             // marks the block as started right before it sends the command to the pty.
-            // When the command doesn't come from Rook, however, the active block isn't
+            // When the command doesn't come from Polaris Terminal, however, the active block isn't
             // started until we receive the preexec hook. At this point, the shell has
-            // already written the command to the pty, resulting in Rook treating it as
+            // already written the command to the pty, resulting in Polaris Terminal treating it as
             // background output.
             // We can't correctly identify the command in advance when this happens, so
             // instead we fix the block list afterwards.
@@ -324,8 +324,8 @@ impl ansi::Handler for EarlyOutputHandler<'_> {
     /// information, such as when the shell reports its input buffer.
     fn input_buffer(&mut self, data: ansi::InputBufferValue) {
         if data.buffer.is_empty() {
-            if rook_core::channel::ChannelState::channel()
-                == rook_core::channel::Channel::Integration
+            if pterm_core::channel::ChannelState::channel()
+                == pterm_core::channel::Channel::Integration
             {
                 log::info!("Ignoring empty input buffer");
             }
@@ -346,8 +346,8 @@ impl ansi::Handler for EarlyOutputHandler<'_> {
         let me = self.inner();
         if me.mode == TypeaheadMode::ShellReported {
             me.typeahead = data.buffer;
-            if rook_core::channel::ChannelState::channel()
-                == rook_core::channel::Channel::Integration
+            if pterm_core::channel::ChannelState::channel()
+                == pterm_core::channel::Channel::Integration
             {
                 log::info!(
                     "Sending shell-reported typeahead event for {:?}",

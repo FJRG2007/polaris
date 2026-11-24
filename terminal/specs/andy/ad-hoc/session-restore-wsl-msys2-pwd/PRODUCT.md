@@ -1,11 +1,11 @@
 # Session Restore: Preserve PWD for WSL and Git Bash
 
 ## Summary
-When Rook restores a session that was running in WSL or an MSYS2-based shell (Git Bash, MSYS2), it re-opens that terminal in the same working directory the user was in when the session was saved.
+When Polaris Terminal restores a session that was running in WSL or an MSYS2-based shell (Git Bash, MSYS2), it re-opens that terminal in the same working directory the user was in when the session was saved.
 
 ## Behavior
 
-1. When a Rook session is snapshotted (e.g. on app quit, window close, or session save), the current working directory is persisted as part of the session state.
+1. When a Polaris Terminal session is snapshotted (e.g. on app quit, window close, or session save), the current working directory is persisted as part of the session state.
 
 2. When a WSL session is restored, the new terminal opens with its working directory set to the same path the user was in before. For example, if the user was in `/home/user/projects`, the restored terminal starts there.
 

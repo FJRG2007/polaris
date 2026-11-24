@@ -1,13 +1,13 @@
 //! Shared styles for notebooks.
 
-use rookui::elements::{
+use ptermui::elements::{
     Container, CrossAxisAlignment, Flex, Hoverable, MainAxisAlignment, MouseStateHandle,
     ParentElement,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::components::UiComponent as _;
-use rookui::units::{IntoPixels, Pixels};
-use rookui::{Element, fonts};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::UiComponent as _;
+use ptermui::units::{IntoPixels, Pixels};
+use ptermui::{Element, fonts};
 
 use crate::appearance::Appearance;
 use crate::settings::{FontSettings, derived_notebook_font_size};

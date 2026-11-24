@@ -5,11 +5,11 @@ Figma: none provided
 
 ## Summary
 
-Add install and update chip support for the OpenCode Rook plugin (`opencode-rook`), matching the existing Claude Code chip UX. Clicking the chip opens a modal with manual installation/update instructions.
+Add install and update chip support for the OpenCode Polaris Terminal plugin (`opencode-polaris-terminal`), matching the existing Claude Code chip UX. Clicking the chip opens a modal with manual installation/update instructions.
 
 ## Problem
 
-When a user runs OpenCode inside Rook, the Rook plugin enriches the experience with native notifications and session status tracking. Today, Rook has no way to prompt OpenCode users to install or update this plugin — `plugin_manager_for(CLIAgent::OpenCode)` returns `None`.
+When a user runs OpenCode inside Polaris Terminal, the Polaris Terminal plugin enriches the experience with native notifications and session status tracking. Today, Polaris Terminal has no way to prompt OpenCode users to install or update this plugin — `plugin_manager_for(CLIAgent::OpenCode)` returns `None`.
 
 ## Goals
 
@@ -19,7 +19,7 @@ When a user runs OpenCode inside Rook, the Rook plugin enriches the experience w
 
 ## Prerequisites
 
-The `opencode-rook` npm package must be published before this feature ships. The name is currently available on npm.
+The `opencode-polaris-terminal` npm package must be published before this feature ships. The name is currently available on npm.
 
 ## Non-Goals
 
@@ -59,14 +59,14 @@ When a user starts an OpenCode session and the plugin has never connected (no li
 - Clicking opens a modal with manual install instructions.
 
 **Install instructions modal:**
-- Title: "Install Rook Plugin for OpenCode"
-- Subtitle: "Add the Rook plugin to your OpenCode configuration, then restart OpenCode."
+- Title: "Install Polaris Terminal Plugin for OpenCode"
+- Subtitle: "Add the Polaris Terminal plugin to your OpenCode configuration, then restart OpenCode."
 - Steps:
   1. "Add the plugin to your config" — copyable snippet:
      ```json
-     { "plugin": ["opencode-rook"] }
+     { "plugin": ["opencode-polaris-terminal"] }
      ```
-     with explanatory text: "Add `"opencode-rook"` to the `plugin` array in your `opencode.json` (project root) or `~/.config/opencode/opencode.json` (global)."
+     with explanatory text: "Add `"opencode-polaris-terminal"` to the `plugin` array in your `opencode.json` (project root) or `~/.config/opencode/opencode.json` (global)."
   2. "Restart OpenCode to activate"
 
 ### Update Chip
@@ -82,13 +82,13 @@ When the plugin is connected but reports a version below `MINIMUM_PLUGIN_VERSION
 **Version detection:**
 - Sole signal: `plugin_version` field from the `SessionStart` event.
 - No filesystem-based version checks. If the plugin hasn't connected, we don't know its version — we show the install chip instead.
-- Since the opencode-rook plugin has never been released, there is no legacy version that predates version reporting. Every installed version will report `plugin_version`.
+- Since the opencode-polaris-terminal plugin has never been released, there is no legacy version that predates version reporting. Every installed version will report `plugin_version`.
 
 **Update instructions modal:**
-- Title: "Update Rook Plugin for OpenCode"
+- Title: "Update Polaris Terminal Plugin for OpenCode"
 - Subtitle: "Clear the cached plugin and restart OpenCode to pull the latest version."
 - Steps:
-  1. "Remove the cached plugin" — copyable command: `rm -rf ~/.cache/opencode/node_modules/opencode-rook`
+  1. "Remove the cached plugin" — copyable command: `rm -rf ~/.cache/opencode/node_modules/opencode-polaris-terminal`
   2. "Restart OpenCode" — "OpenCode will re-download the latest version on startup."
 
 ### Chip Visibility Logic
@@ -117,7 +117,7 @@ Same as Claude Code: install chip and update chip have independent dismiss state
 
 ## Success Criteria
 
-1. Starting an OpenCode session in Rook when the plugin has never connected shows a green "Notifications setup instructions" chip (after a brief debounce).
+1. Starting an OpenCode session in Polaris Terminal when the plugin has never connected shows a green "Notifications setup instructions" chip (after a brief debounce).
 2. Clicking the chip opens a modal with install instructions including a copyable config snippet.
 3. After the user installs and restarts OpenCode, the plugin connects and the chip disappears.
 4. When the plugin reports a version below `MINIMUM_PLUGIN_VERSION`, the "Plugin update instructions" chip appears.

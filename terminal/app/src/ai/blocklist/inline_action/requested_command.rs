@@ -7,22 +7,22 @@ use std::sync::Arc;
 use lazy_static::lazy_static;
 use parking_lot::FairMutex;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
+use ptermui::elements::{
     Align, Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, Dismiss, Empty, Expanded, Flex, MainAxisSize,
     MouseStateHandle, OffsetPositioning, ParentElement, PositionedElementAnchor,
     PositionedElementOffsetBounds, Radius, ScrollbarWidth, SelectableArea, SelectionHandle, Stack,
     Text,
 };
-use rookui::keymap::{Context, EditableBinding, FixedBinding, Keystroke};
-use rookui::ui_components::components::UiComponent as _;
-use rookui::{
+use ptermui::keymap::{Context, EditableBinding, FixedBinding, Keystroke};
+use ptermui::ui_components::components::UiComponent as _;
+use ptermui::{
     AppContext, Element, Entity, EntityId, EventContext, ModelHandle, SingletonEntity,
     TypedActionView, UpdateView, View, ViewContext, ViewHandle,
 };
@@ -126,7 +126,7 @@ lazy_static! {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -335,7 +335,7 @@ pub struct RequestedCommandView {
     header_mouse_state: MouseStateHandle,
     is_editing: bool,
 
-    // A requested command can either be copied directly off of one citation (such as a Rook Drive
+    // A requested command can either be copied directly off of one citation (such as a Polaris Terminal Drive
     // object), derived from one or more citations, or be unrelated to any citations.
     // A given citation should only appear once per block.
     copied_from_citation: Option<AIAgentCitation>,
@@ -855,7 +855,7 @@ impl RequestedCommandView {
             ) if show_for_action_id == &self.action_id => {
                 *shown.lock() = true;
                 Some(render_autonomy_checkbox_setting_speedbump_footer(
-                    "Always allow the Rook Agent to execute read-only commands (relies on model)",
+                    "Always allow the Polaris Terminal Agent to execute read-only commands (relies on model)",
                     *checked,
                     AIBlockAction::ToggleAutoexecuteReadonlyCommandsSpeedbumpCheckbox,
                     self.autoexecute_readonly_commands_speedbump_checkbox_handle
@@ -898,7 +898,7 @@ impl RequestedCommandView {
                     Container::new(
                         ConstrainedBox::new(
                             Icon::Info
-                                .to_rookui_icon(
+                                .to_ptermui_icon(
                                     blended_colors::text_sub(theme, theme.surface_1()).into(),
                                 )
                                 .finish(),
@@ -1837,7 +1837,7 @@ impl View for RequestedCommandView {
                     },
                     theme.nonactive_ui_detail().into(),
                     theme.active_ui_detail().into(),
-                    rookui::elements::Fill::None,
+                    ptermui::elements::Fill::None,
                 )
                 .with_vertical_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Auto, false))
                 .with_propagate_mousewheel_if_not_handled(true)

@@ -1,6 +1,6 @@
 use ai::skills::{ParsedSkill, SkillProvider, SkillScope};
-use rook_util::host_id::HostId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::host_id::HostId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::*;
 
@@ -14,7 +14,7 @@ fn bundled_skill(content: &str) -> BundledSkill {
             path: LocalOrRemotePath::Local("/bundled/skills/test-skill/SKILL.md".into()),
             content: content.to_string(),
             line_range: None,
-            provider: SkillProvider::Rook,
+            provider: SkillProvider::Pterm,
             scope: SkillScope::Bundled,
         },
         BundledSkillActivation::Always,
@@ -96,8 +96,8 @@ fn factory_files_bundled_skill_is_always_active_and_scoped_to_authoring() {
 
 /// The skill must not carry a copy of the Factory file format.
 ///
-/// A bundled copy ships inside a Rook release and goes stale against the
-/// rook-server it is used against. A stale copy does not fail quietly: it
+/// A bundled copy ships inside a Polaris Terminal release and goes stale against the
+/// polaris-terminal-server it is used against. A stale copy does not fail quietly: it
 /// reports fields the server accepts as unknown, and an agent clearing that
 /// diagnostic deletes working configuration. An earlier revision did exactly
 /// that to the Linear and Slack trigger aliases. The format is fetched from

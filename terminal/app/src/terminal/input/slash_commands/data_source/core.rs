@@ -4,15 +4,15 @@ use std::path::PathBuf;
 use ai::skills::SkillProvider;
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::Icon as PtermIcon;
+use pterm_core::ui::appearance::Appearance;
+#[cfg(not(target_family = "wasm"))]
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::fonts::FamilyId;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 #[cfg(not(target_family = "wasm"))]
 use repo_metadata::repositories::DetectedRepositories;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::Icon as RookIcon;
-use rook_core::ui::appearance::Appearance;
-#[cfg(not(target_family = "wasm"))]
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::fonts::FamilyId;
-use rookui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use crate::ai::agent_conversations_model::{AgentConversationsModel, AgentConversationsModelEvent};
 use crate::ai::blocklist::block::cli_controller::{CLISubagentController, CLISubagentEvent};
@@ -435,7 +435,7 @@ pub trait SlashCommandDataSource {
         let ai_settings = AISettings::as_ref(ctx);
         // Hide /host when no default host is configured (env var or the window's own team
         // setting), matching the host the command itself resolves when it runs.
-        let has_default_host = std::env::var("ROOK_CLOUD_MODE_DEFAULT_HOST")
+        let has_default_host = std::env::var("POLARIS_TERMINAL_CLOUD_MODE_DEFAULT_HOST")
             .ok()
             .filter(|s| !s.is_empty())
             .is_some()
@@ -700,13 +700,13 @@ impl InlineItem {
             override_icon
         } else {
             match skill.provider {
-                SkillProvider::Rook => RookIcon::Rook,
-                SkillProvider::Claude => RookIcon::ClaudeLogo,
-                SkillProvider::Codex => RookIcon::OpenAILogo,
-                SkillProvider::Gemini => RookIcon::GeminiLogo,
-                SkillProvider::Droid => RookIcon::DroidLogo,
-                SkillProvider::OpenCode => RookIcon::OpenCodeLogo,
-                _ => RookIcon::Rook,
+                SkillProvider::Pterm => PtermIcon::Pterm,
+                SkillProvider::Claude => PtermIcon::ClaudeLogo,
+                SkillProvider::Codex => PtermIcon::OpenAILogo,
+                SkillProvider::Gemini => PtermIcon::GeminiLogo,
+                SkillProvider::Droid => PtermIcon::DroidLogo,
+                SkillProvider::OpenCode => PtermIcon::OpenCodeLogo,
+                _ => PtermIcon::Pterm,
             }
         };
 

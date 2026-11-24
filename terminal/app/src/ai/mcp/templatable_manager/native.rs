@@ -10,15 +10,15 @@ use mcp::oauth::{
 };
 use mcp::runtime::{error_to_user_message, spawn_server};
 use parking_lot::Mutex;
-use rook_core::channel::ChannelState;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_core::features::FeatureFlag;
-use rook_core::safe_error;
-use rook_core::settings::Setting as _;
-use rook_errors::report_error;
-use rook_server_client::auth::AuthEvent;
-use rookui::windowing::WindowManager;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_core::channel::ChannelState;
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_core::features::FeatureFlag;
+use pterm_core::safe_error;
+use pterm_core::settings::Setting as _;
+use pterm_errors::report_error;
+use pterm_server_client::auth::AuthEvent;
+use ptermui::windowing::WindowManager;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use simple_logger::manager::LogManager;
 use url::Url;
 use uuid::Uuid;
@@ -96,7 +96,7 @@ enum LegacyToTemplatableMCPConversionError {
     InstallationFailed,
 }
 
-/// An MCP server integration that Rook ships with bundled skills for.
+/// An MCP server integration that Polaris Terminal ships with bundled skills for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum McpIntegration {
     Figma,
@@ -154,7 +154,7 @@ impl TemplatableMCPServerManager {
             anyhow::bail!("No spawned server found for uuid={server_uuid}");
         };
 
-        rookui::r#async::block_on(server_info.oauth_result_tx.send(result)).map_err(|_| {
+        ptermui::r#async::block_on(server_info.oauth_result_tx.send(result)).map_err(|_| {
             anyhow::anyhow!(
                 "Failed to send OAuth result to server {server_uuid} - receiver dropped"
             )
@@ -232,7 +232,7 @@ impl TemplatableMCPServerManager {
             report_error!(
                 "No template UUID found for installation UUID",
                 extra: { "installation_uuid" => %installation_uuid },
-                rook_errors::ReportErrorLogMode::OncePerRun
+                pterm_errors::ReportErrorLogMode::OncePerRun
             );
         }
     }
@@ -351,7 +351,7 @@ impl TemplatableMCPServerManager {
             _ => {}
         });
 
-        // Built-in Rook-hosted MCP servers follow the user's auth lifecycle:
+        // Built-in Polaris Terminal-hosted MCP servers follow the user's auth lifecycle:
         // attach after login, re-attach with fresh credentials when the
         // access token rotates, and detach on logout. Skipped in tests, which
         // construct the manager without the auth singletons.
@@ -437,7 +437,7 @@ impl TemplatableMCPServerManager {
             }
         }
 
-        // Attach built-in Rook-hosted servers for already-logged-in users
+        // Attach built-in Polaris Terminal-hosted servers for already-logged-in users
         // (fresh logins are handled by the AuthManager subscription above).
         if !cfg!(test) {
             me.sync_builtin_servers(false, ctx);
@@ -766,7 +766,7 @@ impl TemplatableMCPServerManager {
         self.spawn_ephemeral_server(installation, ctx);
     }
 
-    /// Reconciles built-in Rook-hosted MCP servers (currently the Factory
+    /// Reconciles built-in Polaris Terminal-hosted MCP servers (currently the Factory
     /// MCP) with the feature-flag and auth state: spawns the server when it
     /// should be running and isn't, and shuts it down when it shouldn't be.
     /// Safe to call repeatedly.
@@ -965,10 +965,10 @@ impl TemplatableMCPServerManager {
 
             // For file-based MCP installations without an explicit `working_directory`,
             // default the spawn cwd to the directory the config was discovered in
-            // (repo root for project-scoped configs, ~/.rook/ or ~ for globals). This
+            // (repo root for project-scoped configs, ~/.polaris-terminal/ or ~ for globals). This
             // matches user expectations for repo-relative commands in `.mcp.json`.
             // Cloud-templated installations (lookup returns None) are unaffected and
-            // continue to inherit Rook's process cwd.
+            // continue to inherit Polaris Terminal's process cwd.
             if cli_server.cwd_parameter.is_none()
                 && let Some(spawn_root) =
                     FileBasedMCPManager::as_ref(ctx).spawn_root_for_installation(installation_uuid)

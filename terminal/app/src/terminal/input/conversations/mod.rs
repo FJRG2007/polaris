@@ -5,9 +5,9 @@ mod search_item;
 mod view;
 
 use pathfinder_color::ColorU;
-use rook_core::ui::appearance::Appearance;
-use rookui::SingletonEntity;
-use rookui::keymap::Keystroke;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::SingletonEntity;
+use ptermui::keymap::Keystroke;
 pub use view::{InlineConversationMenuEvent, InlineConversationMenuView};
 
 use crate::ai::agent_conversations_model::AgentConversationEntryId;

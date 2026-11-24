@@ -2,12 +2,12 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use anyhow::Result;
+use pterm_core::features::FeatureFlag;
+use pterm_errors::{report_error, report_if_error};
+use pterm_graphql::mutations::update_user_settings::UpdateUserSettingsInput;
+pub use pterm_terminal::model::secrets::RegexDisplayInfo;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel};
 use regex::Regex;
-use rook_core::features::FeatureFlag;
-use rook_errors::{report_error, report_if_error};
-use rook_graphql::mutations::update_user_settings::UpdateUserSettingsInput;
-pub use rook_terminal::model::secrets::RegexDisplayInfo;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel};
 use serde::{Deserialize, Serialize};
 use settings::macros::{define_settings_group, maybe_define_setting, register_settings_events};
 use settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud};
@@ -83,7 +83,7 @@ impl PartialEq for CustomSecretRegex {
 
 impl settings_value::SettingsValue for CustomSecretRegex {}
 
-define_settings_group!(RookDrivePrivacySettings, settings: [
+define_settings_group!(PtermDrivePrivacySettings, settings: [
     is_telemetry_enabled: IsTelemetryEnabled {
         type: bool,
         default: true,
@@ -243,34 +243,34 @@ impl PrivacySettings {
         let auth_state = AuthStateProvider::as_ref(ctx).get().clone();
         let auth_client = ServerApiProvider::as_ref(ctx).get_auth_client();
 
-        // Initialize from `RookDrivePrivacySettings`, which is the source of truth for these
+        // Initialize from `PtermDrivePrivacySettings`, which is the source of truth for these
         // booleans.
-        let rook_drive_privacy = RookDrivePrivacySettings::as_ref(ctx);
-        let is_telemetry_enabled = *rook_drive_privacy.is_telemetry_enabled.value();
-        let is_crash_reporting_enabled = *rook_drive_privacy.is_crash_reporting_enabled.value();
-        let is_cloud_conversation_storage_enabled = *rook_drive_privacy
+        let pterm_drive_privacy = PtermDrivePrivacySettings::as_ref(ctx);
+        let is_telemetry_enabled = *pterm_drive_privacy.is_telemetry_enabled.value();
+        let is_crash_reporting_enabled = *pterm_drive_privacy.is_crash_reporting_enabled.value();
+        let is_cloud_conversation_storage_enabled = *pterm_drive_privacy
             .is_cloud_conversation_storage_enabled
             .value();
 
         // Listen for changes to the cloud model and update ourselves when they happen.
         ctx.subscribe_to_model(
-            &RookDrivePrivacySettings::handle(ctx),
+            &PtermDrivePrivacySettings::handle(ctx),
             |me, _, event, ctx| {
-                let privacy_settings = RookDrivePrivacySettings::as_ref(ctx);
+                let privacy_settings = PtermDrivePrivacySettings::as_ref(ctx);
                 match event {
-                    RookDrivePrivacySettingsChangedEvent::IsTelemetryEnabled { .. } => {
+                    PtermDrivePrivacySettingsChangedEvent::IsTelemetryEnabled { .. } => {
                         me.set_is_telemetry_enabled(
                             *privacy_settings.is_telemetry_enabled.value(),
                             ctx,
                         );
                     }
-                    RookDrivePrivacySettingsChangedEvent::IsCrashReportingEnabled { .. } => {
+                    PtermDrivePrivacySettingsChangedEvent::IsCrashReportingEnabled { .. } => {
                         me.set_is_crash_reporting_enabled(
                             *privacy_settings.is_crash_reporting_enabled.value(),
                             ctx,
                         );
                     }
-                    RookDrivePrivacySettingsChangedEvent::IsCloudConversationStorageEnabled {
+                    PtermDrivePrivacySettingsChangedEvent::IsCloudConversationStorageEnabled {
                         ..
                     } => {
                         me.set_is_cloud_conversation_storage_enabled(
@@ -413,7 +413,7 @@ impl PrivacySettings {
             }
         }
 
-        self.maybe_sync_with_rook_drive_prefs(ctx);
+        self.maybe_sync_with_pterm_drive_prefs(ctx);
     }
 
     fn overwrite_local_settings_if_cloud_disabled(
@@ -500,7 +500,7 @@ impl PrivacySettings {
         if new_value != old_value {
             self.is_crash_reporting_enabled = new_value;
 
-            RookDrivePrivacySettings::handle(ctx).update(ctx, |settings, ctx| {
+            PtermDrivePrivacySettings::handle(ctx).update(ctx, |settings, ctx| {
                 log::info!("Setting is_crash_reporting_enabled to {new_value}");
                 let _ = settings
                     .is_crash_reporting_enabled
@@ -536,7 +536,7 @@ impl PrivacySettings {
         if new_value != old_value {
             self.is_telemetry_enabled = new_value;
 
-            RookDrivePrivacySettings::handle(ctx).update(ctx, |settings, ctx| {
+            PtermDrivePrivacySettings::handle(ctx).update(ctx, |settings, ctx| {
                 log::info!("Setting is_telemetry_enabled to {new_value}");
                 let _ = settings.is_telemetry_enabled.set_value(new_value, ctx);
             });
@@ -568,7 +568,7 @@ impl PrivacySettings {
 
         self.is_cloud_conversation_storage_enabled = new_value;
 
-        RookDrivePrivacySettings::handle(ctx).update(ctx, |settings, ctx| {
+        PtermDrivePrivacySettings::handle(ctx).update(ctx, |settings, ctx| {
             log::info!("Setting is_cloud_conversation_storage_enabled to {new_value}");
             let _ = settings
                 .is_cloud_conversation_storage_enabled
@@ -706,26 +706,26 @@ impl PrivacySettings {
         }
     }
 
-    /// We wait until rook drive prefs have loaded and then either
+    /// We wait until polaris-terminal drive prefs have loaded and then either
     /// 1) use them as the data store for is_telemetry_enabled and is_crash_reporting_enabled, if those
-    ///    values are set in rook drive, or
-    /// 2) update the rook drive prefs to match the values from the legacy user_settings endpoint so
-    ///    that we can use rook drive prefs going forward.
-    pub fn maybe_sync_with_rook_drive_prefs(&mut self, ctx: &mut ModelContext<Self>) {
-        // Wait for cloud objects to load, and, if telemetry & crash reporting are synced to rook drive
-        // initialize from the rook drive values.
+    ///    values are set in polaris-terminal drive, or
+    /// 2) update the polaris-terminal drive prefs to match the values from the legacy user_settings endpoint so
+    ///    that we can use polaris-terminal drive prefs going forward.
+    pub fn maybe_sync_with_pterm_drive_prefs(&mut self, ctx: &mut ModelContext<Self>) {
+        // Wait for cloud objects to load, and, if telemetry & crash reporting are synced to polaris-terminal drive
+        // initialize from the polaris-terminal drive values.
         let update_manager = UpdateManager::as_ref(ctx);
         ctx.spawn(
             update_manager.initial_load_complete(),
-            Self::handle_rook_drive_objects_loaded,
+            Self::handle_pterm_drive_objects_loaded,
         );
     }
 
-    fn handle_rook_drive_objects_loaded(&mut self, _: (), ctx: &mut ModelContext<Self>) {
+    fn handle_pterm_drive_objects_loaded(&mut self, _: (), ctx: &mut ModelContext<Self>) {
         self.initialize_default_regexes_once(ctx);
-        // Check if the rook drive preferences are set. If they are, and telemetry and crash reporting
-        // are set as rook drive prefs, then use those.  Otherwise, update the rook drive prefs to match
-        // the values from the legacy user_settings endpoint so that we can use rook drive prefs going forward.
+        // Check if the polaris-terminal drive preferences are set. If they are, and telemetry and crash reporting
+        // are set as polaris-terminal drive prefs, then use those.  Otherwise, update the polaris-terminal drive prefs to match
+        // the values from the legacy user_settings endpoint so that we can use polaris-terminal drive prefs going forward.
         let cloud_model = CloudModel::as_ref(ctx);
         let cloud_prefs = cloud_model.get_all_cloud_preferences_by_storage_key();
         let cloud_telemetry_value =
@@ -768,7 +768,7 @@ impl PrivacySettings {
                 Some(is_cloud_conversation_storage_enabled),
             ) => {
                 log::info!(
-                    "Rook Drive privacy preferences are set, using those for telemetry={is_telemetry_enabled}, \
+                    "Polaris Terminal Drive privacy preferences are set, using those for telemetry={is_telemetry_enabled}, \
                     crash_reporting={is_crash_reporting_enabled}, cloud_conversation_storage={is_cloud_conversation_storage_enabled}"
                 );
                 self.set_is_telemetry_enabled(is_telemetry_enabled, ctx);
@@ -780,20 +780,20 @@ impl PrivacySettings {
             }
             _ => {
                 log::info!(
-                    "Rook Drive privacy preferences are not set, syncing local PrivacySettings values to \
-                    RookDrivePrivacySettings and cloud. telemetry={}, crash_reporting={}, \
+                    "Polaris Terminal Drive privacy preferences are not set, syncing local PrivacySettings values to \
+                    PtermDrivePrivacySettings and cloud. telemetry={}, crash_reporting={}, \
                     cloud_conversation_storage={}",
                     self.is_telemetry_enabled,
                     self.is_crash_reporting_enabled,
                     self.is_cloud_conversation_storage_enabled
                 );
-                // First, ensure RookDrivePrivacySettings (the define_settings_group model)
+                // First, ensure PtermDrivePrivacySettings (the define_settings_group model)
                 // reflects the actual PrivacySettings in-memory values. These may differ
-                // because RookDrivePrivacySettings defaults to `true` for all three settings,
+                // because PtermDrivePrivacySettings defaults to `true` for all three settings,
                 // while the user may have changed them to `false` via PrivacySettings before
                 // signing up. Without this step, maybe_sync_local_prefs_to_cloud would read
-                // the stale RookDrivePrivacySettings defaults and push those to the cloud.
-                RookDrivePrivacySettings::handle(ctx).update(ctx, |settings, ctx| {
+                // the stale PtermDrivePrivacySettings defaults and push those to the cloud.
+                PtermDrivePrivacySettings::handle(ctx).update(ctx, |settings, ctx| {
                     report_if_error!(
                         settings
                             .is_telemetry_enabled

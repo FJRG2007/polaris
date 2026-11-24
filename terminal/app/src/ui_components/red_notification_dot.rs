@@ -1,11 +1,11 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::AnsiColorIdentifier;
-use rookui::Element;
-use rookui::elements::{
+use pterm_core::ui::theme::AnsiColorIdentifier;
+use ptermui::Element;
+use ptermui::elements::{
     ChildAnchor, ConstrainedBox, Container, CornerRadius, Empty, Fill, OffsetPositioning,
     ParentAnchor, ParentElement as _, ParentOffsetBounds, Radius, Stack,
 };
-use rookui::ui_components::components::UiComponentStyles;
+use ptermui::ui_components::components::UiComponentStyles;
 
 use crate::appearance::Appearance;
 

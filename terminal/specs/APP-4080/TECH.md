@@ -79,7 +79,7 @@ Render the toggle in `OtherAIWidget`, near `Show conversation history in tools p
 Suggested description:
 - `Show the latest user prompt instead of the generated conversation title for Oz and third-party agent sessions in vertical tabs.`
 
-Because the setting also affects plugin-backed third-party CLI agent sessions, do not make editability depend exclusively on `AISettings::is_any_ai_enabled(app)`. The row can still use standard AI settings styling, but the toggle should remain usable for users who keep Rook AI disabled while using third-party coding agents.
+Because the setting also affects plugin-backed third-party CLI agent sessions, do not make editability depend exclusively on `AISettings::is_any_ai_enabled(app)`. The row can still use standard AI settings styling, but the toggle should remain usable for users who keep Polaris Terminal AI disabled while using third-party coding agents.
 
 ### Centralize agent tab text resolution
 Introduce a small private resolver in `app/src/workspace/view/vertical_tabs.rs` so every vertical-tabs call site uses the same setting semantics.
@@ -174,7 +174,7 @@ flowchart TD
 - **Duplicated resolution stays inconsistent**: centralize the setting read in one helper and make all four vertical-tabs call sites use it.
 - **Pane headers accidentally change**: keep `TerminalView::selected_conversation_display_title()` title-first for existing chrome; add a new tab-specific helper rather than changing the existing method globally.
 - **Third-party `summary` may not be a durable title**: hide this behind `CLIAgentSessionContext::title_like_text()` and treat a dedicated plugin `title` payload field as a follow-up if needed.
-- **Global AI disabled blocks a third-party setting**: make the UI toggle usable even when Rook AI is disabled, since the setting also affects plugin-backed third-party CLI sessions.
+- **Global AI disabled blocks a third-party setting**: make the UI toggle usable even when Polaris Terminal AI is disabled, since the setting also affects plugin-backed third-party CLI sessions.
 - **Blank or whitespace text**: trim and filter every title/prompt candidate before choosing it.
 - **Search mismatch**: test that search includes the visible text after toggling. If both title and prompt are indexed, make sure rendered text still follows the setting.
 
@@ -204,9 +204,9 @@ Manual validation:
 - Non-plugin CLI detection and plain terminal rows keep existing fallback behavior.
 
 Suggested targeted commands after implementation:
-- `cargo test -p rook workspace::view::vertical_tabs_tests`
-- `cargo test -p rook terminal::cli_agent_sessions::mod_tests`
-- `cargo test -p rook settings::ai_tests`
+- `cargo test -p polaris-terminal workspace::view::vertical_tabs_tests`
+- `cargo test -p polaris-terminal terminal::cli_agent_sessions::mod_tests`
+- `cargo test -p polaris-terminal settings::ai_tests`
 
 Do not run `cargo fmt --all` or file-specific `cargo fmt`; follow the repository formatting guidance when implementation changes are made.
 

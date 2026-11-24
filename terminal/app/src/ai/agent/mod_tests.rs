@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use chrono::{Local, TimeZone, Utc};
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use rook_editor::render::model::LineCount;
+use pterm_editor::render::model::LineCount;
 use warp_multi_agent_api::{FileContent, FileContentLineRange};
 
 use crate::ai::agent::{
@@ -17,7 +17,7 @@ use crate::ai::agent::{
     TransientNetworkErrorKind,
 };
 use crate::ai::block_context::BlockContext;
-use crate::ai_assistant::execution_context::{RookAiExecutionContext, RookAiOsContext};
+use crate::ai_assistant::execution_context::{PtermAiExecutionContext, PtermAiOsContext};
 use crate::server::server_api::AIApiError;
 use crate::terminal::shell::ShellType;
 
@@ -107,7 +107,7 @@ fn transient_network_error_includes_user_facing_message_and_debug_details() {
     let rendered = error.to_string();
     assert!(
         rendered.starts_with(
-            "Rook lost connection while receiving the agent response. This is usually temporary.\n\nDebug info: "
+            "Polaris Terminal lost connection while receiving the agent response. This is usually temporary.\n\nDebug info: "
         ),
         "unexpected rendering: {rendered}"
     );
@@ -385,8 +385,8 @@ fn ai_agent_context_round_trips_tagged_variants() {
             are_file_symbols_indexed: true,
         },
         AIAgentContext::SelectedText("selected text".to_string()),
-        AIAgentContext::ExecutionEnvironment(RookAiExecutionContext {
-            os: RookAiOsContext {
+        AIAgentContext::ExecutionEnvironment(PtermAiExecutionContext {
+            os: PtermAiOsContext {
                 category: Some("MacOS".to_string()),
                 distribution: None,
             },
@@ -412,12 +412,12 @@ fn ai_agent_context_round_trips_tagged_variants() {
         AIAgentContext::ProjectRules {
             root_path: "/tmp/project".to_string(),
             active_rules: vec![FileContext::new(
-                "ROOK.md".to_string(),
+                "POLARIS_TERMINAL.md".to_string(),
                 AnyFileContent::StringContent("Be nice.".to_string()),
                 None,
                 None,
             )],
-            additional_rule_paths: vec!["sub/ROOK.md".to_string()],
+            additional_rule_paths: vec!["sub/POLARIS_TERMINAL.md".to_string()],
         },
         AIAgentContext::File(FileContext::new(
             "a.txt".to_string(),
@@ -430,7 +430,7 @@ fn ai_agent_context_round_trips_tagged_variants() {
             branch: Some("main".to_string()),
         },
         AIAgentContext::Repository {
-            name: "rook".to_string(),
+            name: "polaris-terminal".to_string(),
             owner: Some("warpdotdev".to_string()),
             host: Some("github.com".to_string()),
         },
@@ -439,7 +439,7 @@ fn ai_agent_context_round_trips_tagged_variants() {
             state: "OPEN".to_string(),
             draft: true,
             base_branch: "main".to_string(),
-            url: "https://github.com/FJRG2007/rook/pull/42".to_string(),
+            url: "https://github.com/FJRG2007/polaris/pull/42".to_string(),
         },
         AIAgentContext::Skills { skills: vec![] },
     ];

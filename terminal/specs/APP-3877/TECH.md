@@ -5,11 +5,11 @@
 This is the first preparatory changeset for the image cache debounce strategy described in the broader APP-3877 plan. It establishes the per-size eviction API on `ImageCache` and verifies that GPU memory is freed correctly when an `ImageCache` entry is dropped.
 
 ### Relevant files
-- `crates/rookui_core/src/image_cache.rs:799` — `ImageCache`, stores `RwLock<HashMap<u64, HashMap<RenderedImageCacheKey, Rc<Image>>>>`. Whole-asset eviction exists (`evict_image`); per-size eviction does not yet exist.
-- `crates/rookui_core/src/rendering/texture_cache.rs:26` — `TextureCache<T>`, stores a `Vec<TextureInfo<T>>` where each entry holds `Weak<StaticImage>` and a `last_accessed_frame` counter.
-- `crates/rookui_core/src/elements/image.rs:302` — `Image::paint()` calls `ImageCache::image()`, receives `Rc<Image>`, immediately unwraps the inner `Arc<StaticImage>`, and pushes it to the `Scene`. The `Rc<Image>` is never stored beyond `paint()`.
-- `crates/rookui_core/src/scene.rs:109` — `Scene::Image { asset: Arc<StaticImage> }` — the scene stores a strong reference during the current frame only.
-- `crates/rookui/src/rendering/wgpu/renderer/image.rs:53` — `Pipeline::texture_cache: TextureCache<TextureInfo>`, populated from `scene.images[*].asset` each frame.
+- `crates/ptermui_core/src/image_cache.rs:799` — `ImageCache`, stores `RwLock<HashMap<u64, HashMap<RenderedImageCacheKey, Rc<Image>>>>`. Whole-asset eviction exists (`evict_image`); per-size eviction does not yet exist.
+- `crates/ptermui_core/src/rendering/texture_cache.rs:26` — `TextureCache<T>`, stores a `Vec<TextureInfo<T>>` where each entry holds `Weak<StaticImage>` and a `last_accessed_frame` counter.
+- `crates/ptermui_core/src/elements/image.rs:302` — `Image::paint()` calls `ImageCache::image()`, receives `Rc<Image>`, immediately unwraps the inner `Arc<StaticImage>`, and pushes it to the `Scene`. The `Rc<Image>` is never stored beyond `paint()`.
+- `crates/ptermui_core/src/scene.rs:109` — `Scene::Image { asset: Arc<StaticImage> }` — the scene stores a strong reference during the current frame only.
+- `crates/ptermui/src/rendering/wgpu/renderer/image.rs:53` — `Pipeline::texture_cache: TextureCache<TextureInfo>`, populated from `scene.images[*].asset` each frame.
 
 ### How the cascade currently works
 
@@ -59,5 +59,5 @@ fn evict_size(&self, cache_key: u64, rendered_key: RenderedImageCacheKey) {
 All new behavior is verified by unit tests above. No rendering hardware is required — `TextureCache<T>` is generic and tests use `T = ()`. Run with:
 
 ```
-cargo nextest run -p rookui_core
+cargo nextest run -p ptermui_core
 ```

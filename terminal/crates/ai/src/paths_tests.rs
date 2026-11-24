@@ -2,7 +2,7 @@
 use std::path::PathBuf;
 
 #[cfg(windows)]
-use rook_terminal::shell::{ShellLaunchData, ShellType};
+use pterm_terminal::shell::{ShellLaunchData, ShellType};
 
 use super::*;
 

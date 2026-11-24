@@ -1,7 +1,7 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::Empty;
-use rookui::platform::WindowStyle;
-use rookui::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::Empty;
+use ptermui::platform::WindowStyle;
+use ptermui::{
     AddSingletonModel, App, AppContext, Element, Entity, TypedActionView, View, WindowId,
 };
 

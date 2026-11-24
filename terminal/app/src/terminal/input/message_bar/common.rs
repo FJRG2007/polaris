@@ -1,16 +1,16 @@
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     Border, CacheOption, Clipped, Container, CornerRadius, DEFAULT_UI_LINE_HEIGHT_RATIO, Element,
     FormattedTextElement, Hoverable, Image, ParentElement, Radius, Wrap, WrapFill,
 };
-use rookui::platform::Cursor;
-use rookui::prelude::{Align, ConstrainedBox, CrossAxisAlignment, Flex, MainAxisSize, Text};
-use rookui::ui_components::keyboard_shortcut::keystroke_to_keys;
-use rookui::{AppContext, SingletonEntity};
+use ptermui::platform::Cursor;
+use ptermui::prelude::{Align, ConstrainedBox, CrossAxisAlignment, Flex, MainAxisSize, Text};
+use ptermui::ui_components::keyboard_shortcut::keystroke_to_keys;
+use ptermui::{AppContext, SingletonEntity};
 
 use crate::ai::blocklist::agent_view::shortcuts::render_keystroke_with_color_overrides;
 use crate::terminal;
@@ -29,7 +29,7 @@ pub fn render_standard_message_bar(
     right_element: Option<Box<dyn Element>>,
     app: &AppContext,
 ) -> Box<dyn Element> {
-    use rookui::prelude::MainAxisAlignment;
+    use ptermui::prelude::MainAxisAlignment;
 
     let (left_items, right_chips): (Vec<_>, Vec<_>) = message.items.into_iter().partition(|item| {
         !matches!(
@@ -94,7 +94,7 @@ pub fn render_wrapping_standard_message_bar(
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();
     let font_size = styles::font_size(app);
-    let icon = ConstrainedBox::new(icon.to_rookui_icon(Fill::Solid(icon_color)).finish())
+    let icon = ConstrainedBox::new(icon.to_ptermui_icon(Fill::Solid(icon_color)).finish())
         .with_height(font_size)
         .with_width(font_size)
         .finish();
@@ -192,7 +192,7 @@ fn render_message_bar_items(items: &[MessageItem], app: &AppContext) -> Box<dyn 
             }
             MessageItem::Icon { icon, color } => {
                 let icon_color = color.unwrap_or(default_font_color);
-                ConstrainedBox::new(icon.to_rookui_icon(Fill::Solid(icon_color)).finish())
+                ConstrainedBox::new(icon.to_ptermui_icon(Fill::Solid(icon_color)).finish())
                     .with_height(styles::font_size(app))
                     .with_width(styles::font_size(app))
                     .finish()
@@ -331,7 +331,7 @@ fn render_terminal_message_items(items: &[MessageItem], app: &AppContext) -> Box
                     let rendered_key = if key_text == "⏎" {
                         ConstrainedBox::new(
                             Icon::CornerDownLeft
-                                .to_rookui_icon(Fill::Solid(keystroke_color))
+                                .to_ptermui_icon(Fill::Solid(keystroke_color))
                                 .finish(),
                         )
                         .with_height(icon_size)
@@ -340,7 +340,7 @@ fn render_terminal_message_items(items: &[MessageItem], app: &AppContext) -> Box
                     } else if key_text == "⇧" {
                         ConstrainedBox::new(
                             Icon::ArrowBlockUp
-                                .to_rookui_icon(Fill::Solid(keystroke_color))
+                                .to_ptermui_icon(Fill::Solid(keystroke_color))
                                 .finish(),
                         )
                         .with_height(icon_size)
@@ -396,7 +396,7 @@ fn render_terminal_message_items(items: &[MessageItem], app: &AppContext) -> Box
             }
             MessageItem::Icon { icon, color } => {
                 let icon_color = color.unwrap_or(default_text_color);
-                ConstrainedBox::new(icon.to_rookui_icon(Fill::Solid(icon_color)).finish())
+                ConstrainedBox::new(icon.to_ptermui_icon(Fill::Solid(icon_color)).finish())
                     .with_height(icon_size)
                     .with_width(icon_size)
                     .finish()
@@ -516,8 +516,8 @@ pub fn disableable_message_item_color_overrides(
 
 pub mod styles {
     use pathfinder_color::ColorU;
-    use rook_core::ui::appearance::Appearance;
-    use rookui::{AppContext, SingletonEntity};
+    use pterm_core::ui::appearance::Appearance;
+    use ptermui::{AppContext, SingletonEntity};
 
     use crate::ui_components::blended_colors;
 

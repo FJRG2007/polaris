@@ -16,14 +16,14 @@ default-members = [
   "crates/graphql",
   "crates/markdown_parser",
   "crates/sum_tree",
-  "crates/rookui",
-  "crates/rook_completer",
-  "crates/rook_terminal",
-  "crates/rook_util",
+  "crates/ptermui",
+  "crates/pterm_completer",
+  "crates/pterm_terminal",
+  "crates/pterm_util",
 ]
 
 [workspace.package]
-authors = ["Rook Contributors"]
+authors = ["Polaris Terminal Contributors"]
 license = "AGPL-3.0-only"
 publish = false
 
@@ -78,32 +78,32 @@ ui_components = { path = "crates/ui_components" }
 vim = { path = "crates/vim" }
 virtual-fs = { path = "crates/virtual_fs" }
 voice_input = { path = "crates/voice_input" }
-rook = { path = "app" }
-rook_assets = { path = "crates/rook_assets" }
-rook_channel_config = { path = "crates/rook_channel_config" }
-rook_cli = { path = "crates/rook_cli" }
-rook_completer = { path = "crates/rook_completer" }
-rook_core = { path = "crates/rook_core" }
-rook_editor = { path = "crates/editor" }
-rook_errors = { path = "crates/rook_errors" }
-rook_features = { path = "crates/rook_features" }
-rook_files = { path = "crates/rook_files" }
-rook_graphql = { path = "crates/graphql" }
-rook_graphql_schema = { path = "crates/rook_graphql_schema" }
-rook_isolation_platform = { path = "crates/isolation_platform" }
-rook_logging = { path = "crates/rook_logging" }
-rook_managed_secrets = { path = "crates/managed_secrets" }
-rook_multi_agent_client = { path = "crates/rook_multi_agent_client" }
-rook_ripgrep = { path = "crates/rook_ripgrep" }
-rook_search_core = { path = "crates/rook_search_core" }
-rook_server_auth = { path = "crates/rook_server_auth" }
-rook_server_client = { path = "crates/rook_server_client" }
-rook_terminal = { path = "crates/rook_terminal" }
-rook_util = { path = "crates/rook_util" }
-rook_web_event_bus = { path = "crates/rook_web_event_bus" }
-rookui = { path = "crates/rookui" }
-rookui_core = { path = "crates/rookui_core" }
-rookui_extras = { path = "crates/rookui_extras", default-features = false }
+polaris-terminal = { path = "app" }
+pterm_assets = { path = "crates/pterm_assets" }
+pterm_channel_config = { path = "crates/pterm_channel_config" }
+pterm_cli = { path = "crates/pterm_cli" }
+pterm_completer = { path = "crates/pterm_completer" }
+pterm_core = { path = "crates/pterm_core" }
+pterm_editor = { path = "crates/editor" }
+pterm_errors = { path = "crates/pterm_errors" }
+pterm_features = { path = "crates/pterm_features" }
+pterm_files = { path = "crates/pterm_files" }
+pterm_graphql = { path = "crates/graphql" }
+pterm_graphql_schema = { path = "crates/pterm_graphql_schema" }
+pterm_isolation_platform = { path = "crates/isolation_platform" }
+pterm_logging = { path = "crates/pterm_logging" }
+pterm_managed_secrets = { path = "crates/managed_secrets" }
+pterm_multi_agent_client = { path = "crates/pterm_multi_agent_client" }
+pterm_ripgrep = { path = "crates/pterm_ripgrep" }
+pterm_search_core = { path = "crates/pterm_search_core" }
+pterm_server_auth = { path = "crates/pterm_server_auth" }
+pterm_server_client = { path = "crates/pterm_server_client" }
+pterm_terminal = { path = "crates/pterm_terminal" }
+pterm_util = { path = "crates/pterm_util" }
+pterm_web_event_bus = { path = "crates/pterm_web_event_bus" }
+ptermui = { path = "crates/ptermui" }
+ptermui_core = { path = "crates/ptermui_core" }
+ptermui_extras = { path = "crates/ptermui_extras", default-features = false }
 watcher = { path = "crates/watcher" }
 websocket = { path = "crates/websocket" }
 
@@ -446,7 +446,7 @@ split-debuginfo = "unpacked"
 
 [profile.dev.package]
 # Improve the performance of core terminal logic.
-rook_terminal.opt-level = 3
+pterm_terminal.opt-level = 3
 # Minimize the runtime overhead of CPU profiling at the cost of a small
 # increase in compile time for this crate.
 backtrace.opt-level = 3
@@ -578,8 +578,8 @@ tikv-jemallocator = { git = "https://github.com/warpdotdev/jemallocator.git", re
 tikv-jemalloc-sys = { git = "https://github.com/warpdotdev/jemallocator.git", rev = "2ee30bfdf7059223b54810e4ea6c666f0a379e0b" }
 
 [patch."https://github.com/warpdotdev/warp-proto-apis.git"]
-# Uncomment for local development of rook-proto-apis
-# warp_multi_agent_api = { path = "../rook-proto-apis/apis/multi_agent/v1/gen/rust" }
+# Uncomment for local development of polaris-terminal-proto-apis
+# warp_multi_agent_api = { path = "../polaris-terminal-proto-apis/apis/multi_agent/v1/gen/rust" }
 
 [patch."https://github.com/warpdotdev/session-sharing-protocol.git"]
 # Uncomment for local development of session-sharing-protocol

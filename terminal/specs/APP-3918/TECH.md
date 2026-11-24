@@ -93,7 +93,7 @@ Added `app/assets/bundled/svg/upload-cloud-01.svg` and registered as `Icon::Uplo
 
 ### 11. New `GitCommit` icon
 
-Added `app/assets/bundled/svg/git-commit.svg` (a 24×24 SVG with `fill="#FF0000"` per the existing icon convention) and registered it as `Icon::GitCommit` in `crates/rook_core/src/ui/icons.rs`. This replaces `Icon::GitBranch` for the Commit action — a git-branch icon is semantically incorrect for a commit operation.
+Added `app/assets/bundled/svg/git-commit.svg` (a 24×24 SVG with `fill="#FF0000"` per the existing icon convention) and registered it as `Icon::GitCommit` in `crates/pterm_core/src/ui/icons.rs`. This replaces `Icon::GitBranch` for the Commit action — a git-branch icon is semantically incorrect for a commit operation.
 
 ### 8. `ActionButton::clear_adjoined_side`
 

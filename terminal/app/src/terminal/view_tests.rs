@@ -8,11 +8,11 @@ use std::sync::Arc;
 
 use chrono::{Local, Utc};
 use parking_lot::FairMutex;
-use rook_cli::agent::Harness;
-use rook_terminal::model::escape_sequences::{BRACKETED_PASTE_END, BRACKETED_PASTE_START, C0};
-use rookui::notification::UserNotification;
-use rookui::platform::WindowStyle;
-use rookui::{App, EntityIdSet, Presenter, ReadModel, WindowInvalidation};
+use pterm_cli::agent::Harness;
+use pterm_terminal::model::escape_sequences::{BRACKETED_PASTE_END, BRACKETED_PASTE_START, C0};
+use ptermui::notification::UserNotification;
+use ptermui::platform::WindowStyle;
+use ptermui::{App, EntityIdSet, Presenter, ReadModel, WindowInvalidation};
 use session_sharing_protocol::common::CLIAgentSessionState;
 
 use super::*;
@@ -58,7 +58,7 @@ use crate::server::ids::{ClientId, SyncId};
 use crate::server::server_api::ai::SpawnAgentRequest;
 use crate::server::team_scope::RequestTeamScope;
 use crate::settings::import::model::ImportedConfigModel;
-use crate::settings::{AISettings, AppEditorSettings, RightClickBehavior, RookPromptSeparator};
+use crate::settings::{AISettings, AppEditorSettings, PtermPromptSeparator, RightClickBehavior};
 use crate::tab::NewSessionMenuItem;
 use crate::terminal::alt_screen::should_intercept_mouse;
 use crate::terminal::block_list_element::{SnackbarPoint, SnackbarTranslationMode};
@@ -713,7 +713,7 @@ fn focus_reporting_writes_focus_events_in_normal_screen() {
 
         terminal.update(&mut app, |view, ctx| {
             let mut model = view.model.lock();
-            model.simulate_long_running_block("python3 /tmp/rook_focus_test.py", "");
+            model.simulate_long_running_block("python3 /tmp/pterm_focus_test.py", "");
             assert!(!model.is_alt_screen_active());
             ansi::Handler::set_mode(&mut *model, ansi::Mode::ReportFocusInOut);
             assert!(model.is_term_mode_set(TermMode::FOCUS_IN_OUT));
@@ -833,7 +833,7 @@ fn block_list_right_click_forwards_to_pty_when_long_running_block_owns_mouse() {
             rerender!();
             app.update(enclose!((presenter) move |ctx| {
                 ctx.simulate_window_event(
-                    rookui::Event::RightMouseDown {
+                    ptermui::Event::RightMouseDown {
                         position,
                         cmd: false,
                         shift: false,
@@ -897,7 +897,7 @@ fn block_list_shift_right_click_opens_context_menu_when_right_click_pastes() {
             let mut model = view.model.lock();
             model.simulate_long_running_block("cmd", "output");
             assert!(!model.is_alt_screen_active());
-            // No mouse reporting is enabled, so Rook -- not the running command -- owns this
+            // No mouse reporting is enabled, so Polaris Terminal -- not the running command -- owns this
             // right-click regardless of Shift.
             assert!(should_intercept_mouse(&model, false, ctx));
             *view.size_info
@@ -939,7 +939,7 @@ fn block_list_shift_right_click_opens_context_menu_when_right_click_pastes() {
         rerender!();
         app.update(enclose!((presenter) move |ctx| {
             ctx.simulate_window_event(
-                rookui::Event::RightMouseDown {
+                ptermui::Event::RightMouseDown {
                     position,
                     cmd: false,
                     shift: true,
@@ -999,7 +999,7 @@ fn alt_screen_shift_right_click_opens_context_menu_when_right_click_pastes() {
                 save_cursor_and_clear_screen: true,
             });
             assert!(model.is_alt_screen_active());
-            // No mouse reporting is enabled, so Rook -- not the alt-screen application -- owns
+            // No mouse reporting is enabled, so Polaris Terminal -- not the alt-screen application -- owns
             // this right-click, with or without Shift.
             assert!(should_intercept_mouse(&model, false, ctx));
             assert!(should_intercept_mouse(&model, true, ctx));
@@ -1040,7 +1040,7 @@ fn alt_screen_shift_right_click_opens_context_menu_when_right_click_pastes() {
         rerender!();
         app.update(enclose!((presenter) move |ctx| {
             ctx.simulate_window_event(
-                rookui::Event::RightMouseDown {
+                ptermui::Event::RightMouseDown {
                     position,
                     cmd: false,
                     shift: true,
@@ -1131,7 +1131,7 @@ fn input_shift_right_click_opens_context_menu_when_right_click_pastes() {
         rerender!();
         app.update(enclose!((presenter) move |ctx| {
             ctx.simulate_window_event(
-                rookui::Event::RightMouseDown {
+                ptermui::Event::RightMouseDown {
                     position,
                     cmd: false,
                     shift: true,
@@ -1227,7 +1227,7 @@ fn waterfall_background_right_click_honors_right_click_pastes_setting() {
         rerender!();
         app.update(enclose!((presenter) move |ctx| {
             ctx.simulate_window_event(
-                rookui::Event::RightMouseDown {
+                ptermui::Event::RightMouseDown {
                     position,
                     cmd: false,
                     shift: false,
@@ -1258,7 +1258,7 @@ fn waterfall_background_right_click_honors_right_click_pastes_setting() {
         rerender!();
         app.update(enclose!((presenter) move |ctx| {
             ctx.simulate_window_event(
-                rookui::Event::RightMouseDown {
+                ptermui::Event::RightMouseDown {
                     position,
                     cmd: false,
                     shift: true,
@@ -3959,7 +3959,7 @@ fn cmd_enter_from_terminal_without_selected_block_enters_agent_view() {
             .dispatch_keystroke(
                 window_id,
                 &[terminal.id()],
-                &rookui::keymap::Keystroke::parse(keystroke).expect("valid keystroke"),
+                &ptermui::keymap::Keystroke::parse(keystroke).expect("valid keystroke"),
                 false,
             )
             .expect("dispatch should succeed");
@@ -4031,7 +4031,7 @@ fn cmd_enter_from_terminal_with_selected_block_enters_agent_view_with_context() 
             .dispatch_keystroke(
                 window_id,
                 &[terminal.id()],
-                &rookui::keymap::Keystroke::parse(keystroke).expect("valid keystroke"),
+                &ptermui::keymap::Keystroke::parse(keystroke).expect("valid keystroke"),
                 false,
             )
             .expect("dispatch should succeed");
@@ -4103,7 +4103,7 @@ fn cmd_enter_from_active_non_empty_agent_view_requires_confirmation() {
         } else {
             "ctrl-shift-enter"
         };
-        let keystroke = rookui::keymap::Keystroke::parse(keystroke).expect("valid keystroke");
+        let keystroke = ptermui::keymap::Keystroke::parse(keystroke).expect("valid keystroke");
 
         let handled = app
             .dispatch_keystroke(window_id, &[terminal.id()], &keystroke, false)
@@ -4331,7 +4331,7 @@ fn pending_cloud_mode_query_clears_when_streaming_exchange_becomes_renderable() 
 /// Test clearing of session flag state when terminal is cleared
 #[test]
 fn test_clear_session_flag_state() {
-    use rook_terminal::shell::ShellType;
+    use pterm_terminal::shell::ShellType;
 
     use crate::ai::blocklist::SerializedBlockListItem;
     use crate::terminal::ShellHost;
@@ -4952,7 +4952,7 @@ fn test_alt_screen_select_with_sgr_mouse() {
         rerender!(app, presenter, invalidation, size_info);
         app.update(enclose!((presenter) move |ctx| {
             ctx.simulate_window_event(
-                rookui::Event::LeftMouseDown {
+                ptermui::Event::LeftMouseDown {
                     position: start_position,
                     modifiers: Default::default(),
                     click_count: 1,
@@ -4965,7 +4965,7 @@ fn test_alt_screen_select_with_sgr_mouse() {
         rerender!(app, presenter, invalidation, size_info);
         app.update(enclose!((presenter) move |ctx| {
             ctx.simulate_window_event(
-                rookui::Event::LeftMouseDragged {
+                ptermui::Event::LeftMouseDragged {
                     position: end_position,
                     modifiers: Default::default(),
                 },
@@ -4976,7 +4976,7 @@ fn test_alt_screen_select_with_sgr_mouse() {
         rerender!(app, presenter, invalidation, size_info);
         app.update(enclose!((presenter) move |ctx| {
             ctx.simulate_window_event(
-                rookui::Event::LeftMouseUp {
+                ptermui::Event::LeftMouseUp {
                     position: end_position,
                     modifiers: Default::default(),
                 },
@@ -4998,7 +4998,7 @@ fn test_alt_screen_select_with_sgr_mouse() {
         rerender!(app, presenter, invalidation, size_info);
         app.update(enclose!((presenter) move |ctx| {
             ctx.simulate_window_event(
-                rookui::Event::LeftMouseDown {
+                ptermui::Event::LeftMouseDown {
                     position: start_position,
                     modifiers: ModifiersState {
                         shift: true,
@@ -5014,7 +5014,7 @@ fn test_alt_screen_select_with_sgr_mouse() {
         rerender!(app, presenter, invalidation, size_info);
         app.update(enclose!((presenter) move |ctx| {
             ctx.simulate_window_event(
-                rookui::Event::LeftMouseDragged {
+                ptermui::Event::LeftMouseDragged {
                     position: end_position,
                     modifiers: ModifiersState {
                         shift: true,
@@ -5028,7 +5028,7 @@ fn test_alt_screen_select_with_sgr_mouse() {
         rerender!(app, presenter, invalidation, size_info);
         app.update(enclose!((presenter) move |ctx| {
             ctx.simulate_window_event(
-                rookui::Event::LeftMouseUp {
+                ptermui::Event::LeftMouseUp {
                     position: end_position,
                     modifiers: ModifiersState {
                         shift: true,
@@ -6469,7 +6469,7 @@ fn test_banner_for_incompatible_plugins() {
 
 /// Regression test for #9011: the slow-bootstrap banner used to persist
 /// indefinitely when shell integration never sent the bootstrap signal
-/// (e.g. the user's shell `exec`s into `expect` before Rook's integration
+/// (e.g. the user's shell `exec`s into `expect` before Polaris Terminal's integration
 /// runs). The auto-dismiss timer scheduled when the banner opens must
 /// eventually close it.
 #[test]
@@ -6623,7 +6623,7 @@ fn test_bash_vim_banner_already_shown() {
                 .set_value(BannerState::Dismissed, ctx);
         });
 
-        // Ensure Rook's vim keybindings are off.
+        // Ensure Polaris Terminal's vim keybindings are off.
         AppEditorSettings::handle(&app).update(&mut app, |editor_settings, ctx| {
             let _ = editor_settings.vim_mode.set_value(false, ctx);
         });
@@ -6680,7 +6680,7 @@ fn test_bash_vim_banner_on() {
                 .set_value(BannerState::NotDismissed, ctx);
         });
 
-        // Ensure Rook's vim keybindings are off.
+        // Ensure Polaris Terminal's vim keybindings are off.
         AppEditorSettings::handle(&app).update(&mut app, |editor_settings, ctx| {
             let _ = editor_settings.vim_mode.set_value(false, ctx);
         });
@@ -6736,7 +6736,7 @@ fn test_bash_vim_banner_off() {
                 .set_value(BannerState::NotDismissed, ctx);
         });
 
-        // Ensure Rook's vim keybindings are on.
+        // Ensure Polaris Terminal's vim keybindings are on.
         AppEditorSettings::handle(&app).update(&mut app, |editor_settings, ctx| {
             let _ = editor_settings.vim_mode.set_value(true, ctx);
         });
@@ -6793,7 +6793,7 @@ fn test_zsh_vim_banner_on() {
                 .set_value(BannerState::NotDismissed, ctx);
         });
 
-        // Ensure Rook's vim keybindings are off.
+        // Ensure Polaris Terminal's vim keybindings are off.
         AppEditorSettings::handle(&app).update(&mut app, |editor_settings, ctx| {
             let _ = editor_settings.vim_mode.set_value(false, ctx);
         });
@@ -6849,7 +6849,7 @@ fn test_zsh_vim_banner_off() {
                 .set_value(BannerState::NotDismissed, ctx);
         });
 
-        // Ensure Rook's vim keybindings are on.
+        // Ensure Polaris Terminal's vim keybindings are on.
         AppEditorSettings::handle(&app).update(&mut app, |editor_settings, ctx| {
             let _ = editor_settings.vim_mode.set_value(true, ctx);
         });
@@ -6899,7 +6899,7 @@ fn test_fish_vim_banner_on() {
             view.set_focus_handle(focus_handle, ctx);
         });
 
-        // Ensure Rook's vim keybindings are off.
+        // Ensure Polaris Terminal's vim keybindings are off.
         AppEditorSettings::handle(&app).update(&mut app, |editor_settings, ctx| {
             let _ = editor_settings.vim_mode.set_value(false, ctx);
         });
@@ -6948,7 +6948,7 @@ fn test_fish_vim_banner_off() {
             view.set_focus_handle(focus_handle, ctx);
         });
 
-        // Ensure Rook's vim keybindings are on.
+        // Ensure Polaris Terminal's vim keybindings are on.
         AppEditorSettings::handle(&app).update(&mut app, |editor_settings, ctx| {
             let _ = editor_settings.vim_mode.set_value(true, ctx);
         });
@@ -7028,7 +7028,7 @@ fn test_prompt_context_menu_items_for_context_chips() {
                 .update(
                     [ContextChipKind::Time12],
                     false,
-                    RookPromptSeparator::None,
+                    PtermPromptSeparator::None,
                     ctx,
                 )
                 .expect("updating prompt to time chip failed");
@@ -8105,7 +8105,7 @@ fn ctrl_g_closes_cli_agent_rich_input_when_editor_is_focused() {
             .dispatch_keystroke(
                 window_id,
                 &[terminal.id(), input_id, editor_id],
-                &rookui::keymap::Keystroke::parse("ctrl-g").expect("valid keystroke"),
+                &ptermui::keymap::Keystroke::parse("ctrl-g").expect("valid keystroke"),
                 false,
             )
             .expect("dispatch should succeed");
@@ -8150,7 +8150,7 @@ fn ctrl_g_closes_cli_agent_rich_input_from_terminal_context() {
             .dispatch_keystroke(
                 window_id,
                 &[terminal.id()],
-                &rookui::keymap::Keystroke::parse("ctrl-g").expect("valid keystroke"),
+                &ptermui::keymap::Keystroke::parse("ctrl-g").expect("valid keystroke"),
                 false,
             )
             .expect("dispatch should succeed");
@@ -8188,7 +8188,7 @@ fn ctrl_g_toggles_cli_agent_rich_input_from_terminal_context() {
         let (window_id, terminal) =
             open_cli_agent_rich_input_for_agent_with_window_id(&mut app, CLIAgent::OpenCode);
 
-        let keystroke = rookui::keymap::Keystroke::parse("ctrl-g").expect("valid keystroke");
+        let keystroke = ptermui::keymap::Keystroke::parse("ctrl-g").expect("valid keystroke");
 
         // First close: rich input is open → Ctrl-G should close.
         let handled = app
@@ -8455,7 +8455,7 @@ fn drag_drop_image_in_cli_agent_long_running_command_pastes_via_clipboard() {
         // file. Bytes don't have to be a valid PNG.
         let mut image_path = std::env::temp_dir();
         image_path.push(format!(
-            "rook-test-cli-agent-drop-{}.png",
+            "polaris-terminal-test-cli-agent-drop-{}.png",
             std::process::id()
         ));
         std::fs::write(&image_path, b"fake-png-bytes").expect("write tmp image");
@@ -8580,7 +8580,7 @@ fn paste_raw_image_clipboard_in_cli_agent_sends_correct_bytes() {
 
                 // Write image-only data to the clipboard (no text, no paths).
                 ctx.clipboard().write(ClipboardContent {
-                    images: Some(vec![rookui::clipboard::ImageData {
+                    images: Some(vec![ptermui::clipboard::ImageData {
                         data: vec![0x89, 0x50, 0x4E, 0x47], // PNG magic bytes
                         mime_type: "image/png".to_string(),
                         filename: None,
@@ -8955,7 +8955,7 @@ fn status_in_progress_auto_opens_rich_input_after_blocked() {
     })
 }
 
-// Regression test for https://github.com/FJRG2007/rook/issues/9059.
+// Regression test for https://github.com/FJRG2007/polaris/issues/9059.
 // Codex's listener doesn't emit Blocked-state events (it only forwards opaque
 // OSC 9 notifications as Stop), so auto-toggling rich input would trap arrow
 // keys when Codex shows interactive option menus. Auto-toggle must not fire
@@ -9631,7 +9631,7 @@ fn linear_deeplink_does_not_auto_submit_when_already_in_agent_view() {
 
         // First enter fullscreen agent view with no initial prompt. This matches the
         // pre-condition in the issue: the focused terminal is already in fullscreen
-        // agent view when the `rook://linear/work?prompt=...` URI is dispatched.
+        // agent view when the `polaris-terminal://linear/work?prompt=...` URI is dispatched.
         let original_conversation_id = terminal.update(&mut app, |view, ctx| {
             view.agent_view_controller().update(ctx, |controller, ctx| {
                 controller
@@ -9751,7 +9751,7 @@ fn linear_deeplink_via_default_entrypoint_does_not_auto_submit_in_fullscreen() {
     })
 }
 
-/// Regression test for https://github.com/FJRG2007/rook/issues/11212.
+/// Regression test for https://github.com/FJRG2007/polaris/issues/11212.
 ///
 /// Closing the find bar must immediately clear find highlights on AI blocks.
 /// AI blocks are separate child views, so unless `close_find_bar` clears find
@@ -10176,7 +10176,7 @@ fn cmd_k_in_agent_view_cancels_in_progress_conversation_and_starts_new_one() {
 
 #[test]
 #[cfg(target_os = "linux")]
-fn copy_forwards_etx_to_pty_on_linux_alt_screen_without_rook_selection() {
+fn copy_forwards_etx_to_pty_on_linux_alt_screen_without_pterm_selection() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
 
@@ -10193,7 +10193,7 @@ fn copy_forwards_etx_to_pty_on_linux_alt_screen_without_rook_selection() {
 
         terminal.update(&mut app, |view, ctx| {
             // Enter the alt screen (a fullscreen TUI is in control) and add no
-            // Rook-visible selection of any kind.
+            // Polaris Terminal-visible selection of any kind.
             {
                 let mut model = view.model.lock();
                 model.set_mode(ansi::Mode::SwapScreen {
@@ -10213,20 +10213,20 @@ fn copy_forwards_etx_to_pty_on_linux_alt_screen_without_rook_selection() {
             assert_eq!(
                 read_from_clipboard(ctx),
                 "",
-                "Copy must not write anything to the clipboard when Rook has no selection"
+                "Copy must not write anything to the clipboard when Polaris Terminal has no selection"
             );
         });
 
         assert_eq!(
             *pty_writes.borrow(),
             vec![vec![C0::ETX]],
-            "Copy on Linux alt screen with no Rook selection must forward exactly one ETX byte to the PTY"
+            "Copy on Linux alt screen with no Polaris Terminal selection must forward exactly one ETX byte to the PTY"
         );
     })
 }
 
 #[test]
-fn copy_does_not_forward_when_alt_screen_has_rook_selection() {
+fn copy_does_not_forward_when_alt_screen_has_pterm_selection() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
 
@@ -10243,7 +10243,7 @@ fn copy_does_not_forward_when_alt_screen_has_rook_selection() {
 
         terminal.update(&mut app, |view, ctx| {
             {
-                // Enter the alt screen and add text the user will select in Rook.
+                // Enter the alt screen and add text the user will select in Polaris Terminal.
                 let mut model = view.model.lock();
                 model.set_mode(ansi::Mode::SwapScreen {
                     save_cursor_and_clear_screen: true,
@@ -10253,7 +10253,7 @@ fn copy_does_not_forward_when_alt_screen_has_rook_selection() {
                 model.alt_screen_mut().input('h');
             }
 
-            // Make a Rook-owned alt-screen selection (the path that copies today).
+            // Make a Polaris Terminal-owned alt-screen selection (the path that copies today).
             view.begin_alt_selection(Point::new(0, 0), Side::Left, SelectionType::Simple, ctx);
             view.update_alt_selection(Point::new(0, 2), Side::Left, &Lines::zero(), ctx);
             view.end_alt_selection(ctx);
@@ -10268,13 +10268,13 @@ fn copy_does_not_forward_when_alt_screen_has_rook_selection() {
             assert_eq!(
                 read_from_clipboard(ctx),
                 "h",
-                "Copy must still copy the Rook alt-screen selection to the clipboard"
+                "Copy must still copy the Polaris Terminal alt-screen selection to the clipboard"
             );
         });
 
         assert!(
             pty_writes.borrow().is_empty(),
-            "Copy must not forward ETX to the PTY when a Rook alt-screen selection was copied"
+            "Copy must not forward ETX to the PTY when a Polaris Terminal alt-screen selection was copied"
         );
     })
 }
@@ -10333,18 +10333,20 @@ fn single_general_review_comment(content: &str) -> AgentReviewCommentBatch {
     }
 }
 
-fn set_rook_tui_session(view: &mut TerminalView, ctx: &mut ViewContext<TerminalView>) {
-    view.model.lock().simulate_long_running_block("rook", "");
+fn set_pterm_tui_session(view: &mut TerminalView, ctx: &mut ViewContext<TerminalView>) {
+    view.model
+        .lock()
+        .simulate_long_running_block("polaris-terminal", "");
     assert_eq!(
-        CLIAgent::detect("rook", None, None, ctx),
-        Some(CLIAgent::RookTui)
+        CLIAgent::detect("polaris-terminal", None, None, ctx),
+        Some(CLIAgent::PtermTui)
     );
 
     CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
         sessions.set_session(
             view.view_id,
             CLIAgentSession {
-                agent: CLIAgent::RookTui,
+                agent: CLIAgent::PtermTui,
                 status: CLIAgentSessionStatus::InProgress,
                 session_context: CLIAgentSessionContext::default(),
                 input_state: CLIAgentInputState::Closed,
@@ -10362,7 +10364,7 @@ fn set_rook_tui_session(view: &mut TerminalView, ctx: &mut ViewContext<TerminalV
 }
 
 #[test]
-fn rook_tui_listener_does_not_auto_open_rich_input() {
+fn pterm_tui_listener_does_not_auto_open_rich_input() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         AISettings::handle(&app).update(&mut app, |settings, ctx| {
@@ -10375,7 +10377,7 @@ fn rook_tui_listener_does_not_auto_open_rich_input() {
         terminal.update(&mut app, |view, ctx| {
             view.handle_cli_agent_notification(
                 Some(CLI_AGENT_NOTIFICATION_SENTINEL),
-                r#"{"v":1,"agent":"rook-tui","event":"session_start"}"#,
+                r#"{"v":1,"agent":"polaris-terminal-tui","event":"session_start"}"#,
                 ctx,
             );
         });
@@ -10383,7 +10385,7 @@ fn rook_tui_listener_does_not_auto_open_rich_input() {
         terminal.read(&app, |view, ctx| {
             let session = CLIAgentSessionsModel::as_ref(ctx)
                 .session(view.view_id)
-                .expect("Rook TUI session should be registered");
+                .expect("Polaris Terminal TUI session should be registered");
             assert!(session.listener.is_some());
             assert!(!session.should_auto_toggle_input);
             assert!(!view.has_active_cli_agent_input_session(ctx));
@@ -10391,44 +10393,44 @@ fn rook_tui_listener_does_not_auto_open_rich_input() {
     });
 }
 #[test]
-fn active_cli_agent_recognizes_detected_rook_tui_session() {
+fn active_cli_agent_recognizes_detected_pterm_tui_session() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         let _hoa_code_review = FeatureFlag::HoaCodeReview.override_enabled(true);
 
         let terminal = add_window_with_terminal(&mut app, None);
         terminal.update(&mut app, |view, ctx| {
-            set_rook_tui_session(view, ctx);
+            set_pterm_tui_session(view, ctx);
         });
 
         terminal.read(&app, |view, ctx| {
             assert_eq!(
                 view.active_cli_agent(ctx),
-                Some(CLIAgent::RookTui),
-                "Rook TUI should be recognized as a code-review destination while running"
+                Some(CLIAgent::PtermTui),
+                "Polaris Terminal TUI should be recognized as a code-review destination while running"
             );
         });
     });
 }
 
-/// `active_cli_agent` must return `None` for the Rook TUI when `HoaCodeReview`
+/// `active_cli_agent` must return `None` for the Polaris Terminal TUI when `HoaCodeReview`
 /// is disabled, preserving the pre-feature behavior (no review destination).
 #[test]
-fn active_cli_agent_ignores_rook_tui_when_hoa_code_review_disabled() {
+fn active_cli_agent_ignores_pterm_tui_when_hoa_code_review_disabled() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         let _hoa_code_review = FeatureFlag::HoaCodeReview.override_enabled(false);
 
         let terminal = add_window_with_terminal(&mut app, None);
         terminal.update(&mut app, |view, ctx| {
-            set_rook_tui_session(view, ctx);
+            set_pterm_tui_session(view, ctx);
         });
 
         terminal.read(&app, |view, ctx| {
             assert_eq!(
                 view.active_cli_agent(ctx),
                 None,
-                "Rook TUI should not be a review destination when HoaCodeReview is disabled"
+                "Polaris Terminal TUI should not be a review destination when HoaCodeReview is disabled"
             );
         });
     });
@@ -10456,10 +10458,10 @@ fn active_cli_agent_ignores_non_tui_long_running_command() {
     });
 }
 
-/// Sending review comments while the Rook TUI is running writes the built prompt
+/// Sending review comments while the Polaris Terminal TUI is running writes the built prompt
 /// directly to the TUI's PTY rather than the outer rich input.
 #[test]
-fn send_review_comments_to_rook_tui_writes_prompt_to_pty() {
+fn send_review_comments_to_pterm_tui_writes_prompt_to_pty() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         let _hoa_code_review = FeatureFlag::HoaCodeReview.override_enabled(true);
@@ -10476,8 +10478,8 @@ fn send_review_comments_to_rook_tui_writes_prompt_to_pty() {
         });
 
         terminal.update(&mut app, |view, ctx| {
-            set_rook_tui_session(view, ctx);
-            assert_eq!(view.active_cli_agent(ctx), Some(CLIAgent::RookTui));
+            set_pterm_tui_session(view, ctx);
+            assert_eq!(view.active_cli_agent(ctx), Some(CLIAgent::PtermTui));
             assert!(!view.is_cli_agent_rich_input_open(ctx));
 
             let review = single_general_review_comment("please fix the off-by-one");
@@ -10486,7 +10488,7 @@ fn send_review_comments_to_rook_tui_writes_prompt_to_pty() {
         });
 
         // The review prompt is written to the PTY in a single write because
-        // Rook TUI sessions do not open the outer rich input.
+        // Polaris Terminal TUI sessions do not open the outer rich input.
         let writes = pty_writes.borrow();
         assert_eq!(
             writes.len(),

@@ -1,10 +1,10 @@
 use std::default::Default;
 
-use rookui::fonts::Weight;
-use rookui::keymap::FixedBinding;
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::{Coords, UiComponentStyles};
-use rookui::{AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::fonts::Weight;
+use ptermui::keymap::FixedBinding;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::{Coords, UiComponentStyles};
+use ptermui::{AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle};
 
 use crate::modal::Modal;
 use crate::themes::theme::ThemeKind;
@@ -28,7 +28,7 @@ pub enum ThemeDeletionModalEvent {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",

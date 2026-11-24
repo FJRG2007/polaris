@@ -5,13 +5,13 @@ use anyhow::Result;
 use clap::Parser;
 use integration::Builder;
 use integration::test::*;
-use rook_cli::WorkerCommand;
-use rook_core::AppId;
-use rook_core::channel::{Channel, ChannelConfig, ChannelState, OzConfig, RookServerConfig};
+use pterm_cli::WorkerCommand;
+use pterm_core::AppId;
+use pterm_core::channel::{Channel, ChannelConfig, ChannelState, OzConfig, PtermServerConfig};
 
-/// The Rook integration test runner.
+/// The Polaris Terminal integration test runner.
 #[derive(Debug, Default, Parser, Clone)]
-#[command(name = "rook-integration-test")]
+#[command(name = "polaris-terminal-integration-test")]
 #[clap(args_conflicts_with_subcommands = true)]
 pub struct Args {
     #[command(subcommand)]
@@ -29,15 +29,15 @@ pub fn main() -> Result<()> {
         ChannelConfig {
             app_id: AppId::new(
                 "dev",
-                "rook",
+                "polaris-terminal",
                 if cfg!(target_os = "macos") {
-                    "Rook-Integration"
+                    "PolarisTerminal-Integration"
                 } else {
-                    "RookIntegration"
+                    "PolarisTerminalIntegration"
                 },
             ),
-            logfile_name: "rook_integration.log".into(),
-            server_config: RookServerConfig {
+            logfile_name: "pterm_integration.log".into(),
+            server_config: PtermServerConfig {
                 firebase_auth_api_key: "".into(),
                 iap_config: None,
                 // Use an IP in the IANA testing range, with the TCP discard port, to
@@ -69,7 +69,7 @@ pub fn main() -> Result<()> {
                 // GUI application), do so.  This must occur before init_logging, as the
                 // terminal server sets up its own logger, and attempting to set a second
                 // logger leads to a panic.
-                rook::terminal::local_tty::run_terminal_server(args);
+                polaris_terminal::terminal::local_tty::run_terminal_server(args);
                 return Ok(());
             }
             // This is a catch-all to handle the plugin host, which the integration test crate doesn't have a feature flag for.
@@ -107,7 +107,7 @@ pub fn main() -> Result<()> {
     }
 
     #[cfg_attr(not(unix), allow(unreachable_code))]
-    rook::run_integration_test(driver)
+    polaris_terminal::run_integration_test(driver)
 }
 
 /// Type of a function that produces an integration test builder.
@@ -207,9 +207,9 @@ fn register_tests() -> HashMap<&'static str, BoxedBuilderFn> {
     register_test!(test_bash_honor_ps1_expands_dynamic_prompt_once);
     register_test!(test_completions_with_autocd);
     register_test!(test_auto_title);
-    register_test!(test_rook_auto_title_disabled);
-    register_test!(test_rook_honors_user_title_bash);
-    register_test!(test_rook_honors_user_title_zsh);
+    register_test!(test_pterm_auto_title_disabled);
+    register_test!(test_pterm_honors_user_title_bash);
+    register_test!(test_pterm_honors_user_title_zsh);
     register_test!(test_osc7_updates_current_working_directory);
     register_test!(test_input_focused_after_executing_command);
     register_test!(test_new_session_focuses_input);
@@ -239,13 +239,13 @@ fn register_tests() -> HashMap<&'static str, BoxedBuilderFn> {
     register_test!(test_accepting_completion_inserts_space);
     register_test!(test_create_session_with_split_pane_while_bootstrapping);
     register_test!(test_create_session_with_new_tab_while_bootstrapping);
-    register_test!(test_add_theme_to_rook_config);
+    register_test!(test_add_theme_to_pterm_config);
     register_test!(test_palette_opens_when_theme_chooser_is_open);
     #[cfg(target_os = "macos")]
     register_test!(test_preview_config_dir_migration);
-    register_test!(test_launch_rook_with_theme_in_rook_config);
-    register_test!(test_add_launch_config_to_rook_config);
-    register_test!(test_add_workflows_to_rook_config);
+    register_test!(test_launch_pterm_with_theme_in_pterm_config);
+    register_test!(test_add_launch_config_to_pterm_config);
+    register_test!(test_add_workflows_to_pterm_config);
     register_test!(test_loading_project_workflows);
     register_test!(test_cmd_enter);
     register_test!(test_alias_expansion_has_limit);
@@ -294,7 +294,7 @@ fn register_tests() -> HashMap<&'static str, BoxedBuilderFn> {
     register_test!(test_copy_block_command_and_output_honor_ps1_disabled);
     register_test!(test_copy_block_command_and_output_honor_ps1_enabled);
     register_test!(test_copy_prompt_from_input_honor_ps1_disabled);
-    register_test!(test_rook_prompt_unsets_zsh_rprompt);
+    register_test!(test_pterm_prompt_unsets_zsh_rprompt);
     register_test!(test_copy_prompt_from_input_honor_ps1_enabled);
     register_test!(test_copy_rprompt_from_input_honor_ps1_enabled);
     register_test!(test_rprompt_doesnt_show_when_not_enough_space);
@@ -338,7 +338,7 @@ fn register_tests() -> HashMap<&'static str, BoxedBuilderFn> {
 
     register_test!(test_can_auto_bootstrap);
 
-    register_test!(test_ask_rook_ai_keybinding_for_selected_block);
+    register_test!(test_ask_pterm_ai_keybinding_for_selected_block);
     register_test!(test_create_folder_from_command_palette);
 
     register_test!(test_tab_behavior_setting);
@@ -396,7 +396,7 @@ fn register_tests() -> HashMap<&'static str, BoxedBuilderFn> {
 
     register_test!(test_notebook_pane_tracking);
     register_test!(test_close_notebook_tab);
-    register_test!(test_open_in_rook_banner);
+    register_test!(test_open_in_pterm_banner);
     register_test!(test_close_notebook_window);
     register_test!(test_backspace_inside_raw_mermaid_block_edits_text_without_removing_block);
 
@@ -482,7 +482,7 @@ fn register_tests() -> HashMap<&'static str, BoxedBuilderFn> {
     register_test!(test_undo_close_stack_timeout_cleanup);
 
     // File tree tests
-    register_test!(test_file_tree_opens_files_in_rook);
+    register_test!(test_file_tree_opens_files_in_pterm);
     register_test!(test_file_tree_open_in_new_pane);
     register_test!(test_file_tree_open_in_new_tab);
     register_test!(test_file_tree_keyboard_navigation);

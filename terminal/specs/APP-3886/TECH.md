@@ -24,7 +24,7 @@ The tab configs menu has no per-item management actions. Users cannot set a defa
 **Tab config data model:**
 - `app/src/tab_configs/tab_config.rs:128` — `TabConfig` struct (no `source_path` field)
 - `app/src/user_config/util.rs:167` — `parse_tab_config_dir_entry()` (path known here, only stored for errors)
-- `app/src/user_config/mod.rs:105` — `RookConfig::tab_configs()` accessor
+- `app/src/user_config/mod.rs:105` — `PtermConfig::tab_configs()` accessor
 - `app/src/user_config/native.rs:248` — `load_tab_configs()` and filesystem watcher
 
 **DefaultSessionMode setting:**
@@ -61,7 +61,7 @@ Current order:
 1. Agent (with Cmd+T shortcut label if default is Agent)
 2. Terminal (submenu on Windows, regular item elsewhere; Cmd+T shortcut if default is Terminal)
 3. Cloud Oz
-4. User tab configs (from `RookConfig::tab_configs()`)
+4. User tab configs (from `PtermConfig::tab_configs()`)
 5. Separator + "New worktree config" (submenu) + "New Tab Config"
 
 ### Sidecar positioning (horizontal vs vertical)
@@ -136,7 +136,7 @@ Add a helper on `AISettings`:
 ```rust
 fn resolved_default_tab_config(&self, app: &AppContext) -> Option<TabConfig>
 ```
-Reads `default_tab_config_path`, finds the matching `TabConfig` in `RookConfig::tab_configs()` by `source_path`, and returns it. Returns `None` if the path is empty, the file doesn't exist, or the config isn't loaded (triggers fallback to `Terminal`).
+Reads `default_tab_config_path`, finds the matching `TabConfig` in `PtermConfig::tab_configs()` by `source_path`, and returns it. Returns `None` if the path is empty, the file doesn't exist, or the config isn't loaded (triggers fallback to `Terminal`).
 
 ### Setting interaction: `DefaultSessionMode` × `NewSessionShell`
 Two settings, two concerns:
@@ -218,7 +218,7 @@ The `AddDefaultTab` handler checks the effective `DefaultSessionMode`:
 3. `Agent` / `Terminal` → existing behavior (`add_terminal_tab` internally respects Agent mode).
 
 **macOS native menu (Cmd+T routing):**
-On macOS, Cmd+T is handled by the native menu system, not the RookUI keybinding system. The native menu's "New Terminal Tab" item holds Cmd+T for non-Agent modes; "New Agent Tab" holds it for Agent mode. Both callbacks ultimately dispatch through `CustomAction::NewTab` → `AddDefaultTab`.
+On macOS, Cmd+T is handled by the native menu system, not the PtermUI keybinding system. The native menu's "New Terminal Tab" item holds Cmd+T for non-Agent modes; "New Agent Tab" holds it for Agent mode. Both callbacks ultimately dispatch through `CustomAction::NewTab` → `AddDefaultTab`.
 
 The callback `open_new_default_tab_or_window` (`app/src/app_menus.rs`) always dispatches `CustomAction::NewTab`, which the binding system maps to `WorkspaceAction::AddDefaultTab`. This means Cmd+T always goes through the `AddDefaultTab` handler regardless of the current mode — the handler is the single place that routes based on `DefaultSessionMode`.
 
@@ -256,9 +256,9 @@ The "Edit config" button in the action sidecar will also use `resolve_file_targe
 
 Replace the `default_session_mode_dropdown: ViewHandle<Dropdown<FeaturesPageAction>>` (`features_page.rs:1222`) with a `FilterableDropdown<FeaturesPageAction>`. The `FilterableDropdown` component (`app/src/view_components/filterable_dropdown.rs`) already supports search/filter, arrow key navigation, and the same `DropdownItem` API — it wraps a `Menu` with a search editor, so users can type to narrow down the list when many tab configs are present.
 
-In `update_default_session_mode_dropdown()` (`features_page.rs:3273`), after the `DefaultSessionMode::iter()` items (Terminal, Agent), append an item for each loaded tab config from `RookConfig::tab_configs()`, using the config name as the display label and dispatching a new `FeaturesPageAction` variant that sets both `DefaultSessionMode::TabConfig` and `default_tab_config_path`.
+In `update_default_session_mode_dropdown()` (`features_page.rs:3273`), after the `DefaultSessionMode::iter()` items (Terminal, Agent), append an item for each loaded tab config from `PtermConfig::tab_configs()`, using the config name as the display label and dispatching a new `FeaturesPageAction` variant that sets both `DefaultSessionMode::TabConfig` and `default_tab_config_path`.
 
-Subscribe to `RookConfigUpdateEvent::TabConfigs` to rebuild the dropdown when configs change.
+Subscribe to `PtermConfigUpdateEvent::TabConfigs` to rebuild the dropdown when configs change.
 
 ### 10. Cmd+T keybinding indicator in menu
 **File:** `app/src/workspace/view.rs`
@@ -292,7 +292,7 @@ Note: Per-shell shortcut label logic (i.e., showing Cmd+T on the specific shell 
 ### Cmd+T with tab config default
 1. User presses Cmd+T → native menu dispatches `CustomAction::NewTab` → `AddDefaultTab` action.
 2. Handler checks `DefaultSessionMode::TabConfig`.
-3. Reads `default_tab_config_path`, finds matching config in `RookConfig::tab_configs()` via `resolved_default_tab_config()`.
+3. Reads `default_tab_config_path`, finds matching config in `PtermConfig::tab_configs()` via `resolved_default_tab_config()`.
 4. Calls `open_tab_config()` → shows params modal if needed, else opens directly.
 5. If config file is missing, clears settings to `Terminal` and opens a normal terminal tab.
 
@@ -307,7 +307,7 @@ Note: Per-shell shortcut label logic (i.e., showing Cmd+T on the specific shell 
 ## Risks and mitigations
 
 - **Backward compat for `DefaultSessionMode` serialization**: Adding a `TabConfig` variant changes serialized values. Old clients reading a `TabConfig` value will fail to deserialize and fall back to the default (`Terminal`). This is acceptable — the worst case is losing the default preference on downgrade.
-- **Race between file deletion and watcher**: After "Remove" deletes the file, there's a brief window where the config is still in `RookConfig::tab_configs()`. The watcher debounce handles this. The sidecar closes the menu on removal, so the user won't see a stale entry.
+- **Race between file deletion and watcher**: After "Remove" deletes the file, there's a brief window where the config is still in `PtermConfig::tab_configs()`. The watcher debounce handles this. The sidecar closes the menu on removal, so the user won't see a stale entry.
 - **Large number of tab configs**: The settings dropdown and menu will list all configs. No pagination is needed for v1, but configs with identical names are disambiguated by file path in the sidecar subtitle.
 
 ## Testing and validation

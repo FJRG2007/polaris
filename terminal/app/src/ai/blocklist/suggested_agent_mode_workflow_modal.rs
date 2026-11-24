@@ -3,16 +3,16 @@ use std::default::Default;
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::vec2f;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     ChildAnchor, Empty, OffsetPositioning, PositionedElementAnchor, PositionedElementOffsetBounds,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::FixedBinding;
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::{Coords, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::FixedBinding;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::{Coords, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -66,7 +66,7 @@ pub enum SuggestedAgentModeWorkflowModalEvent {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",

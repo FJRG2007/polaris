@@ -1,4 +1,4 @@
-use rookui::EntityId;
+use ptermui::EntityId;
 
 use super::*;
 use crate::ai::agent::conversation::AIConversationId;

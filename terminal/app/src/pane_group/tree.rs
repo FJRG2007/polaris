@@ -3,21 +3,21 @@ use std::{fmt, iter, mem};
 
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use ptermui::elements::{
     ChildAnchor, ConstrainedBox, Container, DispatchEventResult, Element, Empty, EventHandler,
     Flex, Hoverable, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds, Rect, SavePosition,
     Shrinkable, Stack,
 };
-use rookui::platform::Cursor;
-use rookui::{AppContext, EntityId, ViewContext};
+use ptermui::platform::Cursor;
+use ptermui::{AppContext, EntityId, ViewContext};
 
 use super::{ActivationReason, PaneGroup, PaneId};
 use crate::app_state;
 use crate::pane_group::{DraggedBorder, PaneGroupAction, get_minimum_pane_size};
-use crate::themes::theme::RookTheme;
+use crate::themes::theme::PtermTheme;
 
 #[cfg(test)]
 #[path = "tree_tests.rs"]
@@ -513,7 +513,7 @@ impl PaneData {
         self.len == 0
     }
 
-    pub fn render(&self, theme: &RookTheme, app: &AppContext) -> Box<dyn Element> {
+    pub fn render(&self, theme: &PtermTheme, app: &AppContext) -> Box<dyn Element> {
         match &self.root {
             PaneNode::Leaf(pane) => pane.render(app),
             PaneNode::Branch(node) => node.render(theme, &self.hidden_panes, app),
@@ -719,7 +719,7 @@ impl PaneNode {
 
     fn render(
         &self,
-        theme: &RookTheme,
+        theme: &PtermTheme,
         hidden_panes: &Vec<HiddenPane>,
         app: &AppContext,
     ) -> Box<dyn Element> {
@@ -1055,7 +1055,7 @@ impl PaneBranch {
 
     fn render(
         &self,
-        theme: &RookTheme,
+        theme: &PtermTheme,
         hidden_panes: &Vec<HiddenPane>,
         app: &AppContext,
     ) -> Box<dyn Element> {
@@ -1421,7 +1421,7 @@ fn divider_mouse_down_action(
 fn create_divider(
     direction: SplitDirection,
     item: &Divider,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Box<dyn Element> {
     let divider = ConstrainedBox::new(
         Rect::new()
@@ -1457,7 +1457,7 @@ fn create_divider(
 fn create_minimalist_divider(
     direction: SplitDirection,
     item: &Divider,
-    theme: &RookTheme,
+    theme: &PtermTheme,
 ) -> Box<dyn Element> {
     let divider = ConstrainedBox::new(
         Rect::new()

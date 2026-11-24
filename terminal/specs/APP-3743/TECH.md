@@ -113,13 +113,13 @@ On `MenuEvent::Close { via_select_item: false }`: dismissed without selecting �
 
 ### 9. Worktree-in-repo action
 
-`OpenWorktreeInRepo { repo_path }`: loads `~/.rook/default-tab-configs/worktree.toml` (created from embedded template if missing), substitutes template variables, and opens the tab immediately.
+`OpenWorktreeInRepo { repo_path }`: loads `~/.polaris-terminal/default-tab-configs/worktree.toml` (created from embedded template if missing), substitutes template variables, and opens the tab immediately.
 
 The worktree template parameterizes the pane type via `{{pane_type}}` (instead of hardcoding `type = "terminal"`). The `open_worktree_in_repo` handler reads the user's `DefaultSessionMode` setting and sets `pane_type` to `"agent"` when AI is enabled and the default is Agent, or `"terminal"` otherwise. This means worktree sessions respect the user's preference — if they prefer Agent mode, the worktree opens in Agent mode.
 
 **Important**: Template variables (`{{repo}}`, `{{branch_name}}`, `{{pane_type}}`) are substituted in the raw TOML string BEFORE parsing into `TabConfig`, because the TOML deserializer validates enum fields like `type` against known variants (`terminal`, `agent`, `cloud`) and would reject `{{pane_type}}` as invalid.
 
-Params substituted: `repo` (selected path), `branch_name` (auto-generated via `generate_worktree_branch_name()`), `pane_type` (from default session mode). On macOS, the data directory is channel-specific (`~/.rook-local/` for Local, `~/.rook/` for Stable).
+Params substituted: `repo` (selected path), `branch_name` (auto-generated via `generate_worktree_branch_name()`), `pane_type` (from default session mode). On macOS, the data directory is channel-specific (`~/.polaris-terminal-local/` for Local, `~/.polaris-terminal/` for Stable).
 
 ### 10. Bug fixes in `menu.rs` and search-row layout
 
@@ -149,7 +149,7 @@ Params substituted: `repo` (selected path), `branch_name` (auto-generated via `g
 
 ## Testing and Validation
 
-- Build check: `cargo check -p rook` passes with no errors.
+- Build check: `cargo check -p polaris-terminal` passes with no errors.
 - Manual testing: Open both horizontal and vertical tab menus → verify identical items. On macOS/Linux: click Terminal → verify terminal tab opens. On Windows: hover Terminal submenu parent → verify sidecar shows the default terminal row plus shells.
 - Hover Worktree in → verify the sidecar shows the search row, repo items, and pinned footer.
 - Type into "Search repos" → verify repo rows filter live and the footer remains pinned.

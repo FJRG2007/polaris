@@ -407,4 +407,4 @@ If needed, add small pure tests around row-position-id helpers or target resolut
 
 - Support additional pane types once product behavior is defined for their detail sections.
 - Add keyboard-accessible detail affordances in a follow-up ticket if the hover-only behavior proves valuable.
-- If more hover sidecars are added elsewhere in Rook, consider extracting a reusable “row + sidecar + safe triangle” helper instead of keeping the logic local to vertical tabs.
+- If more hover sidecars are added elsewhere in Polaris Terminal, consider extracting a reusable “row + sidecar + safe triangle” helper instead of keeping the logic local to vertical tabs.

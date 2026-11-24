@@ -1,13 +1,13 @@
-use rook_core::ui::theme::Fill;
-use rookui::elements::{Align, Container, Empty, Flex, MouseStateHandle, ParentElement};
-use rookui::fonts::Weight;
-use rookui::keymap::FixedBinding;
-use rookui::modals::{AlertDialogWithCallbacks, AppModalCallback};
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::text::Span;
-use rookui::{
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{Align, Container, Empty, Flex, MouseStateHandle, ParentElement};
+use ptermui::fonts::Weight;
+use ptermui::keymap::FixedBinding;
+use ptermui::modals::{AlertDialogWithCallbacks, AppModalCallback};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::text::Span;
+use ptermui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 use settings::Setting as _;
@@ -17,7 +17,7 @@ use crate::terminal::general_settings::{GeneralSettings, GeneralSettingsChangedE
 use crate::ui_components::dialog::{Dialog, dialog_styles};
 
 pub(super) fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings(vec![
         FixedBinding::new("escape", NativeModalAction::Close, id!("NativeModal")),
@@ -25,7 +25,7 @@ pub(super) fn init(app: &mut AppContext) {
     ]);
 }
 
-/// Used to show a Rook-native modal dialog above a [`super::Workspace`]. The first button is [`ButtonVariant::Accent`].
+/// Used to show a Polaris Terminal-native modal dialog above a [`super::Workspace`]. The first button is [`ButtonVariant::Accent`].
 pub struct NativeModal {
     alert_dialog: Option<AlertDialogWithCallbacks<AppModalCallback>>,
     dont_show_again: bool,
@@ -120,7 +120,7 @@ impl View for NativeModal {
         "NativeModal"
     }
 
-    fn render(&self, app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         let Some(alert_dialog) = self.alert_dialog.as_ref() else {
             log::warn!("No alert dialog was set for the native modal");
             return Empty::new().finish();

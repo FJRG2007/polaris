@@ -5,15 +5,15 @@ use markdown_parser::{
     FormattedText, FormattedTextFragment, FormattedTextInline, FormattedTextLine,
 };
 use pathfinder_geometry::vector::Vector2F;
-use rookui::elements::{
+use ptermui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, FormattedTextElement,
     HighlightedHyperlink, HyperlinkLens, HyperlinkUrl, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, ParentElement, Shrinkable,
 };
-use rookui::fonts::Weight;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     Action, AppContext, Element, Entity, EventContext, SingletonEntity, TypedActionView, View,
     ViewContext,
 };
@@ -32,7 +32,7 @@ pub enum DismissalType {
     Temporary,
 
     /// The banner should not be shown again to the user, whether in a new or existing session.
-    /// Dismissal state should also persist across app sessions (e.g. when Rook is restarted).
+    /// Dismissal state should also persist across app sessions (e.g. when Polaris Terminal is restarted).
     Permanent,
 }
 
@@ -225,7 +225,7 @@ impl<T: Action + Clone> Banner<T> {
 
     fn render_icon(appearance: &Appearance, icon: &Icon) -> Box<dyn Element> {
         let icon_size = font_size(appearance);
-        ConstrainedBox::new(icon.to_rookui_icon(appearance.theme().accent()).finish())
+        ConstrainedBox::new(icon.to_ptermui_icon(appearance.theme().accent()).finish())
             .with_width(icon_size)
             .with_height(icon_size)
             .finish()

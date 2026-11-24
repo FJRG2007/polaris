@@ -5,27 +5,27 @@ use anyhow::Context;
 use async_channel::Sender;
 use futures_util::stream::AbortHandle;
 use lazy_static::lazy_static;
-use regex::Regex;
-use rook_core::context_flag::ContextFlag;
-use rook_editor::editor::NavigationKey;
-use rook_editor::model::{CoreEditorModel, RichTextEditorModel};
-use rook_errors::{report_error, report_if_error};
-use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::r#async::{SpawnedFutureHandle, Timer};
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_core::context_flag::ContextFlag;
+use pterm_editor::editor::NavigationKey;
+use pterm_editor::model::{CoreEditorModel, RichTextEditorModel};
+use pterm_errors::{report_error, report_if_error};
+use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::r#async::{SpawnedFutureHandle, Timer};
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Align, Clipped, ConstrainedBox, Container, CrossAxisAlignment, DispatchEventResult, Empty,
     EventHandler, Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement,
     SavePosition, Shrinkable, Stack,
 };
-use rookui::keymap::{EditableBinding, FixedBinding};
-use rookui::presenter::ChildView;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::keymap::{EditableBinding, FixedBinding};
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, BlurContext, Element, Entity, FocusContext, ModelAsRef, ModelHandle,
     SingletonEntity, TypedActionView, View, ViewContext, ViewHandle, WindowId,
 };
+use regex::Regex;
 use settings::Setting as _;
 use url::Url;
 
@@ -52,9 +52,9 @@ use crate::cloud_object::model::view::{Editor, EditorState};
 use crate::cloud_object::{CloudObject, CloudObjectEventEntrypoint, ObjectType, Owner, Space};
 use crate::drive::drive_helpers::has_feature_gated_anonymous_user_reached_notebook_limit;
 use crate::drive::export::ExportManager;
-use crate::drive::items::RookDriveItemId;
+use crate::drive::items::PtermDriveItemId;
 use crate::drive::sharing::ShareableObject;
-use crate::drive::{CloudObjectTypeAndId, OpenRookDriveObjectSettings};
+use crate::drive::{CloudObjectTypeAndId, OpenPtermDriveObjectSettings};
 use crate::editor::{
     EditOrigin, EditorView, Event as EditorEvent, InteractionState, PropagateAndNoOpNavigationKeys,
     SingleLineEditorOptions, TextColors, TextOptions,
@@ -132,7 +132,7 @@ lazy_static! {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_editable_bindings([
         EditableBinding::new(
@@ -206,7 +206,7 @@ enum NotebookSyncError {
     FeatureNotAvailable,
 }
 
-/// A view that allows viewing/execution and editing of a Rook notebook.
+/// A view that allows viewing/execution and editing of a Polaris Terminal notebook.
 /// We don't currently persist any data.
 pub struct NotebookView {
     /// This is a stateful component that shows information about the notebook like its location
@@ -248,7 +248,7 @@ pub enum NotebookEvent {
         source: WorkflowSource,
     },
     EditWorkflow(SyncId),
-    ViewInRookDrive(RookDriveItemId),
+    ViewInPtermDrive(PtermDriveItemId),
     Pane(PaneEvent),
     MoveToSpace {
         cloud_object_type_and_id: CloudObjectTypeAndId,
@@ -278,7 +278,7 @@ pub enum NotebookAction {
     ResetFontSize,
     ConflictResolutionBannerRefreshClicked,
     FocusTerminalInput,
-    ViewInRookDrive(RookDriveItemId),
+    ViewInPtermDrive(PtermDriveItemId),
     ContextMenu(ContextMenuAction), // right click context menu
     MoveToSpace {
         cloud_object_type_and_id: CloudObjectTypeAndId,
@@ -589,7 +589,7 @@ impl NotebookView {
                 {
                     self.pane_configuration.update(ctx, |pane_config, ctx| {
                         pane_config
-                            .set_shareable_object(Some(ShareableObject::RookDriveObject(id)), ctx);
+                            .set_shareable_object(Some(ShareableObject::PtermDriveObject(id)), ctx);
                     })
                 }
             }
@@ -1195,8 +1195,8 @@ impl NotebookView {
         });
     }
 
-    fn view_in_rook_drive(&mut self, id: RookDriveItemId, ctx: &mut ViewContext<Self>) {
-        ctx.emit(NotebookEvent::ViewInRookDrive(id));
+    fn view_in_pterm_drive(&mut self, id: PtermDriveItemId, ctx: &mut ViewContext<Self>) {
+        ctx.emit(NotebookEvent::ViewInPtermDrive(id));
     }
 
     fn move_to_team_owner(
@@ -1425,7 +1425,7 @@ impl NotebookView {
             );
         }
 
-        if !rookui::platform::is_mobile_device()
+        if !ptermui::platform::is_mobile_device()
             && !ContextFlag::HideOpenOnDesktopButton.is_enabled()
             && *UserAppInstallDetectionSettings::as_ref(ctx)
                 .user_app_installation_detected
@@ -1502,7 +1502,7 @@ impl NotebookView {
     pub fn wait_for_initial_load_then_load(
         &mut self,
         notebook_id: SyncId,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         window_id: WindowId,
         ctx: &mut ViewContext<Self>,
     ) {
@@ -1541,7 +1541,7 @@ impl NotebookView {
     fn fetch_and_load_notebook(
         &mut self,
         notebook_id: ServerId,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         window_id: WindowId,
         ctx: &mut ViewContext<Self>,
     ) {
@@ -1585,7 +1585,7 @@ impl NotebookView {
     pub fn load(
         &mut self,
         notebook: CloudNotebook,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         ctx: &mut ViewContext<Self>,
     ) -> SpawnedFutureHandle {
         self.set_title(&notebook.model().title, ctx);
@@ -1595,7 +1595,7 @@ impl NotebookView {
             self.pane_configuration
                 .update(ctx, |pane_configuration, ctx| {
                     pane_configuration.set_shareable_object(
-                        Some(ShareableObject::RookDriveObject(server_id)),
+                        Some(ShareableObject::PtermDriveObject(server_id)),
                         ctx,
                     );
                 });
@@ -1674,8 +1674,8 @@ impl NotebookView {
                 source: SharingDialogSource::InviteeRequest,
             });
         } else if let Some(focused_folder_id) = settings.focused_folder_id.map(SyncId::ServerId) {
-            self.view_in_rook_drive(
-                RookDriveItemId::Object(CloudObjectTypeAndId::Folder(focused_folder_id)),
+            self.view_in_pterm_drive(
+                PtermDriveItemId::Object(CloudObjectTypeAndId::Folder(focused_folder_id)),
                 ctx,
             );
         }
@@ -1850,7 +1850,7 @@ impl NotebookView {
         if let Some(notebook) = CloudModel::as_ref(ctx).get_notebook(&id) {
             self.load(
                 notebook.clone(),
-                &OpenRookDriveObjectSettings::default(),
+                &OpenPtermDriveObjectSettings::default(),
                 ctx,
             );
         }
@@ -1925,7 +1925,7 @@ impl NotebookView {
                     .with_children([
                         ConstrainedBox::new(
                             icons::Icon::Trash
-                                .to_rookui_icon(appearance.theme().foreground())
+                                .to_ptermui_icon(appearance.theme().foreground())
                                 .finish(),
                         )
                         .with_width(16.)
@@ -2167,7 +2167,7 @@ impl View for NotebookView {
     fn accessibility_contents(&self, ctx: &AppContext) -> Option<AccessibilityContent> {
         Some(AccessibilityContent::new_without_help(
             format!("{} notebook", self.title(ctx)),
-            RookA11yRole::TextRole,
+            PtermA11yRole::TextRole,
         ))
     }
 
@@ -2185,7 +2185,7 @@ impl View for NotebookView {
         }
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn ptermui::Element> {
         let mut content = Flex::column();
         content.extend(self.render_trash_banner(app));
         content.add_child(self.render_title(app));
@@ -2238,7 +2238,7 @@ impl View for NotebookView {
         SavePosition::new(stack.finish(), &self.view_position_id).finish()
     }
 
-    fn keymap_context(&self, app: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         match self.mode_app_ctx(app) {
@@ -2289,7 +2289,7 @@ impl TypedActionView for NotebookView {
             NotebookAction::ResetFontSize => {
                 self.apply_font_size_to_setting(NotebookFontSize::default_value(), ctx)
             }
-            NotebookAction::ViewInRookDrive(id) => self.view_in_rook_drive(*id, ctx),
+            NotebookAction::ViewInPtermDrive(id) => self.view_in_pterm_drive(*id, ctx),
             NotebookAction::FocusTerminalInput => {
                 ctx.emit(NotebookEvent::Pane(PaneEvent::FocusActiveSession))
             }

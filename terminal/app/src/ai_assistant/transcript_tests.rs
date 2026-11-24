@@ -1,5 +1,5 @@
-use rookui::platform::WindowStyle;
-use rookui::{App, SingletonEntity};
+use ptermui::platform::WindowStyle;
+use ptermui::{App, SingletonEntity};
 
 use super::Transcript;
 use crate::ai::AIRequestUsageModel;

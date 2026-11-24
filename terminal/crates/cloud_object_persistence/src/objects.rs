@@ -14,8 +14,8 @@ use persistence::model::{
     NewObjectPermissions, ObjectMetadata, ObjectPermissions,
 };
 use persistence::schema;
-use rook_core::features::FeatureFlag;
-use rook_graphql::scalars::time::ServerTimestamp;
+use pterm_core::features::FeatureFlag;
+use pterm_graphql::scalars::time::ServerTimestamp;
 
 use crate::{decode_guests, decode_link_sharing, encode_guests, encode_link_sharing};
 

@@ -1,20 +1,20 @@
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DEFAULT_UI_LINE_HEIGHT_RATIO, Empty, Fill, Flex, Hoverable, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, SavePosition,
     Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity as _, TypedActionView,
     View, ViewContext, ViewHandle,
 };
@@ -208,7 +208,7 @@ impl PlanAndTodoListView {
         let icon_element = Container::new(
             ConstrainedBox::new(
                 Icon::Compass
-                    .to_rookui_icon(if self.is_in_agent_view {
+                    .to_ptermui_icon(if self.is_in_agent_view {
                         theme.sub_text_color(blended_colors::neutral_1(theme).into())
                     } else {
                         internal_colors::fg_overlay_7(appearance.theme())
@@ -431,8 +431,8 @@ impl PlanAndTodoListView {
                     OffsetPositioning::offset_from_save_position_element(
                         TODO_BUTTON_SAVE_POSITION_ID,
                         vec2f(0., 4.),
-                        rookui::elements::PositionedElementOffsetBounds::WindowByPosition,
-                        rookui::elements::PositionedElementAnchor::BottomLeft,
+                        ptermui::elements::PositionedElementOffsetBounds::WindowByPosition,
+                        ptermui::elements::PositionedElementAnchor::BottomLeft,
                         ChildAnchor::TopLeft,
                     )
                 }
@@ -440,8 +440,8 @@ impl PlanAndTodoListView {
                     OffsetPositioning::offset_from_save_position_element(
                         TODO_BUTTON_SAVE_POSITION_ID,
                         vec2f(0., -4.),
-                        rookui::elements::PositionedElementOffsetBounds::WindowByPosition,
-                        rookui::elements::PositionedElementAnchor::TopLeft,
+                        ptermui::elements::PositionedElementOffsetBounds::WindowByPosition,
+                        ptermui::elements::PositionedElementAnchor::TopLeft,
                         ChildAnchor::BottomLeft,
                     )
                 }
@@ -465,7 +465,7 @@ impl View for PlanAndTodoListView {
         "PlanAndTodoListView"
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
 
         // Calculate icon size

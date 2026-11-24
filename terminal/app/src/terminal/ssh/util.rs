@@ -78,7 +78,7 @@ pub fn check_ssh_login_state(block_output: &str) -> SshLoginState {
 }
 
 /// Represents the parsed components of an interactive SSH command.
-/// For some [`SshRookifyCommand`]s, we do not support parsing
+/// For some [`SshPtermifyCommand`]s, we do not support parsing
 /// a host or port In these cases, we can still parse to a valid
 /// empty `InteractiveSshCommand` to indicate that we did
 /// successfully detect an interactive SSH command.
@@ -150,16 +150,16 @@ pub enum SshLikeCommand {
 /// Represents the different kinds of commands we recognize as starting an interactive SSH
 /// session. `Ssh` means a literal `ssh` command, where all other commands (e.g. `gcloud
 /// compute ssh`) are categorized as SSH-like commands.
-pub enum SshRookifyCommand {
+pub enum SshPtermifyCommand {
     Ssh,
     SshLike(SshLikeCommand),
 }
 
-impl SshRookifyCommand {
+impl SshPtermifyCommand {
     /// Not a literal `ssh` command, but another command that starts an interactive SSH
     /// session.
     pub fn is_ssh_like_command(&self) -> bool {
-        matches!(self, SshRookifyCommand::SshLike(_))
+        matches!(self, SshPtermifyCommand::SshLike(_))
     }
 }
 
@@ -176,21 +176,23 @@ lazy_static! {
     static ref DIGITAL_OCEAN_DROPLET_REGEX: Regex = Regex::new(r"^doctl\s+compute\s+ssh\s.+").expect("digital ocean SSH regex invalid");
 }
 
-impl SshRookifyCommand {
-    pub fn matches(command: &str) -> Option<SshRookifyCommand> {
+impl SshPtermifyCommand {
+    pub fn matches(command: &str) -> Option<SshPtermifyCommand> {
         let command = if let Some(suffix) = command.strip_prefix("command ") {
             suffix
         } else {
             command
         };
         if INTERACTIVE_SSH.is_match(command) {
-            Some(SshRookifyCommand::Ssh)
+            Some(SshPtermifyCommand::Ssh)
         } else if GCLOUD_REGEX.is_match(command) {
-            Some(SshRookifyCommand::SshLike(SshLikeCommand::Gcloud))
+            Some(SshPtermifyCommand::SshLike(SshLikeCommand::Gcloud))
         } else if ELASTIC_BEANSTALK_REGEX.is_match(command) {
-            Some(SshRookifyCommand::SshLike(SshLikeCommand::ElasticBeanstalk))
+            Some(SshPtermifyCommand::SshLike(
+                SshLikeCommand::ElasticBeanstalk,
+            ))
         } else if DIGITAL_OCEAN_DROPLET_REGEX.is_match(command) {
-            Some(SshRookifyCommand::SshLike(
+            Some(SshPtermifyCommand::SshLike(
                 SshLikeCommand::DigitalOceanDroplet,
             ))
         } else {
@@ -200,15 +202,15 @@ impl SshRookifyCommand {
 }
 
 pub fn parse_interactive_ssh_command(command: &str) -> Option<InteractiveSshCommand> {
-    match SshRookifyCommand::matches(command) {
-        Some(SshRookifyCommand::Ssh) => InteractiveSshCommand::parse_ssh_command(command),
-        Some(SshRookifyCommand::SshLike(SshLikeCommand::Gcloud)) => {
+    match SshPtermifyCommand::matches(command) {
+        Some(SshPtermifyCommand::Ssh) => InteractiveSshCommand::parse_ssh_command(command),
+        Some(SshPtermifyCommand::SshLike(SshLikeCommand::Gcloud)) => {
             Some(InteractiveSshCommand::default())
         }
-        Some(SshRookifyCommand::SshLike(SshLikeCommand::ElasticBeanstalk)) => {
+        Some(SshPtermifyCommand::SshLike(SshLikeCommand::ElasticBeanstalk)) => {
             Some(InteractiveSshCommand::default())
         }
-        Some(SshRookifyCommand::SshLike(SshLikeCommand::DigitalOceanDroplet)) => {
+        Some(SshPtermifyCommand::SshLike(SshLikeCommand::DigitalOceanDroplet)) => {
             Some(InteractiveSshCommand::default())
         }
         None => None,
@@ -227,7 +229,7 @@ fn parse_ssh_command_tokens(command: &str) -> Option<Vec<String>> {
     Some(tokens)
 }
 
-/// Creates an sftp command that copies a given local file into the pwd in the rookified ssh session.
+/// Creates an sftp command that copies a given local file into the pwd in the ptermified ssh session.
 pub fn transfer_file_sftp_command(
     local_file_path: String,
     ssh_host: String,

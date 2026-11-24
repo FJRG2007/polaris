@@ -1,4 +1,4 @@
-use rook_graphql::ai::{AgentTaskState, PlatformErrorCode};
+use pterm_graphql::ai::{AgentTaskState, PlatformErrorCode};
 
 use super::classify_driver_error;
 use crate::ai::agent_sdk::driver::AgentDriverError;
@@ -90,16 +90,16 @@ fn not_logged_in_is_error_with_auth_required() {
         Some(PlatformErrorCode::AuthenticationRequired)
     );
     assert!(
-        update.message.contains("ROOK_API_KEY"),
-        "message should mention ROOK_API_KEY: {:?}",
+        update.message.contains("POLARIS_TERMINAL_API_KEY"),
+        "message should mention POLARIS_TERMINAL_API_KEY: {:?}",
         update.message
     );
 }
 
 #[test]
-fn rook_drive_sync_failed_is_error() {
+fn pterm_drive_sync_failed_is_error() {
     assert_state_and_code(
-        AgentDriverError::RookDriveSyncFailed,
+        AgentDriverError::PtermDriveSyncFailed,
         AgentTaskState::Error,
         Some(PlatformErrorCode::InternalError),
     );

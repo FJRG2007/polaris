@@ -17,11 +17,11 @@ use futures_util::stream::AbortHandle;
 use futures_util::{SinkExt, StreamExt};
 use instant::Instant;
 use parking_lot::FairMutex;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rook_server_client::iap::IapManager;
-use rookui::r#async::Timer;
-use rookui::{Entity, ModelContext, RequestState, RetryOption, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use pterm_server_client::iap::IapManager;
+use ptermui::r#async::Timer;
+use ptermui::{Entity, ModelContext, RequestState, RetryOption, SingletonEntity};
 use session_sharing_protocol::common::{
     ActivePrompt, ActivePromptUpdate, AgentPromptFailureReason, AgentPromptRequest,
     AgentPromptRequestId, CommandExecutionFailureReason, CommandExecutionRequestId, ControlAction,
@@ -110,7 +110,7 @@ macro_rules! sharer_warn {
 macro_rules! sharer_error {
     ($network:expr_2021, $($arg:tt)+) => {{
         let (session_id, source_task_id) = $network.log_context();
-        rook_errors::report_error!(
+        pterm_errors::report_error!(
             anyhow::anyhow!("{}", format_args!($($arg)+)),
             extra: {
                 "session_id" => ?session_id,
@@ -395,7 +395,7 @@ impl Network {
         active_prompt: ActivePrompt,
         selection: Selection,
         input_replica_id: ReplicaId,
-        terminal_view_id: rookui::EntityId,
+        terminal_view_id: ptermui::EntityId,
         team_uid: Option<crate::server::ids::ServerId>,
         universal_developer_input_context: UniversalDeveloperInputContext,
         lifetime: Lifetime,
@@ -1667,7 +1667,7 @@ impl Network {
 
     /// Stores the event if it's an OrderedTerminalEvent, and sends the message to the server if we're connected.
     /// If we're not connected, the event will be flushed to the server once we've connected.
-    /// TODO(roland): non OrderedTerminalEvents (like rook prompt) can be dropped if we're not connected. For non OrderedTerminalEvents,
+    /// TODO(roland): non OrderedTerminalEvents (like polaris-terminal prompt) can be dropped if we're not connected. For non OrderedTerminalEvents,
     /// we only need the latest value and can drop old values. We can send the latest value of needed events as part of reconnection.
     fn send_message_to_server(&mut self, message: UpstreamMessage) {
         if let UpstreamMessage::OrderedTerminalEvent(event) = &message {
@@ -1816,7 +1816,7 @@ pub fn failed_to_add_guests_user_error(reason: &FailedToAddGuestsReason) -> Stri
     match reason {
         FailedToAddGuestsReason::Invalid => "Something went wrong. Please try again.",
         FailedToAddGuestsReason::NotWarpUsers => {
-            "One or more emails were not associated with Rook accounts."
+            "One or more emails were not associated with Polaris Terminal accounts."
         }
         FailedToAddGuestsReason::GuestAlreadyAdded => {
             "One or more emails have already been added to the session."

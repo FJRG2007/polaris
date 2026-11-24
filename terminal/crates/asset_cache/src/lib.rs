@@ -6,10 +6,10 @@ use anyhow::Result;
 use base64::Engine as _;
 use base64::prelude::BASE64_STANDARD;
 use bytes::Bytes;
-use reqwest::Url;
-use rookui_core::assets::asset_cache::{
+use ptermui_core::assets::asset_cache::{
     Asset, AssetCache, AssetSource, AssetState, AsyncAssetId, AsyncAssetType,
 };
+use reqwest::Url;
 
 /// Namespace marker for URL-based async asset sources without persistence.
 pub struct UrlAssetWithoutPersistence;
@@ -177,7 +177,7 @@ async fn persist_bytes(bytes: &Bytes, file: &Path) {
     use anyhow::Context;
     use async_fs::{OpenOptions, create_dir_all};
     use futures::AsyncWriteExt;
-    use rook_errors::report_error;
+    use pterm_errors::report_error;
 
     let Some(parent_folder) = file.parent() else {
         report_error!("attempted to write cache file in filesystem root");

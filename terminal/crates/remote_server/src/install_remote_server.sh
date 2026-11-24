@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs the Rook remote server binary on a remote host, plus the
+# Installs the Polaris Terminal remote server binary on a remote host, plus the
 # artifact's `resources/` tree (bundled skills, settings schema) at a
 # global, version-independent location:
 #
@@ -14,7 +14,7 @@
 # Placeholders (substituted at runtime by setup.rs):
 #   {download_base_url}         — e.g. https://app.rook.dev/download/cli
 #   {channel}                   — stable | preview | dev
-#   {install_dir}               — e.g. ~/.rook/remote-server
+#   {install_dir}               — e.g. ~/.polaris-terminal/remote-server
 #   {binary_name}               — e.g. oz | oz-dev | oz-preview
 #   {version_query}             — e.g. &version=v0.2026... (empty when no release tag)
 #   {version_suffix}            — e.g. -v0.2026...        (empty when no release tag)

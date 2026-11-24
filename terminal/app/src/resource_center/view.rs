@@ -1,16 +1,16 @@
-use rook_core::features::FeatureFlag;
-use rook_core::ui::builder::AnimatedButtonOptions;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::builder::AnimatedButtonOptions;
+use ptermui::elements::{
     Align, Border, ConstrainedBox, Container, CrossAxisAlignment, Element, Flex, Icon,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, SavePosition, Shrinkable,
 };
-use rookui::fonts::Weight;
-use rookui::platform::Cursor;
-use rookui::presenter::ChildView;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::windowing::{StateEvent, WindowManager};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::platform::Cursor;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::windowing::{StateEvent, WindowManager};
+use ptermui::{
     AppContext, Entity, EntityId, FocusContext, ModelHandle, SingletonEntity, TypedActionView,
     View, ViewContext, ViewHandle, WindowId,
 };
@@ -332,7 +332,7 @@ impl ResourceCenterView {
                 if FeatureFlag::AvatarInTabBar.is_enabled() {
                     String::new()
                 } else {
-                    "Rook Essentials".to_string()
+                    "Polaris Terminal Essentials".to_string()
                 }
             }
         };

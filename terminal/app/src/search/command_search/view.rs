@@ -8,10 +8,10 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rookui::accessibility::{AccessibilityContent, RookA11yRole};
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
+use ptermui::elements::{
     Align, AnchorPair, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Dismiss, Fill, Flex, MouseStateHandle, OffsetPositioning, OffsetType, ParentElement,
     ParentOffsetBounds, PositionedElementOffsetBounds, PositioningAxis, Radius, Resizable,
@@ -19,9 +19,9 @@ use rookui::elements::{
     Shrinkable, Stack, UniformList, UniformListState, XAxisAnchor, YAxisAnchor,
     resizable_state_handle,
 };
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -29,18 +29,18 @@ use rookui::{
 use super::ai_queries::AIQueriesDataSource;
 use super::env_var_collections::EnvVarCollectionDataSource;
 use super::history::history_data_source_for_session;
-use super::rook_ai::RookAIDataSource;
+use super::pterm_ai::PtermAIDataSource;
 use super::workflows::{WorkflowsDataSource, cloud_workflows_data_source};
 use super::zero_state::{CommandSearchZeroStateEvent, CommandSearchZeroStateView};
 use crate::ai_assistant::GenerateCommandsFromNaturalLanguageError;
-use crate::ai_assistant::execution_context::RookAiExecutionContext;
+use crate::ai_assistant::execution_context::PtermAiExecutionContext;
 use crate::appearance::Appearance;
 use crate::auth::auth_manager::AuthManager;
 use crate::auth::auth_state::AuthState;
 use crate::auth::auth_view_modal::AuthViewVariant;
 use crate::auth::{AuthStateProvider, UserUid};
 use crate::completer::SessionContext;
-use crate::drive::settings::RookDriveSettings;
+use crate::drive::settings::PtermDriveSettings;
 use crate::search::QueryFilter;
 use crate::search::command_search::searcher::{CommandSearchItemAction, CommandSearchMixer};
 use crate::search::mixer::AddAsyncSourceOptions;
@@ -219,7 +219,7 @@ impl CommandSearchView {
         &mut self,
         session_id: SessionId,
         session_context: Option<SessionContext>,
-        ai_execution_context: Option<RookAiExecutionContext>,
+        ai_execution_context: Option<PtermAiExecutionContext>,
         ctx: &mut ViewContext<Self>,
     ) {
         let window_id = ctx.window_id();
@@ -231,11 +231,11 @@ impl CommandSearchView {
             // will show up higher in the list (i.e.: further away from the input).
             if AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
                 mixer.add_sync_source(
-                    RookAIDataSource::new(self.ai_client.clone(), None),
+                    PtermAIDataSource::new(self.ai_client.clone(), None),
                     HashSet::from([QueryFilter::NaturalLanguage]),
                 );
                 mixer.add_async_source(
-                    RookAIDataSource::new(self.ai_client.clone(), ai_execution_context),
+                    PtermAIDataSource::new(self.ai_client.clone(), ai_execution_context),
                     HashSet::from([QueryFilter::NaturalLanguage]),
                     AddAsyncSourceOptions {
                         debounce_interval: Some(Duration::from_millis(50)),
@@ -246,7 +246,7 @@ impl CommandSearchView {
                 );
             }
 
-            if RookDriveSettings::is_rook_drive_enabled(ctx) {
+            if PtermDriveSettings::is_pterm_drive_enabled(ctx) {
                 mixer.add_sync_source(
                     WorkflowsDataSource::new(session_context.as_ref(), ctx),
                     HashSet::from([QueryFilter::Workflows]),
@@ -336,7 +336,7 @@ impl CommandSearchView {
         initial_query: String,
         query_filter: Option<QueryFilter>,
         menu_positioning: MenuPositioning,
-        ai_execution_context: Option<RookAiExecutionContext>,
+        ai_execution_context: Option<PtermAiExecutionContext>,
         ctx: &mut ViewContext<Self>,
     ) {
         self.reset_command_search_mixer(session_id, session_context, ai_execution_context, ctx);
@@ -477,9 +477,9 @@ impl CommandSearchView {
 
                 AcceptHistory(_)
                 | AcceptWorkflow(_)
-                | OpenRookAI
+                | OpenPtermAI
                 | AcceptEnvVarCollection(_)
-                | TranslateUsingRookAI
+                | TranslateUsingPtermAI
                 | AcceptAIQuery(_) => false,
             };
 
@@ -497,7 +497,7 @@ impl CommandSearchView {
             ctx.emit_a11y_content(AccessibilityContent::new(
                 a11y_content,
                 a11y_help_content,
-                RookA11yRole::UserAction,
+                PtermA11yRole::UserAction,
             ));
 
             // Recompute the result index - the incoming index is the index in the
@@ -555,7 +555,7 @@ impl CommandSearchView {
             .build()
             .finish();
         let row = Flex::row()
-            .with_main_axis_size(rookui::elements::MainAxisSize::Max)
+            .with_main_axis_size(ptermui::elements::MainAxisSize::Max)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(Shrinkable::new(1., text).finish());
 
@@ -619,7 +619,7 @@ impl CommandSearchView {
 
         Container::new(
             Flex::row()
-                .with_main_axis_size(rookui::elements::MainAxisSize::Max)
+                .with_main_axis_size(ptermui::elements::MainAxisSize::Max)
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_child(Shrinkable::new(1., text).finish())
                 .finish(),
@@ -638,7 +638,7 @@ impl CommandSearchView {
         user_id: UserUid,
     ) -> Box<dyn Element> {
         let mut row = Flex::row()
-            .with_main_axis_size(rookui::elements::MainAxisSize::Max)
+            .with_main_axis_size(ptermui::elements::MainAxisSize::Max)
             .with_cross_axis_alignment(CrossAxisAlignment::Center);
 
         let upgrade_link = team_uid
@@ -973,11 +973,11 @@ impl View for CommandSearchView {
         Some(AccessibilityContent::new(
             "Command Search".to_owned(),
             "Search your history, workflows, and more.  Use the Up and Down arrows to browse search results after typing.  Press Enter to accept a selected result, inserting it into the terminal input.  Press Escape to close.".to_owned(),
-            RookA11yRole::MenuRole,
+            PtermA11yRole::MenuRole,
         ))
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
         let mixer = self.mixer.as_ref(app);
 
@@ -1095,7 +1095,7 @@ impl CommandSearchView {
 pub mod styles {
     use lazy_static::lazy_static;
     use pathfinder_color::ColorU;
-    use rookui::elements::{Border, DropShadow, ScrollbarWidth};
+    use ptermui::elements::{Border, DropShadow, ScrollbarWidth};
 
     use crate::appearance::Appearance;
     use crate::themes::theme::Fill;

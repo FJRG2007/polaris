@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use cloud_object_client::MockObjectClient;
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::Empty;
-use rookui::platform::WindowStyle;
-use rookui::{App, AppContext, Element, Entity, TypedActionView, View, ViewContext};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::Empty;
+use ptermui::platform::WindowStyle;
+use ptermui::{App, AppContext, Element, Entity, TypedActionView, View, ViewContext};
 
 use super::{Event, OpenOverlay};
 use crate::ai::blocklist::BlocklistAIHistoryModel;

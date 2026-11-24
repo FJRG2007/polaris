@@ -14,20 +14,20 @@ use onboarding::{
 use parking_lot::Mutex;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_core::context_flag::ContextFlag;
-use rook_core::safe_error;
-use rook_core::user_preferences::GetUserPreferences as _;
-use rook_errors::{report_error, report_if_error};
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::safe_error;
+use pterm_core::user_preferences::GetUserPreferences as _;
+use pterm_errors::{report_error, report_if_error};
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Border, ChildAnchor, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
 };
-use rookui::keymap::{EditableBinding, FixedBinding};
-use rookui::platform::{WindowBounds, WindowStyle};
-use rookui::presenter::ChildView;
-use rookui::rendering::OnGPUDeviceSelected;
-use rookui::windowing::WindowManager;
-use rookui::{
+use ptermui::keymap::{EditableBinding, FixedBinding};
+use ptermui::platform::{WindowBounds, WindowStyle};
+use ptermui::presenter::ChildView;
+use ptermui::rendering::OnGPUDeviceSelected;
+use ptermui::windowing::WindowManager;
+use ptermui::{
     AddWindowOptions, AppContext, DisplayId, Element, Entity, EntityId, FocusContext,
     NextNewWindowsHasThisWindowsBoundsUponClose, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WindowId, id,
@@ -64,8 +64,8 @@ use crate::changelog_model::ChangelogRequestType;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::{GenericStringObjectFormat, JsonObjectType, ObjectType};
 use crate::drive::export::ExportManager;
-use crate::drive::items::RookDriveItemId;
-use crate::drive::{CloudObjectTypeAndId, OpenRookDriveObjectArgs, OpenRookDriveObjectSettings};
+use crate::drive::items::PtermDriveItemId;
+use crate::drive::{CloudObjectTypeAndId, OpenPtermDriveObjectArgs, OpenPtermDriveObjectSettings};
 use crate::experiments::{BlockOnboarding, Experiment};
 use crate::features::FeatureFlag;
 use crate::interval_timer::IntervalTimer;
@@ -95,7 +95,7 @@ use crate::terminal::keys_settings::KeysSettings;
 use crate::terminal::shell::ShellType;
 use crate::terminal::view::{TerminalAction, cell_size_and_padding};
 use crate::themes::onboarding_theme_picker_themes;
-use crate::themes::theme::{AnsiColorIdentifier, Blend, Fill, RookThemeConfig, ThemeKind};
+use crate::themes::theme::{AnsiColorIdentifier, Blend, Fill, PtermThemeConfig, ThemeKind};
 use crate::uri::{OpenMCPSettingsArgs, OpenSettingsArgs, url_reports_checkout_success};
 use crate::util::bindings::{self, is_binding_pty_compliant};
 use crate::util::traffic_lights::{TrafficLightData, TrafficLightMouseStates, traffic_light_data};
@@ -114,7 +114,7 @@ use crate::{
     send_telemetry_from_app_ctx, send_telemetry_from_ctx,
 };
 
-const WINDOW_TITLE: &str = "Rook";
+const WINDOW_TITLE: &str = "Polaris Terminal";
 
 lazy_static! {
     static ref FALLBACK_WINDOW_SIZE: Vector2F = vec2f(800.0, 600.0);
@@ -287,11 +287,11 @@ impl CreateEnvironmentArg {
                 // Accept valid URLs (e.g., https://github.com/user/repo)
                 Url::parse(repo).is_ok()
                     // Or valid POSIX portable pathnames (e.g., user/repo)
-                    || rook_util::path::is_posix_portable_pathname(repo)
+                    || pterm_util::path::is_posix_portable_pathname(repo)
                     // Or absolute POSIX paths with portable components (e.g., /Users/me/repo)
                     || repo
                         .strip_prefix('/')
-                        .is_some_and(rook_util::path::is_posix_portable_pathname)
+                        .is_some_and(pterm_util::path::is_posix_portable_pathname)
             })
             .join(" ");
 
@@ -411,11 +411,11 @@ pub fn init(app: &mut AppContext) {
     );
     app.add_global_action(
         "root_view:open_drive_object_new_window",
-        open_rook_drive_object,
+        open_pterm_drive_object,
     );
     app.add_action(
         "root_view:open_drive_object_existing_window",
-        RootView::open_rook_drive_object_in_existing_window,
+        RootView::open_pterm_drive_object_in_existing_window,
     );
 
     app.add_global_action(
@@ -623,10 +623,10 @@ fn open_launch_config(arg: &OpenLaunchConfigArg, ctx: &mut AppContext) {
 fn requires_post_onboarding_login(
     is_logged_in: bool,
     ai_enabled: bool,
-    rook_drive_enabled: bool,
+    pterm_drive_enabled: bool,
 ) -> bool {
     !is_logged_in
-        && (FeatureFlag::AccountFirstOnboarding.is_enabled() || ai_enabled || rook_drive_enabled)
+        && (FeatureFlag::AccountFirstOnboarding.is_enabled() || ai_enabled || pterm_drive_enabled)
 }
 
 /// Replaces the settings and tutorial snapshots consumed when post-auth
@@ -787,7 +787,7 @@ fn open_from_restored(arg: &OpenFromRestoredArg, ctx: &mut AppContext) {
                         AddWindowOptions {
                             window_style: WindowStyle::Pin,
                             window_bounds: WindowBounds::ExactPosition(frame_args.window_bounds),
-                            title: Some("Rook".to_owned()),
+                            title: Some("Polaris Terminal".to_owned()),
                             fullscreen_state: window.fullscreen_state,
                             background_blur_radius_pixels,
                             background_backdrop,
@@ -830,7 +830,7 @@ fn open_from_restored(arg: &OpenFromRestoredArg, ctx: &mut AppContext) {
                         ctx.add_window(
                             AddWindowOptions {
                                 window_bounds: WindowBounds::new(window.bounds),
-                                title: Some("Rook".to_owned()),
+                                title: Some("Polaris Terminal".to_owned()),
                                 fullscreen_state: window.fullscreen_state,
                                 background_blur_radius_pixels,
                                 background_backdrop,
@@ -882,7 +882,7 @@ fn open_from_restored(arg: &OpenFromRestoredArg, ctx: &mut AppContext) {
                 ctx.add_window(
                     AddWindowOptions {
                         window_bounds: WindowBounds::new(window.bounds),
-                        title: Some("Rook".to_owned()),
+                        title: Some("Polaris Terminal".to_owned()),
                         fullscreen_state: window.fullscreen_state,
                         background_blur_radius_pixels,
                         background_backdrop,
@@ -914,7 +914,7 @@ fn path_if_directory(path: &Path) -> Option<&Path> {
 /// Opens a new window with the workspace configured according to `source`. Returns the
 /// newly-opened window ID and a handle to the root view in that window.
 ///
-/// This is the canonical way to open a new Rook window - all other entrypoints should delegate to
+/// This is the canonical way to open a new Polaris Terminal window - all other entrypoints should delegate to
 /// it if possible.
 pub(crate) fn open_new_with_workspace_source(
     source: NewWorkspaceSource,
@@ -1072,7 +1072,7 @@ fn open_settings_page_in_new_window(section: &SettingsSection, ctx: &mut AppCont
     });
 }
 
-/// Maps a `rook://settings` deeplink to the workspace action that opens it.
+/// Maps a `polaris-terminal://settings` deeplink to the workspace action that opens it.
 fn workspace_action_for_open_settings(args: &OpenSettingsArgs) -> WorkspaceAction {
     match args {
         OpenSettingsArgs::Default => WorkspaceAction::ShowSettings,
@@ -1155,7 +1155,7 @@ fn open_linear_issue_work_in_new_window(args: &LinearIssueWork, ctx: &mut AppCon
     });
 }
 
-fn open_rook_drive_object(arg: &OpenRookDriveObjectArgs, ctx: &mut AppContext) {
+fn open_pterm_drive_object(arg: &OpenPtermDriveObjectArgs, ctx: &mut AppContext) {
     match arg.object_type {
         ObjectType::Notebook => open_new_workspace_with_notebook_open(
             SyncId::ServerId(arg.server_id),
@@ -1180,7 +1180,7 @@ fn display_object_missing_error_in_window(window_id: WindowId, ctx: &mut AppCont
 
 fn open_new_workspace_with_notebook_open(
     notebook_id: SyncId,
-    settings: OpenRookDriveObjectSettings,
+    settings: OpenPtermDriveObjectSettings,
     ctx: &mut AppContext,
 ) {
     open_new_with_workspace_source(
@@ -1194,7 +1194,7 @@ fn open_new_workspace_with_notebook_open(
 
 fn open_new_workspace_with_workflow_open(
     workflow_id: SyncId,
-    settings: OpenRookDriveObjectSettings,
+    settings: OpenPtermDriveObjectSettings,
     ctx: &mut AppContext,
 ) {
     open_new_with_workspace_source(
@@ -1285,7 +1285,7 @@ fn default_window_options(window_settings: &WindowSettings, ctx: &AppContext) ->
     AddWindowOptions {
         window_style,
         window_bounds: next_bounds,
-        title: Some("Rook".to_owned()),
+        title: Some("Polaris Terminal".to_owned()),
         background_blur_radius_pixels: Some(*window_settings.background_blur_radius),
         background_backdrop: *window_settings.background_backdrop,
         on_gpu_driver_selected: on_gpu_driver_selected_callback(),
@@ -1470,12 +1470,12 @@ fn toggle_quake_mode_window(global_resource_handles: &GlobalResourceHandles, ctx
                 AddWindowOptions {
                     window_style: WindowStyle::Pin,
                     window_bounds: WindowBounds::ExactPosition(config.window_bounds),
-                    title: Some("Rook".to_owned()),
+                    title: Some("Polaris Terminal".to_owned()),
                     background_blur_radius_pixels: Some(*window_settings.background_blur_radius),
                     background_backdrop: *window_settings.background_backdrop,
                     // Ignore the quake window for positioning the next window
                     anchor_new_windows_from_closed_position:
-                        rookui::NextNewWindowsHasThisWindowsBoundsUponClose::No,
+                        ptermui::NextNewWindowsHasThisWindowsBoundsUponClose::No,
                     on_gpu_driver_selected: on_gpu_driver_selected_callback(),
                     window_instance: Some(ChannelState::app_id().to_string() + "-hotkey"),
                     ..Default::default()
@@ -1542,11 +1542,11 @@ fn toggle_quake_mode_window(global_resource_handles: &GlobalResourceHandles, ctx
     };
 }
 
-/// This action will show or hide all of Rook's windows except the quake window
+/// This action will show or hide all of Polaris Terminal's windows except the quake window
 ///
-/// - If Rook is active and has any windows, hide those windows.
-/// - If Rook is hidden, show all windows.
-/// - If Rook is active but has 0 normal windows, create a new window with a new session.
+/// - If Polaris Terminal is active and has any windows, hide those windows.
+/// - If Polaris Terminal is hidden, show all windows.
+/// - If Polaris Terminal is active but has 0 normal windows, create a new window with a new session.
 fn show_or_hide_non_quake_mode_windows(_: &(), ctx: &mut AppContext) {
     let quake_window_id = get_quake_mode_state(ctx).map(|state| state.window_id);
     let non_quake_mode_window_ids = ctx
@@ -1557,7 +1557,7 @@ fn show_or_hide_non_quake_mode_windows(_: &(), ctx: &mut AppContext) {
         open_new(&(), ctx);
     }
     let windowing_model = ctx.windows();
-    // Now there is at least one window. If a Rook window is active, hide the app.
+    // Now there is at least one window. If a Polaris Terminal window is active, hide the app.
     // Otherwise, show activate the app to show it in front.
     let active_window_id = windowing_model.active_window();
     match active_window_id {
@@ -1606,11 +1606,11 @@ pub enum NewWorkspaceSource {
     },
     NotebookById {
         id: SyncId,
-        settings: OpenRookDriveObjectSettings,
+        settings: OpenPtermDriveObjectSettings,
     },
     WorkflowById {
         id: SyncId,
-        settings: OpenRookDriveObjectSettings,
+        settings: OpenPtermDriveObjectSettings,
     },
     AgentSession {
         options: Box<NewTerminalOptions>,
@@ -1995,7 +1995,7 @@ impl RootView {
                 // the default if it's not already set and the user is logging in.
                 #[cfg(target_os = "macos")]
                 {
-                    use rookui_extras::user_preferences::UserPreferences;
+                    use ptermui_extras::user_preferences::UserPreferences;
 
                     // Make sure we're interacting with user defaults instead
                     // of some other preferences store.  Apple implements some
@@ -2003,7 +2003,7 @@ impl RootView {
                     // defaults (like press-and-hold being either accented
                     // characters or key repeat), so we need to make sure we're
                     // interacting with the user defaults system.
-                    let user_defaults = rookui_extras::user_preferences::user_defaults::UserDefaultsPreferencesStorage::new(None);
+                    let user_defaults = ptermui_extras::user_preferences::user_defaults::UserDefaultsPreferencesStorage::new(None);
                     if user_defaults
                         .read_value("ApplePressAndHoldEnabled")
                         .unwrap_or_default()
@@ -2315,7 +2315,7 @@ impl RootView {
     }
 
     fn onboarding_theme_kind(theme_name: &str) -> Option<ThemeKind> {
-        RookThemeConfig::new()
+        PtermThemeConfig::new()
             .theme_items()
             .find_map(|(kind, theme)| {
                 (theme.name().as_deref() == Some(theme_name)).then(|| kind.clone())
@@ -2664,10 +2664,10 @@ impl RootView {
                 // Account-first always presents account creation to logged-out users.
                 // The fallback flow only requires login for account-backed settings.
                 let ai_enabled = selected_settings.is_ai_enabled();
-                let rook_drive_enabled = selected_settings.is_rook_drive_enabled();
+                let pterm_drive_enabled = selected_settings.is_pterm_drive_enabled();
                 // With old onboarding, we ask user to log in before onboarding, so don't do it after onboarding completes.
                 let requires_login =
-                    requires_post_onboarding_login(is_logged_in, ai_enabled, rook_drive_enabled);
+                    requires_post_onboarding_login(is_logged_in, ai_enabled, pterm_drive_enabled);
 
                 if requires_login {
                     refresh_pending_onboarding_choices(
@@ -2921,7 +2921,7 @@ impl RootView {
                     LoginSlideView::new(
                         ai_enabled,
                         // No agent setup choice has been made yet; default to the
-                        // Rook Agent login screen rather than the third-party copy.
+                        // Polaris Terminal Agent login screen rather than the third-party copy.
                         false,
                         &theme_name,
                         use_vertical_tabs,
@@ -3115,9 +3115,9 @@ impl RootView {
         false
     }
 
-    pub fn open_rook_drive_object_in_existing_window(
+    pub fn open_pterm_drive_object_in_existing_window(
         &mut self,
-        arg: &OpenRookDriveObjectArgs,
+        arg: &OpenPtermDriveObjectArgs,
         ctx: &mut ViewContext<Self>,
     ) -> bool {
         if let AuthOnboardingState::Terminal(handle) = &self.auth_onboarding_state {
@@ -3127,7 +3127,7 @@ impl RootView {
                 ObjectType::Notebook => {
                     handle.update(ctx, |workspace, ctx| {
                         let initialized_section_states =
-                            workspace.has_rook_drive_initialized_sections(ctx);
+                            workspace.has_pterm_drive_initialized_sections(ctx);
                         let notebook_id = SyncId::ServerId(arg.server_id);
                         let settings = arg.settings.clone();
                         let _ = ctx.spawn(initialized_section_states, move |workspace, _, ctx| {
@@ -3143,7 +3143,7 @@ impl RootView {
                 ObjectType::Workflow => {
                     handle.update(ctx, |workspace, ctx| {
                         let initialized_section_states =
-                            workspace.has_rook_drive_initialized_sections(ctx);
+                            workspace.has_pterm_drive_initialized_sections(ctx);
                         let workflow_id = SyncId::ServerId(arg.server_id);
                         let settings = arg.settings.clone();
                         let _ = ctx.spawn(initialized_section_states, move |workspace, _, ctx| {
@@ -3160,16 +3160,16 @@ impl RootView {
                     }
 
                     let item_id =
-                        RookDriveItemId::Object(CloudObjectTypeAndId::from_generic_string_object(
+                        PtermDriveItemId::Object(CloudObjectTypeAndId::from_generic_string_object(
                             GenericStringObjectFormat::Json(JsonObjectType::EnvVarCollection),
                             SyncId::ServerId(arg.server_id),
                         ));
 
                     handle.update(ctx, |workspace, ctx| {
                         let initialized_section_states =
-                            workspace.has_rook_drive_initialized_sections(ctx);
+                            workspace.has_pterm_drive_initialized_sections(ctx);
                         let _ = ctx.spawn(initialized_section_states, move |workspace, _, ctx| {
-                            workspace.view_in_and_focus_rook_drive(item_id, ctx);
+                            workspace.view_in_and_focus_pterm_drive(item_id, ctx);
                         });
                     });
                 }
@@ -3179,14 +3179,14 @@ impl RootView {
                         return false;
                     }
 
-                    let item_id = RookDriveItemId::Object(CloudObjectTypeAndId::Folder(
+                    let item_id = PtermDriveItemId::Object(CloudObjectTypeAndId::Folder(
                         SyncId::ServerId(arg.server_id),
                     ));
                     handle.update(ctx, |workspace, ctx| {
                         let initialized_section_states =
-                            workspace.has_rook_drive_initialized_sections(ctx);
+                            workspace.has_pterm_drive_initialized_sections(ctx);
                         let _ = ctx.spawn(initialized_section_states, move |workspace, _, ctx| {
-                            workspace.view_in_and_focus_rook_drive(item_id, ctx);
+                            workspace.view_in_and_focus_pterm_drive(item_id, ctx);
                         });
                     });
                 }
@@ -3202,7 +3202,7 @@ impl RootView {
             ctx.windows().show_window_and_focus_app(window_id);
             ctx.notify();
         } else {
-            log::warn!("Auth not complete before trying to open rook drive object");
+            log::warn!("Auth not complete before trying to open polaris-terminal drive object");
         }
         true
     }
@@ -3352,7 +3352,7 @@ impl RootView {
     }
 
     /// Insert a command that should create a subshell. If we support bootstrapping AKA
-    /// "rookifying" its [`ShellType`], set a flag to automatically bootstrap it when the command's
+    /// "ptermifying" its [`ShellType`], set a flag to automatically bootstrap it when the command's
     /// block receives the [`AfterBlockStarted`] event.
     pub fn insert_subshell_command_and_bootstrap_if_supported(
         &mut self,
@@ -3378,17 +3378,17 @@ impl RootView {
     /// Shows the user the settings view of their newly joined team
     /// within the app.
     pub fn handle_team_intent_link_action(&mut self, _: &(), ctx: &mut ViewContext<Self>) -> bool {
-        // Force-open rook drive.
+        // Force-open polaris-terminal drive.
         let window_id = ctx.window_id();
         if let AuthOnboardingState::Terminal(handle) = &self.auth_onboarding_state {
             ctx.dispatch_typed_action_for_view(
                 window_id,
                 handle.id(),
-                &WorkspaceAction::OpenRookDrive,
+                &WorkspaceAction::OpenPtermDrive,
             );
             ctx.windows().show_window_and_focus_app(window_id);
         } else {
-            report_error!("Auth not complete before trying to open rook drive");
+            report_error!("Auth not complete before trying to open polaris-terminal drive");
         }
 
         // Use the team tester model to notify relevant subscribers to refresh their data.
@@ -3602,7 +3602,7 @@ impl RootView {
                 } else if let AuthOnboardingState::NeedsSsoLink { .. } = &self.auth_onboarding_state
                 {
                     // We should be able to access their SSO state; if not, default to true,
-                    // since we should err on the side of them _not_ being able to use Rook.
+                    // since we should err on the side of them _not_ being able to use Polaris Terminal.
                     if auth_state.needs_sso_link() == Some(false) {
                         self.auth_onboarding_state.complete_sso_link(ctx);
                     }
@@ -3642,7 +3642,7 @@ impl RootView {
                             self.web_handoff(ctx);
                         } else {
                             // On native, force sign them out, as they should not be able to continue
-                            // to use Rook. Instead, they can sign in or up with a valid account.
+                            // to use Polaris Terminal. Instead, they can sign in or up with a valid account.
                             crate::auth::log_out(ctx);
                         }
                     }
@@ -3715,7 +3715,7 @@ impl RootView {
                 }
             }
             AuthOverrideWarningModalEvent::BulkExport => {
-                self.export_all_rook_drive_objects(ctx);
+                self.export_all_pterm_drive_objects(ctx);
             }
         }
     }
@@ -3735,7 +3735,7 @@ impl RootView {
         ctx.notify();
     }
 
-    fn export_all_rook_drive_objects(&mut self, ctx: &mut ViewContext<Self>) {
+    fn export_all_pterm_drive_objects(&mut self, ctx: &mut ViewContext<Self>) {
         let window_id = ctx.window_id();
         let cloud_model = CloudModel::as_ref(ctx);
         let exportable_objects = cloud_model.get_all_exportable_object_ids();
@@ -3826,10 +3826,10 @@ impl RootView {
     #[cfg(feature = "voice_input")]
     fn maybe_stop_active_voice_input(
         &mut self,
-        key_code: &rookui::platform::keyboard::KeyCode,
+        key_code: &ptermui::platform::keyboard::KeyCode,
         ctx: &mut ViewContext<Self>,
     ) -> bool {
-        use rookui::event::KeyState;
+        use ptermui::event::KeyState;
         use voice_input::{VoiceInput, VoiceInputState, VoiceInputToggledFrom};
 
         use crate::settings::AISettings;
@@ -4043,10 +4043,10 @@ impl View for RootView {
 
         cfg_if::cfg_if! {
             if #[cfg(feature = "voice_input")] {
-                use rookui::elements::{EventHandler, DispatchEventResult};
+                use ptermui::elements::{EventHandler, DispatchEventResult};
                 EventHandler::new(stack.finish())
                     .on_modifier_state_changed(|ctx, _app, key_code, key_state| {
-                        if matches!(key_state, rookui::event::KeyState::Released) {
+                        if matches!(key_state, ptermui::event::KeyState::Released) {
                             ctx.dispatch_action("root_view:maybe_stop_active_voice_input", *key_code);
                         }
                         DispatchEventResult::PropagateToParent
@@ -4058,7 +4058,7 @@ impl View for RootView {
         }
     }
 
-    fn keymap_context(&self, app: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
         if quake_mode_window_is_open() {
             context.set.insert(flags::QUAKE_WINDOW_OPEN_FLAG);

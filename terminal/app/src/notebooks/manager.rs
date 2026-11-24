@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use futures_util::stream::AbortHandle;
 use markdown_parser::markdown_parser::parse_markdown_to_raw_text;
-use rook_errors::report_error;
-use rookui::r#async::SpawnedFutureHandle;
-use rookui::{
+use pterm_errors::report_error;
+use ptermui::r#async::SpawnedFutureHandle;
+use ptermui::{
     Entity, EntityId, ModelContext, ModelHandle, SingletonEntity, WeakViewHandle, WindowId,
 };
 
@@ -14,7 +14,7 @@ use super::CloudNotebook;
 use super::notebook::NotebookView;
 use crate::cloud_object::Owner;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
-use crate::drive::OpenRookDriveObjectSettings;
+use crate::drive::OpenPtermDriveObjectSettings;
 use crate::pane_group::{NotebookPane, PaneContent};
 use crate::server::cloud_objects::update_manager::{
     ObjectOperation, OperationSuccessType, UpdateManager, UpdateManagerEvent,
@@ -33,7 +33,7 @@ mod tests;
 /// [pane group](crate::pane_group::PaneGroup) views, as they contain all open notebook panes.
 ///
 /// The overall flow is:
-/// 1. A `Workspace` is asked to open a notebook (from the Rook Drive index, universal search, etc.).
+/// 1. A `Workspace` is asked to open a notebook (from the Polaris Terminal Drive index, universal search, etc.).
 /// 2. It checks the `NotebookManager` to see if the notebook is already open.
 /// 3. If it is, the existing notebook pane is focused (this may be in another window).
 /// 4. If not, the `Workspace` uses the `NotebookManager` to create a new notebook pane and
@@ -171,7 +171,7 @@ impl NotebookManager {
     pub fn create_pane(
         &mut self,
         source: &NotebookSource,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         window_id: WindowId,
         ctx: &mut ModelContext<Self>,
     ) -> NotebookPane {

@@ -1,17 +1,17 @@
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_core::ui::icons::Icon;
-use rookui::elements::{ConstrainedBox, Container, Highlight, Text};
-use rookui::fonts::{Properties, Weight};
-use rookui::text_layout::ClipConfig;
-use rookui::{
+use pterm_core::ui::icons::Icon;
+use ptermui::elements::{ConstrainedBox, Container, Highlight, Text};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::text_layout::ClipConfig;
+use ptermui::{
     AppContext, Element, Entity, ModelContext, ModelHandle, SingletonEntity as _, WindowId,
 };
 
 use crate::appearance::Appearance;
 use crate::cloud_object::CloudObject;
 use crate::cloud_object::model::persistence::CloudModel;
-use crate::search::command_palette::rook_drive;
+use crate::search::command_palette::pterm_drive;
 use crate::search::data_source::{DataSourceSearchError, Query, QueryResult};
 use crate::search::mixer::DataSourceRunErrorWrapper;
 use crate::search::result_renderer::ItemHighlightState;
@@ -39,7 +39,7 @@ impl InlineMenuAction for AcceptPrompt {
 }
 
 pub struct PromptsMenuDataSource {
-    rook_drive_data_source: ModelHandle<rook_drive::DataSource>,
+    pterm_drive_data_source: ModelHandle<pterm_drive::DataSource>,
     window_id: WindowId,
 }
 
@@ -49,16 +49,16 @@ impl PromptsMenuDataSource {
         // currently its implementation is not well-setup for async use.
         //
         // TODO(zachbai): Revert to full-text search and make this an `AsyncDataSource`.
-        let rook_drive_data_source =
-            ctx.add_model(|ctx| rook_drive::DataSource::new_fuzzy(window_id, ctx));
+        let pterm_drive_data_source =
+            ctx.add_model(|ctx| pterm_drive::DataSource::new_fuzzy(window_id, ctx));
         Self {
-            rook_drive_data_source,
+            pterm_drive_data_source,
             window_id,
         }
     }
 
     /// The short-query paths read the cloud model directly instead of going through
-    /// `rook_drive_data_source`, so they restrict it to the window's spaces themselves.
+    /// `pterm_drive_data_source`, so they restrict it to the window's spaces themselves.
     fn prompts_in_window<'a>(
         &self,
         app: &'a AppContext,
@@ -107,7 +107,7 @@ impl SyncDataSource for PromptsMenuDataSource {
                 .collect());
         }
 
-        self.rook_drive_data_source
+        self.pterm_drive_data_source
             .as_ref(app)
             .search_workflows(query, true, false, app)
             .map(|results| {
@@ -181,7 +181,7 @@ impl SearchItem for PromptSearchItem {
         let icon_color = inline_styles::icon_color(appearance);
         let icon_size = inline_styles::font_size(appearance);
 
-        let icon = Icon::Prompt.to_rookui_icon(icon_color).finish();
+        let icon = Icon::Prompt.to_ptermui_icon(icon_color).finish();
 
         Container::new(
             ConstrainedBox::new(icon)
@@ -226,7 +226,7 @@ impl SearchItem for PromptSearchItem {
         &self,
         highlight_state: ItemHighlightState,
         appearance: &Appearance,
-    ) -> Option<rook_core::ui::theme::Fill> {
+    ) -> Option<pterm_core::ui::theme::Fill> {
         inline_styles::item_background(highlight_state, appearance)
     }
 

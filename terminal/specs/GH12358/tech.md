@@ -1,13 +1,13 @@
 # Tech Spec: Select WSL distributions in tab configs
 
-**Issue:** [FJRG2007/rook#12358](https://github.com/FJRG2007/rook/issues/12358)
+**Issue:** [FJRG2007/polaris#12358](https://github.com/FJRG2007/polaris/issues/12358)
 
 **Product spec:** [`specs/GH12358/product.md`](product.md)
 
 ## Context
 
 Tab configs already carry a per-leaf shell override into the shared pane-template
-startup path, and Rook already has a native WSL launcher. The missing work is a
+startup path, and Polaris Terminal already has a native WSL launcher. The missing work is a
 typed tab-config representation, strict WSL resolution, guest-directory handling,
 and error propagation between those two systems.
 
@@ -66,9 +66,9 @@ Relevant current code:
 - `app/src/terminal/local_tty/windows/mod.rs:159-210` passes the WSL starter to
   `CreateProcessW` with a Windows-native start directory;
   `app/src/terminal/local_tty/windows/mod.rs:237-252` builds the WSL process command.
-- `crates/rook_util/src/path.rs:444-489` converts absolute WSL paths to either a
+- `crates/pterm_util/src/path.rs:444-489` converts absolute WSL paths to either a
   Windows drive path (`/mnt/c/...`) or a distribution-specific `\\WSL$` path.
-  Windows-only coverage is in `crates/rook_util/src/path_tests.rs:557-628`.
+  Windows-only coverage is in `crates/pterm_util/src/path_tests.rs:557-628`.
 - `app/src/terminal/view.rs:9386-9409` installs a pending command queue.
   `app/src/terminal/view.rs:12267-12319` advances it only after successful blocks,
   and `app/src/terminal/view.rs:12821-12823` first submits it on
@@ -111,7 +111,7 @@ behavior. The structured variant validates that the distribution is nonempty and
 has no leading/trailing whitespace. It remains literal: unlike `directory` and
 `commands`, rendering does not apply Handlebars substitution to it.
 
-Add tab-config semantic validation before a parsed config enters `RookConfig`:
+Add tab-config semantic validation before a parsed config enters `PtermConfig`:
 
 - structured WSL is allowed only on terminal/agent leaves;
 - split/cloud usage is an error;
@@ -256,7 +256,7 @@ include the configured name and pane context required to repair the file.
 
 ## End-to-end flow
 
-1. `RookConfig` parses and structurally validates the table as
+1. `PtermConfig` parses and structurally validates the table as
    `TabConfigShell::Structured(Wsl { ... })`.
 2. Parameter submission renders commands/directories and produces a typed pane
    tree; the distribution remains literal.
@@ -268,7 +268,7 @@ include the configured name and pane context required to repair the file.
    policy into terminal creation.
 6. `WslShellStarter` discovers the guest's supported default shell and the Windows
    PTY launches that native WSL session at the prepared host-visible directory.
-7. Rook bootstraps the guest shell. `BootstrapPrecmdDone` submits the first pending
+7. Polaris Terminal bootstraps the guest shell. `BootstrapPrecmdDone` submits the first pending
    command; subsequent successful blocks advance the queue.
 8. Agent panes enter Agent Mode only after their setup queue completes.
 
@@ -281,7 +281,7 @@ include the configured name and pane context required to repair the file.
 | 1-5 | Add `app/src/tab_configs/tab_config_tests.rs` cases for the legacy string, valid WSL table, round trip, missing/blank/whitespace distribution, unknown type, extra key, split/cloud use, literal distribution, and omitted-shell behavior. |
 | 7, 13 | Add `app/src/terminal/available_shells_tests.rs` coverage using synthetic WSL entries: exact match succeeds, case mismatch/unavailable names fail, and two named distributions resolve independently. Add a template preflight test proving one invalid leaf returns an error before pane construction. |
 | 8 | Unit-test the platform gate through an injected `is_windows` capability so the non-Windows error is covered on every CI host. |
-| 9-10 | Extend `crates/rook_util/src/path_tests.rs` for absolute guest and `/mnt/<drive>` conversion as needed; add platform-independent parser tests for `~`, `~/rest`, relative, `~user`, drive, and UNC rejection. On Windows, test `$HOME` expansion and missing-directory errors with a command/filesystem seam rather than requiring a developer distro in ordinary unit tests. |
+| 9-10 | Extend `crates/pterm_util/src/path_tests.rs` for absolute guest and `/mnt/<drive>` conversion as needed; add platform-independent parser tests for `~`, `~/rest`, relative, `~user`, drive, and UNC rejection. On Windows, test `$HOME` expansion and missing-directory errors with a command/filesystem seam rather than requiring a developer distro in ordinary unit tests. |
 | 6, 12, 14 | Add `app/src/terminal/local_tty/shell_tests.rs` coverage proving the structured selection reaches `ShellLaunchData::WSL`/`ShellStarter::Wsl`, plus fallback-policy coverage: legacy WSL initialization may retain its existing behavior, while a required WSL failure returns an error and never constructs a direct-shell fallback. Test the failure event leaves pending commands and Agent Mode unexecuted. |
 | 11-12 | Extend terminal/pane-group tests around the pending queue to prove WSL uses the same `BootstrapPrecmdDone` gate, advances commands only after success, clears the remainder after failure, and defers Agent Mode until completion. |
 | 13 | Add a pane-template test containing host `pwsh`, two distinct WSL selections, and cloud mode; assert independent selectors/directories survive rendering and preparation in layout order. |
@@ -292,8 +292,8 @@ Run the repository-required checks before an implementation PR update:
 
 ```bash
 ./script/format --check
-cargo clippy --workspace --exclude rook_completer --all-targets --tests -- -D warnings
-cargo clippy -p rook_completer --all-targets --tests -- -D warnings
+cargo clippy --workspace --exclude pterm_completer --all-targets --tests -- -D warnings
+cargo clippy -p pterm_completer --all-targets --tests -- -D warnings
 cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2
 cargo test --doc
 ```
@@ -306,7 +306,7 @@ Use a Windows machine with two installed distributions (for example,
 | Scenario | Expected result |
 | --- | --- |
 | Running distro, terminal pane, no directory | Native WSL pane opens in that distro's home; no visible host `wsl.exe` command. |
-| Stopped distro | Opening starts it and completes normal Rook bootstrap. |
+| Stopped distro | Opening starts it and completes normal Polaris Terminal bootstrap. |
 | `~`, `~/project`, `/home/...`, `/mnt/c/...` | Each starts in the corresponding guest-visible directory; `pwd` confirms the WSL path. |
 | Relative, `C:\...`, UNC, missing directory | Clear error; no tab or startup command is created. |
 | Missing and wrong-case distro | Clear exact-name error; no host/default-distro fallback and no partial layout. |

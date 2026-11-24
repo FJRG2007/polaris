@@ -2,23 +2,23 @@
 #
 # Updates the Info.plist file for a macOS app bundle to register supported file types and URL schemes.
 # This only applies the updates common to `script/bundle` and `script/run`.
-# Must be called from the root directory of the rook repo.
+# Must be called from the root directory of the polaris-terminal repo.
 
 set -e
 
 if [[ ! -d "script" ]]; then
-    echo "Run this script from the root of your rook repo."
+    echo "Run this script from the root of your polaris-terminal repo."
     exit 1
 fi
 
-if [[ -z "$ROOK_PLIST_PATH" ]]; then
-  echo 'Must set $ROOK_PLIST_PATH'
+if [[ -z "$POLARIS_TERMINAL_PLIST_PATH" ]]; then
+  echo 'Must set $POLARIS_TERMINAL_PLIST_PATH'
   exit 1
 fi
 
 if [[ -n "$GIT_RELEASE_TAG" ]]; then
-  echo "Updating plist Rook version to $GIT_RELEASE_TAG"
-  plutil -insert RookVersion -string "$GIT_RELEASE_TAG" "$ROOK_PLIST_PATH"
+  echo "Updating plist Polaris Terminal version to $GIT_RELEASE_TAG"
+  plutil -insert PtermVersion -string "$GIT_RELEASE_TAG" "$POLARIS_TERMINAL_PLIST_PATH"
 
   # We convert our version format to be period-separated integers only to align better with
   # Apple's guidance on values for `CFBundleVersion` / `CFBundleShortVersionString`.
@@ -37,21 +37,21 @@ if [[ -n "$GIT_RELEASE_TAG" ]]; then
     FORMATTED_VERSION="${MAJOR}.${YEAR}.${MONTH}.${DAY}.${HOUR}.${MINUTE}.${BUILD}"
     
     echo "Updating plist version to $FORMATTED_VERSION"
-    plutil -replace CFBundleShortVersionString -string "$FORMATTED_VERSION" "$ROOK_PLIST_PATH"
-    plutil -replace CFBundleVersion -string "$FORMATTED_VERSION" "$ROOK_PLIST_PATH"
+    plutil -replace CFBundleShortVersionString -string "$FORMATTED_VERSION" "$POLARIS_TERMINAL_PLIST_PATH"
+    plutil -replace CFBundleVersion -string "$FORMATTED_VERSION" "$POLARIS_TERMINAL_PLIST_PATH"
   else
     echo "Warning: GIT_RELEASE_TAG '$GIT_RELEASE_TAG' does not match expected format vN.YYYY.MM.DD.HH.MM.channel_NN"
   fi
 fi
 
-if [[ -n "$ROOK_SCHEME_NAME" ]]; then
+if [[ -n "$POLARIS_TERMINAL_SCHEME_NAME" ]]; then
   echo "Updating plist to support a custom url scheme"
   # Update the plist that cargo bundle creates to add support for custom URL schemes. Unfortunately, cargo bundle does not support
   # setting arbitrary plist fields, so we must do this after the fact.
-  plutil -insert CFBundleURLTypes -xml "<array><dict><key>CFBundleURLName</key><string>Custom App</string><key>CFBundleURLSchemes</key><array><string>$ROOK_SCHEME_NAME</string></array></dict></array>" "$ROOK_PLIST_PATH"
+  plutil -insert CFBundleURLTypes -xml "<array><dict><key>CFBundleURLName</key><string>Custom App</string><key>CFBundleURLSchemes</key><array><string>$POLARIS_TERMINAL_SCHEME_NAME</string></array></dict></array>" "$POLARIS_TERMINAL_PLIST_PATH"
 fi
 
-if [[ -z "$ROOK_PLIST_NO_FILE_TYPES" ]]; then
+if [[ -z "$POLARIS_TERMINAL_PLIST_NO_FILE_TYPES" ]]; then
   echo "Updating plist with supported file types"
   plutil -insert CFBundleDocumentTypes -xml "
   <array>
@@ -249,7 +249,7 @@ if [[ -z "$ROOK_PLIST_NO_FILE_TYPES" ]]; then
         <string>public.data</string>
       </array>
     </dict>
-  </array>" "$ROOK_PLIST_PATH"
+  </array>" "$POLARIS_TERMINAL_PLIST_PATH"
 fi
 
 # Unfortunately, there isn't a single standard UTI (what goes in LSItemContentTypes) for Markdown
@@ -258,16 +258,16 @@ fi
 # https://blog.smittytone.net/2021/01/19/how-tools-try-to-own-markdown/
 
 echo "Updating plist with permissions descriptions"
-plutil -insert NSAppleEventsUsageDescription -string "A program in Rook wants to use AppleScript." "$ROOK_PLIST_PATH"
-plutil -insert NSCameraUsageDescription -string "A program in Rook wants to use the camera." "$ROOK_PLIST_PATH"
-plutil -insert NSMicrophoneUsageDescription -string "A program in Rook wants to use your microphone." "$ROOK_PLIST_PATH"
-plutil -insert NSContactsUsageDescription -string "A program in Rook wants to use your contacts." "$ROOK_PLIST_PATH"
-plutil -insert NSCalendarsUsageDescription -string "A program in Rook wants to use your calendar." "$ROOK_PLIST_PATH"
-plutil -insert NSCalendarsFullAccessUsageDescription -string "A program in Rook wants full access to your calendar." "$ROOK_PLIST_PATH"
-plutil -insert NSRemindersUsageDescription -string "A program in Rook wants to use your reminders." "$ROOK_PLIST_PATH"
-plutil -insert NSRemindersFullAccessUsageDescription -string "A program in Rook wants full access to your reminders." "$ROOK_PLIST_PATH"
-plutil -insert NSLocationUsageDescription -string "A program in Rook wants to use your location information." "$ROOK_PLIST_PATH"
-plutil -insert NSPhotoLibraryUsageDescription -string "A program in Rook wants to use your photo library." "$ROOK_PLIST_PATH"
+plutil -insert NSAppleEventsUsageDescription -string "A program in Polaris Terminal wants to use AppleScript." "$POLARIS_TERMINAL_PLIST_PATH"
+plutil -insert NSCameraUsageDescription -string "A program in Polaris Terminal wants to use the camera." "$POLARIS_TERMINAL_PLIST_PATH"
+plutil -insert NSMicrophoneUsageDescription -string "A program in Polaris Terminal wants to use your microphone." "$POLARIS_TERMINAL_PLIST_PATH"
+plutil -insert NSContactsUsageDescription -string "A program in Polaris Terminal wants to use your contacts." "$POLARIS_TERMINAL_PLIST_PATH"
+plutil -insert NSCalendarsUsageDescription -string "A program in Polaris Terminal wants to use your calendar." "$POLARIS_TERMINAL_PLIST_PATH"
+plutil -insert NSCalendarsFullAccessUsageDescription -string "A program in Polaris Terminal wants full access to your calendar." "$POLARIS_TERMINAL_PLIST_PATH"
+plutil -insert NSRemindersUsageDescription -string "A program in Polaris Terminal wants to use your reminders." "$POLARIS_TERMINAL_PLIST_PATH"
+plutil -insert NSRemindersFullAccessUsageDescription -string "A program in Polaris Terminal wants full access to your reminders." "$POLARIS_TERMINAL_PLIST_PATH"
+plutil -insert NSLocationUsageDescription -string "A program in Polaris Terminal wants to use your location information." "$POLARIS_TERMINAL_PLIST_PATH"
+plutil -insert NSPhotoLibraryUsageDescription -string "A program in Polaris Terminal wants to use your photo library." "$POLARIS_TERMINAL_PLIST_PATH"
 
 echo "Disabling use of Liquid Glass on macOS Tahoe"
-plutil -insert UIDesignRequiresCompatibility -bool true "$ROOK_PLIST_PATH"
+plutil -insert UIDesignRequiresCompatibility -bool true "$POLARIS_TERMINAL_PLIST_PATH"

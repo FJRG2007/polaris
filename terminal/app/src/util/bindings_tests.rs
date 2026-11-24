@@ -1,6 +1,6 @@
-use rookui::App;
-use rookui::keymap::{EditableBinding, Keystroke, Trigger};
-use rookui::platform::OperatingSystem;
+use ptermui::App;
+use ptermui::keymap::{EditableBinding, Keystroke, Trigger};
+use ptermui::platform::OperatingSystem;
 
 use crate::terminal;
 use crate::util::bindings::{keybinding_name_to_display_string, trigger_to_keystroke};
@@ -170,7 +170,7 @@ fn test_markdown_display_mode_toggle_is_rebound_in_both_directions() {
         app.update(crate::notebooks::file::init);
 
         app.update(|ctx| {
-            let toggle_keystrokes = |ctx: &rookui::AppContext| {
+            let toggle_keystrokes = |ctx: &ptermui::AppContext| {
                 ctx.editable_bindings()
                     .filter(|binding| binding.name == TOGGLE_MARKDOWN_DISPLAY_MODE_BINDING_NAME)
                     .map(|binding| trigger_to_keystroke(binding.trigger))

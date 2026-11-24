@@ -14,7 +14,7 @@ Behavior is specified in `specs/APP-3792/PRODUCT.md`. This document updates the 
 - `app/src/server/server_api/ai.rs` implements that trait for the client-side `ServerApi`; current master includes the codebase calls around `generate_code_embeddings`, `sync_merkle_tree`, `populate_merkle_tree_cache`, `get_relevant_fragments`, `rerank_fragments`, and `codebase_context_config`.
 - `crates/ai/src/index/full_source_code_embedding/snapshot.rs` owns serialized snapshot persistence. The daemon path should reuse the format while changing the base directory.
 - `app/src/ai/blocklist/action_model/execute/search_codebase.rs:28` defines `SearchCodebaseExecutor`; the current hydration path uses local file reads after `GetRelevantFilesController`.
-- `app/src/ai/agent/api/impl.rs:189-194` explicitly disables `SearchCodebase` for `RookifiedRemote { host_id: Some(_) }`.
+- `app/src/ai/agent/api/impl.rs:189-194` explicitly disables `SearchCodebase` for `PtermifiedRemote { host_id: Some(_) }`.
 - The existing local UI strings and flows live in `app/src/ai/blocklist/codebase_index_speedbump_banner.rs:20-30` and `app/src/settings_view/code_page.rs:84-98`.
 
 ### Current remote-server architecture on master
@@ -24,7 +24,7 @@ Behavior is specified in `specs/APP-3792/PRODUCT.md`. This document updates the 
 - `crates/remote_server/src/manager.rs` owns connection setup, initialize, and token rotation from the client side.
 
 ### Dependency assumptions
-- APP-3801's per-user authenticated daemon model is assumed to land as designed in `specs/APP-3801`: the client sends the current bearer token on `Initialize`, refreshes with `Authenticate`, the daemon stores the credential in memory only, and daemon sockets are partitioned by Rook identity. Remote codebase indexing is the first feature that materially depends on daemon-side upstream calls.
+- APP-3801's per-user authenticated daemon model is assumed to land as designed in `specs/APP-3801`: the client sends the current bearer token on `Initialize`, refreshes with `Authenticate`, the daemon stores the credential in memory only, and daemon sockets are partitioned by Polaris Terminal identity. Remote codebase indexing is the first feature that materially depends on daemon-side upstream calls.
 - APP-3790's remote file read path is assumed available for hydrating full file context after retrieval.
 - The v1 design assumes daemon-to-`app.rook.dev` egress is available. That was checked with the initial target enterprise environments. If this assumption fails later, the fallback is a client-proxied `StoreClient`, not part of v1.
 
@@ -46,7 +46,7 @@ Client responsibilities:
 
 Backend responsibilities:
 - Store and retrieve Merkle-tree/index data and embeddings keyed by hashes.
-- Authorize every root-hash retrieval against the authenticated Rook user and repo association that created or owns the remote index.
+- Authorize every root-hash retrieval against the authenticated Polaris Terminal user and repo association that created or owns the remote index.
 - Answer `get_relevant_fragments(root_hash, query, repo_metadata, embedding_config)`.
 - Rerank candidate fragments.
 - Provide codebase context config to both local client indexing and daemon-side remote indexing.
@@ -61,7 +61,7 @@ Alternative shape: the daemon builds or maintains the remote Merkle tree and fra
 
 Why rejected for v1:
 - New repos would require syncing the entire tree and enough fragment data over SSH before backend sync can complete. That adds heavy startup traffic on the least reliable leg of the system.
-- APP-3801 exists specifically to let daemon handlers call Rook services with the user's token; not using it here loses the main benefit.
+- APP-3801 exists specifically to let daemon handlers call Polaris Terminal services with the user's token; not using it here loses the main benefit.
 - The only strong argument is resilience when daemon → `app.rook.dev` egress is blocked. The initial customer check says that egress is acceptable, and if it is unavailable, the product should fail visibly rather than silently route a much heavier protocol through SSH.
 
 ### Rejected alternative: daemon handles all retrieval
@@ -96,7 +96,7 @@ Do not instantiate the full client `ServerApiProvider` inside the daemon unless 
 Once the token source and `allowed_to_refresh_token` policy are injectable, the daemon can reuse the same `ServerApi` implementation directly for codebase-indexing backend calls, with refresh disabled. Until then, share the GraphQL operation construction, result conversion, error mapping, and `http_client::Client` usage; do not fork the GraphQL operations.
 
 Required behavior:
-- Reads the request-scoped token supplied by the remote client/server proto message for operations triggered by that message. The daemon may keep `ServerModel::auth_token()` or an injected token provider as the initialized token cache for daemon-initiated background sync, but request-triggered auth-required outbound Rook service requests must not be authorized solely by the cached daemon token.
+- Reads the request-scoped token supplied by the remote client/server proto message for operations triggered by that message. The daemon may keep `ServerModel::auth_token()` or an injected token provider as the initialized token cache for daemon-initiated background sync, but request-triggered auth-required outbound Polaris Terminal service requests must not be authorized solely by the cached daemon token.
 - Disables token refresh for daemon calls by using `allowed_to_refresh_token() == false`. The daemon path must surface missing/expired/revoked credentials to the client instead of invoking the client's token refresh path.
 - Sends the same backend operations the local client sends today: config fetch, Merkle tree sync, embedding generation, intermediate-node update, cache population, relevant-fragment retrieval only if a future daemon-retrieval path needs it, and reranking only if a future daemon-retrieval path needs it.
 - Classifies errors into at least unauthenticated, backend unreachable, backend rejected, and internal/unknown so status UI can distinguish actionable failures.
@@ -107,21 +107,21 @@ For v1 sync, daemon-side retrieval methods may still be implemented because the 
 ### 3.3 Add daemon-side index cache and startup bootstrap
 The daemon keeps two persistence layers under the remote-server cache root:
 
-- Shared machine-local snapshot files, keyed by repo identity/path and content, containing serialized Merkle trees, fragment metadata, snapshots, and other data that is derived only from files readable by the OS user running the daemon. These snapshot files intentionally contain no Rook-user-specific choices, credentials, or authorization state and can be reused by multiple Rook identities that connect to the same OS account and repo.
+- Shared machine-local snapshot files, keyed by repo identity/path and content, containing serialized Merkle trees, fragment metadata, snapshots, and other data that is derived only from files readable by the OS user running the daemon. These snapshot files intentionally contain no Polaris Terminal-user-specific choices, credentials, or authorization state and can be reused by multiple Polaris Terminal identities that connect to the same OS account and repo.
 - Daemon-local SQLite metadata, using the existing `persistence`/Diesel infrastructure from the app/oz binary rather than ad-hoc JSON. Add remote-indexing migrations for shared cache records and identity-scoped user state. The remote daemon should initialize the SQLite persistence subsystem in `run_daemon_app` or an equivalent daemon bootstrap path before constructing the indexing manager.
 
 Example layout:
-- `~/.rook/remote-server/codebase-indexes/shared/snapshots/{repo_key}/...`
+- `~/.polaris-terminal/remote-server/codebase-indexes/shared/snapshots/{repo_key}/...`
 - SQLite database under the daemon's state directory, with tables such as `remote_codebase_index_cache` and `remote_codebase_index_user_state`.
 
-Sharing the serialized Merkle/snapshot cache is acceptable because it is just a representation of the local codebase for the remote OS account. Sharing user metadata is not acceptable: enablement/decline/drop choices, status, and backend root authorization remain scoped per Rook identity. Backend storage may also deduplicate content-addressed Merkle nodes, fragments, or embeddings internally, but retrieval authorization must bind usable roots to the authenticated Rook user and repo.
+Sharing the serialized Merkle/snapshot cache is acceptable because it is just a representation of the local codebase for the remote OS account. Sharing user metadata is not acceptable: enablement/decline/drop choices, status, and backend root authorization remain scoped per Polaris Terminal identity. Backend storage may also deduplicate content-addressed Merkle nodes, fragments, or embeddings internally, but retrieval authorization must bind usable roots to the authenticated Polaris Terminal user and repo.
 
-Shared cache metadata in SQLite should record at least repo path, repo identity key, snapshot/schema version, snapshot file key/path, root hash, embedding config, last indexed time, and enough timestamps to rebuild the local `WorkspaceMetadata` inputs that currently populate the local build queue. Identity-scoped SQLite metadata should record at least `identity_key`, repo path, enabled/disabled/declined state, current status, last user-visible error, last status update, backend association state, and the last ready root hash associated with that Rook identity.
+Shared cache metadata in SQLite should record at least repo path, repo identity key, snapshot/schema version, snapshot file key/path, root hash, embedding config, last indexed time, and enough timestamps to rebuild the local `WorkspaceMetadata` inputs that currently populate the local build queue. Identity-scoped SQLite metadata should record at least `identity_key`, repo path, enabled/disabled/declined state, current status, last user-visible error, last status update, backend association state, and the last ready root hash associated with that Polaris Terminal identity.
 
 Daemon SQLite wiring:
 - Do not call the full `persistence::initialize(ctx)` path from `run_daemon_app` unchanged. That initializer is app/CLI-shaped: it reads full app state, expects `AuthStateProvider`, creates the general `PersistenceWriter`, and restores UI/session/cloud-object data the daemon does not need.
 - Instead, factor the reusable SQLite pieces behind a daemon-scoped initializer, for example `persistence::initialize_remote_codebase_indexing(ctx)` or a lower-level `sqlite::initialize_with_scope(scope, path)`. It should reuse the existing Diesel migrations, schema generation, `establish_connection` pragmas, error reporting pattern, and writer-thread/event pattern, but only read/write remote-codebase-indexing tables.
-- Store the daemon codebase-indexing database under the remote-server cache root, separate from the normal app/Oz `rook.sqlite`, for example `~/.rook/remote-server/codebase-indexes/index.sqlite`. Keeping it remote-server-scoped avoids mixing long-lived daemon cache rows with a user's normal app/CLI session-restore database while still reusing the same SQLite infrastructure.
+- Store the daemon codebase-indexing database under the remote-server cache root, separate from the normal app/Oz `polaris-terminal.sqlite`, for example `~/.polaris-terminal/remote-server/codebase-indexes/index.sqlite`. Keeping it remote-server-scoped avoids mixing long-lived daemon cache rows with a user's normal app/CLI session-restore database while still reusing the same SQLite infrastructure.
 - Create the parent directory, shared snapshot files, and SQLite file with owner-only access, matching the remote-server socket/cache privacy model. The shared snapshot files and shared metadata tables may be machine-local for the remote OS account; identity decisions still remain keyed by `identity_key`.
 - Add migrations under `crates/persistence/migrations/` for remote indexing tables and regenerate `persistence::schema`/`persistence::model` in the normal way. Tables should live in the shared schema so app/CLI and daemon code can use the same typed Diesel models, but daemon reads should be limited to the remote-indexing tables.
 - Add daemon-specific `ModelEvent` variants or a separate daemon persistence event enum for `UpsertRemoteCodebaseIndexCache`, `UpsertRemoteCodebaseIndexUserState`, `DeleteRemoteCodebaseIndexUserState`, and `DeleteRemoteCodebaseIndexCache`. Prefer a separate enum if adding these events to the app-wide `ModelEvent` would make the general writer handle daemon-only concepts.
@@ -177,7 +177,7 @@ All new remote-indexing RPCs are scoped to the identity-partitioned remote-serve
 - `GetFragmentMetadataFromHash` requires that the connected identity has enabled the repo and that every requested content hash belongs to that repo's current or last-ready snapshot. It must not read cross-repo metadata from the shared cache.
 - `IndexCodebase` must carry a request-scoped bearer credential, either in the proto payload or authenticated request envelope, because it can trigger config fetches, embedding generation, and index sync.
 
-Any request message that can lead to auth-required outbound Rook service calls must carry the current client auth token or an equivalent request-scoped bearer credential. Handlers must reject missing or invalid request-scoped tokens instead of falling back to the daemon's stored `auth_token`; the stored token is only a cache/initialization aid and must not make the proxy socket an ambient-authority boundary. If future versions let `GetFragmentMetadataFromHash` or daemon-side retrieval call Rook services, those messages must also carry the token before those outbound calls are added.
+Any request message that can lead to auth-required outbound Polaris Terminal service calls must carry the current client auth token or an equivalent request-scoped bearer credential. Handlers must reject missing or invalid request-scoped tokens instead of falling back to the daemon's stored `auth_token`; the stored token is only a cache/initialization aid and must not make the proxy socket an ambient-authority boundary. If future versions let `GetFragmentMetadataFromHash` or daemon-side retrieval call Polaris Terminal services, those messages must also carry the token before those outbound calls are added.
 
 `IndexStatus` should include:
 - `state`: not enabled, queued, indexing, ready, stale, failed, disabled, unavailable.
@@ -257,7 +257,7 @@ Use this model from:
 Settings should distinguish local auto-indexing from remote auto-indexing. If implementation chooses to reuse one preference, the product spec must be updated before shipping; the current product expectation is independent control.
 
 ### 3.8 Remote retrieval path
-When `SearchCodebaseExecutor` runs in `SessionType::RookifiedRemote { host_id: Some(_) }`:
+When `SearchCodebaseExecutor` runs in `SessionType::PtermifiedRemote { host_id: Some(_) }`:
 1. Resolve the active remote repo path.
 2. Read `RemoteCodebaseIndexModel` for `(remote_identity_key, host_id, repo_path)`.
 3. If the state is not ready/stale with a root hash, return a typed `SearchCodebaseResult::Failed` reason for indexing-in-progress, failed, disabled, unavailable, or not indexed.
@@ -358,7 +358,7 @@ Expose remote entries in settings, add the remote-aware speedbump/auto-indexing 
 - **Status push loss during disconnect.** Mitigation: identity-scoped status is cached on the daemon; reconnect pushes a fresh `CodebaseIndexStatusesSnapshot`, and clients treat reconnect as the full-resync boundary before trusting incremental deltas.
 - **Snapshot corruption/version skew.** Mitigation: match local snapshot behavior by deleting bad snapshots and rebuilding.
 - **Credential exposure.** Mitigation: use APP-3801 token provider, never persist tokens, redact protocol logs, and ensure agent context never includes auth material.
-- **Proxy-socket auth bypass.** Mitigation: require request-scoped auth tokens on remote client/server proto messages before handlers make auth-required outbound Rook service requests; reject missing or invalid tokens instead of relying on daemon-stored credentials as ambient authority.
+- **Proxy-socket auth bypass.** Mitigation: require request-scoped auth tokens on remote client/server proto messages before handlers make auth-required outbound Polaris Terminal service requests; reject missing or invalid tokens instead of relying on daemon-stored credentials as ambient authority.
 - **Root hash staleness.** Mitigation: stale state keeps last ready root hash usable until a new ready hash arrives; failed sync does not overwrite the last ready hash.
 
 ## 8. Follow-ups

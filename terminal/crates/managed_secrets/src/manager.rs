@@ -3,10 +3,10 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
-use rook_core::features::FeatureFlag;
-use rook_graphql::managed_secrets::ManagedSecret;
-use rook_graphql::queries::task_secrets::ManagedSecretValue as GqlManagedSecretValue;
-use rookui_core::{Entity, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_graphql::managed_secrets::ManagedSecret;
+use pterm_graphql::queries::task_secrets::ManagedSecretValue as GqlManagedSecretValue;
+use ptermui_core::{Entity, SingletonEntity};
 use vec1::vec1;
 
 use crate::ManagedSecretValue;
@@ -17,7 +17,7 @@ use crate::client::{
 use crate::envelope::UploadKey;
 use crate::gcp::{self, GcpWorkloadIdentityFederationError, GcpWorkloadIdentityFederationToken};
 
-/// Singleton model for working with Rook-managed secrets.
+/// Singleton model for working with Polaris Terminal-managed secrets.
 pub struct ManagedSecretManager {
     client: Arc<dyn ManagedSecretsClient>,
     actor_provider: Arc<dyn ActorProvider>,
@@ -49,7 +49,7 @@ impl ManagedSecretManager {
         let client = self.client.clone();
         let actor_provider = self.actor_provider.clone();
         async move {
-            if !FeatureFlag::RookManagedSecrets.is_enabled() {
+            if !FeatureFlag::PtermManagedSecrets.is_enabled() {
                 return Err(anyhow::anyhow!("This feature is not enabled"));
             }
 
@@ -94,7 +94,7 @@ impl ManagedSecretManager {
     ) -> impl Future<Output = anyhow::Result<()>> + use<> {
         let client = self.client.clone();
         async move {
-            if !FeatureFlag::RookManagedSecrets.is_enabled() {
+            if !FeatureFlag::PtermManagedSecrets.is_enabled() {
                 return Err(anyhow::anyhow!("This feature is not enabled"));
             }
 
@@ -113,7 +113,7 @@ impl ManagedSecretManager {
         let client = self.client.clone();
         let actor_provider = self.actor_provider.clone();
         async move {
-            if !FeatureFlag::RookManagedSecrets.is_enabled() {
+            if !FeatureFlag::PtermManagedSecrets.is_enabled() {
                 return Err(anyhow::anyhow!("This feature is not enabled"));
             }
 
@@ -161,7 +161,7 @@ impl ManagedSecretManager {
         }
     }
 
-    /// Get Rook-managed secrets scoped to the currently-executing task.
+    /// Get Polaris Terminal-managed secrets scoped to the currently-executing task.
     ///
     /// This will fail if not in an ambient agent.
     pub fn get_task_secrets(
@@ -176,7 +176,8 @@ impl ManagedSecretManager {
         ) -> anyhow::Result<HashMap<String, ManagedSecretValue>> {
             // We only need the workload token for the duration of the request.
             let workload_token =
-                rook_isolation_platform::issue_workload_token(Some(Duration::from_mins(5))).await?;
+                pterm_isolation_platform::issue_workload_token(Some(Duration::from_mins(5)))
+                    .await?;
             let gql_secrets = client
                 .get_task_secrets(task_id, workload_token.token)
                 .await?;

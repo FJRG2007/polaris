@@ -1,8 +1,8 @@
 use pathfinder_geometry::rect::RectF;
-use rookui::integration::TestStep;
-use rookui::platform::TerminationMode;
-use rookui::windowing::WindowManager;
-use rookui::{SingletonEntity, async_assert_eq};
+use ptermui::integration::TestStep;
+use ptermui::platform::TerminationMode;
+use ptermui::windowing::WindowManager;
+use ptermui::{SingletonEntity, async_assert_eq};
 
 use crate::integration_testing::step::new_step_with_default_assertions;
 

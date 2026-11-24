@@ -1,2 +1,2 @@
-pub use rook_core::ui::color::contrast::*;
-pub use rook_core::ui::color::*;
+pub use pterm_core::ui::color::contrast::*;
+pub use pterm_core::ui::color::*;

@@ -8,7 +8,7 @@ fn make_config(model: &str, harness: &str, remote: bool) -> OrchestrationConfig 
         execution_mode: if remote {
             OrchestrationExecutionMode::Remote {
                 environment_id: "env-1".to_string(),
-                worker_host: "rook".to_string(),
+                worker_host: "polaris-terminal".to_string(),
                 runner_id: String::new(),
             }
         } else {
@@ -27,7 +27,7 @@ fn make_request(model: &str, harness: &str, remote: bool) -> RunAgentsRequest {
         execution_mode: if remote {
             RunAgentsExecutionMode::Remote {
                 environment_id: "env-1".to_string(),
-                worker_host: "rook".to_string(),
+                worker_host: "polaris-terminal".to_string(),
                 computer_use_enabled: false,
                 runner_id: String::new(),
             }

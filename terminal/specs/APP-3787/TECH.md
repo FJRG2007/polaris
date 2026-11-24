@@ -4,7 +4,7 @@ Linear: [APP-3787](https://linear.app/warpdotdev/issue/APP-3787)
 
 ## 1. Problem
 
-The Rook client needs a centralized way to manage connections to `remote_server` processes running on remote hosts. Today, each downstream feature (file tree, code review, agent apply diff) would need to independently figure out how to reach the remote server for its session's host. Each SSH session needs its own dedicated connection to the remote server because SSH connections are tied to the parent session's lifecycle — if the parent session dies, all multiplexed connections through it die too. Deduplication to a single long-lived server process happens on the remote host, not on the client.
+The Polaris Terminal client needs a centralized way to manage connections to `remote_server` processes running on remote hosts. Today, each downstream feature (file tree, code review, agent apply diff) would need to independently figure out how to reach the remote server for its session's host. Each SSH session needs its own dedicated connection to the remote server because SSH connections are tied to the parent session's lifecycle — if the parent session dies, all multiplexed connections through it die too. Deduplication to a single long-lived server process happens on the remote host, not on the client.
 
 This spec covers three pieces:
 1. A protocol change — the `InitializeResponse` returns a `HostId` so the client can deduplicate per-host models
@@ -20,7 +20,7 @@ This spec covers three pieces:
 - `crates/remote_server/proto/remote_server.proto` — `ClientMessage`/`ServerMessage` envelopes with `Initialize`/`InitializeResponse` (to be extended with `host_id`)
 
 ### CLI subcommand dispatch
-- `crates/rook_cli/src/lib.rs (384-426)` — `WorkerCommand` enum with `RemoteServer` variant
+- `crates/pterm_cli/src/lib.rs (384-426)` — `WorkerCommand` enum with `RemoteServer` variant
 - `app/src/lib.rs (542-544)` — `WorkerCommand::RemoteServer` dispatch calling `remote_server::run()`
 
 ### Session bootstrap flow
@@ -31,7 +31,7 @@ This spec covers three pieces:
 - `app/src/terminal/view.rs (11022-11199)` — `TerminalView::handle_session_bootstrapped()` reacts to the event
 
 ### Session and SSH types
-- `app/src/terminal/model/session.rs (691-699)` — `SessionType::Local` / `SessionType::RookifiedRemote`
+- `app/src/terminal/model/session.rs (691-699)` — `SessionType::Local` / `SessionType::PtermifiedRemote`
 - `app/src/terminal/model/session.rs (426-451)` — `SessionInfo` struct with `hostname`, `user`, `session_type`, `spawning_session_id`
 - `app/src/terminal/model/terminal_model.rs (632-647)` — `SubshellInitializationInfo` with `ssh_connection_info: Option<InteractiveSshCommand>`
 - `app/src/terminal/ssh/util.rs (86-89)` — `InteractiveSshCommand { host, port }`
@@ -52,7 +52,7 @@ This spec covers three pieces:
 ## 3. Current State
 
 - The `remote_server` crate has a working `RemoteServerClient` and `ServerModel` with `Initialize`/`InitializeResponse` over length-delimited protobuf.
-- The `rook remote-server` subcommand boots the headless app and runs the server over stdin/stdout.
+- The `polaris-terminal remote-server` subcommand boots the headless app and runs the server over stdin/stdout.
 - There is no client-side manager. No code exists to spawn the remote server over SSH, track which hosts have running servers, or route feature requests to the right client.
 - Sessions know their `hostname` and `session_type` after bootstrap, and SSH sessions have `ssh_connection_info` from the parsed SSH command.
 - The `RemoteCommandExecutor` demonstrates how to run commands over an existing SSH connection using the control socket.
@@ -134,7 +134,7 @@ Each SSH session gets its own `RemoteSessionState`. The manager maps sessions �
 
 **Why per-session connections**: SSH control socket multiplexing ties all multiplexed connections to the parent session's lifecycle. If session A starts SSH and session B piggybacks via the control socket, session B's remote server connection dies when session A's SSH exits. Per-session connections ensure each session's remote server survives independently. The remote host infrastructure handles routing multiple connections to the same long-lived server process — dedup is the server's job, not the client's.
 
-**`RemoteServerClient` as an Entity**: The `RemoteServerClient` is a rookui model (implements `Entity`) that can emit events and be subscribed to. It also derives `Clone`, producing a second handle to the same underlying channels — this is used to call async methods (e.g. `initialize`) from a background thread while the original lives inside a `ModelHandle`. The manager holds a `ModelHandle<RemoteServerClient>` in `server_clients`, and downstream features can subscribe directly to a specific client for server-pushed notifications (e.g. file change events, progress updates) rather than routing everything through the manager's event system.
+**`RemoteServerClient` as an Entity**: The `RemoteServerClient` is a ptermui model (implements `Entity`) that can emit events and be subscribed to. It also derives `Clone`, producing a second handle to the same underlying channels — this is used to call async methods (e.g. `initialize`) from a background thread while the original lives inside a `ModelHandle`. The manager holds a `ModelHandle<RemoteServerClient>` in `server_clients`, and downstream features can subscribe directly to a specific client for server-pushed notifications (e.g. file change events, progress updates) rather than routing everything through the manager's event system.
 
 **Entity and events**:
 
@@ -188,7 +188,7 @@ impl RemoteServerManager {
     ///
     /// Immediately sets status to `Connecting` and emits `SessionConnecting`.
     /// Then spawns a background task that:
-    /// 1. Runs `rook remote-server run` over SSH, creates the client
+    /// 1. Runs `polaris-terminal remote-server run` over SSH, creates the client
     /// 2. Calls `initialize()`, receives HostId, marks Connected
     pub fn connect_session(
         &mut self,
@@ -276,11 +276,11 @@ When `connect_session` is called, the manager owns the entire flow from that poi
 
 **Phase 1 — Server startup and client creation**:
 
-1. Run `rook remote-server run` over SSH as a long-running child process. This is a standalone `Command::new("ssh").spawn()` call — not routed through the session's `CommandExecutor`. Same SSH args pattern as `RemoteCommandExecutor` — ControlPath multiplexing, password auth disabled, X11 disabled.
+1. Run `polaris-terminal remote-server run` over SSH as a long-running child process. This is a standalone `Command::new("ssh").spawn()` call — not routed through the session's `CommandExecutor`. Same SSH args pattern as `RemoteCommandExecutor` — ControlPath multiplexing, password auth disabled, X11 disabled.
 
 ```rust
 let mut args = ssh_args(&socket_path);
-args.extend(["rook", "remote-server", "run"].map(String::from));
+args.extend(["polaris-terminal", "remote-server", "run"].map(String::from));
 let mut child = tokio::process::Command::new("ssh")
     .args(&args)
     .stdin(Stdio::piped())
@@ -326,7 +326,7 @@ This keeps the `RemoteServerManager` focused on connection lifecycle while letti
 ### New SSH session connecting to a host with no existing sessions
 
 1. The caller (trigger TBD — see follow-ups) calls `manager.connect_session(session_id, socket_path)`. Manager sets status to `Connecting`, emits `SessionConnecting`.
-2. Background task runs `ssh -o ControlPath=<socket> placeholder@placeholder rook remote-server run` → gets child stdin/stdout/stderr.
+2. Background task runs `ssh -o ControlPath=<socket> placeholder@placeholder polaris-terminal remote-server run` → gets child stdin/stdout/stderr.
 3. Hops to main thread: creates `RemoteServerClient::from_child_streams(...)`, subscribes to disconnect events, stores client handle. Clones client for async use.
 4. Back on background thread: calls `client.initialize()` → receives `InitializeResponse { server_version: "1.2.3", host_id: "abc123" }`.
 5. Hops to main thread: transitions session to `Connected { client, host_id: HostId("abc123") }`, emits `SessionConnected { session_id, host_id }`.
@@ -335,7 +335,7 @@ This keeps the `RemoteServerManager` focused on connection lifecycle while letti
 ### Second SSH session to the same host
 
 1. `manager.connect_session(session_id_2, socket_path_2)` → same flow, **new independent connection**.
-2. Background task starts its own `rook remote-server run` over SSH. The remote host routes this connection to the same long-lived server process.
+2. Background task starts its own `polaris-terminal remote-server run` over SSH. The remote host routes this connection to the same long-lived server process.
 3. `client.initialize()` → `InitializeResponse { host_id: "abc123" }` (same host ID because it's the same server process).
 4. File tree sees `host_id = "abc123"`, finds an existing `RepoMetadataModel` for that host — reuses it instead of creating a duplicate.
 5. Session 2's `RemoteServerClient` is fully independent of session 1's. If session 1's SSH dies, session 2 is unaffected.

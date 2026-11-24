@@ -1,5 +1,5 @@
 # Polaris's root .gitattributes normalises text to LF; the terminal tree kept
-# its files byte-for-byte as Rook stored them, so undo that here.
+# its files byte-for-byte as Polaris Terminal stored them, so undo that here.
 * !text !eol
 
 # No LFS: the classifier weights are fetched by crates/input_classifier/build.rs.

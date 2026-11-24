@@ -2,7 +2,7 @@
 
 ## Problem
 
-The CLI agent rich input composer (Ctrl-G) was designed for sending natural language prompts to CLI agents. However, CLI agents like Claude Code support a `!` prefix for running shell commands directly. When users type `!ls` in the composer, they expect the same shell input affordances they get elsewhere in Rook — syntax highlighting, red error underlining for unknown commands, and tab completions. Without this, the composer feels broken for shell commands: no visual feedback, no completions, and the `!` prefix interferes with the parser.
+The CLI agent rich input composer (Ctrl-G) was designed for sending natural language prompts to CLI agents. However, CLI agents like Claude Code support a `!` prefix for running shell commands directly. When users type `!ls` in the composer, they expect the same shell input affordances they get elsewhere in Polaris Terminal — syntax highlighting, red error underlining for unknown commands, and tab completions. Without this, the composer feels broken for shell commands: no visual feedback, no completions, and the `!` prefix interferes with the parser.
 
 ## Goals
 

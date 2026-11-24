@@ -1,5 +1,5 @@
-use rook_core::telemetry::{TelemetryContextModel, TelemetryContextProvider};
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_core::telemetry::{TelemetryContextModel, TelemetryContextProvider};
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 
 use crate::auth::AuthStateProvider;
 

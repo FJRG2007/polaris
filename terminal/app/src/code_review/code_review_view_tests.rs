@@ -4,14 +4,14 @@ use std::sync::Arc;
 use ai::agent::action::InsertReviewComment;
 use chrono::Local;
 use lsp::LspManagerModel;
+use pterm_core::ui::appearance::Appearance;
+use pterm_editor::content::buffer::InitialBufferState;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use pterm_editor::render::model::LineCount;
+use ptermui::elements::{Empty, MouseStateHandle};
+use ptermui::platform::WindowStyle;
+use ptermui::{App, ViewHandle};
 use repo_metadata::repositories::DetectedRepositories;
-use rook_core::ui::appearance::Appearance;
-use rook_editor::content::buffer::InitialBufferState;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rook_editor::render::model::LineCount;
-use rookui::elements::{Empty, MouseStateHandle};
-use rookui::platform::WindowStyle;
-use rookui::{App, ViewHandle};
 
 use super::*;
 use crate::NotebookKeybindings;
@@ -48,12 +48,12 @@ use crate::workspaces::user_workspaces::UserWorkspaces;
 #[derive(Default)]
 struct TestView;
 
-impl rookui::Entity for TestView {
+impl ptermui::Entity for TestView {
     type Event = ();
 }
 
-impl rookui::View for TestView {
-    fn render(&self, _: &rookui::AppContext) -> Box<dyn rookui::Element> {
+impl ptermui::View for TestView {
+    fn render(&self, _: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         Empty::new().finish()
     }
 
@@ -62,7 +62,7 @@ impl rookui::View for TestView {
     }
 }
 
-impl rookui::TypedActionView for TestView {
+impl ptermui::TypedActionView for TestView {
     type Action = ();
 }
 
@@ -288,7 +288,7 @@ struct TestContext {
     repo_path: PathBuf,
     repo_location: LocalOrRemotePath,
     #[allow(dead_code)]
-    window_id: rookui::WindowId,
+    window_id: ptermui::WindowId,
     state: LoadedState,
     code_review_view: ViewHandle<CodeReviewView>,
 }
@@ -338,7 +338,7 @@ impl TestContext {
 /// Must be called within an App context.
 fn create_loaded_state_with_editors(
     app: &mut App,
-    window_id: rookui::WindowId,
+    window_id: ptermui::WindowId,
     file_editors: Vec<(String, ViewHandle<LocalCodeEditorView>)>,
 ) -> LoadedState {
     let file_states = file_editors

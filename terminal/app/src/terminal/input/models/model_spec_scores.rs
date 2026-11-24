@@ -1,12 +1,12 @@
 use pathfinder_color::ColorU;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, Expanded, Flex, MainAxisAlignment,
     MainAxisSize, ParentElement as _, Percentage, Radius, Rect, Stack, Text,
 };
-use rookui::prelude::{Align, CrossAxisAlignment};
-use rookui::text_layout::ClipConfig;
-use rookui::{AppContext, Element, SingletonEntity as _};
+use ptermui::prelude::{Align, CrossAxisAlignment};
+use ptermui::text_layout::ClipConfig;
+use ptermui::{AppContext, Element, SingletonEntity as _};
 
 use crate::ai::llms::LLMSpec;
 use crate::appearance::Appearance;
@@ -16,7 +16,7 @@ const CORNER_RADIUS: f32 = 4.0;
 const ROW_SPACING: f32 = 12.0;
 
 pub const MODEL_SPECS_TITLE: &str = "Model Specs";
-pub const MODEL_SPECS_DESCRIPTION: &str = "Rook's benchmarks for how well a model performs in our harness, the rate at which it consumes credits, and task speed.";
+pub const MODEL_SPECS_DESCRIPTION: &str = "Polaris Terminal's benchmarks for how well a model performs in our harness, the rate at which it consumes credits, and task speed.";
 
 pub const REASONING_LEVEL_TITLE: &str = "Reasoning level";
 pub const REASONING_LEVEL_DESCRIPTION: &str = "Increased reasoning levels consume more credits and have higher latency, but higher performance for complicated tasks.";

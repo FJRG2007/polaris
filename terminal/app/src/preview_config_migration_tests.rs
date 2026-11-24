@@ -13,8 +13,8 @@ fn is_symlink_to(link: &Path, expected_target: &Path) -> bool {
 #[test]
 fn creates_symlinks_for_top_level_entries() {
     let tmp = tempfile::tempdir().unwrap();
-    let old_dir = tmp.path().join(".rook");
-    let new_dir = tmp.path().join(".rook-preview");
+    let old_dir = tmp.path().join(".polaris/terminal");
+    let new_dir = tmp.path().join(".polaris-terminal-preview");
 
     fs::create_dir(&old_dir).unwrap();
     fs::write(old_dir.join("keybindings.yaml"), "bindings").unwrap();
@@ -42,8 +42,8 @@ fn creates_symlinks_for_top_level_entries() {
 #[test]
 fn skips_when_new_dir_already_exists() {
     let tmp = tempfile::tempdir().unwrap();
-    let old_dir = tmp.path().join(".rook");
-    let new_dir = tmp.path().join(".rook-preview");
+    let old_dir = tmp.path().join(".polaris/terminal");
+    let new_dir = tmp.path().join(".polaris-terminal-preview");
 
     fs::create_dir(&old_dir).unwrap();
     fs::write(old_dir.join("keybindings.yaml"), "bindings").unwrap();
@@ -58,8 +58,8 @@ fn skips_when_new_dir_already_exists() {
 #[test]
 fn skips_when_old_dir_does_not_exist() {
     let tmp = tempfile::tempdir().unwrap();
-    let old_dir = tmp.path().join(".rook");
-    let new_dir = tmp.path().join(".rook-preview");
+    let old_dir = tmp.path().join(".polaris/terminal");
+    let new_dir = tmp.path().join(".polaris-terminal-preview");
 
     // old_dir intentionally not created.
     migrate_config_dir_via_symlinks(&old_dir, &new_dir);
@@ -70,8 +70,8 @@ fn skips_when_old_dir_does_not_exist() {
 #[test]
 fn skips_ds_store_and_dot_underscore_files() {
     let tmp = tempfile::tempdir().unwrap();
-    let old_dir = tmp.path().join(".rook");
-    let new_dir = tmp.path().join(".rook-preview");
+    let old_dir = tmp.path().join(".polaris/terminal");
+    let new_dir = tmp.path().join(".polaris-terminal-preview");
 
     fs::create_dir(&old_dir).unwrap();
     fs::write(old_dir.join(".DS_Store"), "metadata").unwrap();
@@ -88,8 +88,8 @@ fn skips_ds_store_and_dot_underscore_files() {
 #[test]
 fn skips_excluded_files() {
     let tmp = tempfile::tempdir().unwrap();
-    let old_dir = tmp.path().join(".rook");
-    let new_dir = tmp.path().join(".rook-preview");
+    let old_dir = tmp.path().join(".polaris/terminal");
+    let new_dir = tmp.path().join(".polaris-terminal-preview");
 
     fs::create_dir(&old_dir).unwrap();
     fs::write(old_dir.join("settings.toml"), "[settings]").unwrap();
@@ -104,8 +104,8 @@ fn skips_excluded_files() {
 #[test]
 fn is_idempotent() {
     let tmp = tempfile::tempdir().unwrap();
-    let old_dir = tmp.path().join(".rook");
-    let new_dir = tmp.path().join(".rook-preview");
+    let old_dir = tmp.path().join(".polaris/terminal");
+    let new_dir = tmp.path().join(".polaris-terminal-preview");
 
     fs::create_dir(&old_dir).unwrap();
     fs::write(old_dir.join("keybindings.yaml"), "bindings").unwrap();

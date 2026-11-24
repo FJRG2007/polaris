@@ -4,9 +4,9 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 
+use ptermui::{App, EntityId};
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::watcher::DirectoryWatcher;
-use rookui::{App, EntityId};
 
 use super::PaneGroupRepositoryRoots;
 use crate::code::buffer_location::LocalOrRemotePath;
@@ -32,14 +32,14 @@ fn refresh_working_directories_collapses_subroots_to_nearest_repo_root() {
         fs::create_dir_all(&repo_a).expect("create repo/a");
         fs::create_dir_all(&repo_b).expect("create repo/b");
 
-        // Use dunce::canonicalize to match the behavior of rook_util::standardized_path::StandardizedPath and normalize_cwd,
+        // Use dunce::canonicalize to match the behavior of pterm_util::standardized_path::StandardizedPath and normalize_cwd,
         // which strip the Windows extended-length path prefix (\\?\) for consistent comparison.
         let canonical_repo_root = dunce::canonicalize(&repo_root).expect("canonical repo root");
 
         // Seed DetectedRepositories so get_root_for_path resolves to this repo.
         detected_repos_handle.update(&mut app, |repos, _ctx| {
             let canonical =
-                rook_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
                     canonical_repo_root.as_path(),
                 )
                 .expect("canonicalized path");
@@ -355,13 +355,13 @@ fn pane_group_repository_roots_remove_unknown_pane_group_is_noop() {
 /// seeds it as a detected repo root, and returns the canonical repo path along
 /// with a fresh `WorkingDirectoriesModel` handle.
 fn setup_repo(
-    app: &mut rookui::App,
-    detected_repos: &rookui::ModelHandle<DetectedRepositories>,
+    app: &mut ptermui::App,
+    detected_repos: &ptermui::ModelHandle<DetectedRepositories>,
 ) -> (
     tempfile::TempDir,
     PathBuf,
     PathBuf,
-    rookui::ModelHandle<WorkingDirectoriesModel>,
+    ptermui::ModelHandle<WorkingDirectoriesModel>,
 ) {
     app.add_singleton_model(DirectoryWatcher::new_for_testing);
 
@@ -371,7 +371,7 @@ fn setup_repo(
     let canonical_repo = dunce::canonicalize(&repo_path).expect("canonical repo");
 
     detected_repos.update(app, |repos, _ctx| {
-        let canonical = rook_util::standardized_path::StandardizedPath::from_local_canonicalized(
+        let canonical = pterm_util::standardized_path::StandardizedPath::from_local_canonicalized(
             canonical_repo.as_path(),
         )
         .expect("canonicalized path");

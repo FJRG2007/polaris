@@ -1,5 +1,5 @@
 use async_channel::Sender;
-pub use rook_terminal::shell::{shell_escape_single_quotes, shell_quote_arg};
+pub use pterm_terminal::shell::{shell_escape_single_quotes, shell_quote_arg};
 
 use crate::terminal::model::session::command_executor::{
     InBandCommand, InBandCommandCancelledEvent,

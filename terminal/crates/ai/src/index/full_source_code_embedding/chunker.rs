@@ -1,7 +1,7 @@
 use std::path::Path;
 
 #[cfg(not(target_family = "wasm"))]
-use rook_util::standardized_path::StandardizedPath;
+use pterm_util::standardized_path::StandardizedPath;
 use string_offset::ByteOffset;
 
 mod naive;

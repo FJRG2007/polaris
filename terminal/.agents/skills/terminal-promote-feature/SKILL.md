@@ -1,6 +1,6 @@
 ---
 name: terminal-promote-feature
-description: Promote a feature-flagged feature to Dogfood, Preview, or Stable in the Rook codebase. Use when a feature behind a FeatureFlag is ready to roll out to a broader audience, including wiring up the compile-time/runtime bridge and deferring flag cleanup safely.
+description: Promote a feature-flagged feature to Dogfood, Preview, or Stable in the Polaris Terminal codebase. Use when a feature behind a FeatureFlag is ready to roll out to a broader audience, including wiring up the compile-time/runtime bridge and deferring flag cleanup safely.
 ---
 
 # terminal-promote-feature
@@ -9,17 +9,17 @@ Guides the staged promotion of a gated `FeatureFlag` variant to Dogfood, Preview
 ## Overview
 
 Feature flags have two interacting layers:
-- **Runtime** (`rook_core/src/features.rs`): `DOGFOOD_FLAGS`, `PREVIEW_FLAGS`, `RELEASE_FLAGS` — enabled per-channel at startup.
+- **Runtime** (`pterm_core/src/features.rs`): `DOGFOOD_FLAGS`, `PREVIEW_FLAGS`, `RELEASE_FLAGS` — enabled per-channel at startup.
 - **Compile-time** (`app/Cargo.toml` + `app/src/lib.rs`): Cargo features in `[features]`. The `default = [...]` array enables a feature for all builds. `enabled_features()` in `app/src/lib.rs` bridges each Cargo feature to its `FeatureFlag` variant via `#[cfg(feature = "...")]`.
 
 **Do not remove the flag immediately after promoting to Stable.** Keep it for at least 1–2 release cycles so a rollback is a one-line PR (remove the entry from `default`). Use the `terminal-remove-feature-flag` skill for the cleanup step later.
 
 ## TUI note
-The per-channel arrays in `rook_core/src/features.rs` (`DOGFOOD_FLAGS`/`PREVIEW_FLAGS`/`RELEASE_FLAGS`) are shared and drive both the GUI desktop app (`app/`) and the headless TUI (`crates/rook_tui`) at runtime. The `app/Cargo.toml` `default` + `app/src/lib.rs` `enabled_features()` compile-time bridge is GUI-app-only. If a promoted feature should also reach the TUI, make sure it is enabled at runtime for the target channel (the shared arrays already do this) and, if the feature relies on a compile-time Cargo feature, that the TUI binary (`crates/rook_tui/Cargo.toml`) enables it too.
+The per-channel arrays in `pterm_core/src/features.rs` (`DOGFOOD_FLAGS`/`PREVIEW_FLAGS`/`RELEASE_FLAGS`) are shared and drive both the GUI desktop app (`app/`) and the headless TUI (`crates/pterm_tui`) at runtime. The `app/Cargo.toml` `default` + `app/src/lib.rs` `enabled_features()` compile-time bridge is GUI-app-only. If a promoted feature should also reach the TUI, make sure it is enabled at runtime for the target channel (the shared arrays already do this) and, if the feature relies on a compile-time Cargo feature, that the TUI binary (`crates/pterm_tui/Cargo.toml`) enables it too.
 
 ## Promote to Dogfood
 
-Add the flag to `DOGFOOD_FLAGS` in `rook_core/src/features.rs`:
+Add the flag to `DOGFOOD_FLAGS` in `pterm_core/src/features.rs`:
 
 ```rust
 pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
@@ -32,7 +32,7 @@ No other file changes needed.
 
 ## Promote to Preview
 
-1. Add to `PREVIEW_FLAGS` in `rook_core/src/features.rs`.
+1. Add to `PREVIEW_FLAGS` in `pterm_core/src/features.rs`.
 2. Remove from `DOGFOOD_FLAGS` if present — Preview flags are automatically included in Dogfood builds.
 
 ```rust
@@ -57,7 +57,7 @@ default = [
 ]
 ```
 
-Prefer this over adding to `RELEASE_FLAGS` (see comment at `rook_core/src/features.rs:787-790`). It compiles the feature into all builds and enables a one-line rollback.
+Prefer this over adding to `RELEASE_FLAGS` (see comment at `pterm_core/src/features.rs:787-790`). It compiles the feature into all builds and enables a one-line rollback.
 
 ### 2. `app/src/lib.rs` — add to `enabled_features()` bridge
 
@@ -70,7 +70,7 @@ FeatureFlag::YourFeature,
 
 Place it near logically related entries.
 
-### 3. `rook_core/src/features.rs` — remove from `PREVIEW_FLAGS` / `DOGFOOD_FLAGS`
+### 3. `pterm_core/src/features.rs` — remove from `PREVIEW_FLAGS` / `DOGFOOD_FLAGS`
 
 Remove the variant from whichever arrays it currently lives in:
 

@@ -73,47 +73,45 @@ pub use pane_restoration::*;
 use parking_lot::Mutex;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
-#[cfg(target_os = "macos")]
-pub use preview_config_migration::*;
-pub use remote_server::*;
-pub use rich_input_ctrl_enter::*;
-use rook::appearance::Appearance;
-use rook::features::FeatureFlag;
-use rook::integration_testing::assertions::{
+use polaris_terminal::appearance::Appearance;
+use polaris_terminal::features::FeatureFlag;
+use polaris_terminal::integration_testing::assertions::{
     assert_binding_display_string, go_offline, go_online, join_a_workspace,
 };
-use rook::integration_testing::block::{
+use polaris_terminal::integration_testing::block::{
     BlockPosition, LinePosition, assert_block_visible, assert_bottom_of_block_approx_at,
     assert_num_blocks_in_model,
 };
-use rook::integration_testing::clipboard::assert_clipboard_contains_string;
-use rook::integration_testing::command_palette::{
+use polaris_terminal::integration_testing::clipboard::assert_clipboard_contains_string;
+use polaris_terminal::integration_testing::command_palette::{
     TestStepsExt, close_command_palette, open_command_palette, open_command_palette_and_run_action,
 };
-use rook::integration_testing::context_chips::assert_working_dir_is_present;
-use rook::integration_testing::find::{Find, FindWithinBlockState};
-use rook::integration_testing::input::{
+use polaris_terminal::integration_testing::context_chips::assert_working_dir_is_present;
+use polaris_terminal::integration_testing::find::{Find, FindWithinBlockState};
+use polaris_terminal::integration_testing::input::{
     input_contains_string, input_is_empty, open_input_context_menu,
 };
-use rook::integration_testing::navigation_palette::{
+use polaris_terminal::integration_testing::navigation_palette::{
     RecentSession, check_recency, navigate_to_other_session_step, open_navigation_palette_step,
 };
-use rook::integration_testing::pane_group::assert_focused_pane_index;
-use rook::integration_testing::rook_drive::{
-    assert_is_left_panel_open, assert_rook_drive_is_closed, assert_rook_drive_is_open,
+use polaris_terminal::integration_testing::pane_group::assert_focused_pane_index;
+use polaris_terminal::integration_testing::pterm_drive::{
+    assert_is_left_panel_open, assert_pterm_drive_is_closed, assert_pterm_drive_is_open,
 };
-use rook::integration_testing::settings::{
+use polaris_terminal::integration_testing::settings::{
     assert_theme_chooser_contains, set_window_custom_size, toggle_setting,
 };
-use rook::integration_testing::step::{
+use polaris_terminal::integration_testing::step::{
     assert_no_pending_model_events, new_step_with_default_assertions,
     new_step_with_default_assertions_for_pane,
 };
-use rook::integration_testing::tab::{assert_pane_title, assert_tab_title, tab_title_step};
-use rook::integration_testing::terminal::util::{
+use polaris_terminal::integration_testing::tab::{
+    assert_pane_title, assert_tab_title, tab_title_step,
+};
+use polaris_terminal::integration_testing::terminal::util::{
     ExactLine, ExpectedExitStatus, current_shell_starter_and_version,
 };
-use rook::integration_testing::terminal::{
+use polaris_terminal::integration_testing::terminal::{
     assert_active_block_output, assert_active_block_output_for_single_terminal_in_tab,
     assert_active_block_received_precmd, assert_alt_grid_active, assert_alt_screen_output,
     assert_command_executed_for_single_terminal_in_tab, assert_context_menu_is_open,
@@ -132,56 +130,64 @@ use rook::integration_testing::terminal::{
     open_context_menu_for_selected_block, performance_test, run_alt_grid_program, run_completer,
     validate_git_branch, wait_until_bootstrapped_pane, wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::view_getters::{
+use polaris_terminal::integration_testing::view_getters::{
     pane_group_view, single_input_suggestions_view_for_tab, single_input_view_for_tab,
     single_terminal_pane_view_for_tab, single_terminal_view, single_terminal_view_for_tab,
     workspace_view,
 };
-use rook::integration_testing::window::{
+use polaris_terminal::integration_testing::window::{
     add_and_save_window, add_window, add_window_and_check_bounds, close_window,
     save_active_window_id,
 };
-use rook::integration_testing::workspace::assert_tab_count;
-use rook::integration_testing::{self, view_of_type};
-use rook::pane_group::AGENT_MODE_PANE_DEFAULT_MINIMUM_WIDTH;
-use rook::settings::{
+use polaris_terminal::integration_testing::workspace::assert_tab_count;
+use polaris_terminal::integration_testing::{self, view_of_type};
+use polaris_terminal::pane_group::AGENT_MODE_PANE_DEFAULT_MINIMUM_WIDTH;
+use polaris_terminal::settings::{
     CompletionsOpenWhileTyping, CtrlTabBehavior, INPUT_MODE, MonospaceFontSize, TabBehavior,
 };
-use rook::settings_view::keybindings::KeybindingsView;
-use rook::settings_view::{FeaturesPageAction, SettingsAction, SettingsSection, SettingsView};
-use rook::terminal::alt_screen_reporting::MouseReportingEnabled;
-use rook::terminal::available_shells::AvailableShells;
-use rook::terminal::block_list_viewport::{InputMode, ScrollLines, ScrollPosition};
-use rook::terminal::find::TerminalFindModel;
-use rook::terminal::input::{Input, InputSuggestionsMode};
-use rook::terminal::keys_settings::KeysSettings;
-use rook::terminal::local_tty::TerminalManager as LocalTtyTerminalManager;
-use rook::terminal::model::ansi::{Handler, InitShellValue};
-use rook::terminal::model::blocks::{BlockHeightItem, BlockHeightSummary, TotalIndex};
-use rook::terminal::model::grid::Dimensions;
-use rook::terminal::model::grid::grid_handler::TermMode;
-use rook::terminal::model::terminal_model::BlockIndex;
-use rook::terminal::session_settings::{HonorPS1, SessionSettings, StartupShellOverride};
-use rook::terminal::view::{
+use polaris_terminal::settings_view::keybindings::KeybindingsView;
+use polaris_terminal::settings_view::{
+    FeaturesPageAction, SettingsAction, SettingsSection, SettingsView,
+};
+use polaris_terminal::terminal::alt_screen_reporting::MouseReportingEnabled;
+use polaris_terminal::terminal::available_shells::AvailableShells;
+use polaris_terminal::terminal::block_list_viewport::{InputMode, ScrollLines, ScrollPosition};
+use polaris_terminal::terminal::find::TerminalFindModel;
+use polaris_terminal::terminal::input::{Input, InputSuggestionsMode};
+use polaris_terminal::terminal::keys_settings::KeysSettings;
+use polaris_terminal::terminal::local_tty::TerminalManager as LocalTtyTerminalManager;
+use polaris_terminal::terminal::model::ansi::{Handler, InitShellValue};
+use polaris_terminal::terminal::model::blocks::{BlockHeightItem, BlockHeightSummary, TotalIndex};
+use polaris_terminal::terminal::model::grid::Dimensions;
+use polaris_terminal::terminal::model::grid::grid_handler::TermMode;
+use polaris_terminal::terminal::model::terminal_model::BlockIndex;
+use polaris_terminal::terminal::session_settings::{
+    HonorPS1, SessionSettings, StartupShellOverride,
+};
+use polaris_terminal::terminal::view::{
     ALIAS_EXPANSION_BANNER_SEEN_KEY, BlockVisibilityMode, TerminalAction, TerminalViewState,
 };
-use rook::terminal::{TerminalView, shell};
-use rook::util::bindings::CustomAction;
-use rook::workflows::categories::CategoriesView;
-use rook::workspace::{
+use polaris_terminal::terminal::{TerminalView, shell};
+use polaris_terminal::util::bindings::CustomAction;
+use polaris_terminal::workflows::categories::CategoriesView;
+use polaris_terminal::workspace::{
     NEW_SESSION_MENU_BUTTON_POSITION_ID, NEW_TAB_BUTTON_POSITION_ID, Workspace, WorkspaceAction,
 };
-use rook::{AgentModeEntrypoint, cmd_or_ctrl_shift};
-use rookui_core::event::KeyState;
-use rookui_core::integration::{AssertionOutcome, StepData, TestStep};
-use rookui_core::keymap::{Keystroke, PerPlatformKeystroke, Trigger};
-use rookui_core::platform::keyboard::KeyCode;
-use rookui_core::platform::{OperatingSystem, TerminationMode};
-use rookui_core::units::Lines;
-use rookui_core::windowing::WindowManager;
-use rookui_core::{
+use polaris_terminal::{AgentModeEntrypoint, cmd_or_ctrl_shift};
+#[cfg(target_os = "macos")]
+pub use preview_config_migration::*;
+use ptermui_core::event::KeyState;
+use ptermui_core::integration::{AssertionOutcome, StepData, TestStep};
+use ptermui_core::keymap::{Keystroke, PerPlatformKeystroke, Trigger};
+use ptermui_core::platform::keyboard::KeyCode;
+use ptermui_core::platform::{OperatingSystem, TerminationMode};
+use ptermui_core::units::Lines;
+use ptermui_core::windowing::WindowManager;
+use ptermui_core::{
     AssetProvider, Event, SingletonEntity, UpdateView, ViewHandle, async_assert, async_assert_eq,
 };
+pub use remote_server::*;
+pub use rich_input_ctrl_enter::*;
 pub use rules::*;
 use rust_embed::RustEmbed;
 pub use secrets::*;
@@ -232,12 +238,15 @@ fn new_builder() -> Builder {
     Builder::new()
 }
 
-/// Adds a workflow file, containing two workflows, to the mocked out rook
+/// Adds a workflow file, containing two workflows, to the mocked out polaris-terminal
 /// config directory and verifies that the workflows appear in the workflow menu.
-pub fn test_add_workflows_to_rook_config() -> Builder {
+pub fn test_add_workflows_to_pterm_config() -> Builder {
     new_builder()
         .with_setup(move |utils| {
-            utils.set_env("ROOK_CONFIG_WATCHER_DELAY_MS", Some((10).to_string()));
+            utils.set_env(
+                "POLARIS_TERMINAL_CONFIG_WATCHER_DELAY_MS",
+                Some((10).to_string()),
+            );
 
             std::fs::create_dir_all(integration_testing::workflow::workflows_dir())
                 .expect("Should be able to create workflows dir");
@@ -251,7 +260,7 @@ pub fn test_add_workflows_to_rook_config() -> Builder {
 
                     workflows.read(app, |workflows, _| {
                         // Note that this can be a synchronous assertion because unlike the next test step,
-                        // we don't have concurrency with a RookConfig watcher thread
+                        // we don't have concurrency with a PtermConfig watcher thread
                         assert_eq!(
                             workflows.local_workflows().count(),
                             0,
@@ -288,10 +297,13 @@ pub fn test_add_workflows_to_rook_config() -> Builder {
         )
 }
 
-pub fn test_launch_rook_with_theme_in_rook_config() -> Builder {
+pub fn test_launch_pterm_with_theme_in_pterm_config() -> Builder {
     new_builder()
         .with_setup(move |utils| {
-            utils.set_env("ROOK_CONFIG_WATCHER_DELAY_MS", Some((10).to_string()));
+            utils.set_env(
+                "POLARIS_TERMINAL_CONFIG_WATCHER_DELAY_MS",
+                Some((10).to_string()),
+            );
 
             integration_testing::create_file_from_assets(
                 TEST_ONLY_ASSETS,
@@ -302,12 +314,15 @@ pub fn test_launch_rook_with_theme_in_rook_config() -> Builder {
         .with_step(assert_theme_chooser_contains("Test Theme", 1))
 }
 
-/// Adds a theme to the mocked out rook config directory and verifies that
+/// Adds a theme to the mocked out polaris-terminal config directory and verifies that
 /// the theme appears in the theme picker.
-pub fn test_add_theme_to_rook_config() -> Builder {
+pub fn test_add_theme_to_pterm_config() -> Builder {
     new_builder()
         .with_setup(move |utils| {
-            utils.set_env("ROOK_CONFIG_WATCHER_DELAY_MS", Some((10).to_string()));
+            utils.set_env(
+                "POLARIS_TERMINAL_CONFIG_WATCHER_DELAY_MS",
+                Some((10).to_string()),
+            );
 
             std::fs::create_dir_all(integration_testing::themes::themes_dir())
                 .expect("Should be able to create themes dir");
@@ -591,7 +606,7 @@ pub fn test_suggestions_menu_positioning() -> Builder {
                 ),
         )
         .with_step(
-            new_step_with_default_assertions("Open Rook Drive")
+            new_step_with_default_assertions("Open Polaris Terminal Drive")
                 .with_click_on_saved_position("workspace:toggle_left_panel")
                 .add_assertion(assert_is_left_panel_open()),
         )
@@ -2452,7 +2467,7 @@ precmd_functions+=(_p9k_precmd)
         )
         .with_step(wait_until_bootstrapped_single_pane_for_tab(1))
         .with_step(check_banner_open(1, true))
-        // If the user then switches back to the Rook prompt, we should close the banner.
+        // If the user then switches back to the Polaris Terminal prompt, we should close the banner.
         .with_step(
             new_step_with_default_assertions("Disable honor_ps1").with_action(|app, _, _| {
                 SessionSettings::handle(app).update(app, |session_settings, ctx| {
@@ -3352,7 +3367,7 @@ pub fn test_custom_ps1_expansion_bash() -> Builder {
         )
 }
 
-/// Default auto title. We test that Rook's auto title is used and verify that
+/// Default auto title. We test that Polaris Terminal's auto title is used and verify that
 /// DISABLE_AUTO_TITLE is set correctly.
 pub fn test_auto_title() -> Builder {
     new_builder()
@@ -3374,8 +3389,8 @@ pub fn test_auto_title() -> Builder {
         ))
 }
 
-/// Validate that disabling Rook's auto title feature will not mess with oh-my-zsh settings.
-pub fn test_rook_auto_title_disabled() -> Builder {
+/// Validate that disabling Polaris Terminal's auto title feature will not mess with oh-my-zsh settings.
+pub fn test_pterm_auto_title_disabled() -> Builder {
     new_builder()
         .set_should_run_test(|| {
             // Only run this one on bash and zsh
@@ -3390,20 +3405,20 @@ pub fn test_rook_auto_title_disabled() -> Builder {
             write_rc_files_for_test(
                 &dir,
                 r#"
-ROOK_DISABLE_AUTO_TITLE="1"
+POLARIS_TERMINAL_DISABLE_AUTO_TITLE="1"
 "#,
                 [ShellRcType::Bash],
             );
             write_rc_files_for_test(
                 &dir,
                 r#"
-ROOK_DISABLE_AUTO_TITLE="true"
+POLARIS_TERMINAL_DISABLE_AUTO_TITLE="true"
 "#,
                 [ShellRcType::Zsh],
             );
         })
         .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
-        // If Rook title is disabled, we don't set the DISABLE_AUTO_TITLE env variable
+        // If Polaris Terminal title is disabled, we don't set the DISABLE_AUTO_TITLE env variable
         .with_step(execute_command_for_single_terminal_in_tab(
             0,
             "echo $DISABLE_AUTO_TITLE".to_string(),
@@ -3415,9 +3430,9 @@ ROOK_DISABLE_AUTO_TITLE="true"
         ))
 }
 
-/// Checks that the tab title set by the user takes precedence over the Rook's default title and
+/// Checks that the tab title set by the user takes precedence over the Polaris Terminal's default title and
 /// doesn't require any additional setting from the user's POV. This is bash-specific test.
-pub fn test_rook_honors_user_title_bash() -> Builder {
+pub fn test_pterm_honors_user_title_bash() -> Builder {
     new_builder()
         .set_should_run_test(|| {
             // Only run this one on bash
@@ -3447,9 +3462,9 @@ PROMPT_COMMAND='echo -en "\033]0;TEST_TAB_TITLE\a"'
         ))
 }
 
-/// Checks that the tab title set by the user takes precedence over the Rook's default title and
+/// Checks that the tab title set by the user takes precedence over the Polaris Terminal's default title and
 /// doesn't require any additional setting from the user's POV. This is zsh-specific test.
-pub fn test_rook_honors_user_title_zsh() -> Builder {
+pub fn test_pterm_honors_user_title_zsh() -> Builder {
     new_builder()
         .set_should_run_test(|| {
             // Only run this one on bash
@@ -3481,7 +3496,7 @@ precmd_functions+=(set_title)
 /// Checks that an OSC 7 escape sequence (`\e]7;file://host/path\a`) emitted by
 /// the running command updates the block's current working directory mid-command
 /// without waiting for the next prompt. This lets external tools that change
-/// directory (for example `wt switch` from worktrunk) keep Rook's per-block CWD
+/// directory (for example `wt switch` from worktrunk) keep Polaris Terminal's per-block CWD
 /// in sync with the shell. See issue #9125.
 pub fn test_osc7_updates_current_working_directory() -> Builder {
     new_builder()
@@ -3527,7 +3542,7 @@ pub fn test_osc7_updates_current_working_directory() -> Builder {
                 // the `WorkingDirectory` prompt chip text (read by
                 // `display_working_directory`, which feeds the vertical-tab
                 // subtitle) must be refreshed after OSC 7. Without
-                // `refresh_rook_prompt` in the `BlockWorkingDirectoryUpdated`
+                // `refresh_pterm_prompt` in the `BlockWorkingDirectoryUpdated`
                 // path, the block's `pwd` updates but the chip text stays on
                 // the old CWD until the next `BlockCompleted`.
                 .add_assertion(|app, window_id| {
@@ -5527,7 +5542,7 @@ pub fn test_preferred_shell() -> Builder {
 pub fn test_git_prompt() -> Builder {
     let (starter, _) = current_shell_starter_and_version();
     // Note that we can't use the OUT_DIR for the temp directory
-    // here because that would put us in the rook repo. We need to
+    // here because that would put us in the polaris-terminal repo. We need to
     // be in a place in the filesystem that's not already a git repo.
     new_builder()
         // TODO(CORE-2734): Unknown failure for Powershell
@@ -5601,7 +5616,7 @@ pub fn test_terminal_announces_capabilities_to_shell() -> Builder {
     };
 
     // Note that we can't use the OUT_DIR for the temp directory
-    // here because that would put us in the rook repo. We need to
+    // here because that would put us in the polaris-terminal repo. We need to
     // be in a place in the filesystem that's not already a git repo.
     new_builder()
         .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
@@ -5615,7 +5630,7 @@ pub fn test_terminal_announces_capabilities_to_shell() -> Builder {
             0,
             format!("echo ${var_prefix}TERM_PROGRAM"),
             ExpectedExitStatus::Success,
-            "RookTerminal",
+            "PtermTerminal",
         ))
         .with_step(execute_command_for_single_terminal_in_tab(
             0,
@@ -5863,7 +5878,7 @@ function prompt {{
 }
 
 pub fn test_copy_block_command_and_output_honor_ps1_disabled() -> Builder {
-    let command = "echo ROOK_COPY_E2E_OUTPUT";
+    let command = "echo POLARIS_TERMINAL_COPY_E2E_OUTPUT";
     new_builder()
         .use_tmp_filesystem_for_test_root_directory()
         .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
@@ -5883,14 +5898,14 @@ pub fn test_copy_block_command_and_output_honor_ps1_disabled() -> Builder {
             new_step_with_default_assertions("Copy block copies command and output")
                 .with_click_on_saved_position("Copy")
                 .add_assertion(assert_clipboard_contains_string(format!(
-                    "{command}\nROOK_COPY_E2E_OUTPUT"
+                    "{command}\nPOLARIS_TERMINAL_COPY_E2E_OUTPUT"
                 ))),
         )
 }
 
 pub fn test_copy_block_command_and_output_honor_ps1_enabled() -> Builder {
     let prompt_text = "this is my custom prompt";
-    let command = "echo ROOK_PS1_COPY_E2E_OUTPUT";
+    let command = "echo POLARIS_TERMINAL_PS1_COPY_E2E_OUTPUT";
     new_builder()
         // TODO(CORE-2732): Flakey on linux
         .set_should_run_test(skip_if_powershell_core_2303)
@@ -5952,7 +5967,7 @@ function prompt {{
             new_step_with_default_assertions("Copy block includes PS1 prompt, command, and output")
                 .with_click_on_saved_position("Copy")
                 .add_assertion(assert_clipboard_contains_string(format!(
-                    "{prompt_text}{command}\nROOK_PS1_COPY_E2E_OUTPUT"
+                    "{prompt_text}{command}\nPOLARIS_TERMINAL_PS1_COPY_E2E_OUTPUT"
                 ))),
         )
 }
@@ -5978,7 +5993,7 @@ pub fn test_copy_prompt_from_input_honor_ps1_disabled() -> Builder {
                 .add_assertion(assert_clipboard_contains_string("~".into())),
         )
 }
-pub fn test_rook_prompt_unsets_zsh_rprompt() -> Builder {
+pub fn test_pterm_prompt_unsets_zsh_rprompt() -> Builder {
     new_builder()
         .set_should_run_test(|| {
             let (starter, _) = current_shell_starter_and_version();
@@ -6817,7 +6832,7 @@ pub fn test_agent_mode_pane_minimum_size() -> Builder {
 }
 
 // cheating a little bit in this test; it's hard to tell if the create folder dialog is open from
-// the workspace view, but we DO force rook drive open to show the dialog, so we can look for that
+// the workspace view, but we DO force polaris-terminal drive open to show the dialog, so we can look for that
 pub fn test_create_folder_from_command_palette() -> Builder {
     new_builder()
         .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
@@ -6825,20 +6840,20 @@ pub fn test_create_folder_from_command_palette() -> Builder {
         .with_step(go_offline())
         .with_steps(
             open_command_palette_and_run_action("Create a New Team Folder")
-                .add_assertion(assert_rook_drive_is_closed()),
+                .add_assertion(assert_pterm_drive_is_closed()),
         )
         .with_steps(
             open_command_palette_and_run_action("Create a New Personal Folder")
-                .add_assertion(assert_rook_drive_is_closed()),
+                .add_assertion(assert_pterm_drive_is_closed()),
         )
         .with_step(go_online())
         .with_steps(
             open_command_palette_and_run_action("Create a New Team Folder")
-                .add_assertion(assert_rook_drive_is_open()),
+                .add_assertion(assert_pterm_drive_is_open()),
         )
         .with_steps(
             open_command_palette_and_run_action("Create a New Personal Folder")
-                .add_assertion(assert_rook_drive_is_open()),
+                .add_assertion(assert_pterm_drive_is_open()),
         )
 }
 
@@ -6886,7 +6901,7 @@ pub fn test_context_chips_prompt_at_bootstrap() -> Builder {
             (String::from("SavedPrompt"), String::from("Default")),
         ]))
         .with_step(
-            new_step_with_default_assertions("Check Rook prompt")
+            new_step_with_default_assertions("Check Polaris Terminal prompt")
                 .add_assertion(assert_working_dir_is_present(0)),
         )
 }

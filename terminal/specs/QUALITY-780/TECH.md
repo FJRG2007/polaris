@@ -1,15 +1,15 @@
 # Client Awareness of `wait_for_events` Yields — Tech Spec
 ## Context
-See `specs/QUALITY-780/PRODUCT.md` for user-visible behavior. This spec maps the product invariants onto the existing conversation status, driver lifecycle, task sync, notifications, and orchestration pill bar code paths in the Rook client, and identifies the server-side change needed so the client can actually observe a `wait_for_events` yield. The server-side spec lives at `rook-server/specs/QUALITY-780/TECH.md`.
+See `specs/QUALITY-780/PRODUCT.md` for user-visible behavior. This spec maps the product invariants onto the existing conversation status, driver lifecycle, task sync, notifications, and orchestration pill bar code paths in the Polaris Terminal client, and identifies the server-side change needed so the client can actually observe a `wait_for_events` yield. The server-side spec lives at `polaris-terminal-server/specs/QUALITY-780/TECH.md`.
 
 ### Today's behavior in the bug
 The end-to-end path that produces the bug is:
 
-1. The model calls the server-handled `wait_for_events` tool. `HandleWaitForEvents` in `rook-server/logic/ai/multi_agent/runtime/ambient_agents.go` returns a `ServerToolCallResult::WaitForEventsResult` and side-effects `MarkActiveExecutionYieldedForWaitForEvents` and `ExtendTaskIdleTimeout`.
+1. The model calls the server-handled `wait_for_events` tool. `HandleWaitForEvents` in `polaris-terminal-server/logic/ai/multi_agent/runtime/ambient_agents.go` returns a `ServerToolCallResult::WaitForEventsResult` and side-effects `MarkActiveExecutionYieldedForWaitForEvents` and `ExtendTaskIdleTimeout`.
 2. The current model turn ends; the agent's response stream finishes successfully.
 3. `Message::ToolCallResult` messages (including the legacy server-handled `WaitForEventsResult`) are applied to the local conversation in the `response_event::Type::ClientActions(...)` arm of `BlocklistAIController::handle_response_stream_event` at `app/src/ai/blocklist/controller.rs:2614-2631`, which calls `history_model.apply_client_actions(...)`. The conversation's `ConversationStatus::Success` transition itself fires later when the `BlocklistAIActionEvent` subscriber at `app/src/ai/blocklist/controller.rs:495-518` observes that no follow-up action is queued and marks the response stream completed successfully. (The `AfterStreamFinished` arm at `controller.rs:2680+` is post-stream cleanup; it does not apply `ClientActions`.)
 4. `LocalAgentTaskSyncModel.handle_history_event` (`app/src/ai/blocklist/local_agent_task_sync_model.rs:119-151`) maps `Success` → `AgentTaskState::Succeeded` and fires `update_agent_task`.
-5. The server's `ApplyClientUpdates` path calls `shouldPreserveInProgressOnClientSuccess` from the `AgentTaskStateSucceeded` arm at `rook-server/logic/ai/ambient_agents/dispatcher.go:2013` (the predicate itself lives at `dispatcher.go:2110-2146`). It sees the `wait_for_events` marker and clears `in_progress_since` rather than transitioning the task to `SUCCEEDED`. The server **task state** remains preserved.
+5. The server's `ApplyClientUpdates` path calls `shouldPreserveInProgressOnClientSuccess` from the `AgentTaskStateSucceeded` arm at `polaris-terminal-server/logic/ai/ambient_agents/dispatcher.go:2013` (the predicate itself lives at `dispatcher.go:2110-2146`). It sees the `wait_for_events` marker and clears `in_progress_since` rather than transitioning the task to `SUCCEEDED`. The server **task state** remains preserved.
 6. But on the client, `AgentDriver`'s subscription to `BlocklistAIHistoryEvent::UpdatedConversationStatus` (`app/src/ai/agent_sdk/driver.rs:2600-2683`) sees `Success` and either calls `run_exit.end_run_now(...)` (no `idle_on_complete` configured) or schedules `run_exit.end_run_after(idle_timeout, ...)` (idle timeout configured). When that future resolves, the Oz CLI driver process exits via `ctx.terminate_app(...)`.
 7. `AgentNotificationsModel.handle_history_event_for_mailbox` (`app/src/ai/agent_management/agent_management_model.rs:304-389`) fires `NotificationCategory::Complete` ("Task completed.") on the same `Success` transition.
 8. `aggregated_orchestrator_status` (`app/src/ai/blocklist/orchestration_topology.rs:64-106`) returns `Success` when no node is `InProgress`/`Blocked`/`Error`/`Cancelled`, so the orchestration pill bar's orchestrator badge renders the green check via `render_avatar_with_status_overlay`.
@@ -55,7 +55,7 @@ The combined effect is the bug report: an Oz cloud agent worker exits seconds af
 - `app/src/ai/blocklist/controller.rs:495-518` — `BlocklistAIActionEvent` subscriber that drives the conversation's `Success` transition after no follow-up action is queued. Not the same code path as `AfterStreamFinished`.
 - `app/src/ai/blocklist/controller.rs:2680+` — `ResponseStreamEvent::AfterStreamFinished` handler; post-stream cleanup. Does **not** apply `ClientActions`.
 - `app/src/ai/blocklist/history_model.rs:1484` — `apply_client_actions` (the function that adds `AddMessagesToTask` actions to a conversation; the natural hook point for the new `WaitForEvents` tool-call detection).
-- Search for `WaitForEventsResult` in the client today: no hits. The legacy server tool-call result is opaque to clients (carried in the `Message::ToolCallResult::ServerResult { serialized_result: <opaque string> }` variant per `rook-proto-apis/apis/multi_agent/v1/task.proto:939-941`).
+- Search for `WaitForEventsResult` in the client today: no hits. The legacy server tool-call result is opaque to clients (carried in the `Message::ToolCallResult::ServerResult { serialized_result: <opaque string> }` variant per `polaris-terminal-proto-apis/apis/multi_agent/v1/task.proto:939-941`).
 
 ## Design options
 Three were considered. We are recommending Option B (first-class variant) because the existing exhaustive-matching conventions make it the safest change to land cleanly; the others are documented for context.
@@ -195,9 +195,9 @@ No client-side feature flag is required. The signal that activates the client-si
 
 Rollout sequencing (mirrors server TECH §"Backwards compatibility and coordinated rollout"):
 
-1. **`rook-proto-apis` release.** The proto additions ship first as a no-op (no producer or consumer yet). Wire-compatible: older deserializers ignore the new variants.
-2. **`rook` rev bump.** Cargo.toml in `rook` is bumped to the new release. The client adds the `WaitForEvents` detection and the `WaitingForEvents` flow. Without a server emitting the variant, the new code stays dormant.
-3. **`rook-server` rev bump + flag-on rollout.** The server side ships the new emission path behind a feature flag. Flipping the flag for a tenant/workspace activates the client-side fix for that scope.
+1. **`polaris-terminal-proto-apis` release.** The proto additions ship first as a no-op (no producer or consumer yet). Wire-compatible: older deserializers ignore the new variants.
+2. **`polaris-terminal` rev bump.** Cargo.toml in `polaris-terminal` is bumped to the new release. The client adds the `WaitForEvents` detection and the `WaitingForEvents` flow. Without a server emitting the variant, the new code stays dormant.
+3. **`polaris-terminal-server` rev bump + flag-on rollout.** The server side ships the new emission path behind a feature flag. Flipping the flag for a tenant/workspace activates the client-side fix for that scope.
 4. **Steady state.** Both repos ship the new path; the server-side flag is at 100%. The legacy server-handled `wait_for_events` path stays compiled for one release window and is then removed (server TECH §"Cleanup").
 
 #### Behavior during the rollout window
@@ -274,33 +274,33 @@ Map each `PRODUCT.md` invariant to a concrete test or manual verification. Numbe
   3. The CLI worker process stays alive until the child message arrives. (11)
   4. After the inbound message resumes the agent, the badge transitions back to active and the conversation eventually completes. (8), (30)
 - Repeat with the orchestrator in the foreground and minimized to confirm notification behavior matches.
-- Restart Rook while a conversation is `WaitingForEvents`. Confirm the conversation restores as `Success` (the yield does not survive restart, per §3), the orphan `wait_for_events` tool call is visible in the transcript, and re-engaging the conversation cleanly synthesizes the supersede. (10)
+- Restart Polaris Terminal while a conversation is `WaitingForEvents`. Confirm the conversation restores as `Success` (the yield does not survive restart, per §3), the orphan `wait_for_events` tool call is visible in the transcript, and re-engaging the conversation cleanly synthesizes the supersede. (10)
 - Submit a follow-up while in `WaitingForEvents`. Confirm the input accepts the message, the conversation transitions to `InProgress`, and no notification fires for the transition. (26), (18)
 
 ### Regression coverage
-- Audit every `match conversation.status()` site for an explicit `WaitingForEvents` arm. The exhaustive-matching rule from `ROOK.md` should already enforce this; the test suite confirms.
+- Audit every `match conversation.status()` site for an explicit `WaitingForEvents` arm. The exhaustive-matching rule from `POLARIS_TERMINAL.md` should already enforce this; the test suite confirms.
 - `cargo clippy --workspace --all-targets --all-features --tests -- -D warnings` and `./script/presubmit` pass.
 
 ## Orchestration
-This section is the canonical cross-spec orchestration plan for QUALITY-780. The same text appears in both `rook/specs/QUALITY-780/TECH.md` and `rook-server/specs/QUALITY-780/TECH.md` so each spec is self-contained for the agent implementing it.
+This section is the canonical cross-spec orchestration plan for QUALITY-780. The same text appears in both `polaris-terminal/specs/QUALITY-780/TECH.md` and `polaris-terminal-server/specs/QUALITY-780/TECH.md` so each spec is self-contained for the agent implementing it.
 
 ### Decision
-Implementation is fanned out across multiple AI agents working in parallel git worktrees. The work spans three repositories (`rook-proto-apis`, `rook-server`, `rook`), and the proto change is a hard prerequisite for everything else because both the server and client implementations consume the new generated bindings. After the proto release, the server-side and client-side core work can run in parallel; once the client core lands, the remaining client work fans out further. AI agents complete each subtask in minutes, not days — the bottleneck is wave ordering, not per-agent effort.
+Implementation is fanned out across multiple AI agents working in parallel git worktrees. The work spans three repositories (`polaris-terminal-proto-apis`, `polaris-terminal-server`, `polaris-terminal`), and the proto change is a hard prerequisite for everything else because both the server and client implementations consume the new generated bindings. After the proto release, the server-side and client-side core work can run in parallel; once the client core lands, the remaining client work fans out further. AI agents complete each subtask in minutes, not days — the bottleneck is wave ordering, not per-agent effort.
 
 ### Worktree layout
 Per the `~/src/QUALITY-780/` task-directory convention:
-- `~/src/QUALITY-780/rook-proto-apis` — proto agent.
-- `~/src/QUALITY-780/rook-server` — server-impl agent.
-- `~/src/QUALITY-780/rook` — client-core agent and final integrator.
-- `~/src/QUALITY-780/rook-driver`, `~/src/QUALITY-780/rook-sync-notif`, `~/src/QUALITY-780/rook-pill-bar`, `~/src/QUALITY-780/rook-detection` — additional `rook` worktrees for the four Wave 2 client fan-out agents.
+- `~/src/QUALITY-780/polaris-terminal-proto-apis` — proto agent.
+- `~/src/QUALITY-780/polaris-terminal-server` — server-impl agent.
+- `~/src/QUALITY-780/polaris-terminal` — client-core agent and final integrator.
+- `~/src/QUALITY-780/polaris-terminal-driver`, `~/src/QUALITY-780/polaris-terminal-sync-notif`, `~/src/QUALITY-780/polaris-terminal-pill-bar`, `~/src/QUALITY-780/polaris-terminal-detection` — additional `polaris-terminal` worktrees for the four Wave 2 client fan-out agents.
 
 All branches use the `matthew/` prefix.
 
 ### Dependencies and ordering (three waves)
-- **Wave 0 — Proto release (single agent, sequential).** `proto` adds the new variants to `rook-proto-apis/apis/multi_agent/v1/task.proto` and publishes a release tag. All downstream waves block on this completing.
+- **Wave 0 — Proto release (single agent, sequential).** `proto` adds the new variants to `polaris-terminal-proto-apis/apis/multi_agent/v1/task.proto` and publishes a release tag. All downstream waves block on this completing.
 - **Wave 1 — Core scaffold + server (two agents in parallel, after Wave 0).** `server-impl` and `client-core` run concurrently because they live in different repositories and share no compilation dependency. The client core is sized to be the minimum scaffold that downstream client agents need to compile against (status variant, exhaustive match arms in shared files, predicate split, persistence, restore-site).
 - **Wave 2 — Client fan-out (four agents in parallel, after Wave 1's client-core branch is pushed).** `client-driver`, `client-sync-notif`, `client-pill-bar`, `client-detection` branch from `client-core`'s branch and modify disjoint client subsystems. They do not touch the files client-core owns.
-- **Wave 3 — Integration (orchestrator).** Orchestrator merges all four Wave 2 branches into the client-core branch, runs `cargo fmt` / `cargo clippy` / `./script/presubmit`, and opens a single draft PR for `rook`. `server-impl` independently opens a draft PR for `rook-server`. The proto release tag from Wave 0 is referenced from both implementation PR descriptions.
+- **Wave 3 — Integration (orchestrator).** Orchestrator merges all four Wave 2 branches into the client-core branch, runs `cargo fmt` / `cargo clippy` / `./script/presubmit`, and opens a single draft PR for `polaris-terminal`. `server-impl` independently opens a draft PR for `polaris-terminal-server`. The proto release tag from Wave 0 is referenced from both implementation PR descriptions.
 
 ### Launch config
 Run-wide settings (execution mode, model, harness) are documented in the orchestration config attached to this plan. Defaults:
@@ -311,60 +311,60 @@ Run-wide settings (execution mode, model, harness) are documented in the orchest
 Each wave launches as its own `run_agents` batch. Do not pre-launch downstream waves — wait for each wave's lifecycle events before fanning out the next.
 
 ### Child agents
-- **proto — `rook-proto-apis` proto additions (Wave 0).**
-  - Worktree: `~/src/QUALITY-780/rook-proto-apis`. Branch: `matthew/QUALITY-780-proto-additions`.
+- **proto — `polaris-terminal-proto-apis` proto additions (Wave 0).**
+  - Worktree: `~/src/QUALITY-780/polaris-terminal-proto-apis`. Branch: `matthew/QUALITY-780-proto-additions`.
   - Owns: the proto additions in `apis/multi_agent/v1/task.proto` per server TECH §0.
   - Output: pushes branch, opens draft PR, publishes a release tag/version. Reports the released version string + git ref to the orchestrator.
-- **server-impl — `rook-server` emission path + flag (Wave 1).**
-  - Worktree: `~/src/QUALITY-780/rook-server`. Branch: `matthew/QUALITY-780-server`.
+- **server-impl — `polaris-terminal-server` emission path + flag (Wave 1).**
+  - Worktree: `~/src/QUALITY-780/polaris-terminal-server`. Branch: `matthew/QUALITY-780-server`.
   - Owns: server TECH §0–§1 implementation: `WaitForEventsToolCall::ProduceActions`, `isWaitForEventsAction`, refactor of `HandleWaitForEvents` → `recordWaitForEventsYield`, finalizer hook in `RunPrimaryAgent`, gating of the `ExecuteServerHandledToolCall` arm, the new `WaitForEventsClientToolEnabled` feature flag, and the unit/integration tests in server TECH §"Testing and validation".
   - Validation: `go fmt ./...`, `go vet ./...`, `./script/presubmit` before opening the PR.
   - PR: draft, using `.github/pull_request_template.md`.
-- **client-core — `rook` status variant + predicates + persistence (Wave 1).**
-  - Worktree: `~/src/QUALITY-780/rook`. Branch: `matthew/QUALITY-780-client-core`.
+- **client-core — `polaris-terminal` status variant + predicates + persistence (Wave 1).**
+  - Worktree: `~/src/QUALITY-780/polaris-terminal`. Branch: `matthew/QUALITY-780-client-core`.
   - Owns: §1 (`ConversationStatus::WaitingForEvents` variant + all match arms in `conversation.rs` `Display` / `render_icon` / `status_icon_and_color`); §2 (`is_done` stays as-is, with the new variant correctly returning `false`); §3 (persistence field on `AgentConversationData` + restore-site check in `new_restored` at `conversation.rs:542`). For files that Wave 2 agents own (driver, sync/notif, pill bar, detection), client-core leaves their match arms with conservative `WaitingForEvents` placeholders (e.g. treat like `InProgress` for the clear-stale notification path, like `Blocked` for the not-currently-streaming question) so the tree compiles and existing tests pass. Wave 2 agents replace the placeholders with their final implementations.
   - Validation: `cargo fmt`, `cargo clippy --workspace --all-targets --all-features --tests -- -D warnings`, `./script/presubmit`.
   - Hand-off: pushes the branch and reports the branch name so Wave 2 agents can rebase from a known-good commit.
-- **client-driver — `rook` driver lifecycle (Wave 2).**
-  - Worktree: `~/src/QUALITY-780/rook-driver`. Branch: `matthew/QUALITY-780-client-driver` (off `matthew/QUALITY-780-client-core`).
+- **client-driver — `polaris-terminal` driver lifecycle (Wave 2).**
+  - Worktree: `~/src/QUALITY-780/polaris-terminal-driver`. Branch: `matthew/QUALITY-780-client-driver` (off `matthew/QUALITY-780-client-core`).
   - Owns: §4 (`app/src/ai/agent_sdk/driver.rs` — `IdleTimeoutSender` reuse pattern, `execute_run`'s `UpdatedConversationStatus` handler, `subscribe_to_cli_agent_session_events` no-op verification, watchdog emission of `WaitForEventsResult`).
-- **client-sync-notif — `rook` task sync + notifications (Wave 2).**
-  - Worktree: `~/src/QUALITY-780/rook-sync-notif`. Branch: `matthew/QUALITY-780-client-sync-notif` (off `matthew/QUALITY-780-client-core`).
+- **client-sync-notif — `polaris-terminal` task sync + notifications (Wave 2).**
+  - Worktree: `~/src/QUALITY-780/polaris-terminal-sync-notif`. Branch: `matthew/QUALITY-780-client-sync-notif` (off `matthew/QUALITY-780-client-core`).
   - Owns: §5 (`local_agent_task_sync_model.rs` — `map_conversation_status`) and §6 (`agent_management_model.rs` — `should_trigger_notification` exhaustive rewrite, `handle_history_event_for_mailbox` `WaitingForEvents` arm).
-- **client-pill-bar — `rook` orchestration aggregation + pill bar (Wave 2).**
-  - Worktree: `~/src/QUALITY-780/rook-pill-bar`. Branch: `matthew/QUALITY-780-client-pill-bar` (off `matthew/QUALITY-780-client-core`).
+- **client-pill-bar — `polaris-terminal` orchestration aggregation + pill bar (Wave 2).**
+  - Worktree: `~/src/QUALITY-780/polaris-terminal-pill-bar`. Branch: `matthew/QUALITY-780-client-pill-bar` (off `matthew/QUALITY-780-client-core`).
   - Owns: §7 (`orchestration_topology.rs` — `aggregated_orchestrator_status` precedence + `any_waiting` accumulator + doc-comment, `orchestration_pill_bar.rs` — `pill_status_sort_key` + sort-bucket comment).
-- **client-detection — `rook` tool-call detection + ordering rule (Wave 2).**
-  - Worktree: `~/src/QUALITY-780/rook-detection`. Branch: `matthew/QUALITY-780-client-detection` (off `matthew/QUALITY-780-client-core`).
+- **client-detection — `polaris-terminal` tool-call detection + ordering rule (Wave 2).**
+  - Worktree: `~/src/QUALITY-780/polaris-terminal-detection`. Branch: `matthew/QUALITY-780-client-detection` (off `matthew/QUALITY-780-client-core`).
   - Originally owned the inbound-resume detect/clear path in `history_model.rs`. After the simplification in §8.5, no detect/clear helpers exist; the resume is driven entirely by the natural status flip in `send_request_input`. This agent's remaining responsibility is the client-side rollout notes in §9 and any `controller.rs` ordering guards required to keep the response-stream `Success` transition from clobbering an active wait.
 
 ### Merge strategy
 - Each Wave 2 client agent reports its branch name and a brief summary of changed files. Each agent runs its own `cargo fmt` / `cargo clippy` / `./script/presubmit` before reporting.
-- Orchestrator integrates Wave 2 into client-core in `~/src/QUALITY-780/rook`:
+- Orchestrator integrates Wave 2 into client-core in `~/src/QUALITY-780/polaris-terminal`:
   1. Check out `matthew/QUALITY-780-client-core`.
   2. Merge each Wave 2 branch in sequence (driver → sync-notif → pill-bar → detection). Conflicts should be limited to client-core's placeholder arms in fan-out-owned files; each Wave 2 agent replaces only its own placeholders, so per-file conflicts are localized.
   3. Re-run `cargo fmt`, `cargo clippy --workspace --all-targets --all-features --tests -- -D warnings`, `./script/presubmit` on the integrated branch.
-  4. Push `matthew/QUALITY-780-client-core` and open a single draft PR for `rook`.
-- `server-impl` opens its own draft PR for `rook-server` directly from its branch.
-- Final state: three branches across three repos, three draft PRs (`rook-proto-apis`, `rook-server`, `rook`). The two implementation PRs link to the proto release.
+  4. Push `matthew/QUALITY-780-client-core` and open a single draft PR for `polaris-terminal`.
+- `server-impl` opens its own draft PR for `polaris-terminal-server` directly from its branch.
+- Final state: three branches across three repos, three draft PRs (`polaris-terminal-proto-apis`, `polaris-terminal-server`, `polaris-terminal`). The two implementation PRs link to the proto release.
 
 ### Diagram
 ```mermaid
 flowchart LR
-    Plan([Plan + orchestration config approved]) --> Proto["Wave 0:<br/>proto — rook-proto-apis<br/>add variants + cut release"]
-    Proto --> Server["Wave 1:<br/>server-impl — rook-server<br/>emission + flag + tests"]
-    Proto --> ClientCore["Wave 1:<br/>client-core — rook<br/>status variant + predicates + persistence"]
+    Plan([Plan + orchestration config approved]) --> Proto["Wave 0:<br/>proto — polaris-terminal-proto-apis<br/>add variants + cut release"]
+    Proto --> Server["Wave 1:<br/>server-impl — polaris-terminal-server<br/>emission + flag + tests"]
+    Proto --> ClientCore["Wave 1:<br/>client-core — polaris-terminal<br/>status variant + predicates + persistence"]
     ClientCore --> Driver["Wave 2:<br/>client-driver"]
     ClientCore --> SyncNotif["Wave 2:<br/>client-sync-notif"]
     ClientCore --> PillBar["Wave 2:<br/>client-pill-bar"]
     ClientCore --> Detection["Wave 2:<br/>client-detection"]
-    Server --> ServerPR([rook-server draft PR])
+    Server --> ServerPR([polaris-terminal-server draft PR])
     Driver --> Integrate["Wave 3:<br/>Orchestrator integrates<br/>+ presubmit"]
     SyncNotif --> Integrate
     PillBar --> Integrate
     Detection --> Integrate
-    Integrate --> ClientPR([rook draft PR])
-    Proto --> ProtoPR([rook-proto-apis draft PR])
+    Integrate --> ClientPR([polaris-terminal draft PR])
+    Proto --> ProtoPR([polaris-terminal-proto-apis draft PR])
 ```
 
 ## Risks and mitigations
@@ -373,7 +373,7 @@ flowchart LR
 - **Risk: Orphaned `WaitForEvents` tool-call message in transcript history.** When the conversation transitions to `Cancelled` via user cancel, the unresolved tool call stays in transcript history — pending tool calls are not retroactively cancelled (per PRODUCT.md (29)). The client-side watchdog path does *not* orphan the call: the watchdog emits a `WaitForEventsResult` that closes it before the agent decides what to do next. The only remaining orphan case is the worker-side safety-net idle-shutdown (server TECH §1.1) firing because the client is offline; that path transitions the task to `CANCELLED` without a result message. Mitigation: this is intentional and harmless. Terminal conversations are read-only, so an orphan tool call is just historical metadata and does not affect any live behavior.
 - **Risk: Visual badge for `WaitingForEvents` collides with `Blocked`, `InProgress`, or `Success`.** Mitigation: §1 enumerates the existing color/icon assignments. Until design lands a dedicated visual the placeholder reuses the `InProgress` icon and color so the badge never collides with `Success` / `Blocked`.
 - **Risk: Client watchdog races the worker idle-shutdown.** If the stamped `idle_timeout_seconds` matches the worker's `VMIdleTimeoutMinutes` exactly, the worker can shut down before the client watchdog has time to fire and send the follow-up. Mitigation: the client subtracts `CLIENT_WATCHDOG_SAFETY_MARGIN` (and floors at `HARD_FLOOR`) before scheduling (§4.4). A corresponding server-side margin is tracked as a follow-up so the stamped value the client observes is already below the worker ceiling.
-- **Risk: Coordinated rollout regression.** A misordered release sequence (e.g. client builds without the new proto bindings) could break deserialization. Mitigation: ship `rook-proto-apis` first as a no-op; bump revs in `rook` and `rook-server` only after. Server TECH §"Coordinated rollout" tracks the sequence end-to-end.
+- **Risk: Coordinated rollout regression.** A misordered release sequence (e.g. client builds without the new proto bindings) could break deserialization. Mitigation: ship `polaris-terminal-proto-apis` first as a no-op; bump revs in `polaris-terminal` and `polaris-terminal-server` only after. Server TECH §"Coordinated rollout" tracks the sequence end-to-end.
 
 ## Follow-ups
 - Once the server-side feature flag is at 100% and the legacy `ExecuteServerHandledToolCall` arm is removed (server TECH §"Cleanup"), audit the client for any remaining references to the legacy server-handled `wait_for_events` shape and drop them.

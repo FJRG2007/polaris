@@ -25,11 +25,11 @@
 # Once the stapling is done, the app can be shared.
 #
 # Three passwords are read from GCP Secret Manager (or from env if --read-passwords-from-env is set) if you are codesigning.
-# 1) ROOK_NOTARIZATION_PASSWORD:  This is an "app-specific password" that
+# 1) POLARIS_TERMINAL_NOTARIZATION_PASSWORD:  This is an "app-specific password" that
 #    is tied to the zach@rook.dev account.  See https://support.apple.com/en-us/HT204397
-# 2) ROOK_DEVELOPER_ID_CERT_PASSWORD: This is a password tied to the private key
+# 2) POLARIS_TERMINAL_DEVELOPER_ID_CERT_PASSWORD: This is a password tied to the private key
 #    of our cert - it is needed to use the cert to sign our binary.
-# 3) ROOK_CODESIGN_KEYCHAIN_PASSWORD: This is an arbitrary password only used
+# 3) POLARIS_TERMINAL_CODESIGN_KEYCHAIN_PASSWORD: This is an arbitrary password only used
 #    in the lifetime of this app for creating the keychain used to sign.  Can
 #    be anything.
 #
@@ -70,7 +70,7 @@ cleanup_dmg_files() {
         find "$target_dir" -name "rw.*.dmg" -type f -delete
     fi
     # Also check if any volumes are mounted and unmount them
-    hdiutil info | grep "/Volumes/Rook.*" | awk '{print $1}' | while read -r disk; do
+    hdiutil info | grep "/Volumes/Polaris Terminal.*" | awk '{print $1}' | while read -r disk; do
         echo "Unmounting disk image: $disk"
         hdiutil detach "$disk" -force || true
     done
@@ -124,8 +124,8 @@ function codesign_with_retry() {
 function notarize_artifact() {
   local artifact="$1"
   local auth_args=(
-    --apple-id "$ROOK_NOTARIZATION_APPLE_ID"
-    --password "$ROOK_NOTARIZATION_PASSWORD"
+    --apple-id "$POLARIS_TERMINAL_NOTARIZATION_APPLE_ID"
+    --password "$POLARIS_TERMINAL_NOTARIZATION_PASSWORD"
     --team-id "$APPLE_TEAM_ID"
   )
 
@@ -251,7 +251,7 @@ while (( "$#" )); do
       SELFSIGN=false
       shift
       ;;
-    # Sign with a local Apple Development cert instead of the official Rook cert.
+    # Sign with a local Apple Development cert instead of the official Polaris Terminal cert.
     # Useful for local debug builds when you don't have access to the company signing key.
     # Falls back to ad-hoc signing if no Apple Development cert is found.
     --selfsign)
@@ -338,8 +338,8 @@ while (( "$#" )); do
       ;;
     --artifact)
       if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
-        if [[ "$2" != "app" && "$2" != "cli" && "$2" != "rookctrl" && "$2" != "tui" ]]; then
-          echo "Error: --artifact must be 'app', 'cli', 'rookctrl', or 'tui', got '$2'" >&2
+        if [[ "$2" != "app" && "$2" != "cli" && "$2" != "ptermctrl" && "$2" != "tui" ]]; then
+          echo "Error: --artifact must be 'app', 'cli', 'ptermctrl', or 'tui', got '$2'" >&2
           exit 1
         fi
         ARTIFACT="$2"
@@ -367,7 +367,7 @@ elif [[ $RELEASE_CHANNEL = "local" || $RELEASE_CHANNEL = "dev" ]]; then
   # a normal release build (e.g. in stable).
   if [[ "$ARTIFACT" == "tui" ]]; then
     CARGO_PROFILE="release-tui-debug-assertions"
-  elif [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "rookctrl" ]]; then
+  elif [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "ptermctrl" ]]; then
     CARGO_PROFILE="release-cli-debug_assertions"
   else
     CARGO_PROFILE="release-lto-debug_assertions"
@@ -375,7 +375,7 @@ elif [[ $RELEASE_CHANNEL = "local" || $RELEASE_CHANNEL = "dev" ]]; then
 else
   if [[ "$ARTIFACT" == "tui" ]]; then
     CARGO_PROFILE="release-tui"
-  elif [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "rookctrl" ]]; then
+  elif [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "ptermctrl" ]]; then
     CARGO_PROFILE="release-cli"
   else
     CARGO_PROFILE="release-lto"
@@ -388,57 +388,57 @@ if [[ "$CARGO_PROFILE" == "dev" ]]; then
 fi
 
 if [[ $RELEASE_CHANNEL = "local" ]]; then
-    ROOK_BIN="rook"
-    BUNDLE_ID="dev.rook.Rook-Local"
-    ROOK_APP_NAME="RookLocal"
-    ROOK_SCHEME_NAME="rooklocal"
+    POLARIS_TERMINAL_BIN="polaris-terminal"
+    BUNDLE_ID="dev.polaris.PolarisTerminal-Local"
+    POLARIS_TERMINAL_APP_NAME="PolarisTerminalLocal"
+    POLARIS_TERMINAL_SCHEME_NAME="polaris-terminal-local"
     FEATURES="$FEATURES,agent_mode_debug"
     # For local builds, use different versions of our bundled frameworks (e.g.:
     # Sentry).  This needs to be exported so it can be referenced by
     # app/build.rs later, while running `cargo bundle`.
     export FRAMEWORK_OVERRIDE="dev"
 elif [[ $RELEASE_CHANNEL = "dev" ]]; then
-    ROOK_BIN="dev"
-    BUNDLE_ID="dev.rook.Rook-Dev"
-    ROOK_APP_NAME="RookDev"
-    ROOK_SCHEME_NAME="rookdev"
+    POLARIS_TERMINAL_BIN="dev"
+    BUNDLE_ID="dev.polaris.PolarisTerminal-Dev"
+    POLARIS_TERMINAL_APP_NAME="PolarisTerminalDev"
+    POLARIS_TERMINAL_SCHEME_NAME="polaris-terminal-dev"
     FEATURES="$FEATURES,agent_mode_debug"
     # Enable heap usage tracking & profiling using jemalloc through pprof.
     FEATURES="$FEATURES,jemalloc_pprof,heap_usage_tracking"
-    # Enable the Rook Control CLI wrapper for local scripting/automation.
-    FEATURES="$FEATURES,rook_control_cli"
+    # Enable the Polaris Terminal Control CLI wrapper for local scripting/automation.
+    FEATURES="$FEATURES,pterm_control_cli"
     # For dev builds, use different versions of our bundled frameworks (e.g.:
     # Sentry).  This needs to be exported so it can be referenced by
     # app/build.rs later, while running `cargo bundle`.
     export FRAMEWORK_OVERRIDE="dev"
     export HANDLE_MARKDOWN=1
 elif [[ $RELEASE_CHANNEL = "preview" ]]; then
-    ROOK_BIN="preview"
-    BUNDLE_ID="dev.rook.Rook-Preview"
-    ROOK_APP_NAME="RookPreview"
-    ROOK_SCHEME_NAME="rookpreview"
+    POLARIS_TERMINAL_BIN="preview"
+    BUNDLE_ID="dev.polaris.PolarisTerminal-Preview"
+    POLARIS_TERMINAL_APP_NAME="PolarisTerminalPreview"
+    POLARIS_TERMINAL_SCHEME_NAME="polaris-terminal-preview"
     FEATURES="$FEATURES,preview_channel"
     # Enable heap usage tracking & profiling using jemalloc through pprof.
     FEATURES="$FEATURES,jemalloc_pprof,heap_usage_tracking"
 elif [[ $RELEASE_CHANNEL = "stable" ]]; then
-    ROOK_BIN="stable"
-    BUNDLE_ID="dev.rook.Rook-Stable"
-    ROOK_APP_NAME="Rook"
-    ROOK_SCHEME_NAME="rook"
+    POLARIS_TERMINAL_BIN="stable"
+    BUNDLE_ID="dev.polaris.PolarisTerminal-Stable"
+    POLARIS_TERMINAL_APP_NAME="Polaris Terminal"
+    POLARIS_TERMINAL_SCHEME_NAME="polaris-terminal"
     # Enable heap usage tracking & profiling using jemalloc through pprof.
     FEATURES="$FEATURES,jemalloc_pprof,heap_usage_tracking"
 elif [[ $RELEASE_CHANNEL = "oss" ]]; then
-    ROOK_BIN="rook-oss"
-    BUNDLE_ID="dev.rook.RookOss"
-    ROOK_APP_NAME="RookOss"
-    ROOK_SCHEME_NAME="rookoss"
+    POLARIS_TERMINAL_BIN="polaris-terminal"
+    BUNDLE_ID="dev.polaris.PolarisTerminal"
+    POLARIS_TERMINAL_APP_NAME="PolarisTerminal"
+    POLARIS_TERMINAL_SCHEME_NAME="polaris-terminal"
     # The OSS channel does not ship Sentry, so drop the cocoa_sentry feature
     # (which would otherwise pull in the Sentry framework dependency).
     FEATURES="release_bundle,extern_plist"
 fi
 
 OUT_DIR="target/$TARGET_PROFILE_DIR/bundle/osx"
-DOCK_TILE_PLUGIN_DIR="target/$TARGET_PROFILE_DIR/RookDockTilePlugin.docktileplugin"
+DOCK_TILE_PLUGIN_DIR="target/$TARGET_PROFILE_DIR/PtermDockTilePlugin.docktileplugin"
 
 # Handle specific architecture targeting
 if [[ -n "$TARGET_ARCH" ]]; then
@@ -493,27 +493,27 @@ else
 fi
 
 # Set artifact-specific configuration.
-if [[ "$ARTIFACT" == cli || "$ARTIFACT" == rookctrl ]]; then
+if [[ "$ARTIFACT" == cli || "$ARTIFACT" == ptermctrl ]]; then
   UNIVERSAL_BINARY=false
   OPEN_AFTER_BUNDLE=false
   FEATURES="$FEATURES,standalone"
 elif [[ "$ARTIFACT" == tui ]]; then
-  # The TUI is a separate console crate (`rook_tui`) with its own per-channel
+  # The TUI is a separate console crate (`pterm_tui`) with its own per-channel
   # bins and a minimal feature set, so it does NOT reuse the app's accumulated
-  # FEATURES. It is inherently headless (via `rook`'s `tui` feature). It needs
+  # FEATURES. It is inherently headless (via `polaris-terminal`'s `tui` feature). It needs
   # `release_bundle` to embed the channel config, plus `standalone` so
   # `bundled_resources_dir()` resolves the sibling `resources/` dir next to the
   # binary (the TUI is not shipped inside a `.app` bundle).
   UNIVERSAL_BINARY=false
   OPEN_AFTER_BUNDLE=false
   case "$RELEASE_CHANNEL" in
-    local) ROOK_BIN="rook-tui" ;;
-    oss) ROOK_BIN="rook-tui-oss" ;;
-    *) ROOK_BIN="rook-tui-$RELEASE_CHANNEL" ;;
+    local) POLARIS_TERMINAL_BIN="polaris-terminal-tui" ;;
+    oss) POLARIS_TERMINAL_BIN="polaris-terminal-tui-oss" ;;
+    *) POLARIS_TERMINAL_BIN="polaris-terminal-tui-$RELEASE_CHANNEL" ;;
   esac
-  ROOK_TUI_FEATURES="release_bundle,standalone,voice_input"
+  POLARIS_TERMINAL_TUI_FEATURES="release_bundle,standalone,voice_input"
   if [[ "$RELEASE_CHANNEL" != "oss" ]]; then
-    ROOK_TUI_FEATURES="$ROOK_TUI_FEATURES,crash_reporting"
+    POLARIS_TERMINAL_TUI_FEATURES="$POLARIS_TERMINAL_TUI_FEATURES,crash_reporting"
   fi
 elif [[ "$ARTIFACT" == app ]]; then
   # All channels ship the v3 classifier and v2 heuristic.
@@ -523,7 +523,7 @@ fi
 # A universal binary always has a native slice, so it is unaffected by the
 # host/target mismatch below. This must run after the artifact-specific
 # configuration above, since that's what gives UNIVERSAL_BINARY its final
-# value (e.g. cli/rookctrl/tui always force it to false).
+# value (e.g. cli/ptermctrl/tui always force it to false).
 CAN_EXECUTE_DEFAULT_TARGET=true
 if [[ "$UNIVERSAL_BINARY" != true && "$HOST_ARCH" == "x86_64" && "$DEFAULT_TARGET" == "$ARM_TARGET" ]]; then
   CAN_EXECUTE_DEFAULT_TARGET=false
@@ -539,27 +539,27 @@ fi
 # using the same feature flags and profile that we would be using in production.
 if [[ "$CHECK_ONLY" == "true" ]]; then
   if [[ "$ARTIFACT" == "tui" ]]; then
-    cargo check -p rook_tui --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --target "$DEFAULT_TARGET" --features "$ROOK_TUI_FEATURES"
+    cargo check -p pterm_tui --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --target "$DEFAULT_TARGET" --features "$POLARIS_TERMINAL_TUI_FEATURES"
   else
-    cargo check --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --target "$DEFAULT_TARGET" --features "$FEATURES"
-    if [[ $UNIVERSAL_BINARY = true && "$ARTIFACT" != "cli" && "$ARTIFACT" != "rookctrl" ]]; then
-      cargo check --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --target "$ADDITIONAL_TARGET" --features "$FEATURES"
+    cargo check --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --target "$DEFAULT_TARGET" --features "$FEATURES"
+    if [[ $UNIVERSAL_BINARY = true && "$ARTIFACT" != "cli" && "$ARTIFACT" != "ptermctrl" ]]; then
+      cargo check --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --target "$ADDITIONAL_TARGET" --features "$FEATURES"
     fi
   fi
   exit 0
 fi
 
-DMG_DIR="$BUNDLE_DIR/dmg/$ROOK_BIN"
-DMG_NAME="$ROOK_APP_NAME.dmg"
+DMG_DIR="$BUNDLE_DIR/dmg/$POLARIS_TERMINAL_BIN"
+DMG_NAME="$POLARIS_TERMINAL_APP_NAME.dmg"
 if [[ -z "$FINAL_DMG_NAME" && -n "$DMG_NAME_SUFFIX" ]]; then
-  FINAL_DMG_NAME="$ROOK_APP_NAME-$DMG_NAME_SUFFIX.dmg"
+  FINAL_DMG_NAME="$POLARIS_TERMINAL_APP_NAME-$DMG_NAME_SUFFIX.dmg"
 else
-  FINAL_DMG_NAME="$ROOK_APP_NAME.dmg"
+  FINAL_DMG_NAME="$POLARIS_TERMINAL_APP_NAME.dmg"
 fi
 
 # First clean up and prep the outdir
 mkdir -p "$OUT_DIR"
-rm -R "$OUT_DIR/$ROOK_APP_NAME.app" || echo "No old app to remove"
+rm -R "$OUT_DIR/$POLARIS_TERMINAL_APP_NAME.app" || echo "No old app to remove"
 rm -R "$OUT_DIR/$FINAL_DMG_NAME" || echo "No old dmg to remove"
 
 ###########################
@@ -574,13 +574,13 @@ if [[ "$ARTIFACT" == "app" ]]; then
 
   pushd app > /dev/null
   echo "Building and bundling $DEFAULT_TARGET for channel $RELEASE_CHANNEL and bundle id $BUNDLE_ID with profile $CARGO_PROFILE"
-  cargo bundle --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --target "$DEFAULT_TARGET" --features "$FEATURES"
+  cargo bundle --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --target "$DEFAULT_TARGET" --features "$FEATURES"
   popd > /dev/null
 
-  "$WORKSPACE_ROOT_DIR/script/macos/add_framework_rpath" "$BUNDLE_DIR/$ROOK_APP_NAME.app/Contents/MacOS/$ROOK_BIN"
+  "$WORKSPACE_ROOT_DIR/script/macos/add_framework_rpath" "$BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app/Contents/MacOS/$POLARIS_TERMINAL_BIN"
 
-  export ROOK_SCHEME_NAME
-  export ROOK_PLIST_PATH="$BUNDLE_DIR/$ROOK_APP_NAME.app/Contents/Info.plist"
+  export POLARIS_TERMINAL_SCHEME_NAME
+  export POLARIS_TERMINAL_PLIST_PATH="$BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app/Contents/Info.plist"
   ./script/update_plist
 
   if [[ $REGISTER_SERVICES = true ]]; then
@@ -590,7 +590,7 @@ if [[ "$ARTIFACT" == "app" ]]; then
         <key>NSMenuItem</key>
         <dict>
           <key>default</key>
-          <string>New $ROOK_APP_NAME Tab Here</string>
+          <string>New $POLARIS_TERMINAL_APP_NAME Tab Here</string>
         </dict>
         <key>NSMessage</key>
         <string>openTab</string>
@@ -609,7 +609,7 @@ if [[ "$ARTIFACT" == "app" ]]; then
         <key>NSMenuItem</key>
         <dict>
           <key>default</key>
-          <string>New $ROOK_APP_NAME Window Here</string>
+          <string>New $POLARIS_TERMINAL_APP_NAME Window Here</string>
         </dict>
         <key>NSMessage</key>
         <string>openWindow</string>
@@ -624,25 +624,25 @@ if [[ "$ARTIFACT" == "app" ]]; then
           <string>public.plain-text</string>
         </array>
       </dict>
-    </array>" "$BUNDLE_DIR"/$ROOK_APP_NAME.app/Contents/Info.plist
+    </array>" "$BUNDLE_DIR"/$POLARIS_TERMINAL_APP_NAME.app/Contents/Info.plist
   fi
 
-  # Temporary key that ChatGPT Desktop can use to determine if the latest version of Rook supports the ChatGPT integration.
+  # Temporary key that ChatGPT Desktop can use to determine if the latest version of Polaris Terminal supports the ChatGPT integration.
   # Once support has been rolled out for a sufficient amount of time we (and ChatGPT) can remove this.
-  plutil -insert SUPPORTS_CHAT_GPT_WORK_WITH_APPS -bool true "$BUNDLE_DIR"/$ROOK_APP_NAME.app/Contents/Info.plist
+  plutil -insert SUPPORTS_CHAT_GPT_WORK_WITH_APPS -bool true "$BUNDLE_DIR"/$POLARIS_TERMINAL_APP_NAME.app/Contents/Info.plist
 
   # Add LSBackgroundOnly key and set it to false since we need a UI app
-  plutil -insert LSBackgroundOnly -bool false "$BUNDLE_DIR"/$ROOK_APP_NAME.app/Contents/Info.plist
+  plutil -insert LSBackgroundOnly -bool false "$BUNDLE_DIR"/$POLARIS_TERMINAL_APP_NAME.app/Contents/Info.plist
 
   # Add SMAuthorizedClients for macOS 13+ (Ventura) to support login item functionality
-  plutil -insert SMAuthorizedClients -xml "<array><string>$BUNDLE_ID</string></array>" "$BUNDLE_DIR"/$ROOK_APP_NAME.app/Contents/Info.plist
+  plutil -insert SMAuthorizedClients -xml "<array><string>$BUNDLE_ID</string></array>" "$BUNDLE_DIR"/$POLARIS_TERMINAL_APP_NAME.app/Contents/Info.plist
 
   if [[ $UNIVERSAL_BINARY = true ]]; then
       if [[ $BUILD_BINARY = true ]]; then
           echo "Building $ADDITIONAL_TARGET to include in universal binary"
 
           pushd app > /dev/null
-          cargo build --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --target "$ADDITIONAL_TARGET" --features "$FEATURES"
+          cargo build --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --target "$ADDITIONAL_TARGET" --features "$FEATURES"
           popd > /dev/null
       else
           echo "Skipping build of $ADDITIONAL_TARGET due to --skip-build flag"
@@ -652,13 +652,13 @@ if [[ "$ARTIFACT" == "app" ]]; then
 
       echo "Adding rpath to both binaries for universal executable"
       "$WORKSPACE_ROOT_DIR/script/macos/add_framework_rpath" \
-        "target/$INTEL_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN" \
-        "target/$ARM_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN"
+        "target/$INTEL_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN" \
+        "target/$ARM_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN"
 
       echo "Building universal binary using lipo."
-      lipo -create -output "$tmp_bundle_dir/$ROOK_BIN" \
-          "target/$INTEL_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN" \
-          "target/$ARM_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN"
+      lipo -create -output "$tmp_bundle_dir/$POLARIS_TERMINAL_BIN" \
+          "target/$INTEL_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN" \
+          "target/$ARM_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN"
 
       # Compute the real absolute path to the dSYM file, factoring in symlinks.
       # Starting in Rust 1.56, the generated dSYMs are symlinks to files within the target/dep directory. For example,
@@ -666,35 +666,35 @@ if [[ "$ARTIFACT" == "app" ]]; then
       # would be located at dev.dSYM/Contents/Resources/DWARF/dev-080cf7e291fb066d.dSYM where dev.dSYM is symlink to
       # deps/dev-080cf7e291fb066d.dSYM. To fix this, parse out the actual name of the directory that the dSYM is
       # symlinked to, since this is also the name of file that contains the debug symbols within the dSYM.
-      INTEL_DSYM_NAME=$(basename "$(realpath target/$INTEL_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN.dSYM)" .dSYM)
-      INTEL_DSYM_PATH="target/$INTEL_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN.dSYM/Contents/Resources/DWARF/$INTEL_DSYM_NAME"
-      ARM_DSYM_NAME=$(basename "$(realpath target/$ARM_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN.dSYM)" .dSYM)
-      ARM_DSYM_PATH="target/$ARM_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN.dSYM/Contents/Resources/DWARF/$ARM_DSYM_NAME"
+      INTEL_DSYM_NAME=$(basename "$(realpath target/$INTEL_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN.dSYM)" .dSYM)
+      INTEL_DSYM_PATH="target/$INTEL_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN.dSYM/Contents/Resources/DWARF/$INTEL_DSYM_NAME"
+      ARM_DSYM_NAME=$(basename "$(realpath target/$ARM_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN.dSYM)" .dSYM)
+      ARM_DSYM_PATH="target/$ARM_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN.dSYM/Contents/Resources/DWARF/$ARM_DSYM_NAME"
       if [[ -e "$INTEL_DSYM_PATH" && -e "$ARM_DSYM_PATH" ]]; then
-        echo "Building universal binary .dSYM using lipo and storing in $OUT_DIR/$ROOK_BIN.dSYM"
+        echo "Building universal binary .dSYM using lipo and storing in $OUT_DIR/$POLARIS_TERMINAL_BIN.dSYM"
 
         # Use lipo to merge the .dSYM files into a single universal .dSYM file.
         # It expects the base name for the file (with the .dSYM suffix removed).
-        lipo -create -output "$OUT_DIR/$ROOK_BIN.dSYM" "${INTEL_DSYM_PATH}" "${ARM_DSYM_PATH}"
+        lipo -create -output "$OUT_DIR/$POLARIS_TERMINAL_BIN.dSYM" "${INTEL_DSYM_PATH}" "${ARM_DSYM_PATH}"
       fi
 
       echo "Storing result in $BUNDLE_DIR, replacing $DEFAULT_TARGET binary with fat binary."
-      mv "$tmp_bundle_dir/$ROOK_BIN" "$BUNDLE_DIR/$ROOK_APP_NAME.app/Contents/MacOS"
-  elif [[ -n "$TARGET_ARCH" && -e "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN.dSYM" ]]; then
-    echo "Copying .dSYM into $OUT_DIR/$ROOK_BIN.dSYM"
-    cp -HR "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN.dSYM" "$OUT_DIR/"
+      mv "$tmp_bundle_dir/$POLARIS_TERMINAL_BIN" "$BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app/Contents/MacOS"
+  elif [[ -n "$TARGET_ARCH" && -e "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN.dSYM" ]]; then
+    echo "Copying .dSYM into $OUT_DIR/$POLARIS_TERMINAL_BIN.dSYM"
+    cp -HR "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN.dSYM" "$OUT_DIR/"
   fi
 
   # Note that the dock tile plugin is pre-built for both arm64 and x86_64 so we don't need to run lipo on it.
   echo "Creating PlugIns directory and copying pre-built DockTilePlugin..."
-  mkdir -p "$BUNDLE_DIR/$ROOK_APP_NAME.app/Contents/PlugIns"
-  cp -R "$DOCK_TILE_PLUGIN_DIR" "$BUNDLE_DIR/$ROOK_APP_NAME.app/Contents/PlugIns/"
+  mkdir -p "$BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app/Contents/PlugIns"
+  cp -R "$DOCK_TILE_PLUGIN_DIR" "$BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app/Contents/PlugIns/"
 
   echo "Updating plist with dock tile plugin entries"
-  plutil -insert NSDockTilePlugIn -string "RookDockTilePlugin.docktileplugin" "$BUNDLE_DIR"/$ROOK_APP_NAME.app/Contents/Info.plist
-  plutil -insert MainAppBundleIdentifier -string "$BUNDLE_ID" "$BUNDLE_DIR"/$ROOK_APP_NAME.app/Contents/PlugIns/RookDockTilePlugin.docktileplugin/Contents/Info.plist
+  plutil -insert NSDockTilePlugIn -string "PtermDockTilePlugin.docktileplugin" "$BUNDLE_DIR"/$POLARIS_TERMINAL_APP_NAME.app/Contents/Info.plist
+  plutil -insert MainAppBundleIdentifier -string "$BUNDLE_ID" "$BUNDLE_DIR"/$POLARIS_TERMINAL_APP_NAME.app/Contents/PlugIns/PtermDockTilePlugin.docktileplugin/Contents/Info.plist
 
-  BUNDLED_RESOURCES_DIR="$BUNDLE_DIR/$ROOK_APP_NAME.app/Contents/Resources"
+  BUNDLED_RESOURCES_DIR="$BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app/Contents/Resources"
   echo "Preparing bundled resources..."
   if [[ "${SKIP_SETTINGS_SCHEMA:-}" != "1" && -z "${SETTINGS_SCHEMA_EXECUTABLE:-}" && -z "${SETTINGS_SCHEMA_SOURCE:-}" ]]; then
     if [[ $BUILD_BINARY != true ]]; then
@@ -704,14 +704,14 @@ if [[ "$ARTIFACT" == "app" ]]; then
       echo "Error: Cannot execute the just-built $DEFAULT_TARGET binary on this $HOST_ARCH host to generate a settings schema; pass SETTINGS_SCHEMA_SOURCE or SETTINGS_SCHEMA_EXECUTABLE." >&2
       exit 1
     else
-      export SETTINGS_SCHEMA_EXECUTABLE="$BUNDLE_DIR/$ROOK_APP_NAME.app/Contents/MacOS/$ROOK_BIN"
+      export SETTINGS_SCHEMA_EXECUTABLE="$BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app/Contents/MacOS/$POLARIS_TERMINAL_BIN"
     fi
   fi
   "$WORKSPACE_ROOT_DIR/script/prepare_bundled_resources" "$BUNDLED_RESOURCES_DIR" "$RELEASE_CHANNEL"
 
-  "$WORKSPACE_ROOT_DIR/script/compile_icon" "$RELEASE_CHANNEL" "$BUNDLE_DIR/$ROOK_APP_NAME.app"
+  "$WORKSPACE_ROOT_DIR/script/compile_icon" "$RELEASE_CHANNEL" "$BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app"
 
-  HELPERS_DIR="$BUNDLE_DIR/$ROOK_APP_NAME.app/Contents/Helpers"
+  HELPERS_DIR="$BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app/Contents/Helpers"
   if [[ ",$FEATURES," =~ ",heap_usage_tracking," ]]; then
     echo "Bundling pprof..."
     "$WORKSPACE_ROOT_DIR/script/prepare_bundled_pprof" "$HELPERS_DIR"
@@ -722,7 +722,7 @@ if [[ "$ARTIFACT" == "app" ]]; then
   if [[ $RELEASE_CHANNEL = "stable" ]]; then
     CLI_SCRIPT_PATH="$BUNDLED_RESOURCES_DIR/bin/oz"
   elif [[ $RELEASE_CHANNEL = "oss" ]]; then
-    CLI_SCRIPT_PATH="$BUNDLED_RESOURCES_DIR/bin/rook-oss"
+    CLI_SCRIPT_PATH="$BUNDLED_RESOURCES_DIR/bin/polaris-terminal"
   else
     CLI_SCRIPT_PATH="$BUNDLED_RESOURCES_DIR/bin/oz-$RELEASE_CHANNEL"
   fi
@@ -733,76 +733,76 @@ if [[ "$ARTIFACT" == "app" ]]; then
   cat > "$CLI_SCRIPT_PATH" << 'EOF'
 #!/bin/bash
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec -a "$0" "$script_dir/../../MacOS/ROOK_BIN_PLACEHOLDER" "$@"
+exec -a "$0" "$script_dir/../../MacOS/POLARIS_TERMINAL_BIN_PLACEHOLDER" "$@"
 EOF
   
   # Replace the placeholder with the actual binary name
-  sed -i '' "s/ROOK_BIN_PLACEHOLDER/$ROOK_BIN/" "$CLI_SCRIPT_PATH"
+  sed -i '' "s/POLARIS_TERMINAL_BIN_PLACEHOLDER/$POLARIS_TERMINAL_BIN/" "$CLI_SCRIPT_PATH"
   
   # Make the script executable
   chmod +x "$CLI_SCRIPT_PATH"
 
-  if [[ ",$FEATURES," =~ ",rook_control_cli," ]]; then
-    # Each value must match `Channel::rookctrl_command_name` in the Rust source.
+  if [[ ",$FEATURES," =~ ",pterm_control_cli," ]]; then
+    # Each value must match `Channel::ptermctrl_command_name` in the Rust source.
     if [[ $RELEASE_CHANNEL = "stable" ]]; then
-      ROOKCTRL_COMMAND_NAME="rookctrl"
+      POLARIS_TERMINALCTRL_COMMAND_NAME="ptermctrl"
     elif [[ $RELEASE_CHANNEL = "oss" ]]; then
-      ROOKCTRL_COMMAND_NAME="rookctrl-oss"
+      POLARIS_TERMINALCTRL_COMMAND_NAME="ptermctrl-oss"
     else
-      ROOKCTRL_COMMAND_NAME="rookctrl-$RELEASE_CHANNEL"
+      POLARIS_TERMINALCTRL_COMMAND_NAME="ptermctrl-$RELEASE_CHANNEL"
     fi
-    ROOKCTRL_SCRIPT_PATH="$BUNDLED_RESOURCES_DIR/bin/$ROOKCTRL_COMMAND_NAME"
-    echo "Creating rookctrl wrapper script at $ROOKCTRL_SCRIPT_PATH..."
-    "$WORKSPACE_ROOT_DIR/script/macos/create_rookctrl_wrapper" \
-      "$ROOKCTRL_SCRIPT_PATH" \
-      "../../MacOS/$ROOK_BIN"
+    POLARIS_TERMINALCTRL_SCRIPT_PATH="$BUNDLED_RESOURCES_DIR/bin/$POLARIS_TERMINALCTRL_COMMAND_NAME"
+    echo "Creating ptermctrl wrapper script at $POLARIS_TERMINALCTRL_SCRIPT_PATH..."
+    "$WORKSPACE_ROOT_DIR/script/macos/create_ptermctrl_wrapper" \
+      "$POLARIS_TERMINALCTRL_SCRIPT_PATH" \
+      "../../MacOS/$POLARIS_TERMINAL_BIN"
   fi
 
   # Store the built artifact locations for GitHub Actions outputs.
-  BINARY_PATH="target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN"
+  BINARY_PATH="target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN"
   DMG_PATH="$OUT_DIR/$FINAL_DMG_NAME"
-elif [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "rookctrl" ]]; then
+elif [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "ptermctrl" ]]; then
   if [[ $BUILD_BINARY == true ]]; then
     # Create Info.plist before building the app, since it's embedded at build time.
     # Apple's codesigning tools will detect Info.plist files in the same directory as an executable.
     # This breaks the code signature, so we must use a different location for the file.
     mkdir -p "$BUNDLE_DIR"
-    export ROOK_PLIST_PATH="$BUNDLE_DIR/cli-info.plist"
-    cp app/assets/resources/mac/CLI-Info.plist "$ROOK_PLIST_PATH"
+    export POLARIS_TERMINAL_PLIST_PATH="$BUNDLE_DIR/cli-info.plist"
+    cp app/assets/resources/mac/CLI-Info.plist "$POLARIS_TERMINAL_PLIST_PATH"
 
-    export ROOK_PLIST_NO_FILE_TYPES=true
+    export POLARIS_TERMINAL_PLIST_NO_FILE_TYPES=true
     ./script/update_plist
-    plutil -insert CFBundleIdentifier -string "$BUNDLE_ID" "$ROOK_PLIST_PATH"
-    plutil -insert CFBundleName -string "$ROOK_BIN" "$ROOK_PLIST_PATH"
-    plutil -insert CFBundleExecutable -string "$ROOK_BIN" "$ROOK_PLIST_PATH"
+    plutil -insert CFBundleIdentifier -string "$BUNDLE_ID" "$POLARIS_TERMINAL_PLIST_PATH"
+    plutil -insert CFBundleName -string "$POLARIS_TERMINAL_BIN" "$POLARIS_TERMINAL_PLIST_PATH"
+    plutil -insert CFBundleExecutable -string "$POLARIS_TERMINAL_BIN" "$POLARIS_TERMINAL_PLIST_PATH"
 
-    export "INFO_PLIST_PATH=$(realpath "$ROOK_PLIST_PATH")"
+    export "INFO_PLIST_PATH=$(realpath "$POLARIS_TERMINAL_PLIST_PATH")"
     pushd app > /dev/null
     echo "Building $DEFAULT_TARGET for channel $RELEASE_CHANNEL with profile $CARGO_PROFILE"
-    cargo build --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --target "$DEFAULT_TARGET" --features "$FEATURES"
+    cargo build --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --target "$DEFAULT_TARGET" --features "$FEATURES"
     popd > /dev/null
   else
     echo "Skipping binary build due to --skip-build flag"
   fi
 
-  echo "Copying binary into $OUT_DIR/$ROOK_BIN"
-  cp "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN" "$OUT_DIR/$ROOK_BIN"
+  echo "Copying binary into $OUT_DIR/$POLARIS_TERMINAL_BIN"
+  cp "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN" "$OUT_DIR/$POLARIS_TERMINAL_BIN"
 
-  if [[ "$ARTIFACT" == "rookctrl" ]]; then
-    if [[ ! ",$FEATURES," =~ ",rook_control_cli," ]]; then
-      echo "rookctrl artifact requires the rook_control_cli feature" >&2
+  if [[ "$ARTIFACT" == "ptermctrl" ]]; then
+    if [[ ! ",$FEATURES," =~ ",pterm_control_cli," ]]; then
+      echo "ptermctrl artifact requires the pterm_control_cli feature" >&2
       exit 1
     fi
-    ROOKCTRL_SCRIPT_PATH="$OUT_DIR/rookctrl"
-    echo "Creating rookctrl wrapper script at $ROOKCTRL_SCRIPT_PATH"
-    "$WORKSPACE_ROOT_DIR/script/macos/create_rookctrl_wrapper" \
-      "$ROOKCTRL_SCRIPT_PATH" \
-      "$ROOK_BIN"
+    POLARIS_TERMINALCTRL_SCRIPT_PATH="$OUT_DIR/ptermctrl"
+    echo "Creating ptermctrl wrapper script at $POLARIS_TERMINALCTRL_SCRIPT_PATH"
+    "$WORKSPACE_ROOT_DIR/script/macos/create_ptermctrl_wrapper" \
+      "$POLARIS_TERMINALCTRL_SCRIPT_PATH" \
+      "$POLARIS_TERMINAL_BIN"
   fi
 
-  if [[ -n "$TARGET_ARCH" && -e "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN.dSYM" ]]; then
-    echo "Copying .dSYM into $OUT_DIR/$ROOK_BIN.dSYM"
-    cp -HR "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN.dSYM" "$OUT_DIR/"
+  if [[ -n "$TARGET_ARCH" && -e "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN.dSYM" ]]; then
+    echo "Copying .dSYM into $OUT_DIR/$POLARIS_TERMINAL_BIN.dSYM"
+    cp -HR "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN.dSYM" "$OUT_DIR/"
   fi
 
   echo "Preparing CLI resources directory"
@@ -815,32 +815,32 @@ elif [[ "$ARTIFACT" == "cli" || "$ARTIFACT" == "rookctrl" ]]; then
       echo "Error: Cannot execute the just-built $DEFAULT_TARGET binary on this $HOST_ARCH host to generate a settings schema; pass SETTINGS_SCHEMA_SOURCE or SETTINGS_SCHEMA_EXECUTABLE." >&2
       exit 1
     else
-      export SETTINGS_SCHEMA_EXECUTABLE="$OUT_DIR/$ROOK_BIN"
+      export SETTINGS_SCHEMA_EXECUTABLE="$OUT_DIR/$POLARIS_TERMINAL_BIN"
     fi
   fi
   "$WORKSPACE_ROOT_DIR/script/prepare_bundled_resources" "$BUNDLED_RESOURCES_DIR" "$RELEASE_CHANNEL"
 
 
   # Set the primary binary path to output.
-  if [[ "$ARTIFACT" == "rookctrl" ]]; then
-    BINARY_PATH="$OUT_DIR/rookctrl"
+  if [[ "$ARTIFACT" == "ptermctrl" ]]; then
+    BINARY_PATH="$OUT_DIR/ptermctrl"
   else
-    BINARY_PATH="$OUT_DIR/$ROOK_BIN"
+    BINARY_PATH="$OUT_DIR/$POLARIS_TERMINAL_BIN"
   fi
 elif [[ "$ARTIFACT" == "tui" ]]; then
   if [[ $BUILD_BINARY == true ]]; then
-    echo "Building $ROOK_BIN ($DEFAULT_TARGET) for channel $RELEASE_CHANNEL with profile $CARGO_PROFILE"
-    cargo build -p rook_tui --profile "$CARGO_PROFILE" --bin "$ROOK_BIN" --target "$DEFAULT_TARGET" --features "$ROOK_TUI_FEATURES"
+    echo "Building $POLARIS_TERMINAL_BIN ($DEFAULT_TARGET) for channel $RELEASE_CHANNEL with profile $CARGO_PROFILE"
+    cargo build -p pterm_tui --profile "$CARGO_PROFILE" --bin "$POLARIS_TERMINAL_BIN" --target "$DEFAULT_TARGET" --features "$POLARIS_TERMINAL_TUI_FEATURES"
   else
     echo "Skipping binary build due to --skip-build flag"
   fi
 
-  echo "Copying binary into $OUT_DIR/$ROOK_BIN"
-  cp "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN" "$OUT_DIR/$ROOK_BIN"
+  echo "Copying binary into $OUT_DIR/$POLARIS_TERMINAL_BIN"
+  cp "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN" "$OUT_DIR/$POLARIS_TERMINAL_BIN"
 
-  if [[ -n "$TARGET_ARCH" && -e "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN.dSYM" ]]; then
-    echo "Copying .dSYM into $OUT_DIR/$ROOK_BIN.dSYM"
-    cp -HR "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$ROOK_BIN.dSYM" "$OUT_DIR/"
+  if [[ -n "$TARGET_ARCH" && -e "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN.dSYM" ]]; then
+    echo "Copying .dSYM into $OUT_DIR/$POLARIS_TERMINAL_BIN.dSYM"
+    cp -HR "target/$DEFAULT_TARGET/$TARGET_PROFILE_DIR/$POLARIS_TERMINAL_BIN.dSYM" "$OUT_DIR/"
   fi
 
   # Ship bundled skills + settings schema next to the binary. The standalone TUI
@@ -854,7 +854,7 @@ elif [[ "$ARTIFACT" == "tui" ]]; then
   fi
   "$WORKSPACE_ROOT_DIR/script/prepare_bundled_resources" "$BUNDLED_RESOURCES_DIR" "$RELEASE_CHANNEL"
 
-  BINARY_PATH="$OUT_DIR/$ROOK_BIN"
+  BINARY_PATH="$OUT_DIR/$POLARIS_TERMINAL_BIN"
 else
   echo "Unsupported artifact: $ARTIFACT" >&2
   exit 1
@@ -870,25 +870,25 @@ if [[ $READ_PASSWORDS_FROM_ENV != true ]]; then
 fi
 
 if [[ $CODESIGN = true ]]; then
-  # TODO - does this need to change per user?  Seems like it's tied to the ROOK_NOTARIZATION_PASSWORD password.
+  # TODO - does this need to change per user?  Seems like it's tied to the POLARIS_TERMINAL_NOTARIZATION_PASSWORD password.
   APPLE_TEAM_ID="2BBY89MBSN"
-  CODESIGN_KEYCHAIN_NAME="rook-codesign-keychain"
+  CODESIGN_KEYCHAIN_NAME="polaris-terminal-codesign-keychain"
 
   echo "Starting codesigning..."
 
   if [[ $READ_PASSWORDS_FROM_ENV = true ]]; then
-    if [ -z "$ROOK_NOTARIZATION_PASSWORD" ] ; then
-      echo "ROOK_NOTARIZATION_PASSWORD must be set for code signing"
+    if [ -z "$POLARIS_TERMINAL_NOTARIZATION_PASSWORD" ] ; then
+      echo "POLARIS_TERMINAL_NOTARIZATION_PASSWORD must be set for code signing"
       exit 1
     fi
 
-    if [ -z "$ROOK_DEVELOPER_ID_CERT_PASSWORD" ] ; then
-      echo "ROOK_DEVELOPER_ID_CERT_PASSWORD must be set for code signing"
+    if [ -z "$POLARIS_TERMINAL_DEVELOPER_ID_CERT_PASSWORD" ] ; then
+      echo "POLARIS_TERMINAL_DEVELOPER_ID_CERT_PASSWORD must be set for code signing"
       exit 1
     fi
 
-    if [ -z "$ROOK_CODESIGN_KEYCHAIN_PASSWORD" ] ; then
-      echo "ROOK_CODESIGN_KEYCHAIN_PASSWORD must be set for code signing"
+    if [ -z "$POLARIS_TERMINAL_CODESIGN_KEYCHAIN_PASSWORD" ] ; then
+      echo "POLARIS_TERMINAL_CODESIGN_KEYCHAIN_PASSWORD must be set for code signing"
       exit 1
     fi
   fi
@@ -896,14 +896,14 @@ if [[ $CODESIGN = true ]]; then
   security delete-keychain $CODESIGN_KEYCHAIN_NAME || echo "No existing keychain to clean up".
 
   echo "Creating $CODESIGN_KEYCHAIN_NAME keychain."
-  security create-keychain -p "$ROOK_CODESIGN_KEYCHAIN_PASSWORD" $CODESIGN_KEYCHAIN_NAME
+  security create-keychain -p "$POLARIS_TERMINAL_CODESIGN_KEYCHAIN_PASSWORD" $CODESIGN_KEYCHAIN_NAME
   security list-keychains -s $CODESIGN_KEYCHAIN_NAME
   security set-keychain-settings -t 3600 -u $CODESIGN_KEYCHAIN_NAME
 
   echo "Unlocking keychain and setting cert."
-  security unlock-keychain -p "$ROOK_CODESIGN_KEYCHAIN_PASSWORD" $CODESIGN_KEYCHAIN_NAME
-  security import <(echo "$ROOK_DEVELOPER_ID_CERT" | base64 -d) -f pkcs12 -P "$ROOK_DEVELOPER_ID_CERT_PASSWORD" -k $CODESIGN_KEYCHAIN_NAME -T /usr/bin/codesign
-  security set-key-partition-list -S "apple-tool:,apple:" -s -k "$ROOK_CODESIGN_KEYCHAIN_PASSWORD" $CODESIGN_KEYCHAIN_NAME
+  security unlock-keychain -p "$POLARIS_TERMINAL_CODESIGN_KEYCHAIN_PASSWORD" $CODESIGN_KEYCHAIN_NAME
+  security import <(echo "$POLARIS_TERMINAL_DEVELOPER_ID_CERT" | base64 -d) -f pkcs12 -P "$POLARIS_TERMINAL_DEVELOPER_ID_CERT_PASSWORD" -k $CODESIGN_KEYCHAIN_NAME -T /usr/bin/codesign
+  security set-key-partition-list -S "apple-tool:,apple:" -s -k "$POLARIS_TERMINAL_CODESIGN_KEYCHAIN_PASSWORD" $CODESIGN_KEYCHAIN_NAME
 fi
 
 ##############################
@@ -919,31 +919,31 @@ if [[ $SELFSIGN = true ]]; then
     echo "Found Apple Development certificate"
   fi
   if [[ "$ARTIFACT" == app ]]; then
-    echo "Self-signing $BUNDLE_DIR/$ROOK_APP_NAME.app with ${SIGNING_CERT}..."
-    codesign --force --deep --options runtime --sign "$SIGNING_CERT" "$BUNDLE_DIR/$ROOK_APP_NAME.app" --entitlements script/Debug-Entitlements.plist
-  elif [[ "$ARTIFACT" == cli || "$ARTIFACT" == rookctrl || "$ARTIFACT" == tui ]]; then
-    echo "Self-signing $OUT_DIR/$ROOK_BIN with ${SIGNING_CERT}..."
-    codesign --force --options runtime --sign "$SIGNING_CERT" "$OUT_DIR/$ROOK_BIN" --entitlements script/Debug-Entitlements.plist
+    echo "Self-signing $BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app with ${SIGNING_CERT}..."
+    codesign --force --deep --options runtime --sign "$SIGNING_CERT" "$BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app" --entitlements script/Debug-Entitlements.plist
+  elif [[ "$ARTIFACT" == cli || "$ARTIFACT" == ptermctrl || "$ARTIFACT" == tui ]]; then
+    echo "Self-signing $OUT_DIR/$POLARIS_TERMINAL_BIN with ${SIGNING_CERT}..."
+    codesign --force --options runtime --sign "$SIGNING_CERT" "$OUT_DIR/$POLARIS_TERMINAL_BIN" --entitlements script/Debug-Entitlements.plist
   fi
 elif [[ $CODESIGN = true ]]; then
   if [[ "$ARTIFACT" == app ]]; then
-    echo "Codesigning $BUNDLE_DIR/$ROOK_APP_NAME.app..."
+    echo "Codesigning $BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app..."
     # Use --deep so we sign bundled frameworks as well
-    codesign_with_retry --deep -f -o runtime --timestamp -s "$APPLE_TEAM_ID" "$BUNDLE_DIR/$ROOK_APP_NAME.app" --entitlements script/Entitlements.plist
-  elif [[ "$ARTIFACT" == cli || "$ARTIFACT" == rookctrl || "$ARTIFACT" == tui ]]; then
-    echo "Codesigning $OUT_DIR/$ROOK_BIN..."
-    codesign_with_retry -f -o runtime --timestamp -s "$APPLE_TEAM_ID" "$OUT_DIR/$ROOK_BIN" --entitlements script/Entitlements.plist
+    codesign_with_retry --deep -f -o runtime --timestamp -s "$APPLE_TEAM_ID" "$BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app" --entitlements script/Entitlements.plist
+  elif [[ "$ARTIFACT" == cli || "$ARTIFACT" == ptermctrl || "$ARTIFACT" == tui ]]; then
+    echo "Codesigning $OUT_DIR/$POLARIS_TERMINAL_BIN..."
+    codesign_with_retry -f -o runtime --timestamp -s "$APPLE_TEAM_ID" "$OUT_DIR/$POLARIS_TERMINAL_BIN" --entitlements script/Entitlements.plist
 
     # Create the .zip for notarization in a separate location - otherwise, Apple's codesigning
     # tools decide that it's a sealed resource that belongs to the binary and needs to also be signed.
-    NOTARIZATION_ARTIFACT="$BUNDLE_DIR/${ROOK_BIN}_notarize.zip"
+    NOTARIZATION_ARTIFACT="$BUNDLE_DIR/${POLARIS_TERMINAL_BIN}_notarize.zip"
     if [[ -e "$NOTARIZATION_ARTIFACT" ]]; then
       echo "Removing old notarization artifact..."
       rm "$NOTARIZATION_ARTIFACT"
     fi
 
     # Create a .zip archive to notarize.
-    ditto -c -k "$OUT_DIR/$ROOK_BIN" "$NOTARIZATION_ARTIFACT"
+    ditto -c -k "$OUT_DIR/$POLARIS_TERMINAL_BIN" "$NOTARIZATION_ARTIFACT"
     
     # It's not possible to staple notarization tickets to standalone binaries:
     # https://developer.apple.com/documentation/security/customizing-the-notarization-workflow?language=objc#Staple-the-ticket-to-your-distribution
@@ -956,21 +956,21 @@ fi
 ########################
 
 if [[ "$ARTIFACT" = app ]]; then
-  function create_rook_dmg() {
+  function create_pterm_dmg() {
     echo "Creating $DMG_DIR/$DMG_NAME..."
     rm "$DMG_DIR/$DMG_NAME" || true
     local source_folder="$1"
 
     local args=(
-      --volname Rook
+      --volname "Polaris Terminal"
       # For --no-internet-enable, see https://github.com/create-dmg/create-dmg/issues/179
       --no-internet-enable
-      --background app/assets/resources/mac/rook_install_image.png
+      --background app/assets/resources/mac/pterm_install_image.png
       --icon-size 128
       --window-size 700 500
       --format UDZO
       --app-drop-link 550 250
-      --icon "$ROOK_APP_NAME.app" 150 250
+      --icon "$POLARIS_TERMINAL_APP_NAME.app" 150 250
       # macOS 26.4 Beta has issues with mounting HFS+ DMGs, so we're using APFS instead.
       # APFS has been supported as a DMG filesystem since macOS 10.13, and we target 10.14
       # as our minimum version.
@@ -999,9 +999,9 @@ if [[ "$ARTIFACT" = app ]]; then
     fi
     echo "Creating $DMG_DIR"
     mkdir -p "$DMG_DIR"
-    cp -R "$BUNDLE_DIR/$ROOK_APP_NAME.app" "$DMG_DIR"
+    cp -R "$BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app" "$DMG_DIR"
 
-    create_rook_dmg "$DMG_DIR"
+    create_pterm_dmg "$DMG_DIR"
 
     echo "Codesigning $DMG_DIR/$DMG_NAME..."
     codesign_with_retry -f -s "$APPLE_TEAM_ID" --timestamp "$DMG_DIR/$DMG_NAME"
@@ -1015,7 +1015,7 @@ if [[ "$ARTIFACT" = app ]]; then
     echo "Cleaning up any existing DMG files before creating new ones..."
     cleanup_dmg_files "$DMG_DIR"
 
-    create_rook_dmg "$BUNDLE_DIR"
+    create_pterm_dmg "$BUNDLE_DIR"
   fi
 fi
 
@@ -1036,8 +1036,8 @@ if [[ $CODESIGN = true ]]; then
   echo "Verifying notarization ticket..."
   if [[ "$ARTIFACT" = app ]]; then
     xcrun stapler validate "$DMG_DIR/$DMG_NAME"
-  elif [[ "$ARTIFACT" = cli || "$ARTIFACT" = rookctrl || "$ARTIFACT" = tui ]]; then
-    spctl -a -t open --context context:primary-signature -vv "$OUT_DIR/$ROOK_BIN"
+  elif [[ "$ARTIFACT" = cli || "$ARTIFACT" = ptermctrl || "$ARTIFACT" = tui ]]; then
+    spctl -a -t open --context context:primary-signature -vv "$OUT_DIR/$POLARIS_TERMINAL_BIN"
   fi
 fi
 
@@ -1048,7 +1048,7 @@ fi
 
 if [[ "$ARTIFACT" = app ]]; then
   echo "Copying dmg and app to $OUT_DIR"
-  cp -R "$BUNDLE_DIR/$ROOK_APP_NAME.app" "$OUT_DIR"
+  cp -R "$BUNDLE_DIR/$POLARIS_TERMINAL_APP_NAME.app" "$OUT_DIR"
   cp "$DMG_DIR/$DMG_NAME" "$OUT_DIR/$FINAL_DMG_NAME"
 fi
 

@@ -15,4 +15,4 @@ quote = "1"
 syn = { version = "2", default-features = false, features = ["derive", "parsing", "proc-macro", "printing"] }
 proc-macro2 = "1"
 sha2.workspace = true
-rook_util.workspace = true
+pterm_util.workspace = true

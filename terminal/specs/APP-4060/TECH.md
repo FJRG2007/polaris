@@ -48,7 +48,7 @@ The detected `CLIAgent` is passed to `CLIAgentSessionsModel::set_session` (`view
 
 For natively-detected agents, two paths can create a listener:
 
-1. **OSC 777 sentinel**: When the plugin sends `rook://cli-agent` with a `SessionStart` event, `view.rs:10960` calls `register_listener`. This only fires if the agent plugin is installed.
+1. **OSC 777 sentinel**: When the plugin sends `polaris-terminal://cli-agent` with a `SessionStart` event, `view.rs:10960` calls `register_listener`. This only fires if the agent plugin is installed.
 2. **Proactive registration**: For Codex specifically, `register_cli_agent_listener` is called immediately on detection (`view.rs:10069`) because Codex uses OSC 9 plain-text notifications.
 
 Both paths check `is_agent_supported(&agent)`, which currently returns `true` only for `Claude | OpenCode | Codex`. For `CLIAgent::Unknown`, no listener is ever created.
@@ -277,7 +277,7 @@ sequenceDiagram
    - Plugin install chip appears.
    - Rich input uses Claude's submit strategy.
 
-4. **Persistence test**: Restart Rook and verify the dropdown reflects the saved selection.
+4. **Persistence test**: Restart Polaris Terminal and verify the dropdown reflects the saved selection.
 
 5. **Backward compatibility test**: Existing patterns (migrated with empty agent value) continue to produce `CLIAgent::Unknown` sessions.
 

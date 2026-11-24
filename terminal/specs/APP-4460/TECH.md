@@ -23,6 +23,6 @@ Add unit coverage next to existing Cloud Mode terminal-view tests. The key regre
 - assert `is_input_box_visible` remains `true`;
 - assert incoming shared-session input operations are not applied while the setup group is running, including before the first setup command block has rendered;
 - finish the setup group and assert incoming shared-session input operations apply again.
-Run the focused test by name with `cargo nextest run -p rook -E 'test(<new test name>)'`. Run `cargo fmt --manifest-path /workspace/rook/Cargo.toml -p rook --check` and a targeted `cargo clippy --manifest-path /workspace/rook/Cargo.toml -p rook --tests -- -D warnings` before updating the PR.
+Run the focused test by name with `cargo nextest run -p polaris-terminal -E 'test(<new test name>)'`. Run `cargo fmt --manifest-path /workspace/polaris-terminal/Cargo.toml -p polaris-terminal --check` and a targeted `cargo clippy --manifest-path /workspace/polaris-terminal/Cargo.toml -p polaris-terminal --tests -- -D warnings` before updating the PR.
 ## Parallelization
 Parallelization is not beneficial for this revision. The implementation is a small, tightly coupled change across one setup-state helper, one shared-session input receiver path, and one regression test; splitting it across agents would add coordination overhead and merge risk without reducing wall-clock time.

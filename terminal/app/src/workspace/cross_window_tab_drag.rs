@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use pathfinder_geometry::rect::RectF;
-use rookui::elements::DraggableState;
-use rookui::geometry::vector::{Vector2F, vec2f};
-use rookui::platform::TerminationMode;
-use rookui::windowing::WindowManager;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity, WindowId};
+use ptermui::elements::DraggableState;
+use ptermui::geometry::vector::{Vector2F, vec2f};
+use ptermui::platform::TerminationMode;
+use ptermui::windowing::WindowManager;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity, WindowId};
 
 /// Singleton model that owns all cross-window tab drag state.
 ///
@@ -251,7 +251,7 @@ enum DragPhase {
     /// A reverse-handoff is in progress: the tab is being moved back out of a
     /// target window and into the preview window. Set by `on_drag_while_inserted`
     /// immediately before the view-tree transfer to block re-entrant `on_drag`
-    /// processing (the RookUI framework does not support view transfers within a
+    /// processing (the PtermUI framework does not support view transfers within a
     /// single event cycle). In the primary flow `InsertedInTarget` is held only
     /// briefly between `perform_handoff` and `finalize`, so this state is rarely
     /// reached.

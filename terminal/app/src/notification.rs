@@ -1,4 +1,4 @@
-use rookui::{EntityId, WindowId};
+use ptermui::{EntityId, WindowId};
 /// At the app level, we have structs for representing the UI framework level
 /// notification structs, but with the data parsed to our liking.
 /// The similar structs at the UI framework layer are lower-level (mostly strings).

@@ -2,12 +2,12 @@
 
 use std::ops::Range;
 
-use rook_core::ui::appearance::DEFAULT_UI_FONT_SIZE;
-use rookui_core::PaintContext;
-use rookui_core::elements::{CornerRadius, Point, Radius};
-use rookui_core::geometry::rect::RectF;
-use rookui_core::geometry::vector::{Vector2F, vec2f};
-use rookui_core::text_layout::{Line, PaintStyleOverride, TextFrame};
+use pterm_core::ui::appearance::DEFAULT_UI_FONT_SIZE;
+use ptermui_core::PaintContext;
+use ptermui_core::elements::{CornerRadius, Point, Radius};
+use ptermui_core::geometry::rect::RectF;
+use ptermui_core::geometry::vector::{Vector2F, vec2f};
+use ptermui_core::text_layout::{Line, PaintStyleOverride, TextFrame};
 use string_offset::CharOffset;
 use vim::vim::VimMode;
 

@@ -1,4 +1,4 @@
-# GUI-to-Rook Agent CLI migration matrix
+# GUI-to-Polaris Terminal Agent CLI migration matrix
 
 Use this matrix to set expectations before reading or changing any local file.
 
@@ -10,9 +10,9 @@ No file copy is needed for:
 - user and repository skills discovered from shared paths;
 - bundled skills;
 - Drive objects, saved prompts, and cloud execution profiles after the user logs
-  in to Rook Agent CLI and sync completes.
+  in to Polaris Terminal Agent CLI and sync completes.
 
-Account login is still a separate Rook Agent CLI action. Do not describe cloud
+Account login is still a separate Polaris Terminal Agent CLI action. Do not describe cloud
 availability as migration of local GUI data.
 
 ## Explicit local import
@@ -20,14 +20,14 @@ availability as migration of local GUI data.
 ### Settings
 
 Only public settings whose generated JSON Schema property has
-`x-rook-surfaces` containing both `gui` and `tui` are eligible. The annotation is
+`x-polaris-terminal-surfaces` containing both `gui` and `tui` are eligible. The annotation is
 authoritative and dynamic; do not maintain a setting-name allowlist.
 
 The settings inspector may reveal only those eligible dotted paths and values.
-The user approves each mutation. Missing values in Rook Agent CLI may be added,
-while existing Rook Agent CLI values win unless the user explicitly approves
+The user approves each mutation. Missing values in Polaris Terminal Agent CLI may be added,
+while existing Polaris Terminal Agent CLI values win unless the user explicitly approves
 an overwrite. Preserve comments, unknown settings, and settings exclusive to
-Rook Agent CLI.
+Polaris Terminal Agent CLI.
 
 Permission changes deserve an explicit impact summary. Machine-local file
 allowlists should be offered only when their source paths exist and are valid on
@@ -35,8 +35,8 @@ the current host.
 
 ### Global file-based MCP
 
-The raw server definitions in the resolved GUI Rook global `.mcp.json` may be
-merged into the resolved Rook Agent CLI global `.mcp.json`. The destination
+The raw server definitions in the resolved GUI Polaris Terminal global `.mcp.json` may be
+merged into the resolved Polaris Terminal Agent CLI global `.mcp.json`. The destination
 wins name conflicts. `${VAR}` and other placeholder-bearing
 header/environment strings are preserved.
 
@@ -48,9 +48,9 @@ behavior.
 
 ## Reauthentication or reinstallation
 
-Handle these as setup tasks in Rook Agent CLI, not file migration:
+Handle these as setup tasks in Polaris Terminal Agent CLI, not file migration:
 
-- Rook Agent CLI account login;
+- Polaris Terminal Agent CLI account login;
 - templatable or gallery MCP installations;
 - MCP OAuth grants and refresh tokens;
 - provider credentials, API keys, literal secrets, and secure values;
@@ -59,7 +59,7 @@ Handle these as setup tasks in Rook Agent CLI, not file migration:
 - MCP process running state and installation state.
 
 If a raw file-based server is imported but needs authentication, tell the user to
-authenticate it in Rook Agent CLI. Never copy the GUI credential.
+authenticate it in Polaris Terminal Agent CLI. Never copy the GUI credential.
 
 ## Unsupported
 
@@ -77,4 +77,4 @@ Do not migrate:
 - project-scoped or third-party MCP configuration in v1.
 
 Do not invent a fallback for an unsupported category. Explain the supported
-Rook Agent CLI setup path, if one exists, and leave the GUI source untouched.
+Polaris Terminal Agent CLI setup path, if one exists, and leave the GUI source untouched.

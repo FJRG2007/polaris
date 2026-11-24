@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
-use rook_core::ui::Icon;
-use rook_core::ui::theme::RookTheme;
-use rookui::elements::{Container, Element, MouseStateHandle};
-use rookui::keymap::Keystroke;
-use rookui::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::theme::PtermTheme;
+use ptermui::elements::{Container, Element, MouseStateHandle};
+use ptermui::keymap::Keystroke;
+use ptermui::{
     AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
@@ -290,7 +290,7 @@ mod internal {
 
             // When we insert rich content (including agent view blocks) we insert it immediately before
             // the active block (unless explicitly inserting below a long-running block). The active
-            // block is a special "rook input" block that often exists even when it isn't user-visible.
+            // block is a special "polaris-terminal input" block that often exists even when it isn't user-visible.
             //
             // So, for dedupe we check the first visible (non-zero height) item *immediately before the
             // active block*. This avoids false negatives caused by the active block itself.
@@ -507,7 +507,7 @@ impl MessageTransformer<TerminalMessageArgs<'_>> for AttachedTextSelectionMessag
     }
 }
 
-fn message_magenta(theme: &RookTheme) -> ColorU {
+fn message_magenta(theme: &PtermTheme) -> ColorU {
     let mut color = theme.ansi_fg_magenta();
     color.a = (255. * 0.65) as u8;
     color

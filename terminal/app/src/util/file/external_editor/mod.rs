@@ -8,8 +8,8 @@ mod windows;
 
 use std::path::PathBuf;
 
-use rook_util::path::LineAndColumnArg;
-use rookui::{AppContext, SingletonEntity};
+use pterm_util::path::LineAndColumnArg;
+use ptermui::{AppContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 use settings::EditorChoice;
 

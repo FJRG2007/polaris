@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use rookui::App;
+use ptermui::App;
 
 use super::*;
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
@@ -541,7 +541,7 @@ fn is_cloud_runnable_oz_model_id_classifies_ids() {
     assert!(
         preferences.is_cloud_runnable_oz_model_id(&LLMId::from("custom-router:cloud:team-router"))
     );
-    // Rook Oz slugs — cloud-runnable.
+    // Polaris Terminal Oz slugs — cloud-runnable.
     assert!(preferences.is_cloud_runnable_oz_model_id(&LLMId::from("auto")));
     assert!(preferences.is_cloud_runnable_oz_model_id(&LLMId::from("auto-genius")));
     // A server-provided (non-custom, non-local-router) id is treated as

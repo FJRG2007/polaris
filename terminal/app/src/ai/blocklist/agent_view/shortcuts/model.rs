@@ -1,5 +1,5 @@
-use rook_core::send_telemetry_from_ctx;
-use rookui::{Entity, ModelContext, ModelHandle};
+use pterm_core::send_telemetry_from_ctx;
+use ptermui::{Entity, ModelContext, ModelHandle};
 
 use crate::ai::blocklist::agent_view::{AgentViewController, AgentViewControllerEvent};
 use crate::server::telemetry::TelemetryEvent;

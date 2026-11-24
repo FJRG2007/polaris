@@ -7,10 +7,10 @@ use std::ops::Range;
 
 use num_traits::SaturatingSub;
 use pathfinder_color::ColorU;
+use ptermui_core::elements::Border;
+use ptermui_core::text_layout::PaintStyleOverride;
+use ptermui_core::{Action, AppContext, Element, TypedActionView, View};
 use rangemap::{RangeMap, RangeSet};
-use rookui_core::elements::Border;
-use rookui_core::text_layout::PaintStyleOverride;
-use rookui_core::{Action, AppContext, Element, TypedActionView, View};
 use string_offset::CharOffset;
 
 use crate::content::version::BufferVersion;

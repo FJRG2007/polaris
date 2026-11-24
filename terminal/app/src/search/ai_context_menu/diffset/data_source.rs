@@ -1,4 +1,4 @@
-use rookui::AppContext;
+use ptermui::AppContext;
 
 use super::search_item::DiffSetSearchItem;
 use crate::code_review::diff_state::DiffMode;
@@ -53,6 +53,6 @@ impl SyncDataSource for DiffSetDataSource {
     }
 }
 
-impl rookui::Entity for DiffSetDataSource {
+impl ptermui::Entity for DiffSetDataSource {
     type Event = ();
 }

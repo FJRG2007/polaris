@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use chrono::{Local, Utc};
 use persistence::model::{AgentConversationData, ConversationUsageMetadata};
-use rook_cli::agent::Harness;
-use rookui::{App, EntityId, SingletonEntity};
+use pterm_cli::agent::Harness;
+use ptermui::{App, EntityId, SingletonEntity};
 use warp_multi_agent_api as api;
 
 use super::{ConversationDetailsData, ConversationDetailsPanel, PanelMode};
@@ -310,7 +310,7 @@ fn test_from_task_resolves_harness() {
             let data = ConversationDetailsData::from_task(&base_task, None, None, ctx);
             assert_eq!(data.harness, None);
 
-            // Snapshot without an explicit harness → default to Rook Agent.
+            // Snapshot without an explicit harness → default to Polaris Terminal Agent.
             let mut task = base_task.clone();
             task.agent_config_snapshot = Some(AgentConfigSnapshot::default());
             let data = ConversationDetailsData::from_task(&task, None, None, ctx);
@@ -363,7 +363,7 @@ fn test_from_task_populates_executor() {
 fn test_from_conversation_populates_local_conversation_fields() {
     // Locks in that `ConversationDetailsData::from_conversation` works on native
     // and surfaces the conversation-derived fields the conversation details panel
-    // renders for local Rook Agent runs (APP-3595).
+    // renders for local Polaris Terminal Agent runs (APP-3595).
     App::test((), |mut app| async move {
         let history_model =
             app.add_singleton_model(|_| BlocklistAIHistoryModel::new(vec![], vec![], &[]));

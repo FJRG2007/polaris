@@ -1,6 +1,6 @@
-use rookui::elements::{CrossAxisAlignment, Flex, ParentElement};
-use rookui::prelude::ChildView;
-use rookui::{AppContext, Element};
+use ptermui::elements::{CrossAxisAlignment, Flex, ParentElement};
+use ptermui::prelude::ChildView;
+use ptermui::{AppContext, Element};
 
 use crate::ai::blocklist::block::ImportedCommentGroup;
 

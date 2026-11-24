@@ -3,17 +3,16 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use mockall::Sequence;
-use regex::Regex;
-use rook_graphql::billing::{
+use pterm_graphql::billing::{
     BillingMetadata as GqlBillingMetadata, BonusGrantsInfo as GqlBonusGrantsInfo,
     CustomerType as GqlCustomerType, DelinquencyStatus as GqlDelinquencyStatus,
     PurchaseAddOnCreditsPolicy as GqlPurchaseAddOnCreditsPolicy, Tier as GqlTier,
 };
-use rook_graphql::queries::get_workspaces_metadata_for_user::{
+use pterm_graphql::queries::get_workspaces_metadata_for_user::{
     User as GqlUser, UserProfile as GqlUserProfile, UserPurchasePolicyBillingMetadata,
     UserPurchasePolicyTier,
 };
-use rook_graphql::workspace::{
+use pterm_graphql::workspace::{
     AddonCreditsSettings as GqlAddonCreditsSettings,
     AdminEnablementSetting as GqlAdminEnablementSetting,
     AdminEnablementSettingInfo as GqlAdminEnablementSettingInfo,
@@ -46,10 +45,11 @@ use rook_graphql::workspace::{
     WriteToPtyAutonomyValue as GqlWriteToPtyAutonomyValue,
     WriteToPtySettingInfo as GqlWriteToPtySettingInfo,
 };
-use rookui::elements::Empty;
-use rookui::platform::WindowStyle;
-use rookui::{AddSingletonModel, App, Element, TypedActionView, View, ViewHandle, WindowId};
-use rookui_extras::user_preferences;
+use ptermui::elements::Empty;
+use ptermui::platform::WindowStyle;
+use ptermui::{AddSingletonModel, App, Element, TypedActionView, View, ViewHandle, WindowId};
+use ptermui_extras::user_preferences;
+use regex::Regex;
 use settings::{PrivatePreferences, PublicPreferences};
 
 use super::*;
@@ -272,7 +272,7 @@ fn test_loading_all_spaces_after_switching_from_offline() {
         });
 
         // Spend time waiting for the initial load to finish etc.
-        rookui::r#async::Timer::after(Duration::from_secs(1)).await;
+        ptermui::r#async::Timer::after(Duration::from_secs(1)).await;
 
         // Lets go offline
         NetworkStatus::handle(&app).update(&mut app, |network_status, ctx| {
@@ -285,7 +285,7 @@ fn test_loading_all_spaces_after_switching_from_offline() {
         });
 
         // Spend time waiting for the load to finish etc.
-        rookui::r#async::Timer::after(Duration::from_secs(1)).await;
+        ptermui::r#async::Timer::after(Duration::from_secs(1)).await;
 
         // We also ensure that UserWorkspaces stores a team
         UserWorkspaces::handle(&app).read(&app, |teams, _| {
@@ -550,8 +550,8 @@ fn aws_bedrock_availability_falls_back_to_the_workspace_for_a_multi_team_users_t
     })
 }
 
-const TEST_GCP_AUDIENCE: &str = "//iam.googleapis.com/projects/123456/locations/global/workloadIdentityPools/rook-pool/providers/rook-provider";
-const TEST_GCP_SA_EMAIL: &str = "rook-geap@test-project.iam.gserviceaccount.com";
+const TEST_GCP_AUDIENCE: &str = "//iam.googleapis.com/projects/123456/locations/global/workloadIdentityPools/polaris-terminal-pool/providers/polaris-terminal-provider";
+const TEST_GCP_SA_EMAIL: &str = "polaris-terminal-geap@test-project.iam.gserviceaccount.com";
 
 fn workspace_with_gemini_enterprise_host(
     team: &Team,
@@ -940,12 +940,12 @@ fn workspace_for_teams(teams: Vec<Team>) -> Workspace {
     workspace
 }
 
-fn team_selection(team: Option<Option<String>>) -> rook_cli::scope::TeamSelection {
-    rook_cli::scope::TeamSelection { team }
+fn team_selection(team: Option<Option<String>>) -> pterm_cli::scope::TeamSelection {
+    pterm_cli::scope::TeamSelection { team }
 }
 
-fn object_scope(team: Option<Option<String>>, personal: bool) -> rook_cli::scope::ObjectScope {
-    rook_cli::scope::ObjectScope {
+fn object_scope(team: Option<Option<String>>, personal: bool) -> pterm_cli::scope::ObjectScope {
+    pterm_cli::scope::ObjectScope {
         team_selection: team_selection(team),
         personal,
     }
@@ -1282,24 +1282,24 @@ fn test_window_team_assignment_inherits_from_source_or_default_team() {
 }
 
 #[test]
-fn rook_agent_cli_upgrade_link_is_channel_aware_and_user_bound() {
+fn pterm_agent_cli_upgrade_link_is_channel_aware_and_user_bound() {
     let user_uid = UserUid::new("user-123");
 
     assert_eq!(
-        UserWorkspaces::rook_agent_cli_upgrade_link(Some(user_uid)),
+        UserWorkspaces::pterm_agent_cli_upgrade_link(Some(user_uid)),
         format!(
-            "{}{STRIPE_SUBSCRIPTION_INTERVAL_PAGE_PREFIX}/user/{user_uid}?source=rook-agent-cli",
+            "{}{STRIPE_SUBSCRIPTION_INTERVAL_PAGE_PREFIX}/user/{user_uid}?source=polaris-terminal-agent-cli",
             ChannelState::server_root_url(),
         )
     );
 }
 
 #[test]
-fn rook_agent_cli_upgrade_link_uses_channel_aware_fallback_without_a_user() {
+fn pterm_agent_cli_upgrade_link_uses_channel_aware_fallback_without_a_user() {
     assert_eq!(
-        UserWorkspaces::rook_agent_cli_upgrade_link(None),
+        UserWorkspaces::pterm_agent_cli_upgrade_link(None),
         format!(
-            "{}{STRIPE_SUBSCRIPTION_INTERVAL_PAGE_PREFIX}?source=rook-agent-cli",
+            "{}{STRIPE_SUBSCRIPTION_INTERVAL_PAGE_PREFIX}?source=polaris-terminal-agent-cli",
             ChannelState::server_root_url().trim_end_matches('/'),
         )
     );
@@ -3243,8 +3243,8 @@ fn test_agent_attribution_default_with_no_workspace() {
 #[test]
 fn test_agent_attribution_resolves_each_windows_own_team() {
     let (mut team_a, mut team_b) = two_teams();
-    team_a.settings.enable_rook_attribution = AdminEnablementSetting::Enable;
-    team_b.settings.enable_rook_attribution = AdminEnablementSetting::Disable;
+    team_a.settings.enable_pterm_attribution = AdminEnablementSetting::Enable;
+    team_b.settings.enable_pterm_attribution = AdminEnablementSetting::Disable;
     let mut workspace = workspace_for_test(&team_a);
     workspace.teams.push(team_b.clone());
 
@@ -3282,8 +3282,8 @@ fn test_agent_attribution_resolves_each_windows_own_team() {
 #[test]
 fn test_agent_attribution_follows_a_window_reconciled_onto_another_team() {
     let (mut team_a, mut team_b) = two_teams();
-    team_a.settings.enable_rook_attribution = AdminEnablementSetting::Disable;
-    team_b.settings.enable_rook_attribution = AdminEnablementSetting::Enable;
+    team_a.settings.enable_pterm_attribution = AdminEnablementSetting::Disable;
+    team_b.settings.enable_pterm_attribution = AdminEnablementSetting::Enable;
     let mut workspace = workspace_for_test(&team_a);
     workspace.teams.push(team_b.clone());
 
@@ -3328,7 +3328,7 @@ fn test_agent_attribution_follows_a_window_reconciled_onto_another_team() {
 fn test_agent_attribution_reads_workspace_settings_for_a_teamless_user() {
     let mut workspace = workspace_for_test(&team_for_test());
     workspace.teams.clear();
-    workspace.settings.enable_rook_attribution = AdminEnablementSetting::Disable;
+    workspace.settings.enable_pterm_attribution = AdminEnablementSetting::Disable;
 
     App::test((), |mut app| async move {
         initialize_window_team_test_app(&mut app, vec![workspace]);
@@ -3709,7 +3709,7 @@ fn test_purchase_addon_credits_forwards_teamless_team_uid() {
 
         // Give the spawned client call time to run so the mock expectation is
         // exercised before the test ends.
-        rookui::r#async::Timer::after(Duration::from_millis(100)).await;
+        ptermui::r#async::Timer::after(Duration::from_millis(100)).await;
     })
 }
 
@@ -3742,7 +3742,7 @@ fn test_purchase_addon_credits_forwards_team_uid_when_present() {
 
         // Give the spawned client call time to run so the mock expectation is
         // exercised before the test ends.
-        rookui::r#async::Timer::after(Duration::from_millis(100)).await;
+        ptermui::r#async::Timer::after(Duration::from_millis(100)).await;
     })
 }
 
@@ -3795,7 +3795,7 @@ fn test_remove_user_from_team_rejected_emits_error_event_without_updating_worksp
             );
         });
 
-        rookui::r#async::Timer::after(Duration::from_millis(100)).await;
+        ptermui::r#async::Timer::after(Duration::from_millis(100)).await;
 
         let error_message = receiver
             .try_recv()
@@ -3883,7 +3883,7 @@ fn test_remove_user_from_team_success_emits_success_event_and_refreshes_members(
             );
         });
 
-        rookui::r#async::Timer::after(Duration::from_millis(100)).await;
+        ptermui::r#async::Timer::after(Duration::from_millis(100)).await;
 
         receiver
             .try_recv()
@@ -3907,7 +3907,7 @@ fn gql_tier(purchase_policy: Option<GqlPurchaseAddOnCreditsPolicy>) -> GqlTier {
     GqlTier {
         name: "Free".to_string(),
         description: "Free tier".to_string(),
-        rook_ai_policy: None,
+        pterm_ai_policy: None,
         team_size_policy: None,
         shared_notebooks_policy: None,
         shared_workflows_policy: None,
@@ -4309,9 +4309,9 @@ fn gql_user(
         profile: GqlUserProfile {
             uid: "test-user".to_string(),
         },
-        ai_credit_availability: rook_graphql::ai::AICreditAvailability {
+        ai_credit_availability: pterm_graphql::ai::AICreditAvailability {
             available: true,
-            denial_reason: rook_graphql::ai::AICreditAvailabilityDenialReason::None,
+            denial_reason: pterm_graphql::ai::AICreditAvailabilityDenialReason::None,
             credit_source: None,
         },
         billing_metadata: user_purchase_policy.map(|policy| UserPurchasePolicyBillingMetadata {
@@ -4531,7 +4531,7 @@ fn legacy_cache_migration_yields_a_usable_teamless_catalog() {
     // all available LLMs were solely for Agent Mode. Migrating it must still produce a
     // catalog whose `agent_mode` bucket resolves the cached model -- a "usable teamless
     // catalog" -- not an empty or default one.
-    rookui::App::test((), |mut app| async move {
+    ptermui::App::test((), |mut app| async move {
         app.update(|ctx| {
             ctx.add_singleton_model(|_| {
                 PrivatePreferences::new(

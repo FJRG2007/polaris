@@ -3,13 +3,13 @@
 use ai::document::AIDocumentId;
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_core::ui::Icon;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{ConstrainedBox, Container, Highlight, ParentElement, Shrinkable, Text};
-use rookui::fonts::{Properties, Weight};
-use rookui::prelude::{Align, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize};
-use rookui::text_layout::ClipConfig;
-use rookui::{AppContext, Element, SingletonEntity};
+use pterm_core::ui::Icon;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{ConstrainedBox, Container, Highlight, ParentElement, Shrinkable, Text};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::prelude::{Align, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize};
+use ptermui::text_layout::ClipConfig;
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::ai::document::ai_document_model::{AIDocument, AIDocumentVersion};
 use crate::appearance::Appearance;
@@ -68,7 +68,7 @@ impl SearchItem for PlanSearchItem {
             .sub_text_color(appearance.theme().background());
 
         let icon = Container::new(
-            ConstrainedBox::new(Icon::Compass.to_rookui_icon(icon_color).finish())
+            ConstrainedBox::new(Icon::Compass.to_ptermui_icon(icon_color).finish())
                 .with_width(ICON_SIZE)
                 .with_height(ICON_SIZE)
                 .finish(),

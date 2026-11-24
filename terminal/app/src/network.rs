@@ -1,7 +1,7 @@
 use std::future::Future;
 
-use rook_util::sync::Condition;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_util::sync::Condition;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 /// Represents whether the client is connected to the network.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]

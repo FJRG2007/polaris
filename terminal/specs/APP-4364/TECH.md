@@ -28,7 +28,7 @@ The implementation uses a single tracked tombstone per terminal view via `conver
 ### Tombstone Continue action
 `ConversationEndedTombstoneView` on desktop now creates an optional `Continue` cloud button when the tombstone has an ambient `task_id` and `FeatureFlag::HandoffCloudCloud` is enabled. Rendering additionally requires AI to be enabled and desktop-only compilation. The terminal-view subscription validates that the current ambient view model still owns the clicked `task_id` before entering follow-up compose mode.
 The tombstone action is `ContinueInCloud { task_id }`. It records `AgentManagementTelemetryEvent::TombstoneContinueInCloud`, emits `ConversationEndedTombstoneEvent::ContinueInCloud`, and lets `TerminalView::start_cloud_followup_from_tombstone` remove the tombstone, focus the existing input, and set `pending_cloud_followup_task_id`.
-Keep “Continue locally” visible for Oz/plain conversations. When both actions are visible, the cloud `Continue` button renders first, followed by `Continue locally`. For non-Oz harnesses, local continuation is hidden because those runs cannot be forked into a local Rook conversation. With `HandoffCloudCloud` disabled, the cloud button is not created.
+Keep “Continue locally” visible for Oz/plain conversations. When both actions are visible, the cloud `Continue` button renders first, followed by `Continue locally`. For non-Oz harnesses, local continuation is hidden because those runs cannot be forked into a local Polaris Terminal conversation. With `HandoffCloudCloud` disabled, the cloud button is not created.
 ### Follow-up input mode and submission route
 `TerminalView` owns the follow-up compose state with `pending_cloud_followup_task_id: Option<AmbientAgentTaskId>`. Tombstone clicks and owned execution end paths call `reset_after_cloud_followup_submission`, set agent input mode, update pane configuration, and focus the existing input. This keeps the tombstone as a reveal/focus entrypoint rather than an editor.
 When `InputEvent::SendAgentPrompt` arrives, `try_submit_pending_cloud_followup` intercepts it before the normal `TerminalViewEvent::SendAgentPrompt` path. It validates the feature flag, ambient model, and task ID, then calls `AmbientAgentViewModel::submit_cloud_followup(prompt, ctx)`. On success it resets the input after submission and returns without emitting to the ended shared-session network. On empty prompts it keeps the compose route active enough to restore agent input. On validation failure it restores the prompt into the input, clears pending follow-up state, focuses input, and shows an error toast.
@@ -67,7 +67,7 @@ Manual validation:
 - repeat once to catch stale session IDs, duplicate tombstones, and subscription leaks;
 - verify “Continue locally” still forks locally from the tombstone;
 - verify a normal shared-session viewer still becomes read-only/finished when its session ends.
-Targeted validation for this PR is `cargo check -p rook --features handoff_cloud_cloud`, focused ambient model/spawn tests from PR 2, and the new tombstone/input/viewer-manager tests. Before opening or updating the PR, follow repo rules for formatting and clippy; do not use `cargo fmt --all` or file-specific `cargo fmt`.
+Targeted validation for this PR is `cargo check -p polaris-terminal --features handoff_cloud_cloud`, focused ambient model/spawn tests from PR 2, and the new tombstone/input/viewer-manager tests. Before opening or updating the PR, follow repo rules for formatting and clippy; do not use `cargo fmt --all` or file-specific `cargo fmt`.
 ## Risks and mitigations
 ### Prompt routed to stale network
 The largest correctness risk is accidentally sending the follow-up prompt through `TerminalViewEvent::SendAgentPrompt` to a missing or ended `Network`. Mitigate by making follow-up compose mode intercept submission before the viewer-manager network path.
@@ -87,4 +87,4 @@ The follow-up prompt does not go through the ended shared-session network.
 Setup-v2 loading/error UI appears while the follow-up session is starting, and already-rendered replay content is not duplicated.
 An optimistic follow-up user query renders during setup without reusing initial-run dispatch UI.
 When the new session is ready, the existing `FollowupSessionReady` hotswap path attaches it to the same pane.
-Targeted tests and `cargo check -p rook --features handoff_cloud_cloud` pass.
+Targeted tests and `cargo check -p polaris-terminal --features handoff_cloud_cloud` pass.

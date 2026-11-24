@@ -5,10 +5,10 @@ use std::sync::Arc;
 use anyhow::Result;
 use chrono::{OutOfRangeError, Utc};
 use futures::stream::AbortHandle;
-use rook_core::user_preferences::GetUserPreferences as _;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use pterm_core::user_preferences::GetUserPreferences as _;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 
-use super::execution_context::RookAiExecutionContext;
+use super::execution_context::PtermAiExecutionContext;
 use super::utils::{FormattedTranscriptMessage, TranscriptPart, markdown_segments_from_text};
 use crate::ai::{RequestLimitInfo, RequestUsageInfo};
 use crate::ai_assistant::utils::{AssistantTranscriptPart, TranscriptPartSubType};
@@ -17,14 +17,14 @@ use crate::send_telemetry_from_ctx;
 use crate::server::ids::ServerId;
 use crate::server::server_api::ServerApi;
 use crate::server::server_api::ai::AIClient;
-use crate::server::telemetry::{RookAIRequestResult, TelemetryEvent};
+use crate::server::telemetry::{PtermAIRequestResult, TelemetryEvent};
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// The key for the corresponding entry in UserDefaults.
 /// Not wiring through Settings for now since this data is only needed by the panel view.
 pub const REQUEST_LIMIT_INFO_CACHE_KEY: &str = "AIAssistantRequestLimitInfo";
 
-/// Tracks the current request status for making Rook AI requests against server.
+/// Tracks the current request status for making Polaris Terminal AI requests against server.
 pub enum RequestStatus {
     /// There isn't a request in flight right now.
     NotInFlight,
@@ -84,7 +84,7 @@ pub struct Requests {
     /// This list is mutually exclusive from current_transcript.  
     old_transcript_parts: Vec<TranscriptPart>,
 
-    ai_execution_context: Option<RookAiExecutionContext>,
+    ai_execution_context: Option<PtermAiExecutionContext>,
 }
 
 impl Entity for Requests {
@@ -144,7 +144,7 @@ impl Requests {
 
     pub fn update_ai_execution_context(
         &mut self,
-        ai_execution_context: Option<RookAiExecutionContext>,
+        ai_execution_context: Option<PtermAiExecutionContext>,
     ) {
         self.ai_execution_context = ai_execution_context;
     }
@@ -166,7 +166,7 @@ impl Requests {
         }
     }
 
-    /// Starts a Rook AI request against the server with the given request prompt.
+    /// Starts a Polaris Terminal AI request against the server with the given request prompt.
     pub fn issue_request(
         &mut self,
         request: String,
@@ -238,7 +238,7 @@ impl Requests {
 
                             let req_latency = end_time.signed_duration_since(start_time).num_milliseconds();
                             send_telemetry_from_ctx!(
-                                TelemetryEvent::RookAIRequestIssued { result: RookAIRequestResult::Succeeded { latency_ms: req_latency, truncated }},
+                                TelemetryEvent::PtermAIRequestIssued { result: PtermAIRequestResult::Succeeded { latency_ms: req_latency, truncated }},
                                 ctx
                             );
                         }
@@ -291,7 +291,7 @@ impl Requests {
                             });
 
                             send_telemetry_from_ctx!(
-                                TelemetryEvent::RookAIRequestIssued { result: RookAIRequestResult::OutOfRequests},
+                                TelemetryEvent::PtermAIRequestIssued { result: PtermAIRequestResult::OutOfRequests},
                                 ctx
                             );
                         }
@@ -315,7 +315,7 @@ impl Requests {
                             });
 
                             send_telemetry_from_ctx!(
-                                TelemetryEvent::RookAIRequestIssued { result: RookAIRequestResult::Failed},
+                                TelemetryEvent::PtermAIRequestIssued { result: PtermAIRequestResult::Failed},
                                 ctx
                             );
                         }

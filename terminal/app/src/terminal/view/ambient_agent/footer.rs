@@ -1,11 +1,11 @@
 use pathfinder_color::ColorU;
-use rook_core::ui::appearance::Appearance;
-use rookui::Element;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::Element;
+use ptermui::elements::{
     Border, ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
     ParentElement, Text,
 };
-use rookui::fonts::{Properties, Weight};
+use ptermui::fonts::{Properties, Weight};
 
 use crate::ui_components::blended_colors;
 
@@ -98,7 +98,7 @@ pub fn render_error_footer(error_message: &str, appearance: &Appearance) -> Box<
     let header_color = theme.ui_error_color();
     let body_color = blended_colors::text_main(theme, theme.background());
     let background: ColorU = {
-        let red: rook_core::ui::theme::Fill = theme.ui_error_color().into();
+        let red: pterm_core::ui::theme::Fill = theme.ui_error_color().into();
         red.with_opacity(50).into()
     };
     let border_color = theme.ui_error_color();

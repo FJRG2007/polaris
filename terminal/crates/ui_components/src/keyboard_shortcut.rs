@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::icons::Icon;
-use rookui_core::keymap::Keystroke;
-use rookui_core::platform::OperatingSystem;
-use rookui_core::prelude::*;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::icons::Icon;
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::platform::OperatingSystem;
+use ptermui_core::prelude::*;
 
 use crate::Component;
 

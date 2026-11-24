@@ -2,7 +2,7 @@
 //! registration, streamer-driven discovery, and the pending-metadata poll.
 
 use chrono::Utc;
-use rookui::{App, ModelHandle, ViewHandle};
+use ptermui::{App, ModelHandle, ViewHandle};
 
 use super::*;
 use crate::ai::agent::conversation::AIConversation;

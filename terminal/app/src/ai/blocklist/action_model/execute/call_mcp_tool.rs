@@ -3,8 +3,8 @@ use futures::future::BoxFuture;
 #[cfg(not(target_family = "wasm"))]
 use itertools::Itertools;
 #[cfg(not(target_family = "wasm"))]
-use rookui::SingletonEntity;
-use rookui::{Entity, EntityId, ModelContext, ModelHandle};
+use ptermui::SingletonEntity;
+use ptermui::{Entity, EntityId, ModelContext, ModelHandle};
 #[cfg(not(target_family = "wasm"))]
 use uuid::Uuid;
 
@@ -311,7 +311,7 @@ fn handle_call_tool_result(
     res: Result<rmcp::model::CallToolResult, rmcp::ServiceError>,
     server_output_id: Option<crate::ai::blocklist::action_model::execute::ServerOutputId>,
     tool_name: String,
-    ctx: &rookui::AppContext,
+    ctx: &ptermui::AppContext,
 ) -> AIAgentActionResultType {
     let action_result = match res {
         Ok(result) => {

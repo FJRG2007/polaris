@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use instant::Instant;
-use rook_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
+use pterm_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
 use serde_json::{Value, json};
 use strum_macros::{EnumDiscriminants, EnumIter};
 
@@ -191,7 +191,7 @@ impl TelemetryEvent for LifecycleTelemetryEvent {
     }
 
     fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        rook_core::telemetry::enum_events::<Self>()
+        pterm_core::telemetry::enum_events::<Self>()
     }
 }
 
@@ -215,4 +215,4 @@ impl TelemetryEventDesc for LifecycleTelemetryEventDiscriminants {
     }
 }
 
-rook_core::register_telemetry_event!(LifecycleTelemetryEvent);
+pterm_core::register_telemetry_event!(LifecycleTelemetryEvent);

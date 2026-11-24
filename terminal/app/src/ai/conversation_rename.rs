@@ -1,4 +1,4 @@
-use rookui::{SingletonEntity, View, ViewContext};
+use ptermui::{SingletonEntity, View, ViewContext};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::blocklist::{BeginConversationRenameError, BlocklistAIHistoryModel};

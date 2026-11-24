@@ -1,4 +1,4 @@
-use rookui::EntityId;
+use ptermui::EntityId;
 
 use super::WorkspaceAction;
 use crate::pane_group::TerminalPaneId;

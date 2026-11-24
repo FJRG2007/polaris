@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
-use rook_editor::model::CoreEditorModel;
-use rookui::integration::TestStep;
-use rookui::windowing::WindowManager;
-use rookui::{App, SingletonEntity, ViewHandle, WindowId, async_assert};
+use pterm_editor::model::CoreEditorModel;
+use ptermui::integration::TestStep;
+use ptermui::windowing::WindowManager;
+use ptermui::{App, SingletonEntity, ViewHandle, WindowId, async_assert};
 use string_offset::CharOffset;
 
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::{CloudObjectEventEntrypoint, Space};
-use crate::drive::OpenRookDriveObjectSettings;
+use crate::drive::OpenPtermDriveObjectSettings;
 use crate::integration_testing::view_getters::{notebook_view, workspace_view};
 use crate::notebooks::manager::NotebookSource;
 use crate::server::cloud_objects::update_manager::UpdateManager;
@@ -79,7 +79,7 @@ pub fn open_notebook(window_key: impl Into<String>, notebook_key: impl Into<Stri
             WindowManager::as_ref(ctx).show_window_and_focus_app(*window_id);
             workspace.open_notebook(
                 &NotebookSource::Existing(*notebook_id),
-                &OpenRookDriveObjectSettings::default(),
+                &OpenPtermDriveObjectSettings::default(),
                 ctx,
                 true,
             );

@@ -10,7 +10,7 @@ Today the tombstone reads run time, credits, and artifacts off the in-memory `AI
 ## Goals
 - Non-Oz cloud tombstones render `Run time`, `Credits used`, and the artifact buttons row populated from the `AmbientAgentTask`.
 - Cloud Oz tombstones converge on the same task-derived values, matching `ConversationDetailsData::from_task` numerically and on artifacts.
-- Hide the `Continue locally` button (tombstone + details panel) for tasks whose harness is non-Oz, since forking a non-Oz cloud run into a local Rook conversation is unsupported.
+- Hide the `Continue locally` button (tombstone + details panel) for tasks whose harness is non-Oz, since forking a non-Oz cloud run into a local Polaris Terminal conversation is unsupported.
 - Client-only change: no harness, server, schema, or endpoint work.
 
 ## Non-goals
@@ -38,7 +38,7 @@ The tombstone metadata row segments behave as follows. Source-of-truth rules mir
   - Local (no task): unchanged — harness stays `None`, shown when AI is enabled.
   - Cloud Oz task: shown both before and after task load.
   - Cloud non-Oz task (Claude, Gemini): button shows briefly until task fetch resolves, then hides.
-  - Tombstone wasm `Open in Rook` button: unchanged. Opens the same conversation in the desktop client, where the same hide rules then apply.
+  - Tombstone wasm `Open in Polaris Terminal` button: unchanged. Opens the same conversation in the desktop client, where the same hide rules then apply.
 
 Empty-row, error, and snapshot/transcript-viewer behaviors are unchanged.
 

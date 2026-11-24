@@ -2,7 +2,7 @@
 
 ## Context
 
-[Issue #10207](https://github.com/FJRG2007/rook/issues/10207): Project Explorer
+[Issue #10207](https://github.com/FJRG2007/polaris/issues/10207): Project Explorer
 silently shows populated folders (e.g. `.agents`) as empty when a repo exceeds
 `MAX_FILES_PER_REPO` (100,000) during initial indexing. The reporter has
 ~153k tracked files in `~/code` and sees `Failed to build file tree for
@@ -22,7 +22,7 @@ Root cause:
   when the root is `Failed`.
 
 Scope agreed with @moirahuang and @alokedesai
-([comment](https://github.com/FJRG2007/rook/pull/10490#issuecomment-4423492563)):
+([comment](https://github.com/FJRG2007/polaris/pull/10490#issuecomment-4423492563)):
 **make the file tree use lazy loading when indexing hits the maximum, and
 otherwise leave the user experience unchanged.** No toast, no indicator —
 the visible result should be "the folder expands" rather than "the folder
@@ -32,10 +32,10 @@ tracked internally as a follow-up.
 Out of scope: repo-local skill discovery
 (`app/src/ai/skills/file_watchers/`) silently drops skills in degraded
 mode because it queries the metadata tree, and `ai::project_context::model`
-(`crates/ai/src/project_context/model.rs:298`), `rook::ai::outline::native`,
+(`crates/ai/src/project_context/model.rs:298`), `polaris_terminal::ai::outline::native`,
 and `ai::index::full_source_code_embedding` each call `Entry::build_tree`
 independently and hit the same hard limit. Per @moirahuang
-([comment](https://github.com/FJRG2007/rook/pull/10490#issuecomment-4427103160)),
+([comment](https://github.com/FJRG2007/polaris/pull/10490#issuecomment-4427103160)),
 those surfaces will be addressed holistically in follow-up work; this
 spec is strictly scoped to the file tree.
 
@@ -82,10 +82,10 @@ No new event, no new state on `FileTreeState`, no UI plumbing in the view.
   original bug. With `remaining_file_quota = None` the test asserts
   `Indexed` with all top-level files present.
 - Manual: use the existing fixture at
-  `~/code-fixtures/rook-10207-large-repo` (150,001 files). Build with
-  `./script/run --dont-open` and `open -a target/debug/bundle/osx/RookOss.app
-  ~/code-fixtures/rook-10207-large-repo`. Verify:
-  1. `~/Library/Logs/rook-oss.log` contains the "indexed in degraded
+  `~/code-fixtures/polaris-terminal-10207-large-repo` (150,001 files). Build with
+  `./script/run --dont-open` and `open -a target/debug/bundle/osx/PolarisTerminal.app
+  ~/code-fixtures/polaris-terminal-10207-large-repo`. Verify:
+  1. `~/Library/Logs/polaris-terminal.log` contains the "indexed in degraded
      mode" warn line (or whatever the implementation logs — non-empty,
      non-error).
   2. `.agents`, `src`, etc. expand and show their contents.

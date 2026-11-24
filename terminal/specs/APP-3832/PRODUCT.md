@@ -7,7 +7,7 @@ Add a hover-activated detail sidecar to the vertical tabs panel that shows full,
 - When `View as = Panes`, hovering an eligible pane row shows a single pane-scoped sidecar for that pane.
 - When `View as = Tabs`, hovering an eligible tab representative row shows a tab-scoped sidecar composed of one pane-scoped section per visible pane in that tab.
 
-In this first iteration, the sidecar supports terminal / agent terminal panes, code panes, and supported Rook Drive object panes. It is hover-only; keyboard focus and selection do not open it.
+In this first iteration, the sidecar supports terminal / agent terminal panes, code panes, and supported Polaris Terminal Drive object panes. It is hover-only; keyboard focus and selection do not open it.
 
 ## Problem
 
@@ -188,7 +188,7 @@ From top to bottom, a code pane section shows:
 7. Terminal and agent pane sections show full, un-elided directory, branch, command / conversation text, and metadata badges when those fields exist.
 8. Agent pane sections show a status pill when conversation status is available; plain terminal sections do not.
 9. Code pane sections show full file and path information, plus dirty-state information when applicable, without terminal-specific metadata.
-10. Supported Rook Drive object panes show their full title and pane-kind metadata in the sidecar.
+10. Supported Polaris Terminal Drive object panes show their full title and pane-kind metadata in the sidecar.
 11. `Density`, `Pane title as`, `Additional metadata`, and `Show` do not rearrange or remove the sidecar’s fixed detail layout.
 12. Hovering an unsupported pane type shows no sidecar.
 13. In `View as = Tabs`, a tab containing any unsupported visible pane shows no sidecar in this iteration.
@@ -201,7 +201,7 @@ From top to bottom, a code pane section shows:
 - **Panes mode / terminal**: Hover a plain terminal row and verify a single pane-scoped sidecar appears with full working directory, branch, command text, kind badge, and any available diff / PR badges.
 - **Panes mode / agent**: Hover an Oz or CLI agent row and verify the sidecar shows the status pill, full conversation text, and terminal metadata without clipping.
 - **Panes mode / code**: Hover a code row and verify the sidecar shows the full filename and path, plus dirty-state indication when applicable.
-- **Panes mode / Rook Drive object**: Hover a supported notebook, plan, workflow, environment-variable collection, rule, or MCP server row and verify the sidecar shows the full title with the correct kind badge.
+- **Panes mode / Polaris Terminal Drive object**: Hover a supported notebook, plan, workflow, environment-variable collection, rule, or MCP server row and verify the sidecar shows the full title with the correct kind badge.
 - **Tabs mode / multi-pane tab**: Hover a tab representative row for a tab with multiple supported panes and verify the sidecar shows one section per visible pane in the same pane order as the tab.
 - **Large multi-pane tab**: Hover a representative row for a tab with enough supported panes to exceed the available vertical space and verify the sidecar stays bounded and scrolls internally.
 - **Focus preservation**: Hover items and verify the currently focused pane does not change until the user explicitly clicks a row or an existing interactive badge.

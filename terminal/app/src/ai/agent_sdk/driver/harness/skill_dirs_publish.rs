@@ -1,11 +1,11 @@
-//! Makes Rook-provided skills available to third-party harnesses (Claude Code,
+//! Makes Polaris Terminal-provided skills available to third-party harnesses (Claude Code,
 //! Codex) by symlinking them into a skill root each harness already searches
 //! on its own.
 //!
-//! Oz reads `ROOK_SKILL_DIRS` directly (see
+//! Oz reads `POLARIS_TERMINAL_SKILL_DIRS` directly (see
 //! `crate::ai::agent_sdk::driver::AgentDriver::load_skills_dirs`). Third-party
 //! harnesses discover skills from their own skill roots instead, so this
-//! module reads the same `ROOK_SKILL_DIRS` directories and symlinks each
+//! module reads the same `POLARIS_TERMINAL_SKILL_DIRS` directories and symlinks each
 //! skill folder into the harness's skill root, under the skill's own name.
 //! The published name must match the real skill name (rather than some
 //! namespaced alias) because an agent prompt, or another skill, may
@@ -22,13 +22,13 @@
 //! runs need a real identity check, not an assumption). Anything else at the
 //! target — a real file or directory, or a symlink pointing elsewhere or
 //! nowhere — is a genuine conflict, resolved according to whether this run is
-//! sandboxed (see `rook_isolation_platform::detect`):
+//! sandboxed (see `pterm_isolation_platform::detect`):
 //! - In a sandbox, we own the whole filesystem, so the published skill wins:
 //!   the conflicting entry is renamed aside with a `.backup` suffix rather
 //!   than deleted, so nothing is lost.
 //! - Outside a sandbox (for example the self-hosted direct backend, which
 //!   runs on a host we do not own) we never modify an entry that predates
-//!   us. The skill is instead published under a `rook-<name>` alias (subject
+//!   us. The skill is instead published under a `polaris-terminal-<name>` alias (subject
 //!   to the same ownership check), unless that alias also conflicts, in
 //!   which case the skill is not published at all.
 //!
@@ -48,8 +48,8 @@ use std::path::{Path, PathBuf};
 
 use ai::skills::{parse_skills_dirs_env, resolve_skills_dirs};
 use anyhow::{Context, Result};
-use rook_core::features::FeatureFlag;
-use rook_core::safe_warn;
+use pterm_core::features::FeatureFlag;
+use pterm_core::safe_warn;
 
 /// Suffix appended to a real (non-symlink) file or directory this module
 /// moves aside, in a sandbox, so a published skill can take over its name.
@@ -58,12 +58,12 @@ const SANDBOX_BACKUP_SUFFIX: &str = ".backup";
 
 /// Prefix used to publish a skill under an alternate name outside a sandbox,
 /// when a real, non-symlink entry already occupies its real name.
-const NON_SANDBOX_ALTERNATE_NAME_PREFIX: &str = "rook-";
+const NON_SANDBOX_ALTERNATE_NAME_PREFIX: &str = "polaris-terminal-";
 
-/// Resolve the `ROOK_SKILL_DIRS` source directories, most specific first —
+/// Resolve the `POLARIS_TERMINAL_SKILL_DIRS` source directories, most specific first —
 /// the same directories and precedence order Oz uses (see
 /// `ai::skills::read_skills_for_skills_dirs`).
-pub(super) fn rook_skill_source_dirs(working_dir: &Path) -> Vec<PathBuf> {
+pub(super) fn pterm_skill_source_dirs(working_dir: &Path) -> Vec<PathBuf> {
     resolve_skills_dirs(working_dir, parse_skills_dirs_env())
 }
 
@@ -72,9 +72,9 @@ pub(super) fn publish_skills_for_harness(
     working_dir: &Path,
     is_sandbox: bool,
 ) -> Vec<PathBuf> {
-    let source_dirs = rook_skill_source_dirs(working_dir);
+    let source_dirs = pterm_skill_source_dirs(working_dir);
     let bundled_skill_dirs =
-        bundled_factory_mcp_skill_dirs(rook_core::paths::bundled_resources_dir());
+        bundled_factory_mcp_skill_dirs(pterm_core::paths::bundled_resources_dir());
     let configured_skill_dirs = skill_dirs_from_source_dirs(&source_dirs);
     publish_skill_dirs(
         skill_root,
@@ -110,8 +110,8 @@ where
             Ok(entries) => entries,
             Err(err) => {
                 safe_warn!(
-                    safe: ("ROOK_SKILL_DIRS publish: skipping an unreadable source directory"),
-                    full: ("ROOK_SKILL_DIRS publish: skipping '{}' — {err}", source_dir.display())
+                    safe: ("POLARIS_TERMINAL_SKILL_DIRS publish: skipping an unreadable source directory"),
+                    full: ("POLARIS_TERMINAL_SKILL_DIRS publish: skipping '{}' — {err}", source_dir.display())
                 );
                 continue;
             }
@@ -121,9 +121,9 @@ where
                 Ok(entry) => entry,
                 Err(err) => {
                     safe_warn!(
-                        safe: ("ROOK_SKILL_DIRS publish: failed to read a directory entry"),
+                        safe: ("POLARIS_TERMINAL_SKILL_DIRS publish: failed to read a directory entry"),
                         full: (
-                            "ROOK_SKILL_DIRS publish: failed to read an entry in '{}': {err}",
+                            "POLARIS_TERMINAL_SKILL_DIRS publish: failed to read an entry in '{}': {err}",
                             source_dir.display()
                         )
                     );
@@ -199,9 +199,9 @@ pub(super) fn exclude_published_skill_paths_from_git(
     }
     if let Err(err) = write_published_skill_paths_to_git_exclude(working_dir, published_paths) {
         safe_warn!(
-            safe: ("ROOK_SKILL_DIRS publish: failed to exclude generated skill links from Git"),
+            safe: ("POLARIS_TERMINAL_SKILL_DIRS publish: failed to exclude generated skill links from Git"),
             full: (
-                "ROOK_SKILL_DIRS publish: failed to exclude generated skill links under '{}': {err:#}",
+                "POLARIS_TERMINAL_SKILL_DIRS publish: failed to exclude generated skill links under '{}': {err:#}",
                 working_dir.display()
             )
         );
@@ -380,7 +380,7 @@ fn create_symlink_at(source_dir: &Path, target: &Path) -> Result<Option<PathBuf>
 ///   aside to `<skill_root>/<skill_name>.backup` (or a numbered variant if
 ///   that's already taken) rather than deleted, so nothing is lost.
 /// - Outside a sandbox, the conflicting entry is left untouched, and the
-///   skill is instead published as `<skill_root>/rook-<skill_name>` (subject
+///   skill is instead published as `<skill_root>/polaris-terminal-<skill_name>` (subject
 ///   to the same ownership check). If that alternate name is itself
 ///   occupied by something foreign, the skill is not published under either
 ///   name.
@@ -421,9 +421,9 @@ pub(super) fn publish_skill(
             )
         })?;
         safe_warn!(
-            safe: ("ROOK_SKILL_DIRS publish: replaced a conflicting skill entry in a sandbox, backing up the original"),
+            safe: ("POLARIS_TERMINAL_SKILL_DIRS publish: replaced a conflicting skill entry in a sandbox, backing up the original"),
             full: (
-                "ROOK_SKILL_DIRS publish: replaced skill '{skill_name}' at {} with {}, backing up the original to {}",
+                "POLARIS_TERMINAL_SKILL_DIRS publish: replaced skill '{skill_name}' at {} with {}, backing up the original to {}",
                 target.display(), source_dir.display(), backup.display()
             )
         );
@@ -431,15 +431,15 @@ pub(super) fn publish_skill(
     }
 
     // Outside a sandbox: never modify an entry that predates us. Try the
-    // `rook-<name>` alternate name instead.
+    // `polaris-terminal-<name>` alternate name instead.
     let alt_name = format!("{NON_SANDBOX_ALTERNATE_NAME_PREFIX}{skill_name}");
     let alt_target = skill_root.join(&alt_name);
     match inspect_target(&alt_target, source_dir)? {
         TargetOutcome::Foreign => {
             safe_warn!(
-                safe: ("ROOK_SKILL_DIRS publish: a skill conflict outside a sandbox also collided under its alternate name; the skill was not published"),
+                safe: ("POLARIS_TERMINAL_SKILL_DIRS publish: a skill conflict outside a sandbox also collided under its alternate name; the skill was not published"),
                 full: (
-                    "ROOK_SKILL_DIRS publish: skill '{skill_name}' conflicts with an existing entry at {} (left untouched); the alternate name {} is also occupied, so the skill from {} was not published under either name",
+                    "POLARIS_TERMINAL_SKILL_DIRS publish: skill '{skill_name}' conflicts with an existing entry at {} (left untouched); the alternate name {} is also occupied, so the skill from {} was not published under either name",
                     target.display(), alt_target.display(), source_dir.display()
                 )
             );
@@ -452,9 +452,9 @@ pub(super) fn publish_skill(
         }
         TargetOutcome::Missing => {
             safe_warn!(
-                safe: ("ROOK_SKILL_DIRS publish: a skill conflicted outside a sandbox; the original was left as-is and the skill was published under an alternate name"),
+                safe: ("POLARIS_TERMINAL_SKILL_DIRS publish: a skill conflicted outside a sandbox; the original was left as-is and the skill was published under an alternate name"),
                 full: (
-                    "ROOK_SKILL_DIRS publish: skill '{skill_name}' conflicts with an existing entry at {} (left untouched); published {} as {} instead",
+                    "POLARIS_TERMINAL_SKILL_DIRS publish: skill '{skill_name}' conflicts with an existing entry at {} (left untouched); published {} as {} instead",
                     target.display(), source_dir.display(), alt_target.display()
                 )
             );

@@ -9,16 +9,16 @@ use pathfinder_geometry::rect::RectF;
 use persistence::model::{
     AgentConversation, AgentConversationData, AgentConversationRecord, ConversationUsageMetadata,
 };
+use pterm_core::features::FeatureFlag;
+use pterm_server_client::iap::IapManager;
+use ptermui::platform::{WindowBounds, WindowStyle};
+use ptermui::windowing::WindowManager;
+use ptermui::windowing::state::ApplicationStage;
+use ptermui::{App, ModelHandle};
 #[cfg(feature = "local_fs")]
 use repo_metadata::RepoMetadataModel;
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::watcher::DirectoryWatcher;
-use rook_core::features::FeatureFlag;
-use rook_server_client::iap::IapManager;
-use rookui::platform::{WindowBounds, WindowStyle};
-use rookui::windowing::WindowManager;
-use rookui::windowing::state::ApplicationStage;
-use rookui::{App, ModelHandle};
 use session_sharing_protocol::common::SessionId;
 use shared_session::permissions_manager::SessionPermissionsManager;
 use uuid::Uuid;
@@ -71,8 +71,8 @@ use crate::notebooks::editor::keys::NotebookKeybindings;
 use crate::notebooks::manager::NotebookManager;
 use crate::notebooks::notebook::NotebookView;
 use crate::pricing::PricingInfoModel;
+use crate::pterm_managed_paths_watcher::PtermManagedPathsWatcher;
 use crate::resource_center::TipsCompleted;
-use crate::rook_managed_paths_watcher::RookManagedPathsWatcher;
 use crate::search::files::model::FileSearchModel;
 use crate::server::cloud_objects::listener::Listener;
 use crate::server::cloud_objects::update_manager::UpdateManager;
@@ -149,7 +149,7 @@ fn initialize_app_with_history(app: &mut App, conversations: Vec<AgentConversati
     app.add_singleton_model(|_| DetectedRepositories::default());
     app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
     app.add_singleton_model(DirectoryWatcher::new);
-    app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+    app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
     app.add_singleton_model(FileMCPWatcher::new);
     app.add_singleton_model(|_| FileBasedMCPManager::default());
 
@@ -3994,7 +3994,7 @@ fn test_focused_pane_is_synchronized_with_application_focus() {
 #[cfg(feature = "local_fs")]
 #[test]
 fn test_undo_close_keeps_a_file_pane_watching_its_file() {
-    use rook_files::FileModel;
+    use pterm_files::FileModel;
 
     let _undo_closed_panes = FeatureFlag::UndoClosedPanes.override_enabled(true);
 

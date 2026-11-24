@@ -1,10 +1,10 @@
 # Persist TUI agent prompts for history
 ## Context
-The shared [`BlocklistAIHistoryModel`](https://github.com/FJRG2007/rook/blob/41b922e0/app/src/ai/blocklist/history_model.rs) owns in-memory agent conversations for both the GUI and TUI. Prompt submission updates that model and emits `BlocklistAIHistoryEvent` values, but persistence is a downstream projection rather than part of submission.
+The shared [`BlocklistAIHistoryModel`](https://github.com/FJRG2007/polaris/blob/41b922e0/terminal/app/src/ai/blocklist/history_model.rs) owns in-memory agent conversations for both the GUI and TUI. Prompt submission updates that model and emits `BlocklistAIHistoryEvent` values, but persistence is a downstream projection rather than part of submission.
 
-The GUI projection lives in [`app/src/pane_group/pane/terminal_pane.rs`](https://github.com/FJRG2007/rook/blob/41b922e0/app/src/pane_group/pane/terminal_pane.rs): its per-pane history subscription filters events for the pane's terminal surface, serializes query-bearing exchanges as `PersistedAIInput`, and sends `ModelEvent::UpsertAIQuery` to the persistence writer. The TUI subscribes to the same history model in [`crates/rook_tui/src/terminal_session_view.rs`](https://github.com/FJRG2007/rook/blob/41b922e0/crates/rook_tui/src/terminal_session_view.rs), but does not currently project those events into its persistence writer. TUI prompts therefore remain available only while their conversations are in memory.
+The GUI projection lives in [`app/src/pane_group/pane/terminal_pane.rs`](https://github.com/FJRG2007/polaris/blob/41b922e0/terminal/app/src/pane_group/pane/terminal_pane.rs): its per-pane history subscription filters events for the pane's terminal surface, serializes query-bearing exchanges as `PersistedAIInput`, and sends `ModelEvent::UpsertAIQuery` to the persistence writer. The TUI subscribes to the same history model in [`crates/pterm_tui/src/terminal_session_view.rs`](https://github.com/FJRG2007/polaris/blob/41b922e0/terminal/crates/pterm_tui/src/terminal_session_view.rs), but does not currently project those events into its persistence writer. TUI prompts therefore remain available only while their conversations are in memory.
 
-The GUI and TUI use separate SQLite scopes. [`PersistenceScope::Tui`](https://github.com/FJRG2007/rook/blob/41b922e0/app/src/persistence/mod.rs#L63-L72) prevents schema/version skew between the two frontends, so the TUI must write its own prompt rows for later TUI launches to restore them.
+The GUI and TUI use separate SQLite scopes. [`PersistenceScope::Tui`](https://github.com/FJRG2007/polaris/blob/41b922e0/terminal/app/src/persistence/mod.rs#L63-L72) prevents schema/version skew between the two frontends, so the TUI must write its own prompt rows for later TUI launches to restore them.
 ## Proposed changes
 ### Share the query persistence projection
 Move the event filtering and `PersistedAIInput` construction from the GUI pane handler into `maybe_build_ai_query_upsert_event` in `app/src/ai/blocklist/persistence.rs`.
@@ -27,7 +27,7 @@ The TUI does not apply the GUI's `GeneralSettings::restore_session` gate. That s
 ## Testing and validation
 - Unit-test `maybe_build_ai_query_upsert_event` with a restored conversation containing a user query. Verify the resulting `UpsertAIQuery` preserves the conversation ID, exchange ID, and serialized query input.
 - Run the blocklist persistence unit tests covering the shared projection.
-- Run the `rook_tui` test suite to ensure the new writer lookup and history-event subscription compile with the TUI feature.
+- Run the `pterm_tui` test suite to ensure the new writer lookup and history-event subscription compile with the TUI feature.
 - Run `./script/format` and the repository clippy command before submitting.
 - Manually submit a prompt in the TUI, restart the TUI, and verify the query is present in the TUI-scoped `ai_queries` table.
 ## Parallelization

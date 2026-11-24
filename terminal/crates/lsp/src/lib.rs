@@ -53,8 +53,8 @@ impl std::fmt::Display for LspServerLogLevel {
 use std::sync::Arc;
 
 use anyhow::Result;
-use rookui_core::AppContext;
-use rookui_core::r#async::executor::Background;
+use ptermui_core::AppContext;
+use ptermui_core::r#async::executor::Background;
 #[cfg(not(target_arch = "wasm32"))]
 use simple_logger::SimpleLogger;
 

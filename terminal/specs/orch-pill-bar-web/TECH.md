@@ -49,7 +49,7 @@ The local-orchestration UI already has a clean answer to all three problems: eac
 - `app/src/ai/blocklist/agent_view/orchestration_pill_bar.rs` — pill bar View (1994 lines); `pill_specs()` (418-479), `is_conversation_open_in_other_visible_view()` (1696-1724), `pane_group_id_containing_terminal_view()` (1731-1750)
 - `app/src/ai/blocklist/history_model.rs (388-450)` — parent-child conversation index (`child_conversations_of`, `start_new_child_conversation`, `set_parent_for_conversation`)
 - `app/src/terminal/view/pane_impl.rs (503-543)` — pill bar rendering integration
-- `crates/rook_features/src/lib.rs (665-720)` — feature flags (`OrchestrationPillBar`, `Orchestration`)
+- `crates/pterm_features/src/lib.rs (665-720)` — feature flags (`OrchestrationPillBar`, `Orchestration`)
 
 **Shared session viewer:**
 - `app/src/terminal/shared_session/viewer/terminal_manager.rs (730-750)` — task_id extraction from `SessionSourceType::AmbientAgent`
@@ -60,9 +60,9 @@ The local-orchestration UI already has a clean answer to all three problems: eac
 - `app/src/workspace/view/wasm_view.rs (180-196)` — WASM viewer REST API calls via `ServerApiProvider`
 
 **Server REST API (read-only, no changes needed):**
-- `rook-server/router/handlers/public_api/agent_webhooks.go (1807-1814)` — `ancestor_run_id` filter validation
-- `rook-server/public_api/types/types.gen.go (1579-1658)` — `RunItem` struct with `SessionId`, `SessionLink`, `State`, `Title`, `AgentConfig`, `Artifacts`
-- `rook-server/authz/engine.go (556-605)` — `aiTaskPolicies`, ownership-based `ViewAction`
+- `polaris-terminal-server/router/handlers/public_api/agent_webhooks.go (1807-1814)` — `ancestor_run_id` filter validation
+- `polaris-terminal-server/public_api/types/types.gen.go (1579-1658)` — `RunItem` struct with `SessionId`, `SessionLink`, `State`, `Title`, `AgentConfig`, `Artifacts`
+- `polaris-terminal-server/authz/engine.go (556-605)` — `aiTaskPolicies`, ownership-based `ViewAction`
 
 ## Design options
 
@@ -70,7 +70,7 @@ Two approaches can deliver orchestration data to the web viewer. They share the 
 
 ### Option A: REST + per-child hidden shared-session pane (recommended for V1)
 
-The viewer queries existing rook-server REST APIs for child metadata and status. Each discovered child gets its own hidden shared-session viewer pane (its own `TerminalView`, `TerminalManager`, and child-session `Network`), reusing the pattern that local orchestration uses for remote child agents. Pill clicks navigate via the existing `SwapPaneToConversation` mechanism. No changes to `session-sharing-protocol` or `rook-proto-apis`.
+The viewer queries existing polaris-terminal-server REST APIs for child metadata and status. Each discovered child gets its own hidden shared-session viewer pane (its own `TerminalView`, `TerminalManager`, and child-session `Network`), reusing the pattern that local orchestration uses for remote child agents. Pill clicks navigate via the existing `SwapPaneToConversation` mechanism. No changes to `session-sharing-protocol` or `polaris-terminal-proto-apis`.
 
 **How it works:**
 
@@ -87,7 +87,7 @@ The viewer queries existing rook-server REST APIs for child metadata and status.
 - Child tasks have their own shared sessions (`RunItem.SessionId`). The viewer can join child sessions via WebSocket using the same session-sharing protocol as the parent, getting live `AgentResponseEvent` streams that are harness-agnostic.
 
 **Pros:**
-- Repos touched: **1-2** (rook client + possibly minor rook-server authz). No `session-sharing-protocol` or `rook-proto-apis` changes.
+- Repos touched: **1-2** (polaris-terminal client + possibly minor polaris-terminal-server authz). No `session-sharing-protocol` or `polaris-terminal-proto-apis` changes.
 - Uses existing, tested APIs and client patterns.
 - Simpler server-side work.
 
@@ -102,7 +102,7 @@ The server forwards child `AgentResponseEvent`s and lifecycle status updates thr
 
 **How it works:**
 
-1. Extend `StreamInit` in `rook-proto-apis/apis/multi_agent/v1/response.proto` with optional orchestration fields: `agent_name`, `agent_role`, `parent_agent_id`, `harness_type`, `working_directory`, `agent_description`.
+1. Extend `StreamInit` in `polaris-terminal-proto-apis/apis/multi_agent/v1/response.proto` with optional orchestration fields: `agent_name`, `agent_role`, `parent_agent_id`, `harness_type`, `working_directory`, `agent_description`.
 2. Add `OrchestrationEvent::ChildStatusUpdate` variant to `OrderedTerminalEventType` in `session-sharing-protocol`.
 3. Server forwards child `ResponseEvent`s to the parent's shared session (via `forked_from_conversation_token`) and publishes lifecycle status updates as `OrchestrationEvent`s.
 4. Client processes forked child events to create child conversations and registers parent-child relationships. Status updates arrive via the existing WebSocket — no polling needed.
@@ -113,7 +113,7 @@ The server forwards child `AgentResponseEvent`s and lifecycle status updates thr
 - No auth gap: events flow through the already-authorized session connection.
 
 **Cons:**
-- Repos touched: **4** (session-sharing-protocol, rook-proto-apis, rook-server, rook client).
+- Repos touched: **4** (session-sharing-protocol, polaris-terminal-proto-apis, polaris-terminal-server, polaris-terminal client).
 - Complex server plumbing: forwarding child events to parent session, lifecycle notifier integration.
 - Event volume scales with child count.
 - `session-sharing-protocol` is an external repo pinned by git rev.
@@ -124,7 +124,7 @@ Option A for V1, with each child hosted in its own hidden shared-session pane (s
 
 ## Proposed changes (Option A)
 
-### Layer 1: rook-server — authz (no changes needed)
+### Layer 1: polaris-terminal-server — authz (no changes needed)
 
 The authz model is ownership-based (`authz/engine.go:556-605`): `ViewAction` on an AI task is granted if the principal owns it or belongs to the owning team. Child tasks spawned by `run_agents` inherit the same user/team ownership as the parent. Therefore, any principal who can view the parent task already has `ViewAction` on the children — no new authz rules are required.
 
@@ -134,7 +134,7 @@ This covers the two common cases:
 
 External users with only a session link who are not on the owning team would not have access to child tasks. This is an edge case that can be addressed later if link-shared orchestrated sessions become common.
 
-### Layer 2: rook client — children poller + per-child hidden shared-session panes
+### Layer 2: polaris-terminal client — children poller + per-child hidden shared-session panes
 Split the responsibilities cleanly:
 - A new `OrchestrationViewerModel` *only* discovers children via REST, registers them in `BlocklistAIHistoryModel`, and emits `TerminalViewEvent::EnsureSharedSessionViewerChildPane` on the parent's `TerminalView` once a child first reports a `session_id`. It owns **no** `Network`s.
 - The pane group's `ensure_shared_session_viewer_child_pane` handler materializes a hidden shared-session viewer pane per child. Each hidden pane is created via `create_shared_session_viewer(child_session_id, resources, view_size, /* enable_orchestration_polling */ false, ctx)`, giving the child its own `TerminalView`, `TerminalManager`, `BlocklistAIController`, and viewer-side `Network`. The pane is held off-tree in `child_agent_panes`, exactly like local-orchestration remote children.
@@ -193,7 +193,7 @@ Each hidden child pane's `viewer::TerminalManager` owns its own `Network`. Event
 #### h) Re-Inits don't disrupt user focus
 The per-child-pane architecture eliminates the cross-stream interference described in §V1 lessons. The parent's `BlocklistAIController` continues to receive `Init`s for the parent's own request streams; those `Init`s only affect the parent's pane because each child pane has its own controller, its own agent view state, and its own selected-conversation tracking. No changes to `on_shared_init` are required.
 
-### Layer 3: rook client — make pill bar WASM-compatible
+### Layer 3: polaris-terminal client — make pill bar WASM-compatible
 
 In `orchestration_pill_bar.rs`:
 
@@ -209,9 +209,9 @@ In `orchestration_pill_bar.rs`:
 
 On native, the shared session viewer pill bar retains full pane-management actions (open in new pane/tab, focus pane) since the native client supports multi-pane layouts. No `#[cfg]` gates are needed for native — the existing pill bar logic applies as-is once child conversations are registered.
 
-### Layer 4: rook client — enable pill bar for shared sessions
+### Layer 4: polaris-terminal client — enable pill bar for shared sessions
 
-Add a new `FeatureFlag::OrchestrationViewerPillBar` flag in `crates/rook_features/src/lib.rs`. The pill bar for shared session viewers renders when `OrchestrationViewerPillBar` is enabled and the session has child agents.
+Add a new `FeatureFlag::OrchestrationViewerPillBar` flag in `crates/pterm_features/src/lib.rs`. The pill bar for shared session viewers renders when `OrchestrationViewerPillBar` is enabled and the session has child agents.
 
 In `pane_impl.rs (528-537)`, the existing pill bar rendering condition checks `FeatureFlag::OrchestrationPillBar` + `AgentView` + fullscreen. For shared session viewing, add a parallel condition: `FeatureFlag::OrchestrationViewerPillBar` + `AgentView` + fullscreen + the conversation has children registered via the REST data fetch.
 
@@ -223,7 +223,7 @@ Verify that `child_conversations_of()` returns the correct children for shared-s
 
 ```mermaid
 sequenceDiagram
-    participant Server as rook-server REST API
+    participant Server as polaris-terminal-server REST API
     participant SSS as session-sharing-server
     participant ParentPane as parent viewer pane
     participant ChildPane as hidden child pane
@@ -293,8 +293,8 @@ Older servers that don't support `ancestor_run_id` filtering will return empty r
 
 ## Parallelization
 
-With Option A, this work is entirely in the rook client repo (layers 2-4). No server changes are required (see Layer 1).
+With Option A, this work is entirely in the polaris-terminal client repo (layers 2-4). No server changes are required (see Layer 1).
 
 The client work itself is sequential: WASM pill bar compat (layer 3) and pill bar enablement (layer 4) can proceed without the data fetching (layer 2), but integration testing requires all layers. Given the small server-side scope, parallelization across repos provides limited benefit. A single agent can work through this sequentially.
 
-Branch `matthew/orch-web-ui` is already set up across `rook-server` and `rook`.
+Branch `matthew/orch-web-ui` is already set up across `polaris-terminal-server` and `polaris-terminal`.

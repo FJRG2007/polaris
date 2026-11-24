@@ -38,7 +38,7 @@ The Cmd-O (open file palette) already handles `~` correctly by calling `shellexp
 1. User types `/open-file ~/Documents/notes.txt` and presses Enter.
 2. `~` is expanded to the user's home directory (e.g. `/Users/me`).
 3. The resulting absolute path `/Users/me/Documents/notes.txt` is used directly (not joined with the working directory).
-4. If the file exists, it opens in Rook's code editor.
+4. If the file exists, it opens in Polaris Terminal's code editor.
 5. If the file does not exist, the "File not found" toast shows the expanded path (e.g. `File not found: /Users/me/Documents/notes.txt`), not the literal `~` form.
 
 ### Edge cases

@@ -12,29 +12,29 @@ use ai::workspace::WorkspaceMetadata;
 use lsp::supported_servers::LSPServerType;
 use lsp::{LspManagerModel, LspManagerModelEvent, LspServerModel, LspState};
 use pathfinder_color::ColorU;
+use pterm_core::features::FeatureFlag;
+use pterm_core::settings::ToggleableSetting as _;
+use pterm_core::ui::theme::{AnsiColorIdentifier, Fill as ThemeFill};
+use pterm_util::path::user_friendly_path;
 #[cfg(not(target_family = "wasm"))]
-use remote_server::codebase_index_proto::{RemoteCodebaseIndexState, RemoteCodebaseIndexStatus};
-use rook_core::features::FeatureFlag;
-use rook_core::settings::ToggleableSetting as _;
-use rook_core::ui::theme::{AnsiColorIdentifier, Fill as ThemeFill};
-use rook_util::path::user_friendly_path;
-#[cfg(not(target_family = "wasm"))]
-use rook_util::remote_path::RemotePath;
-use rookui::elements::{
+use pterm_util::remote_path::RemotePath;
+use ptermui::elements::{
     ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Element, Empty,
     Expanded, Fill, Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius,
     Shrinkable,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::ContextPredicate;
-use rookui::platform::{Cursor, FilePickerConfiguration};
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::ui_components::switch::{SwitchStateHandle, TooltipConfig};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::ContextPredicate;
+use ptermui::platform::{Cursor, FilePickerConfiguration};
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::switch::{SwitchStateHandle, TooltipConfig};
+use ptermui::{
     Action, AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WindowId, id,
 };
+#[cfg(not(target_family = "wasm"))]
+use remote_server::codebase_index_proto::{RemoteCodebaseIndexState, RemoteCodebaseIndexStatus};
 
 use super::search::SearchQuery;
 use super::settings_page::{
@@ -75,10 +75,10 @@ const LSP_STATUS_INDICATOR_SIZE: f32 = 8.;
 const CODE_FEATURE_NAME: &str = "Code";
 const INITIALIZATION_SETTINGS_HEADER: &str = "Initialization Settings";
 const CODEBASE_INDEXING_LABEL: &str = "Codebase indexing";
-const CODEBASE_INDEX_DESCRIPTION: &str = "Rook can automatically index code repositories as you navigate them, helping agents quickly understand context and provide solutions. Code is never stored on the server. If a codebase is unable to be indexed, Rook can still navigate your codebase and gain insights via grep and find tool calling.";
-const ROOK_INDEXING_IGNORE_DESCRIPTION: &str = "To exclude specific files or directories from indexing, add them to the .rookindexingignore file in your repository directory. These files will still be accessible to AI features, but they won't be included in codebase embeddings.";
+const CODEBASE_INDEX_DESCRIPTION: &str = "Polaris Terminal can automatically index code repositories as you navigate them, helping agents quickly understand context and provide solutions. Code is never stored on the server. If a codebase is unable to be indexed, Polaris Terminal can still navigate your codebase and gain insights via grep and find tool calling.";
+const POLARIS_TERMINAL_INDEXING_IGNORE_DESCRIPTION: &str = "To exclude specific files or directories from indexing, add them to the .polaris-terminal-indexingignore file in your repository directory. These files will still be accessible to AI features, but they won't be included in codebase embeddings.";
 const AUTO_INDEX_FEATURE_NAME: &str = "Index new folders by default";
-const AUTO_INDEX_DESCRIPTION: &str = "When set to true, Rook will automatically index code repositories as you navigate them - helping agents quickly understand context and provide targeted solutions.";
+const AUTO_INDEX_DESCRIPTION: &str = "When set to true, Polaris Terminal will automatically index code repositories as you navigate them - helping agents quickly understand context and provide targeted solutions.";
 const INDEXING_DISABLED_ADMIN_TEXT: &str = "Team admins have disabled codebase indexing.";
 const INDEXING_WORKSPACE_ENABLED_ADMIN_TEXT: &str = "Team admins have enabled codebase indexing.";
 const INDEXING_DISABLED_GLOBAL_AI_TEXT: &str =
@@ -780,7 +780,7 @@ impl SettingsWidget for CodePageWidget {
         ));
         content.add_child(self.render_settings_subtext(
             global_ai_enabled,
-            ROOK_INDEXING_IGNORE_DESCRIPTION,
+            POLARIS_TERMINAL_INDEXING_IGNORE_DESCRIPTION,
             appearance,
         ));
 
@@ -1256,15 +1256,15 @@ impl CodePageWidget {
                     ..Default::default()
                 })
                 .with_text_and_icon_label(
-                    rookui::ui_components::button::TextAndIcon::new(
-                        rookui::ui_components::button::TextAndIconAlignment::IconFirst,
+                    ptermui::ui_components::button::TextAndIcon::new(
+                        ptermui::ui_components::button::TextAndIconAlignment::IconFirst,
                         "Open project rules",
-                        rookui::elements::Icon::new(
+                        ptermui::elements::Icon::new(
                             "bundled/svg/file-code-02.svg",
                             theme.foreground(),
                         ),
-                        rookui::elements::MainAxisSize::Min,
-                        rookui::elements::MainAxisAlignment::Center,
+                        ptermui::elements::MainAxisSize::Min,
+                        ptermui::elements::MainAxisAlignment::Center,
                         pathfinder_geometry::vector::vec2f(14., 14.),
                     )
                     .with_inner_padding(4.),
@@ -1646,7 +1646,7 @@ impl CodePageWidget {
                 Container::new(
                     ConstrainedBox::new(
                         status_icon
-                            .to_rookui_icon(ThemeFill::Solid(presentation.color))
+                            .to_ptermui_icon(ThemeFill::Solid(presentation.color))
                             .finish(),
                     )
                     .with_width(STATUS_ICON_SIZE)
@@ -1952,7 +1952,7 @@ impl CodePageWidget {
         &self,
         workspace_path: &Path,
         server_type: LSPServerType,
-        server_model: Option<&rookui::ModelHandle<LspServerModel>>,
+        server_model: Option<&ptermui::ModelHandle<LspServerModel>>,
         is_enabled: bool,
         mouse_states: LspServerRowMouseStates,
         appearance: &Appearance,
@@ -2139,9 +2139,9 @@ impl CodePageWidget {
     /// Gets the status color and text for an LSP server.
     fn get_lsp_status_info(
         &self,
-        server_model: Option<&rookui::ModelHandle<LspServerModel>>,
+        server_model: Option<&ptermui::ModelHandle<LspServerModel>>,
         app: &AppContext,
-        theme: &rook_core::ui::theme::RookTheme,
+        theme: &pterm_core::ui::theme::PtermTheme,
     ) -> (ColorU, &'static str) {
         match server_model {
             Some(model) => {

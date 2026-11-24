@@ -86,7 +86,7 @@ fn publish_skill_is_a_noop_when_the_target_already_points_at_our_source() {
     assert_eq!(fs::read_link(&target).unwrap(), skill_dir);
     // No backup or alternate name was ever created for a clean no-op.
     assert!(!skill_root.path().join("github.backup").exists());
-    assert!(!skill_root.path().join("rook-github").exists());
+    assert!(!skill_root.path().join("polaris-terminal-github").exists());
 }
 
 #[test]
@@ -134,7 +134,7 @@ fn publish_skill_outside_a_sandbox_leaves_a_foreign_symlink_untouched_and_uses_a
 
     // The foreign symlink at the real name is completely untouched.
     assert_eq!(fs::read_link(&target).unwrap(), old_skill_dir);
-    let alt_target = skill_root.path().join("rook-github");
+    let alt_target = skill_root.path().join("polaris-terminal-github");
     assert_eq!(published, alt_target);
     assert_eq!(fs::read_link(&alt_target).unwrap(), new_skill_dir);
 }
@@ -146,7 +146,7 @@ fn publish_skill_outside_a_sandbox_does_not_publish_when_the_alternate_name_is_a
     let unrelated_skill_dir = write_skill(source_root.path(), "unrelated");
     let skill_dir = write_skill(source_root.path(), "github");
     let target = skill_root.path().join("github");
-    let alt_target = skill_root.path().join("rook-github");
+    let alt_target = skill_root.path().join("polaris-terminal-github");
     create_symlink(&unrelated_skill_dir, &target).unwrap();
     create_symlink(&unrelated_skill_dir, &alt_target).unwrap();
 
@@ -170,7 +170,7 @@ fn publish_skill_outside_a_sandbox_is_a_noop_when_the_alternate_name_already_poi
     let skill_root = TempDir::new().unwrap();
     let skill_dir = write_skill(source_root.path(), "github");
     let target = skill_root.path().join("github");
-    let alt_target = skill_root.path().join("rook-github");
+    let alt_target = skill_root.path().join("polaris-terminal-github");
     fs::create_dir_all(&target).unwrap();
     fs::write(target.join("real-file.txt"), "do not touch me").unwrap();
     create_symlink(&skill_dir, &alt_target).unwrap();
@@ -265,8 +265,8 @@ fn publish_skill_outside_a_sandbox_leaves_a_conflicting_real_directory_untouched
         "do not touch me"
     );
     assert!(!skill_root.path().join("github.backup").exists());
-    // The skill was published under the `rook-` alternate name instead.
-    let alt_target = skill_root.path().join("rook-github");
+    // The skill was published under the `polaris-terminal-` alternate name instead.
+    let alt_target = skill_root.path().join("polaris-terminal-github");
     assert_eq!(published, alt_target);
     assert_eq!(fs::read_link(&alt_target).unwrap(), skill_dir);
 }
@@ -277,7 +277,7 @@ fn publish_skill_outside_a_sandbox_does_not_publish_when_the_alternate_name_also
     let skill_root = TempDir::new().unwrap();
     let skill_dir = write_skill(source_root.path(), "github");
     let target = skill_root.path().join("github");
-    let alt_target = skill_root.path().join("rook-github");
+    let alt_target = skill_root.path().join("polaris-terminal-github");
     fs::create_dir_all(&target).unwrap();
     fs::write(target.join("real-file.txt"), "do not touch me").unwrap();
     fs::create_dir_all(&alt_target).unwrap();
@@ -453,17 +453,17 @@ fn additional_factory_mcp_skill_publishes_to_native_harness_roots_idempotently()
 }
 
 #[test]
-fn rook_skill_source_wins_over_bundled_factory_mcp_with_the_same_name() {
+fn pterm_skill_source_wins_over_bundled_factory_mcp_with_the_same_name() {
     let root = TempDir::new().unwrap();
-    let rook_skills = root.path().join("rook-skills");
+    let pterm_skills = root.path().join("polaris-terminal-skills");
     let bundled_skills = root.path().join("resources/bundled/skills");
-    fs::create_dir_all(&rook_skills).unwrap();
+    fs::create_dir_all(&pterm_skills).unwrap();
     fs::create_dir_all(&bundled_skills).unwrap();
-    let configured_skill = write_skill(&rook_skills, "factory-mcp");
+    let configured_skill = write_skill(&pterm_skills, "factory-mcp");
     let bundled = write_skill(&bundled_skills, "factory-mcp");
     let skill_root = root.path().join(".claude/skills");
 
-    let configured_skill_dirs = skill_dirs_from_source_dirs([rook_skills]);
+    let configured_skill_dirs = skill_dirs_from_source_dirs([pterm_skills]);
     publish_skill_dirs(
         &skill_root,
         configured_skill_dirs.iter().chain([&bundled]),

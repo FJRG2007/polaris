@@ -4,7 +4,7 @@ Product spec: `specs/zachlloyd/restore-fast-forward-state/PRODUCT.md`
 
 ## Problem
 
-Rook already restores agent conversations across app restarts, but it does not persist the conversation's `autoexecute_override` state. The fast-forward button therefore only affects the in-memory session: after restart, the conversation is restored, but its fast-forward state falls back to the default instead of the user's last choice.
+Polaris Terminal already restores agent conversations across app restarts, but it does not persist the conversation's `autoexecute_override` state. The fast-forward button therefore only affects the in-memory session: after restart, the conversation is restored, but its fast-forward state falls back to the default instead of the user's last choice.
 
 This feature should use the existing SQLite-backed session restoration flow rather than adding a separate persistence mechanism.
 
@@ -29,8 +29,8 @@ This feature should use the existing SQLite-backed session restoration flow rath
 - `app/src/ai/restored_conversations.rs:22` — restored conversations are staged globally on startup.
 - `app/src/ai/blocklist/history_model/conversation_loader.rs:59` — persisted conversations are converted back into `AIConversation`.
 - `app/src/terminal/view/load_ai_conversation.rs:91` — startup restoration path loads restored conversations into terminal views.
-- `crates/rook_features/src/lib.rs:337` — existing `FastForwardAutoexecuteButton` flag.
-- `crates/rook_features/src/lib.rs (806-855)` — `DOGFOOD_FLAGS` and other rollout lists.
+- `crates/pterm_features/src/lib.rs:337` — existing `FastForwardAutoexecuteButton` flag.
+- `crates/pterm_features/src/lib.rs (806-855)` — `DOGFOOD_FLAGS` and other rollout lists.
 
 ## Current state
 
@@ -56,7 +56,7 @@ There is a second gap: the toggle path only mutates in-memory state and emits `U
 
 ### 1. Add a dedicated feature flag
 
-Add a new runtime feature flag in `crates/rook_features/src/lib.rs` for remembering fast-forward state across restored sessions, separate from `FeatureFlag::FastForwardAutoexecuteButton`.
+Add a new runtime feature flag in `crates/pterm_features/src/lib.rs` for remembering fast-forward state across restored sessions, separate from `FeatureFlag::FastForwardAutoexecuteButton`.
 
 Proposed name: `FeatureFlag::RememberFastForwardState`
 
@@ -110,7 +110,7 @@ Update `BlocklistAIHistoryModel::toggle_autoexecute_override(...)` so that after
 That ensures this sequence works correctly:
 
 1. user toggles fast forward
-2. Rook saves the updated conversation JSON immediately
+2. Polaris Terminal saves the updated conversation JSON immediately
 3. user quits or restarts before any other agent event
 4. session restoration reloads the new fast-forward state
 
@@ -189,7 +189,7 @@ This feature does not need a new pane or window snapshot field. Reusing the exis
 
 ### Manual verification
 
-- Start an agent conversation, enable fast forward, restart Rook, verify the restored conversation still shows fast forward enabled.
+- Start an agent conversation, enable fast forward, restart Polaris Terminal, verify the restored conversation still shows fast forward enabled.
 - Repeat with fast forward disabled.
 - Repeat after toggling immediately before quit.
 - Repeat with fullscreen agent view restored.

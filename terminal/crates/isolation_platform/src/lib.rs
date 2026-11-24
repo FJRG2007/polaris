@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use rook_core::channel::{Channel, ChannelState};
+use pterm_core::channel::{Channel, ChannelState};
 use serde::Serialize;
 
 #[cfg(not(target_family = "wasm"))]
@@ -19,30 +19,30 @@ mod namespace;
 /// Environment variable set by the server to identify the isolation platform.
 /// The value should match one of the `IsolationPlatformType` variants in snake_case.
 #[cfg(not(target_family = "wasm"))]
-const ROOK_ISOLATION_PLATFORM_ENV: &str = "ROOK_ISOLATION_PLATFORM";
+const POLARIS_TERMINAL_ISOLATION_PLATFORM_ENV: &str = "POLARIS_TERMINAL_ISOLATION_PLATFORM";
 
-/// Environment variable containing the generic Rook-managed workload token that we use
+/// Environment variable containing the generic Polaris Terminal-managed workload token that we use
 /// for isolation platforms that don't issue their own tokens.
 #[cfg(not(target_family = "wasm"))]
-const ROOK_WORKLOAD_TOKEN_ENV: &str = "ROOK_WORKLOAD_TOKEN";
+const POLARIS_TERMINAL_WORKLOAD_TOKEN_ENV: &str = "POLARIS_TERMINAL_WORKLOAD_TOKEN";
 
-/// A kind of isolation platform. For our usage, isolation platforms are different ways where Rook
+/// A kind of isolation platform. For our usage, isolation platforms are different ways where Polaris Terminal
 /// can be sandboxed, such as VMs, containers, or cloud hosts. This may also include weaker forms
 /// of sandboxing such as Git worktrees.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IsolationPlatformType {
-    /// Rook is running within a Docker container. Note that this does *not* mean this is a Rook-hosted
+    /// Polaris Terminal is running within a Docker container. Note that this does *not* mean this is a Polaris Terminal-hosted
     /// Docker Sandboxes environment. Instead, it's likely a self-hosted agent.
     #[cfg(not(target_family = "wasm"))]
     Docker,
-    /// Rook is running within a Docker Sandbox, likely as a Rook-hosted agent.
+    /// Polaris Terminal is running within a Docker Sandbox, likely as a Polaris Terminal-hosted agent.
     #[cfg(not(target_family = "wasm"))]
     DockerSandbox,
-    /// Rook is running within a Kubernetes pod, likely as a self-hosted agent.
+    /// Polaris Terminal is running within a Kubernetes pod, likely as a self-hosted agent.
     #[cfg(not(target_family = "wasm"))]
     Kubernetes,
-    /// Rook is running within a Namespace instance, likely as a Rook-hosted agent.
+    /// Polaris Terminal is running within a Namespace instance, likely as a Polaris Terminal-hosted agent.
     #[cfg(not(target_family = "wasm"))]
     Namespace,
 }
@@ -136,11 +136,11 @@ pub async fn issue_workload_token(
     }
 }
 
-/// Read a platform-agnostic workload token from the `ROOK_WORKLOAD_TOKEN` environment variable.
+/// Read a platform-agnostic workload token from the `POLARIS_TERMINAL_WORKLOAD_TOKEN` environment variable.
 /// Returns a `WorkloadToken` with no expiration, or an error if the variable is missing/empty.
 #[cfg(not(target_family = "wasm"))]
 fn read_generic_workload_token() -> Result<WorkloadToken, IsolationPlatformError> {
-    let token = std::env::var(ROOK_WORKLOAD_TOKEN_ENV)
+    let token = std::env::var(POLARIS_TERMINAL_WORKLOAD_TOKEN_ENV)
         .map_err(|_| IsolationPlatformError::GenericWorkloadTokenMissing)?;
     if token.is_empty() {
         return Err(IsolationPlatformError::GenericWorkloadTokenMissing);
@@ -151,17 +151,17 @@ fn read_generic_workload_token() -> Result<WorkloadToken, IsolationPlatformError
     })
 }
 
-/// Parse the `ROOK_ISOLATION_PLATFORM` environment variable into a platform type.
+/// Parse the `POLARIS_TERMINAL_ISOLATION_PLATFORM` environment variable into a platform type.
 #[cfg(not(target_family = "wasm"))]
 fn platform_from_env() -> Option<IsolationPlatformType> {
-    let value = std::env::var(ROOK_ISOLATION_PLATFORM_ENV).ok()?;
+    let value = std::env::var(POLARIS_TERMINAL_ISOLATION_PLATFORM_ENV).ok()?;
     match value.as_str() {
         "docker" => Some(IsolationPlatformType::Docker),
         "docker_sandbox" => Some(IsolationPlatformType::DockerSandbox),
         "kubernetes" => Some(IsolationPlatformType::Kubernetes),
         "namespace" => Some(IsolationPlatformType::Namespace),
         other => {
-            log::warn!("Unknown {ROOK_ISOLATION_PLATFORM_ENV} value: {other}");
+            log::warn!("Unknown {POLARIS_TERMINAL_ISOLATION_PLATFORM_ENV} value: {other}");
             None
         }
     }

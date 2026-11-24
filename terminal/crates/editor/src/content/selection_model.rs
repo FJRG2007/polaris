@@ -1,8 +1,8 @@
 use std::ops::Range;
 
 use itertools::Itertools;
-use rook_errors::report_error;
-use rookui_core::{AppContext, Entity, ModelHandle};
+use pterm_errors::report_error;
+use ptermui_core::{AppContext, Entity, ModelHandle};
 use string_offset::CharOffset;
 use vec1::{Vec1, vec1};
 
@@ -310,7 +310,7 @@ impl BufferSelectionModel {
     }
 
     /// Validate the buffer content with this selection model's anchors.
-    pub fn validate_buffer(&self, ctx: &impl rookui_core::ModelAsRef) {
+    pub fn validate_buffer(&self, ctx: &impl ptermui_core::ModelAsRef) {
         self.buffer.as_ref(ctx).validate(&self.anchors);
     }
 

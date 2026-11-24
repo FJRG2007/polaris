@@ -1,13 +1,13 @@
-use rook_core::ui::appearance::Appearance;
-use rook_terminal::model::BlockId;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_terminal::model::BlockId;
+use ptermui::elements::{
     ConstrainedBox, CrossAxisAlignment, Flex, Hoverable, MainAxisSize, ParentElement, Shrinkable,
     Text,
 };
-use rookui::platform::Cursor;
-use rookui::prelude::{Container, MouseStateHandle};
-use rookui::text_layout::ClipConfig;
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::platform::Cursor;
+use ptermui::prelude::{Container, MouseStateHandle};
+use ptermui::text_layout::ClipConfig;
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::terminal::CLIAgent;
 use crate::terminal::view::PADDING_LEFT;
@@ -87,7 +87,7 @@ impl View for HarnessSessionHeader {
                 Container::new(
                     ConstrainedBox::new(
                         chevron_icon
-                            .to_rookui_icon(theme.sub_text_color(theme.background()))
+                            .to_ptermui_icon(theme.sub_text_color(theme.background()))
                             .finish(),
                     )
                     .with_width(CHEVRON_SIZE)

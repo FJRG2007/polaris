@@ -1,6 +1,6 @@
 //! Compact free-form text input used by inline AI block actions.
-use rookui::presenter::ChildView;
-use rookui::{
+use ptermui::presenter::ChildView;
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, View, ViewContext, ViewHandle,
 };
 

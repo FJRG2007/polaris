@@ -1,14 +1,14 @@
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::phenomenon::PhenomenonStyle;
-use rookui::assets::asset_cache::AssetSource;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::phenomenon::PhenomenonStyle;
+use ptermui::assets::asset_cache::AssetSource;
+use ptermui::elements::{
     CacheOption, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Expanded, Flex, Image, MainAxisSize, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, Stack, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::{Element, ViewHandle};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{Element, ViewHandle};
 
 use crate::appearance::Appearance;
 use crate::ui_components::icons::Icon;
@@ -43,7 +43,7 @@ const FEATURE_ITEMS: &[FeatureItem] = &[
     FeatureItem {
         icon: Icon::MessageCheckSquare,
         title: "Native code review",
-        description: "Send inline comments from Rook's code review directly to Claude Code, Codex, or OpenCode",
+        description: "Send inline comments from Polaris Terminal's code review directly to Claude Code, Codex, or OpenCode",
     },
 ];
 
@@ -105,7 +105,7 @@ pub fn render_welcome_banner(
 
     // Title
     let title = Text::new(
-        "Introducing universal agent support: level up any coding agent with Rook",
+        "Introducing universal agent support: level up any coding agent with Polaris Terminal",
         appearance.ui_font_family(),
         20.,
     )
@@ -121,7 +121,7 @@ pub fn render_welcome_banner(
     for item in FEATURE_ITEMS {
         let icon_el = ConstrainedBox::new(
             item.icon
-                .to_rookui_icon(Fill::Solid(PhenomenonStyle::modal_feature_title_text()))
+                .to_ptermui_icon(Fill::Solid(PhenomenonStyle::modal_feature_title_text()))
                 .finish(),
         )
         .with_width(16.)

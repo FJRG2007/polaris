@@ -4,22 +4,22 @@ use std::sync::Arc;
 
 use itertools::Itertools;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::theme::Fill;
-use rook_editor::editor::NavigationKey;
-use rook_errors::report_error;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use pterm_editor::editor::NavigationKey;
+use pterm_errors::report_error;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Align, Border, ChildAnchor, Clipped, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, ScrollbarWidth, Shrinkable, Stack,
 };
-use rookui::fonts::{FamilyId, Weight};
-use rookui::platform::Cursor;
-use rookui::presenter::ChildView;
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{FamilyId, Weight};
+use ptermui::platform::Cursor;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, UpdateView, View,
     ViewContext, ViewHandle,
 };
@@ -36,8 +36,8 @@ use crate::auth::UserUid;
 use crate::cloud_object::breadcrumbs::{ContainingObject, ContainingObjectKind};
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::{CloudObject, CloudObjectEventEntrypoint, ObjectType, Owner, Revision};
-use crate::drive::cloud_object_styling::rook_drive_icon_color;
-use crate::drive::items::RookDriveItemId;
+use crate::drive::cloud_object_styling::pterm_drive_icon_color;
+use crate::drive::items::PtermDriveItemId;
 use crate::drive::{CloudObjectTypeAndId, DriveObjectType};
 use crate::editor::{
     EditorOptions, EditorView, EnterAction, EnterSettings, Event as EditorEvent, InteractionState,
@@ -151,7 +151,7 @@ pub struct WorkflowModal {
     pub(super) ai_metadata_assist_state: AiAssistState,
     breadcrumbs: Option<Vec<BreadcrumbState<ContainingObject>>>,
     /// ID of the breadcrumb space/folder a user clicked on before the unsaved dialog popped up
-    clicked_breadcrumb: Option<RookDriveItemId>,
+    clicked_breadcrumb: Option<PtermDriveItemId>,
     menu: ViewHandle<Menu<WorkflowModalAction>>,
     menu_open: bool,
     arguments_clipped_scroll_state: ClippedScrollStateHandle,
@@ -169,7 +169,7 @@ pub enum WorkflowModalAction {
     CloseUnsavedChangesDialog,
     ForceClose,
     AiAssist,
-    ViewInRookDrive(RookDriveItemId),
+    ViewInPtermDrive(PtermDriveItemId),
     OpenOverflowMenu,
     CopyObjectToClipboard,
     TrashObject,
@@ -180,7 +180,7 @@ pub enum WorkflowModalEvent {
     UpdatedWorkflow(SyncId),
     AiAssistError(String),
     AiAssistUpgradeError(Option<ServerId>, UserUid),
-    ViewInRookDrive(RookDriveItemId),
+    ViewInPtermDrive(PtermDriveItemId),
 }
 
 /// A grouping of various error states the modal can be in. Any of these being
@@ -423,7 +423,7 @@ impl WorkflowModal {
     #[allow(dead_code)]
     fn populate(&mut self, workflow: Workflow, ctx: &mut ViewContext<Self>) {
         // Sanitize the arguments generated for the workflow by removing any illegal characters.
-        // Necessary since Rook AI command search sometimes provides arguments in an invalid argument format.
+        // Necessary since Polaris Terminal AI command search sometimes provides arguments in an invalid argument format.
         let mut sanitized_content = workflow.content().to_string();
         let sanitized_arguments = workflow
             .arguments()
@@ -598,8 +598,8 @@ impl WorkflowModal {
         title_is_empty && description_is_empty && content_is_empty
     }
 
-    fn view_in_rook_drive(&mut self, id: RookDriveItemId, ctx: &mut ViewContext<Self>) {
-        ctx.emit(WorkflowModalEvent::ViewInRookDrive(id));
+    fn view_in_pterm_drive(&mut self, id: PtermDriveItemId, ctx: &mut ViewContext<Self>) {
+        ctx.emit(WorkflowModalEvent::ViewInPtermDrive(id));
         self.close(false /* force */, ctx);
         self.clicked_breadcrumb = None;
     }
@@ -1399,8 +1399,8 @@ impl WorkflowModal {
         let workflow_icon = Container::new(
             ConstrainedBox::new(
                 Icon::from(DriveObjectType::Workflow)
-                    .to_rookui_icon(
-                        rook_drive_icon_color(appearance, DriveObjectType::Workflow).into(),
+                    .to_ptermui_icon(
+                        pterm_drive_icon_color(appearance, DriveObjectType::Workflow).into(),
                     )
                     .finish(),
             )
@@ -1443,10 +1443,10 @@ impl WorkflowModal {
                 appearance,
                 |ctx, _, object| {
                     let item_id = match object.kind {
-                        ContainingObjectKind::Object(id) => RookDriveItemId::Object(id),
-                        ContainingObjectKind::Space(space) => RookDriveItemId::Space(space),
+                        ContainingObjectKind::Object(id) => PtermDriveItemId::Object(id),
+                        ContainingObjectKind::Space(space) => PtermDriveItemId::Space(space),
                     };
-                    ctx.dispatch_typed_action(WorkflowModalAction::ViewInRookDrive(item_id));
+                    ctx.dispatch_typed_action(WorkflowModalAction::ViewInPtermDrive(item_id));
                 },
             );
 
@@ -1697,7 +1697,7 @@ impl WorkflowModal {
             let text_and_icon = TextAndIcon::new(
                 TextAndIconAlignment::TextFirst,
                 label.to_string(),
-                icon.to_rookui_icon(appearance.theme().active_ui_text_color()),
+                icon.to_ptermui_icon(appearance.theme().active_ui_text_color()),
                 MainAxisSize::Min,
                 MainAxisAlignment::Center,
                 vec2f(16., 16.),
@@ -1727,7 +1727,8 @@ impl WorkflowModal {
                 .finish();
 
             let button_with_tool_tip = appearance.ui_builder().tool_tip_on_element(
-                "Generate a title, descriptions, or parameters with Rook AI".to_string(),
+                "Generate a title, descriptions, or parameters with Polaris Terminal AI"
+                    .to_string(),
                 self.button_mouse_states.ai_assist_tool_tip.clone(),
                 rendered_button,
                 ParentAnchor::BottomMiddle,
@@ -1914,17 +1915,17 @@ impl TypedActionView for WorkflowModal {
             WorkflowModalAction::ForceClose => {
                 self.close(true, ctx);
                 if let Some(id) = self.clicked_breadcrumb {
-                    self.view_in_rook_drive(id, ctx);
+                    self.view_in_pterm_drive(id, ctx);
                 }
             }
             WorkflowModalAction::AiAssist => self.issue_request(ctx),
-            WorkflowModalAction::ViewInRookDrive(id) => {
+            WorkflowModalAction::ViewInPtermDrive(id) => {
                 if self.should_show_unsaved_changes_dialog(ctx) {
                     self.clicked_breadcrumb = Some(*id);
                     self.show_unsaved_changes_dialog(ctx);
                     return;
                 }
-                self.view_in_rook_drive(*id, ctx)
+                self.view_in_pterm_drive(*id, ctx)
             }
             WorkflowModalAction::OpenOverflowMenu => self.open_overflow_menu(ctx),
             WorkflowModalAction::CopyObjectToClipboard => self.copy_object_to_clipboard(ctx),

@@ -3,13 +3,13 @@ use async_trait::async_trait;
 use cynic::{MutationBuilder, QueryBuilder};
 #[cfg(test)]
 use mockall::automock;
-use rook_graphql::mutations::delete_runner::{
+use pterm_graphql::mutations::delete_runner::{
     DeleteRunner, DeleteRunnerInput, DeleteRunnerResult, DeleteRunnerVariables,
 };
-use rook_graphql::mutations::upsert_runner::{
+use pterm_graphql::mutations::upsert_runner::{
     UpsertRunner, UpsertRunnerInput, UpsertRunnerResult, UpsertRunnerVariables,
 };
-use rook_graphql::queries::get_runners::{
+use pterm_graphql::queries::get_runners::{
     GetRunners, GetRunnersResult, GetRunnersVariables, Runner, RunnerSortBy,
 };
 

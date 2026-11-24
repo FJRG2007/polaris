@@ -9,8 +9,8 @@ use futures_lite::FutureExt;
 use fuzzy_match::FuzzyMatchResult;
 use instant::Instant;
 use itertools::Itertools;
-use rook_util::path::CleanPathResult;
-use rookui::{AppContext, Entity, SingletonEntity};
+use pterm_util::path::CleanPathResult;
+use ptermui::{AppContext, Entity, SingletonEntity};
 
 use super::search_item::{CreateFileSearchItem, FileSearchItem};
 use crate::code::opened_files::{OpenedFilesInRepo, OpenedFilesModel};
@@ -26,7 +26,7 @@ const MAX_RESULTS: usize = 100;
 enum FileRanking {
     None,
     ChangedInGit,
-    OpenedInRook { timestamp: Instant },
+    OpenedInPterm { timestamp: Instant },
 }
 
 pub struct FileDataSource {
@@ -159,7 +159,7 @@ impl FileDataSource {
                         .as_ref()
                         .and_then(|of: &OpenedFilesInRepo| of.get(&item.path))
                     {
-                        file_ranking = FileRanking::OpenedInRook {
+                        file_ranking = FileRanking::OpenedInPterm {
                             timestamp: *last_opened_timestamp,
                         };
                     }

@@ -3,8 +3,8 @@
 use ai::LLMId;
 use onboarding::OnboardingAuthState;
 use onboarding::slides::OnboardingModelInfo;
-use rook_core::ui::icons::Icon;
-use rookui::{AppContext, SingletonEntity};
+use pterm_core::ui::icons::Icon;
+use ptermui::{AppContext, SingletonEntity};
 
 use super::llms::{LLMInfo, LLMPreferences};
 use crate::auth::AuthStateProvider;

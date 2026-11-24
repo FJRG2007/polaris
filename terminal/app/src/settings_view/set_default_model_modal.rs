@@ -1,8 +1,8 @@
-use rookui::elements::{
+use ptermui::elements::{
     ChildView, Container, CrossAxisAlignment, DispatchEventResult, Element, EventHandler, Flex,
     MainAxisAlignment, MainAxisSize, ParentElement, Text,
 };
-use rookui::{
+use ptermui::{
     AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
     WeakViewHandle,
 };

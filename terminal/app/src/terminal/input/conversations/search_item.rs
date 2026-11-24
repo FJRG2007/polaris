@@ -2,12 +2,12 @@
 
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{ConstrainedBox, Container, Highlight, ParentElement, Shrinkable, Text};
-use rookui::fonts::{Properties, Style, Weight};
-use rookui::prelude::{Align, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize};
-use rookui::text_layout::ClipConfig;
-use rookui::{AppContext, Element, SingletonEntity};
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{ConstrainedBox, Container, Highlight, ParentElement, Shrinkable, Text};
+use ptermui::fonts::{Properties, Style, Weight};
+use ptermui::prelude::{Align, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize};
+use ptermui::text_layout::ClipConfig;
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::ai::agent_conversations_model::AgentConversationEntry;
 use crate::ai::conversation_status_ui::render_status_element;

@@ -1,9 +1,9 @@
 use std::fmt::Write;
 
 use itertools::Itertools;
-use rook_errors::report_if_error;
-use rookui::modals::{AlertDialogWithCallbacks, AppModalCallback, ModalButton};
-use rookui::{
+use pterm_errors::report_if_error;
+use ptermui::modals::{AlertDialogWithCallbacks, AppModalCallback, ModalButton};
+use ptermui::{
     AppContext, EntityId, SingletonEntity, ViewContext, ViewHandle, WeakViewHandle, WindowId,
 };
 use settings::ToggleableSetting as _;
@@ -541,7 +541,7 @@ impl<'a> QuitWarningDialog<'a> {
             QuitScope::Tabs(tabs) if tabs.len() == 1 => "Close tab?",
             QuitScope::Tabs(_) => "Close tabs?",
             QuitScope::Window(_) => "Close window?",
-            QuitScope::App => "Quit Rook?",
+            QuitScope::App => "Quit Polaris Terminal?",
             QuitScope::EditorTab { .. } => "Save changes?",
         };
 
@@ -576,7 +576,7 @@ impl<'a> QuitWarningDialog<'a> {
             not(target_family = "wasm"),
             any(target_os = "linux", target_os = "freebsd", windows)
         )) {
-            // Find a window to show the Rook-native modal in. If there is no active window, use
+            // Find a window to show the Polaris Terminal-native modal in. If there is no active window, use
             // one of the windows with a running process.
             let window_id_to_focus = ctx
                 .windows()

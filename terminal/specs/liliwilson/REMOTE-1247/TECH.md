@@ -35,7 +35,7 @@ The bundled Oz CLI docs also describe `ANTHROPIC_API_KEY` as automatic auth and 
 
 Extend the third-party harness flow with an explicit pre-start step that can materialize config files in the target environment's home/config directories before the CLI process starts, but only when the harness is running in an isolated sandbox environment.
 
-Add this as a new `ThirdPartyHarness` hook, e.g. `prepare_environment_config(&self, working_dir, secrets)`, with a default no-op implementation for harnesses that do not need config writes. The shared orchestration should call this hook only after verifying the current environment is an isolated sandbox via `rook_isolation_platform::detect().is_some()`. That treats any detected isolation platform as eligible for config prep, including future `IsolationPlatformType` variants, and avoids inferring sandbox-ness from harness type alone. That keeps the call site generic while leaving the file formats and merge logic CLI-specific.
+Add this as a new `ThirdPartyHarness` hook, e.g. `prepare_environment_config(&self, working_dir, secrets)`, with a default no-op implementation for harnesses that do not need config writes. The shared orchestration should call this hook only after verifying the current environment is an isolated sandbox via `pterm_isolation_platform::detect().is_some()`. That treats any detected isolation platform as eligible for config prep, including future `IsolationPlatformType` variants, and avoids inferring sandbox-ness from harness type alone. That keeps the call site generic while leaving the file formats and merge logic CLI-specific.
 
 For Claude Code, the prep step should create/update:
 
@@ -88,7 +88,7 @@ Do not bake Claude-specific file writes into a generic runner path in a way that
 
 A likely shape is:
 
-- shared harness orchestration checks `rook_isolation_platform::detect().is_some()` and only calls a per-harness prep method before spawning the CLI command when any isolation platform is detected
+- shared harness orchestration checks `pterm_isolation_platform::detect().is_some()` and only calls a per-harness prep method before spawning the CLI command when any isolation platform is detected
 - Claude prep writes Claude onboarding/trust/permissions config files
 - future Codex prep can handle `~/.codex/*` or login bootstrap independently
 
@@ -114,7 +114,7 @@ autonomous cloud run
 Main Claude flow:
 
 1. Harness validates the CLI binary and required managed secret.
-2. If `rook_isolation_platform::detect().is_some()`, harness prepares Claude config files in the environment home directory for the session's working directory. Otherwise it skips config preparation and preserves the user's existing local CLI state.
+2. If `pterm_isolation_platform::detect().is_some()`, harness prepares Claude config files in the environment home directory for the session's working directory. Otherwise it skips config preparation and preserves the user's existing local CLI state.
 3. Harness launches Claude with the prompt file and bypass-permissions flag.
 4. Claude starts in an already-onboarded, already-trusted project state and uses the existing `ANTHROPIC_API_KEY` auth path.
 5. Harness periodically/finally reads transcript artifacts from `~/.claude` and uploads them.
@@ -123,7 +123,7 @@ Main Claude flow:
 
 - **Brittle coupling to Claude's private config schema.** Mitigate by keeping all Claude-specific assumptions isolated to `ClaudeHarness`, preserving unrelated JSON keys, adding version-aware tests where possible, and documenting the exact fields we rely on in this spec.
 - **Accidental overwrite of user-supplied config.** Always read the existing Claude JSON first, merge only harness-owned keys into that parsed object, and preserve unrelated fields. Add unit tests that start from pre-populated `~/.claude.json` / `~/.claude/settings.json` fixtures and assert unrelated keys survive the write.
-- **Unexpected local config mutation outside sandboxed runs.** Gate `prepare_environment_config` behind an explicit `rook_isolation_platform::detect().is_some()` check in shared harness orchestration, and add tests for the non-sandbox path to verify no Claude config files are created or modified.
+- **Unexpected local config mutation outside sandboxed runs.** Gate `prepare_environment_config` behind an explicit `pterm_isolation_platform::detect().is_some()` check in shared harness orchestration, and add tests for the non-sandbox path to verify no Claude config files are created or modified.
 
 ## Testing and validation
 
@@ -133,7 +133,7 @@ Main Claude flow:
   - uses the expected project trust key derived from the harness working directory
   - leaves existing `customApiKeyResponses` and other auth-related fields unchanged in this first-pass implementation
 - Test merging configs, as if there is an existing local config file.
-- Test that shared harness orchestration skips `prepare_environment_config` when `rook_isolation_platform::detect()` returns `None`, and does call it when detection returns any isolation platform.
+- Test that shared harness orchestration skips `prepare_environment_config` when `pterm_isolation_platform::detect()` returns `None`, and does call it when detection returns any isolation platform.
 - Run a Claude harness in a fresh environment with no existing Claude config and verify the first terminal output is the agent executing the prompt, not onboarding UI.
 - Verify transcript upload still works from `~/.claude` after config prep.
 

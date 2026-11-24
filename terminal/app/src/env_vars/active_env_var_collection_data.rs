@@ -1,4 +1,4 @@
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 use super::CloudEnvVarCollectionModel;
 use crate::cloud_object::breadcrumbs::ContainingObject;

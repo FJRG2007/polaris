@@ -182,7 +182,7 @@ fn create_finished_event_from_conversation(conversation: &AIConversation) -> Res
             warp_token_usage: conversation
                 .token_usage()
                 .iter()
-                .filter_map(|u| u.to_proto_rook_usage())
+                .filter_map(|u| u.to_proto_pterm_usage())
                 .collect(),
             byok_token_usage: conversation
                 .token_usage()

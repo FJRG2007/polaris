@@ -5,16 +5,16 @@ use itertools::Itertools;
 use markdown_parser::{
     FormattedText, FormattedTextFragment, FormattedTextHeader, FormattedTextLine,
 };
-use rook_core::command::ExitCode;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::color::blend::Blend as _;
-use rookui::elements::{
+use pterm_core::command::ExitCode;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::color::blend::Blend as _;
+use ptermui::elements::{
     Border, Container, CornerRadius, CrossAxisAlignment, Flex, FormattedTextElement,
     HighlightedHyperlink, MainAxisSize, MouseStateHandle, ParentElement, Radius,
 };
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::UiComponent as _;
-use rookui::{Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::UiComponent as _;
+use ptermui::{Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::terminal::ssh::util::InteractiveSshCommand;
 use crate::ui_components::buttons::icon_button;
@@ -91,7 +91,7 @@ impl TypedActionView for FileUpload {
         &mut self,
         _action: &Self::Action,
         _ctx: &mut ViewContext<Self>,
-    ) -> rookui::accessibility::ActionAccessibilityContent {
+    ) -> ptermui::accessibility::ActionAccessibilityContent {
         Default::default()
     }
 }
@@ -101,7 +101,7 @@ impl View for FileUpload {
         "SSH File Upload"
     }
 
-    fn render(&self, app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
         self.render_file_upload_element(&self.uploads, appearance)
     }
@@ -187,7 +187,7 @@ impl FileUpload {
         }
     }
 
-    /// Creates an sftp command that copies a given local file into the PWD of the rookified ssh session, if any.
+    /// Creates an sftp command that copies a given local file into the PWD of the ptermified ssh session, if any.
     fn transfer_file_sftp_command(&self, file_upload: &FileUploadInfo) -> String {
         // "sftp "
         let mut command = String::from("sftp ");

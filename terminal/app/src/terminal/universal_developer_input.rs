@@ -5,24 +5,24 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use pathfinder_color::ColorU;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::color::contrast::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::color::contrast::{
     MinimumAllowedContrast, foreground_color_with_minimum_contrast,
 };
-use rook_core::ui::color::{Opacity, Rgb, coloru_with_opacity};
-use rook_core::ui::theme;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::ui::color::{Opacity, Rgb, coloru_with_opacity};
+use pterm_core::ui::theme;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     ChildView, Clipped, Container, CornerRadius, CrossAxisAlignment, Fill, Flex, MainAxisAlignment,
     MainAxisSize, ParentElement, Radius, Rect, Shrinkable, SizeConstraintCondition,
     SizeConstraintSwitch,
 };
-use rookui::ui_components::components::UiComponentStyles;
-use rookui::ui_components::segmented_control::{
+use ptermui::ui_components::components::UiComponentStyles;
+use ptermui::ui_components::segmented_control::{
     RenderableOptionConfig, SegmentedControl, SegmentedControlEvent, TooltipConfig,
 };
-use rookui::{
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity as _, TypedActionView,
     View, ViewAsRef, ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -127,23 +127,26 @@ impl AtContextMenuDisabledReason {
                 let session_type = session.session_type();
                 let has_connected_remote_server = matches!(
                     session_type,
-                    SessionType::RookifiedRemote { host_id: Some(_) }
+                    SessionType::PtermifiedRemote { host_id: Some(_) }
                 );
                 // The @ menu requires repo metadata which is only available for:
                 // - Local sessions
-                // - RookifiedRemote sessions with a connected remote server (host_id is Some)
+                // - PtermifiedRemote sessions with a connected remote server (host_id is Some)
                 //
                 // Block when:
                 // - SSH wrapper session without a remote server upgrade
-                // - RookifiedRemote still connecting (host_id is None)
+                // - PtermifiedRemote still connecting (host_id is None)
                 //
                 // Note: is_ssh_wrapper_session() is set at bootstrap time and stays true
-                // even after the session transitions to RookifiedRemote with a host_id.
+                // even after the session transitions to PtermifiedRemote with a host_id.
                 // So we must check has_connected_remote_server first to avoid
                 // incorrectly blocking upgraded sessions.
                 let is_ssh_without_remote_server = !has_connected_remote_server
                     && (session.is_ssh_wrapper_session()
-                        || matches!(session_type, SessionType::RookifiedRemote { host_id: None }));
+                        || matches!(
+                            session_type,
+                            SessionType::PtermifiedRemote { host_id: None }
+                        ));
                 let is_subshell = session.subshell_info().is_some();
                 (is_ssh_without_remote_server, is_subshell)
             })
@@ -803,7 +806,7 @@ impl View for UniversalDeveloperInputButtonBar {
         "UniversalDeveloperInputButtonBar"
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
         let theme = appearance.theme();
         #[cfg(feature = "voice_input")]
@@ -812,7 +815,7 @@ impl View for UniversalDeveloperInputButtonBar {
         // Helper function to create a 1px vertical divider
         let create_divider = || {
             Container::new(
-                rookui::elements::ConstrainedBox::new(
+                ptermui::elements::ConstrainedBox::new(
                     Rect::new().with_background(theme.surface_3()).finish(),
                 )
                 .with_width(1.0)
@@ -824,7 +827,7 @@ impl View for UniversalDeveloperInputButtonBar {
             .finish()
         };
 
-        let build_buttons = |model_selector_element: Box<dyn rookui::Element>| {
+        let build_buttons = |model_selector_element: Box<dyn ptermui::Element>| {
             // Create a horizontal layout with buttons arranged in a row
             let mut buttons = Flex::row()
                 .with_main_axis_size(MainAxisSize::Max)

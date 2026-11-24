@@ -4,8 +4,8 @@ use ::local_control::protocol::{
     ThemeListResult, ThemeStateResult, ThemeSummary,
 };
 use ::local_control::{ControlError, ErrorCode};
-use rookui::keymap::DescriptionContext;
-use rookui::{ModelContext, SingletonEntity};
+use ptermui::keymap::DescriptionContext;
+use ptermui::{ModelContext, SingletonEntity};
 use serde::Serialize;
 use serde_json::{Value, json};
 use settings::Setting as _;
@@ -16,7 +16,7 @@ use crate::settings::{
     AccessibilitySettings, FontSettings, InputSettings, ThemeSettings, derived_theme_kind,
 };
 use crate::themes::theme::ThemeKind;
-use crate::user_config::RookConfig;
+use crate::user_config::PtermConfig;
 use crate::util::bindings::trigger_to_keystroke;
 
 pub(super) const ALLOWLISTED_SETTING_KEYS: &[&str] = &[
@@ -95,7 +95,7 @@ fn theme_list_result(
     ctx: &mut ModelContext<LocalControlBridge>,
 ) -> Result<ThemeListResult, ControlError> {
     let current_theme = active_theme_kind(ThemeSettings::as_ref(ctx), ctx);
-    let mut themes = RookConfig::as_ref(ctx)
+    let mut themes = PtermConfig::as_ref(ctx)
         .theme_config()
         .theme_items()
         .map(|(kind, _)| ThemeSummary {

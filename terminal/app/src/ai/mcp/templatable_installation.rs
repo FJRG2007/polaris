@@ -3,8 +3,8 @@ use std::hash::{Hash, Hasher};
 
 use handlebars::{get_arguments, render_template};
 use lazy_static::lazy_static;
-use rook_errors::report_error;
-use rook_managed_secrets::ManagedSecretValue;
+use pterm_errors::report_error;
+use pterm_managed_secrets::ManagedSecretValue;
 use serde::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use uuid::Uuid;
@@ -101,7 +101,7 @@ impl TemplatableMCPServerInstallation {
         &self.variable_values
     }
 
-    /// Apply Rook-managed secrets to the installation's variable values.
+    /// Apply Polaris Terminal-managed secrets to the installation's variable values.
     ///
     /// Precedence for each template variable:
     /// 1. Explicit reference: if the current value contains `{{secret_name}}`

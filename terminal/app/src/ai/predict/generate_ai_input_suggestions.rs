@@ -1,5 +1,5 @@
 //! This module contains all auxiliary code for hitting the GenerateAIInputSuggestions endpoint in
-//! rook-server that serves Agent Predict.
+//! polaris-terminal-server that serves Agent Predict.
 
 mod api;
 
@@ -11,7 +11,7 @@ use itertools::Itertools;
 use parking_lot::FairMutex;
 use serde::{Deserialize, Serialize};
 
-use crate::ai_assistant::execution_context::RookAiExecutionContext;
+use crate::ai_assistant::execution_context::PtermAiExecutionContext;
 use crate::terminal::TerminalModel;
 use crate::terminal::model::block::BlockState;
 
@@ -45,7 +45,7 @@ pub struct HistoryContext {
 #[derive(Clone)]
 pub struct NextCommandContext {
     pub history_contexts: Vec<HistoryContext>,
-    pub ai_execution_context: RookAiExecutionContext,
+    pub ai_execution_context: PtermAiExecutionContext,
     pub context_messages: Vec<ContextMessageInput>,
 }
 

@@ -3,15 +3,15 @@ use std::env::var_os;
 
 use anyhow::Context;
 use itertools::Itertools;
-use rookui::AppContext;
-use rookui::keymap::Keystroke;
+use ptermui::AppContext;
+use ptermui::keymap::Keystroke;
 #[cfg(not(test))]
-use rookui::keymap::Trigger;
+use ptermui::keymap::Trigger;
 use serde::{Deserialize, Serialize};
 use vec1::{Vec1, vec1};
 
 /// Environment variable to disable saving keybindings to file (used in integration tests)
-pub const DISABLE_SAVE_ENV_VAR: &str = "ROOK_TEST_DISABLE_KEYBINDING_SAVE";
+pub const DISABLE_SAVE_ENV_VAR: &str = "POLARIS_TERMINAL_TEST_DISABLE_KEYBINDING_SAVE";
 const REMOVED_KEYBINDING_SERIALIZATION: &str = "none";
 
 #[derive(PartialEq, Debug)]
@@ -93,7 +93,7 @@ where
 }
 
 pub fn keybinding_file_path() -> std::path::PathBuf {
-    rook_core::paths::config_local_dir().join(KEYBINDINGS_FILE_NAME)
+    pterm_core::paths::config_local_dir().join(KEYBINDINGS_FILE_NAME)
 }
 
 /// Save the custom keybindings map to disk.

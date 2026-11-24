@@ -1,6 +1,6 @@
-use rook_util::content_version::ContentVersion;
-// Re-export from rook_util so existing app-level imports continue to work.
-pub use rook_util::local_or_remote_path::LocalOrRemotePath;
+use pterm_util::content_version::ContentVersion;
+// Re-export from pterm_util so existing app-level imports continue to work.
+pub use pterm_util::local_or_remote_path::LocalOrRemotePath;
 
 /// Tracks sync state between client and server for a single remote buffer.
 ///

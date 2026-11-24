@@ -1,6 +1,6 @@
-use rook_core::features::FeatureFlag;
-use rookui::units::Pixels;
-use rookui::{AppContext, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::units::Pixels;
+use ptermui::{AppContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 use settings::macros::define_settings_group;
 use settings::{RespectUserSyncSetting, SupportedPlatforms, SyncToCloud};

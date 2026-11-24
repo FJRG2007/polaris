@@ -12,18 +12,18 @@ use futures::channel::oneshot::{self, Receiver};
 use futures::stream::AbortHandle;
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use regex::Regex;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rook_graphql::mcp_gallery_template::MCPGalleryTemplate;
-use rook_graphql::object_permissions::AccessLevel;
-use rook_graphql::scalars::time::ServerTimestamp;
-use rook_util::sync::Condition;
-use rookui::r#async::{FutureId, Timer};
-use rookui::{
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use pterm_graphql::mcp_gallery_template::MCPGalleryTemplate;
+use pterm_graphql::object_permissions::AccessLevel;
+use pterm_graphql::scalars::time::ServerTimestamp;
+use pterm_util::sync::Condition;
+use ptermui::r#async::{FutureId, Timer};
+use ptermui::{
     AppContext, Entity, ModelContext, ModelHandle, RequestState, RetryOption, SingletonEntity,
     duration_with_jitter,
 };
+use regex::Regex;
 
 use super::listener::ObjectUpdateMessage;
 use crate::ai::agent::conversation::AIConversationId;
@@ -2711,8 +2711,8 @@ impl UpdateManager {
         ctx: &mut ModelContext<Self>,
     ) where
         P: 'static + FnMut(Arc<dyn ObjectClient>) -> S,
-        S: rookui::r#async::Spawnable + Future<Output = anyhow::Result<R>>,
-        <S as Future>::Output: rookui::r#async::SpawnableOutput,
+        S: ptermui::r#async::Spawnable + Future<Output = anyhow::Result<R>>,
+        <S as Future>::Output: ptermui::r#async::SpawnableOutput,
         F: 'static + FnMut(R, &mut AppContext) -> Option<ServerPermissions>,
     {
         let object_client = self.object_client.clone();
@@ -2773,8 +2773,8 @@ impl UpdateManager {
         mut on_success: impl FnMut(&mut Self, M, &mut ModelContext<Self>) + 'static,
     ) where
         P: 'static + FnMut(Arc<dyn ObjectClient>) -> S,
-        S: rookui::r#async::Spawnable + Future<Output = anyhow::Result<M>>,
-        <S as Future>::Output: rookui::r#async::SpawnableOutput,
+        S: ptermui::r#async::Spawnable + Future<Output = anyhow::Result<M>>,
+        <S as Future>::Output: ptermui::r#async::SpawnableOutput,
     {
         let cloud_model = CloudModel::handle(ctx);
         let uid = server_id.uid();
@@ -3520,7 +3520,7 @@ impl UpdateManager {
         ctx: &mut ModelContext<Self>,
     ) {
         self.create_object(
-            // TODO(INT-789): support creating folders as rook packs
+            // TODO(INT-789): support creating folders as polaris-terminal packs
             CloudFolderModel::new(&name, false),
             owner,
             client_id,
@@ -4748,7 +4748,7 @@ impl UpdateManager {
             let new_folder = CloudFolderModel {
                 name: new_name,
                 is_open: folder.model().is_open,
-                is_rook_pack: folder.model().is_rook_pack,
+                is_pterm_pack: folder.model().is_pterm_pack,
             };
             self.update_object(new_folder, folder_id, revision, ctx);
         } else {

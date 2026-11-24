@@ -1,6 +1,6 @@
-use rook_core::features::FeatureFlag;
-use rook_errors::report_if_error;
-use rookui::{App, EntityId, ModelHandle, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_if_error;
+use ptermui::{App, EntityId, ModelHandle, SingletonEntity};
 use settings::Setting as _;
 
 use super::AgentNotificationsModel;

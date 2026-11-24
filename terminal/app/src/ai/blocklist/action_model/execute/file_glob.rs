@@ -5,9 +5,9 @@ use std::time::Duration;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use itertools::Itertools;
-use rook_core::features::FeatureFlag;
-use rookui::r#async::FutureExt as AsyncFutureExt;
-use rookui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::r#async::FutureExt as AsyncFutureExt;
+use ptermui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{
@@ -26,7 +26,7 @@ use crate::{TelemetryEvent, send_telemetry_from_app_ctx};
 
 const FILE_GLOB_TIMEOUT: Duration = Duration::from_secs(10);
 
-use rook_errors::report_error;
+use pterm_errors::report_error;
 
 use super::{
     ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput,

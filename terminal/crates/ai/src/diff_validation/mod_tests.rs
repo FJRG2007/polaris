@@ -663,7 +663,7 @@ mod proxy;
 pub fn run_daemon() -> anyhow::Result<()> {
     // Logging is now handled by init_common (log_destination: File).
 
-    // socket_path: ~/.rook[-channel]/remote-server/server.sock
+    // socket_path: ~/.polaris-terminal[-channel]/remote-server/server.sock
     //   The Unix domain socket the daemon binds on.
 }
 ";
@@ -687,7 +687,7 @@ pub fn run_daemon() -> anyhow::Result<()> {
     assert_eq!(deltas[0].replacement_line_range, 2..6);
     assert_eq!(
         deltas[0].insertion,
-        "pub fn run_daemon() -> anyhow::Result<()> {\n    // socket_path: ~/.rook[-channel]/remote-server/server.sock"
+        "pub fn run_daemon() -> anyhow::Result<()> {\n    // socket_path: ~/.polaris-terminal[-channel]/remote-server/server.sock"
     );
 
     let file_lines: Vec<&str> = file_content.lines().collect();
@@ -708,7 +708,7 @@ pub fn run_daemon() -> anyhow::Result<()> {
         "\
 mod proxy;
 pub fn run_daemon() -> anyhow::Result<()> {
-    // socket_path: ~/.rook[-channel]/remote-server/server.sock
+    // socket_path: ~/.polaris-terminal[-channel]/remote-server/server.sock
     //   The Unix domain socket the daemon binds on.
 }
 "
@@ -786,7 +786,7 @@ fn test_custom_lines() {
     assert_eq!(lines("foo\nbar\n").collect_vec(), vec!["foo", "bar"]);
 }
 
-/// Regression test for ROOK-CLIENT-DEV-NYY: panic "Invalid edit range 4042..3982".
+/// Regression test for POLARIS_TERMINAL-CLIENT-DEV-NYY: panic "Invalid edit range 4042..3982".
 ///
 /// Reproduces the crash from MAA conversation d71bf84b (request b621adb3).
 /// Two V4A hunks target the same region: a large deletion whose matched range

@@ -12,7 +12,7 @@ pub mod global_search;
 pub(crate) mod launch_modal;
 pub(crate) mod left_panel;
 pub(crate) mod onboarding;
-pub(crate) mod openrook_launch_modal;
+pub(crate) mod openpterm_launch_modal;
 pub(crate) mod orchestration_launch_modal;
 pub(crate) mod right_panel;
 mod startup_directory;
@@ -59,58 +59,58 @@ pub(crate) use onboarding::OnboardingTutorial;
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
-#[cfg(feature = "local_fs")]
-use repo_metadata::RemoteRepositoryIdentifier;
-#[cfg(feature = "local_fs")]
-use repo_metadata::repositories::DetectedRepositories;
-use rook_cli::agent::Harness;
-use rook_core::context_flag::ContextFlag;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_core::features::FeatureFlag;
-use rook_core::semantic_selection::SemanticSelection;
-use rook_core::ui::Icon;
-use rook_core::ui::color::coloru_with_opacity;
-use rook_core::ui::theme::color::internal_colors;
-use rook_core::ui::theme::phenomenon::PhenomenonStyle;
-use rook_core::ui::theme::{AnsiColors, Fill};
-use rook_core::user_preferences::GetUserPreferences as _;
-use rook_editor::editor::NavigationKey;
-use rook_errors::{report_error, report_if_error};
-use rook_server_client::auth::AuthEvent;
-use rook_util::path::{LineAndColumnArg, user_friendly_path};
-use rookui::accessibility::{
-    AccessibilityContent, AccessibilityVerbosity, ActionAccessibilityContent, RookA11yRole,
+use pterm_cli::agent::Harness;
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_core::features::FeatureFlag;
+use pterm_core::semantic_selection::SemanticSelection;
+use pterm_core::ui::Icon;
+use pterm_core::ui::color::coloru_with_opacity;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_core::ui::theme::phenomenon::PhenomenonStyle;
+use pterm_core::ui::theme::{AnsiColors, Fill};
+use pterm_core::user_preferences::GetUserPreferences as _;
+use pterm_editor::editor::NavigationKey;
+use pterm_errors::{report_error, report_if_error};
+use pterm_server_client::auth::AuthEvent;
+use pterm_util::path::{LineAndColumnArg, user_friendly_path};
+use ptermui::accessibility::{
+    AccessibilityContent, AccessibilityVerbosity, ActionAccessibilityContent, PtermA11yRole,
 };
-use rookui::clipboard::ClipboardContent;
+use ptermui::clipboard::ClipboardContent;
 #[cfg(target_family = "wasm")]
-use rookui::elements::Percentage;
-use rookui::elements::{
+use ptermui::elements::Percentage;
+use ptermui::elements::{
     Align, Border, CacheOption, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Dismiss, DispatchEventResult, DragAxis, Draggable,
     DraggableState, DropTarget, Element, Empty, EventHandler, Expanded, Fill as ElementFill, Flex,
-    Highlight, Hoverable, Icon as RookUiIcon, Image, MainAxisAlignment, MainAxisSize,
+    Highlight, Hoverable, Icon as PtermUiIcon, Image, MainAxisAlignment, MainAxisSize,
     MouseInBehavior, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds, Radius, Rect,
     SavePosition, Shrinkable, SizeConstraintCondition, SizeConstraintSwitch, Stack, Text,
 };
-use rookui::event::KeyState;
-use rookui::fonts::{Properties, Weight};
-use rookui::geometry::vector::{Vector2F, vec2f};
-use rookui::keymap::Context;
-use rookui::modals::{AlertDialogWithCallbacks, AppModalCallback};
-use rookui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
-use rookui::platform::{
+use ptermui::event::KeyState;
+use ptermui::fonts::{Properties, Weight};
+use ptermui::geometry::vector::{Vector2F, vec2f};
+use ptermui::keymap::Context;
+use ptermui::modals::{AlertDialogWithCallbacks, AppModalCallback};
+use ptermui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
+use ptermui::platform::{
     Cursor, FilePickerConfiguration, FullscreenState, SystemTheme, TerminationMode,
 };
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::button::Button;
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::windowing::state::ApplicationStage;
-use rookui::windowing::{StateEvent, WindowManager};
-use rookui::{
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::button::Button;
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::windowing::state::ApplicationStage;
+use ptermui::windowing::{StateEvent, WindowManager};
+use ptermui::{
     AppContext, Entity, EntityId, FocusContext, ModelHandle, SingletonEntity, TypedActionView,
     UpdateModel, UpdateView, View, ViewAsRef, ViewContext, ViewHandle, WeakViewHandle, WindowId,
 };
+#[cfg(feature = "local_fs")]
+use repo_metadata::RemoteRepositoryIdentifier;
+#[cfg(feature = "local_fs")]
+use repo_metadata::repositories::DetectedRepositories;
 #[cfg(all(target_os = "macos", feature = "crash_reporting"))]
 use sentry::protocol::{Attachment, AttachmentType};
 use serde_json;
@@ -269,12 +269,13 @@ use crate::context_chips::ChipRuntimeCapabilities;
 use crate::default_terminal::DefaultTerminal;
 use crate::drive::export::ExportManager;
 use crate::drive::import::modal::{ImportModal, ImportModalEvent};
-use crate::drive::items::RookDriveItemId;
-use crate::drive::settings::{RookDriveSettings, RookDriveSettingsChangedEvent};
+use crate::drive::items::PtermDriveItemId;
+use crate::drive::settings::{PtermDriveSettings, PtermDriveSettingsChangedEvent};
 use crate::drive::workflows::arguments::ArgumentsState;
 use crate::drive::workflows::modal::{WorkflowModal, WorkflowModalEvent};
 use crate::drive::{
-    CloudObjectTypeAndId, DriveObjectType, DrivePanel, DrivePanelEvent, OpenRookDriveObjectSettings,
+    CloudObjectTypeAndId, DriveObjectType, DrivePanel, DrivePanelEvent,
+    OpenPtermDriveObjectSettings,
 };
 use crate::editor::{
     EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions,
@@ -340,8 +341,8 @@ use crate::server::server_api::{ServerApi, ServerApiProvider, ServerTime};
 use crate::server::telemetry::{
     AddTabWithShellSource, AnonymousUserSignupEntrypoint, CloseTarget, EnvVarTelemetryMetadata,
     FileTreeSource, KnowledgePaneEntrypoint, LaunchConfigUiLocation,
-    MCPServerCollectionPaneEntrypoint, NotificationsTurnedOnSource, OpenedRookAISource,
-    PaletteSource, RookDriveSource, SharingDialogSource, TabRenameEvent, TierLimitHitEvent,
+    MCPServerCollectionPaneEntrypoint, NotificationsTurnedOnSource, OpenedPtermAISource,
+    PaletteSource, PtermDriveSource, SharingDialogSource, TabRenameEvent, TierLimitHitEvent,
 };
 use crate::session_management::{SessionNavigationData, SessionSource, TabNavigationData};
 use crate::settings::cloud_preferences::CloudPreferencesSettings;
@@ -408,10 +409,10 @@ use crate::terminal::model::escape_sequences::C0;
 use crate::terminal::model::session::Session;
 use crate::terminal::model::session::SessionId;
 use crate::terminal::model::terminal_model::ConversationTranscriptViewerStatus;
+use crate::terminal::ptermify::settings::PtermifySettings;
 use crate::terminal::resizable_data::{
     DEFAULT_LEFT_PANEL_WIDTH, DEFAULT_RIGHT_PANEL_WIDTH, ModalSizes, ModalType, ResizableData,
 };
-use crate::terminal::rookify::settings::RookifySettings;
 use crate::terminal::safe_mode_settings::SafeModeSettings;
 use crate::terminal::session_settings::{
     NewSessionSource, NotificationsMode, NotificationsSettings, SessionSettings,
@@ -449,7 +450,7 @@ use crate::ui_components::{blended_colors, icons};
 use crate::undo_close::UndoCloseStack;
 #[cfg(target_family = "wasm")]
 use crate::uri::browser_url_handler::{parse_current_url, update_browser_url};
-use crate::user_config::{RookConfig, RookConfigUpdateEvent};
+use crate::user_config::{PtermConfig, PtermConfigUpdateEvent};
 #[cfg(feature = "local_fs")]
 use crate::user_config::{
     ensure_default_worktree_config, find_unused_tab_config_path, find_unused_toml_path,
@@ -469,7 +470,7 @@ use crate::util::links;
 use crate::util::openable_file_type::FileTarget;
 #[cfg(feature = "local_fs")]
 use crate::util::openable_file_type::{
-    EditorLayout, resolve_file_target_to_open_in_rook, resolve_file_target_with_editor_choice,
+    EditorLayout, resolve_file_target_to_open_in_pterm, resolve_file_target_with_editor_choice,
 };
 use crate::util::traffic_lights::{TrafficLightMouseStates, TrafficLightSide, traffic_light_data};
 use crate::util::truncation::truncate_from_end;
@@ -532,8 +533,8 @@ use crate::workspace::view::launch_modal::{LaunchModal, LaunchModalEvent, OzLaun
 use crate::workspace::view::left_panel::{
     LeftPanelAction, LeftPanelEvent, LeftPanelView, ToolPanelView,
 };
-use crate::workspace::view::openrook_launch_modal::{
-    OpenRookLaunchModal, OpenRookLaunchModalEvent,
+use crate::workspace::view::openpterm_launch_modal::{
+    OpenPtermLaunchModal, OpenPtermLaunchModalEvent,
 };
 use crate::workspace::view::orchestration_launch_modal::{
     OrchestrationLaunchModal, OrchestrationLaunchModalEvent,
@@ -567,7 +568,7 @@ const MAX_FONT_SIZE: f32 = 25.0;
 const FONT_SIZE_INCREMENT: f32 = 1.0;
 
 pub const TAB_BAR_HEIGHT: f32 = 34.;
-/// Height for all panel headers (tab bar, rook drive, resource center, theme chooser, etc.).
+/// Height for all panel headers (tab bar, polaris-terminal drive, resource center, theme chooser, etc.).
 /// This ensures consistent header heights across all UI panels.
 pub const PANEL_HEADER_HEIGHT: f32 = TAB_BAR_HEIGHT;
 /// The hover area height for states where the tab bar is revealed on hover.
@@ -584,9 +585,9 @@ const TAB_BAR_ICON_PADDING: f32 = 4.;
 
 const TAB_BAR_PILL_WIDTH: f32 = 100.;
 const PILL_FONT_SIZE: f32 = 12.;
-// We use the word "Rook" in the Update Ready button to make it obvious that the terminal is Rook.
-// This can lead to free advertising when users screen-share Rook when an update is available.
-const UPDATE_READY_TEXT: &str = "Update Rook";
+// We use the word "Polaris Terminal" in the Update Ready button to make it obvious that the terminal is Polaris Terminal.
+// This can lead to free advertising when users screen-share Polaris Terminal when an update is available.
+const UPDATE_READY_TEXT: &str = "Update Polaris Terminal";
 
 const TAB_BAR_OVERFLOW_MENU_WIDTH: f32 = 300.;
 
@@ -617,7 +618,7 @@ const AI_ASSISTANT_BUTTON_ID: &str = "workspace_view:ai_assistant_button";
 
 const VERSION_DEPRECATION_BANNER_TEXT: &str = "Your app is out of date and some features may not work as expected. Please update immediately.";
 
-const VERSION_DEPRECATION_WITHOUT_PERMISSIONS_BANNER_TEXT: &str = "Some Rook features may not work as expected without updating immediately, but Rook is unable to perform the update.";
+const VERSION_DEPRECATION_WITHOUT_PERMISSIONS_BANNER_TEXT: &str = "Some Polaris Terminal features may not work as expected without updating immediately, but Polaris Terminal is unable to perform the update.";
 
 const ASK_AI_ASSISTANT_KEYBINDING_NAME: &str = "workspace:toggle_ai_assistant";
 const TOGGLE_RESOURCE_CENTER_KEYBINDING_NAME: &str = "workspace:toggle_resource_center";
@@ -658,7 +659,7 @@ pub(crate) const TOGGLE_NOTIFICATION_MAILBOX_BINDING_NAME: &str =
 
 // these won't have to be public after we deprecate the code mode v1 project explorer which is defined in terminal
 pub(crate) const TOGGLE_PROJECT_EXPLORER_BINDING_NAME: &str = "workspace:toggle_project_explorer";
-pub(crate) const TOGGLE_ROOK_DRIVE_BINDING_NAME: &str = "workspace:toggle_rook_drive";
+pub(crate) const TOGGLE_POLARIS_TERMINAL_DRIVE_BINDING_NAME: &str = "workspace:toggle_pterm_drive";
 pub(crate) const TOGGLE_RIGHT_PANEL_BINDING_NAME: &str = "workspace:toggle_right_panel";
 pub(crate) const TOGGLE_VERTICAL_TABS_PANEL_BINDING_NAME: &str =
     "workspace:toggle_vertical_tabs_panel";
@@ -677,7 +678,8 @@ pub(crate) const TOGGLE_TAB_CONFIGS_MENU_BINDING_NAME: &str = "workspace:toggle_
 pub(crate) const LEFT_PANEL_PROJECT_EXPLORER_BINDING_NAME: &str =
     "workspace:left_panel_project_explorer";
 pub(crate) const LEFT_PANEL_GLOBAL_SEARCH_BINDING_NAME: &str = "workspace:left_panel_global_search";
-pub(crate) const LEFT_PANEL_ROOK_DRIVE_BINDING_NAME: &str = "workspace:left_panel_rook_drive";
+pub(crate) const LEFT_PANEL_POLARIS_TERMINAL_DRIVE_BINDING_NAME: &str =
+    "workspace:left_panel_pterm_drive";
 pub(crate) const LEFT_PANEL_AGENT_CONVERSATIONS_BINDING_NAME: &str =
     "workspace:left_panel_agent_conversations";
 
@@ -710,14 +712,14 @@ const MAX_FORK_TOAST_TITLE_LENGTH: usize = 100;
 const MAX_WINDOW_TITLE_LENGTH: usize = 80;
 
 #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
-const AUTO_CLOUD_HANDOFF_PROMPT: &str =
-    "Continue this local Rook Agent task in the cloud from the current conversation state.";
+const AUTO_CLOUD_HANDOFF_PROMPT: &str = "Continue this local Polaris Terminal Agent task in the cloud from the current conversation state.";
 
 /// The default display name used for the user if they have no associated display name.
 pub const DEFAULT_USER_DISPLAY_NAME: &str = "User";
 
 lazy_static! {
-    static ref OPENING_ROOK_DRIVE_ON_START_UP: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+    static ref OPENING_POLARIS_TERMINAL_DRIVE_ON_START_UP: Arc<Mutex<bool>> =
+        Arc::new(Mutex::new(false));
     static ref PANEL_CORNER_RADIUS: CornerRadius = CornerRadius::with_all(Radius::Pixels(8.));
     static ref PANEL_HEADER_CORNER_RADIUS: CornerRadius =
         CornerRadius::with_top(Radius::Pixels(8.));
@@ -855,8 +857,8 @@ impl ShowTabBar {
 #[cfg(target_family = "wasm")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SimplifiedWasmTabBarContent {
-    /// Viewing a Rook Drive object (notebook, workflow, env vars, AI facts, MCP servers)
-    RookDriveObject,
+    /// Viewing a Polaris Terminal Drive object (notebook, workflow, env vars, AI facts, MCP servers)
+    PtermDriveObject,
     /// Participating in a shared session (viewer or writer). Contains the optional ambient agent task ID.
     SharedSession { task_id: Option<AmbientAgentTaskId> },
     /// Viewing a conversation transcript. Contains the optional ambient agent task ID.
@@ -899,7 +901,7 @@ pub enum BannerSeverity {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum BannerButtonVariant {
     /// No fill, no border, just text (and optional icon). Used for the primary
-    /// action in the Figma design (e.g. "Fix with Rook Agent").
+    /// action in the Figma design (e.g. "Fix with Polaris Terminal Agent").
     Naked,
     /// Border-only, no fill (e.g. "Open file").
     Outlined,
@@ -1118,7 +1120,7 @@ pub struct Workspace {
     suggested_agent_mode_workflow_modal: ViewHandle<SuggestedAgentModeWorkflowModal>,
     suggested_rule_modal: ViewHandle<SuggestedRuleModal>,
     oz_launch_modal: ModalWithTab<LaunchModal<OzLaunchSlide>>,
-    openrook_launch_modal: ViewHandle<OpenRookLaunchModal>,
+    openpterm_launch_modal: ViewHandle<OpenPtermLaunchModal>,
     orchestration_launch_modal: ViewHandle<OrchestrationLaunchModal>,
     agent_cli_launch_modal: ViewHandle<AgentCliLaunchModal>,
     feature_intro_modal: ViewHandle<FeatureIntroModal>,
@@ -1156,7 +1158,7 @@ pub struct Workspace {
     #[cfg(target_family = "wasm")]
     wasm_nux_dialog: ViewHandle<WasmNUXDialog>,
     #[cfg(target_family = "wasm")]
-    open_in_rook_button: ViewHandle<ActionButton>,
+    open_in_pterm_button: ViewHandle<ActionButton>,
     #[cfg(target_family = "wasm")]
     view_cloud_runs_button: ViewHandle<ActionButton>,
     #[cfg(target_family = "wasm")]
@@ -1639,7 +1641,7 @@ impl Workspace {
                 if let Some(id) = id_to_force_expand {
                     self.open_notebook(
                         &NotebookSource::Existing(id),
-                        &OpenRookDriveObjectSettings::default(),
+                        &OpenPtermDriveObjectSettings::default(),
                         ctx,
                         true,
                     );
@@ -1655,7 +1657,7 @@ impl Workspace {
                 if let Some(id) = id_to_force_expand {
                     self.open_workflow_with_existing(
                         id,
-                        &OpenRookDriveObjectSettings::default(),
+                        &OpenPtermDriveObjectSettings::default(),
                         ctx,
                     );
                     CloudModel::handle(ctx).update(ctx, |cloud_model, ctx| {
@@ -1851,7 +1853,7 @@ impl Workspace {
                 ctx.notify();
             }
             AuthOverrideWarningModalEvent::BulkExport => {
-                self.export_all_rook_drive_objects(ctx);
+                self.export_all_pterm_drive_objects(ctx);
             }
         }
     }
@@ -2238,8 +2240,8 @@ impl Workspace {
                         );
                     });
                 } else {
-                    RookConfig::handle(ctx).update(ctx, |rook_config, ctx| {
-                        rook_config.remove_tab_config_by_path(path, ctx);
+                    PtermConfig::handle(ctx).update(ctx, |pterm_config, ctx| {
+                        pterm_config.remove_tab_config_by_path(path, ctx);
                     });
                 }
                 self.current_workspace_state
@@ -2573,7 +2575,7 @@ impl Workspace {
             |hover_state| {
                 let icon = ConstrainedBox::new(
                     icons::Icon::X
-                        .to_rookui_icon(Fill::Solid(PhenomenonStyle::modal_close_button_text()))
+                        .to_ptermui_icon(Fill::Solid(PhenomenonStyle::modal_close_button_text()))
                         .finish(),
                 )
                 .with_width(16.)
@@ -2700,7 +2702,7 @@ impl Workspace {
         );
     }
 
-    /// Subscribes to `RookConfigUpdateEvent::TabConfigErrors` (and the equivalent
+    /// Subscribes to `PtermConfigUpdateEvent::TabConfigErrors` (and the equivalent
     /// `ModelConfigErrors` for custom model router configs) and shows a persistent
     /// error toast for each file that failed to parse.  Uses `object_id` keyed by
     /// file path so that re-saving the same file auto-dismisses the stale toast.
@@ -2708,9 +2710,9 @@ impl Workspace {
         toast_stack: ViewHandle<DismissibleToastStack<WorkspaceAction>>,
         ctx: &mut ViewContext<Self>,
     ) {
-        ctx.subscribe_to_model(&RookConfig::handle(ctx), move |_me, _, event, ctx| {
+        ctx.subscribe_to_model(&PtermConfig::handle(ctx), move |_me, _, event, ctx| {
             match event {
-                RookConfigUpdateEvent::TabConfigs => {
+                PtermConfigUpdateEvent::TabConfigs => {
                     // On every tab config reload, dismiss error toasts for
                     // files that now parse successfully.  The model has already
                     // been updated with the current error set before this event
@@ -2725,7 +2727,7 @@ impl Workspace {
                         toast_stack.dismiss_toasts_by_prefix("tab_config_error:", ctx);
                     });
                 }
-                RookConfigUpdateEvent::TabConfigErrors(errors) => {
+                PtermConfigUpdateEvent::TabConfigErrors(errors) => {
                     let home_dir = dirs::home_dir();
                     for error in errors {
                         let object_id = format!("tab_config_error:{}", error.file_path.display());
@@ -2754,12 +2756,12 @@ impl Workspace {
                         });
                     }
                 }
-                RookConfigUpdateEvent::ModelConfigs => {
+                PtermConfigUpdateEvent::ModelConfigs => {
                     toast_stack.update(ctx, |toast_stack, ctx| {
                         toast_stack.dismiss_toasts_by_prefix("model_config_error:", ctx);
                     });
                 }
-                RookConfigUpdateEvent::ModelConfigErrors(errors) => {
+                PtermConfigUpdateEvent::ModelConfigErrors(errors) => {
                     let home_dir = dirs::home_dir();
                     for error in errors {
                         let object_id = format!("model_config_error:{}", error.file_path.display());
@@ -2793,17 +2795,17 @@ impl Workspace {
         });
     }
 
-    /// Subscribes to `RookConfigUpdateEvent::SettingsErrors` and
+    /// Subscribes to `PtermConfigUpdateEvent::SettingsErrors` and
     /// `SettingsErrorsCleared` to update the workspace settings-error banner
     /// and mirror the state into the settings pane for its nav-rail footer.
     fn subscribe_to_settings_errors(ctx: &mut ViewContext<Self>) {
-        ctx.subscribe_to_model(&RookConfig::handle(ctx), |me, _, event, ctx| match event {
-            RookConfigUpdateEvent::SettingsErrors(error) => {
+        ctx.subscribe_to_model(&PtermConfig::handle(ctx), |me, _, event, ctx| match event {
+            PtermConfigUpdateEvent::SettingsErrors(error) => {
                 me.settings_file_error = Some(error.clone());
                 me.sync_settings_error_state_into_settings_pane(ctx);
                 ctx.notify();
             }
-            RookConfigUpdateEvent::SettingsErrorsCleared => {
+            PtermConfigUpdateEvent::SettingsErrorsCleared => {
                 me.settings_file_error = None;
                 me.sync_settings_error_state_into_settings_pane(ctx);
                 ctx.notify();
@@ -3034,9 +3036,9 @@ impl Workspace {
             me.handle_oz_launch_modal_event(event, ctx);
         });
 
-        let openrook_launch_view = ctx.add_typed_action_view(OpenRookLaunchModal::new);
-        ctx.subscribe_to_view(&openrook_launch_view, |me, _, event, ctx| {
-            me.handle_openrook_launch_modal_event(event, ctx);
+        let openpterm_launch_view = ctx.add_typed_action_view(OpenPtermLaunchModal::new);
+        ctx.subscribe_to_view(&openpterm_launch_view, |me, _, event, ctx| {
+            me.handle_openpterm_launch_modal_event(event, ctx);
         });
 
         let orchestration_launch_view = ctx.add_typed_action_view(OrchestrationLaunchModal::new);
@@ -3201,7 +3203,7 @@ impl Workspace {
             me.handle_window_settings_changed_event(event, ctx);
         });
 
-        // Show the Rook AI warm welcome iff the user hasn't dismissed it nor interacted with Rook AI before.
+        // Show the Polaris Terminal AI warm welcome iff the user hasn't dismissed it nor interacted with Polaris Terminal AI before.
         // Also, avoid showing it in integration tests to prevent interaction with other tests.
         let mut should_show_ai_assistant_warm_welcome: bool = !FeatureFlag::AgentMode.is_enabled()
             && AISettings::as_ref(ctx).is_any_ai_enabled(ctx)
@@ -3214,7 +3216,7 @@ impl Workspace {
                 .map(|dismissed: bool| !dismissed)
                 .unwrap_or(true);
 
-        // Don't automatically show the Rook AI welcome during onboarding if the block onboarding flow is being used.
+        // Don't automatically show the Polaris Terminal AI welcome during onboarding if the block onboarding flow is being used.
         // This way, we can delay the reveal until the end of the onboarding flow so as not to overwhelm the user.
         if matches!(
             BlockOnboarding::get_group(ctx),
@@ -3239,8 +3241,8 @@ impl Workspace {
             }
         });
 
-        ctx.subscribe_to_model(&RookDriveSettings::handle(ctx), |me, _, event, ctx| {
-            if let RookDriveSettingsChangedEvent::EnableRookDrive { .. } = event {
+        ctx.subscribe_to_model(&PtermDriveSettings::handle(ctx), |me, _, event, ctx| {
+            if let PtermDriveSettingsChangedEvent::EnablePtermDrive { .. } = event {
                 me.update_left_panel_available_views(ctx);
                 ctx.notify();
             }
@@ -3259,7 +3261,7 @@ impl Workspace {
         let wasm_nux_dialog = Self::build_wasm_nux_dialog(ctx);
 
         #[cfg(target_family = "wasm")]
-        let open_in_rook_button = Self::build_open_in_rook_button(ctx);
+        let open_in_pterm_button = Self::build_open_in_pterm_button(ctx);
 
         #[cfg(target_family = "wasm")]
         let transcript_info_button = Self::build_transcript_info_button(ctx);
@@ -3377,8 +3379,8 @@ impl Workspace {
                 if model_ref.target_window_id() == Some(ctx.window_id()) {
                     if model_ref.is_oz_launch_modal_open() {
                         me.open_tab_and_focus_oz_launch_modal(ctx);
-                    } else if model_ref.is_openrook_launch_modal_open() {
-                        me.focus_openrook_launch_modal(ctx);
+                    } else if model_ref.is_openpterm_launch_modal_open() {
+                        me.focus_openpterm_launch_modal(ctx);
                     } else if model_ref.is_orchestration_launch_modal_open() {
                         me.focus_orchestration_launch_modal(ctx);
                     } else if model_ref.is_agent_cli_launch_modal_open() {
@@ -3517,7 +3519,7 @@ impl Workspace {
             #[cfg(target_family = "wasm")]
             wasm_nux_dialog,
             #[cfg(target_family = "wasm")]
-            open_in_rook_button,
+            open_in_pterm_button,
             #[cfg(target_family = "wasm")]
             transcript_info_button,
             #[cfg(target_family = "wasm")]
@@ -3529,7 +3531,7 @@ impl Workspace {
                 view: oz_launch_view,
                 tab_pane_group_id: None,
             },
-            openrook_launch_modal: openrook_launch_view,
+            openpterm_launch_modal: openpterm_launch_view,
             orchestration_launch_modal: orchestration_launch_view,
             agent_cli_launch_modal: agent_cli_launch_view,
             feature_intro_modal: feature_intro_view,
@@ -4352,7 +4354,7 @@ impl Workspace {
                 LeftPanelDisplayedTab::GlobalSearch => ToolPanelView::GlobalSearch {
                     entry_focus: GlobalSearchEntryFocus::Results,
                 },
-                LeftPanelDisplayedTab::RookDrive => ToolPanelView::RookDrive,
+                LeftPanelDisplayedTab::PtermDrive => ToolPanelView::PtermDrive,
                 LeftPanelDisplayedTab::ConversationListView => ToolPanelView::ConversationListView,
             };
             lp.restore_active_view_from_snapshot(active_view, ctx);
@@ -4395,9 +4397,9 @@ impl Workspace {
         shell: Option<AvailableShell>,
         ctx: &mut ViewContext<Self>,
     ) {
-        let show_rook_home = !ContextFlag::CreateNewSession.is_enabled();
+        let show_pterm_home = !ContextFlag::CreateNewSession.is_enabled();
         let mut placeholder_pane = None;
-        let open_rook_drive = if !show_rook_home {
+        let open_pterm_drive = if !show_pterm_home {
             if self.should_trigger_get_started_onboarding(ctx) {
                 self.trigger_get_started_onboarding(ctx);
             } else {
@@ -4417,32 +4419,32 @@ impl Workspace {
             placeholder_pane = Some(home_pane.as_pane().id());
             self.add_tab_from_existing_pane(home_pane, 0, None, ctx);
 
-            // If we can't start a terminal session to run the onboarding flow, show the Rook Home
-            // placeholder along with Rook Drive.
+            // If we can't start a terminal session to run the onboarding flow, show the Polaris Terminal Home
+            // placeholder along with Polaris Terminal Drive.
             true
         };
         let initial_tab = self.active_tab_pane_group().clone();
 
-        if open_rook_drive {
-            // We open Rook Drive automatically in two cases:
-            // * The user is new to Rook, and went through the overall onboarding flow
+        if open_pterm_drive {
+            // We open Polaris Terminal Drive automatically in two cases:
+            // * The user is new to Polaris Terminal, and went through the overall onboarding flow
             // * The user is on the web, so we can't open a terminal session.
             let initial_load_complete = UpdateManager::as_ref(ctx).initial_load_complete();
             ctx.spawn(initial_load_complete, move |me, _, ctx| {
-                // New Rook users can have non-welcome objects if they were directly invited OR if
+                // New Polaris Terminal users can have non-welcome objects if they were directly invited OR if
                 // linked objects were copied over from an anonymous user.
                 if CloudModel::as_ref(ctx).has_non_welcome_objects() {
-                    me.open_or_toggle_rook_drive(false, false, ctx);
+                    me.open_or_toggle_pterm_drive(false, false, ctx);
 
-                    // After opening Rook Drive, if we rendered the Rook Home placeholder panel, replace it with one of
+                    // After opening Polaris Terminal Drive, if we rendered the Polaris Terminal Home placeholder panel, replace it with one of
                     // the user's own objects.
-                    if show_rook_home {
+                    if show_pterm_home {
                         let cloud_model = CloudModel::as_ref(ctx);
                         let candidate_objects = cloud_model
                             .cloud_objects()
                             .filter(|object| {
                                 !object.is_trashed(cloud_model)
-                                    && object.renders_in_rook_drive()
+                                    && object.renders_in_pterm_drive()
                                     && !object.metadata().is_welcome_object
                             })
                             .map(|object| object.cloud_object_type_and_id())
@@ -4618,7 +4620,7 @@ impl Workspace {
                 // Open the transcript details panel by default on WASM (unless on mobile)
                 #[cfg(target_family = "wasm")]
                 {
-                    if !rookui::platform::wasm::is_mobile_device() {
+                    if !ptermui::platform::wasm::is_mobile_device() {
                         me.current_workspace_state.is_transcript_details_panel_open = true;
                         me.transcript_info_button.update(ctx, |button, ctx| {
                             button.set_active(true, ctx);
@@ -4737,7 +4739,7 @@ impl Workspace {
                             .ambient_agent_task_id();
                         if task_id.is_some() {
                             // Open the details panel for shared ambient agent sessions (unless on mobile)
-                            if !rookui::platform::wasm::is_mobile_device() {
+                            if !ptermui::platform::wasm::is_mobile_device() {
                                 me.current_workspace_state.is_transcript_details_panel_open = true;
                                 me.transcript_info_button.update(ctx, |button, ctx| {
                                     button.set_active(true, ctx);
@@ -4837,8 +4839,8 @@ impl Workspace {
         }
 
         let focused_pane_id = pane_group.focused_pane_id(ctx);
-        if focused_pane_id.is_rook_drive_object_pane() {
-            return Some(SimplifiedWasmTabBarContent::RookDriveObject);
+        if focused_pane_id.is_pterm_drive_object_pane() {
+            return Some(SimplifiedWasmTabBarContent::PtermDriveObject);
         }
 
         None
@@ -4937,7 +4939,7 @@ impl Workspace {
 
         self.tips_completed.update(ctx, |tips_completed, ctx| {
             mark_feature_used_and_write_to_user_defaults(
-                Tip::Action(TipAction::RookAI),
+                Tip::Action(TipAction::PtermAI),
                 tips_completed,
                 ctx,
             );
@@ -4945,9 +4947,9 @@ impl Workspace {
         });
 
         // The panel is already open and no models are open, so just refocus the panel.
-        // If there is a modal open, it would sit above the Rook AI panel and we would end up
-        // focusing the Rook AI panel _behind_ the floating modal. Instead, we opt for the normal
-        // toggle behavior which will close the current modal view and then toggle Rook AI.
+        // If there is a modal open, it would sit above the Polaris Terminal AI panel and we would end up
+        // focusing the Polaris Terminal AI panel _behind_ the floating modal. Instead, we opt for the normal
+        // toggle behavior which will close the current modal view and then toggle Polaris Terminal AI.
         if self.current_workspace_state.is_ai_assistant_panel_open
             && !self.ai_assistant_panel.is_self_or_child_focused(ctx)
             && !self.current_workspace_state.is_any_modal_open(ctx)
@@ -4960,7 +4962,7 @@ impl Workspace {
         self.current_workspace_state.is_ai_assistant_panel_open =
             !self.current_workspace_state.is_ai_assistant_panel_open;
 
-        // Close any other modals that could be floating on top of the Rook AI panel.
+        // Close any other modals that could be floating on top of the Polaris Terminal AI panel.
         self.current_workspace_state.close_all_modals();
 
         if self.current_workspace_state.is_ai_assistant_panel_open {
@@ -4974,32 +4976,32 @@ impl Workspace {
     }
 
     /// Sets focused to the index of either the selected object or the first item in WD
-    fn reset_focused_index_in_rook_drive(
+    fn reset_focused_index_in_pterm_drive(
         &mut self,
         should_scroll: bool,
         ctx: &mut ViewContext<Self>,
     ) {
         ctx.focus(&self.left_panel_view);
 
-        self.update_rook_drive_view(ctx, |drive_panel, ctx| {
-            drive_panel.reset_focused_index_in_rook_drive(should_scroll, ctx);
+        self.update_pterm_drive_view(ctx, |drive_panel, ctx| {
+            drive_panel.reset_focused_index_in_pterm_drive(should_scroll, ctx);
         });
     }
 
-    pub fn has_rook_drive_initialized_sections(
+    pub fn has_pterm_drive_initialized_sections(
         &self,
         app: &AppContext,
     ) -> impl Future<Output = ()> + use<> {
         self.left_panel_view
             .as_ref(app)
-            .rook_drive_view()
+            .pterm_drive_view()
             .as_ref(app)
-            .has_rook_drive_initialized_sections(app)
+            .has_pterm_drive_initialized_sections(app)
     }
 
-    /// Check if Rook Drive view is focused within.
-    /// Routes to the appropriate Rook Drive panel.
-    fn is_rook_drive_view_focused(&self, ctx: &mut ViewContext<Self>) -> bool {
+    /// Check if Polaris Terminal Drive view is focused within.
+    /// Routes to the appropriate Polaris Terminal Drive panel.
+    fn is_pterm_drive_view_focused(&self, ctx: &mut ViewContext<Self>) -> bool {
         let app = ctx;
         self.left_panel_view.is_self_or_child_focused(app)
     }
@@ -5200,12 +5202,12 @@ impl Workspace {
     }
 
     /// This function shifts focus to the panel on the left.
-    /// The current focusable panels are: Rook Drive, theme chooser, AI, and resource center (keyboard shortcuts page only)
+    /// The current focusable panels are: Polaris Terminal Drive, theme chooser, AI, and resource center (keyboard shortcuts page only)
     fn focus_left_panel(&mut self, ctx: &mut ViewContext<Self>) {
         // Starts from terminal
         if self.active_tab_pane_group().is_self_or_child_focused(ctx) {
-            if self.current_workspace_state.is_rook_drive_open {
-                self.reset_focused_index_in_rook_drive(true, ctx);
+            if self.current_workspace_state.is_pterm_drive_open {
+                self.reset_focused_index_in_pterm_drive(true, ctx);
             } else if self.is_theme_chooser_open() {
                 ctx.focus(&self.theme_chooser_view);
             } else if self.current_workspace_state.is_ai_assistant_panel_open {
@@ -5220,8 +5222,8 @@ impl Workspace {
         {
             self.focus_active_tab(ctx);
         }
-        // Starts from a left panel: Rook Drive
-        else if self.is_rook_drive_view_focused(ctx) {
+        // Starts from a left panel: Polaris Terminal Drive
+        else if self.is_pterm_drive_view_focused(ctx) {
             if self.current_workspace_state.is_right_panel_open() {
                 self.set_selected_object(None, ctx);
                 if self.current_workspace_state.is_ai_assistant_panel_open {
@@ -5259,14 +5261,14 @@ impl Workspace {
                 ctx.focus(&self.ai_assistant_panel);
             } else if self.current_workspace_state.is_resource_center_open {
                 ctx.focus(&self.resource_center_view);
-            } else if self.current_workspace_state.is_rook_drive_open {
-                self.reset_focused_index_in_rook_drive(true, ctx);
+            } else if self.current_workspace_state.is_pterm_drive_open {
+                self.reset_focused_index_in_pterm_drive(true, ctx);
             } else if self.is_theme_chooser_open() {
                 ctx.focus(&self.theme_chooser_view);
             }
         }
-        // Starts from a left panel: Rook Drive, theme chooser
-        else if self.is_rook_drive_view_focused(ctx)
+        // Starts from a left panel: Polaris Terminal Drive, theme chooser
+        else if self.is_pterm_drive_view_focused(ctx)
             || self.theme_chooser_view.is_self_or_child_focused(ctx)
         {
             self.focus_active_tab(ctx);
@@ -5276,8 +5278,8 @@ impl Workspace {
             || self.resource_center_view.is_self_or_child_focused(ctx)
         {
             if self.current_workspace_state.is_left_panel_open() {
-                if self.current_workspace_state.is_rook_drive_open {
-                    self.reset_focused_index_in_rook_drive(true, ctx);
+                if self.current_workspace_state.is_pterm_drive_open {
+                    self.reset_focused_index_in_pterm_drive(true, ctx);
                 } else if self.is_theme_chooser_open() {
                     ctx.focus(&self.theme_chooser_view);
                 }
@@ -6343,7 +6345,7 @@ impl Workspace {
         // (matching the server contract / admin UI default) if invalid/missing.
         let mut dot_color = team_color_hex
             .as_deref()
-            .and_then(|hex| rook_core::ui::color::hex_color::coloru_from_hex_string(hex).ok())
+            .and_then(|hex| pterm_core::ui::color::hex_color::coloru_from_hex_string(hex).ok())
             .unwrap_or_else(|| internal_colors::neutral_5(theme));
         dot_color.a = TEAM_SWITCHER_DOT_ALPHA;
 
@@ -6434,7 +6436,7 @@ impl Workspace {
     fn handle_ai_fact_view_event(&mut self, event: &AIFactViewEvent, ctx: &mut ViewContext<Self>) {
         match event {
             AIFactViewEvent::OpenSettings => {
-                self.show_settings_with_section(Some(SettingsSection::RookAgent), ctx);
+                self.show_settings_with_section(Some(SettingsSection::PtermAgent), ctx);
             }
             #[allow(unused_variables)]
             AIFactViewEvent::OpenFile(location) => {
@@ -6515,7 +6517,7 @@ impl Workspace {
             AgentManagementViewEvent::OpenPlanNotebook { notebook_uid } => {
                 self.open_notebook(
                     &NotebookSource::Existing((*notebook_uid).into()),
-                    &OpenRookDriveObjectSettings::default(),
+                    &OpenPtermDriveObjectSettings::default(),
                     ctx,
                     false,
                 );
@@ -6670,8 +6672,8 @@ impl Workspace {
                 let pane_group = self.active_tab_pane_group().clone();
                 self.handle_file_tree_event(pane_group, pane_group_event, ctx);
             }
-            LeftPanelEvent::RookDrive(drive_event) => {
-                self.handle_rook_drive_event(drive_event, ctx);
+            LeftPanelEvent::PtermDrive(drive_event) => {
+                self.handle_pterm_drive_event(drive_event, ctx);
             }
             LeftPanelEvent::OpenFileWithTarget {
                 location,
@@ -6857,7 +6859,7 @@ impl Workspace {
     #[cfg(not(target_family = "wasm"))]
     fn view_logs(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.spawn(
-            async { tokio::task::spawn_blocking(rook_logging::create_log_bundle_zip).await },
+            async { tokio::task::spawn_blocking(pterm_logging::create_log_bundle_zip).await },
             |me, result, ctx| match result {
                 Ok(Ok(path)) => {
                     ctx.open_file_path_in_explorer(&path);
@@ -6887,7 +6889,7 @@ impl Workspace {
             .write(ClipboardContent::plain_text(version.to_string()));
     }
 
-    fn export_all_rook_drive_objects(&mut self, ctx: &mut ViewContext<Self>) {
+    fn export_all_pterm_drive_objects(&mut self, ctx: &mut ViewContext<Self>) {
         let window_id = ctx.window_id();
         let cloud_model = CloudModel::as_ref(ctx);
         let exportable_objects = cloud_model.get_all_exportable_object_ids();
@@ -7008,7 +7010,7 @@ impl Workspace {
 
         // 4. User tab configs
         if FeatureFlag::TabConfigs.is_enabled() {
-            let tab_configs = RookConfig::as_ref(ctx).tab_configs().to_vec();
+            let tab_configs = PtermConfig::as_ref(ctx).tab_configs().to_vec();
 
             // Count occurrences of each config name so we can disambiguate
             // duplicates in the menu (e.g. "My Tab Config", "My Tab Config (1)").
@@ -7320,7 +7322,7 @@ impl Workspace {
         }
     }
 
-    /// Writes the default tab config template to an unused path in `~/.rook/tab_configs/`
+    /// Writes the default tab config template to an unused path in `~/.polaris-terminal/tab_configs/`
     /// and opens it respecting the user's configured editor setting.
     #[cfg(feature = "local_fs")]
     fn create_and_open_new_tab_config(&mut self, ctx: &mut ViewContext<Self>) {
@@ -7359,7 +7361,7 @@ impl Workspace {
     }
 
     /// Snapshots the given tab's pane layout and writes it as a new tab config
-    /// TOML to `~/.rook/tab_configs/`, then opens the file in the user's editor.
+    /// TOML to `~/.polaris-terminal/tab_configs/`, then opens the file in the user's editor.
     #[cfg(feature = "local_fs")]
     fn save_current_tab_as_new_config(&mut self, tab_index: usize, ctx: &mut ViewContext<Self>) {
         use crate::tab_configs::session_config::{tab_config_from_pane_snapshot, write_tab_config};
@@ -8167,7 +8169,7 @@ impl Workspace {
     }
 
     /// The tab bar overflow menu is the context menu that appears when
-    /// a user clicks "Update Rook" in the top right of the tab bar.
+    /// a user clicks "Update Polaris Terminal" in the top right of the tab bar.
     pub fn toggle_tab_bar_overflow_menu(&mut self, ctx: &mut ViewContext<Self>) {
         if self.show_tab_bar_overflow_menu {
             self.close_tab_bar_overflow_menu(ctx);
@@ -8200,7 +8202,7 @@ impl Workspace {
                     MenuItemFields::new(if matches!(ChannelState::channel(), Channel::Oss) {
                         "Get the new version"
                     } else {
-                        "Update Rook manually"
+                        "Update Polaris Terminal manually"
                     })
                     .with_on_select_action(WorkspaceAction::DownloadNewVersion)
                     .into_item(),
@@ -8273,7 +8275,7 @@ impl Workspace {
             return;
         }
 
-        if *RookDriveSettings::as_ref(ctx)
+        if *PtermDriveSettings::as_ref(ctx)
             .sharing_onboarding_block_shown
             .value()
         {
@@ -8449,9 +8451,13 @@ impl Workspace {
         ctx.notify();
     }
 
-    /// Opens the Rook Drive object identified by `uid` in a new pane
+    /// Opens the Polaris Terminal Drive object identified by `uid` in a new pane
     /// if it has a pane representation.
-    fn open_rook_drive_object_in_new_pane(&mut self, uid: &ObjectUid, ctx: &mut ViewContext<Self>) {
+    fn open_pterm_drive_object_in_new_pane(
+        &mut self,
+        uid: &ObjectUid,
+        ctx: &mut ViewContext<Self>,
+    ) {
         let Some(object) = CloudModel::as_ref(ctx).get_by_uid(uid) else {
             return;
         };
@@ -8461,7 +8467,7 @@ impl Workspace {
             ObjectType::Notebook => {
                 self.open_notebook(
                     &NotebookSource::Existing(sync_id),
-                    &OpenRookDriveObjectSettings::default(),
+                    &OpenPtermDriveObjectSettings::default(),
                     ctx,
                     true,
                 );
@@ -8469,7 +8475,7 @@ impl Workspace {
             ObjectType::Workflow => {
                 self.open_workflow_in_pane(
                     &WorkflowOpenSource::Existing(sync_id),
-                    &OpenRookDriveObjectSettings::default(),
+                    &OpenPtermDriveObjectSettings::default(),
                     WorkflowViewMode::View,
                     ctx,
                 );
@@ -8498,7 +8504,7 @@ impl Workspace {
     pub fn open_notebook(
         &mut self,
         source: &NotebookSource,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         ctx: &mut ViewContext<Self>,
         default_to_new_pane: bool,
     ) {
@@ -8547,7 +8553,7 @@ impl Workspace {
             });
         }
 
-        // Get notebook ID to set Rook drive index selected state
+        // Get notebook ID to set Polaris Terminal drive index selected state
         if let NotebookSource::Existing(notebook_id) = source {
             let focused_folder_id = settings.focused_folder_id.map(SyncId::ServerId);
             if !notebook_already_open && !default_to_new_pane {
@@ -8556,9 +8562,9 @@ impl Workspace {
 
             if let Some(focused_folder_id) = focused_folder_id {
                 // Only focus the notebook if we don't want to focus a parent folder instead
-                self.open_or_toggle_rook_drive(false, false, ctx);
+                self.open_or_toggle_pterm_drive(false, false, ctx);
                 self.set_selected_object(
-                    Some(RookDriveItemId::Object(
+                    Some(PtermDriveItemId::Object(
                         CloudObjectTypeAndId::from_id_and_type(
                             focused_folder_id,
                             ObjectType::Folder,
@@ -8568,7 +8574,7 @@ impl Workspace {
                 );
             } else {
                 self.set_selected_object(
-                    Some(RookDriveItemId::Object(
+                    Some(PtermDriveItemId::Object(
                         CloudObjectTypeAndId::from_id_and_type(*notebook_id, ObjectType::Notebook),
                     )),
                     ctx,
@@ -8577,11 +8583,11 @@ impl Workspace {
         }
     }
 
-    /// Open a Rook Drive workflow in response to an intent URL.
+    /// Open a Polaris Terminal Drive workflow in response to an intent URL.
     pub fn open_workflow_from_intent(
         &mut self,
         workflow_id: SyncId,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         ctx: &mut ViewContext<Self>,
     ) {
         // If running workflows is supported, do so. Otherwise, or if the workflow isn't in memory,
@@ -8591,7 +8597,7 @@ impl Workspace {
         if ContextFlag::RunWorkflow.is_enabled() && settings.invitee_email.is_none() {
             match CloudModel::as_ref(ctx).get_workflow(&workflow_id).cloned() {
                 Some(workflow) => {
-                    self.open_or_toggle_rook_drive(false, false, ctx);
+                    self.open_or_toggle_pterm_drive(false, false, ctx);
                     self.run_cloud_workflow_in_active_input(
                         workflow,
                         WorkflowSelectionSource::Undefined,
@@ -8603,7 +8609,7 @@ impl Workspace {
                     // that will focus the workflow instead.
                     if let Some(focused_folder) = settings.focused_folder_id.map(SyncId::ServerId) {
                         self.set_selected_object(
-                            Some(RookDriveItemId::Object(
+                            Some(PtermDriveItemId::Object(
                                 CloudObjectTypeAndId::from_id_and_type(
                                     focused_folder,
                                     ObjectType::Folder,
@@ -8623,7 +8629,7 @@ impl Workspace {
     pub fn open_workflow_in_pane(
         &mut self,
         source: &WorkflowOpenSource,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         mode: WorkflowViewMode,
         ctx: &mut ViewContext<Self>,
     ) {
@@ -8701,7 +8707,7 @@ impl Workspace {
 
         if let EnvVarCollectionSource::Existing(env_var_collection_id) = source {
             self.set_selected_object(
-                Some(RookDriveItemId::Object(
+                Some(PtermDriveItemId::Object(
                     CloudObjectTypeAndId::from_generic_string_object(
                         GenericStringObjectFormat::Json(
                             crate::cloud_object::JsonObjectType::EnvVarCollection,
@@ -8770,7 +8776,7 @@ impl Workspace {
         let settings_pane_manager = SettingsPaneManager::handle(ctx);
         if let Some(locator) = settings_pane_manager.as_ref(ctx).find_pane(ctx.window_id()) {
             // Update the page and/or search query if specified. The search query
-            // must be applied even when no page is given (e.g. `rook://settings?q=`)
+            // must be applied even when no page is given (e.g. `polaris-terminal://settings?q=`)
             // so an already-open settings tab reflects the new query.
             if page.is_some() || search_query.is_some() {
                 self.settings_pane.update(ctx, |settings_pane, ctx| {
@@ -9151,7 +9157,7 @@ impl Workspace {
         });
 
         // Focus WD index item
-        self.set_selected_object(Some(RookDriveItemId::AIFactCollection), ctx);
+        self.set_selected_object(Some(PtermDriveItemId::AIFactCollection), ctx);
     }
 
     /// Open the Execution Profile Editor pane
@@ -9241,8 +9247,8 @@ impl Workspace {
         ctx.notify();
     }
 
-    /// Find an active session and pre-fill the input editor the Rook executable with the
-    /// [`rook_cli::Command::DumpDebugInfo`] subcommand.
+    /// Find an active session and pre-fill the input editor the Polaris Terminal executable with the
+    /// [`pterm_cli::Command::DumpDebugInfo`] subcommand.
     fn dump_debug_info(&mut self, ctx: &mut ViewContext<Self>) {
         if let Some(exec) = std::env::current_exe()
             .ok()
@@ -9276,7 +9282,7 @@ impl Workspace {
                     let command = format!(
                         "{} {}",
                         terminal_view.shell_family(ctx).shell_escape(&exec),
-                        rook_cli::dump_debug_info_flag()
+                        pterm_cli::dump_debug_info_flag()
                     );
                     terminal_view.set_pending_command(&command, ctx);
                 });
@@ -9315,7 +9321,7 @@ impl Workspace {
     fn install_oz(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.spawn(async { cli_install::install_oz() }, |view, result, ctx| {
             let command_name = ChannelState::channel().cli_command_name();
-            let message = format!("Installed the Oz CLI globally. You can now run '{command_name}' from any terminal outside of Rook.");
+            let message = format!("Installed the Oz CLI globally. You can now run '{command_name}' from any terminal outside of Polaris Terminal.");
             let toast = DismissibleToast::success(message).with_link(
                 ToastLink::new("Learn more".to_string())
                     .with_href("https://docs.rook.dev/reference/cli".to_string()),
@@ -9331,7 +9337,7 @@ impl Workspace {
             async { cli_install::uninstall_oz() },
             |view, result, ctx| {
                 let toast = DismissibleToast::success(
-                    "Removed the global Oz CLI installation — it still works inside Rook."
+                    "Removed the global Oz CLI installation — it still works inside Polaris Terminal."
                         .to_string(),
                 );
                 view.handle_cli_command_result(
@@ -9344,39 +9350,39 @@ impl Workspace {
         );
     }
 
-    /// Install the Rook Control CLI by creating a symlink in /usr/local/bin
+    /// Install the Polaris Terminal Control CLI by creating a symlink in /usr/local/bin
     #[cfg(target_os = "macos")]
-    fn install_rookctrl(&mut self, ctx: &mut ViewContext<Self>) {
+    fn install_ptermctrl(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.spawn(
-            async { cli_install::install_rookctrl() },
+            async { cli_install::install_ptermctrl() },
             |view, result, ctx| {
-                let command_name = ChannelState::channel().rookctrl_command_name();
-                let message = format!("Installed the Rook Control CLI globally. You can now run '{command_name}' from any terminal outside of Rook.");
+                let command_name = ChannelState::channel().ptermctrl_command_name();
+                let message = format!("Installed the Polaris Terminal Control CLI globally. You can now run '{command_name}' from any terminal outside of Polaris Terminal.");
                 let toast = DismissibleToast::success(message);
                 view.handle_cli_command_result(
                     result,
                     toast,
-                    "Failed to install Rook Control command",
+                    "Failed to install Polaris Terminal Control command",
                     ctx,
                 );
             },
         );
     }
 
-    /// Uninstall the Rook Control CLI by removing the symlink from /usr/local/bin
+    /// Uninstall the Polaris Terminal Control CLI by removing the symlink from /usr/local/bin
     #[cfg(target_os = "macos")]
-    fn uninstall_rookctrl(&mut self, ctx: &mut ViewContext<Self>) {
+    fn uninstall_ptermctrl(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.spawn(
-            async { cli_install::uninstall_rookctrl() },
+            async { cli_install::uninstall_ptermctrl() },
             |view, result, ctx| {
                 let toast = DismissibleToast::success(
-                    "Removed the global Rook Control CLI installation — it still works inside Rook."
+                    "Removed the global Polaris Terminal Control CLI installation — it still works inside Polaris Terminal."
                         .to_string(),
                 );
                 view.handle_cli_command_result(
                     result,
                     toast,
-                    "Failed to uninstall Rook Control command",
+                    "Failed to uninstall Polaris Terminal Control command",
                     ctx,
                 );
             },
@@ -9447,49 +9453,49 @@ impl Workspace {
         ctx.notify();
     }
 
-    pub fn open_or_toggle_rook_drive(
+    pub fn open_or_toggle_pterm_drive(
         &mut self,
         toggle: bool,
         explicit_user_action: bool,
         ctx: &mut ViewContext<Self>,
     ) {
-        // Closing all left panels will also close rook drive so we need to retrieve
-        // whether rook drive was open first, and toggle based on the initial value.
-        let was_rook_drive_open = self.current_workspace_state.is_rook_drive_open;
+        // Closing all left panels will also close polaris-terminal drive so we need to retrieve
+        // whether polaris-terminal drive was open first, and toggle based on the initial value.
+        let was_pterm_drive_open = self.current_workspace_state.is_pterm_drive_open;
         self.current_workspace_state.close_all_left_panels();
-        self.current_workspace_state.is_rook_drive_open =
-            if toggle { !was_rook_drive_open } else { true };
+        self.current_workspace_state.is_pterm_drive_open =
+            if toggle { !was_pterm_drive_open } else { true };
 
-        // Set selected object to None upon toggle close of Rook Drive
-        if !self.current_workspace_state.is_rook_drive_open {
+        // Set selected object to None upon toggle close of Polaris Terminal Drive
+        if !self.current_workspace_state.is_pterm_drive_open {
             self.set_selected_object(None, ctx);
             self.focus_active_tab(ctx);
         }
 
-        // Reset focused index when opening/toggling Rook Drive open
-        if self.current_workspace_state.is_rook_drive_open {
-            self.reset_focused_index_in_rook_drive(true, ctx);
+        // Reset focused index when opening/toggling Polaris Terminal Drive open
+        if self.current_workspace_state.is_pterm_drive_open {
+            self.reset_focused_index_in_pterm_drive(true, ctx);
         }
 
         ctx.notify();
 
-        // Telemetry and welcome tip logic is only for when the user explicitly opens Rook Drive
-        // AND rook drive wasn't open before. There are other scenarios where we open Rook Drive like:
+        // Telemetry and welcome tip logic is only for when the user explicitly opens Polaris Terminal Drive
+        // AND polaris-terminal drive wasn't open before. There are other scenarios where we open Polaris Terminal Drive like:
         // new user onboarding, user joins a team, etc so we want to avoid counting those.
         if explicit_user_action
-            && !was_rook_drive_open
-            && self.current_workspace_state.is_rook_drive_open
+            && !was_pterm_drive_open
+            && self.current_workspace_state.is_pterm_drive_open
         {
             send_telemetry_from_ctx!(
-                TelemetryEvent::RookDriveOpened {
-                    source: RookDriveSource::Legacy,
+                TelemetryEvent::PtermDriveOpened {
+                    source: PtermDriveSource::Legacy,
                     is_code_mode_v2: false
                 },
                 ctx
             );
             self.tips_completed.update(ctx, |tips_completed, ctx| {
                 mark_feature_used_and_write_to_user_defaults(
-                    Tip::Action(TipAction::OpenRookDrive),
+                    Tip::Action(TipAction::OpenPtermDrive),
                     tips_completed,
                     ctx,
                 );
@@ -9964,7 +9970,7 @@ impl Workspace {
                     ) =>
                 {
                     items.push(
-                        MenuItemFields::new("Update and relaunch Rook")
+                        MenuItemFields::new("Update and relaunch Polaris Terminal")
                             .with_on_select_action(WorkspaceAction::ApplyUpdate)
                             .with_override_text_color(appearance.theme().ansi_fg_red())
                             .into_item(),
@@ -9990,7 +9996,7 @@ impl Workspace {
                     let mut item = MenuItemFields::new(if is_oss {
                         "Get the new version"
                     } else {
-                        "Update Rook manually"
+                        "Update Polaris Terminal manually"
                     })
                     .with_on_select_action(WorkspaceAction::DownloadNewVersion);
                     if !is_oss {
@@ -10023,7 +10029,7 @@ impl Workspace {
 
         #[cfg(not(target_family = "wasm"))]
         items.push(
-            MenuItemFields::new("View Rook logs")
+            MenuItemFields::new("View Polaris Terminal logs")
                 .with_on_select_action(WorkspaceAction::ViewLogs)
                 .into_item(),
         );
@@ -10563,7 +10569,7 @@ impl Workspace {
                 let theme = appearance.theme();
                 let search_icon = ConstrainedBox::new(
                     icons::Icon::SearchSmall
-                        .to_rookui_icon(theme.sub_text_color(theme.surface_2()))
+                        .to_ptermui_icon(theme.sub_text_color(theme.surface_2()))
                         .finish(),
                 )
                 .with_width(16.)
@@ -10689,7 +10695,7 @@ impl Workspace {
                     .finish()
                 })
                 .with_cursor(Cursor::PointingHand)
-                .on_click(|ctx: &mut rookui::elements::EventContext, _, _| {
+                .on_click(|ctx: &mut ptermui::elements::EventContext, _, _| {
                     ctx.dispatch_typed_action(WorkspaceAction::OpenWorktreeAddRepoPicker);
                     ctx.dispatch_typed_action(crate::menu::MenuAction::Close(true));
                 })
@@ -10924,8 +10930,8 @@ impl Workspace {
                 ctx.notify();
             }
             LaunchConfigModalEvent::SuccessfullySavedConfig(launch_config) => {
-                ctx.update_model(&RookConfig::handle(ctx), move |rook_config, ctx| {
-                    rook_config.append_launch_config(launch_config, ctx);
+                ctx.update_model(&PtermConfig::handle(ctx), move |pterm_config, ctx| {
+                    pterm_config.append_launch_config(launch_config, ctx);
                 });
                 ctx.notify();
             }
@@ -11085,7 +11091,7 @@ impl Workspace {
                     });
                 });
             },
-            rookui::platform::FilePickerConfiguration::new().folders_only(),
+            ptermui::platform::FilePickerConfiguration::new().folders_only(),
         );
     }
 
@@ -11159,12 +11165,12 @@ impl Workspace {
             .map(crate::util::git::list_local_branches_sync)
             .unwrap_or_default();
         let branch_refs: HashSet<&str> = branches.iter().map(|s| s.as_str()).collect();
-        Some(rook_util::worktree_names::generate_worktree_branch_name(
+        Some(pterm_util::worktree_names::generate_worktree_branch_name(
             &branch_refs,
         ))
     }
 
-    /// Generates a worktree tab config TOML, writes it to `~/.rook/tab_configs/`,
+    /// Generates a worktree tab config TOML, writes it to `~/.polaris-terminal/tab_configs/`,
     /// and opens the resulting config as a new tab.
     ///
     /// When `worktree_branch_name` is `None` (autogenerate), the TOML stores
@@ -11199,7 +11205,7 @@ impl Workspace {
         } else {
             let branches = crate::util::git::list_local_branches_sync(Path::new(repo));
             let branch_refs: HashSet<&str> = branches.iter().map(|s| s.as_str()).collect();
-            rook_util::worktree_names::generate_worktree_branch_name(&branch_refs)
+            pterm_util::worktree_names::generate_worktree_branch_name(&branch_refs)
         };
 
         let toml_content = crate::tab_configs::build_worktree_config_toml(
@@ -11285,12 +11291,12 @@ impl Workspace {
                     });
                 });
             },
-            rookui::platform::FilePickerConfiguration::new().folders_only(),
+            ptermui::platform::FilePickerConfiguration::new().folders_only(),
         );
     }
 
     /// Opens a worktree in the given repo using the default worktree tab config,
-    /// saving the materialized config to `~/.rook/tab_configs/` first.
+    /// saving the materialized config to `~/.polaris-terminal/tab_configs/` first.
     /// The branch name is auto-generated.
     #[cfg(feature = "local_fs")]
     fn open_worktree_in_repo(&mut self, repo_path: String, ctx: &mut ViewContext<Self>) {
@@ -11306,7 +11312,7 @@ impl Workspace {
         };
         let branches = crate::util::git::list_local_branches_sync(Path::new(&repo_path));
         let branch_refs: HashSet<&str> = branches.iter().map(|s| s.as_str()).collect();
-        let branch_name = rook_util::worktree_names::generate_worktree_branch_name(&branch_refs);
+        let branch_name = pterm_util::worktree_names::generate_worktree_branch_name(&branch_refs);
         let repo_display_name = Path::new(&repo_path)
             .file_name()
             .map(|name| name.to_string_lossy().to_string())
@@ -11386,7 +11392,7 @@ impl Workspace {
                     persisted.user_added_workspace(path_buf, ctx);
                 });
             },
-            rookui::platform::FilePickerConfiguration::new().folders_only(),
+            ptermui::platform::FilePickerConfiguration::new().folders_only(),
         );
     }
 
@@ -11447,8 +11453,8 @@ impl Workspace {
                 // If saved workflow id matches the one that is currently displayed, then refresh workflow info box + input
                 self.maybe_refresh_workflow_info_box_and_input(workflow_id, ctx);
             }
-            WorkflowModalEvent::ViewInRookDrive(id) => {
-                self.view_in_and_focus_rook_drive(*id, ctx);
+            WorkflowModalEvent::ViewInPtermDrive(id) => {
+                self.view_in_and_focus_pterm_drive(*id, ctx);
             }
             WorkflowModalEvent::AiAssistUpgradeError(team_uid, user_id) => {
                 let upgrade_link = team_uid
@@ -11515,7 +11521,7 @@ impl Workspace {
                     // Proc same behavior as DrivePanelEvent::RunWorkflow
                     self.run_cloud_workflow_in_active_input(
                         workflow.clone(),
-                        WorkflowSelectionSource::RookDrive,
+                        WorkflowSelectionSource::PtermDrive,
                         TerminalSessionFallbackBehavior::default(),
                         ctx,
                     );
@@ -11746,7 +11752,7 @@ impl Workspace {
                 // This workspace can survive an anonymous user signing up from
                 // inside the app. Refresh the cached auth state and recompute
                 // effective toolbelt availability so onboarding preferences
-                // (for example, Rook Drive and conversation history) take
+                // (for example, Polaris Terminal Drive and conversation history) take
                 // effect without requiring an off/on toggle.
                 self.auth_state = AuthStateProvider::as_ref(ctx).get().clone();
                 self.update_left_panel_available_views(ctx);
@@ -11947,10 +11953,10 @@ impl Workspace {
                 .size()
         });
 
-        let rook_ai_width = modal_sizes.map(|ms| {
-            ms.rook_ai_width
+        let pterm_ai_width = modal_sizes.map(|ms| {
+            ms.pterm_ai_width
                 .lock()
-                .expect("should be able to lock rook_ai resizable state handle")
+                .expect("should be able to lock pterm_ai resizable state handle")
                 .size()
         });
 
@@ -11961,10 +11967,10 @@ impl Workspace {
                 .size()
         });
 
-        let rook_drive_index_width = modal_sizes.map(|ms| {
-            ms.rook_drive_index_width
+        let pterm_drive_index_width = modal_sizes.map(|ms| {
+            ms.pterm_drive_index_width
                 .lock()
-                .expect("should be able to lock rook drive resizable state handle")
+                .expect("should be able to lock polaris-terminal drive resizable state handle")
                 .size()
         });
 
@@ -11995,9 +12001,9 @@ impl Workspace {
             fullscreen_state: window_fullscreen_state,
             quake_mode,
             universal_search_width,
-            rook_ai_width,
+            pterm_ai_width,
             voltron_width,
-            rook_drive_index_width,
+            pterm_drive_index_width,
             left_panel_open: self.left_panel_open,
             vertical_tabs_panel_open: self.vertical_tabs_panel_open,
             left_panel_width,
@@ -12703,7 +12709,7 @@ impl Workspace {
 
     pub fn open_autoupdate_failure_link(&mut self, ctx: &mut ViewContext<Self>) {
         // The rename turned upstream's own documentation host into one this
-        // project does not own and which resolves to somebody else. Rook's
+        // project does not own and which resolves to somebody else. Polaris Terminal's
         // answer to "the update did not apply" is the release page anyway.
         ctx.open_url(crate::autoupdate::github::RELEASES_URL);
     }
@@ -13124,7 +13130,7 @@ impl Workspace {
     pub fn add_tab_for_cloud_notebook(
         &mut self,
         notebook_id: SyncId,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         ctx: &mut ViewContext<Self>,
     ) {
         // TODO: We should validate that this notebook exists and fallback if it doesn't
@@ -13142,7 +13148,7 @@ impl Workspace {
     fn add_tab_for_cloud_workflow(
         &mut self,
         workflow_id: SyncId,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         ctx: &mut ViewContext<Self>,
     ) {
         let panes_layout = PanesLayout::Snapshot(Box::new(PaneNodeSnapshot::Leaf(LeafSnapshot {
@@ -13771,7 +13777,7 @@ impl Workspace {
         ctx.spawn(
             async move {
                 let transcript_file = tempfile::Builder::new()
-                    .prefix("rook_run_transcript_")
+                    .prefix("pterm_run_transcript_")
                     .suffix(".json")
                     .tempfile()
                     .context("Failed to create temporary transcript file")?;
@@ -13886,7 +13892,7 @@ impl Workspace {
         // True when the fork is paired with a follow-up that fires immediately after restore
         // (a prompt to send, or a `/summarize` triggered by `summarize_after_fork`).
         // Used to suppress the `couldn't find original conversation directory` ephemeral hint
-        // for cloud-to-local forks, which would otherwise mask the rooking indicator while the
+        // for cloud-to-local forks, which would otherwise mask the pterming indicator while the
         // agent processes the follow-up. See `BlocklistAIStatusBar::render`'s
         // `ephemeral_message_model.current_message().is_none()` gate.
         let has_initial_query = summarize_after_fork || initial_prompt.is_some();
@@ -14505,7 +14511,7 @@ impl Workspace {
 
     #[cfg(target_os = "macos")]
     pub fn sync_window_button_visibility(&self, ctx: &mut ViewContext<Self>) {
-        use rookui::platform::mac::WindowExt;
+        use ptermui::platform::mac::WindowExt;
         let show = if FeatureFlag::FullScreenZenMode.is_enabled()
             && TabSettings::as_ref(ctx)
                 .workspace_decoration_visibility
@@ -14553,7 +14559,7 @@ impl Workspace {
                         let url = NOTIFICATIONS_TROUBLESHOOT_URL.to_string();
                         view.toast_stack.update(ctx, |toast_stack, ctx| {
                             let toast = DismissibleToast::error(
-                                "Rook doesn't have permission to send desktop notifications."
+                                "Polaris Terminal doesn't have permission to send desktop notifications."
                                     .to_string(),
                             )
                             .with_link(
@@ -14740,7 +14746,7 @@ impl Workspace {
         ctx.notify();
     }
 
-    fn open_rook_drive_palette(&mut self, ctx: &mut ViewContext<Self>) {
+    fn open_pterm_drive_palette(&mut self, ctx: &mut ViewContext<Self>) {
         self.palette.update(ctx, |view, ctx| {
             view.reset(ctx);
             view.set_active_query_filter(QueryFilter::Drive, ctx);
@@ -14915,7 +14921,7 @@ impl Workspace {
                 _ => self.open_navigation_palette(ctx),
             },
             PaletteMode::LaunchConfig => self.open_launch_config_palette(ctx),
-            PaletteMode::RookDrive => self.open_rook_drive_palette(ctx),
+            PaletteMode::PtermDrive => self.open_pterm_drive_palette(ctx),
             PaletteMode::Files => self.open_files_palette(ctx),
             PaletteMode::Conversations => self.open_conversations_palette(ctx),
         }
@@ -15007,12 +15013,12 @@ impl Workspace {
             }
             CommandPaletteEvent::OpenNotebook { id } => self.open_notebook(
                 &NotebookSource::Existing(*id),
-                &OpenRookDriveObjectSettings::default(),
+                &OpenPtermDriveObjectSettings::default(),
                 ctx,
                 true,
             ),
-            CommandPaletteEvent::ViewInRookDrive { id } => {
-                self.view_in_and_focus_rook_drive(RookDriveItemId::Object(*id), ctx);
+            CommandPaletteEvent::ViewInPtermDrive { id } => {
+                self.view_in_and_focus_pterm_drive(PtermDriveItemId::Object(*id), ctx);
             }
             #[allow(unused_variables)]
             CommandPaletteEvent::OpenFile {
@@ -15030,12 +15036,12 @@ impl Workspace {
                             .and_then(|wd| match wd {
                                 LocalOrRemotePath::Remote(remote) => {
                                     let std_path =
-                                        rook_util::standardized_path::StandardizedPath::try_new(
+                                        pterm_util::standardized_path::StandardizedPath::try_new(
                                             path,
                                         )
                                         .ok()?;
                                     Some(LocalOrRemotePath::Remote(
-                                        rook_util::remote_path::RemotePath::new(
+                                        pterm_util::remote_path::RemotePath::new(
                                             remote.host_id.clone(),
                                             std_path,
                                         ),
@@ -15074,53 +15080,55 @@ impl Workspace {
     }
 
     /// This function is used when we set a selected object, which is an object open in an active pane.
-    /// We do not want to focus Rook Drive, instead we want to focus the editor of the open object.
-    fn view_in_rook_drive(&mut self, item_id: RookDriveItemId, ctx: &mut ViewContext<Self>) {
+    /// We do not want to focus Polaris Terminal Drive, instead we want to focus the editor of the open object.
+    fn view_in_pterm_drive(&mut self, item_id: PtermDriveItemId, ctx: &mut ViewContext<Self>) {
         self.open_left_panel(ctx);
         self.left_panel_view.update(ctx, |left_panel, ctx| {
-            left_panel.handle_action(&LeftPanelAction::RookDrive, ctx);
+            left_panel.handle_action(&LeftPanelAction::PtermDrive, ctx);
         });
 
-        if let RookDriveItemId::Object(object_id) = item_id {
+        if let PtermDriveItemId::Object(object_id) = item_id {
             CloudModel::handle(ctx).update(ctx, |model, ctx| {
                 model.force_expand_object_and_ancestors_cloud_id(object_id, ctx);
             });
         }
-        self.update_rook_drive_view(ctx, |rook_drive, ctx| {
-            rook_drive.scroll_item_into_view(item_id, ctx);
-            rook_drive.expand_section_for_drive_item_id(item_id, ctx);
-            rook_drive.initialize_drive_section_states(ctx);
+        self.update_pterm_drive_view(ctx, |pterm_drive, ctx| {
+            pterm_drive.scroll_item_into_view(item_id, ctx);
+            pterm_drive.expand_section_for_drive_item_id(item_id, ctx);
+            pterm_drive.initialize_drive_section_states(ctx);
         });
     }
 
-    /// This function is used when we want to view an item in Rook Drive AND focus Rook Drive.
-    pub fn view_in_and_focus_rook_drive(
+    /// This function is used when we want to view an item in Polaris Terminal Drive AND focus Polaris Terminal Drive.
+    pub fn view_in_and_focus_pterm_drive(
         &mut self,
-        item_id: RookDriveItemId,
+        item_id: PtermDriveItemId,
         ctx: &mut ViewContext<Self>,
     ) {
-        self.view_in_rook_drive(item_id, ctx);
+        self.view_in_pterm_drive(item_id, ctx);
 
-        self.update_rook_drive_view(ctx, |rook_drive, ctx| {
-            rook_drive.reset_and_open_to_main_index(ctx);
-            rook_drive.set_focused_item(item_id, ctx);
+        self.update_pterm_drive_view(ctx, |pterm_drive, ctx| {
+            pterm_drive.reset_and_open_to_main_index(ctx);
+            pterm_drive.set_focused_item(item_id, ctx);
         });
         ctx.notify();
     }
 
-    /// Updates the left panel's rook drive view.
-    fn update_rook_drive_view<F>(&mut self, ctx: &mut ViewContext<Self>, update_fn: F)
+    /// Updates the left panel's polaris-terminal drive view.
+    fn update_pterm_drive_view<F>(&mut self, ctx: &mut ViewContext<Self>, update_fn: F)
     where
         F: FnOnce(&mut DrivePanel, &mut ViewContext<DrivePanel>),
     {
         self.left_panel_view.update(ctx, |left_panel, ctx| {
-            left_panel.rook_drive_view().update(ctx, |rook_drive, ctx| {
-                update_fn(rook_drive, ctx);
-            });
+            left_panel
+                .pterm_drive_view()
+                .update(ctx, |pterm_drive, ctx| {
+                    update_fn(pterm_drive, ctx);
+                });
         });
     }
 
-    /// View an object in Rook Drive and open its sharing settings.
+    /// View an object in Polaris Terminal Drive and open its sharing settings.
     fn open_object_sharing_settings(
         &mut self,
         object_id: CloudObjectTypeAndId,
@@ -15128,10 +15136,10 @@ impl Workspace {
         source: SharingDialogSource,
         ctx: &mut ViewContext<Self>,
     ) {
-        self.view_in_rook_drive(RookDriveItemId::Object(object_id), ctx);
-        self.update_rook_drive_view(ctx, |rook_drive, ctx| {
-            rook_drive.reset_and_open_to_main_index(ctx);
-            rook_drive.open_object_sharing_settings(object_id, invitee_email, source, ctx);
+        self.view_in_pterm_drive(PtermDriveItemId::Object(object_id), ctx);
+        self.update_pterm_drive_view(ctx, |pterm_drive, ctx| {
+            pterm_drive.reset_and_open_to_main_index(ctx);
+            pterm_drive.open_object_sharing_settings(object_id, invitee_email, source, ctx);
         });
 
         ctx.notify();
@@ -15143,14 +15151,14 @@ impl Workspace {
         space: Space,
         ctx: &mut ViewContext<Self>,
     ) {
-        self.update_rook_drive_view(ctx, |rook_drive, ctx| {
-            rook_drive.move_object_to_team_owner(cloud_object_type_and_id, space, ctx);
+        self.update_pterm_drive_view(ctx, |pterm_drive, ctx| {
+            pterm_drive.move_object_to_team_owner(cloud_object_type_and_id, space, ctx);
         });
     }
 
     fn set_focused_index(&mut self, index: Option<usize>, ctx: &mut ViewContext<Self>) {
-        self.update_rook_drive_view(ctx, |rook_drive, ctx| {
-            rook_drive.set_focused_index(index, ctx);
+        self.update_pterm_drive_view(ctx, |pterm_drive, ctx| {
+            pterm_drive.set_focused_index(index, ctx);
         });
         ctx.notify();
     }
@@ -15181,16 +15189,17 @@ impl Workspace {
                 ..
             } => match ChannelState::app_version() {
                 Some(version) => {
-                    let opening_rook_drive_on_start_up = OPENING_ROOK_DRIVE_ON_START_UP
-                        .lock()
-                        .expect("Should be able to access OPENING_ROOK_DRIVE_ON_START_UP");
+                    let opening_pterm_drive_on_start_up =
+                        OPENING_POLARIS_TERMINAL_DRIVE_ON_START_UP.lock().expect(
+                            "Should be able to access OPENING_POLARIS_TERMINAL_DRIVE_ON_START_UP",
+                        );
 
                     request_type = Some(ChangelogRequestType::WindowLaunch);
                     // Do not show changelog on quake mode window or if it has already been shown
-                    // or if we are opening Rook Drive on start up
+                    // or if we are opening Polaris Terminal Drive on start up
                     quake_mode_window_id() != Some(ctx.window_id())
                         && !Settings::has_changelog_been_shown(version, ctx)
-                        && !*opening_rook_drive_on_start_up
+                        && !*opening_pterm_drive_on_start_up
                 }
                 None => false,
             },
@@ -15222,13 +15231,15 @@ impl Workspace {
                                 link = link.with_keystroke(keystroke);
                             }
 
-                            let toast = DismissibleToast::default(String::from("Rook updated!"))
-                                .with_link(link);
+                            let toast = DismissibleToast::default(String::from(
+                                "Polaris Terminal updated!",
+                            ))
+                            .with_link(link);
 
                             stack.add_ephemeral_toast(toast, ctx);
                         });
                     } else {
-                        // If resource center isn't already open and Rook AI isn't open, then open resource center
+                        // If resource center isn't already open and Polaris Terminal AI isn't open, then open resource center
                         if !self.current_workspace_state.is_resource_center_open
                             && !self.current_workspace_state.is_ai_assistant_panel_open
                         {
@@ -15280,8 +15291,8 @@ impl Workspace {
         self.current_workspace_state.is_workflow_modal_open
     }
 
-    pub fn is_rook_drive_open(&self) -> bool {
-        self.current_workspace_state.is_rook_drive_open
+    pub fn is_pterm_drive_open(&self) -> bool {
+        self.current_workspace_state.is_pterm_drive_open
     }
 
     pub fn is_left_panel_open(&self, ctx: &AppContext) -> bool {
@@ -15315,9 +15326,9 @@ impl Workspace {
             SettingsViewEvent::LaunchNetworkLogging => {
                 self.open_network_log_pane(ctx);
             }
-            SettingsViewEvent::OpenRookDrive => {
+            SettingsViewEvent::OpenPtermDrive => {
                 self.close_all_overlays(ctx);
-                self.open_or_toggle_rook_drive(
+                self.open_or_toggle_pterm_drive(
                     false, /* toggle */
                     false, /* explicit_user_action */
                     ctx,
@@ -16115,7 +16126,7 @@ impl Workspace {
                 "Your conversation hasn't synced to the cloud yet. Try sending another message, then hand off again."
             }
             HandoffPrepareError::InvalidModel => {
-                "Custom models can't run in the cloud. Switch to a Rook model to hand off."
+                "Custom models can't run in the cloud. Switch to a Polaris Terminal model to hand off."
             }
             HandoffPrepareError::EmptySourceAndPrompt => {
                 "Nothing to hand off — start a conversation first."
@@ -16337,7 +16348,7 @@ impl Workspace {
             pane_group::Event::OpenCloudWorkflowForEdit(workflow_id) => self
                 .open_workflow_with_existing(
                     *workflow_id,
-                    &OpenRookDriveObjectSettings::default(),
+                    &OpenPtermDriveObjectSettings::default(),
                     ctx,
                 ),
             pane_group::Event::OpenWorkflowModalWithTemporary(workflow) => {
@@ -16386,7 +16397,7 @@ impl Workspace {
                 );
             }
             #[cfg_attr(not(feature = "local_fs"), allow(unused_variables))]
-            pane_group::Event::OpenFileInRook { path, session } => {
+            pane_group::Event::OpenFileInPterm { path, session } => {
                 #[cfg(feature = "local_fs")]
                 {
                     let layout = *EditorSettings::as_ref(ctx).open_file_layout.value();
@@ -16399,11 +16410,11 @@ impl Workspace {
             } => {
                 self.move_to_drive_space(*cloud_object_type_and_id, *space, ctx);
             }
-            pane_group::Event::OpenRookDriveLink {
-                open_rook_drive_args,
+            pane_group::Event::OpenPtermDriveLink {
+                open_pterm_drive_args,
             } => {
                 let object_found = CloudModel::as_ref(ctx)
-                    .get_by_uid(&open_rook_drive_args.server_id.uid())
+                    .get_by_uid(&open_pterm_drive_args.server_id.uid())
                     .is_some();
 
                 if !object_found {
@@ -16417,42 +16428,42 @@ impl Workspace {
                     return;
                 }
 
-                let server_id = open_rook_drive_args.server_id;
-                match open_rook_drive_args.object_type {
+                let server_id = open_pterm_drive_args.server_id;
+                match open_pterm_drive_args.object_type {
                     ObjectType::Notebook => self.open_notebook(
                         &NotebookSource::Existing(SyncId::ServerId(server_id)),
-                        &open_rook_drive_args.settings,
+                        &open_pterm_drive_args.settings,
                         ctx,
                         true,
                     ),
-                    ObjectType::Workflow => self.view_in_and_focus_rook_drive(
-                        RookDriveItemId::Object(CloudObjectTypeAndId::Workflow(SyncId::ServerId(
+                    ObjectType::Workflow => self.view_in_and_focus_pterm_drive(
+                        PtermDriveItemId::Object(CloudObjectTypeAndId::Workflow(SyncId::ServerId(
                             server_id,
                         ))),
                         ctx,
                     ),
                     ObjectType::GenericStringObject(GenericStringObjectFormat::Json(
                         JsonObjectType::EnvVarCollection,
-                    )) => self.view_in_and_focus_rook_drive(
-                        RookDriveItemId::Object(CloudObjectTypeAndId::from_generic_string_object(
+                    )) => self.view_in_and_focus_pterm_drive(
+                        PtermDriveItemId::Object(CloudObjectTypeAndId::from_generic_string_object(
                             GenericStringObjectFormat::Json(JsonObjectType::EnvVarCollection),
                             SyncId::ServerId(server_id),
                         )),
                         ctx,
                     ),
-                    ObjectType::Folder => self.view_in_and_focus_rook_drive(
-                        RookDriveItemId::Object(CloudObjectTypeAndId::Folder(SyncId::ServerId(
+                    ObjectType::Folder => self.view_in_and_focus_pterm_drive(
+                        PtermDriveItemId::Object(CloudObjectTypeAndId::Folder(SyncId::ServerId(
                             server_id,
                         ))),
                         ctx,
                     ),
                     _ => {
-                        log::warn!("Attempted to open an unsupported Rook Drive link")
+                        log::warn!("Attempted to open an unsupported Polaris Terminal Drive link")
                     }
                 }
             }
             #[cfg(feature = "local_fs")]
-            pane_group::Event::OpenCodeInRook {
+            pane_group::Event::OpenCodeInPterm {
                 source,
                 layout,
                 line_col,
@@ -16460,7 +16471,7 @@ impl Workspace {
                 self.open_code(source.clone(), *layout, *line_col, false, &[], ctx);
             }
             #[cfg(feature = "local_fs")]
-            pane_group::Event::PreviewCodeInRook { source } => {
+            pane_group::Event::PreviewCodeInPterm { source } => {
                 self.open_code(
                     source.clone(),
                     EditorLayout::SplitPane, // preview always uses split pane
@@ -16576,8 +16587,8 @@ impl Workspace {
                 // Focus an existing pane by its locator (used when avoiding duplicate file panes during undo close pane)
                 self.focus_pane(*locator, ctx);
             }
-            pane_group::Event::ViewInRookDrive(id) => {
-                self.view_in_and_focus_rook_drive(*id, ctx);
+            pane_group::Event::ViewInPtermDrive(id) => {
+                self.view_in_and_focus_pterm_drive(*id, ctx);
             }
             // If focused pane contains an object, then set selected state in WD to that object
             pane_group::Event::PaneFocused => {
@@ -16602,7 +16613,7 @@ impl Workspace {
 
                     if let Some(workflow_id) = active_workflow_id {
                         self.set_selected_object(
-                            Some(RookDriveItemId::Object(
+                            Some(PtermDriveItemId::Object(
                                 CloudObjectTypeAndId::from_id_and_type(
                                     workflow_id,
                                     ObjectType::Workflow,
@@ -16625,7 +16636,7 @@ impl Workspace {
 
                     if let Some(notebook_id) = notebook_id {
                         self.set_selected_object(
-                            Some(RookDriveItemId::Object(
+                            Some(PtermDriveItemId::Object(
                                 CloudObjectTypeAndId::from_id_and_type(
                                     notebook_id,
                                     ObjectType::Notebook,
@@ -16647,7 +16658,7 @@ impl Workspace {
 
                     if let Some(env_var_collection_id) = env_var_collection_id {
                         self.set_selected_object(
-                            Some(RookDriveItemId::Object(
+                            Some(PtermDriveItemId::Object(
                                 CloudObjectTypeAndId::from_generic_string_object(
                                     GenericStringObjectFormat::Json(
                                         crate::cloud_object::JsonObjectType::EnvVarCollection,
@@ -16667,7 +16678,7 @@ impl Workspace {
                     let workflow_id = workflow_pane.get_view(ctx).as_ref(ctx).workflow_id();
 
                     self.set_selected_object(
-                        Some(RookDriveItemId::Object(
+                        Some(PtermDriveItemId::Object(
                             CloudObjectTypeAndId::from_id_and_type(
                                 workflow_id,
                                 ObjectType::Workflow,
@@ -16681,7 +16692,7 @@ impl Workspace {
                 else if let Some(_ai_fact_pane) =
                     pane_group.ai_fact_pane_by_pane_id(focused_pane_id)
                 {
-                    self.set_selected_object(Some(RookDriveItemId::AIFactCollection), ctx);
+                    self.set_selected_object(Some(PtermDriveItemId::AIFactCollection), ctx);
                     active_object_open_in_pane = true;
                 }
 
@@ -17029,8 +17040,8 @@ impl Workspace {
                 ctx.notify();
             }
             pane_group::Event::ClearHoveredTabIndex => self.hovered_tab_index = None,
-            pane_group::Event::OpenRookDriveObjectInPane(uid) => {
-                self.open_rook_drive_object_in_new_pane(uid, ctx);
+            pane_group::Event::OpenPtermDriveObjectInPane(uid) => {
+                self.open_pterm_drive_object_in_new_pane(uid, ctx);
             }
             pane_group::Event::OpenSuggestedAgentModeWorkflowModal { workflow_and_id } => {
                 self.open_suggested_agent_mode_workflow_modal(workflow_and_id, ctx);
@@ -17219,7 +17230,7 @@ impl Workspace {
             }
             pane_group::Event::OpenAddPromptPane { initial_content } => {
                 if UserWorkspaces::as_ref(ctx).personal_drive(ctx).is_some() {
-                    self.update_rook_drive_view(ctx, |drive_view, ctx| {
+                    self.update_pterm_drive_view(ctx, |drive_view, ctx| {
                         if let Some(initial_content) = initial_content {
                             drive_view.create_workflow_with_content(
                                 Space::Personal,
@@ -17250,7 +17261,7 @@ impl Workspace {
                     self.left_panel_view
                         .read(ctx, |left_panel, _| match target_view {
                             LeftPanelTargetView::FileTree => left_panel.is_file_tree_active(),
-                            LeftPanelTargetView::RookDrive => left_panel.is_rook_drive_active(),
+                            LeftPanelTargetView::PtermDrive => left_panel.is_pterm_drive_active(),
                         });
 
                 if self.active_tab_pane_group().as_ref(ctx).left_panel_open && is_target_active {
@@ -17265,7 +17276,7 @@ impl Workspace {
                     self.left_panel_view.update(ctx, |left_panel, ctx| {
                         let action = match target_view {
                             LeftPanelTargetView::FileTree => LeftPanelAction::ProjectExplorer,
-                            LeftPanelTargetView::RookDrive => LeftPanelAction::RookDrive,
+                            LeftPanelTargetView::PtermDrive => LeftPanelAction::PtermDrive,
                         };
                         left_panel.handle_action_with_force_open(&action, *force_open, ctx);
                     });
@@ -17621,7 +17632,7 @@ impl Workspace {
     }
 
     /// Insert the given command that should open a subshell. And set a flag that we should
-    /// automatically bootstrap AKA "rookify" that subshell if we support it. No-op if there is
+    /// automatically bootstrap AKA "ptermify" that subshell if we support it. No-op if there is
     /// no active terminal session.
     pub fn insert_subshell_command_and_bootstrap_if_supported(
         &mut self,
@@ -17723,7 +17734,7 @@ impl Workspace {
 
                 // Check whether this remote session has an active remote server
                 // connection (or is in the process of connecting). This is only
-                // true for Auto SSH Rookification (mode 1) sessions where
+                // true for Auto SSH Ptermification (mode 1) sessions where
                 // `connect_session` was called at `InitShell` time.
                 let has_remote_server = is_remote
                     && FeatureFlag::SshRemoteServer.is_enabled()
@@ -17789,12 +17800,12 @@ impl Workspace {
         }
     }
 
-    fn handle_rook_drive_event(&mut self, event: &DrivePanelEvent, ctx: &mut ViewContext<Self>) {
+    fn handle_pterm_drive_event(&mut self, event: &DrivePanelEvent, ctx: &mut ViewContext<Self>) {
         match event {
             DrivePanelEvent::RunWorkflow(workflow) => {
                 self.run_cloud_workflow_in_active_input(
                     workflow.as_ref().clone(),
-                    WorkflowSelectionSource::RookDrive,
+                    WorkflowSelectionSource::PtermDrive,
                     TerminalSessionFallbackBehavior::default(),
                     ctx,
                 );
@@ -17825,27 +17836,27 @@ impl Workspace {
             DrivePanelEvent::OpenWorkflowModalWithCloudWorkflow(workflow_id) => {
                 self.open_workflow_with_existing(
                     *workflow_id,
-                    &OpenRookDriveObjectSettings::default(),
+                    &OpenPtermDriveObjectSettings::default(),
                     ctx,
                 );
             }
             DrivePanelEvent::OpenSearch => {
                 self.open_palette_action(
-                    PaletteMode::RookDrive,
-                    PaletteSource::RookDrive,
+                    PaletteMode::PtermDrive,
+                    PaletteSource::PtermDrive,
                     None,
                     ctx,
                 );
             }
             DrivePanelEvent::OpenNotebook(source) => {
-                self.open_notebook(source, &OpenRookDriveObjectSettings::default(), ctx, true)
+                self.open_notebook(source, &OpenPtermDriveObjectSettings::default(), ctx, true)
             }
             DrivePanelEvent::OpenEnvVarCollection(source) => {
                 self.open_env_var_collection(source, false, ctx)
             }
             DrivePanelEvent::OpenWorkflowInPane(source, mode) => self.open_workflow_in_pane(
                 source,
-                &OpenRookDriveObjectSettings::default(),
+                &OpenPtermDriveObjectSettings::default(),
                 *mode,
                 ctx,
             ),
@@ -17853,7 +17864,7 @@ impl Workspace {
                 self.open_ai_fact_collection_pane(None, None, ctx);
                 send_telemetry_from_ctx!(
                     TelemetryEvent::KnowledgePaneOpened {
-                        entrypoint: KnowledgePaneEntrypoint::RookDrive,
+                        entrypoint: KnowledgePaneEntrypoint::PtermDrive,
                     },
                     ctx
                 );
@@ -17863,12 +17874,12 @@ impl Workspace {
 
                 send_telemetry_from_ctx!(
                     TelemetryEvent::MCPServerCollectionPaneOpened {
-                        entrypoint: MCPServerCollectionPaneEntrypoint::RookDrive,
+                        entrypoint: MCPServerCollectionPaneEntrypoint::PtermDrive,
                     },
                     ctx
                 );
             }
-            DrivePanelEvent::FocusRookDrive => {
+            DrivePanelEvent::FocusPtermDrive => {
                 ctx.focus(&self.left_panel_view);
             }
             DrivePanelEvent::OpenSharedObjectsCreationDeniedModal(object_type, team_uid) => {
@@ -17935,7 +17946,9 @@ impl Workspace {
         ctx.focus_self();
         ctx.notify();
         self.set_selected_object(
-            Some(RookDriveItemId::Object(workflow.cloud_object_type_and_id())),
+            Some(PtermDriveItemId::Object(
+                workflow.cloud_object_type_and_id(),
+            )),
             ctx,
         );
     }
@@ -18041,15 +18054,15 @@ impl Workspace {
         });
     }
 
-    /// Opens a custom model router's YAML config file in Rook's own editor.
+    /// Opens a custom model router's YAML config file in Polaris Terminal's own editor.
     ///
-    /// Unlike most "open file" flows, this always uses the Rook code editor
+    /// Unlike most "open file" flows, this always uses the Polaris Terminal code editor
     /// rather than honoring the user's external/system editor preference, since
-    /// the button is specifically for editing the router config inside Rook.
+    /// the button is specifically for editing the router config inside Polaris Terminal.
     #[cfg(feature = "local_fs")]
     fn open_custom_router_file(&mut self, path: &Path, ctx: &mut ViewContext<Self>) {
         let settings = EditorSettings::as_ref(ctx);
-        let target = resolve_file_target_to_open_in_rook(path, settings, None);
+        let target = resolve_file_target_to_open_in_pterm(path, settings, None);
         self.open_file_with_target(
             path.to_path_buf(),
             target,
@@ -18296,7 +18309,7 @@ impl Workspace {
                             ctx.notify();
                         });
                     }
-                    TranslateUsingRookAI => {
+                    TranslateUsingPtermAI => {
                         active_input_handle.update(ctx, |input, ctx| {
                             let content = format!("# {query}");
                             input.focus_input_box(ctx);
@@ -18313,7 +18326,7 @@ impl Workspace {
                             ctx,
                         );
                     }
-                    OpenRookAI => {
+                    OpenPtermAI => {
                         if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
                             return;
                         }
@@ -18454,13 +18467,13 @@ impl Workspace {
                                         .contains_ai_document(&ai_doc_id, ctx)
                                 }) {
                                     new_toast = DismissibleToast::success(
-                                        "Plan synced to your Rook Drive".to_string(),
+                                        "Plan synced to your Polaris Terminal Drive".to_string(),
                                     )
                                     .with_object_id(object_id_clone)
                                     .with_link(
                                         ToastLink::new("View".to_string()).with_onclick_action(
-                                            WorkspaceAction::ViewObjectInRookDrive(
-                                                RookDriveItemId::Object(
+                                            WorkspaceAction::ViewObjectInPtermDrive(
+                                                PtermDriveItemId::Object(
                                                     CloudObjectTypeAndId::Notebook(notebook.id),
                                                 ),
                                             ),
@@ -18477,8 +18490,8 @@ impl Workspace {
                             {
                                 new_toast = new_toast.with_link(
                                     ToastLink::new("View".to_string()).with_onclick_action(
-                                        WorkspaceAction::ViewObjectInRookDrive(
-                                            RookDriveItemId::Object(
+                                        WorkspaceAction::ViewObjectInPtermDrive(
+                                            PtermDriveItemId::Object(
                                                 CloudObjectTypeAndId::Workflow(workflow.id),
                                             ),
                                         ),
@@ -18625,7 +18638,7 @@ impl Workspace {
                 .server_id
                 .and_then(|id| CloudModel::as_ref(ctx).get_by_uid(&id.uid()))
             && created_object.space(ctx) == Space::Personal
-            && created_object.renders_in_rook_drive()
+            && created_object.renders_in_pterm_drive()
         {
             self.check_and_trigger_drive_sharing_onboarding_block(
                 created_object.cloud_object_type_and_id(),
@@ -19019,16 +19032,16 @@ impl Workspace {
         });
     }
 
-    fn set_selected_object(&mut self, id: Option<RookDriveItemId>, ctx: &mut ViewContext<Self>) {
-        // Set Rook drive index selected state
-        self.update_rook_drive_view(ctx, |drive_panel, ctx| {
+    fn set_selected_object(&mut self, id: Option<PtermDriveItemId>, ctx: &mut ViewContext<Self>) {
+        // Set Polaris Terminal drive index selected state
+        self.update_pterm_drive_view(ctx, |drive_panel, ctx| {
             drive_panel.set_selected_object(id, ctx);
         });
         // If WD open, show the highlighted object (force expand necessary ancestors)
-        if self.current_workspace_state.is_rook_drive_open
+        if self.current_workspace_state.is_pterm_drive_open
             && let Some(id) = id
         {
-            self.view_in_rook_drive(id, ctx);
+            self.view_in_pterm_drive(id, ctx);
             ctx.notify();
         }
     }
@@ -19200,15 +19213,15 @@ impl Workspace {
                 let command = code.trim().to_string();
                 let args_state =
                     ArgumentsState::for_command_workflow(&Default::default(), command.clone());
-                let workflow = Workflow::new("Command from Rook AI", command)
+                let workflow = Workflow::new("Command from Polaris Terminal AI", command)
                     .with_arguments(args_state.arguments);
                 self.run_workflow_in_active_input(
                     &WorkflowType::AIGenerated {
                         workflow,
-                        origin: AIWorkflowOrigin::LegacyRookAI,
+                        origin: AIWorkflowOrigin::LegacyPtermAI,
                     },
-                    WorkflowSource::RookAI,
-                    WorkflowSelectionSource::RookAI,
+                    WorkflowSource::PtermAI,
+                    WorkflowSelectionSource::PtermAI,
                     None,
                     TerminalSessionFallbackBehavior::default(),
                     ctx,
@@ -19225,15 +19238,15 @@ impl Workspace {
         }
     }
 
-    fn handle_openrook_launch_modal_event(
+    fn handle_openpterm_launch_modal_event(
         &mut self,
-        event: &OpenRookLaunchModalEvent,
+        event: &OpenPtermLaunchModalEvent,
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            OpenRookLaunchModalEvent::Close => {
+            OpenPtermLaunchModalEvent::Close => {
                 OneTimeModalModel::handle(ctx).update(ctx, |model, ctx| {
-                    model.mark_openrook_launch_modal_dismissed(ctx);
+                    model.mark_openpterm_launch_modal_dismissed(ctx);
                 });
                 self.focus_active_tab(ctx);
                 ctx.notify();
@@ -19889,7 +19902,7 @@ impl Workspace {
     fn open_workflow_with_existing(
         &mut self,
         workflow_id: SyncId,
-        settings: &OpenRookDriveObjectSettings,
+        settings: &OpenPtermDriveObjectSettings,
         ctx: &mut ViewContext<Self>,
     ) {
         let source = WorkflowOpenSource::Existing(workflow_id);
@@ -19909,7 +19922,7 @@ impl Workspace {
         };
         self.open_workflow_in_pane(
             &source,
-            &OpenRookDriveObjectSettings::default(),
+            &OpenPtermDriveObjectSettings::default(),
             WorkflowViewMode::Create,
             ctx,
         );
@@ -19930,7 +19943,7 @@ impl Workspace {
         };
         self.open_workflow_in_pane(
             &source,
-            &OpenRookDriveObjectSettings::default(),
+            &OpenPtermDriveObjectSettings::default(),
             WorkflowViewMode::Create,
             ctx,
         );
@@ -19949,7 +19962,7 @@ impl Workspace {
             .with_child(
                 Container::new(
                     ConstrainedBox::new(
-                        RookUiIcon::new(icons::Icon::AiAssistant.into(), *AI_ASSISTANT_LOGO_COLOR)
+                        PtermUiIcon::new(icons::Icon::AiAssistant.into(), *AI_ASSISTANT_LOGO_COLOR)
                             .finish(),
                     )
                     .with_width(16.)
@@ -19962,7 +19975,7 @@ impl Workspace {
             .with_child(
                 Text::new_inline(AI_ASSISTANT_FEATURE_NAME, appearance.ui_font_family(), 14.)
                     .with_style(Properties {
-                        weight: rookui::fonts::Weight::Bold,
+                        weight: ptermui::fonts::Weight::Bold,
                         ..Default::default()
                     })
                     .finish(),
@@ -19996,7 +20009,8 @@ impl Workspace {
         let body = appearance
             .ui_builder()
             .wrappable_text(
-                "Ask Rook AI to explain errors, suggest commands or write scripts.".to_owned(),
+                "Ask Polaris Terminal AI to explain errors, suggest commands or write scripts."
+                    .to_owned(),
                 true,
             )
             .with_style(UiComponentStyles {
@@ -20668,11 +20682,11 @@ impl Workspace {
                         .left_panel_views
                         .first()
                         .copied()
-                        .unwrap_or(ToolPanelView::RookDrive)
+                        .unwrap_or(ToolPanelView::PtermDrive)
                     {
                         ToolPanelView::ProjectExplorer => "Project explorer",
                         ToolPanelView::GlobalSearch { .. } => "Global search",
-                        ToolPanelView::RookDrive => "Rook Drive",
+                        ToolPanelView::PtermDrive => "Polaris Terminal Drive",
                         ToolPanelView::ConversationListView => "Agent conversations",
                     }
                 } else {
@@ -20722,11 +20736,11 @@ impl Workspace {
                 .left_panel_views
                 .first()
                 .copied()
-                .unwrap_or(ToolPanelView::RookDrive)
+                .unwrap_or(ToolPanelView::PtermDrive)
             {
                 ToolPanelView::ProjectExplorer => "Project explorer",
                 ToolPanelView::GlobalSearch { .. } => "Global search",
-                ToolPanelView::RookDrive => "Rook Drive",
+                ToolPanelView::PtermDrive => "Polaris Terminal Drive",
                 ToolPanelView::ConversationListView => "Agent conversations",
             }
         } else {
@@ -20789,7 +20803,7 @@ impl Workspace {
         };
 
         // Build the button content: Diff icon + optional diff stats
-        let icon = ConstrainedBox::new(icons::Icon::Diff.to_rookui_icon(font_color).finish())
+        let icon = ConstrainedBox::new(icons::Icon::Diff.to_ptermui_icon(font_color).finish())
             .with_width(16.)
             .with_height(16.)
             .finish();
@@ -20970,7 +20984,7 @@ impl Workspace {
                     .with_spacing(10.)
                     .with_child(
                         ConstrainedBox::new(
-                            icons::Icon::Search.to_rookui_icon(text_color).finish(),
+                            icons::Icon::Search.to_ptermui_icon(text_color).finish(),
                         )
                         .with_width(16.)
                         .with_height(16.)
@@ -21033,7 +21047,7 @@ impl Workspace {
             .is_user_web_anonymous_user()
             .unwrap_or_default();
 
-        // Simplified mode for viewing Rook Drive objects, shared sessions, or conversation transcripts on WASM
+        // Simplified mode for viewing Polaris Terminal Drive objects, shared sessions, or conversation transcripts on WASM
         #[cfg(target_family = "wasm")]
         if let Some(content_type) = self.get_simplified_wasm_tab_bar_content(ctx) {
             // Use MainAxisAlignment::SpaceBetween and expand to fill width
@@ -21042,11 +21056,11 @@ impl Workspace {
                 .with_main_axis_size(MainAxisSize::Max);
             let bg_color = blended_colors::neutral_1(appearance.theme());
 
-            // Left: Rook logo - clickable to link to rook.dev
-            let rook_logo = Hoverable::new(self.mouse_states.rook_logo.clone(), |_state| {
+            // Left: Polaris Terminal logo - clickable to link to rook.dev
+            let pterm_logo = Hoverable::new(self.mouse_states.pterm_logo.clone(), |_state| {
                 ConstrainedBox::new(
-                    rook_core::ui::Icon::Rook
-                        .to_rookui_icon(appearance.theme().foreground())
+                    pterm_core::ui::Icon::Pterm
+                        .to_ptermui_icon(appearance.theme().foreground())
                         .finish(),
                 )
                 .with_height(24.)
@@ -21058,9 +21072,9 @@ impl Workspace {
             })
             .with_cursor(Cursor::PointingHand)
             .finish();
-            tab_bar.add_child(rook_logo);
+            tab_bar.add_child(pterm_logo);
 
-            // Right: Info button + "View all cloud runs" button (for ambient agent sessions) + "Open in Rook" button
+            // Right: Info button + "View all cloud runs" button (for ambient agent sessions) + "Open in Polaris Terminal" button
             let mut right_row = Flex::row()
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_main_axis_size(MainAxisSize::Min);
@@ -21069,12 +21083,12 @@ impl Workspace {
             let task_id = match content_type {
                 SimplifiedWasmTabBarContent::ConversationTranscript { task_id }
                 | SimplifiedWasmTabBarContent::SharedSession { task_id } => task_id,
-                SimplifiedWasmTabBarContent::RookDriveObject => None,
+                SimplifiedWasmTabBarContent::PtermDriveObject => None,
             };
 
             // Show info button for conversation transcripts and shared sessions (if there's content to display)
             let should_show_info_button =
-                !matches!(content_type, SimplifiedWasmTabBarContent::RookDriveObject)
+                !matches!(content_type, SimplifiedWasmTabBarContent::PtermDriveObject)
                     && self
                         .active_tab_pane_group()
                         .as_ref(ctx)
@@ -21100,9 +21114,9 @@ impl Workspace {
                 }
             }
 
-            // Hide "Open in Rook" button on mobile devices
-            if !rookui::platform::wasm::is_mobile_device() {
-                right_row.add_child(ChildView::new(&self.open_in_rook_button).finish());
+            // Hide "Open in Polaris Terminal" button on mobile devices
+            if !ptermui::platform::wasm::is_mobile_device() {
+                right_row.add_child(ChildView::new(&self.open_in_pterm_button).finish());
             }
             tab_bar.add_child(right_row.finish());
 
@@ -21514,7 +21528,7 @@ impl Workspace {
             target.add_child(
                 Container::new(
                     SavePosition::new(
-                        self.render_legacy_rook_ai_entrypoint_button(appearance),
+                        self.render_legacy_pterm_ai_entrypoint_button(appearance),
                         AI_ASSISTANT_BUTTON_ID,
                     )
                     .finish(),
@@ -21532,7 +21546,7 @@ impl Workspace {
             );
         } else {
             let resource_center_closed = !self.current_workspace_state.is_resource_center_open;
-            if resource_center_closed && ContextFlag::RookEssentials.is_enabled() {
+            if resource_center_closed && ContextFlag::PtermEssentials.is_enabled() {
                 target.add_child(
                     Container::new(self.render_resource_center_button(appearance, ctx))
                         .with_margin_left(TAB_BAR_PADDING_LEFT)
@@ -21912,7 +21926,7 @@ impl Workspace {
                 icons::Icon::Lightbulb,
                 &self.mouse_states.resource_center_icon,
                 WorkspaceAction::ToggleResourceCenter,
-                "Rook Essentials".to_string(),
+                "Polaris Terminal Essentials".to_string(),
                 self.cached_keybindings[TOGGLE_RESOURCE_CENTER_KEYBINDING_NAME].clone(),
                 false,
                 false,
@@ -21923,7 +21937,7 @@ impl Workspace {
             const INDICATOR_DIAMETER: f32 = 6.;
             let indicator = Container::new(
                 ConstrainedBox::new(
-                    RookUiIcon::new(ELLIPSE_SVG_PATH, appearance.theme().accent()).finish(),
+                    PtermUiIcon::new(ELLIPSE_SVG_PATH, appearance.theme().accent()).finish(),
                 )
                 .with_height(INDICATOR_DIAMETER)
                 .with_width(INDICATOR_DIAMETER)
@@ -21971,7 +21985,7 @@ impl Workspace {
         let icon = ConstrainedBox::new(
             Container::new(
                 icons::Icon::CloudOffline
-                    .to_rookui_icon(appearance.theme().foreground())
+                    .to_ptermui_icon(appearance.theme().foreground())
                     .finish(),
             )
             .with_uniform_padding(3.)
@@ -22001,7 +22015,10 @@ impl Workspace {
         Align::new(hoverable.finish()).finish()
     }
 
-    fn render_legacy_rook_ai_entrypoint_button(&self, appearance: &Appearance) -> Box<dyn Element> {
+    fn render_legacy_pterm_ai_entrypoint_button(
+        &self,
+        appearance: &Appearance,
+    ) -> Box<dyn Element> {
         let (icon, action, label) = (
             icons::Icon::AiAssistant,
             WorkspaceAction::ClickedAIAssistantIcon,
@@ -22159,7 +22176,7 @@ impl Workspace {
         .with_width(TAB_BAR_PILL_WIDTH)
         .finish();
 
-        // Rook cannot install this one itself, so the only thing to do with it
+        // Polaris Terminal cannot install this one itself, so the only thing to do with it
         // is fetch it. The overflow menu does offer that in this stage, but
         // behind a second click on its one actionable entry; go straight to the
         // release page that entry would have opened.
@@ -22341,7 +22358,7 @@ impl Workspace {
             AISettings::as_ref(app)
                 .is_any_ai_enabled(app)
                 .then(|| WorkspaceBannerButtonDetails {
-                    text: "Fix with Rook Agent".to_owned(),
+                    text: "Fix with Polaris Terminal Agent".to_owned(),
                     action: WorkspaceAction::FixSettingsWithOz {
                         error_description: error.to_string(),
                     },
@@ -22419,7 +22436,7 @@ impl Workspace {
                     }
 
                     // On the open-source channel this stage is the ordinary
-                    // outcome and not a failure: Rook publishes to GitHub
+                    // outcome and not a failure: Polaris Terminal publishes to GitHub
                     // releases and has no unattended installer, so it reports
                     // the new version and stops. Saying it in red, as an error
                     // the person has to work around, is what made "there is a
@@ -22428,9 +22445,12 @@ impl Workspace {
                     let description = if is_deprecated {
                         VERSION_DEPRECATION_WITHOUT_PERMISSIONS_BANNER_TEXT.to_owned()
                     } else if is_oss {
-                        format!("Rook {} is available on GitHub.", new_version.version)
+                        format!(
+                            "Polaris Terminal {} is available on GitHub.",
+                            new_version.version
+                        )
                     } else {
-                        "A new version is available but Rook is unable to perform the update."
+                        "A new version is available but Polaris Terminal is unable to perform the update."
                             .to_owned()
                     };
 
@@ -22448,7 +22468,7 @@ impl Workspace {
                             text: if is_oss {
                                 "Get it from GitHub".to_string()
                             } else {
-                                "Update Rook manually".to_string()
+                                "Update Polaris Terminal manually".to_string()
                             },
                             action: WorkspaceAction::DownloadNewVersion,
                             variant: BannerButtonVariant::Outlined,
@@ -22467,7 +22487,8 @@ impl Workspace {
                         if is_incoming_version_past_current(new_version.soft_cutoff.as_deref()) {
                             VERSION_DEPRECATION_WITHOUT_PERMISSIONS_BANNER_TEXT.to_owned()
                         } else {
-                            "Rook was unable to launch the new installed version.".to_owned()
+                            "Polaris Terminal was unable to launch the new installed version."
+                                .to_owned()
                         };
 
                     Some(WorkspaceBannerFields {
@@ -22477,7 +22498,7 @@ impl Workspace {
                         description,
                         secondary_button: None,
                         button: Some(WorkspaceBannerButtonDetails {
-                            text: "Update Rook manually".to_string(),
+                            text: "Update Polaris Terminal manually".to_string(),
                             action: WorkspaceAction::DownloadNewVersion,
                             variant: BannerButtonVariant::Outlined,
                             icon: None,
@@ -22551,11 +22572,14 @@ impl Workspace {
         let text_color = theme.main_text_color(Fill::Solid(bg_color)).into_solid();
 
         // Left side: alert icon + bold heading + regular description, all inline.
-        let icon =
-            ConstrainedBox::new(Icon::AlertCircle.to_rookui_icon(text_color.into()).finish())
-                .with_width(16.)
-                .with_height(16.)
-                .finish();
+        let icon = ConstrainedBox::new(
+            Icon::AlertCircle
+                .to_ptermui_icon(text_color.into())
+                .finish(),
+        )
+        .with_width(16.)
+        .with_height(16.)
+        .finish();
 
         let ui_font_family = appearance.ui_font_family();
         const BANNER_FONT_SIZE: f32 = 12.;
@@ -22653,7 +22677,7 @@ impl Workspace {
                                     // `x-close.svg`), matching the Figma
                                     // design. `Icon::XCircle` wraps the x in
                                     // a circle which is not what we want.
-                                    Icon::X.to_rookui_icon(text_color.into()).finish(),
+                                    Icon::X.to_ptermui_icon(text_color.into()).finish(),
                                 )
                                 .with_width(16.)
                                 .with_height(16.)
@@ -22716,7 +22740,7 @@ impl Workspace {
             if let Some(icon) = icon {
                 row.add_child(
                     Container::new(
-                        ConstrainedBox::new(icon.to_rookui_icon(text_color.into()).finish())
+                        ConstrainedBox::new(icon.to_ptermui_icon(text_color.into()).finish())
                             .with_width(14.)
                             .with_height(14.)
                             .finish(),
@@ -22957,7 +22981,7 @@ impl Workspace {
         }
 
         #[cfg(target_family = "wasm")]
-        if !rookui::platform::wasm::is_mobile_device()
+        if !ptermui::platform::wasm::is_mobile_device()
             && self
                 .current_workspace_state
                 .is_transcript_details_panel_open
@@ -23037,7 +23061,7 @@ impl Workspace {
                 )
             }
             HeaderToolbarItemKind::ToolsPanel => {
-                if !pane_group.left_panel_open || rookui::platform::is_mobile_device() {
+                if !pane_group.left_panel_open || ptermui::platform::is_mobile_device() {
                     return None;
                 }
                 Some(ChildView::new(&self.left_panel_view).finish())
@@ -23157,7 +23181,7 @@ impl Workspace {
         let reporting_setings = AltScreenReporting::as_ref(app);
         let general_settings = GeneralSettings::as_ref(app);
         let theme_settings = ThemeSettings::as_ref(app);
-        let rookify_settings = RookifySettings::as_ref(app);
+        let ptermify_settings = PtermifySettings::as_ref(app);
         let terminal_settings = TerminalSettings::as_ref(app);
         let window_settings = WindowSettings::as_ref(app);
         let pane_settings = PaneSettings::as_ref(app);
@@ -23201,7 +23225,9 @@ impl Workspace {
             .value()
             .same_line_prompt_enabled()
         {
-            context.set.insert(flags::ROOK_SAME_LINE_PROMPT_FLAG);
+            context
+                .set
+                .insert(flags::POLARIS_TERMINAL_SAME_LINE_PROMPT_FLAG);
         }
 
         if *ssh_settings.reuse_existing_control_master.value() {
@@ -23209,8 +23235,10 @@ impl Workspace {
                 .set
                 .insert(flags::SSH_REUSE_CONTROL_MASTER_CONTEXT_FLAG);
         }
-        if *rookify_settings.enable_ssh_rookification.value() {
-            context.set.insert(flags::SSH_ROOKIFICATION_CONTEXT_FLAG);
+        if *ptermify_settings.enable_ssh_ptermification.value() {
+            context
+                .set
+                .insert(flags::SSH_POLARIS_TERMINALIFICATION_CONTEXT_FLAG);
         }
 
         if keys_settings.extra_meta_keys.left_alt {
@@ -23274,8 +23302,10 @@ impl Workspace {
                 .insert(flags::COMPLETIONS_OPEN_WHILE_TYPING_CONTEXT_FLAG);
         }
 
-        if *input_settings.rook_completions_enabled.value() {
-            context.set.insert(flags::ROOK_COMPLETIONS_CONTEXT_FLAG);
+        if *input_settings.pterm_completions_enabled.value() {
+            context
+                .set
+                .insert(flags::POLARIS_TERMINAL_COMPLETIONS_CONTEXT_FLAG);
         }
 
         if *input_settings.native_shell_completions_enabled.value() {
@@ -23578,14 +23608,18 @@ impl Workspace {
         if *ai_settings.rule_suggestions_enabled_internal.value() {
             context.set.insert(flags::SUGGESTED_RULES_FLAG);
         }
-        if *ai_settings.rook_drive_context_enabled.value() {
-            context.set.insert(flags::ROOK_DRIVE_CONTEXT_FLAG);
+        if *ai_settings.pterm_drive_context_enabled.value() {
+            context
+                .set
+                .insert(flags::POLARIS_TERMINAL_DRIVE_CONTEXT_FLAG);
         }
         if *ai_settings.file_based_mcp_enabled.value() {
             context.set.insert(flags::FILE_BASED_MCP_FLAG);
         }
-        if *ai_settings.can_use_rook_credits_for_fallback.value() {
-            context.set.insert(flags::ROOK_CREDIT_FALLBACK_FLAG);
+        if *ai_settings.can_use_pterm_credits_for_fallback.value() {
+            context
+                .set
+                .insert(flags::POLARIS_TERMINAL_CREDIT_FALLBACK_FLAG);
         }
         if *session_settings.show_model_selectors_in_prompt.value() {
             context
@@ -23754,7 +23788,7 @@ impl Workspace {
     fn process_updated_sync_state(&self, ctx: &mut ViewContext<Self>) {
         // If there is an active terminal, return a sync event that all
         // other synced terminals should apply to match it.
-        // If there is no active terminal (like when all Rook windows are
+        // If there is no active terminal (like when all Polaris Terminal windows are
         // minimized), return an event to start syncing.
         let sync_event = self
             .active_tab_pane_group()
@@ -23859,8 +23893,8 @@ impl Workspace {
         self.on_window_closed(ctx);
     }
 
-    fn focus_openrook_launch_modal(&mut self, ctx: &mut ViewContext<Self>) {
-        ctx.focus(&self.openrook_launch_modal);
+    fn focus_openpterm_launch_modal(&mut self, ctx: &mut ViewContext<Self>) {
+        ctx.focus(&self.openpterm_launch_modal);
     }
 
     fn focus_orchestration_launch_modal(&mut self, ctx: &mut ViewContext<Self>) {
@@ -23985,8 +24019,8 @@ impl Workspace {
                 entry_focus: GlobalSearchEntryFocus::Results,
             });
         }
-        if *RookDriveSettings::as_ref(ctx).enable_rook_drive {
-            views.push(ToolPanelView::RookDrive);
+        if *PtermDriveSettings::as_ref(ctx).enable_pterm_drive {
+            views.push(ToolPanelView::PtermDrive);
         }
         views
     }
@@ -24001,7 +24035,7 @@ impl Workspace {
         });
     }
 
-    /// Opens a given URL in the desktop Rook app if installed, or redirects to download page.
+    /// Opens a given URL in the desktop Polaris Terminal app if installed, or redirects to download page.
     #[cfg(target_family = "wasm")]
     fn open_link_on_desktop(&mut self, url: &Url, ctx: &mut ViewContext<Self>) {
         use crate::settings::app_installation_detection::{
@@ -24024,7 +24058,7 @@ impl Workspace {
             // Many users' browser settings will block Local Network Access so this will end up redirecting to download page,
             // even if they have the app installed.
             let toast_message = format!(
-                "Have Rook installed but redirecting to download page?\nEnable Local Network Access for {} in your browser.",
+                "Have Polaris Terminal installed but redirecting to download page?\nEnable Local Network Access for {} in your browser.",
                 ChannelState::server_root_url()
             );
             self.toast_stack.update(ctx, |toast_stack, ctx| {
@@ -24054,7 +24088,7 @@ impl TypedActionView for Workspace {
             WorkspaceAction::SetA11yVerbosityLevel(verbosity) => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
                     format!("{verbosity:?} accessibility announcements set"),
-                    RookA11yRole::UserAction,
+                    PtermA11yRole::UserAction,
                 ))
             }
             _ => ActionAccessibilityContent::from_debug(),
@@ -24571,8 +24605,8 @@ impl TypedActionView for Workspace {
                 // the currently active session in the log out modal.
                 ctx.dispatch_global_action("app:maybe_log_out", ());
             }
-            ExportAllRookDriveObjects => {
-                self.export_all_rook_drive_objects(ctx);
+            ExportAllPtermDriveObjects => {
+                self.export_all_pterm_drive_objects(ctx);
             }
             CopyVersion(version) => self.copy_version(version, ctx),
             DownloadNewVersion => self.download_new_version(ctx),
@@ -24656,9 +24690,9 @@ impl TypedActionView for Workspace {
             #[cfg(target_os = "macos")]
             UninstallOz => self.uninstall_oz(ctx),
             #[cfg(target_os = "macos")]
-            InstallRookctrl => self.install_rookctrl(ctx),
+            InstallPtermctrl => self.install_ptermctrl(ctx),
             #[cfg(target_os = "macos")]
-            UninstallRookctrl => self.uninstall_rookctrl(ctx),
+            UninstallPtermctrl => self.uninstall_ptermctrl(ctx),
             UndoRevertInCodeReviewPane { window_id, view_id } => {
                 self.undo_revert_in_code_review_pane(*window_id, *view_id, ctx)
             }
@@ -24694,7 +24728,7 @@ impl TypedActionView for Workspace {
                             owner: personal_drive,
                             initial_folder_id: None,
                         },
-                        &OpenRookDriveObjectSettings::default(),
+                        &OpenPtermDriveObjectSettings::default(),
                         ctx,
                         true,
                     );
@@ -24703,7 +24737,7 @@ impl TypedActionView for Workspace {
             CreateTeamNotebook => {
                 let team_uid = self.team_uid(ctx);
                 if let Some(team_uid) = team_uid {
-                    self.update_rook_drive_view(ctx, |drive_panel, ctx| {
+                    self.update_pterm_drive_view(ctx, |drive_panel, ctx| {
                         drive_panel.open_cloud_object_dialog(
                             DriveObjectType::Notebook {
                                 is_ai_document: false,
@@ -24713,7 +24747,7 @@ impl TypedActionView for Workspace {
                             ctx,
                         );
                     });
-                    self.current_workspace_state.is_rook_drive_open = true;
+                    self.current_workspace_state.is_pterm_drive_open = true;
                     ctx.notify();
                 }
             }
@@ -24733,7 +24767,7 @@ impl TypedActionView for Workspace {
             CreateTeamEnvVarCollection => {
                 let team_uid = self.team_uid(ctx);
                 if let Some(team_uid) = team_uid {
-                    self.update_rook_drive_view(ctx, |drive_panel, ctx| {
+                    self.update_pterm_drive_view(ctx, |drive_panel, ctx| {
                         drive_panel.open_cloud_object_dialog(
                             DriveObjectType::EnvVarCollection,
                             Space::Team { team_uid },
@@ -24741,7 +24775,7 @@ impl TypedActionView for Workspace {
                             ctx,
                         );
                     });
-                    self.current_workspace_state.is_rook_drive_open = true;
+                    self.current_workspace_state.is_pterm_drive_open = true;
                     ctx.notify();
                 }
             }
@@ -24756,7 +24790,7 @@ impl TypedActionView for Workspace {
                     };
                     self.open_workflow_in_pane(
                         &source,
-                        &OpenRookDriveObjectSettings::default(),
+                        &OpenPtermDriveObjectSettings::default(),
                         WorkflowViewMode::Create,
                         ctx,
                     );
@@ -24774,14 +24808,14 @@ impl TypedActionView for Workspace {
                     };
                     self.open_workflow_in_pane(
                         &source,
-                        &OpenRookDriveObjectSettings::default(),
+                        &OpenPtermDriveObjectSettings::default(),
                         WorkflowViewMode::Create,
                         ctx,
                     );
                 }
             }
             CreatePersonalFolder => {
-                self.update_rook_drive_view(ctx, |drive_panel, ctx| {
+                self.update_pterm_drive_view(ctx, |drive_panel, ctx| {
                     drive_panel.open_cloud_object_dialog(
                         DriveObjectType::Folder,
                         Space::Personal,
@@ -24789,13 +24823,13 @@ impl TypedActionView for Workspace {
                         ctx,
                     );
                 });
-                self.current_workspace_state.is_rook_drive_open = true;
+                self.current_workspace_state.is_pterm_drive_open = true;
                 ctx.notify();
             }
             CreateTeamFolder => {
                 let team_uid = self.team_uid(ctx);
                 if let Some(team_uid) = team_uid {
-                    self.update_rook_drive_view(ctx, |drive_panel, ctx| {
+                    self.update_pterm_drive_view(ctx, |drive_panel, ctx| {
                         drive_panel.open_cloud_object_dialog(
                             DriveObjectType::Folder,
                             Space::Team { team_uid },
@@ -24803,7 +24837,7 @@ impl TypedActionView for Workspace {
                             ctx,
                         );
                     });
-                    self.current_workspace_state.is_rook_drive_open = true;
+                    self.current_workspace_state.is_pterm_drive_open = true;
                     ctx.notify();
                 }
             }
@@ -24832,9 +24866,9 @@ impl TypedActionView for Workspace {
                 send_telemetry_from_ctx!(TelemetryEvent::DragAndDropTabGroup, ctx);
                 ctx.notify();
             }
-            OpenRookDrive => {
-                if RookDriveSettings::is_rook_drive_enabled(ctx) {
-                    self.open_left_panel_view(&LeftPanelAction::RookDrive, ctx);
+            OpenPtermDrive => {
+                if PtermDriveSettings::is_pterm_drive_enabled(ctx) {
+                    self.open_left_panel_view(&LeftPanelAction::PtermDrive, ctx);
                 }
             }
             ToggleLeftPanel => {
@@ -24849,9 +24883,9 @@ impl TypedActionView for Workspace {
                 let file_tree_active = self
                     .left_panel_view
                     .read(ctx, |lp, _| lp.is_file_tree_active());
-                let rook_drive_active = self
+                let pterm_drive_active = self
                     .left_panel_view
-                    .read(ctx, |lp, _| lp.is_rook_drive_active());
+                    .read(ctx, |lp, _| lp.is_pterm_drive_active());
 
                 self.toggle_left_panel(ctx);
 
@@ -24871,11 +24905,11 @@ impl TypedActionView for Workspace {
                             },
                             ctx
                         );
-                    } else if rook_drive_active {
-                        // Tools panel opened with Rook Drive as the active view
+                    } else if pterm_drive_active {
+                        // Tools panel opened with Polaris Terminal Drive as the active view
                         send_telemetry_from_ctx!(
-                            TelemetryEvent::RookDriveOpened {
-                                source: RookDriveSource::LeftPanelToolbelt,
+                            TelemetryEvent::PtermDriveOpened {
+                                source: PtermDriveSource::LeftPanelToolbelt,
                                 is_code_mode_v2: true
                             },
                             ctx
@@ -25198,7 +25232,7 @@ impl TypedActionView for Workspace {
             ToggleAIAssistant => {
                 self.toggle_ai_assistant_panel(ctx);
                 send_telemetry_from_ctx!(
-                    TelemetryEvent::ToggleRookAI {
+                    TelemetryEvent::TogglePtermAI {
                         opened: self.current_workspace_state.is_ai_assistant_panel_open
                     },
                     ctx
@@ -25209,8 +25243,8 @@ impl TypedActionView for Workspace {
                     self.toggle_ai_assistant_panel(ctx);
                     if self.current_workspace_state.is_ai_assistant_panel_open {
                         send_telemetry_from_ctx!(
-                            TelemetryEvent::OpenedRookAI {
-                                source: OpenedRookAISource::GlobalEntryButton
+                            TelemetryEvent::OpenedPtermAI {
+                                source: OpenedPtermAISource::GlobalEntryButton
                             },
                             ctx
                         );
@@ -25224,8 +25258,8 @@ impl TypedActionView for Workspace {
             ClickedAIAssistantWarmWelcome => {
                 self.toggle_ai_assistant_panel(ctx);
                 send_telemetry_from_ctx!(
-                    TelemetryEvent::OpenedRookAI {
-                        source: OpenedRookAISource::WarmWelcome
+                    TelemetryEvent::OpenedPtermAI {
+                        source: OpenedPtermAISource::WarmWelcome
                     },
                     ctx
                 );
@@ -25279,7 +25313,7 @@ impl TypedActionView for Workspace {
                 // Blocking is ok here only because this action is only registered in dev and local
                 // builds to aid in debugging and development.
                 let access_token =
-                    rookui::r#async::block_on(self.server_api.get_or_refresh_access_token());
+                    ptermui::r#async::block_on(self.server_api.get_or_refresh_access_token());
                 if let Ok(token) = access_token
                     && let Some(bearer) = token.bearer_token()
                 {
@@ -25411,7 +25445,7 @@ impl TypedActionView for Workspace {
                 });
                 self.open_workflow_with_existing(
                     *workflow_id,
-                    &OpenRookDriveObjectSettings::default(),
+                    &OpenPtermDriveObjectSettings::default(),
                     ctx,
                 );
             }
@@ -25484,16 +25518,16 @@ impl TypedActionView for Workspace {
             }
             FocusLeftPanel => self.focus_left_panel(ctx),
             FocusRightPanel => self.focus_right_panel(ctx),
-            ViewObjectInRookDrive(item_id) => {
+            ViewObjectInPtermDrive(item_id) => {
                 // Focus newly created object in WD
-                self.view_in_and_focus_rook_drive(*item_id, ctx);
+                self.view_in_and_focus_pterm_drive(*item_id, ctx);
             }
             OpenObjectSharingSettings { object_id, source } => {
                 self.open_object_sharing_settings(*object_id, None, *source, ctx);
             }
             UndoTrash(cloud_object_type_and_id) => {
-                self.update_rook_drive_view(ctx, |rook_drive, ctx| {
-                    rook_drive.undo_trash(cloud_object_type_and_id, ctx);
+                self.update_pterm_drive_view(ctx, |pterm_drive, ctx| {
+                    pterm_drive.undo_trash(cloud_object_type_and_id, ctx);
                 });
             }
             TerminateApp => {
@@ -25512,8 +25546,8 @@ impl TypedActionView for Workspace {
                         workflow,
                         origin: AIWorkflowOrigin::AgentMode,
                     },
-                    WorkflowSource::RookAI,
-                    WorkflowSelectionSource::RookAI,
+                    WorkflowSource::PtermAI,
+                    WorkflowSelectionSource::PtermAI,
                     None,
                     TerminalSessionFallbackBehavior::default(),
                     ctx,
@@ -25740,7 +25774,7 @@ impl TypedActionView for Workspace {
             }
             OpenNotebook { id } => self.open_notebook(
                 &NotebookSource::Existing(*id),
-                &OpenRookDriveObjectSettings::default(),
+                &OpenPtermDriveObjectSettings::default(),
                 ctx,
                 true,
             ),
@@ -25911,7 +25945,7 @@ impl TypedActionView for Workspace {
                     };
                     self.open_workflow_in_pane(
                         &source,
-                        &OpenRookDriveObjectSettings::default(),
+                        &OpenPtermDriveObjectSettings::default(),
                         WorkflowViewMode::Create,
                         ctx,
                     );
@@ -25929,7 +25963,7 @@ impl TypedActionView for Workspace {
                     };
                     self.open_workflow_in_pane(
                         &source,
-                        &OpenRookDriveObjectSettings::default(),
+                        &OpenPtermDriveObjectSettings::default(),
                         WorkflowViewMode::Create,
                         ctx,
                     );
@@ -26011,35 +26045,35 @@ impl TypedActionView for Workspace {
                 );
             }
             #[cfg(debug_assertions)]
-            OpenOpenRookLaunchModal => {
-                // Force open the OpenRook launch modal for debugging
+            OpenOpenPtermLaunchModal => {
+                // Force open the OpenPterm launch modal for debugging
                 OneTimeModalModel::handle(ctx).update(ctx, |model, ctx| {
-                    model.force_open_openrook_launch_modal(ctx);
+                    model.force_open_openpterm_launch_modal(ctx);
                 });
                 ctx.notify();
             }
             #[cfg(debug_assertions)]
-            ResetOpenRookLaunchModalState => {
-                // Reset the OpenRook launch modal dismissed state for debugging
+            ResetOpenPtermLaunchModalState => {
+                // Reset the OpenPterm launch modal dismissed state for debugging
                 let old_value = *GeneralSettings::as_ref(ctx)
-                    .did_check_to_trigger_openrook_launch_modal
+                    .did_check_to_trigger_openpterm_launch_modal
                     .value();
                 GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
                     if let Err(e) = settings
-                        .did_check_to_trigger_openrook_launch_modal
+                        .did_check_to_trigger_openpterm_launch_modal
                         .set_value(false, ctx)
                     {
-                        log::warn!("Failed to reset OpenRook launch modal dismissed setting: {e}");
+                        log::warn!("Failed to reset OpenPterm launch modal dismissed setting: {e}");
                     }
                 });
                 let new_value = *GeneralSettings::as_ref(ctx)
-                    .did_check_to_trigger_openrook_launch_modal
+                    .did_check_to_trigger_openpterm_launch_modal
                     .value();
                 log::info!(
-                    "OpenRook launch modal state: old={}, new={}, feature_flag_enabled={}",
+                    "OpenPterm launch modal state: old={}, new={}, feature_flag_enabled={}",
                     old_value,
                     new_value,
-                    FeatureFlag::OpenRookLaunchModal.is_enabled()
+                    FeatureFlag::OpenPtermLaunchModal.is_enabled()
                 );
             }
             #[cfg(debug_assertions)]
@@ -26123,14 +26157,14 @@ impl TypedActionView for Workspace {
                         .set_value(false, ctx)
                     {
                         log::warn!(
-                            "Failed to reset Rook Agent CLI launch modal dismissed setting: {e}"
+                            "Failed to reset Polaris Terminal Agent CLI launch modal dismissed setting: {e}"
                         );
                     }
                 });
                 let new_value =
                     *AISettings::as_ref(ctx).did_check_to_trigger_agent_cli_launch_modal;
                 log::info!(
-                    "Rook Agent CLI launch modal state: old={old_value}, new={new_value}, feature_flag_enabled={}",
+                    "Polaris Terminal Agent CLI launch modal state: old={old_value}, new={new_value}, feature_flag_enabled={}",
                     FeatureFlag::AgentCliLaunchModal.is_enabled()
                 );
             }
@@ -26178,19 +26212,19 @@ impl TypedActionView for Workspace {
                 log::info!("Feature intro seen state has been reset");
             }
             #[cfg(debug_assertions)]
-            InstallOpenCodeRookPlugin => {
-                let message = set_opencode_rook_plugin("github:warpdotdev/opencode-warp-internal");
+            InstallOpenCodePtermPlugin => {
+                let message = set_opencode_pterm_plugin("github:warpdotdev/opencode-warp-internal");
                 self.toast_stack.update(ctx, |view, ctx| {
                     view.add_ephemeral_toast(DismissibleToast::default(message), ctx);
                 });
             }
             #[cfg(debug_assertions)]
-            UseLocalOpenCodeRookPlugin => {
+            UseLocalOpenCodePtermPlugin => {
                 let message = match dirs::home_dir() {
                     Some(home) => {
-                        let plugin_path = home.join("opencode-rook/src/index.ts");
+                        let plugin_path = home.join("opencode-polaris-terminal/src/index.ts");
                         let entry = format!("file://{}", plugin_path.display());
-                        set_opencode_rook_plugin(&entry)
+                        set_opencode_pterm_plugin(&entry)
                     }
                     None => "Failed to determine home directory".to_string(),
                 };
@@ -26206,7 +26240,7 @@ impl TypedActionView for Workspace {
                     .unwrap_or_default()
                     .as_secs();
                 let output_path = env::temp_dir()
-                    .join(format!("rook_sample_{timestamp}.txt"))
+                    .join(format!("pterm_sample_{timestamp}.txt"))
                     .display()
                     .to_string();
 
@@ -26315,11 +26349,11 @@ impl TypedActionView for Workspace {
                     self.open_left_panel_view(&LeftPanelAction::ProjectExplorer, ctx);
                 }
             }
-            ToggleRookDrive => {
-                if RookDriveSettings::is_rook_drive_enabled(ctx) {
+            TogglePtermDrive => {
+                if PtermDriveSettings::is_pterm_drive_enabled(ctx) {
                     let is_showing =
-                        self.left_panel_view.as_ref(ctx).active_view() == ToolPanelView::RookDrive;
-                    self.toggle_left_panel_view(&LeftPanelAction::RookDrive, is_showing, ctx);
+                        self.left_panel_view.as_ref(ctx).active_view() == ToolPanelView::PtermDrive;
+                    self.toggle_left_panel_view(&LeftPanelAction::PtermDrive, is_showing, ctx);
                 }
             }
             ToggleGlobalSearch => {
@@ -26585,7 +26619,7 @@ impl View for Workspace {
         self.sync_window_button_visibility(ctx);
     }
 
-    fn keymap_context(&self, app: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         if NetworkStatus::as_ref(app).is_online() {
@@ -26696,8 +26730,8 @@ impl View for Workspace {
             context.set.insert("Workspace_ActiveOrSelectedTabsInGroup");
         }
 
-        if RookDriveSettings::is_rook_drive_enabled(app) {
-            context.set.insert(flags::ENABLE_ROOK_DRIVE);
+        if PtermDriveSettings::is_pterm_drive_enabled(app) {
+            context.set.insert(flags::ENABLE_POLARIS_TERMINAL_DRIVE);
         }
 
         if AISettings::as_ref(app).is_conversation_history_enabled(app) {
@@ -26715,7 +26749,7 @@ impl View for Workspace {
         }
 
         if self.team_uid(app).is_some() {
-            context.set.insert("RookDrive_BelongsToTeam");
+            context.set.insert("PtermDrive_BelongsToTeam");
         }
 
         if self.auth_state.is_anonymous_or_logged_out() {
@@ -26742,8 +26776,10 @@ impl View for Workspace {
         }
 
         let default_terminal = DefaultTerminal::as_ref(app);
-        if default_terminal.is_rook_default() {
-            context.set.insert(flags::ROOK_IS_DEFAULT_TERMINAL);
+        if default_terminal.is_pterm_default() {
+            context
+                .set
+                .insert(flags::POLARIS_TERMINAL_IS_DEFAULT_TERMINAL);
         }
 
         if FeatureFlag::DebugMode.is_enabled() {
@@ -26822,7 +26858,7 @@ impl View for Workspace {
 
         let tab_bar_mode = self.tab_bar_mode(app);
 
-        // For WASM simplified tab bar views (Rook Drive objects, shared sessions, conversation transcripts),
+        // For WASM simplified tab bar views (Polaris Terminal Drive objects, shared sessions, conversation transcripts),
         // we render the tab bar outside of panels so that the details panel only affects content below the tab bar.
         cfg_if::cfg_if! {
             if #[cfg(target_family = "wasm")] {
@@ -26864,7 +26900,7 @@ impl View for Workspace {
         #[cfg(target_family = "wasm")]
         {
             let pane_group = self.active_tab_pane_group().as_ref(app);
-            if rookui::platform::wasm::is_mobile_device() && pane_group.left_panel_open {
+            if ptermui::platform::wasm::is_mobile_device() && pane_group.left_panel_open {
                 let scrim = Rect::new()
                     .with_background(Fill::Solid(ColorU::new(
                         0,
@@ -26967,7 +27003,7 @@ impl View for Workspace {
 
         // Transcript details panel overlay (right side, mobile only)
         #[cfg(target_family = "wasm")]
-        if rookui::platform::wasm::is_mobile_device()
+        if ptermui::platform::wasm::is_mobile_device()
             && self
                 .current_workspace_state
                 .is_transcript_details_panel_open
@@ -27577,8 +27613,8 @@ impl View for Workspace {
             stack.add_child(ChildView::new(&self.oz_launch_modal.view).finish());
         }
 
-        if should_show_modal && one_time_modal_model.is_openrook_launch_modal_open() {
-            stack.add_child(ChildView::new(&self.openrook_launch_modal).finish());
+        if should_show_modal && one_time_modal_model.is_openpterm_launch_modal_open() {
+            stack.add_child(ChildView::new(&self.openpterm_launch_modal).finish());
         }
 
         if should_show_modal && one_time_modal_model.is_orchestration_launch_modal_open() {
@@ -29538,7 +29574,7 @@ fn render_horizontal_group_pin_indicator(appearance: &Appearance) -> Box<dyn Ele
     let theme = appearance.theme();
     ConstrainedBox::new(
         Icon::PinFilledDiagonal
-            .to_rookui_icon(theme.main_text_color(theme.background()))
+            .to_ptermui_icon(theme.main_text_color(theme.background()))
             .finish(),
     )
     .with_width(TAB_PIN_INDICATOR_ICON_SIZE)
@@ -29773,7 +29809,7 @@ fn render_cross_window_ghost_chip(
     appearance: &Appearance,
     app: &AppContext,
 ) -> Box<dyn Element> {
-    use rookui::elements::DropShadow;
+    use ptermui::elements::DropShadow;
 
     let theme = appearance.theme();
 
@@ -29829,11 +29865,11 @@ fn compute_default_panel_widths(
     }
 }
 
-/// Idempotently sets the opencode-rook plugin entry in `~/.config/opencode/opencode.json`.
-/// Removes any existing opencode-rook plugin entries (both local file:// and github:) and adds
+/// Idempotently sets the opencode-polaris-terminal plugin entry in `~/.config/opencode/opencode.json`.
+/// Removes any existing opencode-polaris-terminal plugin entries (both local file:// and github:) and adds
 /// the given `new_entry`. Creates the config file with a default structure if it doesn't exist.
 #[cfg(debug_assertions)]
-fn set_opencode_rook_plugin(new_entry: &str) -> String {
+fn set_opencode_pterm_plugin(new_entry: &str) -> String {
     let Some(home) = dirs::home_dir() else {
         return "Failed to determine home directory".to_string();
     };
@@ -29865,10 +29901,10 @@ fn set_opencode_rook_plugin(new_entry: &str) -> String {
         return "opencode.json has unexpected structure (plugin is not an array)".to_string();
     };
 
-    // Remove any existing opencode-rook entries
+    // Remove any existing opencode-polaris-terminal entries
     plugins.retain(|entry| {
         let s = entry.as_str().unwrap_or("");
-        !s.contains("opencode-rook")
+        !s.contains("opencode-polaris-terminal")
     });
 
     plugins.push(serde_json::Value::String(new_entry.to_string()));

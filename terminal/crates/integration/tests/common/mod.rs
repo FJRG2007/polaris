@@ -2,13 +2,13 @@ use std::env;
 use std::process::Stdio;
 
 use command::blocking::Command;
-use rookui_core::integration::RERUN_EXIT_CODE;
+use ptermui_core::integration::RERUN_EXIT_CODE;
 
 const MAX_TEST_RUNS: usize = 10;
 
 /// Runs a single integration test.
 ///
-/// This runs the `integration` binary from the `rook` crate, passing it the
+/// This runs the `integration` binary from the `polaris-terminal` crate, passing it the
 /// name of the test to execute as the one positional argument.
 pub fn run_integration_test(name: &str) -> Result<(), String> {
     let mut keep_going = true;
@@ -24,9 +24,9 @@ pub fn run_integration_test(name: &str) -> Result<(), String> {
             k == "PATH"
                 // Propagate any Rust-related variables.
                 || k.starts_with("RUST_")
-                // Propagate any Rook-specific variables.
-                || k.starts_with("ROOK_")
-                || k.starts_with("ROOKUI_")
+                // Propagate any Polaris Terminal-specific variables.
+                || k.starts_with("POLARIS_TERMINAL_")
+                || k.starts_with("PTERMUI_")
                 // Propagate any wgpu-specific variables.
                 || k.starts_with("WGPU_")
                 // Make sure the test knows what X or Wayland server to use.
@@ -44,7 +44,7 @@ pub fn run_integration_test(name: &str) -> Result<(), String> {
             .arg(name)
             .env_clear()
             .envs(inherited_envs)
-            .env("ROOK_INTEGRATION", "1")
+            .env("POLARIS_TERMINAL_INTEGRATION", "1")
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .status()

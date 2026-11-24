@@ -1,10 +1,10 @@
 use std::future::Future;
 
 use ai::api_keys::ApiKeyManager;
-use rook_core::features::FeatureFlag;
-use rook_core::send_telemetry_from_ctx;
-use rook_util::sync::Condition;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity, WindowId};
+use pterm_core::features::FeatureFlag;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_util::sync::Condition;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity, WindowId};
 use settings::Setting as _;
 
 use super::hoa_onboarding;
@@ -37,10 +37,10 @@ pub struct OneTimeModalModel {
     is_build_plan_migration_modal_open: bool,
     /// Whether the Oz launch modal is currently being shown.
     is_oz_launch_modal_open: bool,
-    /// Whether the OpenRook launch modal is currently being shown.
-    is_openrook_launch_modal_open: bool,
+    /// Whether the OpenPterm launch modal is currently being shown.
+    is_openpterm_launch_modal_open: bool,
     is_orchestration_launch_modal_open: bool,
-    /// Whether the Rook Agent CLI launch modal is currently being shown.
+    /// Whether the Polaris Terminal Agent CLI launch modal is currently being shown.
     is_agent_cli_launch_modal_open: bool,
     /// Whether the auto-handoff sleep discoverability modal is currently being shown.
     is_auto_handoff_sleep_modal_open: bool,
@@ -140,7 +140,7 @@ impl OneTimeModalModel {
                         .did_check_to_trigger_agent_cli_launch_modal
                         .set_value(true, ctx)
                     {
-                        log::warn!("Failed to mark Rook Agent CLI launch modal as dismissed: {e}");
+                        log::warn!("Failed to mark Polaris Terminal Agent CLI launch modal as dismissed: {e}");
                     }
                     // New signups shouldn't see feature-intro popovers on their second
                     // startup, so pre-mark every registered feature intro as seen.
@@ -153,10 +153,10 @@ impl OneTimeModalModel {
                 mark_free_ai_removal_notice_seen(ctx);
                 GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
                     if let Err(e) = settings
-                        .did_check_to_trigger_openrook_launch_modal
+                        .did_check_to_trigger_openpterm_launch_modal
                         .set_value(true, ctx)
                     {
-                        log::warn!("Failed to mark OpenRook launch modal as dismissed: {e}");
+                        log::warn!("Failed to mark OpenPterm launch modal as dismissed: {e}");
                     }
                 });
             }
@@ -170,7 +170,7 @@ impl OneTimeModalModel {
         Self {
             is_build_plan_migration_modal_open: false,
             is_oz_launch_modal_open: false,
-            is_openrook_launch_modal_open: false,
+            is_openpterm_launch_modal_open: false,
             is_orchestration_launch_modal_open: false,
             is_agent_cli_launch_modal_open: false,
             is_auto_handoff_sleep_modal_open: false,
@@ -198,13 +198,13 @@ impl OneTimeModalModel {
         self.set_oz_launch_modal_open(false, ctx);
     }
 
-    /// Returns whether the OpenRook launch modal is currently open.
-    pub fn is_openrook_launch_modal_open(&self) -> bool {
-        self.is_openrook_launch_modal_open && self.target_window_id.is_some()
+    /// Returns whether the OpenPterm launch modal is currently open.
+    pub fn is_openpterm_launch_modal_open(&self) -> bool {
+        self.is_openpterm_launch_modal_open && self.target_window_id.is_some()
     }
 
-    pub fn mark_openrook_launch_modal_dismissed(&mut self, ctx: &mut ModelContext<Self>) {
-        self.set_openrook_launch_modal_open(false, ctx);
+    pub fn mark_openpterm_launch_modal_dismissed(&mut self, ctx: &mut ModelContext<Self>) {
+        self.set_openpterm_launch_modal_open(false, ctx);
     }
 
     pub fn is_orchestration_launch_modal_open(&self) -> bool {
@@ -360,7 +360,7 @@ impl OneTimeModalModel {
     /// Returns true if any one-time modal is currently open.
     pub fn is_any_modal_open(&self) -> bool {
         (self.is_oz_launch_modal_open
-            || self.is_openrook_launch_modal_open
+            || self.is_openpterm_launch_modal_open
             || self.is_orchestration_launch_modal_open
             || self.is_agent_cli_launch_modal_open
             || self.is_auto_handoff_sleep_modal_open
@@ -376,8 +376,8 @@ impl OneTimeModalModel {
     }
 
     #[cfg(debug_assertions)]
-    pub fn force_open_openrook_launch_modal(&mut self, ctx: &mut ModelContext<Self>) {
-        self.set_openrook_launch_modal_open(true, ctx);
+    pub fn force_open_openpterm_launch_modal(&mut self, ctx: &mut ModelContext<Self>) {
+        self.set_openpterm_launch_modal_open(true, ctx);
     }
 
     #[cfg(debug_assertions)]
@@ -420,13 +420,13 @@ impl OneTimeModalModel {
         false
     }
 
-    fn set_openrook_launch_modal_open(
+    fn set_openpterm_launch_modal_open(
         &mut self,
         is_open: bool,
         ctx: &mut ModelContext<Self>,
     ) -> bool {
-        if self.is_openrook_launch_modal_open != is_open {
-            self.is_openrook_launch_modal_open = is_open;
+        if self.is_openpterm_launch_modal_open != is_open {
+            self.is_openpterm_launch_modal_open = is_open;
             ctx.emit(OneTimeModalEvent::VisibilityChanged { is_open });
             return true;
         }
@@ -475,9 +475,9 @@ impl OneTimeModalModel {
             }
         });
 
-        // The OpenRook launch modal takes priority over the Oz launch modal
+        // The OpenPterm launch modal takes priority over the Oz launch modal
         // when both are enabled.
-        if self.check_and_trigger_openrook_launch_modal(ctx) {
+        if self.check_and_trigger_openpterm_launch_modal(ctx) {
             return;
         }
 
@@ -572,14 +572,14 @@ impl OneTimeModalModel {
         let customer_type = UserWorkspaces::as_ref(ctx)
             .current_workspace()
             .map(|workspace| workspace.billing_metadata.customer_type);
-        let is_rook_ai_enabled = *AISettings::as_ref(ctx).is_any_ai_enabled;
+        let is_pterm_ai_enabled = *AISettings::as_ref(ctx).is_any_ai_enabled;
         let has_byok_or_byoe = ApiKeyManager::as_ref(ctx).has_any_key();
         let completed_new_onboarding = has_completed_local_onboarding(ctx);
         let has_zero_base_credits = AIRequestUsageModel::as_ref(ctx).request_limit() == 0;
 
         let decision = free_ai_removal_modal_decision(
             customer_type,
-            is_rook_ai_enabled,
+            is_pterm_ai_enabled,
             has_byok_or_byoe,
             completed_new_onboarding,
             has_zero_base_credits,
@@ -672,33 +672,33 @@ impl OneTimeModalModel {
         should_show_oz_modal
     }
 
-    fn check_and_trigger_openrook_launch_modal(&mut self, ctx: &mut ModelContext<Self>) -> bool {
+    fn check_and_trigger_openpterm_launch_modal(&mut self, ctx: &mut ModelContext<Self>) -> bool {
         // Only show if the feature flag is enabled.
-        if !FeatureFlag::OpenRookLaunchModal.is_enabled() {
+        if !FeatureFlag::OpenPtermLaunchModal.is_enabled() {
             return false;
         }
 
         let general_settings = GeneralSettings::as_ref(ctx);
-        let openrook_modal_shown = *general_settings
-            .did_check_to_trigger_openrook_launch_modal
+        let openpterm_modal_shown = *general_settings
+            .did_check_to_trigger_openpterm_launch_modal
             .value();
 
-        if openrook_modal_shown {
+        if openpterm_modal_shown {
             return false;
         }
 
         GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
             if let Err(e) = settings
-                .did_check_to_trigger_openrook_launch_modal
+                .did_check_to_trigger_openpterm_launch_modal
                 .set_value(true, ctx)
             {
-                log::warn!("Failed to mark OpenRook launch modal as dismissed: {e}");
+                log::warn!("Failed to mark OpenPterm launch modal as dismissed: {e}");
             }
         });
 
-        let should_show_openrook_modal = !matches!(ChannelState::channel(), Channel::Integration);
-        self.set_openrook_launch_modal_open(should_show_openrook_modal, ctx);
-        should_show_openrook_modal
+        let should_show_openpterm_modal = !matches!(ChannelState::channel(), Channel::Integration);
+        self.set_openpterm_launch_modal_open(should_show_openpterm_modal, ctx);
+        should_show_openpterm_modal
     }
 
     fn check_and_trigger_orchestration_launch_modal(
@@ -743,7 +743,9 @@ impl OneTimeModalModel {
                 .did_check_to_trigger_agent_cli_launch_modal
                 .set_value(true, ctx)
             {
-                log::warn!("Failed to mark Rook Agent CLI launch modal as dismissed: {e}");
+                log::warn!(
+                    "Failed to mark Polaris Terminal Agent CLI launch modal as dismissed: {e}"
+                );
             }
         });
 
@@ -940,13 +942,13 @@ enum FreeAiRemovalModalDecision {
 
 fn free_ai_removal_modal_decision(
     customer_type: Option<CustomerType>,
-    is_rook_ai_enabled: bool,
+    is_pterm_ai_enabled: bool,
     has_byok_or_byoe: bool,
     completed_new_onboarding: bool,
     has_zero_base_credits: bool,
     workspaces_fetched: bool,
 ) -> FreeAiRemovalModalDecision {
-    if !is_rook_ai_enabled || has_byok_or_byoe || completed_new_onboarding {
+    if !is_pterm_ai_enabled || has_byok_or_byoe || completed_new_onboarding {
         return FreeAiRemovalModalDecision::MarkSeenSilently;
     }
     // Restrict to a Free (or confirmed solo) user; anyone else is paid (silently

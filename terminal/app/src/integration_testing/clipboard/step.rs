@@ -1,5 +1,5 @@
-use rookui::clipboard::ClipboardContent;
-use rookui::integration::TestStep;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::integration::TestStep;
 
 use super::assert_clipboard_contains_string;
 

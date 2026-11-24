@@ -8,23 +8,23 @@ use std::path::PathBuf;
 
 use lsp::ReferenceLocation;
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::icons::Icon as RookIcon;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::content::buffer::InitialBufferState;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rook_files::FileModel;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::icons::Icon as PtermIcon;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::content::buffer::InitialBufferState;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use pterm_files::FileModel;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, Fill, Flex, Hoverable, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, ScrollbarWidth,
     Shrinkable, Stack, Text,
 };
-use rookui::keymap::FixedBinding;
-use rookui::platform::Cursor;
-use rookui::prelude::Align;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::Cursor;
+use ptermui::prelude::Align;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 use string_offset::CharOffset;
@@ -40,7 +40,7 @@ pub const FIND_REFERENCES_CARD_MAX_HEIGHT: f32 = 300.;
 const HAS_REFERENCES: &str = "HasReferences";
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -319,15 +319,15 @@ impl FindReferencesView {
             .with_can_show_diff_ui(false)
             .with_show_line_numbers(false)
             .with_horizontal_scrollbar_appearance(
-                rookui::elements::new_scrollable::ScrollableAppearance::new(
-                    rookui::elements::ScrollbarWidth::None,
+                ptermui::elements::new_scrollable::ScrollableAppearance::new(
+                    ptermui::elements::ScrollbarWidth::None,
                     false,
                 ),
             );
 
             editor_view.set_vertical_scrollbar_appearance(
-                rookui::elements::new_scrollable::ScrollableAppearance::new(
-                    rookui::elements::ScrollbarWidth::None,
+                ptermui::elements::new_scrollable::ScrollableAppearance::new(
+                    ptermui::elements::ScrollbarWidth::None,
                     false,
                 ),
             );
@@ -400,7 +400,7 @@ impl View for FindReferencesView {
         "FindReferencesView"
     }
 
-    fn keymap_context(&self, _app: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, _app: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
         if !self.references.is_empty() {
             context.set.insert(HAS_REFERENCES);
@@ -410,7 +410,7 @@ impl View for FindReferencesView {
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
         if self.references.is_empty() {
-            return rookui::elements::Empty::new().finish();
+            return ptermui::elements::Empty::new().finish();
         }
 
         let appearance = Appearance::handle(app).as_ref(app);
@@ -517,7 +517,7 @@ fn render_header(
     let icon_color = theme.sub_text_color(theme.background());
     let close_button = Hoverable::new(back_mouse_state, move |state| {
         let close_icon = ConstrainedBox::new(
-            rookui::elements::Icon::new(RookIcon::X.into(), icon_color).finish(),
+            ptermui::elements::Icon::new(PtermIcon::X.into(), icon_color).finish(),
         )
         .with_width(16.)
         .with_height(16.)

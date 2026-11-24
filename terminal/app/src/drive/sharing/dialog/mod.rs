@@ -5,24 +5,24 @@ use inheritance::{InheritanceDetails, InheritanceState};
 use itertools::Itertools;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill as ThemeFill;
-use rook_editor::editor::NavigationKey;
-use rook_errors::report_error;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill as ThemeFill;
+use pterm_editor::editor::NavigationKey;
+use pterm_errors::report_error;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{
     Align, Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Dismiss, Empty, Fill, Flex, Highlight, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement, PositionedElementAnchor,
     PositionedElementOffsetBounds, Radius, SavePosition, ScrollStateHandle, Scrollable,
     ScrollableElement, ScrollbarWidth, Shrinkable, Stack, UniformList, UniformListState,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::platform::{Cursor, SaveFilePickerConfiguration};
-use rookui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use rookui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::platform::{Cursor, SaveFilePickerConfiguration};
+use ptermui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle,
 };
@@ -216,7 +216,7 @@ pub enum SharingDialogAction {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",
@@ -451,11 +451,11 @@ impl SharingDialog {
         }
     }
 
-    /// The Rook Drive server ID for the target object. `None` if the target is not a Rook Drive
+    /// The Polaris Terminal Drive server ID for the target object. `None` if the target is not a Polaris Terminal Drive
     /// object or AI conversation.
     fn target_cloud_object_id(&self, app: &AppContext) -> Option<ServerId> {
         match self.target.as_ref() {
-            Some(ShareableObject::RookDriveObject(id)) => Some(*id),
+            Some(ShareableObject::PtermDriveObject(id)) => Some(*id),
             Some(ShareableObject::AIConversation(id)) => BlocklistAIHistoryModel::as_ref(app)
                 .get_server_conversation_metadata(id)
                 .map(|m| ServerId::from_string_lossy(m.metadata.uid.uid())),
@@ -463,7 +463,7 @@ impl SharingDialog {
         }
     }
 
-    /// The targeted Rook Drive object, or `None` if the target is not a known Rook Drive object.
+    /// The targeted Polaris Terminal Drive object, or `None` if the target is not a known Polaris Terminal Drive object.
     fn target_cloud_object<'a>(&self, app: &'a AppContext) -> Option<&'a dyn CloudObject> {
         self.target_cloud_object_id(app)
             .and_then(|id| CloudModel::as_ref(app).get_by_uid(&id.uid()))
@@ -480,7 +480,7 @@ impl SharingDialog {
         self.target
             .as_ref()
             .and_then(|target| match target {
-                ShareableObject::RookDriveObject(server_id) => CloudModel::as_ref(app)
+                ShareableObject::PtermDriveObject(server_id) => CloudModel::as_ref(app)
                     .get_by_uid(&server_id.uid())
                     .map(|object| object.display_name()),
                 ShareableObject::Session { .. } => Some("session".to_string()),
@@ -514,7 +514,7 @@ impl SharingDialog {
         match self.target.as_ref() {
             // Always treat session contents as "editable," so that the sharing dialog is shown.
             Some(ShareableObject::Session { .. }) => ContentEditability::Editable,
-            Some(ShareableObject::RookDriveObject(id)) => {
+            Some(ShareableObject::PtermDriveObject(id)) => {
                 CloudViewModel::as_ref(app).object_editability(&id.uid(), app)
             }
             // Always treat AI conversations as "editable," so that the sharing dialog is shown.
@@ -526,7 +526,7 @@ impl SharingDialog {
     /// The current user's access level on the shared object.
     fn access_level(&self, app: &AppContext) -> SharingAccessLevel {
         match self.target.as_ref() {
-            Some(ShareableObject::RookDriveObject(id)) => {
+            Some(ShareableObject::PtermDriveObject(id)) => {
                 CloudViewModel::as_ref(app).access_level(&id.uid(), app)
             }
             Some(ShareableObject::AIConversation(id)) => {
@@ -638,10 +638,10 @@ impl SharingDialog {
     /// Report a telemetry event for opening this sharing dialog.
     ///
     /// This should be called by views that contain a sharing dialog whenever they open it (i.e.
-    /// panes and the Rook Drive index).
+    /// panes and the Polaris Terminal Drive index).
     pub fn report_open(&self, source: SharingDialogSource, ctx: &mut ViewContext<Self>) {
         let event = match self.target.as_ref() {
-            Some(ShareableObject::RookDriveObject(id)) => {
+            Some(ShareableObject::PtermDriveObject(id)) => {
                 match CloudModel::as_ref(ctx).get_by_uid(&id.uid()) {
                     Some(object) => TelemetryEvent::OpenedSharingDialog(OpenedSharingDialogEvent {
                         source,
@@ -682,7 +682,7 @@ impl SharingDialog {
 
     fn owner(&self, app: &AppContext) -> Option<Subject> {
         match self.target.as_ref()? {
-            ShareableObject::RookDriveObject(id) => {
+            ShareableObject::PtermDriveObject(id) => {
                 let owner = CloudModel::as_ref(app)
                     .get_by_uid(&id.uid())?
                     .permissions()
@@ -970,7 +970,7 @@ impl SharingDialog {
                         source: SharedSessionActionSource::SharingDialog,
                     })
                 }
-                Some(ShareableObject::RookDriveObject(_))
+                Some(ShareableObject::PtermDriveObject(_))
                 | Some(ShareableObject::AIConversation(_)) => {
                     Some(TelemetryEvent::ObjectLinkCopied { link: url.clone() })
                 }
@@ -1043,7 +1043,7 @@ impl SharingDialog {
                 }
 
                 // Add Remove option for non-team guests, or for team guests in non-session contexts
-                // (team removal is supported for RookDrive objects and AI conversations, but not sessions)
+                // (team removal is supported for PtermDrive objects and AI conversations, but not sessions)
                 if !is_team_guest || !is_session {
                     items.push(MenuItem::Separator);
                     items.push(
@@ -1089,7 +1089,7 @@ impl SharingDialog {
         }
 
         match &self.target {
-            Some(ShareableObject::RookDriveObject(object_id)) => {
+            Some(ShareableObject::PtermDriveObject(object_id)) => {
                 let guest_identifier = guest.subject.to_guest_identifier(ctx);
                 if let Some(guest_identifier) = guest_identifier {
                     let object_id = *object_id;
@@ -1158,7 +1158,7 @@ impl SharingDialog {
         ctx.notify();
 
         match &self.target {
-            Some(ShareableObject::RookDriveObject(object_id)) => {
+            Some(ShareableObject::PtermDriveObject(object_id)) => {
                 self.set_targeted_guest_access_for_object(idx, access_level, *object_id, ctx);
             }
             Some(ShareableObject::Session { handle, .. }) => {
@@ -1497,7 +1497,7 @@ impl SharingDialog {
             invite_button = invite_button.disabled();
         }
 
-        // For Rook Drive targets, we can't update permissions while there's a pending change.
+        // For Polaris Terminal Drive targets, we can't update permissions while there's a pending change.
         if self
             .target_cloud_object(app)
             .is_some_and(|object| object.metadata().has_pending_online_only_change())
@@ -1650,7 +1650,7 @@ impl SharingDialog {
         }
 
         match &self.target {
-            Some(ShareableObject::RookDriveObject(object_id)) => {
+            Some(ShareableObject::PtermDriveObject(object_id)) => {
                 UpdateManager::handle(ctx).update(ctx, |update_manager, ctx| {
                     update_manager.add_object_guests(
                         *object_id,
@@ -2471,8 +2471,8 @@ impl SharingDialog {
 
     fn qr_filename(&self) -> String {
         match self.target_session_id() {
-            Some(session_id) => format!("rook-session-qr-code-{session_id}.png"),
-            None => "rook-session-qr-code.png".to_string(),
+            Some(session_id) => format!("polaris-terminal-session-qr-code-{session_id}.png"),
+            None => "polaris-terminal-session-qr-code.png".to_string(),
         }
     }
 
@@ -2801,7 +2801,7 @@ impl SharingDialog {
                 TextAndIcon::new(
                     TextAndIconAlignment::IconFirst,
                     "Copy link",
-                    Icon::Link.to_rookui_icon(copy_button_foreground),
+                    Icon::Link.to_ptermui_icon(copy_button_foreground),
                     MainAxisSize::Min,
                     MainAxisAlignment::SpaceBetween,
                     vec2f(12., 12.),
@@ -2964,7 +2964,7 @@ impl TypedActionView for SharingDialog {
                     ctx.notify();
                     return;
                 }
-                if let Some(ShareableObject::RookDriveObject(id)) = self.target.as_ref() {
+                if let Some(ShareableObject::PtermDriveObject(id)) = self.target.as_ref() {
                     UpdateManager::handle(ctx).update(ctx, move |update_manager, ctx| {
                         update_manager.set_object_link_permissions(*id, *access_level, ctx);
                     });

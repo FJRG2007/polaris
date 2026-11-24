@@ -1,7 +1,7 @@
 use byte_unit::Byte;
 use instant::Duration;
-use rookui::keymap::ContextPredicate;
-use rookui::{AppContext, WindowId, id};
+use ptermui::keymap::ContextPredicate;
+use ptermui::{AppContext, WindowId, id};
 use serde::{Deserialize, Serialize};
 use session_sharing_protocol::common::{Role, Scrollback, ScrollbackBlock, SessionId};
 use session_sharing_protocol::sharer::SessionSourceType;
@@ -284,7 +284,7 @@ impl SharedSessionScrollbackType {
 
 #[cfg(not(test))]
 pub fn max_session_size(window_id: WindowId, app: &AppContext) -> Byte {
-    use rookui::SingletonEntity;
+    use ptermui::SingletonEntity;
 
     use crate::workspaces::user_workspaces::UserWorkspaces;
     UserWorkspaces::as_ref(app)
@@ -326,7 +326,7 @@ pub enum SharedSessionActionSource {
 }
 
 /// Returns the native intent URL to join a shared session.
-/// This should be used when opening the session from within Rook.
+/// This should be used when opening the session from within Polaris Terminal.
 pub fn join_native_intent(session_id: &SessionId) -> String {
     format!(
         "{}://shared_session/{}",

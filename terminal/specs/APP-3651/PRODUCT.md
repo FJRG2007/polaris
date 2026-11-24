@@ -93,7 +93,7 @@ For code panes with a single tab, render normally using the title from `PaneConf
 
 #### Kind icon for code panes
 
-Use `crate::code::icon_from_file_path` to attempt to get a language-specific icon (Rust, TypeScript, Python, etc.) from the active file's path. If `icon_from_file_path` returns `None`, fall back to the generic `RookIcon::Code2` icon rendered as a `to_rookui_icon` in sub text color.
+Use `crate::code::icon_from_file_path` to attempt to get a language-specific icon (Rust, TypeScript, Python, etc.) from the active file's path. If `icon_from_file_path` returns `None`, fall back to the generic `PtermIcon::Code2` icon rendered as a `to_ptermui_icon` in sub text color.
 
 For non-code, non-terminal panes (Notebook, Settings, Workflow, etc.), use the existing `TypedPane::icon()` value.
 
@@ -151,7 +151,7 @@ Remove all expand/collapse state and behavior:
 
 ## Validation
 
-- **Manual testing**: Open Rook with vertical tabs enabled. Create terminal tabs with various states (default shell, running `vim`, agent conversations, multiple directories). Verify primary/secondary line content matches the rules above.
+- **Manual testing**: Open Polaris Terminal with vertical tabs enabled. Create terminal tabs with various states (default shell, running `vim`, agent conversations, multiple directories). Verify primary/secondary line content matches the rules above.
 - **New session**: Open a brand new terminal tab. Before running any commands, verify the primary line says "New session" and the secondary line shows the working directory.
 - **Code pane testing**: Open code panes with single and multiple files of various languages. Verify language icons appear for supported extensions and fall back to Code2 for unsupported ones. Verify multi-tab "and X more" rendering.
 - **Path clipping**: Resize the vertical tabs panel to a narrow width and verify that long paths clip from the start (filename visible) and git branches clip from the end.

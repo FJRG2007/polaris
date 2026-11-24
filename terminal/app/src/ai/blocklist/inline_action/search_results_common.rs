@@ -1,10 +1,10 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Element, Flex, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable, Text,
 };
-use rookui::platform::Cursor;
-use rookui::{AppContext, EventContext, SingletonEntity};
+use ptermui::platform::Cursor;
+use ptermui::{AppContext, EventContext, SingletonEntity};
 
 use super::inline_action_header::{
     ICON_MARGIN, INLINE_ACTION_HEADER_VERTICAL_PADDING, INLINE_ACTION_HORIZONTAL_PADDING,
@@ -16,7 +16,7 @@ pub fn render_search_results_header(
     title_text: String,
     right_label_text: String,
     is_expanded: bool,
-    mouse_state: rookui::elements::MouseStateHandle,
+    mouse_state: ptermui::elements::MouseStateHandle,
     on_toggle: impl Fn(&mut EventContext) + 'static,
     app: &AppContext,
 ) -> Box<dyn Element> {
@@ -32,7 +32,7 @@ pub fn render_search_results_header(
     // Left side: icon + title
     let mut left_side = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
     let search_icon = ConstrainedBox::new(
-        rookui::elements::Icon::new(
+        ptermui::elements::Icon::new(
             Icon::SearchSmall.into(),
             appearance.theme().main_text_color(header_background),
         )
@@ -69,7 +69,7 @@ pub fn render_search_results_header(
     right_side.add_child(Container::new(right_label).with_margin_right(8.).finish());
 
     let chevron_icon = ConstrainedBox::new(
-        rookui::elements::Icon::new(
+        ptermui::elements::Icon::new(
             if is_expanded {
                 Icon::ChevronDown.into()
             } else {
@@ -95,7 +95,7 @@ pub fn render_search_results_header(
         })
         .finish();
 
-    rookui::elements::Hoverable::new(mouse_state, |_| inner)
+    ptermui::elements::Hoverable::new(mouse_state, |_| inner)
         .on_click(move |ctx, _, _| {
             on_toggle(ctx);
         })
@@ -117,7 +117,7 @@ pub fn render_results_body_container(body: Box<dyn Element>, app: &AppContext) -
 /// error state; the caller-supplied icon conveys the status.
 pub fn render_status_header(
     text: String,
-    icon: rookui::elements::Icon,
+    icon: ptermui::elements::Icon,
     app: &AppContext,
 ) -> Box<dyn Element> {
     let appearance = Appearance::as_ref(app);

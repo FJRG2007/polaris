@@ -5,22 +5,22 @@
 // Technologies, and the rename turned upstream's own domain into rook.dev,
 // which is registered to someone else - the same value the OSS server config
 // had to drop. The repository is the only address this fork can source.
-#define MyAppPublisher "Rook"
-#define MyAppURL "https://github.com/FJRG2007/rook"
+#define MyAppPublisher "Polaris Terminal"
+#define MyAppURL "https://github.com/FJRG2007/polaris"
 #ifndef MyAppName
-  #define MyAppName "RookAgentCLIDev"
+  #define MyAppName "PtermAgentCLIDev"
 #endif
 #ifndef MyAppVersion
   #define MyAppVersion "0.1.0"
 #endif
 #ifndef MyAppExeName
-  #define MyAppExeName "rook-tui-dev.exe"
+  #define MyAppExeName "polaris-terminal-tui-dev.exe"
 #endif
 #ifndef ReleaseChannel
   #define ReleaseChannel "dev"
 #endif
 #ifndef CLIName
-  #define CLIName "rook-dev"
+  #define CLIName "polaris-terminal-dev"
 #endif
 #ifndef InstallDirName
   #define InstallDirName "tui-dev"
@@ -32,10 +32,10 @@
   #define WindowsAssetsDir "..\..\app\assets\windows\x64"
 #endif
 
-#define ProductRegistryKey "SOFTWARE\Rook.dev\RookAgentCLI\" + ReleaseChannel
+#define ProductRegistryKey "SOFTWARE\Polaris Terminal.dev\PtermAgentCLI\" + ReleaseChannel
 
 [Setup]
-AppId=rook-agent-cli-{#ReleaseChannel}
+AppId=polaris-terminal-agent-cli-{#ReleaseChannel}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
@@ -59,12 +59,12 @@ OutputBaseFilename={#OutputName}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
-WizardSmallImageFile="installer-images\rook-logo.bmp"
-WizardImageFile="installer-images\rook-banner.bmp"
+WizardSmallImageFile="installer-images\polaris-terminal-logo.bmp"
+WizardImageFile="installer-images\polaris-terminal-banner.bmp"
 SetupIconFile="..\..\app\channels\{#ReleaseChannel}\icon\no-padding\icon.ico"
 CloseApplications=no
 RestartApplications=no
-SetupMutex=Local\RookAgentCLI{#ReleaseChannel}Setup
+SetupMutex=Local\PtermAgentCLI{#ReleaseChannel}Setup
 MinVersion=10.0.18362
 ChangesEnvironment=true
 RedirectionGuard=no
@@ -124,17 +124,17 @@ end;
 function GetDefaultInstallDir(Param: string): string;
 begin
   if IsAdminInstallMode then
-    Result := ExpandConstant('{commonappdata}\Rook\{#InstallDirName}')
+    Result := ExpandConstant('{commonappdata}\Polaris Terminal\{#InstallDirName}')
   else
-    Result := ExpandConstant('{localappdata}\Rook\{#InstallDirName}');
+    Result := ExpandConstant('{localappdata}\Polaris Terminal\{#InstallDirName}');
 end;
 
 function GetDefaultBinDir(): string;
 begin
   if IsAdminInstallMode then
-    Result := ExpandConstant('{commonappdata}\Rook\bin')
+    Result := ExpandConstant('{commonappdata}\Polaris Terminal\bin')
   else
-    Result := ExpandConstant('{localappdata}\Rook\bin');
+    Result := ExpandConstant('{localappdata}\Polaris Terminal\bin');
 end;
 function GetRegisteredBinDir(var BinDir: string): Boolean;
 begin
@@ -150,7 +150,7 @@ function GetBinDir(Param: string): string;
 var
   RequestedBinDir: string;
 begin
-  RequestedBinDir := ExpandConstant('{param:rook_bin_dir|}');
+  RequestedBinDir := ExpandConstant('{param:pterm_bin_dir|}');
   if RequestedBinDir <> '' then
   begin
     Result := RequestedBinDir;
@@ -272,9 +272,9 @@ begin
   LauncherContents :=
     '@echo off' + #13#10 +
     'setlocal' + #13#10 +
-    'set "ROOK_TUI_MANAGED_ROOT=' + ManagedRoot + '"' + #13#10 +
-    'set /p ROOK_TUI_ACTIVE_VERSION=<"%ROOK_TUI_MANAGED_ROOT%\current"' + #13#10 +
-    '"%ROOK_TUI_MANAGED_ROOT%\versions\%ROOK_TUI_ACTIVE_VERSION%\{#MyAppExeName}" %*' + #13#10;
+    'set "POLARIS_TERMINAL_TUI_MANAGED_ROOT=' + ManagedRoot + '"' + #13#10 +
+    'set /p POLARIS_TERMINAL_TUI_ACTIVE_VERSION=<"%POLARIS_TERMINAL_TUI_MANAGED_ROOT%\current"' + #13#10 +
+    '"%POLARIS_TERMINAL_TUI_MANAGED_ROOT%\versions\%POLARIS_TERMINAL_TUI_ACTIVE_VERSION%\{#MyAppExeName}" %*' + #13#10;
   WriteAtomicTextFile(LauncherPath, LauncherContents);
 end;
 
@@ -300,7 +300,7 @@ begin
     not AllowDowngrade() then
   begin
     Result :=
-      'Rook Agent CLI ' + CurrentVersion +
+      'Polaris Terminal Agent CLI ' + CurrentVersion +
       ' is newer than {#MyAppVersion}. Pass /allow_downgrade=1 to install an older version.';
     exit;
   end;
@@ -327,7 +327,7 @@ begin
     exit;
 
   if not IsCompleteVersionDir(VersionDir(ExpandConstant('{app}'), '{#MyAppVersion}')) then
-    RaiseException('The installed Rook Agent CLI payload is incomplete');
+    RaiseException('The installed Polaris Terminal Agent CLI payload is incomplete');
 
   BinDir := GetBinDir('');
   if (PreviousBinDir <> '') and

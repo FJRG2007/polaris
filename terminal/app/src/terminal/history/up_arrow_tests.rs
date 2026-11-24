@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use chrono::{Duration, Local};
-use rook_core::SessionId;
-use rookui::{App, AppContext, EntityId, SingletonEntity};
+use pterm_core::SessionId;
+use ptermui::{App, AppContext, EntityId, SingletonEntity};
 use settings::Setting;
 
 use super::{UpArrowHistoryConfig, prompt_history_for_terminal_surface};

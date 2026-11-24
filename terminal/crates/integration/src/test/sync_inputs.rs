@@ -1,15 +1,15 @@
-use rook::cmd_or_ctrl_shift;
-use rook::integration_testing::step::new_step_with_default_assertions;
-use rook::integration_testing::terminal::util::ExpectedExitStatus;
-use rook::integration_testing::terminal::{
+use polaris_terminal::cmd_or_ctrl_shift;
+use polaris_terminal::integration_testing::step::new_step_with_default_assertions;
+use polaris_terminal::integration_testing::terminal::util::ExpectedExitStatus;
+use polaris_terminal::integration_testing::terminal::{
     assert_active_block_output, assert_command_executed, assert_long_running_block_executing,
     assert_no_block_executing, execute_command, run_alt_grid_program, wait_until_bootstrapped_pane,
     wait_until_bootstrapped_single_pane_for_tab,
 };
-use rook::integration_testing::view_getters::{terminal_view, workspace_view};
-use rook::workspace::WorkspaceAction;
-use rookui_core::integration::TestStep;
-use rookui_core::{async_assert, async_assert_eq};
+use polaris_terminal::integration_testing::view_getters::{terminal_view, workspace_view};
+use polaris_terminal::workspace::WorkspaceAction;
+use ptermui_core::integration::TestStep;
+use ptermui_core::{async_assert, async_assert_eq};
 
 use super::{Builder, new_builder};
 use crate::util::{get_input_buffer, skip_if_powershell_core_2303};

@@ -1,5 +1,5 @@
-use rookui::integration::{AssertionOutcome, TestStep};
-use rookui::{App, WindowId};
+use ptermui::integration::{AssertionOutcome, TestStep};
+use ptermui::{App, WindowId};
 
 use crate::integration_testing::command_palette::assertions::{
     assert_command_palette_has_results, assert_command_palette_is_closed,

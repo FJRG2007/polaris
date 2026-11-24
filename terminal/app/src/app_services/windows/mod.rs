@@ -1,10 +1,10 @@
+#[cfg(feature = "release_bundle")]
+use pterm_errors::report_error;
+use ptermui::AppContext;
 use registry::register_uri_handler;
 #[cfg(feature = "release_bundle")]
-use rook_errors::report_error;
-use rookui::AppContext;
-#[cfg(feature = "release_bundle")]
 use {
-    rook_core::channel::ChannelState, service_impl::forward_uri_to_sole_running_instance,
+    pterm_core::channel::ChannelState, service_impl::forward_uri_to_sole_running_instance,
     single_instance_manager::SingleInstanceManager, thiserror::Error, url::Url,
 };
 
@@ -19,7 +19,7 @@ mod single_instance_manager;
 pub enum StartupArgsForwardingError {
     #[error("should not forward arguments after an auto-update")]
     IgnoredAfterAutoUpdate,
-    #[error("there is no other instance of Rook")]
+    #[error("there is no other instance of Polaris Terminal")]
     NoExistingInstance,
     #[error("failed to construct url")]
     CouldNotCreateUrl(#[from] url::ParseError),
@@ -31,7 +31,7 @@ pub enum StartupArgsForwardingError {
 
 #[cfg(feature = "release_bundle")]
 pub fn pass_startup_args_to_existing_instance(
-    args: &rook_cli::AppArgs,
+    args: &pterm_cli::AppArgs,
 ) -> Result<(), StartupArgsForwardingError> {
     if args.finish_update {
         return Err(StartupArgsForwardingError::IgnoredAfterAutoUpdate);
@@ -40,13 +40,13 @@ pub fn pass_startup_args_to_existing_instance(
         return Err(StartupArgsForwardingError::NoExistingInstance);
     }
     if args.autostart {
-        // Rook was opened by hand before sign-in got round to starting it: the
+        // Polaris Terminal was opened by hand before sign-in got round to starting it: the
         // user already has the window they wanted.
-        log::info!("Rook is already running; dropping the launch at sign-in");
+        log::info!("Polaris Terminal is already running; dropping the launch at sign-in");
         return Ok(());
     }
 
-    rookui::r#async::block_on(async {
+    ptermui::r#async::block_on(async {
         if args.urls.is_empty() {
             // If there are no URLs on the command line, send one to open a new
             // window using the same current working directory as this process.

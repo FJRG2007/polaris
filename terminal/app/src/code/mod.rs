@@ -3,10 +3,10 @@ use std::fmt::Debug;
 use std::ops::AddAssign;
 
 use pathfinder_geometry::rect::RectF;
-use rook_errors::{ErrorExt, register_error};
-use rook_util::file::FileSaveError;
-use rookui::AppContext;
-use rookui::elements::DropTargetData;
+use pterm_errors::{ErrorExt, register_error};
+use pterm_util::file::FileSaveError;
+use ptermui::AppContext;
+use ptermui::elements::DropTargetData;
 
 #[cfg(not(target_family = "wasm"))]
 pub mod find_references_view;

@@ -3,17 +3,17 @@ use std::sync::Arc;
 
 use byte_unit::Byte;
 use parking_lot::FairMutex;
-use rook_core::features::FeatureFlag;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use ptermui::elements::{
     Container, Flex, MainAxisSize, MouseStateHandle, ParentElement, Shrinkable, Text,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::button::ButtonVariant;
-use rookui::ui_components::components::UiComponent;
-use rookui::ui_components::radio_buttons::{
+use ptermui::platform::Cursor;
+use ptermui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::ui_components::radio_buttons::{
     RadioButtonItem, RadioButtonLayout, RadioButtonStateHandle,
 };
-use rookui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use ptermui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use super::style::{self, BUTTON_GAP, MODAL_MARGIN};
 use crate::ai::blocklist::BlocklistAIHistoryModel;
@@ -77,7 +77,7 @@ impl Body {
     /// during session initialization. This is important because these events count toward
     /// the session size quota, but are separate from the scrollback blocks.
     fn calculate_agent_conversations_size(
-        terminal_view_id: rookui::EntityId,
+        terminal_view_id: ptermui::EntityId,
         ctx: &ViewContext<Self>,
     ) -> Byte {
         let conversations: Vec<_> = BlocklistAIHistoryModel::as_ref(ctx)
@@ -100,7 +100,7 @@ impl Body {
         &mut self,
         open_source: SharedSessionActionSource,
         model: Arc<FairMutex<TerminalModel>>,
-        terminal_view_id: rookui::EntityId,
+        terminal_view_id: ptermui::EntityId,
         ctx: &mut ViewContext<Self>,
     ) {
         let model = model.lock();

@@ -88,7 +88,7 @@ When the warning is shown, it is rendered only in the expanded vertical-tabs set
 - Icon color: the standard theme warning color (e.g., `theme.ui_warning_color()`), not the error color.
 - Tooltip trigger: hovering the warning icon only. Hovering the rest of the row continues to behave like today: it highlights the clickable row and clicking toggles "Show: PR link".
 - Tooltip text: "Requires the GitHub CLI to be installed and authenticated".
-- Tooltip positioning: above the warning icon, using the standard Rook tooltip styling and overlay behavior.
+- Tooltip positioning: above the warning icon, using the standard Polaris Terminal tooltip styling and overlay behavior.
 - The warning icon is omitted entirely when "Show: PR link" is disabled or validation is not suppressed.
 
 ### What Does NOT Change
@@ -101,7 +101,7 @@ When the warning is shown, it is rendered only in the expanded vertical-tabs set
 
 ## Success Criteria
 
-1. A user with a working authenticated `gh` CLI on a fresh Rook install sees the PR chip in both terminal prompt and agent view footer without configuration.
+1. A user with a working authenticated `gh` CLI on a fresh Polaris Terminal install sees the PR chip in both terminal prompt and agent view footer without configuration.
 
 2. A user without `gh` initially sees the PR chip in default layouts until the PR chip runtime deterministically detects the missing dependency; afterward, the chip is suppressed from default layouts.
 
@@ -126,9 +126,9 @@ When the warning is shown, it is rendered only in the expanded vertical-tabs set
 - **Unit tests:** Custom prompt/footer configurations are not modified by suppression.
 - **Unit tests:** Missing `gh` and unauthenticated `gh` transition validation state to suppressed.
 - **Unit tests:** Benign empty states and transient failures do not transition validation state to suppressed.
-- **Manual test (happy path):** With authenticated `gh`, open Rook with default settings in a GitHub repo branch with an open PR. Confirm chip appears in terminal prompt and agent footer and renders "PR #N".
-- **Manual test (missing `gh`):** Remove/rename `gh` from `$PATH`. Open Rook with default settings. Confirm the chip is suppressed after deterministic failure.
-- **Manual test (unauthenticated):** Run `gh auth logout`. Open Rook with default settings. Confirm the chip is suppressed after deterministic auth failure.
+- **Manual test (happy path):** With authenticated `gh`, open Polaris Terminal with default settings in a GitHub repo branch with an open PR. Confirm chip appears in terminal prompt and agent footer and renders "PR #N".
+- **Manual test (missing `gh`):** Remove/rename `gh` from `$PATH`. Open Polaris Terminal with default settings. Confirm the chip is suppressed after deterministic failure.
+- **Manual test (unauthenticated):** Run `gh auth logout`. Open Polaris Terminal with default settings. Confirm the chip is suppressed after deterministic auth failure.
 - **Manual test (custom prompt):** Add the PR chip manually to a custom prompt. Confirm suppression does not remove it from the saved custom config.
 - **Manual test (vertical tabs warning):** With "Show: PR link" enabled and validation suppressed, confirm the warning icon appears next to the "PR link" label and the tooltip text matches the spec.
 

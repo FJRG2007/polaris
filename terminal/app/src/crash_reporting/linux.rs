@@ -1,6 +1,6 @@
 use crate::crash_reporting::VirtualEnvironment;
 
-/// Returns what virtualized environment Rook is running in, if any.
+/// Returns what virtualized environment Polaris Terminal is running in, if any.
 pub fn get_virtualized_environment() -> Option<VirtualEnvironment> {
     if let Ok(output) = command::blocking::Command::new("systemd-detect-virt").output() {
         if !output.status.success() {

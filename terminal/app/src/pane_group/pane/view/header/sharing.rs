@@ -1,15 +1,15 @@
-//! Support for pane contents that are shareable, like sessions and Rook Drive objects.
+//! Support for pane contents that are shareable, like sessions and Polaris Terminal Drive objects.
 //!
 //! This is tightly coupled to the pane header so that different overlays (context menus, the
 //! sharing dialog, and so on) are correctly displayed.
 
-use rook_core::features::FeatureFlag;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{ConstrainedBox, MouseStateHandle, ParentElement};
-use rookui::platform::Cursor;
-use rookui::ui_components::components::UiComponent;
-use rookui::{AppContext, Element, ViewContext, ViewHandle};
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{ConstrainedBox, MouseStateHandle, ParentElement};
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{AppContext, Element, ViewContext, ViewHandle};
 
 use super::{Event, OpenOverlay, PaneHeader, PaneHeaderAction};
 use crate::drive::sharing::dialog::{SharingDialog, SharingDialogEvent};
@@ -65,17 +65,17 @@ impl<P: BackingView> PaneHeader<P> {
         &self.shared_content.sharing_dialog
     }
 
-    pub fn has_shareable_object<C: rookui::ViewAsRef>(&self, ctx: &C) -> bool {
+    pub fn has_shareable_object<C: ptermui::ViewAsRef>(&self, ctx: &C) -> bool {
         self.sharing_dialog().as_ref(ctx).has_target()
     }
 
-    pub fn has_shareable_shared_session<C: rookui::ViewAsRef>(&self, ctx: &C) -> bool {
+    pub fn has_shareable_shared_session<C: ptermui::ViewAsRef>(&self, ctx: &C) -> bool {
         self.sharing_dialog()
             .as_ref(ctx)
             .has_shared_session_target()
     }
 
-    pub fn is_sharing_dialog_enabled<C: rookui::ViewAsRef>(&self, ctx: &C) -> bool {
+    pub fn is_sharing_dialog_enabled<C: ptermui::ViewAsRef>(&self, ctx: &C) -> bool {
         let sharing_enabled = self.has_shareable_object(ctx);
         if self.has_shareable_shared_session(ctx) {
             sharing_enabled && FeatureFlag::SessionSharingAcls.is_enabled()

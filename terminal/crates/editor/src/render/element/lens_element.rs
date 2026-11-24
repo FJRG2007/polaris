@@ -1,11 +1,11 @@
 use std::ops::Range;
 
-use rookui_core::elements::Point;
-use rookui_core::event::DispatchedEvent;
-use rookui_core::geometry::rect::RectF;
-use rookui_core::geometry::vector::Vector2F;
-use rookui_core::units::IntoPixels;
-use rookui_core::{
+use ptermui_core::elements::Point;
+use ptermui_core::event::DispatchedEvent;
+use ptermui_core::geometry::rect::RectF;
+use ptermui_core::geometry::vector::Vector2F;
+use ptermui_core::units::IntoPixels;
+use ptermui_core::{
     AfterLayoutContext, AppContext, Element, EventContext, LayoutContext, ModelHandle,
     PaintContext, SizeConstraint, WeakViewHandle,
 };

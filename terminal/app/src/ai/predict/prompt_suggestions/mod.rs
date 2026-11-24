@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
-use rookui::AppContext;
-use rookui::keymap::Keystroke;
+use ptermui::AppContext;
+use ptermui::keymap::Keystroke;
 
 use crate::terminal::TerminalModel;
 use crate::util::bindings::keybinding_name_to_keystroke;

@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use instant::Instant;
-use rook_core::features::FeatureFlag;
-use rook_core::telemetry::TelemetryEvent;
+use pterm_core::features::FeatureFlag;
+use pterm_core::telemetry::TelemetryEvent;
 
 use super::telemetry::{
     LifecycleRecoveryRecord, LifecycleTelemetryEvent, LifecycleTelemetryLimiter,

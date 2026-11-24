@@ -1,7 +1,7 @@
 # QUALITY-731 — Agent name round trip client spec
 ## Context
 QUALITY-731 is a shared-session viewer bug: the orchestrator's own client labels children with `agent_run_configs[i].name`, but a viewer reconstructs child conversations from server task records and currently does not have access to that short name. As a result, viewer-side pills, hover cards, breadcrumbs, status cards, and transcript participant labels fall back to `title`, which can be a long descriptive sentence or a truncated prompt.
-The fix sources the orchestrator's short label from the existing `agent_config_snapshot.name` field instead of introducing a parallel top-level `name` field on the task or request types. This aligns with the paired rook-server spec, which uses `AgentConfigSnapshot.Name` as the canonical home for the orchestrator-supplied label.
+The fix sources the orchestrator's short label from the existing `agent_config_snapshot.name` field instead of introducing a parallel top-level `name` field on the task or request types. This aligns with the paired polaris-terminal-server spec, which uses `AgentConfigSnapshot.Name` as the canonical home for the orchestrator-supplied label.
 ## Scope
 This PR delivers the orchestrator → server → viewer round-trip plus the single highest-value display surface: the orchestration pill bar in `OrchestrationViewerModel::apply_children_fetch`. Other surfaces that still render `task.title` (or `entry.display.title`) directly are left for follow-up work, tracked under "Out of scope (follow-ups)" below. The wire contract and `display_name()` helper this PR introduces are the prerequisites those follow-ups will consume.
 Relevant existing client surfaces:
@@ -38,7 +38,7 @@ Source code:
 - `app/src/pane_group/pane/terminal_pane.rs`: remove the `request.name.clone()` plumbing in `launch_remote_child`, the `agent_name_for_create = Some(request_name.clone())` line and the corresponding 5th positional arg in `launch_local_no_harness_child`, and the `agent_name_for_task = Some(request_name.clone())` line + 5th arg in `launch_local_harness_child`.
 - `app/src/pane_group/pane/local_harness_launch.rs`: remove the `agent_name: Option<String>` parameter from `prepare_local_harness_child_launch` and the 5th positional arg threaded into `create_agent_task`. The `#[allow(clippy::too_many_arguments)]` attribute on this function becomes unnecessary; remove it if so.
 - `app/src/ai/conversation_details_panel.rs`: keep the deferral comment QUALITY-731 v1 added on `from_task`; the surface remains on `task.title` (unchanged behavior).
-- `crates/rook_graphql_schema/api/schema.graphql`: remove the `agentName: String` field + docstring under `CreateAgentTaskInput`.
+- `crates/pterm_graphql_schema/api/schema.graphql`: remove the `agentName: String` field + docstring under `CreateAgentTaskInput`.
 - All `name: None` literals on `SpawnAgentRequest { ... }` builders added in QUALITY-731 v1 (in `agent_sdk/ambient.rs`, `terminal/view/ambient_agent/model.rs`, `terminal/view_tests.rs`, `agent_sdk/mcp_config_tests.rs`, `ambient_agents/spawn_tests.rs`, `terminal/view/ambient_agent/model_tests.rs`): remove.
 - All `name: None` literals on `AmbientAgentTask { ... }` test fixtures added in QUALITY-731 v1 (in `agent_conversations_model_tests.rs`, `cloud_conversation_continuation_tests.rs`, `conversation_ended_tombstone_view_tests.rs`, `view_impl_tests.rs`, `spawn_tests.rs` `task_with` helper, `pane_group/mod_tests.rs`, `conversation_details_panel_tests.rs`, `orchestration_event_streamer_tests.rs`): remove.
 Tests:
@@ -53,7 +53,7 @@ flowchart LR
     B --> C[StartAgentRequest name + Remote title]
     C --> D[SpawnAgentRequest config.name + title]
     C --> E[createAgentTask agentConfigSnapshot.name for local harness]
-    D --> F[rook-server agent_config_snapshot.name + title]
+    D --> F[polaris-terminal-server agent_config_snapshot.name + title]
     E --> F
     F --> G[GET /agent/runs returns agent_config_snapshot.name + title]
     G --> H[OrchestrationViewerModel]
@@ -75,21 +75,21 @@ Manual validation:
 6. The conversation details side pane intentionally remains on `task.title` per the QUALITY-731 v1 deferral.
 Commands to run after implementation:
 - Targeted Rust tests for any modules touched, for example:
-  - `cargo test -p rook -- ai::ambient_agents::task`
-  - `cargo test -p rook -- terminal::shared_session::viewer::orchestration_viewer_model_tests`
-  - `cargo test -p rook -- pane_group::pane::local_harness_launch_tests`
+  - `cargo test -p polaris-terminal -- ai::ambient_agents::task`
+  - `cargo test -p polaris-terminal -- terminal::shared_session::viewer::orchestration_viewer_model_tests`
+  - `cargo test -p polaris-terminal -- pane_group::pane::local_harness_launch_tests`
 - `cargo fmt`
 - `./script/presubmit` before pushing (skip the `command-signatures-v2` step locally only if the corepack/yarn-4 setup blocks it on this machine; CI is authoritative).
 - Manual UI verification against a local client connected to a server with the paired pivot changes.
 ## Parallelization
-Server agent: local, `/Users/matthew/src/roundtrip-agent-name/rook-server`, branch `matthew/roundtrip-agent-name`, base `origin/matthew/restore-remote-orch-conversations`, draft PR target #11223. Owns server-side rollback + helper + REST/GraphQL contract drops.
-Client agent: local, `/Users/matthew/src/roundtrip-agent-name/rook`, branch `matthew/roundtrip-agent-name`, base `origin/master`, draft PR target #11090. Owns client-side rollback + outbound snapshot stamping + `display_name()` rewrite.
+Server agent: local, `/Users/matthew/src/roundtrip-agent-name/polaris-terminal-server`, branch `matthew/roundtrip-agent-name`, base `origin/matthew/restore-remote-orch-conversations`, draft PR target #11223. Owns server-side rollback + helper + REST/GraphQL contract drops.
+Client agent: local, `/Users/matthew/src/roundtrip-agent-name/polaris-terminal`, branch `matthew/roundtrip-agent-name`, base `origin/master`, draft PR target #11090. Owns client-side rollback + outbound snapshot stamping + `display_name()` rewrite.
 Sequencing:
 - Both PRs can be force-pushed in parallel — the wire contract (use existing `agent_config_snapshot` envelope, drop QUALITY-731 v1 parallel fields) is fully agreed upfront.
 - End-to-end manual validation must wait for both branches to be on the pivoted contract.
 PR hygiene:
 - Force-push removes the QUALITY-731 v1 commits from each PR. Rewrite the PR descriptions to call out the pivot and link to the paired PR.
-- Mark the `Rook Agent Mode` checkbox on the client PR template.
+- Mark the `Polaris Terminal Agent Mode` checkbox on the client PR template.
 - Keep both PRs in draft.
 ## Out of scope (follow-ups)
 The pivot delivers the wire contract and the orchestration viewer pill. The following surfaces still render `task.title` (or the denormalized `entry.display.title`) directly and would benefit from a follow-up that fans `display_name()` through them, but each requires an additional plumbing decision (the entry-based ones in particular don't have access to `agent_config_snapshot` today):

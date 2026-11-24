@@ -1,11 +1,11 @@
 # TECH.md — First-class Grok Build agent support
 
-Issue: https://github.com/FJRG2007/rook/issues/11727  
+Issue: https://github.com/FJRG2007/polaris/issues/11727  
 Product spec: `specs/GH11727/product.md`
 
 ## Context
 
-Rook’s third-party CLI agent stack is centered on `CLIAgent` in
+Polaris Terminal’s third-party CLI agent stack is centered on `CLIAgent` in
 `app/src/terminal/cli_agent.rs`. Long-running commands are detected via
 `CLIAgent::detect`; matches create a `CLIAgentSession` and drive the CLI agent
 footer, rich input, chrome icons, and optional plugins.
@@ -14,7 +14,7 @@ Relevant systems today:
 
 - **Identity / detect / skills / bash / brand** — `app/src/terminal/cli_agent.rs`
 - **Sessions + rich input state** — `app/src/terminal/cli_agent_sessions/`
-- **OSC 777 protocol** — `cli_agent_sessions/event/` (`rook://cli-agent` sentinel;
+- **OSC 777 protocol** — `cli_agent_sessions/event/` (`polaris-terminal://cli-agent` sentinel;
   `agent` field must equal `command_prefix()`)
 - **Listeners** — `cli_agent_sessions/listener/mod.rs` (`is_agent_supported`,
   DefaultSessionListener vs Codex OSC 9 fallback)
@@ -24,12 +24,12 @@ Relevant systems today:
   `rich_input_submit_strategy`
 - **Proactive Codex listener** — `TerminalView` long-running path registers Codex
   without SessionStart
-- **Icons** — `crates/rook_core/src/ui/icons.rs` + `app/assets/bundled/svg/`
+- **Icons** — `crates/pterm_core/src/ui/icons.rs` + `app/assets/bundled/svg/`
 - **Telemetry** — `CLIAgentType` in `app/src/server/telemetry/events.rs`
 - **Chrome** — `app/src/ui_components/agent_icon.rs`
 
-Grok Build (production `~/.grok/bin/grok`) already treats Rook as a first-class
-terminal brand and emits **OSC 9** notifications. Lifecycle hooks can emit Rook’s
+Grok Build (production `~/.grok/bin/grok`) already treats Polaris Terminal as a first-class
+terminal brand and emits **OSC 9** notifications. Lifecycle hooks can emit Polaris Terminal’s
 OSC 777 protocol without changing Grok Build source. Install alias `agent`
 collides with Cursor’s `CLIAgent::CursorCli` prefix — detection must use `grok`
 only.
@@ -65,13 +65,13 @@ whose last segment is `grok` are **not** special-cased (same as Claude/Codex).
 
 - Reuse the existing `Icon::GrokLogo` mapping and
   `app/assets/bundled/svg/grok.svg` asset from `master`.
-- Do **not** ship separate light/dark SVGs; Rook recolors one asset (same as Claude
+- Do **not** ship separate light/dark SVGs; Polaris Terminal recolors one asset (same as Claude
   / OpenAI). Black-filled source art is invisible under the icon shader.
 
 ### 3. Listener + OSC 9
 
 - Include `CLIAgent::Grok` in `is_agent_supported`.
-- Handler: **Codex-style** dual path — parse OSC 777 `rook://cli-agent` when
+- Handler: **Codex-style** dual path — parse OSC 777 `polaris-terminal://cli-agent` when
   present; otherwise treat OSC 9 body as opaque `Stop` until rich notifications
   latch. OSC 9 events reuse `CLIAgentEventSource::CodexOsc9Fallback` (shared
   opaque fallback tag; only `RichPlugin` latches rich status).
@@ -89,25 +89,25 @@ whose last segment is `grok` are **not** special-cased (same as Claude/Codex).
 
 - Add `plugin_manager/grok.rs` with **one-click auto-install** (file write, not a
   marketplace CLI). User-facing copy matches Claude/Codex (**Enable … notifications**,
-  **Rook plugin installed/updated**):
+  **Polaris Terminal plugin installed/updated**):
   - `can_auto_install() -> true`
   - `install` / `update` write under `$GROK_HOME/hooks` (or `~/.grok/hooks`):
-    - `rook-plugin.json` (SessionStart / UserPromptSubmit / Stop / StopFailure)
-    - `bin/rook-plugin.sh` (OSC 777 `rook://cli-agent`, `"agent":"grok"`)
-    - `rook-plugin.version` (semver for `needs_update`)
-  - Naming: Claude/Codex use marketplace plugin id `rook@…-rook` (separate repos
-    `claude-code-rook` / `codex-rook` — not checked into this monorepo). Grok has
-    no hosted package yet, so the same conceptual **rook** plugin is written as
-    `rook-plugin.*` hooks files.
+    - `polaris-terminal-plugin.json` (SessionStart / UserPromptSubmit / Stop / StopFailure)
+    - `bin/polaris-terminal-plugin.sh` (OSC 777 `polaris-terminal://cli-agent`, `"agent":"grok"`)
+    - `polaris-terminal-plugin.version` (semver for `needs_update`)
+  - Naming: Claude/Codex use marketplace plugin id `polaris-terminal@…-polaris-terminal` (separate repos
+    `claude-code-polaris-terminal` / `codex-polaris-terminal` — not checked into this monorepo). Grok has
+    no hosted package yet, so the same conceptual **polaris-terminal** plugin is written as
+    `polaris-terminal-plugin.*` hooks files.
   - `is_installed` / `needs_update` read those files; honors `$GROK_HOME`.
   - Manual instructions remain for sandboxed / remote sessions that force
     instruction mode.
   - **Limitation vs Claude/Codex/Gemini:** those call the agent’s own
-    `plugin`/`extensions` CLI against a published Rook marketplace package
-    (`claude-code-rook`, `gemini-cli-rook`, etc.). Grok Build has a plugin
-    marketplace, but Rook does not yet ship a hosted Grok plugin package — so
-    auto-install materializes the hooks-based Rook plugin on disk. A future
-    `grok plugin install …` path can replace the file write if Rook publishes
+    `plugin`/`extensions` CLI against a published Polaris Terminal marketplace package
+    (`claude-code-polaris-terminal`, `gemini-cli-polaris-terminal`, etc.). Grok Build has a plugin
+    marketplace, but Polaris Terminal does not yet ship a hosted Grok plugin package — so
+    auto-install materializes the hooks-based Polaris Terminal plugin on disk. A future
+    `grok plugin install …` path can replace the file write if Polaris Terminal publishes
     one.
   - Wire in `plugin_manager_for_with_shell` without a new feature flag.
 
@@ -132,7 +132,7 @@ User runs `grok`
   → proactive listener (OSC 9 + optional OSC 777)
   → footer icon + toolbar + optional rich input
   → submit/images → PTY / clipboard paste into Grok TUI
-  → optional hooks → OSC 777 rook://cli-agent → rich status
+  → optional hooks → OSC 777 polaris-terminal://cli-agent → rich status
 ```
 
 ## Testing and validation
@@ -169,4 +169,4 @@ Manual proof required on the PR (screenshots + short recording).
 - Optional rename of `CLIAgentEventSource::CodexOsc9Fallback` to an agent-neutral
   name shared by Codex and Grok.
 - `Harness::Grok` for cloud/orchestration.
-- ACP client for Rook Agent Mode.
+- ACP client for Polaris Terminal Agent Mode.

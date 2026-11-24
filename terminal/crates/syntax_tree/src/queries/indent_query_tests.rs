@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use arborium::tree_sitter::Tree;
 use languages::{Language, language_by_filename};
-use rook_editor::content::buffer::{Buffer, BufferSnapshot};
-use rook_editor::content::selection_model::BufferSelectionModel;
-use rook_editor::content::text::IndentBehavior;
-use rook_util::standardized_path::StandardizedPath;
-use rookui_core::App;
+use pterm_editor::content::buffer::{Buffer, BufferSnapshot};
+use pterm_editor::content::selection_model::BufferSelectionModel;
+use pterm_editor::content::text::IndentBehavior;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui_core::App;
 
 use super::*;
 use crate::SyntaxTreeState;
@@ -15,7 +15,7 @@ use crate::SyntaxTreeState;
 fn mock_buffer_and_tree(text_content: &str, language: Arc<Language>) -> (Buffer, Tree) {
     // Create a tree by parsing the text
     let snapshot = BufferSnapshot::from_plain_text(text_content);
-    let tree = rookui_core::r#async::block_on(async {
+    let tree = ptermui_core::r#async::block_on(async {
         SyntaxTreeState::parse_text(snapshot, None, &language).await
     })
     .expect("test buffer is small and should parse");
@@ -60,7 +60,7 @@ fn test_indent_query() {
         });
 
         let buffer_snapshot = buffer_handle.read(&app, |buffer, _| buffer.buffer_snapshot());
-        let tree = rookui_core::r#async::block_on(async {
+        let tree = ptermui_core::r#async::block_on(async {
             SyntaxTreeState::parse_text(buffer_snapshot, None, &language).await
         })
         .expect("test buffer is small and should parse");
@@ -157,7 +157,7 @@ fn test_indent_query_on_go() {
         });
 
         let buffer_snapshot = buffer_handle.read(&app, |buffer, _| buffer.buffer_snapshot());
-        let tree = rookui_core::r#async::block_on(async {
+        let tree = ptermui_core::r#async::block_on(async {
             SyntaxTreeState::parse_text(buffer_snapshot, None, &language).await
         })
         .expect("test buffer is small and should parse");

@@ -6,20 +6,20 @@ use std::fmt::Debug;
 use std::ops::Range;
 
 use lazy_static::lazy_static;
+use pterm_editor::content::version::BufferVersion;
+use pterm_editor::editor::{EmbeddedItemModel, RunnableCommandModel, TextDecoration};
+use pterm_editor::model::{CoreEditorModel, PlainTextEditorModel};
+use pterm_editor::render::element::RichTextAction;
+use pterm_editor::render::model::{ExpansionType, LineCount, Location};
+use pterm_editor::selection::{TextDirection, TextUnit};
+use pterm_util::user_input::UserInput;
+use ptermui::actions::StandardAction;
+use ptermui::elements::Axis;
+use ptermui::event::ModifiersState;
+use ptermui::keymap::{EditableBinding, FixedBinding, Keystroke, PerPlatformKeystroke};
+use ptermui::units::Pixels;
+use ptermui::{AppContext, TypedActionView, ViewContext, WeakViewHandle};
 use rangemap::RangeSet;
-use rook_editor::content::version::BufferVersion;
-use rook_editor::editor::{EmbeddedItemModel, RunnableCommandModel, TextDecoration};
-use rook_editor::model::{CoreEditorModel, PlainTextEditorModel};
-use rook_editor::render::element::RichTextAction;
-use rook_editor::render::model::{ExpansionType, LineCount, Location};
-use rook_editor::selection::{TextDirection, TextUnit};
-use rook_util::user_input::UserInput;
-use rookui::actions::StandardAction;
-use rookui::elements::Axis;
-use rookui::event::ModifiersState;
-use rookui::keymap::{EditableBinding, FixedBinding, Keystroke, PerPlatformKeystroke};
-use rookui::units::Pixels;
-use rookui::{AppContext, TypedActionView, ViewContext, WeakViewHandle};
 use string_offset::CharOffset;
 
 use crate::cmd_or_ctrl_shift;
@@ -42,7 +42,7 @@ lazy_static! {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     let text_entry = id!("CodeEditorView") & !id!("IMEOpen");
     // We use this to disable some keybindings that would conflict with the Agent Mode embedded editor.
@@ -1128,7 +1128,7 @@ impl TypedActionView for CodeEditorView {
     }
 }
 
-impl rook_editor::editor::EditorView for CodeEditorView {
+impl pterm_editor::editor::EditorView for CodeEditorView {
     type RichTextAction = CodeEditorViewAction;
 
     fn runnable_command_at<'a>(
@@ -1205,7 +1205,7 @@ impl RichTextAction<CodeEditorView> for CodeEditorViewAction {
             modifiers.shift
         );
 
-        // The first mouse down to bring focus to a Rook window will not have a corresponding mouse up.
+        // The first mouse down to bring focus to a Polaris Terminal window will not have a corresponding mouse up.
         // We ignore it, and they can click again.
         if is_first_mouse {
             return None;

@@ -4,9 +4,9 @@ use ai::agent::action::{RunAgentsAgentRunConfig, RunAgentsExecutionMode, RunAgen
 use ai::agent::orchestration_config::{
     OrchestrationConfig, OrchestrationConfigStatus, OrchestrationExecutionMode,
 };
-use rook_core::execution_mode::ExecutionMode;
-use rook_core::features::FeatureFlag;
-use rookui::{App, Entity, EntityId, ModelHandle};
+use pterm_core::execution_mode::ExecutionMode;
+use pterm_core::features::FeatureFlag;
+use ptermui::{App, Entity, EntityId, ModelHandle};
 use settings::Setting;
 
 use super::*;
@@ -84,7 +84,7 @@ fn persist_plan_config_with_harness(
                     harness_type: harness_type.to_string(),
                     execution_mode: OrchestrationExecutionMode::Remote {
                         environment_id: "env-1".to_string(),
-                        worker_host: "rook".to_string(),
+                        worker_host: "polaris-terminal".to_string(),
                         runner_id: String::new(),
                     },
                 },
@@ -168,7 +168,7 @@ fn execute_denies_duplicate_launched_agent() {
 
 fn initialize_run_agents_test(app: &mut App, mode: ExecutionMode) -> RunAgentsTestState {
     initialize_settings_for_tests_with_mode(app, mode, false);
-    app.update(rook_core::telemetry::testing::MockTelemetryContextProvider::register);
+    app.update(pterm_core::telemetry::testing::MockTelemetryContextProvider::register);
     let global_resource_handles = GlobalResourceHandles::mock(app);
     app.add_singleton_model(|_| GlobalResourceHandlesProvider::new(global_resource_handles));
     let history = app.add_singleton_model(|_| BlocklistAIHistoryModel::new(vec![], vec![], &[]));
@@ -233,7 +233,7 @@ fn remote_run_agents_action(harness_type: &str) -> AIAgentAction {
             harness_type: harness_type.to_string(),
             execution_mode: RunAgentsExecutionMode::Remote {
                 environment_id: "env-1".to_string(),
-                worker_host: "rook".to_string(),
+                worker_host: "polaris-terminal".to_string(),
                 computer_use_enabled: false,
                 runner_id: String::new(),
             },
@@ -330,7 +330,7 @@ fn should_autoexecute_when_plan_has_approved_orchestration_config() {
 }
 
 #[test]
-fn should_not_autoexecute_approved_remote_non_rook_plan_without_default_auth_secret() {
+fn should_not_autoexecute_approved_remote_non_pterm_plan_without_default_auth_secret() {
     App::test((), |mut app| async move {
         let state = initialize_run_agents_test(&mut app, ExecutionMode::App);
         persist_plan_config_with_harness(
@@ -759,7 +759,7 @@ fn execute_denies_child_run_agents_when_multi_level_orchestration_disabled() {
 }
 
 #[test]
-fn execute_denies_remote_non_rook_harness_without_default_auth_secret() {
+fn execute_denies_remote_non_pterm_harness_without_default_auth_secret() {
     App::test((), |mut app| async move {
         let state = initialize_run_agents_test(&mut app, ExecutionMode::App);
         let action = remote_run_agents_action("codex");
@@ -790,7 +790,8 @@ fn execute_denies_remote_non_rook_harness_without_default_auth_secret() {
 }
 
 #[test]
-fn should_autoexecute_remote_non_rook_harness_with_always_allow_even_without_default_auth_secret() {
+fn should_autoexecute_remote_non_pterm_harness_with_always_allow_even_without_default_auth_secret()
+{
     App::test((), |mut app| async move {
         let state = initialize_run_agents_test(&mut app, ExecutionMode::App);
         set_run_agents_permission(&mut app, RunAgentsPermission::AlwaysAllow);
@@ -811,7 +812,7 @@ fn should_autoexecute_remote_non_rook_harness_with_always_allow_even_without_def
 }
 
 #[test]
-fn should_autoexecute_remote_non_rook_harness_with_default_auth_secret() {
+fn should_autoexecute_remote_non_pterm_harness_with_default_auth_secret() {
     App::test((), |mut app| async move {
         let state = initialize_run_agents_test(&mut app, ExecutionMode::App);
         set_run_agents_permission(&mut app, RunAgentsPermission::AlwaysAllow);
@@ -833,7 +834,7 @@ fn should_autoexecute_remote_non_rook_harness_with_default_auth_secret() {
 }
 
 #[test]
-fn should_autoexecute_remote_rook_harness_without_default_auth_secret() {
+fn should_autoexecute_remote_pterm_harness_without_default_auth_secret() {
     App::test((), |mut app| async move {
         let state = initialize_run_agents_test(&mut app, ExecutionMode::App);
         set_run_agents_permission(&mut app, RunAgentsPermission::AlwaysAllow);

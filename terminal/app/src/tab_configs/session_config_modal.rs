@@ -1,16 +1,16 @@
 use std::path::PathBuf;
 
 use pathfinder_geometry::vector::vec2f;
-use rookui::elements::{
+use ptermui::elements::{
     ChildAnchor, ChildView, ConstrainedBox, Container, CrossAxisAlignment, Flex,
     FormattedTextElement, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Stack,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::macros::id;
-use rookui::keymap::{FixedBinding, Keystroke};
-use rookui::platform::file_picker::FilePickerConfiguration;
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::macros::id;
+use ptermui::keymap::{FixedBinding, Keystroke};
+use ptermui::platform::file_picker::FilePickerConfiguration;
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -23,7 +23,7 @@ use crate::view_components::action_button::{
     ActionButton, ButtonSize, KeystrokeSource, NakedTheme, PrimaryTheme,
 };
 
-pub fn init(app: &mut rookui::AppContext) {
+pub fn init(app: &mut ptermui::AppContext) {
     app.register_fixed_bindings([FixedBinding::new(
         "enter",
         SessionConfigModalAction::Submit,
@@ -37,7 +37,7 @@ const SECTION_GAP: f32 = 16.;
 pub enum SessionConfigModalAction {
     SelectSessionType(usize),
     OpenDirectoryPicker,
-    DirectorySelected(Result<String, rookui::platform::file_picker::FilePickerError>),
+    DirectorySelected(Result<String, ptermui::platform::file_picker::FilePickerError>),
     ToggleWorktree,
     ToggleAutogenerateWorktreeBranchName,
     Submit,
@@ -86,7 +86,7 @@ impl SessionConfigModal {
         });
 
         let submit_button = ctx.add_view(|ctx| {
-            ActionButton::new("Get Rooking", PrimaryTheme)
+            ActionButton::new("Get Pterming", PrimaryTheme)
                 .with_full_width(true)
                 .with_keybinding(
                     KeystrokeSource::Fixed(Keystroke::parse("enter").unwrap_or_default()),

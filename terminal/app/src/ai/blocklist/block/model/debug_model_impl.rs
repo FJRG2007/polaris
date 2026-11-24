@@ -1,4 +1,4 @@
-use rookui::{AppContext, ViewContext};
+use ptermui::{AppContext, ViewContext};
 
 use crate::ai::{
     agent::{

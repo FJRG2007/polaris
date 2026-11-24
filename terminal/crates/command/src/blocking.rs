@@ -10,7 +10,7 @@ use std::process::{Child, CommandArgs, CommandEnvs, ExitStatus, Output, Stdio};
 #[cfg(windows)]
 use anyhow::Context as _;
 #[cfg(windows)]
-use rook_errors::report_error;
+use pterm_errors::report_error;
 #[cfg(windows)]
 use {super::windows::JobObject, std::os::windows::io::AsRawHandle};
 
@@ -78,8 +78,8 @@ impl Command {
         {
             use std::os::windows::process::CommandExt;
             // We need to set the `CREATE_BREAKAWAY_FROM_JOB` flag to avoid assigning
-            // the process to the same Job Object as the Rook process, otherwise the
-            // process will be killed when the Rook process is killed.
+            // the process to the same Job Object as the Polaris Terminal process, otherwise the
+            // process will be killed when the Polaris Terminal process is killed.
             let flags = windows::Win32::System::Threading::CREATE_NO_WINDOW.0
                 | windows::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB.0;
             inner.creation_flags(flags);
@@ -98,7 +98,7 @@ impl Command {
     /// Sets the [process creation flags][1] to be passed to `CreateProcess`.
     ///
     /// These will always be ORed with `CREATE_UNICODE_ENVIRONMENT` and `CREATE_NO_WINDOW`.
-    /// The latter is needed to avoid a console window temporarily popping up in Rook.
+    /// The latter is needed to avoid a console window temporarily popping up in Polaris Terminal.
     ///
     /// [1]: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684863(v=vs.85).aspx
     pub fn creation_flags(&mut self, flags: u32) -> &mut Self {

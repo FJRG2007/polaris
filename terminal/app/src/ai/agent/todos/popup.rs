@@ -1,14 +1,14 @@
 use pathfinder_color::ColorU;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     Border, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Dismiss, DropShadow, Empty, Expanded, Flex, MainAxisSize, ParentElement,
     Radius, SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Shrinkable, Text,
 };
-use rookui::fonts::{FamilyId, Properties, Weight};
-use rookui::keymap::FixedBinding;
-use rookui::{
+use ptermui::fonts::{FamilyId, Properties, Weight};
+use ptermui::keymap::FixedBinding;
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext,
 };
@@ -47,7 +47,7 @@ struct Styles {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",
@@ -124,9 +124,9 @@ impl AgentTodosPopupView {
 
     fn render_header(
         &self,
-        app: &rookui::AppContext,
+        app: &ptermui::AppContext,
         todo_list: &AIAgentTodoList,
-    ) -> Box<dyn rookui::Element> {
+    ) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
         let styles = self.styles(appearance);
         let theme = appearance.theme();
@@ -159,7 +159,7 @@ impl View for AgentTodosPopupView {
         "AgentTodosPopup"
     }
 
-    fn render(&self, app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         let Some(todo_list) = self
             .ai_context_model
             .as_ref(app)
@@ -271,7 +271,7 @@ impl View for AgentTodosPopupView {
             ScrollbarWidth::Auto,
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            rookui::elements::Fill::None,
+            ptermui::elements::Fill::None,
         )
         .with_overlayed_scrollbar()
         .finish();

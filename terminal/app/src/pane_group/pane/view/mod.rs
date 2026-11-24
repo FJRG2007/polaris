@@ -8,13 +8,13 @@ pub use header_content::{
     HeaderContent, HeaderRenderContext, StandardHeader, StandardHeaderOptions,
 };
 use pathfinder_geometry::rect::RectF;
-use rookui::elements::{
+use ptermui::elements::{
     Border, ConstrainedBox, Container, DropTarget, DropTargetData, Flex, MainAxisSize,
     ParentElement, SavePosition, Shrinkable,
 };
-use rookui::keymap::EditableBinding;
-use rookui::presenter::ChildView;
-use rookui::{
+use ptermui::keymap::EditableBinding;
+use ptermui::presenter::ChildView;
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -42,7 +42,7 @@ const HAS_SHARED_OBJECT_CONTEXT_KEY: &str = "PaneView_HasSharedObject";
 const DRAG_PREVIEW_HEADER_MAX_WIDTH: f32 = 400.;
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_editable_bindings([EditableBinding::new(
         "pane:share_pane_contents",
@@ -448,7 +448,7 @@ impl<P: BackingView> View for PaneView<P> {
         .finish()
     }
 
-    fn keymap_context(&self, ctx: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, ctx: &AppContext) -> ptermui::keymap::Context {
         let mut keymap_context = Self::default_keymap_context();
         if self.header.as_ref(ctx).is_sharing_dialog_enabled(ctx) {
             keymap_context.set.insert(HAS_SHARED_OBJECT_CONTEXT_KEY);

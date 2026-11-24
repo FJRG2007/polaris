@@ -1,5 +1,5 @@
-use rookui::elements::Element;
-use rookui::{AppContext, SingletonEntity};
+use ptermui::elements::Element;
+use ptermui::{AppContext, SingletonEntity};
 
 use crate::ai::blocklist::agent_view::orchestration_pill_bar::{
     render_agent_avatar_disc, render_orchestrator_avatar_disc,

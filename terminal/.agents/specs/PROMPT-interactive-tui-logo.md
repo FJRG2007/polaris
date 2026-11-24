@@ -3,7 +3,7 @@
 ## Product
 
 ### Summary
-Make the spinning object in the Rook Agent CLI zero state respond to left-mouse dragging. A horizontal drag directly scrubs the object in either direction with deliberately low sensitivity; releasing it uses recent signed pointer velocity to produce a momentum flick, which then settles to the configured idle speed while keeping the direction the flick established. The interaction is an undisclosed easter egg: the screen gains no hint, hover treatment, setting, or unsupported-terminal warning.
+Make the spinning object in the Polaris Terminal Agent CLI zero state respond to left-mouse dragging. A horizontal drag directly scrubs the object in either direction with deliberately low sensitivity; releasing it uses recent signed pointer velocity to produce a momentum flick, which then settles to the configured idle speed while keeping the direction the flick established. The interaction is an undisclosed easter egg: the screen gains no hint, hover treatment, setting, or unsupported-terminal warning.
 
 ### Key design choices
 - Reuse the TUI's existing session-wide mouse capture and `LeftMouseDown` / `LeftMouseDragged` / `LeftMouseUp` event path; do not change terminal mouse mode.
@@ -24,26 +24,26 @@ Make the spinning object in the Rook Agent CLI zero state respond to left-mouse 
 9. All phase and velocity integration uses elapsed monotonic time and radians per second, not angle per repaint tick. Equivalent timestamped input produces the same phase and velocity at 15 fps, 30 fps, or delayed repaint schedules.
 10. The current phase, active drag origin/displacement, recent horizontal samples, and settling state survive a terminal resize. New layout geometry is used for later hit tests, but a drag that began before resize may continue through it.
 11. Interaction state resets when the session replaces the zero state with transcript content or another surface, including a reversed idle direction. If the zero state later returns, it is at the ordinary forward idle animation with no previous drag, direction, or momentum contribution.
-12. The interaction applies to whichever object the zero-state animation is already rendering: the built-in Rook mark or configured custom ASCII art. The same physics, target calculation, and reset rules apply to both.
+12. The interaction applies to whichever object the zero-state animation is already rendering: the built-in Polaris Terminal mark or configured custom ASCII art. The same physics, target calculation, and reset rules apply to both.
 13. If the host terminal ignores mouse reporting or otherwise sends no mouse events, the zero state remains exactly today's idle animation. There is no warning, hint, disabled state, or other visible difference.
 14. Mouse events outside the current object target remain unhandled by the animation so existing or future zero-state children can receive them. A valid object drag consumes its down, drag, and up events.
 
 ### Non-goals
 - Persisting the flicked direction beyond the current zero-state episode; it is session-local and resets when the zero state exits rather than being written to settings.
-- Keyboard controls, scroll-wheel control, touchpad gesture abstraction, saved momentum, preferences, telemetry, sound, or reuse on other Rook logo surfaces.
+- Keyboard controls, scroll-wheel control, touchpad gesture abstraction, saved momentum, preferences, telemetry, sound, or reuse on other Polaris Terminal logo surfaces.
 - Hint copy, hover affordances, cursor changes, or other discoverability UI.
 - Changes to Crossterm mouse capture, terminal capability negotiation, background-star motion, object shape, extrusion, styling, frame cadence, or the existing rotation-period setting.
 
 ## Tech
 
 ### Context
-- `crates/rookui_core/src/runtime/mod.rs:696 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` enters the TUI alternate screen with `EnableMouseCapture`; `crates/rookui_core/src/runtime/mod.rs:621 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` invalidates all views on resize.
-- `crates/rookui_core/src/runtime/event_conversion.rs:45 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` already converts Crossterm left-button down, up, and drag reports into `TuiEvent`.
-- `crates/rookui_core/src/presenter/tui.rs:78 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` caches the last laid-out element tree for input dispatch, but invalidated views receive newly rendered elements. Interaction state cannot live only in `ZeroStateAnimationElement` if it must survive resize and unrelated zero-state re-renders.
-- `crates/rook_tui/src/zero_state_animation.rs:175 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` owns current object layout and paint geometry. `object_frame_at` at line 258 derives rotation solely from `AnimationClock::elapsed()` and the configured rotation period.
-- `crates/rook_tui/src/zero_state.rs:58 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` owns the animation clock across element rebuilds. Its render path stacks the animation behind a text overlay at line 159.
-- `crates/rook_tui/src/terminal_session_view.rs:5175 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` is the authoritative visibility decision: an empty transcript embeds `TuiZeroStateView`; otherwise it embeds the transcript.
-- `crates/rookui_core/src/elements/tui/stack.rs:132 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` dispatches events front-to-back. The text overlay does not handle these mouse events, so the animation layer can consume only valid object drags without changing the stack.
+- `crates/ptermui_core/src/runtime/mod.rs:696 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` enters the TUI alternate screen with `EnableMouseCapture`; `crates/ptermui_core/src/runtime/mod.rs:621 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` invalidates all views on resize.
+- `crates/ptermui_core/src/runtime/event_conversion.rs:45 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` already converts Crossterm left-button down, up, and drag reports into `TuiEvent`.
+- `crates/ptermui_core/src/presenter/tui.rs:78 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` caches the last laid-out element tree for input dispatch, but invalidated views receive newly rendered elements. Interaction state cannot live only in `ZeroStateAnimationElement` if it must survive resize and unrelated zero-state re-renders.
+- `crates/pterm_tui/src/zero_state_animation.rs:175 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` owns current object layout and paint geometry. `object_frame_at` at line 258 derives rotation solely from `AnimationClock::elapsed()` and the configured rotation period.
+- `crates/pterm_tui/src/zero_state.rs:58 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` owns the animation clock across element rebuilds. Its render path stacks the animation behind a text overlay at line 159.
+- `crates/pterm_tui/src/terminal_session_view.rs:5175 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` is the authoritative visibility decision: an empty transcript embeds `TuiZeroStateView`; otherwise it embeds the transcript.
+- `crates/ptermui_core/src/elements/tui/stack.rs:132 @ 82f3dce2bd1d36b52b37eb088da79e7d37de974d` dispatches events front-to-back. The text overlay does not handle these mouse events, so the animation layer can consume only valid object drags without changing the stack.
 
 ### Constants
 Keep the interaction tuning together in `zero_state_animation.rs` so later adjustment does not alter the state machine:
@@ -87,7 +87,7 @@ The cap applies to total interactive velocity, not to the configured idle settin
   - Rejected: toggle capture only in the zero state or add capability UI. Capture is already active for the TUI session, so either change adds complexity without enabling this feature.
 
 ### Proposed changes
-1. In `crates/rook_tui/src/zero_state_animation.rs`, introduce a session-local interaction state and cloneable handle with these responsibilities:
+1. In `crates/pterm_tui/src/zero_state_animation.rs`, introduce a session-local interaction state and cloneable handle with these responsibilities:
    - Track whether the zero state is visible, whether a valid press/qualified drag is active, mouse-down and current pointer positions, up to four recent distinct horizontal samples with monotonic dispatch times, directly manipulated phase, signed release velocity, the established idle direction, and the start time/velocity of the current settle.
    - Expose pure time-parameterized functions for press, drag, release, visibility transition, and resolving angle/velocity at a supplied `Instant`. Production calls use `Instant::now`; tests supply deterministic timestamps.
    - Integrate configured idle velocity and the interactive contribution analytically from elapsed time. Never advance phase by a fixed amount per render.
@@ -96,9 +96,9 @@ The cap applies to total interactive velocity, not to the configured idle settin
    - During paint, resolve the object angle from idle clock plus interaction state, pass that angle into frame generation, and retain the tight non-background object-cell bounding rectangle for the current frame.
    - Split frame generation so object rotation accepts an explicit angle while background stars continue to use ordinary elapsed time. Preserve the existing test helper behavior for idle frames.
    - Implement `dispatch_event` on the animation element. Down hit-tests the retained target and starts a candidate interaction without changing phase; drag handles a previously captured press even outside bounds; up settles or cancels. Each state change calls `event_ctx.notify()` and consumes only events belonging to a valid object interaction.
-3. In `crates/rook_tui/src/zero_state.rs`, store/receive the shared handle alongside `AnimationClock` and pass it through every element rebuild. Do not add hover or hint UI, and keep the current `TuiStack` composition.
-4. In `crates/rook_tui/src/terminal_session_view.rs`, create and own one interaction handle per terminal session, pass it when constructing `TuiZeroStateView`, and synchronize the existing `transcript_is_empty` visibility decision into it before selecting zero state versus transcript. The synchronization must be idempotent and must not itself notify or trigger a render loop.
-5. Extend sibling test files, primarily `zero_state_animation_tests.rs`, `zero_state_tests.rs`, and the focused terminal-session view tests. No `rookui_core` runtime or event-conversion production change is expected because the necessary capture and event variants already exist.
+3. In `crates/pterm_tui/src/zero_state.rs`, store/receive the shared handle alongside `AnimationClock` and pass it through every element rebuild. Do not add hover or hint UI, and keep the current `TuiStack` composition.
+4. In `crates/pterm_tui/src/terminal_session_view.rs`, create and own one interaction handle per terminal session, pass it when constructing `TuiZeroStateView`, and synchronize the existing `transcript_is_empty` visibility decision into it before selecting zero state versus transcript. The synchronization must be idempotent and must not itself notify or trigger a render loop.
+5. Extend sibling test files, primarily `zero_state_animation_tests.rs`, `zero_state_tests.rs`, and the focused terminal-session view tests. No `ptermui_core` runtime or event-conversion production change is expected because the necessary capture and event variants already exist.
 
 ### Open questions resolved
 - **Is mouse capture already enabled?** Yes. The TUI enables capture when entering its alternate screen and already converts and dispatches left down/drag/up events. This feature must not alter terminal mouse mode.
@@ -125,7 +125,7 @@ The cap applies to total interactive velocity, not to the configured idle settin
 All criteria must pass before merge.
 
 1. **Existing idle behavior remains bit-for-bit stable.** With no interaction, `object_frame_at` produces the same logo cells at representative phases for the built-in logo and custom ASCII fixtures, and background-star positions remain based only on elapsed time. Check with the existing `zero_state_animation_tests` plus a new `idle_frames_are_unchanged_without_interaction` regression test.
-2. **Mouse plumbing needs no runtime change.** Existing `rookui_core` tests continue to prove Crossterm down/drag/up conversion, and review confirms `EnableMouseCapture` remains present with no new capture toggle or terminal capability UI. Check with `cargo nextest run -p rookui_core --features tui`.
+2. **Mouse plumbing needs no runtime change.** Existing `ptermui_core` tests continue to prove Crossterm down/drag/up conversion, and review confirms `EnableMouseCapture` remains present with no new capture toggle or terminal capability UI. Check with `cargo nextest run -p ptermui_core --features tui`.
 3. **Hit testing is object-only.** `drag_starts_only_inside_current_object_bounds_and_captures_through_release` must show that a press on the rendered built-in object starts capture, while presses on a background star and blank panel cell return unhandled. Repeat against a custom ASCII object and an edge-on frame.
 4. **Press and click never snap.** A new `press_and_click_without_horizontal_motion_preserve_phase_and_velocity` test must compare the resolved angle immediately before press, after press, and after release with no horizontal movement; values must follow the uninterrupted idle solution with no discontinuity or momentum.
 5. **Direct drag is bidirectional, retuned, and deterministic.** `horizontal_drag_scrubs_both_directions_with_retuned_sensitivity` must show that eight-cell right and left gestures produce equal and opposite `1/12`-revolution turns. `pause_before_first_drag_does_not_accumulate_rate_limit_allowance` and `fast_direction_reversal_is_rate_limited_from_the_last_applied_angle` must prove the 2 revolutions-per-second held cap and that gesture history cannot bank excess speed. Vertical-only motion must preserve ordinary idle motion, and drag/up remain consumed after the pointer leaves bounds.
@@ -135,13 +135,13 @@ All criteria must pass before merge.
 9. **Resize preserves; exit resets.** New focused tests must rebuild/layout the element at a different `TuiSize` during an active drag and during momentum without changing resolved phase/velocity, then drive a zero-state visible-to-hidden-to-visible transition and assert that drag/momentum state is cleared.
 10. **No collateral event handling.** A focused presenter/event test must prove down/drag/up outside a valid interaction remain available to front/ancestor handlers, while all three events of a valid object drag are consumed by the animation even when later positions are outside the target.
 11. **Small terminals and absent mouse events degrade silently.** Existing too-small layout tests plus a new interaction assertion must show no object target and no handled drag when the animation is hidden. A run with no mouse events must show unchanged idle behavior and no new copy or affordance.
-12. **Targeted tests pass.** Run `cargo nextest run -p rook_tui` and `cargo nextest run -p rookui_core --features tui`.
+12. **Targeted tests pass.** Run `cargo nextest run -p pterm_tui` and `cargo nextest run -p ptermui_core --features tui`.
 13. **Formatting, linting, and build gates pass.** Run:
     - `./script/format --check`
-    - `cargo clippy --workspace --exclude rook_completer --all-targets --tests -- -D warnings`
-    - `cargo clippy -p rook --all-targets --tests -- -D warnings`
-    - `cargo clippy -p rook_completer --all-targets --tests -- -D warnings`
-    - `CARGO_BUILD_JOBS=2 cargo build -p rook_tui --bin rook-tui-oss`
+    - `cargo clippy --workspace --exclude pterm_completer --all-targets --tests -- -D warnings`
+    - `cargo clippy -p polaris-terminal --all-targets --tests -- -D warnings`
+    - `cargo clippy -p pterm_completer --all-targets --tests -- -D warnings`
+    - `CARGO_BUILD_JOBS=2 cargo build -p pterm_tui --bin polaris-terminal-tui-oss`
     The PR's CI is the full-suite backstop for this bounded TUI change.
 14. **The running TUI proves the complete gesture.** After the build passes, launch the authenticated zero state with `./script/run-tui` in a real terminal and use computer use to perform and durably record: a no-input idle baseline, valid press with no angle jump, a modest short forward drag, a longer faster forward flick, a reverse drag/flick, the gradual 3-second settle into steady reverse idle, a later forward flick turning it back around, drag continuation outside the object, and resize during momentum. Show the pointer and contrast interaction segments against baseline so gesture-driven motion is distinguishable from the five-second idle loop.
 15. **Live edge cases are checked.** In the same running-TUI verification, confirm a press on stars/blank space does nothing, a click without drag does nothing, vertical-only drag does not freeze or drive the object, the high clamp remains legible without visible flicker, and leaving/re-entering the zero state removes prior momentum and restores forward idle. Attach durable video and representative screenshots to the PR, and state plainly which criteria remain deterministic-test-only if the capture cannot establish them visually.

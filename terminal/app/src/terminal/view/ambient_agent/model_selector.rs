@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::vec2f;
-use rook_cli::agent::Harness;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::Fill;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::editor::NavigationKey;
-use rookui::elements::{
+use pterm_cli::agent::Harness;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::Fill;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::editor::NavigationKey;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, Container, OffsetPositioning, ParentAnchor, ParentElement as _,
     ParentOffsetBounds, Stack,
 };
-use rookui::{
+use ptermui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };

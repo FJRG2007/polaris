@@ -1,4 +1,4 @@
-# Note that ROOK_SESSION_ID is expected to have been set when executing commands to
+# Note that POLARIS_TERMINAL_SESSION_ID is expected to have been set when executing commands to
 # emit the InitShell payload, which includes the session ID.
 begin
 # We wrap ourselves in a begin block because these are effectively injected
@@ -11,7 +11,7 @@ begin
 set -l saved_fish_private_mode $fish_private_mode
 set -g fish_private_mode 1
 
-# Disable fish autosuggestions - because input goes through Rook's editor instead,
+# Disable fish autosuggestions - because input goes through Polaris Terminal's editor instead,
 # they are never actionable, and the extra output can cause problems.
 set -g fish_autosuggestion_enabled 0
 
@@ -21,7 +21,7 @@ set -g DCS_START \u1b\u50\u24
 
 # Appended to $DCS_START to signal that the following message is JSON-encoded.
 # The Rust app also receives non-JSON-encoded DCS's sent from
-# _rook_run_generator_command_internal, which instead end in 'e' (0x65).
+# _pterm_run_generator_command_internal, which instead end in 'e' (0x65).
 set -g DCS_JSON_MARKER 'd'
 
 set -g DCS_END \x1b\x5c
@@ -34,47 +34,47 @@ set -g OSC_PARAM_SEPARATOR ';'
 
 set -g RESET_GRID_OSC (printf '\e]9279\a')
 
-if test -n "$ROOK_INITIAL_WORKING_DIR"
-    cd "$ROOK_INITIAL_WORKING_DIR" >/dev/null 2>&1
-    set -e ROOK_INITIAL_WORKING_DIR
+if test -n "$POLARIS_TERMINAL_INITIAL_WORKING_DIR"
+    cd "$POLARIS_TERMINAL_INITIAL_WORKING_DIR" >/dev/null 2>&1
+    set -e POLARIS_TERMINAL_INITIAL_WORKING_DIR
 end
 
-# Append additional PATH entries if provided via ROOK_PATH_APPEND.
-if test -n "$ROOK_PATH_APPEND"
-    set -gx --path PATH "$PATH:$ROOK_PATH_APPEND"
-    set -e ROOK_PATH_APPEND
+# Append additional PATH entries if provided via POLARIS_TERMINAL_PATH_APPEND.
+if test -n "$POLARIS_TERMINAL_PATH_APPEND"
+    set -gx --path PATH "$PATH:$POLARIS_TERMINAL_PATH_APPEND"
+    set -e POLARIS_TERMINAL_PATH_APPEND
 end
 
-function rook_send_json_message
+function pterm_send_json_message
     # Sends a message to the controlling terminal as a DSC control sequence.
-    set -l escaped_json (rook_hex_encode_string "$argv")
-    if [ "$ROOK_USING_WINDOWS_CON_PTY" = true ]
+    set -l escaped_json (pterm_hex_encode_string "$argv")
+    if [ "$POLARIS_TERMINAL_USING_WINDOWS_CON_PTY" = true ]
         echo -n "$OSC_START$DCS_JSON_MARKER$OSC_PARAM_SEPARATOR$escaped_json$OSC_END"
     else
         echo -n "$DCS_START$DCS_JSON_MARKER$escaped_json$DCS_END"
     end
 end
 
-function rook_maybe_send_reset_grid_osc
-    # Note that $ROOK_USING_WINDOWS_CON_PTY is set in the init shell script.
-    if [ "$ROOK_USING_WINDOWS_CON_PTY" = true ]
+function pterm_maybe_send_reset_grid_osc
+    # Note that $POLARIS_TERMINAL_USING_WINDOWS_CON_PTY is set in the init shell script.
+    if [ "$POLARIS_TERMINAL_USING_WINDOWS_CON_PTY" = true ]
         printf $RESET_GRID_OSC
     end
 end
 
 
-# rook_hex_encode_string hex-encodes the given string with `od`.
-function rook_hex_encode_string 
+# pterm_hex_encode_string hex-encodes the given string with `od`.
+function pterm_hex_encode_string 
   printf '%s' "$argv" | od -An -v -tx1 | command tr -d ' \n'
 end
 
 # fish has no byte-safe string indexing, so `od` is still needed to reach the raw UTF-8 bytes.
-function rook_completions_hex_encode
+function pterm_completions_hex_encode
   set -l od_output (printf '%s' "$argv" | od -An -v -tx1)
   string replace -a -- ' ' '' (string join '' $od_output)
 end
 
-function rook_hex_decode_string
+function pterm_hex_decode_string
     if test (count $argv) -eq 0 -o -z "$argv[1]"
         return
     end
@@ -92,18 +92,18 @@ end
 # A list of PIDs for running in-band command(s). This is used to kill running
 # in-band commands in preexec for a user command, so they do not interfere with
 # user command output.
-set -g _rook_generator_pids ''
+set -g _pterm_generator_pids ''
 
 # Runs the given command in the background, records its PID in
-# _ROOK_GENERATOR_PIDS_STARTED_TMP_FILE, and adds its PID from the file when
+# _POLARIS_TERMINAL_GENERATOR_PIDS_STARTED_TMP_FILE, and adds its PID from the file when
 # the job is completed.
 #
 # Usage:
-#   _rook_run_generator_command_internal <command_id> '<command>'
+#   _pterm_run_generator_command_internal <command_id> '<command>'
 #
 # The first argument is the command's ID, which is included in the DCS string sent
 # to the rust app. The second argument is the command string itself.
-function  _rook_run_generator_command_internal
+function  _pterm_run_generator_command_internal
     set -l command_id $argv[1]
     set -l command (string join -- ' ' (string escape $argv[2]))
     # Fish cannot run shell functions in the background, so in order to run
@@ -121,10 +121,10 @@ function  _rook_run_generator_command_internal
     # N.B. Fish shell variables cannot contain null characters, so the command output must be
     # immediately hex encoded before being stored in a variable.
     fish -c "
-        set -l rook_using_windows_con_pty $ROOK_USING_WINDOWS_CON_PTY;
+        set -l pterm_using_windows_con_pty $POLARIS_TERMINAL_USING_WINDOWS_CON_PTY;
         set -l reset_grid_osc $RESET_GRID_OSC;
-        function rook_maybe_send_reset_grid_osc
-            if [ \"\$rook_using_windows_con_pty\" = true ]
+        function pterm_maybe_send_reset_grid_osc
+            if [ \"\$pterm_using_windows_con_pty\" = true ]
                 printf \$reset_grid_osc
             end
         end
@@ -141,14 +141,14 @@ function  _rook_run_generator_command_internal
         set -l LC_ALL \"C\"
         set -l byte_count (string length \"\$hex_encoded_message\")
         echo -n \"\$OSC_START_GENERATOR_OUTPUT\$byte_count;\$hex_encoded_message\$OSC_END_GENERATOR_OUTPUT\"
-        rook_maybe_send_reset_grid_osc" 2> /dev/null &
+        pterm_maybe_send_reset_grid_osc" 2> /dev/null &
         
     set -l command_pid $last_pid
-    set -a _rook_generator_pids $command_pid
+    set -a _pterm_generator_pids $command_pid
 
-    # Remove the command's PID from _rook_generator_pids when the command exits.
+    # Remove the command's PID from _pterm_generator_pids when the command exits.
     function on_command_{$command_pid}_finish --on-process-exit $command_pid --inherit-variable command_pid
-        set -g _rook_generator_pids (string replace $command_pid '' $_rook_generator_pids)
+        set -g _pterm_generator_pids (string replace $command_pid '' $_pterm_generator_pids)
 
         # Erase this function after the pids list is updated above so we don't create an infinite number of
         # functions that could pollute the user's context (nested functions are still existing in the global
@@ -157,7 +157,7 @@ function  _rook_run_generator_command_internal
 
         # Note: If we're on windows, we send a reset grid to erase any cursor mutations caused by
         # the in-band command.
-        rook_maybe_send_reset_grid_osc
+        pterm_maybe_send_reset_grid_osc
     end
 end
 
@@ -169,21 +169,21 @@ end
 # not substituted until the command string is actually evaluated.
 #
 # Usage:
-#   rook_run_generator_command <command_id> '<command> <arg1> ... <argn>'
-function rook_run_generator_command
-    # Setting this environment variable allows rook_precmd to detect if a generator
+#   pterm_run_generator_command <command_id> '<command> <arg1> ... <argn>'
+function pterm_run_generator_command
+    # Setting this environment variable allows pterm_precmd to detect if a generator
     # command or a user command has just completed.
-    set -g _ROOK_GENERATOR_COMMAND 1
-    _rook_run_generator_command_internal $argv
+    set -g _POLARIS_TERMINAL_GENERATOR_COMMAND 1
+    _pterm_run_generator_command_internal $argv
 end
 
 # Computes native shell completions for the given (hex-encoded) command line and emits them over the
 # completions OSC protocol.
-function rook_run_generator_command_native_completions
-    set -g _ROOK_GENERATOR_COMMAND 1
+function pterm_run_generator_command_native_completions
+    set -g _POLARIS_TERMINAL_GENERATOR_COMMAND 1
     set -l line
     if test (count $argv) -gt 0
-        set line (rook_hex_decode_string $argv[1] 2>/dev/null)
+        set line (pterm_hex_decode_string $argv[1] 2>/dev/null)
     end
 
     printf '\e]9280;A\a'
@@ -194,9 +194,9 @@ function rook_run_generator_command_native_completions
             # Hex-encode both fields: OSC params are semicolon-delimited and only the third is
             # read (see decode_hex_completions_payload in ansi/mod.rs), so a literal `;`, BEL,
             # or ESC in a match or description would otherwise corrupt the sequence.
-            printf '\e]9280;C;%s\a' (rook_completions_hex_encode $parts[1])
+            printf '\e]9280;C;%s\a' (pterm_completions_hex_encode $parts[1])
             if test (count $parts) -gt 1 -a -n "$parts[2]"
-                printf '\e]9280;D?description;%s\a' (rook_completions_hex_encode $parts[2])
+                printf '\e]9280;D?description;%s\a' (pterm_completions_hex_encode $parts[2])
             end
         end
     end
@@ -204,20 +204,20 @@ function rook_run_generator_command_native_completions
 end
 
 # Run before a command is executed.
-function rook_preexec --on-event fish_preexec
-    set -l command (rook_escape_json "$argv")
-    rook_send_json_message "{\"hook\": \"Preexec\", \"value\": {\"command\": \"$command\", \"session_id\": $ROOK_SESSION_ID}}"
-    rook_maybe_send_reset_grid_osc
+function pterm_preexec --on-event fish_preexec
+    set -l command (pterm_escape_json "$argv")
+    pterm_send_json_message "{\"hook\": \"Preexec\", \"value\": {\"command\": \"$command\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID}}"
+    pterm_maybe_send_reset_grid_osc
 
     # If this preexec is called for user command, kill ongoing generator command jobs.
-    if not string match -q "rook_run_generator_command*" -- (string trim -- $argv[1])
-        for pid in $_rook_generator_pids
+    if not string match -q "pterm_run_generator_command*" -- (string trim -- $argv[1])
+        for pid in $_pterm_generator_pids
             # Suppress stderr output; kill writes to stderr if the given PID is not running
             # (which might rarely be the case due to race conditions in checking which PIDs to
             # cancel and this kill command).
             kill -9 $pid >/dev/null 2>/dev/null
         end
-        set -g _rook_generator_pids ''
+        set -g _pterm_generator_pids ''
     end
 end
 
@@ -228,25 +228,25 @@ end
 #
 # We wrap in a local function instead of exporting the variable directly in
 # order to avoid interfering with manually-run git commands by the user.
-function rook_git
+function pterm_git
     GIT_OPTIONAL_LOCKS=0 command git $argv
 end
 
 # Wrap fish prompt function output with OSC prompt marker sequences,
 # so that we can direct the prompt bytes to the appropriate grids.
-function rook_update_prompt_vars
+function pterm_update_prompt_vars
   # Back up the original fish_prompt if not already done
-  if not functions -q rook_original_fish_prompt
-    functions -c fish_prompt rook_original_fish_prompt
+  if not functions -q pterm_original_fish_prompt
+    functions -c fish_prompt pterm_original_fish_prompt
   end
 
   # Back up the original fish_right_prompt if it exists and not already backed up
-  if functions -q fish_right_prompt; and not functions -q rook_original_fish_right_prompt
-    functions -c fish_right_prompt rook_original_fish_right_prompt
+  if functions -q fish_right_prompt; and not functions -q pterm_original_fish_right_prompt
+    functions -c fish_right_prompt pterm_original_fish_right_prompt
   end
 
   # If not honoring PS1, set both prompts to be empty
-  if test "$ROOK_HONOR_PS1" = "0"
+  if test "$POLARIS_TERMINAL_HONOR_PS1" = "0"
     function fish_prompt; echo -n ""; end
     function fish_right_prompt; echo -n ""; end
   # If honoring PS1, add prefix/suffix to both prompts
@@ -254,7 +254,7 @@ function rook_update_prompt_vars
 
     function end_prompt        
       echo -n (printf '\x1b')
-      if test "$ROOK_HONOR_PS1" != "1" && [ "$ROOK_USING_WINDOWS_CON_PTY" = true ]
+      if test "$POLARIS_TERMINAL_HONOR_PS1" != "1" && [ "$POLARIS_TERMINAL_USING_WINDOWS_CON_PTY" = true ]
         echo -n "]133;B$RESET_GRID_OSC"
       else
         echo -n ']133;B'
@@ -267,43 +267,43 @@ function rook_update_prompt_vars
       echo -n (printf '\x1b')
       echo -n ']133;A'
       echo -n (printf '\x07')
-      rook_original_fish_prompt
+      pterm_original_fish_prompt
       end_prompt
     end
 
-    # Check if rook_original_fish_right_prompt was backed up before redefining fish_right_prompt
-    if functions -q rook_original_fish_right_prompt
+    # Check if pterm_original_fish_right_prompt was backed up before redefining fish_right_prompt
+    if functions -q pterm_original_fish_right_prompt
       function fish_right_prompt
         echo -n (printf '\x1b')
         echo -n ']133;P;k=r'
         echo -n (printf '\x07')
-        rook_original_fish_right_prompt
+        pterm_original_fish_right_prompt
         end_prompt
       end
     end
   end
 end
 
-# Changes the ROOK_HONOR_PS1 variable to 1, to indicate we want to use the user's custom prompt. Restores
-# the original fish prompt functions (which we set to empty for Rook prompt) by calling rook_update_prompt_vars
+# Changes the POLARIS_TERMINAL_HONOR_PS1 variable to 1, to indicate we want to use the user's custom prompt. Restores
+# the original fish prompt functions (which we set to empty for Polaris Terminal prompt) by calling pterm_update_prompt_vars
 # to refresh the prompt. We force a repaint of the prompt to ensure the change is reflected immediately.
-function rook_change_prompt_modes_to_ps1
-  set -x ROOK_HONOR_PS1 "1"
+function pterm_change_prompt_modes_to_ps1
+  set -x POLARIS_TERMINAL_HONOR_PS1 "1"
 
   # Restores fish_prompt and fish_right_prompt.
-  rook_update_prompt_vars
+  pterm_update_prompt_vars
   # Forces a repaint of the current prompt to ensure the change is reflected immediately.
   commandline -f repaint
 end
 
-# Changes the ROOK_HONOR_PS1 variable to 0, to indicate we want to use the Rook prompt. Saves and clears
-# the fish prompt functions (which we set to empty for Rook prompt) by calling rook_update_prompt_vars
+# Changes the POLARIS_TERMINAL_HONOR_PS1 variable to 0, to indicate we want to use the Polaris Terminal prompt. Saves and clears
+# the fish prompt functions (which we set to empty for Polaris Terminal prompt) by calling pterm_update_prompt_vars
 # to refresh the prompt. We force a repaint of the prompt to ensure the change is reflected immediately.
-function rook_change_prompt_modes_to_rook_prompt
-  set -x ROOK_HONOR_PS1 "0"
+function pterm_change_prompt_modes_to_pterm_prompt
+  set -x POLARIS_TERMINAL_HONOR_PS1 "0"
 
   # Updates fish_prompt and fish_right_prompt to be empty.
-  rook_update_prompt_vars
+  pterm_update_prompt_vars
   # Forces a repaint of the current prompt to ensure the change is reflected immediately.
   commandline -f repaint
 end
@@ -311,7 +311,7 @@ end
 set block_id 0
 # Run before the prompt is displayed. We also need to trigger this on "fish_posterror", as
 # submitting a command containing a syntax error will not trigger "fish_preexec" or "fish_prompt".
-function rook_precmd --on-event fish_prompt --on-event fish_posterror
+function pterm_precmd --on-event fish_prompt --on-event fish_posterror
     # Handle prompt behavior (we do this first to make sure the exit status is from the command,
     # rather than from our own code)
     set -l exit_code $status
@@ -325,14 +325,14 @@ function rook_precmd --on-event fish_prompt --on-event fish_posterror
         set exit_code 1
     end
 
-    set -l next_block_id "precmd-$ROOK_SESSION_ID-$block_id"
-    rook_send_json_message "{\"hook\": \"CommandFinished\", \"value\": {\"exit_code\": $exit_code, \"next_block_id\": \"$next_block_id\", \"session_id\": $ROOK_SESSION_ID}}"
-    rook_maybe_send_reset_grid_osc
+    set -l next_block_id "precmd-$POLARIS_TERMINAL_SESSION_ID-$block_id"
+    pterm_send_json_message "{\"hook\": \"CommandFinished\", \"value\": {\"exit_code\": $exit_code, \"next_block_id\": \"$next_block_id\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID}}"
+    pterm_maybe_send_reset_grid_osc
 
     set block_id (math $block_id + 1)
 
-    if ! test -z $_ROOK_GENERATOR_COMMAND
-        set -e _ROOK_GENERATOR_COMMAND
+    if ! test -z $_POLARIS_TERMINAL_GENERATOR_COMMAND
+        set -e _POLARIS_TERMINAL_GENERATOR_COMMAND
         set -l escaped_json "{\"hook\": \"Precmd\", \"value\": {
         \"exit_code\": $exit_code,
         \"next_block_id\": \"$next_block_id\",
@@ -343,10 +343,10 @@ function rook_precmd --on-event fish_prompt --on-event fish_posterror
         \"virtual_env\": \"\",
         \"conda_env\": \"\",
         \"node_version\": \"\",
-        \"session_id\": $ROOK_SESSION_ID,
+        \"session_id\": $POLARIS_TERMINAL_SESSION_ID,
         \"is_after_in_band_command\": true
         }}"
-        rook_send_json_message $escaped_json
+        pterm_send_json_message $escaped_json
         return 0
     end
 
@@ -359,12 +359,12 @@ function rook_precmd --on-event fish_prompt --on-event fish_posterror
     bind \cP "commandline ''"
 
     # We use the ESC-p bindkey for this ("p" for PS1/custom prompt).
-    bind \ep rook_change_prompt_modes_to_ps1
+    bind \ep pterm_change_prompt_modes_to_ps1
 
-    # We use the ESC-w bindkey for this ("w" for Rook prompt).
-    bind \ew rook_change_prompt_modes_to_rook_prompt
+    # We use the ESC-w bindkey for this ("w" for Polaris Terminal prompt).
+    bind \ew pterm_change_prompt_modes_to_pterm_prompt
 
-    bind \ei rook_report_input
+    bind \ei pterm_report_input
 
     # Define local variables in appropriate outer block for fish variable scoping.
     # See https://stackoverflow.com/a/53685510.
@@ -374,9 +374,9 @@ function rook_precmd --on-event fish_prompt --on-event fish_posterror
     set -l escaped_pwd
     if set -q WSL_DISTRO_NAME
         # In WSL, avoid symlinks b/c on Windows `std::fs` is unable to resolve symlink inside WSL containers.
-        set escaped_pwd (rook_escape_json (pwd -P))
+        set escaped_pwd (pterm_escape_json (pwd -P))
     else
-        set escaped_pwd (rook_escape_json $PWD)
+        set escaped_pwd (pterm_escape_json $PWD)
     end
 
     set -l escaped_virtual_env ""
@@ -389,19 +389,19 @@ function rook_precmd --on-event fish_prompt --on-event fish_posterror
     # blocks created during the bootstrap process don't have visible
     # prompts, and we don't want to invoke `git` before we've sourced the
     # user's rcfiles and have a fully-populated PATH.
-    if test -n "$ROOK_BOOTSTRAPPED"
+    if test -n "$POLARIS_TERMINAL_BOOTSTRAPPED"
       if test -n "$VIRTUAL_ENV"
-          set escaped_virtual_env (rook_escape_json "$VIRTUAL_ENV")
+          set escaped_virtual_env (pterm_escape_json "$VIRTUAL_ENV")
       end
       if test -n "$CONDA_DEFAULT_ENV"
-          set escaped_conda_env (rook_escape_json "$CONDA_DEFAULT_ENV")
+          set escaped_conda_env (pterm_escape_json "$CONDA_DEFAULT_ENV")
       end
       
         # Get the Node.js version, but only when the Node.js Version chip is enabled.
-        # Rook sets ROOK_PROMPT_NODE_VERSION_ENABLED to "0" when the chip is not in the
+        # Polaris Terminal sets POLARIS_TERMINAL_PROMPT_NODE_VERSION_ENABLED to "0" when the chip is not in the
         # prompt (defaulting to enabled when unset), so we avoid spawning `node` on
         # every prompt when the chip is not shown.
-        if test "$ROOK_PROMPT_NODE_VERSION_ENABLED" != "0"; and command -v node > /dev/null 2>&1
+        if test "$POLARIS_TERMINAL_PROMPT_NODE_VERSION_ENABLED" != "0"; and command -v node > /dev/null 2>&1
             # Check for package.json in current directory and parent directories
             set current_dir (pwd)
             set found_package_json false
@@ -445,15 +445,15 @@ function rook_precmd --on-event fish_prompt --on-event fish_posterror
                     # `node --version` when the directory or PATH changes (PATH changes
                     # on `nvm use`). Use global cache vars so they persist across calls.
                     set -l node_cache_key "$PWD:$PATH"
-                    if test "$node_cache_key" = "$_ROOK_NODE_VERSION_CACHE_KEY"
-                        set escaped_node_version "$_ROOK_NODE_VERSION_CACHE_VALUE"
+                    if test "$node_cache_key" = "$_POLARIS_TERMINAL_NODE_VERSION_CACHE_KEY"
+                        set escaped_node_version "$_POLARIS_TERMINAL_NODE_VERSION_CACHE_VALUE"
                     else
                         set -l node_version (node --version 2>/dev/null)
                         if test -n "$node_version"
-                            set escaped_node_version (rook_escape_json "$node_version")
+                            set escaped_node_version (pterm_escape_json "$node_version")
                         end
-                        set -g _ROOK_NODE_VERSION_CACHE_KEY "$node_cache_key"
-                        set -g _ROOK_NODE_VERSION_CACHE_VALUE "$escaped_node_version"
+                        set -g _POLARIS_TERMINAL_NODE_VERSION_CACHE_KEY "$node_cache_key"
+                        set -g _POLARIS_TERMINAL_NODE_VERSION_CACHE_VALUE "$escaped_node_version"
                     end
                 end
             end
@@ -462,32 +462,32 @@ function rook_precmd --on-event fish_prompt --on-event fish_posterror
       set -l git_branch ""
       set -l git_head ""
       if command -q git
-          set git_branch (rook_git symbolic-ref --short HEAD 2> /dev/null)
+          set git_branch (pterm_git symbolic-ref --short HEAD 2> /dev/null)
           if test -z "$git_branch"
               # Fallback to the git commit hash if we aren't on a named branch.
-              set git_head (rook_git rev-parse --short HEAD 2> /dev/null)
+              set git_head (pterm_git rev-parse --short HEAD 2> /dev/null)
           else
               set git_head "$git_branch"
           end
       end
-      set escaped_git_head (rook_escape_json "$git_head")
-      set escaped_git_branch (rook_escape_json "$git_branch")
+      set escaped_git_head (pterm_escape_json "$git_head")
+      set escaped_git_branch (pterm_escape_json "$git_branch")
     end
 
-    rook_update_prompt_vars
+    pterm_update_prompt_vars
     # This is used solely for prompt previews, when we're using prompt markers with combined grid.
     # We need to use this since fish does not have a way to ignore printable characters for cursor
-    # positioning (unlike zsh/bash), so we need a separate mechanism to send the prompt to Rook
-    # in the case of Rook prompt (for previewing the PS1). We send an escaped version of the raw prompt
-    # bytes via a hex string (in a JSON payload) to Rook.
-    # Note that we are CALLING the `rook_original_fish_prompt` function on the next line and assigning the
+    # positioning (unlike zsh/bash), so we need a separate mechanism to send the prompt to Polaris Terminal
+    # in the case of Polaris Terminal prompt (for previewing the PS1). We send an escaped version of the raw prompt
+    # bytes via a hex string (in a JSON payload) to Polaris Terminal.
+    # Note that we are CALLING the `pterm_original_fish_prompt` function on the next line and assigning the
     # outputted string to the local variable `raw_prompt_for_preview`.
-    set -l raw_prompt_for_preview (rook_original_fish_prompt)
-    # We encode the prompt as a hex string to pass it to Rook.
-    set escaped_prompt (rook_escape_prompt "$raw_prompt_for_preview")
+    set -l raw_prompt_for_preview (pterm_original_fish_prompt)
+    # We encode the prompt as a hex string to pass it to Polaris Terminal.
+    set escaped_prompt (pterm_escape_prompt "$raw_prompt_for_preview")
 
     set -l escaped_json
-    if test "$ROOK_HONOR_PS1" = "1"
+    if test "$POLARIS_TERMINAL_HONOR_PS1" = "1"
       # Don't send lprompt or rprompt in this case - we'll use prompt markers for both directly!
       set escaped_json "{\"hook\": \"Precmd\", \"value\": {
       \"exit_code\": $exit_code,
@@ -500,7 +500,7 @@ function rook_precmd --on-event fish_prompt --on-event fish_posterror
       \"virtual_env\": \"$escaped_virtual_env\",
       \"conda_env\": \"$escaped_conda_env\",
       \"node_version\": \"$escaped_node_version\",
-      \"session_id\": $ROOK_SESSION_ID
+      \"session_id\": $POLARIS_TERMINAL_SESSION_ID
       }}"
     else
       # We send an lprompt to use for prompt preview purposes only (we still use prompt markers for active prompts).
@@ -515,15 +515,15 @@ function rook_precmd --on-event fish_prompt --on-event fish_posterror
       \"virtual_env\": \"$escaped_virtual_env\",
       \"conda_env\": \"$escaped_conda_env\",
       \"node_version\": \"$escaped_node_version\",
-      \"session_id\": $ROOK_SESSION_ID
+      \"session_id\": $POLARIS_TERMINAL_SESSION_ID
       }}"
     end
-    rook_send_json_message $escaped_json
+    pterm_send_json_message $escaped_json
 end
 
-function rook_escape_prompt
+function pterm_escape_prompt
     # To match the implementation of PS1 support in bash / zsh, we use the same method of encoding
-    # the prompt as a hex string so that it can be interpreted on the Rook side
+    # the prompt as a hex string so that it can be interpreted on the Polaris Terminal side
     # Note: before converting the prompt to a hex string, we remove any multi-line newlines and
     # replace them with a single space (to avoid prompts that span multiple empty lines)
     echo "$argv" | command tr '\n\n' ' ' | command od -An -v -tx1 | command tr -d ' \n'
@@ -534,7 +534,7 @@ end
 # Specifically, special characters like backspace, tab, form feed, carriage return, and newlines
 # are replaced with escaped equivalents. Double quotes and literal backslash characters are also
 # backslash-escaped.
-function rook_escape_json
+function pterm_escape_json
     # Explanation of the sed replacements (each command is separated by a `;`):
     # s/(["\\])/\\\1/g - Replace all double-quote (") and backslash (\) characters with the escaped versions (\" and \\)
     # s/\b/\\b/g - Replace all backspace characters with \b
@@ -553,7 +553,7 @@ end
 
 # Reports the widget `^R` is bound to, if the user has rebound it away from fish's own
 # history search. Returns non-zero when `^R` is still on a fish default.
-function rook_external_ctrl_r_widget
+function pterm_external_ctrl_r_widget
   # fish >= 4.0 renamed key specifications, so `bind` echoes back `ctrl-r` where earlier
   # versions echo `\cr`.
   set -l widget ""
@@ -570,12 +570,12 @@ end
 
 
 # Runs the shell's own ctrl-r history tool as a foreground command.
-function rook_run_external_ctrl_r_widget
+function pterm_run_external_ctrl_r_widget
   set -l result ""
-  switch "$_ROOK_EXTERNAL_CTRL_R_WIDGET"
+  switch "$_POLARIS_TERMINAL_EXTERNAL_CTRL_R_WIDGET"
     case 'fzf-history-widget' '_fzf_search_history'
       test -z "$fish_private_mode"; and builtin history merge
-      $_ROOK_EXTERNAL_CTRL_R_WIDGET
+      $_POLARIS_TERMINAL_EXTERNAL_CTRL_R_WIDGET
       set result (commandline | string collect)
       commandline -r ''
     case '_atuin_search'
@@ -583,45 +583,45 @@ function rook_run_external_ctrl_r_widget
       # leave the UI on the terminal and capture only the selection.
       set -l output (ATUIN_SHELL_FISH=t ATUIN_LOG=error atuin search -i 3>&1 1>&2 2>&3 | string collect)
       # atuin prefixes the selection with __atuin_accept__: when `enter_accept` is on and the
-      # user pressed enter. Rook always inserts without executing, so the prefix is dropped.
+      # user pressed enter. Polaris Terminal always inserts without executing, so the prefix is dropped.
       set result (string replace "__atuin_accept__:" "" -- "$output" | string collect)
   end
-  set -l rook_escaped_selection (rook_escape_json "$result")
-  rook_send_json_message "{ \"hook\": \"ExternalShellWidgetSelection\", \"value\": { \"buffer\": \"$rook_escaped_selection\", \"session_id\": $ROOK_SESSION_ID } }"
+  set -l pterm_escaped_selection (pterm_escape_json "$result")
+  pterm_send_json_message "{ \"hook\": \"ExternalShellWidgetSelection\", \"value\": { \"buffer\": \"$pterm_escaped_selection\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID } }"
 end
 
-function rook_ctrl_t_widget_result
+function pterm_ctrl_t_widget_result
   test "$argv[1]" = "$argv[2]"; or string collect -- "$argv[2]"
 end
 
 # Runs fzf's ctrl-t file-search widget as a foreground command.
-function rook_run_external_ctrl_t_widget
+function pterm_run_external_ctrl_t_widget
   set -l result ""
-  set -l rook_ctrl_t_parts (string split -m 1 -- ':' "$argv[1]")
-  set -l char_cursor $rook_ctrl_t_parts[1]
-  set -l original_line (rook_hex_decode_string $rook_ctrl_t_parts[2] | string collect --no-trim-newlines --allow-empty)
+  set -l pterm_ctrl_t_parts (string split -m 1 -- ':' "$argv[1]")
+  set -l char_cursor $pterm_ctrl_t_parts[1]
+  set -l original_line (pterm_hex_decode_string $pterm_ctrl_t_parts[2] | string collect --no-trim-newlines --allow-empty)
   commandline -r -- $original_line
   commandline -C -- $char_cursor
-  switch "$_ROOK_EXTERNAL_CTRL_R_WIDGET"
+  switch "$_POLARIS_TERMINAL_EXTERNAL_CTRL_R_WIDGET"
     case 'fzf-history-widget'
       fzf-file-widget
     case '_fzf_search_history'
       _fzf_search_directory
   end
   set -l cl_readback (commandline | string collect)
-  set result (rook_ctrl_t_widget_result "$original_line" "$cl_readback")
+  set result (pterm_ctrl_t_widget_result "$original_line" "$cl_readback")
   commandline -r ''
-  set -l rook_escaped_selection (rook_escape_json "$result")
-  rook_send_json_message "{ \"hook\": \"ExternalShellWidgetSelection\", \"value\": { \"buffer\": \"$rook_escaped_selection\", \"session_id\": $ROOK_SESSION_ID } }"
+  set -l pterm_escaped_selection (pterm_escape_json "$result")
+  pterm_send_json_message "{ \"hook\": \"ExternalShellWidgetSelection\", \"value\": { \"buffer\": \"$pterm_escaped_selection\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID } }"
 end
 
-function rook_run_external_alt_c_widget
-  set -l rook_alt_c_parts (string split -m 1 -- ':' "$argv[1]")
-  set -l char_cursor $rook_alt_c_parts[1]
-  set -l original_line (rook_hex_decode_string $rook_alt_c_parts[2] | string collect --no-trim-newlines --allow-empty)
+function pterm_run_external_alt_c_widget
+  set -l pterm_alt_c_parts (string split -m 1 -- ':' "$argv[1]")
+  set -l char_cursor $pterm_alt_c_parts[1]
+  set -l original_line (pterm_hex_decode_string $pterm_alt_c_parts[2] | string collect --no-trim-newlines --allow-empty)
   commandline -r -- $original_line
   commandline -C -- $char_cursor
-  switch "$_ROOK_EXTERNAL_CTRL_R_WIDGET"
+  switch "$_POLARIS_TERMINAL_EXTERNAL_CTRL_R_WIDGET"
     case 'fzf-history-widget'
       fzf-cd-widget
     case '_fzf_search_history'
@@ -638,41 +638,41 @@ end
 # fish only supports a single fish_should_add_to_history function (unlike zsh's array of
 # zshaddhistory hooks or bash's PROMPT_COMMAND-style stacking), so compose with any
 # user-defined one -- e.g. from a plugin sourced in config.fish before this bootstrap script
-# runs -- rather than clobbering it, following the same backup pattern rook_update_prompt_vars
+# runs -- rather than clobbering it, following the same backup pattern pterm_update_prompt_vars
 # uses for fish_prompt.
 #
-# rook_original_fish_should_add_to_history must exist and be safe to call *before* we install our
+# pterm_original_fish_should_add_to_history must exist and be safe to call *before* we install our
 # own wrapper below. This bootstrap script can run more than once in the same fish process (a
 # shell reload, or a nested fish subshell), and a user or plugin can define or replace
 # fish_should_add_to_history at any point, including between two of our sourcings -- so on every
 # run, re-derive the backup from whatever fish_should_add_to_history currently is, unless that's
-# already our own wrapper from a previous run (identified by the rook_run_external_ctrl_r_widget
+# already our own wrapper from a previous run (identified by the pterm_run_external_ctrl_r_widget
 # sentinel in its body), in which case the existing backup -- the last real hook we captured, or
 # the accept-everything default if none ever existed -- is left alone. Backing up our own wrapper
 # as if it were the original would make every history check call itself.
 if functions -q fish_should_add_to_history
-  and not functions fish_should_add_to_history | string match --quiet -- '*rook_run_external_ctrl_r_widget*'
-  functions -q rook_original_fish_should_add_to_history; and functions -e rook_original_fish_should_add_to_history
-  functions -c fish_should_add_to_history rook_original_fish_should_add_to_history
-else if not functions -q rook_original_fish_should_add_to_history
-  function rook_original_fish_should_add_to_history
+  and not functions fish_should_add_to_history | string match --quiet -- '*pterm_run_external_ctrl_r_widget*'
+  functions -q pterm_original_fish_should_add_to_history; and functions -e pterm_original_fish_should_add_to_history
+  functions -c fish_should_add_to_history pterm_original_fish_should_add_to_history
+else if not functions -q pterm_original_fish_should_add_to_history
+  function pterm_original_fish_should_add_to_history
     return 0
   end
 end
 function fish_should_add_to_history
-  string match --quiet -- '*rook_run_external_ctrl_r_widget*' $argv[1]; and return 1
-  string match --quiet -- '*rook_run_external_ctrl_t_widget*' $argv[1]; and return 1
-  string match --quiet -- '*rook_run_external_alt_c_widget*' $argv[1]; and return 1
-  rook_original_fish_should_add_to_history $argv
+  string match --quiet -- '*pterm_run_external_ctrl_r_widget*' $argv[1]; and return 1
+  string match --quiet -- '*pterm_run_external_ctrl_t_widget*' $argv[1]; and return 1
+  string match --quiet -- '*pterm_run_external_alt_c_widget*' $argv[1]; and return 1
+  pterm_original_fish_should_add_to_history $argv
 end
 
-function rook_bootstrapped
+function pterm_bootstrapped
   set -l histfile_directory
   set histfile_directory "$XDG_DATA_HOME"
   if test -z "$histfile_directory"
         set histfile_directory "$HOME/.local/share"
   end
-  set -l escaped_histfile (rook_escape_json "$histfile_directory/fish/fish_history")
+  set -l escaped_histfile (pterm_escape_json "$histfile_directory/fish/fish_history")
 
   set -l vi_mode_enabled ""
   if [ "$fish_key_bindings" = "fish_vi_key_bindings" ]
@@ -680,21 +680,21 @@ function rook_bootstrapped
   end
 
   set -l shell_plugins
-  set -g _ROOK_EXTERNAL_CTRL_R_WIDGET ""
-  set -l rook_ctrl_r_widget (rook_external_ctrl_r_widget)
-  switch "$rook_ctrl_r_widget"
+  set -g _POLARIS_TERMINAL_EXTERNAL_CTRL_R_WIDGET ""
+  set -l pterm_ctrl_r_widget (pterm_external_ctrl_r_widget)
+  switch "$pterm_ctrl_r_widget"
     case 'fzf-history-widget' '_fzf_search_history'
-      if functions -q $rook_ctrl_r_widget
-        set -g _ROOK_EXTERNAL_CTRL_R_WIDGET "$rook_ctrl_r_widget"
+      if functions -q $pterm_ctrl_r_widget
+        set -g _POLARIS_TERMINAL_EXTERNAL_CTRL_R_WIDGET "$pterm_ctrl_r_widget"
         set -a shell_plugins fzf
       end
     case '_atuin_search'
-      if functions -q $rook_ctrl_r_widget
-        set -g _ROOK_EXTERNAL_CTRL_R_WIDGET "$rook_ctrl_r_widget"
+      if functions -q $pterm_ctrl_r_widget
+        set -g _POLARIS_TERMINAL_EXTERNAL_CTRL_R_WIDGET "$pterm_ctrl_r_widget"
         set -a shell_plugins atuin
       end
   end
-  set -l escaped_shell_plugins (rook_escape_json $shell_plugins)
+  set -l escaped_shell_plugins (pterm_escape_json $shell_plugins)
 
   set -l kernel_name (uname)
   if test -n "$kernel_name"
@@ -716,54 +716,54 @@ function rook_bootstrapped
     end
   end
 
-  set -l escaped_abbr (rook_escape_json (abbr --show))
-  set -l escaped_aliases (rook_escape_json (alias))
-  set -l env_var_names (rook_escape_json (set --names))
-  set -l function_names (rook_escape_json (functions -an))
-  set -l escaped_builtins (rook_escape_json (builtin -n))
+  set -l escaped_abbr (pterm_escape_json (abbr --show))
+  set -l escaped_aliases (pterm_escape_json (alias))
+  set -l env_var_names (pterm_escape_json (set --names))
+  set -l function_names (pterm_escape_json (functions -an))
+  set -l escaped_builtins (pterm_escape_json (builtin -n))
   # Note "keywords" is set to an empty string since fish includes keywords as a
   # part of its builtins (e.g. "for", "while", etc.).
-  set -l escaped_editor (rook_escape_json "$EDITOR")
-  set -l escaped_shell_path (rook_escape_json (status fish-path))
-  set -l escaped_json "{\"hook\": \"Bootstrapped\", \"value\": {\"histfile\": \"$escaped_histfile\", \"session_id\": $ROOK_SESSION_ID, \"shell\": \"fish\", \"home_dir\": \"$HOME\", \"path\": \"$PATH\", \"editor\": \"$escaped_editor\", \"abbreviations\": \"$escaped_abbr\", \"aliases\": \"$escaped_aliases\", \"function_names\": \"$function_names\", \"env_var_names\": \"$env_var_names\", \"builtins\": \"$escaped_builtins\", \"keywords\": \"\", \"shell_version\": \"$FISH_VERSION\", \"shell_plugins\": \"$escaped_shell_plugins\", \"vi_mode_enabled\": \"$vi_mode_enabled\", \"os_category\": \"$os_category\", \"linux_distribution\": \"$linux_distribution\", \"wsl_name\": \"$WSL_DISTRO_NAME\", \"shell_path\": \"$escaped_shell_path\"}}"
-  rook_send_json_message $escaped_json
+  set -l escaped_editor (pterm_escape_json "$EDITOR")
+  set -l escaped_shell_path (pterm_escape_json (status fish-path))
+  set -l escaped_json "{\"hook\": \"Bootstrapped\", \"value\": {\"histfile\": \"$escaped_histfile\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID, \"shell\": \"fish\", \"home_dir\": \"$HOME\", \"path\": \"$PATH\", \"editor\": \"$escaped_editor\", \"abbreviations\": \"$escaped_abbr\", \"aliases\": \"$escaped_aliases\", \"function_names\": \"$function_names\", \"env_var_names\": \"$env_var_names\", \"builtins\": \"$escaped_builtins\", \"keywords\": \"\", \"shell_version\": \"$FISH_VERSION\", \"shell_plugins\": \"$escaped_shell_plugins\", \"vi_mode_enabled\": \"$vi_mode_enabled\", \"os_category\": \"$os_category\", \"linux_distribution\": \"$linux_distribution\", \"wsl_name\": \"$WSL_DISTRO_NAME\", \"shell_path\": \"$escaped_shell_path\"}}"
+  pterm_send_json_message $escaped_json
 end
 
-function rook_init_shell
+function pterm_init_shell
     set -l  init_shell "{\"hook\": \"InitShell\", \"value\": {\"shell\": \"$argv\"}}"
-    rook_hex_encode_string "$init_shell"
+    pterm_hex_encode_string "$init_shell"
 end
 
-# Add a key binding to report the current input buffer to Rook. We can override
-# any user-defined binds here because user input goes through Rook's editor, not
+# Add a key binding to report the current input buffer to Polaris Terminal. We can override
+# any user-defined binds here because user input goes through Polaris Terminal's editor, not
 # the fish line editor.
 # This is arbitrarily bound to ESC-i in all supported shells ("i" for input).
 # Binding to ESC-1 caused bootstrap failures with vi keybindings.
-function rook_report_input
-    set -l escaped_input (rook_escape_json (commandline))
-    rook_send_json_message "{ \"hook\": \"InputBuffer\", \"value\": { \"buffer\": \"$escaped_input\", \"session_id\": $ROOK_SESSION_ID } }"
+function pterm_report_input
+    set -l escaped_input (pterm_escape_json (commandline))
+    pterm_send_json_message "{ \"hook\": \"InputBuffer\", \"value\": { \"buffer\": \"$escaped_input\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID } }"
     # This prevents fish from rendering typeahead as background output once we've collected it.
     commandline ''
 end
 
 function clear
-    rook_send_json_message "{\"hook\": \"Clear\", \"value\": {\"session_id\": $ROOK_SESSION_ID}}"
+    pterm_send_json_message "{\"hook\": \"Clear\", \"value\": {\"session_id\": $POLARIS_TERMINAL_SESSION_ID}}"
 end
 
-function rook_finish_update
+function pterm_finish_update
   set -l update_id "$argv[1]"
-  rook_send_json_message "{\"hook\": \"FinishUpdate\", \"value\": { \"update_id\": \"$update_id\", \"session_id\": $ROOK_SESSION_ID}}"
+  pterm_send_json_message "{\"hook\": \"FinishUpdate\", \"value\": { \"update_id\": \"$update_id\", \"session_id\": $POLARIS_TERMINAL_SESSION_ID}}"
 end
 
 
-# Check if the rook apt source file has been renamed to `warpdotdev.list.distUpgrade` due to an ubuntu version update.
+# Check if the polaris-terminal apt source file has been renamed to `warpdotdev.list.distUpgrade` due to an ubuntu version update.
 # If this occurred, we want to rename the source file back to `warpdotdev.list` to ensure updates can proceed.
 # We purposefully skip this if either the `warpdotdev.list` file already exists (indicating that the user has already
 # done this themselves) _or_ if a `warpdotdev.sources` file exists (which is the new Deb822 format for source files).
 # The `.sources` file could only exist if a user manually created it; Ubuntu doesn't create one automatically for the
-# rook source file due to a bug in its update flow where it considers our source file to be "invalid" because it
+# polaris-terminal source file due to a bug in its update flow where it considers our source file to be "invalid" because it
 # contains a `signed-by` key.
-function rook_handle_dist_upgrade
+function pterm_handle_dist_upgrade
   set -l source_file_name "$argv[1]"
 
   # The `apt-config shell` command outputs an environment variable assignment in POSIX-compliant syntax. Therefore,
@@ -782,7 +782,7 @@ end
 
 # The SSH logic only applies to local sessions, because we don't yet have support for bootstrapping
 # recursive SSH sessions.
-if test "$ROOK_IS_LOCAL_SHELL_SESSION" = "1"
+if test "$POLARIS_TERMINAL_IS_LOCAL_SHELL_SESSION" = "1"
     function is_interactive_ssh_session
         # Parse through all ssh options, as defined in the ssh man pages.  Send
         # stderr to /dev/null to silence argparse output when an option is invalid.
@@ -807,9 +807,9 @@ if test "$ROOK_IS_LOCAL_SHELL_SESSION" = "1"
         end
     end
 
-    function rook_ssh_helper
-        set -l init_shell_zsh (rook_init_shell "zsh")
-        set -l init_shell_bash (rook_init_shell "bash")
+    function pterm_ssh_helper
+        set -l init_shell_zsh (pterm_init_shell "zsh")
+        set -l init_shell_bash (pterm_init_shell "bash")
         set -l remote_session_id (command od -An -N8 -tu8 /dev/urandom 2>/dev/null | command tr -d ' \n')
         if test -z "$remote_session_id"; or test "$remote_session_id" = "0"
             # If we cannot generate a non-zero random token, run plain SSH instead.
@@ -820,7 +820,7 @@ if test "$ROOK_IS_LOCAL_SHELL_SESSION" = "1"
         # If the user's SSH config sets a RemoteCommand for this destination,
         # OpenSSH refuses to also run our bootstrap as a command-line remote
         # command, aborting with "Cannot execute command-line and remote
-        # command." Rookification is structurally impossible there, so fall back
+        # command." Ptermification is structurally impossible there, so fall back
         # to plain SSH. `ssh -G` prints `remotecommand none` when unset.
         set -l user_remote_command (command ssh -G $argv 2>/dev/null | command sed -n 's/^remotecommand //p')
         if test -n "$user_remote_command"; and test "$user_remote_command" != "none"
@@ -831,30 +831,30 @@ if test "$ROOK_IS_LOCAL_SHELL_SESSION" = "1"
         # Hex-encode the ZSH environment script we use to bootstrap remote zsh b/c it contains control characters
         # We decode on the SSH server using xxd if its available, otherwise fall back to a for-loop over each byte
         # and use printf to convert back to plaintext
-        set -l zsh_env_script (printf '%s' 'unsetopt ZLE RCS GLOBAL_RCS; ROOK_SESSION_ID='$remote_session_id'; ROOK_USING_WINDOWS_CON_PTY=@@USING_CON_PTY_BOOLEAN@@; ROOK_HONOR_PS1='$ROOK_HONOR_PS1'; _hostname=$(command -pv hostname >/dev/null 2>&1 && command -p hostname 2>/dev/null || uname -n); _user=$(command -pv whoami >/dev/null 2>&1 && command -p whoami 2>/dev/null || echo $USER); _msg=$(printf "{\"hook\": \"InitShell\", \"value\": {\"session_id\": $ROOK_SESSION_ID, \"shell\": \"zsh\", \"user\": \"%s\", \"hostname\": \"%s\"}}" "$_user" "$_hostname" | command -p od -An -v -tx1 | command -p tr -d " \n"); printf '"'"'\x1b\x50\x24\x64%s\x1b\x5c'"'"' $_msg; unset _hostname _user _msg' | command od -An -v -tx1 | command tr -d ' \n')
+        set -l zsh_env_script (printf '%s' 'unsetopt ZLE RCS GLOBAL_RCS; POLARIS_TERMINAL_SESSION_ID='$remote_session_id'; POLARIS_TERMINAL_USING_WINDOWS_CON_PTY=@@USING_CON_PTY_BOOLEAN@@; POLARIS_TERMINAL_HONOR_PS1='$POLARIS_TERMINAL_HONOR_PS1'; _hostname=$(command -pv hostname >/dev/null 2>&1 && command -p hostname 2>/dev/null || uname -n); _user=$(command -pv whoami >/dev/null 2>&1 && command -p whoami 2>/dev/null || echo $USER); _msg=$(printf "{\"hook\": \"InitShell\", \"value\": {\"session_id\": $POLARIS_TERMINAL_SESSION_ID, \"shell\": \"zsh\", \"user\": \"%s\", \"hostname\": \"%s\"}}" "$_user" "$_hostname" | command -p od -An -v -tx1 | command -p tr -d " \n"); printf '"'"'\x1b\x50\x24\x64%s\x1b\x5c'"'"' $_msg; unset _hostname _user _msg' | command od -An -v -tx1 | command tr -d ' \n')
 
         # Optionally attach to an existing ControlMaster the user already
         # runs for this destination instead of creating our own. Resolve
         # the user's configured ControlPath with `ssh -G` (which expands
         # tokens like %h/%p/%r/%C into a literal path), then verify the
         # master is alive with `ssh -O check`. Both probes are local-only
-        # commands. On any failure we fall back to creating a Rook-owned
+        # commands. On any failure we fall back to creating a Polaris Terminal-owned
         # master, preserving the existing behavior.
-        set -l control_path "$SSH_SOCKET_DIR/$ROOK_SESSION_ID"
+        set -l control_path "$SSH_SOCKET_DIR/$POLARIS_TERMINAL_SESSION_ID"
         set -l control_master_mode "yes"
         set -l external_control_master "false"
-        if test "$ROOK_SSH_REUSE_CONTROL_MASTER" = "1"
+        if test "$POLARIS_TERMINAL_SSH_REUSE_CONTROL_MASTER" = "1"
             set -l user_control_path (command ssh -G $argv 2>/dev/null | command sed -n 's/^controlpath //p')
             # Skip when no ControlPath is configured, and reject resolved
             # paths containing characters we cannot safely embed in the SSH
             # hook JSON below (e.g. an unexpanded % token, quotes, or
-            # whitespace); in those cases fall back to a Rook-owned master.
+            # whitespace); in those cases fall back to a Polaris Terminal-owned master.
             if test -n "$user_control_path"
                 and test "$user_control_path" != "none"
                 and string match --quiet --regex '^[A-Za-z0-9._/~@:+,-]+$' -- "$user_control_path"
                 if command ssh -O check -o ControlPath="$user_control_path" $argv >/dev/null 2>&1
                     # A live master exists: multiplex through it and let the
-                    # client know Rook does not own it.
+                    # client know Polaris Terminal does not own it.
                     set control_path "$user_control_path"
                     set control_master_mode "no"
                     set external_control_master "true"
@@ -871,15 +871,15 @@ if test "$ROOK_IS_LOCAL_SHELL_SESSION" = "1"
         command ssh -o ControlMaster=$control_master_mode -o ControlPath="$control_path" \
         -t $argv \
 "
-export TERM_PROGRAM='RookTerminal'
-test -n '$ROOK_CLIENT_VERSION' && export ROOK_CLIENT_VERSION='$ROOK_CLIENT_VERSION'
+export TERM_PROGRAM='PtermTerminal'
+test -n '$POLARIS_TERMINAL_CLIENT_VERSION' && export POLARIS_TERMINAL_CLIENT_VERSION='$POLARIS_TERMINAL_CLIENT_VERSION'
 # Only forward the protocol version if it was set locally (i.e. the HOANotifications feature flag is on).
-test -n '$ROOK_CLI_AGENT_PROTOCOL_VERSION' && export ROOK_CLI_AGENT_PROTOCOL_VERSION='$ROOK_CLI_AGENT_PROTOCOL_VERSION'
-hook="'$(printf "{\"hook\": \"SSH\", \"value\": {\"socket_path\": \"'$control_path'\", \"remote_shell\": \"%s\", \"session_id\": '"$ROOK_SESSION_ID"', \"remote_session_id\": '"$remote_session_id"', \"external_control_master\": '"$external_control_master"'}}" "${SHELL##*/}" | command od -An -v -tx1 | command tr -d " \n")'"
+test -n '$POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION' && export POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION='$POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION'
+hook="'$(printf "{\"hook\": \"SSH\", \"value\": {\"socket_path\": \"'$control_path'\", \"remote_shell\": \"%s\", \"session_id\": '"$POLARIS_TERMINAL_SESSION_ID"', \"remote_session_id\": '"$remote_session_id"', \"external_control_master\": '"$external_control_master"'}}" "${SHELL##*/}" | command od -An -v -tx1 | command tr -d " \n")'"
 printf '$DCS_START$DCS_JSON_MARKER%s$DCS_END' "'$hook'"
 
 if test "'"${SHELL##*/}" != "bash" -a "${SHELL##*/}" != "zsh"'"; then
-  # Emulate the SSHD logic to print the MotD. Because the Rook SSH wrapper passes
+  # Emulate the SSHD logic to print the MotD. Because the Polaris Terminal SSH wrapper passes
   # a command to run, SSHD does a quiet login, updating utmp and other login
   # state, but not printing the MotD. For bash and zsh, this is instead handled
   # by our bootstrap script.
@@ -910,31 +910,31 @@ bash)
       stty raw
       HISTCONTROL=ignorespace
       HISTIGNORE=" *"
-      ROOK_SESSION_ID='$remote_session_id'
-      ROOK_HONOR_PS1="'$ROOK_HONOR_PS1'"
+      POLARIS_TERMINAL_SESSION_ID='$remote_session_id'
+      POLARIS_TERMINAL_HONOR_PS1="'$POLARIS_TERMINAL_HONOR_PS1'"
       _hostname=$(command -pv hostname >/dev/null 2>&1 && command -p hostname 2>/dev/null || uname -n)
       _user=$(command -pv whoami >/dev/null 2>&1 && command -p whoami 2>/dev/null || echo $USER)
-      _msg=$(printf "{\"hook\": \"InitShell\", \"value\": {\"session_id\": $ROOK_SESSION_ID, \"shell\": \"bash\", \"user\": \"%s\", \"hostname\": \"%s\"}}" "$_user" "$_hostname" | command -p od -An -v -tx1 | command -p tr -d " \n")'"
-      ROOK_USING_WINDOWS_CON_PTY=@@USING_CON_PTY_BOOLEAN@@
-      if [[ "'$OS'" == Windows_NT ]]; then ROOK_IN_MSYS2=true; else ROOK_IN_MSYS2=false; fi
+      _msg=$(printf "{\"hook\": \"InitShell\", \"value\": {\"session_id\": $POLARIS_TERMINAL_SESSION_ID, \"shell\": \"bash\", \"user\": \"%s\", \"hostname\": \"%s\"}}" "$_user" "$_hostname" | command -p od -An -v -tx1 | command -p tr -d " \n")'"
+      POLARIS_TERMINAL_USING_WINDOWS_CON_PTY=@@USING_CON_PTY_BOOLEAN@@
+      if [[ "'$OS'" == Windows_NT ]]; then POLARIS_TERMINAL_IN_MSYS2=true; else POLARIS_TERMINAL_IN_MSYS2=false; fi
       printf '\''"'\x1b\x50\x24\x64%s\x1b\x5c'"'\'' \""'$_msg'"\"'
       unset _hostname _user _msg
     )
     ;;
-zsh) ROOK_TMP_DIR="'$(mktemp -d rooktmp.XXXXXX)'"
+zsh) POLARIS_TERMINAL_TMP_DIR="'$(mktemp -d ptermtmp.XXXXXX)'"
 local ZSH_ENV_SCRIPT='$zsh_env_script'
 if [[ "'$?'" == 0 ]]; then
   if command -v xxd >/dev/null 2>&1; then
-    echo "'$ZSH_ENV_SCRIPT'" | command xxd -p -r > "'$ROOK_TMP_DIR'"/.zshenv
+    echo "'$ZSH_ENV_SCRIPT'" | command xxd -p -r > "'$POLARIS_TERMINAL_TMP_DIR'"/.zshenv
   else
     for i in {0..\$((\${#ZSH_ENV_SCRIPT} - 1))..2}; do
       builtin printf "'"\x${ZSH_ENV_SCRIPT:$i:2}"'"
-    done > "'$ROOK_TMP_DIR'"/.zshenv
+    done > "'$POLARIS_TERMINAL_TMP_DIR'"/.zshenv
   fi
 else
-  echo \"Failed to bootstrap rook. Continuing with a non-bootstrapped shell.\"
+  echo \"Failed to bootstrap polaris-terminal. Continuing with a non-bootstrapped shell.\"
 fi
-TMPPREFIX="'$HOME/.zshtmp-'" ROOK_SSH_RCFILES="'${ZDOTDIR:-$HOME}'" ZDOTDIR="'$ROOK_TMP_DIR'" exec -l zsh -g $TRACE_FLAG_IF_ROOK_SHELL_DEBUG_MODE
+TMPPREFIX="'$HOME/.zshtmp-'" POLARIS_TERMINAL_SSH_RCFILES="'${ZDOTDIR:-$HOME}'" ZDOTDIR="'$POLARIS_TERMINAL_TMP_DIR'" exec -l zsh -g $TRACE_FLAG_IF_POLARIS_TERMINAL_SHELL_DEBUG_MODE
     ;;
 esac
 "
@@ -942,15 +942,15 @@ esac
 
     function ssh
         if is_interactive_ssh_session $argv
-            rook_send_json_message "{\"hook\": \"PreInteractiveSSHSession\", \"value\": {\"session_id\": $ROOK_SESSION_ID}}"
+            pterm_send_json_message "{\"hook\": \"PreInteractiveSSHSession\", \"value\": {\"session_id\": $POLARIS_TERMINAL_SESSION_ID}}"
 
-            if [ "$ROOK_USE_SSH_WRAPPER" = "1" ]
-                if test $ROOK_SHELL_DEBUG_MODE
-                    set -g TRACE_FLAG_IF_ROOK_SHELL_DEBUG_MODE "-x"
+            if [ "$POLARIS_TERMINAL_USE_SSH_WRAPPER" = "1" ]
+                if test $POLARIS_TERMINAL_SHELL_DEBUG_MODE
+                    set -g TRACE_FLAG_IF_POLARIS_TERMINAL_SHELL_DEBUG_MODE "-x"
                 else
-                    set -g TRACE_FLAG_IF_ROOK_SHELL_DEBUG_MODE ""
+                    set -g TRACE_FLAG_IF_POLARIS_TERMINAL_SHELL_DEBUG_MODE ""
                 end
-                rook_ssh_helper $argv
+                pterm_ssh_helper $argv
             else
                 command ssh $argv
             end
@@ -960,10 +960,10 @@ esac
     end
 end
 
-rook_precmd
+pterm_precmd
 
 # Print the MotD if this is a login shell. Normally, login(1) or pam_motd(8)
-# would do this. However, Rook does not use login(1) for local sessions and for
+# would do this. However, Polaris Terminal does not use login(1) for local sessions and for
 # remote sessions, SSHD thinks it is starting a non-interactive session, so it
 # does not print PAM messages.
 if status --is-login
@@ -976,8 +976,8 @@ if status --is-login
   end
 end
 
-rook_bootstrapped
+pterm_bootstrapped
 
-set -g ROOK_BOOTSTRAPPED 1
+set -g POLARIS_TERMINAL_BOOTSTRAPPED 1
 set -g fish_private_mode $saved_fish_private_mode
 end

@@ -3,10 +3,10 @@ use std::borrow::Cow;
 use cynic::{GraphQlResponse, QueryFragment, QueryVariables};
 use http::StatusCode;
 use instant::Duration;
+use pterm_core::channel::ChannelState;
+use pterm_core::operating_system_info::OperatingSystemInfo;
+use pterm_errors::{ErrorExt, register_error};
 use reqwest::header::CONTENT_TYPE;
-use rook_core::channel::ChannelState;
-use rook_core::operating_system_info::OperatingSystemInfo;
-use rook_errors::{ErrorExt, register_error};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -37,7 +37,7 @@ pub trait Operation<QF> {
 }
 
 /// The various errors we could encounter when making a GraphQL request to
-/// rook-server.
+/// polaris-terminal-server.
 #[derive(Debug, thiserror::Error)]
 pub enum GraphQLError {
     /// Encountered an error while sending the request.

@@ -5,15 +5,15 @@ use ai::diff_validation::DiffType;
 #[cfg(not(target_family = "wasm"))]
 use futures::FutureExt;
 #[cfg(not(target_family = "wasm"))]
-use rook_files::{FileModel, FileModelEvent};
-use rook_util::file::FileId;
+use pterm_files::{FileModel, FileModelEvent};
+use pterm_util::file::FileId;
 #[cfg(not(target_family = "wasm"))]
-use rook_util::file::FileSaveError;
-use rook_util::standardized_path::StandardizedPath;
+use pterm_util::file::FileSaveError;
+use pterm_util::standardized_path::StandardizedPath;
 #[cfg(not(target_family = "wasm"))]
-use rookui::SingletonEntity;
-use rookui::elements::ChildView;
-use rookui::{AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::SingletonEntity;
+use ptermui::elements::ChildView;
+use ptermui::{AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle};
 
 use super::diff_viewer::{DiffViewer, DisplayMode};
 use super::editor::NavBarBehavior;

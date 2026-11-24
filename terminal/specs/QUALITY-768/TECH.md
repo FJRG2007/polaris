@@ -2,7 +2,7 @@
 
 ## Context
 
-Restarting Rook left orchestration sessions in four distinct broken states. Local-local orchestration came back without the pill bar, and `send_message_to_agent` / `messages_received` rows rendered the child as `"Unknown agent"`. Local-remote orchestration restored the placeholder child pane as the empty `"New agent conversation"` shell instead of the cloud transcript that was actually streaming server-side. A meaningful share (~50% in some traces) of local-no-harness Oz child conversations were silently dropped at read time entirely. And a cloud-parent orchestration session (a shared-session viewer pane locally) survived the first restart correctly but lost its cloud-mode shape on the next snapshot — the second restart re-materialised the parent as a plain local terminal with the cloud session's env-setup blocks replayed and no orchestration UI. Underneath all four symptoms, the on-disk eviction policy was splitting orchestration trees across restarts, so even a healthy read path would re-encounter partial state on the next boot.
+Restarting Polaris Terminal left orchestration sessions in four distinct broken states. Local-local orchestration came back without the pill bar, and `send_message_to_agent` / `messages_received` rows rendered the child as `"Unknown agent"`. Local-remote orchestration restored the placeholder child pane as the empty `"New agent conversation"` shell instead of the cloud transcript that was actually streaming server-side. A meaningful share (~50% in some traces) of local-no-harness Oz child conversations were silently dropped at read time entirely. And a cloud-parent orchestration session (a shared-session viewer pane locally) survived the first restart correctly but lost its cloud-mode shape on the next snapshot — the second restart re-materialised the parent as a plain local terminal with the cloud session's env-setup blocks replayed and no orchestration UI. Underneath all four symptoms, the on-disk eviction policy was splitting orchestration trees across restarts, so even a healthy read path would re-encounter partial state on the next boot.
 
 The subsystem-level explanation of restoration ↔ orchestration lives in the architecture report at `/Users/matthew/src/orch-restore/restoration-and-orchestration.md`. The PR body summarises the user-visible behaviour. This spec is the implementation-level account of the four code-level decisions that ship in this PR; an earlier read-time optimistic-stub filter was superseded by upstream PR #11814 and dropped during the rebase — see change 3 below.
 
@@ -85,7 +85,7 @@ The iteration uses an `iter.next()` pattern to unconditionally keep the freshest
 Tradeoffs.
 
 - **Freshest-tree exception.** The plan considered a strict cap that evicts even from the freshest tree. Rejected: a strict cap could split an active orchestration session in half on disk, regressing into the same "broken half-tree" failure mode that motivated this change. The unbounded freshest-tree case is documented as a known limitation below.
-- **Sharing the constant.** Two `const usize` values in two files is a soft drift hazard, but `crates/persistence` is upstream of `rook` in the workspace graph and cannot import from it. The reverse import would pull persistence-only code into the read-side path. Documented in `MAX_HISTORICAL_CONVERSATIONS`'s comment that the read cap is moot only as long as it stays ≥ the disk cap.
+- **Sharing the constant.** Two `const usize` values in two files is a soft drift hazard, but `crates/persistence` is upstream of `polaris-terminal` in the workspace graph and cannot import from it. The reverse import would pull persistence-only code into the read-side path. Documented in `MAX_HISTORICAL_CONVERSATIONS`'s comment that the read cap is moot only as long as it stays ≥ the disk cap.
 - **Parse failure handling.** Rows whose `conversation_data` fails JSON parsing are treated as their own root rather than being silently linked into another tree. The disk row is untouched and the eviction algorithm just refuses to chain a malformed row into a tree.
 
 ### 5. Cloud-mode shared-session viewer snapshot/restore loop
@@ -141,10 +141,10 @@ Manual validation matrix (covers each change end-to-end on a restart):
 1. Local-local restart: pill bar renders with the correct agent names (no "Unknown agent" fallback); the multi-root stub shape is silently healed by upstream restore dedupe; conversation list UI is intact.
 2. Tree-aware prune: orchestration trees stay together on disk across the cap.
 3. Local-remote restart: the cloud transcript merges onto the local placeholder; the "New agent conversation" placeholder bug is gone; live runs continue to attach.
-4. Cloud-parent restart-restart: a remote orchestration parent restores correctly across two consecutive Rook restarts; no fallback to a stray local terminal with replayed env-setup blocks.
+4. Cloud-parent restart-restart: a remote orchestration parent restores correctly across two consecutive Polaris Terminal restarts; no fallback to a stray local terminal with replayed env-setup blocks.
 5. Baseline single-conversation restore: no regressions.
 
-Validation commands: `cargo fmt -p rook -p persistence`, `cargo clippy -p rook --all-targets --features local_fs -- -D warnings`, `cargo clippy -p persistence --tests --all-features -- -D warnings`, and `cargo nextest run` over `pane_group::`, `persistence::agent::tests`, `ai::blocklist::history_model::tests`, and `persistence::model::tests`.
+Validation commands: `cargo fmt -p polaris-terminal -p persistence`, `cargo clippy -p polaris-terminal --all-targets --features local_fs -- -D warnings`, `cargo clippy -p persistence --tests --all-features -- -D warnings`, and `cargo nextest run` over `pane_group::`, `persistence::agent::tests`, `ai::blocklist::history_model::tests`, and `persistence::model::tests`.
 
 Deferred coverage:
 
@@ -160,7 +160,7 @@ Deferred coverage:
 
 ## Follow-ups
 
-- Share the retention constant between `crates/persistence` and `rook` once the read cap might plausibly be raised independently (for example, if a future history view wants to surface more than the disk cap can hold). Today the read cap is moot, so a separate constant is acceptable; tomorrow it may need to be a single source of truth.
+- Share the retention constant between `crates/persistence` and `polaris-terminal` once the read cap might plausibly be raised independently (for example, if a future history view wants to surface more than the disk cap can hold). Today the read cap is moot, so a separate constant is acceptable; tomorrow it may need to be a single source of truth.
 - Add a property test that asserts `select_conversations_to_evict` never returns an evict-list that splits an orchestration tree across the kept/evicted boundary. The existing case tests cover the substantive shapes; a property test would shore them up under generated inputs.
 - Tighten `decide_remote_child_hydration_action` against `AmbientAgentLiveSessionState` variants added in future schema bumps. The function currently matches `Attachable` and `Inactive` explicitly; new variants fall into the `LoadTranscript` / `Fallback` decision based on whether the task has a server token. A `cfg`-gated exhaustiveness assertion would catch a new variant at compile time.
 - `new_for_shared_session_viewer` has the same latent snapshot/restore loop as the ambient-agent restoration paths fixed by §5. It's a separate entry point used when the user opens a shared session from the conversation list, not the orchestration restore flow, so it's deferred. The shape of the fix is identical: pass `is_cloud_mode: true` from that call site once we confirm the cloud-mode behaviour is desired for non-restore opens.

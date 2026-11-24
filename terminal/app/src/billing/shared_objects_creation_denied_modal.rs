@@ -1,11 +1,11 @@
 use std::default::Default;
 
-use rook_core::ui::appearance::Appearance;
-use rookui::fonts::Weight;
-use rookui::keymap::FixedBinding;
-use rookui::presenter::ChildView;
-use rookui::ui_components::components::{Coords, UiComponentStyles};
-use rookui::{
+use pterm_core::ui::appearance::Appearance;
+use ptermui::fonts::Weight;
+use ptermui::keymap::FixedBinding;
+use ptermui::presenter::ChildView;
+use ptermui::ui_components::components::{Coords, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -13,7 +13,7 @@ use super::shared_objects_creation_denied_body::{
     SharedObjectsCreationDeniedBody, SharedObjectsCreationDeniedBodyEvent,
 };
 use crate::drive::DriveObjectType;
-use crate::drive::cloud_object_styling::rook_drive_icon_color;
+use crate::drive::cloud_object_styling::pterm_drive_icon_color;
 use crate::modal::{Modal, ModalEvent};
 use crate::server::ids::ServerId;
 use crate::themes::theme::Fill;
@@ -39,7 +39,7 @@ pub enum SharedObjectsCreationDeniedModalEvent {
 }
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",
@@ -132,14 +132,14 @@ impl SharedObjectsCreationDeniedModal {
         let (icon, icon_color) = match object_type {
             DriveObjectType::Notebook { is_ai_document } => (
                 Some(Icon::Notebook),
-                Some(Fill::Solid(rook_drive_icon_color(
+                Some(Fill::Solid(pterm_drive_icon_color(
                     appearance,
                     DriveObjectType::Notebook { is_ai_document },
                 ))),
             ),
             DriveObjectType::Workflow => (
                 Some(Icon::Workflow),
-                Some(Fill::Solid(rook_drive_icon_color(
+                Some(Fill::Solid(pterm_drive_icon_color(
                     appearance,
                     DriveObjectType::Workflow,
                 ))),

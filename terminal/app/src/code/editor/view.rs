@@ -9,41 +9,41 @@ use ai::diff_validation::DiffDelta;
 use lazy_static::lazy_static;
 use num_traits::SaturatingSub;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::platform::SessionPlatform;
-use rook_editor::content::buffer::{
+use pterm_core::platform::SessionPlatform;
+use pterm_editor::content::buffer::{
     Buffer, BufferEditAction, EditOrigin, InitialBufferState, ToBufferCharOffset as _,
     ToBufferPoint,
 };
-use rook_editor::content::text::IndentUnit;
-use rook_editor::content::version::BufferVersion;
-use rook_editor::model::{CoreEditorModel, PlainTextEditorModel};
-use rook_editor::multiline::AnyMultilineString;
-use rook_editor::render::element::lens_element::RichTextElementLens;
-use rook_editor::render::element::{
+use pterm_editor::content::text::IndentUnit;
+use pterm_editor::content::version::BufferVersion;
+use pterm_editor::model::{CoreEditorModel, PlainTextEditorModel};
+use pterm_editor::multiline::AnyMultilineString;
+use pterm_editor::render::element::lens_element::RichTextElementLens;
+use pterm_editor::render::element::{
     DisplayOptions, DisplayStateHandle, RichTextElement, VerticalExpansionBehavior,
 };
-use rook_editor::render::model::{
+use pterm_editor::render::model::{
     AutoScrollMode, BlockSpacing, CODE_EDITOR_HIDDEN_SECTION_EXPANSION_LINES, Decoration,
     ExpansionType, LineCount, ParagraphStyles, RichTextStyles,
 };
-use rook_editor::search::{MATCH_FILL, SELECTED_MATCH_FILL, SearchEvent, Searcher};
-use rook_util::content_version::ContentVersion;
-use rook_util::standardized_path::StandardizedPath;
-use rookui::elements::new_scrollable::{
+use pterm_editor::search::{MATCH_FILL, SELECTED_MATCH_FILL, SearchEvent, Searcher};
+use pterm_util::content_version::ContentVersion;
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui::elements::new_scrollable::{
     AxisConfiguration, DualAxisConfig, NewScrollableElement, ScrollableAppearance,
 };
-use rookui::elements::{
+use ptermui::elements::{
     ChildAnchor, ChildView, Dismiss, Fill, Flex, Margin, MouseStateHandle, NewScrollable,
     OffsetPositioning, Padding, ParentAnchor, ParentElement, ParentOffsetBounds, ScrollStateHandle,
     Shrinkable, Stack,
 };
-use rookui::event::ModifiersState;
-use rookui::keymap::Keystroke;
-use rookui::platform::Cursor;
-use rookui::prelude::RectF;
-use rookui::text::point::Point;
-use rookui::units::Pixels;
-use rookui::{
+use ptermui::event::ModifiersState;
+use ptermui::keymap::Keystroke;
+use ptermui::platform::Cursor;
+use ptermui::prelude::RectF;
+use ptermui::text::point::Point;
+use ptermui::units::Pixels;
+use ptermui::{
     AppContext, BlurContext, CursorInfo, Element, Entity, FocusContext, ModelHandle,
     SingletonEntity, View, ViewContext, ViewHandle, WeakViewHandle, WindowId,
 };
@@ -406,11 +406,11 @@ impl CodeEditorView {
                 // from truncating space for the code editor. We should not render it as an overlay
                 // for small code editors.
                 horizontal_scrollbar_appearance: ScrollableAppearance::new(
-                    rookui::elements::ScrollbarWidth::Auto,
+                    ptermui::elements::ScrollbarWidth::Auto,
                     false,
                 ),
                 vertical_scrollbar_appearance: ScrollableAppearance::new(
-                    rookui::elements::ScrollbarWidth::Auto,
+                    ptermui::elements::ScrollbarWidth::Auto,
                     false,
                 ),
                 gutter_hover_target: GutterHoverTarget::GutterElement,
@@ -880,21 +880,21 @@ impl CodeEditorView {
         let hidden_section_end = line_range.end.as_usize();
         let lines_to_unhide = match expansion_type {
             ExpansionType::Both => {
-                rook_editor::content::text::LineCount::from(hidden_section_start)
-                    ..rook_editor::content::text::LineCount::from(hidden_section_end)
+                pterm_editor::content::text::LineCount::from(hidden_section_start)
+                    ..pterm_editor::content::text::LineCount::from(hidden_section_end)
             }
             ExpansionType::ExpandDown => {
                 let end = hidden_section_end
                     .min(hidden_section_start + CODE_EDITOR_HIDDEN_SECTION_EXPANSION_LINES);
-                rook_editor::content::text::LineCount::from(hidden_section_start)
-                    ..rook_editor::content::text::LineCount::from(end)
+                pterm_editor::content::text::LineCount::from(hidden_section_start)
+                    ..pterm_editor::content::text::LineCount::from(end)
             }
             ExpansionType::ExpandUp => {
                 let start = hidden_section_start.max(
                     hidden_section_end.saturating_sub(CODE_EDITOR_HIDDEN_SECTION_EXPANSION_LINES),
                 );
-                rook_editor::content::text::LineCount::from(start)
-                    ..rook_editor::content::text::LineCount::from(hidden_section_end)
+                pterm_editor::content::text::LineCount::from(start)
+                    ..pterm_editor::content::text::LineCount::from(hidden_section_end)
             }
         };
         self.model.update(ctx, |model, ctx| {
@@ -1031,12 +1031,12 @@ impl CodeEditorView {
                     && !results.matches.is_empty()
                 {
                     // Convert all match ranges to selection offsets
-                    let selection_offsets: Vec<rook_editor::content::buffer::SelectionOffsets> =
+                    let selection_offsets: Vec<pterm_editor::content::buffer::SelectionOffsets> =
                         results
                             .matches
                             .iter()
                             .map(
-                                |match_result| rook_editor::content::buffer::SelectionOffsets {
+                                |match_result| pterm_editor::content::buffer::SelectionOffsets {
                                     head: match_result.end,
                                     tail: match_result.start,
                                 },
@@ -1048,8 +1048,8 @@ impl CodeEditorView {
                         self.model.update(ctx, |model, ctx| {
                                 model.selection().update(ctx, |selection_model, ctx| {
                                     selection_model.update_selection(
-                                        rook_editor::content::buffer::BufferSelectAction::SetSelectionOffsets { selections },
-                                        rook_editor::content::buffer::AutoScrollBehavior::Selection,
+                                        pterm_editor::content::buffer::BufferSelectAction::SetSelectionOffsets { selections },
+                                        pterm_editor::content::buffer::AutoScrollBehavior::Selection,
                                         ctx,
                                     );
                                 });
@@ -1074,7 +1074,7 @@ impl CodeEditorView {
                     self.model.update(ctx, |model, ctx| {
                         model.update_content( |mut content_model, ctx| {
                             content_model.apply_edit(
-                                rook_editor::content::buffer::BufferEditAction::InsertAtCharOffsetRanges { edits: &edits },
+                                pterm_editor::content::buffer::BufferEditAction::InsertAtCharOffsetRanges { edits: &edits },
                                 EditOrigin::UserInitiated,
                                 selection_model,
                                 ctx,
@@ -1127,7 +1127,7 @@ impl CodeEditorView {
                             self.model.update(ctx, |model, ctx| {
                                     model.update_content(|mut content_model, ctx| {
                                         content_model.apply_edit(
-                                            rook_editor::content::buffer::BufferEditAction::InsertAtCharOffsetRanges { edits: &edits },
+                                            pterm_editor::content::buffer::BufferEditAction::InsertAtCharOffsetRanges { edits: &edits },
                                             EditOrigin::UserInitiated,
                                             selection_model,
                                             ctx,
@@ -2089,8 +2089,8 @@ impl CodeEditorView {
                             self.model.update(ctx, |model, ctx| {
                                 model.selection_model().update(ctx, |selection, ctx| {
                                     selection.update_selection(
-                                        rook_editor::content::buffer::BufferSelectAction::MoveRight,
-                                        rook_editor::content::buffer::AutoScrollBehavior::Selection,
+                                        pterm_editor::content::buffer::BufferSelectAction::MoveRight,
+                                        pterm_editor::content::buffer::AutoScrollBehavior::Selection,
                                         ctx,
                                     );
                                 });
@@ -2434,7 +2434,7 @@ impl View for CodeEditorView {
         }
     }
 
-    fn keymap_context(&self, app: &AppContext) -> rookui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> ptermui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         if self.interaction_state(app) != InteractionState::Editable {

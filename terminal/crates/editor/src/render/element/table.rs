@@ -1,15 +1,15 @@
 use std::ops::Range;
 
-use rookui_core::elements::{
+use ptermui_core::elements::{
     Axis, CornerRadius, DEFAULT_SCROLL_WHEEL_PIXELS_PER_LINE, Radius, ScrollData,
     ScrollbarAppearance, ScrollbarGeometry, ScrollbarWidth, compute_scrollbar_geometry,
     project_scroll_delta_by_sensitivity, scroll_delta_for_pointer_movement,
 };
-use rookui_core::event::DispatchedEvent;
-use rookui_core::geometry::rect::RectF;
-use rookui_core::geometry::vector::{Vector2F, vec2f};
-use rookui_core::units::{IntoPixels, Pixels};
-use rookui_core::{AppContext, ClipBounds, Event, EventContext};
+use ptermui_core::event::DispatchedEvent;
+use ptermui_core::geometry::rect::RectF;
+use ptermui_core::geometry::vector::{Vector2F, vec2f};
+use ptermui_core::units::{IntoPixels, Pixels};
+use ptermui_core::{AppContext, ClipBounds, Event, EventContext};
 use string_offset::CharOffset;
 
 use super::paint::{CursorData, CursorDisplayType};
@@ -112,7 +112,7 @@ impl RenderableBlock for RenderableTable {
         &self.viewport_item
     }
 
-    fn layout(&mut self, _: &RenderState, _: &mut rookui_core::LayoutContext, _: &AppContext) {}
+    fn layout(&mut self, _: &RenderState, _: &mut ptermui_core::LayoutContext, _: &AppContext) {}
 
     fn paint(&mut self, model: &RenderState, ctx: &mut RenderContext, _app: &AppContext) {
         let content = model.content();

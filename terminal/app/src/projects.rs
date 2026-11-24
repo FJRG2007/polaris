@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
 
 use chrono::Utc;
-use rook_errors::report_error;
-use rookui::{Entity, ModelContext, SingletonEntity};
+use pterm_errors::report_error;
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 use crate::persistence::ModelEvent;
 use crate::persistence::model::Project;

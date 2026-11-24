@@ -3,26 +3,27 @@
 //! In list mode it shows a dropdown styled to match the other orchestration
 //! pickers; in custom mode it swaps the top bar for an inline editor that
 //! accepts a self-hosted worker slug. The layout mirrors the Oz webapp's
-//! host selector: workspace default first (badged "Default"), then rook,
+//! host selector: workspace default first (badged "Default"), then polaris-terminal,
 //! then connected worker hosts, then the user's most recent custom slug
 //! marked as disconnected if it is not currently connected, then a
 //! "Custom host…" entry.
 
-use rook_core::ui::theme::Fill;
-use rookui::elements::{
+use pterm_core::ui::theme::Fill;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement,
     PositionedElementAnchor, Radius,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::platform::Cursor;
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::platform::Cursor;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
 use crate::ai::blocklist::inline_action::orchestration_controls::{
     self as oc, ORCHESTRATION_PICKER_BORDER_WIDTH, ORCHESTRATION_PICKER_FONT_SIZE,
-    ORCHESTRATION_PICKER_HEIGHT, ORCHESTRATION_PICKER_RADIUS, ORCHESTRATION_ROOK_WORKER_HOST,
+    ORCHESTRATION_PICKER_HEIGHT, ORCHESTRATION_PICKER_RADIUS,
+    ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST,
 };
 use crate::appearance::Appearance;
 use crate::editor::{
@@ -62,7 +63,7 @@ const EDITOR_PLACEHOLDER: &str = "my-worker-host";
 /// Dispatched by the inner dropdown items and the inline cancel button.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InternalAction {
-    /// Pick a known host (rook, workspace default, or a recent slug).
+    /// Pick a known host (polaris-terminal, workspace default, or a recent slug).
     SelectKnown(String),
     /// Switch to custom-mode text input.
     EnterCustomMode,
@@ -77,7 +78,7 @@ pub struct HostPicker {
     current_slug: String,
     /// Admin-configured workspace default, when set.
     default_host: Option<String>,
-    /// User's most-recent custom host, deduped against rook / default.
+    /// User's most-recent custom host, deduped against polaris-terminal / default.
     recent_host: Option<String>,
     /// Currently connected self-hosted worker slugs.
     connected_hosts: Vec<String>,
@@ -148,7 +149,7 @@ impl HostPicker {
         });
 
         let mut me = Self {
-            current_slug: ORCHESTRATION_ROOK_WORKER_HOST.to_string(),
+            current_slug: ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST.to_string(),
             default_host: None,
             recent_host: None,
             connected_hosts: Vec::new(),
@@ -208,7 +209,7 @@ impl HostPicker {
     }
 
     /// Sets the displayed slug. Unknown slugs switch the picker into custom
-    /// mode pre-filled with the slug. Empty input falls back to `"rook"`.
+    /// mode pre-filled with the slug. Empty input falls back to `"polaris-terminal"`.
     pub fn set_selected(&mut self, slug: &str, ctx: &mut ViewContext<Self>) {
         let effective = normalize_slug(slug);
         let is_known = self.is_known_option(&effective);
@@ -225,7 +226,7 @@ impl HostPicker {
     // ── Internals ───────────────────────────────────────────────────
 
     fn is_known_option(&self, slug: &str) -> bool {
-        if slug.eq_ignore_ascii_case(ORCHESTRATION_ROOK_WORKER_HOST) {
+        if slug.eq_ignore_ascii_case(ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST) {
             return true;
         }
         if self.default_host.as_deref() == Some(slug) {
@@ -261,7 +262,7 @@ impl HostPicker {
     fn enter_custom_mode_with_slug(&mut self, slug: &str, ctx: &mut ViewContext<Self>) {
         self.is_custom_mode = true;
         self.slug_before_edit = Some(self.current_slug.clone());
-        let initial = if slug.eq_ignore_ascii_case(ORCHESTRATION_ROOK_WORKER_HOST) {
+        let initial = if slug.eq_ignore_ascii_case(ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST) {
             String::new()
         } else {
             slug.to_string()
@@ -275,16 +276,16 @@ impl HostPicker {
     /// Commits the editor contents. Empty input reverts to the previous slug.
     fn commit_custom(&mut self, ctx: &mut ViewContext<Self>) {
         // Trim manually here — we must distinguish empty input (revert) from
-        // a literal "rook" entry (commit). `normalize_slug` collapses both
-        // into `"rook"`, so it's not safe to use on the commit path.
+        // a literal "polaris-terminal" entry (commit). `normalize_slug` collapses both
+        // into `"polaris-terminal"`, so it's not safe to use on the commit path.
         let raw = self.editor.as_ref(ctx).buffer_text(ctx).trim().to_string();
         if raw.is_empty() {
             self.cancel_custom(ctx);
             return;
         }
-        if raw.eq_ignore_ascii_case(ORCHESTRATION_ROOK_WORKER_HOST) {
-            // Treat "rook" typed in custom mode as a normal rook selection.
-            self.current_slug = ORCHESTRATION_ROOK_WORKER_HOST.to_string();
+        if raw.eq_ignore_ascii_case(ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST) {
+            // Treat "polaris-terminal" typed in custom mode as a normal polaris-terminal selection.
+            self.current_slug = ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST.to_string();
             self.is_custom_mode = false;
             self.slug_before_edit = None;
             self.sync_dropdown_selection(ctx);
@@ -391,7 +392,7 @@ impl HostPicker {
         let mouse_state = self.clear_mouse_state.clone();
         Hoverable::new(mouse_state, move |_| {
             ConstrainedBox::new(
-                Container::new(Icon::X.to_rookui_icon(icon_fill).finish())
+                Container::new(Icon::X.to_ptermui_icon(icon_fill).finish())
                     .with_uniform_padding(2.)
                     .finish(),
             )
@@ -409,18 +410,18 @@ impl HostPicker {
 
 // ── Pure helpers (also exercised by unit tests) ─────────────────────
 
-/// Trims `slug` and falls back to `"rook"` when empty.
+/// Trims `slug` and falls back to `"polaris-terminal"` when empty.
 fn normalize_slug(slug: &str) -> String {
     let trimmed = slug.trim();
     if trimmed.is_empty() {
-        ORCHESTRATION_ROOK_WORKER_HOST.to_string()
+        ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST.to_string()
     } else {
         trimmed.to_string()
     }
 }
 
 /// Builds the menu items shown in list mode, in the order: workspace default
-/// (badged "Default" if set), rook, connected worker hosts (badged
+/// (badged "Default" if set), polaris-terminal, connected worker hosts (badged
 /// "Connected"), recent custom slug (badged "Disconnected" when it is not
 /// currently connected), then a "Custom host…" entry.
 pub(crate) fn build_menu_items(
@@ -440,11 +441,11 @@ pub(crate) fn build_menu_items(
         known_slugs.push(slug.to_string());
     }
     items.push(menu_item_for_known(
-        ORCHESTRATION_ROOK_WORKER_HOST,
+        ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST,
         None,
-        InternalAction::SelectKnown(ORCHESTRATION_ROOK_WORKER_HOST.to_string()),
+        InternalAction::SelectKnown(ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST.to_string()),
     ));
-    known_slugs.push(ORCHESTRATION_ROOK_WORKER_HOST.to_string());
+    known_slugs.push(ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST.to_string());
 
     for slug in connected_hosts {
         if slug.trim().is_empty()

@@ -1,5 +1,5 @@
 use futures_util::future::{AbortHandle, Abortable, Aborted};
-use rookui::App;
+use ptermui::App;
 
 use super::*;
 use crate::terminal::model::session::ExecuteCommandOptions;

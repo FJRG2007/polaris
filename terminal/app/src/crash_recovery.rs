@@ -5,15 +5,15 @@ use ::settings::Setting as _;
 use cfg_if::cfg_if;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
-use rook_cli::RecoveryMechanism;
-use rook_core::channel::{Channel, ChannelState};
-use rook_errors::{report_error, report_if_error};
-use rookui::{Entity, ModelContext, SingletonEntity, WindowId};
-use rookui_extras::user_preferences::UserPreferences;
+use pterm_cli::RecoveryMechanism;
+use pterm_core::channel::{Channel, ChannelState};
+use pterm_errors::{report_error, report_if_error};
+use ptermui::{Entity, ModelContext, SingletonEntity, WindowId};
+use ptermui_extras::user_preferences::UserPreferences;
 
 use crate::settings;
 
-/// Keep in sync with [`rook_cli::AppArgs`].
+/// Keep in sync with [`pterm_cli::AppArgs`].
 pub const RECOVERY_MECHANISM_ARG: &str = "crash-recovery-mechanism";
 
 lazy_static! {
@@ -34,7 +34,7 @@ pub enum Event {
 }
 
 /// Returns true if this process is the crash recovery process.
-pub fn is_crash_recovery_process(args: &rook_cli::AppArgs) -> bool {
+pub fn is_crash_recovery_process(args: &pterm_cli::AppArgs) -> bool {
     args.crash_recovery_mechanism.is_some()
 }
 
@@ -80,7 +80,7 @@ impl CrashRecoveryProcess {
 
         *IS_CRASH_RECOVERY_PROCESS_RUNNING.write() = false;
         self.is_alive = false;
-        rook_logging::on_crash_recovery_process_killed();
+        pterm_logging::on_crash_recovery_process_killed();
     }
 
     fn handle_draw_frame_error(&mut self, window_id: WindowId) {
@@ -221,14 +221,14 @@ impl CrashRecovery {
     }
 
     #[cfg(test)]
-    pub fn register_for_test(app: &mut rookui::App) {
-        use rook_core::user_preferences::GetUserPreferences as _;
+    pub fn register_for_test(app: &mut ptermui::App) {
+        use pterm_core::user_preferences::GetUserPreferences as _;
 
         app.update(|ctx| {
             ctx.add_singleton_model(|ctx| {
                 let user_preferences = ctx.private_user_preferences();
                 let launch_mode = crate::LaunchMode::App {
-                    args: rook_cli::AppArgs::default(),
+                    args: pterm_cli::AppArgs::default(),
                     api_key: None,
                 };
                 crate::crash_recovery::CrashRecovery::new(&launch_mode, user_preferences)
@@ -390,7 +390,7 @@ fn spawn_recovery_process(
 }
 
 #[cfg(windows)]
-fn wait_for_parent_crash(args: &rook_cli::AppArgs) {
+fn wait_for_parent_crash(args: &pterm_cli::AppArgs) {
     use windows::Win32::Foundation::{GetLastError, WAIT_FAILED, WAIT_OBJECT_0};
     use windows::Win32::System::Threading::{GetProcessId, INFINITE, WaitForSingleObject};
 
@@ -420,7 +420,7 @@ fn wait_for_parent_crash(args: &rook_cli::AppArgs) {
 }
 
 #[cfg(unix)]
-fn wait_for_parent_crash(args: &rook_cli::AppArgs) {
+fn wait_for_parent_crash(args: &pterm_cli::AppArgs) {
     use nix::unistd::Pid;
 
     let parent_pid = args
@@ -448,7 +448,7 @@ fn handle_parent_crash(
     recovery_mechanism: RecoveryMechanism,
     user_preferences: &dyn UserPreferences,
 ) -> bool {
-    rook_logging::on_parent_process_crash();
+    pterm_logging::on_parent_process_crash();
 
     match recovery_mechanism {
         #[cfg(target_os = "linux")]

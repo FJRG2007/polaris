@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Install all dependencies required to build Rook on Web.
+# Install all dependencies required to build Polaris Terminal on Web.
 
 set -e
 

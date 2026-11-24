@@ -7,14 +7,14 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use pathfinder_color::ColorU;
-use rook_core::ui::icons::Icon;
-use rook_core::ui::theme::RookTheme;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::ui::icons::Icon;
+use pterm_core::ui::theme::PtermTheme;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     ConstrainedBox, CrossAxisAlignment, Empty, Flex, Hoverable, MainAxisSize, MouseState,
     MouseStateHandle, ParentElement, SavePosition, Shrinkable, Text,
 };
-use rookui::{Element, EventContext};
+use ptermui::{Element, EventContext};
 
 use crate::appearance::Appearance;
 
@@ -83,7 +83,7 @@ pub struct JsonTreeState {
     /// Per-node `MouseStateHandle`s used by the `Hoverable` elements in each
     /// rendered row.
     ///
-    /// RookUI requires that `MouseStateHandle`s be created once and reused
+    /// PtermUI requires that `MouseStateHandle`s be created once and reused
     /// across renders: creating `MouseStateHandle::default()` inline during
     /// render discards the `click_count` set during `LeftMouseDown` before
     /// `LeftMouseUp` fires, so click handlers never trigger. Storing handles
@@ -139,7 +139,7 @@ impl JsonTreeState {
 // ---------------------------------------------------------------------------
 
 /// Pre-resolved colors for each JSON value category, sourced from the active
-/// `RookTheme`. Build this once per render from `JsonTreeColors::from_theme`.
+/// `PtermTheme`. Build this once per render from `JsonTreeColors::from_theme`.
 #[derive(Debug, Clone, Copy)]
 pub struct JsonTreeColors {
     /// Color for object/array keys and array indices.
@@ -157,13 +157,13 @@ pub struct JsonTreeColors {
 }
 
 impl JsonTreeColors {
-    /// Resolve colors from a `RookTheme` and its background color.
+    /// Resolve colors from a `PtermTheme` and its background color.
     ///
     /// Each JSON value type maps to a visually distinct ANSI foreground color
     /// so that keys, strings, numbers, booleans, and null are easy to
     /// distinguish at a glance. Annotations and punctuation use the theme's
     /// subdued text color so they don't compete with value content.
-    pub fn from_theme(theme: &RookTheme) -> Self {
+    pub fn from_theme(theme: &PtermTheme) -> Self {
         let bg = theme.background();
         Self {
             key: theme.ansi_fg_cyan(),
@@ -309,7 +309,7 @@ fn render_value(
     on_toggle: &Arc<ToggleFn>,
     on_toggle_string: &Arc<ToggleStringFn>,
     on_copy_json: &Arc<CopyJsonFn>,
-    font_family: rookui::fonts::FamilyId,
+    font_family: ptermui::fonts::FamilyId,
     column: &mut Flex,
 ) {
     match value {
@@ -515,7 +515,7 @@ fn render_long_string_row(
     position_id_prefix: &str,
     on_toggle_string: &Arc<ToggleStringFn>,
     on_copy_json: &Arc<CopyJsonFn>,
-    font_family: rookui::fonts::FamilyId,
+    font_family: ptermui::fonts::FamilyId,
     column: &mut Flex,
 ) {
     let anchor_id = format!("{position_id_prefix}:row:{path:?}");
@@ -538,7 +538,7 @@ fn render_long_string_row(
     // Chevron in the standard left position.
     chevron_and_key.add_child(
         ConstrainedBox::new(
-            icon.to_rookui_icon(rook_core::ui::theme::Fill::Solid(colors.annotation))
+            icon.to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(colors.annotation))
                 .finish(),
         )
         .with_width(CHEVRON_SIZE)
@@ -625,7 +625,7 @@ fn render_container_node(
     position_id_prefix: &str,
     on_toggle: &Arc<ToggleFn>,
     on_copy_json: &Arc<CopyJsonFn>,
-    font_family: rookui::fonts::FamilyId,
+    font_family: ptermui::fonts::FamilyId,
     column: &mut Flex,
 ) {
     // Empty containers have no chevron and are not interactive.
@@ -657,7 +657,7 @@ fn render_container_node(
         let icon_color = colors.annotation;
         row.add_child(
             ConstrainedBox::new(
-                icon.to_rookui_icon(rook_core::ui::theme::Fill::Solid(icon_color))
+                icon.to_ptermui_icon(pterm_core::ui::theme::Fill::Solid(icon_color))
                     .finish(),
             )
             .with_width(CHEVRON_SIZE)
@@ -734,7 +734,7 @@ fn render_scalar_row(
     colors: &JsonTreeColors,
     position_id_prefix: &str,
     on_copy_json: &Arc<CopyJsonFn>,
-    font_family: rookui::fonts::FamilyId,
+    font_family: ptermui::fonts::FamilyId,
     column: &mut Flex,
 ) {
     let anchor_id = format!("{position_id_prefix}:row:{path:?}");

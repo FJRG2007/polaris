@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, Table};
-use rook_cli::agent::OutputFormat;
-use rook_graphql::queries::get_simple_integrations::{
+use pterm_cli::agent::OutputFormat;
+use pterm_graphql::queries::get_simple_integrations::{
     ListedSimpleIntegrationConfig, SimpleIntegration, SimpleIntegrationConnectionStatus,
     SimpleIntegrationsOutput,
 };
@@ -112,13 +112,13 @@ fn format_mcp_server_display(name: &str, config: &Value) -> String {
         return format!("{name}: {command} {}", args.join(" "));
     }
 
-    if let Some(rook_id) = obj
-        .get("rook_id")
+    if let Some(pterm_id) = obj
+        .get("pterm_id")
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|s| !s.is_empty())
     {
-        return format!("{name}: rook_id={rook_id}");
+        return format!("{name}: pterm_id={pterm_id}");
     }
 
     name.to_string()

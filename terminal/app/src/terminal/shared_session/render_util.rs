@@ -1,12 +1,12 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rookui::elements::{
+use ptermui::elements::{
     ChildAnchor, CornerRadius, Fill, Hoverable, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, Stack,
 };
-use rookui::fonts::Weight;
-use rookui::ui_components::components::{UiComponent, UiComponentStyles};
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::fonts::Weight;
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use super::presence_manager::{MUTED_AVATAR_BORDER_COLOR, MUTED_PARTICIPANT_COLOR, Participant};
 use crate::appearance::Appearance;

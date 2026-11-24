@@ -1,5 +1,5 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::elements::{Border, CornerRadius, DropShadow, Radius, ScrollbarWidth};
+use pterm_core::ui::appearance::Appearance;
+use ptermui::elements::{Border, CornerRadius, DropShadow, Radius, ScrollbarWidth};
 
 use crate::search::result_renderer::QueryResultRendererStyles;
 
@@ -17,7 +17,7 @@ pub const MULTILINE_RESULT_EXTRA_VERTICAL_PADDING: f32 = 2.;
 ///
 /// Figma reference: "Palette Menu Item" (node-id=6241:68275) is 28px tall with 4px vertical
 /// padding, leaving 20px for inner content.
-/// https://www.figma.com/design/YjhPAtwuMsy6QnldxfL1DH/Open-files-in-Rook?node-id=6241-68275&m=dev
+/// https://www.figma.com/design/YjhPAtwuMsy6QnldxfL1DH/Open-files-in-Polaris Terminal?node-id=6241-68275&m=dev
 const COMMAND_PALETTE_BASE_ROW_HEIGHT: f32 = 28.;
 
 pub const PALETTE_HEIGHT: f32 = 464.;

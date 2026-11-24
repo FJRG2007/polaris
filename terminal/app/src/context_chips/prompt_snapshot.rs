@@ -1,12 +1,12 @@
 use itertools::Itertools;
-use rookui::{AppContext, SingletonEntity};
+use ptermui::{AppContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 
 use super::current_prompt::CurrentPrompt;
 use super::prompt::Prompt;
 use super::{ChipResult, ChipValue, chips_to_string};
 use crate::context_chips::ContextChipKind;
-use crate::settings::RookPromptSeparator;
+use crate::settings::PtermPromptSeparator;
 
 /// Struct that holds a point in time snapshot of a prompt (chips are no longer interactive)
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -14,8 +14,8 @@ pub struct PromptSnapshot {
     chips: Vec<ChipResult>,
 
     same_line_prompt_enabled: bool,
-    /// The separator to use as a trailing character at the end of Rook prompt, if any.
-    separator: RookPromptSeparator,
+    /// The separator to use as a trailing character at the end of Polaris Terminal prompt, if any.
+    separator: PtermPromptSeparator,
 }
 
 impl PromptSnapshot {
@@ -58,7 +58,7 @@ impl PromptSnapshot {
     pub fn from_chips(
         chips: Vec<ChipResult>,
         same_line_prompt_enabled: bool,
-        separator: RookPromptSeparator,
+        separator: PtermPromptSeparator,
     ) -> Self {
         Self {
             chips,
@@ -86,7 +86,7 @@ impl PromptSnapshot {
         self.same_line_prompt_enabled
     }
 
-    pub(super) fn separator(&self) -> RookPromptSeparator {
+    pub(super) fn separator(&self) -> PtermPromptSeparator {
         self.separator
     }
 }

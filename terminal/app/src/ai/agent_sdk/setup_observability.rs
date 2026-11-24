@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use futures::FutureExt as _;
-use rookui::r#async::executor::Background;
+use ptermui::r#async::executor::Background;
 use tracing::Instrument as _;
 
 use crate::ai::ambient_agents::AmbientAgentTaskId;
@@ -180,7 +180,7 @@ impl OzRunTimelineEvent {
 #[derive(Clone, Copy)]
 pub(crate) enum SetupStep {
     TeamMetadataRefresh,
-    RookDriveSync,
+    PtermDriveSync,
     TaskDataFetch,
     EnvironmentResolution,
     SkillRepoClone,
@@ -226,8 +226,8 @@ impl SetupStep {
             Self::TeamMetadataRefresh => {
                 span_and_name!("setup_team_metadata_refresh")
             }
-            Self::RookDriveSync => {
-                span_and_name!("setup_rook_drive_sync")
+            Self::PtermDriveSync => {
+                span_and_name!("setup_pterm_drive_sync")
             }
             Self::TaskDataFetch => {
                 span_and_name!("setup_task_metadata_secrets_attachments_git_credentials_fetch")

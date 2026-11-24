@@ -261,7 +261,7 @@ Use the scenarios in `specs/APP-3825/PRODUCT.md`:
 
 ### Automated validation
 
-This feature is mostly RookUI drag/drop hit-testing, so manual validation is the primary check. Add lightweight automated coverage where it is cheap and reliable:
+This feature is mostly PtermUI drag/drop hit-testing, so manual validation is the primary check. Add lightweight automated coverage where it is cheap and reliable:
 
 - if a pure helper is introduced for vertical drag-target rendering decisions, cover `OverTab` / `BeforeTab` cases in `app/src/workspace/view/vertical_tabs_tests.rs`
 - add or update workspace tests only if the new helper can be exercised without full UI drag simulation

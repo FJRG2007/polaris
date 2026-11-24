@@ -10,12 +10,12 @@ use futures::{FutureExt, select};
 use futures_lite::pin;
 use itertools::Itertools;
 use parking_lot::FairMutex;
-use rook_core::command::ExitCode;
-use rook_core::execution_mode::AppExecutionMode;
-use rook_core::features::FeatureFlag;
-use rook_util::path::ShellFamily;
-use rookui::r#async::{Spawnable, Timer};
-use rookui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use pterm_core::command::ExitCode;
+use pterm_core::execution_mode::AppExecutionMode;
+use pterm_core::features::FeatureFlag;
+use pterm_util::path::ShellFamily;
+use ptermui::r#async::{Spawnable, Timer};
+use ptermui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::lrc_activity::{LrcActivityMonitor, SAMPLE_INTERVAL};
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
@@ -134,7 +134,7 @@ impl ShellCommandExecutor {
     ) {
         // We wait for precmd for the block _after_ the requested command's block so that
         // downstream checks for current working directory are fresh. The precmd hook is when
-        // the shell relays current working directory to rook.
+        // the shell relays current working directory to polaris-terminal.
         if let ModelEvent::BlockMetadataReceived(BlockMetadataReceivedEvent { .. }) = event {
             let model = self.terminal_model.lock();
             let block_finished_senders = self.block_finished_senders.drain().collect_vec();
@@ -645,7 +645,7 @@ impl ShellCommandExecutor {
         enum WakeReason {
             BlockFinished,
             Timeout,
-            /// User clicked `Check now` in the rooking indicator, short-circuiting  
+            /// User clicked `Check now` in the pterming indicator, short-circuiting  
             /// the agent-set poll timer. Treated as a preemption so the server does  
             /// not interpret the early snapshot as a completion.  
             ForceRefresh,
@@ -765,7 +765,7 @@ impl ShellCommandExecutor {
     /// Force any in-flight poll for the given long-running command block to resolve
     /// immediately with a fresh snapshot, bypassing the agent-set timeout.
     ///
-    /// Called by the `Check now` affordance in the rooking indicator. No-ops if there
+    /// Called by the `Check now` affordance in the pterming indicator. No-ops if there
     /// is no matching in-flight poll (e.g. because the block already finished or the
     /// agent has transferred control to the user).
     pub fn force_refresh_block(&mut self, block_id: &BlockId) {

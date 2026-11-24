@@ -8,7 +8,7 @@ use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
 /// never gets a Dock tile (and therefore never shows the perpetual Dock bounce
 /// of an app that is "still launching").
 ///
-/// The bundled CLI wrapper `exec`s the GUI executable from inside `Rook.app`,
+/// The bundled CLI wrapper `exec`s the GUI executable from inside `Polaris Terminal.app`,
 /// so Launch Services binds the process to a bundle whose `Info.plist` makes
 /// it a dockable foreground app. This applies at runtime what the standalone
 /// CLI binary gets from the `LSBackgroundOnly` key in its own `Info.plist`.

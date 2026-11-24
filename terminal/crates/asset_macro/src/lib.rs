@@ -1,4 +1,4 @@
-//! This module defines a set of macros used to reference assets in Rook.
+//! This module defines a set of macros used to reference assets in Polaris Terminal.
 //!
 //! The three types of assets are:
 //! - Bundled: These are always included in the app bundle. These files are located in `app/assets/bundled`.
@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use rook_util::assets::{ASSETS_DIR, ASYNC_ASSETS_DIR, BUNDLED_ASSETS_DIR, REMOTE_ASSETS_DIR};
+use pterm_util::assets::{ASSETS_DIR, ASYNC_ASSETS_DIR, BUNDLED_ASSETS_DIR, REMOTE_ASSETS_DIR};
 use sha2::Digest;
 use syn::parse::Parse;
 use syn::{LitStr, Token, parse_macro_input};
@@ -72,7 +72,7 @@ fn construct_bundled_asset(asset_name: &str, asset_dir: &str) -> Result<TokenStr
     if full_asset_path(asset_name, asset_dir).exists() {
         let full_location = format!("{asset_dir}/{asset_name}");
         Ok(quote! {
-            ::rookui_core::assets::asset_cache::AssetSource::Bundled {
+            ::ptermui_core::assets::asset_cache::AssetSource::Bundled {
                 path: #full_location .into(),
             }
         })
@@ -101,13 +101,13 @@ fn construct_remote_asset(asset_name: &str, asset_dir: &str) -> Result<TokenStre
     let mut hasher = sha2::Sha256::new();
     hasher.update(&contents);
     let hash: [u8; 32] = hasher.finalize().into();
-    let url = rook_util::assets::hashed_asset_url(&rook_util::assets::hashed_asset_path(
+    let url = pterm_util::assets::hashed_asset_url(&pterm_util::assets::hashed_asset_path(
         Path::new(asset_name),
         &hash,
     ));
 
     Ok(quote! {
-        ::asset_cache::url_source(::rook_util::assets::make_absolute_url( #url ))
+        ::asset_cache::url_source(::pterm_util::assets::make_absolute_url( #url ))
     })
 }
 

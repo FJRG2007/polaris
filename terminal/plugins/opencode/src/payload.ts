@@ -3,12 +3,12 @@ import path from "path"
 const PLUGIN_MAX_PROTOCOL_VERSION = 1
 
 function negotiateProtocolVersion(): number {
-  const rookVersion = parseInt(
-    process.env.ROOK_CLI_AGENT_PROTOCOL_VERSION || "1",
+  const ptermVersion = parseInt(
+    process.env.POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION || "1",
     10,
   )
-  if (isNaN(rookVersion)) return PLUGIN_MAX_PROTOCOL_VERSION
-  return Math.min(rookVersion, PLUGIN_MAX_PROTOCOL_VERSION)
+  if (isNaN(ptermVersion)) return PLUGIN_MAX_PROTOCOL_VERSION
+  return Math.min(ptermVersion, PLUGIN_MAX_PROTOCOL_VERSION)
 }
 
 interface PayloadBase {

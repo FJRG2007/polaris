@@ -5,9 +5,9 @@ use std::sync::OnceLock;
 
 use command::blocking::Command;
 use freedesktop_desktop_entry::DesktopEntry;
-use rook_errors::report_error;
-use rook_util::path::LineAndColumnArg;
-use rookui::AppContext;
+use pterm_errors::report_error;
+use pterm_util::path::LineAndColumnArg;
+use ptermui::AppContext;
 
 use super::Editor;
 

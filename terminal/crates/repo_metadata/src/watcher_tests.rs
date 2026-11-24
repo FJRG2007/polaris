@@ -7,9 +7,9 @@ use std::time::Duration;
 
 use futures::channel::mpsc;
 use futures::{FutureExt as _, StreamExt as _};
-use rook_util::standardized_path::StandardizedPath;
-use rookui_core::r#async::Timer;
-use rookui_core::{App, ModelContext, ModelHandle};
+use pterm_util::standardized_path::StandardizedPath;
+use ptermui_core::r#async::Timer;
+use ptermui_core::{App, ModelContext, ModelHandle};
 use virtual_fs::{Stub, VirtualFS};
 
 use crate::repositories::stub_git_repository;

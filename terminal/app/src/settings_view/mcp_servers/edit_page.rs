@@ -9,20 +9,20 @@ use diesel::SqliteConnection;
 #[cfg(feature = "local_fs")]
 use parking_lot::Mutex;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::content::buffer::InitialBufferState;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rook_errors::report_error;
-use rookui::elements::{
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::content::buffer::InitialBufferState;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use pterm_errors::report_error;
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, Container, CornerRadius, CrossAxisAlignment, Flex,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, Shrinkable, Stack, Text,
 };
-use rookui::platform::Cursor;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::platform::Cursor;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
     WeakViewHandle,
 };
@@ -171,8 +171,8 @@ impl MCPServersEditPageView {
                 ctx,
             )
             .with_horizontal_scrollbar_appearance(
-                rookui::elements::new_scrollable::ScrollableAppearance::new(
-                    rookui::elements::ScrollbarWidth::Auto,
+                ptermui::elements::new_scrollable::ScrollableAppearance::new(
+                    ptermui::elements::ScrollbarWidth::Auto,
                     true,
                 ),
             );

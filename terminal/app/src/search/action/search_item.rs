@@ -3,17 +3,17 @@ use std::sync::Arc;
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
 use pathfinder_color::ColorU;
-use rookui::elements::{
+use ptermui::elements::{
     Align, ConstrainedBox, Container, Flex, Highlight, ParentElement, Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::{DescriptionContext, Keystroke};
-use rookui::ui_components::components::UiComponent;
-use rookui::{AppContext, Element, SingletonEntity};
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::{DescriptionContext, Keystroke};
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::drive::DriveObjectType;
-use crate::drive::cloud_object_styling::rook_drive_icon_color;
+use crate::drive::cloud_object_styling::pterm_drive_icon_color;
 use crate::features::FeatureFlag;
 use crate::search::command_palette::mixer::CommandPaletteItemAction;
 use crate::search::command_palette::render_util::{
@@ -182,7 +182,7 @@ impl SearchItemIcon for BindingGroup {
     fn icon(&self) -> Icon {
         match self {
             Self::Settings => Icon::Gear,
-            Self::RookAi => {
+            Self::PtermAi => {
                 if !FeatureFlag::AgentMode.is_enabled() {
                     Icon::AiAssistant
                 } else {
@@ -212,19 +212,19 @@ impl SearchItemIcon for BindingGroup {
             | Self::Folders
             | Self::Terminal
             | Self::Notifications => appearance.theme().foreground().into_solid(),
-            Self::RookAi if !FeatureFlag::AgentMode.is_enabled() => {
-                ColorU::from_u32(colors::ROOK_AI)
+            Self::PtermAi if !FeatureFlag::AgentMode.is_enabled() => {
+                ColorU::from_u32(colors::POLARIS_TERMINAL_AI)
             }
-            Self::RookAi => appearance.theme().foreground().into_solid(),
-            Self::Workflow => rook_drive_icon_color(appearance, DriveObjectType::Workflow),
-            Self::Notebooks => rook_drive_icon_color(
+            Self::PtermAi => appearance.theme().foreground().into_solid(),
+            Self::Workflow => pterm_drive_icon_color(appearance, DriveObjectType::Workflow),
+            Self::Notebooks => pterm_drive_icon_color(
                 appearance,
                 DriveObjectType::Notebook {
                     is_ai_document: false,
                 },
             ),
             Self::EnvVarCollection => {
-                rook_drive_icon_color(appearance, DriveObjectType::EnvVarCollection)
+                pterm_drive_icon_color(appearance, DriveObjectType::EnvVarCollection)
             }
         }
     }

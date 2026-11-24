@@ -1,9 +1,9 @@
 [package]
 name = "repo_metadata"
-authors = ["Rook Contributors"]
+authors = ["Polaris Terminal Contributors"]
 version = "0.1.0"
 edition = "2024"
-description = "Repository metadata utilities for Rook"
+description = "Repository metadata utilities for Polaris Terminal"
 publish.workspace = true
 license.workspace = true
 
@@ -21,10 +21,10 @@ serde_json.workspace = true
 thiserror.workspace = true
 walkdir.workspace = true
 itertools.workspace = true
-rookui_core.workspace = true
-rook_core.workspace = true
-rook_errors.workspace = true
-rook_util.workspace = true
+ptermui_core.workspace = true
+pterm_core.workspace = true
+pterm_errors.workspace = true
+pterm_util.workspace = true
 ignore = "0.4.23"
 once_cell.workspace = true
 log.workspace = true
@@ -49,4 +49,4 @@ anyhow.workspace = true
 env_logger.workspace = true
 futures = "0.3"
 virtual-fs.workspace = true
-rookui = { workspace = true, features = ["test-util"] }
+ptermui = { workspace = true, features = ["test-util"] }

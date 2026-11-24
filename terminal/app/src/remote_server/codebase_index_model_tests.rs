@@ -315,23 +315,30 @@ fn availability_falls_back_to_longest_status_prefix() {
 fn availability_uses_unmatched_explicit_path_as_not_indexed() {
     let mut model = RemoteCodebaseIndexModel::default();
     let host = host();
-    model.record_navigated_directory(session(1), &remote_path("/workspaces/rook"), true);
+    model.record_navigated_directory(
+        session(1),
+        &remote_path("/workspaces/polaris-terminal"),
+        true,
+    );
     model.apply_status_update(
-        remote_path("/workspaces/rook"),
-        ready_status("/workspaces/rook"),
+        remote_path("/workspaces/polaris-terminal"),
+        ready_status("/workspaces/polaris-terminal"),
     );
 
     let availability = model.availability_for_remote(
         &host,
-        Some("/workspaces/rook"),
-        Some("/Users/user/code/rook"),
+        Some("/workspaces/polaris-terminal"),
+        Some("/Users/user/code/polaris-terminal"),
     );
 
     assert!(matches!(
         availability,
         RemoteCodebaseSearchAvailability::NotIndexed { .. }
     ));
-    assert_eq!(availability.repo_path(), Some("/Users/user/code/rook"));
+    assert_eq!(
+        availability.repo_path(),
+        Some("/Users/user/code/polaris-terminal")
+    );
 }
 
 #[test]
@@ -364,26 +371,29 @@ fn availability_uses_requested_path_when_it_matches_known_remote_repo() {
         ready_status("/workspaces/other"),
     );
     model.apply_status_update(
-        remote_path("/workspaces/rook"),
-        ready_status("/workspaces/rook"),
+        remote_path("/workspaces/polaris-terminal"),
+        ready_status("/workspaces/polaris-terminal"),
     );
 
     let availability = model.availability_for_remote(
         &host,
         Some("/workspaces/other"),
-        Some("/workspaces/rook/app"),
+        Some("/workspaces/polaris-terminal/app"),
     );
 
     assert!(availability.is_ready());
-    assert_eq!(availability.repo_path(), Some("/workspaces/rook"));
+    assert_eq!(
+        availability.repo_path(),
+        Some("/workspaces/polaris-terminal")
+    );
 }
 
 #[test]
 fn codebases_for_agent_context_includes_searchable_remote_paths() {
     let mut model = RemoteCodebaseIndexModel::default();
     model.apply_status_update(
-        remote_path("/workspaces/rook"),
-        ready_status("/workspaces/rook"),
+        remote_path("/workspaces/polaris-terminal"),
+        ready_status("/workspaces/polaris-terminal"),
     );
     model.apply_status_update(
         remote_path("/workspaces/stale"),
@@ -392,14 +402,14 @@ fn codebases_for_agent_context_includes_searchable_remote_paths() {
 
     let entries = model.codebases_for_agent_context(&host());
 
-    // Sorted by name, and "rook" sorts before "stale" where upstream's "warp"
+    // Sorted by name, and "polaris-terminal" sorts before "stale" where upstream's "warp"
     // sorted after it.
     assert_eq!(
         entries,
         vec![
             RemoteCodebaseContextEntry {
-                name: "rook".to_string(),
-                path: "/workspaces/rook".to_string(),
+                name: "polaris-terminal".to_string(),
+                path: "/workspaces/polaris-terminal".to_string(),
             },
             RemoteCodebaseContextEntry {
                 name: "stale".to_string(),
@@ -460,17 +470,24 @@ fn clear_remote_codebase_indexing_state_returns_paths_and_removes_client_state()
     let mut model = RemoteCodebaseIndexModel::default();
     let host = host();
     model.apply_status_update(
-        remote_path("/workspaces/rook"),
-        ready_status("/workspaces/rook"),
+        remote_path("/workspaces/polaris-terminal"),
+        ready_status("/workspaces/polaris-terminal"),
     );
-    model.record_navigated_directory(session(1), &remote_path("/workspaces/rook"), true);
+    model.record_navigated_directory(
+        session(1),
+        &remote_path("/workspaces/polaris-terminal"),
+        true,
+    );
 
     let remote_paths = model.clear_remote_codebase_indexing_state();
 
-    assert_eq!(remote_paths, vec![remote_path("/workspaces/rook")]);
+    assert_eq!(
+        remote_paths,
+        vec![remote_path("/workspaces/polaris-terminal")]
+    );
     assert!(model.entries_for_settings().is_empty());
     assert!(matches!(
-        model.availability_for_remote(&host, Some("/workspaces/rook"), None),
+        model.availability_for_remote(&host, Some("/workspaces/polaris-terminal"), None),
         RemoteCodebaseSearchAvailability::NotIndexed { .. }
     ));
 }
@@ -570,15 +587,15 @@ fn known_remote_repo_path_uses_single_indexed_descendant_for_broad_cwd() {
     let host = host();
     model.record_navigated_directory(session(1), &remote_path("/workspaces"), false);
     model.apply_status_update(
-        remote_path("/workspaces/rook"),
-        ready_status("/workspaces/rook"),
+        remote_path("/workspaces/polaris-terminal"),
+        ready_status("/workspaces/polaris-terminal"),
     );
 
     let remote_path = model.resolve_known_remote_repo_path(&host, Some("/workspaces"), None);
 
     assert_eq!(
         remote_path.map(|remote_path| remote_path.path.as_str().to_string()),
-        Some("/workspaces/rook".to_string())
+        Some("/workspaces/polaris-terminal".to_string())
     );
 }
 

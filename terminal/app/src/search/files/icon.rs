@@ -1,6 +1,6 @@
-use rook_core::ui::appearance::Appearance;
-use rookui::Element;
-use rookui::elements::Icon;
+use pterm_core::ui::appearance::Appearance;
+use ptermui::Element;
+use ptermui::elements::Icon;
 
 use crate::search::result_renderer::ItemHighlightState;
 

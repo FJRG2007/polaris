@@ -1,17 +1,17 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::theme::color::internal_colors;
-use rookui_core::elements::{
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui_core::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Element, Flex,
     ParentElement, Radius, Shrinkable,
 };
-use rookui_core::fonts::{Properties, Weight};
-use rookui_core::keymap::Keystroke;
-use rookui_core::prelude::{MainAxisAlignment, MainAxisSize, Text};
-use rookui_core::{AppContext, EventContext};
+use ptermui_core::fonts::{Properties, Weight};
+use ptermui_core::keymap::Keystroke;
+use ptermui_core::prelude::{MainAxisAlignment, MainAxisSize, Text};
+use ptermui_core::{AppContext, EventContext};
 
 use crate::{Component, Options as _, Renderable, button};
 

@@ -1,4 +1,4 @@
-//! Commands to interact with ambient agents on Rook's platform.
+//! Commands to interact with ambient agents on Polaris Terminal's platform.
 use std::io::Write as _;
 use std::sync::Arc;
 use std::time::Duration;
@@ -7,20 +7,20 @@ use anyhow::{Context as _, anyhow};
 use bytes::Bytes;
 use comfy_table::Cell;
 use futures::{StreamExt, future};
-use rook_cli::agent::{Harness, OutputFormat, Prompt, RunCloudArgs};
-use rook_cli::json_filter::JsonOutput;
-use rook_cli::task::{
+use pterm_cli::agent::{Harness, OutputFormat, Prompt, RunCloudArgs};
+use pterm_cli::json_filter::JsonOutput;
+use pterm_cli::task::{
     ArtifactTypeArg, ExecutionLocationArg, ListTasksArgs, MessageCommand, MessageDeliveredArgs,
     MessageListArgs, MessageReadArgs, MessageSendArgs, MessageWatchArgs, RunSortByArg,
     RunSourceArg, RunStateArg, TaskGetArgs,
 };
-use rook_cli::{GlobalOptions, SortOrderArg};
-use rook_core::channel::ChannelState;
-use rook_core::features::FeatureFlag;
-use rook_server_client::HttpStatusError;
-use rookui::r#async::{Spawnable, Timer};
-use rookui::platform::TerminationMode;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_cli::{GlobalOptions, SortOrderArg};
+use pterm_core::channel::ChannelState;
+use pterm_core::features::FeatureFlag;
+use pterm_server_client::HttpStatusError;
+use ptermui::r#async::{Spawnable, Timer};
+use ptermui::platform::TerminationMode;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 
 use super::common::{EnvironmentChoice, ResolveConfigurationError, parse_ambient_task_id};
@@ -248,8 +248,8 @@ impl AmbientAgentRunner {
         }
 
         let refresh_future = super::common::refresh_workspace_metadata(ctx);
-        let rook_drive_sync_future = super::common::refresh_rook_drive(ctx);
-        let setup_future = future::try_join(refresh_future, rook_drive_sync_future);
+        let pterm_drive_sync_future = super::common::refresh_pterm_drive(ctx);
+        let setup_future = future::try_join(refresh_future, pterm_drive_sync_future);
 
         ctx.spawn(setup_future, move |_runner, setup_result, ctx| {
             if let Err(err) = setup_result {
@@ -625,7 +625,7 @@ impl AmbientAgentRunner {
                     if should_open
                         && let Some(session_join_info) = session_join_info {
                             let url =
-                                match (super::is_running_in_rook(), session_join_info.session_id) {
+                                match (super::is_running_in_pterm(), session_join_info.session_id) {
                                     (true, Some(session_id)) => {
                                         shared_session::join_native_intent(&session_id)
                                     }
@@ -1076,12 +1076,12 @@ fn task_id_from_run_id(run_id: &str) -> Option<AmbientAgentTaskId> {
 }
 
 fn task_id_from_oz_run_id_env() -> anyhow::Result<Option<AmbientAgentTaskId>> {
-    match std::env::var(rook_cli::OZ_RUN_ID_ENV) {
+    match std::env::var(pterm_cli::OZ_RUN_ID_ENV) {
         Ok(run_id) => parse_ambient_task_id(&run_id, "Invalid OZ_RUN_ID").map(Some),
         Err(std::env::VarError::NotPresent) => Ok(None),
         Err(std::env::VarError::NotUnicode(_)) => Err(anyhow!(
             "{} is set but is not valid Unicode",
-            rook_cli::OZ_RUN_ID_ENV
+            pterm_cli::OZ_RUN_ID_ENV
         )),
     }
 }
@@ -1441,7 +1441,7 @@ pub fn get_run_conversation(ctx: &mut AppContext, run_id: String) -> anyhow::Res
     runner.update(ctx, |runner, ctx| runner.get_run_conversation(run_id, ctx))
 }
 
-/// Normalized Rook conversation JSON, or a raw third-party harness transcript.
+/// Normalized Polaris Terminal conversation JSON, or a raw third-party harness transcript.
 #[derive(Debug, PartialEq)]
 enum ConversationCliOutput {
     Normalized(serde_json::Value),
@@ -1615,7 +1615,7 @@ impl AmbientAgentRunner {
     }
 }
 
-impl rookui::Entity for AmbientAgentRunner {
+impl ptermui::Entity for AmbientAgentRunner {
     type Event = ();
 }
 

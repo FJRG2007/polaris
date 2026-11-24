@@ -1,8 +1,8 @@
 //! Module to attribute AI-generated requested commands
-//! to known documents (e.g. Rook Drive objects).
+//! to known documents (e.g. Polaris Terminal Drive objects).
 
 use markdown_parser::{FormattedTextLine, parse_markdown};
-use rookui::{AppContext, SingletonEntity};
+use ptermui::{AppContext, SingletonEntity};
 
 use crate::ai::agent::AIAgentCitation;
 use crate::cloud_object::model::persistence::CloudModel;
@@ -21,16 +21,16 @@ pub(crate) fn is_command_copied_from_document(
     let command = command.trim();
 
     match document {
-        AIAgentCitation::RookDriveObject { uid } => {
-            is_command_copied_from_rook_drive_object(command, uid, shell_type, ctx)
+        AIAgentCitation::PtermDriveObject { uid } => {
+            is_command_copied_from_pterm_drive_object(command, uid, shell_type, ctx)
         }
         _ => false,
     }
 }
 
 /// Returns true iff the `command` is directly copied from the
-/// Rook Drive object identified by `object_uid`.
-fn is_command_copied_from_rook_drive_object(
+/// Polaris Terminal Drive object identified by `object_uid`.
+fn is_command_copied_from_pterm_drive_object(
     command: &str,
     object_uid: &str,
     shell_type: Option<ShellType>,

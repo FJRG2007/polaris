@@ -1,15 +1,15 @@
 use std::path::Path;
 
-use rook_core::paths::home_relative_path;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::ui::icons::Icon;
-use rook_core::ui::theme::{AnsiColorIdentifier, Fill};
-use rookui::elements::{
+use pterm_core::paths::home_relative_path;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::ui::icons::Icon;
+use pterm_core::ui::theme::{AnsiColorIdentifier, Fill};
+use ptermui::elements::{
     Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Expanded, Flex, MainAxisSize, Padding, ParentElement, Radius, Shrinkable, Text,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::{
     AppContext, Element, Entity, EntityId, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -162,7 +162,7 @@ pub struct ConversationEndedTombstoneView {
     #[cfg(not(target_family = "wasm"))]
     continue_locally_button: Option<ViewHandle<ActionButton>>,
     #[cfg(target_family = "wasm")]
-    open_in_rook_button: Option<ViewHandle<ActionButton>>,
+    open_in_pterm_button: Option<ViewHandle<ActionButton>>,
 }
 
 impl ConversationEndedTombstoneView {
@@ -228,19 +228,21 @@ impl ConversationEndedTombstoneView {
         };
 
         // In wasm, continuing locally is impossible so we instead
-        // offer to open the conversation in rook (where you can continue locally).
+        // offer to open the conversation in polaris-terminal (where you can continue locally).
         #[cfg(target_family = "wasm")]
-        let open_in_rook_button =
+        let open_in_pterm_button =
             if matches!(tombstone_cta, Some(TombstoneCta::ContinueInCloud { .. })) {
                 None
             } else {
                 conversation_id.map(|conv_id| {
                     ctx.add_typed_action_view(move |_| {
-                        ActionButton::new("Open in Rook", PrimaryTheme)
-                            .with_tooltip("Open this conversation in the Rook desktop app")
+                        ActionButton::new("Open in Polaris Terminal", PrimaryTheme)
+                            .with_tooltip(
+                                "Open this conversation in the Polaris Terminal desktop app",
+                            )
                             .on_click(move |ctx| {
                                 ctx.dispatch_typed_action(
-                                    ConversationEndedTombstoneAction::OpenInRook(conv_id),
+                                    ConversationEndedTombstoneAction::OpenInPterm(conv_id),
                                 );
                             })
                     })
@@ -254,7 +256,7 @@ impl ConversationEndedTombstoneView {
             #[cfg(not(target_family = "wasm"))]
             continue_locally_button,
             #[cfg(target_family = "wasm")]
-            open_in_rook_button,
+            open_in_pterm_button,
         };
 
         ctx.subscribe_to_view(
@@ -279,7 +281,7 @@ impl ConversationEndedTombstoneView {
                         ctx
                     );
                     ctx.clipboard()
-                        .write(rookui::clipboard::ClipboardContent::plain_text(
+                        .write(ptermui::clipboard::ClipboardContent::plain_text(
                             branch.clone(),
                         ));
                 }
@@ -364,7 +366,7 @@ impl ConversationEndedTombstoneView {
             Fill::Solid(theme.ansi_fg_green())
         };
         let icon_element = Container::new(
-            ConstrainedBox::new(icon.to_rookui_icon(icon_color).finish())
+            ConstrainedBox::new(icon.to_ptermui_icon(icon_color).finish())
                 .with_height(14.)
                 .with_width(14.)
                 .finish(),
@@ -506,10 +508,10 @@ impl ConversationEndedTombstoneView {
         #[cfg(target_family = "wasm")]
         {
             // Don't show on mobile devices - they can't use the desktop app
-            if !rookui::platform::wasm::is_mobile_device()
-                && let Some(ref open_in_rook_button) = self.open_in_rook_button
+            if !ptermui::platform::wasm::is_mobile_device()
+                && let Some(ref open_in_pterm_button) = self.open_in_pterm_button
             {
-                row.add_child(ChildView::new(open_in_rook_button).finish());
+                row.add_child(ChildView::new(open_in_pterm_button).finish());
                 has_button = true;
             }
         }
@@ -552,7 +554,7 @@ pub enum ConversationEndedTombstoneAction {
     #[cfg(not(target_family = "wasm"))]
     ContinueLocally(AIConversationId),
     #[cfg(target_family = "wasm")]
-    OpenInRook(AIConversationId),
+    OpenInPterm(AIConversationId),
 }
 
 impl View for ConversationEndedTombstoneView {
@@ -652,8 +654,8 @@ impl TypedActionView for ConversationEndedTombstoneView {
                 });
             }
             #[cfg(target_family = "wasm")]
-            ConversationEndedTombstoneAction::OpenInRook(conversation_id) => {
-                send_telemetry_from_ctx!(AgentManagementTelemetryEvent::TombstoneOpenInRook, ctx);
+            ConversationEndedTombstoneAction::OpenInPterm(conversation_id) => {
+                send_telemetry_from_ctx!(AgentManagementTelemetryEvent::TombstoneOpenInPterm, ctx);
                 let conversation = BlocklistAIHistoryModel::handle(ctx)
                     .as_ref(ctx)
                     .conversation(conversation_id);
@@ -664,7 +666,7 @@ impl TypedActionView for ConversationEndedTombstoneView {
                         if let Ok(url) = url::Url::parse(&url_string) {
                             ctx.dispatch_typed_action(&WorkspaceAction::OpenLinkOnDesktop(url));
                         } else {
-                            rook_errors::report_error!(
+                            pterm_errors::report_error!(
                                 "Failed to parse conversation URL",
                                 extra: { "url" => %url_string }
                             );
@@ -673,7 +675,7 @@ impl TypedActionView for ConversationEndedTombstoneView {
                         log::warn!("No server conversation token available for conversation");
                     }
                 } else {
-                    rook_errors::report_error!("Conversation not found in history model");
+                    pterm_errors::report_error!("Conversation not found in history model");
                 }
             }
         }

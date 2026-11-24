@@ -3,13 +3,13 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use ptermui::r#async::block_on;
+use ptermui::elements::Empty;
+use ptermui::platform::WindowStyle;
+use ptermui::windowing::WindowManager;
+use ptermui::{App, AppContext, Element, Entity, SingletonEntity, TypedActionView, View};
 use repo_metadata::RepoMetadataModel;
 use repo_metadata::repositories::DetectedRepositories;
-use rookui::r#async::block_on;
-use rookui::elements::Empty;
-use rookui::platform::WindowStyle;
-use rookui::windowing::WindowManager;
-use rookui::{App, AppContext, Element, Entity, SingletonEntity, TypedActionView, View};
 use tempfile::tempdir;
 
 use crate::search::ai_context_menu::files::data_source::{

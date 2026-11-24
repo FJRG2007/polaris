@@ -8,7 +8,7 @@ This spec covers enabling `/prompts` (saved prompts) in the CLI agent rich input
 - `app/src/terminal/input.rs` — `handle_inline_prompts_menu_event()`, `show_workflows_info_box_on_workflow_selection()`
 
 ## Current State
-The prompts menu (`InlinePromptsMenuView`) and the workflow info box insertion flow already exist in the normal Rook input. When a prompt is selected, `handle_inline_prompts_menu_event()` calls `show_workflows_info_box_on_workflow_selection()`, which inserts the workflow template into the editor with argument highlighting and the shift-tab UX.
+The prompts menu (`InlinePromptsMenuView`) and the workflow info box insertion flow already exist in the normal Polaris Terminal input. When a prompt is selected, `handle_inline_prompts_menu_event()` calls `show_workflows_info_box_on_workflow_selection()`, which inserts the workflow template into the editor with argument highlighting and the shift-tab UX.
 
 The CLI agent rich input reuses the same `Input` view and editor. On submit, `input_enter()` detects `CLIAgentSessionsModel::is_input_open()` and emits `Event::SubmitCLIAgentInput` with the raw buffer text, which is written to the PTY.
 
@@ -35,4 +35,4 @@ The prompts menu is already rendered through the `suggestions_mode_model` system
 - Verify selecting a saved prompt inserts the prompt text with argument highlighting.
 - Verify shift-tab argument editing works in CLI agent rich input.
 - Verify the prompt content submits correctly to the PTY.
-- Verify no regressions in normal Rook agent input (prompts still work as before).
+- Verify no regressions in normal Polaris Terminal agent input (prompts still work as before).

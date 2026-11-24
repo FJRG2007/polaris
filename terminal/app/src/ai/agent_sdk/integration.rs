@@ -1,12 +1,12 @@
 use futures::future;
-use rook_cli::GlobalOptions;
-use rook_cli::integration::{CreateIntegrationArgs, IntegrationCommand, UpdateIntegrationArgs};
-use rook_cli::provider::ProviderType;
-use rook_graphql::mutations::create_simple_integration::CreateSimpleIntegrationOutput;
-use rook_graphql::queries::get_oauth_connect_tx_status::OauthConnectTxStatus;
-use rook_graphql::queries::get_simple_integrations::SimpleIntegrationsOutput;
-use rookui::platform::TerminationMode;
-use rookui::{AppContext, ModelContext, SingletonEntity};
+use pterm_cli::GlobalOptions;
+use pterm_cli::integration::{CreateIntegrationArgs, IntegrationCommand, UpdateIntegrationArgs};
+use pterm_cli::provider::ProviderType;
+use pterm_graphql::mutations::create_simple_integration::CreateSimpleIntegrationOutput;
+use pterm_graphql::queries::get_oauth_connect_tx_status::OauthConnectTxStatus;
+use pterm_graphql::queries::get_simple_integrations::SimpleIntegrationsOutput;
+use ptermui::platform::TerminationMode;
+use ptermui::{AppContext, ModelContext, SingletonEntity};
 
 use super::common::{EnvironmentChoice, ResolveConfigurationError};
 use super::integration_output;
@@ -65,8 +65,8 @@ impl IntegrationCommandRunner {
 
     fn create(&self, args: CreateIntegrationArgs, ctx: &mut ModelContext<Self>) {
         let refresh_future = super::common::refresh_workspace_metadata(ctx);
-        let rook_drive_sync_future = super::common::refresh_rook_drive(ctx);
-        let setup_future = future::try_join(refresh_future, rook_drive_sync_future);
+        let pterm_drive_sync_future = super::common::refresh_pterm_drive(ctx);
+        let setup_future = future::try_join(refresh_future, pterm_drive_sync_future);
 
         ctx.spawn(setup_future, move |runner, setup_result, ctx| {
             if let Err(err) = setup_result {
@@ -378,8 +378,8 @@ impl IntegrationCommandRunner {
 
     fn update(&self, args: UpdateIntegrationArgs, ctx: &mut ModelContext<Self>) {
         let refresh_future = super::common::refresh_workspace_metadata(ctx);
-        let rook_drive_sync_future = super::common::refresh_rook_drive(ctx);
-        let setup_future = future::try_join(refresh_future, rook_drive_sync_future);
+        let pterm_drive_sync_future = super::common::refresh_pterm_drive(ctx);
+        let setup_future = future::try_join(refresh_future, pterm_drive_sync_future);
 
         ctx.spawn(setup_future, move |runner, setup_result, ctx| {
             if let Err(err) = setup_result {
@@ -523,7 +523,7 @@ impl IntegrationCommandRunner {
     }
 }
 
-impl rookui::Entity for IntegrationCommandRunner {
+impl ptermui::Entity for IntegrationCommandRunner {
     type Event = ();
 }
 impl SingletonEntity for IntegrationCommandRunner {}

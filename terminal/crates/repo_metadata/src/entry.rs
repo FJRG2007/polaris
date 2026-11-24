@@ -10,8 +10,8 @@ use futures_lite::StreamExt;
 use ignore::gitignore::Gitignore;
 #[cfg(feature = "local_fs")]
 use notify_debouncer_full::notify::WatchFilter;
-use rook_errors::{ErrorExt, register_error, report_error};
-use rook_util::standardized_path::StandardizedPath;
+use pterm_errors::{ErrorExt, register_error, report_error};
+use pterm_util::standardized_path::StandardizedPath;
 use thiserror::Error;
 
 use crate::gitignore_cache;
@@ -588,7 +588,7 @@ fn evaluate_entry(
 ) -> Result<EvaluatedEntry, BuildTreeError> {
     let is_dir = curr_path.is_dir();
 
-    // Only ignore symlinks to directories. Symlinks to files are preserved (e.g. ROOK.md).
+    // Only ignore symlinks to directories. Symlinks to files are preserved (e.g. POLARIS_TERMINAL.md).
     if curr_path.is_symlink() && is_dir {
         return Err(BuildTreeError::Symlink);
     }

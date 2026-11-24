@@ -2,8 +2,8 @@ use ai::LLMId;
 use chrono::{DateTime, Utc};
 use onboarding::slides::{AgentAutonomy, AgentDevelopmentSettings};
 use onboarding::{SelectedSettings, UICustomizationSettings};
-use rook_core::features::FeatureFlag;
-use rookui::{App, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use ptermui::{App, SingletonEntity};
 
 use crate::LaunchMode;
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
@@ -14,7 +14,7 @@ use crate::ai::mcp::TemplatableMCPServerManager;
 use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::{Revision, ServerAIExecutionProfile, ServerMetadata, ServerPermissions};
-use crate::drive::settings::RookDriveSettings;
+use crate::drive::settings::PtermDriveSettings;
 use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ServerId, SyncId};
@@ -214,7 +214,7 @@ fn account_first_settings_enable_agent_for_authenticated_users_and_apply_ui_choi
                 show_conversation_history: false,
                 show_project_explorer: true,
                 show_global_search: false,
-                show_rook_drive: false,
+                show_pterm_drive: false,
                 show_code_review_button: true,
             }),
         };
@@ -238,7 +238,7 @@ fn account_first_settings_enable_agent_for_authenticated_users_and_apply_ui_choi
                 assert_eq!(*AISettings::as_ref(ctx).is_any_ai_enabled, expected_ai);
                 assert!(!*TabSettings::as_ref(ctx).use_vertical_tabs);
                 assert!(*TabSettings::as_ref(ctx).show_code_review_button);
-                assert!(!*RookDriveSettings::as_ref(ctx).enable_rook_drive);
+                assert!(!*PtermDriveSettings::as_ref(ctx).enable_pterm_drive);
                 assert!(*CodeSettings::as_ref(ctx).show_project_explorer);
                 assert!(!*CodeSettings::as_ref(ctx).show_global_search);
             });
@@ -323,7 +323,7 @@ fn apply_account_first_onboarding_settings_sets_dollars_for_new_accounts_only() 
     });
 }
 
-/// Rook's AI features run on a Rook account. For third-party agent intent
+/// Polaris Terminal's AI features run on a Polaris Terminal account. For third-party agent intent
 /// (`disable_oz = true`), AI is therefore off when the user skips creating an
 /// account and on once they have one.
 #[test]

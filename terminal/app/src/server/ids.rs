@@ -10,7 +10,7 @@ pub use cloud_objects::ids::{
 /// ServerId. It implements different To/From and Display, and HashableId traits.
 /// Takes type and desired prefix for HashableId.
 ///
-/// Note: This macro uses `$crate::server::ids::*` paths, so it only works within the rook crate.
+/// Note: This macro uses `$crate::server::ids::*` paths, so it only works within the polaris-terminal crate.
 /// For types defined in cloud_objects, use `cloud_objects::server_id_traits!` instead.
 #[macro_export]
 macro_rules! server_id_traits {

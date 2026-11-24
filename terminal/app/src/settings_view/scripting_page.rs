@@ -1,16 +1,18 @@
-//! Settings UI for local scripting and Rook control permissions.
+//! Settings UI for local scripting and Polaris Terminal control permissions.
 use std::cell::RefCell;
 use std::collections::HashMap;
 
 #[cfg(target_os = "macos")]
-use rook_core::channel::ChannelState;
-use rook_errors::report_if_error;
-use rookui::elements::{ChildView, Element, MouseStateHandle};
+use pterm_core::channel::ChannelState;
+use pterm_errors::report_if_error;
+use ptermui::elements::{ChildView, Element, MouseStateHandle};
 #[cfg(target_os = "macos")]
-use rookui::ui_components::button::ButtonVariant;
+use ptermui::ui_components::button::ButtonVariant;
 #[cfg(target_os = "macos")]
-use rookui::ui_components::components::UiComponent;
-use rookui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
+    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 use settings::Setting as _;
 
 use super::search::SearchQuery;
@@ -32,7 +34,7 @@ use crate::workspace::{ToastStack, cli_install};
 pub enum ScriptingSettingsPageAction {
     SetLocalControlMode(LocalControlMode),
     #[cfg(target_os = "macos")]
-    InstallRookControlCli,
+    InstallPtermControlCli,
 }
 
 pub struct ScriptingSettingsPageView {
@@ -40,7 +42,7 @@ pub struct ScriptingSettingsPageView {
     local_only_icon_tooltip_states: RefCell<HashMap<String, MouseStateHandle>>,
     local_control_mode_dropdown: ViewHandle<Dropdown<ScriptingSettingsPageAction>>,
     #[cfg(target_os = "macos")]
-    rookctrl_installing: bool,
+    ptermctrl_installing: bool,
 }
 
 impl ScriptingSettingsPageView {
@@ -52,7 +54,7 @@ impl ScriptingSettingsPageView {
         });
         Self::update_local_control_mode_dropdown(local_control_mode_dropdown.clone(), ctx);
 
-        if FeatureFlag::RookControlCli.is_enabled() {
+        if FeatureFlag::PtermControlCli.is_enabled() {
             ctx.subscribe_to_model(&LocalControlSettings::handle(ctx), |view, _, _, ctx| {
                 Self::update_local_control_mode_dropdown(
                     view.local_control_mode_dropdown.clone(),
@@ -64,7 +66,7 @@ impl ScriptingSettingsPageView {
 
         #[cfg(target_os = "macos")]
         let widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
-            Box::new(RookControlCliInstallWidget::default()),
+            Box::new(PtermControlCliInstallWidget::default()),
             Box::new(LocalControlModeWidget),
         ];
         #[cfg(not(target_os = "macos"))]
@@ -76,7 +78,7 @@ impl ScriptingSettingsPageView {
             local_only_icon_tooltip_states: RefCell::new(HashMap::new()),
             local_control_mode_dropdown,
             #[cfg(target_os = "macos")]
-            rookctrl_installing: false,
+            ptermctrl_installing: false,
         }
     }
 
@@ -106,23 +108,23 @@ impl ScriptingSettingsPageView {
     }
 
     #[cfg(target_os = "macos")]
-    fn install_rookctrl(&mut self, ctx: &mut ViewContext<Self>) {
-        if self.rookctrl_installing || cli_install::is_rookctrl_installed() {
+    fn install_ptermctrl(&mut self, ctx: &mut ViewContext<Self>) {
+        if self.ptermctrl_installing || cli_install::is_ptermctrl_installed() {
             return;
         }
 
-        self.rookctrl_installing = true;
+        self.ptermctrl_installing = true;
         ctx.notify();
         let window_id = ctx.window_id();
         ctx.spawn(
-            async { cli_install::install_rookctrl() },
+            async { cli_install::install_ptermctrl() },
             move |view, result, ctx| {
-                view.rookctrl_installing = false;
+                view.ptermctrl_installing = false;
                 match result {
                     Ok(()) => {
-                        let command_name = ChannelState::channel().rookctrl_command_name();
+                        let command_name = ChannelState::channel().ptermctrl_command_name();
                         let message = format!(
-                            "Successfully installed the Rook Control CLI! You can now run '{command_name}' from the command line."
+                            "Successfully installed the Polaris Terminal Control CLI! You can now run '{command_name}' from the command line."
                         );
                         ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                             toast_stack.add_ephemeral_toast(
@@ -133,7 +135,7 @@ impl ScriptingSettingsPageView {
                         });
                     }
                     Err(error) => {
-                        let message = format!("Failed to install Rook Control command: {error}");
+                        let message = format!("Failed to install Polaris Terminal Control command: {error}");
                         log::warn!("{message}");
                         ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                             toast_stack.add_persistent_toast(
@@ -166,7 +168,7 @@ impl TypedActionView for ScriptingSettingsPageView {
                 ctx.notify();
             }
             #[cfg(target_os = "macos")]
-            ScriptingSettingsPageAction::InstallRookControlCli => self.install_rookctrl(ctx),
+            ScriptingSettingsPageAction::InstallPtermControlCli => self.install_ptermctrl(ctx),
         }
     }
 }
@@ -187,7 +189,7 @@ impl SettingsPageMeta for ScriptingSettingsPageView {
     }
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
-        cfg!(not(target_family = "wasm")) && FeatureFlag::RookControlCli.is_enabled()
+        cfg!(not(target_family = "wasm")) && FeatureFlag::PtermControlCli.is_enabled()
     }
 
     fn update_filter(&mut self, query: &SearchQuery, ctx: &mut ViewContext<Self>) -> MatchData {
@@ -211,16 +213,16 @@ impl From<ViewHandle<ScriptingSettingsPageView>> for SettingsPageViewHandle {
 
 #[cfg(target_os = "macos")]
 #[derive(Default)]
-struct RookControlCliInstallWidget {
+struct PtermControlCliInstallWidget {
     install_button_mouse_state: MouseStateHandle,
 }
 
 #[cfg(target_os = "macos")]
-impl SettingsWidget for RookControlCliInstallWidget {
+impl SettingsWidget for PtermControlCliInstallWidget {
     type View = ScriptingSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "rook control cli command rookctrl install scripting"
+        "polaris-terminal control cli command ptermctrl install scripting"
     }
 
     fn render(
@@ -229,9 +231,9 @@ impl SettingsWidget for RookControlCliInstallWidget {
         appearance: &Appearance,
         _app: &AppContext,
     ) -> Box<dyn Element> {
-        let installed = cli_install::is_rookctrl_installed();
-        let disabled = view.rookctrl_installing || installed;
-        let label = if view.rookctrl_installing {
+        let installed = cli_install::is_ptermctrl_installed();
+        let disabled = view.ptermctrl_installing || installed;
+        let label = if view.ptermctrl_installing {
             "Installing…"
         } else if installed {
             "Installed"
@@ -254,19 +256,22 @@ impl SettingsWidget for RookControlCliInstallWidget {
             button
                 .build()
                 .on_click(|ctx, _, _| {
-                    ctx.dispatch_typed_action(ScriptingSettingsPageAction::InstallRookControlCli);
+                    ctx.dispatch_typed_action(ScriptingSettingsPageAction::InstallPtermControlCli);
                 })
                 .finish()
         };
 
         render_body_item::<ScriptingSettingsPageAction>(
-            "Rook Control CLI command".into(),
+            "Polaris Terminal Control CLI command".into(),
             None,
             LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
             button,
-            Some("Install the rookctrl command for scripting Rook from your terminal.".to_owned()),
+            Some(
+                "Install the ptermctrl command for scripting Polaris Terminal from your terminal."
+                    .to_owned(),
+            ),
         )
     }
 }
@@ -276,7 +281,7 @@ impl SettingsWidget for LocalControlModeWidget {
     type View = ScriptingSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "scripting rook control automation rookctrl local cli scripts disabled enabled"
+        "scripting polaris-terminal control automation ptermctrl local cli scripts disabled enabled"
     }
 
     fn render(
@@ -286,7 +291,7 @@ impl SettingsWidget for LocalControlModeWidget {
         app: &AppContext,
     ) -> Box<dyn Element> {
         render_body_item::<ScriptingSettingsPageAction>(
-            "rookctrl CLI".into(),
+            "ptermctrl CLI".into(),
             None,
             LocalOnlyIconState::for_setting(
                 LocalControlModeSetting::storage_key(),
@@ -297,7 +302,7 @@ impl SettingsWidget for LocalControlModeWidget {
             ToggleState::Enabled,
             appearance,
             ChildView::new(&view.local_control_mode_dropdown).finish(),
-            Some("rookctrl allows for scripting Rook's UI. Use with care.".to_owned()),
+            Some("ptermctrl allows for scripting Polaris Terminal's UI. Use with care.".to_owned()),
         )
     }
 }

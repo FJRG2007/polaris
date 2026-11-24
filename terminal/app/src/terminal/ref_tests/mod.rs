@@ -1,12 +1,12 @@
 // The test harness in this file is adapted from the alacritty_terminal crate
-// under the Apache license; see: crates/rook_terminal/src/model/LICENSE-ALACRITTY.
+// under the Apache license; see: crates/pterm_terminal/src/model/LICENSE-ALACRITTY.
 
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::Path;
 use std::sync::Arc;
 
-use rookui::r#async::executor::Background;
+use ptermui::r#async::executor::Background;
 use serde::Deserialize;
 use serde_json as json;
 
@@ -120,7 +120,7 @@ fn ref_test(dir: &Path) {
         size,
         max_block_scroll_limit: history_size as usize,
         max_retained_output_lines: 0,
-        rook_prompt_height_lines: 0.1,
+        pterm_prompt_height_lines: 0.1,
     };
     let mut terminal = TerminalModel::new(
         None, /* restored_blocks */

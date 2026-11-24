@@ -76,7 +76,7 @@ ViewerTerminalSizeReported {
 
 **New module** — `server/src/sessions/manager/viewer_terminal_size.rs` contains `relay_viewer_terminal_size()` and `process_viewer_terminal_size_report()`.
 
-### 3. Client: Viewer Reports Its Size (`rook-internal/app/`)
+### 3. Client: Viewer Reports Its Size (`polaris-terminal-internal/app/`)
 
 **Reporting via `resize_internal`** — viewer size reporting is handled inside `TerminalView::resize_internal()` at `app/src/terminal/view.rs:13763-13797` (`maybe_report_viewer_terminal_size`). After every resize, the method checks the `SizeUpdateReason`: if it's `SharerSizeChanged`, reporting is skipped (prevents loops). Otherwise, if the viewer is eligible, it compares the natural rows/cols (stored in `SizeUpdate::natural_rows`/`natural_cols`, captured before shared-session clamping in `SizeUpdateBuilder::build()`) against `last_reported_natural_size` for deduplication, and emits `Event::ReportViewerTerminalSize` when changed.
 
@@ -88,7 +88,7 @@ ViewerTerminalSizeReported {
 
 **Viewer-side sizing override** — in `SizeUpdateBuilder::build()` at `app/src/terminal/view.rs:1211-1236`, when the viewer has `last_reported_natural_size.is_some()` (viewer-driven sizing is active), the MAX with the sharer's size is skipped — the viewer uses its own natural size directly. This prevents the viewer from inflating its model size to the sharer's dimensions when the sharer PTY is already sized to the viewer's viewport.
 
-### 4. Client: Sharer Honors Viewer's Size (`rook-internal/app/`)
+### 4. Client: Sharer Honors Viewer's Size (`polaris-terminal-internal/app/`)
 
 **New downstream message handling** — in the sharer's `Network::process_websocket_message()` at `app/src/terminal/shared_session/sharer/network.rs:1040-1047`, `DownstreamMessage::ViewerTerminalSizeReported` emits `NetworkEvent::ViewerTerminalSizeReported { window_size }`. The `participant_id` from the protocol message is not propagated since the centralized eligibility check doesn't need it.
 

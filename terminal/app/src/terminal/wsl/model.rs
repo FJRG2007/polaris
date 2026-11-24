@@ -1,7 +1,7 @@
 use itertools::Itertools as _;
-use rook_errors::report_error;
-use rookui::{Entity, ModelContext, SingletonEntity};
-use rookui_extras::user_preferences::registry_backed::KEY_NOT_FOUND_ERR;
+use pterm_errors::report_error;
+use ptermui::{Entity, ModelContext, SingletonEntity};
+use ptermui_extras::user_preferences::registry_backed::KEY_NOT_FOUND_ERR;
 use windows_registry::CURRENT_USER;
 use windows_result::Error as WindowsError;
 

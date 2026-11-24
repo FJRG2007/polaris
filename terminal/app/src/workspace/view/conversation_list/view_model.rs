@@ -1,5 +1,5 @@
 use fuzzy_match::match_indices_case_insensitive;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use crate::ai::agent_conversations_model::{
     AgentConversationEntry, AgentConversationEntryId, AgentConversationsModel,

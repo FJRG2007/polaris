@@ -1,10 +1,10 @@
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rookui::elements::{
+use ptermui::elements::{
     AfterLayoutContext, AppContext, Element, EventContext, LayoutContext, PaintContext, Point,
     SizeConstraint,
 };
-use rookui::event::DispatchedEvent;
-use rookui::geometry::rect::RectF;
+use ptermui::event::DispatchedEvent;
+use ptermui::geometry::rect::RectF;
 
 use super::blockgrid_renderer::{BlockGridRenderer, GridRenderParams};
 use crate::appearance::Appearance;
@@ -44,7 +44,7 @@ impl BlockGridElement {
             block_grid: block_grid.clone(),
             block_grid_params: BlockGridParams {
                 grid_render_params: GridRenderParams {
-                    rook_theme: theme.clone(),
+                    pterm_theme: theme.clone(),
                     font_family: appearance.monospace_font_family(),
                     font_size: appearance.monospace_font_size(),
                     font_weight: appearance.monospace_font_weight(),

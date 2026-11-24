@@ -3,7 +3,7 @@ use std::sync::Arc;
 use input_classifier::{HeuristicClassifier, InputClassifier};
 #[cfg(feature = "nld_classifier_v3")]
 use input_classifier::{OnnxClassifier, OnnxModel};
-use rookui::{Entity, ModelContext, SingletonEntity};
+use ptermui::{Entity, ModelContext, SingletonEntity};
 
 pub struct InputClassifierModel {
     pub classifier: Arc<dyn InputClassifier>,

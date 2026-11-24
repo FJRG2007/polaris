@@ -3,17 +3,17 @@ use std::collections::HashMap;
 use anyhow::{Result, anyhow};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::{safe_anyhow, safe_error};
-use rook_errors::{ErrorExt, report_error};
-use rookui::actions::StandardAction;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::{safe_anyhow, safe_error};
+use pterm_errors::{ErrorExt, report_error};
+use ptermui::actions::StandardAction;
+use ptermui::elements::{
     ChildAnchor, ChildView, Container, Fill, HighlightedHyperlink, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
 };
-use rookui::keymap::FixedBinding;
-use rookui::ui_components::components::{Coords, UiComponentStyles};
-use rookui::{
+use ptermui::keymap::FixedBinding;
+use ptermui::ui_components::components::{Coords, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -32,7 +32,7 @@ use crate::server::server_api::auth::UserAuthenticationError;
 use crate::util::bindings::CustomAction;
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_fixed_bindings([
         // Bindings for paste require the StandardAction and CustomAction binding to work on all platforms.
@@ -97,7 +97,7 @@ pub struct AuthRedirectPayload {
 }
 
 impl AuthRedirectPayload {
-    /// Attempts to parse the `AuthRedirectPayload` from URL sent to Rook. To parse successfully, the URL
+    /// Attempts to parse the `AuthRedirectPayload` from URL sent to Polaris Terminal. To parse successfully, the URL
     /// must be of format {scheme}://auth/desktop_redirect?refresh_token={token}.
     pub fn from_url(url: Url) -> Result<Self> {
         if url.host_str() != Some(AUTH_URL_HOST) {
@@ -243,7 +243,7 @@ impl AuthView {
     }
 
     /// Parses the given 'clipboard_content' string into a URL which is assumed to represent the
-    /// OAuth redirect URL containing the user's refresh token after the user authenticated Rook.
+    /// OAuth redirect URL containing the user's refresh token after the user authenticated Polaris Terminal.
     fn handle_pasted_auth_url(&mut self, pasted_url: String, ctx: &mut ViewContext<Self>) {
         self.set_auth_token_input_editable(false, ctx);
         match AuthRedirectPayload::from_raw_url(pasted_url) {

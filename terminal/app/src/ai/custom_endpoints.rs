@@ -2,7 +2,7 @@ use ai::api_keys::{
     ApiKeyManager, CustomEndpointDefinition, CustomEndpointDefinitions, CustomEndpointId,
     CustomEndpointModel, CustomEndpointParams,
 };
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 use settings::Setting;
 use uuid::Uuid;
 
@@ -12,7 +12,7 @@ use crate::settings::cloud_preferences_syncer::{
     CloudPreferencesSyncer, CloudPreferencesSyncerEvent,
 };
 use crate::settings::{AISettings, AISettingsChangedEvent, SettingsFileError};
-use crate::user_config::{RookConfig, RookConfigUpdateEvent};
+use crate::user_config::{PtermConfig, PtermConfigUpdateEvent};
 
 const CUSTOM_ENDPOINTS_TOML_KEY: &str = "custom_endpoints";
 
@@ -34,24 +34,24 @@ impl CustomEndpointSettingsModel {
             }
         });
         ctx.subscribe_to_model(
-            &RookConfig::handle(ctx),
+            &PtermConfig::handle(ctx),
             |model, _, event, ctx| match event {
-                RookConfigUpdateEvent::SettingsErrors(error) => {
+                PtermConfigUpdateEvent::SettingsErrors(error) => {
                     model.settings_invalid = settings_error_affects_custom_endpoints(error);
                     model.sync_or_migrate(ctx);
                 }
-                RookConfigUpdateEvent::SettingsErrorsCleared => {
+                PtermConfigUpdateEvent::SettingsErrorsCleared => {
                     model.settings_invalid = false;
                     model.sync_or_migrate(ctx);
                 }
-                RookConfigUpdateEvent::Themes
-                | RookConfigUpdateEvent::LocalUserWorkflows
-                | RookConfigUpdateEvent::LaunchConfigs
-                | RookConfigUpdateEvent::TabConfigs
-                | RookConfigUpdateEvent::TabConfigErrors(_)
-                | RookConfigUpdateEvent::ModelConfigs
-                | RookConfigUpdateEvent::ModelConfigErrors(_)
-                | RookConfigUpdateEvent::Settings => {}
+                PtermConfigUpdateEvent::Themes
+                | PtermConfigUpdateEvent::LocalUserWorkflows
+                | PtermConfigUpdateEvent::LaunchConfigs
+                | PtermConfigUpdateEvent::TabConfigs
+                | PtermConfigUpdateEvent::TabConfigErrors(_)
+                | PtermConfigUpdateEvent::ModelConfigs
+                | PtermConfigUpdateEvent::ModelConfigErrors(_)
+                | PtermConfigUpdateEvent::Settings => {}
             },
         );
         ctx.subscribe_to_model(

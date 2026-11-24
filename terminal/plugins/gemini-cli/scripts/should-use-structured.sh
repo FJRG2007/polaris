@@ -1,5 +1,5 @@
 #!/bin/bash
-# Determines whether the current Rook build supports structured CLI agent notifications.
+# Determines whether the current Polaris Terminal build supports structured CLI agent notifications.
 #
 # Usage:
 #   source "$SCRIPT_DIR/should-use-structured.sh"
@@ -11,8 +11,8 @@
 #
 # Returns 0 (true) when structured notifications are safe to use, 1 (false) otherwise.
 
-# Last known Rook release per channel that unconditionally set
-# ROOK_CLI_AGENT_PROTOCOL_VERSION without gating it behind the
+# Last known Polaris Terminal release per channel that unconditionally set
+# POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION without gating it behind the
 # HOANotifications feature flag. These builds advertise protocol
 # support but can't actually render structured notifications.
 LAST_BROKEN_DEV=""
@@ -20,22 +20,22 @@ LAST_BROKEN_STABLE="v0.2026.03.25.08.24.stable_05"
 LAST_BROKEN_PREVIEW="v0.2026.03.25.08.24.preview_05"
 
 should_use_structured() {
-    # No protocol version advertised → Rook doesn't know about structured notifications.
-    [ -z "${ROOK_CLI_AGENT_PROTOCOL_VERSION:-}" ] && return 1
+    # No protocol version advertised → Polaris Terminal doesn't know about structured notifications.
+    [ -z "${POLARIS_TERMINAL_CLI_AGENT_PROTOCOL_VERSION:-}" ] && return 1
 
     # No client version available → can't verify this build has the fix.
-    [ -z "${ROOK_CLIENT_VERSION:-}" ] && return 1
+    [ -z "${POLARIS_TERMINAL_CLIENT_VERSION:-}" ] && return 1
 
     # Check whether this version is at or before the last broken release for its channel.
     local threshold=""
-    case "$ROOK_CLIENT_VERSION" in
+    case "$POLARIS_TERMINAL_CLIENT_VERSION" in
         *dev*)     threshold="$LAST_BROKEN_DEV" ;;
         *stable*)  threshold="$LAST_BROKEN_STABLE" ;;
         *preview*) threshold="$LAST_BROKEN_PREVIEW" ;;
     esac
 
     # If we matched a channel and the version is <= the broken threshold, fall back.
-    if [ -n "$threshold" ] && [[ ! "$ROOK_CLIENT_VERSION" > "$threshold" ]]; then
+    if [ -n "$threshold" ] && [[ ! "$POLARIS_TERMINAL_CLIENT_VERSION" > "$threshold" ]]; then
         return 1
     fi
 

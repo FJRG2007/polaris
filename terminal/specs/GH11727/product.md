@@ -1,12 +1,12 @@
 # PRODUCT.md — First-class Grok Build agent support
 
-Issue: https://github.com/FJRG2007/rook/issues/11727
+Issue: https://github.com/FJRG2007/polaris/issues/11727
 
 ## Summary
 
 Add Grok Build (SpaceXAI’s `grok` binary) as a first-class third-party CLI coding
-agent in Rook, at parity with Claude Code, Codex, and OpenCode. Users who run
-`grok` in a Rook pane get native agent identity (brand icon and color), the CLI
+agent in Polaris Terminal, at parity with Claude Code, Codex, and OpenCode. Users who run
+`grok` in a Polaris Terminal pane get native agent identity (brand icon and color), the CLI
 agent toolbar, rich input, image attach, skills/bash mode support, and
 notification/session status wiring.
 
@@ -21,28 +21,28 @@ notification/session status wiring.
   chrome that already uses `CLIAgent` identity.
 - Full CLI agent toolbar / rich input / image paste paths used by other agents.
 - Session listener support, including OSC 9 fallback (Grok Build already notifies
-  Rook via OSC 9) and OSC 777 rich plugin events when the Rook plugin is installed.
-- One-click install/update for the Rook notification plugin (hooks under
+  Polaris Terminal via OSC 9) and OSC 777 rich plugin events when the Polaris Terminal plugin is installed.
+- One-click install/update for the Polaris Terminal notification plugin (hooks under
   `~/.grok/hooks` or `$GROK_HOME/hooks`), matching Claude/Codex product language.
 - Unit tests for detection, listener support, and plugin manager wiring.
 - Telemetry: a distinct `CLIAgentType` for Grok Build.
 
 **Out of scope**
 
-- ACP / `grok agent stdio` as a backend for Rook’s built-in Agent Mode.
+- ACP / `grok agent stdio` as a backend for Polaris Terminal’s built-in Agent Mode.
 - Cloud orchestration `Harness::Grok` / ambient spawn of Grok Build on workers.
 - Treating the install alias `agent` as Grok Build (that basename is Cursor CLI).
-- Changing Grok Build itself or shipping a Grok binary inside Rook.
+- Changing Grok Build itself or shipping a Grok binary inside Polaris Terminal.
 - Docs site / marketing pages outside this repository (including the public
   “supported third-party CLI agents” list called out on #11727 — follow-up in
   warpdotdev/docs or equivalent).
 - Hosted marketplace package under `~/.grok/installed-plugins/` /
   `grok plugin install …`; file-based hooks install under `$GROK_HOME/hooks` is
-  the interim until Rook publishes one.
+  the interim until Polaris Terminal publishes one.
 
 ## Branding
 
-Aligned with [#11727](https://github.com/FJRG2007/rook/issues/11727) community
+Aligned with [#11727](https://github.com/FJRG2007/polaris/issues/11727) community
 guidance (official package filenames; logomark only):
 
 - Use the official **Grok logomark** (not corporate mark, not wordmark, not full
@@ -51,18 +51,18 @@ guidance (official package filenames; logomark only):
   https://data.x.ai/logos/xAI_Grok_Assets.zip.
 - Canonical package files for avatars: `Grok_Logomark_Light.svg` /
   `Grok_Logomark_Dark.svg` (issue recommendation for dark/light UI).
-- **Rook adaptation:** reuse the existing monochrome SVG at
+- **Polaris Terminal adaptation:** reuse the existing monochrome SVG at
   `app/assets/bundled/svg/grok.svg` with `fill="#FF0000"` (icon red-channel
-  alpha mask). Rook tints the mark at paint time for light/dark chrome — the
+  alpha mask). Polaris Terminal tints the mark at paint time for light/dark chrome — the
   same pipeline as Claude / Codex / OpenAI. Dual on-disk light/dark files would
-  not match how Rook’s `Icon` system works and would break tinting. Geometry
+  not match how Polaris Terminal’s `Icon` system works and would break tinting. Geometry
   comes from the official logomark; only fill is converted to the mask color
   and the paths are padded into the existing circular avatar frame.
 
 ## Behavior invariants
 
 1. When the user runs a long-running command whose resolved first token is
-   `grok`, Rook creates a CLI agent session with display name **Grok Build** and
+   `grok`, Polaris Terminal creates a CLI agent session with display name **Grok Build** and
    shows the CLI agent toolbar when the third-party CLI agent toolbar setting is
    enabled.
 
@@ -80,12 +80,12 @@ guidance (official package filenames; logomark only):
    a submit strategy that does not drop or double-submit the prompt. Empty or
    whitespace-only submit is a no-op.
 
-5. Image attach while rich input is open uses Rook attachment chips; on submit,
+5. Image attach while rich input is open uses Polaris Terminal attachment chips; on submit,
    images are delivered via the system clipboard and Grok Build’s paste chord
    (Ctrl/Cmd+V; Alt+V on Windows), matching other CLI agents. Image drop while
    rich input is closed uses the same clipboard + paste path.
 
-6. Bash mode: when the rich input starts with `!`, Rook uses the same mode-switch
+6. Bash mode: when the rich input starts with `!`, Polaris Terminal uses the same mode-switch
    prefix split used for Claude/OpenCode so Grok Build can enter shell mode.
 
 7. Skills: the rich input slash/skills menu only lists providers Grok Build can
@@ -95,17 +95,17 @@ guidance (official package filenames; logomark only):
    Cursor CLI). An alias whose expansion’s first token is `grok` **is** detected
    as Grok Build.
 
-9. Without the Rook notification plugin, the session still provides toolbar, rich
+9. Without the Polaris Terminal notification plugin, the session still provides toolbar, rich
    input, and images. Status may be limited to command-detect “in progress” plus
    native OSC 9 turn-complete/approval signals treated like Codex OSC 9 fallback.
 
-10. With the plugin installed (OSC 777 title `rook://cli-agent` and JSON body
-    `"agent":"grok"`), Rook latches rich plugin status (e.g. prompt titles,
+10. With the plugin installed (OSC 777 title `polaris-terminal://cli-agent` and JSON body
+    `"agent":"grok"`), Polaris Terminal latches rich plugin status (e.g. prompt titles,
     blocked/success) the same way it does for Claude/OpenCode plugins.
 
 11. When a plugin manager is registered for Grok Build, the footer shows the same
     **Enable Grok Build notifications** chip as other agents (one-click install).
-    That writes the Rook notification plugin into `$GROK_HOME/hooks` (hooks files
+    That writes the Polaris Terminal notification plugin into `$GROK_HOME/hooks` (hooks files
     rather than a marketplace package). Manual setup instructions remain as
     fallback when auto-install is unavailable (e.g. remote/sandbox).
 

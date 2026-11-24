@@ -1,5 +1,5 @@
-use rookui::elements::MouseStateHandle;
-use rookui::{AppContext, EntityId, SingletonEntity, ViewContext, ViewHandle, WindowId};
+use ptermui::elements::MouseStateHandle;
+use ptermui::{AppContext, EntityId, SingletonEntity, ViewContext, ViewHandle, WindowId};
 use serde::{Deserialize, Serialize};
 
 use super::OneTimeModalModel;
@@ -42,7 +42,7 @@ pub(super) struct WorkspaceMouseStates {
     pub(super) title_bar_search_bar: MouseStateHandle,
     pub(super) team_switcher_pill: MouseStateHandle,
     #[cfg(target_family = "wasm")]
-    pub(super) rook_logo: MouseStateHandle,
+    pub(super) pterm_logo: MouseStateHandle,
 }
 
 #[derive(Debug)]
@@ -89,7 +89,7 @@ pub struct WorkspaceState {
     pub is_launch_config_save_modal_open: bool,
     pub is_resource_center_open: bool,
     pub is_command_search_open: bool,
-    pub is_rook_drive_open: bool,
+    pub is_pterm_drive_open: bool,
     pub is_ai_assistant_panel_open: bool,
     pub is_agent_management_popup_open: bool,
     pub is_auth_override_modal_open: bool,
@@ -130,7 +130,7 @@ impl WorkspaceState {
             || self.is_theme_chooser_open
             || self.is_ai_assistant_panel_open
             || self.is_workflow_modal_open
-            || self.is_rook_drive_open
+            || self.is_pterm_drive_open
     }
 
     pub fn is_any_non_palette_modal_open(&self, app: &AppContext) -> bool {
@@ -214,7 +214,7 @@ impl WorkspaceState {
     }
 
     pub fn close_all_left_panels(&mut self) {
-        self.is_rook_drive_open = false;
+        self.is_pterm_drive_open = false;
         self.is_theme_chooser_open = false;
     }
 
@@ -305,7 +305,7 @@ pub enum TerminalSessionFallbackBehavior {
 /// Given a [`WindowId`], see if its [`Workspace`] contains an active [`TerminalView`] and return
 /// that.
 ///
-/// Note that "active" is not the same as "focused" in Rook's pane management.
+/// Note that "active" is not the same as "focused" in Polaris Terminal's pane management.
 pub fn active_terminal_in_window<T, F>(
     window_id: WindowId,
     ctx: &mut AppContext,
@@ -383,7 +383,7 @@ pub fn get_context_target_terminal_view(
 pub fn get_terminal_background_fill(
     window_id: WindowId,
     app: &AppContext,
-) -> rookui::elements::Fill {
+) -> ptermui::elements::Fill {
     let theme = Appearance::as_ref(app).theme();
     let terminal_opacity = get_terminal_background_opacity(window_id, app);
     theme.background().with_opacity(terminal_opacity).into()

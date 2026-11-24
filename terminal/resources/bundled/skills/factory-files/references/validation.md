@@ -1,7 +1,7 @@
 # Validating and reading diagnostics
 
 ## Layers of validation
-1. **The server's parser** (`logic/factoryfile` in `rook-server`) is the only
+1. **The server's parser** (`logic/factoryfile` in `polaris-terminal-server`) is the only
    authority. `POST /api/v1/factory-files/validate` runs it over a tree you
    submit as paths and content, and adds the state-independent rules the apply
    path enforces next: runner platforms and instance shapes, and trigger filter
@@ -28,12 +28,12 @@ python3 "<skill-dir>/scripts/validate_factory_files.py" "<factory-root>"
 python3 "<skill-dir>/scripts/validate_factory_files.py" "<factory-root>" --json
 ```
 
-`--server-root <url>`, `ROOK_SERVER_ROOT`, or `ROOK_SERVER_ROOT_URL` selects a
+`--server-root <url>`, `POLARIS_TERMINAL_SERVER_ROOT`, or `POLARIS_TERMINAL_SERVER_ROOT_URL` selects a
 local, staging, or self-hosted server, in that order of precedence. An Oz
 sandbox exports its own server root under the last of those names, so a
 sandbox validates against the server it belongs to rather than production.
 
-The endpoint needs no credential; `ROOK_API_KEY` is forwarded when the
+The endpoint needs no credential; `POLARIS_TERMINAL_API_KEY` is forwarded when the
 environment already has one, which makes the request attributable inside an
 agent sandbox. If the server answers a forwarded key with 401 or 403, the
 request is retried once without it and the drop is noted on stderr, so a stale
@@ -110,7 +110,7 @@ against a registered Factory.
 - `FF_INVALID_REFERENCE` — a named reference does not resolve, such as an
   Automation or Scorer naming an Agent the tree does not declare, or an
   unknown current `agentType` or `credentialStrategy`.
-- `FF_INVALID_MCP` — an MCP entry is not exactly a non-empty `rookId`.
+- `FF_INVALID_MCP` — an MCP entry is not exactly a non-empty `ptermId`.
 - `FF_INVALID_TRIGGER` — a trigger is structurally wrong, such as an inline
   schedule on a non-schedule trigger, or a `schedule.cron_fired` trigger that
   declares both or neither of `schedule.cron` and `filter.schedule_ids`.
@@ -127,9 +127,9 @@ curl -s https://app.rook.dev/api/v1/factory-files/schemas/v1alpha1
 
 They are ordinary JSON Schema 2020-12 documents, exact for the version they
 describe, so any standard validator works if a tree is already converted to
-JSON. `x-rook-*` annotations carry constraints JSON Schema cannot express
+JSON. `x-polaris-terminal-*` annotations carry constraints JSON Schema cannot express
 portably, such as trimmed Unicode alias rules and the power-of-two Linux
-compute sizes; only a Rook validator enforces those.
+compute sizes; only a Polaris Terminal validator enforces those.
 
 Fetching a schema is not validation. A successful fetch says the server is
 reachable, nothing more.
@@ -138,7 +138,7 @@ reachable, nothing more.
 This skill used to bundle the schemas and a local validator so authoring worked
 without a server. That was removed, and should not be reintroduced.
 
-The copy shipped inside a Rook release, so it was routinely older than the
+The copy shipped inside a Polaris Terminal release, so it was routinely older than the
 server a Factory syncs against. A stale copy does not degrade gracefully: it
 reports a field the server accepts as unknown, and an agent trying to reach a
 clean run resolves that by deleting working configuration. It happened — an
@@ -157,7 +157,7 @@ diagnostic by deleting the resource or moving a file to a path the parser
 ignores.
 
 ## Checking against the parser directly
-When `rook-server` is checked out locally, its parser tests are the closest
+When `polaris-terminal-server` is checked out locally, its parser tests are the closest
 thing to ground truth. Run them from that checkout, not from the Factory
 repository:
 

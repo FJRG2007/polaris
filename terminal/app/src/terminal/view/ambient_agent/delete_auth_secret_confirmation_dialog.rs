@@ -1,10 +1,10 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use rook_cli::agent::Harness;
-use rook_managed_secrets::client::SecretOwner;
-use rookui::elements::{Align, ChildView, Container, Dismiss, DropShadow, Empty};
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use pterm_cli::agent::Harness;
+use pterm_managed_secrets::client::SecretOwner;
+use ptermui::elements::{Align, ChildView, Container, Dismiss, DropShadow, Empty};
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 

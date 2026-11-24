@@ -17,8 +17,8 @@ use std::time::Duration;
 pub use codebase_index::{CodebaseIndex, RetrievalID, SyncProgress};
 pub use fragment_metadata::{FragmentLocation as FragmentMetadataLocation, FragmentMetadata};
 pub use merkle_tree::{ContentHash, NodeHash};
-use rook_errors::{AnyhowErrorExt, ErrorExt, register_error};
-use rook_graphql::queries::rerank_fragments::FragmentLocationInput;
+use pterm_errors::{AnyhowErrorExt, ErrorExt, register_error};
+use pterm_graphql::queries::rerank_fragments::FragmentLocationInput;
 pub use snapshot::SnapshotStorage;
 use string_offset::ByteOffset;
 pub use sync_client::SyncTask;
@@ -131,54 +131,54 @@ pub struct RepoMetadata {
     pub path: Option<String>,
 }
 
-impl From<RepoMetadata> for rook_graphql::full_source_code_embedding::RepoMetadata {
+impl From<RepoMetadata> for pterm_graphql::full_source_code_embedding::RepoMetadata {
     fn from(val: RepoMetadata) -> Self {
         Self { path: val.path }
     }
 }
 
-impl From<EmbeddingConfig> for rook_graphql::full_source_code_embedding::EmbeddingConfig {
+impl From<EmbeddingConfig> for pterm_graphql::full_source_code_embedding::EmbeddingConfig {
     fn from(val: EmbeddingConfig) -> Self {
         match val {
             EmbeddingConfig::OpenAiTextSmall3_256 => {
-                rook_graphql::full_source_code_embedding::EmbeddingConfig::OpenaiTextSmall3256
+                pterm_graphql::full_source_code_embedding::EmbeddingConfig::OpenaiTextSmall3256
             }
             EmbeddingConfig::VoyageCode3_512 => {
-                rook_graphql::full_source_code_embedding::EmbeddingConfig::VoyageCode3512
+                pterm_graphql::full_source_code_embedding::EmbeddingConfig::VoyageCode3512
             }
             EmbeddingConfig::Voyage3_5_512 => {
-                rook_graphql::full_source_code_embedding::EmbeddingConfig::Voyage35512
+                pterm_graphql::full_source_code_embedding::EmbeddingConfig::Voyage35512
             }
             EmbeddingConfig::Voyage3_5_Lite_512 => {
-                rook_graphql::full_source_code_embedding::EmbeddingConfig::Voyage35Lite512
+                pterm_graphql::full_source_code_embedding::EmbeddingConfig::Voyage35Lite512
             }
             EmbeddingConfig::Voyage4_512 => {
-                rook_graphql::full_source_code_embedding::EmbeddingConfig::Voyage4512
+                pterm_graphql::full_source_code_embedding::EmbeddingConfig::Voyage4512
             }
         }
     }
 }
 
-impl TryFrom<rook_graphql::full_source_code_embedding::EmbeddingConfig> for EmbeddingConfig {
+impl TryFrom<pterm_graphql::full_source_code_embedding::EmbeddingConfig> for EmbeddingConfig {
     type Error = Error;
 
     fn try_from(
-        value: rook_graphql::full_source_code_embedding::EmbeddingConfig,
+        value: pterm_graphql::full_source_code_embedding::EmbeddingConfig,
     ) -> Result<Self, Self::Error> {
         match value {
-            rook_graphql::full_source_code_embedding::EmbeddingConfig::OpenaiTextSmall3256 => {
+            pterm_graphql::full_source_code_embedding::EmbeddingConfig::OpenaiTextSmall3256 => {
                 Ok(Self::OpenAiTextSmall3_256)
             }
-            rook_graphql::full_source_code_embedding::EmbeddingConfig::Voyage35Lite512 => {
+            pterm_graphql::full_source_code_embedding::EmbeddingConfig::Voyage35Lite512 => {
                 Ok(Self::Voyage3_5_Lite_512)
             }
-            rook_graphql::full_source_code_embedding::EmbeddingConfig::VoyageCode3512 => {
+            pterm_graphql::full_source_code_embedding::EmbeddingConfig::VoyageCode3512 => {
                 Ok(Self::VoyageCode3_512)
             }
-            rook_graphql::full_source_code_embedding::EmbeddingConfig::Voyage35512 => {
+            pterm_graphql::full_source_code_embedding::EmbeddingConfig::Voyage35512 => {
                 Ok(Self::Voyage3_5_512)
             }
-            rook_graphql::full_source_code_embedding::EmbeddingConfig::Voyage4512 => {
+            pterm_graphql::full_source_code_embedding::EmbeddingConfig::Voyage4512 => {
                 Ok(Self::Voyage4_512)
             }
         }
@@ -234,7 +234,7 @@ impl Fragment {
     }
 }
 
-impl From<Fragment> for rook_graphql::full_source_code_embedding::Fragment {
+impl From<Fragment> for pterm_graphql::full_source_code_embedding::Fragment {
     fn from(val: Fragment) -> Self {
         Self {
             content: val.content,
@@ -243,7 +243,7 @@ impl From<Fragment> for rook_graphql::full_source_code_embedding::Fragment {
     }
 }
 
-impl From<Fragment> for rook_graphql::queries::rerank_fragments::RerankFragmentInput {
+impl From<Fragment> for pterm_graphql::queries::rerank_fragments::RerankFragmentInput {
     fn from(val: Fragment) -> Self {
         Self {
             content: val.content,
@@ -257,11 +257,11 @@ impl From<Fragment> for rook_graphql::queries::rerank_fragments::RerankFragmentI
     }
 }
 
-impl TryFrom<rook_graphql::queries::rerank_fragments::RerankFragment> for Fragment {
+impl TryFrom<pterm_graphql::queries::rerank_fragments::RerankFragment> for Fragment {
     type Error = Error;
 
     fn try_from(
-        val: rook_graphql::queries::rerank_fragments::RerankFragment,
+        val: pterm_graphql::queries::rerank_fragments::RerankFragment,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             content: val.content,

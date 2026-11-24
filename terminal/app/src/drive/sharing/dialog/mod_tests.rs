@@ -1,5 +1,5 @@
 use chrono::Local;
-use rookui::{App, SingletonEntity, TypedActionView, ViewHandle};
+use ptermui::{App, SingletonEntity, TypedActionView, ViewHandle};
 use session_sharing_protocol::common::SessionId;
 
 use super::{SharingDialog, SharingDialogAction, SharingDialogMode};
@@ -329,7 +329,7 @@ fn assert_set_link_permissions_dispatch(
 
         let object_uid = add_shareable_object(&mut app);
         let dialog = app.add_typed_action_view(window_id, |ctx| {
-            SharingDialog::new(Some(ShareableObject::RookDriveObject(object_uid)), ctx)
+            SharingDialog::new(Some(ShareableObject::PtermDriveObject(object_uid)), ctx)
         });
 
         set_link_permissions(&dialog, access_level, &mut app);

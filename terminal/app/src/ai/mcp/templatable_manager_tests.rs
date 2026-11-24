@@ -1,6 +1,6 @@
 use futures_util::stream::AbortHandle;
 use mcp::oauth::CallbackResult;
-use rookui::App;
+use ptermui::App;
 use url::Url;
 use uuid::Uuid;
 
@@ -26,7 +26,7 @@ fn oauth_callback_preserves_decoded_issuer() {
         .pending_oauth_csrf
         .insert("test-state".to_string(), installation_uuid);
     let callback_url = Url::parse(
-        "rookdev://mcp/oauth2callback?code=test-code&state=test-state&iss=https%3A%2F%2Fmcp.linear.app",
+        "polaris-terminal-dev://mcp/oauth2callback?code=test-code&state=test-state&iss=https%3A%2F%2Fmcp.linear.app",
     )
     .unwrap();
 

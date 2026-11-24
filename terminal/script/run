@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Cross-platform entrypoint for running a local Rook build.
+# Cross-platform entrypoint for running a local Polaris Terminal build.
 #
-# On macOS this delegates to `./script/macos/run`, which builds and runs Rook
+# On macOS this delegates to `./script/macos/run`, which builds and runs Polaris Terminal
 # as a real `.app` bundle (with code signing, plist updates, etc.). On Linux
 # and Windows it invokes `cargo run` directly for the appropriate binary.
 #
@@ -21,18 +21,18 @@ OS_TYPE="$(uname -s)"
 FEATURES="gui"
 INSTALL_COMMON_SKILLS=1
 FORCE_COMMON_SKILLS=0
-COMMON_SKILLS_TARGET="${ROOK_COMMON_SKILLS_INSTALL_TARGET:-}"
+COMMON_SKILLS_TARGET="${POLARIS_TERMINAL_COMMON_SKILLS_INSTALL_TARGET:-}"
 
 ./script/install_channel_config || echo "Skipping internal channel config installation (no repo access)."
 
 
-# If rook_channel_config is on PATH, build the Local channel binary; otherwise build the OSS channel.
-if command -v rook-channel-config &>/dev/null; then
-    ROOK_BIN_NAME="rook"
-    ROOK_CHANNEL="local"
+# If pterm_channel_config is on PATH, build the Local channel binary; otherwise build the OSS channel.
+if command -v polaris-terminal-channel-config &>/dev/null; then
+    POLARIS_TERMINAL_BIN_NAME="polaris-terminal"
+    POLARIS_TERMINAL_CHANNEL="local"
 else
-    ROOK_BIN_NAME="rook-oss"
-    ROOK_CHANNEL="oss"
+    POLARIS_TERMINAL_BIN_NAME="polaris-terminal"
+    POLARIS_TERMINAL_CHANNEL="oss"
 fi
 
 # Shared argument parsing. macOS-specific flags (--dont-open,
@@ -40,13 +40,13 @@ fi
 # silently ignored on other platforms.
 MAC_ARGS=()
 CARGO_PARAMS=()
-ROOK_ARGS=()
+POLARIS_TERMINAL_ARGS=()
 
 while (( "$#" )); do
   case "$1" in
     --)
       shift
-      ROOK_ARGS=("$@")
+      POLARIS_TERMINAL_ARGS=("$@")
       break
       ;;
     --features)
@@ -60,7 +60,7 @@ while (( "$#" )); do
       ;;
     --host-id)
       if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
-        export ROOK_CLOUD_MODE_DEFAULT_HOST="$2"
+        export POLARIS_TERMINAL_CLOUD_MODE_DEFAULT_HOST="$2"
         shift 2
       else
         echo "Error: Argument for $1 is missing" >&2
@@ -105,7 +105,7 @@ if [[ "$INSTALL_COMMON_SKILLS" -eq 1 ]]; then
   if [[ "${COMMON_SKILLS_TARGET}" = "project" || "${COMMON_SKILLS_TARGET}" = "global" ]]; then
     COMMON_SKILLS_ARGS=("--${COMMON_SKILLS_TARGET}")
   fi
-  if [[ "${ROOK_SKIP_COMMON_SKILLS_INSTALL:-}" = "1" ]]; then
+  if [[ "${POLARIS_TERMINAL_SKIP_COMMON_SKILLS_INSTALL:-}" = "1" ]]; then
     :
   elif [[ "$FORCE_COMMON_SKILLS" -eq 1 ]]; then
     if [[ "${#COMMON_SKILLS_ARGS[@]}" -gt 0 ]]; then
@@ -123,7 +123,7 @@ if [[ "$INSTALL_COMMON_SKILLS" -eq 1 ]]; then
 fi
 
 # These cargo features were removed and replaced by environment variables read
-# by rook-channel-config. Intercept them here so that existing --features
+# by polaris-terminal-channel-config. Intercept them here so that existing --features
 # invocations keep working.
 for mapping in \
     "with_local_server:WITH_LOCAL_SERVER" \
@@ -140,21 +140,21 @@ for mapping in \
 done
 
 export FEATURES
-export ROOK_BIN_NAME
-export ROOK_CHANNEL
+export POLARIS_TERMINAL_BIN_NAME
+export POLARIS_TERMINAL_CHANNEL
 
 if [[ "$OS_TYPE" = "Darwin" ]]; then
-  if [[ ${#ROOK_ARGS[@]} -gt 0 ]]; then
-    exec ./script/macos/run "${MAC_ARGS[@]}" -- "${ROOK_ARGS[@]}"
+  if [[ ${#POLARIS_TERMINAL_ARGS[@]} -gt 0 ]]; then
+    exec ./script/macos/run "${MAC_ARGS[@]}" -- "${POLARIS_TERMINAL_ARGS[@]}"
   else
     exec ./script/macos/run "${MAC_ARGS[@]}"
   fi
 elif [[ "$OS_TYPE" = "Linux" ]] || [[ "$OS_TYPE" =~ ^(MINGW64_NT|MSYS_NT) ]]; then
-  echo "Running cargo run --bin $ROOK_BIN_NAME --features \"$FEATURES\" ${CARGO_PARAMS[*]}"
-  if [[ ${#ROOK_ARGS[@]} -gt 0 ]]; then
-    cargo run --bin "$ROOK_BIN_NAME" --features "$FEATURES" "${CARGO_PARAMS[@]}" -- "${ROOK_ARGS[@]}"
+  echo "Running cargo run --bin $POLARIS_TERMINAL_BIN_NAME --features \"$FEATURES\" ${CARGO_PARAMS[*]}"
+  if [[ ${#POLARIS_TERMINAL_ARGS[@]} -gt 0 ]]; then
+    cargo run --bin "$POLARIS_TERMINAL_BIN_NAME" --features "$FEATURES" "${CARGO_PARAMS[@]}" -- "${POLARIS_TERMINAL_ARGS[@]}"
   else
-    cargo run --bin "$ROOK_BIN_NAME" --features "$FEATURES" "${CARGO_PARAMS[@]}"
+    cargo run --bin "$POLARIS_TERMINAL_BIN_NAME" --features "$FEATURES" "${CARGO_PARAMS[@]}"
   fi
 else
   echo "No run script defined for the current platform ($OS_TYPE)!" >&2

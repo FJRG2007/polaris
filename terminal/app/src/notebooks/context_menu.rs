@@ -1,12 +1,12 @@
 //! Shared context menu implementation for notebooks.
 
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::context_flag::ContextFlag;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::{ChildAnchor, OffsetPositioning, ParentAnchor, ParentOffsetBounds, Stack};
-use rookui::keymap::Trigger;
-use rookui::presenter::ChildView;
-use rookui::{Action, Element, EventContext, TypedActionView, View, ViewContext, ViewHandle};
+use pterm_core::context_flag::ContextFlag;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::{ChildAnchor, OffsetPositioning, ParentAnchor, ParentOffsetBounds, Stack};
+use ptermui::keymap::Trigger;
+use ptermui::presenter::ChildView;
+use ptermui::{Action, Element, EventContext, TypedActionView, View, ViewContext, ViewHandle};
 
 use super::editor::keys::custom_action_to_display;
 use super::editor::view::RichTextEditorView;
@@ -269,7 +269,7 @@ where
 
     #[cfg(test)]
     /// List out the context menu items by name.
-    pub fn item_names(&self, ctx: &impl rookui::ViewAsRef) -> Vec<String> {
+    pub fn item_names(&self, ctx: &impl ptermui::ViewAsRef) -> Vec<String> {
         self.menu
             .as_ref(ctx)
             .items()

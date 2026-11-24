@@ -3,17 +3,17 @@ use std::collections::HashMap;
 use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
 use ai::project_context::model::ProjectContextModel;
 use pane_group::{NotebookPane, PaneState, SplitPaneState, TerminalPaneId};
+use pterm_editor::editor::NavigationKey;
+#[cfg(feature = "local_fs")]
+use pterm_files::FileModel;
+use ptermui::platform::WindowStyle;
+use ptermui::{AddSingletonModel, App, ViewHandle};
 #[cfg(feature = "local_fs")]
 use repo_metadata::CanonicalizedPath;
 #[cfg(feature = "local_fs")]
 use repo_metadata::RepoMetadataModel;
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::watcher::DirectoryWatcher;
-use rook_editor::editor::NavigationKey;
-#[cfg(feature = "local_fs")]
-use rook_files::FileModel;
-use rookui::platform::WindowStyle;
-use rookui::{AddSingletonModel, App, ViewHandle};
 use session_sharing_protocol::common::SessionId;
 #[cfg(feature = "local_fs")]
 use tempfile::TempDir;
@@ -53,10 +53,10 @@ use crate::notebooks::editor::keys::NotebookKeybindings;
 use crate::notebooks::notebook::NotebookView;
 use crate::pane_group::{Direction, PaneGroupAction, PaneId};
 use crate::pricing::PricingInfoModel;
+use crate::pterm_managed_paths_watcher::PtermManagedPathsWatcher;
 #[cfg(not(target_family = "wasm"))]
 use crate::remote_server::codebase_index_model::RemoteCodebaseIndexModel;
 use crate::resource_center::Tip;
-use crate::rook_managed_paths_watcher::RookManagedPathsWatcher;
 use crate::server::cloud_objects::listener::Listener;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::experiments::ServerExperiments;
@@ -172,7 +172,7 @@ pub(crate) fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| DetectedRepositories::default());
     app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
     app.add_singleton_model(DirectoryWatcher::new);
-    app.add_singleton_model(RookManagedPathsWatcher::new_for_testing);
+    app.add_singleton_model(PtermManagedPathsWatcher::new_for_testing);
     app.add_singleton_model(FileMCPWatcher::new);
     app.add_singleton_model(|_| FileBasedMCPManager::default());
 
@@ -191,7 +191,7 @@ pub(crate) fn initialize_app(app: &mut App) {
     // page's `IapManager::as_ref(ctx).is_enabled()` check panics if the
     // singleton isn't registered, even though it's a no-op on production.
     app.add_singleton_model(|ctx| {
-        rook_server_client::iap::IapManager::new(
+        pterm_server_client::iap::IapManager::new(
             None,
             Box::new(|_| futures::FutureExt::boxed(futures::future::ready(None::<String>))),
             None,
@@ -246,7 +246,7 @@ pub(crate) fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| History::new(vec![]));
 
     // SkillManager is registered after `HomeDirectoryWatcher`, `DirectoryWatcher`,
-    // `RookManagedPathsWatcher`, `DetectedRepositories`, and `RepoMetadataModel`
+    // `PtermManagedPathsWatcher`, `DetectedRepositories`, and `RepoMetadataModel`
     // because `SkillWatcher::new` subscribes to all of them.
     app.add_singleton_model(SkillManager::new);
 
@@ -545,7 +545,7 @@ fn test_theme_chooser_does_not_suppress_tab_bar_traffic_light_padding() {
     });
 }
 
-/// Regression for account-first onboarding users who select Rook Drive and
+/// Regression for account-first onboarding users who select Polaris Terminal Drive and
 /// conversation history, skip signup, and create an account later. The stored
 /// preferences should remain true while unavailable, then take effect
 /// automatically as account and AI availability change—without an off/on
@@ -562,11 +562,11 @@ fn test_tools_panel_preferences_activate_after_signup_and_ai_enablement() {
         // Preserve the user's onboarding intent while starting logged out with
         // AI disabled (the account-skipped account-first completion state).
         app.update(|ctx| {
-            RookDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
+            PtermDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
                 settings
-                    .enable_rook_drive
+                    .enable_pterm_drive
                     .set_value(true, ctx)
-                    .expect("remember Rook Drive preference");
+                    .expect("remember Polaris Terminal Drive preference");
             });
             AISettings::handle(ctx).update(ctx, |settings, ctx| {
                 settings
@@ -588,8 +588,8 @@ fn test_tools_panel_preferences_activate_after_signup_and_ai_enablement() {
             assert!(
                 workspace
                     .left_panel_views
-                    .contains(&ToolPanelView::RookDrive),
-                "the stored preference should keep the locked Rook Drive entry visible"
+                    .contains(&ToolPanelView::PtermDrive),
+                "the stored preference should keep the locked Polaris Terminal Drive entry visible"
             );
             assert!(
                 workspace
@@ -598,7 +598,7 @@ fn test_tools_panel_preferences_activate_after_signup_and_ai_enablement() {
                 "the stored preference should keep the locked conversations entry visible"
             );
             workspace.left_panel_view.update(ctx, |left_panel, ctx| {
-                left_panel.handle_action_with_force_open(&LeftPanelAction::RookDrive, false, ctx);
+                left_panel.handle_action_with_force_open(&LeftPanelAction::PtermDrive, false, ctx);
                 assert_eq!(
                     left_panel.active_view_availability(ctx),
                     left_panel::ToolPanelAvailability::RequiresAccount
@@ -631,10 +631,10 @@ fn test_tools_panel_preferences_activate_after_signup_and_ai_enablement() {
         });
         app.read(|ctx| {
             // Availability must not erase the raw onboarding preferences.
-            assert!(*RookDriveSettings::as_ref(ctx).enable_rook_drive);
+            assert!(*PtermDriveSettings::as_ref(ctx).enable_pterm_drive);
             assert!(*AISettings::as_ref(ctx).show_conversation_history);
-            assert!(!RookDriveSettings::is_rook_drive_available(ctx));
-            assert!(!RookDriveSettings::is_rook_drive_enabled(ctx));
+            assert!(!PtermDriveSettings::is_pterm_drive_available(ctx));
+            assert!(!PtermDriveSettings::is_pterm_drive_enabled(ctx));
             assert!(!AISettings::as_ref(ctx).is_conversation_history_available(ctx));
             assert!(!AISettings::as_ref(ctx).is_conversation_history_enabled(ctx));
         });
@@ -659,7 +659,7 @@ fn test_tools_panel_preferences_activate_after_signup_and_ai_enablement() {
             assert!(
                 workspace
                     .left_panel_views
-                    .contains(&ToolPanelView::RookDrive),
+                    .contains(&ToolPanelView::PtermDrive),
                 "Drive entry remains visible and unlocks after signup"
             );
             assert!(
@@ -669,10 +669,10 @@ fn test_tools_panel_preferences_activate_after_signup_and_ai_enablement() {
                 "conversation entry remains visible while waiting for AI"
             );
             assert!(!workspace.auth_state.is_anonymous_or_logged_out());
-            assert!(RookDriveSettings::is_rook_drive_enabled(ctx));
+            assert!(PtermDriveSettings::is_pterm_drive_enabled(ctx));
             assert!(!AISettings::as_ref(ctx).is_conversation_history_enabled(ctx));
             workspace.left_panel_view.update(ctx, |left_panel, ctx| {
-                left_panel.handle_action_with_force_open(&LeftPanelAction::RookDrive, false, ctx);
+                left_panel.handle_action_with_force_open(&LeftPanelAction::PtermDrive, false, ctx);
                 assert_eq!(
                     left_panel.active_view_availability(ctx),
                     left_panel::ToolPanelAvailability::Available
@@ -809,7 +809,7 @@ fn test_tools_panel_does_not_suppress_vertical_tab_bar_traffic_light_padding() {
 /// would drop the override and let the source profile's default D win.
 #[test]
 fn copy_model_and_profile_preserves_explicit_model_over_source_profile_default() {
-    use rookui::EntityId;
+    use ptermui::EntityId;
 
     use crate::ai::llms::{AvailableLLMs, LLMId, LLMInfo, ModelsByFeature};
     use crate::workspaces::user_workspaces::TeamlessScopeForTest;
@@ -1207,7 +1207,7 @@ fn test_open_file_with_target_event_preserves_requested_line() {
 #[cfg(feature = "local_fs")]
 #[test]
 fn test_markdown_toggle_shortcut_switches_between_raw_and_rendered_panes() {
-    use rookui::keymap::Keystroke;
+    use ptermui::keymap::Keystroke;
 
     use crate::code::editor_management::CodeManager;
     use crate::code::global_buffer_model::GlobalBufferModel;
@@ -1395,9 +1395,9 @@ fn test_worktree_sidecar_search_editor_enter_executes_selection() {
 }
 
 /// RAII guard that removes tab config TOML files whose name starts with
-/// `prefix` from `~/.rook/tab_configs/` on drop. Because `Drop` runs even
+/// `prefix` from `~/.polaris-terminal/tab_configs/` on drop. Because `Drop` runs even
 /// when a test panics, this prevents stale worktree configs from leaking
-/// into Rook dev.
+/// into Polaris Terminal dev.
 #[cfg(feature = "local_fs")]
 struct TabConfigCleanupGuard {
     prefix: &'static str,
@@ -2795,7 +2795,7 @@ fn test_notebook_pane_tracking() {
                     owner: Owner::mock_current_user(),
                     initial_folder_id: None,
                 },
-                &OpenRookDriveObjectSettings::default(),
+                &OpenPtermDriveObjectSettings::default(),
                 ctx,
                 true,
             );
@@ -2835,7 +2835,7 @@ fn test_notebook_pane_tracking() {
             // Re-opening the notebook should not create a new view.
             workspace.open_notebook(
                 &NotebookSource::Existing(notebook_id),
-                &OpenRookDriveObjectSettings::default(),
+                &OpenPtermDriveObjectSettings::default(),
                 ctx,
                 true,
             );
@@ -2946,67 +2946,67 @@ fn test_terminal_model_isnt_leaked() {
 }
 
 #[test]
-fn test_open_or_toggle_rook_drive() {
+fn test_open_or_toggle_pterm_drive() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
 
         let workspace = mock_workspace(&mut app);
         workspace.update(&mut app, |workspace, ctx| {
-            // First, unconditionally open Rook Drive as a system action. WD should be open and welcome tips should not have opening rook drive.
-            workspace.open_or_toggle_rook_drive(
+            // First, unconditionally open Polaris Terminal Drive as a system action. WD should be open and welcome tips should not have opening polaris-terminal drive.
+            workspace.open_or_toggle_pterm_drive(
                 false, /* toggle */
                 false, /* explicit_user_action */
                 ctx,
             );
             assert!(
-                workspace.current_workspace_state.is_rook_drive_open,
-                "Rook Drive should be open"
+                workspace.current_workspace_state.is_pterm_drive_open,
+                "Polaris Terminal Drive should be open"
             );
             assert!(
                 !workspace
                     .tips_completed
                     .as_ref(ctx)
                     .features_used
-                    .contains(&Tip::Action(TipAction::OpenRookDrive)),
-                "Rook drive welcome tip should not be completed"
+                    .contains(&Tip::Action(TipAction::OpenPtermDrive)),
+                "Polaris Terminal drive welcome tip should not be completed"
             );
 
-            // Next, toggle rook drive as a user action. WD should be closed and tip should not be filled out.
-            workspace.open_or_toggle_rook_drive(
+            // Next, toggle polaris-terminal drive as a user action. WD should be closed and tip should not be filled out.
+            workspace.open_or_toggle_pterm_drive(
                 true, /* toggle */
                 true, /* explicit_user_action */
                 ctx,
             );
             assert!(
-                !workspace.current_workspace_state.is_rook_drive_open,
-                "Rook Drive should be closed"
+                !workspace.current_workspace_state.is_pterm_drive_open,
+                "Polaris Terminal Drive should be closed"
             );
             assert!(
                 !workspace
                     .tips_completed
                     .as_ref(ctx)
                     .features_used
-                    .contains(&Tip::Action(TipAction::OpenRookDrive)),
-                "Rook drive welcome tip should not be completed"
+                    .contains(&Tip::Action(TipAction::OpenPtermDrive)),
+                "Polaris Terminal drive welcome tip should not be completed"
             );
 
-            // Finally, toggle rook drive again as a user action. WD should be open and tip filled out.
-            workspace.open_or_toggle_rook_drive(
+            // Finally, toggle polaris-terminal drive again as a user action. WD should be open and tip filled out.
+            workspace.open_or_toggle_pterm_drive(
                 true, /* toggle */
                 true, /* explicit_user_action */
                 ctx,
             );
             assert!(
-                workspace.current_workspace_state.is_rook_drive_open,
-                "Rook Drive should be open"
+                workspace.current_workspace_state.is_pterm_drive_open,
+                "Polaris Terminal Drive should be open"
             );
             assert!(
                 workspace
                     .tips_completed
                     .as_ref(ctx)
                     .features_used
-                    .contains(&Tip::Action(TipAction::OpenRookDrive)),
-                "Rook drive welcome tip should not be completed"
+                    .contains(&Tip::Action(TipAction::OpenPtermDrive)),
+                "Polaris Terminal drive welcome tip should not be completed"
             );
         });
     });
@@ -3245,13 +3245,13 @@ fn test_switch_focus_panels() {
 
         // Shift focus from terminal to left panel when WD is open
         workspace.update(&mut app, |view, ctx| {
-            view.current_workspace_state.is_rook_drive_open = true;
+            view.current_workspace_state.is_pterm_drive_open = true;
             view.focus_left_panel(ctx);
         });
         workspace.update(&mut app, |view, ctx| {
             assert!(
                 view.left_panel_view.is_self_or_child_focused(ctx),
-                "Expected Rook Drive panel to be focused"
+                "Expected Polaris Terminal Drive panel to be focused"
             );
         });
 
@@ -4410,11 +4410,11 @@ fn test_worktree_sidecar_hides_linked_worktrees_from_repo_list() {
             let external_git_dir_canon = CanonicalizedPath::try_from(external_git_dir.as_path())
                 .expect("canonical external git dir");
 
-            let main_repo_std: rook_util::standardized_path::StandardizedPath =
+            let main_repo_std: pterm_util::standardized_path::StandardizedPath =
                 main_repo_canon.into();
-            let linked_worktree_std: rook_util::standardized_path::StandardizedPath =
+            let linked_worktree_std: pterm_util::standardized_path::StandardizedPath =
                 linked_worktree_canon.into();
-            let external_git_dir_std: rook_util::standardized_path::StandardizedPath =
+            let external_git_dir_std: pterm_util::standardized_path::StandardizedPath =
                 external_git_dir_canon.into();
 
             DetectedRepositories::handle(ctx).update(ctx, |repos, _ctx| {
@@ -5350,88 +5350,88 @@ fn test_pin_tab_on_grouped_tab_extracts_then_pins() {
 
 /// Regression for the tools-panel tab visibility toggles surfaced in the
 /// Appearance settings page: toggling a tab's backing setting must add/remove
-/// that tab from the tools panel live, and re-enabling Rook Drive must make it
-/// selectable again (the original report was that Rook Drive could vanish from
+/// that tab from the tools panel live, and re-enabling Polaris Terminal Drive must make it
+/// selectable again (the original report was that Polaris Terminal Drive could vanish from
 /// the tools panel with no way back).
 #[test]
-fn test_tools_panel_rook_drive_toggle_updates_available_views() {
-    // Force the non-anonymous path so `is_rook_drive_enabled` follows the
-    // `enable_rook_drive` setting rather than the auth state.
+fn test_tools_panel_pterm_drive_toggle_updates_available_views() {
+    // Force the non-anonymous path so `is_pterm_drive_enabled` follows the
+    // `enable_pterm_drive` setting rather than the auth state.
     let _skip_anon_guard = FeatureFlag::SkipFirebaseAnonymousUser.override_enabled(false);
 
     App::test((), |mut app| async move {
         initialize_app(&mut app);
         let workspace = mock_workspace(&mut app);
 
-        // Rook Drive is enabled by default, so it is an available tools-panel
+        // Polaris Terminal Drive is enabled by default, so it is an available tools-panel
         // tab and can be made the active view.
         workspace.update(&mut app, |workspace, ctx| {
             assert!(
                 workspace
                     .left_panel_views
-                    .contains(&ToolPanelView::RookDrive),
-                "Rook Drive should be an available tools-panel tab by default"
+                    .contains(&ToolPanelView::PtermDrive),
+                "Polaris Terminal Drive should be an available tools-panel tab by default"
             );
             workspace.left_panel_view.update(ctx, |lp, ctx| {
-                lp.handle_action_with_force_open(&LeftPanelAction::RookDrive, false, ctx);
+                lp.handle_action_with_force_open(&LeftPanelAction::PtermDrive, false, ctx);
             });
             assert_eq!(
                 workspace.left_panel_view.as_ref(ctx).active_view(),
-                ToolPanelView::RookDrive,
-                "Rook Drive should be selectable as the active view"
+                ToolPanelView::PtermDrive,
+                "Polaris Terminal Drive should be selectable as the active view"
             );
         });
 
-        // Turning the toggle off (via its backing setting) removes Rook Drive
+        // Turning the toggle off (via its backing setting) removes Polaris Terminal Drive
         // from the tools panel; if other tabs remain the active view falls back
         // to one of them.
         app.update(|ctx| {
-            RookDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
+            PtermDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
                 settings
-                    .enable_rook_drive
+                    .enable_pterm_drive
                     .set_value(false, ctx)
-                    .expect("disable rook drive");
+                    .expect("disable polaris-terminal drive");
             });
         });
         workspace.update(&mut app, |workspace, ctx| {
             assert!(
                 !workspace
                     .left_panel_views
-                    .contains(&ToolPanelView::RookDrive),
-                "Disabling the setting should remove Rook Drive from the tools panel"
+                    .contains(&ToolPanelView::PtermDrive),
+                "Disabling the setting should remove Polaris Terminal Drive from the tools panel"
             );
             if !workspace.left_panel_views.is_empty() {
                 assert_ne!(
                     workspace.left_panel_view.as_ref(ctx).active_view(),
-                    ToolPanelView::RookDrive,
-                    "Active view should fall back to a remaining tab when Rook Drive is removed"
+                    ToolPanelView::PtermDrive,
+                    "Active view should fall back to a remaining tab when Polaris Terminal Drive is removed"
                 );
             }
         });
 
-        // Re-enabling restores Rook Drive as a selectable tab.
+        // Re-enabling restores Polaris Terminal Drive as a selectable tab.
         app.update(|ctx| {
-            RookDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
+            PtermDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
                 settings
-                    .enable_rook_drive
+                    .enable_pterm_drive
                     .set_value(true, ctx)
-                    .expect("re-enable rook drive");
+                    .expect("re-enable polaris-terminal drive");
             });
         });
         workspace.update(&mut app, |workspace, ctx| {
             assert!(
                 workspace
                     .left_panel_views
-                    .contains(&ToolPanelView::RookDrive),
-                "Re-enabling the setting should restore Rook Drive to the tools panel"
+                    .contains(&ToolPanelView::PtermDrive),
+                "Re-enabling the setting should restore Polaris Terminal Drive to the tools panel"
             );
             workspace.left_panel_view.update(ctx, |lp, ctx| {
-                lp.handle_action_with_force_open(&LeftPanelAction::RookDrive, false, ctx);
+                lp.handle_action_with_force_open(&LeftPanelAction::PtermDrive, false, ctx);
             });
             assert_eq!(
                 workspace.left_panel_view.as_ref(ctx).active_view(),
-                ToolPanelView::RookDrive,
-                "Rook Drive should be selectable again after re-enabling"
+                ToolPanelView::PtermDrive,
+                "Polaris Terminal Drive should be selectable again after re-enabling"
             );
         });
     });
@@ -5440,7 +5440,7 @@ fn test_tools_panel_rook_drive_toggle_updates_available_views() {
 #[cfg(target_family = "wasm")]
 mod simplified_wasm_tab_bar {
     use chrono::Utc;
-    use rookui::{AppContext, View, ViewContext};
+    use ptermui::{AppContext, View, ViewContext};
     use uuid::Uuid;
 
     use super::*;
@@ -5652,11 +5652,11 @@ mod simplified_wasm_tab_bar {
                         .active_tab_pane_group()
                         .as_ref(ctx)
                         .focused_pane_id(ctx)
-                        .is_rook_drive_object_pane()
+                        .is_pterm_drive_object_pane()
                 );
                 assert_eq!(
                     workspace.get_simplified_wasm_tab_bar_content(ctx),
-                    Some(SimplifiedWasmTabBarContent::RookDriveObject)
+                    Some(SimplifiedWasmTabBarContent::PtermDriveObject)
                 );
             });
         });

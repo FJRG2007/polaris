@@ -193,7 +193,7 @@ sequenceDiagram
   - `viewer::TerminalManager::on_view_detached(Closed)` performs today's full teardown.
   - `viewer::TerminalManager::on_view_detached(Moved)` is a no-op (network stays `Active`, `SharedSessionStatus` unchanged) because `TerminalManager` is reused across the move.
   - `local_tty::TerminalManager::on_view_detached` behaves identically for all `DetachType` values (regression).
-- **Integration tests** (using the `crates/integration` framework; see skill `rook-integration-test`)
+- **Integration tests** (using the `crates/integration` framework; see skill `polaris-terminal-integration-test`)
   - Close a shared-session viewer tab, emit a new `DownstreamMessage::OrderedTerminalEvent` from a mock server, restore the tab, assert the new block is present.
   - Close a shared-session viewer tab with editor role, restore the tab, assert input is still `Editable`.
   - Close a shared-session viewer tab, assert no ended banner was inserted, restore, assert no ended banner.
@@ -201,9 +201,9 @@ sequenceDiagram
   - Close a local-terminal tab and restore it — existing tests continue to pass.
   - Close cloud tab, then close another cloud tab, then `Cmd-Shift-T` twice — both restore live.
 - **Presubmit**
-  - `./script/presubmit` (cargo fmt + clippy + tests). Note the `ROOK.md` rule about running this before PR.
+  - `./script/presubmit` (cargo fmt + clippy + tests). Note the `POLARIS_TERMINAL.md` rule about running this before PR.
 - **Manual**
-  - Run `cargo run --features with_local_server` against a local `rook-server`, spawn a cloud agent conversation, close the tab mid-agent-response, `Cmd-Shift-T`, verify the view keeps streaming.
+  - Run `cargo run --features with_local_server` against a local `polaris-terminal-server`, spawn a cloud agent conversation, close the tab mid-agent-response, `Cmd-Shift-T`, verify the view keeps streaming.
   - Verify the conversation list moves the conversation to "Past" immediately on close, then back to "Active" on restore; and that it stays "Past" → finalizes to historical after grace-period expiry.
 
 ## 9. Follow-ups

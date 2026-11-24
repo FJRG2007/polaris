@@ -28,11 +28,11 @@ fn repository_info_from_gh_output_parses_name_and_owner() {
     // No url in the output => host is absent.
     assert_eq!(
         super::repository_info_from_gh_output(
-            r#"{"name":"rook-internal","owner":{"login":"warpdotdev"}}"#
+            r#"{"name":"polaris-terminal-internal","owner":{"login":"warpdotdev"}}"#
         )
         .unwrap(),
         RepositoryInfo {
-            name: "rook-internal".to_owned(),
+            name: "polaris-terminal-internal".to_owned(),
             owner: Some("warpdotdev".to_owned()),
             host: None,
         }
@@ -44,11 +44,11 @@ fn repository_info_from_gh_output_parses_name_and_owner() {
 fn repository_info_from_gh_output_parses_host_from_url() {
     assert_eq!(
         super::repository_info_from_gh_output(
-            r#"{"name":"rook-internal","owner":{"login":"warpdotdev"},"url":"https://github.com/warpdotdev/warp-internal"}"#
+            r#"{"name":"polaris-terminal-internal","owner":{"login":"warpdotdev"},"url":"https://github.com/warpdotdev/warp-internal"}"#
         )
         .unwrap(),
         RepositoryInfo {
-            name: "rook-internal".to_owned(),
+            name: "polaris-terminal-internal".to_owned(),
             owner: Some("warpdotdev".to_owned()),
             host: Some("github.com".to_owned()),
         }
@@ -97,7 +97,8 @@ fn repository_info_from_gh_output_rejects_missing_name() {
 #[test]
 fn repository_info_from_gh_output_rejects_missing_owner_login() {
     assert!(
-        super::repository_info_from_gh_output(r#"{"name":"rook-internal","owner":{}}"#).is_err()
+        super::repository_info_from_gh_output(r#"{"name":"polaris-terminal-internal","owner":{}}"#)
+            .is_err()
     );
 }
 
@@ -109,8 +110,10 @@ fn repository_info_from_gh_output_rejects_empty_fields() {
             .is_err()
     );
     assert!(
-        super::repository_info_from_gh_output(r#"{"name":"rook-internal","owner":{"login":""}}"#)
-            .is_err()
+        super::repository_info_from_gh_output(
+            r#"{"name":"polaris-terminal-internal","owner":{"login":""}}"#
+        )
+        .is_err()
     );
 }
 
@@ -144,7 +147,7 @@ async fn get_repository_info_reads_gh_repo_view() {
     let gh_path = fake_bin.path().join("gh");
     fs::write(
         &gh_path,
-        "#!/bin/sh\nprintf '{\"name\":\"rook-internal\",\"owner\":{\"login\":\"warpdotdev\"}}\\n'\n",
+        "#!/bin/sh\nprintf '{\"name\":\"polaris-terminal-internal\",\"owner\":{\"login\":\"warpdotdev\"}}\\n'\n",
     )
     .expect("failed to write fake gh");
     let mut permissions = fs::metadata(&gh_path).unwrap().permissions();
@@ -162,7 +165,7 @@ async fn get_repository_info_reads_gh_repo_view() {
             .await
             .unwrap(),
         Some(RepositoryInfo {
-            name: "rook-internal".to_owned(),
+            name: "polaris-terminal-internal".to_owned(),
             owner: Some("warpdotdev".to_owned()),
             host: None,
         })
@@ -320,7 +323,7 @@ async fn get_pr_for_branch_does_not_require_origin_remote() {
     let gh_path = fake_bin.path().join("gh");
     fs::write(
         &gh_path,
-        "#!/bin/sh\nprintf '{\"number\":123,\"url\":\"https://github.com/rook/rook/pull/123\",\"state\":\"OPEN\",\"isDraft\":true,\"baseRefName\":\"main\"}\\n'\n",
+        "#!/bin/sh\nprintf '{\"number\":123,\"url\":\"https://github.com/polaris-terminal/polaris-terminal/pull/123\",\"state\":\"OPEN\",\"isDraft\":true,\"baseRefName\":\"main\"}\\n'\n",
     )
     .expect("failed to write fake gh");
     let mut permissions = fs::metadata(&gh_path).unwrap().permissions();
@@ -337,7 +340,7 @@ async fn get_pr_for_branch_does_not_require_origin_remote() {
         get_pr_for_branch(&repo, Some(&path_env)).await.unwrap(),
         Some(PrInfo {
             number: 123,
-            url: "https://github.com/rook/rook/pull/123".to_string(),
+            url: "https://github.com/polaris-terminal/polaris-terminal/pull/123".to_string(),
             state: "OPEN".to_string(),
             draft: true,
             base_branch: "main".to_string(),

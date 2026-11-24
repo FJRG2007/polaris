@@ -1,26 +1,26 @@
 {
-  "name": "codex-rook",
-  "description": "Official Rook terminal integrations for Codex",
+  "name": "codex-polaris-terminal",
+  "description": "Official Polaris Terminal terminal integrations for Codex",
   "owner": {
-    "name": "Rook",
+    "name": "Polaris Terminal",
     "url": "https://rook.dev"
   },
   "plugins": [
     {
-      "name": "rook",
-      "description": "Native Rook notifications when Codex completes tasks or needs input",
-      "source": "./plugins/rook",
+      "name": "polaris-terminal",
+      "description": "Native Polaris Terminal notifications when Codex completes tasks or needs input",
+      "source": "./plugins/polaris-terminal",
       "policy": {
         "installation": "AVAILABLE",
         "authentication": "ON_INSTALL"
       },
       "version": "0.4.0",
       "category": "productivity",
-      "tags": ["notifications", "terminal", "rook"]
+      "tags": ["notifications", "terminal", "polaris-terminal"]
     },
     {
       "name": "orchestration",
-      "description": "Rook integration for Codex in Oz cloud agent environments, including parent-message delivery hooks and skills",
+      "description": "Polaris Terminal integration for Codex in Oz cloud agent environments, including parent-message delivery hooks and skills",
       "source": "./plugins/orchestration",
       "policy": {
         "installation": "AVAILABLE",
@@ -28,7 +28,7 @@
       },
       "version": "0.4.0",
       "category": "productivity",
-      "tags": ["terminal", "rook", "oz"]
+      "tags": ["terminal", "polaris-terminal", "oz"]
     }
   ]
 }

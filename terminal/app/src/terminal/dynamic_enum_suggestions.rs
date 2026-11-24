@@ -1,4 +1,4 @@
-use rook_completer::completer::{CommandOutput, GeneratorContext};
+use pterm_completer::completer::{CommandOutput, GeneratorContext};
 
 use crate::completer::SessionContext;
 
@@ -17,7 +17,7 @@ pub(crate) async fn run_dynamic_enum_command(
 /// trims each row and splits on newlines.
 fn parse_dynamic_command(output: &CommandOutput) -> anyhow::Result<Vec<String>> {
     match output.status {
-        rook_completer::completer::CommandExitStatus::Success => {
+        pterm_completer::completer::CommandExitStatus::Success => {
             let output = String::from_utf8_lossy(output.output());
             let cleaned_output: Vec<String> = output
                 .split("\n")
@@ -26,7 +26,7 @@ fn parse_dynamic_command(output: &CommandOutput) -> anyhow::Result<Vec<String>> 
                 .collect();
             Ok(cleaned_output)
         }
-        rook_completer::completer::CommandExitStatus::Failure => {
+        pterm_completer::completer::CommandExitStatus::Failure => {
             Err(anyhow::anyhow!("Command exited with failure code"))
         }
     }

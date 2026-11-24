@@ -1,5 +1,5 @@
-use rookui::async_assert;
-use rookui::integration::AssertionCallback;
+use ptermui::async_assert;
+use ptermui::integration::AssertionCallback;
 
 use crate::context_chips::ContextChipKind;
 use crate::integration_testing::view_getters::single_terminal_view_for_tab;

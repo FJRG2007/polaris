@@ -3,19 +3,19 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use rook_core::features::FeatureFlag;
-use rook_core::settings::Setting;
-use rook_core::ui::appearance::Appearance;
-use rook_editor::content::buffer::{InitialBufferState, ToBufferCharOffset, ToBufferPoint};
-use rook_editor::model::CoreEditorModel;
-use rook_editor::render::element::VerticalExpansionBehavior;
-use rook_editor::render::model::viewport::SizeInfo;
-use rook_util::user_input::UserInput;
-use rookui::keymap::Keystroke;
-use rookui::platform::WindowStyle;
-use rookui::text::point::Point;
-use rookui::units::IntoPixels;
-use rookui::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::settings::Setting;
+use pterm_core::ui::appearance::Appearance;
+use pterm_editor::content::buffer::{InitialBufferState, ToBufferCharOffset, ToBufferPoint};
+use pterm_editor::model::CoreEditorModel;
+use pterm_editor::render::element::VerticalExpansionBehavior;
+use pterm_editor::render::model::viewport::SizeInfo;
+use pterm_util::user_input::UserInput;
+use ptermui::keymap::Keystroke;
+use ptermui::platform::WindowStyle;
+use ptermui::text::point::Point;
+use ptermui::units::IntoPixels;
+use ptermui::{
     App, EntityId, EntityIdSet, Event, Presenter, SingletonEntity, TypedActionView, UpdateModel,
     ViewHandle, WindowId, WindowInvalidation,
 };
@@ -1292,11 +1292,11 @@ fn test_vim_delete_word_dge() {
 
     App::test((), |mut app| async move {
         initialize_code_editor_app(&mut app);
-        let editor = add_code_editor("echo hello-hi rook-dev", &mut app);
+        let editor = add_code_editor("echo hello-hi polaris-terminal-dev", &mut app);
 
         set_cursor_position(&editor, 1, 20, &mut app);
         vim_user_insert(&editor, "dge", &mut app);
-        assert_eq!(buffer_text(&editor, &app), "echo hello-hi rookev");
+        assert_eq!(buffer_text(&editor, &app), "echo hello-hi ptermev");
         assert_eq!(cursor_position(&editor, &app), (1, 18));
 
         vim_user_insert(&editor, "dge", &mut app);

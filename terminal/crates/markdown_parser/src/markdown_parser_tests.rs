@@ -905,9 +905,12 @@ fn test_autolink_with_escaped_dot() {
 #[test]
 fn test_autolink_with_escaped_dash() {
     assert_eq!(
-        test_parse_markdown("https://rook\\-dev.com"),
+        test_parse_markdown("https://polaris-terminal\\-dev.com"),
         vec![FormattedTextLine::Line(vec![
-            FormattedTextFragment::hyperlink("https://rook-dev.com", "https://rook-dev.com"),
+            FormattedTextFragment::hyperlink(
+                "https://polaris-terminal-dev.com",
+                "https://polaris-terminal-dev.com"
+            ),
         ])]
     );
 }
@@ -1898,7 +1901,7 @@ fn test_parse_escapes_inline() {
 #[test]
 fn test_parse_embedded() {
     assert_eq!(
-        test_parse_markdown("```rook-embedded-object\nid: workflow-123\n```"),
+        test_parse_markdown("```polaris-terminal-embedded-object\nid: workflow-123\n```"),
         vec![FormattedTextLine::Embedded(Mapping::from_iter([(
             Value::String("id".to_string()),
             Value::String("workflow-123".to_string())
@@ -1906,7 +1909,9 @@ fn test_parse_embedded() {
     );
 
     assert_eq!(
-        test_parse_markdown("```rook-embedded-object\nid: notebook-123\ntype: notebook\n```"),
+        test_parse_markdown(
+            "```polaris-terminal-embedded-object\nid: notebook-123\ntype: notebook\n```"
+        ),
         vec![FormattedTextLine::Embedded(Mapping::from_iter([
             (
                 Value::String("id".to_string()),
@@ -1921,9 +1926,9 @@ fn test_parse_embedded() {
 
     // Fallback to code block.
     assert_eq!(
-        test_parse_markdown("```rook-embedded-object\ncargo run --features abc\n```"),
+        test_parse_markdown("```polaris-terminal-embedded-object\ncargo run --features abc\n```"),
         vec![FormattedTextLine::CodeBlock(CodeBlockText {
-            lang: "rook-embedded-object".to_string(),
+            lang: "polaris-terminal-embedded-object".to_string(),
             code: "cargo run --features abc\n".to_string()
         })]
     );
@@ -2862,7 +2867,8 @@ fn test_parse_table_with_empty_cells() {
 
 #[test]
 fn test_parse_table_with_links() {
-    let source = "| Link | Text |\n| --- | --- |\n| [Rook](https://rook.dev) | normal |\n";
+    let source =
+        "| Link | Text |\n| --- | --- |\n| [Polaris Terminal](https://rook.dev) | normal |\n";
     let result = test_parse_markdown_with_gfm_tables(source);
     assert_eq!(result.len(), 1);
 
@@ -2870,7 +2876,7 @@ fn test_parse_table_with_links() {
         assert_eq!(table.rows.len(), 1);
         let link_cell = &table.rows[0][0];
         assert_eq!(link_cell.len(), 1);
-        assert_eq!(link_cell[0].text, "Rook");
+        assert_eq!(link_cell[0].text, "Polaris Terminal");
         assert!(matches!(
             &link_cell[0].styles.hyperlink,
             Some(Hyperlink::Url(url)) if url == "https://rook.dev"

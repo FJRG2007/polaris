@@ -5,7 +5,7 @@ use std::sync::mpsc::SyncSender;
 use async_channel::{Receiver, Sender, TrySendError};
 use parking_lot::FairMutex;
 use pathfinder_geometry::vector::Vector2F;
-use rookui::{AppContext, ModelHandle, ViewHandle, WindowId};
+use ptermui::{AppContext, ModelHandle, ViewHandle, WindowId};
 
 use crate::ai::blocklist::InputConfig;
 use crate::context_chips::prompt_type::PromptType;

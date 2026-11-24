@@ -18,29 +18,29 @@ use mcp_servers_page::MCPServersSettingsPageView;
 use nav::{SettingsNavItem, SettingsUmbrella};
 use pathfinder_geometry::vector::Vector2F;
 use privacy_page::{PrivacyPageView, PrivacyPageViewEvent};
-use referrals_page::{ReferralsPageEvent, ReferralsPageView};
-use rook_agent_page::{RookAgentPageAction, RookAgentPageEvent, RookAgentPageView};
-use rook_core::channel::ChannelState;
-use rook_core::context_flag::ContextFlag;
-use rook_core::features::FeatureFlag;
-use rook_core::send_telemetry_from_ctx;
-use rook_core::settings::ToggleableSetting as _;
-use rook_core::ui::theme::color::internal_colors;
-use rook_editor::editor::NavigationKey;
-use rookify_page::{RookifyPageAction, RookifyPageView};
-use rookui::elements::{
+use pterm_agent_page::{PtermAgentPageAction, PtermAgentPageEvent, PtermAgentPageView};
+use pterm_core::channel::ChannelState;
+use pterm_core::context_flag::ContextFlag;
+use pterm_core::features::FeatureFlag;
+use pterm_core::send_telemetry_from_ctx;
+use pterm_core::settings::ToggleableSetting as _;
+use pterm_core::ui::theme::color::internal_colors;
+use pterm_editor::editor::NavigationKey;
+use ptermify_page::{PtermifyPageAction, PtermifyPageView};
+use ptermui::elements::{
     Align, Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, Empty,
     EventHandler, Expanded, Fill, Flex, MainAxisSize, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, SavePosition, ScrollbarWidth, Shrinkable, Stack,
     Text, Wrap,
 };
-use rookui::fonts::{Properties, Weight};
-use rookui::keymap::{ContextPredicate, EnabledPredicate, FixedBinding};
-use rookui::{
+use ptermui::fonts::{Properties, Weight};
+use ptermui::keymap::{ContextPredicate, EnabledPredicate, FixedBinding};
+use ptermui::{
     Action, AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView,
     UpdateView as _, View, ViewContext, ViewHandle, id,
 };
+use referrals_page::{ReferralsPageEvent, ReferralsPageView};
 use scripting_page::ScriptingSettingsPageView;
 use search::{MatchMode, SearchQuery};
 use settings_file_footer::{SettingsFooterKind, SettingsFooterMouseStates, render_footer};
@@ -109,11 +109,11 @@ mod platform;
 mod platform_page;
 mod privacy;
 mod privacy_page;
+mod pterm_agent_page;
+mod pterm_drive_page;
+mod ptermify_page;
 mod referrals_page;
 mod remove_custom_endpoint_confirmation_dialog;
-mod rook_agent_page;
-mod rook_drive_page;
-mod rookify_page;
 mod scripting_page;
 pub(crate) mod search;
 mod set_default_model_modal;
@@ -135,7 +135,7 @@ pub use code_indexing_page::CodeIndexingPageView;
 pub use features_page::FeaturesPageAction;
 pub use main_page::handle_experiment_change;
 pub use privacy_page::PrivacyPageAction;
-pub(crate) use rook_agent_page::custom_model_routers_widget_id;
+pub(crate) use pterm_agent_page::custom_model_routers_widget_id;
 pub use settings_page::{
     AdditionalInfo, InputListItem, LocalOnlyIconState, ToggleState, render_body_item_label,
     render_info_icon, render_input_list, render_separator,
@@ -150,7 +150,7 @@ const SIDEBAR_WIDTH_DEFAULT: f32 = 200.;
 /// Wider sidebar used when the settings-file footer is enabled. Sized to
 /// match Figma's settings nav rail (223px alert + 12px horizontal padding
 /// on each side + 1px right border), giving the error-alert footer enough
-/// room to render its "Open file" and "Fix with Rook Agent" buttons side-by-side
+/// room to render its "Open file" and "Fix with Polaris Terminal Agent" buttons side-by-side
 /// with the designed 24px indent and 8px internal padding.
 const SIDEBAR_WIDTH_WITH_FOOTER: f32 = 248.;
 
@@ -234,7 +234,7 @@ pub(super) fn editor_text_colors(appearance: &Appearance) -> TextColors {
 }
 
 /// Small inline pill rendered next to a settings label to mark a feature as beta.
-/// Used for experimental features (i.e. AsyncFind) that are enabled for Friends of Rook (i.e. Dogfood/Preview) and toggleable by others.
+/// Used for experimental features (i.e. AsyncFind) that are enabled for Friends of Polaris Terminal (i.e. Dogfood/Preview) and toggleable by others.
 pub(super) fn render_beta_chip(appearance: &Appearance) -> Box<dyn Element> {
     let theme = appearance.theme();
     let chip_color = theme.sub_text_color(theme.surface_3()).into_solid();
@@ -257,10 +257,10 @@ pub(super) fn render_beta_chip(appearance: &Appearance) -> Box<dyn Element> {
 pub(super) fn render_model_chips(
     labels: impl IntoIterator<Item = String>,
     appearance: &Appearance,
-    text_color: rook_core::ui::theme::Fill,
+    text_color: pterm_core::ui::theme::Fill,
 ) -> Box<dyn Element> {
-    use rookui::ui_components::chip::Chip;
-    use rookui::ui_components::components::{UiComponent, UiComponentStyles};
+    use ptermui::ui_components::chip::Chip;
+    use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
 
     let theme = appearance.theme();
     let chip_border = internal_colors::neutral_4(theme).into();
@@ -288,7 +288,7 @@ pub enum SettingsViewEvent {
     StartResize,
     CheckForUpdate,
     LaunchNetworkLogging,
-    OpenRookDrive,
+    OpenPtermDrive,
     SignupAnonymousUser,
     ShowToast {
         message: String,
@@ -322,10 +322,10 @@ pub enum SettingsSection {
     Scripting,
     SharedBlocks,
     Teams,
-    RookDrive,
-    Rookify,
+    PtermDrive,
+    Ptermify,
     // ── Agents umbrella subpages ──
-    RookAgent,
+    PtermAgent,
     AgentProfiles,
     AgentMCPServers,
     Knowledge,
@@ -335,7 +335,7 @@ pub enum SettingsSection {
     EditorAndCodeReview,
     // ── Cloud platform umbrella subpages ──
     CloudEnvironments,
-    RookCloudAgentAPIKeys,
+    PtermCloudAgentAPIKeys,
 }
 
 use std::fmt::{self, Display};
@@ -349,8 +349,8 @@ impl Display for SettingsSection {
             SettingsSection::Keybindings => write!(f, "Keyboard shortcuts"),
             SettingsSection::SharedBlocks => write!(f, "Shared blocks"),
             SettingsSection::Scripting => write!(f, "Scripting"),
-            SettingsSection::RookDrive => write!(f, "Rook Drive"),
-            SettingsSection::RookAgent => write!(f, "Rook Agent"),
+            SettingsSection::PtermDrive => write!(f, "Polaris Terminal Drive"),
+            SettingsSection::PtermAgent => write!(f, "Polaris Terminal Agent"),
             SettingsSection::AgentProfiles => write!(f, "Profiles"),
             SettingsSection::AgentMCPServers => write!(f, "MCP servers"),
             SettingsSection::Knowledge => write!(f, "Knowledge"),
@@ -358,7 +358,7 @@ impl Display for SettingsSection {
             SettingsSection::CodeIndexing => write!(f, "Indexing and projects"),
             SettingsSection::EditorAndCodeReview => write!(f, "Editor and Code Review"),
             SettingsSection::CloudEnvironments => write!(f, "Environments"),
-            SettingsSection::RookCloudAgentAPIKeys => write!(f, "API keys"),
+            SettingsSection::PtermCloudAgentAPIKeys => write!(f, "API keys"),
             _ => write!(f, "{self:?}"),
         }
     }
@@ -367,7 +367,7 @@ impl Display for SettingsSection {
 impl SettingsSection {
     /// Stable identifier for this section, used everywhere the section leaves
     /// the process: the SQLite session-restore key and the
-    /// `surface.settings.open --page` rookctrl vocabulary.
+    /// `surface.settings.open --page` ptermctrl vocabulary.
     ///
     /// These strings are a compatibility contract — changing one breaks
     /// session restore for existing users and a public CLI argument. They were
@@ -375,7 +375,7 @@ impl SettingsSection {
     /// migration is needed. [`Display`] is now purely the user-facing sidebar
     /// label and is free to change without touching anything here.
     ///
-    /// Deeplinks are deliberately *not* on this vocabulary: `rook://settings`
+    /// Deeplinks are deliberately *not* on this vocabulary: `polaris-terminal://settings`
     /// uses its own snake_cased allowlist (see
     /// `settings_section_for_simple_subpage`).
     pub fn slug(self) -> &'static str {
@@ -391,9 +391,9 @@ impl SettingsSection {
             Self::Scripting => "Scripting",
             Self::SharedBlocks => "Shared blocks",
             Self::Teams => "Teams",
-            Self::RookDrive => "Rook Drive",
-            Self::Rookify => "Rookify",
-            Self::RookAgent => "Rook Agent",
+            Self::PtermDrive => "Polaris Terminal Drive",
+            Self::Ptermify => "Ptermify",
+            Self::PtermAgent => "Polaris Terminal Agent",
             Self::AgentProfiles => "Profiles",
             Self::AgentMCPServers => "MCP servers",
             Self::Knowledge => "Knowledge",
@@ -403,12 +403,12 @@ impl SettingsSection {
             Self::CloudEnvironments => "Environments",
             // Keeps the "Oz" spelling the slug was seeded from; only the
             // Display label above dropped it.
-            Self::RookCloudAgentAPIKeys => "Oz Cloud API Keys",
+            Self::PtermCloudAgentAPIKeys => "Oz Cloud API Keys",
         }
     }
 
     /// Parses a [`Self::slug`], also accepting the legacy spellings that
-    /// persisted sessions and existing rookctrl callers may still be using.
+    /// persisted sessions and existing ptermctrl callers may still be using.
     ///
     /// Legacy names for pages that no longer exist under that name resolve
     /// here, at the boundary, rather than becoming sections of their own. That
@@ -427,10 +427,10 @@ impl SettingsSection {
             "Scripting" => Self::Scripting,
             "Shared blocks" => Self::SharedBlocks,
             "Teams" => Self::Teams,
-            "Rook Drive" | "RookDrive" => Self::RookDrive,
-            "Rookify" => Self::Rookify,
-            // "Oz" and "AI" are older names for what is now the Rook Agent page.
-            "Rook Agent" | "Oz" | "AI" => Self::RookAgent,
+            "Polaris Terminal Drive" | "PtermDrive" => Self::PtermDrive,
+            "Ptermify" => Self::Ptermify,
+            // "Oz" and "AI" are older names for what is now the Polaris Terminal Agent page.
+            "Polaris Terminal Agent" | "Oz" | "AI" => Self::PtermAgent,
             "Profiles" | "AgentProfiles" => Self::AgentProfiles,
             // "MCP Servers" named the standalone page before it moved under the
             // Agents umbrella; it differs from the current slug only by casing.
@@ -441,7 +441,7 @@ impl SettingsSection {
             "Indexing and projects" | "CodeIndexing" | "Code" => Self::CodeIndexing,
             "Editor and Code Review" | "EditorAndCodeReview" => Self::EditorAndCodeReview,
             "Environments" | "CloudEnvironments" => Self::CloudEnvironments,
-            "Oz Cloud API Keys" | "OzCloudAPIKeys" => Self::RookCloudAgentAPIKeys,
+            "Oz Cloud API Keys" | "OzCloudAPIKeys" => Self::PtermCloudAgentAPIKeys,
             _ => return None,
         };
         Some(section)
@@ -449,7 +449,7 @@ impl SettingsSection {
 }
 
 /// Resolves a stable, friendly deeplink slug (used by
-/// `rook://settings?widget=<slug>`) to the settings page and `&'static str`
+/// `polaris-terminal://settings?widget=<slug>`) to the settings page and `&'static str`
 /// widget id it should scroll to.
 ///
 /// Only allowlisted widgets are linkable, so the public URL contract stays
@@ -461,7 +461,10 @@ pub fn settings_widget_deeplink_target(slug: &str) -> Option<(SettingsSection, &
             SettingsSection::Features,
             features_page::global_hotkey_widget_id(),
         )),
-        "custom_router" => Some((SettingsSection::RookAgent, custom_model_routers_widget_id())),
+        "custom_router" => Some((
+            SettingsSection::PtermAgent,
+            custom_model_routers_widget_id(),
+        )),
         #[cfg(not(target_family = "wasm"))]
         "cli_agents" => Some((
             SettingsSection::ThirdPartyCLIAgents,
@@ -507,7 +510,7 @@ pub mod flags {
     pub const SCROLL_REPORTING_CONTEXT_FLAG: &str = "Scroll_Reporting";
     pub const FOCUS_REPORTING_CONTEXT_FLAG: &str = "Focus_Reporting";
     pub const SSH_REUSE_CONTROL_MASTER_CONTEXT_FLAG: &str = "SSH_Reuse_Control_Master";
-    pub const SSH_ROOKIFICATION_CONTEXT_FLAG: &str = "SSH_Rookification";
+    pub const SSH_POLARIS_TERMINALIFICATION_CONTEXT_FLAG: &str = "SSH_Ptermification";
     pub const NOTIFICATIONS_CONTEXT_FLAG: &str = "Notifications_Enabled";
     pub const LONG_RUNNING_NOTIFICATIONS_FLAG: &str = "Long_Running_Notifications";
     pub const AGENT_TASK_COMPLETED_NOTIFICATIONS_FLAG: &str = "Agent_Task_Completed_Notifications";
@@ -524,7 +527,7 @@ pub mod flags {
         "Jump_To_Bottom_Of_Block_Button_Enabled";
     pub const RESPECT_SYSTEM_THEME_CONTEXT_FLAG: &str = "Respect_System_Theme";
     pub const COMPLETIONS_OPEN_WHILE_TYPING_CONTEXT_FLAG: &str = "Completions_Open_While_Typing";
-    pub const ROOK_COMPLETIONS_CONTEXT_FLAG: &str = "Rook_Completions";
+    pub const POLARIS_TERMINAL_COMPLETIONS_CONTEXT_FLAG: &str = "Pterm_Completions";
     pub const NATIVE_SHELL_COMPLETIONS_CONTEXT_FLAG: &str = "Native_Shell_Completions";
     pub const COMMAND_CORRECTIONS_CONTEXT_FLAG: &str = "Command_Corrections";
     pub const ERROR_UNDERLINING_FLAG: &str = "error_underlining";
@@ -606,7 +609,7 @@ pub mod flags {
     pub const IN_BAND_COMMAND_BLOCKS_FLAG: &str = "In_Band_Command_Blocks_Visible";
     pub const RECORDING_MODE_FLAG: &str = "Recording_Mode_Enabled";
     pub const IN_BAND_GENERATORS_FLAG: &str = "In_Band_Generators_Enabled";
-    pub const ROOK_SAME_LINE_PROMPT_FLAG: &str = "Rook_Same_Line_Prompt_Enabled";
+    pub const POLARIS_TERMINAL_SAME_LINE_PROMPT_FLAG: &str = "Pterm_Same_Line_Prompt_Enabled";
     pub const DEBUG_NETWORK_ONLINE_FLAG: &str = "Network_Status_Online";
     pub const AI_INPUT_AUTODETECTION_FLAG: &str = "AI_Input_Autodetection";
     pub const NLD_IN_TERMINAL_FLAG: &str = "NLD_In_Terminal";
@@ -621,9 +624,9 @@ pub mod flags {
         "Auto_Approve_Bypasses_Command_Denylist";
     pub const AI_RULES_FLAG: &str = "AI_Rules";
     pub const SUGGESTED_RULES_FLAG: &str = "Suggested_Rules";
-    pub const ROOK_DRIVE_CONTEXT_FLAG: &str = "Rook_Drive_Context";
+    pub const POLARIS_TERMINAL_DRIVE_CONTEXT_FLAG: &str = "Pterm_Drive_Context";
     pub const FILE_BASED_MCP_FLAG: &str = "File_Based_MCP";
-    pub const ROOK_CREDIT_FALLBACK_FLAG: &str = "Rook_Credit_Fallback";
+    pub const POLARIS_TERMINAL_CREDIT_FALLBACK_FLAG: &str = "Pterm_Credit_Fallback";
     pub const SHOW_BASE_MODEL_PICKER_IN_PROMPT_FLAG: &str = "Show_Base_Model_Picker_In_Prompt";
     pub const DEBUG_SHOW_MEMORY_STATS_FLAG: &str = "Debug_Memory_Statistics";
     pub const ALLOW_NATIVE_WAYLAND: &str = "Allow_Native_Wayland";
@@ -635,11 +638,11 @@ pub mod flags {
     pub const IS_AUTOINDEXING_ENABLED: &str = "IsAutoIndexingEnabled";
     pub const LIGATURE_RENDERING_CONTEXT_FLAG: &str = "Ligature_Rendering_Enabled";
     pub const HAS_SETTINGS_TO_IMPORT_FLAG: &str = "HasSettingsToImport";
-    /// The user's setting enabled UDI, but we may show a classic input (e.g. ssh/subshell rookification)
+    /// The user's setting enabled UDI, but we may show a classic input (e.g. ssh/subshell ptermification)
     pub const UNIVERSAL_DEVELOPER_INPUT_ENABLED: &str = "UniversalDeveloperInputEnabled";
     pub const AGENT_MODE_INPUT: &str = "InputAgentMode";
     pub const TERMINAL_MODE_INPUT: &str = "InputTerminalMode";
-    pub const ROOK_IS_DEFAULT_TERMINAL: &str = "RookIsDefaultTerminal";
+    pub const POLARIS_TERMINAL_IS_DEFAULT_TERMINAL: &str = "PtermIsDefaultTerminal";
     pub const PASSIVE_CODE_DIFF_KEYBINDINGS_ENABLED: &str = "PassiveCodeDiffKeybindingsEnabled";
     /// When set, ctrl-enter should accept a prompt suggestion rather than insert a newline.
     /// This flag is set by the terminal Input when there's a pending passive code diff.
@@ -666,7 +669,7 @@ pub mod flags {
     pub const AUTO_OPEN_RICH_INPUT_ON_CLI_AGENT_START_FLAG: &str =
         "AutoOpenRichInputOnCLIAgentStart";
     pub const AUTO_DISMISS_RICH_INPUT_AFTER_SUBMIT_FLAG: &str = "AutoDismissRichInputAfterSubmit";
-    pub const ENABLE_ROOK_DRIVE: &str = "EnableRookDrive";
+    pub const ENABLE_POLARIS_TERMINAL_DRIVE: &str = "EnablePtermDrive";
     // Tools panel settings
     pub const SHOW_CONVERSATION_HISTORY: &str = "ShowConversationHistory";
     pub const SHOW_PROJECT_EXPLORER: &str = "ShowProjectExplorer";
@@ -682,15 +685,15 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     main_page::init_actions_from_parent_view(app, context, builder);
     appearance_page::init_actions_from_parent_view(app, context, builder);
     features_page::init_actions_from_parent_view(app, context, builder);
-    rookify_page::init_actions_from_parent_view(app, context, builder);
+    ptermify_page::init_actions_from_parent_view(app, context, builder);
     privacy_page::init_actions_from_parent_view(app, context, builder);
-    rook_agent_page::init_actions_from_parent_view(app, context, builder);
+    pterm_agent_page::init_actions_from_parent_view(app, context, builder);
     agent_profiles_page::init_actions_from_parent_view(app, context, builder);
     knowledge_page::init_actions_from_parent_view(app, context, builder);
     cli_agents_page::init_actions_from_parent_view(app, context, builder);
     code_indexing_page::init_actions_from_parent_view(app, context, builder);
     code_editor_review_page::init_actions_from_parent_view(app, context, builder);
-    rook_drive_page::init_actions_from_parent_view(app, context, builder);
+    pterm_drive_page::init_actions_from_parent_view(app, context, builder);
 
     if ChannelState::enable_debug_features() || cfg!(windows) {
         ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
@@ -846,7 +849,7 @@ impl<T: Action + Clone> ToggleSettingActionPair<T> {
         context_prefix: &ContextPredicate,
         context_boolean_flag: &'static str,
     ) -> Self {
-        use rookui::keymap::macros::id;
+        use ptermui::keymap::macros::id;
 
         ToggleSettingActionPair {
             descriptions: SettingActionPairDescriptions {
@@ -992,14 +995,14 @@ pub enum SettingsAction {
     AppearancePageToggle(AppearancePageAction),
     FeaturesPageToggle(FeaturesPageAction),
     PrivacyPageToggle(PrivacyPageAction),
-    RookAgent(RookAgentPageAction),
+    PtermAgent(PtermAgentPageAction),
     AgentProfiles(AgentProfilesPageAction),
     Knowledge(KnowledgePageAction),
     CLIAgents(CLIAgentsPageAction),
     CodeIndexing(CodeIndexingPageAction),
     EditorAndCodeReview(EditorAndCodeReviewPageAction),
-    RookDrive(rook_drive_page::RookDriveSettingsPageAction),
-    RookifyPageToggle(RookifyPageAction),
+    PtermDrive(pterm_drive_page::PtermDriveSettingsPageAction),
+    PtermifyPageToggle(PtermifyPageAction),
     Tab,
     Split(Direction),
     ToggleMaximizePane,
@@ -1158,14 +1161,14 @@ macro_rules! update_page {
             SettingsPageViewHandle::SharedBlocks(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::Keybindings(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::Teams(handle) => $ctx.update_view(handle, $update),
-            SettingsPageViewHandle::Rookify(handle) => $ctx.update_view(handle, $update),
-            SettingsPageViewHandle::RookCloudAgentAPIKeys(handle) => {
+            SettingsPageViewHandle::Ptermify(handle) => $ctx.update_view(handle, $update),
+            SettingsPageViewHandle::PtermCloudAgentAPIKeys(handle) => {
                 $ctx.update_view(handle, $update)
             }
             SettingsPageViewHandle::Privacy(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::Referrals(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::Scripting(handle) => $ctx.update_view(handle, $update),
-            SettingsPageViewHandle::RookAgent(handle) => $ctx.update_view(handle, $update),
+            SettingsPageViewHandle::PtermAgent(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::AgentProfiles(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::Knowledge(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::CLIAgents(handle) => $ctx.update_view(handle, $update),
@@ -1177,7 +1180,7 @@ macro_rules! update_page {
             }
             SettingsPageViewHandle::BillingAndUsage(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::MCPServers(handle) => $ctx.update_view(handle, $update),
-            SettingsPageViewHandle::RookDrive(handle) => $ctx.update_view(handle, $update),
+            SettingsPageViewHandle::PtermDrive(handle) => $ctx.update_view(handle, $update),
         }
     };
 }
@@ -1204,7 +1207,7 @@ pub struct SettingsView {
     /// Mirrored from `Workspace` via [`set_settings_error_state`].
     settings_error_banner_dismissed: bool,
     /// Mouse state handles for the nav-rail footer buttons. Constructed once
-    /// per `SettingsView` per `ROOK.md`'s guidance that inline
+    /// per `SettingsView` per `POLARIS_TERMINAL.md`'s guidance that inline
     /// `MouseStateHandle::default()` breaks hover/click tracking.
     footer_mouse_states: SettingsFooterMouseStates,
 }
@@ -1252,10 +1255,10 @@ impl SettingsView {
         // About page
         let about_page_handle = ctx.add_typed_action_view(AboutPageView::new);
 
-        // Rook Agent page
-        let rook_agent_page_handle = ctx.add_typed_action_view(RookAgentPageView::new);
-        ctx.subscribe_to_view(&rook_agent_page_handle, |me, _, event, ctx| {
-            me.handle_rook_agent_page_event(event, ctx);
+        // Polaris Terminal Agent page
+        let pterm_agent_page_handle = ctx.add_typed_action_view(PtermAgentPageView::new);
+        ctx.subscribe_to_view(&pterm_agent_page_handle, |me, _, event, ctx| {
+            me.handle_pterm_agent_page_event(event, ctx);
         });
 
         // Agent profiles page, under the Agents umbrella
@@ -1304,7 +1307,7 @@ impl SettingsView {
         let teams_page_handle = ctx.add_typed_action_view(TeamsPageView::new);
         ctx.subscribe_to_view(&teams_page_handle, |_, _, event, ctx| match event {
             TeamsPageViewEvent::TeamsChanged => ctx.notify(),
-            TeamsPageViewEvent::OpenRookDrive => ctx.emit(SettingsViewEvent::OpenRookDrive),
+            TeamsPageViewEvent::OpenPtermDrive => ctx.emit(SettingsViewEvent::OpenPtermDrive),
             TeamsPageViewEvent::ShowToast { message, flavor } => {
                 ctx.emit(SettingsViewEvent::ShowToast {
                     message: message.clone(),
@@ -1315,9 +1318,9 @@ impl SettingsView {
             TeamsPageViewEvent::ModalVisibilityChanged => ctx.notify(),
         });
 
-        let rookify_page_handle = ctx.add_typed_action_view(RookifyPageView::new);
-        ctx.subscribe_to_view(&rookify_page_handle, |me, _, event, ctx| {
-            me.handle_rookify_page_event(event, ctx);
+        let ptermify_page_handle = ctx.add_typed_action_view(PtermifyPageView::new);
+        ctx.subscribe_to_view(&ptermify_page_handle, |me, _, event, ctx| {
+            me.handle_ptermify_page_event(event, ctx);
         });
 
         // Render the privacy page only if telemetry opt-out is enabled.
@@ -1332,17 +1335,17 @@ impl SettingsView {
         ctx.subscribe_to_view(&referrals_page_handle, |me, _, event, ctx| {
             me.handle_referrals_page_event(event, ctx);
         });
-        let scripting_page_handle = if FeatureFlag::RookControlCli.is_enabled() {
+        let scripting_page_handle = if FeatureFlag::PtermControlCli.is_enabled() {
             Some(ctx.add_typed_action_view(ScriptingSettingsPageView::new))
         } else {
             None
         };
 
-        // Rook Drive page
-        let rook_drive_page_handle =
-            ctx.add_typed_action_view(rook_drive_page::RookDriveSettingsPageView::new);
-        ctx.subscribe_to_view(&rook_drive_page_handle, |me, _, event, ctx| {
-            me.handle_rook_drive_page_event(event, ctx);
+        // Polaris Terminal Drive page
+        let pterm_drive_page_handle =
+            ctx.add_typed_action_view(pterm_drive_page::PtermDriveSettingsPageView::new);
+        ctx.subscribe_to_view(&pterm_drive_page_handle, |me, _, event, ctx| {
+            me.handle_pterm_drive_page_event(event, ctx);
         });
 
         let platform_page_handle = ctx.add_typed_action_view(platform_page::PlatformPageView::new);
@@ -1386,7 +1389,7 @@ impl SettingsView {
 
         let mut settings_pages = vec![
             SettingsPage::new(main_page_handle),
-            SettingsPage::new(rook_agent_page_handle),
+            SettingsPage::new(pterm_agent_page_handle),
             SettingsPage::new(agent_profiles_page_handle),
             SettingsPage::new(knowledge_page_handle),
             SettingsPage::new(cli_agents_page_handle),
@@ -1398,10 +1401,10 @@ impl SettingsView {
             SettingsPage::new(features_page_handle),
             SettingsPage::new(keybindings_handle),
             SettingsPage::new(platform_page_handle),
-            SettingsPage::new(rookify_page_handle),
+            SettingsPage::new(ptermify_page_handle),
             SettingsPage::new(referrals_page_handle),
             SettingsPage::new(show_blocks_view_handle),
-            SettingsPage::new(rook_drive_page_handle),
+            SettingsPage::new(pterm_drive_page_handle),
         ];
 
         if let Some(scripting_page_handle) = scripting_page_handle {
@@ -1422,7 +1425,7 @@ impl SettingsView {
             SettingsNavItem::Umbrella(SettingsUmbrella::new(
                 "Agents",
                 vec![
-                    SettingsSection::RookAgent,
+                    SettingsSection::PtermAgent,
                     SettingsSection::AgentProfiles,
                     SettingsSection::AgentMCPServers,
                     SettingsSection::Knowledge,
@@ -1441,22 +1444,22 @@ impl SettingsView {
                 "Cloud platform",
                 vec![
                     SettingsSection::CloudEnvironments,
-                    SettingsSection::RookCloudAgentAPIKeys,
+                    SettingsSection::PtermCloudAgentAPIKeys,
                 ],
             )),
             SettingsNavItem::Page(SettingsSection::Teams),
             SettingsNavItem::Page(SettingsSection::Appearance),
             SettingsNavItem::Page(SettingsSection::Features),
             SettingsNavItem::Page(SettingsSection::Keybindings),
-            SettingsNavItem::Page(SettingsSection::Rookify),
+            SettingsNavItem::Page(SettingsSection::Ptermify),
             SettingsNavItem::Page(SettingsSection::Referrals),
             SettingsNavItem::Page(SettingsSection::SharedBlocks),
-            SettingsNavItem::Page(SettingsSection::RookDrive),
+            SettingsNavItem::Page(SettingsSection::PtermDrive),
             SettingsNavItem::Page(SettingsSection::Privacy),
             SettingsNavItem::Page(SettingsSection::About),
         ];
 
-        if FeatureFlag::RookControlCli.is_enabled() {
+        if FeatureFlag::PtermControlCli.is_enabled() {
             let shared_blocks_index = nav_items
                 .iter()
                 .position(|item| {
@@ -1470,7 +1473,7 @@ impl SettingsView {
         }
 
         let initial_page = match page {
-            Some(SettingsSection::Scripting) if !FeatureFlag::RookControlCli.is_enabled() => {
+            Some(SettingsSection::Scripting) if !FeatureFlag::PtermControlCli.is_enabled() => {
                 SettingsSection::Account
             }
             other => other.unwrap_or_default(),
@@ -1815,7 +1818,7 @@ impl SettingsView {
         }
     }
 
-    fn handle_rookify_page_event(
+    fn handle_ptermify_page_event(
         &mut self,
         event: &SettingsPageEvent,
         ctx: &mut ViewContext<Self>,
@@ -1916,37 +1919,37 @@ impl SettingsView {
         }
     }
 
-    fn handle_rook_drive_page_event(
+    fn handle_pterm_drive_page_event(
         &mut self,
-        event: &rook_drive_page::RookDriveSettingsPageEvent,
+        event: &pterm_drive_page::PtermDriveSettingsPageEvent,
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            rook_drive_page::RookDriveSettingsPageEvent::SignUp => {
+            pterm_drive_page::PtermDriveSettingsPageEvent::SignUp => {
                 ctx.emit(SettingsViewEvent::SignupAnonymousUser)
             }
         }
     }
 
-    fn handle_rook_agent_page_event(
+    fn handle_pterm_agent_page_event(
         &mut self,
-        event: &RookAgentPageEvent,
+        event: &PtermAgentPageEvent,
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            RookAgentPageEvent::FocusModal => ctx.focus(&self.search_editor),
+            PtermAgentPageEvent::FocusModal => ctx.focus(&self.search_editor),
             #[cfg(feature = "local_fs")]
-            RookAgentPageEvent::OpenCustomRouterEditor(router) => {
+            PtermAgentPageEvent::OpenCustomRouterEditor(router) => {
                 ctx.emit(SettingsViewEvent::OpenCustomRouterEditor(router.clone()));
             }
             #[cfg(feature = "local_fs")]
-            RookAgentPageEvent::OpenCustomRouterFile(path) => {
+            PtermAgentPageEvent::OpenCustomRouterFile(path) => {
                 ctx.emit(SettingsViewEvent::OpenCustomRouterFile(path.clone()));
             }
-            RookAgentPageEvent::SignupAnonymousUser => {
+            PtermAgentPageEvent::SignupAnonymousUser => {
                 ctx.emit(SettingsViewEvent::SignupAnonymousUser)
             }
-            RookAgentPageEvent::ShowModal | RookAgentPageEvent::HideModal => {
+            PtermAgentPageEvent::ShowModal | PtermAgentPageEvent::HideModal => {
                 // Modal rendering is handled in get_modal_content_for_page
                 ctx.notify();
             }
@@ -2082,7 +2085,7 @@ impl SettingsView {
 
         #[cfg(feature = "crash_reporting")]
         {
-            crate::crash_reporting::set_tag("rook.settings_page", section.to_string());
+            crate::crash_reporting::set_tag("polaris-terminal.settings_page", section.to_string());
         }
 
         if let Some(settings_page) = self.current_settings_page() {
@@ -2121,12 +2124,12 @@ impl SettingsView {
             SettingsPageViewHandle::Appearance(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::BillingAndUsage(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::About(v) => v.as_ref(app).should_render(app),
-            SettingsPageViewHandle::RookCloudAgentAPIKeys(v) => v.as_ref(app).should_render(app),
+            SettingsPageViewHandle::PtermCloudAgentAPIKeys(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Privacy(v) => v.as_ref(app).should_render(app),
-            SettingsPageViewHandle::Rookify(v) => v.as_ref(app).should_render(app),
+            SettingsPageViewHandle::Ptermify(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Referrals(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Scripting(v) => v.as_ref(app).should_render(app),
-            SettingsPageViewHandle::RookAgent(v) => v.as_ref(app).should_render(app),
+            SettingsPageViewHandle::PtermAgent(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::AgentProfiles(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Knowledge(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::CLIAgents(v) => v.as_ref(app).should_render(app),
@@ -2134,7 +2137,7 @@ impl SettingsView {
             SettingsPageViewHandle::MCPServers(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::CodeIndexing(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::EditorAndCodeReview(v) => v.as_ref(app).should_render(app),
-            SettingsPageViewHandle::RookDrive(v) => v.as_ref(app).should_render(app),
+            SettingsPageViewHandle::PtermDrive(v) => v.as_ref(app).should_render(app),
         }
     }
 
@@ -2374,13 +2377,13 @@ impl SettingsView {
             SettingsPageViewHandle::Privacy(view) => {
                 view.read(app, |view, _| view.get_modal_content())
             }
-            SettingsPageViewHandle::RookCloudAgentAPIKeys(view) => {
+            SettingsPageViewHandle::PtermCloudAgentAPIKeys(view) => {
                 view.read(app, |view, _| view.get_modal_content())
             }
             SettingsPageViewHandle::MCPServers(view) => {
                 view.read(app, |view, _| view.get_modal_content(app))
             }
-            SettingsPageViewHandle::RookAgent(view) => {
+            SettingsPageViewHandle::PtermAgent(view) => {
                 view.read(app, |view, _| view.get_modal_content(app))
             }
             SettingsPageViewHandle::Teams(view) => {
@@ -2399,7 +2402,7 @@ impl SettingsView {
                         Container::new(
                             ConstrainedBox::new(
                                 icons::Icon::SearchSmall
-                                    .to_rookui_icon(appearance.theme().active_ui_text_color())
+                                    .to_ptermui_icon(appearance.theme().active_ui_text_color())
                                     .finish(),
                             )
                             .with_width(16.)
@@ -2789,9 +2792,9 @@ impl TypedActionView for SettingsView {
                     })
                 }
             }
-            SettingsAction::RookAgent(ai_action) => {
-                if let Some(rook_agent_page) = self.settings_page(SettingsSection::RookAgent)
-                    && let SettingsPageViewHandle::RookAgent(view) = &rook_agent_page.view_handle
+            SettingsAction::PtermAgent(ai_action) => {
+                if let Some(pterm_agent_page) = self.settings_page(SettingsSection::PtermAgent)
+                    && let SettingsPageViewHandle::PtermAgent(view) = &pterm_agent_page.view_handle
                 {
                     view.update(ctx, |view, ctx| {
                         view.handle_action(ai_action, ctx);
@@ -2843,21 +2846,21 @@ impl TypedActionView for SettingsView {
                     })
                 }
             }
-            SettingsAction::RookDrive(rook_drive_action) => {
-                if let Some(rook_drive_page) = self.settings_page(SettingsSection::RookDrive)
-                    && let SettingsPageViewHandle::RookDrive(view) = &rook_drive_page.view_handle
+            SettingsAction::PtermDrive(pterm_drive_action) => {
+                if let Some(pterm_drive_page) = self.settings_page(SettingsSection::PtermDrive)
+                    && let SettingsPageViewHandle::PtermDrive(view) = &pterm_drive_page.view_handle
                 {
                     view.update(ctx, |view, ctx| {
-                        view.handle_action(rook_drive_action, ctx);
+                        view.handle_action(pterm_drive_action, ctx);
                     })
                 }
             }
-            SettingsAction::RookifyPageToggle(rookify_action) => {
-                if let Some(rookify_page) = self.settings_page(SettingsSection::Rookify)
-                    && let SettingsPageViewHandle::Rookify(view) = &rookify_page.view_handle
+            SettingsAction::PtermifyPageToggle(ptermify_action) => {
+                if let Some(ptermify_page) = self.settings_page(SettingsSection::Ptermify)
+                    && let SettingsPageViewHandle::Ptermify(view) = &ptermify_page.view_handle
                 {
                     view.update(ctx, |view, ctx| {
-                        view.handle_action(rookify_action, ctx);
+                        view.handle_action(ptermify_action, ctx);
                     })
                 }
             }
@@ -2900,16 +2903,16 @@ impl BackingView for SettingsView {
     fn handle_pane_header_overflow_menu_action(
         &mut self,
         action: &Self::PaneHeaderOverflowMenuAction,
-        ctx: &mut rookui::ViewContext<Self>,
+        ctx: &mut ptermui::ViewContext<Self>,
     ) {
         self.handle_action(action, ctx)
     }
 
-    fn close(&mut self, ctx: &mut rookui::ViewContext<Self>) {
+    fn close(&mut self, ctx: &mut ptermui::ViewContext<Self>) {
         ctx.emit(SettingsViewEvent::Pane(PaneEvent::Close));
     }
 
-    fn focus_contents(&mut self, ctx: &mut rookui::ViewContext<Self>) {
+    fn focus_contents(&mut self, ctx: &mut ptermui::ViewContext<Self>) {
         ctx.focus(&self.search_editor)
     }
 

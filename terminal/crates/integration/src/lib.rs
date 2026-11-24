@@ -6,5 +6,5 @@ pub mod user_defaults;
 pub mod util;
 
 pub use builder::Builder;
-pub use rook::integration_testing::view_getters;
-pub use rookui_core::integration::{AssertionOutcome, TestStep};
+pub use polaris_terminal::integration_testing::view_getters;
+pub use ptermui_core::integration::{AssertionOutcome, TestStep};

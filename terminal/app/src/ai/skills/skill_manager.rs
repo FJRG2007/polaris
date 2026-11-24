@@ -9,10 +9,10 @@ use ai::skills::{
 pub use file_watchers::{
     SkillWatcher, SkillWatcherEvent, extract_skill_parent_directory, read_skills_from_directories,
 };
-use rook_core::features::FeatureFlag;
-use rook_util::host_id::HostId;
-use rook_util::local_or_remote_path::LocalOrRemotePath;
-use rookui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use pterm_core::features::FeatureFlag;
+use pterm_util::host_id::HostId;
+use pterm_util::local_or_remote_path::LocalOrRemotePath;
+use ptermui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use super::bundled::{BundledSkill, BundledSkills};
 #[cfg(test)]
@@ -40,7 +40,7 @@ pub struct SkillManager {
     /// Reverse lookup: skill name → set of paths with that name.
     /// This allows efficient lookup by skill name without scanning all paths.
     skills_by_name: HashMap<String, HashSet<LocalOrRemotePath>>,
-    /// Skills bundled into Rook for the local host and connected remote hosts.
+    /// Skills bundled into Polaris Terminal for the local host and connected remote hosts.
     bundled_skills: BundledSkills,
     /// Home directories published by connected remote hosts.
     ///
@@ -580,7 +580,7 @@ impl SkillManager {
         }
     }
 
-    /// Registers skills loaded from `ROOK_SKILL_DIRS` environment variable directories
+    /// Registers skills loaded from `POLARIS_TERMINAL_SKILL_DIRS` environment variable directories
     /// as personal (home) tier skills.
     ///
     /// Unlike [`handle_skills_added`], this method does not require each skill's path
@@ -591,7 +591,9 @@ impl SkillManager {
     /// Call this after reading skills with [`ai::skills::read_skills_for_skills_dirs`].
     pub fn add_skills_dirs_skills(&mut self, skills: Vec<ParsedSkill>) {
         let Some(home_dir) = dirs::home_dir() else {
-            log::warn!("ROOK_SKILL_DIRS: home directory unavailable; cannot register env skills");
+            log::warn!(
+                "POLARIS_TERMINAL_SKILL_DIRS: home directory unavailable; cannot register env skills"
+            );
             return;
         };
         let home_dir = LocalOrRemotePath::Local(home_dir);

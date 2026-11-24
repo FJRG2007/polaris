@@ -1,9 +1,9 @@
 #[cfg(test)]
-use rookui::App;
+use ptermui::App;
 
 #[cfg(test)]
 pub fn initialize_settings_for_tests(app: &mut App) {
-    use rook_core::execution_mode::ExecutionMode;
+    use pterm_core::execution_mode::ExecutionMode;
     initialize_settings_for_tests_with_mode(app, ExecutionMode::App, false);
 }
 
@@ -20,14 +20,14 @@ pub fn initialize_history_persistence_for_tests(app: &mut App) {
 #[cfg(test)]
 pub fn initialize_settings_for_tests_with_mode(
     app: &mut App,
-    mode: rook_core::execution_mode::ExecutionMode,
+    mode: pterm_core::execution_mode::ExecutionMode,
     is_sandboxed: bool,
 ) {
-    use rook_core::execution_mode::AppExecutionMode;
-    use rook_core::semantic_selection::SemanticSelection;
+    use pterm_core::execution_mode::AppExecutionMode;
+    use pterm_core::semantic_selection::SemanticSelection;
 
     use crate::ai::cloud_agent_settings::CloudAgentSettings;
-    use crate::drive::settings::RookDriveSettings;
+    use crate::drive::settings::PtermDriveSettings;
     use crate::search::command_search::settings::CommandSearchSettings;
     use crate::settings::app_icon::AppIconSettings;
     use crate::settings::manager::SettingsManager;
@@ -44,23 +44,23 @@ pub fn initialize_settings_for_tests_with_mode(
     use crate::terminal::general_settings::GeneralSettings;
     use crate::terminal::keys_settings::KeysSettings;
     use crate::terminal::ligature_settings::LigatureSettings;
-    use crate::terminal::rookify::settings::RookifySettings;
+    use crate::terminal::ptermify::settings::PtermifySettings;
     use crate::terminal::safe_mode_settings::SafeModeSettings;
     use crate::terminal::session_settings::SessionSettings;
     use crate::terminal::settings::TerminalSettings;
     use crate::terminal::shared_session::settings::SharedSessionSettings;
     use crate::undo_close::UndoCloseSettings;
-    use crate::user_config::RookConfig;
+    use crate::user_config::PtermConfig;
     use crate::window_settings::WindowSettings;
     use crate::workspace::tab_settings::TabSettings;
     app.add_singleton_model(|ctx| AppExecutionMode::new(mode, is_sandboxed, ctx));
 
     app.update(init_and_register_user_preferences);
     app.add_singleton_model(|_ctx| SettingsManager::default());
-    app.add_singleton_model(RookConfig::mock);
+    app.add_singleton_model(PtermConfig::mock);
     app.update(|ctx| {
         // Register a no-op secure storage provider for testing.
-        rookui_extras::secure_storage::register_noop("test", ctx);
+        ptermui_extras::secure_storage::register_noop("test", ctx);
     });
 
     AccessibilitySettings::register(app);
@@ -89,7 +89,7 @@ pub fn initialize_settings_for_tests_with_mode(
     InputSettings::register(app);
     KeysSettings::register(app);
     LigatureSettings::register(app);
-    if rook_core::features::FeatureFlag::RookControlCli.is_enabled() {
+    if pterm_core::features::FeatureFlag::PtermControlCli.is_enabled() {
         LocalControlSettings::register(app);
     }
 
@@ -105,7 +105,7 @@ pub fn initialize_settings_for_tests_with_mode(
     ScrollSettings::register(app);
     SelectionSettings::register(app);
     app.update(|ctx| {
-        RookifySettings::register(ctx);
+        PtermifySettings::register(ctx);
     });
     SessionSettings::register(app);
     SshSettings::register(app);
@@ -117,7 +117,7 @@ pub fn initialize_settings_for_tests_with_mode(
     UndoCloseSettings::register(app);
     VimBannerSettings::register(app);
     SharedObjectLimitBannerSettings::register(app);
-    RookDriveSettings::register(app);
+    PtermDriveSettings::register(app);
     WindowSettings::register(app);
     SharedSessionSettings::register(app);
     CodeSettings::register(app);

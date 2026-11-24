@@ -5,14 +5,14 @@
 //! filtering across both top-level pages and umbrella subpages — so that
 //! refactors of the settings page model cannot silently regress them.
 
-use rook::integration_testing::settings::{
+use polaris_terminal::integration_testing::settings::{
     assert_settings_nav_page_visible, assert_settings_nav_subpage_visible, assert_settings_section,
     assert_settings_widget_rendered, assert_umbrella_expanded, clear_settings_search,
     click_settings_nav_subpage, click_settings_umbrella, open_settings_page,
     press_settings_nav_down, press_settings_nav_up, type_settings_search,
 };
-use rook::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use rook::settings_view::{SettingsSection, cli_agent_settings_widget_id};
+use polaris_terminal::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use polaris_terminal::settings_view::{SettingsSection, cli_agent_settings_widget_id};
 
 use super::{Builder, new_builder};
 
@@ -66,7 +66,7 @@ pub fn test_settings_keyboard_navigation_down_into_collapsed_umbrella() -> Build
         .with_step(open_settings_page(SettingsSection::Account))
         .with_step(assert_umbrella_expanded(AGENTS_UMBRELLA, false))
         .with_step(press_settings_nav_down())
-        .with_step(assert_settings_section(SettingsSection::RookAgent))
+        .with_step(assert_settings_section(SettingsSection::PtermAgent))
         .with_step(assert_umbrella_expanded(AGENTS_UMBRELLA, true))
 }
 
@@ -198,8 +198,8 @@ pub fn test_settings_search_preserved_on_sidebar_click() -> Builder {
         .with_step(open_settings_page(SettingsSection::Account))
         .with_step(type_settings_search("agent"))
         .with_step(assert_umbrella_expanded(AGENTS_UMBRELLA, true))
-        .with_step(click_settings_nav_subpage(SettingsSection::RookAgent))
-        .with_step(assert_settings_section(SettingsSection::RookAgent))
+        .with_step(click_settings_nav_subpage(SettingsSection::PtermAgent))
+        .with_step(assert_settings_section(SettingsSection::PtermAgent))
         // The query survives the click, and so does the filtered sidebar.
         .with_step(assert_settings_nav_page_visible(
             SettingsSection::About,

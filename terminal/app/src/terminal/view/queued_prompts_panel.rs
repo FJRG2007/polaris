@@ -1,4 +1,4 @@
-//! Multi-prompt queue panel rendered between the rooking indicator and the input editor in
+//! Multi-prompt queue panel rendered between the pterming indicator and the input editor in
 //! [`TerminalView`].
 //!
 //! Reads from the `QueuedQueryModel` singleton (keyed by `AIConversationId`) for the queue of the
@@ -11,23 +11,23 @@ use std::collections::HashMap;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::vec2f;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::clipboard::ClipboardContent;
-use rookui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::clipboard::ClipboardContent;
+use ptermui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
+use ptermui::elements::{
     Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, DEFAULT_UI_LINE_HEIGHT_RATIO, DragAxis, Draggable,
     DraggableState, Empty, Expanded, Fill, Flex, Hoverable, MinSize, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, SavePosition,
     ScrollbarWidth, Shrinkable, Stack, Text,
 };
-use rookui::fonts::{Properties, Style, Weight};
-use rookui::keymap::Keystroke;
-use rookui::platform::Cursor;
-use rookui::text_layout::ClipConfig;
-use rookui::ui_components::components::UiComponent;
-use rookui::{
+use ptermui::fonts::{Properties, Style, Weight};
+use ptermui::keymap::Keystroke;
+use ptermui::platform::Cursor;
+use ptermui::text_layout::ClipConfig;
+use ptermui::ui_components::components::UiComponent;
+use ptermui::{
     AppContext, BlurContext, Element, Entity, EntityId, FocusContext, ModelHandle, SingletonEntity,
     TypedActionView, View, ViewContext, ViewHandle,
 };
@@ -1047,7 +1047,7 @@ fn render_header(
     let ui_font_size = appearance.ui_font_size();
     Hoverable::new(header_mouse_state.clone(), move |_state| {
         let chevron =
-            ConstrainedBox::new(chevron_icon.to_rookui_icon(sub_text_color.into()).finish())
+            ConstrainedBox::new(chevron_icon.to_ptermui_icon(sub_text_color.into()).finish())
                 .with_height(16.)
                 .with_width(16.)
                 .finish();
@@ -1259,7 +1259,7 @@ fn render_row(props: RenderRowProps<'_>, app: &AppContext) -> Box<dyn Element> {
             Hoverable::new(drag_handle_tooltip_state.clone(), move |drag_state| {
                 let icon = ConstrainedBox::new(
                     TerminalIcon::DragIndicatorVertical
-                        .to_rookui_icon(disabled_color.into())
+                        .to_ptermui_icon(disabled_color.into())
                         .finish(),
                 )
                 .with_height(20.)
@@ -1286,7 +1286,7 @@ fn render_row(props: RenderRowProps<'_>, app: &AppContext) -> Box<dyn Element> {
         } else {
             ConstrainedBox::new(
                 TerminalIcon::DragIndicatorVertical
-                    .to_rookui_icon(theme.sub_text_color(theme.surface_1()))
+                    .to_ptermui_icon(theme.sub_text_color(theme.surface_1()))
                     .finish(),
             )
             .with_height(20.)

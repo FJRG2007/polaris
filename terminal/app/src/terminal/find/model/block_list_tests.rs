@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use rookui::App;
+use ptermui::App;
 
 use super::{BlockListFindRun, BlockListMatch};
 use crate::terminal::block_filter::BlockFilterQuery;
@@ -352,7 +352,7 @@ fn test_run_find_on_block_list_with_filtered_block() {
     });
 }
 
-/// Regression test for https://github.com/FJRG2007/rook/issues/9542
+/// Regression test for https://github.com/FJRG2007/polaris/issues/9542
 ///
 /// When the active block's output is still streaming and the find results are refreshed,
 /// the focused match must remain on the same text span even though new matches are
@@ -417,7 +417,7 @@ fn test_rerun_on_block_preserves_focused_match_in_active_block() {
     });
 }
 
-/// Regression test for https://github.com/FJRG2007/rook/issues/9542
+/// Regression test for https://github.com/FJRG2007/polaris/issues/9542
 ///
 /// When the user is focused on a match in an older (finished) block and the active block
 /// receives new streaming output, the focus must not drift to a different match.

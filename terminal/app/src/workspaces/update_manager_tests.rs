@@ -1,8 +1,8 @@
 use chrono::Utc;
 use cloud_object_client::MockObjectClient;
 use itertools::Itertools;
-use rookui::{AddSingletonModel, App};
-use rookui_extras::user_preferences;
+use ptermui::{AddSingletonModel, App};
+use ptermui_extras::user_preferences;
 use settings::{PrivatePreferences, PublicPreferences};
 
 use super::*;
@@ -128,7 +128,7 @@ fn test_leaving_team_removes_objects() {
             &mut app,
         );
 
-        // Add the initial Rook Drive objects.
+        // Add the initial Polaris Terminal Drive objects.
         CloudModel::handle(&app).update(&mut app, |cloud_model, _| {
             cloud_model.add_object(
                 SyncId::ServerId(team_workflow_id.into()),
@@ -337,7 +337,7 @@ fn initialize_llm_preferences_dependencies(app: &mut App) {
     app.add_singleton_model(CodeSettings::new_with_defaults);
     app.add_singleton_model(AISettings::new_with_defaults);
     app.update(|ctx| {
-        rookui_extras::secure_storage::register_noop("test", ctx);
+        ptermui_extras::secure_storage::register_noop("test", ctx);
     });
     app.add_singleton_model(ai::api_keys::ApiKeyManager::new);
     app.add_singleton_model(|_| crate::ai::mcp::TemplatableMCPServerManager::default());

@@ -125,7 +125,7 @@ fn workspace_member_conversion_preserves_is_disabled() {
 }
 
 mod pending_email_invites_conversion {
-    use rook_graphql::workspace::EmailInvite as GqlEmailInvite;
+    use pterm_graphql::workspace::EmailInvite as GqlEmailInvite;
 
     use crate::workspaces::gql_convert::team_pending_email_invites_from_gql;
 
@@ -181,7 +181,7 @@ mod pending_email_invites_conversion {
 }
 
 mod team_settings_conversion {
-    use rook_graphql::workspace as gqlws;
+    use pterm_graphql::workspace as gqlws;
 
     use crate::ai::execution_profiles::{
         ActionPermission, ComputerUsePermission, WriteToPtyPermission,
@@ -301,7 +301,7 @@ mod team_settings_conversion {
                 selected_auto_reload_credit_denomination: Some(50),
             },
             ambient_agent_settings: Some(gqlws::AmbientAgentSettings {
-                enable_rook_attribution: gqlws::AdminEnablementSetting::Enable,
+                enable_pterm_attribution: gqlws::AdminEnablementSetting::Enable,
                 default_host_slug: Some("my-host".to_string()),
             }),
             team_byo: None,
@@ -405,7 +405,7 @@ mod team_settings_conversion {
 
         // Ambient agent settings surface attribution + default host slug.
         assert_eq!(
-            settings.enable_rook_attribution,
+            settings.enable_pterm_attribution,
             AdminEnablementSetting::Enable
         );
         assert_eq!(settings.default_host_slug.as_deref(), Some("my-host"));
@@ -463,7 +463,7 @@ mod team_settings_conversion {
 }
 
 mod team_visibility_conversion {
-    use rook_graphql::workspace::TeamVisibility as GqlTeamVisibility;
+    use pterm_graphql::workspace::TeamVisibility as GqlTeamVisibility;
 
     use crate::workspaces::team::TeamVisibility;
 

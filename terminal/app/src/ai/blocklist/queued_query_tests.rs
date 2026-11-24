@@ -5,7 +5,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rookui::{App, SingletonEntity};
+use ptermui::{App, SingletonEntity};
 
 use super::{
     AutofireAction, QueuedQuery, QueuedQueryEvent, QueuedQueryId, QueuedQueryModel,
@@ -20,7 +20,7 @@ use crate::test_util::settings::initialize_history_persistence_for_tests;
 /// singleton) inside a test app and capture emitted events.
 fn with_model<F>(test: F)
 where
-    F: FnOnce(App, rookui::ModelHandle<QueuedQueryModel>, Rc<RefCell<Vec<QueuedQueryEvent>>>)
+    F: FnOnce(App, ptermui::ModelHandle<QueuedQueryModel>, Rc<RefCell<Vec<QueuedQueryEvent>>>)
         + 'static,
 {
     App::test((), |mut app| async move {
@@ -64,7 +64,7 @@ fn image_attachment(file_name: &str) -> PendingAttachment {
 }
 
 fn append_user(
-    model: &rookui::ModelHandle<QueuedQueryModel>,
+    model: &ptermui::ModelHandle<QueuedQueryModel>,
     app: &mut App,
     conversation_id: AIConversationId,
     text: &str,
@@ -710,7 +710,7 @@ fn delete_conversation_drops_only_that_conversation_state() {
     // Removing one conversation from history should drop its queue + toggle but leave others.
     with_model(|mut app, model, _events| {
         let history = BlocklistAIHistoryModel::handle(&app);
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         let conv_a = history.update(&mut app, |h, ctx| {
             h.start_new_conversation(terminal_view_id, false, false, false, ctx)
         });
@@ -884,7 +884,7 @@ fn command_in_flight_flag_arms_and_clears() {
 fn delete_conversation_clears_in_flight_command() {
     with_model(|mut app, model, _events| {
         let history = BlocklistAIHistoryModel::handle(&app);
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         let conv = history.update(&mut app, |h, ctx| {
             h.start_new_conversation(terminal_view_id, false, false, false, ctx)
         });
@@ -903,7 +903,7 @@ fn clear_conversations_for_terminal_surface_drops_every_listed_conversation() {
     // ClearedConversationsForTerminalSurface with multiple ids must drop each listed conversation's queue.
     with_model(|mut app, model, _events| {
         let history = BlocklistAIHistoryModel::handle(&app);
-        let terminal_view_id = rookui::EntityId::new();
+        let terminal_view_id = ptermui::EntityId::new();
         let conv_a = history.update(&mut app, |h, ctx| {
             h.start_new_conversation(terminal_view_id, false, false, false, ctx)
         });

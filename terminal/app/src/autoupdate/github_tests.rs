@@ -25,7 +25,7 @@ fn no_part_of_a_tag_is_rewritten() {
     }
 }
 
-/// The tab bar shows the "Update Rook" pill only for an update at or before
+/// The tab bar shows the "Update Polaris Terminal" pill only for an update at or before
 /// `last_prominent_update`; left empty, a downloaded update was reachable from
 /// the avatar menu alone.
 #[test]
@@ -130,7 +130,7 @@ fn an_unrecognised_tag_has_no_ordering() {
 fn a_release_url_points_at_the_version_it_names() {
     assert_eq!(
         release_url("v0.2026.09.08.21.45.oss_00"),
-        "https://github.com/FJRG2007/rook/releases/tag/v0.2026.09.08.21.45.oss_00"
+        "https://github.com/FJRG2007/polaris/releases/tag/v0.2026.09.08.21.45.oss_00"
     );
 }
 

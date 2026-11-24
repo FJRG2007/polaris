@@ -1,5 +1,5 @@
-use rookui::async_assert;
-use rookui::integration::TestStep;
+use ptermui::async_assert;
+use ptermui::integration::TestStep;
 
 use crate::integration_testing::command_palette::open_command_palette_and_run_action;
 use crate::integration_testing::view_getters::workspace_view;

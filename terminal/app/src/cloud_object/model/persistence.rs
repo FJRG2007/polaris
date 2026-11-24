@@ -3,11 +3,11 @@ use std::sync::mpsc::SyncSender;
 
 use chrono::{DateTime, Duration, Utc};
 use itertools::Itertools;
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_error;
+use pterm_graphql::scalars::time::ServerTimestamp;
+use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 use rand::Rng;
-use rook_core::features::FeatureFlag;
-use rook_errors::report_error;
-use rook_graphql::scalars::time::ServerTimestamp;
-use rookui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use super::generic_string_model::GenericStringObjectId;
 use crate::ai::execution_profiles::CloudAIExecutionProfile;
@@ -900,7 +900,7 @@ impl CloudModel {
 
             folder.set_model(CloudFolderModel {
                 is_open,
-                is_rook_pack: folder.model().is_rook_pack,
+                is_pterm_pack: folder.model().is_pterm_pack,
                 name: folder.model().name.clone(),
             });
 
@@ -1102,11 +1102,11 @@ impl CloudModel {
             .count()
     }
 
-    /// Number of cloud objects that have errored in some way and are visible in the Rook Drive index
+    /// Number of cloud objects that have errored in some way and are visible in the Polaris Terminal Drive index
     pub fn num_visible_errored_objects(&self) -> usize {
         self.objects_by_id
             .values()
-            .filter(|object| object.renders_in_rook_drive() && object.metadata().is_errored())
+            .filter(|object| object.renders_in_pterm_drive() && object.metadata().is_errored())
             .count()
     }
 
@@ -1415,7 +1415,7 @@ impl CloudModel {
     pub fn current_revision(&self, id: &SyncId) -> Option<&Revision> {
         self.objects_by_id
             .get(&id.uid())
-            .and_then(|rook_cloud_object| rook_cloud_object.metadata().revision.as_ref())
+            .and_then(|pterm_cloud_object| pterm_cloud_object.metadata().revision.as_ref())
     }
 
     /// Returns only active (not trashed) notebooks in cloud model.

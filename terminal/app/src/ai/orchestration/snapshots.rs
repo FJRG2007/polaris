@@ -6,13 +6,14 @@
 //! option lists cannot drift between the GUI and the TUI.
 
 use ai::agent::action::RunAgentsExecutionMode;
-use rook_cli::agent::Harness;
-use rookui::{AppContext, SingletonEntity};
+use pterm_cli::agent::Harness;
+use ptermui::{AppContext, SingletonEntity};
 
 use super::config_state::{AuthSecretSelection, OrchestrationConfigState};
 use super::providers::{
-    ORCHESTRATION_ENV_NONE_LABEL, ORCHESTRATION_ROOK_WORKER_HOST, ORCHESTRATION_RUNNER_NONE_LABEL,
-    get_base_model_choices, resolve_default_host_slug, resolve_recent_host_slug,
+    ORCHESTRATION_ENV_NONE_LABEL, ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST,
+    ORCHESTRATION_RUNNER_NONE_LABEL, get_base_model_choices, resolve_default_host_slug,
+    resolve_recent_host_slug,
 };
 use crate::LLMPreferences;
 use crate::ai::auth_secret_types::auth_secret_types_for_harness;
@@ -71,11 +72,11 @@ pub enum OptionBadge {
     Default,
     Recent,
     Connected,
-    /// Constructed by `rook_tui` (the TUI ask-question card). The variant
+    /// Constructed by `pterm_tui` (the TUI ask-question card). The variant
     /// lives here so both frontends share a single `OptionBadge` type.
     /// The lint is suppressed because the construction site is in the
-    /// downstream `rook_tui` crate, which is invisible to clippy when
-    /// linting `rook` in isolation.
+    /// downstream `pterm_tui` crate, which is invisible to clippy when
+    /// linting `polaris-terminal` in isolation.
     #[allow(dead_code)]
     Recommended,
 }
@@ -286,7 +287,7 @@ struct ModelChoiceInput {
 
 /// Builds the model options for the active harness, mirroring the GUI's
 /// `populate_model_picker_for_harness` three catalog branches:
-/// - **Oz / empty**: the Rook LLM catalog (auto, then custom, then other
+/// - **Oz / empty**: the Polaris Terminal LLM catalog (auto, then custom, then other
 ///   models; custom models excluded for Cloud runs).
 /// - **Local Codex**: only a "Default model" entry.
 /// - **Other non-Oz harnesses**: "Default model" plus the server-provided
@@ -330,7 +331,7 @@ pub fn oz_model_snapshot(
     is_local: bool,
     ctx: &AppContext,
 ) -> OptionSnapshot {
-    // Oz / unset: Rook LLM catalog. Custom models are excluded for cloud
+    // Oz / unset: Polaris Terminal LLM catalog. Custom models are excluded for cloud
     // execution because remote workers cannot use local custom endpoints.
     let llm_prefs = LLMPreferences::as_ref(ctx);
     let (auto_models, rest): (Vec<_>, Vec<_>) = get_base_model_choices(llm_prefs, ctx, is_local)
@@ -477,7 +478,7 @@ fn build_api_key_snapshot(
 // ── Host ────────────────────────────────────────────────────────────
 
 /// Builds the host options in the GUI host picker's order: `scope`'s team
-/// default (badged), rook, connected worker hosts (badged), the recent
+/// default (badged), polaris-terminal, connected worker hosts (badged), the recent
 /// custom slug (badged), then a custom-host text-entry footer.
 pub fn host_snapshot<S: TeamScope + ?Sized>(
     state: &OrchestrationConfigState,
@@ -495,7 +496,7 @@ pub fn host_snapshot<S: TeamScope + ?Sized>(
             worker_host.trim().to_string()
         }
         RunAgentsExecutionMode::Remote { .. } | RunAgentsExecutionMode::Local => {
-            ORCHESTRATION_ROOK_WORKER_HOST.to_string()
+            ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST.to_string()
         }
     };
     build_host_snapshot(default_host, recent_host, connected_hosts, &current)
@@ -518,10 +519,10 @@ fn build_host_snapshot(
         added_slugs.push(slug);
     }
     rows.push(OptionRow::new(
-        ORCHESTRATION_ROOK_WORKER_HOST,
-        ORCHESTRATION_ROOK_WORKER_HOST,
+        ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST,
+        ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST,
     ));
-    added_slugs.push(ORCHESTRATION_ROOK_WORKER_HOST.to_string());
+    added_slugs.push(ORCHESTRATION_POLARIS_TERMINAL_WORKER_HOST.to_string());
 
     for slug in connected_hosts {
         if slug.trim().is_empty()

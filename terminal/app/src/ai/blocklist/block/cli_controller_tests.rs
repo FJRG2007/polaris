@@ -1,4 +1,4 @@
-use rookui::{App, ViewHandle};
+use ptermui::{App, ViewHandle};
 
 use super::*;
 use crate::terminal::TerminalView;

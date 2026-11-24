@@ -1,12 +1,12 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use rook_core::features::FeatureFlag;
-use rook_errors::report_if_error;
-use rookui::elements::{Flex, MouseStateHandle, ParentElement};
-use rookui::ui_components::components::UiComponent;
-use rookui::ui_components::switch::SwitchStateHandle;
-use rookui::{Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use pterm_core::features::FeatureFlag;
+use pterm_errors::report_if_error;
+use ptermui::elements::{Flex, MouseStateHandle, ParentElement};
+use ptermui::ui_components::components::UiComponent;
+use ptermui::ui_components::switch::SwitchStateHandle;
+use ptermui::{Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
 use settings::{Setting, ToggleableSetting};
 
 use crate::appearance::Appearance;
@@ -151,7 +151,10 @@ impl ExternalEditorView {
 
         let mut items = vec![default_app];
 
-        items.push(DropdownItem::new("Rook", make_action(EditorChoice::Rook)));
+        items.push(DropdownItem::new(
+            "Polaris Terminal",
+            make_action(EditorChoice::Pterm),
+        ));
         if FeatureFlag::AllowOpeningFileLinksUsingEditorEnv.is_enabled() {
             items.push(DropdownItem::new(
                 "$EDITOR",
@@ -173,7 +176,7 @@ impl ExternalEditorView {
             EditorChoice::ExternalEditor(editor) => {
                 dropdown.set_selected_by_name(format!("{editor}"), ctx)
             }
-            EditorChoice::Rook => dropdown.set_selected_by_name("Rook", ctx),
+            EditorChoice::Pterm => dropdown.set_selected_by_name("Polaris Terminal", ctx),
             EditorChoice::EnvEditor => dropdown.set_selected_by_name("$EDITOR", ctx),
             EditorChoice::SystemDefault => dropdown.set_selected_by_name(default_option_text, ctx),
         };
@@ -274,7 +277,7 @@ impl View for ExternalEditorView {
         "ExternalEditorView"
     }
 
-    fn render(&self, app: &rookui::AppContext) -> Box<dyn rookui::Element> {
+    fn render(&self, app: &ptermui::AppContext) -> Box<dyn ptermui::Element> {
         let appearance = Appearance::as_ref(app);
 
         let default_editor = render_dropdown_item(
@@ -309,7 +312,7 @@ impl View for ExternalEditorView {
 
         let default_layout = render_dropdown_item(
             appearance,
-            "Choose a layout to open files in Rook",
+            "Choose a layout to open files in Polaris Terminal",
             None,
             None,
             LocalOnlyIconState::for_setting(
@@ -357,7 +360,7 @@ impl View for ExternalEditorView {
         }
 
         column.add_child(render_body_item::<ExternalEditorAction>(
-            "Open Markdown files in Rook's Markdown Viewer by default".to_string(),
+            "Open Markdown files in Polaris Terminal's Markdown Viewer by default".to_string(),
             Some(AdditionalInfo {
                 mouse_state: self.markdown_viewer_mouse_state.clone(),
                 on_click_action: Some(ExternalEditorAction::OpenUrl(

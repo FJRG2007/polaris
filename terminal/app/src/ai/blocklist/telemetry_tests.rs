@@ -3,7 +3,7 @@ use ai::agent::action_result::{
     RunAgentsAgentOutcome, RunAgentsAgentOutcomeKind, RunAgentsLaunchedExecutionMode,
     RunAgentsResult,
 };
-use rook_core::telemetry::TelemetryEvent as _;
+use pterm_core::telemetry::TelemetryEvent as _;
 
 use super::*;
 

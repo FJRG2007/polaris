@@ -2,22 +2,22 @@ use std::borrow::Cow;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-use rook_core::features::FeatureFlag;
-use rook_core::ui::Icon;
-use rook_core::ui::appearance::Appearance;
-use rook_core::ui::color::blend::Blend as _;
-use rook_core::ui::theme::color::internal_colors;
-use rookui::elements::{
+use pterm_core::features::FeatureFlag;
+use pterm_core::ui::Icon;
+use pterm_core::ui::appearance::Appearance;
+use pterm_core::ui::color::blend::Blend as _;
+use pterm_core::ui::theme::color::internal_colors;
+use ptermui::elements::{
     ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DropShadow, Expanded,
     Flex, Hoverable, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement as _,
     ParentOffsetBounds, Radius, Stack,
 };
-use rookui::fonts::Weight;
-use rookui::keymap::EditableBinding;
-use rookui::platform::file_picker::FilePickerError;
-use rookui::platform::{Cursor, FilePickerConfiguration};
-use rookui::ui_components::components::{UiComponent as _, UiComponentStyles};
-use rookui::{
+use ptermui::fonts::Weight;
+use ptermui::keymap::EditableBinding;
+use ptermui::platform::file_picker::FilePickerError;
+use ptermui::platform::{Cursor, FilePickerConfiguration};
+use ptermui::ui_components::components::{UiComponent as _, UiComponentStyles};
+use ptermui::{
     AppContext, Element, Entity, SingletonEntity as _, TypedActionView, View, ViewContext,
 };
 
@@ -26,7 +26,7 @@ use crate::util::bindings::{BindingGroup, CustomAction, keybinding_name_to_displ
 const BUTTON_MIN_WIDTH: f32 = 149.;
 
 pub fn init(app: &mut AppContext) {
-    use rookui::keymap::macros::*;
+    use ptermui::keymap::macros::*;
 
     app.register_editable_bindings([
         EditableBinding::new(
@@ -108,7 +108,7 @@ impl ProjectButtons {
 
         Hoverable::new(mouse_state, move |state| {
             let icon_el = Container::new(
-                ConstrainedBox::new(icon.to_rookui_icon(icon_color).finish())
+                ConstrainedBox::new(icon.to_ptermui_icon(icon_color).finish())
                     .with_height(20.)
                     .with_width(20.)
                     .finish(),

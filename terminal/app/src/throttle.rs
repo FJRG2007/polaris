@@ -3,7 +3,7 @@ use std::{pin, task};
 
 use futures_lite::{Stream, ready};
 use pin::Pin;
-use rookui::r#async::Timer;
+use ptermui::r#async::Timer;
 use task::{Context, Poll};
 
 pub struct Throttle<S> {
