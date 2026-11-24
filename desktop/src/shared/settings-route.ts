@@ -1,14 +1,18 @@
 /**
- * Where Settings... opens: the host's own Settings > This app, inside the
- * Polaris window with its sidebar and search, whenever the host has that
- * screen; the page bundled with the app only when it does not.
+ * Where Settings... opens - from the tray, the app menu, or anything else that
+ * asks for the app's settings: the host's own Settings > This app, inside the
+ * Polaris window with its sidebar and search, whenever a host is known. There
+ * is one view of these settings; the page bundled with the app is only for the
+ * first run, before any host, and for a host older than the screen.
  *
  * The page the window is on says it draws these settings (`announce`), and then
  * the app only asks it to open a category. When it has not said so - the
- * window is on the sign-in page, an error page, or a host older than the
- * screen - the host itself is asked whether the screen exists, so a host that
- * has it is opened there and only a host that does not, or none at all, gets
- * the bundled page, told why so it can offer the update or the connection.
+ * window is closed, on the sign-in page, an error page, or a host older than
+ * the screen - the host is asked whether the screen exists, and only a host
+ * that answers that it does not gets the bundled page, told why so it can offer
+ * the update. A host that does not answer is opened all the same: the window's
+ * service worker keeps every category's page, so the same screen draws offline
+ * and every value on it, being this computer's, stays editable.
  *
  * Pure, so the decision can be asserted without Electron.
  */
@@ -59,7 +63,8 @@ export interface LocalSettingsState {
 export type SettingsRoute =
     /** The window's page draws them: ask it to open the place. */
     | { readonly kind: "page"; readonly path: string; }
-    /** The host has the screen: load it in the Polaris window. */
+    /** Load the host's screen in the Polaris window, opening the window when
+     *  there is none; offline its service worker answers from the pages it kept. */
     | { readonly kind: "navigate"; readonly path: string; }
     /** Ask the host first; decided again with its answer. */
     | { readonly kind: "probe"; readonly path: string; }
@@ -73,27 +78,27 @@ export interface SettingsRouteState {
     readonly pageLoaded: boolean;
     /** Whether that page said it draws these settings. */
     readonly pageAnnounced: boolean;
-    /** The host's answer, once asked; null before. */
+    /** The host's answer, once asked (or "present" for a host already seen with
+     *  the screen); null before. */
     readonly probe: SettingsProbe | null;
 }
 
 export function settingsRoute(place: SettingsPlace, state: SettingsRouteState): SettingsRoute {
     const path = settingsPath(place);
     if (!state.origin) return { kind: "local", reason: null };
-    if (!state.pageLoaded) return { kind: "local", reason: "offline" };
-    if (state.pageAnnounced) return { kind: "page", path };
+    if (state.pageLoaded && state.pageAnnounced) return { kind: "page", path };
     switch (state.probe) {
         case null:
             return { kind: "probe", path };
         case "present":
         case "signed-out":
-            // Behind the sign-in the host takes the address back after it, and an
-            // older host's sign-in page still beats a page that looks like no other.
+        case "unreachable":
+            // Behind the sign-in the host takes the address back after it. Out of
+            // reach, the window's worker draws the kept page - the same screen -
+            // and failing that the window says why and offers the hosts.
             return { kind: "navigate", path };
         case "missing":
             return { kind: "local", reason: "outdated" };
-        case "unreachable":
-            return { kind: "local", reason: "offline" };
     }
 }
 

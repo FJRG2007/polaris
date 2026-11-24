@@ -8,7 +8,8 @@
  * Said once per document: the app forgets it on a full navigation or a reload,
  * and this mounts again on the page that follows.
  *
- * It also asks the service worker to keep every category's page, so each one
+ * It also asks the service worker to keep every category's page (and the
+ * device add-ons'), so each one
  * opens with the host out of reach even if it was never opened here before (a
  * page the worker kept is what a navigation gets offline). The phone app's
  * categories are kept the same way inside the phone app.
@@ -31,7 +32,7 @@ export function DesktopAppSettingsListener() {
             if (category) router.push(`/account/app/${category}`);
         });
         void settings.announce().catch(() => undefined);
-        keepCategoryPages(APP_SETTING_CATEGORIES);
+        keepCategoryPages(APP_SETTING_CATEGORIES, [DEVICE_ADDONS_PATH]);
         return stop;
     }, [settings, router]);
 
@@ -42,9 +43,12 @@ export function DesktopAppSettingsListener() {
     return null;
 }
 
-function keepCategoryPages(categories: readonly string[]): void {
+/** The desktop's device add-ons, listed in its settings after the categories. */
+const DEVICE_ADDONS_PATH = "/account/addons";
+
+function keepCategoryPages(categories: readonly string[], more: readonly string[] = []): void {
     if (!("serviceWorker" in navigator) || !navigator.onLine) return;
-    const paths = categories.map((category) => `/account/app/${category}`);
+    const paths = [...categories.map((category) => `/account/app/${category}`), ...more];
     void navigator.serviceWorker.ready
         .then((registration) => registration.active?.postMessage({ type: "keep-pages", paths }))
         .catch(() => undefined);
