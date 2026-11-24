@@ -88,7 +88,8 @@
         "conflictTitle": "{title} (offline copy)",
         "notMade": "This note could not be added to Polaris.",
         "notMoved": "This note could not be moved.",
-        "notDeleted": "This note could not be deleted."
+        "notDeleted": "This note could not be deleted.",
+        "notChanged": "This change to the note could not be saved."
     },
     "view": {
         "sharedWithYou": "Shared with you",

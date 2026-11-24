@@ -30,7 +30,11 @@ const DAY_MS = 24 * 3_600_000;
 export const OFFLINE_STORE_LIMITS: LocalStoreLimits = {
     writes: { entries: 2_000, maxAgeMs: 365 * DAY_MS, buildBound: false },
     /** Per target, the server's version after this device's last write it took. */
-    acks: { entries: 1_000, maxAgeMs: 365 * DAY_MS, buildBound: false }
+    acks: { entries: 1_000, maxAgeMs: 365 * DAY_MS, buildBound: false },
+    /** What a screen starts something new from (a note template), kept so it can
+     *  start one with nothing to ask. A copy of server data, but one compared by
+     *  version on every visit, so a new build need not throw it away. */
+    templates: { entries: 500, maxAgeMs: 180 * DAY_MS, buildBound: false }
 };
 
 export const offlineStore = createLocalStore(indexedDbStore("polaris-offline"), OFFLINE_STORE_LIMITS, snapshotBuild);

@@ -65,7 +65,7 @@ import {
 } from "lucide-react";
 import { TemplatePickerDialog } from "./note-templates";
 import type { TreeNote } from "./offline-tree";
-import { NOTE_CREATE, NOTE_DELETE, NOTE_MOVE, writeNote } from "./offline-writes";
+import { NOTE_CREATE, NOTE_DELETE, NOTE_MOVE, NOTE_UPDATE, writeNote } from "./offline-writes";
 import type { NoteTemplateSummary } from "@/lib/notes/template-service";
 
 /** One shelf, as the page read it. */
@@ -178,7 +178,7 @@ export function showNote(router: { push(href: string): void }, noteId: string | 
 /** A note write answered with an error, for a caller that shows one. Kept
  *  offline answers no error, and the screen draws it from the device. */
 async function placeNote(
-    kind: typeof NOTE_MOVE | typeof NOTE_DELETE,
+    kind: typeof NOTE_MOVE | typeof NOTE_UPDATE | typeof NOTE_DELETE,
     payload: Record<string, unknown>
 ): Promise<{ error?: string; queued?: true }> {
     let failed = "";
@@ -499,7 +499,7 @@ export function NoteTree({
                                         setRenaming(null);
                                         if (title)
                                             void act(() =>
-                                                actions.updateNoteAction({ noteId, title })
+                                                placeNote(NOTE_UPDATE, { noteId, title })
                                             );
                                     }}
                                     onCreateNote={create}
@@ -1276,7 +1276,7 @@ function NoteBranch({
                         <ContextMenuItem
                             onSelect={() =>
                                 void onAct(() =>
-                                    actions.updateNoteAction({
+                                    placeNote(NOTE_UPDATE, {
                                         noteId: note.id,
                                         pinned: !note.pinned
                                     })
@@ -1306,7 +1306,7 @@ function NoteBranch({
                         <ContextMenuItem
                             onSelect={() =>
                                 void onAct(() =>
-                                    actions.updateNoteAction({ noteId: note.id, archived: true })
+                                    placeNote(NOTE_UPDATE, { noteId: note.id, archived: true })
                                 )
                             }
                         >

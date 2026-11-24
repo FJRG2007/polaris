@@ -14,7 +14,6 @@
 
 import { saveFile } from "@/components/transfers/move-file";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import * as actions from "./actions";
 import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { runAction } from "@/lib/run-action";
@@ -45,6 +44,7 @@ import {
     Share2,
     Trash2
 } from "lucide-react";
+import { useKeptTemplates } from "./offline-templates";
 import { ImportNotesDialog, NewNotebookDialog, NotebookPeopleDialog } from "./notebook-dialogs";
 import { appWrites, type AppWrite } from "@/lib/offline/app-writes";
 import { reachability, subscribeReachability } from "@/lib/reachability";
@@ -55,6 +55,7 @@ import {
     NOTE_DELETE,
     NOTE_MOVE,
     NOTE_TEXT,
+    NOTE_UPDATE,
     readNoteSent,
     saveNoteText,
     useNoteWrites,
@@ -62,7 +63,14 @@ import {
     writeNote,
     type NoteTextPayload
 } from "./offline-writes";
-import { deletedHere, failedPlacement, localNote, withNoteWrites } from "./offline-tree";
+import {
+    deletedHere,
+    failedPlacement,
+    localNote,
+    noteAsHere,
+    pendingUpdate,
+    withNoteWrites
+} from "./offline-tree";
 
 /** How long a note sits untouched before it is written. Long enough not to
  *  write on every keystroke, short enough that closing the tab is safe. */
@@ -87,12 +95,23 @@ export function NotesView({
     // a note made, moved or deleted offline is drawn that way until it is sent.
     const writes = useNoteWrites(() => router.refresh());
     const shelves = useMemo(() => withNoteWrites(served, writes.entries), [served, writes.entries]);
+    // Every template in reach, kept here so a note made offline starts from one.
+    useKeptTemplates(useMemo(() => served.flatMap((shelf) => shelf.templates ?? []), [served]));
     // The note in the address. One made on this device and not on the server
     // yet is opened from what it was made with: the page the server sent (or
     // the one the device kept) has some other note, or none.
     const wanted = useSearchParams()?.get("note") ?? null;
     const local = wanted && wanted !== servedNote?.id ? localNote(writes.entries, writes.made, wanted) : null;
-    const note = local ?? (servedNote && !deletedHere(writes.entries, servedNote.id) ? servedNote : null);
+    const opened = local ?? servedNote;
+    // Deleted or archived here and not sent: gone from this screen already.
+    const gone =
+        !opened ||
+        deletedHere(writes.entries, opened.id) ||
+        pendingUpdate(writes.entries, opened.id).archived === true;
+    const note = useMemo(
+        () => (gone || !opened ? null : noteAsHere(opened, writes.entries)),
+        [gone, opened, writes.entries]
+    );
     const shared = local || !note ? null : servedShared;
     const backlinks = local || !note ? [] : servedBacklinks;
     const [title, setTitle] = useState(note?.title ?? "");
@@ -258,10 +277,14 @@ export function NotesView({
             (waiting.attempts > 0 ||
                 !reach.reachable ||
                 (typeof navigator !== "undefined" && navigator.onLine === false)));
-    const act = async (run: () => Promise<{ error?: string }>) => {
+    const act = async (run: () => Promise<{ error?: string; queued?: true } | null>) => {
         const result = await runAction(run, setError);
-        if (!result?.error) router.refresh();
+        // Kept on this device: drawn from there, nothing new to fetch.
+        if (result && !result.error && !result.queued) router.refresh();
     };
+    /** Rename, pin or archive the open note now, or keep it for later. */
+    const change = (payload: { pinned?: boolean; archived?: boolean }) =>
+        note ? writeNote(NOTE_UPDATE, { noteId: note.id, ...payload }, setError) : Promise.resolve(null);
 
     /** Every note on every shelf, which is what a breadcrumb is read from - the
      *  open note may be on a shelf that is not the one being browsed. */
@@ -332,21 +355,14 @@ export function NotesView({
                                 bare
                                 className="h-auto flex-1 text-2xl font-semibold"
                             />
-                            {!shared && !local && (
+                            {!shared && (
                                 <button
                                     type="button"
                                     aria-label={
                                         note.pinned ? t("view.unpinNote") : t("view.pinNote")
                                     }
                                     title={note.pinned ? t("tree.unpin") : t("tree.pin")}
-                                    onClick={() =>
-                                        void act(() =>
-                                            actions.updateNoteAction({
-                                                noteId: note.id,
-                                                pinned: !note.pinned
-                                            })
-                                        )
-                                    }
+                                    onClick={() => void act(() => change({ pinned: !note.pinned }))}
                                     className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                 >
                                     {note.pinned ? (
@@ -410,18 +426,15 @@ export function NotesView({
                                 <Download className="size-4" />
                             </button>
                             )}
-                            {!shared && !local && (
+                            {!shared && (
                                 <button
                                     type="button"
                                     aria-label={t("view.archiveNote")}
                                     title={t("tree.archive")}
                                     onClick={() =>
                                         void act(async () => {
-                                            const result = await actions.updateNoteAction({
-                                                noteId: note.id,
-                                                archived: true
-                                            });
-                                            if (!result.error) router.push("/notes");
+                                            const result = await change({ archived: true });
+                                            if (result && !result.error) showNote(router, null, Boolean(result.queued));
                                             return result;
                                         })
                                     }
@@ -475,7 +488,9 @@ export function NotesView({
                                             ? t("offline.notMade")
                                             : notPlaced.kind === NOTE_MOVE
                                               ? t("offline.notMoved")
-                                              : t("offline.notDeleted"))}
+                                              : notPlaced.kind === NOTE_UPDATE
+                                                ? t("offline.notChanged")
+                                                : t("offline.notDeleted"))}
                                 </span>
                                 <Button size="sm" variant="ghost" onClick={() => void appWrites.retry(notPlaced)}>
                                     {t("offline.retry")}

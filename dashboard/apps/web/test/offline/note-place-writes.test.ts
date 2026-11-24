@@ -1,5 +1,5 @@
 /**
- * A note made, moved or deleted with Polaris out of reach: sent at once when it
+ * A note made, moved, renamed, pinned, archived or deleted with Polaris out of reach: sent at once when it
  * can be, kept on the device when it cannot, drawn in the tree from there with
  * its waiting state, and sent in order (the create first, its text after) when
  * Polaris answers.
@@ -12,7 +12,11 @@ const createNoteAction = vi.fn();
 const moveNoteAction = vi.fn();
 const deleteNoteAction = vi.fn();
 const saveNoteTextAction = vi.fn();
+const updateNoteAction = vi.fn();
+const templateContentsAction = vi.fn();
 vi.mock("@/app/(app)/notes/actions", () => ({
+    updateNoteAction: (input: unknown) => updateNoteAction(input),
+    templateContentsAction: (ids: unknown) => templateContentsAction(ids),
     createNoteAction: (input: unknown) => createNoteAction(input),
     moveNoteAction: (input: unknown) => moveNoteAction(input),
     deleteNoteAction: (noteId: unknown) => deleteNoteAction(noteId),
@@ -25,10 +29,13 @@ vi.mock("@/lib/reachability", () => ({
 vi.mock("@/lib/new-build", () => ({ checkForNewBuild: async () => undefined }));
 
 const { appWrites, dropOfflineStore, offlineStore } = await import("@/lib/offline/app-writes");
-const { NOTE_CREATE, NOTE_DELETE, NOTE_MOVE, saveNoteText, writeNote } = await import(
+const { NOTE_CREATE, NOTE_DELETE, NOTE_MOVE, NOTE_UPDATE, saveNoteText, writeNote } = await import(
     "@/app/(app)/notes/offline-writes"
 );
-const { deletedHere, failedPlacement, localNote, withNoteWrites } = await import("@/app/(app)/notes/offline-tree");
+const { deletedHere, failedPlacement, localNote, noteAsHere, pendingUpdate, withNoteWrites } = await import(
+    "@/app/(app)/notes/offline-tree"
+);
+const { keptTemplate, refreshKeptTemplates } = await import("@/app/(app)/notes/offline-templates");
 
 import type { AppWrite } from "@/lib/offline/app-writes";
 import type { NoteSummary } from "@/lib/notes/note-service";
@@ -86,7 +93,15 @@ const entry = (kind: string, target: string, payload: unknown, extra: Partial<Ap
 beforeEach(async () => {
     await dropOfflineStore();
     offlineStore.setOwner("u1");
-    for (const action of [createNoteAction, moveNoteAction, deleteNoteAction, saveNoteTextAction]) action.mockReset();
+    for (const action of [
+        createNoteAction,
+        moveNoteAction,
+        deleteNoteAction,
+        saveNoteTextAction,
+        updateNoteAction,
+        templateContentsAction
+    ])
+        action.mockReset();
 });
 
 describe("a note made, moved or deleted offline", () => {
@@ -116,7 +131,7 @@ describe("a note made, moved or deleted offline", () => {
         expect(await waiting()).toHaveLength(0);
     });
 
-    it("moves a note made here by changing where it will be made", async () => {
+    it("moves a note made here behind its create, never into it", async () => {
         createNoteAction.mockRejectedValue(unreachable());
         const made = await writeNote(NOTE_CREATE, { title: "Untitled", body: "", spaceId: null }, vi.fn());
         const moved = await writeNote(
@@ -127,16 +142,29 @@ describe("a note made, moved or deleted offline", () => {
         expect(moved).toEqual({ queued: true });
         expect(moveNoteAction).not.toHaveBeenCalled();
         const kept = await waiting();
-        expect(kept).toHaveLength(1);
-        expect(kept[0]!.payload).toMatchObject({ id: made?.id, spaceId: SPACE });
+        expect(kept.map((one) => one.kind)).toEqual([NOTE_CREATE, NOTE_MOVE]);
+        expect(kept[0]!.payload).toMatchObject({ id: made?.id, spaceId: null });
+        const opened = localNote(kept, new Map(), made!.id!);
+        expect(noteAsHere(opened!, kept)).toMatchObject({ spaceId: SPACE });
     });
 
-    it("forgets a note made here and deleted before it was sent, with its text", async () => {
+    it("drops the create and text of a note deleted before it was sent, and sends the delete alone", async () => {
         createNoteAction.mockRejectedValue(unreachable());
+        deleteNoteAction.mockRejectedValue(unreachable());
         const made = await writeNote(NOTE_CREATE, { title: "Untitled", body: "" }, vi.fn());
         await saveNoteText({ noteId: made!.id!, title: "Draft", body: "<p>x</p>", base: null });
         expect(await writeNote(NOTE_DELETE, { noteId: made?.id }, vi.fn())).toEqual({ queued: true });
-        expect(deleteNoteAction).not.toHaveBeenCalled();
+        expect((await waiting()).map((one) => one.kind)).toEqual([NOTE_DELETE]);
+        expect(localNote(await waiting(), new Map(), made!.id!)).toBeNull();
+
+        // The create may have been on its way already; a delete of a note the
+        // server does not have is answered as done.
+        createNoteAction.mockReset();
+        deleteNoteAction.mockReset();
+        deleteNoteAction.mockResolvedValue({});
+        await drained();
+        expect(createNoteAction).not.toHaveBeenCalled();
+        expect(deleteNoteAction).toHaveBeenCalledWith(made?.id);
         expect(await waiting()).toHaveLength(0);
     });
 
@@ -181,6 +209,101 @@ describe("a note made, moved or deleted offline", () => {
         deleteNoteAction.mockResolvedValue({});
         await drained();
         expect(await waiting()).toHaveLength(0);
+    });
+});
+
+describe("a note renamed, pinned or archived offline", () => {
+    it("is sent at once when Polaris answers", async () => {
+        updateNoteAction.mockResolvedValue({});
+        expect(await writeNote(NOTE_UPDATE, { noteId: NOTE, pinned: true }, vi.fn())).toEqual({});
+        expect(updateNoteAction).toHaveBeenCalledWith({ noteId: NOTE, pinned: true });
+        expect(await waiting()).toHaveLength(0);
+    });
+
+    it("is kept when Polaris does not answer, folding a change behind a change", async () => {
+        updateNoteAction.mockRejectedValue(unreachable());
+        expect(await writeNote(NOTE_UPDATE, { noteId: NOTE, title: "First" }, vi.fn())).toEqual({ queued: true });
+        await writeNote(NOTE_UPDATE, { noteId: NOTE, pinned: true }, vi.fn());
+        await writeNote(NOTE_UPDATE, { noteId: NOTE, title: "Second" }, vi.fn());
+        const kept = await waiting();
+        expect(kept).toHaveLength(1);
+        expect(kept[0]!.payload).toEqual({ noteId: NOTE, title: "Second", pinned: true });
+        expect(pendingUpdate(kept, NOTE)).toEqual({ title: "Second", pinned: true });
+
+        updateNoteAction.mockReset();
+        updateNoteAction.mockResolvedValue({});
+        await drained();
+        expect(updateNoteAction).toHaveBeenCalledTimes(1);
+        expect(await waiting()).toHaveLength(0);
+    });
+
+    it("waits behind the create of a note made here, then sends both in order", async () => {
+        createNoteAction.mockRejectedValueOnce(unreachable());
+        const made = await writeNote(NOTE_CREATE, { title: "Untitled", body: "" }, vi.fn());
+        // Polaris is back, but the note is not on it yet.
+        const pinned = await writeNote(NOTE_UPDATE, { noteId: made?.id, pinned: true, title: "Named" }, vi.fn());
+        expect(pinned).toEqual({ queued: true });
+        expect(updateNoteAction).not.toHaveBeenCalled();
+
+        const order: string[] = [];
+        createNoteAction.mockImplementation(async (input: { id: string }) => {
+            order.push("create");
+            return { id: input.id };
+        });
+        updateNoteAction.mockImplementation(async () => {
+            order.push("update");
+            return {};
+        });
+        await drained();
+        expect(order).toEqual(["create", "update"]);
+    });
+
+    it("is drawn: renamed and pinned to the top, archived out of the tree, refused as Polaris has it", () => {
+        const shelves = [shelf([summary(OTHER, { pinned: true }), summary(NOTE)])];
+        const [pinnedNow] = withNoteWrites(shelves, [
+            entry(NOTE_UPDATE, NOTE, { noteId: NOTE, title: "Renamed", pinned: true })
+        ]);
+        expect(pinnedNow!.notes.map((note) => note.id)).toEqual([NOTE, OTHER]);
+        expect(pinnedNow!.notes[0]).toMatchObject({ title: "Renamed", pinned: true, offline: "pending" });
+
+        const [archived] = withNoteWrites(shelves, [entry(NOTE_UPDATE, OTHER, { noteId: OTHER, archived: true })]);
+        expect(archived!.notes.map((note) => note.id)).toEqual([NOTE]);
+
+        const refused = entry(NOTE_UPDATE, NOTE, { noteId: NOTE, archived: true }, { state: "failed", reason: "" });
+        const [kept] = withNoteWrites(shelves, [refused]);
+        expect(kept!.notes.find((note) => note.id === NOTE)).toMatchObject({ offline: "failed", title: "Note 1" });
+        expect(failedPlacement([refused], NOTE)).toBe(refused);
+        expect(pendingUpdate([refused], NOTE)).toEqual({});
+    });
+});
+
+describe("a note made offline from a template", () => {
+    const TEMPLATE = "0190a1b2-c3d4-7e5f-8a9b-000000000009";
+    const listed = [{ id: TEMPLATE, spaceId: null, name: "Standup", isDefault: true, version: "v1" }];
+
+    it("starts from the copy of the template this device keeps", async () => {
+        templateContentsAction.mockResolvedValue([
+            { id: TEMPLATE, title: "Standup", body: "<p>Yesterday</p>", version: "v1" }
+        ]);
+        expect(await refreshKeptTemplates(listed)).toBe(1);
+        // Kept and current: nothing is asked again.
+        expect(await refreshKeptTemplates(listed)).toBe(0);
+        expect(templateContentsAction).toHaveBeenCalledTimes(1);
+        expect(await refreshKeptTemplates([{ ...listed[0]!, version: "v2" }])).toBe(1);
+
+        createNoteAction.mockRejectedValue(unreachable());
+        const made = await writeNote(NOTE_CREATE, { title: "Untitled", body: "", templateId: TEMPLATE }, vi.fn());
+        const opened = localNote(await waiting(), new Map(), made!.id!);
+        expect(opened).toMatchObject({ title: "Standup", body: "<p>Yesterday</p>" });
+        // The server still applies the template itself.
+        expect((await waiting())[0]!.payload).toMatchObject({ templateId: TEMPLATE });
+    });
+
+    it("starts blank, as before, from a template this device never kept", async () => {
+        expect(await keptTemplate(TEMPLATE)).toBeNull();
+        createNoteAction.mockRejectedValue(unreachable());
+        const made = await writeNote(NOTE_CREATE, { title: "Untitled", body: "", templateId: TEMPLATE }, vi.fn());
+        expect(localNote(await waiting(), new Map(), made!.id!)).toMatchObject({ title: "Untitled", body: "" });
     });
 });
 
