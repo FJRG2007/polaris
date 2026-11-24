@@ -22,11 +22,13 @@ import {
     ADDON_ACTIONS,
     ADDON_CATEGORIES,
     addonText,
+    addonSettingSections,
     readAddonSettingValues,
     type AddonEntry,
     type AddonManifest,
     type AddonPermission,
     type AddonSetting,
+    type AddonSettingGroup,
     type AddonSettingValue,
     type AddonsSnapshot,
     type InstalledAddon
@@ -347,11 +349,12 @@ export function AddonsShelf({ query, category, byName, label, kind }: { query: s
     );
 }
 
-/** One declared setting, drawn with Polaris's own control for its kind. */
-function SettingRow({ setting, value, locale, onChange }: { setting: AddonSetting; value: AddonSettingValue; locale: string; onChange: (value: AddonSettingValue) => void }) {
+type SettingProps = { setting: AddonSetting; value: AddonSettingValue; locale: string; onChange: (value: AddonSettingValue) => void };
+
+/** One declared setting's control: Polaris's own for its kind, never an add-on's markup. */
+function SettingControl({ setting, value, locale, onChange, width }: SettingProps & { width: string }) {
     const t = useTranslations("account");
     const label = addonText(setting.label, locale);
-    const hint = setting.hint ? addonText(setting.hint, locale) : null;
     let control: ReactNode;
     switch (setting.kind) {
         case "toggle":
@@ -363,7 +366,7 @@ function SettingRow({ setting, value, locale, onChange }: { setting: AddonSettin
                     value={typeof value === "string" ? value : setting.default}
                     onValueChange={onChange}
                     aria-label={label}
-                    className="w-48"
+                    className={width}
                     options={setting.options.map((option) => ({ value: option.value, label: addonText(option.label, locale) }))}
                 />
             );
@@ -371,7 +374,7 @@ function SettingRow({ setting, value, locale, onChange }: { setting: AddonSettin
         case "range":
             control = (
                 <ControlSlider
-                    className="w-48"
+                    className={width}
                     value={typeof value === "number" ? value : setting.default}
                     min={setting.min}
                     max={setting.max}
@@ -387,12 +390,19 @@ function SettingRow({ setting, value, locale, onChange }: { setting: AddonSettin
                     value={typeof value === "string" ? (value === "call.leave" ? "call.hangup" : value) : "none"}
                     onValueChange={(next) => onChange(next === "none" ? null : next)}
                     aria-label={label}
-                    className="w-48"
+                    className={width}
                     options={[{ value: "none", label: say(t, "action.none") }, ...PICKABLE_ACTIONS.map((action) => ({ value: action, label: say(t, `action.${action.slice("call.".length)}`) }))]}
                 />
             );
             break;
     }
+    return control;
+}
+
+/** One declared setting as a row: its name and hint, then its control. */
+function SettingRow(props: SettingProps) {
+    const label = addonText(props.setting.label, props.locale);
+    const hint = props.setting.hint ? addonText(props.setting.hint, props.locale) : null;
     return (
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 py-2">
             <div className="min-w-0 flex-1 basis-48">
@@ -401,8 +411,51 @@ function SettingRow({ setting, value, locale, onChange }: { setting: AddonSettin
                 </p>
                 {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
             </div>
-            {control}
+            <SettingControl {...props} width="w-full sm:w-48" />
         </div>
+    );
+}
+
+/** The device's own part above a tile: a knob with its pointer, or a button lit while it does something. */
+function TileShape({ look, lit }: { look: "dials" | "buttons"; lit: boolean }) {
+    if (look === "dials") {
+        return (
+            <span aria-hidden className="relative block size-11 shrink-0 rounded-full border-2 border-border bg-muted">
+                <span className="absolute left-1/2 top-1 h-3 w-0.5 -translate-x-1/2 rounded-full bg-primary" />
+            </span>
+        );
+    }
+    return <span aria-hidden className={`block h-8 w-11 shrink-0 rounded-md border-2 ${lit ? "border-primary bg-primary/30" : "border-border bg-muted"}`} />;
+}
+
+/** One setting as a tile of the device (a knob, a button): its shape, its name, its control. */
+function SettingTile({ look, ...props }: SettingProps & { look: "dials" | "buttons" }) {
+    const label = addonText(props.setting.label, props.locale);
+    const lit = props.value !== null && props.value !== false && props.value !== "none";
+    return (
+        <div className="flex min-w-0 flex-col items-center gap-2 rounded-md border border-border p-3">
+            <TileShape look={look} lit={lit} />
+            <p className="max-w-full truncate text-xs text-muted-foreground" title={label}>
+                {label}
+            </p>
+            <SettingControl {...props} width="w-full" />
+        </div>
+    );
+}
+
+/** A titled group of settings, as rows or as the device's tiles. */
+function SettingGroup({ group, locale, children }: { group: AddonSettingGroup | null; locale: string; children: ReactNode }) {
+    if (!group) return <div className="flex min-w-0 flex-col divide-y divide-border">{children}</div>;
+    const hint = group.hint ? addonText(group.hint, locale) : null;
+    const tiles = group.look === "dials" || group.look === "buttons";
+    return (
+        <section className="flex min-w-0 flex-col gap-2" aria-label={addonText(group.label, locale)}>
+            <div className="min-w-0">
+                <h3 className="truncate text-sm font-medium">{addonText(group.label, locale)}</h3>
+                {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+            </div>
+            <div className={tiles ? "grid min-w-0 grid-cols-2 gap-2 md:grid-cols-4" : "flex min-w-0 flex-col divide-y divide-border"}>{children}</div>
+        </section>
     );
 }
 
@@ -446,21 +499,28 @@ function AddonSettings({ bridge, manifest }: { bridge: AddonsBridge; manifest: A
     };
 
     return (
-        <div className="flex min-w-0 flex-col divide-y divide-border">
-            {manifest.settings.map((setting) => (
-                <SettingRow key={setting.key} setting={setting} value={values[setting.key] ?? null} locale={locale} onChange={(value) => change(setting.key, value)} />
+        <div className="flex min-w-0 flex-col gap-5">
+            {addonSettingSections(manifest).map(({ group, settings }) => (
+                <SettingGroup key={group?.key ?? ""} group={group} locale={locale}>
+                    {settings.map((setting) => {
+                        const props: SettingProps = { setting, value: values[setting.key] ?? null, locale, onChange: (value) => change(setting.key, value) };
+                        return group && (group.look === "dials" || group.look === "buttons") ? <SettingTile key={setting.key} look={group.look} {...props} /> : <SettingRow key={setting.key} {...props} />;
+                    })}
+                </SettingGroup>
             ))}
         </div>
     );
 }
 
 /**
- * The add-on's own view, for what its declared settings cannot draw: a frame
+ * The add-on's own view, for what its declared settings cannot draw (a preview,
+ * never a control: those are declared settings, drawn below it). A frame
  * with scripts and nothing else (no same origin, so it reaches neither this
  * page nor its storage), served by the app from the installed package. It gets
  * the page's tokens, theme and locale when it is ready and again whenever one
  * of them changes while it is open, and every call it makes is read here and
- * judged by the app.
+ * judged by the app. It has no edge and no scrollbar of its own: its height is
+ * the one it reports, so it reads as part of this page.
  */
 export function AddonView({ bridge, manifest, view }: { bridge: AddonsBridge; manifest: AddonManifest; view: string }) {
     const t = useTranslations("account");
@@ -544,7 +604,8 @@ export function AddonView({ bridge, manifest, view }: { bridge: AddonsBridge; ma
             sandbox="allow-scripts"
             referrerPolicy="no-referrer"
             title={say(t, "detail.view", { name: manifest.name })}
-            className="w-full min-w-0 rounded-md border border-border bg-background"
+            scrolling="no"
+            className="block w-full min-w-0 border-0 bg-transparent"
             style={{ height }}
         />
     );
@@ -649,8 +710,8 @@ export function AddonPage({ id }: { id: string }) {
             {installed && installed.manifest ? (
                 <section className="flex min-w-0 flex-col gap-2" aria-label={say(t, "detail.settings")}>
                     <h2 className="text-sm font-medium text-muted-foreground">{say(t, "detail.settings")}</h2>
-                    <AddonSettings bridge={state.bridge} manifest={installed.manifest} />
                     {installed.manifest.view ? <AddonView bridge={state.bridge} manifest={installed.manifest} view={installed.manifest.view} /> : null}
+                    <AddonSettings bridge={state.bridge} manifest={installed.manifest} />
                 </section>
             ) : null}
             {entry && entry.screenshots.length > 0 ? (

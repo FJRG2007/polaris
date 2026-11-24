@@ -11,7 +11,13 @@ name: terminal
 # affect the build changed, and `terminal` always reports.
 
 on:
+  # Branches only. A tag names a commit its branch push already tested, and
+  # with no `before` to compare against every tag push (desktop-v*, extension-v*
+  # and the rest, several a day) rebuilt the whole workspace from cold. A
+  # Dependabot branch always has its pull request, which runs the full matrix,
+  # so its push would only repeat the Linux leg of it.
   push:
+    branches: ["**", "!dependabot/**"]
   pull_request:
   workflow_dispatch:
   # A push builds and tests on Linux only; the macOS and Windows legs run on
@@ -178,11 +184,22 @@ jobs:
       # --no-fail-fast so one broken test does not hide the others.
       - name: Run tests
         run: |
-          # One rustc in this build peaks near 9.4G of the Linux runner's 15G, so
-          # nothing runs beside it there. A sampler reports memory every 15 s
-          # because a runner killed for memory leaves no trace of its own.
+          # Two rustc processes in this build are huge: the app crate's library
+          # (~8.5G on Linux) and its unit-test harness (~11.5G), which cargo
+          # would otherwise compile side by side - more than the Linux and
+          # Windows runners' 16G, and far more than macOS's 7G. Building one job
+          # at a time to keep them apart serialised the other ~90 test binaries
+          # too (19 min on Linux). Instead the build runs in two steps: first
+          # everything except the app package's own targets, at full width -
+          # only the library is large there - then the rest, where the harness
+          # is the one large process, two at a time (one on macOS). On Linux a
+          # larger swap file is the safety net, not the plan, and a sampler
+          # reports memory every 15 s because a runner killed for memory leaves
+          # no trace of its own.
           if [ "${{ matrix.os }}" = "linux" ]; then
-            export CARGO_BUILD_JOBS=1
+            sudo fallocate -l 12G /mnt/polaris-swap && sudo chmod 600 /mnt/polaris-swap \
+              && sudo mkswap /mnt/polaris-swap >/dev/null && sudo swapon /mnt/polaris-swap || true
+            free -m
             (
               while :; do
                 printf '[resources] %s %s | %s\n' \
@@ -213,6 +230,14 @@ jobs:
             do
               filter="$filter and not test(=$shell_dependent)"
             done
+          fi
+          # `cargo nextest` builds through `cargo test --no-run` with the same
+          # profile and features, so nothing built here is built again below.
+          cargo test --no-run --workspace --locked --exclude serve-wasm --exclude rook
+          if [ "${{ matrix.os }}" = "macos" ]; then
+            export CARGO_BUILD_JOBS=1
+          else
+            export CARGO_BUILD_JOBS=2
           fi
           cargo nextest run --workspace --locked --no-fail-fast \
             --exclude serve-wasm \

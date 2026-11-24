@@ -1,11 +1,12 @@
 /**
  * The default browser's registered command, read and started without a shell
- * (BUG-0020). Nothing here touches the real registry or starts a process: the
- * reader is a table and only the parsed command is checked.
+ * (BUG-0020). Nothing here touches the real registry or starts a browser: the
+ * reader is a table, and the launcher is run against this test's own Node,
+ * which exits with the codes a browser does.
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { launchFor, parseRegQuery, registeredLaunch, splitArguments } from "../../src/main/default-browser";
+import { launchDetached, launchFor, parseRegQuery, registeredLaunch, splitArguments } from "../../src/main/default-browser";
 
 const URL_IN = "https://click.example.com/ls/click?upn=a1B2%2Fx&b=2";
 
@@ -131,5 +132,30 @@ describe("registeredLaunch", () => {
         const traversal = table({ [choice("https")]: String.raw`..\..\Evil`, [command(String.raw`..\..\Evil`)]: String.raw`"C:\E\e.exe" %1` });
         await expect(registeredLaunch(URL_IN, traversal, {})).resolves.toBeNull();
         await expect(registeredLaunch("file:///C:/x", table({}), {})).resolves.toBeNull();
+    });
+});
+
+// BUG-0020: the started browser is only a messenger when one is already
+// running; its exit code is the one place that says whether the link was taken.
+describe("launchDetached", () => {
+    const node = process.execPath;
+    const exitWith = (code: number) => ["-e", `process.exit(${code})`];
+
+    it("resolves when the browser hands the link to its running copy (Chromium 24, Firefox 0)", async () => {
+        await expect(launchDetached(node, exitWith(24))).resolves.toBeUndefined();
+        await expect(launchDetached(node, exitWith(0))).resolves.toBeUndefined();
+    });
+
+    it("rejects with the exit code when the running copy did not take it", async () => {
+        await expect(launchDetached(node, exitWith(21))).rejects.toThrow(/code 21: .*profile in use/);
+        await expect(launchDetached(node, exitWith(1))).rejects.toThrow(/code 1: the browser exited without taking the link/);
+    });
+
+    it("resolves when the process keeps running: it became the browser", async () => {
+        await expect(launchDetached(node, ["-e", "setTimeout(() => {}, 3000)"], 300)).resolves.toBeUndefined();
+    });
+
+    it("rejects for a program that is not there", async () => {
+        await expect(launchDetached(String.raw`C:\nowhere\browser.exe`, [])).rejects.toThrow(/is not there/);
     });
 });

@@ -1,10 +1,10 @@
 /**
- * The Stream 100's own editor, shown in a sandboxed frame on the add-on's page
- * in Polaris (docs/device-addons.md, Views). It draws the controller - the
- * screen with what it is set to show, the four knobs and the four lit buttons -
- * and changes the same settings the list above it does, through the page:
- * `settings.set` for a change, and the page's `hello` and `settings` messages
- * for the look, the language and changes made elsewhere.
+ * A preview of the Stream 100's screen, shown in a sandboxed frame on the
+ * add-on's page in Polaris (docs/device-addons.md, Views): what the screen is
+ * set to show, at its brightness, with the name of what each knob turns. It
+ * shows, it does not ask - every control is a declared setting that Polaris
+ * draws with its own components around it. The page's `hello` and `settings`
+ * messages bring the look, the language and every change.
  */
 
 "use strict";
@@ -31,31 +31,23 @@ const SAMPLE_LEVELS = [0.7, 0.45, 0.6, 0.85];
 
 const WORDS = {
     en: {
-        knob: "Knob {n}",
-        button: "Button {n}",
-        display: "Screen shows",
-        brightness: "Screen brightness",
         screen: "Preview of the Stream 100 screen",
-        saveFailed: "That change was not saved.",
+        caption: "Screen preview: {display}, {brightness}% bright",
+        captionOff: "Screen preview: off",
         callNote: "The people in the call show here.",
         nowPlayingNote: "What is playing shows here.",
         offNote: "The screen is off.",
         categories: { calls: "Calls", music: "Music", games: "Games", browser: "Browser", system: "System sounds", other: "Other apps", output: "Whole output", none: "Nothing" },
-        actions: { none: "Nothing", "call.mic": "Mute mic", "call.deafen": "Deafen", "call.camera": "Camera", "call.share": "Share your screen", "call.hangup": "Hang up" },
         displays: { mixer: "Volume of each knob", call: "People in the call", nowPlaying: "What is playing", off: "Off" }
     },
     es: {
-        knob: "Rueda {n}",
-        button: "Botón {n}",
-        display: "La pantalla muestra",
-        brightness: "Brillo de la pantalla",
         screen: "Vista previa de la pantalla del Stream 100",
-        saveFailed: "Ese cambio no se guardó.",
+        caption: "Vista previa: {display}, brillo al {brightness}%",
+        captionOff: "Vista previa: pantalla apagada",
         callNote: "Aquí aparecen las personas de la llamada.",
         nowPlayingNote: "Aquí aparece lo que suena.",
         offNote: "La pantalla está apagada.",
         categories: { calls: "Llamadas", music: "Música", games: "Juegos", browser: "Navegador", system: "Sonidos del sistema", other: "Otras apps", output: "Toda la salida", none: "Nada" },
-        actions: { none: "Nada", "call.mic": "Silenciar", "call.deafen": "Sin audio", "call.camera": "Cámara", "call.share": "Compartir pantalla", "call.hangup": "Colgar" },
         displays: { mixer: "Volumen de cada rueda", call: "Personas en la llamada", nowPlaying: "Lo que suena", off: "Apagada" }
     }
 };
@@ -81,13 +73,6 @@ function readValues(values) {
     return out;
 }
 
-/** What one control's choice is stored as: a button set to nothing is null, the brightness a number. */
-function storedValue(key, value) {
-    if (BUTTONS.includes(key)) return value === "none" ? null : value;
-    if (key === "brightness") return Number(value);
-    return value;
-}
-
 /** Only the tokens the page hands over that are custom properties; anything else is dropped. */
 function tokenEntries(tokens) {
     if (!tokens || typeof tokens !== "object") return [];
@@ -98,49 +83,15 @@ function fill(text, values) {
     return text.replace(/\{(\w+)\}/g, (match, name) => (name in values ? String(values[name]) : match));
 }
 
-if (typeof module !== "undefined") module.exports = { wordsFor, readValues, storedValue, tokenEntries, DEFAULTS };
+if (typeof module !== "undefined") module.exports = { wordsFor, readValues, tokenEntries, fill, DEFAULTS };
 
 if (typeof document !== "undefined") {
-    const state = { words: WORDS.en, values: null, nextId: 1 };
-    const pending = new Map();
+    const state = { words: WORDS.en, values: null };
     const parentWindow = window.parent;
     const byId = (id) => document.getElementById(id);
-    const post = (message) => parentWindow.postMessage(message, "*");
-    const resize = () => post({ type: "resize", height: Math.ceil(document.documentElement.scrollHeight) });
-
-    function call(method, params) {
-        const id = state.nextId++;
-        post({ type: "call", id, method, params });
-        return new Promise((resolve) => pending.set(id, resolve));
-    }
-
-    function option(select, value, label) {
-        const item = document.createElement("option");
-        item.value = value;
-        item.textContent = label;
-        select.append(item);
-    }
-
-    function control(kind, index, key, choices, labels) {
-        const current = (state.values ?? DEFAULTS)[key];
-        const card = document.createElement("div");
-        card.className = "control";
-        const shape = document.createElement("div");
-        shape.className = kind;
-        if (kind === "button" && current !== "none") shape.classList.add("lit");
-        shape.setAttribute("aria-hidden", "true");
-        const title = document.createElement("span");
-        title.className = "title";
-        title.textContent = fill(state.words[kind], { n: index + 1 });
-        const select = document.createElement("select");
-        for (const value of choices) option(select, value, labels[value]);
-        select.value = current;
-        select.disabled = state.values === null;
-        select.setAttribute("aria-label", title.textContent);
-        select.addEventListener("change", () => void change(key, select.value));
-        card.append(shape, title, select);
-        return card;
-    }
+    // The frame is as tall as what it draws: measured from the content, never from
+    // the document, whose height is at least the frame's and so could never shrink.
+    const resize = () => parentWindow.postMessage({ type: "resize", height: Math.ceil(byId("root").getBoundingClientRect().height) }, "*");
 
     function drawScreen(values) {
         const screen = byId("screen");
@@ -171,43 +122,10 @@ if (typeof document !== "undefined") {
 
     function draw() {
         const values = state.values ?? DEFAULTS;
-        const words = state.words;
-        const loading = state.values === null;
-        byId("root").setAttribute("aria-busy", loading ? "true" : "false");
-        byId("display-label").textContent = words.display;
-        byId("brightness-label").textContent = words.brightness;
-        const display = byId("display");
-        display.replaceChildren();
-        for (const value of DISPLAYS) option(display, value, words.displays[value]);
-        display.value = values.display;
-        display.disabled = loading;
-        const brightness = byId("brightness");
-        brightness.value = String(values.brightness);
-        brightness.disabled = loading;
-        byId("knobs").replaceChildren(...KNOBS.map((key, index) => control("knob", index, key, CATEGORIES, words.categories)));
-        byId("buttons").replaceChildren(...BUTTONS.map((key, index) => control("button", index, key, ACTIONS, words.actions)));
+        byId("root").setAttribute("aria-busy", state.values === null ? "true" : "false");
         drawScreen(values);
+        byId("caption").textContent = values.display === "off" ? state.words.captionOff : fill(state.words.caption, { display: state.words.displays[values.display], brightness: values.brightness });
         resize();
-    }
-
-    /** Shown at once, and put back when the app refuses it. */
-    async function change(key, raw) {
-        if (state.values === null) return;
-        const before = state.values;
-        const drawn = key === "brightness" ? Number(raw) : raw;
-        if (before[key] === drawn) return;
-        state.values = { ...before, [key]: drawn };
-        byId("error").hidden = true;
-        draw();
-        const reply = await call("settings.set", { key, value: storedValue(key, raw) });
-        if (reply && reply.ok) {
-            state.values = readValues(reply.value);
-        } else {
-            state.values = before;
-            byId("error").textContent = state.words.saveFailed;
-            byId("error").hidden = false;
-        }
-        draw();
     }
 
     window.addEventListener("message", (event) => {
@@ -224,15 +142,10 @@ if (typeof document !== "undefined") {
         } else if (message.type === "settings") {
             state.values = readValues(message.values);
             draw();
-        } else if (message.type === "reply" && pending.has(message.id)) {
-            pending.get(message.id)(message);
-            pending.delete(message.id);
         }
     });
 
-    byId("display").addEventListener("change", () => void change("display", byId("display").value));
-    byId("brightness").addEventListener("change", () => void change("brightness", byId("brightness").value));
-    new ResizeObserver(resize).observe(document.body);
+    new ResizeObserver(resize).observe(byId("root"));
     draw();
-    post({ type: "ready" });
+    parentWindow.postMessage({ type: "ready" }, "*");
 }

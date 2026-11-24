@@ -61,10 +61,27 @@ notice is not offered.
 ## Settings
 
 An add-on declares its settings (`toggle`, `choice`, `range`, `action`) with
-English labels and any other languages it ships; Polaris draws them with its own
-controls. Values are kept per device in `addons/settings/<id>.json`, checked
-against the declaration on every read and write. An add-on may also name a
-`view` for what plain settings cannot draw, shown in a sandboxed frame.
+labels in every language Polaris ships (`en-US`, `es-ES`); Polaris draws them
+with its own components (`Switch`, `Select`, `ControlSlider`), whose lists open
+above the page and follow its theme. Values are kept per device in
+`addons/settings/<id>.json`, checked against the declaration on every read and
+write.
+
+`groups` lays them out: each is a titled section (`key`, `label`, optional
+`hint`) with a `look` - `rows` (one row per setting), `dials` or `buttons` (a
+tile per setting with a knob or a lit button drawn above its control, four
+across, two on a phone). A setting joins one with `group`; those in none come
+first. An app older than groups reads the same settings as one list.
+
+An add-on may also name a `view` for what plain settings cannot draw, such as a
+preview of the device's screen.
+
+**A view shows; it never asks.** Every control is a declared setting. A select,
+checkbox, slider or text box inside a frame is the browser's own - it matches
+nothing around it, and the frame clips its list - so a view holds none:
+`clients/desktop/test/main/addons/view-rules.test.ts` fails on any form control or
+control role in a repository add-on's view folder, and on a text missing a
+language.
 
 ## Views
 
@@ -81,7 +98,11 @@ origin) and speaks `postMessage` (`apps/web/src/lib/device-addon-view.ts`):
   view is open, so a view redraws on every `hello`, not only the first;
 - `{type: "settings", values}` comes after ready and whenever the add-on's settings change
   outside the view (the list above it, another window);
-- `{type: "resize", height}` sets the frame's height (120 to 1600 px);
+- `{type: "resize", height}` sets the frame's height (120 to 1600 px). The frame
+  has no edge and no scrollbar of its own, so a view reports the height of what
+  it draws (its root element's box, never `document.scrollHeight`, which is at
+  least the frame's and can never shrink), uses the page's `--background` and no
+  padding of its own, and reads as part of the page;
 - `{type: "call", id, method, params}` gets `{type: "reply", id, ok, value | error}`.
   The methods are the process's own (`settings.get`, `polaris.state`,
   `polaris.action`, judged against the granted permissions) and `settings.set`

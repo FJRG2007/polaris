@@ -155,6 +155,84 @@ on that hand-over alone:
 Not yet confirmed on the owner's machine: whether Brave starts from the
 direct launch there. Status stays **open** until they confirm on 0.1.60.
 
+## Why it stayed silent for weeks (2026-11-24, desktop 0.1.93)
+
+Reported again from Settings > Updates: the commit links do nothing. The
+Windows busy cursor shows for a moment, then no tab. The owner was on 0.1.87
+and 0.1.88. What was checked on that machine (read-only), and what it shows:
+
+- **The click gets to the browser.** The commit link is a plain
+  `<a target="_blank">` (`update-changelog.tsx`), which goes through
+  `setWindowOpenHandler` to `openExternal`. The installed 0.1.88 `app.asar`
+  has the same `routesFor` code as the source. The busy cursor is Windows
+  starting `brave.exe`.
+- **The browser gets the right command line.** A stub exe started through the
+  real `registeredLaunch` + `launchDetached`, with the machine's real
+  `BraveHTML` command, received
+  `--single-argument https://.../commit/abc123?x=1&y=2#frag` as one argument,
+  unchanged. Quoting, `&` and `#` are ruled out.
+- **The environment is clean.** The running Polaris process's environment
+  block (read from its PEB) has no `ELECTRON_*`, `CHROME_*`, `GOOGLE_*` or
+  `NODE_OPTIONS`. Polaris and Brave both run at medium integrity, not
+  elevated, in session 1. The working directory (`app-0.1.88`) exists. The
+  stub confirmed that a started browser inherits Polaris's parent process,
+  job, environment and working directory.
+- **Brave never received the links.** Brave's history (all three profiles)
+  has no commit page opened from outside since 2026-11-12, the last time a
+  Polaris commit link worked (transition `AUTO_TOPLEVEL`). Every commit visit
+  after that was clicked inside Brave. A cold start does work: Brave's
+  current browser process was started at 11:35 by a mail link
+  (`--single-argument https://yesim.tech/...`), and history shows that page
+  opening from outside at the same second. So the link is lost in the
+  hand-over: the step where a second `brave.exe` gives the link to the copy
+  already running.
+- **Polaris called it a success.** `launchDetached` resolved on the process's
+  `spawn` event. That only means `brave.exe` was created, and with Brave
+  already running, the created process is just a messenger. Chromium's own
+  exit codes say whether the messenger delivered the link.
+  `--single-argument` skips the fast path (`chrome_exe_main_win.cc` returns 0
+  only from `AttemptFastNotify`, and only with no other switch), so a
+  delivered link exits with `NORMAL_EXIT_PROCESS_NOTIFIED` = 24
+  (`chrome/common/chrome_result_codes.h`). A refused one exits with another
+  code, for example 21, `PROFILE_IN_USE`, which means the messenger could not
+  reach the running window. Polaris never read the code, so a refused
+  hand-over counted as opened: the second route never ran and the dialog
+  never showed.
+- **The log could never be written.** `links.log` goes in
+  `app.getPath("logs")` (`%APPDATA%\Polaris\logs`). That folder does not
+  exist on the owner's machine: Electron names it but does not create it.
+  `appendFileSync` into a missing folder throws, and the throw was swallowed.
+  "No links.log" said nothing about the routes. Every failure since 0.1.58
+  went unrecorded.
+
+So the root cause of "nothing happens" is that a refused hand-over to the
+running browser was reported as success, and nothing saw it. Not proven: why
+Brave turns down a messenger started by Polaris when Brave is already
+running. The environment, arguments, integrity level and click path above
+are ruled out. What is left is something the messenger inherits from Polaris
+as its parent: its job object, which comes from whatever started Polaris
+(the jobs here are held by Task Scheduler and the Program Compatibility
+Assistant, and can't be read without elevation), or the foreground hand-off.
+With this fix, the next failed click writes Brave's exit code to `links.log`,
+and that code names the reason.
+
+### Fix (desktop 0.1.93)
+
+- `launchDetached` (`default-browser.ts`) waits to see what the started
+  browser does. Exit 24 or 0 means the link was handed over. Still running
+  after 8 s means it became the browser (a cold start). Any other exit
+  rejects with the code and what it means.
+- `openOutsideOutcome` (`open-external.ts`): a refused hand-over moves on to
+  `shell.openExternal`. That route can't confirm anything opened, so the
+  outcome is `unconfirmed`, and the person sees "The link may not have
+  opened" with the address and Copy link. Every route failing still shows
+  "Couldn't open the link". A Store browser, which has no registered
+  command, goes straight to the system route with no dialog.
+- `links.log`: the folder is created first, and every attempt is written,
+  successes too. Each entry has the route, the link's scheme and host (never
+  the whole address, which can carry tokens) and, for a failure, the exit
+  code.
+
 ## Regression test
 
 - `clients/desktop/test/main/open-external.test.ts`: a several-thousand-character
@@ -180,6 +258,13 @@ direct launch there. Status stays **open** until they confirm on 0.1.60.
   link when every route fails.
 - `dashboard/apps/web/test/mail/message-base.test.ts`,
   `dashboard/apps/web/test/rich-text/preview-links.test.ts`.
+- `clients/desktop/test/main/default-browser.test.ts` > `launchDetached`: run against
+  this test's own Node exiting with a browser's codes. 24 and 0 resolve; 21
+  and 1 reject with the code (this test fails on the 0.1.60-0.1.92 launcher,
+  which resolved on spawn); a process still running resolves.
+- `clients/desktop/test/main/open-external.test.ts`: a refused hand-over is
+  `unconfirmed` (dialog shown) after the system route; a Store browser and a
+  delivered hand-over are `opened`; the log names the host, never the token.
 - Not exercised: a real browser starting from the direct launch (never run
   here, so no browser opens on this machine).
 

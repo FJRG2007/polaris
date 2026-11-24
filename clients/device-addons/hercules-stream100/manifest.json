@@ -11,6 +11,48 @@
         "linux-x64": "main.cjs",
         "win32-x64": "main.cjs"
     },
+    "groups": [
+        {
+            "hint": {
+                "en-US": "What each knob turns up and down.",
+                "es-ES": "Lo que sube y baja cada rueda."
+            },
+            "key": "knobs",
+            "label": {
+                "en-US": "Knobs",
+                "es-ES": "Ruedas"
+            },
+            "look": "dials"
+        },
+        {
+            "hint": {
+                "en-US": "What each button does in a Polaris call.",
+                "es-ES": "Lo que hace cada botón en una llamada de Polaris."
+            },
+            "key": "buttons",
+            "label": {
+                "en-US": "Lit buttons",
+                "es-ES": "Botones iluminados"
+            },
+            "look": "buttons"
+        },
+        {
+            "key": "turning",
+            "label": {
+                "en-US": "How the knobs turn",
+                "es-ES": "Cómo giran las ruedas"
+            },
+            "look": "rows"
+        },
+        {
+            "key": "screen",
+            "label": {
+                "en-US": "Screen",
+                "es-ES": "Pantalla"
+            },
+            "look": "rows"
+        }
+    ],
     "id": "hercules-stream100",
     "minAppVersion": "0.1.75",
     "name": "Hercules Stream 100",
@@ -27,62 +69,73 @@
             "key": "enabled",
             "kind": "toggle",
             "label": {
-                "en-US": "Use the Stream 100"
+                "en-US": "Use the Stream 100",
+                "es-ES": "Usar el Stream 100"
             }
         },
         {
             "default": "calls",
+            "group": "knobs",
             "key": "knob1",
             "kind": "choice",
             "label": {
-                "en-US": "Knob 1"
+                "en-US": "Knob 1",
+                "es-ES": "Rueda 1"
             },
             "options": [
                 {
                     "label": {
-                        "en-US": "Calls"
+                        "en-US": "Calls",
+                        "es-ES": "Llamadas"
                     },
                     "value": "calls"
                 },
                 {
                     "label": {
-                        "en-US": "Music"
+                        "en-US": "Music",
+                        "es-ES": "Música"
                     },
                     "value": "music"
                 },
                 {
                     "label": {
-                        "en-US": "Games"
+                        "en-US": "Games",
+                        "es-ES": "Juegos"
                     },
                     "value": "games"
                 },
                 {
                     "label": {
-                        "en-US": "Browser"
+                        "en-US": "Browser",
+                        "es-ES": "Navegador"
                     },
                     "value": "browser"
                 },
                 {
                     "label": {
-                        "en-US": "System sounds"
+                        "en-US": "System sounds",
+                        "es-ES": "Sonidos del sistema"
                     },
                     "value": "system"
                 },
                 {
                     "label": {
-                        "en-US": "Other apps"
+                        "en-US": "Other apps",
+                        "es-ES": "Otras apps"
                     },
                     "value": "other"
                 },
                 {
                     "label": {
-                        "en-US": "Whole output"
+                        "en-US": "Whole output",
+                        "es-ES": "Toda la salida"
                     },
                     "value": "output"
                 },
                 {
                     "label": {
-                        "en-US": "Nothing"
+                        "en-US": "Nothing",
+                        "es-ES": "Nada"
                     },
                     "value": "none"
                 }
@@ -90,57 +143,67 @@
         },
         {
             "default": "music",
+            "group": "knobs",
             "key": "knob2",
             "kind": "choice",
             "label": {
-                "en-US": "Knob 2"
+                "en-US": "Knob 2",
+                "es-ES": "Rueda 2"
             },
             "options": [
                 {
                     "label": {
-                        "en-US": "Calls"
+                        "en-US": "Calls",
+                        "es-ES": "Llamadas"
                     },
                     "value": "calls"
                 },
                 {
                     "label": {
-                        "en-US": "Music"
+                        "en-US": "Music",
+                        "es-ES": "Música"
                     },
                     "value": "music"
                 },
                 {
                     "label": {
-                        "en-US": "Games"
+                        "en-US": "Games",
+                        "es-ES": "Juegos"
                     },
                     "value": "games"
                 },
                 {
                     "label": {
-                        "en-US": "Browser"
+                        "en-US": "Browser",
+                        "es-ES": "Navegador"
                     },
                     "value": "browser"
                 },
                 {
                     "label": {
-                        "en-US": "System sounds"
+                        "en-US": "System sounds",
+                        "es-ES": "Sonidos del sistema"
                     },
                     "value": "system"
                 },
                 {
                     "label": {
-                        "en-US": "Other apps"
+                        "en-US": "Other apps",
+                        "es-ES": "Otras apps"
                     },
                     "value": "other"
                 },
                 {
                     "label": {
-                        "en-US": "Whole output"
+                        "en-US": "Whole output",
+                        "es-ES": "Toda la salida"
                     },
                     "value": "output"
                 },
                 {
                     "label": {
-                        "en-US": "Nothing"
+                        "en-US": "Nothing",
+                        "es-ES": "Nada"
                     },
                     "value": "none"
                 }
@@ -148,57 +211,67 @@
         },
         {
             "default": "games",
+            "group": "knobs",
             "key": "knob3",
             "kind": "choice",
             "label": {
-                "en-US": "Knob 3"
+                "en-US": "Knob 3",
+                "es-ES": "Rueda 3"
             },
             "options": [
                 {
                     "label": {
-                        "en-US": "Calls"
+                        "en-US": "Calls",
+                        "es-ES": "Llamadas"
                     },
                     "value": "calls"
                 },
                 {
                     "label": {
-                        "en-US": "Music"
+                        "en-US": "Music",
+                        "es-ES": "Música"
                     },
                     "value": "music"
                 },
                 {
                     "label": {
-                        "en-US": "Games"
+                        "en-US": "Games",
+                        "es-ES": "Juegos"
                     },
                     "value": "games"
                 },
                 {
                     "label": {
-                        "en-US": "Browser"
+                        "en-US": "Browser",
+                        "es-ES": "Navegador"
                     },
                     "value": "browser"
                 },
                 {
                     "label": {
-                        "en-US": "System sounds"
+                        "en-US": "System sounds",
+                        "es-ES": "Sonidos del sistema"
                     },
                     "value": "system"
                 },
                 {
                     "label": {
-                        "en-US": "Other apps"
+                        "en-US": "Other apps",
+                        "es-ES": "Otras apps"
                     },
                     "value": "other"
                 },
                 {
                     "label": {
-                        "en-US": "Whole output"
+                        "en-US": "Whole output",
+                        "es-ES": "Toda la salida"
                     },
                     "value": "output"
                 },
                 {
                     "label": {
-                        "en-US": "Nothing"
+                        "en-US": "Nothing",
+                        "es-ES": "Nada"
                     },
                     "value": "none"
                 }
@@ -206,57 +279,67 @@
         },
         {
             "default": "output",
+            "group": "knobs",
             "key": "knob4",
             "kind": "choice",
             "label": {
-                "en-US": "Knob 4"
+                "en-US": "Knob 4",
+                "es-ES": "Rueda 4"
             },
             "options": [
                 {
                     "label": {
-                        "en-US": "Calls"
+                        "en-US": "Calls",
+                        "es-ES": "Llamadas"
                     },
                     "value": "calls"
                 },
                 {
                     "label": {
-                        "en-US": "Music"
+                        "en-US": "Music",
+                        "es-ES": "Música"
                     },
                     "value": "music"
                 },
                 {
                     "label": {
-                        "en-US": "Games"
+                        "en-US": "Games",
+                        "es-ES": "Juegos"
                     },
                     "value": "games"
                 },
                 {
                     "label": {
-                        "en-US": "Browser"
+                        "en-US": "Browser",
+                        "es-ES": "Navegador"
                     },
                     "value": "browser"
                 },
                 {
                     "label": {
-                        "en-US": "System sounds"
+                        "en-US": "System sounds",
+                        "es-ES": "Sonidos del sistema"
                     },
                     "value": "system"
                 },
                 {
                     "label": {
-                        "en-US": "Other apps"
+                        "en-US": "Other apps",
+                        "es-ES": "Otras apps"
                     },
                     "value": "other"
                 },
                 {
                     "label": {
-                        "en-US": "Whole output"
+                        "en-US": "Whole output",
+                        "es-ES": "Toda la salida"
                     },
                     "value": "output"
                 },
                 {
                     "label": {
-                        "en-US": "Nothing"
+                        "en-US": "Nothing",
+                        "es-ES": "Nada"
                     },
                     "value": "none"
                 }
@@ -264,42 +347,52 @@
         },
         {
             "default": "call.mic",
+            "group": "buttons",
             "key": "button1",
             "kind": "action",
             "label": {
-                "en-US": "Button 1"
+                "en-US": "Button 1",
+                "es-ES": "Botón 1"
             }
         },
         {
             "default": "call.deafen",
+            "group": "buttons",
             "key": "button2",
             "kind": "action",
             "label": {
-                "en-US": "Button 2"
+                "en-US": "Button 2",
+                "es-ES": "Botón 2"
             }
         },
         {
             "default": "call.camera",
+            "group": "buttons",
             "key": "button3",
             "kind": "action",
             "label": {
-                "en-US": "Button 3"
+                "en-US": "Button 3",
+                "es-ES": "Botón 3"
             }
         },
         {
             "default": "call.hangup",
+            "group": "buttons",
             "key": "button4",
             "kind": "action",
             "label": {
-                "en-US": "Button 4"
+                "en-US": "Button 4",
+                "es-ES": "Botón 4"
             }
         },
         {
             "default": 2,
+            "group": "turning",
             "key": "percentPerDetent",
             "kind": "range",
             "label": {
-                "en-US": "Volume per click"
+                "en-US": "Volume per click",
+                "es-ES": "Volumen por paso"
             },
             "max": 10,
             "min": 1,
@@ -307,10 +400,12 @@
         },
         {
             "default": 3,
+            "group": "turning",
             "key": "maxAcceleration",
             "kind": "range",
             "label": {
-                "en-US": "Speed-up on a fast turn"
+                "en-US": "Speed-up on a fast turn",
+                "es-ES": "Aceleración al girar rápido"
             },
             "max": 5,
             "min": 1,
@@ -318,10 +413,12 @@
         },
         {
             "default": 3,
+            "group": "turning",
             "key": "deadBand",
             "kind": "range",
             "label": {
-                "en-US": "Ignore tiny movements"
+                "en-US": "Ignore tiny movements",
+                "es-ES": "Ignorar movimientos mínimos"
             },
             "max": 24,
             "min": 0,
@@ -329,33 +426,39 @@
         },
         {
             "default": "mixer",
+            "group": "screen",
             "key": "display",
             "kind": "choice",
             "label": {
-                "en-US": "Screen shows"
+                "en-US": "Screen shows",
+                "es-ES": "La pantalla muestra"
             },
             "options": [
                 {
                     "label": {
-                        "en-US": "Volume of each knob"
+                        "en-US": "Volume of each knob",
+                        "es-ES": "Volumen de cada rueda"
                     },
                     "value": "mixer"
                 },
                 {
                     "label": {
-                        "en-US": "People in the call"
+                        "en-US": "People in the call",
+                        "es-ES": "Personas en la llamada"
                     },
                     "value": "call"
                 },
                 {
                     "label": {
-                        "en-US": "What is playing"
+                        "en-US": "What is playing",
+                        "es-ES": "Lo que suena"
                     },
                     "value": "nowPlaying"
                 },
                 {
                     "label": {
-                        "en-US": "Off"
+                        "en-US": "Off",
+                        "es-ES": "Apagada"
                     },
                     "value": "off"
                 }
@@ -363,10 +466,12 @@
         },
         {
             "default": 80,
+            "group": "screen",
             "key": "brightness",
             "kind": "range",
             "label": {
-                "en-US": "Screen brightness"
+                "en-US": "Screen brightness",
+                "es-ES": "Brillo de la pantalla"
             },
             "max": 100,
             "min": 10,
@@ -374,6 +479,6 @@
         }
     ],
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.3",
+    "version": "0.1.4",
     "view": "view/index.html"
 }
