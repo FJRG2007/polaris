@@ -19,7 +19,7 @@
  */
 
 import { addonShortcutsNow, registerAddonViewScheme, startDeviceAddons, stopDeviceAddons } from "./addons/electron";
-import { HOST_UPDATE_ACCESS_PATH, HOST_UPDATE_PATH, readSettingsProbe, readUpdateAccess, settingsRoute, type HostPageOutcome, type LocalSettingsState, type SettingsPlace, type SettingsProbe } from "@/shared/settings-route";
+import { HOST_UPDATE_ACCESS_PATH, readSettingsProbe, readUpdateAccess, settingsRoute, type HostPageOutcome, type LocalSettingsState, type SettingsPlace, type SettingsProbe } from "@/shared/settings-route";
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
 import { runner } from "./runner";
@@ -83,8 +83,8 @@ let sheet: LocalSheet | null = null;
 /** The page of the main window that said it draws the app's settings, by its
  *  contents' id; cleared as that page navigates away, fails or dies. */
 let settingsPage: number | null = null;
-/** Why the bundled settings page is open, and on which place; read by that page. */
-let localSettings: LocalSettingsState = { place: "hosts", reason: null };
+/** Why the hosts window is open, when Settings... opened it; read by that page. */
+let localSettings: LocalSettingsState = { reason: null };
 
 let loadError: string | null = null;
 
@@ -480,9 +480,9 @@ function openMain(url: string): void {
         dropAlternate();
     });
 }
-function openConnect(settings: LocalSettingsState = { place: "hosts", reason: null }): void {
+function openConnect(settings: LocalSettingsState = { reason: null }): void {
     localSettings = settings;
-    // Already open: put back, so the page reads the place and the reason anew.
+    // Already open: put back, so the page reads the reason anew.
     if (sheet && !sheet.isDestroyed()) sheet.close();
     if (connect && !connect.isDestroyed()) {
         connect.show();
@@ -545,7 +545,7 @@ const settingsHosts = new Set<string>();
 /**
  * Whether the person signed in on the window may update the host: the host is
  * asked (`HOST_UPDATE_ACCESS_PATH`), so the answer is the check it enforces
- * itself. Only then does the bundled page offer the update.
+ * itself. Only then does the hosts window offer the update.
  */
 async function canUpdateHost(window: BrowserWindow | null, origin: string): Promise<boolean> {
     return readUpdateAccess(await probeStatus(window, origin, HOST_UPDATE_ACCESS_PATH));
@@ -556,9 +556,10 @@ async function canUpdateHost(window: BrowserWindow | null, origin: string): Prom
  * menu, the launcher: the host's own Settings > This app in the Polaris window,
  * with its sidebar and search, whenever a host is known (`settingsRoute`),
  * opening the window when it was closed. Offline it is the same screen, kept by
- * the window's service worker. The page bundled with the app only on the first
- * run, before any host, or on a host that answers that it has no such screen -
- * and then it says which, with the button that fixes it.
+ * the window's service worker. The app draws no settings of its own: on the
+ * first run, before any host, it is the hosts window that adds one, and on a
+ * host that answers that it has no such screen the hosts window says so, with
+ * the update when this person may run it.
  */
 async function openSettings(place: SettingsPlace = "general"): Promise<void> {
     const page = main && !main.isDestroyed() ? main : null;
@@ -581,7 +582,7 @@ async function openSettings(place: SettingsPlace = "general"): Promise<void> {
     if (route.kind === "local") {
         const reason = route.reason;
         const canUpdate = reason === "outdated" && origin ? await canUpdateHost(page, origin) : false;
-        openConnect({ place: reason === null ? "hosts" : place, reason, canUpdate });
+        openConnect({ reason, canUpdate });
         return;
     }
     closeConnect();
@@ -599,25 +600,14 @@ async function openSettings(place: SettingsPlace = "general"): Promise<void> {
 }
 
 /**
- * A host page the bundled settings asked for (an update, the device add-ons):
- * the Polaris window opens it, or the settings are told why it cannot - out of
- * reach, or a host older than the page (asked first, but for the update page,
- * which every host has).
+ * The host's update page, asked for by the hosts window when the host is older
+ * than Settings > This app: the Polaris window opens it, or "offline" when
+ * there is no window or host to open it on.
  */
 async function openOnHost(path: string): Promise<HostPageOutcome> {
     const page = main && !main.isDestroyed() ? main : null;
     const origin = current;
     if (!page || !origin || page.webContents.isCrashed()) return "offline";
-    if (path !== HOST_UPDATE_PATH) {
-        const probe = await probeSettings(page, origin, path);
-        if (probe === "missing") {
-            // The page asks the state again, to know whether to offer the update.
-            localSettings = { ...localSettings, reason: "outdated", canUpdate: await canUpdateHost(page, origin) };
-            return "outdated";
-        }
-        if (probe === "unreachable") return "offline";
-        if (origin !== current || page.isDestroyed()) return "offline";
-    }
     closeConnect();
     if (page.isMinimized()) page.restore();
     page.show();
@@ -626,7 +616,7 @@ async function openOnHost(path: string): Promise<HostPageOutcome> {
     return "opened";
 }
 
-/** Put the settings away, sheet or window. */
+/** Put the hosts window away, sheet or window. */
 function closeConnect(): void {
     sheet?.close();
     connect?.close();
@@ -1091,14 +1081,6 @@ function start(): void {
             checkUpdates: () =>
                 updateWatch?.checkNow() ??
                 Promise.resolve({ kind: "failed", reason: "Polaris is still starting. Try again in a moment." } as const),
-            updateDownloaded: () =>
-                updateWatch?.downloaded() ??
-                Promise.resolve({ kind: "failed", reason: "Polaris is still starting. Try again in a moment." } as const),
-            openUpdatePage: () => {
-                if (!menuUpdate) return false;
-                menuUpdate.open();
-                return true;
-            }
         });
 
         installScreenShare(server);

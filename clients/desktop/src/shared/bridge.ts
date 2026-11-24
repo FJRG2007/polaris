@@ -24,7 +24,7 @@ import type { Relaunch } from "./relaunch";
 import type { UpdateReady } from "./update-ready";
 import type { UpdateCheck } from "./update-check";
 import type { CallHotkey, CallHotkeysInput, CallHotkeysResult } from "./call-hotkeys";
-import type { CallPageAction, LookChange, VoiceAction, VoiceState, WidgetLook, WidgetView } from "./voice-widget";
+import type { CallPageAction, VoiceAction, VoiceState, WidgetLook, WidgetView } from "./voice-widget";
 import type { SearchEngine } from "./launcher";
 import type { ClipboardKeep } from "./clipboard-store";
 
@@ -456,16 +456,6 @@ export const PREFERENCE_TOGGLES = ["minimizeToTray", "startMinimized", "voiceWid
 
 export type PreferenceToggle = (typeof PREFERENCE_TOGGLES)[number];
 
-/** What the app's own settings page lists for an installed device add-on, offline included. */
-export interface LocalAddonRow {
-    readonly id: string;
-    readonly name: string;
-    readonly version: string;
-    readonly enabled: boolean;
-    /** How it is doing, in words, as the add-on's page in Settings says it. */
-    readonly status: string;
-}
-
 export interface PolarisLocal {
     /** The season the main process drew the Polaris mark in for this window,
      *  as it came (`SEASON_ARGUMENT`); null for the plain mark. */
@@ -477,8 +467,8 @@ export interface PolarisLocal {
             readonly address: string | null;
             readonly error: string | null;
             readonly servers: readonly ServerRow[];
-            /** The place to open and why this page is open instead of the host's
-             *  Settings. Absent on an app from before it. */
+            /** Why Settings... opened this window instead of the host's
+             *  Settings > This app. */
             readonly settings?: LocalSettingsState;
         }>;
         /** Open an address, adding it to the list with the name given, if any. */
@@ -491,37 +481,7 @@ export interface PolarisLocal {
         /** Change a listed host's address and name together. */
         edit(origin: string, address: string, name: string): Promise<Outcome>;
         remove(origin: string): Promise<Outcome>;
-        /** The program's own settings, kept with the servers. */
-        preferences(): Promise<Preferences | null>;
-        /** Whether it took: the switch goes back when it did not. */
-        setOpenAtLogin(open: boolean): Promise<boolean>;
-        /** Keep whether the graphics card is used. It applies from the next start. */
-        setHardwareAcceleration(on: boolean): Promise<boolean>;
-        /** Keep one of the plain switches. Whether it took. */
-        setToggle(name: PreferenceToggle, on: boolean): Promise<boolean>;
-        /** The launcher's key and whether the system gave it, with who likely holds it
-         *  when not. Looks once at the installed and running launchers. */
-        launcherStatus(): Promise<LauncherStatus>;
-        /** Hold a newly recorded key; the old one is kept when the new one is refused. */
-        setLauncherBinding(binding: string): Promise<LauncherStatus>;
-        /** Let the key go while a new one is recorded, so the press reaches the page. */
-        recordLauncherKey(recording: boolean): Promise<void>;
-        setLauncherEngine(engine: SearchEngine): Promise<boolean>;
-        /** How long the clipboard history keeps a copy. */
-        setClipboardKeep(keep: ClipboardKeep): Promise<boolean>;
-        /** One of the voice widget's looks changed. */
-        setVoiceWidgetLook(change: LookChange): Promise<boolean>;
-        /** Forget every copy the launcher kept. */
-        clearClipboardHistory(): Promise<void>;
-        /** The device add-ons installed here, from the app itself (none on an app older than them). */
-        addons?(): Promise<readonly LocalAddonRow[]>;
-        /** Turn an installed add-on on or off. Whether it took. */
-        setAddonEnabled?(id: string, enabled: boolean): Promise<boolean>;
-        /** Heard when an add-on is installed, removed, turned on or off, or its device comes or goes. */
-        onAddonsChange?(listener: () => void): () => void;
-        /** Close and open the app again, so a setting read at start applies. */
-        relaunch(): Promise<Outcome>;
-        /** Put the settings away. */
+        /** Put the hosts window away. */
         close(): Promise<void>;
         /** Heard each time the page, kept open between visits, is shown again. */
         onShown?(listener: () => void): () => void;
@@ -533,17 +493,8 @@ export interface PolarisLocal {
         importHostsFile(): Promise<HostImport>;
         /** Take in a list of hosts from a pasted or scanned code. */
         importHosts(text: string): Promise<HostImport>;
-        /** Ask for a newer version of this app now and say what was found. */
-        checkForUpdates(): Promise<UpdateCheck>;
-        /** After an answer of "downloading": what that download came to, once
-         *  it is installed or has failed. */
-        updateDownloaded(): Promise<UpdateCheck>;
-        /** Restart into the version that is installed and waiting. */
-        restartToUpdate(): Promise<Outcome>;
-        /** Open the download page of the version found; false when there is none. */
-        openUpdatePage(): Promise<boolean>;
-        /** Open a host page (`readHostPath`) in the Polaris window, or say why
-         *  it could not. */
+        /** Open the host's update page (`readHostPath`) in the Polaris window,
+         *  or say that it could not. */
         openOnHost?(path: string): Promise<HostPageOutcome>;
     };
     readonly apiKey: {
@@ -849,18 +800,6 @@ export const CHANNELS = {
     overlayStroke: "desktop:overlay-stroke",
     connectState: "local:connect-state",
     connectSubmit: "local:connect-submit",
-    connectPreferences: "local:connect-preferences",
-    connectOpenAtLogin: "local:connect-open-at-login",
-    connectHardwareAcceleration: "local:connect-hardware-acceleration",
-    connectToggle: "local:connect-toggle",
-    connectLauncherStatus: "local:connect-launcher-status",
-    connectLauncherBinding: "local:connect-launcher-binding",
-    connectLauncherRecord: "local:connect-launcher-record",
-    connectLauncherEngine: "local:connect-launcher-engine",
-    connectClipboardKeep: "local:connect-clipboard-keep",
-    connectVoiceWidgetLook: "local:connect-voice-widget-look",
-    connectClipboardClear: "local:connect-clipboard-clear",
-    connectRelaunch: "local:connect-relaunch",
     connectSwitch: "local:connect-switch",
     connectRename: "local:connect-rename",
     connectEdit: "local:connect-edit",
@@ -871,13 +810,7 @@ export const CHANNELS = {
     connectHostsImport: "local:connect-hosts-import",
     connectCheck: "local:connect-check",
     connectClose: "local:connect-close",
-    connectAddons: "local:connect-addons",
-    connectAddonEnable: "local:connect-addon-enable",
     connectShown: "local:connect-shown",
-    connectCheckUpdates: "local:connect-check-updates",
-    connectUpdateDownloaded: "local:connect-update-downloaded",
-    connectRestart: "local:connect-restart",
-    connectUpdatePage: "local:connect-update-page",
     connectOpenOnHost: "local:connect-open-on-host",
     keyState: "local:key-state",
     keySubmit: "local:key-submit",

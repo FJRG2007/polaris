@@ -23,6 +23,7 @@ import { useDesktopBridge, usePhoneAppSettings } from "@/components/desktop-app"
 import { phoneAppSettings, type PhoneAppSettings } from "@/lib/mobile-bridge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useNetworkState } from "@enigmax/primitives/react/network";
 import { readDesktopUpdateCheck, type DesktopUpdateCheck, type PolarisDesktop } from "@/lib/desktop-bridge";
 import { Button, buttonVariants, Card, CardBody, ConfirmDeleteDialog, Select, Skeleton, Switch, useToast } from "@polaris/ui";
 
@@ -472,6 +473,10 @@ type UpdateState = { readonly kind: "idle" } | { readonly kind: "checking" } | D
 function Updates({ bridge, version }: { bridge: PolarisDesktop; version: string }) {
     const t = useTranslations("appSettings");
     const [state, setState] = useState<UpdateState>({ kind: "idle" });
+    // Opened from the window's cache with no connection: a check or a download
+    // page cannot answer, so they wait for one and say so. A restart into an
+    // update already downloaded needs none.
+    const { online } = useNetworkState();
 
     // An update already downloaded, or one that finishes while the page is open.
     useEffect(() => {
@@ -512,16 +517,17 @@ function Updates({ bridge, version }: { bridge: PolarisDesktop; version: string 
         }
     })();
     const busy = state.kind === "checking" || state.kind === "downloading";
+    const waiting = !online && state.kind !== "ready";
 
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
-                <Row label={t("updates.version", { version: version || bridge.version })} hint={message}>
+                <Row label={t("updates.version", { version: version || bridge.version })} hint={waiting ? t("updates.offline") : message}>
                     {state.kind === "ready" && bridge.installUpdate ? (
                         <Button size="sm" onClick={() => void bridge.installUpdate?.()}>
                             {t("updates.restart")}
                         </Button>
-                    ) : state.kind === "available" ? (
+                    ) : state.kind === "available" && !waiting ? (
                         <Link href="/account/downloads" className={buttonVariants({ size: "sm" })}>
                             {t("updates.download")}
                         </Link>
@@ -529,9 +535,9 @@ function Updates({ bridge, version }: { bridge: PolarisDesktop; version: string 
                         <Button
                             size="sm"
                             variant="secondary"
-                            aria-disabled={busy}
+                            aria-disabled={busy || waiting}
                             onClick={() => {
-                                if (busy) return;
+                                if (busy || waiting) return;
                                 setState({ kind: "checking" });
                                 void bridge
                                     .checkForUpdates?.()
@@ -637,6 +643,8 @@ type PhoneUpdateState = { readonly kind: "idle"; } | { readonly kind: "checking"
 function PhoneUpdates({ settings, snapshot }: { settings: PhoneAppSettings; snapshot: core.AppPhoneSnapshot; }) {
     const t = useTranslations("appSettings");
     const [state, setState] = useState<PhoneUpdateState>({ kind: "idle" });
+    // From the cache with no connection the check cannot answer: it waits for one.
+    const { online } = useNetworkState();
     const live = useRef(true);
     useEffect(() => {
         live.current = true;
@@ -663,18 +671,19 @@ function PhoneUpdates({ settings, snapshot }: { settings: PhoneAppSettings; snap
         }
     })();
     const busy = state.kind === "checking";
+    const waiting = !online && snapshot.updates === "check";
 
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
-                <Row label={t("updates.version", { version: snapshot.version })} hint={message}>
+                <Row label={t("updates.version", { version: snapshot.version })} hint={waiting ? t("updates.offline") : message}>
                     {snapshot.updates === "check" && (
                         <Button
                             size="sm"
                             variant="secondary"
-                            aria-disabled={busy}
+                            aria-disabled={busy || waiting}
                             onClick={() => {
-                                if (busy) return;
+                                if (busy || waiting) return;
                                 setState({ kind: "checking" });
                                 void settings.checkForUpdates().then((answer) => {
                                     if (live.current) setState(answer);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addonPagePath, addonShortcuts, addonStatusWords, localAddonRows, sameShortcuts } from "@/main/addons/ways-in";
+import { addonPagePath, addonShortcuts, sameShortcuts } from "@/main/addons/ways-in";
 
 const stream = { name: "Hercules Stream 100", claims: [{ vendorId: 0x06f8, productId: 0xe053, name: "Hercules Stream 100" }] };
 const pedal = { name: "A pedal", claims: [{ vendorId: 1, productId: 2, name: "Pedal" }] };
@@ -38,19 +38,5 @@ describe("ways to an add-on's page", () => {
         expect(sameShortcuts(a, [{ ...a[0]! }])).toBe(true);
         expect(sameShortcuts(a, [])).toBe(false);
         expect(sameShortcuts(a, [{ ...a[0]!, name: "Y" }])).toBe(false);
-    });
-});
-
-describe("the app's own page's add-on rows", () => {
-    it("says what a running add-on said about its device, detail included", () => {
-        expect(addonStatusWords({ state: "running", status: { state: "busy", detail: "close Stream Control" } })).toBe("In use elsewhere - close Stream Control");
-        expect(addonStatusWords({ state: "running", status: null })).toBe("Running");
-        expect(addonStatusWords({ state: "failed", status: { state: "connected" } })).toBe("Stopped after crashing");
-        expect(addonStatusWords({ state: "sleeping" })).toBe("Unplugged");
-    });
-
-    it("names a row whose files are gone by its id", () => {
-        const rows = localAddonRows([{ id: "gone", version: "1.0.0", enabled: true, manifest: null, run: { state: "missing" } }]);
-        expect(rows).toEqual([{ id: "gone", name: "gone", version: "1.0.0", enabled: true, status: "Files missing, reinstall it" }]);
     });
 });

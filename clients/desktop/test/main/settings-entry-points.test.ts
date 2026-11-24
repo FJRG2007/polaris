@@ -10,7 +10,7 @@ import { appItems, type MenuActions } from "@/main/menu";
 /**
  * Every place that opens the app's settings - the tray, the app menu - goes
  * through one decision (`settingsRoute`, run by `openSettings`), so none of
- * them can open the bundled page while the host has Settings > This app.
+ * them can open the hosts window while the host has Settings > This app.
  */
 const INDEX = readFileSync(join(__dirname, "..", "..", "src", "main", "index.ts"), "utf8");
 
@@ -43,16 +43,21 @@ describe("settings entry points", () => {
 
     it("the menu action is wired to openSettings, and nothing else opens the settings in place of it", () => {
         expect(INDEX).toMatch(/changeServer: \(\) => void openSettings\(\)/);
-        // The bundled page with a settings place and a reason is opened by the
-        // decision alone (and by a host page the bundled page itself asked for).
+        // The hosts window is told a reason by the decision alone.
         const withReason = [...INDEX.matchAll(/openConnect\(\{[^}]*reason/g)];
         expect(withReason).toHaveLength(1);
         expect(body("openSettings")).toMatch(/openConnect\(\{[^}]*reason/);
     });
 
-    it("a closed window opens the host's screen in a new one rather than the bundled page", () => {
+    it("a closed window opens the host's screen in a new one rather than the hosts window", () => {
         const decision = body("openSettings");
         expect(decision).toMatch(/if \(!page\) \{\s*showPolaris\(route\.path\);/);
         expect(decision).not.toMatch(/reason: "offline"/);
+    });
+
+    it("the hosts window draws no settings of its own: they are the host's Settings > This app", () => {
+        const page = readFileSync(join(__dirname, "..", "..", "src", "renderer", "connect.html"), "utf8");
+        expect(page).not.toMatch(/data-setting=|class="setting\b|role="tablist"/);
+        expect(INDEX).not.toMatch(/openConnect\(\{[^}]*place/);
     });
 });

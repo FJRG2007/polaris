@@ -16,13 +16,6 @@
                 <img class="mark" src="mark.svg" alt="" />
                 <h1 id="title">Open your Polaris</h1>
             </div>
-            <label id="search-box" class="search" hidden>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                    <circle cx="11" cy="11" r="7" />
-                    <path d="m20 20-3.5-3.5" />
-                </svg>
-                <input id="settings-search" type="search" placeholder="Search settings" aria-label="Search settings" spellcheck="false" autocomplete="off" />
-            </label>
             <button id="close-sheet" class="icon sheet-close" type="button" aria-label="Close" title="Close" hidden>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
                     <path d="M18 6 6 18" />
@@ -30,204 +23,55 @@
                 </svg>
             </button>
         </header>
-        <div class="layout">
-            <nav id="nav" class="sidebar" aria-label="Settings" hidden>
-                <p class="nav-group">This app</p>
-                <div id="tabs" class="categories" role="tablist" aria-orientation="vertical"></div>
-            </nav>
-            <main id="pages" class="pages">
-                <div id="reason" class="notice" role="status" hidden>
-                    <p id="reason-text"></p>
-                    <div id="reason-acts" class="acts"></div>
+        <main id="pages" class="pages">
+            <div id="reason" class="notice" role="status" hidden>
+                <p id="reason-text"></p>
+                <div id="reason-acts" class="acts"></div>
+            </div>
+            <p id="failure" class="banner bad" role="alert" hidden></p>
+            <section id="servers-page">
+                <div class="section-head">
+                    <p class="section-title">Your hosts</p>
+                    <div class="acts">
+                        <button id="hosts-receive" class="icon" type="button" aria-label="Import hosts from another device" title="Import hosts from another device">
+                            <span data-icon="import"></span>
+                        </button>
+                        <button id="hosts-send" class="icon" type="button" aria-label="Export hosts to another device" title="Export hosts to another device" data-needs-hosts>
+                            <span data-icon="export"></span>
+                        </button>
+                    </div>
                 </div>
-                <p id="failure" class="banner bad" role="alert" hidden></p>
-                <p id="search-empty" class="hint search-empty" hidden>No settings match your search.</p>
-                <section id="servers-page" role="tabpanel">
-                    <div class="section-head">
-                        <p class="section-title">Your hosts</p>
-                        <div class="acts">
-                            <button id="hosts-receive" class="icon" type="button" aria-label="Import hosts from another device" title="Import hosts from another device">
-                                <span data-icon="import"></span>
-                            </button>
-                            <button id="hosts-send" class="icon" type="button" aria-label="Export hosts to another device" title="Export hosts to another device" data-needs-hosts>
-                                <span data-icon="export"></span>
-                            </button>
-                        </div>
+                <p id="transfer-note" class="hint transfer-note" role="status" aria-live="polite" hidden></p>
+                <ul id="server-list" class="server-list" aria-label="Your hosts" hidden></ul>
+                <button id="show-add" class="ghost with-icon" type="button" hidden><span data-icon="plus"></span>Add a host</button>
+                <form id="form" novalidate>
+                    <label class="field-label">
+                        <span id="address-label">The address you open Polaris at *</span>
+                        <input
+                            id="address"
+                            name="address"
+                            type="url"
+                            inputmode="url"
+                            autocomplete="url"
+                            spellcheck="false"
+                            placeholder="https://polaris.example.com"
+                            aria-describedby="address-note"
+                            autofocus
+                        />
+                        <span id="address-note" class="hint" aria-live="polite">https://, or http:// for an address on your own network.</span>
+                    </label>
+                    <label class="field-label">
+                        <span>Name</span>
+                        <input id="name" name="name" type="text" spellcheck="false" placeholder="Home, Work..." aria-describedby="name-note" />
+                        <span id="name-note" class="hint">Optional. Shown in the list instead of the address.</span>
+                    </label>
+                    <div class="row end">
+                        <button id="hide-add" class="ghost" type="button" hidden>Cancel</button>
+                        <button id="submit" class="primary" type="submit" aria-disabled="true">Open</button>
                     </div>
-                    <p id="transfer-note" class="hint transfer-note" role="status" aria-live="polite" hidden></p>
-                    <ul id="server-list" class="server-list" aria-label="Your hosts" hidden></ul>
-                    <button id="show-add" class="ghost with-icon" type="button" hidden><span data-icon="plus"></span>Add a host</button>
-                    <form id="form" novalidate>
-                        <label class="field-label">
-                            <span id="address-label">The address you open Polaris at *</span>
-                            <input
-                                id="address"
-                                name="address"
-                                type="url"
-                                inputmode="url"
-                                autocomplete="url"
-                                spellcheck="false"
-                                placeholder="https://polaris.example.com"
-                                aria-describedby="address-note"
-                                autofocus
-                            />
-                            <span id="address-note" class="hint" aria-live="polite">https://, or http:// for an address on your own network.</span>
-                        </label>
-                        <label class="field-label">
-                            <span>Name</span>
-                            <input id="name" name="name" type="text" spellcheck="false" placeholder="Home, Work..." aria-describedby="name-note" />
-                            <span id="name-note" class="hint">Optional. Shown in the list instead of the address.</span>
-                        </label>
-                        <div class="row end">
-                            <button id="hide-add" class="ghost" type="button" hidden>Cancel</button>
-                            <button id="submit" class="primary" type="submit" aria-disabled="true">Open</button>
-                        </div>
-                    </form>
-                </section>
-                <section id="general-page" role="tabpanel" hidden>
-                    <div class="settings-list">
-                        <label class="setting" data-setting="openAtLogin">
-                            <span class="setting-text">
-                                <span class="name">Open with the computer</span>
-                                <span class="hint">Polaris opens when you sign in.</span>
-                            </span>
-                            <input id="open-at-login" class="switch" type="checkbox" role="switch" />
-                        </label>
-                        <label class="setting" data-setting="startMinimized">
-                            <span class="setting-text">
-                                <span class="name">Start in the tray</span>
-                                <span class="hint">Opened with the computer, Polaris waits in the tray and says it is running. Off, its window opens.</span>
-                            </span>
-                            <input id="start-minimized" class="switch" type="checkbox" role="switch" />
-                        </label>
-                        <label class="setting" data-setting="minimizeToTray">
-                            <span class="setting-text">
-                                <span class="name">Minimize to tray</span>
-                                <span class="hint">Closing the window keeps Polaris running for calls and notifications.</span>
-                            </span>
-                            <input id="minimize-to-tray" class="switch" type="checkbox" role="switch" />
-                        </label>
-                        <label class="setting" data-setting="voiceWidget">
-                            <span class="setting-text">
-                                <span class="name">Show voice widget during calls</span>
-                                <span class="hint">Who is in the call and who is talking, over your other windows. Shift+` in a game, or Ctrl+Shift+`, unlocks it.</span>
-                            </span>
-                            <input id="voice-widget" class="switch" type="checkbox" role="switch" />
-                        </label>
-                        <label class="setting" data-setting="voiceWidgetGameOnly">
-                            <span class="setting-text">
-                                <span class="name">Only while a game is running</span>
-                                <span class="hint">Hides the voice widget until Polaris sees a game.</span>
-                            </span>
-                            <input id="voice-widget-game-only" class="switch" type="checkbox" role="switch" />
-                        </label>
-                        <div id="voice-widget-avatars-row" class="setting" data-setting="voiceWidgetAvatars">
-                            <span class="setting-text">
-                                <span class="name">Avatar size</span>
-                            </span>
-                            <div id="voice-widget-avatars" aria-label="Avatar size"></div>
-                        </div>
-                        <div id="voice-widget-names-row" class="setting" data-setting="voiceWidgetNames">
-                            <span class="setting-text">
-                                <span class="name">Show names</span>
-                            </span>
-                            <div id="voice-widget-names" aria-label="Show names"></div>
-                        </div>
-                        <div id="voice-widget-people-row" class="setting" data-setting="voiceWidgetPeople">
-                            <span class="setting-text">
-                                <span class="name">Show people</span>
-                            </span>
-                            <div id="voice-widget-people" aria-label="Show people"></div>
-                        </div>
-                        <div id="voice-widget-opacity-row" class="setting" data-setting="voiceWidgetOpacity">
-                            <span class="setting-text">
-                                <span class="name">Opacity</span>
-                            </span>
-                            <div id="voice-widget-opacity" aria-label="Opacity"></div>
-                        </div>
-                        <div id="voice-widget-corner-row" class="setting" data-setting="voiceWidgetCorner">
-                            <span class="setting-text">
-                                <span class="name">Position</span>
-                                <span class="hint">Where the widget starts. Unlock it to drag it anywhere.</span>
-                            </span>
-                            <div id="voice-widget-corner" aria-label="Position"></div>
-                        </div>
-                        <label class="setting" data-setting="launcher">
-                            <span class="setting-text">
-                                <span id="launcher-name" class="name">Alt+Space search</span>
-                                <span id="launcher-on-hint" class="hint">Your shortcut opens Polaris search over any app.</span>
-                            </span>
-                            <input id="launcher" class="switch" type="checkbox" role="switch" />
-                        </label>
-                        <div class="setting" data-setting="launcherBinding">
-                            <span class="setting-text">
-                                <span class="name">Search shortcut</span>
-                                <span id="launcher-key-hint" class="hint">Alt+Space</span>
-                            </span>
-                            <button id="launcher-record" class="ghost" type="button">Change</button>
-                        </div>
-                        <p id="launcher-problem" class="error" data-category="search" role="alert" hidden></p>
-                        <label id="launcher-game-mode-row" class="setting" data-setting="launcherGameMode">
-                            <span class="setting-text">
-                                <span class="name">Game mode</span>
-                                <span class="hint">While you play, or anything is full screen, your shortcut goes to what is in front.</span>
-                            </span>
-                            <input id="launcher-game-mode" class="switch" type="checkbox" role="switch" />
-                        </label>
-                        <div class="setting" data-setting="launcherEngine">
-                            <span class="setting-text">
-                                <span class="name">Web search</span>
-                                <span class="hint">Where a web search from Polaris search goes.</span>
-                            </span>
-                            <div id="launcher-engine" aria-label="Web search"></div>
-                        </div>
-                        <label class="setting" data-setting="launcherClipboard">
-                            <span class="setting-text">
-                                <span class="name">Clipboard history</span>
-                                <span id="launcher-clipboard-hint" class="hint">Polaris search keeps what you copy on this computer, encrypted. Passwords from password managers are skipped. Type "clip" to see them.</span>
-                            </span>
-                            <input id="launcher-clipboard" class="switch" type="checkbox" role="switch" />
-                        </label>
-                        <div id="launcher-keep-row" class="setting" data-setting="launcherClipboardKeep">
-                            <span class="setting-text">
-                                <span class="name">Keep history for</span>
-                                <span class="hint">Older copies are deleted.</span>
-                            </span>
-                            <div id="launcher-keep" aria-label="Keep history for"></div>
-                        </div>
-                        <div id="launcher-clear-row" class="setting" data-category="clipboard">
-                            <span class="setting-text">
-                                <span class="name">Clear clipboard history</span>
-                                <span class="hint">Deletes every copy kept on this computer.</span>
-                            </span>
-                            <button id="launcher-clear" class="ghost" type="button">Clear</button>
-                        </div>
-                    </div>
-                    <div class="row version-row" data-category="updates">
-                        <p id="version" class="hint version"></p>
-                        <button id="check-updates" class="ghost" type="button">Check for updates</button>
-                        <button id="restart-update" class="primary" type="button" hidden>Restart now</button>
-                        <button id="update-page" class="primary" type="button" hidden>Open download page</button>
-                    </div>
-                    <p id="update-status" class="hint" data-category="updates" role="status" aria-live="polite"></p>
-                </section>
-                <section id="advanced-page" role="tabpanel" hidden>
-                    <div class="settings-list">
-                        <label class="setting" data-setting="hardwareAcceleration">
-                            <span class="setting-text">
-                                <span class="name">Hardware acceleration</span>
-                                <span class="hint">Uses your graphics card to keep Polaris smooth. Turn it off if windows flicker or go blank.</span>
-                            </span>
-                            <input id="hardware-acceleration" class="switch" type="checkbox" role="switch" />
-                        </label>
-                    </div>
-                    <div id="restart-pending" class="row version-row" data-category="advanced" hidden>
-                        <p class="hint">Applies when Polaris restarts.</p>
-                        <button id="restart-pending-now" class="primary" type="button">Restart now</button>
-                    </div>
-                </section>
-            </main>
-        </div>
+                </form>
+            </section>
+        </main>
         </div>
         <dialog id="send-dialog" class="wide" aria-labelledby="send-title">
             <p id="send-title" class="name">Export your hosts</p>
@@ -272,23 +116,6 @@
                 <button id="remove-cancel" class="ghost" type="button">Cancel</button>
                 <!-- enigma: a confirmation button, whose whole job is to be read. -->
                 <button id="remove-confirm" class="danger" type="button">Remove</button>
-            </div>
-        </dialog>
-        <dialog id="confirm-restart" aria-labelledby="restart-title" aria-describedby="restart-body">
-            <p id="restart-title" class="name">Restart to apply</p>
-            <p id="restart-body" class="hint">Polaris uses the new setting once it restarts.</p>
-            <p id="restart-failure" class="error" role="alert" hidden></p>
-            <div class="row end">
-                <button id="restart-later" class="ghost" type="button">Later</button>
-                <button id="restart-now" class="primary" type="button">Restart now</button>
-            </div>
-        </dialog>
-        <dialog id="confirm-clear-clips" aria-labelledby="clear-clips-title" aria-describedby="clear-clips-body">
-            <p id="clear-clips-title" class="name">Clear clipboard history?</p>
-            <p id="clear-clips-body" class="hint">Every copy Polaris search kept on this computer is deleted.</p>
-            <div class="row end">
-                <button id="clear-clips-cancel" class="ghost" type="button">Cancel</button>
-                <button id="clear-clips-confirm" class="danger" type="button">Clear</button>
             </div>
         </dialog>
         <script src="connect.js"></script>
