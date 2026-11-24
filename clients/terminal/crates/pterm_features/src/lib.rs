@@ -345,7 +345,7 @@ pub enum FeatureFlag {
     /// Enables fallback model load output messaging in the pterming indicator.
     FallbackModelLoadOutputMessaging,
 
-    /// Names the model doing the work in the pterming indicator (e.g. "Pterming with
+    /// Names the model doing the work in the pterming indicator (e.g. "Working with
     /// Claude Sonnet 4.5.") once the server reports which model a response is
     /// running on, rather than only naming it when the model is a fallback.
     PtermingModelName,

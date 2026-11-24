@@ -47,7 +47,7 @@ fn renders_the_indicator_row_and_requests_a_repaint() {
         });
         app.read(|app_ctx| {
             let element = render_pterming_indicator_row(
-                "Pterming",
+                "Working",
                 Duration::ZERO,
                 TuiText::new("▶▶ Auto approve off")
                     .with_style(TuiUiBuilder::from_app(app_ctx).muted_text_style())
@@ -69,7 +69,7 @@ fn renders_the_indicator_row_and_requests_a_repaint() {
                 "unexpected spinner glyph in row: {line:?}"
             );
             assert!(
-                line.contains(" Pterming... (0s)"),
+                line.contains(" Working... (0s)"),
                 "unexpected indicator row: {line:?}"
             );
             assert!(line.ends_with("▶▶ Auto approve off  Ctrl + C to stop"));

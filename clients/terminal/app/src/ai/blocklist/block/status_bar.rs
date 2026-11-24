@@ -1162,7 +1162,7 @@ struct PtermingModelInputs {
     is_new_user_query: bool,
 }
 
-const UNNAMED_FALLBACK_MODEL_POLARIS_TERMINALING_TEXT: &str = "Pterming with another model.";
+const UNNAMED_FALLBACK_MODEL_POLARIS_TERMINALING_TEXT: &str = "Working with another model.";
 
 /// The fallback message's copy. It shipped before model naming existed and keeps
 /// its full stop, where everything named since ends in the row's ellipsis. The
@@ -1178,14 +1178,14 @@ fn fallback_pterming_text(display_name: &str) -> String {
     format!("{stem} with {display_name}.")
 }
 
-/// Pterming text for the model a response is running on, e.g. "Pterming with Claude
+/// Pterming text for the model a response is running on, e.g. "Working with Claude
 /// Sonnet 4.5...". `None` keeps the row on its generic copy, which is what `auto`
 /// and custom routers get until routing picks a model and the server reports it.
 ///
 /// Naming the model is `PtermingModelName`'s. `FallbackModelLoadOutputMessaging`
 /// owns the two things specific to a fallback attempt: the explanation line, and
 /// naming the previous exchange's model when this one has not reported yet. That
-/// lookback avoids a flicker from "Pterming..." on agent-initiated follow-ups,
+/// lookback avoids a flicker from "Working..." on agent-initiated follow-ups,
 /// since a conversation that fell back once is likely to again, and is skipped
 /// after a new user query because the primary model may have recovered by then.
 /// Nothing else borrows another exchange's model: naming one the response may not

@@ -5519,7 +5519,7 @@ impl TuiTerminalSessionView {
                     let label = if conversation.is_summarizing() {
                         "Summarizing conversation"
                     } else {
-                        "Pterming"
+                        "Working"
                     };
                     content = content.child(
                         TuiContainer::new(self.render_pterming_indicator(label, elapsed, ctx))

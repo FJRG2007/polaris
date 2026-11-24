@@ -1,4 +1,4 @@
-//! The in-progress `⋮ Pterming... (Ns)` indicator row rendered between the
+//! The in-progress `⋮ Working... (Ns)` indicator row rendered between the
 //! transcript and the input box while the selected conversation is in
 //! progress — the TUI counterpart of the GUI's pterming indicator — and its
 //! resting form, the completed-response summary row (`∷ 5s • 0.5 credits`).

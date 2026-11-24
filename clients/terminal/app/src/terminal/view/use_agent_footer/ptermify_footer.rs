@@ -30,7 +30,7 @@ impl PtermifyFooterView {
         let button_size = ButtonSize::XSmall;
 
         let ptermify_button = ctx.add_typed_action_view(|_ctx| {
-            ActionButton::new("Ptermify subshell", AgentFooterButtonTheme::new(None))
+            ActionButton::new("Integrate subshell", AgentFooterButtonTheme::new(None))
                 .with_icon(Icon::Pterm)
                 .with_size(button_size)
                 .with_tooltip("Enable Polaris Terminal shell integration in this session")

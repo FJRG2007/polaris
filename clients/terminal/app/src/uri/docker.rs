@@ -28,7 +28,7 @@ impl TryFrom<String> for DockerContainerId {
             ))
         } else if input.chars().any(|c| !c.is_ascii_hexdigit()) {
             Err(anyhow!(
-                "Could not find valid docker container id to open ptermified shell"
+                "Could not find valid docker container id to open integrated shell"
             ))
         } else {
             Ok(DockerContainerId(input))

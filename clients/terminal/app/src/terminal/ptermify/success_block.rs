@@ -111,7 +111,7 @@ impl PtermifySuccessBlock {
         let auto_ptermify_snippet = auto_ptermify_snippet.map(|(output_grid, can_write_to_rc)| {
             AutoPtermifySnippet {
                 description: (if !output_grid.is_empty() {
-                    "Run the following to automatically Ptermify in the future:"
+                    "Run the following to automatically integrate in the future:"
                 } else {
                     "In remote subshells, Polaris Terminal runs commands in the background to power completions, syntax highlighting, and other features."
                 }).into(),
@@ -151,7 +151,7 @@ impl PtermifySuccessBlock {
 
     pub fn render_title_ui(&self, theme: &PtermTheme, appearance: &Appearance) -> Box<dyn Element> {
         let header_contents = render::build_header_row(
-            "Session Ptermified",
+            "Session integrated",
             Icon::new(UiIcon::Pterm.into(), theme.active_ui_detail()),
             theme,
             appearance,

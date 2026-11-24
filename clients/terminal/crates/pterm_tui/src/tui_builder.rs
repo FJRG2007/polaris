@@ -426,7 +426,7 @@ impl TuiUiBuilder {
         self.pterming_base_fill().into_solid()
     }
 
-    /// The peak color the "Pterming" shimmer band lerps toward: a theme text
+    /// The peak color the "Working" shimmer band lerps toward: a theme text
     /// color selected for contrast against the resolved terminal background.
     pub(crate) fn pterming_shimmer_color(&self) -> ColorU {
         self.pterm_theme

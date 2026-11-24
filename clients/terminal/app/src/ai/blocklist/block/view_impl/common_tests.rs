@@ -379,7 +379,7 @@ fn names_the_model_before_a_status_message_ellipsis() {
     );
     assert_eq!(
         status_message_naming_model(LOAD_OUTPUT_MESSAGE, "Claude Sonnet 4.5"),
-        "Pterming with Claude Sonnet 4.5..."
+        "Working with Claude Sonnet 4.5..."
     );
     assert_eq!(
         status_message_naming_model(LOAD_OUTPUT_MESSAGE_FOR_CREATING_DIFF, "GPT-5.2"),

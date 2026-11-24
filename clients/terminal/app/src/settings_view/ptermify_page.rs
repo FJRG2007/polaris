@@ -52,7 +52,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         .is_supported_on_current_platform()
     {
         toggle_binding_pairs.push(ToggleSettingActionPair::new(
-            "SSH Ptermification",
+            "SSH integration",
             builder(SettingsAction::PtermifyPageToggle(
                 PtermifyPageAction::ToggleSshPtermification,
             )),
@@ -164,7 +164,8 @@ impl PtermifyPageView {
             .is_supported_on_current_platform()
         {
             categories.push(Category::with_header(
-                CategoryHeader::new("SSH").with_subtitle("Ptermify your interactive SSH sessions."),
+                CategoryHeader::new("SSH")
+                    .with_subtitle("Integrate your interactive SSH sessions."),
                 vec![Box::new(SSHWidget::default())],
             ));
         }
@@ -515,7 +516,11 @@ impl TitleWidget {
         .finish();
 
         Flex::column()
-            .with_child(render_page_title("Ptermify", HEADER_FONT_SIZE, appearance))
+            .with_child(render_page_title(
+                "Shell integration",
+                HEADER_FONT_SIZE,
+                appearance,
+            ))
             .with_child(ptermify_description)
             .finish()
     }
@@ -525,7 +530,7 @@ impl SettingsWidget for TitleWidget {
     type View = PtermifyPageView;
 
     fn search_terms(&self) -> &str {
-        "ssh subshell ptermify session"
+        "ssh subshell shell integration session"
     }
 
     fn render(
@@ -587,7 +592,7 @@ impl SettingsWidget for SubshellsWidget {
     type View = PtermifyPageView;
 
     fn search_terms(&self) -> &str {
-        "ptermify subshell"
+        "shell integration subshell"
     }
 
     fn render(
@@ -613,7 +618,7 @@ impl SettingsWidget for SSHWidget {
     type View = PtermifyPageView;
 
     fn search_terms(&self) -> &str {
-        "ptermify ssh sessions install extension reuse controlmaster"
+        "shell integration ssh sessions install extension reuse controlmaster"
     }
 
     fn render(
@@ -637,7 +642,7 @@ impl SettingsWidget for SSHWidget {
             &PtermifySettings::as_ref(app).enable_ssh_ptermification,
             move || {
                 render_body_item::<PtermifyPageAction>(
-                    "Ptermify SSH Sessions".into(),
+                    "Integrate SSH Sessions".into(),
                     None,
                     LocalOnlyIconState::for_setting(
                         EnableSshPtermification::storage_key(),

@@ -10381,12 +10381,12 @@ impl TerminalView {
 
         let a11y_message = match &ptermify_keybinding {
             Some(keystroke) => format!(
-                "You can press {} to Ptermify this {} for more Polaris Terminal features.",
+                "You can press {} to integrate this {} for more Polaris Terminal features.",
                 keystroke.displayed(),
                 lowercase_title
             ),
             None => format!(
-                "You can Ptermify this {lowercase_title} for more Polaris Terminal features."
+                "You can integrate this {lowercase_title} for more Polaris Terminal features."
             ),
         };
 
@@ -27361,7 +27361,7 @@ impl TypedActionView for TerminalView {
                 PtermA11yRole::TextareaRole,
             )),
             ShowPtermifySettings => Custom(AccessibilityContent::new_without_help(
-                "Opened Ptermify Settings",
+                "Opened shell integration settings",
                 PtermA11yRole::ButtonRole,
             )),
             OpenFilesPalette { .. } => Custom(AccessibilityContent::new_without_help(

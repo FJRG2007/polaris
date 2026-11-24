@@ -172,11 +172,11 @@ impl SshRemoteServerChoiceView {
             .with_child(Container::new(checkbox_label).with_margin_left(4.).finish())
             .finish();
 
-        // Right: "Manage Ptermify settings" link.
+        // Right: "Manage shell integration settings" link.
         let manage_settings_link = appearance
             .ui_builder()
             .link(
-                "Manage Ptermify settings".into(),
+                "Manage shell integration settings".into(),
                 None,
                 Some(Box::new(|ctx| {
                     ctx.dispatch_typed_action(

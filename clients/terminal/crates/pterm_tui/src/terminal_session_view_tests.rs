@@ -976,7 +976,7 @@ fn auto_approve_controls_retain_independent_mouse_state() {
         let (mut element, scene, buffer) = view.read(&app, |view, ctx| {
             let builder = TuiUiBuilder::from_app(ctx);
             let controls = TuiFlex::column()
-                .child(view.render_pterming_indicator("Pterming...", Duration::ZERO, ctx))
+                .child(view.render_pterming_indicator("Working...", Duration::ZERO, ctx))
                 .child(view.render_auto_approve_statusline(&builder, ctx))
                 .finish();
             render_retained_element(controls, ctx, 80, 2)

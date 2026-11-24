@@ -194,7 +194,7 @@ The Code umbrella no longer works this way: `CodeIndexing` and `EditorAndCodeRev
 
 Useful to read, not to copy:
 
-- **Ptermify** (`ptermify_page.rs`) — `PageType::new_categorized(categories, None)` where the first category is `Category::new("", vec![Box::new(TitleWidget::default())])` and `TitleWidget::render` calls `render_page_title("Ptermify", …)`. Single-topic page, title inside a widget: bug class 1.
+- **Ptermify** (`ptermify_page.rs`) — `PageType::new_categorized(categories, None)` where the first category is `Category::new("", vec![Box::new(TitleWidget::default())])` and `TitleWidget::render` calls `render_page_title("Shell integration", …)`. Single-topic page, title inside a widget: bug class 1.
 - **Polaris Terminal Drive** (`pterm_drive_page.rs`) — `PageType::new_uncategorized([PtermDriveHeaderWidget, PtermDriveToggleWidget], None)` with no title slot at all. `PtermDriveHeaderWidget` is a conditional sign-up banner, so a signed-in user sees only a bare toggle row and no page heading.
 
 ## How to verify a settings-page change

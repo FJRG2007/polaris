@@ -38,11 +38,11 @@ The modal appears once, immediately after the user completes the onboarding slid
 - **Session type:** A row of selectable pill-style buttons that wrap. Options (in order): Built in agent, Claude, Codex, Gemini, Terminal. Only one can be selected at a time. Built in agent is selected by default.
 - **Select directory:** A button that opens a native OS folder picker. Displays the selected path left-aligned (defaults to `~`). Text is semibold, no folder icon.
 - **Enable worktree support:** A checkbox. Disabled with a tooltip ("Select a git repository to enable worktree support") when the selected directory is not a git repository. Unchecked by default.
-- **"Get pterming" button:** Primary action button with Enter keyboard shortcut.
+- **"Get started" button:** Primary action button with Enter keyboard shortcut.
 
 ### Session type behavior
 
-Each session type determines what happens when the user clicks "Get pterming":
+Each session type determines what happens when the user clicks "Get started":
 
 - **Terminal:** Opens a terminal session in the selected directory. No command is auto-run.
 - **Oz:** Opens the tab into agent view / Oz agent mode (not a CLI command). The tab starts in the selected directory with the Oz agent UI active.
@@ -58,9 +58,9 @@ When checked and a git repo is selected, the session (and tab config, if saved) 
 
 **Disabled state:** The checkbox is visually disabled and non-interactive when the selected directory does not contain a `.git` directory (or is not inside a git repo). A tooltip explains: "Select a git repository to enable worktree support." If the user changes the directory from a git repo to a non-git directory, the checkbox unchecks automatically and becomes disabled.
 
-### "Get pterming"
+### "Get started"
 
-Clicking "Get pterming" always saves a tab config and opens it:
+Clicking "Get started" always saves a tab config and opens it:
 
 1. Writes a new TOML file to `~/.polaris-terminal/tab_configs/`. The file is named `startup_config.toml` (or `startup_config_1.toml`, `startup_config_2.toml`, etc. if the name is taken).
 2. The TOML file contains:
@@ -151,14 +151,14 @@ cwd = "/absolute/path/to/dir"
 
 ### Keyboard interaction
 
-- **Enter:** Activates "Get pterming" (same as clicking the button).
+- **Enter:** Activates "Get started" (same as clicking the button).
 - **Escape:** Closes the modal without taking any action — the user lands on an empty terminal tab.
 - Arrow keys / Tab: Navigate between session type pills and checkboxes.
 
 ### Dismissal
 
 The modal can be dismissed by:
-- Clicking "Get pterming" (takes action).
+- Clicking "Get started" (takes action).
 - Pressing Escape (no action taken).
 - Clicking outside the modal (no action taken).
 - There is no explicit close/X button in the Figma.
@@ -170,9 +170,9 @@ The modal's core logic (collecting session type, directory, worktree preference,
 ## Success Criteria
 
 1. After completing onboarding, the modal appears overlayed on the terminal.
-2. Selecting "Terminal" + a directory + "Get pterming" writes a tab config TOML to `~/.polaris-terminal/tab_configs/` and replaces the current tab with a session in that directory.
-3. Selecting a CLI agent + a directory + "Get pterming" writes a tab config TOML, replaces the current tab, sets the working directory, and auto-runs the agent CLI command.
-4. Selecting "Built in agent" + a directory + "Get pterming" writes a tab config TOML, replaces the current tab, and opens Oz agent view in that directory.
+2. Selecting "Terminal" + a directory + "Get started" writes a tab config TOML to `~/.polaris-terminal/tab_configs/` and replaces the current tab with a session in that directory.
+3. Selecting a CLI agent + a directory + "Get started" writes a tab config TOML, replaces the current tab, sets the working directory, and auto-runs the agent CLI command.
+4. Selecting "Built in agent" + a directory + "Get started" writes a tab config TOML, replaces the current tab, and opens Oz agent view in that directory.
 5. The written TOML appears in the + tab menu.
 6. The worktree checkbox is disabled when the selected directory is not a git repo, and enabled when it is.
 7. Checking worktree + save produces a TOML with `{{worktree_branch_name}}` params and worktree commands.

@@ -100,7 +100,7 @@ Create `app/src/tab_configs/session_config_modal.rs`. This is a self-contained `
 - Session type pill buttons using `Wrap::row()` for flex-wrap (hardcoded list in order: Built in agent (Oz), Claude, Codex, Gemini, Terminal)
 - Directory picker button (opens native `FilePickerConfiguration::folders_only()`), displays `~` via `pterm_util::path::user_friendly_path()`, left-aligned text with semibold weight, no folder icon
 - "Enable worktree support" checkbox (disabled when directory is not a git repo)
-- "Get pterming" button using `ActionButton` with `PrimaryTheme` and `with_full_width(true)`, includes Enter keystroke badge via `with_keybinding()`
+- "Get started" button using `ActionButton` with `PrimaryTheme` and `with_full_width(true)`, includes Enter keystroke badge via `with_keybinding()`
 
 The modal always saves a tab config — there is no "Save as tab config" checkbox.
 
@@ -170,7 +170,7 @@ When either flag is off (old onboarding), the existing path (`start_agent_onboar
 2. `root_view` applies settings, transitions to `Terminal` state with the workspace.
 3. `root_view` dispatches `WorkspaceAction::ShowSessionConfigModal` (flag-gated).
 4. Workspace opens `session_config_modal` as a centered overlay.
-5. User selects session type, picks directory, optionally toggles worktree, clicks "Get pterming".
+5. User selects session type, picks directory, optionally toggles worktree, clicks "Get started".
 6. Modal emits `SessionConfigModalEvent::Completed(selection)`.
 7. Workspace calls `handle_session_config_completed`:
    - Sets `DefaultSessionMode` if Oz.

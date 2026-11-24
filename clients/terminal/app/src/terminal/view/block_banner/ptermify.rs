@@ -46,7 +46,7 @@ impl PtermifyBannerState {
     }
 
     pub fn title(&self) -> &str {
-        "Ptermify subshell"
+        "Integrate subshell"
     }
 
     pub fn action(&self) -> TerminalAction {

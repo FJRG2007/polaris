@@ -143,7 +143,7 @@ fn reads_a_reported_model_off_the_exchange_output() {
 }
 
 /// An empty display name is an absent one, not a name: carrying it through would
-/// render "Pterming with ...".
+/// render "Working with ...".
 #[test]
 fn treats_an_empty_display_name_as_no_name() {
     assert_eq!(ModelInUse::from(&model_info("", false)).display_name, None);
@@ -156,7 +156,7 @@ fn names_the_model_reported_for_the_exchange() {
     assert_eq!(
         pterming_model_message(for_current(Some(named("Claude Sonnet 4.5")))),
         Some(PtermingModelMessage {
-            text: "Pterming with Claude Sonnet 4.5...".to_owned(),
+            text: "Working with Claude Sonnet 4.5...".to_owned(),
             model_display_name: Some("Claude Sonnet 4.5".to_owned()),
             show_fallback_explanation: false,
         })
@@ -210,7 +210,7 @@ fn names_a_fallback_model_without_the_naming_flag() {
     assert_eq!(
         pterming_model_message(for_current(Some(fallback("Claude Haiku 4.5")))),
         Some(PtermingModelMessage {
-            text: "Pterming with Claude Haiku 4.5.".to_owned(),
+            text: "Working with Claude Haiku 4.5.".to_owned(),
             model_display_name: None,
             show_fallback_explanation: true,
         })
@@ -231,11 +231,11 @@ fn ends_the_fallback_message_in_a_period_and_the_named_message_in_an_ellipsis() 
 
     assert_eq!(
         fallback_text.as_deref(),
-        Some("Pterming with Claude Haiku 4.5.")
+        Some("Working with Claude Haiku 4.5.")
     );
     assert_eq!(
         named_text.as_deref(),
-        Some("Pterming with Claude Haiku 4.5...")
+        Some("Working with Claude Haiku 4.5...")
     );
 }
 
@@ -251,7 +251,7 @@ fn names_a_fallback_model_without_the_explanation_line() {
     assert_eq!(
         pterming_model_message(for_current(Some(fallback("Claude Haiku 4.5")))),
         Some(PtermingModelMessage {
-            text: "Pterming with Claude Haiku 4.5...".to_owned(),
+            text: "Working with Claude Haiku 4.5...".to_owned(),
             model_display_name: Some("Claude Haiku 4.5".to_owned()),
             show_fallback_explanation: false,
         })
@@ -259,7 +259,7 @@ fn names_a_fallback_model_without_the_explanation_line() {
 }
 
 /// Goes through the conversion rather than hand-building the input, so this also
-/// covers what an empty display name renders as: "Pterming with ." before the
+/// covers what an empty display name renders as: "Working with ." before the
 /// normalization, this afterwards. No name means no name for the other status
 /// messages either.
 #[test]
@@ -317,7 +317,7 @@ fn names_the_previous_exchanges_fallback_model_on_agent_follow_ups() {
             is_new_user_query: false,
         }),
         Some(PtermingModelMessage {
-            text: "Pterming with Claude Haiku 4.5.".to_owned(),
+            text: "Working with Claude Haiku 4.5.".to_owned(),
             // Borrowed, so it stays out of the row's other messages: the lookback
             // was justified for this one sentence, not for five more.
             model_display_name: None,

@@ -1617,8 +1617,10 @@ fn add_open_setting_pages_as_editable_binding(app: &mut AppContext) {
         .with_context_predicate(id!("Workspace")),
         EditableBinding::new(
             "workspace:show_settings_ptermify_page",
-            BindingDescription::new("Open Settings: Ptermify")
-                .with_custom_description(bindings::MAC_MENUS_CONTEXT, "Configure Ptermify..."),
+            BindingDescription::new("Open Settings: Shell integration").with_custom_description(
+                bindings::MAC_MENUS_CONTEXT,
+                "Configure shell integration...",
+            ),
             WorkspaceAction::ShowSettingsPage(SettingsSection::Ptermify),
         )
         .with_group(bindings::BindingGroup::Settings.as_str())

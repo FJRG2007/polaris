@@ -166,7 +166,7 @@ pub fn description_row(
     .finish()
 }
 
-/// Renders a "Never Ptermify this host" link or nothing.
+/// Renders a "Never integrate this host" link or nothing.
 pub fn render_never_ptermify_ssh_link(
     ssh_host: &Option<String>,
     app: &AppContext,
@@ -187,7 +187,7 @@ pub fn render_never_ptermify_ssh_link(
     let link = appearance
         .ui_builder()
         .link(
-            "Never Ptermify this host".into(),
+            "Never integrate this host".into(),
             None,
             Some(Box::new({
                 let ssh_host = ssh_host.clone();

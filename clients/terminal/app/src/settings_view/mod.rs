@@ -350,6 +350,7 @@ impl Display for SettingsSection {
             SettingsSection::SharedBlocks => write!(f, "Shared blocks"),
             SettingsSection::Scripting => write!(f, "Scripting"),
             SettingsSection::PtermDrive => write!(f, "Polaris Terminal Drive"),
+            SettingsSection::Ptermify => write!(f, "Shell integration"),
             SettingsSection::PtermAgent => write!(f, "Polaris Terminal Agent"),
             SettingsSection::AgentProfiles => write!(f, "Profiles"),
             SettingsSection::AgentMCPServers => write!(f, "MCP servers"),

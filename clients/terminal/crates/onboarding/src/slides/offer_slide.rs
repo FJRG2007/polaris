@@ -351,7 +351,7 @@ impl OfferSlide {
         let get_pterming = self.get_pterming_button.render(
             appearance,
             button::Params {
-                content: button::Content::Label("Get Pterming".into()),
+                content: button::Content::Label("Get started".into()),
                 theme: &button::themes::Primary,
                 options: button::Options {
                     keystroke: Some(enter),

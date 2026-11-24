@@ -20,7 +20,7 @@ use crate::terminal::model::session::SessionId;
 use crate::terminal::ptermify::render::SSH_DOCS_URL;
 use crate::ui_components::icons::Icon;
 
-const BANNER_TITLE: &str = "Tmux SSH ptermification has been deprecated";
+const BANNER_TITLE: &str = "Tmux SSH integration has been deprecated";
 
 const BANNER_BODY: &str = "Polaris Terminal now connects to remote sessions using the SSH extension, which is \
     more robust than the tmux-based flow. The tmux option has been removed.";

@@ -32,7 +32,7 @@ maybe_define_setting!(SubshellCommandsDenylist, group: PtermifySettings, {
     surface: settings::SettingSurfaces::GUI,
     private: false,
     toml_path: "ptermify.subshells.subshell_commands_denylist",
-    description: "Commands that should not trigger the subshell ptermification prompt.",
+    description: "Commands that should not trigger the subshell integration prompt.",
 });
 
 maybe_define_setting!(SshHostsDenylist, group: PtermifySettings, {
@@ -43,7 +43,7 @@ maybe_define_setting!(SshHostsDenylist, group: PtermifySettings, {
     surface: settings::SettingSurfaces::GUI,
     private: false,
     toml_path: "ptermify.ssh.ssh_hosts_denylist",
-    description: "SSH hosts that should not trigger the ptermification prompt.",
+    description: "SSH hosts that should not trigger the integration prompt.",
 });
 
 maybe_define_setting!(EnableSshPtermification, group: PtermifySettings, {
@@ -104,7 +104,7 @@ maybe_define_setting!(UseSshTmuxWrapper, group: PtermifySettings, {
     surface: settings::SettingSurfaces::GUI,
     private: false,
     toml_path: "ptermify.ssh.use_ssh_tmux_wrapper",
-    description: "Deprecated: whether to use a tmux-based wrapper for SSH ptermification.",
+    description: "Deprecated: whether to use a tmux-based wrapper for SSH integration.",
 });
 
 // When set, the user previously opted into the now-deprecated tmux SSH wrapper and should

@@ -200,7 +200,7 @@ fn classified_offer_renders_in_every_selection_state() {
                 slide.update(&mut app, |slide, ctx| slide.handle_action(&action, ctx));
             }
 
-            // "Get Pterming" on the primary raises the auth prompt bar, which
+            // "Get started" on the primary raises the auth prompt bar, which
             // renders stacked over the slide.
             slide.update(&mut app, |slide, ctx| {
                 slide.handle_action(&OfferSlideAction::GetPterming, ctx)
