@@ -44,12 +44,15 @@ linked under each one. Most of them ask for administrator rights to change exclu
 
 ### Malwarebytes
 
-1. Open Malwarebytes and select **Detection History**.
-2. Open the **Allow List** tab and select **Add**.
-3. Select **Allow a file or folder**.
-4. Choose `%LOCALAPPDATA%\polaris`.
+1. Open Malwarebytes, select the gear icon (**Settings**) and choose **Allow List**. In some
+   versions it is under **Detection History** > **Allow List**.
+2. Select **Add** > **Allow a file or folder** and choose `%LOCALAPPDATA%\polaris`.
+3. If it asks what to exclude, tick excluding it from malware, ransomware and potentially
+   unwanted item detections.
+4. Restart the computer once. That completes the removals Malwarebytes left pending, and it
+   stops asking you to restart.
 
-To allow your Polaris address instead, choose **Allow a website** in step 3.
+To allow your Polaris address instead, choose **Allow a website** in step 2.
 
 [Malwarebytes' steps](https://help.malwarebytes.com/hc/en-us/articles/31589453538075-Add-or-remove-items-from-Malwarebytes-Allow-list)
 

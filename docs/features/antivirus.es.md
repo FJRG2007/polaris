@@ -45,13 +45,18 @@ mayoría piden permisos de administrador para cambiar las exclusiones.
 
 ### Malwarebytes
 
-1. Abre Malwarebytes y elige **Historial de detecciones** (Detection History).
-2. Abre la pestaña **Lista de permitidos** (Allow List) y elige **Añadir** (Add).
-3. Elige **Permitir un archivo o carpeta** (Allow a file or folder).
-4. Selecciona `%LOCALAPPDATA%\polaris`.
+1. Abre Malwarebytes, pulsa el icono de engranaje (**Ajustes**) y elige **Lista de permitidos**
+   (Allow List). En algunas versiones está en **Historial de detecciones** (Detection History) >
+   **Lista de permitidos**.
+2. Elige **Añadir** (Add) > **Permitir un archivo o carpeta** (Allow a file or folder) y
+   selecciona `%LOCALAPPDATA%\polaris`.
+3. Si pregunta qué excluir, marca que se excluya de las detecciones de malware, ransomware y
+   programas potencialmente no deseados.
+4. Reinicia el ordenador una vez. Así terminan los borrados que Malwarebytes dejó pendientes y
+   deja de pedir que reinicies.
 
 Para permitir la dirección de tu Polaris, elige **Permitir un sitio web** (Allow a website) en
-el paso 3.
+el paso 2.
 
 [Pasos de Malwarebytes](https://help.malwarebytes.com/hc/en-us/articles/31589453538075-Add-or-remove-items-from-Malwarebytes-Allow-list)
 
