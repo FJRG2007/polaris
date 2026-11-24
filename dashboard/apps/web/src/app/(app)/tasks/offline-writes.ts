@@ -53,6 +53,9 @@ async function deliver(entry: Pick<AppWrite, "kind" | "target" | "payload">): Pr
 
 for (const kind of TASK_KINDS) registerWriteKind(kind, deliver);
 
+/** The fields of a task write that name another task. */
+const TASK_REFERENCES = ["parentId", "beforeId", "afterId"] as const;
+
 const isTaskWrite = (entry: AppWrite): boolean => TASK_KINDS.includes(entry.kind);
 
 async function taskWrites(): Promise<AppWrite[]> {
@@ -102,7 +105,11 @@ export async function writeTask(
     const input = kind === TASK_CREATE && typeof payload.id !== "string" ? { ...payload, id: newClientKey() } : payload;
     const target = kind === TASK_CREATE ? (input.id as string) : String(input.taskId);
     const offline = typeof navigator !== "undefined" && navigator.onLine === false;
-    const behind = (await taskWrites()).some((entry) => entry.target === target && entry.state === "pending");
+    // Behind anything still waiting for this task or for a task it names - a
+    // subtask under a parent made offline, a move next to one - so the server
+    // has those before it reads this.
+    const named = new Set([target, ...TASK_REFERENCES.map((field) => input[field]).filter((id) => typeof id === "string")]);
+    const behind = (await taskWrites()).some((entry) => named.has(entry.target) && entry.state === "pending");
 
     if (!offline && !behind) {
         let unanswered = false;
