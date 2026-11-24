@@ -160,7 +160,7 @@ export const ADDON_CATEGORY_PREFIX = "addon:";
 
 /**
  * One device add-on of the published catalog (docs/device-addons.md), read at
- * build time from the same `device-addons/<id>/manifest.json` CI signs, in one
+ * build time from the same `clients/device-addons/<id>/manifest.json` CI signs, in one
  * locale. Its summary and changelog are the publisher's own words.
  */
 export interface SiteAddon {

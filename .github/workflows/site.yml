@@ -33,11 +33,11 @@ on:
       - "tv/addons/README.md"
       - "tv/addons/*/screenshot.*"
       # The device add-ons the marketplace lists, as their manifests describe them.
-      - "device-addons/*/manifest.json"
-      - "device-addons/*/listing.json"
-      - "device-addons/*/*.png"
-      - "device-addons/*/*.svg"
-      - "device-addons/*/*.webp"
+      - "clients/device-addons/*/manifest.json"
+      - "clients/device-addons/*/listing.json"
+      - "clients/device-addons/*/*.png"
+      - "clients/device-addons/*/*.svg"
+      - "clients/device-addons/*/*.webp"
       - "dashboard/apps/web/messages/*/marketplace.json"
       - ".github/workflows/site.yml"
   # Releases are published with each workflow's own token, which starts no

@@ -267,7 +267,7 @@ function storeWords(webLocale: string): site.StoreWords {
 
 /* Device add-ons: the manifests CI signs into the catalog (docs/device-addons.md). */
 
-const addonsDir = join(root, "device-addons");
+const addonsDir = join(root, "clients", "device-addons");
 const addonIconsDir = join(siteDir, "public", "addon-icons");
 rmSync(addonIconsDir, { recursive: true, force: true });
 
@@ -276,7 +276,7 @@ const addonSources = (existsSync(addonsDir) ? readdirSync(addonsDir).sort() : []
     .filter((id) => existsSync(join(addonsDir, id, "manifest.json")))
     .map((id) => {
         const manifest = readAddonManifest(JSON.parse(read(join(addonsDir, id, "manifest.json"))));
-        if (!manifest || manifest.id !== id) throw new Error(`device-addons/${id}: manifest does not read`);
+        if (!manifest || manifest.id !== id) throw new Error(`clients/device-addons/${id}: manifest does not read`);
         const listingFile = join(addonsDir, id, "listing.json");
         const listing = (existsSync(listingFile) ? JSON.parse(read(listingFile)) : {}) as {
             icon?: unknown;
