@@ -18,6 +18,9 @@ pub const ENTRY: &str = "main.cjs";
 /// The first desktop release with the add-on host.
 pub const MIN_APP_VERSION: &str = "0.1.75";
 
+/// The page the desktop app shows as the add-on's editor, inside its package.
+pub const VIEW: &str = "view/index.html";
+
 pub fn manifest() -> Value {
     let entries: serde_json::Map<String, Value> = PLATFORMS
         .iter()
@@ -43,6 +46,7 @@ pub fn manifest() -> Value {
         // display is asked for once something is drawn on it.
         "permissions": ["usb", "audio-sessions", "polaris-actions"],
         "settings": crate::addon::addon_settings(),
+        "view": VIEW,
     })
 }
 
