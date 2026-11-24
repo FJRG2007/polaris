@@ -21,7 +21,7 @@ import { Check } from "lucide-react";
 import * as core from "@polaris/core/app-settings";
 import { useDesktopBridge, usePhoneAppSettings } from "@/components/desktop-app";
 import { HostsManager } from "@/components/this-app/hosts-manager";
-import { phoneAppSettings, type PhoneAppSettings } from "@/lib/mobile-bridge";
+import { phoneAppSettings, phoneHosts, type PhoneAppSettings } from "@/lib/mobile-bridge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useNetworkState } from "@enigmax/primitives/react/network";
@@ -59,6 +59,9 @@ export function AppSettingsView({ category }: { category: core.AppSettingCategor
     const phone = usePhoneAppSettings();
     const t = useTranslations("appSettings");
     if (!bridge?.appSettings && phone) {
+        // A phone app that manages its hosts here draws them as the desktop app's.
+        const hosts = category === "hosts" ? phoneHosts() : null;
+        if (hosts) return <HostsManager hosts={hosts} />;
         const settings = phoneAppSettings();
         if (settings) return <InPhone settings={settings} category={category} />;
     }

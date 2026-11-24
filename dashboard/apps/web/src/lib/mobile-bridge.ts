@@ -7,7 +7,7 @@
  */
 
 import * as core from "@polaris/core/app-settings";
-import type { DesktopOutcome, DesktopVpnStatus, PolarisDesktop } from "@/lib/desktop-bridge";
+import type { DesktopHosts, DesktopOutcome, DesktopVpnStatus, PolarisDesktop } from "@/lib/desktop-bridge";
 
 interface PolarisMobileBridge {
     platform?(): string;
@@ -43,6 +43,12 @@ interface PolarisMobileBridge {
     appSettings?(): string;
     /** Open one of the screens its General category lists (`APP_PHONE_ACTIONS`). */
     appSettingsAction?(action: string): void;
+    /** The servers the app keeps, managed in Settings > This app > Hosts: `op`
+     *  is list, check, add, switch, edit, remove, status, link, copy, export or
+     *  import. Answers later, through `window.__polarisMobileHosts(id, json)`,
+     *  shaped as the desktop app's. Absent from an app that manages them in its
+     *  own screen only. */
+    hostsCall?(id: string, op: string, args: string): void;
     /** A check for a newer build; answers later, through
      *  `window.__polarisMobileUpdate(id, json)`. */
     checkForUpdates?(id: string): void;
@@ -349,5 +355,100 @@ export function phoneAppSettings(): PhoneAppSettings | null {
             typeof found.checkForUpdates === "function"
                 ? updateRequest(found)
                 : Promise.resolve({ kind: "failed" } as const)
+    };
+}
+
+/** How long a hosts call may take before the page stops waiting: an address is probed for up to 15 s. */
+const HOSTS_WAIT_MS = 45_000;
+/** The largest file "Open a file" reads, as the app's own import did. */
+const HOSTS_FILE_MAX = 64 * 1024;
+
+type HostsWindow = Window & { __polarisMobileHosts?: (id: string, json: string) => void };
+
+const hostCalls = new Map<string, (answer: unknown) => void>();
+
+/** One hosts call; null for no answer, which the desktop readers take as a refusal. */
+function hostsRequest(found: PolarisMobileBridge, op: string, args: Record<string, string> = {}): Promise<unknown> {
+    const target = window as HostsWindow;
+    target.__polarisMobileHosts ??= (id, json) => {
+        const resolve = hostCalls.get(id);
+        hostCalls.delete(id);
+        try {
+            resolve?.(JSON.parse(json));
+        } catch {
+            resolve?.(null);
+        }
+    };
+    requests += 1;
+    const id = `hosts-${requests}-${Date.now().toString(36)}`;
+    return new Promise((resolve) => {
+        const timer = window.setTimeout(() => {
+            hostCalls.delete(id);
+            resolve(null);
+        }, HOSTS_WAIT_MS);
+        hostCalls.set(id, (answer) => {
+            window.clearTimeout(timer);
+            resolve(answer);
+        });
+        try {
+            found.hostsCall?.(id, op, JSON.stringify(args));
+        } catch {
+            hostCalls.delete(id);
+            window.clearTimeout(timer);
+            resolve(null);
+        }
+    });
+}
+
+/** A file somebody picks, read as text; null when cancelled, "" when too big or unreadable. */
+function pickText(): Promise<string | null> {
+    return new Promise((resolve) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.addEventListener("cancel", () => resolve(null));
+        input.addEventListener("change", () => {
+            const file = input.files?.[0];
+            if (!file) return resolve(null);
+            if (file.size > HOSTS_FILE_MAX) return resolve("");
+            void file.text().then(resolve, () => resolve(""));
+        });
+        input.click();
+    });
+}
+
+/**
+ * The servers this phone keeps, in the desktop app's shape so Settings > This
+ * app > Hosts draws both with one screen. Null in a browser and in an app that
+ * manages them in its own screen only.
+ */
+export function phoneHosts(): DesktopHosts | null {
+    const found = bridge();
+    if (typeof found?.hostsCall !== "function") return null;
+    // One object per bridge, so the screen does not read the list again on every render.
+    if (madeHosts?.found !== found) madeHosts = { found, hosts: makePhoneHosts(found) };
+    return madeHosts.hosts;
+}
+
+let madeHosts: { found: PolarisMobileBridge; hosts: DesktopHosts } | null = null;
+
+function makePhoneHosts(found: PolarisMobileBridge): DesktopHosts {
+    const call = (op: string, args?: Record<string, string>) => hostsRequest(found, op, args);
+    return {
+        list: () => call("list"),
+        check: (address) => call("check", { address }),
+        add: (address, name) => call("add", { address, name }),
+        switchTo: (origin) => call("switch", { origin }),
+        edit: (origin, address, name) => call("edit", { origin, address, name }),
+        remove: (origin) => call("remove", { origin }),
+        status: (origin) => call("status", { origin }),
+        link: () => call("link"),
+        copy: () => call("copy"),
+        exportFile: () => call("export"),
+        importFile: async () => {
+            const text = await pickText();
+            if (text === null) return { ok: false, error: null };
+            return text ? call("import", { text }) : { ok: false, error: "" };
+        },
+        importText: (text) => call("import", { text })
     };
 }
