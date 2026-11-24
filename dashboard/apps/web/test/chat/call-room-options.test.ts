@@ -29,3 +29,9 @@ describe("call room options", () => {
         expect(options.publishDefaults?.videoCodec).toBe("vp9");
     });
 });
+
+describe("which copy of a picture is asked for", () => {
+    it("leaves it to the tiles, since the client's own measure never sees them (BUG-0036)", () => {
+        expect(CALL_ROOM_OPTIONS.adaptiveStream).toBe(false);
+    });
+});

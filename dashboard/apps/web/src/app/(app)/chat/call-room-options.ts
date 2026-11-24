@@ -13,25 +13,16 @@ import type { RoomOptions } from "livekit-client";
 /** What `new Room()` is handed for every call, group or one-to-one. */
 export const CALL_ROOM_OPTIONS: Partial<RoomOptions> = {
     /**
-     * Ask for the resolution the tile is actually drawn at, and stop
-     * the flow entirely while it is off screen. On a wall of eight
-     * faces this is most of the bandwidth.
+     * Off, because the tiles do its job themselves (`call-layer`).
      *
-     * `pixelDensity: "screen"` is the half that was missing, and it
-     * is why a shared screen looked sharp in this product while the
-     * faces beside it did not. Left unset, the client asks for the
-     * tile's size in CSS pixels and assumes one device pixel each -
-     * so on a laptop that paints two, a 320-wide tile was fed a
-     * 320-wide picture and then doubled to fill 640 real pixels.
-     * That is upscaling, and it looks exactly like a soft camera. A
-     * shared screen escaped it by being the biggest element on the
-     * page: even halved it cleared the top layer.
-     *
-     * It costs bandwidth on a high-density display, which is the
-     * documented trade and the one being asked for here: the picture
-     * is the product.
+     * The client's own version only measures a video handed to its
+     * `attach()`, and the tiles here draw a `MediaStream` into their own
+     * element - so it never measured anything, and every viewer asked for
+     * the top copy of every picture. Each tile now reports its own size in
+     * device pixels, and the one somebody is looking at - focused or full
+     * screen - asks for the top copy outright (BUG-0036).
      */
-    adaptiveStream: { pixelDensity: "screen" },
+    adaptiveStream: false,
     // Stop sending the quality layers nobody is subscribed to.
     dynacast: true,
     publishDefaults: {

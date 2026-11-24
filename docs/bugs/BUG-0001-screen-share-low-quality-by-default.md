@@ -1,7 +1,7 @@
 ---
 id: BUG-0001
 title: A shared screen goes out at low quality on a line that can carry the source
-status: fixed-watching
+status: regressed
 area: calls / screen share
 location: dashboard/apps/web/src/app/(app)/chat/call-quality.ts
 related:
@@ -83,3 +83,9 @@ Collect, from the person sharing:
 Starting soft at once points at the first rung or the capture constraints.
 Going soft after a while points at `driftAuto`: check which reading counted as
 trouble.
+
+## Regressed
+
+Reported again on 2026-11-24 as [BUG-0036](BUG-0036-watched-screen-share-arrives-at-540p.md):
+the 60 fps top rung tuned to keep frames gave up resolution under pressure, and
+the only fallback below 1080p was 540p.

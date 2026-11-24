@@ -187,6 +187,7 @@ import { StreamReportDialog } from "./stream-report-dialog";
 import { useStreamPrefs } from "./stream-shape";
 import { useAttending } from "@/components/use-attention";
 import { sharePress } from "./call-share-menu";
+import { useLayerRequest } from "./call-layer";
 import { MeetingLinkLimits } from "./meeting-link-limits";
 
 /**
@@ -2715,6 +2716,8 @@ function Tile({
     const t = useTranslations("chat");
     const video = useRef<HTMLVideoElement>(null);
     const frame = useRef<HTMLDivElement | null>(null);
+    /** Which copy of this picture the media server sends - see `call-layer`. */
+    useLayerRequest(stream, frame, { screen, focused });
     /** The face in an empty tile, sized to the tile: a fixed one spilled over
      *  the name of every tile in a phone's grid. */
     const face = useFaceSize(frame);

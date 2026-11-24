@@ -553,19 +553,76 @@ export function levelOf(setting: CallQuality, auto: CallLevel): CallLevel {
 /**
  * How a shared screen should be encoded at this rung.
  *
- * Read off the framerate, as `screenIsMotion` is - except that a screen auto
- * has had to bring down is held sharp instead. Under pressure a "motion" share
- * gives up resolution first, and a document at half its size is unreadable,
- * while one at half its framerate is not even noticed.
+ * The content hint is read off the framerate, as `screenIsMotion` is, and a
+ * screen auto has had to bring down is hinted as detail. What it gives up under
+ * pressure is always frames, never size.
  */
 export function screenTuning(
     level: CallLevel,
     degraded: boolean
 ): { hint: "motion" | "detail"; preference: RTCDegradationPreference } {
     const motion = !degraded && screenIsMotion(level);
-    return motion
-        ? { hint: "motion", preference: "maintain-framerate" }
-        : { hint: "detail", preference: "maintain-resolution" };
+    // Whatever the content, a shared screen keeps its size and gives up frames
+    // when the line narrows - what Discord's Go Live does, and what nobody
+    // notices. Giving up size instead is how a 1080p share reached a viewer
+    // with a fast connection at 540p (BUG-0036): text at half its size is
+    // unreadable, a game at half its framerate is still a game.
+    return { hint: motion ? "motion" : "detail", preference: "maintain-resolution" };
+}
+
+/** One extra, smaller copy of a shared screen, in the shape the media client's
+ *  `VideoPreset` takes. */
+export interface ScreenLayer {
+    readonly width: number;
+    readonly height: number;
+    readonly maxBitrate: number;
+    readonly maxFramerate: number;
+}
+
+/** The copy every share falls back to first: 720p at 15 fps, LiveKit's own
+ *  `ScreenSharePresets.h720fps15` (1.5 Mbps). Sharp enough to read code on. */
+const SCREEN_FALLBACK = { edge: 720, frameRate: 15, maxBitrate: 1_500_000 } as const;
+/** The second copy, for a screen well above 1080p: LiveKit's
+ *  `ScreenSharePresets.h1080fps30` (5 Mbps). */
+const SCREEN_MIDDLE = { edge: 1080, frameRate: 30, maxBitrate: 5_000_000 } as const;
+
+/**
+ * The smaller copies a shared screen is sent with beside its own size.
+ *
+ * Left to the media client, a screen gets one copy at half its size and a
+ * quarter of its allowance: 960x540 under a 1080p share, the only thing the
+ * server could forward whenever the full copy was not getting through
+ * (BUG-0036). Here the first fallback is 720p - and a screen far above 1080p
+ * gets a 1080p copy between - so a share that has to come down lands on
+ * something still readable. No copy is ever the source's own size: a second
+ * full-size encode is the sharer's machine doing the hardest work twice.
+ *
+ * Sizes are cut on the short edge, in the screen's own shape, and each copy's
+ * allowance is scaled by its pixels against the preset it came from.
+ */
+export function screenLayers(
+    source: { readonly width?: number; readonly height?: number } | null | undefined
+): ScreenLayer[] {
+    const width = source?.width ?? 0;
+    const height = source?.height ?? 0;
+    if (width <= 0 || height <= 0) return [];
+    const edge = Math.min(width, height);
+    const layer = (preset: { edge: number; frameRate: number; maxBitrate: number }): ScreenLayer => {
+        const scale = preset.edge / edge;
+        const w = Math.round((width * scale) / 2) * 2;
+        const h = Math.round((height * scale) / 2) * 2;
+        const pixels = (w * h) / ((preset.edge * 16 * preset.edge) / 9);
+        return {
+            width: w,
+            height: h,
+            maxBitrate: Math.round(preset.maxBitrate * Math.max(pixels, 0.5)),
+            maxFramerate: preset.frameRate
+        };
+    };
+    const layers: ScreenLayer[] = [];
+    if (edge > SCREEN_FALLBACK.edge) layers.push(layer(SCREEN_FALLBACK));
+    if (edge > SCREEN_MIDDLE.edge * 1.25) layers.push(layer(SCREEN_MIDDLE));
+    return layers;
 }
 
 /**

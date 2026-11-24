@@ -15,10 +15,10 @@
  * - **It connects.** The server has an address both browsers can reach, so
  *   neither has to discover its own and neither needs a relay of its own.
  * - **It sends less.** `dynacast` stops publishing the quality layers nobody is
- *   currently watching, and `adaptiveStream` asks for the resolution a tile is
- *   actually being drawn at - so a face in a 160px tile is not a 720p stream
- *   being thrown away after decode, and a call in a background tab pauses
- *   instead of paying for frames nobody sees.
+ *   currently watching, and each tile asks for the resolution it is actually
+ *   drawn at (`call-layer`) - so a face in a 160px tile is not a 720p stream
+ *   being thrown away after decode, and the screen somebody is watching comes
+ *   in at its top copy.
  * - **There is nothing to negotiate.** No offers, no answers, no candidates, no
  *   book of which slot carries the screen. Publishing a track says what it is,
  *   and a subscriber is told.
@@ -39,6 +39,7 @@ import { z } from "zod";
 import { callRemoteSchema, emitCallRemote } from "@/lib/chat/call-remote";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as quality from "./call-quality";
+import * as layer from "./call-layer";
 import { setStreamPrefs, streamShape, useStreamPrefs } from "./stream-shape";
 import * as shareHeal from "./call-share-heal";
 import { volumeFor } from "./call-volumes";
@@ -105,7 +106,14 @@ import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from
 import { extraPublications, oneVoice, serialized, type PublishedTrack } from "./call-tracks";
 import { retuneScreenEncoding, swapScreen, type EncodedTrack } from "./call-share-menu";
 import { CALL_ROOM_OPTIONS } from "./call-room-options";
-import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
+import type {
+    LocalVideoTrack,
+    Participant,
+    RemoteTrackPublication,
+    Room,
+    Track,
+    TrackPublication
+} from "livekit-client";
 import { ACTIVITY_ATTRIBUTE, ACTIVITY_TOPIC, reportPoseFailure } from "@/lib/chat/call-activity";
 import { ANNOTATE_TOPIC, ANNOTATORS } from "@/lib/chat/call-annotate";
 import {
@@ -1088,6 +1096,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     return false;
                 }
             }
+            // The smaller copies of a shared screen, cut from the size it is
+            // actually being sent at - see `screenLayers`.
+            const lk = screening ? await livekit() : null;
+            const screenShareSimulcastLayers = lk
+                ? quality
+                      .screenLayers(track.getSettings())
+                      .map((one) => new lk.VideoPreset(one.width, one.height, one.maxBitrate, one.maxFramerate))
+                : undefined;
             try {
                 await local.publishTrack(track, {
                     source,
@@ -1104,6 +1120,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     ...(screening
                         ? {
                               screenShareEncoding: quality.screenEncoding(level),
+                              ...(screenShareSimulcastLayers?.length ? { screenShareSimulcastLayers } : {}),
                               // A shared screen goes out as VP8 with plain
                               // simulcast, not the room's VP9 layers. Published
                               // again as VP9 after a reconnection, the server
@@ -1683,7 +1700,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // Fetched now rather than imported: see `livekit` above. It is one
             // request, cached, and it happens while the browser is already
             // waiting on the ticket.
-            const { ConnectionState, ParticipantEvent, Room, RoomEvent } = await livekit();
+            const { ConnectionState, ParticipantEvent, Room, RoomEvent, VideoQuality } = await livekit();
             if (stopped) {
                 connecting = false;
                 return;
@@ -1704,11 +1721,21 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 // joined muted publishes a muted track and never fires a mute
                 // event, so their icon would only appear if they happened to
                 // unmute and mute again.
-                .on(RoomEvent.TrackSubscribed, () => {
+                .on(RoomEvent.TrackSubscribed, (track, publication) => {
+                    // The tiles say which copy of a picture they need, and
+                    // this is where that reaches the server - see `call-layer`.
+                    if (track.kind === "video") {
+                        const remote = publication as RemoteTrackPublication;
+                        layer.bindLayerSink(track.mediaStreamTrack.id, (want) => {
+                            if ("top" in want) remote.setVideoQuality(VideoQuality.HIGH);
+                            else remote.setVideoDimensions(want);
+                        });
+                    }
                     resort();
                     resortStates();
                 })
-                .on(RoomEvent.TrackUnsubscribed, () => {
+                .on(RoomEvent.TrackUnsubscribed, (track) => {
+                    if (track.kind === "video") layer.bindLayerSink(track.mediaStreamTrack.id, null);
                     resort();
                     resortStates();
                 })
