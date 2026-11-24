@@ -54,6 +54,12 @@
         "sending": "Sending",
         "sendNow": "Send now",
         "closePill": "Close",
-        "fillInFirst": "{count, plural, one {1 field is still to fill.} other {# fields are still to fill.}} Fill it in, or send again to send it as it is."
+        "fillInFirst": "{count, plural, one {1 field is still to fill.} other {# fields are still to fill.}} Fill it in, or send again to send it as it is.",
+        "answerKind": {
+            "answerAs": "Change how this answers",
+            "reply": "Reply",
+            "replyAll": "Reply all",
+            "forward": "Forward"
+        }
     }
 }

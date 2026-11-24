@@ -45,6 +45,7 @@ import { useHoldConversationNotices } from "@/components/notifications/notificat
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
 import { FolderRoleDialog, type MissingFolderRole } from "./folder-role-dialog";
+import type { AnswerContext } from "./answering";
 import { defaultSender, mailboxInView, rememberSender, rememberedSender } from "./default-sender";
 import {
     useRef,
@@ -218,6 +219,9 @@ export interface ComposerSeed {
     readonly inReplyToId?: string | null;
     readonly forward?: boolean;
     readonly draftId?: string | null;
+    /** How it is answering, for a composer opened by Reply, Reply all or
+     *  Forward - which is what lets it switch between them. */
+    readonly answering?: AnswerContext;
 }
 
 const MailContext = createContext<MailContextValue | null>(null);

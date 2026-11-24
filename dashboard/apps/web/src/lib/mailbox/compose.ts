@@ -223,10 +223,15 @@ async function ancestryFor(
     if (!inReplyToId) return { inReplyTo: "", references: [] };
     const parent = await prisma.mailMessage.findFirst({
         where: { id: inReplyToId, account: { userId } },
-        select: { messageId: true, references: true }
+        select: { messageId: true, references: true, inReplyTo: true }
     });
     if (!parent?.messageId) return { inReplyTo: "", references: [] };
-    const held = stringsFrom(parent.references).map(core.bareMessageId).filter(Boolean);
+    const listed = stringsFrom(parent.references).map(core.bareMessageId).filter(Boolean);
+    // A parent with no References but an In-Reply-To answered one message, and
+    // RFC 5322 3.6.4 has that id stand in for the chain - without it the reply
+    // reaches clients that thread by References as the start of a conversation.
+    const answered = core.bareMessageId(parent.inReplyTo);
+    const held = listed.length > 0 ? listed : answered ? [answered] : [];
     return {
         inReplyTo: `<${parent.messageId}>`,
         // The whole chain, oldest first, with this message's own id last. A

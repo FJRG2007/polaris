@@ -24,6 +24,10 @@ export interface AnswerableMessage {
     readonly replyTo: readonly core.MailAddress[];
     readonly listId: string;
     readonly sentAt: string;
+    /** Mail-Followup-To and List-Post, where the message carried them. Only an
+     *  opened message has them: a row in a list does not. */
+    readonly followupTo?: readonly core.MailAddress[];
+    readonly listPost?: string;
 }
 
 /**
@@ -57,6 +61,8 @@ export function replySeed(
             cc: message.cc,
             replyTo: message.replyTo,
             listId: message.listId,
+            followupTo: message.followupTo ?? [],
+            listPost: message.listPost ?? "",
             sentAt: new Date(message.sentAt)
         },
         self,
@@ -103,4 +109,37 @@ export function forwardSeed(message: AnswerableMessage, quoted: string) {
         inReplyToId: message.id,
         forward: true
     };
+}
+
+/** The three ways to answer a message, as the composer's switch names them. */
+export type AnswerKind = "reply" | "reply-all" | "forward";
+
+/**
+ * What the composer needs to turn one way of answering into another.
+ *
+ * Gmail lets somebody who pressed Reply decide halfway through that it should
+ * have been Reply all, or a forward, without losing what they wrote. Switching
+ * is the same seed built again for the other kind, so the recipients it lands
+ * on are exactly the ones that button would have opened with.
+ */
+export interface AnswerContext {
+    readonly kind: AnswerKind;
+    readonly message: AnswerableMessage;
+    readonly self: readonly string[];
+    readonly quoted: string;
+}
+
+/** The seed for one way of answering, carrying what switching needs. */
+export function answerSeed(
+    kind: AnswerKind,
+    message: AnswerableMessage,
+    self: readonly string[],
+    quoted: string
+) {
+    const seed =
+        kind === "forward"
+            ? { ...forwardSeed(message, quoted), cc: [] }
+            : replySeed(message, self, kind === "reply-all", quoted);
+    const answering: AnswerContext = { kind, message, self, quoted };
+    return { ...seed, answering };
 }
