@@ -379,7 +379,38 @@ function InfoBody({
     }
 
     if (view === "privacy" && privacy) {
-        return shell(t("info.privacy"), <div className="flex flex-col gap-3 px-3 py-3">{privacy}</div>);
+        // Everything about what this conversation keeps and shows lives here,
+        // once: the timer is in the section itself, and the two switches
+        // that go with it follow it rather than sitting on the main page.
+        const allowDelete =
+            vanishRules?.mayChange && vanishRules.mode === "agreement" ? entries.vanish?.onAllowDelete : undefined;
+        const onLinkPreviews = vanishRules?.mayChange ? entries.vanish?.onLinkPreviews : undefined;
+        return shell(
+            t("info.privacy"),
+            <>
+                <div className="flex flex-col gap-3 px-3 py-3">{privacy}</div>
+                {allowDelete || onLinkPreviews ? (
+                    <div className="border-t border-border py-1">
+                        {allowDelete ? (
+                            <SwitchRow
+                                icon={<Trash2 />}
+                                label={t("vanish.allowDeleteForAll")}
+                                checked={vanishRules!.deleteForAll}
+                                onChange={allowDelete}
+                            />
+                        ) : null}
+                        {onLinkPreviews ? (
+                            <SwitchRow
+                                icon={<Link2Off />}
+                                label={t("chatPrivacy.linkPreviews")}
+                                checked={vanishRules!.linkPreviews}
+                                onChange={onLinkPreviews}
+                            />
+                        ) : null}
+                    </div>
+                ) : null}
+            </>
+        );
     }
 
     const members = channel.kind === "group" ? channel.others : [];
@@ -522,7 +553,7 @@ function InfoBody({
                         void write({ pinned: on }, () => actions.setPinnedAction(channel.id, on))
                     }
                 />
-                {vanishRules?.mayChange && (
+                {vanishRules?.mayChange && !privacy && (
                     <SettingRow
                         icon={<Timer />}
                         label={t("vanish.timer")}
@@ -538,7 +569,7 @@ function InfoBody({
                         onClick={() => setView("privacy")}
                     />
                 ) : null}
-                {vanishRules?.mayChange && entries.vanish?.onLinkPreviews ? (
+                {vanishRules?.mayChange && !privacy && entries.vanish?.onLinkPreviews ? (
                     <SwitchRow
                         icon={<Link2Off />}
                         label={t("chatPrivacy.linkPreviews")}
