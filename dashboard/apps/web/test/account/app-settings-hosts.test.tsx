@@ -189,6 +189,17 @@ describe("the hosts list", () => {
         expect(within(dialog).getByText(/its windows close/)).toBeTruthy();
     });
 
+    it("draws a row's edit and remove as icons, named for the host they act on", async () => {
+        install(fakeHosts());
+        await draw();
+        for (const name of ["Edit Home", "Remove Home"]) {
+            const button = screen.getByRole("button", { name });
+            // A phone row has no room for two words beside the name: an icon, its words for a screen reader.
+            expect(button.querySelector("svg")).toBeTruthy();
+            expect(button.textContent?.trim()).toBe("");
+        }
+    });
+
     it("edits a host's name and address together", async () => {
         const hosts = fakeHosts();
         install(hosts);

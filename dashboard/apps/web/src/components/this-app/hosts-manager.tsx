@@ -15,6 +15,7 @@
  */
 
 import { QRCodeSVG } from "qrcode.react";
+import { Pencil, Trash2 } from "lucide-react";
 import { QrScanDialog } from "@/app/(app)/vault/qr-scan";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -272,7 +273,8 @@ function HostItem({
     const shown = status ?? "checking";
     const label = t(`hosts.status.${shown}`);
     return (
-        <li className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+        // One line at any width: the name gives way and truncates, the actions are icons that never wrap under it.
+        <li className="flex min-w-0 items-center gap-3 py-3 first:pt-0 last:pb-0">
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
                 <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[shown]}`} title={label} aria-hidden />
                 <span className="sr-only">{label}</span>
@@ -288,17 +290,30 @@ function HostItem({
                     </span>
                 </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1">
                 {!row.active && (
-                    <Button size="sm" variant="secondary" onClick={onSwitch} disabled={busy} aria-busy={busy}>
+                    <Button size="sm" variant="secondary" className="me-1" onClick={onSwitch} disabled={busy} aria-busy={busy}>
                         {t("hosts.switch")}
                     </Button>
                 )}
-                <Button size="sm" variant="ghost" onClick={onEdit} aria-label={t("hosts.editNamed", { name: shownName(row) })}>
-                    {t("hosts.edit")}
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={onEdit}
+                    aria-label={t("hosts.editNamed", { name: shownName(row) })}
+                    title={t("hosts.edit")}
+                >
+                    <Pencil aria-hidden />
                 </Button>
-                <Button size="sm" variant="ghost" onClick={onRemove} aria-label={t("hosts.removeNamed", { name: shownName(row) })}>
-                    {t("hosts.remove")}
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-danger-ink hover:bg-danger-soft hover:text-danger-ink"
+                    onClick={onRemove}
+                    aria-label={t("hosts.removeNamed", { name: shownName(row) })}
+                    title={t("hosts.remove")}
+                >
+                    <Trash2 aria-hidden />
                 </Button>
             </div>
         </li>
