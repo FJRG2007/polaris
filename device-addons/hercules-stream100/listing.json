@@ -1,3 +1,3 @@
 {
-    "changelog": "First release: each knob follows calls, music, games, the browser or the whole output, with steady steps and no jumps; the lit buttons mute, deafen, turn the camera on or off, or leave the call. Reads the controller on Windows once Windows' own driver is in use, and on Linux where the system lets Polaris open it."
+    "changelog": "0.1.1: an editor on the add-on's page shows the controller - what the screen shows, each knob and each lit button - and changes them in place. 0.1.0: each knob follows calls, music, games, the browser or the whole output, with steady steps and no jumps; the lit buttons mute, deafen, turn the camera on or off, or leave the call. Reads the controller on Windows once Windows' own driver is in use, and on Linux where the system lets Polaris open it."
 }

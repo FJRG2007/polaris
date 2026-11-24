@@ -60,6 +60,7 @@ for (const id of existsSync(source) ? readdirSync(source).sort() : []) {
         if (layers.length === 0) throw new Error(`${id}: no files for ${platform}`);
         const files = { ...Object.assign({}, ...layers.map((path) => filesUnder(path))), "manifest.json": [new TextEncoder().encode(JSON.stringify(manifest, null, 4)), { mtime: FIXED_TIME }] };
         if (!files[manifest.entries[platform]]) throw new Error(`${id}: ${platform} entry ${manifest.entries[platform]} is missing`);
+        if (manifest.view && !files[manifest.view]) throw new Error(`${id}: ${platform} view ${manifest.view} is missing`);
         const zip = zipSync(files, { level: 9 });
         const name = `${id}-${manifest.version}-${platform}.zip`;
         writeFileSync(join(out, name), zip);

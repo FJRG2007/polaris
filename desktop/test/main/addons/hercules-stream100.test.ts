@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { describe, expect, it, vi } from "vitest";
 import { addonMessageSchema } from "@/shared/addon-protocol";
+import { resolveViewFile } from "@/main/addons/view";
 import { readAddonManifest } from "@polaris/core/device-addons";
 
 /** The first device add-on, as CI packages it (device-addons/hercules-stream100). */
@@ -103,5 +104,55 @@ describe("Hercules Stream 100 add-on", () => {
         deliver({ type: "start", id: "hercules-stream100", version: "0.1.0", permissions: [], devices: [], settings: {} });
         await flush();
         expect(fake.reset).toHaveBeenCalledTimes(1);
+    });
+
+    describe("its editor", () => {
+        const manifest = readAddonManifest(JSON.parse(readFileSync(new URL("manifest.json", folder), "utf8")))!;
+        const root = fileURLToPath(new URL("any/", folder));
+        const view = createRequire(import.meta.url)(fileURLToPath(new URL("any/view/view.js", folder))) as {
+            wordsFor(locale: string): { categories: Record<string, string>; actions: Record<string, string>; displays: Record<string, string>; };
+            readValues(values: unknown): Record<string, unknown>;
+            storedValue(key: string, value: string): unknown;
+            tokenEntries(tokens: unknown): Array<[string, string]>;
+            DEFAULTS: Record<string, unknown>;
+        };
+
+        it("is declared, and everything its page loads is served from its folder, with no inline script", () => {
+            expect(manifest.view).toBe("view/index.html");
+            const html = readFileSync(new URL("any/view/index.html", folder), "utf8");
+            const loaded = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map((match) => match[1]!);
+            expect(loaded.sort()).toEqual(["view.css", "view.js"]);
+            for (const path of loaded) expect(resolveViewFile(root, manifest.view!, path)).not.toBeNull();
+            const scripts = html.match(/<script[^>]*>/g) ?? [];
+            expect(scripts.length).toBeGreaterThan(0);
+            for (const tag of scripts) expect(tag).toMatch(/^<script src="[^"]+">$/);
+        });
+
+        it("offers exactly the choices the manifest declares, and starts from its defaults", () => {
+            const words = view.wordsFor("en-US");
+            for (const setting of manifest.settings) {
+                if (setting.kind === "choice") {
+                    const labels = setting.key === "display" ? words.displays : words.categories;
+                    expect(Object.keys(labels).sort(), setting.key).toEqual(setting.options.map((option) => option.value).sort());
+                }
+                if (setting.kind === "action" && setting.default) expect(Object.keys(words.actions)).toContain(setting.default);
+                if (setting.key in view.DEFAULTS) expect(view.DEFAULTS[setting.key], setting.key).toBe(setting.default);
+            }
+            expect(Object.keys(view.wordsFor("es-ES").categories).sort()).toEqual(Object.keys(words.categories).sort());
+            expect(view.wordsFor("fr-FR")).toBe(words);
+        });
+
+        it("reads what is stored field by field, and stores a button set to nothing as none", () => {
+            expect(view.readValues({ knob1: "music", knob2: "loud", button1: null, button4: "call.leave", brightness: 400 })).toMatchObject({
+                knob1: "music",
+                knob2: "music",
+                button1: "none",
+                button4: "call.hangup",
+                brightness: 100
+            });
+            expect(view.storedValue("button2", "none")).toBeNull();
+            expect(view.storedValue("brightness", "55")).toBe(55);
+            expect(view.tokenEntries({ "--primary": "1 2% 3%", "color": "red", "--x": 4 })).toEqual([["--primary", "1 2% 3%"]]);
+        });
     });
 });

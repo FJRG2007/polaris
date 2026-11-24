@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Stream 100</title>
+        <link rel="stylesheet" href="view.css" />
+    </head>
+    <body>
+        <main id="root" aria-busy="true">
+            <section class="screen-row">
+                <div class="screen" id="screen" role="img"></div>
+                <div class="screen-controls">
+                    <label class="field">
+                        <span id="display-label"></span>
+                        <select id="display" disabled></select>
+                    </label>
+                    <label class="field">
+                        <span id="brightness-label"></span>
+                        <input id="brightness" type="range" min="10" max="100" step="5" disabled />
+                    </label>
+                </div>
+            </section>
+            <section class="controls" id="knobs"></section>
+            <section class="controls" id="buttons"></section>
+            <p class="error" id="error" role="status" hidden></p>
+        </main>
+        <script src="view.js"></script>
+    </body>
+</html>
