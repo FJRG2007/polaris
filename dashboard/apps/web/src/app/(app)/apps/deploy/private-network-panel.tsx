@@ -69,7 +69,7 @@ type Kind = "application" | "database";
 
 /** How long a read is reused before the server is asked again. */
 const CACHE_MS = 30_000;
-const cache = new Map<string, { at: number; view: PrivateNetworkView; canEdit: boolean }>();
+const cache = new Map<string, { at: number; view: PrivateNetworkView; canEdit: boolean; canUpdate: boolean }>();
 
 const PROBLEM_KEYS = {
     empty: "problems.empty",
@@ -150,7 +150,12 @@ export function PrivateNetworkPanel({
                 setError(result.error ?? t("loadFailed"));
                 return;
             }
-            const entry = { at: Date.now(), view: result.view, canEdit: Boolean(result.canEdit) };
+            const entry = {
+                at: Date.now(),
+                view: result.view,
+                canEdit: Boolean(result.canEdit),
+                canUpdate: Boolean(result.canUpdate)
+            };
             cache.set(key, entry);
             setError(null);
             setData(entry);
@@ -200,6 +205,7 @@ export function PrivateNetworkPanel({
                     id={id}
                     view={data.view}
                     canEdit={data.canEdit}
+                    canUpdate={data.canUpdate}
                     notice={notice}
                     embedded={embedded}
                     onChanged={changed}
@@ -247,6 +253,7 @@ function PanelBody({
     id,
     view,
     canEdit,
+    canUpdate,
     notice,
     embedded,
     onChanged
@@ -255,6 +262,7 @@ function PanelBody({
     id: string;
     view: PrivateNetworkView;
     canEdit: boolean;
+    canUpdate: boolean;
     notice: string | null;
     embedded?: boolean;
     onChanged: (message: string | null) => Promise<void>;
@@ -316,7 +324,10 @@ function PanelBody({
                 >
                     <StatusIcon status={view.status} /> {t(`status.${view.status}`)}
                 </p>
-                {view.status === "unsupported" && (
+                {view.status === "unsupported" && !canUpdate && (
+                    <p className="text-xs text-muted-foreground">{t("statusHint.unsupportedAdmin")}</p>
+                )}
+                {view.status === "unsupported" && canUpdate && (
                     <p className="text-xs text-muted-foreground">
                         {t.rich("statusHint.unsupported", {
                             link: (chunks) => (

@@ -51,6 +51,9 @@ export type LocalSettingsReason = "offline" | "outdated";
 export interface LocalSettingsState {
     readonly place: SettingsPlace;
     readonly reason: LocalSettingsReason | null;
+    /** Whether the person signed in may update the host, as the host itself
+     *  answers for its update page; only then is the update offered. */
+    readonly canUpdate?: boolean;
 }
 
 export type SettingsRoute =
@@ -96,6 +99,16 @@ export function settingsRoute(place: SettingsPlace, state: SettingsRouteState): 
 
 /** The host's page that updates it, opened from the bundled page. */
 export const HOST_UPDATE_PATH = "/admin/updates";
+
+/**
+ * Whether the host's update page lets the signed-in person in, from its answer
+ * asked without following a redirect: the page itself for an administrator;
+ * anything else - sent home as refused, to the sign-in, no answer - is not a
+ * page this person can use, so no update button is offered for it.
+ */
+export function readUpdateAccess(status: number | null): boolean {
+    return status !== null && status >= 200 && status < 300;
+}
 
 /** What came of asking the Polaris window to open a host page. */
 export type HostPageOutcome = "opened" | LocalSettingsReason;

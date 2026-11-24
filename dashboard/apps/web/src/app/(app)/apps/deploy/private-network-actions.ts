@@ -72,7 +72,7 @@ async function refusal(caught: unknown): Promise<string> {
 export async function privateNetworkAction(
     kind: Kind,
     id: string
-): Promise<{ view?: names.PrivateNetworkView; canEdit?: boolean; error?: string }> {
+): Promise<{ view?: names.PrivateNetworkView; canEdit?: boolean; canUpdate?: boolean; error?: string }> {
     const user = await requirePermission("deploy.read");
     try {
         const service = await reach(kind, id, user.id, "project.read");
@@ -80,7 +80,8 @@ export async function privateNetworkAction(
             () => true,
             () => false
         );
-        return { view: await names.privateNetworkView(service.kind, service.id), canEdit };
+        // Updates is an administrator's page (requireAdmin); nobody else is sent there.
+        return { view: await names.privateNetworkView(service.kind, service.id), canEdit, canUpdate: user.isAdmin };
     } catch (caught) {
         console.error("polaris: a private network could not be read:", caught);
         return { error: (await words())("loadFailed") };

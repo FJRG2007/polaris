@@ -19,7 +19,7 @@
  */
 
 import { addonShortcutsNow, registerAddonViewScheme, startDeviceAddons, stopDeviceAddons } from "./addons/electron";
-import { HOST_UPDATE_PATH, readSettingsProbe, settingsRoute, type HostPageOutcome, type LocalSettingsState, type SettingsPlace, type SettingsProbe } from "@/shared/settings-route";
+import { HOST_UPDATE_PATH, readSettingsProbe, readUpdateAccess, settingsRoute, type HostPageOutcome, type LocalSettingsState, type SettingsPlace, type SettingsProbe } from "@/shared/settings-route";
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
 import { runner } from "./runner";
@@ -517,6 +517,11 @@ const SETTINGS_PROBE_MS = 4000;
  * visit gets.
  */
 async function probeSettings(window: BrowserWindow, origin: string, path: string): Promise<SettingsProbe> {
+    return readSettingsProbe(await probeStatus(window, origin, path));
+}
+
+/** The status the host answers for `path` in the window's session; null when none came. */
+async function probeStatus(window: BrowserWindow, origin: string, path: string): Promise<number | null> {
     try {
         const answer = await window.webContents.session.fetch(`${origin}${path}`, {
             method: "GET",
@@ -525,10 +530,19 @@ async function probeSettings(window: BrowserWindow, origin: string, path: string
             signal: AbortSignal.timeout(SETTINGS_PROBE_MS)
         });
         void answer.body?.cancel().catch(() => undefined);
-        return readSettingsProbe(answer.status);
+        return answer.status;
     } catch {
-        return readSettingsProbe(null);
+        return null;
     }
+}
+
+/**
+ * Whether the person signed in on the window may update the host: its update
+ * page is asked, so the answer is the check the host itself enforces, on a host
+ * of any age. Only then does the bundled page offer the update.
+ */
+async function canUpdateHost(window: BrowserWindow, origin: string): Promise<boolean> {
+    return readUpdateAccess(await probeStatus(window, origin, HOST_UPDATE_PATH));
 }
 
 /**
@@ -556,7 +570,8 @@ async function openSettings(place: SettingsPlace = "general"): Promise<void> {
     }
     if (route.kind === "local" || route.kind === "probe" || !page || !current) {
         const reason = route.kind === "local" ? route.reason : "offline";
-        openConnect({ place: reason === null ? "hosts" : place, reason });
+        const canUpdate = reason === "outdated" && page && current ? await canUpdateHost(page, current) : false;
+        openConnect({ place: reason === null ? "hosts" : place, reason, canUpdate });
         return;
     }
     closeConnect();
@@ -579,7 +594,11 @@ async function openOnHost(path: string): Promise<HostPageOutcome> {
     if (!page || !origin || page.webContents.isCrashed()) return "offline";
     if (path !== HOST_UPDATE_PATH) {
         const probe = await probeSettings(page, origin, path);
-        if (probe === "missing") return "outdated";
+        if (probe === "missing") {
+            // The page asks the state again, to know whether to offer the update.
+            localSettings = { ...localSettings, reason: "outdated", canUpdate: await canUpdateHost(page, origin) };
+            return "outdated";
+        }
         if (probe === "unreachable") return "offline";
         if (origin !== current || page.isDestroyed()) return "offline";
     }

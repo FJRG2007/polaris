@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HOST_UPDATE_PATH, readHostPath, readSettingsPlace, readSettingsProbe, settingsPath, settingsRoute, type SettingsRouteState } from "@/shared/settings-route";
+import { HOST_UPDATE_PATH, readHostPath, readSettingsPlace, readSettingsProbe, readUpdateAccess, settingsPath, settingsRoute, type SettingsRouteState } from "@/shared/settings-route";
 
 const HOST = "https://polaris.example.com";
 const loaded: SettingsRouteState = { origin: HOST, pageLoaded: true, pageAnnounced: false, probe: null };
@@ -75,5 +75,16 @@ describe("host pages the bundled page may open", () => {
         expect(readSettingsPlace("addons")).toBe("addons");
         expect(readSettingsPlace("hosts")).toBe("hosts");
         expect(readSettingsPlace("../admin")).toBeNull();
+    });
+});
+
+describe("readUpdateAccess", () => {
+    it("offers the update only when the host lets this person into its update page", () => {
+        expect(readUpdateAccess(200)).toBe(true);
+    });
+
+    it.each([307, 302, 303, 401, 403, 404, 500, null])("offers no update for %s", (status) => {
+        // 307 is the host sending a non-administrator home, or anybody to the sign-in.
+        expect(readUpdateAccess(status)).toBe(false);
     });
 });

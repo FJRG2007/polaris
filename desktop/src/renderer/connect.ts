@@ -586,7 +586,9 @@ const reasonActs = byId<HTMLElement>("reason-acts");
  */
 async function openOnHost(path: string): Promise<void> {
     const outcome = (await window.polarisLocal.connect.openOnHost?.(path).catch(() => null)) ?? "offline";
-    if (outcome !== "opened") explain(outcome);
+    if (outcome === "opened") return;
+    const state = await window.polarisLocal.connect.state().catch(() => null);
+    explain(outcome, state?.settings?.canUpdate === true);
 }
 
 /**
@@ -594,12 +596,17 @@ async function openOnHost(path: string): Promise<void> {
  * out of reach, or a Polaris from before this app's settings were in it. Each
  * says what the reader can do about it, with the button that does it.
  */
-function explain(why: LocalSettingsState["reason"]): void {
+function explain(why: LocalSettingsState["reason"], canUpdate = false): void {
     reason.hidden = why === null;
-    if (why === "outdated") {
+    if (why === "outdated" && canUpdate) {
         reasonText.textContent =
             "Your Polaris is older than this app, so these settings open here instead of in Settings. Update Polaris to have them there, next to the rest.";
         reasonActs.replaceChildren(textButton("Update Polaris", () => void openOnHost(HOST_UPDATE_PATH), true));
+    } else if (why === "outdated") {
+        // Only an administrator can update it; nobody else is offered a page that would refuse them.
+        reasonText.textContent =
+            "Your Polaris is older than this app, so these settings open here instead of in Settings. An administrator has to update Polaris to have them there.";
+        reasonActs.replaceChildren();
     } else if (why === "offline") {
         reasonText.textContent = "Polaris cannot be reached, so these are the settings kept on this computer.";
         reasonActs.replaceChildren(textButton("Connect", () => showPage("hosts"), true));
@@ -608,7 +615,7 @@ function explain(why: LocalSettingsState["reason"]): void {
 
 /** The place and the notice the app opened this page with. */
 function openAt(state: LocalSettingsState | null): void {
-    explain(state?.reason ?? null);
+    explain(state?.reason ?? null, state?.canUpdate === true);
     if (state && known) showPage(state.place);
 }
 
