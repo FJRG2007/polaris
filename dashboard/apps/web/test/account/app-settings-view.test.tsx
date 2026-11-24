@@ -9,7 +9,10 @@
  */
 
 import { MessagesWrapper } from "../setup/i18n";
-import { navigationEntries } from "@/lib/search/entries";
+import { COMMAND_ENTRY_FIELDS, navigationEntries } from "@/lib/search/entries";
+import { searchItems } from "@polaris/core/search-text";
+import { APP_SETTINGS } from "@polaris/core/app-settings";
+import appSettingsMessages from "../../messages/en-US/appSettings.json";
 import { APP_SECTIONS, sectionOffered } from "@/lib/apps";
 import { APP_SETTING_CATEGORIES } from "@polaris/core/app-settings";
 import { act, cleanup, render, screen } from "@testing-library/react";
@@ -168,5 +171,15 @@ describe("the This app group", () => {
         expect(found()).toBe(false);
         expect(found(false)).toBe(false);
         expect(found(true)).toBe(true);
+    });
+    it("finds every setting from the search, on its own category's page", () => {
+        const entries = navigationEntries(false, [], { held: [], installed: [], desktop: true });
+        const items = appSettingsMessages.items as Record<string, { label: string }>;
+        for (const setting of APP_SETTINGS) {
+            const label = items[setting.key]?.label.replace("{key}", "Alt+Space");
+            expect(label, setting.key).toBeTruthy();
+            const hrefs = searchItems(entries, label!, COMMAND_ENTRY_FIELDS).map((entry) => entry.href);
+            expect(hrefs, label).toContain(`/account/app/${setting.category}`);
+        }
     });
 });
