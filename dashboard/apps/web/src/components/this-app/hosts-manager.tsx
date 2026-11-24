@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, Input, Textarea, useToast } from "@polaris/ui";
 import * as bridge from "@/lib/desktop-bridge";
+import { useKeptAnswer, type KeptAnswerStore } from "@/components/this-app/app-settings-values";
 
 /** The longest name the app keeps for a host (`SERVER_NAME_MAX` in the desktop app). */
 export const HOST_NAME_MAX = 40;
@@ -29,38 +30,22 @@ const CHECK_DELAY_MS = 400;
 
 const STORE_KEY = "polaris.this-app.hosts";
 
-/** The list the app gave this session, so the page opened again draws it unchanged. */
-let sessionHosts: bridge.DesktopHostsSnapshot | null = null;
+/** The list the app gave this session, so the page opened again draws it unchanged; the device keeps the last one too. */
+const hostsStore: KeptAnswerStore<bridge.DesktopHostsSnapshot> = {
+    session: null,
+    key: STORE_KEY,
+    parse: bridge.readDesktopHosts
+};
 
 /** How each host answered this session, by origin, so a revisit shows the dots it had. */
 const sessionStatus = new Map<string, bridge.DesktopHostStatus>();
 
 /** Only for tests: forget the session's list and statuses. */
 export function forgetHostsSnapshot(): void {
-    sessionHosts = null;
+    hostsStore.session = null;
     sessionStatus.clear();
 }
 
-function keptHosts(): bridge.DesktopHostsSnapshot | null {
-    if (sessionHosts) return sessionHosts;
-    try {
-        const raw = window.localStorage.getItem(STORE_KEY);
-        return raw ? bridge.readDesktopHosts(JSON.parse(raw)) : null;
-    } catch {
-        return null;
-    }
-}
-
-function keepHosts(next: bridge.DesktopHostsSnapshot): void {
-    sessionHosts = next;
-    try {
-        window.localStorage.setItem(STORE_KEY, JSON.stringify(next));
-    } catch {
-        // A private window or a full store: the session's copy still holds.
-    }
-}
-
-/** The address as the app is asked about it: surrounding space dropped. */
 export function normalizeHostAddress(value: string): string {
     return value.trim();
 }
@@ -140,17 +125,10 @@ function AddressLine({ state }: { state: AddressState }) {
 export function HostsManager({ hosts }: { hosts: bridge.DesktopHosts }) {
     const t = useTranslations("appSettings");
     const toast = useToast();
-    const [snapshot, setSnapshot] = useState<bridge.DesktopHostsSnapshot | null>(() => keptHosts());
-    const [unavailable, setUnavailable] = useState(false);
     const [status, setStatus] = useState<ReadonlyMap<string, bridge.DesktopHostStatus>>(() => new Map(sessionStatus));
     const [editing, setEditing] = useState<string | null>(null);
     const [removing, setRemoving] = useState<bridge.DesktopHostRow | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
-
-    const keep = useCallback((next: bridge.DesktopHostsSnapshot) => {
-        keepHosts(next);
-        setSnapshot(next);
-    }, []);
 
     const askStatus = useCallback(
         (rows: readonly bridge.DesktopHostRow[]) => {
@@ -168,30 +146,13 @@ export function HostsManager({ hosts }: { hosts: bridge.DesktopHosts }) {
         [hosts]
     );
 
-    const refresh = useCallback(async () => {
-        const next = bridge.readDesktopHosts(await hosts.list().catch(() => null));
-        if (!next) {
-            if (!sessionHosts) setUnavailable(true);
-            return;
-        }
-        setUnavailable(false);
-        keep(next);
-        askStatus(next.servers);
-    }, [hosts, keep, askStatus]);
-
-    useEffect(() => {
-        void refresh();
-        const visible = () => {
-            if (document.visibilityState === "visible") void refresh();
-        };
-        const focused = () => void refresh();
-        window.addEventListener("focus", focused);
-        document.addEventListener("visibilitychange", visible);
-        return () => {
-            window.removeEventListener("focus", focused);
-            document.removeEventListener("visibilitychange", visible);
-        };
-    }, [refresh]);
+    // The list is the app's own and local: drawn at once from the kept copy, asked again behind it, and each host's status fills in after.
+    const {
+        value: snapshot,
+        unavailable,
+        refresh,
+        keep
+    } = useKeptAnswer(hostsStore, () => hosts.list(), { onAnswer: (next) => askStatus(next.servers) });
 
     /** A switch or a removal the app refused: say so in its words, or ours. */
     const refused = useCallback(
@@ -208,7 +169,7 @@ export function HostsManager({ hosts }: { hosts: bridge.DesktopHosts }) {
 
     const remove = async (row: bridge.DesktopHostRow) => {
         setRemoving(null);
-        const before = sessionHosts;
+        const before = hostsStore.session;
         // Shown gone at once; put back when the app refuses.
         if (before) keep({ ...before, servers: before.servers.filter((one) => one.origin !== row.origin) });
         const outcome = bridge.readDesktopOutcome(await hosts.remove(row.origin).catch(() => null));

@@ -19,9 +19,9 @@
 
 import { useToast } from "@polaris/ui";
 import * as core from "@polaris/core/app-settings";
-import { useCallback, useEffect, useState } from "react";
 import type { PolarisDesktop } from "@/lib/desktop-bridge";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type DesktopAppSettings = NonNullable<PolarisDesktop["appSettings"]>;
 
@@ -39,34 +39,115 @@ function storeKey(category: string): string {
     return `${STORE_PREFIX}${category}`;
 }
 
-/** The last answer kept on this device for a category, read through the schema: it may be from an older build. */
-export function readKeptAppSettings(category: string): core.AppSettingsSnapshot | null {
+/** Whether two answers would draw the same screen, so an identical one changes nothing. */
+function same<T>(a: T | null, b: T): boolean {
+    return !!a && JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Where a This app screen keeps what the app answered: this session's copy
+ * (`session`, which several screens may share) and this device's (`localStorage`
+ * under `key`, read through `parse` because it may be from an older build).
+ */
+export interface KeptAnswerStore<T> {
+    session: T | null;
+    readonly key: string;
+    readonly parse: (raw: unknown) => T | null;
+}
+
+/** The answer a screen draws first: this session's, else the one kept on the device. */
+export function keptAnswer<T>(store: KeptAnswerStore<T>): T | null {
+    if (store.session) return store.session;
+    if (typeof window === "undefined") return null;
     try {
-        const raw = window.localStorage.getItem(storeKey(category));
-        return raw ? core.readAppSettings(JSON.parse(raw)) : null;
+        const raw = window.localStorage.getItem(store.key);
+        return raw ? store.parse(JSON.parse(raw)) : null;
     } catch {
         return null;
     }
 }
 
-function keepOnDevice(category: string, snapshot: core.AppSettingsSnapshot): void {
-    try {
-        window.localStorage.setItem(storeKey(category), JSON.stringify(snapshot));
-    } catch {
-        // A private window or a full store: the session's copy still holds.
-    }
+export interface KeptAnswer<T> {
+    /** Null only while this device has never seen an answer. */
+    readonly value: T | null;
+    /** The app did not answer and nothing is kept to draw instead. */
+    readonly unavailable: boolean;
+    /** Ask the app again. */
+    readonly refresh: () => Promise<void>;
+    /** Take an answer: drawn now, and kept for the session and on the device. */
+    readonly keep: (next: T) => void;
 }
 
-/** What the category draws first: this session's answer, else the one kept on the device. */
-function firstSnapshot(category: string): core.AppSettingsSnapshot | null {
-    if (liveSnapshot) return liveSnapshot;
-    if (typeof window === "undefined") return null;
-    return readKeptAppSettings(category);
+/**
+ * Draws the kept answer at once and asks the app in the background - on mount,
+ * when it says something changed (`subscribe`), and when the window comes back
+ * - changing the screen only where the answer differs. `onAnswer` hears every
+ * fresh answer, for what a screen fills in after (a host's status).
+ */
+export function useKeptAnswer<T>(
+    store: KeptAnswerStore<T>,
+    ask: () => Promise<unknown>,
+    options: { subscribe?: (listener: () => void) => () => void; onAnswer?: (value: T) => void } = {}
+): KeptAnswer<T> {
+    const [value, setValue] = useState<T | null>(() => keptAnswer(store));
+    const [unavailable, setUnavailable] = useState(false);
+    // Read through refs, so a caller's inline functions never ask the app again on every render.
+    const latest = useRef({ store, ask, ...options });
+    latest.current = { store, ask, ...options };
+
+    const keep = useCallback((next: T) => {
+        const { store: kept } = latest.current;
+        kept.session = next;
+        try {
+            window.localStorage.setItem(kept.key, JSON.stringify(next));
+        } catch {
+            // A private window or a full store: the session's copy still holds.
+        }
+        setValue((current) => (same(current, next) ? current : next));
+    }, []);
+
+    const refresh = useCallback(async () => {
+        const { store: kept, ask: request, onAnswer } = latest.current;
+        const next = kept.parse(await request().catch(() => null));
+        if (next) {
+            keep(next);
+            setUnavailable(false);
+            onAnswer?.(next);
+        } else if (!keptAnswer(kept)) setUnavailable(true);
+    }, [keep]);
+
+    const key = store.key;
+    useEffect(() => {
+        void refresh();
+        const stop = latest.current.subscribe?.(() => void refresh());
+        const visible = () => {
+            if (document.visibilityState === "visible") void refresh();
+        };
+        const focused = () => void refresh();
+        window.addEventListener("focus", focused);
+        document.addEventListener("visibilitychange", visible);
+        return () => {
+            stop?.();
+            window.removeEventListener("focus", focused);
+            document.removeEventListener("visibilitychange", visible);
+        };
+    }, [refresh, key]);
+
+    return { value, unavailable, refresh, keep };
 }
 
-/** Whether two answers would draw the same screen, so an identical one changes nothing. */
-function same(a: core.AppSettingsSnapshot | null, b: core.AppSettingsSnapshot): boolean {
-    return !!a && JSON.stringify(a) === JSON.stringify(b);
+/** Where a category's answer is kept: the session's is every category's, the device's is the category's own. */
+function categoryStore(category: string): KeptAnswerStore<core.AppSettingsSnapshot> {
+    return {
+        get session() {
+            return liveSnapshot;
+        },
+        set session(next) {
+            liveSnapshot = next;
+        },
+        key: storeKey(category),
+        parse: core.readAppSettings
+    };
 }
 
 export interface AppSettingsValues {
@@ -85,45 +166,14 @@ export interface AppSettingsValues {
 export function useAppSettingsValues(settings: DesktopAppSettings, category: string): AppSettingsValues {
     const t = useTranslations("appSettings");
     const toast = useToast();
-    const [snapshot, setSnapshot] = useState<core.AppSettingsSnapshot | null>(() => firstSnapshot(category));
-    const [unavailable, setUnavailable] = useState(false);
-
-    const keep = useCallback(
-        (next: core.AppSettingsSnapshot) => {
-            liveSnapshot = next;
-            keepOnDevice(category, next);
-            setSnapshot((current) => (same(current, next) ? current : next));
-        },
-        [category]
-    );
-
-    const refresh = useCallback(async () => {
-        const next = core.readAppSettings(await settings.get().catch(() => null));
-        if (next) {
-            keep(next);
-            setUnavailable(false);
-        } else if (!liveSnapshot && !readKeptAppSettings(category)) setUnavailable(true);
-    }, [settings, keep, category]);
-
-    useEffect(() => {
-        void refresh();
-        const stop = settings.onChange(() => void refresh());
-        const visible = () => {
-            if (document.visibilityState === "visible") void refresh();
-        };
-        const focused = () => void refresh();
-        window.addEventListener("focus", focused);
-        document.addEventListener("visibilitychange", visible);
-        return () => {
-            stop();
-            window.removeEventListener("focus", focused);
-            document.removeEventListener("visibilitychange", visible);
-        };
-    }, [settings, refresh]);
+    const store = useMemo(() => categoryStore(category), [category]);
+    const { value: snapshot, unavailable, refresh, keep } = useKeptAnswer(store, () => settings.get(), {
+        subscribe: (listener) => settings.onChange(listener)
+    });
 
     const change = useCallback(
         (next: core.AppSettingChange) => {
-            const before = liveSnapshot ?? readKeptAppSettings(category);
+            const before = keptAnswer(store);
             if (!before || before[next.key] === next.value) return;
             keep({ ...before, [next.key]: next.value });
             void settings
@@ -136,7 +186,7 @@ export function useAppSettingsValues(settings: DesktopAppSettings, category: str
                     toast.show({ title: t("saveFailed") });
                 });
         },
-        [settings, keep, toast, t, category]
+        [settings, keep, toast, t, store]
     );
 
     return { snapshot, unavailable, refresh, change, keep };
