@@ -16,7 +16,7 @@ fn creates_symlinks_for_top_level_entries() {
     let old_dir = tmp.path().join(".polaris/terminal");
     let new_dir = tmp.path().join(".polaris-terminal-preview");
 
-    fs::create_dir(&old_dir).unwrap();
+    fs::create_dir_all(&old_dir).unwrap();
     fs::write(old_dir.join("keybindings.yaml"), "bindings").unwrap();
     fs::create_dir(old_dir.join("themes")).unwrap();
     fs::write(old_dir.join("themes").join("dark.yaml"), "theme").unwrap();
@@ -45,7 +45,7 @@ fn skips_when_new_dir_already_exists() {
     let old_dir = tmp.path().join(".polaris/terminal");
     let new_dir = tmp.path().join(".polaris-terminal-preview");
 
-    fs::create_dir(&old_dir).unwrap();
+    fs::create_dir_all(&old_dir).unwrap();
     fs::write(old_dir.join("keybindings.yaml"), "bindings").unwrap();
     fs::create_dir(&new_dir).unwrap();
 
@@ -73,7 +73,7 @@ fn skips_ds_store_and_dot_underscore_files() {
     let old_dir = tmp.path().join(".polaris/terminal");
     let new_dir = tmp.path().join(".polaris-terminal-preview");
 
-    fs::create_dir(&old_dir).unwrap();
+    fs::create_dir_all(&old_dir).unwrap();
     fs::write(old_dir.join(".DS_Store"), "metadata").unwrap();
     fs::write(old_dir.join("._somefile"), "resource fork").unwrap();
     fs::write(old_dir.join("keybindings.yaml"), "bindings").unwrap();
@@ -91,7 +91,7 @@ fn skips_excluded_files() {
     let old_dir = tmp.path().join(".polaris/terminal");
     let new_dir = tmp.path().join(".polaris-terminal-preview");
 
-    fs::create_dir(&old_dir).unwrap();
+    fs::create_dir_all(&old_dir).unwrap();
     fs::write(old_dir.join("settings.toml"), "[settings]").unwrap();
     fs::write(old_dir.join("keybindings.yaml"), "bindings").unwrap();
 
@@ -107,7 +107,7 @@ fn is_idempotent() {
     let old_dir = tmp.path().join(".polaris/terminal");
     let new_dir = tmp.path().join(".polaris-terminal-preview");
 
-    fs::create_dir(&old_dir).unwrap();
+    fs::create_dir_all(&old_dir).unwrap();
     fs::write(old_dir.join("keybindings.yaml"), "bindings").unwrap();
 
     migrate_config_dir_via_symlinks(&old_dir, &new_dir);
