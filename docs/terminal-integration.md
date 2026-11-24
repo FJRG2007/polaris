@@ -361,6 +361,12 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   (the Polaris repository releases many products, so "latest release" is not the
   terminal's). `script/release_tag` and `script/update_plist` learn the prefix.
   Auto-tagging only for changes under `terminal/`.
+- **Built:** `app/src/autoupdate/github.rs` lists the `terminal-v*` tags
+  (`git/matching-refs/tags/terminal-v`), orders them, and reads the release of
+  the newest that is final and has this platform's installer (up to three
+  tried). The reported version drops the prefix, as `GIT_RELEASE_TAG` does, and
+  the release link adds it back. `ParsedVersion`, `compare_release_tags` and
+  `script/update_plist` strip it.
 
 ### Settings storage and user data (`.rook`)
 
