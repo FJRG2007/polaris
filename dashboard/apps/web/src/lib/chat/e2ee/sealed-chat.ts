@@ -19,11 +19,14 @@
  * the sender's own text is kept the moment the server takes it, so a row never
  * blinks empty between the draft and its stored copy. They are keyed by the id
  * and the time of the row's last edit, so an edited row is opened again.
+ * Each one that opens is also kept in this device's search index
+ * (`sealed-search-index.ts`), sealed at rest, so its words can be searched.
  */
 
 import { z } from "zod";
 import * as core from "@polaris/core";
 import type { MlsDevice, SealedStored } from "./mls-client";
+import type { SealedSearchIndex } from "./sealed-search-index";
 
 const SEALED_CONTENT_VERSION = 1;
 /** How many opened bodies this page keeps (oldest dropped first). */
@@ -62,6 +65,7 @@ export function decodeSealedContent(bytes: Uint8Array): SealedContent | null {
 
 let viewer: string | null = null;
 let opening: Promise<MlsDevice> | null = null;
+let indexing: Promise<SealedSearchIndex> | null = null;
 /** Message id (and last edit) -> its opened content, or null when it did not open here. */
 const opened = new Map<string, SealedContent | null>();
 
@@ -77,6 +81,8 @@ export function configureSealedChat(viewerId: string | null): void {
     if (viewer === viewerId) return;
     viewer = viewerId;
     opening = null;
+    void indexing?.then((index) => index.close()).catch(() => undefined);
+    indexing = null;
     opened.clear();
 }
 
@@ -95,6 +101,41 @@ function device(): Promise<MlsDevice> {
             throw caught;
         });
     return opening;
+}
+
+function searchIndex(): Promise<SealedSearchIndex> {
+    const userId = viewer;
+    if (!userId) return Promise.reject(new Error("sealed chat is off"));
+    indexing ??= Promise.all([import("./mls-browser"), import("./sealed-search-index")])
+        .then(([browser, search]) => search.SealedSearchIndex.open(browser.browserDeviceId(userId)))
+        .catch((caught: unknown) => {
+            indexing = null;
+            throw caught;
+        });
+    return indexing;
+}
+
+/** Keep an opened message searchable on this device; a failure costs only the search. */
+function index(channelId: string, id: string, editedAt: string | undefined, content: SealedContent | null): void {
+    if (!content?.body) return;
+    searchIndex()
+        .then((kept) => kept.record({ id, channelId, ...(editedAt ? { editedAt } : {}), body: content.body }))
+        .catch((caught: unknown) => console.warn("polaris: an opened message could not be kept searchable here:", caught));
+}
+
+/**
+ * The sealed messages this device opened whose words hold `term`, newest
+ * first, in `channelId` when one is named. Empty while sealed chat is off.
+ */
+export async function searchSealedText(term: string, channelId: string | null, limit: number): Promise<string[]> {
+    if (!sealedChatActive() || !term.trim()) return [];
+    return (await searchIndex()).search(term, channelId, limit);
+}
+
+/** Drop messages the server says are gone from this device's search index. */
+export async function forgetSealedText(ids: readonly string[]): Promise<void> {
+    if (!sealedChatActive() || !ids.length) return;
+    await (await searchIndex()).forget(ids);
 }
 
 function keep(id: string, content: SealedContent | null): void {
@@ -127,6 +168,7 @@ export async function sendSealedMessage(input: SealedSendInput): Promise<string>
         replyToId: input.replyToId ?? null
     });
     keep(id, content);
+    index(input.channelId, id, undefined, content);
     return id;
 }
 
@@ -149,11 +191,11 @@ export function sealedSendFailure(caught: unknown): "refused" | "unreachable" {
  */
 export async function openSealed(channelId: string, refs: readonly SealedRef[]): Promise<ReadonlyMap<string, SealedContent | null>> {
     const out = new Map<string, SealedContent | null>();
-    const missing = new Map<string, string>();
+    const missing = new Map<string, SealedRef>();
     for (const ref of refs) {
         const known = opened.get(refKey(ref));
         if (known !== undefined) out.set(refId(ref), known);
-        else missing.set(refId(ref), refKey(ref));
+        else missing.set(refId(ref), ref);
     }
     if (!missing.size) return out;
     // Read without joining the group: the history keys sealed to this account open it.
@@ -165,7 +207,9 @@ export async function openSealed(channelId: string, refs: readonly SealedRef[]):
         const byId = new Map(rows.map((row) => [row.id, row.opened ? decodeSealedContent(row.opened) : null]));
         for (const id of page) {
             const content = byId.get(id) ?? null;
-            keep(missing.get(id)!, content);
+            const ref = missing.get(id)!;
+            keep(refKey(ref), content);
+            index(channelId, id, typeof ref === "string" ? undefined : ref.editedAt, content);
             out.set(id, content);
         }
     }
@@ -194,6 +238,7 @@ export async function editSealedMessage(input: SealedEditInput): Promise<string>
         await mls.ensureGroup(input.channelId);
         const editedAt = await mls.editSealed(input.channelId, input.messageId, encodeSealedContent(content));
         keep(versionKey(input.messageId, editedAt), content);
+        index(input.channelId, input.messageId, editedAt, content);
         return editedAt;
     } catch (caught) {
         if (before === undefined) opened.delete(shown);

@@ -9,6 +9,7 @@
 import { IndexedDbMlsStore } from "@polaris/core-rs/mls-store";
 import { fetchTransport, MlsDevice, type MlsDeviceOptions, type MlsMemberClass } from "./mls-client";
 import { IndexedDbHistoryKeyStore } from "./mls-history-keys";
+import { SealedSearchIndex } from "./sealed-search-index";
 
 const BASE = "/core-rs/mls/";
 const DEVICE_NOTE = "polaris-mls/device/";
@@ -58,23 +59,23 @@ export async function openBrowserDevice(userId: string, account?: MlsDeviceOptio
 }
 
 /**
- * Delete this browser's device for the account - its MLS state and the history
- * keys it kept - when the account signs out of this browser. Its groups see a
+ * Delete this browser's device for the account - its MLS state, the history
+ * keys it kept and its index of opened sealed text - when the account signs out of this browser. Its groups see a
  * stale leaf until a member removes it; a later sign-in is a new device.
  */
 export async function forgetBrowserDevice(userId: string): Promise<void> {
     const known = localStorage.getItem(DEVICE_NOTE + userId);
     if (!known) return;
-    await Promise.all([IndexedDbMlsStore.destroy(known), IndexedDbHistoryKeyStore.destroy(known)]);
+    await Promise.all([IndexedDbMlsStore.destroy(known), IndexedDbHistoryKeyStore.destroy(known), SealedSearchIndex.destroy(known)]);
     localStorage.removeItem(DEVICE_NOTE + userId);
 }
 
-/** Every account signed out of this browser: delete every MLS device and its kept history keys. */
+/** Every account signed out of this browser: delete every MLS device, its kept history keys and its search index. */
 export async function forgetEveryBrowserDevice(factory: IDBFactory = globalThis.indexedDB): Promise<void> {
     const databases = await factory.databases();
     await Promise.all(
         databases.flatMap(({ name }) =>
-            name && (name.startsWith("polaris-mls/") || name.startsWith("polaris-mls-history/")) ? [new Promise<void>((resolve, reject) => {
+            name && (name.startsWith("polaris-mls/") || name.startsWith("polaris-mls-history/") || name.startsWith("polaris-mls-search/")) ? [new Promise<void>((resolve, reject) => {
                 const request = factory.deleteDatabase(name);
                 request.onsuccess = () => resolve();
                 request.onerror = () => reject(request.error);

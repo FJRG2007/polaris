@@ -229,11 +229,25 @@ on the device, through `openSealed`, with the same page cache.
   (`sendSealedMessage`), then the conversation is read up to it. Chat
   messages are not sent as server pushes, so no notice is drawn anywhere the
   device could not open it.
-- **Search.** The server searches bodies, and a sealed one is empty, so a
-  sealed message is found only by who, where, when and what is attached to it;
-  its text is not searchable. Searching sealed text needs a local index on the
-  device over every message it has opened, which is not built. This is the
-  limit, stated where search is documented for people when the flag goes on.
+- **Search** (`sealed-search-index.ts`, `chat/sealed-search.ts`). The server
+  searches bodies, and a sealed one is empty, so a sealed message's words are
+  matched on the device. Every sealed message the browser opens, sends or
+  edits is kept in the device's index (`polaris-mls-search/<device>` in
+  IndexedDB): each entry sealed with AES-256-GCM under a non-extractable key in
+  the same database, the message id in the additional data, the conversation
+  inside the seal; beside it only the id and the time of its last edit, so a
+  version already kept is not sealed again. The newest version wins; at most
+  20,000 entries, the oldest dropped first. A search with words asks the
+  server for plain matches as before and, at the same time, the index for up
+  to 200 sealed matches, newest first; those ids (never the words) go to
+  `searchSealedAction`, which answers only sealed rows among them through the
+  same reach, chat lock, age gate, history and filters, and names the ones that
+  are deleted or out of reach, which the device drops. Both answers are one
+  list, newest first; a sealed hit that opens to words that no longer match
+  (edited elsewhere) is left out. The index is deleted with the device at
+  sign-out. Its limit: it finds only what this browser opened, so a message
+  never scrolled to here, or opened on another device, is found by who, where,
+  when and what is attached to it, not by its words.
 - **Link cards.** Not made for a sealed message: the server makes a card by
   fetching the link, which would tell it what was sent. The link is still a
   link. A card the sender makes and seals beside the message is the way to
@@ -329,8 +343,7 @@ What is built on top of it:
 
 ## Not built yet
 
-- Searching sealed text and sealed link cards (see "Other places a message is
-  shown").
+- Sealed link cards (see "Other places a message is shown").
 - The `org` history-key envelope. The organisation recovery key (proposal 3.5)
   has no public key stored anywhere yet - its custodian setup is not built - so
   nothing can serve it and no `org` envelope can be sealed until it is.

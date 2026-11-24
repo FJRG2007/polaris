@@ -34,6 +34,7 @@ import * as webhooks from "@/lib/chat/webhooks";
 import * as follows from "@/lib/chat/follows";
 import * as polarMember from "@/lib/chat/polar-member";
 import { chatE2eeEnabled } from "@/lib/chat/e2ee/flag";
+import { SEARCH_CANDIDATES } from "@/lib/chat/e2ee/sealed-search-index";
 import { channelGroupCandidates, grantChannelGroups } from "@/lib/chat/channel-groups";
 import { confirmAge } from "@/lib/chat/age-gate";
 import { MAX_REREAD } from "@/lib/chat/reread-limit";
@@ -68,7 +69,7 @@ import {
     sendScheduledNow,
     type ScheduledMessageView
 } from "@/lib/chat/scheduled";
-import { decodeSharedCursor, encodeSharedCursor, searchMessages, type ChatSearchHit } from "@/lib/chat/search";
+import { decodeSharedCursor, encodeSharedCursor, searchMessages, searchSealedHits, type ChatSearchHit, type SealedSearchAnswer } from "@/lib/chat/search";
 import { callConversationMembers } from "@/lib/chat/meetings";
 import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
 import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
@@ -389,6 +390,24 @@ export async function searchMessagesAction(
     if (!parsed.success) return { hits: [] };
     const unlock = proofSchema.safeParse(proof);
     return { hits: await searchMessages(me, parsed.data, unlock.success ? unlock.data : null) };
+}
+
+/** As many sealed messages as one search names: what a device's index found, past the filters the server still applies. */
+const sealedSearchIds = z.array(z.string().uuid()).max(SEARCH_CANDIDATES);
+
+/**
+ * The sealed messages this device's own index found for a search's words,
+ * through every rule a search answers to (docs/chat-e2ee-mls.md, Search).
+ * Nothing while sealed chat is off.
+ */
+export async function searchSealedAction(input: unknown, ids: unknown, proof?: string | null): Promise<SealedSearchAnswer> {
+    const me = await actor();
+    if (!chatE2eeEnabled()) return { hits: [], gone: [] };
+    const parsed = core.chatSearchSchema.safeParse(input);
+    const named = sealedSearchIds.safeParse(ids);
+    if (!parsed.success || !named.success || !parsed.data.term) return { hits: [], gone: [] };
+    const unlock = proofSchema.safeParse(proof);
+    return searchSealedHits(me, parsed.data, [...new Set(named.data)], unlock.success ? unlock.data : null);
 }
 
 /** One tile of the info page's gallery: a picture or a video someone sent here. */
