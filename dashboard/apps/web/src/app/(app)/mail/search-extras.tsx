@@ -92,7 +92,7 @@ export function SearchOffers({
     const recent = offers[0]?.kind === "recent";
     return (
         <div
-            className="absolute start-0 end-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-surface py-1 shadow-lg"
+            className="absolute start-0 end-0 top-full z-30 mt-1 max-h-72 overflow-y-auto overscroll-contain rounded-md border border-border bg-surface py-1 shadow-lg"
             data-search-offers=""
             // A press here would blur the box before the click lands.
             onMouseDown={(event) => event.preventDefault()}

@@ -1010,7 +1010,7 @@ export function Composer() {
                             ) : null}
 
                             {files.length > 0 ? (
-                                <ul className="flex max-h-32 shrink-0 flex-wrap gap-2 overflow-y-auto border-t border-border px-3 py-2">
+                                <ul className="flex max-h-32 shrink-0 flex-wrap gap-2 overflow-y-auto overscroll-contain border-t border-border px-3 py-2">
                                     {files.map((file) => (
                                         <li
                                             key={file.id}

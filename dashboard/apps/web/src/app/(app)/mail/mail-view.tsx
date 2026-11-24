@@ -2839,7 +2839,7 @@ function ThreadRow({
                             </p>
                             {thread.matches && thread.matches.length > 0 ? (
                                 <span
-                                    className="shrink-0 rounded bg-warning/15 px-1 text-[10px] font-medium tabular-nums text-foreground"
+                                    className="shrink-0 rounded bg-warning-soft px-1 text-[10px] font-medium tabular-nums text-foreground"
                                     data-row-matches=""
                                 >
                                     {t("searchBox.matchCount", { count: thread.matches.length })}

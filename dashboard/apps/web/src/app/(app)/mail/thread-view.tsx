@@ -1368,7 +1368,7 @@ function MessageCard({
         <li
             className={cn(
                 "scroll-mt-2 rounded-md border bg-card",
-                matched ? "border-warning/60" : "border-border"
+                matched ? "border-warning-edge" : "border-border"
             )}
             data-message-card={message.id}
             data-search-match={matched ? "" : undefined}
