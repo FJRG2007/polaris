@@ -15,6 +15,9 @@ pub const PLATFORMS: [&str; 2] = ["win32-x64", "linux-x64"];
 /// The script each platform's package starts.
 pub const ENTRY: &str = "main.cjs";
 
+/// The page in the package that draws the controller (`docs/device-addons.md`).
+pub const VIEW: &str = "view/index.html";
+
 /// The first desktop release with the add-on host.
 pub const MIN_APP_VERSION: &str = "0.1.75";
 
@@ -43,6 +46,8 @@ pub fn manifest() -> Value {
         // display is asked for once something is drawn on it.
         "permissions": ["usb", "audio-sessions", "polaris-actions"],
         "settings": crate::addon::addon_settings(),
+        // The editor that shows the controller: its screen, knobs and buttons.
+        "view": VIEW,
     })
 }
 

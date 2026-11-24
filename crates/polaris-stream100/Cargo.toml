@@ -1,6 +1,6 @@
 [package]
 name = "polaris-stream100"
-version = "0.1.0"
+version = "0.1.1"
 description = "Polaris' driver for the Hercules Stream 100: its USB protocol, knob handling, display frames and per-app audio categories (docs/devices/hercules-stream100.md)."
 edition.workspace = true
 rust-version.workspace = true
