@@ -83,12 +83,13 @@ const settingKeySchema = z.string().regex(/^[a-z][a-zA-Z0-9]{0,39}$/);
  * add-on's page in Settings, so an ordinary setting needs no add-on HTML.
  */
 export const addonSettingSchema = z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("toggle"), key: settingKeySchema, label: addonTextSchema, hint: addonTextSchema.optional(), default: z.boolean() }),
+    z.object({ kind: z.literal("toggle"), key: settingKeySchema, label: addonTextSchema, hint: addonTextSchema.optional(), group: settingKeySchema.optional(), default: z.boolean() }),
     z.object({
         kind: z.literal("choice"),
         key: settingKeySchema,
         label: addonTextSchema,
         hint: addonTextSchema.optional(),
+        group: settingKeySchema.optional(),
         options: z.array(z.object({ value: z.string().min(1).max(40), label: addonTextSchema })).min(1).max(32),
         default: z.string().min(1).max(40)
     }),
@@ -97,16 +98,34 @@ export const addonSettingSchema = z.discriminatedUnion("kind", [
         key: settingKeySchema,
         label: addonTextSchema,
         hint: addonTextSchema.optional(),
+        group: settingKeySchema.optional(),
         min: z.number(),
         max: z.number(),
         step: z.number().positive(),
         default: z.number()
     }),
     /** A Polaris action picked from the client's own list (mute, deafen, ...), or none. */
-    z.object({ kind: z.literal("action"), key: settingKeySchema, label: addonTextSchema, hint: addonTextSchema.optional(), default: z.string().max(64).nullable() })
+    z.object({ kind: z.literal("action"), key: settingKeySchema, label: addonTextSchema, hint: addonTextSchema.optional(), group: settingKeySchema.optional(), default: z.string().max(64).nullable() })
 ]);
 
 export type AddonSetting = z.infer<typeof addonSettingSchema>;
+
+/** How the host lays out a group of settings: one row each, or tiles in the device's own order (knobs, buttons). */
+export const ADDON_GROUP_LOOKS = ["rows", "dials", "buttons"] as const;
+
+/**
+ * A titled section of settings on the add-on's page. Every control in it is
+ * still Polaris's own; the look only chooses rows or tiles with the device's
+ * shape drawn above each, so a controller's knobs read as knobs.
+ */
+export const addonSettingGroupSchema = z.object({
+    key: settingKeySchema,
+    label: addonTextSchema,
+    hint: addonTextSchema.optional(),
+    look: z.enum(ADDON_GROUP_LOOKS).default("rows")
+});
+
+export type AddonSettingGroup = z.infer<typeof addonSettingGroupSchema>;
 export type AddonSettingValue = boolean | string | number | null;
 
 export const addonManifestSchema = z.object({
@@ -133,7 +152,17 @@ export const addonManifestSchema = z.object({
         .default([])
         .refine((list) => new Set(list.map((item) => item.key)).size === list.length, "repeated setting")
         .refine((list) => list.every(settingDefaultFits), "default outside its setting"),
-    /** A page of its own for what plain settings cannot draw, run in a sandboxed frame inside its Settings page. */
+    /** Sections the settings are drawn in, in this order after the settings that name none (or a group not listed here). */
+    groups: z
+        .array(addonSettingGroupSchema)
+        .max(16)
+        .default([])
+        .refine((list) => new Set(list.map((item) => item.key)).size === list.length, "repeated group"),
+    /**
+     * A page of its own for what plain settings cannot draw, shown on its
+     * Settings page in a sandboxed frame. It shows, it does not ask: every
+     * control is a declared setting, drawn by Polaris (docs/device-addons.md, Views).
+     */
     view: entryPathSchema.optional()
 });
 
@@ -258,7 +287,11 @@ function settingValue(setting: AddonSetting, value: unknown): AddonSettingValue 
 export function readAddonSettingValues(settings: readonly AddonSetting[], stored: unknown): Record<string, AddonSettingValue> {
     const source = stored && typeof stored === "object" ? (stored as Record<string, unknown>) : {};
     const values: Record<string, AddonSettingValue> = {};
-    for (const setting of settings) values[setting.key] = settingValue(setting, Object.hasOwn(source, setting.key) ? source[setting.key] : undefined) ?? setting.default;
+    // `??` would read a button stored as "nothing" (null) as its default; only a missing or unfit value falls back.
+    for (const setting of settings) {
+        const value = settingValue(setting, Object.hasOwn(source, setting.key) ? source[setting.key] : undefined);
+        values[setting.key] = value === undefined ? setting.default : value;
+    }
     return values;
 }
 
@@ -332,3 +365,19 @@ export const addonInstallResultSchema = z.union([
     z.object({ ok: z.literal(true) }),
     z.object({ ok: z.literal(false), reason: z.string().max(40) })
 ]);
+
+/**
+ * The settings as the host draws them: those in no listed group first, then
+ * each group in its declared order. A group no setting names is left out.
+ */
+export function addonSettingSections(manifest: Pick<AddonManifest, "settings" | "groups">): { group: AddonSettingGroup | null; settings: AddonSetting[] }[] {
+    const groups = manifest.groups ?? [];
+    const known = new Set(groups.map((group) => group.key));
+    const loose = manifest.settings.filter((setting) => !setting.group || !known.has(setting.group));
+    const sections: { group: AddonSettingGroup | null; settings: AddonSetting[] }[] = loose.length > 0 ? [{ group: null, settings: loose }] : [];
+    for (const group of groups) {
+        const settings = manifest.settings.filter((setting) => setting.group === group.key);
+        if (settings.length > 0) sections.push({ group, settings });
+    }
+    return sections;
+}

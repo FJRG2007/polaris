@@ -106,13 +106,13 @@ describe("Hercules Stream 100 add-on", () => {
         expect(fake.reset).toHaveBeenCalledTimes(1);
     });
 
-    describe("its editor", () => {
+    describe("its screen preview", () => {
         const manifest = readAddonManifest(JSON.parse(readFileSync(new URL("manifest.json", folder), "utf8")))!;
         const root = fileURLToPath(new URL("any/", folder));
         const view = createRequire(import.meta.url)(fileURLToPath(new URL("any/view/view.js", folder))) as {
-            wordsFor(locale: string): { categories: Record<string, string>; actions: Record<string, string>; displays: Record<string, string>; };
+            wordsFor(locale: string): { categories: Record<string, string>; displays: Record<string, string>; caption: string };
             readValues(values: unknown): Record<string, unknown>;
-            storedValue(key: string, value: string): unknown;
+            fill(text: string, values: Record<string, unknown>): string;
             tokenEntries(tokens: unknown): Array<[string, string]>;
             DEFAULTS: Record<string, unknown>;
         };
@@ -128,21 +128,21 @@ describe("Hercules Stream 100 add-on", () => {
             for (const tag of scripts) expect(tag).toMatch(/^<script src="[^"]+">$/);
         });
 
-        it("offers exactly the choices the manifest declares, and starts from its defaults", () => {
+        it("names exactly the choices the manifest declares, and starts from its defaults", () => {
             const words = view.wordsFor("en-US");
             for (const setting of manifest.settings) {
                 if (setting.kind === "choice") {
                     const labels = setting.key === "display" ? words.displays : words.categories;
                     expect(Object.keys(labels).sort(), setting.key).toEqual(setting.options.map((option) => option.value).sort());
                 }
-                if (setting.kind === "action" && setting.default) expect(Object.keys(words.actions)).toContain(setting.default);
                 if (setting.key in view.DEFAULTS) expect(view.DEFAULTS[setting.key], setting.key).toBe(setting.default);
             }
             expect(Object.keys(view.wordsFor("es-ES").categories).sort()).toEqual(Object.keys(words.categories).sort());
+            expect(Object.keys(view.wordsFor("es-ES")).sort()).toEqual(Object.keys(words).sort());
             expect(view.wordsFor("fr-FR")).toBe(words);
         });
 
-        it("reads what is stored field by field, and stores a button set to nothing as none", () => {
+        it("reads what is stored field by field", () => {
             expect(view.readValues({ knob1: "music", knob2: "loud", button1: null, button4: "call.leave", brightness: 400 })).toMatchObject({
                 knob1: "music",
                 knob2: "music",
@@ -150,9 +150,15 @@ describe("Hercules Stream 100 add-on", () => {
                 button4: "call.hangup",
                 brightness: 100
             });
-            expect(view.storedValue("button2", "none")).toBeNull();
-            expect(view.storedValue("brightness", "55")).toBe(55);
+            expect(view.fill(view.wordsFor("en-US").caption, { display: "Off", brightness: 40 })).toBe("Screen preview: Off, 40% bright");
             expect(view.tokenEntries({ "--primary": "1 2% 3%", "color": "red", "--x": 4 })).toEqual([["--primary", "1 2% 3%"]]);
+        });
+        it("lays its settings out as the controller: knobs as dials, buttons as buttons", () => {
+            const looks = Object.fromEntries(manifest.groups.map((group) => [group.key, group.look]));
+            for (const setting of manifest.settings) {
+                if (setting.key.startsWith("knob")) expect(looks[setting.group!], setting.key).toBe("dials");
+                if (setting.key.startsWith("button")) expect(looks[setting.group!], setting.key).toBe("buttons");
+            }
         });
     });
 });
