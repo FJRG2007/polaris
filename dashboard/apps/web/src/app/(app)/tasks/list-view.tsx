@@ -21,6 +21,9 @@ import { TaskPanel } from "./task-panel";
 import { BoardView } from "./views/board";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
+import { useTaskWrites, writeTask, TASK_CREATE, TASK_MOVE, TASK_UPDATE } from "./offline-writes";
+import { withQueuedWrites } from "./offline-rows";
+import { TaskWritesContext, TaskWritesNotice } from "./task-write-mark";
 import { GanttView } from "./views/schedule";
 import { CalendarView } from "./views/calendar";
 import { keyboardIsBusy } from "@/lib/keyboard";
@@ -263,9 +266,17 @@ export function ListScreen({
         });
     }, [restored, scope, viewType, groupBy, sort, filter, showClosed, subtaskMode]);
 
+    // What this device wrote and has not sent yet - kept across a reload or a
+    // night offline - is drawn over what the server sent, and the overlay of
+    // writes in flight over that.
+    const taskWrites = useTaskWrites(() => refresh());
     const rows = useMemo(
-        () => tasks.map((task) => ({ ...task, ...pending[task.id] })),
-        [tasks, pending]
+        () =>
+            withQueuedWrites(tasks, taskWrites.entries, context, lists, listId).map((task) => ({
+                ...task,
+                ...pending[task.id]
+            })),
+        [tasks, taskWrites.entries, context, lists, listId, pending]
     );
 
     /**
@@ -432,12 +443,10 @@ export function ListScreen({
         const written = change.tagIds
             ? { ...change, tagIds: await settleTagIds(change.tagIds) }
             : change;
-        const result = await runAction(
-            () => actions.updateTaskAction({ taskId: task.id, ...written }),
-            setError
-        );
+        const result = await writeTask(TASK_UPDATE, { taskId: task.id, ...written }, setError);
         if (result?.error) setError(result.error);
-        refresh([task.id]);
+        // Kept on this device: the row stays as drawn, and is fetched when it is sent.
+        if (!result?.queued) refresh([task.id]);
     };
 
     const duplicateTask = async (task: TaskRow) => {
@@ -585,14 +594,9 @@ export function ListScreen({
                     }
                   : {}
         }));
-        const result = await runAction(
-            () =>
-                actions.moveTaskAction({
-                    taskId,
-                    statusId,
-                    beforeId: position.beforeId,
-                    afterId: position.afterId
-                }),
+        const result = await writeTask(
+            TASK_MOVE,
+            { taskId, statusId, beforeId: position.beforeId, afterId: position.afterId },
             setError
         );
         if (result?.error) setError(result.error);
@@ -602,7 +606,7 @@ export function ListScreen({
         // that decides the order, a promised place only survives if the screen's
         // arrangement is written down with it, and only once the move itself
         // went through.
-        else if (result && sort.field !== "manual" && position.placed) {
+        else if (result && !result.queued && sort.field !== "manual" && position.placed) {
             const dragged = rowById.get(taskId);
             // A neighbour from another list is not a place: the two are ordered
             // against their own lists, so there is no gap between them to be put
@@ -619,7 +623,7 @@ export function ListScreen({
                 await adoptOrder(dragged, position);
             }
         }
-        refresh();
+        if (!result?.queued) refresh();
     };
 
     const quickCreate = async (groupKey: string, name: string, extra: QuickCreateExtra = {}) => {
@@ -636,9 +640,9 @@ export function ListScreen({
         }
 
         const tagIds = extra.tagIds ? await settleTagIds(extra.tagIds) : undefined;
-        const result = await runAction(
-            () =>
-                actions.createTaskAction({
+        const result = await writeTask(
+            TASK_CREATE,
+            {
                     listId: target,
                     name,
                     statusId: placement.statusId,
@@ -649,11 +653,11 @@ export function ListScreen({
                     // A tag made in the composer a moment ago still carries
                     // this browser's own id until it is settled into a real one.
                     ...(extra.tagIds ? { tagIds: tagIds ?? [] } : {})
-                }),
+            },
             setError
         );
         if (result?.error) setError(result.error);
-        refresh();
+        if (!result?.queued) refresh();
     };
 
     // What "New task" opens on. A screen with no list of its own still has to be
@@ -1066,6 +1070,7 @@ export function ListScreen({
         // flex-1, as on every other Tasks screen: the page lays this out in a row
         // beside the space tree, where without it the screen shrinks to its
         // content and the list stops halfway across.
+        <TaskWritesContext.Provider value={taskWrites.states}>
         <div className={cn("flex min-w-0 flex-1 flex-col gap-4", selected.length > 0 && "pb-16")}>
             <header className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
@@ -1249,6 +1254,8 @@ export function ListScreen({
                     {error}
                 </p>
             )}
+
+            <TaskWritesNotice entries={taskWrites.entries} />
 
             <SelectionBar
                 count={selected.length}
@@ -1458,5 +1465,6 @@ export function ListScreen({
                 }}
             />
         </div>
+        </TaskWritesContext.Provider>
     );
 }

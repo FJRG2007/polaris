@@ -24,6 +24,7 @@ import { tagColorFor } from "./pickers";
 import { useAutosave } from "./autosave";
 import { ShareDialog } from "./task-share";
 import { runAction } from "@/lib/run-action";
+import { writeTask, TASK_CREATE, TASK_UPDATE } from "./offline-writes";
 import { TaskNameField } from "./task-name-field";
 import { usePolarContext } from "@/components/polar/polar-panel";
 import { CopyButton } from "@/components/copy-button";
@@ -244,10 +245,7 @@ export function TaskPanel({
         const written = Array.isArray(input.tagIds)
             ? { ...input, tagIds: await settleTagIds(input.tagIds as readonly string[]) }
             : input;
-        const result = await runAction(
-            () => actions.updateTaskAction({ taskId: openId, ...written }),
-            setError
-        );
+        const result = await writeTask(TASK_UPDATE, { taskId: openId, ...written }, setError);
         if (!result || result.error) {
             if (result?.error) setError(result.error);
             // The screen is showing something the server did not take. A picker is put
@@ -259,6 +257,11 @@ export function TaskPanel({
         }
 
         saved.current = { ...task, ...overlay };
+        // Kept on this device until Polaris answers: shown as made, nothing to fetch yet.
+        if (result.queued) {
+            paint(overlay);
+            return true;
+        }
         if (mode === "picker") {
             load(openId);
             onChanged();
@@ -334,10 +337,7 @@ export function TaskPanel({
     const toSubtasks = async (parentId: string, listId: string, items: readonly string[]) => {
         setError("");
         for (const name of items) {
-            const result = await runAction(
-                () => actions.createTaskAction({ listId, name, parentId }),
-                setError
-            );
+            const result = await writeTask(TASK_CREATE, { listId, name, parentId }, setError);
             if (!result || result.error) {
                 if (result?.error) setError(result.error);
                 load(parentId);

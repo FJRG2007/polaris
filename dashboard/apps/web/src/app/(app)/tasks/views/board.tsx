@@ -18,6 +18,7 @@
  * how work moves, so the sequence of its columns has to be too.
  */
 
+import { TaskReference } from "../task-write-mark";
 import * as core from "@polaris/core";
 import type { TaskRow } from "@/lib/tasks/facts";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
@@ -417,7 +418,7 @@ export function TaskCard({
                             <TaskStatusMarker commands={commands} />
                         </span>
                         <span className="font-mono text-[0.625rem] text-muted-foreground">
-                            {task.reference}
+                            <TaskReference taskId={task.id} reference={task.reference} />
                         </span>
                         <span className="flex-1" />
                         <BlockedMarker task={task} format={format.date} />

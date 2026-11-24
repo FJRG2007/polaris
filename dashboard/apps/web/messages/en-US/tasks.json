@@ -838,5 +838,12 @@
         "invalidClient": "Google does not recognize this client ID and secret together. Check both on the client you created - a secret belongs to one client only.",
         "redirectRefused": "Google refuses to authorize anybody with this redirect URI. Add {redirectUri} to the client's authorized redirect URIs, and give this deployment a domain - Google rejects an IP address outright.",
         "noRefreshToken": "Google did not return a refresh token. Remove Polaris from your Google account's third-party access and link again."
+    },
+    "offline": {
+        "waiting": "Saved on this device. Sends when Polaris is back.",
+        "notSent": "Not saved. Your change is still on this device.",
+        "notSaved": "{count, plural, one {# task change was not saved.} other {# task changes were not saved.}}",
+        "retry": "Try again",
+        "discard": "Discard"
     }
 }

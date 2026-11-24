@@ -652,6 +652,15 @@ export async function createTask(
     spaceId: string,
     input: core.TaskCreateInput
 ): Promise<{ id: string; reference: string }> {
+    // A write replayed from a device that kept it offline: already made, so
+    // answered with what it is rather than made again.
+    if (input.id) {
+        const made = await prisma.task.findFirst({
+            where: { id: input.id, spaceId },
+            select: { id: true, number: true, space: { select: { prefix: true } } }
+        });
+        if (made) return { id: made.id, reference: core.taskReference(made.space.prefix, made.number) };
+    }
     const statusId = input.statusId
         ? (await statusInSpace(spaceId, input.statusId)).id
         : await defaultStatusId(spaceId);
@@ -661,6 +670,7 @@ export async function createTask(
         const { number, prefix } = await nextTaskNumber(tx, spaceId);
         const task = await tx.task.create({
             data: {
+                ...(input.id ? { id: input.id } : {}),
                 spaceId,
                 listId: input.listId,
                 parentId: input.parentId,

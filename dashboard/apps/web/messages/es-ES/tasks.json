@@ -838,5 +838,12 @@
         "invalidClient": "Google no reconoce juntos este ID de cliente y este secreto. Revisa ambos en el cliente que creaste: un secreto pertenece a un solo cliente.",
         "redirectRefused": "Google se niega a autorizar a nadie con este URI de redirección. Añade {redirectUri} a los URI de redirección autorizados del cliente y dale un dominio a esta instalación: Google rechaza directamente las direcciones IP.",
         "noRefreshToken": "Google no devolvió un token de actualización. Quita Polaris del acceso de terceros de tu cuenta de Google y vuelve a vincularla."
+    },
+    "offline": {
+        "waiting": "Guardado en este dispositivo. Se envía al volver Polaris.",
+        "notSent": "Sin guardar. Tu cambio sigue en este dispositivo.",
+        "notSaved": "{count, plural, one {# cambio de tarea no se guardó.} other {# cambios de tareas no se guardaron.}}",
+        "retry": "Reintentar",
+        "discard": "Descartar"
     }
 }

@@ -1045,6 +1045,9 @@ export type SprintInput = z.infer<typeof sprintSchema>;
  * enter, and be filled in afterwards.
  */
 export const taskCreateSchema = z.object({
+    /** The id it is made with, when a device kept it offline and named it: sent
+     *  twice, it is still made once. */
+    id: uuid.optional(),
     listId: uuid,
     name: taskName,
     description: taskDescription.default(""),

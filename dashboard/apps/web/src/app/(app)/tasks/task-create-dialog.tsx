@@ -33,10 +33,9 @@
  * discard it, takes it away.
  */
 
-import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { tagColorFor } from "./pickers";
-import { runAction } from "@/lib/run-action";
+import { writeTask, TASK_CREATE } from "./offline-writes";
 import { PropertyRows } from "./task-properties";
 import { TaskNameField } from "./task-name-field";
 import { useEffect, useMemo, useState } from "react";
@@ -365,9 +364,9 @@ export function TaskCreateDialog({
         // Tags made in the picker are still carrying an id this browser invented;
         // the write waits for the real ones and goes without any that were refused.
         const tagIds = await settleTagIds(shown.tags.map((tag) => tag.id));
-        const result = await runAction(
-            () =>
-                actions.createTaskAction({
+        const result = await writeTask(
+            TASK_CREATE,
+            {
                     name: draft.name.trim(),
                     description: draft.description,
                     listId: draft.listId,
@@ -382,7 +381,7 @@ export function TaskCreateDialog({
                     points: draft.points,
                     blockedUntil: draft.blockedUntil,
                     blockedNote: draft.blockedNote
-                }),
+            },
             setError
         );
         setSaving(false);
@@ -392,7 +391,8 @@ export function TaskCreateDialog({
         }
         clearTaskDraft(draft.listId);
         onClose();
-        if (result?.id) onCreated(result.id);
+        // A task kept on this device to send later has nothing to open yet.
+        if (result?.id && !result.queued) onCreated(result.id);
     };
 
     return (
