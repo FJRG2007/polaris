@@ -489,6 +489,8 @@ export interface PolarisLocal {
         relaunch(): Promise<Outcome>;
         /** Put the settings away. */
         close(): Promise<void>;
+        /** Heard each time the page, kept open between visits, is shown again. */
+        onShown?(listener: () => void): () => void;
         /** Put the list of hosts on the clipboard as a code. */
         copyHosts(): Promise<{ readonly ok: boolean; readonly count: number; }>;
         /** Write the list of hosts to a file somebody picks. */
@@ -830,6 +832,7 @@ export const CHANNELS = {
     connectHostsImport: "local:connect-hosts-import",
     connectCheck: "local:connect-check",
     connectClose: "local:connect-close",
+    connectShown: "local:connect-shown",
     connectCheckUpdates: "local:connect-check-updates",
     connectUpdateDownloaded: "local:connect-update-downloaded",
     connectRestart: "local:connect-restart",

@@ -811,17 +811,91 @@ button.icon [data-icon] {
     }
 }
 
-/* The settings laid over the Polaris window (`openLocalSheet`). */
+/* The settings: the categories beside the page of the one chosen, as Settings
+   > This app lays them out on the host. One column on the first run (only the
+   address form) and in a narrow window, where the categories scroll across. */
 .panel {
     position: relative;
 }
 
+.layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+}
+
+body:not(.first-run) .layout {
+    grid-template-columns: 200px minmax(0, 1fr);
+    align-items: start;
+}
+
+.categories {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: sticky;
+    top: 0;
+    min-width: 0;
+}
+
+.categories[hidden] {
+    display: none;
+}
+
+.categories button {
+    justify-content: flex-start;
+    min-width: 0;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--muted);
+    padding: 0 0.625rem;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.categories button:hover {
+    color: var(--text);
+    background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.categories button[aria-selected="true"] {
+    color: var(--text);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.pages {
+    min-width: 0;
+}
+
+.pages > section > .section-title:first-child {
+    margin: 0 0 12px;
+}
+
+@media (max-width: 600px) {
+    body:not(.first-run) .layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .categories {
+        flex-direction: row;
+        overflow-x: auto;
+        position: static;
+    }
+
+    .categories button {
+        flex: none;
+    }
+}
+
+/* Laid over the Polaris window (`openLocalSheet`): the whole window, the way
+   the host's own Settings fill it, under the strip the window is dragged by. */
 .sheet {
     min-height: 100vh;
-    display: grid;
-    place-items: center;
-    padding: 56px 24px 24px;
-    background: rgb(5 6 8 / 0.55);
+    padding: 0;
+    background: var(--ground);
 }
 
 .sheet::before {
@@ -833,31 +907,26 @@ button.icon [data-icon] {
 }
 
 .sheet .panel {
-    width: min(540px, 100%);
-    max-height: calc(100vh - 80px);
-    overflow: auto;
-    padding: 20px 20px 16px;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    box-shadow: 0 24px 80px rgb(0 0 0 / 0.4);
+    box-sizing: border-box;
+    width: min(960px, 100%);
+    min-height: 100vh;
+    margin: 0 auto;
+    padding: 56px 24px 24px;
 }
 
-/* The card rises in once it is shown, not while it waits for its state. */
 .sheet .panel:not([data-loading]) {
-    animation: sheet-in 160ms ease-out;
+    animation: sheet-in 120ms ease-out;
 }
 
 .sheet-close {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 52px;
+    right: 24px;
 }
 
 @keyframes sheet-in {
     from {
         opacity: 0;
-        transform: translateY(8px) scale(0.98);
     }
 }
 

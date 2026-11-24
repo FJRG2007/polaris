@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { OverviewShortcut } from "@polaris/core";
 import { Dialog, DialogContent, DialogTitle, Input, cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useDesktopAppSettings } from "@/components/desktop-app";
 import { searchItems } from "@polaris/core/search-text";
 import {
     COMMAND_ENTRY_FIELDS,
@@ -64,12 +65,15 @@ export function ShortcutPicker({
     }, [open]);
 
     const appKey = appIds.join(",");
+    // The desktop app's own settings (Settings > This app) pin like any other
+    // section, only where they can open: inside the app.
+    const desktop = useDesktopAppSettings();
     const pool = useMemo(
         () => [
-            ...navigationEntries(isAdmin, appKey ? appKey.split(",") : [], gate),
+            ...navigationEntries(isAdmin, appKey ? appKey.split(",") : [], { ...gate, desktop }),
             ...resourceEntries(resources)
         ],
-        [isAdmin, appKey, gate, resources]
+        [isAdmin, appKey, gate, desktop, resources]
     );
 
     const trimmed = query.trim();

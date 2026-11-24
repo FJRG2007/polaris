@@ -56,7 +56,7 @@ import * as settings from "./settings";
 import { cancelRelaunch, holdCall, loadRelaunch, markRelaunch, relaunched } from "./relaunch";
 import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpdateAttempted, updateAttempted } from "./settings";
 import { backIndex, isServerUrl, serverPath } from "./navigation";
-import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, type LocalSheet } from "./windows";
+import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, warmLocalSheet, type LocalSheet } from "./windows";
 import { app, autoUpdater, BrowserWindow, dialog, net, powerMonitor, screen, session } from "electron";
 import { describeNetError, describeOfflinePage, errorText, finishedLoad, isCertificateError, netErrorCode, RECONNECTS_WORDS } from "./reachability";
 import { createReconnector, RECONNECT_PROBE_MS } from "./reconnect";
@@ -426,6 +426,9 @@ function openMain(url: string): void {
     // for elsewhere first; failing that the window stays for its Try again, and the
     // servers window is the way to the others.
     window.webContents.on("did-finish-load", () => {
+        // The app's own settings page, loaded out of sight now that this one is
+        // in, so opening it from here (offline included) draws at once.
+        warmLocalSheet(window, "connect");
         if (!current) return;
         const load = finishedLoad(window.webContents.getTitle(), offline);
         offline = load === "offline";

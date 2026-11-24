@@ -27,6 +27,7 @@ import type { ClipboardKeep } from "@/shared/clipboard-store";
 import { OPACITIES, type LookChange } from "@/shared/voice-widget";
 import { bindingFromPress } from "@/shared/launcher-hotkey";
 import jsQR from "jsqr";
+import { APP_SETTING_CATEGORIES, APP_SETTINGS, type AppSettingCategory } from "@polaris/core/app-settings";
 
 dressMark(window.polarisLocal.season);
 
@@ -40,8 +41,6 @@ const list = byId<HTMLUListElement>("server-list");
 const title = byId<HTMLHeadingElement>("title");
 const tabs = byId<HTMLElement>("tabs");
 const serversPage = byId<HTMLElement>("servers-page");
-const generalPage = byId<HTMLElement>("general-page");
-const advancedPage = byId<HTMLElement>("advanced-page");
 const showAdd = byId<HTMLButtonElement>("show-add");
 const hideAdd = byId<HTMLButtonElement>("hide-add");
 const removeDialog = byId<HTMLDialogElement>("confirm-remove");
@@ -364,16 +363,78 @@ function showForm(shown: boolean): void {
     if (shown) input.focus();
 }
 
-type Page = "servers" | "general" | "advanced";
+/** The name of each category, as the host's Settings lists them. */
+const CATEGORY_NAMES: Record<AppSettingCategory, string> = {
+    general: "General",
+    window: "Window and tray",
+    search: "Search and shortcuts",
+    clipboard: "Clipboard",
+    voice: "Voice widget and games",
+    hosts: "Hosts",
+    advanced: "Advanced",
+    updates: "Updates"
+};
 
-const PAGES: Record<Page, HTMLElement> = { servers: serversPage, general: generalPage, advanced: advancedPage };
+/**
+ * One page per category of the shared schema (`@polaris/core/app-settings`),
+ * the same categories in the same order as Settings > This app on the host.
+ * The rows are written once in the markup, each naming its setting, and are
+ * moved here into the page of that setting's category - so the schema, not
+ * the markup, decides where a setting is listed. The hosts are their own page.
+ */
+function buildPages(): Record<AppSettingCategory, HTMLElement> {
+    const holder = byId<HTMLElement>("pages");
+    const categoryOf = new Map<string, AppSettingCategory>(APP_SETTINGS.map((entry) => [entry.key, entry.category]));
+    const pages = { hosts: serversPage } as Record<AppSettingCategory, HTMLElement>;
+    const lists = new Map<AppSettingCategory, HTMLElement>();
+    for (const category of APP_SETTING_CATEGORIES) {
+        const tab = document.createElement("button");
+        tab.type = "button";
+        tab.id = `tab-${category}`;
+        tab.setAttribute("role", "tab");
+        tab.setAttribute("aria-controls", `${category}-page`);
+        tab.textContent = CATEGORY_NAMES[category];
+        tab.addEventListener("click", () => showPage(category));
+        tabs.append(tab);
+        if (category === "hosts") continue;
+        const page = document.createElement("section");
+        page.id = `${category}-page`;
+        page.setAttribute("role", "tabpanel");
+        page.hidden = true;
+        const heading = document.createElement("p");
+        heading.className = "section-title";
+        heading.textContent = CATEGORY_NAMES[category];
+        const list = document.createElement("div");
+        list.className = "settings-list";
+        page.append(heading, list);
+        holder.append(page);
+        pages[category] = page;
+        lists.set(category, list);
+    }
+    serversPage.id = "hosts-page";
+    for (const row of document.querySelectorAll<HTMLElement>("[data-setting], [data-category]")) {
+        const category = (row.dataset.category as AppSettingCategory | undefined) ?? categoryOf.get(row.dataset.setting ?? "");
+        const list = category ? lists.get(category) : undefined;
+        if (!category || !list) continue;
+        // A row goes in its page's list; anything else (the version line, a notice) below it.
+        if (row.classList.contains("setting") || row.parentElement?.classList.contains("settings-list")) list.append(row);
+        else pages[category].append(row);
+    }
+    for (const id of ["general-page", "advanced-page"]) document.getElementById(id)?.remove();
+    return pages;
+}
 
-function showPage(shown: Page): void {
+const PAGES = buildPages();
+
+function showPage(shown: AppSettingCategory): void {
     for (const [page, element] of Object.entries(PAGES)) {
         element.hidden = page !== shown;
         byId(`tab-${page}`).setAttribute("aria-selected", String(page === shown));
     }
+    // In a narrow window the categories scroll across; the chosen one stays in view.
+    byId(`tab-${shown}`).scrollIntoView({ block: "nearest", inline: "nearest" });
 }
+showPage("hosts");
 
 function draw(servers: readonly ServerRow[]): void {
     const first = known === null;
@@ -385,6 +446,7 @@ function draw(servers: readonly ServerRow[]): void {
         button.hidden = servers.length === 0;
     }
     tabs.hidden = servers.length === 0;
+    document.body.classList.toggle("first-run", servers.length === 0);
     title.textContent = servers.length === 0 ? "Open your Polaris" : "Polaris";
     if (first || servers.length === 0) showForm(servers.length === 0);
     list.replaceChildren(
@@ -605,9 +667,6 @@ byId("hosts-import").addEventListener("click", () => {
 });
 showAdd.addEventListener("click", () => showForm(true));
 hideAdd.addEventListener("click", () => showForm(false));
-byId("tab-servers").addEventListener("click", () => showPage("servers"));
-byId("tab-general").addEventListener("click", () => showPage("general"));
-byId("tab-advanced").addEventListener("click", () => showPage("advanced"));
 byId("remove-cancel").addEventListener("click", () => removeDialog.close());
 byId("remove-confirm").addEventListener("click", () => {
     const server = removing;
@@ -849,7 +908,7 @@ hardwareAcceleration.addEventListener("change", () => {
 byId("restart-later").addEventListener("click", () => restartDialog.close());
 byId("restart-now").addEventListener("click", relaunch);
 byId("restart-pending-now").addEventListener("click", relaunch);
-const preferencesLoaded = window.polarisLocal.connect.preferences().catch(() => null).then((preferences) => {
+const loadPreferences = () => window.polarisLocal.connect.preferences().catch(() => null).then((preferences) => {
     if (!preferences) return;
     openAtLogin.checked = preferences.openAtLogin;
     hardwareAcceleration.checked = preferences.hardwareAcceleration;
@@ -868,6 +927,7 @@ const preferencesLoaded = window.polarisLocal.connect.preferences().catch(() => 
     restartPending.hidden = !preferences.restartPending;
     byId("version").textContent = `Polaris ${preferences.version}`;
 });
+const preferencesLoaded = loadPreferences();
 
 const checkUpdates = byId<HTMLButtonElement>("check-updates");
 const restartUpdate = byId<HTMLButtonElement>("restart-update");
@@ -991,4 +1051,12 @@ const stateLoaded = window.polarisLocal.connect.state().catch(() => null).then((
 void Promise.allSettled([stateLoaded, preferencesLoaded]).then(() => {
     delete byId("panel").dataset.loading;
     if (!form.hidden) input.focus();
+});
+
+// Kept open between visits (`openLocalSheet` hides it instead of closing it):
+// shown again, it reads the list and the settings anew, since either may have
+// changed elsewhere while it was away.
+window.polarisLocal.connect.onShown?.(() => {
+    void refresh();
+    void loadPreferences();
 });

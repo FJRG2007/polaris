@@ -71,7 +71,7 @@ describe("the service worker", () => {
                 addEventListener: (name: string, handler: (event: unknown) => void) => listeners.set(name, handler)
             },
             caches: { match: async () => offline, open: async (name: string) => store(name) },
-            fetch: (request: { url: string }) => network(request.url),
+            fetch: (request: string | { url: string }) => network(typeof request === "string" ? request : request.url),
             Response,
             URL
         });
@@ -88,7 +88,12 @@ describe("the service worker", () => {
         };
         const kept = () => [...(stores.get("polaris-shell-v1")?.keys() ?? [])];
         const seed = (name: string, path: string, value: unknown) => void (stores.get(name) ?? stores.set(name, new Map()).get(name)!).set(path, value);
-        return { request, kept, offline, seed };
+        const message = async (data: unknown) => {
+            let work: Promise<unknown> | undefined;
+            listeners.get("message")?.({ data, waitUntil: (done: Promise<unknown>) => (work = done) });
+            await work;
+        };
+        return { request, kept, offline, seed, message };
     }
 
     it("answers with the offline page exactly when a gateway speaks for a dead Polaris", async () => {
@@ -134,6 +139,31 @@ describe("the service worker", () => {
         const gateway = boot(async (url) => (url.endsWith("/notes") ? list : answer(502)));
         await gateway.request("/notes");
         expect(await gateway.request("/notes/n2")).toBe(list);
+    });
+
+    it("keeps the desktop app's settings pages ahead of a visit, and nothing else asked", async () => {
+        const loaded: string[] = [];
+        let online = true;
+        const page = answer(200);
+        const worker = boot(async (url) => {
+            if (!online) throw new TypeError("offline");
+            loaded.push(new URL(url).pathname);
+            return url.endsWith("/hosts") ? answer(200, { redirected: true }) : page;
+        });
+        await worker.request("/account/app/general");
+        loaded.length = 0;
+        await worker.message({
+            type: "keep-pages",
+            paths: ["/account/app/general", "/account/app/voice", "/account/app/hosts", "/notes", "/vault", "https://elsewhere.example/account/app/x", 4]
+        });
+        // Already kept, a redirect, or not one of those pages: never loaded or never kept.
+        expect(loaded).toEqual(["/account/app/voice", "/account/app/hosts"]);
+        expect(worker.kept()).toEqual(["/account/app/general", "/account/app/voice"]);
+        await worker.message({ type: "something-else", paths: ["/account/app/updates"] });
+        await worker.message(null);
+        expect(worker.kept()).toHaveLength(2);
+        online = false;
+        expect(await worker.request("/account/app/voice")).toBe(page);
     });
 
     it("never keeps the Vault, the PIN screen or a page outside the app", async () => {

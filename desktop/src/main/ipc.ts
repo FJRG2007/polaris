@@ -805,14 +805,28 @@ export function registerIpc(host: IpcHost): void {
     const snapshot = async () => {
         const status = await launcherStatus();
         const state = host.connectState();
+        const look = voiceWidgetLook();
         return {
             ...host.preferences(),
+            voiceWidgetAvatars: look.avatars,
+            voiceWidgetNames: look.names,
+            voiceWidgetPeople: look.people,
+            voiceWidgetOpacity: String(look.opacity),
+            voiceWidgetCorner: look.corner,
             launcherBinding: launcherBinding(),
             launcherKey: status.key,
             launcherProblem: status.problem,
             server: state.address,
             servers: state.servers.map((server) => ({ origin: server.origin, name: server.name }))
         };
+    };
+    // One look choice, held to the widget's own rule before it is kept.
+    const changeLook = (raw: unknown): boolean => {
+        const look = lookChangeSchema.safeParse(raw);
+        if (!look.success) return false;
+        rememberVoiceWidgetLook(withLookChange(voiceWidgetLook(), look.data));
+        followVoiceWidgetLook();
+        return true;
     };
     const applyChange = async (change: AppSettingChange): Promise<boolean> => {
         switch (change.key) {
@@ -827,6 +841,16 @@ export function registerIpc(host: IpcHost): void {
                 rememberLauncherClipboardKeep(change.value);
                 followClipboardKeep();
                 return true;
+            case "voiceWidgetAvatars":
+                return changeLook({ key: "avatars", value: change.value });
+            case "voiceWidgetNames":
+                return changeLook({ key: "names", value: change.value });
+            case "voiceWidgetPeople":
+                return changeLook({ key: "people", value: change.value });
+            case "voiceWidgetOpacity":
+                return changeLook({ key: "opacity", value: Number(change.value) });
+            case "voiceWidgetCorner":
+                return changeLook({ key: "corner", value: change.value });
             default:
                 return host.setToggle(change.key, change.value);
         }

@@ -41,6 +41,11 @@ const bridge: PolarisLocal = {
         clearClipboardHistory: () => ipcRenderer.invoke(CHANNELS.connectClipboardClear),
         relaunch: () => ipcRenderer.invoke(CHANNELS.connectRelaunch),
         close: () => ipcRenderer.invoke(CHANNELS.connectClose),
+        onShown: (listener) => {
+            const heard = () => listener();
+            ipcRenderer.on(CHANNELS.connectShown, heard);
+            return () => void ipcRenderer.removeListener(CHANNELS.connectShown, heard);
+        },
         checkForUpdates: async () => readUpdateCheck(await ipcRenderer.invoke(CHANNELS.connectCheckUpdates)),
         updateDownloaded: async () => readUpdateCheck(await ipcRenderer.invoke(CHANNELS.connectUpdateDownloaded)),
         restartToUpdate: () => ipcRenderer.invoke(CHANNELS.connectRestart),

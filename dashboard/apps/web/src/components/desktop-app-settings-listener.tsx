@@ -7,11 +7,15 @@
  *
  * Said once per document: the app forgets it on a full navigation or a reload,
  * and this mounts again on the page that follows.
+ *
+ * It also asks the service worker to keep every category's page, so each one
+ * opens with the host out of reach even if it was never opened here before (a
+ * page the worker kept is what a navigation gets offline).
  */
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { readAppSettingCategory } from "@polaris/core/app-settings";
+import { APP_SETTING_CATEGORIES, readAppSettingCategory } from "@polaris/core/app-settings";
 import { useDesktopBridge } from "@/components/desktop-app";
 
 export function DesktopAppSettingsListener() {
@@ -25,8 +29,17 @@ export function DesktopAppSettingsListener() {
             if (category) router.push(`/account/app/${category}`);
         });
         void settings.announce().catch(() => undefined);
+        keepCategoryPages();
         return stop;
     }, [settings, router]);
 
     return null;
+}
+
+function keepCategoryPages(): void {
+    if (!("serviceWorker" in navigator) || !navigator.onLine) return;
+    const paths = APP_SETTING_CATEGORIES.map((category) => `/account/app/${category}`);
+    void navigator.serviceWorker.ready
+        .then((registration) => registration.active?.postMessage({ type: "keep-pages", paths }))
+        .catch(() => undefined);
 }

@@ -40,6 +40,8 @@ await build({
     minify: true,
     logLevel: "info",
     legalComments: "none",
+    // The settings page reads the shared settings schema from the core package.
+    plugins: [ownPackages()],
     entryPoints: ["connect", "api-key", "push", "tv", "usb", "overlay", "voice-widget", "updating"].map((page) => join(ROOT, "src/renderer", `${page}.ts`)),
     outdir: join(DIST, "renderer")
 });

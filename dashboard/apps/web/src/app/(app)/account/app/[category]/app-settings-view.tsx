@@ -215,10 +215,7 @@ function SettingRow({
     }
     if (entry.kind === "choice") {
         const value = snapshot[key] as string;
-        const options =
-            key === "launcherEngine"
-                ? core.APP_SEARCH_ENGINES.map((id) => ({ value: id, label: t(`engines.${id}`) }))
-                : core.APP_CLIPBOARD_KEEPS.map((id) => ({ value: id, label: t(`keeps.${id}`) }));
+        const options = entry.options.map((id) => ({ value: id, label: choiceLabel(t, key, id) }));
         return (
             <Row label={label} hint={hint}>
                 <Select
@@ -245,6 +242,13 @@ function SettingRow({
             />
         </Row>
     );
+}
+
+/** What a choice reads as: the engine and keep names have their own lists, the rest sit under their setting. */
+function choiceLabel(t: ReturnType<typeof useTranslations>, key: core.AppSettingKey, id: string): string {
+    if (key === "launcherEngine") return t(`engines.${id}`);
+    if (key === "launcherClipboardKeep") return t(`keeps.${id}`);
+    return t(`items.${key}.options.${id}`);
 }
 
 /** The launcher's key: Change takes the next press, Esc keeps the old one. */

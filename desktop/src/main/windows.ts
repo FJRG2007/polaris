@@ -345,21 +345,55 @@ export interface LocalSheet {
     isDestroyed(): boolean;
 }
 
-/**
- * The settings over the Polaris window they belong to: the window dims and the
- * page sits on it, the way an app's own settings do, instead of a second window
- * appearing beside it. Same page, same bridge and the same rules as a local
- * window; the page is told with `?sheet` and draws itself as a card. It closes
- * with its window, and says so through `onClosed`.
- */
-export function openLocalSheet(parent: BrowserWindow, kind: "connect", onClosed: () => void): LocalSheet {
+/** The sheet's page for each Polaris window, loaded once and kept between visits. */
+const warmSheets = new WeakMap<BrowserWindow, WebContentsView>();
+
+/** The sheet's page for `parent`, made and loaded now if it is not yet: out of sight until opened. */
+function sheetView(parent: BrowserWindow, kind: "connect"): WebContentsView {
+    const kept = warmSheets.get(parent);
+    if (kept && !kept.webContents.isDestroyed()) return kept;
     const view = new WebContentsView({ webPreferences: localPreferences() });
     view.setBackgroundColor("#00000000");
     const contents = view.webContents;
     register(contents, kind);
     contents.on("will-navigate", (event) => event.preventDefault());
     contents.setWindowOpenHandler(() => ({ action: "deny" }));
+    warmSheets.set(parent, view);
+    parent.once("closed", () => {
+        warmSheets.delete(parent);
+        if (!contents.isDestroyed()) contents.close();
+    });
+    // A page whose process died is not shown again; the next opening makes a new one.
+    contents.once("render-process-gone", () => {
+        if (warmSheets.get(parent) === view) warmSheets.delete(parent);
+        setImmediate(() => {
+            if (!contents.isDestroyed()) contents.close();
+        });
+    });
+    void contents.loadFile(join(__dirname, "..", "renderer", `${kind}.html`), { query: { sheet: "1" } });
+    return view;
+}
 
+/**
+ * Loads the sheet's page ahead of time, out of sight, so the first time it is
+ * opened it is drawn at once instead of a fresh page starting cold.
+ */
+export function warmLocalSheet(parent: BrowserWindow, kind: "connect"): void {
+    if (!parent.isDestroyed()) sheetView(parent, kind);
+}
+
+/**
+ * The settings over the Polaris window they belong to, filling it the way the
+ * host's own Settings do, instead of a second window appearing beside it. Same
+ * page, same bridge and the same rules as a local window; the page is told
+ * with `?sheet`. The page is kept loaded while its window lives: put away, it
+ * is only taken off the window, and opened again it is put back and told so
+ * (`connectShown`), so it reads its state anew without loading again. It goes
+ * with its window, and says it was put away through `onClosed`.
+ */
+export function openLocalSheet(parent: BrowserWindow, kind: "connect", onClosed: () => void): LocalSheet {
+    const view = sheetView(parent, kind);
+    const contents = view.webContents;
     const fit = () => {
         if (parent.isDestroyed()) return;
         const [width = 0, height = 0] = parent.getContentSize();
@@ -371,20 +405,25 @@ export function openLocalSheet(parent: BrowserWindow, kind: "connect", onClosed:
         if (closed) return;
         closed = true;
         for (const event of RESIZES) parent.off(event as "resize", fit);
+        parent.off("closed", close);
+        contents.off("render-process-gone", close);
         if (!parent.isDestroyed()) {
             parent.contentView.removeChildView(view);
             parent.webContents.focus();
         }
-        if (!contents.isDestroyed()) contents.close();
         onClosed();
     };
 
     fit();
     for (const event of RESIZES) parent.on(event as "resize", fit);
     parent.once("closed", close);
+    contents.once("render-process-gone", close);
     parent.contentView.addChildView(view);
-    contents.once("did-finish-load", () => contents.focus());
-    void contents.loadFile(join(__dirname, "..", "renderer", `${kind}.html`), { query: { sheet: "1" } });
+    if (contents.isLoading()) contents.once("did-finish-load", () => contents.focus());
+    else {
+        contents.send(CHANNELS.connectShown);
+        contents.focus();
+    }
     return { focus: () => contents.focus(), close, isDestroyed: () => closed };
 }
 

@@ -7,6 +7,11 @@ import {
     APP_SEARCH_ENGINES,
     APP_SETTINGS,
     APP_SETTING_TOGGLES,
+    APP_WIDGET_AVATARS,
+    APP_WIDGET_CORNERS,
+    APP_WIDGET_NAMES,
+    APP_WIDGET_OPACITIES,
+    APP_WIDGET_PEOPLE,
     appSettingsTarget,
     readAppSettingChange,
     readAppSettings
@@ -15,6 +20,7 @@ import { SETTING_DEFAULTS } from "@/main/settings";
 import { SEARCH_ENGINE_IDS } from "@/shared/launcher";
 import { CLIPBOARD_KEEP_IDS } from "@/shared/clipboard-store";
 import { PREFERENCE_TOGGLES } from "@/shared/bridge";
+import { AVATAR_SIZES, CORNERS, NAME_MODES, OPACITIES, PEOPLE_MODES } from "@/shared/voice-widget";
 
 describe("the shared settings schema", () => {
     it("lists every switch the app keeps, with the app's own default", () => {
@@ -31,6 +37,18 @@ describe("the shared settings schema", () => {
     it("offers the choices the app accepts", () => {
         expect([...APP_SEARCH_ENGINES]).toEqual(SEARCH_ENGINE_IDS);
         expect([...APP_CLIPBOARD_KEEPS]).toEqual(CLIPBOARD_KEEP_IDS);
+        expect([...APP_WIDGET_AVATARS]).toEqual([...AVATAR_SIZES]);
+        expect([...APP_WIDGET_NAMES]).toEqual([...NAME_MODES]);
+        expect([...APP_WIDGET_PEOPLE]).toEqual([...PEOPLE_MODES]);
+        expect([...APP_WIDGET_CORNERS]).toEqual([...CORNERS]);
+        expect([...APP_WIDGET_OPACITIES]).toEqual(OPACITIES.map(String));
+    });
+
+    it("lists every voice widget look the app keeps", () => {
+        const keys = Object.keys(SETTING_DEFAULTS).filter((key) => /^voiceWidget(Avatars|Names|People|Opacity|Corner)$/.test(key));
+        const listed = APP_SETTINGS.map((entry) => entry.key as string);
+        expect(keys).toHaveLength(5);
+        for (const key of keys) expect(listed, key).toContain(key);
     });
 });
 
@@ -42,6 +60,9 @@ describe("a change crossing the bridge", () => {
         expect(readAppSettingChange({ key: "launcher", value: "yes" })).toBeNull();
         expect(readAppSettingChange({ key: "server", value: "https://elsewhere.example" })).toBeNull();
         expect(readAppSettingChange({ key: "launcher", value: true, extra: 1 })).toBeNull();
+        expect(readAppSettingChange({ key: "voiceWidgetOpacity", value: "60" })).toEqual({ key: "voiceWidgetOpacity", value: "60" });
+        expect(readAppSettingChange({ key: "voiceWidgetOpacity", value: 60 })).toBeNull();
+        expect(readAppSettingChange({ key: "voiceWidgetCorner", value: "middle" })).toBeNull();
         expect(readAppSettingChange(null)).toBeNull();
     });
 });
@@ -53,6 +74,8 @@ describe("the app's answer as the page reads it", () => {
         expect(snapshot?.voiceWidgetGameOnly).toBe(false);
         expect(snapshot?.launcherEngine).toBe("duckduckgo");
         expect(snapshot?.servers).toEqual([]);
+        expect(snapshot?.voiceWidgetOpacity).toBe("100");
+        expect(snapshot?.voiceWidgetCorner).toBe("top-left");
         expect(readAppSettings("nope")).toBeNull();
     });
 });

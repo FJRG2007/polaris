@@ -35,6 +35,14 @@ export const APP_SEARCH_ENGINES = ["duckduckgo", "google", "bing", "brave", "sta
 /** How long the clipboard history keeps a copy. */
 export const APP_CLIPBOARD_KEEPS = ["day", "week", "month", "quarter"] as const;
 
+/** How the voice widget looks: its faces, when names and people show, how see-through it is, and where it starts. */
+export const APP_WIDGET_AVATARS = ["large", "small"] as const;
+export const APP_WIDGET_NAMES = ["always", "speaking", "never"] as const;
+export const APP_WIDGET_PEOPLE = ["always", "speaking"] as const;
+/** Percentages, kept as text so every choice crosses the bridge the same way. */
+export const APP_WIDGET_OPACITIES = ["100", "80", "60", "40"] as const;
+export const APP_WIDGET_CORNERS = ["top-left", "top-right", "bottom-left", "bottom-right"] as const;
+
 interface SettingBase<K extends string> {
     readonly key: K;
     readonly category: AppSettingCategory;
@@ -69,6 +77,46 @@ export const APP_SETTINGS = [
     },
     { key: "voiceWidget", kind: "toggle", category: "voice", default: true },
     { key: "voiceWidgetGameOnly", kind: "toggle", category: "voice", default: false, dependsOn: "voiceWidget" },
+    {
+        key: "voiceWidgetAvatars",
+        kind: "choice",
+        category: "voice",
+        default: "large",
+        options: APP_WIDGET_AVATARS,
+        dependsOn: "voiceWidget"
+    },
+    {
+        key: "voiceWidgetNames",
+        kind: "choice",
+        category: "voice",
+        default: "always",
+        options: APP_WIDGET_NAMES,
+        dependsOn: "voiceWidget"
+    },
+    {
+        key: "voiceWidgetPeople",
+        kind: "choice",
+        category: "voice",
+        default: "always",
+        options: APP_WIDGET_PEOPLE,
+        dependsOn: "voiceWidget"
+    },
+    {
+        key: "voiceWidgetOpacity",
+        kind: "choice",
+        category: "voice",
+        default: "100",
+        options: APP_WIDGET_OPACITIES,
+        dependsOn: "voiceWidget"
+    },
+    {
+        key: "voiceWidgetCorner",
+        kind: "choice",
+        category: "voice",
+        default: "top-left",
+        options: APP_WIDGET_CORNERS,
+        dependsOn: "voiceWidget"
+    },
     { key: "hardwareAcceleration", kind: "toggle", category: "advanced", default: true, restart: true }
 ] as const satisfies readonly AppSettingEntry[];
 
@@ -121,6 +169,11 @@ const snapshotSchema = z.object({
     launcherClipboardKeep: z.enum(APP_CLIPBOARD_KEEPS).catch("week"),
     voiceWidget: z.boolean().catch(true),
     voiceWidgetGameOnly: z.boolean().catch(false),
+    voiceWidgetAvatars: z.enum(APP_WIDGET_AVATARS).catch("large"),
+    voiceWidgetNames: z.enum(APP_WIDGET_NAMES).catch("always"),
+    voiceWidgetPeople: z.enum(APP_WIDGET_PEOPLE).catch("always"),
+    voiceWidgetOpacity: z.enum(APP_WIDGET_OPACITIES).catch("100"),
+    voiceWidgetCorner: z.enum(APP_WIDGET_CORNERS).catch("top-left"),
     hardwareAcceleration: z.boolean().catch(true),
     /** The kept choice differs from the one this run started with. */
     restartPending: z.boolean().catch(false),
@@ -148,7 +201,12 @@ export function readAppSettings(raw: unknown): AppSettingsSnapshot | null {
 export const appSettingChangeSchema = z.union([
     z.object({ key: z.enum(APP_SETTING_TOGGLES), value: z.boolean() }).strict(),
     z.object({ key: z.literal("launcherEngine"), value: z.enum(APP_SEARCH_ENGINES) }).strict(),
-    z.object({ key: z.literal("launcherClipboardKeep"), value: z.enum(APP_CLIPBOARD_KEEPS) }).strict()
+    z.object({ key: z.literal("launcherClipboardKeep"), value: z.enum(APP_CLIPBOARD_KEEPS) }).strict(),
+    z.object({ key: z.literal("voiceWidgetAvatars"), value: z.enum(APP_WIDGET_AVATARS) }).strict(),
+    z.object({ key: z.literal("voiceWidgetNames"), value: z.enum(APP_WIDGET_NAMES) }).strict(),
+    z.object({ key: z.literal("voiceWidgetPeople"), value: z.enum(APP_WIDGET_PEOPLE) }).strict(),
+    z.object({ key: z.literal("voiceWidgetOpacity"), value: z.enum(APP_WIDGET_OPACITIES) }).strict(),
+    z.object({ key: z.literal("voiceWidgetCorner"), value: z.enum(APP_WIDGET_CORNERS) }).strict()
 ]);
 
 export type AppSettingChange = z.infer<typeof appSettingChangeSchema>;

@@ -110,6 +110,42 @@ function keptPage(url, answer) {
         .then((kept) => kept || offlinePage(answer));
 }
 
+/* The pages a page may ask to have kept before they were ever opened here: the
+ * desktop app's own settings (Settings > This app), which read nothing from the
+ * network once drawn, so every category opens offline - a category opened
+ * offline is a full navigation, answered from here. */
+const WARMABLE = /^\/account\/app\/[a-z]{1,20}$/;
+const WARM_MOST = 16;
+
+/** Loads and keeps each path not kept yet, one at a time. */
+function warmPages(paths) {
+    return caches.open(SHELL).then((cache) =>
+        paths.reduce(
+            (done, path) =>
+                done.then(() =>
+                    cache.match(path).then((kept) =>
+                        kept
+                            ? undefined
+                            : fetch(self.location.origin + path, { credentials: "same-origin" })
+                                  .then((answer) => (keepable(answer) ? keepPage(path, answer) : undefined))
+                                  .catch(() => undefined)
+                    )
+                ),
+            Promise.resolve()
+        )
+    );
+}
+
+self.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || data.type !== "keep-pages" || !Array.isArray(data.paths)) return;
+    const paths = data.paths
+        .filter((path) => typeof path === "string" && WARMABLE.test(path))
+        .slice(0, WARM_MOST);
+    const work = warmPages(paths).catch(() => undefined);
+    if (typeof event.waitUntil === "function") event.waitUntil(work);
+});
+
 self.addEventListener("install", (event) => {
     event.waitUntil(
         caches
