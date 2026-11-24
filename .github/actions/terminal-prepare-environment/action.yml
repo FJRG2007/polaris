@@ -35,6 +35,28 @@ runs:
       shell: bash
       run: echo "CARGO_HOME=C:\cargo" >> $GITHUB_ENV
 
+    # Real-time scanning opens every file rustc and the linker write - tens of
+    # thousands of objects and ~90 test executables, each scanned again when
+    # nextest launches it once per test. The runner is a throwaway VM, so the
+    # build directories are excluded from it. A runner without Defender skips
+    # this, and the status line says which case a slow run was.
+    - name: Exclude the build from Windows Defender scanning
+      if: ${{ inputs.target_os == 'windows' }}
+      shell: pwsh
+      run: |
+        try {
+          $status = Get-MpComputerStatus -ErrorAction Stop
+          Write-Output "Defender real-time protection: $($status.RealTimeProtectionEnabled)"
+          Add-MpPreference -ErrorAction Stop -ExclusionPath @(
+            $env:GITHUB_WORKSPACE, $env:RUNNER_TEMP, 'C:\cargo', "$env:USERPROFILE\.rustup"
+          )
+          Add-MpPreference -ErrorAction Stop -ExclusionProcess @(
+            'cargo.exe', 'rustc.exe', 'link.exe', 'cargo-nextest.exe', 'clippy-driver.exe'
+          )
+        } catch {
+          Write-Output "Defender not configurable here: $($_.Exception.Message)"
+        }
+
     # The classifier model the input_classifier build script downloads from the
     # terminal-assets-v1 release (pinned by sha256 there). Cached so a run does
     # not fetch it again; the build script checks the digest either way.
@@ -60,9 +82,10 @@ runs:
         # build mode, so jobs that produce the same artifacts share an entry and
         # jobs that do not stay out of each other's way.
         shared-key: terminal-${{ inputs.cache_key != '' && inputs.cache_key || inputs.target_os }}
-        # Save even when the job fails, or a job that has never passed never
-        # writes a cache and compiles the whole workspace every run.
-        cache-on-failure: true
+        # Never from a failed job: a cache written by a broken build is
+        # restored by every run after it. The entry is saved by main's push and
+        # its nightly schedule, and every branch and pull request restores it.
+        cache-on-failure: false
         # Dependencies only: a fresh checkout gives every source file a new
         # mtime, so caching the workspace's own crates only made the entries
         # gigabytes larger and saved nothing. The repository's 10 GB cache budget
