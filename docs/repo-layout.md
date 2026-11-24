@@ -45,14 +45,12 @@ The client apps move under `clients/`:
 | From | To |
 | --- | --- |
 | `desktop/` | `clients/desktop/` |
-| `mobile/` | `clients/mobile/` |
-| `tv/` | `clients/tv/` |
 | `terminal/` | `clients/terminal/` |
 | `device-addons/` | `clients/device-addons/` |
 | `scripts/device-addons/publish.mjs` | `clients/device-addons/scripts/publish.mjs` (the root `scripts/` then goes) |
 
 The root then holds `.claude/`, `.github/`, `clients/`, `crates/`,
-`dashboard/`, `docs/`, `vendor/` and the files above.
+`dashboard/`, `docs/`, `mobile/`, `tv/`, `vendor/` and the files above.
 
 ### What has to change with it
 
@@ -105,8 +103,17 @@ build`; the site build (TV catalog); `git grep` for each old prefix returns
 only history notes; every workflow's `paths` and `working-directory` resolve
 (`changes` jobs report, no required check left pending).
 
-### Open choice
+### Decided: a partial regroup
 
-`tv/` and `mobile/` are the moves with outside cost (shipped TV catalog links,
-F-Droid metadata). Moving only `desktop/`, `terminal/` and `device-addons/`
-avoids both, at the price of the regroup being partial.
+Only `desktop/`, `terminal/` and `device-addons/` (with
+`scripts/device-addons/`) move to `clients/`. `tv/` and `mobile/` stay where
+they are:
+
+- `tv/` stays because deployed dashboards ship
+  `github.com/FJRG2007/polaris/tree/main/tv/examples/...` links in
+  `dashboard/packages/core/src/tv-compat/*.json`; GitHub does not redirect a
+  moved path, so every install would show broken links until it updates, and
+  old releases forever.
+- `mobile/` stays because F-Droid builds from its own copy of
+  `mobile/android/fdroid/app.polaris.mobile.yml` (`subdir: mobile/android/app`),
+  which this repository cannot change in the same push.
