@@ -16,6 +16,7 @@
  */
 
 import { join } from "node:path";
+import { asciiJson } from "./json.mjs";
 import { createRequire } from "node:module";
 import { createHash, createPrivateKey, sign } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -58,7 +59,7 @@ for (const id of existsSync(source) ? readdirSync(source).sort() : []) {
         if (!manifest.entries[platform]) continue;
         const layers = [join(dir, "any"), join(dir, platform)].filter((path) => existsSync(path));
         if (layers.length === 0) throw new Error(`${id}: no files for ${platform}`);
-        const files = { ...Object.assign({}, ...layers.map((path) => filesUnder(path))), "manifest.json": [new TextEncoder().encode(JSON.stringify(manifest, null, 4)), { mtime: FIXED_TIME }] };
+        const files = { ...Object.assign({}, ...layers.map((path) => filesUnder(path))), "manifest.json": [new TextEncoder().encode(asciiJson(manifest, 4)), { mtime: FIXED_TIME }] };
         if (!files[manifest.entries[platform]]) throw new Error(`${id}: ${platform} entry ${manifest.entries[platform]} is missing`);
         if (manifest.view && !files[manifest.view]) throw new Error(`${id}: ${platform} view ${manifest.view} is missing`);
         const zip = zipSync(files, { level: 9 });
@@ -81,7 +82,9 @@ for (const id of existsSync(source) ? readdirSync(source).sort() : []) {
     });
 }
 
-const catalog = new TextEncoder().encode(JSON.stringify({ schema: 1, issued: new Date().toISOString(), addons }));
+// `commit` is what the next run's version guard (version-guard.mjs) compares against.
+const commit = /^[0-9a-f]{40}$/.test(process.env.GITHUB_SHA ?? "") ? { commit: process.env.GITHUB_SHA } : {};
+const catalog = new TextEncoder().encode(asciiJson({ schema: 1, issued: new Date().toISOString(), ...commit, addons }));
 const signature = sign(null, catalog, createPrivateKey(pem)).toString("base64");
 writeFileSync(join(out, "catalog.json"), catalog);
 writeFileSync(join(out, "catalog.json.sig"), JSON.stringify({ keyId: KEY_ID, signature }));

@@ -46,6 +46,7 @@ pub fn manifest() -> Value {
         // display is asked for once something is drawn on it.
         "permissions": ["usb", "audio-sessions", "polaris-actions"],
         "settings": crate::addon::addon_settings(),
+        "groups": crate::addon::addon_groups(),
         // The editor that shows the controller: its screen, knobs and buttons.
         "view": VIEW,
     })

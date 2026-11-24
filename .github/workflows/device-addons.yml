@@ -8,6 +8,9 @@ on:
     branches: [main]
     paths:
       - "device-addons/**"
+      # The native modules packaged into add-ons (version-guard.mjs NATIVE_SOURCES).
+      - "crates/polaris-stream100/**"
+      - "crates/polaris-stream100-node/**"
       - "scripts/device-addons/**"
       - ".github/workflows/device-addons.yml"
   workflow_dispatch:
@@ -66,6 +69,15 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
+      - run: node --test scripts/device-addons/device-addons.test.mjs
+      # A package that changed under a version already published never reaches
+      # an app holding that version: refuse it before anything is uploaded.
+      - name: Every changed add-on has a new version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download device-addons -p catalog.json -D "$RUNNER_TEMP/published" || true
+          node scripts/device-addons/version-guard.mjs device-addons "$RUNNER_TEMP/published/catalog.json" "${{ github.event.before }}"
       # Each platform's module into its add-on's `<platform>/` folder.
       - uses: actions/download-artifact@v4
         with:

@@ -153,3 +153,16 @@ off offline.
 platform's own files laid over `any/`). A native module is not committed: the
 workflow builds it per platform into `<platform>/` before packaging (the
 `native` job). A push to main touching `device-addons/**` publishes the catalog.
+
+**Any change to what a package holds needs a new version.** An app compares
+versions, not bytes: a package republished under a version it already holds is
+never taken (0.1.4 of the Stream 100 went out twice, and the computers that had
+the first one kept it). `scripts/device-addons/version-guard.mjs` fails the
+workflow when a packaged file (`manifest.json`, `any/`, `<platform>/`, or a
+native module's crate) changed since the commit the published catalog names
+(`commit`) and the version did not.
+
+The catalog and each package's `manifest.json` are written as ASCII JSON, every
+other character as a `\uXXXX` escape (`scripts/device-addons/json.mjs`). GitHub
+serves release files with no charset, and a reader that falls back to Latin-1
+showed "botón" as "botÃ³n"; escaped, the bytes read the same either way.

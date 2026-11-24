@@ -394,7 +394,8 @@ export function readAddonsSnapshot(value: unknown): AddonsSnapshot | null {
 
 /** What an install answers: done, or the reason it was not. */
 export const addonInstallResultSchema = z.union([
-    z.object({ ok: z.literal(true) }),
+    /** `started` is false when the add-on went in but could not be started; absent from an app older than 0.1.97. */
+    z.object({ ok: z.literal(true), started: z.boolean().optional() }),
     z.object({ ok: z.literal(false), reason: z.string().max(40) })
 ]);
 

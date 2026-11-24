@@ -2534,7 +2534,8 @@
             "appVersion": "It needs a newer desktop app. Update the app first.",
             "download": "The download failed. Try again.",
             "integrity": "The download did not match what was published, so nothing was installed.",
-            "other": "It could not be installed. Try again."
+            "other": "It could not be installed. Try again.",
+            "notStarted": "Installed, but it has not started. Its status says why."
         },
         "detail": {
             "version": "Version",

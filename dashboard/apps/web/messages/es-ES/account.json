@@ -2534,7 +2534,8 @@
             "appVersion": "Necesita una app más nueva. Actualiza la app primero.",
             "download": "Falló la descarga. Inténtalo de nuevo.",
             "integrity": "La descarga no coincidía con lo publicado y no se instaló nada.",
-            "other": "No se pudo instalar. Inténtalo de nuevo."
+            "other": "No se pudo instalar. Inténtalo de nuevo.",
+            "notStarted": "Instalado, pero no ha arrancado. Su estado dice por qué."
         },
         "detail": {
             "version": "Versión",

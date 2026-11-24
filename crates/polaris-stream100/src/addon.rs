@@ -18,24 +18,25 @@ pub const KNOB_CHOICES: &[&str] = &[
 ];
 pub const DISPLAY_CHOICES: &[&str] = &["mixer", "call", "nowPlaying", "off"];
 
-fn label(text: &str) -> Value {
-    json!({ "en-US": text })
+/// A text in every language Polaris ships (`en-US`, `es-ES`).
+pub(crate) fn label(en: &str, es: &str) -> Value {
+    json!({ "en-US": en, "es-ES": es })
 }
 
-fn choice_label(value: &str) -> &'static str {
+fn choice_label(value: &str) -> (&'static str, &'static str) {
     match value {
-        "calls" => "Calls",
-        "music" => "Music",
-        "games" => "Games",
-        "browser" => "Browser",
-        "system" => "System sounds",
-        "other" => "Other apps",
-        "output" => "Whole output",
-        "none" => "Nothing",
-        "mixer" => "Volume of each knob",
-        "call" => "People in the call",
-        "nowPlaying" => "What is playing",
-        _ => "Off",
+        "calls" => ("Calls", "Llamadas"),
+        "music" => ("Music", "Música"),
+        "games" => ("Games", "Juegos"),
+        "browser" => ("Browser", "Navegador"),
+        "system" => ("System sounds", "Sonidos del sistema"),
+        "other" => ("Other apps", "Otras apps"),
+        "output" => ("Whole output", "Toda la salida"),
+        "none" => ("Nothing", "Nada"),
+        "mixer" => ("Volume of each knob", "Volumen de cada rueda"),
+        "call" => ("People in the call", "Personas en la llamada"),
+        "nowPlaying" => ("What is playing", "Lo que suena"),
+        _ => ("Off", "Apagada"),
     }
 }
 
@@ -43,7 +44,10 @@ fn options(values: &[&str]) -> Value {
     Value::Array(
         values
             .iter()
-            .map(|value| json!({ "value": value, "label": label(choice_label(value)) }))
+            .map(|value| {
+                let (en, es) = choice_label(value);
+                json!({ "value": value, "label": label(en, es) })
+            })
             .collect(),
     )
 }
@@ -78,21 +82,32 @@ fn knob_target(value: &str) -> Option<Target> {
     Some(Target::Category { category })
 }
 
-fn range(key: &str, text: &str, min: u32, max: u32, default: u32) -> Value {
-    json!({ "kind": "range", "key": key, "label": label(text), "min": min, "max": max, "step": 1, "default": default })
+fn range(key: &str, text: (&str, &str), min: u32, max: u32, default: u32) -> Value {
+    json!({ "kind": "range", "key": key, "group": "turning", "label": label(text.0, text.1), "min": min, "max": max, "step": 1, "default": default })
+}
+
+/// The manifest's `groups`: how the page lays the settings out, as the controller.
+pub fn addon_groups() -> Value {
+    json!([
+        { "key": "knobs", "label": label("Knobs", "Ruedas"), "hint": label("What each knob turns up and down.", "Lo que sube y baja cada rueda."), "look": "dials" },
+        { "key": "buttons", "label": label("Lit buttons", "Botones iluminados"), "hint": label("What each button does in a Polaris call.", "Lo que hace cada botón en una llamada de Polaris."), "look": "buttons" },
+        { "key": "turning", "label": label("How the knobs turn", "Cómo giran las ruedas"), "look": "rows" },
+        { "key": "screen", "label": label("Screen", "Pantalla"), "look": "rows" },
+    ])
 }
 
 /// The manifest's `settings` list.
 pub fn addon_settings() -> Value {
     let defaults = Settings::default();
     let mut list = vec![
-        json!({ "kind": "toggle", "key": "enabled", "label": label("Use the Stream 100"), "default": defaults.enabled }),
+        json!({ "kind": "toggle", "key": "enabled", "label": label("Use the Stream 100", "Usar el Stream 100"), "default": defaults.enabled }),
     ];
     for (index, target) in defaults.knobs.iter().enumerate() {
         list.push(json!({
             "kind": "choice",
             "key": format!("knob{}", index + 1),
-            "label": label(&format!("Knob {}", index + 1)),
+            "group": "knobs",
+            "label": label(&format!("Knob {}", index + 1), &format!("Rueda {}", index + 1)),
             "options": options(KNOB_CHOICES),
             "default": knob_value(target),
         }));
@@ -101,33 +116,34 @@ pub fn addon_settings() -> Value {
         list.push(json!({
             "kind": "action",
             "key": format!("button{}", index + 1),
-            "label": label(&format!("Button {}", index + 1)),
+            "group": "buttons",
+            "label": label(&format!("Button {}", index + 1), &format!("Botón {}", index + 1)),
             "default": action,
         }));
     }
     list.push(range(
         "percentPerDetent",
-        "Volume per click",
+        ("Volume per click", "Volumen por paso"),
         1,
         10,
         defaults.tuning.percent_per_detent.into(),
     ));
     list.push(range(
         "maxAcceleration",
-        "Speed-up on a fast turn",
+        ("Speed-up on a fast turn", "Aceleración al girar rápido"),
         1,
         5,
         defaults.tuning.max_acceleration.into(),
     ));
     list.push(range(
         "deadBand",
-        "Ignore tiny movements",
+        ("Ignore tiny movements", "Ignorar movimientos mínimos"),
         0,
         24,
         defaults.tuning.dead_band.into(),
     ));
-    list.push(json!({ "kind": "choice", "key": "display", "label": label("Screen shows"), "options": options(DISPLAY_CHOICES), "default": "mixer" }));
-    list.push(json!({ "kind": "range", "key": "brightness", "label": label("Screen brightness"), "min": 10, "max": 100, "step": 5, "default": defaults.brightness }));
+    list.push(json!({ "kind": "choice", "key": "display", "group": "screen", "label": label("Screen shows", "La pantalla muestra"), "options": options(DISPLAY_CHOICES), "default": "mixer" }));
+    list.push(json!({ "kind": "range", "key": "brightness", "group": "screen", "label": label("Screen brightness", "Brillo de la pantalla"), "min": 10, "max": 100, "step": 5, "default": defaults.brightness }));
     Value::Array(list)
 }
 
