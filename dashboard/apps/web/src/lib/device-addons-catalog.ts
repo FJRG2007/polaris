@@ -72,7 +72,9 @@ async function download(url: string, max: number): Promise<Uint8Array | null> {
     return readCapped(response, max);
 }
 
-let held: { catalog: AddonCatalog; at: number } | null = null;
+type Held = { catalog: AddonCatalog; at: number };
+
+let held: Held | null = null;
 let failedAt = 0;
 let refreshing: Promise<void> | null = null;
 
@@ -110,7 +112,8 @@ export async function publishedAddonCatalog(): Promise<AddonCatalog | null> {
         return held.catalog;
     }
     if (due) await refresh();
-    return held?.catalog ?? null;
+    // Set by the refresh just awaited, which the narrowing above cannot see.
+    return (held as Held | null)?.catalog ?? null;
 }
 
 /** Forget what is held. For tests. */

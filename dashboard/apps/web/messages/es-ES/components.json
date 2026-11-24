@@ -203,6 +203,7 @@
             "installed": "Complementos",
             "catalog": "Para instalar",
             "setting": "Ajuste de {name}",
+            "section": "Ajustes de {name}",
             "offer": "De {publisher} - {summary}"
         },
         "recent": "Recientes",

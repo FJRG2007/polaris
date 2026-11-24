@@ -10,8 +10,8 @@
  */
 
 import type { CommandEntry } from "./entries";
-import { Download, Puzzle, SlidersHorizontal } from "lucide-react";
-import { addonText, type AddonCatalog, type AddonManifest, type InstalledAddon } from "@polaris/core/device-addons";
+import { Download, Puzzle, LayoutGrid, SlidersHorizontal } from "lucide-react";
+import { addonSettingTargets, type AddonCatalog, type AddonManifest, type InstalledAddon } from "@polaris/core/device-addons";
 
 /** The store's own page, which every add-on page sits under. */
 export const ADDONS_HREF = "/account/addons";
@@ -24,6 +24,8 @@ export interface AddonSearchWords {
     readonly catalog: string;
     /** Second line of a setting ("Setting of {name}"). */
     readonly setting: (name: string) => string;
+    /** Second line of a group of settings ("Settings of {name}"). */
+    readonly section: (name: string) => string;
     /** Second line of an add-on to install ("By {publisher} - {summary}"). */
     readonly offer: (publisher: string, summary: string) => string;
     /** Terms that find any add-on ("add-on", "plugin" in the reader's language). */
@@ -39,11 +41,6 @@ export interface AddonSearchSource {
 
 export function addonHref(id: string): string {
     return `${ADDONS_HREF}/${encodeURIComponent(id)}`;
-}
-
-/** Where one setting is drawn on its add-on's page (the row's `id`). */
-export function addonSettingAnchor(key: string): string {
-    return `setting-${key}`;
 }
 
 function claimNames(manifest: Pick<AddonManifest, "claims">): string[] {
@@ -71,17 +68,17 @@ export function addonEntries(source: AddonSearchSource, words: AddonSearchWords)
             keywords: [...words.keywords, manifest.publisher, ...claimNames(manifest)]
         });
         // A setting is only drawn once the add-on's own files are read.
-        for (const setting of addon.manifest?.settings ?? []) {
-            const label = addonText(setting.label, source.locale);
-            const options = setting.kind === "choice" ? setting.options.map((option) => addonText(option.label, source.locale)) : [];
+        if (!addon.manifest) continue;
+        for (const target of addonSettingTargets(addon.manifest, source.locale)) {
+            const group = target.kind === "group";
             entries.push({
-                id: `addon-setting:${addon.id}:${setting.key}`,
-                label: `${manifest.name} - ${label}`,
+                id: `addon-${target.kind}:${addon.id}:${target.key}`,
+                label: target.section ? `${manifest.name} - ${target.section} - ${target.label}` : `${manifest.name} - ${target.label}`,
                 group: words.installed,
-                href: `${href}#${addonSettingAnchor(setting.key)}`,
-                icon: SlidersHorizontal,
-                context: words.setting(manifest.name),
-                keywords: [label, ...(setting.hint ? [addonText(setting.hint, source.locale)] : []), ...options]
+                href: `${href}#${target.anchor}`,
+                icon: group ? LayoutGrid : SlidersHorizontal,
+                context: group ? words.section(manifest.name) : words.setting(manifest.name),
+                keywords: [target.label, ...(target.section ? [target.section] : []), ...target.words]
             });
         }
     }

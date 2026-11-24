@@ -413,3 +413,45 @@ export function addonSettingSections(manifest: Pick<AddonManifest, "settings" | 
     }
     return sections;
 }
+
+/** Where one setting is drawn on its add-on's page (the element's `id`), for a link straight to it. */
+export function addonSettingAnchor(key: string): string {
+    return `setting-${key}`;
+}
+
+/** Where one group of settings is drawn on its add-on's page (the section's `id`). */
+export function addonGroupAnchor(key: string): string {
+    return `group-${key}`;
+}
+
+/** A place on an add-on's page a search result can lead to: a group of settings or one setting. */
+export interface AddonSettingTarget {
+    readonly kind: "group" | "setting";
+    readonly key: string;
+    /** The element's `id` on the add-on's page. */
+    readonly anchor: string;
+    readonly label: string;
+    /** The group a setting is drawn in, or null for a group and for a setting in none. */
+    readonly section: string | null;
+    /** Other words that find it: its hint, a choice's options, a group's settings. */
+    readonly words: readonly string[];
+}
+
+/** Every group and setting of an add-on, in the order its page draws them, in the reader's language. */
+export function addonSettingTargets(manifest: Pick<AddonManifest, "settings" | "groups">, locale: string): AddonSettingTarget[] {
+    const targets: AddonSettingTarget[] = [];
+    for (const { group, settings } of addonSettingSections(manifest)) {
+        const section = group ? addonText(group.label, locale) : null;
+        const labels = settings.map((setting) => addonText(setting.label, locale));
+        if (group && section) {
+            const words = [...(group.hint ? [addonText(group.hint, locale)] : []), ...labels];
+            targets.push({ kind: "group", key: group.key, anchor: addonGroupAnchor(group.key), label: section, section: null, words });
+        }
+        settings.forEach((setting, index) => {
+            const options = setting.kind === "choice" ? setting.options.map((option) => addonText(option.label, locale)) : [];
+            const words = [...(setting.hint ? [addonText(setting.hint, locale)] : []), ...options];
+            targets.push({ kind: "setting", key: setting.key, anchor: addonSettingAnchor(setting.key), label: labels[index]!, section, words });
+        });
+    }
+    return targets;
+}

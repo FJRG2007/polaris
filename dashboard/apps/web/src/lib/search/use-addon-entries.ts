@@ -103,6 +103,7 @@ export function useAddonEntries(open: boolean, host: SearchHost | undefined): Co
                 installed: t("search.addons.installed"),
                 catalog: t("search.addons.catalog"),
                 setting: (name) => t("search.addons.setting", { name }),
+                section: (name) => t("search.addons.section", { name }),
                 offer: (publisher, summary) => t("search.addons.offer", { publisher, summary }),
                 keywords: [t("search.addons.installed"), "add-on", "addon", "plugin"]
             }

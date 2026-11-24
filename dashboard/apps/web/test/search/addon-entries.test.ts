@@ -1,7 +1,8 @@
 /**
  * Device add-ons in the search. The rules being protected: an add-on installed
  * on this device is found by its name and leads to its page; each setting it
- * declares is found too and leads to that setting on the page; the catalog's
+ * declares, and each group they are drawn in, is found too and leads to that
+ * place on the page; the catalog's
  * others are listed apart, as add-ons to install, and never twice; and a page
  * with no desktop app behind it (installed unknown) lists only those.
  */
@@ -32,8 +33,10 @@ const manifest = {
             label: { "en-US": "Knob 1", "es-ES": "Rueda 1" },
             options: [{ value: "calls", label: { "en-US": "Calls", "es-ES": "Llamadas" } }],
             default: "calls"
-        }
-    ]
+        },
+        { kind: "toggle", key: "pad1", label: { "en-US": "Pad 1" }, group: "pads", default: false }
+    ],
+    groups: [{ key: "pads", label: { "en-US": "Pads", "es-ES": "Botones" }, hint: { "en-US": "The square buttons" }, look: "buttons" }]
 } as unknown as AddonManifest;
 
 const other = { ...manifest, id: "fixture-pedal", name: "Fixture Pedal", settings: [], claims: [] } as unknown as AddonEntry;
@@ -44,6 +47,7 @@ const words: AddonSearchWords = {
     installed: "Device add-ons",
     catalog: "Add-ons to install",
     setting: (name) => `Setting of ${name}`,
+    section: (name) => `Settings of ${name}`,
     offer: (publisher, summary) => `By ${publisher} - ${summary}`,
     keywords: ["add-on"]
 };
@@ -68,6 +72,17 @@ describe("addonEntries", () => {
         expect(knob).toMatchObject({ label: "Fixture Mixer 100 - Rueda 1", href: "/account/addons/fixture-mixer#setting-knob1", context: "Setting of Fixture Mixer 100" });
         expect(entries.find((entry) => entry.id === "addon-setting:fixture-mixer:enabled")?.label).toBe("Fixture Mixer 100 - Use the mixer");
         expect(find(entries, "llamadas").map((entry) => entry.id)).toContain("addon-setting:fixture-mixer:knob1");
+    });
+
+    it("lists each group of settings, leading to its section, and finds a setting by its group", () => {
+        const entries = addonEntries({ installed: [installed], catalog, locale: "es-ES" }, words);
+        const group = entries.find((entry) => entry.id === "addon-group:fixture-mixer:pads");
+        expect(group).toMatchObject({ label: "Fixture Mixer 100 - Botones", href: "/account/addons/fixture-mixer#group-pads", context: "Settings of Fixture Mixer 100" });
+        const pad = entries.find((entry) => entry.id === "addon-setting:fixture-mixer:pad1");
+        expect(pad).toMatchObject({ label: "Fixture Mixer 100 - Botones - Pad 1", href: "/account/addons/fixture-mixer#setting-pad1" });
+        // A group is found by its hint and by the settings in it.
+        expect(find(entries, "square buttons").map((entry) => entry.id)).toContain("addon-group:fixture-mixer:pads");
+        expect(find(entries, "botones").map((entry) => entry.id)).toContain("addon-setting:fixture-mixer:pad1");
     });
 
     it("lists the catalog's others apart, and an installed one never as one to install", () => {

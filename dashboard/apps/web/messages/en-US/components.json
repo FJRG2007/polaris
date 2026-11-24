@@ -203,6 +203,7 @@
             "installed": "Device add-ons",
             "catalog": "Add-ons to install",
             "setting": "Setting of {name}",
+            "section": "Settings of {name}",
             "offer": "By {publisher} - {summary}"
         },
         "recent": "Recent",

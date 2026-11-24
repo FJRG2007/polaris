@@ -22,6 +22,8 @@ import {
     ADDON_ACTIONS,
     ADDON_CATEGORIES,
     addonText,
+    addonGroupAnchor,
+    addonSettingAnchor,
     addonSettingSections,
     readAddonSettingValues,
     type AddonEntry,
@@ -44,7 +46,6 @@ import {
     type AddonsBridge,
     type AddonsState
 } from "@/lib/device-addons-client";
-import { addonSettingAnchor } from "@/lib/search/addon-entries";
 import { pageIsDark } from "@/lib/page-theme";
 import { OfficialSoftware } from "./official-software";
 import { useOfficialChoice } from "./official-choice-dialog";
@@ -485,7 +486,7 @@ function SettingTile({ look, ...props }: SettingProps & { look: "dials" | "butto
     const label = addonText(props.setting.label, props.locale);
     const lit = props.value !== null && props.value !== false && props.value !== "none";
     return (
-        <div className="flex min-w-0 flex-col items-center gap-2 rounded-md border border-border p-3">
+        <div id={addonSettingAnchor(props.setting.key)} className="flex min-w-0 scroll-mt-24 flex-col items-center gap-2 rounded-md border border-border p-3">
             <TileShape look={look} lit={lit} />
             <p className="max-w-full truncate text-xs text-muted-foreground" title={label}>
                 {label}
@@ -501,7 +502,7 @@ function SettingGroup({ group, locale, children }: { group: AddonSettingGroup | 
     const hint = group.hint ? addonText(group.hint, locale) : null;
     const tiles = group.look === "dials" || group.look === "buttons";
     return (
-        <section className="flex min-w-0 flex-col gap-2" aria-label={addonText(group.label, locale)}>
+        <section id={addonGroupAnchor(group.key)} className="flex min-w-0 scroll-mt-24 flex-col gap-2" aria-label={addonText(group.label, locale)}>
             <div className="min-w-0">
                 <h3 className="truncate text-sm font-medium">{addonText(group.label, locale)}</h3>
                 {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
@@ -531,7 +532,7 @@ function AddonSettings({ bridge, manifest }: { bridge: AddonsBridge; manifest: A
         };
     }, [bridge, manifest]);
 
-    // A search result names one setting (`#setting-<key>`); it is drawn only once the values arrive.
+    // A search result names one setting or group (`#setting-<key>`, `#group-<key>`); they are drawn only once the values arrive.
     const loaded = values !== null;
     useEffect(() => {
         if (!loaded) return;

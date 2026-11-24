@@ -3,14 +3,16 @@
  * An add-on's page draws every setting with Polaris's own controls, in the
  * groups its manifest declares - the Stream 100's knobs as dials, its buttons
  * as buttons - and never a native select, checkbox or slider. A manifest
- * without groups (an app older than them) reads as one list.
+ * without groups (an app older than them) reads as one list. Every group and
+ * setting a search result can name is drawn under that name, tiles included,
+ * and the page scrolls to the one in its address.
  */
 
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
-import { addonSettingSections, readAddonManifest, readAddonSettingValues } from "@polaris/core/device-addons";
+import { addonSettingSections, addonSettingTargets, readAddonManifest, readAddonSettingValues } from "@polaris/core/device-addons";
 
 vi.mock("@/components/i18n/i18n-provider", () => ({
     useLocale: () => "es-ES",
@@ -73,6 +75,29 @@ describe("an add-on's settings", () => {
         expect(within(screen.getByRole("region", { name: "Botones iluminados" })).getAllByRole("combobox")).toHaveLength(4);
         expect(screen.getByRole("region", { name: "Pantalla" })).toBeTruthy();
         expect(view.container.querySelectorAll("select, option, input[type=range], input[type=checkbox], textarea")).toHaveLength(0);
+    });
+
+    it("draw every place a search result names, tiles and groups included, and scroll to the one in the address", async () => {
+        // jsdom draws nothing, so it has no scrollIntoView: record the calls instead.
+        const scrolled: string[] = [];
+        const before = Element.prototype.scrollIntoView;
+        Element.prototype.scrollIntoView = function (this: Element) {
+            scrolled.push(this.id);
+        };
+        window.history.replaceState(null, "", "#setting-knob2");
+        try {
+            const view = open(raw);
+            await screen.findByRole("region", { name: "Ruedas" });
+            const targets = addonSettingTargets(manifest, "es-ES");
+            expect(targets.some((target) => target.kind === "group")).toBe(true);
+            for (const target of targets) expect(view.container.querySelector(`[id="${target.anchor}"]`), target.anchor).not.toBeNull();
+            // A knob is a tile, not a row: its own element carries the name.
+            expect(view.container.querySelector("#setting-knob2")?.textContent).toContain("Rueda 2");
+            await waitFor(() => expect(scrolled).toContain("setting-knob2"));
+        } finally {
+            window.history.replaceState(null, "", "#");
+            Element.prototype.scrollIntoView = before;
+        }
     });
 
     it("read as one list from an app that does not know groups", async () => {
