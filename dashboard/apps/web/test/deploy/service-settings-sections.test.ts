@@ -32,6 +32,7 @@ const FILES = [
     "gpu-card.tsx",
     "deploy-hooks-card.tsx",
     "restart-policy-card.tsx",
+    "build-options-card.tsx",
     "registries/registry-pick-card.tsx"
 ];
 

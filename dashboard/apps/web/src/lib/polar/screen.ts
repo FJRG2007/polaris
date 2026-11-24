@@ -33,6 +33,8 @@ export interface ScreenRecord {
 export const SCREEN_RECORDS: readonly ScreenRecord[] = [
     { route: "/o/[slug]", kind: "organization profile", id: "slug" },
     { route: "/u/[username]", kind: "user profile", id: "username" },
+    { route: "/account/addons/[addonId]", kind: "device add-on", id: "addonId" },
+    { route: "/account/app/[category]", kind: null },
     { route: "/account/api-keys/[keyId]/usage", kind: "api key", id: "keyId" },
     { route: "/account/api-keys/[keyId]", kind: "api key", id: "keyId" },
     { route: "/account/organizations/[slug]/[[...section]]", kind: "organization", id: "slug" },
