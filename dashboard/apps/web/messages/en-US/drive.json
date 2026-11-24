@@ -1275,5 +1275,17 @@
             "fileFailed": "{name} could not be uploaded: {reason}",
             "revokeFailed": "Could not delete it. Try again."
         }
+    },
+    "offline": {
+        "title": "Changes waiting for Polaris",
+        "rename": "Rename {from} to {to}",
+        "move": "Move {name} to {folder}",
+        "moveTop": "Move {name} to the top folder",
+        "trash": "Move {name} to the bin",
+        "mkdir": "New folder {name}",
+        "waiting": "Made when Polaris is back",
+        "notMade": "Not made",
+        "retry": "Try again",
+        "drop": "Drop"
     }
 }

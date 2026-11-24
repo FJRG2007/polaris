@@ -55,7 +55,7 @@ import { RequestDialog, type RequestTarget } from "./request-dialog";
 import { ConnectionDialog, EditConnectionDialog } from "./connection-dialog";
 import { AccessDialog, UnlockPanel, type AccessTarget } from "./access-dialog";
 import { PeopleShareDialog, type PeopleShareTarget } from "./people-share-dialog";
-import { useCallback, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react";
 import {
     abortPrefetchesOutside,
     dropDriveSnapshots,
@@ -106,6 +106,9 @@ import {
     DateInput
 } from "@polaris/ui";
 import * as polls from "./drive-reads";
+import { isNetworkFailure } from "@/lib/reachability";
+import { KeptDriveChanges } from "./kept-changes";
+import { keepDriveChange, useDriveChanges, withDriveChanges, type DriveChange } from "./offline-changes";
 
 /** How often the machines behind the sources are re-checked. One short-lived
  *  socket per source, and a device going down is worth noticing while the
@@ -191,6 +194,13 @@ export function DriveExplorer({
     const conflicts = useConflictPrompt();
 
     const [entries, setEntries] = useState<DriveEntry[]>([]);
+    /** Changes made here while Polaris could not be reached, and the folder
+     *  drawn as it will be once they are made. */
+    const driveChanges = useDriveChanges(connectionId ?? null);
+    const shownEntries = useMemo(
+        () => (connectionId ? withDriveChanges(entries, connectionId, path, driveChanges) : entries),
+        [entries, connectionId, path, driveChanges]
+    );
     const [loading, setLoading] = useState(false);
     /** Why the listing did not arrive, as the panel draws it: the sentence, what
      *  to do about it, and - for somebody who administers this connection - what
@@ -261,6 +271,20 @@ export function DriveExplorer({
     useEffect(() => {
         if (notice) setOpError(notice);
     }, [notice]);
+
+    /**
+     * Ask for a change, or keep it on this device when Polaris cannot be
+     * reached - it is made when Polaris answers (`offline-changes`). Anything
+     * else that goes wrong is left to the caller, as before.
+     */
+    async function orKeep<T extends object>(change: DriveChange, ask: () => Promise<T>): Promise<T | object> {
+        try {
+            return await ask();
+        } catch (caught) {
+            if (isNetworkFailure(caught) && (await keepDriveChange(change))) return {};
+            throw caught;
+        }
+    }
 
     /** Run a mutating operation in the background: shows in the operations panel,
      * keeps the dashboard usable (a transition), and refreshes the listing after.
@@ -461,7 +485,13 @@ export function DriveExplorer({
                 // The request itself never landed - the tab went offline, or the
                 // dashboard was restarting under it. Nothing was learned about
                 // the device, so the offer is simply to ask again.
-                if (!signal.aborted) {
+                // The folder as it was last read, when this tab has it: still
+                // there to look at and to rename, move or delete in.
+                const kept = signal.aborted ? null : readListing(connectionId, path, true);
+                if (kept) {
+                    setEntries(kept);
+                    setOpError(t("explorer.unreachable"));
+                } else if (!signal.aborted) {
                     setError({
                         reason: t("explorer.unreachable"),
                         hint: t("explorer.unreachableHint"),
@@ -647,7 +677,9 @@ export function DriveExplorer({
         setNewFolderOpen(false);
         setNewFolderName("");
         runOp(t("explorer.ops.creating", { name }), () =>
-            driveActions.mkdirAction(connectionId, path, name)
+            orKeep({ op: "mkdir", connectionId, path, name }, () =>
+                driveActions.mkdirAction(connectionId, path, name)
+            )
         );
     }
 
@@ -662,8 +694,14 @@ export function DriveExplorer({
         );
         setOpError(null);
         startTransition(async () => {
-            const result = await driveActions.renameAction(connectionId, entry.path, to);
-            if (result?.error) setOpError(result.error);
+            try {
+                const result = await orKeep({ op: "rename", connectionId, from: entry.path, to }, () =>
+                    driveActions.renameAction(connectionId, entry.path, to)
+                );
+                if ("error" in result && result.error) setOpError(String(result.error));
+            } catch {
+                setOpError(t("explorer.opFailed", { label: nextName }));
+            }
             void load();
         });
     }
@@ -788,9 +826,11 @@ export function DriveExplorer({
         if (!connectionId) return {};
         let mode = first;
         for (let round = 0; round < 3; round++) {
-            const result =
+            const result: { error?: string; conflict?: ClashView } =
                 kind === "move"
-                    ? await driveActions.moveIntoAction(connectionId, entry.path, dest, mode)
+                    ? await orKeep({ op: "move", connectionId, from: entry.path, dest }, () =>
+                          driveActions.moveIntoAction(connectionId, entry.path, dest, mode)
+                      )
                     : await driveActions.copyAction(connectionId, entry.path, dest, mode);
             if (!result.conflict) return result;
             const answers = await conflicts.ask({ clashes: [result.conflict], batch, late: true });
@@ -857,11 +897,30 @@ export function DriveExplorer({
     async function startJob(kind: "trash" | "delete", targets: DriveEntry[]) {
         if (!connectionId) return;
         setOpError(null);
-        const result = await driveActions.startDriveJobAction(
-            connectionId,
-            kind,
-            targets.map((entry) => entry.path)
-        );
+        let result: Awaited<ReturnType<typeof driveActions.startDriveJobAction>>;
+        try {
+            result = await driveActions.startDriveJobAction(
+                connectionId,
+                kind,
+                targets.map((entry) => entry.path)
+            );
+        } catch (caught) {
+            // To the bin is kept for when Polaris answers; deleting for good is
+            // not something to do later on its own, so it is put back and said.
+            const kept =
+                kind === "trash" && isNetworkFailure(caught)
+                    ? (
+                          await Promise.all(
+                              targets.map((entry) => keepDriveChange({ op: "trash", connectionId, path: entry.path }))
+                          )
+                      ).every(Boolean)
+                    : false;
+            if (!kept) {
+                setOpError(t("explorer.unreachable"));
+                void load();
+            }
+            return;
+        }
         if (result.error) {
             setOpError(result.error);
             dropDriveSnapshots();
@@ -1075,7 +1134,7 @@ export function DriveExplorer({
                         path={path}
                         segments={segments}
                         rootPath={selectedConnection?.rootPath ?? ""}
-                        entries={entries}
+                        entries={shownEntries}
                         loading={loading}
                         error={error}
                         onRetry={() => void load(true)}
@@ -1269,6 +1328,7 @@ export function DriveExplorer({
                 </div>
             ) : null}
 
+            <KeptDriveChanges changes={driveChanges} />
             {opError ? (
                 <div className="fixed bottom-[calc(1rem+var(--safe-bottom))] end-[calc(1rem+var(--safe-end))] z-50 flex w-80 items-start gap-2 rounded-lg border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink shadow-popover">
                     <Info className="mt-0.5 size-4 shrink-0" />

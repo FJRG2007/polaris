@@ -56,9 +56,10 @@ export function recentKey(connectionId: string, lens: string): string {
     return `${RECENT_PREFIX}${connectionId}:${lens}`;
 }
 
-/** The cached listing of a folder, or null when there is none worth painting. */
-export function readListing(connectionId: string, path: string): DriveEntry[] | null {
-    return readSnapshot<DriveEntry[]>(key(connectionId, path), TTL_MS)?.value ?? null;
+/** The cached listing of a folder, or null when there is none worth painting.
+ *  `anyAge` takes it however old, for when Polaris cannot be asked at all. */
+export function readListing(connectionId: string, path: string, anyAge = false): DriveEntry[] | null {
+    return readSnapshot<DriveEntry[]>(key(connectionId, path), anyAge ? Number.POSITIVE_INFINITY : TTL_MS)?.value ?? null;
 }
 
 export function writeListing(connectionId: string, path: string, entries: DriveEntry[]): void {

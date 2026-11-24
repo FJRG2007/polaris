@@ -35,6 +35,8 @@ vi.mock("@/components/use-live-resource", () => ({
         refresh: () => {}
     })
 }));
+// The offline replay is a server action; the explorer only imports it.
+vi.mock("../../src/app/(app)/drive/offline-actions", () => ({ replayDriveChangeAction: async () => ({}) }));
 vi.mock("../../src/app/(app)/drive/actions", () => ({}));
 // Saving "don't ask again" is a server action file that reaches the session
 // as it is imported; nothing here answers that question.

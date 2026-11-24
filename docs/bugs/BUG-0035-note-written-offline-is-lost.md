@@ -166,3 +166,18 @@ message carries the composer's key (`draftKey` on `mailDraftSchema`):
 answer writes over the same draft, and a draft that has since been queued or
 sent is left alone rather than put back to being a draft. A save the composer
 gets through itself, or a send, forgets any older kept copy.
+
+## Drive changes made offline
+
+A rename, a move, a new folder or a delete to the bin made in Drive while
+Polaris could not be reached used to fail with a banner. Now each is kept on the
+device (`drive/offline-changes.ts`, kind `drive.change`, one entry per change,
+in order) and made when Polaris answers (`replayDriveChangeAction`). A replay
+whose first attempt landed and only lost its answer is answered as done: the
+renamed or moved file is already where it was going, the binned one is gone,
+the folder already exists. Until then the folder is drawn as it will be, and
+the changes wait in a strip above it with a clock, or with Polaris's reason, Try
+again and Drop. A folder opened with Polaris unreachable shows the last listing
+this tab read, however old, with the unreachable banner. Uploads and deleting
+for good are not kept: one needs the file on the host, the other cannot be
+undone, so it is put back and says Polaris could not be reached.

@@ -1275,5 +1275,17 @@
             "fileFailed": "No se pudo subir {name}: {reason}",
             "revokeFailed": "No se pudo borrar. Reintenta."
         }
+    },
+    "offline": {
+        "title": "Cambios pendientes",
+        "rename": "Renombrar {from} a {to}",
+        "move": "Mover {name} a {folder}",
+        "moveTop": "Mover {name} a la raíz",
+        "trash": "Enviar {name} a la papelera",
+        "mkdir": "Carpeta nueva {name}",
+        "waiting": "Al volver Polaris",
+        "notMade": "No hecho",
+        "retry": "Reintentar",
+        "drop": "Quitar"
     }
 }
