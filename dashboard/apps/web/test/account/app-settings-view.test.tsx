@@ -28,7 +28,7 @@ const SNAPSHOT = {
     launcher: true,
     launcherBinding: "Alt+Space",
     launcherGameMode: true,
-    launcherEngine: "duckduckgo",
+    launcherEngine: "google",
     launcherClipboard: true,
     launcherClipboardKeep: "week",
     voiceWidget: true,

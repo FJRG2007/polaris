@@ -72,7 +72,7 @@ describe("the app's answer as the page reads it", () => {
         const snapshot = readAppSettings({ launcher: false, version: "0.1.70" });
         expect(snapshot?.launcher).toBe(false);
         expect(snapshot?.voiceWidgetGameOnly).toBe(false);
-        expect(snapshot?.launcherEngine).toBe("duckduckgo");
+        expect(snapshot?.launcherEngine).toBe("google");
         expect(snapshot?.servers).toEqual([]);
         expect(snapshot?.voiceWidgetOpacity).toBe("100");
         expect(snapshot?.voiceWidgetCorner).toBe("top-left");

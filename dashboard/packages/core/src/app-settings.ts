@@ -30,7 +30,7 @@ export const APP_SETTING_CATEGORIES = [
 export type AppSettingCategory = (typeof APP_SETTING_CATEGORIES)[number];
 
 /** Where a web search from the launcher goes, the first the default. */
-export const APP_SEARCH_ENGINES = ["duckduckgo", "google", "bing", "brave", "startpage"] as const;
+export const APP_SEARCH_ENGINES = ["google", "duckduckgo", "bing", "brave", "startpage"] as const;
 
 /** How long the clipboard history keeps a copy. */
 export const APP_CLIPBOARD_KEEPS = ["day", "week", "month", "quarter"] as const;
@@ -65,7 +65,7 @@ export const APP_SETTINGS = [
     { key: "launcher", kind: "toggle", category: "search", default: true },
     { key: "launcherBinding", kind: "shortcut", category: "search", default: "Alt+Space", dependsOn: "launcher" },
     { key: "launcherGameMode", kind: "toggle", category: "search", default: true, dependsOn: "launcher" },
-    { key: "launcherEngine", kind: "choice", category: "search", default: "duckduckgo", options: APP_SEARCH_ENGINES },
+    { key: "launcherEngine", kind: "choice", category: "search", default: "google", options: APP_SEARCH_ENGINES },
     { key: "launcherClipboard", kind: "toggle", category: "clipboard", default: true },
     {
         key: "launcherClipboardKeep",
@@ -164,7 +164,7 @@ const snapshotSchema = z.object({
     launcher: z.boolean().catch(true),
     launcherBinding: z.string().max(40).catch("Alt+Space"),
     launcherGameMode: z.boolean().catch(true),
-    launcherEngine: z.enum(APP_SEARCH_ENGINES).catch("duckduckgo"),
+    launcherEngine: z.enum(APP_SEARCH_ENGINES).catch("google"),
     launcherClipboard: z.boolean().catch(true),
     launcherClipboardKeep: z.enum(APP_CLIPBOARD_KEEPS).catch("week"),
     voiceWidget: z.boolean().catch(true),

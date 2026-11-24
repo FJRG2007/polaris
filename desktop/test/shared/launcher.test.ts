@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { convert, evaluate, quickAnswer } from "@/shared/quick-answer";
-import { matchScore, rankedMatches, topMatches, useBoost, USE_BOOST_MAX, webSearchUrl } from "@/shared/launcher";
+import { DEFAULT_SEARCH_ENGINE, launcherEngineOf, matchScore, rankedMatches, SEARCH_ENGINE_IDS, topMatches, useBoost, USE_BOOST_MAX, webSearchUrl } from "@/shared/launcher";
 import { conflictSentence, findLaunchers, likelyHolders } from "@/shared/launcher-conflicts";
 import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipboardProbe } from "@/shared/clipboard-history";
 import { bindingFromPress, DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator, type KeyPress } from "@/shared/launcher-hotkey";
@@ -191,6 +191,16 @@ describe("the launcher's list", () => {
         expect(webSearchUrl("google", "539 + 21%")).toBe("https://www.google.com/search?q=539%20%2B%2021%25");
     });
 
+    it("searches with Google unless somebody picked another engine", () => {
+        expect(DEFAULT_SEARCH_ENGINE).toBe("google");
+        expect(SEARCH_ENGINE_IDS[0]).toBe("google");
+        // The old default, saved by every settings file whether or not it was picked.
+        expect(launcherEngineOf("duckduckgo", false)).toBe("google");
+        expect(launcherEngineOf("duckduckgo", true)).toBe("duckduckgo");
+        expect(launcherEngineOf("bing", false)).toBe("bing");
+        expect(launcherEngineOf("startpage", true)).toBe("startpage");
+        expect(launcherEngineOf("google", false)).toBe("google");
+    });
 });
 
 describe("ranking by use", () => {
