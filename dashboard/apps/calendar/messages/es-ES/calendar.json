@@ -699,5 +699,17 @@
         "floating": "Sin zona (flotante)",
         "none": "Ninguna zona coincide.",
         "search": "Buscar zona horaria"
+    },
+    "offline": {
+        "title": "Pendiente de guardar",
+        "create": "Nuevo: {title}",
+        "save": "Cambiado: {title}",
+        "move": "Movido: {title}",
+        "delete": "Borrado: {title}",
+        "waiting": "Espera a Polaris",
+        "notMade": "No se hizo",
+        "keepMine": "Dejar el mío",
+        "drop": "Quitar",
+        "kept": "Guardado aquí. Se hará cuando vuelva Polaris."
     }
 }

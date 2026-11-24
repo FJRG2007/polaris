@@ -173,6 +173,27 @@ function sharedPlugin(side, used) {
     };
 }
 
+/**
+ * The browser half of one module of server actions: each a call the dashboard
+ * forwards, carrying which action it is under `polaris.app-action-ref`, so the
+ * dashboard can keep the call and make it later when Polaris cannot be reached
+ * (`hostUi.offline`). Exported for the tests.
+ */
+export function actionStubSource(appId, moduleId, names) {
+    const at = (name) =>
+        `${JSON.stringify(appId)}, ${JSON.stringify(moduleId)}, ${JSON.stringify(name)}`;
+    const ref = (name) =>
+        `{ app: ${JSON.stringify(appId)}, module: ${JSON.stringify(moduleId)}, name: ${JSON.stringify(name)} }`;
+    return [
+        `const call = globalThis[Symbol.for("polaris.app-action")];`,
+        `const ref = Symbol.for("polaris.app-action-ref");`,
+        ...names.map(
+            (name) =>
+                `export const ${name} = Object.assign((...args) => call(${at(name)}, args), { [ref]: ${ref(name)} });`
+        )
+    ].join("\n");
+}
+
 /** In the browser half, a server action is a call the dashboard forwards. */
 function actionStubPlugin(app, src, actions) {
     return {
@@ -182,14 +203,7 @@ function actionStubPlugin(app, src, actions) {
                 const id = actions.get(args.path);
                 if (!id) return undefined;
                 const names = actions.names.get(args.path);
-                const lines = [
-                    `const call = globalThis[Symbol.for("polaris.app-action")];`,
-                    ...names.map(
-                        (name) =>
-                            `export const ${name} = (...args) => call(${JSON.stringify(app.id)}, ${JSON.stringify(id)}, ${JSON.stringify(name)}, args);`
-                    )
-                ];
-                return { contents: lines.join("\n"), loader: "js" };
+                return { contents: actionStubSource(app.id, id, names), loader: "js" };
             });
         }
     };

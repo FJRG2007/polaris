@@ -9,9 +9,11 @@
  * below are what make every kind sendable from anywhere.
  */
 
+import "@/app/(app)/drive/offline-changes";
 import "@/app/(app)/mail/offline-sends";
 import "@/app/(app)/notes/offline-writes";
 import "@/app/(app)/office/offline-writes";
+import "@/lib/offline/app-action-writes";
 import { appWrites, offlineStore, recoverUnloaded } from "@/lib/offline/app-writes";
 import { useQueueFlusher } from "@/lib/offline/write-queue";
 

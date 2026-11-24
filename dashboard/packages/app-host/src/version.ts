@@ -14,7 +14,7 @@
 
 /** The host API this dashboard provides. Kept equal to `hostApi` in this
  *  package's package.json, which is what the bundler reads. */
-export const HOST_API = "1.1";
+export const HOST_API = "1.2";
 
 /** What a bundle built before bundles declared a version was built against. */
 export const LEGACY_HOST_API = "1.0";

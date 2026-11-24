@@ -186,6 +186,35 @@ this tab read, however old, with the unreachable banner. Uploads and deleting
 for good are not kept: one needs the file on the host, the other cannot be
 undone, so it is put back and says Polaris could not be reached.
 
+## Calendar changes made offline (2026-11-24)
+
+A new event, a save from the editor, a drag or resize, and a delete made in
+Calendar while Polaris could not be reached used to fail with a toast. Calendar
+is an app bundle, so this is built once for every bundle: each action stub the
+bundler writes carries which action it is (`polaris.app-action-ref`), and the
+dashboard offers apps `hostUi.offline` (host API 1.2), which tries the call and,
+when no server answers, keeps it as data in the shared queue (kind
+`app.action`, `lib/offline/app-action-writes.ts`) and sends it to
+`/api/app-bundles/action` from whichever page is open. An `{ ok: false, error }`
+answer marks it not sent with the app's words; a gateway or 5xx answer is tried
+again. A whole save replaces one still waiting for the same event; drags and
+deletes follow each other in order, and a later change to an event with one
+waiting is kept behind it rather than made out of order.
+
+The grid draws the waiting changes as they will be (`withKeptCalls`), and a
+strip above it shows each with a clock, or with the refusal, Try again and Drop
+- and for a save refused because the event changed meanwhile, Keep mine (sent
+again with no version). A new event carries a UID chosen on the device, so one
+sent again after a lost answer is the event already made, not a second. A drag
+sent again after a lost answer would move twice; that window is the request
+landing and only its answer being lost.
+
+The Drive kind is now registered on every page too (`components/offline-writes.tsx`):
+before, a Drive change flushed from another screen was marked not made.
+
+Not covered: opening an event offline (the editor reads it from Polaris), and a
+calendar bundle on a dashboard older than host API 1.2 fails as before.
+
 ## A long outage marked waiting writes as not sent
 
 Every flush that found no server counted an attempt, and five marked the write

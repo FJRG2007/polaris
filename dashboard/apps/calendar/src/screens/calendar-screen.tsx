@@ -62,6 +62,8 @@ import { ViewPicker } from "./view-picker";
 import type { PartStat } from "../engine";
 import { TodoEditor } from "./todo-editor";
 import { TaskCard } from "./task-card";
+import { KeptStrip } from "./kept-strip";
+import * as offline from "./offline-calls";
 import * as taskActions from "../actions/tasks";
 import { useScopeChoice } from "./scope-dialog";
 import type { GridTarget } from "./grid-target";
@@ -295,6 +297,14 @@ export function CalendarScreen({ path }: { path: string[] }) {
         readRange(instants, zone, signal, t("grid.loadFailed"))
     );
     const { refresh: refreshRange, replace: replaceRange } = rangeRead;
+    // What this device changed while Polaris could not be reached, drawn as it
+    // will be once it is made.
+    const kept = offline.useKeptCalls();
+    const shownRange = useMemo(
+        () => (rangeRead.data ? offline.withKeptCalls(rangeRead.data, kept) : null),
+        [rangeRead.data, kept]
+    );
+    const keptWaiting = kept.filter((call) => call.state === "pending").length;
 
     // The address follows the view; an opened event keeps its own until closed.
     useEffect(() => {
@@ -332,7 +342,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
     );
     const events = useMemo(
         () =>
-            gridEvents(rangeRead.data, {
+            gridEvents(shownRange, {
                 zone,
                 locale,
                 now,
@@ -345,7 +355,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 t
             }),
         [
-            rangeRead.data,
+            shownRange,
             zone,
             locale,
             now,
@@ -371,6 +381,19 @@ export function CalendarScreen({ path }: { path: string[] }) {
         dropCached("range");
         refreshRange();
     }, [refreshRange]);
+
+    // A kept change was made: the window is read again, now as the server has it.
+    const keptBefore = useRef(keptWaiting);
+    useEffect(() => {
+        if (keptWaiting < keptBefore.current) eventsChanged();
+        keptBefore.current = keptWaiting;
+    }, [keptWaiting, eventsChanged]);
+
+    /** A change kept on this device: the grid draws it from the kept call. */
+    const keptOffline = (previous: RangeView | null) => {
+        if (previous) replaceRange(previous);
+        toast.show({ key: "calendar-kept", title: t("offline.kept") });
+    };
 
     // An event changed anywhere else - an assistant's calendar tool, an
     // invitation answered, a Stream Deck key, another tab or device - is pushed
@@ -748,16 +771,27 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 )
             });
         try {
-            await unwrap(
-                () =>
-                    eventActions.deleteEventAction({
+            const answer = await offline.sendOrKeep(
+                eventActions.deleteEventAction,
+                { objectId: task.id, recurrenceKey: null, scope: "all", zone },
+                {
+                    target: task.id,
+                    meta: {
+                        op: "delete",
                         objectId: task.id,
-                        recurrenceKey: null,
+                        recurrenceKey: "",
                         scope: "all",
-                        zone
-                    }),
+                        start: "",
+                        summary: task.title
+                    }
+                },
                 t("screen.failed")
             );
+            if (answer === offline.KEPT) {
+                setSelected(null);
+                keptOffline(previous);
+                return;
+            }
             undo.current = {
                 run: async () => {
                     await unwrap(
@@ -867,19 +901,34 @@ export function CalendarScreen({ path }: { path: string[] }) {
         setCreating(true);
         const previous = rangeRead.data;
         try {
-            await unwrap(
-                () =>
-                    eventActions.saveEventAction({
+            const uid = offline.newEventUid();
+            const answer = await offline.sendOrKeep(
+                eventActions.saveEventAction,
+                {
+                    objectId: null,
+                    uid,
+                    recurrenceKey: null,
+                    scope: "all",
+                    version: null,
+                    zone,
+                    event: model.inputOf(form)
+                },
+                {
+                    target: `new:${uid}`,
+                    meta: {
+                        op: "save",
                         objectId: null,
-                        recurrenceKey: null,
-                        scope: "all",
-                        version: null,
-                        zone,
-                        event: model.inputOf(form)
-                    }),
+                        summary: form.summary,
+                        occurrence: offline.keptOccurrence(`new:${uid}`, form, zone)
+                    }
+                },
                 t("screen.failed")
             );
             setPopover(null);
+            if (answer === offline.KEPT) {
+                keptOffline(previous);
+                return;
+            }
             toast.show({ key: "calendar-created-event", title: t("editor.created") });
             eventsChanged();
         } catch (caught) {
@@ -922,16 +971,32 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 )
             });
         try {
-            await unwrap(
-                () =>
-                    eventActions.deleteEventAction({
+            const answer = await offline.sendOrKeep(
+                eventActions.deleteEventAction,
+                {
+                    objectId: occurrence.objectId,
+                    recurrenceKey: occurrence.recurring ? occurrence.recurrenceKey : null,
+                    scope,
+                    zone
+                },
+                {
+                    target: occurrence.objectId,
+                    meta: {
+                        op: "delete",
                         objectId: occurrence.objectId,
-                        recurrenceKey: occurrence.recurring ? occurrence.recurrenceKey : null,
+                        recurrenceKey: occurrence.recurrenceKey,
                         scope,
-                        zone
-                    }),
+                        start: occurrence.start,
+                        summary: occurrence.summary
+                    }
+                },
                 t("screen.failed")
             );
+            if (answer === offline.KEPT) {
+                setSelected(null);
+                keptOffline(previous);
+                return;
+            }
             if (scope === "all") {
                 undo.current = {
                     run: async () => {
@@ -1021,11 +1086,36 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 t("screen.failed")
             );
         try {
-            await shift(
-                change.startDeltaMs,
-                change.endDeltaMs,
-                occurrence.recurring ? occurrence.recurrenceKey : null
+            const answer = await offline.sendOrKeep(
+                eventActions.shiftEventAction,
+                {
+                    objectId: occurrence.objectId,
+                    recurrenceKey: occurrence.recurring ? occurrence.recurrenceKey : null,
+                    startDeltaMs: change.startDeltaMs,
+                    endDeltaMs: change.endDeltaMs,
+                    scope,
+                    version: null,
+                    zone
+                },
+                {
+                    target: occurrence.objectId,
+                    meta: {
+                        op: "shift",
+                        objectId: occurrence.objectId,
+                        recurrenceKey: occurrence.recurrenceKey,
+                        scope,
+                        start: occurrence.start,
+                        startDeltaMs: change.startDeltaMs,
+                        endDeltaMs: change.endDeltaMs,
+                        summary: occurrence.summary
+                    }
+                },
+                t("screen.failed")
             );
+            if (answer === offline.KEPT) {
+                keptOffline(previous);
+                return;
+            }
             undo.current = {
                 // The occurrence's own key is unchanged by a move: it names the original start.
                 run: async () => {
@@ -1606,7 +1696,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 </div>
                 <div className="flex items-center gap-1.5">
                     <CalendarSearch
-                        occurrences={rangeRead.data?.occurrences ?? []}
+                        occurrences={shownRange?.occurrences ?? []}
                         colorOf={colorOf}
                         zone={zone}
                         locale={locale}
@@ -1719,6 +1809,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                             {t("grid.stale")}
                         </p>
                     ) : null}
+                    <KeptStrip kept={kept} />
                     {rangeRead.data && rangeRead.data.unreadable > 0 ? (
                         <p
                             role="status"
