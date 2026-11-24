@@ -643,6 +643,23 @@ async function nextOrderInList(listId: string): Promise<number> {
     return first.order - core.ORDER_STEP;
 }
 
+/** The task a device already made under this id in the space, if any. */
+async function madeWithId(spaceId: string, id: string): Promise<{ id: string; reference: string } | null> {
+    const made = await prisma.task.findFirst({
+        where: { id, spaceId },
+        select: { id: true, number: true, space: { select: { prefix: true } } }
+    });
+    return made ? { id: made.id, reference: core.taskReference(made.space.prefix, made.number) } : null;
+}
+
+function isUniqueViolation(caught: unknown): boolean {
+    return (
+        typeof caught === "object" &&
+        caught !== null &&
+        (caught as Prisma.PrismaClientKnownRequestError).code === "P2002"
+    );
+}
+
 /**
  * Create a task. The reference number and the row are written in one
  * transaction, so a race hands out two numbers rather than one number twice.
@@ -654,19 +671,14 @@ export async function createTask(
 ): Promise<{ id: string; reference: string }> {
     // A write replayed from a device that kept it offline: already made, so
     // answered with what it is rather than made again.
-    if (input.id) {
-        const made = await prisma.task.findFirst({
-            where: { id: input.id, spaceId },
-            select: { id: true, number: true, space: { select: { prefix: true } } }
-        });
-        if (made) return { id: made.id, reference: core.taskReference(made.space.prefix, made.number) };
-    }
+    const made = input.id ? await madeWithId(spaceId, input.id) : null;
+    if (made) return made;
     const statusId = input.statusId
         ? (await statusInSpace(spaceId, input.statusId)).id
         : await defaultStatusId(spaceId);
     const order = await nextOrderInList(input.listId);
 
-    const created = await prisma.$transaction(async (tx) => {
+    const create = prisma.$transaction(async (tx) => {
         const { number, prefix } = await nextTaskNumber(tx, spaceId);
         const task = await tx.task.create({
             data: {
@@ -698,6 +710,16 @@ export async function createTask(
         });
         return { id: task.id, reference: core.taskReference(prefix, number) };
     });
+    let created: { id: string; reference: string };
+    try {
+        created = await create;
+    } catch (caught) {
+        // The same replay arrived twice at once and the other one made it:
+        // answered with that task, and its activity is already written.
+        const raced = input.id && isUniqueViolation(caught) ? await madeWithId(spaceId, input.id) : null;
+        if (!raced) throw caught;
+        return raced;
+    }
 
     await logActivity(created.id, actorId, "created");
     await announceAssignment(created.id, input.name, input.assigneeIds, actorId);

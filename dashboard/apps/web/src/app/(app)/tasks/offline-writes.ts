@@ -16,7 +16,8 @@
 
 import * as actions from "./actions";
 import { useEffect, useState } from "react";
-import { noteRequestFailure } from "@/lib/reachability";
+import { actionFailureText, runAction } from "@/lib/run-action";
+import { isNetworkFailure, noteRequestFailure } from "@/lib/reachability";
 import { newClientKey, type QueueSendResult } from "@/lib/offline/outbox";
 import { appWrites, offlineStore, registerWriteKind, type AppWrite } from "@/lib/offline/app-writes";
 
@@ -33,10 +34,11 @@ export type TaskCreatePayload = Record<string, unknown> & { readonly id: string;
 /** A change or a move: the action's own input, naming the task. */
 export type TaskChangePayload = Record<string, unknown> & { readonly taskId: string; };
 
+// Looked up when called, not when this module loads.
 const call: Record<TaskWriteKind, (payload: Record<string, unknown>) => Promise<{ id?: string; error?: string; }>> = {
-    [TASK_CREATE]: actions.createTaskAction,
-    [TASK_UPDATE]: actions.updateTaskAction,
-    [TASK_MOVE]: actions.moveTaskAction
+    [TASK_CREATE]: (payload) => actions.createTaskAction(payload),
+    [TASK_UPDATE]: (payload) => actions.updateTaskAction(payload),
+    [TASK_MOVE]: (payload) => actions.moveTaskAction(payload)
 };
 
 async function deliver(entry: Pick<AppWrite, "kind" | "target" | "payload">): Promise<QueueSendResult> {
@@ -86,8 +88,9 @@ export type TaskWriteResult = { id?: string; reference?: string; error?: string;
 
 /**
  * Write a task now, or keep the write for when Polaris answers. Answers what the
- * action answered when it was sent, `{ queued: true }` when it was kept, and
- * null when it failed in a way that is neither (`onFailure` was told).
+ * action answered when it was sent, `{ queued: true }` when it was kept (no
+ * answer, or the device is offline), and null when it failed otherwise - the
+ * server threw, or there was nowhere to keep it (`onFailure` was told).
  */
 export async function writeTask(
     kind: TaskWriteKind,
@@ -102,19 +105,27 @@ export async function writeTask(
     const behind = (await taskWrites()).some((entry) => entry.target === target && entry.state === "pending");
 
     if (!offline && !behind) {
-        try {
-            return await call[kind](input);
-        } catch (caught) {
-            // Not answered: kept, and sent when Polaris is back.
-            noteRequestFailure(caught);
-            console.error(caught);
-        }
+        let unanswered = false;
+        const answer = await runAction(
+            () =>
+                call[kind](input).catch((caught: unknown) => {
+                    // Not answered: kept below, and sent when Polaris is back. Anything
+                    // else (the server threw, a replaced build) fails as it always did.
+                    if (!isNetworkFailure(caught)) throw caught;
+                    noteRequestFailure(caught);
+                    unanswered = true;
+                    return null;
+                }),
+            onFailure
+        );
+        if (!unanswered) return answer;
     }
     if (await keep(kind, target, input)) {
         appWrites.flush();
         return { queued: true };
     }
-    onFailure("");
+    // Nowhere to keep it (no account on this device, storage refused).
+    onFailure(actionFailureText());
     return null;
 }
 
@@ -164,14 +175,4 @@ export function useTaskWrites(onSent?: (entry: AppWrite) => void): TaskWritesSta
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     return state;
-}
-
-/** Put every task write that was not taken back in line. */
-export async function retryTaskWrites(entries: readonly AppWrite[]): Promise<void> {
-    for (const entry of entries) if (entry.state === "failed") await appWrites.retry(entry);
-}
-
-/** Let go of every task write that was not taken: the tasks go back to what Polaris has. */
-export async function discardTaskWrites(entries: readonly AppWrite[]): Promise<void> {
-    for (const entry of entries) if (entry.state === "failed") await appWrites.discard(entry.key);
 }

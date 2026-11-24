@@ -11,8 +11,20 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button } from "@polaris/ui";
 import { createContext, useContext } from "react";
 import { AlertCircle, Clock } from "lucide-react";
-import type { AppWrite } from "@/lib/offline/app-writes";
-import { discardTaskWrites, retryTaskWrites } from "./offline-writes";
+import { appWrites, type AppWrite } from "@/lib/offline/app-writes";
+
+// Kept apart from `./offline-writes`, which reaches the server actions: the
+// rows that draw the mark are rendered where no server is.
+
+/** Put every task write that was not taken back in line. */
+async function retryTaskWrites(entries: readonly AppWrite[]): Promise<void> {
+    for (const entry of entries) if (entry.state === "failed") await appWrites.retry(entry);
+}
+
+/** Let go of every task write that was not taken: the tasks go back to what Polaris has. */
+async function discardTaskWrites(entries: readonly AppWrite[]): Promise<void> {
+    for (const entry of entries) if (entry.state === "failed") await appWrites.discard(entry.key);
+}
 
 /** Per task, whether a write to it waits on this device or was not taken. */
 export const TaskWritesContext = createContext<ReadonlyMap<string, "pending" | "failed">>(new Map());
