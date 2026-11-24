@@ -19,9 +19,10 @@
 import { join } from "node:path";
 import { release } from "node:os";
 import { textSize } from "./settings";
+import { markSeason } from "./app-icon";
 import { createPresenter, launchedByInstaller } from "./window-front";
 import { hideFromSharing } from "./screen-share";
-import { CHANNELS, TEXT_SIZE_ARGUMENT, VERSION_ARGUMENT } from "@/shared/bridge";
+import { CHANNELS, SEASON_ARGUMENT, TEXT_SIZE_ARGUMENT, VERSION_ARGUMENT } from "@/shared/bridge";
 import { defaultTitleBarColors, foreignPageCss, overlayHeight } from "@/shared/title-bar";
 import { openExternal } from "./open-external";
 import { isServerUrl, mainFrameStep, openVerdict } from "./navigation";
@@ -100,7 +101,10 @@ function splashChrome(): BrowserWindowConstructorOptions {
 
 /** The app's own pages, opened at the account's text size (`preload/local.ts`). */
 function localPreferences(): WebPreferences {
-    return preferences("local.js", { additionalArguments: [`${TEXT_SIZE_ARGUMENT}${textSize()}`] });
+    // And the season the mark is drawn in, known before the page draws (`app-icon.ts`).
+    const season = markSeason();
+    const extra = season ? [`${SEASON_ARGUMENT}${season}`] : [];
+    return preferences("local.js", { additionalArguments: [`${TEXT_SIZE_ARGUMENT}${textSize()}`, ...extra] });
 }
 
 function polarisPreferences(): WebPreferences {

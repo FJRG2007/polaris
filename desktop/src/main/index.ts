@@ -43,6 +43,7 @@ import { CHANNELS, type AddressCheck, type Outcome } from "@/shared/bridge";
 import { allowLocalPermission, allowPermission } from "./permissions";
 import * as hostTransfer from "./host-transfer";
 import { handledSquirrelEvent } from "./squirrel";
+import { restoreAppIcon } from "./app-icon";
 import { closeOnceShown } from "./window-front";
 import { installScreenShare } from "./screen-share";
 import { installTray } from "./tray";
@@ -823,6 +824,8 @@ function start(): void {
     });
 
     app.whenReady().then(() => {
+        // The season's icon from the last launch, before any window or the tray is up.
+        restoreAppIcon();
         // The tray icon first: on a sign-in that is all a start in the tray shows, and
         // nothing below needs to have run for its menu to work.
         const menu: MenuActions = {

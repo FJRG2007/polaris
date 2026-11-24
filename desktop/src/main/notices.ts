@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { Notification, nativeImage, type NativeImage } from "electron";
 import { OnceNotices } from "./notice-once";
 import { noticeLayout } from "./notice-layout";
+import { dressedMark } from "./app-icon";
 
 const live = new Map<string, Notification>();
 const said = new OnceNotices();
@@ -25,6 +26,9 @@ const said = new OnceNotices();
  *  Windows draws a toast's picture from a file and does not take an .ico. */
 let mark: NativeImage | null = null;
 function appMark(): NativeImage | undefined {
+    // In the season's dress while the app icon wears it.
+    const dressed = dressedMark();
+    if (dressed) return dressed;
     mark ??= nativeImage.createFromPath(join(__dirname, "..", "icon.png"));
     return mark.isEmpty() ? undefined : mark;
 }

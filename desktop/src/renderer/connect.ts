@@ -14,7 +14,7 @@
  * address, so the row reads "Home" instead of the host.
  */
 
-import { available, byId, say } from "./dom";
+import { available, byId, dressMark, say } from "./dom";
 import { serverAddressSchema } from "@/shared/server-address";
 import { describeUpdateCheck, type UpdateCheck } from "@/shared/update-check";
 import { describeServer, normalizeServerName, SERVER_NAME_MAX, type ServerRow } from "@/shared/servers";
@@ -27,6 +27,8 @@ import type { ClipboardKeep } from "@/shared/clipboard-store";
 import { OPACITIES, type LookChange } from "@/shared/voice-widget";
 import { bindingFromPress } from "@/shared/launcher-hotkey";
 import jsQR from "jsqr";
+
+dressMark(window.polarisLocal.season);
 
 const form = byId<HTMLFormElement>("form");
 const input = byId<HTMLInputElement>("address");

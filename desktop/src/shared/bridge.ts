@@ -446,6 +446,9 @@ export const PREFERENCE_TOGGLES = ["minimizeToTray", "startMinimized", "voiceWid
 export type PreferenceToggle = (typeof PREFERENCE_TOGGLES)[number];
 
 export interface PolarisLocal {
+    /** The season the main process drew the Polaris mark in for this window,
+     *  as it came (`SEASON_ARGUMENT`); null for the plain mark. */
+    readonly season: string | null;
     readonly connect: {
         /** The address in use, why it could not be opened if it could not, and
          *  every server kept. */
@@ -861,3 +864,6 @@ export const VERSION_ARGUMENT = "--polaris-desktop-version=";
 /** The argument that carries the account's text size into the app's own
  *  windows' preload, so the first paint is at it without a synchronous call. */
 export const TEXT_SIZE_ARGUMENT = "--polaris-text-size=";
+
+/** The season an app's own window draws the Polaris mark in, as an argument of the window. */
+export const SEASON_ARGUMENT = "--polaris-season=";

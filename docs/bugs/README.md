@@ -44,3 +44,4 @@ Security findings are not kept here; they live in
 | BUG-0031 | The desktop voice widget shows initials instead of people's profile pictures | Desktop | Fixed, watching | desktop/src/main/voice-widget.ts | 2026-11-23 |
 | BUG-0032 | In Polaris desktop, pressing "View full profile" in a direct message froze the window for a while | Chat | Open, not reproduced | dashboard/apps/web/src/app/(app)/chat/profile-details.tsx | 2026-11-23 |
 | BUG-0033 | With Polaris unreachable, only the chat opens | Dashboard | Partly fixed | dashboard/apps/web/public/sw.js | 2026-11-23 |
+| BUG-0034 | In Polaris desktop the Christmas Polaris logo does not load | Desktop | Fixed, watching | desktop/src/main/app-icon.ts | 2026-11-24 |

@@ -12,9 +12,10 @@ import type { StrokeInput } from "@/shared/annotate";
 import type { WidgetView } from "@/shared/voice-widget";
 import { applyTextSize } from "./text-size";
 import { readTextSize } from "@/shared/text-size";
-import { CHANNELS, TEXT_SIZE_ARGUMENT, type PolarisLocal, type PushEvent, type TvInstallState } from "@/shared/bridge";
+import { CHANNELS, SEASON_ARGUMENT, TEXT_SIZE_ARGUMENT, type PolarisLocal, type PushEvent, type TvInstallState } from "@/shared/bridge";
 
 const bridge: PolarisLocal = {
+    season: process.argv.find((arg) => arg.startsWith(SEASON_ARGUMENT))?.slice(SEASON_ARGUMENT.length) ?? null,
     connect: {
         state: () => ipcRenderer.invoke(CHANNELS.connectState),
         submit: (address, name) => ipcRenderer.invoke(CHANNELS.connectSubmit, { address, name: name ?? "" }),

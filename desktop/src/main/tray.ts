@@ -13,6 +13,8 @@ import { Menu, Tray, clipboard, nativeImage, type MenuItemConstructorOptions } f
 let tray: Tray | null = null;
 /** The dressed image asked for, kept for a tray put up after the ask. */
 let wanted: Electron.NativeImage | null = null;
+/** The same as an .ico on Windows, when one could be written. */
+let wantedFile: string | null = null;
 /** What the menu was last put up with, so it can be put up again. */
 let held: { items: readonly MenuItemConstructorOptions[]; show: () => void } | null = null;
 /** The last link handed to the browser, for "Copy last link opened". */
@@ -29,10 +31,18 @@ export function rememberLink(url: string): void {
 }
 
 /** The tray icon in the season's dress, or the shipped one for null. A no-op
- *  until the tray is up, and on macOS, which has none. */
-export function setTrayImage(image: Electron.NativeImage | null): void {
+ *  until the tray is up, and on macOS, which has none. On Windows `icoFile` is the
+ *  same picture as an .ico, which carries a size for every display scale the
+ *  way the shipped one does. */
+export function setTrayImage(image: Electron.NativeImage | null, icoFile: string | null = null): void {
     wanted = image;
+    wantedFile = icoFile;
     if (!tray || tray.isDestroyed()) return;
+    const ico = image && icoFile && process.platform === "win32" ? nativeImage.createFromPath(icoFile) : null;
+    if (ico && !ico.isEmpty()) {
+        tray.setImage(ico);
+        return;
+    }
     if (image) {
         // 32 on Windows, where the notification area scales it to the display.
         const side = process.platform === "win32" ? 32 : 22;
@@ -56,7 +66,7 @@ export function installTray(items: readonly MenuItemConstructorOptions[], show: 
         tray = new Tray(process.platform === "win32" ? image : image.resize({ width: 22, height: 22 }));
         tray.setToolTip("Polaris");
         tray.on("click", show);
-        if (wanted) setTrayImage(wanted);
+        if (wanted) setTrayImage(wanted, wantedFile);
     }
     tray.setContextMenu(
         Menu.buildFromTemplate([

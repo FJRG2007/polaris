@@ -11,14 +11,18 @@
  * dates in a stable order. A page from before that sends only `{ png }`; it is
  * worn only while no host reports a calendar.
  *
- * Nothing is installed or written to disk, so it needs no reinstall and a new
- * season is one message away.
+ * What the hosts last said is kept in the app's data folder, so a launch wears
+ * the season from its first frame instead of the plain mark until a page of the
+ * dashboard has loaded - which the splash, the address form and a sign-in page
+ * never do (BUG-0034). On Windows the settled icon is also written there as an
+ * .ico, the file the taskbar button and the notification area read.
  */
 
-import { join } from "node:path";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { z } from "zod";
 import { app, BrowserWindow, nativeImage, type NativeImage } from "electron";
-import { appIconSeason } from "../../../dashboard/packages/core/src/app-icon-season";
+import { appIconSeason, officialSeasonOn } from "../../../dashboard/packages/core/src/app-icon-season";
 import { SEASONS, type Season, type SeasonCalendar } from "../../../dashboard/packages/core/src/seasons";
 import { setTrayImage } from "./tray";
 
@@ -55,6 +59,27 @@ export interface Report {
     readonly at: number;
 }
 
+/** The reports as they are kept on disk. A file that does not read as this is
+ *  ignored, and the next report writes a good one over it. */
+const storedSchema = z
+    .object({
+        reports: z
+            .array(
+                z
+                    .object({
+                        host: z.string().max(512),
+                        // JSON has no undefined: a page from before calendars is stored without one.
+                        calendar: calendarSchema.nullable().optional(),
+                        icons: z.partialRecord(z.enum(SEASONS), png),
+                        legacy: png.nullable(),
+                        at: z.number().int().nonnegative()
+                    })
+                    .strict()
+            )
+            .max(64)
+    })
+    .strict();
+
 /**
  * Each host's last report, by origin, kept after its window moves to another
  * Polaris: the app shows one host at a time, and forgetting the others on every
@@ -64,11 +89,19 @@ const reports = new Map<string, Report>();
 /** What is up now, so a repeat of it is not applied again. */
 let shown: string | null | undefined;
 let recheck: NodeJS.Timeout | null = null;
+/** What was last written to disk, so an unchanged report is not written again. */
+let written: string | null = null;
 
 /** How often the date is looked at again, for a season that starts overnight. */
 const RECHECK_MS = 30 * 60_000;
 /** A host not opened for this long no longer has a say. */
 const STALE_MS = 14 * 24 * 60 * 60_000;
+
+function fresh(all: readonly Report[], now: Date): Report[] {
+    return all
+        .filter((report) => now.getTime() - report.at <= STALE_MS)
+        .sort((a, b) => (a.host < b.host ? -1 : a.host > b.host ? 1 : 0));
+}
 
 /**
  * The PNG every window wears for these reports on `now`: the settled season's
@@ -76,13 +109,28 @@ const STALE_MS = 14 * 24 * 60 * 60_000;
  * - what a page from before that asked for. Null is the shipped icon. Pure.
  */
 export function iconFor(all: readonly Report[], now: Date): string | null {
-    const ordered = all
-        .filter((report) => now.getTime() - report.at <= STALE_MS)
-        .sort((a, b) => (a.host < b.host ? -1 : a.host > b.host ? 1 : 0));
+    const ordered = fresh(all, now);
     const season = appIconSeason(ordered, now);
     if (season) return ordered.find((report) => report.icons[season])?.icons[season] ?? null;
     if (ordered.some((report) => report.calendar !== undefined)) return null;
     return ordered.find((report) => report.legacy)?.legacy ?? null;
+}
+
+/**
+ * The season the app's own screens draw the mark in (the splash, the address
+ * form): the one the icon settles on, or - before any host has said what its
+ * calendar is - the calendar Polaris ships with. A host that turned seasons
+ * off keeps them plain. Pure.
+ */
+export function markSeasonFor(all: readonly Report[], now: Date): Season | null {
+    const ordered = fresh(all, now);
+    if (!ordered.some((report) => report.calendar !== undefined)) return officialSeasonOn(now);
+    return appIconSeason(ordered, now);
+}
+
+/** The season the app's own screens draw the mark in now. */
+export function markSeason(): Season | null {
+    return markSeasonFor([...reports.values()], new Date());
 }
 
 /** What one page said, as the report it stands for; null for a page going away,
@@ -93,6 +141,76 @@ export function reportOf(origin: string, icon: AppIcon, at: number): Report | nu
     return { host: origin, calendar: icon.calendar, icons: icon.icons ?? {}, legacy: null, at };
 }
 
+/** The reports a stored file holds; none for a file that is missing or does not read. Pure. */
+export function readStoredReports(raw: string | null): Report[] {
+    if (!raw) return [];
+    try {
+        const parsed = storedSchema.safeParse(JSON.parse(raw));
+        if (!parsed.success) return [];
+        return parsed.data.reports.map((report) => ({ ...report, calendar: report.calendar }));
+    } catch {
+        return [];
+    }
+}
+
+/** The reports as a file, without the hosts that no longer have a say. When a
+ *  host last spoke is kept to the hour, so a page that reports again and again
+ *  says nothing new and is not written each time. Pure. */
+export function storedReports(all: readonly Report[], now: Date): string {
+    const hour = 60 * 60_000;
+    const kept = fresh(all, now).slice(0, 64).map((report) => ({ ...report, at: Math.floor(report.at / hour) * hour }));
+    return JSON.stringify({ reports: kept });
+}
+
+function storeFile(): string {
+    return join(app.getPath("userData"), "app-icon.json");
+}
+
+/** Written beside the file and renamed over it: a crash mid-write keeps the last one. */
+function writeAtomic(file: string, data: string | Buffer): void {
+    const temp = `${file}.${process.pid}.tmp`;
+    writeFileSync(temp, data);
+    renameSync(temp, file);
+}
+
+function persist(): void {
+    const next = storedReports([...reports.values()], new Date());
+    if (next === written) return;
+    try {
+        writeAtomic(storeFile(), next);
+        written = next;
+    } catch {
+        // Only the next launch's first frame depends on it.
+    }
+}
+
+function watch(): void {
+    if (recheck) return;
+    recheck = setInterval(settle, RECHECK_MS);
+    recheck.unref?.();
+    // A window opened later wears what the others do.
+    app.on("browser-window-created", (_event, window) => {
+        if (shown) applyAppIcon(window, { png: shown });
+    });
+}
+
+/**
+ * Put back what the hosts said last time, before the first window opens, so
+ * it opens in the season's dress. Call once the app is ready.
+ */
+export function restoreAppIcon(): void {
+    let raw: string | null = null;
+    try {
+        raw = readFileSync(storeFile(), "utf8");
+    } catch {
+        // A first launch, or a folder that cannot be read: the shipped icon.
+    }
+    for (const report of readStoredReports(raw)) if (!reports.has(report.host)) reports.set(report.host, report);
+    written = raw;
+    watch();
+    settle();
+}
+
 /**
  * Take what a page said and put up the icon every window settles on. The host
  * is the page's origin as the app sees it, not what the page claims.
@@ -100,15 +218,9 @@ export function reportOf(origin: string, icon: AppIcon, at: number): Report | nu
 export function reportAppIcon(origin: string, icon: AppIcon): void {
     const report = reportOf(origin, icon, Date.now());
     if (report) reports.set(origin, report);
-    if (!recheck) {
-        recheck = setInterval(settle, RECHECK_MS);
-        recheck.unref?.();
-        // A window opened later wears what the others do.
-        app.on("browser-window-created", (_event, window) => {
-            if (shown) applyAppIcon(window, { png: shown });
-        });
-    }
+    watch();
     settle();
+    persist();
 }
 
 function settle(): void {
@@ -117,6 +229,16 @@ function settle(): void {
     shown = next;
     for (const window of BrowserWindow.getAllWindows()) applyAppIcon(window, { png: next });
     if (BrowserWindow.getAllWindows().length === 0) applyAppIcon(null, { png: next });
+}
+
+/** The settled icon, decoded once per picture. */
+let dressed: { readonly png: string; readonly image: NativeImage; } | null = null;
+
+/** The mark in the season's dress while the app icon wears it, else null. */
+export function dressedMark(): NativeImage | null {
+    if (!shown) return null;
+    if (dressed?.png !== shown) dressed = { png: shown, image: nativeImage.createFromDataURL(shown) };
+    return dressed.image.isEmpty() ? null : dressed.image;
 }
 
 /** The icon the app ships with, the one a null puts back. */
@@ -142,6 +264,85 @@ function onAppleGrid(image: NativeImage): NativeImage {
     return nativeImage.createFromBitmap(target, { width: side, height: side });
 }
 
+/** The sizes the Windows shell asks an .ico for, at every display scale. */
+export const ICO_SIDES = [16, 24, 32, 48, 64, 256] as const;
+
+/**
+ * An .ico holding each PNG as is, which Windows reads since Vista. A side of
+ * 256 is written as 0, as the format has it. Pure.
+ */
+export function icoOf(images: readonly { readonly side: number; readonly png: Buffer; }[]): Buffer {
+    const header = Buffer.alloc(6 + 16 * images.length);
+    header.writeUInt16LE(0, 0);
+    header.writeUInt16LE(1, 2);
+    header.writeUInt16LE(images.length, 4);
+    let offset = header.length;
+    images.forEach((image, index) => {
+        const entry = 6 + 16 * index;
+        const side = image.side >= 256 ? 0 : image.side;
+        header.writeUInt8(side, entry);
+        header.writeUInt8(side, entry + 1);
+        header.writeUInt8(0, entry + 2);
+        header.writeUInt8(0, entry + 3);
+        header.writeUInt16LE(1, entry + 4);
+        header.writeUInt16LE(32, entry + 6);
+        header.writeUInt32LE(image.png.length, entry + 8);
+        header.writeUInt32LE(offset, entry + 12);
+        offset += image.png.length;
+    });
+    return Buffer.concat([header, ...images.map((image) => image.png)]);
+}
+
+/**
+ * The app user model id Electron gives a Squirrel install
+ * (`<package>/app-<version>/<exe>` beside `<package>/Update.exe`):
+ * `com.squirrel.<package>.<exe>`, as `shell/browser/app_package.cc` derives
+ * it, so the taskbar details set here belong to the button the window already
+ * has. Null when the app is not a Squirrel install. Pure but for `exists`.
+ */
+export function squirrelAppId(execPath: string, exists: (path: string) => boolean): string | null {
+    const folder = dirname(dirname(execPath));
+    if (!exists(join(folder, "Update.exe"))) return null;
+    const exe = basename(execPath).replace(/\.exe$/i, "");
+    const strip = (value: string) => value.replace(/\s+/g, "");
+    return `com.squirrel.${strip(basename(folder))}.${strip(exe)}`;
+}
+
+/** What the taskbar button is told about the app, or null where it is not told. */
+function taskbarDetails(icon: string): Electron.AppDetailsOptions | null {
+    if (process.platform !== "win32") return null;
+    const appId = app.isPackaged ? squirrelAppId(process.execPath, existsSync) : process.execPath;
+    if (!appId) return null;
+    // A Squirrel install starts from the stub beside Update.exe, as its shortcuts do.
+    const stub = join(dirname(dirname(process.execPath)), basename(process.execPath));
+    const command = app.isPackaged && existsSync(stub) ? stub : process.execPath;
+    return {
+        appId,
+        appIconPath: icon,
+        appIconIndex: 0,
+        relaunchCommand: `"${command}"`,
+        relaunchDisplayName: app.getName()
+    };
+}
+
+/**
+ * The icon as a file the Windows shell can read, at one path that is rewritten
+ * every season - so a button pinned in December is plain again in February -
+ * or null when it could not be written.
+ */
+function writeTaskbarIcon(image: NativeImage | null): string | null {
+    try {
+        const file = join(app.getPath("userData"), "taskbar-icon.ico");
+        const data = image
+            ? icoOf(ICO_SIDES.map((side) => ({ side, png: image.resize({ width: side, height: side, quality: "best" }).toPNG() })))
+            : readFileSync(join(__dirname, "..", "icon.ico"));
+        writeAtomic(file, data);
+        return file;
+    } catch {
+        return null;
+    }
+}
+
 /** Set the dressed icon; anything that goes wrong leaves the shipped one. */
 export function applyAppIcon(window: BrowserWindow | null, icon: AppIcon): void {
     try {
@@ -155,6 +356,9 @@ export function applyAppIcon(window: BrowserWindow | null, icon: AppIcon): void 
     }
 }
 
+/** The .ico last written, and for which picture, so every window shares one write. */
+let ico: { readonly png: string | null; readonly file: string | null; } | null = null;
+
 function setIcons(window: BrowserWindow | null, icon: AppIcon): void {
     const drawn = icon.png ? nativeImage.createFromDataURL(icon.png) : null;
     const image = drawn && !drawn.isEmpty() ? drawn : null;
@@ -164,6 +368,15 @@ function setIcons(window: BrowserWindow | null, icon: AppIcon): void {
         else app.dock?.setIcon(shipped());
         return;
     }
-    if (window && !window.isDestroyed()) window.setIcon(image ?? shipped());
-    setTrayImage(image);
+    if (process.platform === "win32") {
+        const key = image ? icon.png! : null;
+        if (!ico || ico.png !== key) ico = { png: key, file: writeTaskbarIcon(image) };
+    }
+    const file = process.platform === "win32" ? ico?.file ?? null : null;
+    if (window && !window.isDestroyed()) {
+        window.setIcon(image ?? shipped());
+        const details = file ? taskbarDetails(file) : null;
+        if (details) window.setAppDetails(details);
+    }
+    setTrayImage(image, file);
 }
