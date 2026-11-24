@@ -128,10 +128,105 @@ fn an_unrecognised_tag_has_no_ordering() {
 /// list of every release the fork has ever cut.
 #[test]
 fn a_release_url_points_at_the_version_it_names() {
+    // A reported version carries no prefix; the tag it names does.
+    for tag in [
+        "v0.2026.09.08.21.45.oss_00",
+        "terminal-v0.2026.09.08.21.45.oss_00",
+    ] {
+        assert_eq!(
+            release_url(tag),
+            "https://github.com/FJRG2007/polaris/releases/tag/terminal-v0.2026.09.08.21.45.oss_00"
+        );
+    }
+}
+
+/// The build calls itself by the version after the prefix (`GIT_RELEASE_TAG`),
+/// and `should_update` compares the two with `==`, so the reported version
+/// must not keep it - or every check would offer the build it is running.
+#[test]
+fn a_terminal_tag_reports_the_version_the_build_carries() {
+    let version = version_from_tag("terminal-v0.2026.11.24.10.00.oss_00");
+    assert_eq!(version.version, "v0.2026.11.24.10.00.oss_00");
     assert_eq!(
-        release_url("v0.2026.09.08.21.45.oss_00"),
-        "https://github.com/FJRG2007/polaris/releases/tag/v0.2026.09.08.21.45.oss_00"
+        version.last_prominent_update.as_deref(),
+        Some("v0.2026.11.24.10.00.oss_00")
     );
+}
+
+/// The prefix names the product, so a tag orders the same with or without it.
+#[test]
+fn the_terminal_prefix_does_not_affect_ordering() {
+    for (left, right, expected) in [
+        (
+            "terminal-v0.2026.11.24.10.00.oss_00",
+            "v0.2026.11.24.10.00.oss_00",
+            Ordering::Equal,
+        ),
+        (
+            "terminal-v0.2026.11.24.10.00.oss_01",
+            "v0.2026.11.24.10.00.oss_00",
+            Ordering::Greater,
+        ),
+        (
+            "v0.1.2",
+            "terminal-v0.2026.11.24.10.00.oss_00",
+            Ordering::Less,
+        ),
+    ] {
+        assert_eq!(compare_release_tags(left, right), Some(expected));
+    }
+}
+
+/// Only `terminal-v*` tags are releases of this app, newest first, and one
+/// that cannot be ordered is skipped rather than guessed at.
+#[test]
+fn release_tags_are_the_terminal_ones_newest_first() {
+    let refs: Vec<GitRef> = [
+        "refs/tags/terminal-v0.2026.11.24.10.00.oss_00",
+        "refs/tags/desktop-v0.1.81",
+        "refs/tags/terminal-v0.2026.12.01.09.30.oss_00",
+        "refs/tags/terminal-vnightly",
+        "refs/tags/terminal-v0.2026.11.24.10.00.oss_01",
+        "refs/heads/terminal-v0.2027.01.01.00.00.oss_00",
+    ]
+    .into_iter()
+    .map(|name| GitRef {
+        name: name.to_owned(),
+    })
+    .collect();
+    assert_eq!(
+        newest_release_tags(&refs),
+        [
+            "terminal-v0.2026.12.01.09.30.oss_00",
+            "terminal-v0.2026.11.24.10.00.oss_01",
+            "terminal-v0.2026.11.24.10.00.oss_00",
+        ]
+    );
+}
+
+/// A draft, a prerelease, or a release still missing this platform's
+/// installer is not offered.
+#[test]
+fn only_a_finished_release_is_offered() {
+    let release = |draft, prerelease, assets: &[&str]| LatestRelease {
+        tag_name: "terminal-v0.2026.11.24.10.00.oss_00".to_owned(),
+        draft,
+        prerelease,
+        assets: assets
+            .iter()
+            .map(|name| ReleaseAsset {
+                name: (*name).to_owned(),
+            })
+            .collect(),
+    };
+    let asset = "PolarisTerminal.dmg";
+    assert_eq!(
+        unusable_release(&release(false, false, &[asset]), asset),
+        None
+    );
+    assert!(unusable_release(&release(true, false, &[asset]), asset).is_some());
+    assert!(unusable_release(&release(false, true, &[asset]), asset).is_some());
+    assert!(unusable_release(&release(false, false, &["other.exe"]), asset).is_some());
 }
 
 /// A tag that would build a URL for a page that does not exist falls back to

@@ -17,6 +17,9 @@ if [[ -z "$POLARIS_TERMINAL_PLIST_PATH" ]]; then
 fi
 
 if [[ -n "$GIT_RELEASE_TAG" ]]; then
+  # The release tag is `terminal-v...` in the Polaris repository; the version
+  # is what follows the prefix.
+  GIT_RELEASE_TAG="${GIT_RELEASE_TAG#terminal-}"
   echo "Updating plist Polaris Terminal version to $GIT_RELEASE_TAG"
   plutil -insert PtermVersion -string "$GIT_RELEASE_TAG" "$POLARIS_TERMINAL_PLIST_PATH"
 

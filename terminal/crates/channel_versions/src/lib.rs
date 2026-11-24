@@ -48,6 +48,9 @@ impl TryFrom<&str> for ParsedVersion {
     type Error = anyhow::Error;
 
     fn try_from(value: &str) -> Result<Self> {
+        // A release tag in the Polaris repository carries a product prefix
+        // (`terminal-v0...`); the version is what follows it.
+        let value = value.strip_prefix("terminal-").unwrap_or(value);
         PARSED_VERSIONS_CACHE
             .get_or_try_insert(value, || {
                 VERSION_RE

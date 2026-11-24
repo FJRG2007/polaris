@@ -102,3 +102,15 @@ fn changelog_tui_updates_are_backward_compatible() {
         serde_json::from_str(new_payload).expect("new changelog payload should deserialize");
     assert_eq!(changelog.tui_updates, ["Added inline TUI menus"]);
 }
+
+/// A Polaris release tag carries the product prefix; it parses as the version after it.
+#[test]
+fn test_parse_terminal_release_tag() {
+    let tagged: ParsedVersion = "terminal-v0.2026.11.24.10.00.oss_02"
+        .try_into()
+        .expect("terminal tag is parsable");
+    let bare: ParsedVersion = "v0.2026.11.24.10.00.oss_02"
+        .try_into()
+        .expect("version string is parsable");
+    assert_eq!(tagged, bare);
+}

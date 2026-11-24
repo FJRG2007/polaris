@@ -5,6 +5,12 @@
 //! is the one Polaris Terminal ships on. Polaris Terminal publishes to GitHub releases instead, so this
 //! asks GitHub what the latest tag is.
 //!
+//! The Polaris repository releases more than the terminal (the desktop app, the
+//! extension and others, each under its own tag prefix), so its "latest release"
+//! is usually not a terminal one, and the terminal's are not marked latest at
+//! all. Terminal releases are the `terminal-v*` tags: this lists those, orders
+//! them, and reads the release of the newest.
+//!
 //! It only reports. Downloading and installing an update is left to the person,
 //! because doing it properly means platform-specific install flows and a way to
 //! verify what was downloaded, and neither exists here yet.
@@ -19,7 +25,21 @@ use serde::Deserialize;
 /// Where releases are published. Also what the user is sent to.
 pub const RELEASES_URL: &str = "https://github.com/FJRG2007/polaris/releases";
 
-const LATEST_RELEASE_API: &str = "https://api.github.com/repos/FJRG2007/polaris/releases/latest";
+/// Every terminal release tag starts with this; the rest is what the build
+/// reports as its version (`GIT_RELEASE_TAG`), `v0.YYYY.MM.DD.HH.MM.oss_NN`.
+pub const TAG_PREFIX: &str = "terminal-";
+
+/// The tags that are terminal releases, and nothing else the repository tags.
+const TERMINAL_TAGS_API: &str =
+    "https://api.github.com/repos/FJRG2007/polaris/git/matching-refs/tags/terminal-v";
+
+/// One release, by its tag.
+const RELEASE_BY_TAG_API: &str = "https://api.github.com/repos/FJRG2007/polaris/releases/tags";
+
+/// How many of the newest tags are tried when the newest has no usable
+/// release (a prerelease, or one whose installers are still uploading). Kept
+/// small: each costs a request against an unauthenticated rate limit.
+const RELEASES_TRIED: usize = 3;
 
 /// The page for one release, which is where someone told to get a specific
 /// version needs to land. The index lists every release Polaris Terminal has ever had, and
@@ -31,13 +51,21 @@ pub fn release_url(tag: &str) -> String {
     if tag.is_empty() || tag.contains(['/', '?', '#', ' ']) {
         return RELEASES_URL.to_owned();
     }
-    format!("{RELEASES_URL}/tag/{tag}")
+    // A version is reported without the prefix (it is what the build calls
+    // itself), and the tag it came from has it.
+    if tag.starts_with(TAG_PREFIX) {
+        format!("{RELEASES_URL}/tag/{tag}")
+    } else {
+        format!("{RELEASES_URL}/tag/{TAG_PREFIX}{tag}")
+    }
 }
 
 /// Kept short: this runs on a poll, and a hung request must not accumulate.
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// The version a release tag reports as: the tag, verbatim.
+/// The version a release tag reports as: the tag, verbatim, less the
+/// [`TAG_PREFIX`] the build never sees (the release workflow passes the version
+/// after it as `GIT_RELEASE_TAG`).
 ///
 /// `ChannelState::app_version` hands back `GIT_RELEASE_TAG` exactly as the build
 /// passed it - `v0.1.0`, `v` and all - and `should_update` compares the two with
@@ -53,6 +81,7 @@ const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 /// such field, so nothing was ever prominent, and a ready update was easy to
 /// miss next to Warp showing the button for the same kind of release.
 fn version_from_tag(tag: &str) -> VersionInfo {
+    let tag = tag.strip_prefix(TAG_PREFIX).unwrap_or(tag);
     let mut version = VersionInfo::new(tag.to_owned());
     version.last_prominent_update = Some(tag.to_owned());
     version
@@ -96,7 +125,10 @@ enum PrereleaseIdentifier {
 
 impl ReleaseTag {
     fn parse(tag: &str) -> Option<Self> {
-        // Build metadata is excluded from precedence by the semver spec.
+        // The prefix says which product a tag belongs to, not which release
+        // is newer. Build metadata is excluded from precedence by the semver
+        // spec.
+        let tag = tag.strip_prefix(TAG_PREFIX).unwrap_or(tag);
         let tag = tag.strip_prefix('v').unwrap_or(tag);
         let tag = tag.split('+').next().unwrap_or(tag);
         let (core, prerelease) = match tag.split_once('-') {
@@ -200,6 +232,26 @@ pub fn installer_asset_name() -> Option<&'static str> {
     }
 }
 
+/// The subset of GitHub's reference payload that matters here.
+#[derive(Debug, Deserialize)]
+struct GitRef {
+    /// `refs/tags/terminal-v...`.
+    #[serde(rename = "ref")]
+    name: String,
+}
+
+/// The release tags among `refs`, newest first. A tag this cannot order is
+/// left out rather than guessed at.
+fn newest_release_tags(refs: &[GitRef]) -> Vec<&str> {
+    let mut tags: Vec<&str> = refs
+        .iter()
+        .filter_map(|git_ref| git_ref.name.strip_prefix("refs/tags/"))
+        .filter(|tag| tag.starts_with(TAG_PREFIX) && ReleaseTag::parse(tag).is_some())
+        .collect();
+    tags.sort_by(|left, right| compare_release_tags(right, left).unwrap_or(Ordering::Equal));
+    tags
+}
+
 /// The subset of GitHub's release payload that matters here.
 #[derive(Debug, Deserialize)]
 struct LatestRelease {
@@ -217,50 +269,88 @@ struct ReleaseAsset {
     name: String,
 }
 
-/// The version of the most recent published release, as a `VersionInfo` so it
-/// travels through the same reporting path as any other update check.
-pub async fn fetch_latest_release_version(client: &http_client::Client) -> Result<VersionInfo> {
-    let response = client
-        .get(LATEST_RELEASE_API)
+/// One GET against the GitHub API, parsed as `T`.
+async fn get_github_json<T: serde::de::DeserializeOwned>(
+    client: &http_client::Client,
+    url: &str,
+) -> Result<T> {
+    client
+        .get(url)
         // GitHub rejects an API request with no user agent.
         .header("User-Agent", "polaris-terminal-autoupdate")
         .header("Accept", "application/vnd.github+json")
         .timeout(FETCH_TIMEOUT)
         .send()
         .await
-        .context("failed to reach the GitHub releases API")?
+        .context("failed to reach the GitHub API")?
         .error_for_status()
-        .context("the GitHub releases API returned an error")?;
-
-    let release: LatestRelease = response
+        .context("the GitHub API returned an error")?
         .json()
         .await
-        .context("failed to parse the GitHub release payload")?;
+        .context("failed to parse the GitHub API payload")
+}
 
-    // `/releases/latest` already excludes both, but a future switch to
-    // `/releases` would not, and offering someone a draft is worse than
-    // offering nothing.
+/// Why `release` cannot be offered to this platform, if it cannot.
+fn unusable_release(release: &LatestRelease, asset: &str) -> Option<String> {
+    // Offering someone a draft or a prerelease is worse than offering nothing.
     if release.draft || release.prerelease {
-        anyhow::bail!("latest GitHub release is a draft or prerelease");
+        return Some(format!(
+            "release {} is a draft or prerelease",
+            release.tag_name
+        ));
     }
-
     // The three installers are built by separate jobs and published as each
-    // finishes, so a release exists, and is `latest`, from the moment the
-    // first one lands. Reporting it to everyone at that point offers an
-    // update that only one platform can act on - and the one platform whose
-    // job failed outright would be offered it forever.
-    let Some(asset) = installer_asset_name() else {
-        anyhow::bail!("no installer is published for this platform");
-    };
+    // finishes, so a release exists from the moment the first one lands.
+    // Reporting it to everyone at that point offers an update that only one
+    // platform can act on - and the one platform whose job failed outright
+    // would be offered it forever.
     if !release
         .assets
         .iter()
         .any(|published| published.name == asset)
     {
-        anyhow::bail!("release {} has not published {asset} yet", release.tag_name);
+        return Some(format!(
+            "release {} has not published {asset} yet",
+            release.tag_name
+        ));
+    }
+    None
+}
+
+/// The version of the most recent published terminal release, as a
+/// `VersionInfo` so it travels through the same reporting path as any other
+/// update check.
+pub async fn fetch_latest_release_version(client: &http_client::Client) -> Result<VersionInfo> {
+    let Some(asset) = installer_asset_name() else {
+        anyhow::bail!("no installer is published for this platform");
+    };
+
+    let refs: Vec<GitRef> = get_github_json(client, TERMINAL_TAGS_API)
+        .await
+        .context("failed to list the terminal release tags")?;
+    let tags = newest_release_tags(&refs);
+    if tags.is_empty() {
+        anyhow::bail!("no terminal release has been tagged yet");
     }
 
-    Ok(version_from_tag(&release.tag_name))
+    let mut reasons = Vec::new();
+    for tag in tags.into_iter().take(RELEASES_TRIED) {
+        let release: LatestRelease =
+            match get_github_json(client, &format!("{RELEASE_BY_TAG_API}/{tag}")).await {
+                Ok(release) => release,
+                // A tag is pushed before its release is created, so the newest
+                // tag having none yet is ordinary.
+                Err(error) => {
+                    reasons.push(format!("{tag}: {error:#}"));
+                    continue;
+                }
+            };
+        match unusable_release(&release, asset) {
+            None => return Ok(version_from_tag(&release.tag_name)),
+            Some(reason) => reasons.push(reason),
+        }
+    }
+    anyhow::bail!("no usable terminal release: {}", reasons.join("; "))
 }
 
 #[cfg(test)]
