@@ -150,3 +150,33 @@ describe("a send", () => {
         await expect(after).resolves.toBe("draft-9");
     });
 });
+
+describe("a save that could not reach Polaris", () => {
+    it("leaves the words pending, for the composer to keep on the device", async () => {
+        const saves = draftSaves(SEED, null, async () => null);
+        const fields = withBody("written on the train");
+        await saves.save(fields);
+        expect(saves.pending(fields)).toBe(true);
+        expect(saves.pending(SEED)).toBe(false);
+    });
+
+    it("is not pending once a save took it", async () => {
+        const saves = draftSaves(SEED, null, async () => "d1");
+        const fields = withBody("hello");
+        await saves.save(fields);
+        expect(saves.pending(fields)).toBe(false);
+    });
+
+    it("a kept draft opened again is saved as it was opened, not taken as already written", async () => {
+        const written: string[] = [];
+        const kept = withBody("kept on this device");
+        const saves = draftSaves(kept, "d1", async (fields, id) => {
+            written.push(`${id}:${fields.body}`);
+            return id;
+        }, true);
+        expect(saves.pending(kept)).toBe(true);
+        await saves.save(kept);
+        expect(written).toEqual(["d1:kept on this device"]);
+        expect(saves.pending(kept)).toBe(false);
+    });
+});

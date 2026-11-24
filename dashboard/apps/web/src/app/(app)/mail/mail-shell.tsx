@@ -223,6 +223,16 @@ export interface ComposerSeed {
     /** How it is answering, for a composer opened by Reply, Reply all or
      *  Forward - which is what lets it switch between them. */
     readonly answering?: AnswerContext;
+    /** A draft kept on this device while Polaris could not be reached, opened
+     *  again: its key, the address it goes from and its files, which the seed
+     *  above cannot carry. What it holds is saved like anything typed. */
+    readonly kept?: KeptOpen;
+}
+
+export interface KeptOpen {
+    readonly draftKey: string;
+    readonly identityId: string | null;
+    readonly files: readonly { id: string; name: string; size: number }[];
 }
 
 const MailContext = createContext<MailContextValue | null>(null);

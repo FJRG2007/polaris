@@ -64,10 +64,13 @@ export async function keepSend(message: Outgoing): Promise<boolean> {
     return kept;
 }
 
-/** The sends kept on this device, oldest first, kept current. */
-export function useKeptSends(): readonly AppWrite[] {
+/** The writes of these kinds kept on this device, oldest first, kept current -
+ *  what the strip above the mailbox lists. */
+export function useKeptMail(kinds: readonly string[]): readonly AppWrite[] {
     const [entries, setEntries] = useState<readonly AppWrite[]>([]);
+    const named = kinds.join(" ");
     useEffect(() => {
+        const wanted = new Set(named.split(" "));
         let live = true;
         const reload = () =>
             void appWrites.readAll().then(
@@ -75,19 +78,19 @@ export function useKeptSends(): readonly AppWrite[] {
                     live &&
                     setEntries(
                         all
-                            .filter((entry) => entry.kind === MAIL_SEND)
+                            .filter((entry) => wanted.has(entry.kind))
                             .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
                     ),
                 () => undefined
             );
         reload();
         const unsubscribe = appWrites.subscribe((event) => {
-            if (!event || event.entry.kind === MAIL_SEND) reload();
+            if (!event || wanted.has(event.entry.kind)) reload();
         });
         return () => {
             live = false;
             unsubscribe();
         };
-    }, []);
+    }, [named]);
     return entries;
 }

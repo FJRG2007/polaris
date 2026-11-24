@@ -97,6 +97,18 @@ export async function replaceWrite(entry: NewWrite): Promise<boolean> {
     return true;
 }
 
+/**
+ * Forget what is still waiting for one target, and what a closing tab left of
+ * it: the server took something newer straight from the screen. A failed entry
+ * stays, as in `replaceWrite`.
+ */
+export async function forgetWrites(kind: string, target: string): Promise<void> {
+    forgetUnloaded(kind, target);
+    for (const other of await keptFor(kind, target)) {
+        if (other.state === "pending") await offlineStore.forget("writes", other.key);
+    }
+}
+
 export function readAck(target: string): Promise<string | null> {
     return offlineStore.read<string>("acks", target);
 }

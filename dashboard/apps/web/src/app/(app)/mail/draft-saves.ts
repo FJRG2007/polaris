@@ -97,6 +97,9 @@ export interface DraftSaves {
     /** Save these, after whatever is already on its way. Answers with the id the
      *  draft has once it is done - null while nothing has been written. */
     readonly save: (fields: DraftFields) => Promise<string | null>;
+    /** Whether these say something the server does not hold yet - what is left
+     *  to keep on the device when a save could not reach it. */
+    readonly pending: (fields: DraftFields) => boolean;
     /** Run a task after every save already asked for, with the id they left. */
     readonly after: <T>(task: (id: string | null) => Promise<T>) => Promise<T>;
     /** The draft is this one now, holding these - what a send answers with. */
@@ -115,18 +118,26 @@ export interface DraftSaves {
  * @param seed - What the composer opened with.
  * @param draftId - The draft it reopened, or null for a new message.
  * @param write - Where a draft is written.
+ * @param unsaved - The seed is words the server does not hold yet (a draft
+ *   kept on this device while Polaris could not be reached): it is saved like
+ *   anything typed, not taken as what the composer opened with.
  */
 export function draftSaves(
     seed: DraftFields,
     draftId: string | null,
-    write: DraftWriter
+    write: DraftWriter,
+    unsaved = false
 ): DraftSaves {
     let id = draftId;
-    let opened = seed;
+    let opened: DraftFields = unsaved
+        ? { ...seed, to: [], cc: [], bcc: [], subject: "", body: "", attachmentIds: [] }
+        : seed;
     // What the server holds. A reopened draft holds what it was opened with; a
     // new message holds nothing yet.
-    let written: DraftFields | null = draftId ? seed : null;
+    let written: DraftFields | null = draftId && !unsaved ? seed : null;
     let held = false;
+    const changed = (fields: DraftFields): boolean =>
+        !held && !(written ? sameDraft(fields, written) : sameWords(fields, opened));
     let tail: Promise<unknown> = Promise.resolve();
 
     function queue<T>(task: () => Promise<T>): Promise<T> {
@@ -139,8 +150,7 @@ export function draftSaves(
         id: () => id,
         save: (fields) =>
             queue(async () => {
-                if (held) return id;
-                if (written ? sameDraft(fields, written) : sameWords(fields, opened)) return id;
+                if (!changed(fields)) return id;
                 const saved = await write(fields, id).catch(() => null);
                 if (saved) {
                     id = saved;
@@ -148,6 +158,7 @@ export function draftSaves(
                 }
                 return id;
             }),
+        pending: changed,
         after: (task) => queue(() => task(id)),
         adopt: (next, fields) => {
             id = next;
