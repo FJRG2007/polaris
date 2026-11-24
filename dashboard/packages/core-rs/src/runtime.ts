@@ -12,9 +12,9 @@
 import { nativeSource } from "./native";
 import { hmac } from "@noble/hashes/hmac.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { BindingMissingError, type CoreBinding, pickBinding, serves } from "./binding";
+import { BindingMissingError, type BindingSource, type CoreBinding, pickBinding, serves } from "./binding";
 
-export { BindingMissingError };
+export { BindingMissingError, type BindingSource };
 import { DOMAINS, MODES, type DomainName, type Mode } from "./registry";
 import { bytesToHex, canonical, encodeValue, outcome, type Expect } from "./vectors";
 
@@ -24,11 +24,6 @@ export type CoreRecord =
     | { kind: "fallback"; domain: string; op: string; reason: FallbackReason; source: string; at: string }
     | { kind: "difference"; domain: string; op: string; inputHash: string; tsHash: string; rustHash: string; at: string };
 
-export interface BindingSource {
-    /** Where the binding comes from, for records: "napi", "wasm", or a test's name. */
-    readonly kind: string;
-    load(): CoreBinding | Promise<CoreBinding>;
-}
 
 type State =
     | { status: "idle" }

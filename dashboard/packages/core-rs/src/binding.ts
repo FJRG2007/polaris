@@ -75,6 +75,17 @@ export function pickBinding(loaded: unknown, target: BindingTarget = "napi"): Co
 }
 
 /** Thrown by a source whose binding file is simply not there (as opposed to broken). */
+/**
+ * Where a binding is loaded from. It lives here, with no imports beyond the
+ * registry, so a consumer of `native` (the desktop app) does not pull the
+ * runtime and its hashing dependency into its own type check.
+ */
+export interface BindingSource {
+    /** Where the binding comes from, for records: "napi", "wasm", or a test's name. */
+    readonly kind: string;
+    load(): CoreBinding | Promise<CoreBinding>;
+}
+
 export class BindingMissingError extends Error {
     override name = "BindingMissingError";
 }

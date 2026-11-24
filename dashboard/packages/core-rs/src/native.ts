@@ -9,8 +9,7 @@
  * browser (where it simply finds no Node and returns no source).
  */
 
-import type { BindingSource } from "./runtime";
-import { BindingMissingError, pickBinding } from "./binding";
+import { BindingMissingError, type BindingSource, pickBinding } from "./binding";
 
 interface NodeBuiltins {
     getBuiltinModule?: (id: string) => unknown;
