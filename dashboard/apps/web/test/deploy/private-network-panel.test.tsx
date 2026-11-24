@@ -73,8 +73,8 @@ const BASE_VIEW: PrivateNetworkView = {
     crossLinksOffered: true
 };
 
-async function mountReady(overrides: Partial<PrivateNetworkView> = {}, id = "service-1") {
-    privateNetworkAction.mockResolvedValue({ view: { ...BASE_VIEW, ...overrides }, canEdit: true });
+async function mountReady(overrides: Partial<PrivateNetworkView> = {}, id = "service-1", canUpdate = true) {
+    privateNetworkAction.mockResolvedValue({ view: { ...BASE_VIEW, ...overrides }, canEdit: true, canUpdate });
     render(<PrivateNetworkPanel kind="application" id={id} />, { wrapper: MessagesWrapper });
     await screen.findByText("api.polaris.internal");
 }
@@ -232,5 +232,15 @@ describe("the private networking panel", () => {
         await mountReady({ crossLinksOffered: false }, "service-swarm");
         expect(screen.queryByRole("button", { name: "Allow a service" })).toBeNull();
         expect(screen.getByText(/not available on Swarm servers/)).toBeTruthy();
+    });
+
+    it("sends an administrator to Updates for a server too old for names, and tells anybody else who can", async () => {
+        await mountReady({ status: "unsupported" }, "service-old-admin");
+        expect(screen.getByRole("link", { name: "Updates" }).getAttribute("href")).toBe("/admin/updates");
+        cleanup();
+
+        await mountReady({ status: "unsupported" }, "service-old-member", false);
+        expect(screen.queryByRole("link", { name: "Updates" })).toBeNull();
+        expect(screen.getByText(/An administrator has to update it/)).toBeTruthy();
     });
 });

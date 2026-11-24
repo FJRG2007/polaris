@@ -185,6 +185,8 @@
     "web/mail:view.replyAll (es-ES)",
     "web/mail:views.inbox.title (es-ES)",
     "web/mail:views.sent.title (es-ES)",
+    "web/mailCompose:compose.answerKind.reply (es-ES)",
+    "web/mailCompose:compose.answerKind.replyAll (es-ES)",
     "web/mailCompose:compose.times.monday (es-ES)",
     "web/mailCompose:compose.undo (es-ES)",
     "web/mailServer:boxes.newPassword (es-ES)",

@@ -34,6 +34,10 @@ export interface DraftFields {
     readonly subject: string;
     readonly body: string;
     readonly attachmentIds: readonly string[];
+    /** The message this answers, and whether as a forward. Saved with every
+     *  draft, so a reply reopened from Drafts still threads where it belongs. */
+    readonly inReplyToId?: string | null;
+    readonly forward?: boolean;
 }
 
 function sameAddresses(
@@ -78,6 +82,8 @@ export function sameDraft(left: DraftFields, right: DraftFields): boolean {
         left.identityId === right.identityId &&
         left.subject === right.subject &&
         left.body === right.body &&
+        (left.inReplyToId ?? null) === (right.inReplyToId ?? null) &&
+        (left.forward ?? false) === (right.forward ?? false) &&
         sameWords(left, right)
     );
 }

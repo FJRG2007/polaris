@@ -43,7 +43,17 @@ export function RecipientField({
     const offered = useContactSuggestions(typed, held);
     const { suggestions, highlight } = offered;
 
-    const invalid = useMemo(() => typed.trim().length > 0 && !looksLikeAddress(typed), [typed]);
+    /**
+     * Whether the writer has left the field with something in it that is not an
+     * address. Not while they type: "ana" is the start of a search for Ana, and
+     * saying it is not an address while her suggestions are on screen is
+     * calling the question wrong before it is asked.
+     */
+    const [left, setLeft] = useState(false);
+    const invalid = useMemo(
+        () => left && typed.trim().length > 0 && !looksLikeAddress(typed),
+        [left, typed]
+    );
 
     function commit(entry: { address: string; name: string }): void {
         if (!looksLikeAddress(entry.address)) return;
@@ -102,8 +112,12 @@ export function RecipientField({
                         aria-label={label}
                         aria-invalid={invalid || undefined}
                         className="h-6 min-w-[8rem] flex-1 border-0 bg-transparent px-1 text-[13px]"
-                        onChange={(event) => setTyped(event.target.value)}
+                        onChange={(event) => {
+                            setTyped(event.target.value);
+                            setLeft(false);
+                        }}
                         onBlur={() => {
+                            setLeft(true);
                             // Leaving the field finishes what is in it. Losing a
                             // typed address because somebody clicked Send is the
                             // single most annoying bug a composer can have.

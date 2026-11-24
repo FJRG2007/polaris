@@ -136,6 +136,31 @@ describe("a task's offline writes", () => {
         expect(await waiting()).toHaveLength(0);
     });
 
+    it("keeps a subtask under a parent still waiting behind the parent's create, and sends it after", async () => {
+        createTaskAction.mockRejectedValueOnce(unreachable());
+        await writeTask(TASK_CREATE, { listId: LIST, name: "Parent" }, vi.fn());
+        const parent = (createTaskAction.mock.calls[0]?.[0] as { id: string }).id;
+        createTaskAction.mockClear();
+
+        // Polaris answers again, but the parent has not been sent yet.
+        const order: string[] = [];
+        createTaskAction.mockImplementation(async (input: { id: string; name: string }) => (order.push(input.name), { id: input.id }));
+        expect(await writeTask(TASK_CREATE, { listId: LIST, name: "Child", parentId: parent }, vi.fn())).toEqual({
+            queued: true
+        });
+        await drained();
+        expect(order).toEqual(["Parent", "Child"]);
+        expect(await waiting()).toHaveLength(0);
+    });
+
+    it("keeps a move placed next to a task still waiting behind it", async () => {
+        createTaskAction.mockRejectedValueOnce(unreachable());
+        await writeTask(TASK_CREATE, { listId: LIST, name: "New" }, vi.fn());
+        const made = (createTaskAction.mock.calls[0]?.[0] as { id: string }).id;
+        expect(await writeTask(TASK_MOVE, { taskId: TASK, afterId: made }, vi.fn())).toEqual({ queued: true });
+        expect(moveTaskAction).not.toHaveBeenCalled();
+    });
+
     it("never folds two creates together", async () => {
         createTaskAction.mockRejectedValue(unreachable());
         await writeTask(TASK_CREATE, { listId: LIST, name: "A" }, vi.fn());

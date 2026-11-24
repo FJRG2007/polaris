@@ -16,6 +16,9 @@
  *   from the panel does not apply here: it was given in a private chat, not in
  *   a room where somebody else's message can steer the model.
  * - Tools over secrets (Vault, passwords, keys, snippets) are never offered.
+ * - In a sealed conversation the change is kept sealed (`holdCall` with
+ *   `sealed`): what it would do came from the conversation, so it waits under
+ *   POLARIS_MASTER_KEY like Polar's own device there, never in the clear.
  *
  * After an approval the same mention is answered again with what was done, so
  * Polar can say so - or ask for the next change of a chain, which waits the
@@ -24,8 +27,10 @@
 
 import { prisma } from "@polaris/db";
 import { tool, type ToolSet } from "ai";
+import { loadEnv } from "@polaris/config";
 import { ChatAccessError } from "./access";
 import type { Pressed } from "./component-actions";
+import { decryptSecret, encryptSecret } from "@polaris/storage";
 import type { MessageComponentInput } from "./message-components";
 
 /** Most steps one mention takes: discovery, a few reads, then the answer. */
@@ -157,7 +162,60 @@ export function callComponents(
     ];
 }
 
-/** Keeps a change until it is approved, on the message that offers it. */
+/** A change kept sealed: whole, in `done` (an object there, never a list). */
+interface SealedHeld {
+    readonly sealed: { readonly ciphertext: string; readonly nonce: string; readonly keyId: string };
+}
+
+/** What a kept change runs with, opened. */
+export interface HeldCall {
+    readonly input: unknown;
+    readonly done: DoneCall[];
+    /** Kept sealed: it was offered in a sealed conversation, and is answered there. */
+    readonly sealed: boolean;
+}
+
+/** The sealed value a row's `done` holds, or null for one kept in the clear. */
+export function sealedHeldOf(value: unknown): SealedHeld["sealed"] | null {
+    const sealed = value && typeof value === "object" && !Array.isArray(value) ? (value as Partial<SealedHeld>).sealed : undefined;
+    return sealed && typeof sealed.ciphertext === "string" && typeof sealed.nonce === "string" && typeof sealed.keyId === "string"
+        ? sealed
+        : null;
+}
+
+/** The input and the earlier changes, sealed together under the master key. */
+function sealHeld(id: string, input: unknown, done: readonly DoneCall[]): SealedHeld {
+    // The row's id rides inside, so a sealed value copied onto another row does not open there.
+    const blob = encryptSecret(JSON.stringify({ id, input, done }), loadEnv().POLARIS_MASTER_KEY);
+    return { sealed: { ciphertext: blob.ciphertext.toString("base64"), nonce: blob.nonce.toString("base64"), keyId: blob.keyId } };
+}
+
+/**
+ * A kept change, opened - a sealed one under the master key. Null for one that
+ * no longer opens (a replaced master key, a value from another row), which is
+ * answered as gone.
+ */
+export function openHeld(row: { readonly id: string; readonly input: unknown; readonly done: unknown }): HeldCall | null {
+    const sealed = sealedHeldOf(row.done);
+    if (!sealed) return { input: row.input, done: doneOf(row.done), sealed: false };
+    try {
+        const plain = decryptSecret(
+            { ciphertext: Buffer.from(sealed.ciphertext, "base64"), nonce: Buffer.from(sealed.nonce, "base64"), keyId: sealed.keyId },
+            loadEnv().POLARIS_MASTER_KEY
+        );
+        const opened = JSON.parse(plain) as { id?: unknown; input?: unknown; done?: unknown };
+        if (opened.id !== row.id) return null;
+        return { input: opened.input ?? {}, done: doneOf(opened.done), sealed: true };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Keeps a change until it is approved, on the message that offers it. With
+ * `sealed`, its input and the earlier changes are kept sealed and the `input`
+ * column holds nothing: only the tool's name is readable.
+ */
 export async function holdCall(input: {
     readonly id: string;
     readonly ownerId: string;
@@ -165,7 +223,9 @@ export async function holdCall(input: {
     readonly mentionId: string;
     readonly call: PendingCall;
     readonly done: readonly DoneCall[];
+    readonly sealed?: boolean;
 }): Promise<void> {
+    const callInput = input.call.input ?? {};
     await prisma.polarChatCall.create({
         data: {
             id: input.id,
@@ -173,8 +233,8 @@ export async function holdCall(input: {
             messageId: input.messageId,
             mentionId: input.mentionId,
             tool: input.call.tool,
-            input: (input.call.input ?? {}) as object,
-            done: input.done as unknown as object
+            input: (input.sealed ? {} : callInput) as object,
+            done: (input.sealed ? sealHeld(input.id, callInput, input.done) : input.done) as unknown as object
         }
     });
     // Ones left waiting are dropped as new ones arrive: no sweep to schedule.
@@ -269,14 +329,33 @@ export function mentionToolRules(asker: string, room: string, data: string): str
 /** Approve: the change runs as the asker, and Polar answers again with what it did. */
 export async function approveCall(pressed: Pressed): Promise<void> {
     const row = await takeCall(pressed);
+    const held = openHeld(row);
     const mention = await prisma.chatMessage.findUnique({
         where: { id: row.mentionId },
-        select: { id: true, channelId: true, authorId: true, parentId: true, body: true, deletedAt: true }
+        select: { id: true, channelId: true, authorId: true, parentId: true, replyToId: true, body: true, deletedAt: true }
     });
-    if (!mention || mention.deletedAt || mention.channelId !== pressed.message.channelId) {
+    if (!held || !mention || mention.deletedAt || mention.channelId !== pressed.message.channelId) {
         throw new ChatAccessError({ key: "errors.componentGone" });
     }
-    const done = await runApprovedCall(pressed.user.id, row.tool, row.input, row.id);
+    if (held.sealed) {
+        // Polar's device opens the question first: one it can no longer open
+        // is answered as gone, with the change not run.
+        const { approveSealedPolar } = await import("./e2ee/sealed-polar");
+        const question = {
+            channelId: mention.channelId,
+            messageId: mention.id,
+            authorId: pressed.user.id,
+            parentId: mention.parentId,
+            replyToId: mention.replyToId
+        };
+        const answered = await approveSealedPolar(question, pressed.message.id, async () => {
+            const done = await runApprovedCall(pressed.user.id, row.tool, held.input, row.id);
+            return done ? [...held.done, done] : null;
+        });
+        if (!answered) throw new ChatAccessError({ key: "errors.componentGone" });
+        return;
+    }
+    const done = await runApprovedCall(pressed.user.id, row.tool, held.input, row.id);
     if (!done) throw new ChatAccessError({ key: "errors.componentGone" });
     const { answerPolarMention } = await import("./polar-mention");
     await answerPolarMention(
@@ -288,14 +367,19 @@ export async function approveCall(pressed: Pressed): Promise<void> {
             body: mention.body
         },
         pressed.message.id,
-        [...doneOf(row.done), done]
+        [...held.done, done]
     );
 }
 
-/** Cancel: nothing runs, and the message says so. */
+/** Cancel: nothing runs, and the message says so - sealed by Polar's device where the offer was sealed. */
 export async function cancelCall(pressed: Pressed): Promise<void> {
-    await takeCall(pressed);
+    const row = await takeCall(pressed);
     const { chatWordsFor } = await import("./text");
     const words = await chatWordsFor(pressed.user.id);
+    if (sealedHeldOf(row.done)) {
+        const { cancelSealedPolar } = await import("./e2ee/sealed-polar");
+        await cancelSealedPolar(pressed.message.channelId, pressed.message.id, words("polar.callCancelled"));
+        return;
+    }
     await pressed.update({ body: words("polar.callCancelled"), components: [] });
 }

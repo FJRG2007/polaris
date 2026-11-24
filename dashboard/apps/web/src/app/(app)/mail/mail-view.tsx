@@ -33,7 +33,7 @@ import { useMailLayout } from "./use-mail-layout";
 import { ThreadContextMenu } from "./thread-menu";
 import type { DisplayFormat } from "@polaris/core";
 import { RefusedMailboxes } from "./refused-notice";
-import { forwardSeed, replySeed } from "./answering";
+import { answerSeed } from "./answering";
 import { missingFolderRole, refusalOf, refusalOrFailure } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
 import type { MailAction } from "@/lib/mailbox/messages";
@@ -1441,14 +1441,12 @@ export function MailView({
                 const envelope = opened.envelope;
                 const quoted = opened.readable.text;
                 openComposer(
-                    kind === "forward"
-                        ? forwardSeed(envelope, quoted)
-                        : replySeed(
-                              envelope,
-                              accounts.map((account) => account.address),
-                              kind === "reply-all",
-                              quoted
-                          )
+                    answerSeed(
+                        kind,
+                        envelope,
+                        accounts.map((account) => account.address),
+                        quoted
+                    )
                 );
             });
         },
@@ -2841,7 +2839,7 @@ function ThreadRow({
                             </p>
                             {thread.matches && thread.matches.length > 0 ? (
                                 <span
-                                    className="shrink-0 rounded bg-warning/15 px-1 text-[10px] font-medium tabular-nums text-foreground"
+                                    className="shrink-0 rounded bg-warning-soft px-1 text-[10px] font-medium tabular-nums text-foreground"
                                     data-row-matches=""
                                 >
                                     {t("searchBox.matchCount", { count: thread.matches.length })}

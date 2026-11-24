@@ -2928,7 +2928,10 @@
     "outbox": {
         "notSent": "Not sent: {excerpt}",
         "retry": "Send again",
-        "discard": "Delete"
+        "discard": "Delete",
+        "editNotSent": "Edit not saved: {excerpt}",
+        "reactionNotSent": "Reaction not sent: {emoji}",
+        "deleteNotSent": "Message not deleted"
     },
     "groupInvites": {
         "notification": "{name} invited you to a group",

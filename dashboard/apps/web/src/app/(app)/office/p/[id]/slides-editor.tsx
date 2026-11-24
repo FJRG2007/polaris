@@ -42,6 +42,7 @@ import { isPicture, readPicture, type PictureRefusal } from "./image-file";
 import { ImageSourceProvider, SlideDrawing, SlideLookProvider, SlideStage } from "./slide-canvas";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useOfficeDocument } from "@/app/(app)/office/use-office-document";
+import { SavingNote } from "@/app/(app)/office/saving-note";
 import { ShortcutsDialog } from "@/components/shortcuts/shortcuts-dialog";
 import {
     Button,
@@ -186,7 +187,7 @@ export function SlidesEditor({
     audienceWindow?: boolean;
 }) {
     const t = useTranslations("office");
-    const { doc } = useOfficeDocument({ documentId, content, editable });
+    const { doc, saving, retry } = useOfficeDocument({ documentId, content, editable });
     const version = edits.useDocumentVersion(doc);
     const history = edits.useDeckHistory(doc, editable);
 
@@ -720,409 +721,412 @@ export function SlidesEditor({
     return (
         <ImageSourceProvider source={imageSource}>
             <SlideLookProvider lookOf={lookFor}>
-                <div ref={root} className="relative flex min-h-0 flex-1 max-sm:flex-col">
-                    {/* The slides. A column of them rather than a strip: a deck is
-                    read top to bottom in every tool that makes one. */}
-                    <SlideList
-                        slides={deckSlides}
-                        bySlide={bySlide}
-                        at={at}
-                        editable={editable}
-                        actions={listActions}
-                    />
+                <div className="flex min-h-0 flex-1 flex-col">
+                    <div ref={root} className="relative flex min-h-0 flex-1 max-sm:flex-col">
+                        {/* The slides. A column of them rather than a strip: a deck is
+                        read top to bottom in every tool that makes one. */}
+                        <SlideList
+                            slides={deckSlides}
+                            bySlide={bySlide}
+                            at={at}
+                            editable={editable}
+                            actions={listActions}
+                        />
 
-                    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                        <div className="flex shrink-0 items-center gap-1 border-b border-border px-3 py-1.5">
-                            {/* Everything that edits, in one row that scrolls
-                            sideways when the window is too narrow for it,
-                            rather than wrapping into rows that push the slide
-                            down. */}
-                            <ScrollRow className="flex min-w-0 flex-1 items-center gap-1">
-                                {editable ? (
-                                    <>
-                                        <div className="flex shrink-0 items-center">
+                        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                            <div className="flex shrink-0 items-center gap-1 border-b border-border px-3 py-1.5">
+                                {/* Everything that edits, in one row that scrolls
+                                sideways when the window is too narrow for it,
+                                rather than wrapping into rows that push the slide
+                                down. */}
+                                <ScrollRow className="flex min-w-0 flex-1 items-center gap-1">
+                                    {editable ? (
+                                        <>
+                                            <div className="flex shrink-0 items-center">
+                                                <ToolButton
+                                                    label={t("slides.newSlide")}
+                                                    onClick={() => addSlide()}
+                                                >
+                                                    <Plus className="size-4 shrink-0" aria-hidden />
+                                                </ToolButton>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="shrink-0 px-1"
+                                                            aria-label={t(
+                                                                "slides.design.newSlideLayout"
+                                                            )}
+                                                            title={t("slides.design.newSlideLayout")}
+                                                        >
+                                                            <ChevronDown
+                                                                className="size-3 shrink-0"
+                                                                aria-hidden
+                                                            />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="start">
+                                                        <LayoutItems
+                                                            onPick={(layout) => addSlide(layout)}
+                                                        />
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
                                             <ToolButton
-                                                label={t("slides.newSlide")}
-                                                onClick={() => addSlide()}
+                                                label={t("slides.undo")}
+                                                disabled={!history.canUndo}
+                                                onClick={history.undo}
                                             >
-                                                <Plus className="size-4 shrink-0" aria-hidden />
+                                                <Undo2 className="size-4 shrink-0" aria-hidden />
                                             </ToolButton>
+                                            <ToolButton
+                                                label={t("slides.redo")}
+                                                disabled={!history.canRedo}
+                                                onClick={history.redo}
+                                            >
+                                                <Redo2 className="size-4 shrink-0" aria-hidden />
+                                            </ToolButton>
+                                            <span
+                                                className="mx-1 h-5 w-px shrink-0 bg-border"
+                                                aria-hidden
+                                            />
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="shrink-0"
+                                                title={t("slides.text")}
+                                                onClick={() => addBox("text")}
+                                            >
+                                                <Type className="size-4 shrink-0" aria-hidden />
+                                                {/* Named on the widest screens only: with a
+                                                box chosen its formatting needs the row. */}
+                                                <span className="max-2xl:sr-only">
+                                                    {t("slides.text")}
+                                                </span>
+                                            </Button>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="shrink-0 px-1"
-                                                        aria-label={t(
-                                                            "slides.design.newSlideLayout"
-                                                        )}
-                                                        title={t("slides.design.newSlideLayout")}
+                                                        className="shrink-0"
+                                                        title={t("slides.shape")}
                                                     >
+                                                        <Shapes
+                                                            className="size-4 shrink-0"
+                                                            aria-hidden
+                                                        />
+                                                        <span className="max-2xl:sr-only">
+                                                            {t("slides.shape")}
+                                                        </span>
                                                         <ChevronDown
                                                             className="size-3 shrink-0"
                                                             aria-hidden
                                                         />
                                                     </Button>
                                                 </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="start">
-                                                    <LayoutItems
-                                                        onPick={(layout) => addSlide(layout)}
-                                                    />
+                                                <DropdownMenuContent
+                                                    align="start"
+                                                    // The new shape takes the focus, not
+                                                    // the button that made it.
+                                                    onCloseAutoFocus={(event) => event.preventDefault()}
+                                                >
+                                                    {deck.SHAPES.map((shape) => {
+                                                        const Icon = SHAPE_ICON[shape];
+                                                        return (
+                                                            <div key={shape}>
+                                                                {shape === deck.LINE_SHAPES[0] ? (
+                                                                    <DropdownMenuSeparator />
+                                                                ) : null}
+                                                                <DropdownMenuItem
+                                                                    onSelect={() =>
+                                                                        addBox("shape", shape)
+                                                                    }
+                                                                >
+                                                                    <Icon className="size-4" />
+                                                                    {t(`slides.shapes.${shape}`)}
+                                                                </DropdownMenuItem>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
-                                        </div>
-                                        <ToolButton
-                                            label={t("slides.undo")}
-                                            disabled={!history.canUndo}
-                                            onClick={history.undo}
-                                        >
-                                            <Undo2 className="size-4 shrink-0" aria-hidden />
-                                        </ToolButton>
-                                        <ToolButton
-                                            label={t("slides.redo")}
-                                            disabled={!history.canRedo}
-                                            onClick={history.redo}
-                                        >
-                                            <Redo2 className="size-4 shrink-0" aria-hidden />
-                                        </ToolButton>
-                                        <span
-                                            className="mx-1 h-5 w-px shrink-0 bg-border"
-                                            aria-hidden
-                                        />
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="shrink-0"
+                                                title={t("slides.image.insert")}
+                                                onClick={() =>
+                                                    void chooseFiles({
+                                                        accept: "image/*",
+                                                        multiple: true,
+                                                        onFailed: (title) => toast.show({ title })
+                                                    }).then((files) => {
+                                                        if (files.length > 0) void addPictures(files);
+                                                    })
+                                                }
+                                            >
+                                                <ImagePlus className="size-4 shrink-0" aria-hidden />
+                                                <span className="max-2xl:sr-only">
+                                                    {t("slides.image.insert")}
+                                                </span>
+                                            </Button>
+                                            <TableMenu onPick={addTable} />
+                                            <ChartMenu onPick={addChart} />
+                                            {chooser}
+                                            <span
+                                                className="mx-1 h-5 w-px shrink-0 bg-border"
+                                                aria-hidden
+                                            />
+                                            <ToolButton
+                                                label={t("slides.duplicateBox")}
+                                                disabled={chosenBoxes.length === 0}
+                                                onClick={duplicateChosen}
+                                            >
+                                                <CopyPlus className="size-4 shrink-0" aria-hidden />
+                                            </ToolButton>
+                                            <ToolButton
+                                                label={t("slides.deleteBox")}
+                                                disabled={chosenBoxes.length === 0}
+                                                onClick={removeChosen}
+                                            >
+                                                <Trash2 className="size-4 shrink-0" aria-hidden />
+                                            </ToolButton>
+                                            {chosenBoxes.length > 0 && slide ? (
+                                                <FormatBar
+                                                    boxes={chosenBoxes}
+                                                    onPatch={patchChosen}
+                                                    onArrange={(how) =>
+                                                        edits.arrangeBox(doc, slide.id, chosenIds, how)
+                                                    }
+                                                    onAlign={alignChosen}
+                                                    onDistribute={distributeChosen}
+                                                    onGroup={groupChosen}
+                                                    onUngroup={ungroupChosen}
+                                                    cell={editingCell}
+                                                    onTable={(id, edit) =>
+                                                        edits.updateTable(doc, slide.id, id, edit)
+                                                    }
+                                                    onChart={(id, chart) =>
+                                                        edits.setChart(doc, slide.id, id, chart)
+                                                    }
+                                                    onEditData={setChartData}
+                                                />
+                                            ) : slide ? (
+                                                <DesignBar
+                                                    theme={theme}
+                                                    background={lookFor(slide.id).background}
+                                                    ownBackground={deck.hasOwnBackground(
+                                                        backgrounds,
+                                                        slide.id
+                                                    )}
+                                                    onBackground={(color) =>
+                                                        edits.setBackground(doc, [slide.id], color)
+                                                    }
+                                                    onBackgroundEverywhere={() =>
+                                                        edits.backgroundEverywhere(
+                                                            doc,
+                                                            lookFor(slide.id).background
+                                                        )
+                                                    }
+                                                    onLayout={(layout) =>
+                                                        edits.applyLayout(doc, slide.id, layout)
+                                                    }
+                                                    onTheme={(next) => edits.setTheme(doc, next)}
+                                                />
+                                            ) : null}
+                                        </>
+                                    ) : null}
+                                </ScrollRow>
+                                <div className="flex shrink-0 items-center gap-1">
+                                    <Button
+                                        variant={motionOpen ? "secondary" : "ghost"}
+                                        size="icon"
+                                        aria-label={t("slides.motion.title")}
+                                        title={t("slides.motion.title")}
+                                        aria-pressed={motionOpen}
+                                        onClick={() => setMotionOpen((open) => !open)}
+                                    >
+                                        <Sparkles className="size-4 shrink-0" aria-hidden />
+                                    </Button>
+                                    <ToolButton
+                                        label={t("slides.shortcuts")}
+                                        onClick={() => setHelpOpen(true)}
+                                    >
+                                        <Keyboard className="size-4 shrink-0" aria-hidden />
+                                    </ToolButton>
+                                    <div className="flex items-center">
                                         <Button
-                                            variant="ghost"
+                                            variant="secondary"
                                             size="sm"
-                                            className="shrink-0"
-                                            title={t("slides.text")}
-                                            onClick={() => addBox("text")}
+                                            className="rounded-r-none"
+                                            onClick={() => present(at)}
                                         >
-                                            <Type className="size-4 shrink-0" aria-hidden />
-                                            {/* Named on the widest screens only: with a
-                                            box chosen its formatting needs the row. */}
-                                            <span className="max-2xl:sr-only">
-                                                {t("slides.text")}
+                                            <Play className="size-4 shrink-0" aria-hidden />
+                                            <span className="max-sm:sr-only">
+                                                {t("slides.present")}
                                             </span>
                                         </Button>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button
-                                                    variant="ghost"
+                                                    variant="secondary"
                                                     size="sm"
-                                                    className="shrink-0"
-                                                    title={t("slides.shape")}
+                                                    className="rounded-l-none border-l border-border px-1.5"
+                                                    aria-label={t("slides.presentOptions")}
+                                                    title={t("slides.presentOptions")}
                                                 >
-                                                    <Shapes
-                                                        className="size-4 shrink-0"
-                                                        aria-hidden
-                                                    />
-                                                    <span className="max-2xl:sr-only">
-                                                        {t("slides.shape")}
-                                                    </span>
                                                     <ChevronDown
-                                                        className="size-3 shrink-0"
+                                                        className="size-4 shrink-0"
                                                         aria-hidden
                                                     />
                                                 </Button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent
-                                                align="start"
-                                                // The new shape takes the focus, not
-                                                // the button that made it.
-                                                onCloseAutoFocus={(event) => event.preventDefault()}
-                                            >
-                                                {deck.SHAPES.map((shape) => {
-                                                    const Icon = SHAPE_ICON[shape];
-                                                    return (
-                                                        <div key={shape}>
-                                                            {shape === deck.LINE_SHAPES[0] ? (
-                                                                <DropdownMenuSeparator />
-                                                            ) : null}
-                                                            <DropdownMenuItem
-                                                                onSelect={() =>
-                                                                    addBox("shape", shape)
-                                                                }
-                                                            >
-                                                                <Icon className="size-4" />
-                                                                {t(`slides.shapes.${shape}`)}
-                                                            </DropdownMenuItem>
-                                                        </div>
-                                                    );
-                                                })}
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onSelect={() => present(at)}>
+                                                    <Play aria-hidden />
+                                                    {t("slides.fromHere")}
+                                                    <ShortcutHint id="office.slides.present" />
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onSelect={() => present(0)}>
+                                                    <SkipBack aria-hidden />
+                                                    {t("slides.fromStart")}
+                                                    <ShortcutHint id="office.slides.presentFromStart" />
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onSelect={() => present(at, true)}>
+                                                    <Presentation aria-hidden />
+                                                    {t("slides.presenter.title")}
+                                                </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="shrink-0"
-                                            title={t("slides.image.insert")}
-                                            onClick={() =>
-                                                void chooseFiles({
-                                                    accept: "image/*",
-                                                    multiple: true,
-                                                    onFailed: (title) => toast.show({ title })
-                                                }).then((files) => {
-                                                    if (files.length > 0) void addPictures(files);
-                                                })
-                                            }
-                                        >
-                                            <ImagePlus className="size-4 shrink-0" aria-hidden />
-                                            <span className="max-2xl:sr-only">
-                                                {t("slides.image.insert")}
-                                            </span>
-                                        </Button>
-                                        <TableMenu onPick={addTable} />
-                                        <ChartMenu onPick={addChart} />
-                                        {chooser}
-                                        <span
-                                            className="mx-1 h-5 w-px shrink-0 bg-border"
-                                            aria-hidden
-                                        />
-                                        <ToolButton
-                                            label={t("slides.duplicateBox")}
-                                            disabled={chosenBoxes.length === 0}
-                                            onClick={duplicateChosen}
-                                        >
-                                            <CopyPlus className="size-4 shrink-0" aria-hidden />
-                                        </ToolButton>
-                                        <ToolButton
-                                            label={t("slides.deleteBox")}
-                                            disabled={chosenBoxes.length === 0}
-                                            onClick={removeChosen}
-                                        >
-                                            <Trash2 className="size-4 shrink-0" aria-hidden />
-                                        </ToolButton>
-                                        {chosenBoxes.length > 0 && slide ? (
-                                            <FormatBar
-                                                boxes={chosenBoxes}
-                                                onPatch={patchChosen}
-                                                onArrange={(how) =>
-                                                    edits.arrangeBox(doc, slide.id, chosenIds, how)
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* The slide, as large as the room allows in both directions:
+                        sized off this area's own width and height, so a short
+                        window shows the whole slide rather than a scrolled part. */}
+                            <div
+                                className="min-h-0 flex-1 bg-muted/30 p-4 [container-type:size]"
+                                onDragOver={(event) => {
+                                    if (!editable || !event.dataTransfer.types.includes("Files"))
+                                        return;
+                                    event.preventDefault();
+                                    event.dataTransfer.dropEffect = "copy";
+                                }}
+                                onDrop={(event) => {
+                                    if (!editable) return;
+                                    const files = [...event.dataTransfer.files].filter(isPicture);
+                                    if (files.length === 0) return;
+                                    event.preventDefault();
+                                    void addPictures(files);
+                                }}
+                            >
+                                <div className="flex h-full w-full items-center justify-center">
+                                    <div
+                                        className="relative aspect-video overflow-hidden rounded-lg border border-border bg-white shadow-sm"
+                                        style={{ width: "min(100cqw, calc(100cqh * 16 / 9))" }}
+                                    >
+                                        {editable && slide ? (
+                                            <SlideStage
+                                                label={t("slides.canvas", { number: at + 1 })}
+                                                slideId={slide.id}
+                                                boxes={onSlide}
+                                                chosen={chosenIds}
+                                                editing={editing}
+                                                editingCell={
+                                                    editingCell?.box === editing ? editingCell.at : null
                                                 }
-                                                onAlign={alignChosen}
-                                                onDistribute={distributeChosen}
-                                                onGroup={groupChosen}
-                                                onUngroup={ungroupChosen}
-                                                cell={editingCell}
+                                                placeholderOf={placeholderOf}
+                                                nameOf={nameOf}
+                                                resizeLabel={t("slides.resize")}
+                                                lineEndLabel={t("slides.lineEnd")}
+                                                columnLabel={t("slides.table.columnWidth")}
+                                                onChoose={setChosen}
+                                                onEdit={(id, cell) => {
+                                                    setEditing(id);
+                                                    if (cell) setEditingCell({ box: id, at: cell });
+                                                    else if (!id) setEditingCell(null);
+                                                }}
+                                                onCell={onCell}
                                                 onTable={(id, edit) =>
                                                     edits.updateTable(doc, slide.id, id, edit)
                                                 }
-                                                onChart={(id, chart) =>
-                                                    edits.setChart(doc, slide.id, id, chart)
+                                                onFrames={(frames) =>
+                                                    edits.setFrames(doc, slide.id, frames)
                                                 }
-                                                onEditData={setChartData}
+                                                onText={(id, text) =>
+                                                    edits.updateBox(doc, slide.id, id, { text })
+                                                }
                                             />
-                                        ) : slide ? (
-                                            <DesignBar
-                                                theme={theme}
-                                                background={lookFor(slide.id).background}
-                                                ownBackground={deck.hasOwnBackground(
-                                                    backgrounds,
-                                                    slide.id
-                                                )}
-                                                onBackground={(color) =>
-                                                    edits.setBackground(doc, [slide.id], color)
-                                                }
-                                                onBackgroundEverywhere={() =>
-                                                    edits.backgroundEverywhere(
-                                                        doc,
-                                                        lookFor(slide.id).background
-                                                    )
-                                                }
-                                                onLayout={(layout) =>
-                                                    edits.applyLayout(doc, slide.id, layout)
-                                                }
-                                                onTheme={(next) => edits.setTheme(doc, next)}
-                                            />
-                                        ) : null}
-                                    </>
-                                ) : null}
-                            </ScrollRow>
-                            <div className="flex shrink-0 items-center gap-1">
-                                <Button
-                                    variant={motionOpen ? "secondary" : "ghost"}
-                                    size="icon"
-                                    aria-label={t("slides.motion.title")}
-                                    title={t("slides.motion.title")}
-                                    aria-pressed={motionOpen}
-                                    onClick={() => setMotionOpen((open) => !open)}
-                                >
-                                    <Sparkles className="size-4 shrink-0" aria-hidden />
-                                </Button>
-                                <ToolButton
-                                    label={t("slides.shortcuts")}
-                                    onClick={() => setHelpOpen(true)}
-                                >
-                                    <Keyboard className="size-4 shrink-0" aria-hidden />
-                                </ToolButton>
-                                <div className="flex items-center">
-                                    <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        className="rounded-r-none"
-                                        onClick={() => present(at)}
-                                    >
-                                        <Play className="size-4 shrink-0" aria-hidden />
-                                        <span className="max-sm:sr-only">
-                                            {t("slides.present")}
-                                        </span>
-                                    </Button>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                className="rounded-l-none border-l border-border px-1.5"
-                                                aria-label={t("slides.presentOptions")}
-                                                title={t("slides.presentOptions")}
+                                        ) : (
+                                            <SlideDrawing boxes={onSlide} slideId={slide?.id ?? ""} />
+                                        )}
+                                        {previewing && slide ? (
+                                            // Played over the canvas; a press anywhere on it stops.
+                                            <div
+                                                className="absolute inset-0 z-10 overflow-hidden"
+                                                onPointerDown={() => setPreviewing(false)}
                                             >
-                                                <ChevronDown
-                                                    className="size-4 shrink-0"
-                                                    aria-hidden
+                                                <PreviewShow
+                                                    key={slide.id}
+                                                    slides={deckSlides}
+                                                    index={at}
+                                                    bySlide={bySlide}
+                                                    motionOf={motionOf}
+                                                    onDone={() => setPreviewing(false)}
                                                 />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onSelect={() => present(at)}>
-                                                <Play aria-hidden />
-                                                {t("slides.fromHere")}
-                                                <ShortcutHint id="office.slides.present" />
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onSelect={() => present(0)}>
-                                                <SkipBack aria-hidden />
-                                                {t("slides.fromStart")}
-                                                <ShortcutHint id="office.slides.presentFromStart" />
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onSelect={() => present(at, true)}>
-                                                <Presentation aria-hidden />
-                                                {t("slides.presenter.title")}
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                                            </div>
+                                        ) : null}
+                                    </div>
                                 </div>
                             </div>
+                            {slide ? (
+                                <NotesPanel
+                                    slideId={slide.id}
+                                    notes={notesFor(slide)}
+                                    editable={editable}
+                                    onWrite={(slideId, text) => {
+                                        const one = edits
+                                            .slidesOf(doc)
+                                            .toArray()
+                                            .find((s) => s.id === slideId);
+                                        if (one) edits.setNotes(doc, one, text);
+                                    }}
+                                />
+                            ) : null}
                         </div>
-
-                        {/* The slide, as large as the room allows in both directions:
-                    sized off this area's own width and height, so a short
-                    window shows the whole slide rather than a scrolled part. */}
-                        <div
-                            className="min-h-0 flex-1 bg-muted/30 p-4 [container-type:size]"
-                            onDragOver={(event) => {
-                                if (!editable || !event.dataTransfer.types.includes("Files"))
-                                    return;
-                                event.preventDefault();
-                                event.dataTransfer.dropEffect = "copy";
-                            }}
-                            onDrop={(event) => {
-                                if (!editable) return;
-                                const files = [...event.dataTransfer.files].filter(isPicture);
-                                if (files.length === 0) return;
-                                event.preventDefault();
-                                void addPictures(files);
-                            }}
-                        >
-                            <div className="flex h-full w-full items-center justify-center">
-                                <div
-                                    className="relative aspect-video overflow-hidden rounded-lg border border-border bg-white shadow-sm"
-                                    style={{ width: "min(100cqw, calc(100cqh * 16 / 9))" }}
-                                >
-                                    {editable && slide ? (
-                                        <SlideStage
-                                            label={t("slides.canvas", { number: at + 1 })}
-                                            slideId={slide.id}
-                                            boxes={onSlide}
-                                            chosen={chosenIds}
-                                            editing={editing}
-                                            editingCell={
-                                                editingCell?.box === editing ? editingCell.at : null
-                                            }
-                                            placeholderOf={placeholderOf}
-                                            nameOf={nameOf}
-                                            resizeLabel={t("slides.resize")}
-                                            lineEndLabel={t("slides.lineEnd")}
-                                            columnLabel={t("slides.table.columnWidth")}
-                                            onChoose={setChosen}
-                                            onEdit={(id, cell) => {
-                                                setEditing(id);
-                                                if (cell) setEditingCell({ box: id, at: cell });
-                                                else if (!id) setEditingCell(null);
-                                            }}
-                                            onCell={onCell}
-                                            onTable={(id, edit) =>
-                                                edits.updateTable(doc, slide.id, id, edit)
-                                            }
-                                            onFrames={(frames) =>
-                                                edits.setFrames(doc, slide.id, frames)
-                                            }
-                                            onText={(id, text) =>
-                                                edits.updateBox(doc, slide.id, id, { text })
-                                            }
-                                        />
-                                    ) : (
-                                        <SlideDrawing boxes={onSlide} slideId={slide?.id ?? ""} />
-                                    )}
-                                    {previewing && slide ? (
-                                        // Played over the canvas; a press anywhere on it stops.
-                                        <div
-                                            className="absolute inset-0 z-10 overflow-hidden"
-                                            onPointerDown={() => setPreviewing(false)}
-                                        >
-                                            <PreviewShow
-                                                key={slide.id}
-                                                slides={deckSlides}
-                                                index={at}
-                                                bySlide={bySlide}
-                                                motionOf={motionOf}
-                                                onDone={() => setPreviewing(false)}
-                                            />
-                                        </div>
-                                    ) : null}
-                                </div>
-                            </div>
-                        </div>
-                        {slide ? (
-                            <NotesPanel
+                        {motionOpen && slide ? (
+                            <MotionPanel
+                                slideIds={deckSlides.map((one) => one.id)}
                                 slideId={slide.id}
-                                notes={notesFor(slide)}
+                                transition={motionOf(slide.id).transition}
+                                animations={motionOf(slide.id).animations}
+                                boxes={onSlide}
+                                chosen={chosenBoxes}
+                                nameOf={nameOf}
                                 editable={editable}
-                                onWrite={(slideId, text) => {
-                                    const one = edits
-                                        .slidesOf(doc)
-                                        .toArray()
-                                        .find((s) => s.id === slideId);
-                                    if (one) edits.setNotes(doc, one, text);
+                                playing={previewing}
+                                onTransition={(ids, transition) =>
+                                    edits.setTransition(doc, ids, transition)
+                                }
+                                onAnimations={(list) => edits.setAnimations(doc, slide.id, list)}
+                                onChoose={(ids) => {
+                                    setEditing("");
+                                    setChosen(ids);
+                                }}
+                                onPlay={() => setPreviewing(true)}
+                                onStop={() => setPreviewing(false)}
+                                onClose={() => {
+                                    setMotionOpen(false);
+                                    setPreviewing(false);
                                 }}
                             />
                         ) : null}
                     </div>
-                    {motionOpen && slide ? (
-                        <MotionPanel
-                            slideIds={deckSlides.map((one) => one.id)}
-                            slideId={slide.id}
-                            transition={motionOf(slide.id).transition}
-                            animations={motionOf(slide.id).animations}
-                            boxes={onSlide}
-                            chosen={chosenBoxes}
-                            nameOf={nameOf}
-                            editable={editable}
-                            playing={previewing}
-                            onTransition={(ids, transition) =>
-                                edits.setTransition(doc, ids, transition)
-                            }
-                            onAnimations={(list) => edits.setAnimations(doc, slide.id, list)}
-                            onChoose={(ids) => {
-                                setEditing("");
-                                setChosen(ids);
-                            }}
-                            onPlay={() => setPreviewing(true)}
-                            onStop={() => setPreviewing(false)}
-                            onClose={() => {
-                                setMotionOpen(false);
-                                setPreviewing(false);
-                            }}
-                        />
-                    ) : null}
+                    {editable ? <SavingNote state={saving} onRetry={retry} /> : null}
                 </div>
                 {presenting?.presenter ? (
                     <PresenterView

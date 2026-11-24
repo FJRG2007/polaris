@@ -26,6 +26,8 @@ export default defineConfig({
          *
          * A test that genuinely hangs still fails. It just fails on evidence.
          */
+        // Core is imported from its build; a stale one is made again first.
+        globalSetup: ["./test/setup/core-build.ts"],
         // What an installable app takes from the dashboard, provided before any
         // test loads one. Every service in it loads on first use, so a test that
         // replaces a dashboard module replaces it for the apps too.

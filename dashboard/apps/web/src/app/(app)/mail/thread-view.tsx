@@ -28,7 +28,7 @@ import { mailRefusalText } from "@/lib/mailbox/refusal-text";
 import * as flying from "@polaris/ui/image-flight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AddressChip } from "./address-chip";
-import { forwardSeed, replySeed } from "./answering";
+import { answerSeed, replySeed } from "./answering";
 import { leavesTheView, scopeOf } from "./mail-actions";
 import { missingFolderRole, refusalOf, refusalOrFailure } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
@@ -388,11 +388,14 @@ export function ThreadView({
                 // how a thread turns into unreadable nested tables. A message with
                 // no text part quotes nothing, which is honest.
                 const body = readable?.text ?? "";
-                openComposer(
-                    kind === "forward"
-                        ? forwardSeed(answered, body)
-                        : replySeed(answered, self, kind === "reply-all", body)
-                );
+                // The row in the conversation, plus the headers only the opened
+                // message carries - see `answer-headers`.
+                const message = {
+                    ...answered,
+                    followupTo: opened.envelope.followupTo,
+                    listPost: opened.envelope.listPost
+                };
+                openComposer(answerSeed(kind, message, self, body));
             });
         },
         [newest, openComposer, self, toast]
@@ -1365,7 +1368,7 @@ function MessageCard({
         <li
             className={cn(
                 "scroll-mt-2 rounded-md border bg-card",
-                matched ? "border-warning/60" : "border-border"
+                matched ? "border-warning-edge" : "border-border"
             )}
             data-message-card={message.id}
             data-search-match={matched ? "" : undefined}

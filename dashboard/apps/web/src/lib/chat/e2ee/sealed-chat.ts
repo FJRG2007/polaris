@@ -26,7 +26,7 @@
 import { z } from "zod";
 import * as core from "@polaris/core";
 import type { MlsDevice, SealedStored } from "./mls-client";
-import type { SealedSearchIndex } from "./sealed-search-index";
+import type { IndexedSealed, SealedSearchIndex } from "./sealed-search-index";
 
 const SEALED_CONTENT_VERSION = 1;
 /** How many opened bodies this page keeps (oldest dropped first). */
@@ -130,6 +130,14 @@ function index(channelId: string, id: string, editedAt: string | undefined, cont
 export async function searchSealedText(term: string, channelId: string | null, limit: number): Promise<string[]> {
     if (!sealedChatActive() || !term.trim()) return [];
     return (await searchIndex()).search(term, channelId, limit);
+}
+
+/** As `searchSealedText`, with the words each was found in and the version they are. */
+export async function searchSealedEntries(term: string, channelId: string | null, limit: number): Promise<IndexedSealed[]> {
+    if (!sealedChatActive() || !term.trim()) return [];
+    const index = await searchIndex();
+    const ids = await index.search(term, channelId, limit);
+    return ids.flatMap((id) => index.entry(id) ?? []);
 }
 
 /** Drop messages the server says are gone from this device's search index. */

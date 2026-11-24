@@ -37,7 +37,8 @@ import {
     holdCall,
     mentionToolkit,
     mentionToolRules,
-    type DoneCall
+    type DoneCall,
+    type PendingCall
 } from "./polar-calls";
 
 export const POLAR_AGENT = "polar";
@@ -131,11 +132,11 @@ export function polarCommandQuestion(body: string): string {
  *
  * With `sealed`, the conversation is sealed: Polar reads it through its own
  * device and answers sealed, with no draft streamed in the clear while it
- * writes and no tools: a change it offers waits, with what it would do, on
- * the server until it is approved, which would keep words of a sealed
- * conversation there in the clear. The way to fix an answer that is not one
- * ("Try again", "Set up providers") goes under it as on a plain answer: those
- * buttons say nothing of what was asked.
+ * writes. Its tools are the same; a change it offers is sealed in its answer
+ * like the rest of it, and kept for its approval sealed too (`holdCall` with
+ * `sealed`), so no word of it waits on the server in the clear. The buttons
+ * under a sealed answer ("Approve", "Try again", "Set up providers") go on
+ * after it is posted and say nothing of what was asked.
  */
 export async function answerPolarMention(
     mention: PolarMention,
@@ -159,7 +160,7 @@ export async function answerPolarMention(
     const [history, repliedTo, toolkit] = await Promise.all([
         shielded ? Promise.resolve([]) : conversationBefore(mention, sealed),
         shielded ? Promise.resolve(null) : messageRepliedTo(mention, sealed),
-        sealed ? Promise.resolve(null) : mentionToolkit(mention.authorId)
+        mentionToolkit(mention.authorId)
     ]);
 
     const answer = await answerMentionWithReason({
@@ -188,6 +189,34 @@ export async function answerPolarMention(
     });
     const rules = await import("./rules").then((module) => module.rulesForChannel(mention.channelId));
     const fit = (text: string) => [...text].slice(0, rules.maxMessageLength).join("");
+    const pending = answer.pending ?? null;
+    if (sealed && pending) {
+        const body = offerBody(answer.text, pending, words, rules.maxMessageLength);
+        const callId = crypto.randomUUID();
+        if (replace) await sealed.rewrite(replace, body);
+        const messageId = replace ?? (await sealed.post(body));
+        await updateAgentMessage({
+            messageId,
+            channelId: mention.channelId,
+            agent: POLAR_AGENT,
+            components: callComponents(callId, mention.authorId, words),
+            edited: false
+        });
+        try {
+            await holdCall({ id: callId, ownerId: mention.authorId, messageId, mentionId: mention.messageId, call: pending, done, sealed: true });
+        } catch (error) {
+            console.error("chat: Polar could not keep a sealed change for its approval:", error);
+            await sealed.rewrite(messageId, words("polar.failed"));
+            await updateAgentMessage({
+                messageId,
+                channelId: mention.channelId,
+                agent: POLAR_AGENT,
+                components: problemComponents("failed", words, mention.authorId),
+                edited: false
+            });
+        }
+        return messageId;
+    }
     if (sealed) {
         const body = fit(shownText(answer.text, answer.problem));
         const components = problemComponents(answer.problem, words, mention.authorId);
@@ -199,13 +228,8 @@ export async function answerPolarMention(
             await updateAgentMessage({ messageId, channelId: mention.channelId, agent: POLAR_AGENT, components, edited: false });
         return messageId;
     }
-    const pending = answer.pending ?? null;
     if (pending) {
-        // What it will do goes last and whole, so a long answer is what gets cut.
-        const offer = fit(describeCall(pending, (title) => words("polar.wantsTo", { action: title })));
-        const room = Math.max(0, rules.maxMessageLength - [...offer].length - 2);
-        const said = [...answer.text].slice(0, room).join("");
-        const body = [said, offer].filter(Boolean).join("\n\n");
+        const body = offerBody(answer.text, pending, words, rules.maxMessageLength);
         const callId = crypto.randomUUID();
         const offered = callComponents(callId, mention.authorId, words);
         const messageId = replace
@@ -261,6 +285,15 @@ function sendDraft(mention: PolarMention, text: string, messageId?: string): voi
 }
 
 type Words = Awaited<ReturnType<typeof chatWordsFor>>;
+
+/** Polar's words and the change it offers, within `max` characters. */
+function offerBody(text: string, pending: PendingCall, words: Words, max: number): string {
+    // What it will do goes last and whole, so a long answer is what gets cut.
+    const offer = [...describeCall(pending, (title) => words("polar.wantsTo", { action: title }))].slice(0, max).join("");
+    const room = Math.max(0, max - [...offer].length - 2);
+    const said = [...text].slice(0, room).join("");
+    return [said, offer].filter(Boolean).join("\n\n");
+}
 
 /** The sentence as Chat shows it: the provider link moves to its button. */
 function shownText(text: string, problem: MentionProblem | null): string {

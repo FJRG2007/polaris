@@ -53,7 +53,10 @@ import { keepSignatureDelimiter, signatureBlock, splitAtSignature, withSignature
 import { joinComposerBody, trimComposerBody } from "./trimmed-content";
 import { TrimmedPill } from "./trimmed-pill";
 import { draftSaves, type DraftFields, type DraftSaves, type DraftWriter } from "./draft-saves";
+import { readMessage } from "./message-store";
+import { answerSeed, draftAnswerKind, type AnswerContext, type AnswerKind } from "./answering";
 import {
+    Check,
     ChevronDown,
     Clock,
     FileText,
@@ -61,8 +64,11 @@ import {
     Maximize2,
     Minimize2,
     Minus,
+    Forward,
     Paperclip,
     PenLine,
+    Reply,
+    ReplyAll,
     Send,
     X
 } from "lucide-react";
@@ -218,6 +224,26 @@ export function Composer() {
      */
     const [focusAt, setFocusAt] = useState(0);
     const [ownLine, setOwnLine] = useState(false);
+    /**
+     * Reply, Reply all or Forward, for a composer one of those opened. Switched
+     * from the composer itself - see `switchAnswer`. A draft reopened from
+     * Drafts gets the same switch once the message it answers has loaded.
+     */
+    const [switched, setSwitched] = useState<{ seed: ComposerSeed; kind: AnswerKind } | null>(
+        null
+    );
+    const [restored, setRestored] = useState<{ seed: ComposerSeed; context: AnswerContext } | null>(
+        null
+    );
+    // Held with the seed it belongs to, so the render a new seed arrives in
+    // does not read the last composer's choice for this one.
+    const answering =
+        composing?.answering ?? (restored && restored.seed === composing ? restored.context : null);
+    const answerKind =
+        switched && switched.seed === composing ? switched.kind : (answering?.kind ?? null);
+    const forwarding = answerKind ? answerKind === "forward" : Boolean(composing?.forward);
+    /** The files a forward brought over, which a switch back to a reply drops. */
+    const carriedIds = useRef<string[]>([]);
 
     // Opening the composer seeds it. Keyed on the seed object, which is replaced
     // whenever something asks for a new one, so pressing Reply on two different
@@ -259,6 +285,7 @@ export function Composer() {
         setExpanded(false);
         setFiles([]);
         setViewing(null);
+        carriedIds.current = [];
         saves.current = draftSaves(
             {
                 accountId: account,
@@ -268,7 +295,9 @@ export function Composer() {
                 bcc: [...(composing.bcc ?? [])],
                 subject: composing.subject ?? "",
                 body,
-                attachmentIds: []
+                attachmentIds: [],
+                inReplyToId: composing.inReplyToId ?? null,
+                forward: composing.forward ?? false
             },
             composing.draftId ?? null,
             writeDraft
@@ -286,6 +315,39 @@ export function Composer() {
         // changed, and two replies in a row have to move the caret twice.
         if (composing.inReplyToId && (composing.to ?? []).length > 0) setFocusAt(Date.now());
     }, [composing, accounts, identities]);
+
+    // A reopened reply or forward loads the message it answers, which is what
+    // switching between Reply, Reply all and Forward rebuilds from. The draft
+    // keeps that message by id; one that is gone, or cannot be opened, leaves
+    // the draft as it was saved, without the switch.
+    useEffect(() => {
+        const messageId = composing?.inReplyToId;
+        if (!composing?.draftId || !messageId || composing.answering) return;
+        let current = true;
+        const seed = composing;
+        void readMessage(messageId).then(
+            (opened) => {
+                if (!current) return;
+                const self = accounts.map((account) => account.address);
+                const message = opened.envelope;
+                const kind = draftAnswerKind(message, self, {
+                    to: seed.to ?? [],
+                    cc: seed.cc ?? [],
+                    forward: seed.forward ?? false
+                });
+                setRestored({
+                    seed,
+                    context: { kind, message, self, quoted: opened.readable.text }
+                });
+            },
+            () => undefined
+        );
+        return () => {
+            current = false;
+        };
+        // The mailboxes refresh often; the message is held by the store, so
+        // answering again costs no request.
+    }, [composing, accounts]);
 
     // A reopened draft brings back the files already on it. Keyed on the seed
     // alone, for the reason the seeding above is.
@@ -319,11 +381,12 @@ export function Composer() {
     const [carrying, setCarrying] = useState(false);
     const [notCarried, setNotCarried] = useState<string[]>([]);
 
-    // A forward brings the original's files with it. A reopened draft already
-    // has whatever survived of them, so only a fresh forward asks.
+    // A forward brings the original's files with it. A draft reopened as a
+    // forward already has whatever survived of them, so only a fresh forward -
+    // or a reopened reply switched to one - asks.
     useEffect(() => {
         setNotCarried([]);
-        if (!composing?.forward || !composing.inReplyToId || composing.draftId) {
+        if (!forwarding || !composing?.inReplyToId || (composing.draftId && composing.forward)) {
             setCarrying(false);
             return;
         }
@@ -340,6 +403,7 @@ export function Composer() {
             }
             if ("uploads" in outcome) {
                 const carried = outcome.uploads as Attached[];
+                carriedIds.current = carried.map((file) => file.id);
                 setFiles((held) => [...held, ...carried]);
                 saves.current?.carry(carried.map((file) => file.id));
                 setNotCarried(outcome.skipped);
@@ -348,7 +412,7 @@ export function Composer() {
         return () => {
             current = false;
         };
-    }, [composing]);
+    }, [composing, forwarding]);
 
     const dirty =
         to.length > 0 || subject.trim() !== "" || message.trim() !== "" || files.length > 0;
@@ -366,11 +430,27 @@ export function Composer() {
                 bcc,
                 subject,
                 body: message,
-                attachmentIds: files.map((file) => file.id)
+                attachmentIds: files.map((file) => file.id),
+                inReplyToId: composing.inReplyToId ?? null,
+                forward: forwarding
             });
         }, AUTOSAVE_MS);
         return () => clearTimeout(timer);
-    }, [composing, accountId, identityId, to, cc, bcc, subject, message, files, dirty, queued, loadingFiles]);
+    }, [
+        composing,
+        accountId,
+        identityId,
+        to,
+        cc,
+        bcc,
+        subject,
+        message,
+        files,
+        dirty,
+        queued,
+        loadingFiles,
+        forwarding
+    ]);
 
     /** Put the history into the editor, where it can be read, edited or cut. */
     const showTrimmed = useCallback(() => {
@@ -383,6 +463,46 @@ export function Composer() {
         // The pill is gone, and the focus with it: back to the message.
         setFocusAt(Date.now());
     }, [body, trimmed]);
+
+    /**
+     * Turn a reply into a reply to all, a forward, or back - the way Gmail's
+     * switch does, keeping what was written.
+     *
+     * The recipients become the ones that button would have opened with. The
+     * subject and the quote change only while they are still the ones the
+     * composer opened with: a subject somebody rewrote, or a quote they opened
+     * and edited, is theirs. A forward brings the message's files and a switch
+     * away from one drops them again.
+     */
+    const switchAnswer = useCallback(
+        (kind: AnswerKind) => {
+            const context = answering;
+            if (!composing || !context || !answerKind || kind === answerKind) return;
+            const was = answerSeed(answerKind, context.message, context.self, context.quoted);
+            const next = answerSeed(kind, context.message, context.self, context.quoted);
+            setTo([...next.to]);
+            setCc([...next.cc]);
+            if (next.cc.length > 0) setShowCopies(true);
+            if (subject.trim() === was.subject.trim()) setSubject(next.subject);
+            if (trimmed && (kind === "forward" || answerKind === "forward")) {
+                const split = trimComposerBody(next.body, false);
+                if (split) setTrimmed(split.tail);
+            }
+            if (answerKind === "forward") {
+                const dropped = new Set(carriedIds.current);
+                carriedIds.current = [];
+                setFiles((held) => held.filter((file) => !dropped.has(file.id)));
+                setNotCarried([]);
+                for (const id of dropped) {
+                    void fetch(`/api/mail/uploads?id=${encodeURIComponent(id)}`, {
+                        method: "DELETE"
+                    });
+                }
+            }
+            setSwitched({ seed: composing, kind });
+        },
+        [composing, answering, answerKind, subject, trimmed]
+    );
 
     const attach = useCallback(
         async (chosen: readonly File[]) => {
@@ -478,14 +598,16 @@ export function Composer() {
                     bcc,
                     subject,
                     body: message,
-                    attachmentIds: files.map((file) => file.id)
+                    attachmentIds: files.map((file) => file.id),
+                    inReplyToId: composing?.inReplyToId ?? null,
+                    forward: forwarding
                 };
                 const draftId = (await saves.current?.after((id) => Promise.resolve(id))) ?? null;
                 saves.current?.hold();
                 const outcome = await outbox.queueMessage({
                     ...fields,
                     inReplyToId: composing?.inReplyToId ?? null,
-                    forward: composing?.forward ?? false,
+                    forward: forwarding,
                     sendAt: when,
                     draftId
                 });
@@ -514,6 +636,7 @@ export function Composer() {
             t,
             files,
             composing,
+            forwarding,
             refreshMailbox,
             startSending,
             shelf
@@ -584,7 +707,9 @@ export function Composer() {
                 bcc,
                 subject,
                 body: message,
-                attachmentIds: filesNow.current.map((file) => file.id)
+                attachmentIds: filesNow.current.map((file) => file.id),
+                inReplyToId: composing?.inReplyToId ?? null,
+                forward: forwarding
             };
             const id = await saves.current?.save(fields);
             if (id) await fileDraftOnServerAction(id);
@@ -600,7 +725,9 @@ export function Composer() {
         bcc,
         subject,
         message,
-        refreshMailbox
+        refreshMailbox,
+        composing,
+        forwarding
     ]);
 
     const account = accounts.find((one) => one.id === accountId);
@@ -672,6 +799,9 @@ export function Composer() {
                 inert={queued ? true : undefined}
             >
                 <header className="flex items-center gap-1 border-b border-border px-3 py-2">
+                    {answerKind && answering && posture !== "minimized" ? (
+                        <AnswerSwitch kind={answerKind} onSwitch={switchAnswer} />
+                    ) : null}
                     <button
                         type="button"
                         className="min-w-0 flex-1 truncate text-start text-[13px] font-medium"
@@ -880,7 +1010,7 @@ export function Composer() {
                             ) : null}
 
                             {files.length > 0 ? (
-                                <ul className="flex max-h-32 shrink-0 flex-wrap gap-2 overflow-y-auto border-t border-border px-3 py-2">
+                                <ul className="flex max-h-32 shrink-0 flex-wrap gap-2 overflow-y-auto overscroll-contain border-t border-border px-3 py-2">
                                     {files.map((file) => (
                                         <li
                                             key={file.id}
@@ -1060,6 +1190,63 @@ export function Composer() {
                 />
             ) : null}
         </>
+    );
+}
+
+/** The icon each way of answering is drawn with, here and on the buttons. */
+const ANSWER_ICONS = { reply: Reply, "reply-all": ReplyAll, forward: Forward } as const;
+const ANSWER_LABELS = { reply: "reply", "reply-all": "replyAll", forward: "forward" } as const;
+
+/**
+ * Reply, Reply all or Forward, from inside the composer.
+ *
+ * Gmail's arrow beside the recipients: pressing the wrong button is common, and
+ * closing a half-written reply to press the other one is not an answer.
+ */
+function AnswerSwitch({
+    kind,
+    onSwitch
+}: {
+    kind: AnswerKind;
+    onSwitch: (kind: AnswerKind) => void;
+}) {
+    const t = useTranslations("mailCompose");
+    const Icon = ANSWER_ICONS[kind];
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 shrink-0 gap-1 px-1.5"
+                    aria-label={t("compose.answerKind.answerAs")}
+                    title={t("compose.answerKind.answerAs")}
+                >
+                    <Icon className="size-4 shrink-0" aria-hidden />
+                    <ChevronDown className="size-3.5 shrink-0" aria-hidden />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+                {(["reply", "reply-all", "forward"] as const).map((option) => {
+                    const OptionIcon = ANSWER_ICONS[option];
+                    return (
+                        <DropdownMenuItem
+                            key={option}
+                            className={cn(option === kind && "font-medium")}
+                            onSelect={() => onSwitch(option)}
+                        >
+                            <OptionIcon className="size-4 shrink-0" aria-hidden />
+                            <span className="min-w-0 flex-1 truncate">
+                                {t(`compose.answerKind.${ANSWER_LABELS[option]}`)}
+                            </span>
+                            {option === kind ? (
+                                <Check className="size-3.5 shrink-0" aria-hidden />
+                            ) : null}
+                        </DropdownMenuItem>
+                    );
+                })}
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 

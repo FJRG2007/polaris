@@ -24,6 +24,7 @@ import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
 import * as core from "@polaris/core";
 import { addressesFrom } from "./json";
+import { answerHeaders } from "./answer-headers";
 import { readShape, type MessageShape } from "./structure";
 import { reconcileAttachments } from "./attachment-rows";
 import type { ImapFlow } from "imapflow";
@@ -1069,6 +1070,7 @@ export async function messageForReading(userId: string, messageId: string) {
         }
     });
     if (!message) return null;
+    const answering = await answerHeaders(message.headers);
     return {
         accountId: message.accountId,
         policy: message.account,
@@ -1084,6 +1086,8 @@ export async function messageForReading(userId: string, messageId: string) {
             cc: addressesFrom(message.ccJson),
             replyTo: addressesFrom(message.replyToJson),
             listId: message.listId,
+            followupTo: answering.followupTo,
+            listPost: answering.listPost,
             sentAt: message.sentAt.toISOString()
         },
         row: {

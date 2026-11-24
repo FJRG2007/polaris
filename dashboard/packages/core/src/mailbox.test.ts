@@ -254,6 +254,62 @@ describe("addresses", () => {
         ]);
     });
 
+    it("sends a reply to all where Mail-Followup-To asks, and only there", () => {
+        const message = {
+            ...envelope({
+                from: [{ name: "Ada", address: "ada@x.com" }],
+                to: [{ name: "List", address: "list@x.com" }],
+                cc: [
+                    { name: "Me", address: "me@x.com" },
+                    { name: "Dee", address: "dee@x.com" }
+                ]
+            }),
+            replyTo: [],
+            followupTo: [
+                { name: "List", address: "list@x.com" },
+                { name: "Me", address: "me@x.com" }
+            ]
+        };
+        const all = mailbox.replyRecipients(message, ["me@x.com"], true);
+        expect(all.to.map((entry) => entry.address)).toEqual(["list@x.com"]);
+        expect(all.cc).toHaveLength(0);
+        // A plain reply is still to the person who wrote.
+        expect(mailbox.replyRecipients(message, ["me@x.com"], false).to[0]?.address).toBe(
+            "ada@x.com"
+        );
+    });
+
+    it("adds the list from List-Post to a reply to all that would miss it", () => {
+        const message = {
+            ...envelope({
+                from: [{ name: "Ada", address: "ada@x.com" }],
+                to: [{ name: "Me", address: "me@x.com" }],
+                cc: [{ name: "Dee", address: "dee@x.com" }]
+            }),
+            replyTo: [],
+            listPost: "List@X.com"
+        };
+        const all = mailbox.replyRecipients(message, ["me@x.com"], true);
+        expect(all.to.map((entry) => entry.address)).toEqual(["ada@x.com", "list@x.com"]);
+        expect(all.cc.map((entry) => entry.address)).toEqual(["dee@x.com"]);
+        expect(mailbox.replyRecipients(message, ["me@x.com"], false).to).toHaveLength(1);
+    });
+
+    it("leaves a list already copied where it was", () => {
+        const message = {
+            ...envelope({
+                from: [{ name: "Ada", address: "ada@x.com" }],
+                to: [{ name: "Me", address: "me@x.com" }],
+                cc: [{ name: "List", address: "list@x.com" }]
+            }),
+            replyTo: [],
+            listPost: "list@x.com"
+        };
+        const all = mailbox.replyRecipients(message, ["me@x.com"], true);
+        expect(all.to.map((entry) => entry.address)).toEqual(["ada@x.com"]);
+        expect(all.cc.map((entry) => entry.address)).toEqual(["list@x.com"]);
+    });
+
     it("honours Reply-To, which is what a mailing list depends on", () => {
         const message = {
             ...envelope({ from: [{ name: "", address: "noreply@x.com" }] }),

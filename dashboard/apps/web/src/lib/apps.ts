@@ -2794,7 +2794,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "General", // i18n-ignore
             href: "/account/app/general",
             icon: Power,
-            keywords: ["desktop", "startup", "open at login", "start with the computer", "tray"],
+            keywords: ["desktop", "startup", "open at login", "start with the computer", "open with the computer", "start in the tray", "tray"],
             group: THIS_APP_GROUP,
             desktopOnly: true,
             phoneApp: true
@@ -2803,7 +2803,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Window and tray", // i18n-ignore
             href: "/account/app/window",
             icon: AppWindow,
-            keywords: ["desktop", "minimize", "tray", "close button", "window"],
+            keywords: ["desktop", "minimize", "minimize to tray", "tray", "close button", "window"],
             group: THIS_APP_GROUP,
             desktopOnly: true
         },
@@ -2811,7 +2811,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Search and shortcuts", // i18n-ignore
             href: "/account/app/search",
             icon: Search,
-            keywords: ["launcher", "spotlight", "alt space", "hotkey", "game mode", "search engine"],
+            keywords: ["launcher", "spotlight", "alt space", "alt+space", "hotkey", "search shortcut", "game mode", "search engine", "web search"],
             group: THIS_APP_GROUP,
             desktopOnly: true
         },
@@ -2819,7 +2819,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Clipboard", // i18n-ignore
             href: "/account/app/clipboard",
             icon: ClipboardList,
-            keywords: ["clipboard history", "copied", "paste", "copy"],
+            keywords: ["clipboard history", "keep history for", "clear clipboard", "copied", "paste", "copy"],
             group: THIS_APP_GROUP,
             desktopOnly: true
         },
@@ -2827,7 +2827,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Voice widget and games", // i18n-ignore
             href: "/account/app/voice",
             icon: AudioLines,
-            keywords: ["overlay", "voice widget", "call widget", "games", "in game"],
+            keywords: ["overlay", "voice widget", "call widget", "games", "in game", "show voice widget during calls", "only while a game is running", "avatar size", "show names", "show people", "opacity", "position"],
             group: THIS_APP_GROUP,
             desktopOnly: true
         },

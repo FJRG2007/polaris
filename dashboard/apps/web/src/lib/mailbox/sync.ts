@@ -777,6 +777,9 @@ const QUERY = {
         "list-id",
         "list-unsubscribe",
         "list-unsubscribe-post",
+        // Where a reply to all goes on a mailing list - see `answer-headers`.
+        "list-post",
+        "mail-followup-to",
         "disposition-notification-to",
         "return-receipt-to",
         "authentication-results",

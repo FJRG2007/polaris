@@ -54,6 +54,12 @@
         "sending": "Enviando",
         "sendNow": "Enviar ya",
         "closePill": "Cerrar",
-        "fillInFirst": "{count, plural, one {Queda 1 dato por rellenar.} other {Quedan # datos por rellenar.}} Rellénalo o vuelve a enviar para mandarlo tal cual."
+        "fillInFirst": "{count, plural, one {Queda 1 dato por rellenar.} other {Quedan # datos por rellenar.}} Rellénalo o vuelve a enviar para mandarlo tal cual.",
+        "answerKind": {
+            "answerAs": "Cambiar cómo responde",
+            "reply": "Responder",
+            "replyAll": "Responder a todos",
+            "forward": "Reenviar"
+        }
     }
 }

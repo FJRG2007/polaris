@@ -30,6 +30,7 @@ import { pageIsDark, watchPageTheme } from "@/lib/page-theme";
 import { reconcileScene, type SceneElement } from "@/lib/office/scene";
 import { useRegisterExporter } from "@/app/(app)/office/export-slot";
 import { useOfficeDocument, REMOTE } from "@/app/(app)/office/use-office-document";
+import { SavingNote } from "@/app/(app)/office/saving-note";
 
 /** What shows while the canvas code arrives. */
 function CanvasLoading() {
@@ -65,7 +66,7 @@ export function DiagramEditor({
     content: number[] | null;
     editable: boolean;
 }) {
-    const { doc } = useOfficeDocument({ documentId, content, editable });
+    const { doc, saving, retry } = useOfficeDocument({ documentId, content, editable });
     const locale = useLocale();
     // The canvas's own words, from the `diagram` catalog the page hands down.
     // One translator per locale, so the canvas redraws its chrome exactly when
@@ -209,10 +210,10 @@ export function DiagramEditor({
     );
 
     return (
-        <div className="min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col">
             {/* The canvas measures its own container, so it needs one with a
                 height rather than one that grows to fit it. */}
-            <div className="h-full w-full [&_.polaris-diagram]:!bg-transparent">
+            <div className="min-h-0 w-full flex-1 [&_.polaris-diagram]:!bg-transparent">
                 <DiagramCanvas
                     initialData={initial}
                     viewModeEnabled={!editable}
@@ -241,6 +242,7 @@ export function DiagramEditor({
                     }}
                 />
             </div>
+            {editable ? <SavingNote state={saving} onRetry={retry} /> : null}
         </div>
     );
 }

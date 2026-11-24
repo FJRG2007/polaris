@@ -12,6 +12,7 @@
  */
 
 import { snapshotBuild } from "@/lib/snapshot-cache";
+import { AT_REST_KIND } from "@/lib/offline/at-rest";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { createLocalStore, indexedDbStore, type LocalStoreLimits } from "./local-store";
 
@@ -23,7 +24,10 @@ const DAY_MS = 24 * 3_600_000;
 export const CHAT_STORE_LIMITS: LocalStoreLimits = {
     lists: { entries: 1, maxAgeMs: 30 * DAY_MS, buildBound: true },
     messages: { entries: 80, maxAgeMs: 30 * DAY_MS, buildBound: true },
-    outbox: { entries: 500, maxAgeMs: 30 * DAY_MS, buildBound: false }
+    outbox: { entries: 500, maxAgeMs: 30 * DAY_MS, buildBound: false },
+    // The key the outbox's words are sealed under (`lib/offline/at-rest`):
+    // read with every entry, and outlives them, so it is never dropped first.
+    [AT_REST_KIND]: { entries: 4, maxAgeMs: 365 * DAY_MS, buildBound: false }
 };
 
 export const chatStore = createLocalStore(indexedDbStore("polaris-chat"), CHAT_STORE_LIMITS, snapshotBuild);

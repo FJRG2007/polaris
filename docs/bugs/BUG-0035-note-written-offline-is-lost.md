@@ -82,9 +82,29 @@ server refused them or did not answer five times. A 5xx or 429 answer is
 retried; any other 4xx is shown as not saved. What a closing tab left is put
 beside what already waited, never over it.
 
+## Chat edits, reactions and deletes
+
+An edit, a reaction or a delete that finds no server is kept in the chat's
+own outbox line (`app/(app)/chat/outbox.ts`, `changeMessage`), behind the
+messages and changes already waiting, and sent in order when Polaris answers.
+The row is drawn with the change meanwhile, with the same clock a waiting
+message has (`withChanges`); one the server refuses goes to the not-sent bar
+with "Send again" and "Delete". An edit behind an edit, or the same reaction
+behind itself, replaces the waiting one; a delete takes what waited for its
+message with it. A reaction is sent as the state wanted (`on`), not a press,
+so sending it twice never takes it back. A sealed message's edit is sealed
+again through the device's MLS group when it is sent, from the version it
+replaced.
+
+The words of everything waiting in the chat outbox (messages and edits) are
+sealed at rest under a non-extractable AES-256-GCM key kept in the same store
+(`lib/offline/at-rest.ts`), dropped with it at sign-out. Where the browser has
+no WebCrypto and sealed chat is on, nothing is kept: the message is sent at
+once, as before. Entries kept in the clear by an earlier version still send.
+
+Spreadsheets, slides and drawings now show the text editor's saving line
+(`office/saving-note.tsx`).
+
 ## Not fixed here
 
-- Tasks are not on the queue yet.
 - Creating, moving or deleting a note offline still needs the host.
-- Spreadsheets, slides and drawings queue their changes the same way but show
-  no saving line (they never had one).

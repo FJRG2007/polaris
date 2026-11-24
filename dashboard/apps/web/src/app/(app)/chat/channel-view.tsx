@@ -44,7 +44,7 @@ import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
 import { MessageList } from "./message-list";
 import { useComposerEmoji, useSpaceEmojiScope } from "./space-emoji";
-import { runAction } from "@/lib/run-action";
+import { actionFailureText, runAction } from "@/lib/run-action";
 import { useMessageDelete } from "./delete-message";
 import { useCallHold } from "./call-session";
 import { readActivityCard } from "./activity-card-actions";
@@ -130,10 +130,9 @@ import { usePolarContext } from "@/components/polar/polar-panel";
 import * as polls from "./chat-reads";
 import * as chatCache from "@/lib/chat/offline/chat-cache";
 import * as outbox from "./outbox";
-import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 import * as readMarks from "@/lib/chat/read-marks";
 import { prefetchMedia } from "./media-download";
-import { newClientKey, type OutboxEntry } from "@/lib/chat/offline/outbox";
+import { isChatChange, newClientKey, withChanges, withReaction, type ChatQueued, type OutboxEntry } from "@/lib/chat/offline/outbox";
 import { mayStartThread } from "@/lib/chat/thread-rules";
 
 /** Loaded only when a forum is opened: most channels never need it, and it
@@ -271,6 +270,8 @@ export function ChannelView({
     const [pending, setPending] = useState<readonly ChatMessageView[]>([]);
     /** What this device could not send here, waiting for a retry or a delete. */
     const [unsent, setUnsent] = useState<readonly OutboxEntry[]>([]);
+    // Edits, reactions and deletes kept on this device until the server takes them.
+    const changes = outbox.useChatChanges(channelId);
     const [olderThan, setOlderThan] = useState<string | null>(null);
     const [loadingOlder, setLoadingOlder] = useState(false);
     // Whether there is a page below the window too, which there is only after
@@ -1698,8 +1699,8 @@ export function ChannelView({
         const going = unlandedOutgoing(outgoing, stored).map((one) =>
             outgoingMessage(one, { channelId, authorId: viewerId, authorName: viewerName })
         );
-        return withSending(stored, [...pending, ...going]);
-    }, [messages, pending, outgoing, channelId, viewerId, viewerName]);
+        return withSending(withChanges(stored, changes), [...pending, ...going]);
+    }, [messages, changes, pending, outgoing, channelId, viewerId, viewerName]);
     const rows = useMemo(() => (drafting.length ? [...shown, ...drafting] : shown), [shown, drafting]);
 
     /** Put the newest message on screen. */
@@ -2276,19 +2277,7 @@ export function ChannelView({
      * one row.
      */
     const patchReaction = (messageId: string, emoji: string, mine: boolean) => {
-        const apply = (entry: ChatMessageView): ChatMessageView => {
-            const existing = entry.reactions.find((entry) => entry.emoji === emoji);
-            if ((existing?.mine ?? false) === mine) return entry;
-            if (!existing)
-                return { ...entry, reactions: [...entry.reactions, { emoji, count: 1, mine }] };
-            const count = existing.count + (mine ? 1 : -1);
-            return {
-                ...entry,
-                reactions: entry.reactions
-                    .map((entry) => (entry.emoji === emoji ? { ...entry, count, mine } : entry))
-                    .filter((entry) => entry.count > 0)
-            };
-        };
+        const apply = (entry: ChatMessageView): ChatMessageView => withReaction(entry, emoji, mine);
         setMessages(
             (current) =>
                 current?.map((entry) => (entry.id === messageId ? apply(entry) : entry)) ?? current
@@ -2296,15 +2285,20 @@ export function ChannelView({
     };
 
     const react = async (messageId: string, emoji: string) => {
+        // As drawn: a reaction still waiting on this device counts as pressed.
         const before =
-            held.current
+            withChanges(held.current, changes)
                 .find((entry) => entry.id === messageId)
                 ?.reactions.find((entry) => entry.emoji === emoji)?.mine ?? false;
         // Said deterministically rather than as a nudge up or down, so putting
         // it back is the same call with the other answer.
         patchReaction(messageId, emoji, !before);
-        const result = await runAction(() => actions.reactAction({ messageId, emoji }), setError);
-        patchReaction(messageId, emoji, result?.on ?? before);
+        // Kept on this device when Polaris does not answer, and drawn as pressed
+        // with the clock until it is sent.
+        const result = await outbox.changeMessage({ op: "react", channelId, messageId, emoji, on: !before }, setError);
+        if (result && "queued" in result) return;
+        if (result && "error" in result) setError(result.error || actionFailureText());
+        patchReaction(messageId, emoji, result && "on" in result && result.on !== undefined ? result.on : before);
     };
 
     /** Change one message on screen, for the things that happen to one message
@@ -2886,19 +2880,25 @@ export function ChannelView({
                             await loadScheduled();
                         }}
                     />
-                    {unsent.length > 0 && (
+                    {(unsent.length > 0 || changes.some((change) => change.state === "failed")) && (
                         <div
                             role="status"
                             className="flex flex-col gap-1 border-t border-border px-4 py-2 text-xs"
                         >
-                            {unsent.map((entry) => (
+                            {[...unsent, ...changes.filter((change) => change.state === "failed")].map((entry: ChatQueued) => (
                                 <div key={entry.key} className="flex min-w-0 items-center gap-2">
                                     <AlertCircle className="size-3.5 shrink-0 text-destructive" />
                                     <span
                                         className="min-w-0 flex-1 truncate"
-                                        title={entry.reason || entry.body}
+                                        title={entry.reason || ("body" in entry ? entry.body : undefined)}
                                     >
-                                        {t("outbox.notSent", { excerpt: entry.body })}
+                                        {!isChatChange(entry)
+                                            ? t("outbox.notSent", { excerpt: entry.body })
+                                            : entry.op === "edit"
+                                              ? t("outbox.editNotSent", { excerpt: entry.body })
+                                              : entry.op === "react"
+                                                ? t("outbox.reactionNotSent", { emoji: entry.emoji })
+                                                : t("outbox.deleteNotSent")}
                                     </span>
                                     <Button
                                         size="sm"
@@ -3003,33 +3003,39 @@ export function ChannelView({
                         }}
                         onSaveEdit={async (messageId, body) => {
                             const target = editing?.id === messageId ? editing : messages?.find((entry) => entry.id === messageId);
+                            // Kept on this device when Polaris does not answer, and drawn
+                            // as edited with the clock until it is sent; a sealed one is
+                            // sealed again when it goes, its words sealed here meanwhile.
                             if (target?.sealed) {
-                                // Sealed again on this device and shown at once (its opened
-                                // copy, never the row's stored body); put back if refused.
+                                // Shown at once (its opened copy, never the row's stored
+                                // body); put back if refused.
                                 setEditing(null);
                                 const was = target.edited;
                                 patchMessage(messageId, { edited: true });
-                                try {
-                                    const sealedEditedAt = await sealedChat.editSealedMessage({
+                                const result = await outbox.changeMessage(
+                                    {
+                                        op: "edit",
                                         channelId,
                                         messageId,
                                         body,
+                                        sealed: true,
                                         ...(target.sealedEditedAt ? { editedAt: target.sealedEditedAt } : {})
-                                    });
-                                    patchMessage(messageId, { sealedEditedAt });
-                                } catch (caught) {
-                                    patchMessage(messageId, { edited: was });
-                                    const text = (caught as { text?: unknown } | null)?.text;
-                                    setError(typeof text === "string" ? text : t("errors.sealedEditFailed"));
+                                    },
+                                    () => setError(t("errors.sealedEditFailed"))
+                                );
+                                if (result && "queued" in result) return;
+                                if (result && "sealedEditedAt" in result && result.sealedEditedAt) {
+                                    patchMessage(messageId, { sealedEditedAt: result.sealedEditedAt });
+                                    return;
                                 }
+                                patchMessage(messageId, { edited: was });
+                                if (result && "error" in result) setError(result.error || t("errors.sealedEditFailed"));
                                 return;
                             }
-                            const result = await runAction(
-                                () => actions.editAction({ messageId, body }),
-                                setError
-                            );
+                            const result = await outbox.changeMessage({ op: "edit", channelId, messageId, body }, setError);
                             setEditing(null);
-                            if (!result?.error) patchMessage(messageId, { body, edited: true });
+                            if (result && "error" in result) setError(result.error || actionFailureText());
+                            else if (result && !("queued" in result)) patchMessage(messageId, { body, edited: true });
                         }}
                     />
                     {locating ? (

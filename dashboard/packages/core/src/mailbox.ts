@@ -595,7 +595,15 @@ export function quoteForReply(body: string, from: MailAddress, sentAt: Date): st
  * received.
  */
 export function replyRecipients(
-    envelope: MailEnvelope & { readonly replyTo: readonly MailAddress[] },
+    envelope: MailEnvelope & {
+        readonly replyTo: readonly MailAddress[];
+        /** The Mail-Followup-To header: where its writer asked a reply to all
+         *  to go, instead of everybody on the message. Absent on most mail. */
+        readonly followupTo?: readonly MailAddress[];
+        /** The address a mailing list takes posts at, from List-Post (RFC 2369).
+         *  Empty when the list publishes none, or says `NO`. */
+        readonly listPost?: string;
+    },
     self: readonly string[],
     all: boolean
 ): { readonly to: readonly MailAddress[]; readonly cc: readonly MailAddress[] } {
@@ -608,7 +616,18 @@ export function replyRecipients(
     const ownMessage = primary.filter(notMe).length === 0;
     const answered = ownMessage ? envelope.to.filter(notMe) : primary.filter(notMe);
     if (!all) return { to: dedupeAddresses(answered), cc: [] };
-    const to = dedupeAddresses([...answered, ...envelope.to.filter(notMe)]);
+    // Somebody on a list who asked for answers to go to the list alone, not to
+    // them as well, said so in Mail-Followup-To - Mutt and Thunderbird honour
+    // it on a reply to all, and the whole of it replaces To and Cc.
+    const followup = (envelope.followupTo ?? []).filter(notMe);
+    if (followup.length > 0) return { to: dedupeAddresses(followup), cc: [] };
+    // The list itself is in the conversation even where its server rewrote the
+    // headers so that it is on none of them: a reply to all that leaves it out
+    // answers everybody on the thread except the people reading the thread.
+    const list = envelope.listPost?.trim().toLowerCase() ?? "";
+    const named = [...answered, ...envelope.to, ...envelope.cc].some((entry) => key(entry) === list);
+    const posted = list && !named && !mine.has(list) ? [{ name: "", address: list }] : [];
+    const to = dedupeAddresses([...answered, ...envelope.to.filter(notMe), ...posted]);
     const already = new Set(to.map(key));
     const cc = envelope.cc.filter((entry) => notMe(entry) && !already.has(key(entry)));
     return { to, cc: dedupeAddresses(cc) };

@@ -774,7 +774,11 @@ export type ChatEditInput = z.infer<typeof chatEditSchema>;
 
 export const chatReactSchema = z.object({
     messageId: z.string().uuid(),
-    emoji: chatEmoji
+    emoji: chatEmoji,
+    /** Pressed (true) or taken back (false), for a reaction sent again from a
+     *  device's outbox: the same answer however many times it arrives. Absent,
+     *  the press toggles, as it always did. */
+    on: z.boolean().optional()
 });
 
 export type ChatReactInput = z.infer<typeof chatReactSchema>;

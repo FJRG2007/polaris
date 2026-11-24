@@ -27,6 +27,7 @@ import { dropSnapshots } from "@/lib/snapshot-cache";
 import { PlainNames } from "@/components/person-name";
 import { usePathname, useRouter } from "next/navigation";
 import type { SearchHit } from "@/lib/search/lookup-service";
+import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
 import { OPEN_SEARCH_EVENT, requestedQuery, requestedScope } from "@/lib/search/open-search";
 import {
@@ -111,6 +112,12 @@ let indexCache: { at: number; resources: SearchResource[] } | null = null;
  *  a sign-out without a reload would leave one account's names in the next
  *  account's memory. */
 const lookupCache = new Map<string, { at: number; hits: SearchHit[] }>();
+
+/** This device's sealed messages for one lookup, with the module that merges them in. */
+interface SealedLookup {
+    readonly lookup: typeof import("@/lib/search/sealed-lookup");
+    readonly hits: SearchHit[];
+}
 const MAX_LOOKUP_CACHE = 40;
 
 function rememberLookup(key: string, hits: SearchHit[]): void {
@@ -471,6 +478,19 @@ export function CommandPalette({
         setSearching(true);
         const timer = setTimeout(
             () => {
+                // Sealed messages are matched on this device; the server holds no words
+                // for them. Loaded only with sealed chat on, for a scope that lists
+                // messages, with words typed.
+                const sealed: Promise<SealedLookup | null> =
+                    term && (scope.id === "messages" || scope.id === "chat") && sealedChatActive()
+                        ? import("@/lib/search/sealed-lookup").then(async (lookup) => ({
+                              lookup,
+                              hits: await lookup.sealedLookupHits(scope.id, term, t)
+                          })).catch((caught: unknown) => {
+                              console.warn("polaris: sealed messages were left out of this search:", caught);
+                              return null;
+                          })
+                        : Promise.resolve(null);
                 void fetch(`/api/search/lookup?scope=${scope.id}&q=${encodeURIComponent(term)}`, {
                     cache: "no-store",
                     signal: controller.signal
@@ -479,7 +499,9 @@ export function CommandPalette({
                         const body: { hits?: SearchHit[]; error?: string } = await response.json();
                         if (!response.ok)
                             throw new Error(body.error ?? "That search could not be run");
-                        const found = body.hits ?? [];
+                        const extra = await sealed;
+                        const found = extra ? extra.lookup.withSealedHits(scope.id, body.hits ?? [], extra.hits) : (body.hits ?? []);
+                        if (controller.signal.aborted) return;
                         rememberLookup(key, found);
                         setHits(found);
                         setFailure(null);

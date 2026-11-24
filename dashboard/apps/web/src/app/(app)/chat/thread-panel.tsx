@@ -18,6 +18,7 @@ import { X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
 import * as outbox from "./outbox";
+import { withChanges } from "@/lib/chat/offline/outbox";
 import { unlockProofFor } from "./lock-session";
 import * as core from "@polaris/core";
 import { Composer } from "./composer";
@@ -29,7 +30,7 @@ import { useOutgoing } from "./outgoing";
 import { notUploadedSaid, sendWithFiles } from "./send-with-files";
 import { useMessageDelete } from "./delete-message";
 import { useDropExpired } from "./vanish-controls";
-import { runAction } from "@/lib/run-action";
+import { actionFailureText, runAction } from "@/lib/run-action";
 import { useChatPane } from "./use-chat-pane";
 import type { PollDraft } from "./poll-dialog";
 import { useChatStream } from "./use-chat-stream";
@@ -106,6 +107,8 @@ export function ThreadPanel({
     // already stored - see `outgoingMessage`.
     // Polar's answers being written in this thread - see `polar-draft.ts`.
     const { rows: drafting, onFrame: onDraftFrame } = usePolarDrafts(root.channelId, root.id, messages);
+    // Edits, reactions and deletes kept on this device until the server takes them.
+    const changes = outbox.useChatChanges(root.channelId);
     const shown = useMemo(() => {
         if (!messages) return null;
         const going = unlandedOutgoing(outgoing, messages).map((one) =>
@@ -116,8 +119,8 @@ export function ThreadPanel({
                 parentId: root.id
             })
         );
-        return withSending(messages, going);
-    }, [messages, outgoing, root.channelId, root.id, viewerId, viewerName]);
+        return withSending(withChanges(messages, changes), going);
+    }, [messages, changes, outgoing, root.channelId, root.id, viewerId, viewerName]);
     /** Somebody to drop into the reply being written. The thread has its own box,
      *  so a name mentioned in here belongs in this one rather than in the
      *  channel's - see the composer's `insert`. */
@@ -249,11 +252,15 @@ export function ThreadPanel({
                                 await load();
                             }}
                             onReact={async (messageId, emoji) => {
-                                await runAction(
-                                    () => actions.reactAction({ messageId, emoji }),
+                                const mine =
+                                    shown?.find((entry) => entry.id === messageId)?.reactions.find((entry) => entry.emoji === emoji)?.mine ?? false;
+                                // Kept on this device when Polaris does not answer, drawn as pressed meanwhile.
+                                const result = await outbox.changeMessage(
+                                    { op: "react", channelId: root.channelId, messageId, emoji, on: !mine },
                                     setError
                                 );
-                                await load();
+                                if (result && "error" in result) setError(result.error || actionFailureText());
+                                if (!result || !("queued" in result)) await load();
                             }}
                             onMention={(text) =>
                                 setInserting((current) => ({

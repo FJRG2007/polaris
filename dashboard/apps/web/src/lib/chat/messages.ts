@@ -126,6 +126,9 @@ export interface ChatMessageView {
     /** When a sealed row was last edited, so a device that opened the earlier
      *  version opens it again. Absent on a plain row, which carries its text. */
     readonly sealedEditedAt?: string;
+    /** Drawn with a change this device has not sent yet (an edit, a reaction,
+     *  a delete): set on the device only (`withChanges`), never by the server. */
+    readonly changeWaiting?: boolean;
     readonly kind: core.ChatMessageKind;
     /** Empty for a deleted message - the tombstone carries no text. */
     readonly body: string;
@@ -1638,13 +1641,23 @@ export async function react(actor: ChatActor, input: core.ChatReactInput): Promi
     // Only one of this space's, and checked here rather than trusted from the
     // picker that offered it. Taking one back is allowed even once the emoji is
     // gone: it is the one thing still worth doing with it.
+    // Asked for a state rather than a press (an outbox sending it again): one
+    // already in that state is answered as it is, and changes nothing.
+    if (input.on !== undefined && input.on === (existing !== null)) return input.on;
     const { stored } = await reactionEmoji(access.spaceId, input.emoji, existing !== null);
 
     if (existing) await prisma.chatReaction.delete({ where: { id: existing.id } });
-    else
-        await prisma.chatReaction.create({
-            data: { messageId: input.messageId, userId: actor.id, emoji: stored }
-        });
+    else {
+        try {
+            await prisma.chatReaction.create({
+                data: { messageId: input.messageId, userId: actor.id, emoji: stored }
+            });
+        } catch (caught) {
+            // The same state asked twice at once: the other one made it.
+            if (input.on === true && (caught as { code?: unknown } | null)?.code === "P2002") return true;
+            throw caught;
+        }
+    }
 
     publishChatChange({
         channelId: message.channelId,
