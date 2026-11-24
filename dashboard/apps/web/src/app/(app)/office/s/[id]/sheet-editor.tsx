@@ -51,6 +51,7 @@ import {
 } from "react";
 import type { MenuNode } from "@/lib/office/sheet-menu";
 import { useOfficeDocument, REMOTE } from "@/app/(app)/office/use-office-document";
+import { SavingNote } from "@/app/(app)/office/saving-note";
 import {
     cellsOf,
     changedCells,
@@ -87,7 +88,7 @@ export function SheetEditor({
     editable: boolean;
 }) {
     const t = useTranslations("office");
-    const { doc } = useOfficeDocument({ documentId, content, editable });
+    const { doc, saving, retry } = useOfficeDocument({ documentId, content, editable });
     const cells = useMemo(() => doc.getMap<SheetCell>(CELLS), [doc]);
     const shape = useMemo(() => doc.getMap<unknown>(SHAPE), [doc]);
     const host = useRef<HTMLDivElement | null>(null);
@@ -307,6 +308,7 @@ export function SheetEditor({
                     {failed}
                 </p>
             ) : null}
+            {editable ? <SavingNote state={saving} onRetry={retry} /> : null}
         </div>
     );
 }

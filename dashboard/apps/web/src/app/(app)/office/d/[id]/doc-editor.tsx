@@ -24,12 +24,13 @@
  * minutes rather than glances at.
  */
 
-import { Button, cn } from "@polaris/ui";
+import { cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Loader2 } from "lucide-react";
 import { Extension } from "@tiptap/core";
 import { OFFICE_FIELD } from "@/lib/office/content";
-import { useOfficeDocument, type OfficeSaving } from "@/app/(app)/office/use-office-document";
+import { useOfficeDocument } from "@/app/(app)/office/use-office-document";
+import { SavingNote } from "@/app/(app)/office/saving-note";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { useMemo } from "react";
 import { documentExtensions } from "@/components/rich-text/document-schema";
@@ -180,34 +181,4 @@ function placeCaretNear(editor: Editor, x: number, y: number): void {
     });
     if (hit) editor.chain().focus().setTextSelection(hit.pos).run();
     else editor.commands.focus("end");
-}
-
-/** What the corner says about whether the work is safe. Quiet when it is: a
- *  permanent "saved" is a label nobody reads, and the one that matters is the
- *  one that says it did not. */
-function SavingNote({ state, onRetry }: { state: OfficeSaving; onRetry: () => void }) {
-    const t = useTranslations("office");
-    if (state === "settled") return null;
-    return (
-        <div
-            role="status"
-            className={cn(
-                "flex shrink-0 items-center gap-3 border-t border-border px-4 py-1.5 text-[12px]",
-                state === "failed" ? "text-danger" : "text-muted-foreground"
-            )}
-        >
-            <p className="min-w-0 flex-1">
-                {state === "saving"
-                    ? t("docEditor.saving")
-                    : state === "offline"
-                      ? t("docEditor.offline")
-                      : t("docEditor.thatDidNotSaveYour")}
-            </p>
-            {state === "failed" ? (
-                <Button size="sm" variant="ghost" onClick={onRetry}>
-                    {t("docEditor.retry")}
-                </Button>
-            ) : null}
-        </div>
-    );
 }
