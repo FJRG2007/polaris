@@ -12,7 +12,7 @@
 import { useArcadeT } from "./i18n";
 import { findGame } from "../games/registry";
 import { hostUi } from "@polaris/app-host/client";
-import { Button, clearWindowControls, Input, Switch, windowControlsBand } from "@polaris/ui";
+import { Button, clearWindowControls, CodeInput, Switch, windowControlsBand } from "@polaris/ui";
 import {
     padFrame,
     stickAxes,
@@ -190,14 +190,14 @@ export function PhonePadScreen() {
                 <label htmlFor="pad-code" className="text-sm font-medium">
                     {t("pad.code")} *
                 </label>
-                <Input
+                <CodeInput
                     id="pad-code"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={7}
+                    autoSubmit
+                    autoFocus={false}
+                    length={6}
                     value={code}
-                    onChange={(event) => setCode(event.target.value.replace(/[^\d ]/g, ""))}
-                    className="text-center text-2xl tracking-widest tabular-nums"
+                    onValueChange={setCode}
+                    className="h-12"
                 />
                 <Button type="submit" disabled={busy} aria-disabled={digits.length !== 6}>
                     {busy ? t("pad.connecting") : t("pad.connect")}
