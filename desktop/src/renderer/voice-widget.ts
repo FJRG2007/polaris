@@ -7,7 +7,9 @@
  */
 
 import { byId } from "./dom";
+import { clampInside, clampWidth } from "@/shared/overlay-layout";
 import {
+    cornerPoint,
     faceColor,
     initials,
     insideRegions,
@@ -204,7 +206,111 @@ function draw(view: WidgetView | null): void {
     deafen.classList.toggle("on", selfDeafened);
     label(deafen, selfDeafened ? "Undeafen" : "Deafen");
     lockHint.textContent = view.lockKey && view.unlocked ? `${view.lockKey} to lock` : "";
+    document.body.classList.toggle("unlocked", view.unlocked);
+    unlockedNow = view.unlocked;
+    lastView = view;
+    // Locked mid-drag: the pointer's release may never reach a page that lets
+    // clicks through, so the drag ends here and the panel goes back to its place.
+    if (!view.unlocked && drag) {
+        drag = null;
+        panel.classList.remove("moving");
+    }
+    if (!drag) placePanel(view);
 }
+
+/** The view last drawn, placed again when the layer's size changes. */
+let lastView: WidgetView | null = null;
+let unlockedNow = false;
+
+/** The page's pixels per pixel at the default text size: its rem, over 16. */
+function textScale(): number {
+    return (Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
+}
+
+const layerRect = () => ({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight });
+
+function moveTo(point: { x: number; y: number; }): void {
+    const { width, height } = panel.getBoundingClientRect();
+    const inside = clampInside({ ...point, width, height }, layerRect());
+    panel.style.left = `${Math.round(inside.x)}px`;
+    panel.style.top = `${Math.round(inside.y)}px`;
+}
+
+/**
+ * Put the panel where it was left in the layer, or in its corner of the work
+ * area; whole inside the layer either way. A panel whose rows grow from the
+ * bottom keeps its bottom edge where it was left.
+ */
+function placePanel(view: WidgetView): void {
+    const { layer } = view;
+    if (!layer || panel.hidden) return;
+    const { place } = layer;
+    // With no names and no buttons it is as narrow as a face.
+    const narrow = view.look.names === "never" && controls.hidden;
+    panel.style.width = place?.width ? `${place.width}px` : narrow ? "auto" : "";
+    const { width, height } = panel.getBoundingClientRect();
+    moveTo(place
+        ? { x: place.x, y: view.anchor === "bottom" && place.height ? place.y + place.height - height : place.y }
+        : cornerPoint(layer.area, { width, height }, view.look.corner, layer.margin));
+}
+
+window.addEventListener("resize", () => {
+    if (lastView && !drag) placePanel(lastView);
+});
+
+/** A drag under way while unlocked: moving the panel, or (`sizing`) its width. */
+let drag: {
+    readonly sizing: boolean;
+    readonly x: number;
+    readonly y: number;
+    readonly left: number;
+    readonly top: number;
+    readonly width: number;
+    moved: boolean;
+} | null = null;
+const grip = byId("grip");
+
+panel.addEventListener("pointerdown", (event) => {
+    if (!unlockedNow || event.button !== 0 || (event.target as Element).closest("button")) return;
+    const box = panel.getBoundingClientRect();
+    drag = { sizing: event.target === grip, x: event.clientX, y: event.clientY, left: box.left, top: box.top, width: box.width, moved: false };
+    panel.setPointerCapture(event.pointerId);
+    panel.classList.add("moving");
+    event.preventDefault();
+});
+
+panel.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 3) return;
+    drag.moved = true;
+    if (drag.sizing) panel.style.width = `${clampWidth("voice", drag.width + dx, textScale())}px`;
+    moveTo(drag.sizing ? { x: drag.left, y: drag.top } : { x: drag.left + dx, y: drag.top + dy });
+});
+
+function drop(event: PointerEvent): void {
+    if (!drag) return;
+    const done = drag;
+    drag = null;
+    panel.classList.remove("moving");
+    if (panel.hasPointerCapture(event.pointerId)) panel.releasePointerCapture(event.pointerId);
+    if (!done.moved) return;
+    const box = panel.getBoundingClientRect();
+    void window.polarisLocal.voiceWidget
+        .place({
+            id: "voice",
+            x: Math.round(box.left),
+            y: Math.round(box.top),
+            width: Math.max(1, Math.round(box.width)),
+            height: Math.max(1, Math.round(box.height)),
+            sized: done.sizing
+        })
+        .catch(() => undefined);
+}
+
+panel.addEventListener("pointerup", drop);
+panel.addEventListener("pointercancel", drop);
 
 /** The quick actions are on the widget while it is locked, as clickable regions. */
 let lockedActions = false;

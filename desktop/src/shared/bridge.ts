@@ -25,6 +25,7 @@ import type { UpdateReady } from "./update-ready";
 import type { UpdateCheck } from "./update-check";
 import type { CallHotkey, CallHotkeysInput, CallHotkeysResult } from "./call-hotkeys";
 import type { CallPageAction, VoiceAction, VoiceState, WidgetLook, WidgetView } from "./voice-widget";
+import type { PlaceReport } from "./overlay-layout";
 import type { SearchEngine } from "./launcher";
 import type { ClipboardKeep } from "./clipboard-store";
 
@@ -582,6 +583,8 @@ export interface PolarisLocal {
         /** While locked, take clicks (true: the pointer is over a clickable
          *  region) or let them through to the game (false). */
         clickable(on: boolean): Promise<void>;
+        /** A panel was dragged or resized to here, in the layer's pixels. */
+        place(place: PlaceReport): Promise<void>;
     };
 }
 
@@ -814,6 +817,7 @@ export const CHANNELS = {
     widgetView: "desktop:widget-view",
     widgetAction: "desktop:widget-action",
     widgetClickable: "desktop:widget-clickable",
+    widgetPlace: "desktop:widget-place",
     appSettingsResetOverlay: "desktop:app-settings-reset-overlay",
     appSettingsOverlayShortcut: "desktop:app-settings-overlay-shortcut",
     appSettingsOverlayGame: "desktop:app-settings-overlay-game",

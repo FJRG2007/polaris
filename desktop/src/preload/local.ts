@@ -72,7 +72,8 @@ const bridge: PolarisLocal = {
             return () => ipcRenderer.removeListener(CHANNELS.widgetView, handler);
         },
         act: (action) => ipcRenderer.invoke(CHANNELS.widgetAction, action),
-        clickable: (on) => ipcRenderer.invoke(CHANNELS.widgetClickable, on)
+        clickable: (on) => ipcRenderer.invoke(CHANNELS.widgetClickable, on),
+        place: (place) => ipcRenderer.invoke(CHANNELS.widgetPlace, place)
     }
 };
 

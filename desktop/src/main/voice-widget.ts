@@ -6,8 +6,16 @@
  *
  * Locked, clicks go through it to whatever is underneath. The lock key (Shift
  * and the key under Esc, as in Discord) unlocks it: it then takes clicks,
- * shows mute, deafen and leave, and can be dragged; where it is left is kept.
- * Until it is dragged it sits in the corner chosen in the settings.
+ * shows mute, deafen and leave, and can be dragged and made wider; where it
+ * is left is kept. Until it is dragged it sits in the corner chosen in the
+ * settings.
+ *
+ * The widget is a panel of the overlay layer (`overlay-layout`): one
+ * see-through window over the work area of the display the panel is on (not
+ * the taskbar: a window over the whole screen is taken by Windows for a
+ * full-screen app, which turns on Do not disturb), so a panel is
+ * dragged and resized in the page rather than by moving a window, and later
+ * widgets join it as panels of their own.
  *
  * With clickable regions on, the quick actions (mute, deafen, leave) stay on
  * it while locked and take clicks there: the window lets every click through
@@ -33,12 +41,11 @@ import { holdGlobalKey } from "./call-hotkeys";
 import { displayAccelerator, launcherAccelerator } from "@/shared/launcher-hotkey";
 import { openVoiceWidgetWindow } from "./windows";
 import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
-import { nativeImage, screen, type BrowserWindow, type WebContents } from "electron";
+import { clampInside, clampWidth, displayFor, type PanelPlace, type PlaceReport } from "@/shared/overlay-layout";
+import { nativeImage, screen, type BrowserWindow, type Display, type WebContents } from "electron";
 import {
-    cornerPoint,
     lockKeys,
     overlayGameRows,
-    widgetSize,
     widgetVisible,
     withOverlayGame,
     type OverlayGame,
@@ -286,7 +293,7 @@ export function closeVoiceWidget(): void {
  *  corner moves it there (the settings forgot where it was dragged). */
 export function followVoiceWidgetLook(): void {
     look = settings.voiceWidgetLook();
-    draw(true);
+    draw();
 }
 
 function currentLook(): WidgetLook {
@@ -294,35 +301,21 @@ function currentLook(): WidgetLook {
     return look;
 }
 
-/** The kept place when it is still on a screen, else null for the chosen corner. */
-function keptPlace(height: number): { x: number; y: number; } | null {
-    const kept = settings.voiceWidgetPlace();
-    if (!kept) return null;
-    const onScreen = screen.getAllDisplays().some(({ workArea }) =>
-        kept.x + MARGIN >= workArea.x &&
-        kept.y + MARGIN >= workArea.y &&
-        kept.x + MARGIN <= workArea.x + workArea.width &&
-        kept.y + Math.min(height, MARGIN) <= workArea.y + workArea.height
-    );
-    return onScreen ? kept : null;
-}
-
-function cornerOfScreen(size: { width: number; height: number; }): { x: number; y: number; } {
-    return cornerPoint(screen.getPrimaryDisplay().workArea, size, currentLook().corner, MARGIN);
-}
-
-/** The widget's size, grown with the account's text size: its page is drawn in rem. */
-function size(people: number, open: boolean): { width: number; height: number; } {
-    const scale = textScale(settings.textSize());
-    const base = widgetSize(people, open, currentLook(), lockedActions());
-    return { width: Math.round(base.width * scale), height: Math.round(base.height * scale) };
+/**
+ * The display the layer covers and where the voice panel sits on it: the
+ * display it was left on, or - when that one is gone, or it was never moved -
+ * the main display, with no place so the panel takes its chosen corner.
+ */
+function layerPlan(): { display: Display; place: PanelPlace | null; } {
+    const kept = settings.voicePanelPlace();
+    const on = kept && displayFor({ x: kept.x + MARGIN, y: kept.y + MARGIN }, screen.getAllDisplays());
+    return on ? { display: on, place: kept } : { display: screen.getPrimaryDisplay(), place: null };
 }
 
 function open(): NonNullable<typeof widget> {
     look = settings.voiceWidgetLook();
     facesChanged = true;
-    const bounds = size(state?.participants.length ?? 0, false);
-    const window = openVoiceWidgetWindow({ ...(keptPlace(bounds.height) ?? cornerOfScreen(bounds)), ...bounds });
+    const window = openVoiceWidgetWindow(layerPlan().display.workArea);
     const opened = { window, ready: false };
     window.webContents.once("did-finish-load", () => {
         opened.ready = true;
@@ -330,16 +323,40 @@ function open(): NonNullable<typeof widget> {
         draw();
         window.showInactive();
     });
-    // Only a drag moves it while unlocked; a move of its own (a new size in
-    // its corner) is not somebody choosing a place.
-    window.on("moved", () => {
-        if (unlocked) remember();
-    });
+    // A display added, removed or resized: the layer covers its display again.
+    const follow = () => draw();
+    screen.on("display-metrics-changed", follow);
+    screen.on("display-removed", follow);
     window.once("closed", () => {
+        screen.removeListener("display-metrics-changed", follow);
+        screen.removeListener("display-removed", follow);
         if (widget === opened) widget = null;
     });
     holdLockKey();
     return opened;
+}
+
+/**
+ * The layer's page says where a panel was dragged or resized to, in its own
+ * pixels. Only while unlocked - nobody arranges a locked overlay - and kept
+ * inside the display, at a width the panel allows.
+ */
+export function placeVoicePanel(report: PlaceReport): void {
+    if (!widget || widget.window.isDestroyed() || !unlocked) return;
+    const origin = widget.window.getBounds();
+    // Only moved, a panel that never had a width of its own keeps taking its
+    // own, so it still grows with the text size.
+    const chosen = report.sized || settings.voicePanelPlace()?.width !== undefined;
+    const width = chosen ? clampWidth(report.id, report.width, textScale(settings.textSize())) : report.width;
+    const inside = clampInside({ ...report, width }, { x: 0, y: 0, width: origin.width, height: origin.height });
+    settings.rememberPanelPlace({
+        id: report.id,
+        x: origin.x + inside.x,
+        y: origin.y + inside.y,
+        ...(chosen ? { width } : {}),
+        height: report.height
+    });
+    draw();
 }
 
 /** Hold the first lock key the system gives, letting go of the one held before. */
@@ -356,15 +373,6 @@ function holdLockKey(): void {
     }
 }
 
-let movedWhileUnlocked = false;
-
-function remember(): void {
-    if (!widget || widget.window.isDestroyed()) return;
-    const { x, y } = widget.window.getBounds();
-    settings.rememberVoiceWidgetPlace({ x, y });
-    movedWhileUnlocked = true;
-}
-
 function toggleLock(): void {
     if (!widget || widget.window.isDestroyed()) return;
     unlocked = !unlocked;
@@ -372,13 +380,8 @@ function toggleLock(): void {
     const { window } = widget;
     // Unlocked it takes clicks and can be dragged; locked, clicks go through.
     window.setFocusable(unlocked);
-    if (unlocked) {
-        movedWhileUnlocked = false;
-        window.setIgnoreMouseEvents(false);
-    } else {
-        window.setIgnoreMouseEvents(true, { forward: true });
-        if (movedWhileUnlocked) remember();
-    }
+    if (unlocked) window.setIgnoreMouseEvents(false);
+    else window.setIgnoreMouseEvents(true, { forward: true });
     draw();
 }
 
@@ -456,25 +459,18 @@ function facesView(): Readonly<Record<string, string>> | undefined {
     return view;
 }
 
-/** Draw the widget; `replace` puts it back in its corner even at the same size
- *  (a new corner chosen), unless it was dragged somewhere. */
-function draw(replace = false): void {
+/** Draw the widget: the layer over its display, and the voice panel in it. */
+function draw(): void {
     if (!widget || widget.window.isDestroyed() || !state) return;
     const { window } = widget;
     // Clickable regions switched off while the pointer sat on one.
     if (takingClicks && !lockedActions()) setVoiceWidgetClickable(false);
     const shape = currentLook();
-    const bounds = window.getBounds();
-    const { width, height } = size(state.participants.length, unlocked);
     const bottom = shape.corner.startsWith("bottom");
-    if (replace || bounds.height !== height || bounds.width !== width) {
-        // Where nobody dragged it, it stays in its corner as it grows; dragged,
-        // it grows away from the edge its rows sit against.
-        const place = settings.voiceWidgetPlace()
-            ? { x: bounds.x, y: bottom ? bounds.y + bounds.height - height : bounds.y }
-            : cornerOfScreen({ width, height });
-        window.setBounds({ ...place, width, height });
-    }
+    const { display, place } = layerPlan();
+    const bounds = window.getBounds();
+    const cover = display.workArea;
+    if (bounds.x !== cover.x || bounds.y !== cover.y || bounds.width !== cover.width || bounds.height !== cover.height) window.setBounds(cover);
     if (!widget.ready) return;
     const faceUpdate = facesView();
     const view: WidgetView = {
@@ -486,6 +482,11 @@ function draw(replace = false): void {
         buttons: quickActions(),
         pinned: settings.toggle("voiceWidgetPinned"),
         anchor: bottom ? "bottom" : "top",
+        layer: {
+            area: { x: 0, y: 0, width: cover.width, height: cover.height },
+            margin: MARGIN,
+            place: place && { x: place.x - cover.x, y: place.y - cover.y, width: place.width, height: place.height }
+        },
         ...(faceUpdate ? { faces: faceUpdate } : {})
     };
     window.webContents.send(CHANNELS.widgetView, view);

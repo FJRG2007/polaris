@@ -148,6 +148,18 @@ describe("the app's settings screen", () => {
         expect(screen.getByRole("switch", { name: "Counter-Strike 2" }).getAttribute("aria-checked")).toBe("true");
     });
 
+    it("names the chosen lock key in the voice widget's hint, and the default keys without one", async () => {
+        const chosen = { ...SNAPSHOT, overlayLockBinding: "Mod+Alt+O", overlayLockKey: "Ctrl+Alt+O", features: ["overlayLockKey"] };
+        install(fakeBridge({ get: vi.fn(async () => chosen), setOverlayShortcut: vi.fn(async () => chosen) }));
+        await draw("voice");
+        expect(screen.getByText("Who is in the call and who is talking. Ctrl+Alt+O unlocks it.")).toBeTruthy();
+        cleanup();
+        forgetAppSettingsSnapshot();
+        install(fakeBridge());
+        await draw("voice");
+        expect(screen.getByText(appSettingsMessages.items.voiceWidget.hint)).toBeTruthy();
+    });
+
     it("turns the overlay off for a game at once and back when the app refuses it", async () => {
         let refuse: (value: unknown) => void = () => undefined;
         const setOverlayGame = vi.fn(() => new Promise((resolve) => (refuse = resolve)));

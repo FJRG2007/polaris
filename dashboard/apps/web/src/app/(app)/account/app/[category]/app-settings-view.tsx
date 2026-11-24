@@ -265,6 +265,10 @@ function SettingRow({
         key === "launcher" ? t("items.launcher.label", { key: snapshot.launcherKey }) : t(`items.${key}.label`);
     let hint: string = t(`items.${key}.hint`);
     if (key === "launcherClipboard" && !snapshot.launcherClipboardPersists) hint = t("clipboard.memoryOnly");
+    // A key somebody chose replaces the default keys the hint names.
+    if (key === "voiceWidget" && snapshot.overlayLockBinding && snapshot.overlayLockKey) {
+        hint = t("items.voiceWidget.hintKey", { key: snapshot.overlayLockKey });
+    }
 
     if (entry.kind === "shortcut" && key === "overlayLockBinding") {
         const setOverlayShortcut = settings.setOverlayShortcut;

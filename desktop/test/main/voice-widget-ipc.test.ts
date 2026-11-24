@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const widget = vi.hoisted(() => ({
     setVoiceState: vi.fn(),
     voiceWidgetAction: vi.fn(() => true),
+    placeVoicePanel: vi.fn(),
     overlayLockStatus: vi.fn(() => ({ key: "Shift+` / Ctrl+Shift+`", problem: null })),
     overlayGames: vi.fn(() => []),
     recordOverlayLockKey: vi.fn(),
@@ -109,6 +110,24 @@ describe("the widget's buttons", () => {
     it("refuses any window but the widget", () => {
         expect(handlers.get(CHANNELS.widgetAction)?.(event("polaris"), "leave")).toBe(false);
         expect(widget.voiceWidgetAction).not.toHaveBeenCalled();
+    });
+});
+
+describe("a panel dragged in the overlay layer", () => {
+    const place = { id: "voice", x: 40, y: 60, width: 260, height: 120, sized: true };
+
+    it("is kept from the layer", () => {
+        handlers.get(CHANNELS.widgetPlace)?.(event("voice-widget"), place);
+        expect(widget.placeVoicePanel).toHaveBeenCalledWith(place);
+    });
+
+    it("refuses an unknown panel, a malformed place and any other window", () => {
+        widget.placeVoicePanel.mockClear();
+        handlers.get(CHANNELS.widgetPlace)?.(event("voice-widget"), { ...place, id: "chat" });
+        handlers.get(CHANNELS.widgetPlace)?.(event("voice-widget"), { ...place, width: 0 });
+        handlers.get(CHANNELS.widgetPlace)?.(event("voice-widget"), { ...place, x: 1.5 });
+        handlers.get(CHANNELS.widgetPlace)?.(event("polaris"), place);
+        expect(widget.placeVoicePanel).not.toHaveBeenCalled();
     });
 });
 

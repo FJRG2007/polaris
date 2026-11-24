@@ -19,6 +19,7 @@ import { DEFAULT_TEXT_SIZE, readTextSize, type TextSize } from "@/shared/text-si
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { readRelaunchMark, type RelaunchMark } from "@/shared/relaunch";
 import { DEFAULT_LAUNCHER_BINDING } from "@/shared/launcher-hotkey";
+import { layoutSchema, voicePlace, withPlace, type PanelPlace } from "@/shared/overlay-layout";
 import { AVATAR_SIZES, CORNERS, DEFAULT_LOOK, MAX_OFF_GAMES, MAX_USERS_LIMIT, NAME_MODES, OPACITIES, PEOPLE_MODES, type Opacity, type OverlayGame, type WidgetLook } from "@/shared/voice-widget";
 import { DEFAULT_SEARCH_ENGINE, SEARCH_ENGINE_IDS, launcherEngineOf, type SearchEngine } from "@/shared/launcher";
 import { CLIPBOARD_KEEP_IDS, DEFAULT_CLIPBOARD_KEEP, clipboardOn, type ClipboardKeep } from "@/shared/clipboard-store";
@@ -78,6 +79,9 @@ const settingsSchema = z.object({
     launcherGameMode: z.boolean().catch(true),
     // Where the widget was dragged to, or null for its corner.
     voiceWidgetPlace: z.object({ x: z.number().int(), y: z.number().int() }).nullable().catch(null),
+    // Where each of the overlay layer's panels was left (`overlay-layout`),
+    // read entry by entry in `overlayLayout()`.
+    overlayLayout: z.array(z.unknown()).max(64).catch([]),
     // How the widget looks, as Discord's overlay voice widget offers: each
     // choice on its own, so a file without one, or with one this build does
     // not know, takes the default for that choice alone.
@@ -148,6 +152,7 @@ const EMPTY: Settings = {
     voiceWidgetGameOnly: false,
     launcherGameMode: true,
     voiceWidgetPlace: null,
+    overlayLayout: [],
     voiceWidgetAvatars: DEFAULT_LOOK.avatars,
     voiceWidgetNames: DEFAULT_LOOK.names,
     voiceWidgetPeople: DEFAULT_LOOK.people,
@@ -327,6 +332,30 @@ export function rememberVoiceWidgetPlace(place: { x: number; y: number }): void 
     save({ ...load(), voiceWidgetPlace: place });
 }
 
+/** Where each overlay panel was left; an entry this build cannot read is skipped. */
+export function overlayLayout(): PanelPlace[] {
+    return load().overlayLayout.flatMap((entry) => {
+        const place = layoutSchema.safeParse([entry]);
+        return place.success ? place.data : [];
+    });
+}
+
+/** The voice panel's place: the layout's, or where the widget was dragged before there was one. */
+export function voicePanelPlace(): PanelPlace | null {
+    return voicePlace(overlayLayout(), voiceWidgetPlace());
+}
+
+/** Keep where a panel was left. The voice panel's corner is also kept where an
+ *  older app reads it, so going back to one leaves the widget where it was. */
+export function rememberPanelPlace(place: PanelPlace): void {
+    const { id, ...rest } = place;
+    save({
+        ...load(),
+        overlayLayout: withPlace(overlayLayout(), id, rest),
+        ...(id === "voice" ? { voiceWidgetPlace: { x: place.x, y: place.y } } : {})
+    });
+}
+
 /** How the voice widget looks. */
 export function voiceWidgetLook(): WidgetLook {
     const settings = load();
@@ -345,6 +374,7 @@ export function resetVoiceWidgetLayout(): void {
     save({
         ...load(),
         voiceWidgetPlace: null,
+        overlayLayout: [],
         voiceWidgetAvatars: DEFAULT_LOOK.avatars,
         voiceWidgetNames: DEFAULT_LOOK.names,
         voiceWidgetPeople: DEFAULT_LOOK.people,
@@ -388,7 +418,7 @@ export function rememberVoiceWidgetLook(look: WidgetLook): void {
         voiceWidgetOpacity: String(look.opacity) as OpacityChoice,
         voiceWidgetCorner: look.corner,
         voiceWidgetMaxUsers: look.maxUsers,
-        ...(moved ? { voiceWidgetPlace: null } : {})
+        ...(moved ? { voiceWidgetPlace: null, overlayLayout: withPlace(overlayLayout(), "voice", null) } : {})
     });
 }
 

@@ -32,7 +32,10 @@ const {
     overlayLockBinding,
     overlayOffGames,
     rememberOverlayLockBinding,
-    rememberOverlayOffGames
+    rememberOverlayOffGames,
+    overlayLayout,
+    rememberPanelPlace,
+    voicePanelPlace
 } = await import("@/main/settings");
 
 beforeEach(() => {
@@ -207,6 +210,37 @@ describe("the voice widget's look", () => {
         expect(toggle("overlayClickable")).toBe(false);
         // Not part of the layout: when it shows is somebody's own choice.
         expect(toggle("voiceWidgetGameOnly")).toBe(true);
+    });
+});
+
+describe("the overlay layer's panels", () => {
+    it("put a widget dragged before the layer where it was left", () => {
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidgetPlace: { x: 300, y: 200 } }));
+        expect(overlayLayout()).toEqual([]);
+        expect(voicePanelPlace()).toEqual({ id: "voice", x: 300, y: 200 });
+    });
+
+    it("keep each place, also where an older app reads the widget's", () => {
+        rememberPanelPlace({ id: "voice", x: 40, y: 50, width: 300, height: 120 });
+        expect(voicePanelPlace()).toEqual({ id: "voice", x: 40, y: 50, width: 300, height: 120 });
+        expect(voiceWidgetPlace()).toEqual({ x: 40, y: 50 });
+    });
+
+    it("skip an entry this build cannot read and keep the rest", () => {
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ overlayLayout: [{ id: "voice", x: "a" }, { id: "chat", x: 1, y: 2 }, 7] }));
+        expect(overlayLayout()).toEqual([{ id: "chat", x: 1, y: 2 }]);
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ overlayLayout: "broken" }));
+        expect(overlayLayout()).toEqual([]);
+    });
+
+    it("go back to their corners on a reset, and the voice panel on a new corner", () => {
+        rememberPanelPlace({ id: "voice", x: 40, y: 50 });
+        rememberPanelPlace({ id: "chat", x: 1, y: 2 });
+        rememberVoiceWidgetLook({ avatars: "large", names: "always", people: "always", opacity: 100, corner: "bottom-right", maxUsers: 8 });
+        expect(voicePanelPlace()).toBeNull();
+        expect(overlayLayout()).toEqual([{ id: "chat", x: 1, y: 2 }]);
+        resetVoiceWidgetLayout();
+        expect(overlayLayout()).toEqual([]);
     });
 });
 

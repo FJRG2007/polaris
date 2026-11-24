@@ -90,6 +90,15 @@ export interface WidgetView {
     readonly pinned?: boolean;
     /** Which edge the rows sit against: the bottom for a widget in a bottom corner. */
     readonly anchor: "top" | "bottom";
+    /** The layer the panel is drawn in: the display's work area and the
+     *  margin from its edges, in the layer's pixels, and where the panel was
+     *  left (null: its corner). Absent from an older main process, whose
+     *  window was the panel itself. */
+    readonly layer?: {
+        readonly area: Region;
+        readonly margin: number;
+        readonly place: { readonly x: number; readonly y: number; readonly width?: number; readonly height?: number; } | null;
+    };
     /** Each face fetched so far, by person id, as a data URL. Sent only when one
      *  arrived since the last view; a view without it keeps the ones it had. */
     readonly faces?: Readonly<Record<string, string>>;

@@ -27,11 +27,13 @@ import {
     setOverlayLockBinding,
     setVoiceState,
     setVoiceWidgetClickable,
+    placeVoicePanel,
     voiceWidgetAction
 } from "./voice-widget";
 import { launcherBinding, overlayLockBinding, rememberLauncherClipboardKeep, rememberLauncherEngine, rememberTextSize, rememberVoiceWidgetLook, resetVoiceWidgetLayout, textSize, voiceWidgetLook } from "./settings";
 import { readTextSize } from "@/shared/text-size";
 import { lookChangeSchema, voiceActionSchema, voiceStateSchema, withLookChange } from "@/shared/voice-widget";
+import { placeReportSchema } from "@/shared/overlay-layout";
 import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
 import { closeNotice, showNotice } from "./notices";
 import { appBadgeSchema, applyAppBadge } from "./app-badge";
@@ -475,6 +477,11 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.widgetClickable, (event, raw: unknown): void => {
         const on = z.boolean().safeParse(raw);
         if (from(event, "voice-widget") && on.success) setVoiceWidgetClickable(on.data);
+    });
+    // A panel dragged or resized in the overlay layer.
+    ipcMain.handle(CHANNELS.widgetPlace, (event, raw: unknown): void => {
+        const place = placeReportSchema.safeParse(raw);
+        if (from(event, "voice-widget") && place.success) placeVoicePanel(place.data);
     });
 
     ipcMain.handle(CHANNELS.gameCurrent, (event) => {
