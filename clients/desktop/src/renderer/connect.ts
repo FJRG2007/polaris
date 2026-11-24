@@ -28,6 +28,7 @@ import { OPACITIES, type LookChange } from "@/shared/voice-widget";
 import { bindingFromPress } from "@/shared/launcher-hotkey";
 import jsQR from "jsqr";
 import { APP_SETTING_CATEGORIES, APP_SETTINGS, type AppSettingCategory } from "@polaris/core/app-settings";
+import { HOST_UPDATE_PATH, settingsPath, type LocalSettingsState } from "@/shared/settings-route";
 
 dressMark(window.polarisLocal.season);
 
@@ -40,6 +41,10 @@ const note = byId<HTMLSpanElement>("address-note");
 const list = byId<HTMLUListElement>("server-list");
 const title = byId<HTMLHeadingElement>("title");
 const tabs = byId<HTMLElement>("tabs");
+const nav = byId<HTMLElement>("nav");
+const searchBox = byId<HTMLLabelElement>("search-box");
+const search = byId<HTMLInputElement>("settings-search");
+const searchEmpty = byId<HTMLParagraphElement>("search-empty");
 const serversPage = byId<HTMLElement>("servers-page");
 const showAdd = byId<HTMLButtonElement>("show-add");
 const hideAdd = byId<HTMLButtonElement>("hide-add");
@@ -375,6 +380,14 @@ const CATEGORY_NAMES: Record<AppSettingCategory, string> = {
     updates: "Updates"
 };
 
+/** A page's title, as each page of the host's Settings opens with one. */
+function pageTitle(text: string): HTMLHeadingElement {
+    const heading = document.createElement("h2");
+    heading.className = "page-title";
+    heading.textContent = text;
+    return heading;
+}
+
 /**
  * One page per category of the shared schema (`@polaris/core/app-settings`),
  * the same categories in the same order as Settings > This app on the host.
@@ -401,17 +414,15 @@ function buildPages(): Record<AppSettingCategory, HTMLElement> {
         page.id = `${category}-page`;
         page.setAttribute("role", "tabpanel");
         page.hidden = true;
-        const heading = document.createElement("p");
-        heading.className = "section-title";
-        heading.textContent = CATEGORY_NAMES[category];
         const list = document.createElement("div");
         list.className = "settings-list";
-        page.append(heading, list);
+        page.append(pageTitle(CATEGORY_NAMES[category]), list);
         holder.append(page);
         pages[category] = page;
         lists.set(category, list);
     }
     serversPage.id = "hosts-page";
+    serversPage.prepend(pageTitle(CATEGORY_NAMES.hosts));
     for (const row of document.querySelectorAll<HTMLElement>("[data-setting], [data-category]")) {
         const category = (row.dataset.category as AppSettingCategory | undefined) ?? categoryOf.get(row.dataset.setting ?? "");
         const list = category ? lists.get(category) : undefined;
@@ -449,15 +460,18 @@ function buildAddonsPage(): void {
     page.id = "addons-page";
     page.setAttribute("role", "tabpanel");
     page.hidden = true;
-    const heading = document.createElement("p");
-    heading.className = "section-title";
-    heading.textContent = "Device add-ons";
     const list = document.createElement("div");
     list.className = "settings-list";
-    const empty = document.createElement("p");
-    empty.className = "hint";
-    empty.textContent = "Nothing installed on this computer. Add-ons are installed from Settings > Device add-ons in Polaris.";
-    page.append(heading, list, empty);
+    // Nothing installed: the store is on the host, so the way there is a button,
+    // never directions to a menu.
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    const emptyText = document.createElement("p");
+    emptyText.className = "hint";
+    emptyText.textContent = "Nothing installed on this computer yet.";
+    const browse = textButton("Browse add-ons", () => void openOnHost(settingsPath("addons")), true);
+    empty.append(emptyText, browse);
+    page.append(pageTitle("Device add-ons"), list, empty);
     byId<HTMLElement>("pages").append(page);
     PAGES.addons = page;
 
@@ -506,7 +520,16 @@ function buildAddonsPage(): void {
 }
 buildAddonsPage();
 
+/** The page shown, and the one to go back to once a search is cleared. */
+let currentPage = "hosts";
+
 function showPage(shown: string): void {
+    if (!PAGES[shown]) return;
+    currentPage = shown;
+    if (search.value) {
+        search.value = "";
+        filterSettings("");
+    }
     for (const [page, element] of Object.entries(PAGES)) {
         element.hidden = page !== shown;
         byId(`tab-${page}`).setAttribute("aria-selected", String(page === shown));
@@ -525,7 +548,8 @@ function draw(servers: readonly ServerRow[]): void {
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-needs-hosts]")) {
         button.hidden = servers.length === 0;
     }
-    tabs.hidden = servers.length === 0;
+    nav.hidden = servers.length === 0;
+    searchBox.hidden = servers.length === 0;
     document.body.classList.toggle("first-run", servers.length === 0);
     title.textContent = servers.length === 0 ? "Open your Polaris" : "Polaris";
     if (first || servers.length === 0) showForm(servers.length === 0);
@@ -543,16 +567,120 @@ function draw(servers: readonly ServerRow[]): void {
     ask();
 }
 
-async function refresh(): Promise<void> {
+async function refresh(opened = false): Promise<void> {
     const state = await window.polarisLocal.connect.state().catch(() => null);
     draw(state?.servers ?? []);
+    if (opened) openAt(state?.settings ?? null);
 }
+
+// ---- Why this page, and not the host's Settings ----
+
+const reason = byId<HTMLElement>("reason");
+const reasonText = byId<HTMLParagraphElement>("reason-text");
+const reasonActs = byId<HTMLElement>("reason-acts");
+
+/**
+ * Open a page of the host in the Polaris window. When it cannot be - no host
+ * in reach, or one older than the page - the notice says which, with the
+ * button that fixes it.
+ */
+async function openOnHost(path: string): Promise<void> {
+    const outcome = (await window.polarisLocal.connect.openOnHost?.(path).catch(() => null)) ?? "offline";
+    if (outcome !== "opened") explain(outcome);
+}
+
+/**
+ * The notice over every page when the host's Settings could not be opened:
+ * out of reach, or a Polaris from before this app's settings were in it. Each
+ * says what the reader can do about it, with the button that does it.
+ */
+function explain(why: LocalSettingsState["reason"]): void {
+    reason.hidden = why === null;
+    if (why === "outdated") {
+        reasonText.textContent =
+            "Your Polaris is older than this app, so these settings open here instead of in Settings. Update Polaris to have them there, next to the rest.";
+        reasonActs.replaceChildren(textButton("Update Polaris", () => void openOnHost(HOST_UPDATE_PATH), true));
+    } else if (why === "offline") {
+        reasonText.textContent = "Polaris cannot be reached, so these are the settings kept on this computer.";
+        reasonActs.replaceChildren(textButton("Connect", () => showPage("hosts"), true));
+    } else reasonActs.replaceChildren();
+}
+
+/** The place and the notice the app opened this page with. */
+function openAt(state: LocalSettingsState | null): void {
+    explain(state?.reason ?? null);
+    if (state && known) showPage(state.place);
+}
+
+// ---- Search, as the host's Settings search finds a setting ----
+
+/** Lower case and without accents, so a word typed either way finds the row. */
+function folded(text: string): string {
+    return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+}
+
+/**
+ * Every page at once, showing only the rows whose name or hint holds every
+ * word typed, under the title of their page; cleared, the page that was open
+ * comes back. A page with no rows of its own (the hosts) is found by its title.
+ */
+function filterSettings(query: string): void {
+    const words = folded(query).split(/\s+/).filter(Boolean);
+    document.body.classList.toggle("searching", words.length > 0);
+    let found = 0;
+    for (const [name, page] of Object.entries(PAGES)) {
+        const rows = [...page.querySelectorAll<HTMLElement>(".setting")];
+        if (words.length === 0) {
+            page.hidden = name !== currentPage;
+            for (const row of rows) delete row.dataset.searchMiss;
+            continue;
+        }
+        const title = folded(page.querySelector(".page-title")?.textContent ?? "");
+        let matches = 0;
+        for (const row of rows) {
+            const text = `${title} ${folded(row.textContent ?? "")}`;
+            const hit = words.every((word) => text.includes(word));
+            if (hit) {
+                delete row.dataset.searchMiss;
+                if (!row.hidden) matches++;
+            } else row.dataset.searchMiss = "";
+        }
+        const hit = matches > 0 || (rows.length === 0 && words.every((word) => title.includes(word)));
+        page.hidden = !hit;
+        if (hit) found++;
+    }
+    searchEmpty.hidden = words.length === 0 || found > 0;
+    for (const name of Object.keys(PAGES)) {
+        byId(`tab-${name}`).setAttribute("aria-selected", String(words.length === 0 && name === currentPage));
+    }
+}
+
+search.addEventListener("input", () => filterSettings(search.value));
+search.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && search.value) {
+        event.preventDefault();
+        search.value = "";
+        filterSettings("");
+    }
+});
+document.addEventListener("keydown", (event) => {
+    if (searchBox.hidden) return;
+    // Ctrl+K, or / outside a field, puts the cursor in the search, as in Polaris.
+    const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
+    if ((event.key === "k" && (event.ctrlKey || event.metaKey)) || (event.key === "/" && !typing)) {
+        event.preventDefault();
+        search.focus();
+        search.select();
+    }
+});
 
 // Laid over the Polaris window: Escape, the cross or a press beside the card
 // puts it away.
 if (new URLSearchParams(location.search).has("sheet")) {
     const closeSheet = () => void window.polarisLocal.connect.close().catch(() => undefined);
     document.body.classList.add("sheet");
+    // The window's own buttons are on the left there, and the header keeps clear of them.
+    document.body.classList.toggle("mac", navigator.platform.startsWith("Mac"));
     const cross = byId<HTMLButtonElement>("close-sheet");
     cross.hidden = false;
     cross.addEventListener("click", closeSheet);
@@ -1121,6 +1249,7 @@ const stateLoaded = window.polarisLocal.connect.state().catch(() => null).then((
     if (state?.address && !input.value && servers.length === 0) input.value = state.address;
     say(failure, state?.error ?? null);
     draw(servers);
+    openAt(state?.settings ?? null);
     check();
     ask();
 });
@@ -1137,6 +1266,6 @@ void Promise.allSettled([stateLoaded, preferencesLoaded]).then(() => {
 // shown again, it reads the list and the settings anew, since either may have
 // changed elsewhere while it was away.
 window.polarisLocal.connect.onShown?.(() => {
-    void refresh();
+    void refresh(true);
     void loadPreferences();
 });

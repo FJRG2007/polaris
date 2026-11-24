@@ -13,7 +13,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cn, useToast } from "@polaris/ui";
-import { updateTaskAction } from "../../tasks/actions";
+import { writeTask, TASK_UPDATE } from "../../tasks/offline-writes";
 import { StatusDot, StatusPicker } from "../../tasks/pickers";
 import { formatBytes } from "@polaris/core";
 import { GameLogo } from "@/components/game-logo";
@@ -526,17 +526,14 @@ export function TasksWidget({ data }: { data: Loaded<OverviewTasks> }) {
                                 else rest[task.id] = before;
                                 return rest;
                             });
-                        void updateTaskAction({ taskId: task.id, statusId: next }).then(
-                            (answer) => {
-                                if (!answer.error) return;
-                                undo();
-                                toast.show({ title: answer.error });
-                            },
-                            () => {
-                                undo();
-                                toast.show({ title: t("errors.changeNotSaved") });
-                            }
-                        );
+                        void writeTask(TASK_UPDATE, { taskId: task.id, statusId: next }, () => {
+                            undo();
+                            toast.show({ title: t("errors.changeNotSaved") });
+                        }).then((answer) => {
+                            if (!answer?.error) return;
+                            undo();
+                            toast.show({ title: answer.error });
+                        });
                     };
                     return (
                         <WidgetRow

@@ -15,6 +15,7 @@ import * as core from "@polaris/core";
 import { TaskPanel } from "./task-panel";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
+import { writeTask, TASK_UPDATE } from "./offline-writes";
 import { useStableOrder } from "./stable-order";
 import { Fragment, useMemo, useState, useTransition } from "react";
 import type { RunningTimer } from "@/lib/tasks/time-service";
@@ -186,12 +187,9 @@ export function HomeView({
                 [task.id]: { ...current[task.id], ...taskOverlay(change, context) }
             }));
         }
-        const result = await runAction(
-            () => actions.updateTaskAction({ taskId: task.id, ...change }),
-            setError
-        );
+        const result = await writeTask(TASK_UPDATE, { taskId: task.id, ...change }, setError);
         if (result?.error) setError(result.error);
-        refresh(task.id);
+        if (!result?.queued) refresh(task.id);
     };
 
     /**

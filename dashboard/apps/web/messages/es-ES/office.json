@@ -113,7 +113,9 @@
     "docEditor": {
         "opening": "Abriendo",
         "saving": "Guardando",
-        "thatDidNotSaveYour": "No se guardó. Tu trabajo sigue en pantalla - revisa tu conexión."
+        "thatDidNotSaveYour": "No se guardó. Tu trabajo sigue en pantalla - revisa tu conexión.",
+        "offline": "Guardado en este dispositivo. Se envía al volver Polaris.",
+        "retry": "Reintentar"
     },
     "export": {
         "thatCouldNotBeMade": "No se pudo generar. Vuelve a intentarlo en un momento.",

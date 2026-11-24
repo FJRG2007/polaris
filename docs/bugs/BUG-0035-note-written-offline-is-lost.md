@@ -60,9 +60,31 @@ order, the technique WhatsApp Web and Linear use):
   the reader cannot add notes (a note shared to edit), the save is shown as a
   conflict with "Keep mine" and "Discard mine".
 
+## The last second before the tab closes (2026-11-24)
+
+A note saves 0.8 s after typing stops and the device store answers
+asynchronously, so text typed in that pause was lost when the tab closed. What
+a screen holds unsaved is now written synchronously to localStorage when the
+page is hidden or closed (`keepOnUnload` in `lib/offline/app-writes`), moved
+into the queue the next time any Polaris page opens for that account, replaced
+by any later save of the same note so older text never comes back, and dropped
+on sign-out. Leaving a note for another note or screen saves it at once.
+
+## Documents (2026-11-24)
+
+The office editors (`office/use-office-document.ts`) keep every change on the
+queue first (`office/offline-writes.ts`, kind `office.update`). A change is a
+Yjs update, so what waits for a document is merged into one update and needs
+no conflict copy: applied twice or beside somebody else's it gives the same
+document. A reopened document shows the changes still on the device; the text
+editor says "Saved on this device" while they wait, and "Try again" when the
+server refused them or did not answer five times. A 5xx or 429 answer is
+retried; any other 4xx is shown as not saved. What a closing tab left is put
+beside what already waited, never over it.
+
 ## Not fixed here
 
-- Documents and tasks are not on the queue yet.
-- Text typed less than a second before the tab closes (inside the autosave
-  pause) is not kept.
+- Tasks are not on the queue yet.
 - Creating, moving or deleting a note offline still needs the host.
+- Spreadsheets, slides and drawings queue their changes the same way but show
+  no saving line (they never had one).

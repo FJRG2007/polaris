@@ -44,6 +44,13 @@ export function createWriteQueue<E extends QueuedEntry>(options: {
     };
     let running: Promise<void> | null = null;
     let again = false;
+    // Entries are sent oldest first, so two kept in the same millisecond must
+    // not tie: a tie would let the IndexedDB key order send them swapped.
+    let lastStamp = 0;
+    const stamp = (): string => {
+        lastStamp = Math.max(Date.now(), lastStamp + 1);
+        return new Date(lastStamp).toISOString();
+    };
 
     const readAll = async (): Promise<E[]> => (await store.readAll<E>(kind)).map((entry) => entry.value);
     const drainOnce = async (): Promise<void> => {
@@ -79,7 +86,7 @@ export function createWriteQueue<E extends QueuedEntry>(options: {
     return {
         readAll,
         enqueue(entry) {
-            const full = { ...entry, state: "pending", attempts: 0, createdAt: new Date().toISOString() } as E;
+            const full = { ...entry, state: "pending", attempts: 0, createdAt: stamp() } as E;
             return store.write(kind, full.key, full);
         },
         async retry(entry, change) {

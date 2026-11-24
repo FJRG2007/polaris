@@ -157,8 +157,8 @@ function dockPopup(element: HTMLElement, editorElement: HTMLElement): () => void
     Object.assign(element.style, {
         position: "fixed",
         top: "auto",
-        paddingLeft: "env(safe-area-inset-left)",
-        paddingRight: "env(safe-area-inset-right)"
+        paddingLeft: "var(--safe-left)",
+        paddingRight: "var(--safe-right)"
     });
     document.body.appendChild(element);
     let frame = 0;

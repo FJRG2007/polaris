@@ -25,6 +25,12 @@ export function setActionFailureText(text: string): void {
     failed = text;
 }
 
+/** The sentence a failed action is reported with, for a caller that fails the
+ *  same way without a rejection of its own to hand `runAction`. */
+export function actionFailureText(): string {
+    return failed;
+}
+
 /**
  * Await a server action, returning null when it rejects and reporting why through
  * `onFailure`. The real error is logged, since the message that reaches the

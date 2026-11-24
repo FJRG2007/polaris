@@ -14,6 +14,7 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { useMemo, useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { writeTask, TASK_CREATE, TASK_MOVE, TASK_UPDATE } from "./offline-writes";
 import { schemaMessage } from "./schema-message";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { settleTagIds, withCreatedTags } from "./tag-creation";
@@ -230,8 +231,9 @@ export function SubtaskSection({
         const moved = dragging;
         setDragging(null);
         onError("");
-        await runAction(() => actions.moveTaskAction({ taskId: moved, ...position }), onError);
-        reload();
+        const result = await writeTask(TASK_MOVE, { taskId: moved, ...position }, onError);
+        if (result?.error) onError(result.error);
+        if (!result?.queued) reload();
     };
 
     const edit = async (subtaskId: string, change: TaskEdit) => {
@@ -245,12 +247,9 @@ export function SubtaskSection({
         const written = change.tagIds
             ? { ...change, tagIds: await settleTagIds(change.tagIds) }
             : change;
-        const result = await runAction(
-            () => actions.updateTaskAction({ taskId: subtaskId, ...written }),
-            onError
-        );
+        const result = await writeTask(TASK_UPDATE, { taskId: subtaskId, ...written }, onError);
         if (result?.error) onError(result.error);
-        reload();
+        if (!result?.queued) reload();
     };
 
     /** What the menu writes. It speaks about a set even here, where there is
@@ -382,17 +381,13 @@ export function SubtaskSection({
                     placeholder={t("subwork.addSubtask")}
                     onAdd={async (name) => {
                         onError("");
-                        const result = await runAction(
-                            () =>
-                                actions.createTaskAction({
-                                    listId,
-                                    name,
-                                    parentId: taskId
-                                }),
+                        const result = await writeTask(
+                            TASK_CREATE,
+                            { listId, name, parentId: taskId },
                             onError
                         );
                         if (result?.error) onError(result.error);
-                        reload();
+                        if (!result?.queued) reload();
                     }}
                 />
             )}

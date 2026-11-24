@@ -9,6 +9,7 @@
  * that reflows is a table you cannot compare rows in.
  */
 
+import { TaskReference } from "../task-write-mark";
 import * as core from "@polaris/core";
 import { useEffect, useMemo, useState } from "react";
 import { toFacts, type TaskRow } from "@/lib/tasks/facts";
@@ -330,7 +331,7 @@ function TaskLine({
                             className="flex min-w-0 items-center gap-2 text-start"
                         >
                             <span className="hidden shrink-0 font-mono text-[0.6875rem] text-muted-foreground sm:inline">
-                                {task.reference}
+                                <TaskReference taskId={task.id} reference={task.reference} />
                             </span>
                             <span
                                 title={task.name}
@@ -1310,7 +1311,7 @@ export function TableView(props: ViewProps) {
                                             className="flex w-full items-center gap-2 text-start"
                                         >
                                             <span className="shrink-0 whitespace-nowrap font-mono text-[0.6875rem] text-muted-foreground">
-                                                {task.reference}
+                                                <TaskReference taskId={task.id} reference={task.reference} />
                                             </span>
                                             <span className="min-w-0 truncate" title={task.name}>
                                                 {task.name}

@@ -10,6 +10,7 @@
 
 import { registerAddonIpc } from "./addons/electron";
 import { z } from "zod";
+import { readHostPath, type HostPageOutcome, type LocalSettingsState } from "@/shared/settings-route";
 import { overlayHeight, titleBarColorsSchema } from "@/shared/title-bar";
 import { runningPrograms } from "./game-detect";
 import { chooseShare, endShare, listShareSources, SOURCE_ID } from "./screen-share";
@@ -94,7 +95,9 @@ export interface IpcHost extends PushHost {
     readonly setToggle: (name: PreferenceToggle, on: boolean) => boolean;
     /** Close and open the app again, unless something running would be lost. */
     readonly relaunch: () => Outcome;
-    readonly connectState: () => { address: string | null; error: string | null; servers: ServerRow[]; };
+    readonly connectState: () => { address: string | null; error: string | null; servers: ServerRow[]; settings: LocalSettingsState; };
+    /** Open a page of the host in the Polaris window; false with none to open it in. */
+    readonly openOnHost: (path: string) => Promise<HostPageOutcome>;
     readonly connectSubmit: (raw: unknown, name?: string) => Promise<Outcome>;
     readonly connectCheck: (raw: unknown) => Promise<AddressCheck>;
     readonly switchServer: (origin: string) => Promise<Outcome>;
@@ -900,6 +903,11 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.connectRestart, (event) => (from(event, "connect") ? host.updates.install() : REFUSED));
     // Takes nothing: only the page of the version the app itself announced.
     ipcMain.handle(CHANNELS.connectUpdatePage, (event) => from(event, "connect") && host.openUpdatePage());
+    // Only the host pages the bundled settings point at, by their exact address.
+    ipcMain.handle(CHANNELS.connectOpenOnHost, (event, raw: unknown) => {
+        const path = readHostPath(raw);
+        return from(event, "connect") && path !== null ? host.openOnHost(path) : "offline";
+    });
     ipcMain.handle(CHANNELS.connectClose, (event) => {
         if (from(event, "connect")) host.closeConnect();
     });

@@ -21,11 +21,21 @@
  */
 
 import * as Y from "yjs";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { appWrites } from "@/lib/offline/app-writes";
+import { reachability, subscribeReachability } from "@/lib/reachability";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+    OFFICE_UPDATE,
+    fromBase64,
+    keepOfficeUpdate,
+    keepOfficeUpdateOnUnload,
+    waitingOfficeUpdates,
+    type OfficeUpdatePayload
+} from "./offline-writes";
 
-/** What the corner says about whether the work is safe. Three rather than two:
- *  "saved" and "saving" leave nowhere to put a failure. */
-export type OfficeSaving = "settled" | "saving" | "failed";
+/** What the corner says about whether the work is safe. "offline" is kept on
+ *  this device and waiting for Polaris - safe, but not shared yet. */
+export type OfficeSaving = "settled" | "saving" | "offline" | "failed";
 
 /**
  * How long the editor waits after the last change before it sends.
@@ -49,7 +59,7 @@ export function useOfficeDocument({
      *  bytes across the boundary. */
     content: number[] | null;
     editable: boolean;
-}): { doc: Y.Doc; saving: OfficeSaving } {
+}): { doc: Y.Doc; saving: OfficeSaving; retry: () => void } {
     // Built once, from what was stored. A new Y.Doc per render would throw the
     // document away between keystrokes.
     const doc = useMemo(() => {
@@ -62,6 +72,12 @@ export function useOfficeDocument({
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
     /** What has been changed and not yet sent, merged into one update. */
     const unsent = useRef<Uint8Array[]>([]);
+    /** Taken from `unsent` and not yet kept on the device or sent. */
+    const inFlight = useRef(new Set<Uint8Array>());
+    const reach = useSyncExternalStore(subscribeReachability, reachability, reachability);
+    /** This document's changes on the device: none, waiting, waiting with
+     *  Polaris out of reach, or refused / tried too often. */
+    const [kept, setKept] = useState<"none" | "pending" | "unanswered" | "failed">("none");
 
     /**
      * Which tab this is.
@@ -83,6 +99,21 @@ export function useOfficeDocument({
         if (pending.length === 0) return;
         unsent.current = [];
         const merged = Y.mergeUpdates(pending);
+        inFlight.current.add(merged);
+        // Kept on this device first, then sent from its queue: closing the tab or
+        // losing the network from here on loses nothing.
+        const queued = await keepOfficeUpdate({ documentId, update: merged, origin }, Y.mergeUpdates).catch(
+            () => false
+        );
+        inFlight.current.delete(merged);
+        if (queued) {
+            // Typing since goes on showing as saving until it is kept too.
+            setSaving(unsent.current.length > 0 ? "saving" : "settled");
+            void refreshKept.current();
+            return;
+        }
+        // This device keeps nothing (a private window, a link visitor): sent at
+        // once, as before.
         try {
             const answer = await fetch(
                 `/api/office/${encodeURIComponent(documentId)}/content?origin=${origin}`,
@@ -97,6 +128,53 @@ export function useOfficeDocument({
             setSaving("failed");
         }
     };
+
+    const refreshKept = useRef(async (): Promise<void> => undefined);
+    refreshKept.current = async (): Promise<void> => {
+        const entries = await waitingOfficeUpdates(documentId);
+        setKept(
+            entries.length === 0
+                ? "none"
+                : entries.some((entry) => entry.state === "failed")
+                  ? "failed"
+                  : entries.some((entry) => entry.attempts > 0)
+                    ? "unanswered"
+                    : "pending"
+        );
+    };
+
+    /**
+     * What this device kept of the document and has not handed over yet - typed
+     * offline, or in the moment before the tab last closed - is part of the
+     * document as far as its writer is concerned: put back on opening. Applied
+     * as from the wire, so it is not sent a second time and every editor
+     * redraws it.
+     */
+    useEffect(() => {
+        if (!editable) return;
+        let live = true;
+        void waitingOfficeUpdates(documentId).then((entries) => {
+            if (!live) return;
+            for (const entry of entries) {
+                Y.applyUpdate(doc, fromBase64((entry.payload as OfficeUpdatePayload).update), REMOTE);
+            }
+            void refreshKept.current();
+        });
+        const unsubscribe = appWrites.subscribe((event) => {
+            if (event && (event.entry.kind !== OFFICE_UPDATE || event.entry.target !== documentId)) return;
+            void refreshKept.current();
+        });
+        return () => {
+            live = false;
+            unsubscribe();
+        };
+    }, [doc, documentId, editable]);
+
+    const retry = useCallback(() => {
+        void waitingOfficeUpdates(documentId).then(async (entries) => {
+            for (const entry of entries) if (entry.state === "failed") await appWrites.retry(entry);
+        });
+    }, [documentId]);
 
     /**
      * Send what changed, once the changing stops.
@@ -156,28 +234,46 @@ export function useOfficeDocument({
      * And once more on the way out.
      *
      * A tab closed inside the wait above would otherwise lose everything done
-     * since the last send. `sendBeacon` is what lets a request outlive the page
-     * that started it, which a fetch cannot promise.
+     * since the last send. What is unsent is kept on the device synchronously
+     * (`keepOfficeUpdateOnUnload`) and goes out the next time Polaris opens;
+     * `sendBeacon`, which can outlive the page, also tries now, so the others in
+     * the document see it at once. Both arriving is harmless: an update applied
+     * twice does nothing. Leaving for another screen sends it as usual.
      */
     useEffect(() => {
         if (!editable) return;
+        const unsentNow = (): Uint8Array | null => {
+            const pending = [...inFlight.current, ...unsent.current];
+            return pending.length === 0 ? null : Y.mergeUpdates(pending);
+        };
+        const stopKeeping = keepOfficeUpdateOnUnload(() => {
+            const update = unsentNow();
+            return update && { documentId, update, origin };
+        });
         const leave = (): void => {
-            const pending = unsent.current;
-            if (pending.length === 0) return;
-            unsent.current = [];
+            const update = unsentNow();
+            if (!update) return;
             navigator.sendBeacon?.(
                 `/api/office/${encodeURIComponent(documentId)}/content?origin=${origin}`,
-                new Blob([Y.mergeUpdates(pending) as unknown as BlobPart], {
-                    type: "application/octet-stream"
-                })
+                new Blob([update as unknown as BlobPart], { type: "application/octet-stream" })
             );
         };
         window.addEventListener("pagehide", leave);
         return () => {
-            leave();
+            stopKeeping();
             window.removeEventListener("pagehide", leave);
+            void send.current();
         };
     }, [documentId, editable, origin]);
 
-    return { doc, saving };
+    const offline = !reach.reachable || (typeof navigator !== "undefined" && navigator.onLine === false);
+    const shown: OfficeSaving =
+        saving !== "settled" || kept === "none"
+            ? saving
+            : kept === "failed"
+              ? "failed"
+              : kept === "unanswered" || offline
+                ? "offline"
+                : "saving";
+    return { doc, saving: shown, retry };
 }

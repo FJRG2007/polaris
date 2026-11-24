@@ -14,7 +14,16 @@
 import * as actions from "./actions";
 import { noteRequestFailure } from "@/lib/reachability";
 import { newClientKey, type QueueSendResult } from "@/lib/offline/outbox";
-import { appWrites, readAck, registerWriteKind, replaceWrite, writeAck, writesFor, type AppWrite } from "@/lib/offline/app-writes";
+import {
+    appWrites,
+    keepOnUnload,
+    readAck,
+    registerWriteKind,
+    replaceWrite,
+    writeAck,
+    writesFor,
+    type AppWrite
+} from "@/lib/offline/app-writes";
 
 export const NOTE_TEXT = "note.text";
 
@@ -90,4 +99,15 @@ export async function saveNoteText(payload: NoteTextPayload): Promise<{ queued: 
 export async function waitingNoteText(noteId: string): Promise<AppWrite | null> {
     const entries = await writesFor(NOTE_TEXT, noteId);
     return entries.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+}
+
+/**
+ * Keep the note's unsaved text if the page goes away inside the pause before a
+ * save (`keepOnUnload`). `read` answers what the editor holds unsaved, or null.
+ */
+export function keepNoteTextOnUnload(read: () => NoteTextPayload | null): () => void {
+    return keepOnUnload(() => {
+        const payload = read();
+        return payload && { key: newClientKey(), kind: NOTE_TEXT, target: payload.noteId, payload };
+    });
 }

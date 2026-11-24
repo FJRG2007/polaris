@@ -19,7 +19,7 @@
  */
 
 import { addonShortcutsNow, registerAddonViewScheme, startDeviceAddons, stopDeviceAddons } from "./addons/electron";
-import { appSettingsTarget } from "@polaris/core/app-settings";
+import { HOST_UPDATE_PATH, readSettingsProbe, settingsRoute, type HostPageOutcome, type LocalSettingsState, type SettingsPlace, type SettingsProbe } from "@/shared/settings-route";
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
 import { runner } from "./runner";
@@ -83,6 +83,9 @@ let sheet: LocalSheet | null = null;
 /** The page of the main window that said it draws the app's settings, by its
  *  contents' id; cleared as that page navigates away, fails or dies. */
 let settingsPage: number | null = null;
+/** Why the bundled settings page is open, and on which place; read by that page. */
+let localSettings: LocalSettingsState = { place: "hosts", reason: null };
+
 let loadError: string | null = null;
 
 /**
@@ -477,14 +480,14 @@ function openMain(url: string): void {
         dropAlternate();
     });
 }
-function openConnect(): void {
-    if (sheet && !sheet.isDestroyed()) {
-        sheet.focus();
-        return;
-    }
+function openConnect(settings: LocalSettingsState = { place: "hosts", reason: null }): void {
+    localSettings = settings;
+    // Already open: put back, so the page reads the place and the reason anew.
+    if (sheet && !sheet.isDestroyed()) sheet.close();
     if (connect && !connect.isDestroyed()) {
         connect.show();
         connect.focus();
+        connect.webContents.send(CHANNELS.connectShown);
         return;
     }
     // Over Polaris when it is on screen; a window of its own on the first run, or
@@ -505,26 +508,87 @@ function openConnect(): void {
     });
 }
 
+/** How long the host is given to say whether it has Settings > This app. */
+const SETTINGS_PROBE_MS = 4000;
+
+/**
+ * Ask the host, in the Polaris window's own session (its sign-in), whether it
+ * has the screen at `path`, without following the redirect a signed-out
+ * visit gets.
+ */
+async function probeSettings(window: BrowserWindow, origin: string, path: string): Promise<SettingsProbe> {
+    try {
+        const answer = await window.webContents.session.fetch(`${origin}${path}`, {
+            method: "GET",
+            redirect: "manual",
+            credentials: "include",
+            signal: AbortSignal.timeout(SETTINGS_PROBE_MS)
+        });
+        void answer.body?.cancel().catch(() => undefined);
+        return readSettingsProbe(answer.status);
+    } catch {
+        return readSettingsProbe(null);
+    }
+}
+
 /**
  * Open the app's settings where somebody asked for them: the host's own
- * Settings when the main window's page said it draws them ("This app"), else
- * the page bundled with the app - offline, before any host, or on a host from
- * before that screen existed.
+ * Settings > This app in the Polaris window, with its sidebar and search, as
+ * long as the host has that screen (`settingsRoute`); the page bundled with the
+ * app only offline, before any host, or on a host older than the screen - and
+ * then it says which, with the button that fixes it.
  */
-function openSettings(category = "general"): void {
+async function openSettings(place: SettingsPlace = "general"): Promise<void> {
     const page = main && !main.isDestroyed() ? main : null;
-    const target = appSettingsTarget({
+    const state = {
+        origin: current,
         pageLoaded: Boolean(page && !page.webContents.isCrashed()),
-        pageAnnounced: page !== null && settingsPage === page.webContents.id
-    });
-    if (target === "local" || !page) {
-        openConnect();
+        pageAnnounced: page !== null && settingsPage === page.webContents.id,
+        probe: null as SettingsProbe | null
+    };
+    let route = settingsRoute(place, state);
+    if (route.kind === "probe" && page && current) {
+        const origin = current;
+        const probe = await probeSettings(page, origin, route.path);
+        // The host was changed, or the window closed, while it was asked.
+        if (origin !== current || page.isDestroyed()) return;
+        route = settingsRoute(place, { ...state, probe });
+    }
+    if (route.kind === "local" || route.kind === "probe" || !page || !current) {
+        const reason = route.kind === "local" ? route.reason : "offline";
+        openConnect({ place: reason === null ? "hosts" : place, reason });
         return;
     }
+    closeConnect();
     if (page.isMinimized()) page.restore();
     page.show();
     page.focus();
-    page.webContents.send(CHANNELS.appSettingsOpen, category);
+    if (route.kind === "page") page.webContents.send(CHANNELS.appSettingsOpen, place);
+    else void page.loadURL(`${current}${route.path}`);
+}
+
+/**
+ * A host page the bundled settings asked for (an update, the device add-ons):
+ * the Polaris window opens it, or the settings are told why it cannot - out of
+ * reach, or a host older than the page (asked first, but for the update page,
+ * which every host has).
+ */
+async function openOnHost(path: string): Promise<HostPageOutcome> {
+    const page = main && !main.isDestroyed() ? main : null;
+    const origin = current;
+    if (!page || !origin || page.webContents.isCrashed()) return "offline";
+    if (path !== HOST_UPDATE_PATH) {
+        const probe = await probeSettings(page, origin, path);
+        if (probe === "missing") return "outdated";
+        if (probe === "unreachable") return "offline";
+        if (origin !== current || page.isDestroyed()) return "offline";
+    }
+    closeConnect();
+    if (page.isMinimized()) page.restore();
+    page.show();
+    page.focus();
+    void page.loadURL(`${origin}${path}`);
+    return "opened";
 }
 
 /** Put the settings away, sheet or window. */
@@ -836,7 +900,7 @@ function start(): void {
         // The tray icon first: on a sign-in that is all a start in the tray shows, and
         // nothing below needs to have run for its menu to work.
         const menu: MenuActions = {
-            changeServer: () => openSettings(),
+            changeServer: () => void openSettings(),
             switchServer: (origin) => void switchOrSayWhy(origin),
             back: goBack,
             reload: () => BrowserWindow.getFocusedWindow()?.webContents.reload(),
@@ -922,7 +986,8 @@ function start(): void {
             runningGame: () => games.running(),
             isReporter: (sender) => Boolean(main && !main.isDestroyed() && main.webContents === sender),
             setCustomGames: (list) => games.setCustomGames(list),
-            connectState: () => ({ address: current, error: loadError, servers: servers() }),
+            connectState: () => ({ address: current, error: loadError, servers: servers(), settings: localSettings }),
+            openOnHost,
             preferences: () => {
                 const hardwareAcceleration = settings.hardwareAcceleration();
                 return {
