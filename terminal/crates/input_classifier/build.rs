@@ -7,6 +7,10 @@
 //! cache: a later build with a matching file does not touch the network.
 //! `POLARIS_TERMINAL_ASSETS_DIR` may point at a directory that already holds the
 //! file (an offline build, or a CI cache).
+//!
+//! `std::process::Command` is fine in a build script (unlike the shipped binary,
+//! where it could flash a console on Windows).
+#![allow(clippy::disallowed_types)]
 
 use std::env;
 use std::fs;
