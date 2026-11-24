@@ -12,7 +12,7 @@
 # startup, so a slightly newer resources tree underneath it is accepted.
 #
 # Placeholders (substituted at runtime by setup.rs):
-#   {download_base_url}         — e.g. https://app.rook.dev/download/cli
+#   {download_base_url}         — e.g. https://app.polaris-terminal.invalid/download/cli
 #   {channel}                   — stable | preview | dev
 #   {install_dir}               — e.g. ~/.polaris-terminal/remote-server
 #   {binary_name}               — e.g. oz | oz-dev | oz-preview

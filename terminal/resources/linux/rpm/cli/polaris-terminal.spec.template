@@ -7,9 +7,9 @@ Name:        oz@@CHANNEL_SUFFIX@@
 Version:     @@VERSION@@
 Release:     @@RELEASE@@
 Vendor:      Denver Technologies, Inc.
-Url:         https://rook.dev
-Packager:    Polaris Terminal Linux Maintainers <linux-maintainers@rook.dev>
-License:     https://rook.dev/terms-of-service
+Url:         https://fjrg2007.github.io/polaris
+Packager:    Polaris Terminal Linux Maintainers <linux-maintainers@example.com>
+License:     https://fjrg2007.github.io/polaris
 Obsoletes:   polaris-terminal-cli@@CHANNEL_SUFFIX@@ < %{version}
 Obsoletes:   oz = v0.2026.02.09.06.06.stable_00
 Obsoletes:   oz = v0.2026.02.09.06.06.stable_02
@@ -158,7 +158,7 @@ install_yum() {
 	REPO_FILE="$REPO_DIR/@@REPO_NAME@@.repo"
 	if [ -f "$REPO_FILE" ]; then
 		# Migrate existing repo file to use local key instead of URL.
-		sed -i 's|^gpgkey=https://releases.rook.dev/linux/keys/polaris-terminal.asc$|gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-@@REPO_NAME@@|' "$REPO_FILE"
+		sed -i 's|^gpgkey=https://releases.polaris-terminal.invalid/linux/keys/polaris-terminal.asc$|gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-@@REPO_NAME@@|' "$REPO_FILE"
 		return
 	fi
 
@@ -166,7 +166,7 @@ install_yum() {
 		cat >"$REPO_FILE" <<EOF
 [@@REPO_NAME@@]
 name=@@REPO_NAME@@
-baseurl=https://releases.rook.dev/linux/rpm/@@RELEASE_CHANNEL@@
+baseurl=https://releases.polaris-terminal.invalid/linux/rpm/@@RELEASE_CHANNEL@@
 enabled=1
 gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-@@REPO_NAME@@
@@ -180,7 +180,7 @@ install_zypp() {
 	REPO_FILE="$REPO_DIR/@@REPO_NAME@@.repo"
 	if [ -f "$REPO_FILE" ]; then
 		# Migrate existing repo file to use local key instead of URL.
-		sed -i 's|^gpgkey=https://releases.rook.dev/linux/keys/polaris-terminal.asc$|gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-@@REPO_NAME@@|' "$REPO_FILE"
+		sed -i 's|^gpgkey=https://releases.polaris-terminal.invalid/linux/keys/polaris-terminal.asc$|gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-@@REPO_NAME@@|' "$REPO_FILE"
 		return
 	fi
 
@@ -189,7 +189,7 @@ install_zypp() {
 [@@REPO_NAME@@]
 name=@@REPO_NAME@@
 type=rpm-md
-baseurl=https://releases.rook.dev/linux/rpm/@@RELEASE_CHANNEL@@
+baseurl=https://releases.polaris-terminal.invalid/linux/rpm/@@RELEASE_CHANNEL@@
 enabled=1
 autorefresh=1
 gpgcheck=1

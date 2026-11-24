@@ -120,7 +120,7 @@ impl ChannelState {
         let Ok(url) = Url::parse(Self::server_root_url().as_ref()) else {
             return false;
         };
-        url.host_str() == Some("staging.rook.dev")
+        url.host_str() == Some("staging.polaris-terminal.invalid")
     }
 
     /// Returns the canonical identifier for the application.

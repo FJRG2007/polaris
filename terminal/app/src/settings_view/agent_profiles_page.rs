@@ -2145,7 +2145,7 @@ impl SettingsWidget for UsageWidget {
                 }
             } else {
                 vec![
-                    FormattedTextFragment::hyperlink("Contact support", "mailto:support@rook.dev"),
+                    FormattedTextFragment::hyperlink("Contact support", "mailto:support@example.com"),
                     FormattedTextFragment::plain_text(" for more AI usage."),
                 ]
             }
@@ -2934,7 +2934,7 @@ impl AgentsWidget {
             ),
             FormattedTextFragment::hyperlink(
                 "Learn more",
-                "https://docs.rook.dev/agents/capabilities/codebase-context",
+                "https://github.com/FJRG2007/polaris/tree/main/terminal#readme",
             ),
         ];
         let description = Container::new(
@@ -3012,7 +3012,7 @@ impl AgentsWidget {
                 FormattedTextFragment::plain_text(" or "),
                 FormattedTextFragment::hyperlink(
                     "learn more about MCPs.",
-                    "https://docs.rook.dev/agents/capabilities/mcp",
+                    "https://github.com/FJRG2007/polaris/tree/main/terminal#readme",
                 ),
             ];
 

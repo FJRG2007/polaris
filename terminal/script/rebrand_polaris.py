@@ -22,7 +22,7 @@ forms, so Rust sources are split into code, strings and comments first:
     per-repository dir   .rook/             -> .polaris/terminal/
     prose                Rook               -> Polaris Terminal
 
-The rook.dev hosts and addresses are left as they are: the sweep that removes
+The hosts and addresses under the old project's domain are left as they are: the sweep that removes
 them is its own step, guarded by a test, and it decides per category.
 """
 
@@ -41,7 +41,7 @@ SKIP_SCRIPTS = {
 
 # Kept verbatim and restored after the rewrite.
 PRESERVE = re.compile(
-    # Hosts and addresses under the old domain: handled by the rook.dev sweep.
+    # Hosts and addresses under the old domain: handled by the domain sweep.
     r"[A-Za-z0-9._%+-]*@?[A-Za-z0-9.-]*\brook\.dev\b"
 )
 

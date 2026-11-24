@@ -496,7 +496,7 @@ impl TitleWidget {
             ),
             FormattedTextFragment::hyperlink(
                 "Learn more",
-                "https://docs.rook.dev/terminal/ptermify/subshells",
+                "https://github.com/FJRG2007/polaris/tree/main/terminal#readme",
             ),
         ];
 

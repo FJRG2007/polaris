@@ -764,7 +764,7 @@ impl CategoriesView {
                 .link(
                     "creating your own workflow".into(),
                     Some(
-                        "https://docs.rook.dev/knowledge-and-collaboration/polaris-terminal-drive/workflows"
+                        "https://github.com/FJRG2007/polaris/tree/main/terminal#readme"
                             .into(),
                     ),
                     None,

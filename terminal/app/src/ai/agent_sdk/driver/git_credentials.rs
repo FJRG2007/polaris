@@ -33,7 +33,8 @@ const DEFAULT_GIT_NAME: &str = "Polaris Terminal";
 /// The fallback author address stamped on commits an agent makes when the
 /// server supplies no identity. Under `.invalid`, which RFC 2606 reserves so it
 /// can never be registered: the rename turned upstream's own domain into
-/// `rook.dev`, which belongs to someone else, and a commit author is permanent.
+/// the old project's `.dev` domain, which belongs to someone else, and a commit
+/// author is permanent.
 const DEFAULT_GIT_EMAIL: &str = "agent@polaris-terminal.invalid";
 const GITHUB_HOST: &str = "github.com";
 const GH_HOSTS_FILENAME: &str = "hosts.yml";

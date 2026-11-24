@@ -8,7 +8,7 @@ The remote server gains a daemon-wide authentication layer so that handlers runn
 
 ## Problem
 
-Today the remote server has no notion of user identity. Any handler that needs to call Polaris Terminal services (`app.rook.dev` APIs, upstream LLM routing, telemetry attribution, Drive-backed features) from the remote host has no credential to present. At the same time, APP-4068 makes the server a long-running daemon shared across multiple client connections from the same user's tabs, with a 10-minute grace period after the last disconnect. Any credential model for this system has to work within that architecture: the daemon is started by whichever proxy got there first, serves multiple concurrent connections, and may outlive any single SSH session.
+Today the remote server has no notion of user identity. Any handler that needs to call Polaris Terminal services (`app.polaris-terminal.invalid` APIs, upstream LLM routing, telemetry attribution, Drive-backed features) from the remote host has no credential to present. At the same time, APP-4068 makes the server a long-running daemon shared across multiple client connections from the same user's tabs, with a 10-minute grace period after the last disconnect. Any credential model for this system has to work within that architecture: the daemon is started by whichever proxy got there first, serves multiple concurrent connections, and may outlive any single SSH session.
 
 ## Goals
 

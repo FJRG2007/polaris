@@ -227,7 +227,7 @@
 
             meta = {
               description = "Polaris Terminal is an agentic development environment, born out of the terminal (Experimental Nix Support, Linux-only).";
-              homepage = "https://www.rook.dev";
+              homepage = "https://fjrg2007.github.io/polaris";
               license = lib.licenses.agpl3Only;
               mainProgram = "polaris-terminal-terminal-experimental";
               platforms = systems;

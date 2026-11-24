@@ -103,7 +103,7 @@ Note that for `async_assert` to actually work, the `set_assertion` needs to **re
 
 ## How to add a sqlite snapshot?
 * You can copy over a polaris-terminal.sqlite file from ~/Library/Application\ Support/{polaris-terminal, dev.polaris.PolarisTerminal-(Dev|Preview|Stable)} directly
-* You may want to sanitize some info that is specific to you (i.e. cwd https://staging.rook.dev/block/FNBafyVtxvjmdNIx6HxUM5)
+* You may want to sanitize some info that is specific to you (i.e. cwd https://staging.example.com/block/FNBafyVtxvjmdNIx6HxUM5)
 
 
 ### How to run integration tests?

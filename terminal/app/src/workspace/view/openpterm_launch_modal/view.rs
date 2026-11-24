@@ -28,7 +28,7 @@ const HERO_IMAGE_PATH: &str = "async/png/onboarding/openpterm_launch_banner.png"
 const REPO_URL: &str = "https://github.com/FJRG2007/polaris";
 const CONTRIBUTING_URL: &str =
     "https://github.com/FJRG2007/polaris/blob/master/terminal/CONTRIBUTING.md";
-const OZ_URL: &str = "https://oz.rook.dev";
+const OZ_URL: &str = "https://oz.polaris-terminal.invalid";
 
 struct InlineLink {
     text: &'static str,

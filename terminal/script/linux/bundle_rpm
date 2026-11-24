@@ -93,7 +93,7 @@ cp "$RPMBUILD_DIR/RPMS/$ARCH/$RPM_NAME" "$OUT_DIR"
 if [ "${GITHUB_ACTIONS}" == "true" ]; then
   # Import our signing key's public key into rpm so the signature can be
   # verified.
-  sudo rpm --import https://releases.rook.dev/linux/keys/polaris-terminal.asc
+  sudo rpm --import https://releases.polaris-terminal.invalid/linux/keys/polaris-terminal.asc
 
   # We use batch mode with tty-based pin entry to ensure that the build doesn't
   # hang waiting on user input if, for some reason, we failed to preset the
@@ -103,7 +103,7 @@ if [ "${GITHUB_ACTIONS}" == "true" ]; then
   # the build.
   rpmsign \
     --verbose \
-    --addsign --key-id "linux-maintainers@rook.dev" \
+    --addsign --key-id "linux-maintainers@example.com" \
     --define "_gpg_sign_cmd_extra_args --batch --yes --pinentry-mode loopback" --define "_gpg_digest_algo sha256" \
     "$OUT_DIR/$RPM_NAME" \
     || true

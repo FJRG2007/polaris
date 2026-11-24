@@ -208,12 +208,12 @@ fn no_proxy_suffix_with_dot() {
         env::set_var("HTTPS_PROXY", "http://proxy:3128");
     }
     unsafe {
-        env::set_var("NO_PROXY", ".rook.dev");
+        env::set_var("NO_PROXY", ".example.com");
     }
 
-    assert!(resolved_proxy_tls("sessions.app.rook.dev").is_none());
+    assert!(resolved_proxy_tls("sessions.app.example.com").is_none());
 
-    assert!(resolved_proxy_tls("rook.dev").is_some()); // Exact "rook.dev" != ".rook.dev"
+    assert!(resolved_proxy_tls("example.com").is_some()); // Exact "example.com" != ".example.com"
     assert!(resolved_proxy_tls("other.com").is_some());
     clear_proxy_env();
 }
@@ -226,13 +226,13 @@ fn no_proxy_suffix_without_dot() {
         env::set_var("HTTPS_PROXY", "http://proxy:3128");
     }
     unsafe {
-        env::set_var("NO_PROXY", "rook.dev");
+        env::set_var("NO_PROXY", "example.com");
     }
 
-    // "sessions.app.rook.dev" ends with ".rook.dev" → matches
-    assert!(resolved_proxy_tls("sessions.app.rook.dev").is_none());
+    // "sessions.app.example.com" ends with ".example.com" → matches
+    assert!(resolved_proxy_tls("sessions.app.example.com").is_none());
     // Exact match too
-    assert!(resolved_proxy_tls("rook.dev").is_none());
+    assert!(resolved_proxy_tls("example.com").is_none());
     assert!(resolved_proxy_tls("notpterm.dev").is_some());
     clear_proxy_env();
 }

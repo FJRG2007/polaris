@@ -4,7 +4,7 @@
 
 // Publisher, "Support" and "Update" in Add/Remove Programs. Both were
 // upstream's: the company that publishes this fork's binaries is not Denver
-// Technologies, and the rename turned upstream's own domain into rook.dev,
+// Technologies, and the rename turned upstream's own domain into the old project's .dev domain,
 // which is registered to someone else - the same value the OSS server config
 // had to drop. The repository is the only address this fork can source.
 #define MyAppPublisher "Polaris Terminal"

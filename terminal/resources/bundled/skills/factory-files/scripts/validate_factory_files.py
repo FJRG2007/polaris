@@ -43,7 +43,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Optional
 
-DEFAULT_SERVER_ROOT = "https://app.rook.dev"
+DEFAULT_SERVER_ROOT = "https://app.polaris-terminal.invalid"
 VALIDATE_PATH = "/api/v1/factory-files/validate"
 
 # Bounded so an unreachable or slow server reports quickly rather than stalling

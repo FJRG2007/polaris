@@ -115,8 +115,8 @@ against a registered Factory.
 The schema endpoints are unauthenticated and cacheable:
 
 ```bash
-curl -s https://app.rook.dev/api/v1/factory-files/schemas
-curl -s https://app.rook.dev/api/v1/factory-files/schemas/v1alpha1
+curl -s https://app.polaris-terminal.invalid/api/v1/factory-files/schemas
+curl -s https://app.polaris-terminal.invalid/api/v1/factory-files/schemas/v1alpha1
 ```
 
 They are ordinary JSON Schema 2020-12 documents, exact for the version they

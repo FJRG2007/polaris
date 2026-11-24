@@ -8,7 +8,7 @@ use ptermui::{Action, AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 
-const LOGIN_TROUBLESHOOTING_DOCS_URL: &str = "https://docs.rook.dev/support-and-community/troubleshooting-and-support/troubleshooting-login-issues";
+const LOGIN_TROUBLESHOOTING_DOCS_URL: &str = "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 
 /// Represents reasons why login failed.
 pub enum LoginFailureReason {

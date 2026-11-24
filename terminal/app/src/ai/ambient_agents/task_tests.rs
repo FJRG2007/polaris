@@ -178,7 +178,7 @@ fn retained_failed_and_error_tasks_have_attachable_live_sessions() {
     for state in [AmbientAgentTaskState::Failed, AmbientAgentTaskState::Error] {
         let mut task = make_task(None, "Retained failed task");
         task.state = state;
-        task.session_link = Some(format!("https://app.rook.dev/session/{session_id}"));
+        task.session_link = Some(format!("https://app.example.com/session/{session_id}"));
         task.is_sandbox_running = true;
 
         assert!(task.has_active_execution());
@@ -198,7 +198,7 @@ fn ended_failed_task_with_stale_session_metadata_is_inactive() {
     task.state = AmbientAgentTaskState::Failed;
     task.session_id = Some("22222222-2222-2222-2222-222222222222".to_string());
     task.session_link =
-        Some("https://app.rook.dev/session/22222222-2222-2222-2222-222222222222".to_string());
+        Some("https://app.example.com/session/22222222-2222-2222-2222-222222222222".to_string());
     task.is_sandbox_running = false;
 
     assert_eq!(

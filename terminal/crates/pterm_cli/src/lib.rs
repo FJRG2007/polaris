@@ -442,7 +442,7 @@ impl Args {
 
 <bold><underline>Learn more:</underline></bold>
 * Use <bold>{bin_name} help</bold> to learn more about each command
-* Read the documentation at https://docs.rook.dev/reference/cli
+* Read the documentation at https://github.com/FJRG2007/polaris/tree/main/terminal#readme
 "#
         ));
 

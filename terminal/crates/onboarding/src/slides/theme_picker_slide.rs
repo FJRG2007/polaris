@@ -52,7 +52,7 @@ pub enum ThemePickerSlideAction {
     PrivacySettingsClicked,
 }
 
-const TOS_URL: &str = "https://www.rook.dev/terms-of-service";
+const TOS_URL: &str = "https://fjrg2007.github.io/polaris";
 
 #[derive(Debug, Clone)]
 struct ThemeOption {

@@ -11,7 +11,7 @@ use clap::{Arg, Args, Command, ValueEnum};
 pub struct ShareArgs {
     /// Share the agent's session
     ///
-    /// Learn more at https://docs.rook.dev/knowledge-and-collaboration/session-sharing
+    /// Learn more at https://github.com/FJRG2007/polaris/tree/main/terminal#readme
     #[arg(long = "share", value_name = "RECIPIENTS", num_args=0..=1)]
     pub share: Option<Vec<ShareRequest>>,
 }

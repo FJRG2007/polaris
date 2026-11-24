@@ -27,7 +27,7 @@ const CONTENT_WIDTH: f32 = COLUMN_WIDTH - COLUMN_HORIZONTAL_PADDING * 2.;
 const CARD_RADIUS: f32 = 8.;
 const FEATURE_FONT_SIZE: f32 = 12.;
 const HERO_IMAGE_PATH: &str = "async/png/onboarding/agent_cli_launch_banner.png";
-const GET_STARTED_URL: &str = "https://docs.rook.dev/cli/quickstart/";
+const GET_STARTED_URL: &str = "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 
 fn modal_background(appearance: &Appearance) -> Fill {
     appearance.theme().surface_3()

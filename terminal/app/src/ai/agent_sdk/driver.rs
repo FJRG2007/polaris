@@ -4148,7 +4148,7 @@ impl AgentDriver {
                     "slow bootstrap"
                 );
                 eprintln!(
-                    "Warning: Terminal session is slow to bootstrap. See https://docs.rook.dev/support-and-community/troubleshooting-and-support/known-issues#shells to troubleshoot."
+                    "Warning: Terminal session is slow to bootstrap. See https://github.com/FJRG2007/polaris/tree/main/terminal#readme to troubleshoot."
                 );
             }
             TerminalDriverEvent::EstablishedSharedSession {

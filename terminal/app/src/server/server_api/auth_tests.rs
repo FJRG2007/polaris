@@ -28,12 +28,12 @@ fn test_firebase_token_urls() -> Result<()> {
     );
 
     assert_eq!(
-        custom_token.proxy_url("https://staging.rook.dev", "api_key"),
-        "https://staging.rook.dev/proxy/customToken?key=api_key"
+        custom_token.proxy_url("https://staging.example.com", "api_key"),
+        "https://staging.example.com/proxy/customToken?key=api_key"
     );
     assert_eq!(
-        refresh_token.proxy_url("https://staging.rook.dev", "api_key"),
-        "https://staging.rook.dev/proxy/token?key=api_key"
+        refresh_token.proxy_url("https://staging.example.com", "api_key"),
+        "https://staging.example.com/proxy/token?key=api_key"
     );
     Ok(())
 }

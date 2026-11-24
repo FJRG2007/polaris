@@ -66,7 +66,7 @@ impl OnboardingPromptBlock {
         const LINE_TWO: &str = "Polaris Terminal works with many custom prompts like oh-my-zsh, Starship, Powerlevel10K. ";
         const LINK_TEXT: &str = "Learn more";
         const LINK_DESTINATION: &str =
-            "https://docs.rook.dev/terminal/appearance/prompt#custom-prompt-compatibility-table";
+            "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 
         Flex::column()
             .with_children([

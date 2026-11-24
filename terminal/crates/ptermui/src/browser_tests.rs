@@ -11,8 +11,8 @@ fn safe_browser_open_url_accepts_browser_safe_urls() {
         Some("http://example.com/path?q=1")
     );
     assert_eq!(
-        safe_browser_open_url("mailto:support@rook.dev").as_deref(),
-        Some("mailto:support@rook.dev")
+        safe_browser_open_url("mailto:support@example.com").as_deref(),
+        Some("mailto:support@example.com")
     );
 }
 

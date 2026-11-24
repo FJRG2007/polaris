@@ -1,5 +1,5 @@
 // Hard coded constants to divide keybindings into their respective categories/sections.
-// This should always align with documentation: https://docs.rook.dev/getting-started/keyboard-shortcuts
+// This should always align with documentation: https://github.com/FJRG2007/polaris/tree/main/terminal#readme
 
 use ptermui::keymap::Keystroke;
 

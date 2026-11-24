@@ -83,6 +83,16 @@ jobs:
             terminal=false
           fi
           echo "terminal=$terminal" >> "$GITHUB_OUTPUT"
+      # rook.dev is registered to somebody else and resolves, so no link,
+      # address or host under terminal/ may name it (docs/terminal-integration.md,
+      # "The rook.dev links"). Here rather than in lints so a docs-only change
+      # is checked too.
+      - name: No rook.dev under terminal/
+        run: |
+          if git grep -n 'rook\.dev' -- terminal; then
+            echo "::error::terminal/ names rook.dev, a domain this project does not own"
+            exit 1
+          fi
 
   lints:
     name: Formatting + Clippy (${{ matrix.name }})

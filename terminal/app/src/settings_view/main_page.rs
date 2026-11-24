@@ -528,7 +528,7 @@ impl AccountWidget {
                             .ui_builder()
                             .link(
                                 "Contact support".into(),
-                                Some("mailto:support@rook.dev".into()),
+                                Some("mailto:support@example.com".into()),
                                 None,
                                 self.ui_state_handles.enterprise_contact_us_link.clone(),
                             )
@@ -719,7 +719,7 @@ impl SettingsWidget for SettingsSyncWidget {
         let label_info = AdditionalInfo {
             mouse_state: self.tooltip_state.clone(),
             on_click_action: Some(MainPageAction::OpenUrl(
-                "https://docs.rook.dev/terminal/more-features/settings-sync".into(),
+                "https://github.com/FJRG2007/polaris/tree/main/terminal#readme".into(),
             )),
             secondary_text: None,
             tooltip_override_text: None,

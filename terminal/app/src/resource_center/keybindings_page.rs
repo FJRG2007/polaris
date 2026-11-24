@@ -56,7 +56,7 @@ pub struct KeybindingsView {
 
 /// Keybindings are sorted into these sections,
 /// where "Fundamentals" is the default for any remaining non-categorized ones.
-/// This should always align with documentation: https://docs.rook.dev/getting-started/keyboard-shortcuts
+/// This should always align with documentation: https://github.com/FJRG2007/polaris/tree/main/terminal#readme
 #[derive(Clone, Eq, PartialEq, Sequence)]
 pub enum KeybindingSection {
     Essentials,

@@ -18,13 +18,13 @@ fn test_editor_display_name() {
                 UserProfileWithUID {
                     firebase_uid: UserUid::new("abc123"),
                     display_name: Some("The Editor".to_string()),
-                    email: "editor@rook.dev".to_string(),
+                    email: "editor@example.com".to_string(),
                     photo_url: "http://example.com/profile.jpg".to_string(),
                 },
                 UserProfileWithUID {
                     firebase_uid: UserUid::new("def456"),
                     display_name: None,
-                    email: "anon@rook.dev".to_string(),
+                    email: "anon@example.com".to_string(),
                     photo_url: "http://example.com/profile.jpg".to_string(),
                 },
             ])
@@ -36,19 +36,19 @@ fn test_editor_display_name() {
 
             // If the editor doesn't have a profile, default to their email.
             assert_eq!(
-                &editor_display_name(Some("unknown@rook.dev"), ctx),
-                "unknown@rook.dev"
+                &editor_display_name(Some("unknown@example.com"), ctx),
+                "unknown@example.com"
             );
 
             // If the profile is missing a display name, default to the email.
             assert_eq!(
-                &editor_display_name(Some("anon@rook.dev"), ctx),
-                "anon@rook.dev"
+                &editor_display_name(Some("anon@example.com"), ctx),
+                "anon@example.com"
             );
 
             // If there's a display name available, use that.
             assert_eq!(
-                &editor_display_name(Some("editor@rook.dev"), ctx),
+                &editor_display_name(Some("editor@example.com"), ctx),
                 "The Editor"
             );
         });

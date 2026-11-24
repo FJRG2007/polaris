@@ -120,7 +120,7 @@ On fatal outcome:
 ### No environment
 
 - Render setup-required state with no creation form.
-- Enter opens `https://oz.rook.dev/environments`.
+- Enter opens `https://oz.polaris-terminal.invalid/environments`.
 - `R` invokes shared refresh.
 - Automatically transition when `CloudEnvironmentCatalog` reports an environment.
 

@@ -35,7 +35,7 @@ impl ErrorExt for reqwest::Error {
         // downgrade to a warning.
         if let (Some(url), Some(status)) = (self.url(), self.status())
             && let Some(domain) = url.domain()
-            && domain == "staging.rook.dev"
+            && domain == "staging.polaris-terminal.invalid"
             && status == StatusCode::FORBIDDEN
         {
             return false;

@@ -246,7 +246,7 @@ fn pending_copy_consumes_exact_generated_url_once() {
     App::test((), |mut app| async move {
         register_tui_session_view_test_singletons(&mut app);
         let browser_url =
-            "https://app.rook.dev/device?user_code=ABCD-EFGH&source=polaris-terminal-agent-cli"
+            "https://app.example.com/device?user_code=ABCD-EFGH&source=polaris-terminal-agent-cli"
                 .to_owned();
         app.add_singleton_model({
             let browser_url = browser_url.clone();

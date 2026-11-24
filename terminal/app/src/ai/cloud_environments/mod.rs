@@ -23,7 +23,7 @@ use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// Oz web app page for viewing and creating cloud environments.
 #[cfg(feature = "tui")]
-pub const OZ_ENVIRONMENTS_URL: &str = "https://oz.rook.dev/environments";
+pub const OZ_ENVIRONMENTS_URL: &str = "https://oz.polaris-terminal.invalid/environments";
 
 impl StringModel for AmbientAgentEnvironment {
     type CloudObjectType = CloudAmbientAgentEnvironment;

@@ -370,7 +370,7 @@ fn managed_resolver_non_local_uuid_calls_managed_client() {
 #[test]
 fn well_known_spec_resolves_via_managed_client() {
     let _flag = FeatureFlag::WellKnownMcpIds.override_enabled(true);
-    let config_json = r#"{"mcpServers":{"linear":{"url":"https://app.rook.dev/mcp/integration-proxy/linear","headers":{"Authorization":"Bearer tok"}}}}"#;
+    let config_json = r#"{"mcpServers":{"linear":{"url":"https://app.example.com/mcp/integration-proxy/linear","headers":{"Authorization":"Bearer tok"}}}}"#;
     let mut mock = MockManagedMcpClient::new();
     mock.expect_create_managed_mcp_client_config()
         .times(1)
@@ -647,7 +647,7 @@ fn ephemeral_mcp_missing_secret_is_filtered_before_spawn() {
 fn ephemeral_installation_id_is_stable_across_resolutions_for_same_run() {
     let task_id: AmbientAgentTaskId = "550e8400-e29b-41d4-a716-446655440010".parse().unwrap();
     let config_json =
-        r#"{"mcpServers":{"slack":{"url":"https://app.rook.dev/mcp/integration-proxy/slack"}}}"#;
+        r#"{"mcpServers":{"slack":{"url":"https://app.example.com/mcp/integration-proxy/slack"}}}"#;
 
     // Same run re-resolving the same server after a rebuild.
     let first = AgentDriver::installations_from_managed_client_config_json(
@@ -677,7 +677,7 @@ fn ephemeral_installation_id_differs_across_runs() {
     let task_id_a: AmbientAgentTaskId = "550e8400-e29b-41d4-a716-446655440011".parse().unwrap();
     let task_id_b: AmbientAgentTaskId = "550e8400-e29b-41d4-a716-446655440012".parse().unwrap();
     let config_json =
-        r#"{"mcpServers":{"slack":{"url":"https://app.rook.dev/mcp/integration-proxy/slack"}}}"#;
+        r#"{"mcpServers":{"slack":{"url":"https://app.example.com/mcp/integration-proxy/slack"}}}"#;
 
     let a = AgentDriver::installations_from_managed_client_config_json(
         config_json,
@@ -703,9 +703,9 @@ fn ephemeral_installation_id_differs_across_runs() {
 fn ephemeral_installation_id_differs_across_servers_in_same_run() {
     let task_id: AmbientAgentTaskId = "550e8400-e29b-41d4-a716-446655440013".parse().unwrap();
     let slack_config =
-        r#"{"mcpServers":{"slack":{"url":"https://app.rook.dev/mcp/integration-proxy/slack"}}}"#;
+        r#"{"mcpServers":{"slack":{"url":"https://app.example.com/mcp/integration-proxy/slack"}}}"#;
     let linear_config =
-        r#"{"mcpServers":{"linear":{"url":"https://app.rook.dev/mcp/integration-proxy/linear"}}}"#;
+        r#"{"mcpServers":{"linear":{"url":"https://app.example.com/mcp/integration-proxy/linear"}}}"#;
 
     let slack = AgentDriver::installations_from_managed_client_config_json(
         slack_config,
@@ -730,7 +730,7 @@ fn ephemeral_installation_id_differs_across_servers_in_same_run() {
 #[test]
 fn ephemeral_installation_id_is_random_without_task_id() {
     let config_json =
-        r#"{"mcpServers":{"slack":{"url":"https://app.rook.dev/mcp/integration-proxy/slack"}}}"#;
+        r#"{"mcpServers":{"slack":{"url":"https://app.example.com/mcp/integration-proxy/slack"}}}"#;
 
     let first =
         AgentDriver::installations_from_managed_client_config_json(config_json, None, "slack")
@@ -935,7 +935,7 @@ fn managed_resolution_exhausts_retry_budget_on_persistent_transient_error() {
 #[test]
 fn well_known_resolution_retries_transient_error_then_succeeds() {
     let _flag = FeatureFlag::WellKnownMcpIds.override_enabled(true);
-    let config_json = r#"{"mcpServers":{"linear":{"url":"https://app.rook.dev/mcp/integration-proxy/linear","headers":{"Authorization":"Bearer tok"}}}}"#;
+    let config_json = r#"{"mcpServers":{"linear":{"url":"https://app.example.com/mcp/integration-proxy/linear","headers":{"Authorization":"Bearer tok"}}}}"#;
     let calls = Arc::new(AtomicUsize::new(0));
     let calls_clone = Arc::clone(&calls);
     let mut mock = MockManagedMcpClient::new();

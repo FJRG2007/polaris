@@ -33,9 +33,9 @@ fn test_parse_team_edit() {
 
 #[test]
 fn test_parse_user_default() {
-    let result = parse_share_request("ben@rook.dev").unwrap();
+    let result = parse_share_request("ben@example.com").unwrap();
     match result.subject {
-        ShareSubject::User { email } => assert_eq!(email, "ben@rook.dev"),
+        ShareSubject::User { email } => assert_eq!(email, "ben@example.com"),
         _ => panic!("Expected User subject"),
     }
     assert!(matches!(result.access_level, ShareAccessLevel::View));
@@ -43,9 +43,9 @@ fn test_parse_user_default() {
 
 #[test]
 fn test_parse_user_view() {
-    let result = parse_share_request("ben@rook.dev:view").unwrap();
+    let result = parse_share_request("ben@example.com:view").unwrap();
     match result.subject {
-        ShareSubject::User { email } => assert_eq!(email, "ben@rook.dev"),
+        ShareSubject::User { email } => assert_eq!(email, "ben@example.com"),
         _ => panic!("Expected User subject"),
     }
     assert!(matches!(result.access_level, ShareAccessLevel::View));
@@ -53,9 +53,9 @@ fn test_parse_user_view() {
 
 #[test]
 fn test_parse_user_edit() {
-    let result = parse_share_request("ben@rook.dev:edit").unwrap();
+    let result = parse_share_request("ben@example.com:edit").unwrap();
     match result.subject {
-        ShareSubject::User { email } => assert_eq!(email, "ben@rook.dev"),
+        ShareSubject::User { email } => assert_eq!(email, "ben@example.com"),
         _ => panic!("Expected User subject"),
     }
     assert!(matches!(result.access_level, ShareAccessLevel::Edit));

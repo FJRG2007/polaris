@@ -203,10 +203,10 @@ pub fn output_conversation_debug_info(
                 // The debug link within the container will be using host.docker.internal, but we're opening
                 // from outside the container.
                 // The server is configured to always write debug data to GCS instead of locally when run for evals, so we replace
-                // with staging.rook.dev instead of localhost:8080.
+                // with staging.polaris-terminal.invalid instead of localhost:8080.
                 token
                     .debug_link()
-                    .replace("host.docker.internal:8080", "staging.rook.dev")
+                    .replace("host.docker.internal:8080", "staging.polaris-terminal.invalid")
             })
             .unwrap_or("unavailable".to_owned());
         write_to_debug_file(&format!("Conversation Debug Link: {debug_link}"));

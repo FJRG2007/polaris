@@ -143,7 +143,7 @@ def run_validator(
     server_url is optional only so a check can name the server through the
     environment instead. One of the two is required: with neither, the
     validator would fall through to its production default and post a real
-    tree to app.rook.dev from a test run.
+    tree to app.polaris-terminal.invalid from a test run.
     """
     if server_url is None and not set(extra_env or {}) & set(SERVER_ROOT_VARIABLES):
         raise RuntimeError(

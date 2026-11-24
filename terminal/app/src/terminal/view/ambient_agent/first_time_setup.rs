@@ -162,7 +162,7 @@ impl FirstTimeCloudAgentSetupView {
             FormattedTextFragment::plain_text(
                 "Use Oz cloud agents to run parallel agents, build agents that run autonomously, and check in on your agents from anywhere. ",
             ),
-            FormattedTextFragment::hyperlink("Visit docs", "https://docs.rook.dev/platform/"),
+            FormattedTextFragment::hyperlink("Visit docs", "https://github.com/FJRG2007/polaris/tree/main/terminal#readme"),
         ];
         column.add_child(
             FormattedTextElement::new(

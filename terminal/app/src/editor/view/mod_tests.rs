@@ -535,7 +535,7 @@ fn test_smart_select_with_drag() {
 
         app.add_window(WindowStyle::NotStealFocus, |ctx| {
             let mut editor = EditorView::new_with_base_text(
-                "word ~/.polaris-terminal/themes/foo-bar.yaml andy@rook.dev",
+                "word ~/.polaris-terminal/themes/foo-bar.yaml andy@example.com",
                 Default::default(),
                 ctx,
             );

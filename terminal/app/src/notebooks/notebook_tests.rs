@@ -531,8 +531,8 @@ fn test_not_eager_baton_grab_different_editor() {
         // Complete the initial load so that grab-the-baton behavior applies.
         initial_load(&mut app, vec![]).await;
 
-        let uid = "ian@rook.dev".to_string();
-        let email = "ian@rook.dev".to_string();
+        let uid = "ian@example.com".to_string();
+        let email = "ian@example.com".to_string();
 
         let (_, notebook_view, _) = create_notebook(&mut app);
         let mut cloud_notebook = cloud_notebook("Test Notebook", r#"A notebook"#);
@@ -584,8 +584,8 @@ fn test_baton_grab_editor_changed_offline() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
 
-        let other_uid = "ben@rook.dev";
-        let other_email = "ben@rook.dev";
+        let other_uid = "ben@example.com";
+        let other_email = "ben@example.com";
 
         let (_, notebook_view, _) = create_notebook(&mut app);
 
@@ -640,7 +640,7 @@ fn test_baton_grab_editor_left_offline() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
 
-        let other_uid = "ben@rook.dev";
+        let other_uid = "ben@example.com";
 
         let (_, notebook_view, _) = create_notebook(&mut app);
 

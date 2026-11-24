@@ -7237,7 +7237,7 @@ impl Workspace {
                 },
             ),
             NewSessionMenuItem::OpenLaunchConfigDocs => {
-                ctx.open_url("https://docs.rook.dev/terminal/sessions/launch-configurations")
+                ctx.open_url("https://github.com/FJRG2007/polaris/tree/main/terminal#readme")
             }
             #[cfg(feature = "local_fs")]
             NewSessionMenuItem::CreateNewTabConfig => {
@@ -9324,7 +9324,7 @@ impl Workspace {
             let message = format!("Installed the Oz CLI globally. You can now run '{command_name}' from any terminal outside of Polaris Terminal.");
             let toast = DismissibleToast::success(message).with_link(
                 ToastLink::new("Learn more".to_string())
-                    .with_href("https://docs.rook.dev/reference/cli".to_string()),
+                    .with_href("https://github.com/FJRG2007/polaris/tree/main/terminal#readme".to_string()),
             );
             view.handle_cli_command_result(result, toast, "Failed to install Oz command", ctx);
         });
@@ -21056,7 +21056,7 @@ impl Workspace {
                 .with_main_axis_size(MainAxisSize::Max);
             let bg_color = blended_colors::neutral_1(appearance.theme());
 
-            // Left: Polaris Terminal logo - clickable to link to rook.dev
+            // Left: Polaris Terminal logo - clickable to link to the Polaris site
             let pterm_logo = Hoverable::new(self.mouse_states.pterm_logo.clone(), |_state| {
                 ConstrainedBox::new(
                     pterm_core::ui::Icon::Pterm
@@ -21068,7 +21068,7 @@ impl Workspace {
                 .finish()
             })
             .on_click(|ctx, _, _| {
-                ctx.dispatch_typed_action(WorkspaceAction::OpenLink("https://rook.dev".to_owned()));
+                ctx.dispatch_typed_action(WorkspaceAction::OpenLink("https://fjrg2007.github.io/polaris".to_owned()));
             })
             .with_cursor(Cursor::PointingHand)
             .finish();
@@ -24050,7 +24050,7 @@ impl Workspace {
 
         if !is_app_installed {
             // App not installed - redirect to download page
-            ctx.open_url("https://rook.dev/download");
+            ctx.open_url("https://fjrg2007.github.io/polaris");
             // In webapp code we cannot distinguish between
             // the localhost:9277/install_detection endpoint not running (not installed) vs
             // the browser blocking Local Network Access which results in CORS error;
@@ -25579,7 +25579,7 @@ impl TypedActionView for Workspace {
             #[cfg(all(enable_crash_recovery, target_os = "linux"))]
             DismissWaylandCrashRecoveryBannerAndOpenLink => {
                 self.dismiss_workspace_banner(ctx, &WorkspaceBanner::WaylandCrashRecovery);
-                ctx.open_url("https://docs.rook.dev/terminal/more-features/linux#native-wayland");
+                ctx.open_url("https://github.com/FJRG2007/polaris/tree/main/terminal#readme");
             }
             FixInAgentMode { query } => {
                 self.active_tab_pane_group().update(ctx, |pane_group, ctx| {

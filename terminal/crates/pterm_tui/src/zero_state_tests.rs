@@ -654,7 +654,7 @@ fn login_line_shows_signed_in_account_email() {
         assert!(
             lines
                 .iter()
-                .any(|line| line.contains("Signed in as test_user@rook.dev")),
+                .any(|line| line.contains("Signed in as test_user@example.com")),
             "zero-state login line should show the signed-in email:\n{}",
             lines.join("\n")
         );

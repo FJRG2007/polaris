@@ -48,7 +48,7 @@ pub struct IssueTokenArgs {
     /// Supported components are:
     /// - principal (`user:my-user-id`)
     /// - scoped_principal (`principal:my-team-id/user:my-user-id`)
-    /// - email (`email:user@rook.dev`)
+    /// - email (`email:user@example.com`)
     /// - teams (`teams:my-team-id`)
     /// - environment (`environment:my-environment-id`)
     /// - agent_name (`agent_name:my-agent`)

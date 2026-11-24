@@ -49,8 +49,8 @@ fn bearer_token_rejects_session_cookie_auth() {
 #[test]
 fn factory_mcp_url_joins_server_roots_with_and_without_trailing_slash() {
     assert_eq!(
-        factory_mcp_url("https://app.rook.dev"),
-        "https://app.rook.dev/api/v1/mcp/factory"
+        factory_mcp_url("https://app.example.com"),
+        "https://app.example.com/api/v1/mcp/factory"
     );
     assert_eq!(
         factory_mcp_url("http://localhost:8080/"),
@@ -61,7 +61,7 @@ fn factory_mcp_url_joins_server_roots_with_and_without_trailing_slash() {
 #[test]
 fn factory_installation_resolves_to_a_preauthenticated_http_server() {
     let installation =
-        factory_mcp_installation_for_server_root("https://staging.rook.dev", "tok-123");
+        factory_mcp_installation_for_server_root("https://staging.example.com", "tok-123");
     assert_eq!(installation.uuid(), FACTORY_MCP_INSTALLATION_UUID);
     // Fully resolved: nothing for the variable-prompt UI to ask for, and
     // nothing for handlebars to substitute at spawn time.
@@ -77,7 +77,7 @@ fn factory_installation_resolves_to_a_preauthenticated_http_server() {
     assert_eq!(server.name, FACTORY_MCP_SERVER_NAME);
     match server.transport_type {
         TransportType::ServerSentEvents(sse) => {
-            assert_eq!(sse.url, "https://staging.rook.dev/api/v1/mcp/factory");
+            assert_eq!(sse.url, "https://staging.example.com/api/v1/mcp/factory");
             assert_eq!(sse.headers.len(), 1);
             assert_eq!(sse.headers[0].name, "Authorization");
             assert_eq!(sse.headers[0].value, "Bearer tok-123");

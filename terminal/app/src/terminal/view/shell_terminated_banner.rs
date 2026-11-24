@@ -226,7 +226,7 @@ impl TerminationType {
                         .build()
                         .on_click(|ctx, _, _| {
                             ctx.dispatch_typed_action(Action::OpenUrl(
-                                "https://docs.rook.dev/support-and-community/troubleshooting-and-support/known-issues#debugging".to_string(),
+                                "https://github.com/FJRG2007/polaris/tree/main/terminal#readme".to_string(),
                             ));
                         })
                         .finish(),
@@ -264,7 +264,7 @@ impl TerminationType {
                         .build()
                         .on_click(|ctx, _, _| {
                             ctx.dispatch_typed_action(Action::OpenUrl(
-                                "https://docs.rook.dev/support-and-community/troubleshooting-and-support/known-issues#debugging".to_string(),
+                                "https://github.com/FJRG2007/polaris/tree/main/terminal#readme".to_string(),
                             ));
                         })
                         .finish(),

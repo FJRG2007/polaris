@@ -66,7 +66,7 @@ fn missing_credentials_and_identity_start_signed_out() {
 #[test]
 fn tags_tui_verification_url_without_losing_existing_query_parameters() {
     let url = tui_verification_url(
-        "https://app.rook.dev/device?user_code=ABCD-EFGH&existing=value#fragment",
+        "https://app.example.com/device?user_code=ABCD-EFGH&existing=value#fragment",
         "ABCD-EFGH",
     );
     let url = url::Url::parse(&url).unwrap();
@@ -92,7 +92,7 @@ fn leaves_invalid_verification_url_unchanged() {
 
 #[test]
 fn adds_user_code_when_complete_verification_url_is_unavailable() {
-    let url = tui_verification_url("https://app.rook.dev/device", "ABCD-EFGH");
+    let url = tui_verification_url("https://app.example.com/device", "ABCD-EFGH");
     let url = url::Url::parse(&url).unwrap();
 
     assert_eq!(
@@ -208,7 +208,7 @@ fn stores_device_fallback_before_opening_browser() {
 fn opens_only_the_current_retained_url() {
     App::test((), |mut app| async move {
         let browser_url =
-            "https://app.rook.dev/device?user_code=ABCD-EFGH&source=polaris-terminal-agent-cli"
+            "https://app.example.com/device?user_code=ABCD-EFGH&source=polaris-terminal-agent-cli"
                 .to_owned();
         app.add_singleton_model({
             let browser_url = browser_url.clone();

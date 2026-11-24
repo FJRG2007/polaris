@@ -5,8 +5,8 @@ Depends: fontconfig, libegl1, libwayland-client0, libwayland-egl1, libx11-6, lib
 Recommends: libgl1-mesa-dri, yaru-icon-theme | adwaita-icon-theme-full
 Priority: optional
 Architecture: @@ARCH@@
-Maintainer: Polaris Terminal Linux Maintainers <linux-maintainers@rook.dev>
-Homepage: https://rook.dev/
+Maintainer: Polaris Terminal Linux Maintainers <linux-maintainers@example.com>
+Homepage: https://fjrg2007.github.io/polaris
 Description: Polaris Terminal, the Rust-based terminal for developers and teams
  Polaris Terminal is a modern, Rust-based terminal with AI built in so teams can
  build great software, faster. Bringing collaboration to the command line,

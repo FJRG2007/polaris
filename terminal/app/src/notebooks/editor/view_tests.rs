@@ -611,7 +611,7 @@ fn test_link_editing() {
                 .url_editor()
                 .clone()
                 .update(ctx, |url_editor, ctx| {
-                    url_editor.user_insert("https://rook.dev", ctx);
+                    url_editor.user_insert("https://example.com", ctx);
                 });
 
             editor.link_editor.update(ctx, |link_editor, ctx| {
@@ -623,7 +623,7 @@ fn test_link_editing() {
         editor_view.read(&app, |editor, ctx| {
             assert_eq!(
                 editor.model.as_ref(ctx).debug_buffer(ctx),
-                "<text>Some <a_https://rook.dev>text<a>"
+                "<text>Some <a_https://example.com>text<a>"
             );
         });
 
@@ -654,7 +654,7 @@ fn test_link_editing() {
         editor_view.read(&app, |editor, ctx| {
             assert_eq!(
                 editor.model.as_ref(ctx).debug_buffer(ctx),
-                "<text>Some <a_https://rook.dev>text<a><a_https://example.com>new link<a>"
+                "<text>Some <a_https://example.com>text<a><a_https://example.com>new link<a>"
             );
         });
     });
@@ -890,7 +890,7 @@ fn test_link_editing_disabled_for_multiselect() {
                 .url_editor()
                 .clone()
                 .update(ctx, |url_editor, ctx| {
-                    url_editor.user_insert("https://rook.dev", ctx);
+                    url_editor.user_insert("https://example.com", ctx);
                 });
 
             editor.link_editor.update(ctx, |link_editor, ctx| {

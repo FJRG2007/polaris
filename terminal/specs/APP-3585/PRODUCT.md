@@ -1,7 +1,7 @@
 # APP-3585: Setting for agent commit and PR attribution
 Linear: https://linear.app/warpdotdev/issue/APP-3585
 ## Summary
-Oz agent currently always adds a `Co-Authored-By: Oz <oz-agent@rook.dev>` attribution line to commit messages and pull request descriptions it creates. This behavior is gated by a binary team-level setting managed by admins. This feature upgrades that gate to a two-level setting: admins choose Yes / No / Respect User Choice, and individual users can control the setting when their team has not forced it.
+Oz agent currently always adds a `Co-Authored-By: Oz <oz-agent@example.com>` attribution line to commit messages and pull request descriptions it creates. This behavior is gated by a binary team-level setting managed by admins. This feature upgrades that gate to a two-level setting: admins choose Yes / No / Respect User Choice, and individual users can control the setting when their team has not forced it.
 ## Problem
 Teams and individual users may not want Oz's name in their git history or PR descriptions. Currently, admins can only turn attribution on or off for the entire team. There is no per-user opt-out, and users who want to control the behavior independently cannot do so unless their admin acts first.
 ## Goals
