@@ -61,7 +61,7 @@ notice is not offered.
 
 ## Updates
 
-`desktop/src/main/addons/updates.ts` decides, `manager.ts` acts. With anything
+`clients/desktop/src/main/addons/updates.ts` decides, `manager.ts` acts. With anything
 installed the catalog is looked at a minute after start and every 6 hours, a
 failed look (offline, GitHub down) retried from 5 minutes, doubling up to the
 6 hours; opening the store or plugging a claimed device in looks too.
