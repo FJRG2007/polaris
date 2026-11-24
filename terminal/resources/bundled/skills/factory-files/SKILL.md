@@ -64,8 +64,8 @@ Read the tree's `schemaVersion` from `factory.yaml`; a tree that omits it is
 `v1alpha1`. Then fetch the schema for that version:
 
 ```bash
-curl -s https://app.rook.dev/api/v1/factory-files/schemas
-curl -s https://app.rook.dev/api/v1/factory-files/schemas/<schemaVersion>
+curl -s https://app.polaris-terminal.invalid/api/v1/factory-files/schemas
+curl -s https://app.polaris-terminal.invalid/api/v1/factory-files/schemas/<schemaVersion>
 ```
 
 The registry lists the versions the server supports. The version endpoint

@@ -3,7 +3,7 @@ pkgver=@@VERSION@@
 pkgrel=@@RELEASE@@
 pkgdesc="Polaris Terminal, the Rust-based terminal for developers and teams"
 arch=('@@ARCH@@')
-url="https://rook.dev"
+url="https://fjrg2007.github.io/polaris"
 license=('custom')
 depends=(
 	'curl'

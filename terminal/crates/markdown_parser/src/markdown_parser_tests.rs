@@ -850,12 +850,12 @@ fn test_parse_link_in_tag() {
         ])]
     );
 
-    let source = "a [https://google.com](https://rook.dev) link";
+    let source = "a [https://google.com](https://example.com) link";
     assert_eq!(
         test_parse_markdown(source),
         vec![FormattedTextLine::Line(vec![
             FormattedTextFragment::plain_text("a "),
-            FormattedTextFragment::hyperlink("https://google.com", "https://rook.dev"),
+            FormattedTextFragment::hyperlink("https://google.com", "https://example.com"),
             FormattedTextFragment::plain_text(" link")
         ])]
     );
@@ -1068,14 +1068,14 @@ fn test_parse_escapes() {
 
 #[test]
 fn test_parse_escape_in_style() {
-    let source = "Some *styled \\* escaped* [te\\]xt\\^](https://rook.dev)";
+    let source = "Some *styled \\* escaped* [te\\]xt\\^](https://example.com)";
     assert_eq!(
         test_parse_markdown(source),
         vec![FormattedTextLine::Line(vec![
             FormattedTextFragment::plain_text("Some "),
             FormattedTextFragment::italic("styled * escaped"),
             FormattedTextFragment::plain_text(" "),
-            FormattedTextFragment::hyperlink("te]xt^", "https://rook.dev")
+            FormattedTextFragment::hyperlink("te]xt^", "https://example.com")
         ])]
     );
 }
@@ -1433,10 +1433,10 @@ fn test_parse_inline() {
 #[test]
 fn test_parse_inline_link() {
     assert_eq!(
-        parse_all("[basic](https://rook.dev)", parse_inline),
+        parse_all("[basic](https://example.com)", parse_inline),
         vec![FormattedTextFragment::hyperlink(
             "basic",
-            "https://rook.dev"
+            "https://example.com"
         )]
     );
 
@@ -1674,14 +1674,14 @@ fn test_parse_inline_link_spec() {
 #[test]
 fn test_parse_long_link_with_parens() {
     // This is a regression test for CLD-1604.
-    let source = "This is [a link](https://console.cloud.google.com/traces/list?project=astral-field-294621&pageState=(%22traceIntervalPicker%22:(%22groupValue%22:%22P1D%22,%22customValue%22:null),%22traceFilter%22:(%22chips%22:%22%255B%257B_22k_22_3A_22%252Fhttp%252Furl_22_2C_22t_22_3A10_2C_22v_22_3A_22_5C_22https_3A%252F%252Fapp.rook.dev%252Fgraphql_5C_22_22_2C_22s_22_3Atrue_2C_22i_22_3A_22%252Fhttp%252Furl_22%257D%255D%22))&minl=0&maxl=53.33333333333334&tid=c3c3ffc64f74f16a1015e3f2d105c3d9&spanId=0ddd4991fda16831) with parentheses";
+    let source = "This is [a link](https://console.cloud.google.com/traces/list?project=astral-field-294621&pageState=(%22traceIntervalPicker%22:(%22groupValue%22:%22P1D%22,%22customValue%22:null),%22traceFilter%22:(%22chips%22:%22%255B%257B_22k_22_3A_22%252Fhttp%252Furl_22_2C_22t_22_3A10_2C_22v_22_3A_22_5C_22https_3A%252F%252Fapp.example.com%252Fgraphql_5C_22_22_2C_22s_22_3Atrue_2C_22i_22_3A_22%252Fhttp%252Furl_22%257D%255D%22))&minl=0&maxl=53.33333333333334&tid=c3c3ffc64f74f16a1015e3f2d105c3d9&spanId=0ddd4991fda16831) with parentheses";
     assert_eq!(
         parse_all(source, parse_inline),
         vec![
             FormattedTextFragment::plain_text("This is "),
             FormattedTextFragment::hyperlink(
                 "a link",
-                "https://console.cloud.google.com/traces/list?project=astral-field-294621&pageState=(%22traceIntervalPicker%22:(%22groupValue%22:%22P1D%22,%22customValue%22:null),%22traceFilter%22:(%22chips%22:%22%255B%257B_22k_22_3A_22%252Fhttp%252Furl_22_2C_22t_22_3A10_2C_22v_22_3A_22_5C_22https_3A%252F%252Fapp.rook.dev%252Fgraphql_5C_22_22_2C_22s_22_3Atrue_2C_22i_22_3A_22%252Fhttp%252Furl_22%257D%255D%22))&minl=0&maxl=53.33333333333334&tid=c3c3ffc64f74f16a1015e3f2d105c3d9&spanId=0ddd4991fda16831"
+                "https://console.cloud.google.com/traces/list?project=astral-field-294621&pageState=(%22traceIntervalPicker%22:(%22groupValue%22:%22P1D%22,%22customValue%22:null),%22traceFilter%22:(%22chips%22:%22%255B%257B_22k_22_3A_22%252Fhttp%252Furl_22_2C_22t_22_3A10_2C_22v_22_3A_22_5C_22https_3A%252F%252Fapp.example.com%252Fgraphql_5C_22_22_2C_22s_22_3Atrue_2C_22i_22_3A_22%252Fhttp%252Furl_22%257D%255D%22))&minl=0&maxl=53.33333333333334&tid=c3c3ffc64f74f16a1015e3f2d105c3d9&spanId=0ddd4991fda16831"
             ),
             FormattedTextFragment::plain_text(" with parentheses")
         ]
@@ -2868,7 +2868,7 @@ fn test_parse_table_with_empty_cells() {
 #[test]
 fn test_parse_table_with_links() {
     let source =
-        "| Link | Text |\n| --- | --- |\n| [Polaris Terminal](https://rook.dev) | normal |\n";
+        "| Link | Text |\n| --- | --- |\n| [Polaris Terminal](https://example.com) | normal |\n";
     let result = test_parse_markdown_with_gfm_tables(source);
     assert_eq!(result.len(), 1);
 
@@ -2879,7 +2879,7 @@ fn test_parse_table_with_links() {
         assert_eq!(link_cell[0].text, "Polaris Terminal");
         assert!(matches!(
             &link_cell[0].styles.hyperlink,
-            Some(Hyperlink::Url(url)) if url == "https://rook.dev"
+            Some(Hyperlink::Url(url)) if url == "https://example.com"
         ));
     } else {
         panic!("Expected table");

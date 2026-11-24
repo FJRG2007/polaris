@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn qr_matrix_for_url_returns_square_matrix_with_dark_modules() {
-    let matrix = match qr_matrix_for_url("https://app.rook.dev/session/test-session") {
+    let matrix = match qr_matrix_for_url("https://app.example.com/session/test-session") {
         Ok(matrix) => matrix,
         Err(error) => panic!("failed to generate QR matrix: {error}"),
     };

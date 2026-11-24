@@ -562,12 +562,12 @@ fn test_line_to_fragments() {
 
 #[test]
 fn test_secrets_serialization() {
-    let mut blockgrid = mock_blockgrid("foo zach@rook.dev bar");
+    let mut blockgrid = mock_blockgrid("foo zach@example.com bar");
     blockgrid.maybe_enable_secret_obfuscation(ObfuscateSecrets::Yes);
     blockgrid.grid_handler_mut().mark_secret_range(
         Point::new(0, 4)..=Point::new(0, 16),
         IsObfuscated::Yes,
-        "zach@rook.dev".to_string(),
+        "zach@example.com".to_string(),
         SecretLevel::User,
     );
 
@@ -594,7 +594,7 @@ fn test_secrets_serialization() {
         .expect("should unobfuscate secret");
 
     assert_eq!(
-        "foo zach@rook.dev bar",
+        "foo zach@example.com bar",
         blockgrid.grid_handler.bounds_to_string(
             Point::new(0, 0),
             Point::new(0, 21),
@@ -779,7 +779,7 @@ fn test_find_url_omits_trailing_periods() {
     );
 
     // Test that it handles a period in the middle of the URL path somewhere.
-    let blockgrid = mock_blockgrid("Visit https://github.com/rook.dev/Polaris Terminal/issues.");
+    let blockgrid = mock_blockgrid("Visit https://github.com/example.com/Polaris Terminal/issues.");
     assert_eq!(
         blockgrid
             .grid_handler

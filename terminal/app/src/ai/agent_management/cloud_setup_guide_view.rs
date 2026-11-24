@@ -33,10 +33,10 @@ use crate::view_components::action_button::{ActionButton, SecondaryTheme};
 use crate::workflows::WorkflowType;
 use crate::workflows::workflow::{Argument, ArgumentType, Workflow};
 
-const DOCS_URL: &str = "https://docs.rook.dev/platform/";
+const DOCS_URL: &str = "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 const ENV_DOCS_URL: &str =
-    "https://docs.rook.dev/reference/cli/integration-setup#creating-an-environment";
-const OZ_URL: &str = "https://oz.rook.dev";
+    "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
+const OZ_URL: &str = "https://oz.polaris-terminal.invalid";
 
 const CONTENT_MAX_WIDTH: f32 = 720.;
 
@@ -211,13 +211,13 @@ impl CloudSetupGuideView {
         header_container.finish()
     }
 
-    /// Render the quick start banner with link to oz.rook.dev.
+    /// Render the quick start banner with link to oz.polaris-terminal.invalid.
     fn render_quick_start_banner(&self, appearance: &Appearance) -> Box<dyn Element> {
         let theme = appearance.theme();
         let font_size = 16.;
 
         let text = Text::new_inline(
-            "Quick start: Visit oz.rook.dev for a UI-based setup experience.",
+            "Quick start: Visit oz.polaris-terminal.invalid for a UI-based setup experience.",
             appearance.ui_font_family(),
             font_size,
         )

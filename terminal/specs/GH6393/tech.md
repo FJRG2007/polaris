@@ -351,7 +351,7 @@ Each numbered item below maps to a product invariant from `product.md`.
 Cmd+click → `open_url` coverage previously relied on a per-cell position cache stamped during grid rendering; that cache was removed (too risky for the render hot path), so synthetic-click integration tests are not included. Click behavior needs a different test mechanism (follow-up).
 
 **Manual verification (recorded in PR description with a short clip).**
-- Run `printf '\e]8;;https://rook.dev\e\\Open Polaris Terminal\e]8;;\e\\\n'` in a Polaris Terminal block; hover, observe pointer; Cmd+click, observe browser open.
+- Run `printf '\e]8;;https://fjrg2007.github.io/polaris\e\\Open Polaris Terminal\e]8;;\e\\\n'` in a Polaris Terminal block; hover, observe pointer; Cmd+click, observe browser open.
 - Run `wizcli` (or any CLI that emits OSC 8 — `gcc`, `make`, modern `git`) and exercise the live link.
 - Run `cat` on a file containing a hyperlink across a wrapped line to confirm reflow on resize keeps the click intact.
 - Run a TUI in alt-screen mode that emits OSC 8 (e.g. `lazygit`) to confirm parity with block-list behavior.

@@ -100,7 +100,7 @@ impl Slide for OzLaunchSlide {
                 "Oz agents can be defined using the standard Skills format. You can use the built in scheduler to setup agents to run autonomously at set intervals, or use the Oz SDK or API to programmatically start and manage Oz agents."
             }
             OzLaunchSlide::AgentManagement => {
-                "View all of your agents across local and cloud sessions in the Polaris Terminal app or at [oz.rook.dev](https://oz.rook.dev). Join live agent sessions, continue tasks locally, and steer agents with one click."
+                "View all of your agents across local and cloud sessions in the Polaris Terminal app or at [oz.polaris-terminal.invalid](https://oz.polaris-terminal.invalid). Join live agent sessions, continue tasks locally, and steer agents with one click."
             }
             OzLaunchSlide::LaunchCredits => {
                 "Upgrade to Build this month and receive 1,000 extra credits to try using Oz. Credits are only eligible for Oz runs in Polaris Terminal-hosted cloud environments."

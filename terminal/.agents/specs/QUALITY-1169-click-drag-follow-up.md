@@ -78,9 +78,9 @@ it and do not guess a scrollbar from coordinates.
   split-entry, or scrollbar association fixture.
 
 **Trace/reproduction evidence:** The supplied MAA URL
-`https://staging.rook.dev/conversation/a2b2ba95-0b15-4f94-b813-4cb3d0656607`
+`https://staging.polaris-terminal.invalid/conversation/a2b2ba95-0b15-4f94-b813-4cb3d0656607`
 was opened directly and in a browser. It redirects to
-`https://staging.rook.dev/login?redirect_to=...`; no action blocks,
+`https://staging.polaris-terminal.invalid/login?redirect_to=...`; no action blocks,
 coordinates, or artifact preview are accessible without credentials. Do not
 claim that this particular trace contained a split sequence. The merged client
 path and a deterministic replay establish the defensive fix: the same-call
@@ -90,7 +90,7 @@ unobservable trace grouping. The libass replay of the merged ASS vector at
 `(639.5,359.5)` with `\an7`; a 128×128 reproduction is clipped at the top-left
 with `\an5` and centered around `(64,64)` with `\an7`.
 The steerable investigation run is
-`https://oz.staging.rook.dev/runs/019f8f43-6380-752b-8bbc-26da28a52e5c`.
+`https://oz.staging.polaris-terminal.invalid/runs/019f8f43-6380-752b-8bbc-26da28a52e5c`.
 
 ### Proposed changes
 

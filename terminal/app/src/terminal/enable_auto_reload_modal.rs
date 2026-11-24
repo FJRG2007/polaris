@@ -236,7 +236,7 @@ impl EnableAutoReloadModalBody {
             ),
             FormattedTextFragment::hyperlink(
                 "Learn more",
-                "https://docs.rook.dev/support-and-community/plans-and-billing/add-on-credits#id-2.-enable-auto-reload",
+                "https://github.com/FJRG2007/polaris/tree/main/terminal#readme",
             ),
         ];
         let explanation_text = ptermui::elements::FormattedTextElement::new(

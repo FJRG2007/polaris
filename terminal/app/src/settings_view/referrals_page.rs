@@ -94,9 +94,9 @@ const CLAIMED_REFERRAL_COUNT_LEFT_MARGIN: f32 = 40.;
 const CLAIMED_REFERRAL_CLIP: usize = 999;
 
 const TERMS_LINK_TEXT: &str = "Certain restrictions apply.";
-const TERMS_URL: &str = "https://docs.rook.dev/support-and-community/community/refer-a-friend#referral-program-terms-and-conditions";
+const TERMS_URL: &str = "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 const TERMS_CONTACT_TEXT: &str =
-    " If you have any questions about the referral program, please contact referrals@rook.dev.";
+    " If you have any questions about the referral program, please contact referrals@example.com.";
 
 enum ApiState {
     Loading,

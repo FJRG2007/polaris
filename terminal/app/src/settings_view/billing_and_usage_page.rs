@@ -3262,13 +3262,13 @@ impl BillingAndUsagePageView {
                 vec![
                     FormattedTextFragment::hyperlink(
                         "Upgrade to Enterprise",
-                        "mailto:sales@rook.dev",
+                        "mailto:sales@example.com",
                     ),
                     FormattedTextFragment::plain_text(" for custom limits and dedicated support."),
                 ]
             } else if !billing_metadata.is_usage_based_pricing_toggleable() {
                 vec![
-                    FormattedTextFragment::hyperlink("Contact support", "mailto:support@rook.dev"),
+                    FormattedTextFragment::hyperlink("Contact support", "mailto:support@example.com"),
                     FormattedTextFragment::plain_text(" for more AI usage."),
                 ]
             } else {

@@ -367,7 +367,7 @@ impl SectionView for ChangelogSectionView {
                 .ui_builder()
                 .link(
                     "Read all changelogs".into(),
-                    Some("https://docs.rook.dev/changelog".into()),
+                    Some("https://github.com/FJRG2007/polaris/tree/main/terminal#readme".into()),
                     None,
                     self.changelog_button_mouse_states
                         .view_changelogs_mouse_state

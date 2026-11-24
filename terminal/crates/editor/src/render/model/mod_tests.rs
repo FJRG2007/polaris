@@ -1394,7 +1394,7 @@ fn test_link_at_offset_uses_cached_cell_links() {
                 FormattedTextFragment {
                     text: "bc".into(),
                     styles: FormattedTextStyles {
-                        hyperlink: Some(Hyperlink::Url("https://rook.dev".into())),
+                        hyperlink: Some(Hyperlink::Url("https://example.com".into())),
                         ..Default::default()
                     },
                 },
@@ -1409,7 +1409,7 @@ fn test_link_at_offset_uses_cached_cell_links() {
     };
     table.cell_links = vec![
         vec![
-            vec![ParsedUrl::new(1..3, "https://rook.dev".into())],
+            vec![ParsedUrl::new(1..3, "https://example.com".into())],
             vec![],
         ],
         vec![vec![], vec![]],
@@ -1417,11 +1417,11 @@ fn test_link_at_offset_uses_cached_cell_links() {
 
     assert_eq!(
         table.link_at_offset(CharOffset::from(1)),
-        Some("https://rook.dev".into())
+        Some("https://example.com".into())
     );
     assert_eq!(
         table.link_at_offset(CharOffset::from(2)),
-        Some("https://rook.dev".into())
+        Some("https://example.com".into())
     );
     assert_eq!(table.link_at_offset(CharOffset::from(0)), None);
     assert_eq!(table.link_at_offset(CharOffset::from(3)), None);

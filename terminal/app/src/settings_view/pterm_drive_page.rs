@@ -264,7 +264,7 @@ impl SettingsWidget for PtermDriveToggleWidget {
             Some(AdditionalInfo {
                 mouse_state: self.info_icon_mouse_state.clone(),
                 on_click_action: Some(PtermDriveSettingsPageAction::OpenUrl(
-                    "https://docs.rook.dev/knowledge-and-collaboration/polaris-terminal-drive".to_string(),
+                    "https://github.com/FJRG2007/polaris/tree/main/terminal#readme".to_string(),
                 )),
                 secondary_text: None,
                 tooltip_override_text: None,

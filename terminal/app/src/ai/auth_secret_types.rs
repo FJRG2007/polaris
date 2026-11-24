@@ -35,11 +35,11 @@ pub fn learn_more_url_for_harness(harness: Harness) -> &'static str {
     }
 }
 
-const DEFAULT_LEARN_MORE_URL: &str = "https://docs.rook.dev/platform/harnesses/authentication/";
+const DEFAULT_LEARN_MORE_URL: &str = "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 const CODEX_LEARN_MORE_URL: &str =
-    "https://docs.rook.dev/platform/harnesses/authentication/#connecting-codex-credentials";
+    "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 const CLAUDE_LEARN_MORE_URL: &str =
-    "https://docs.rook.dev/platform/harnesses/authentication/#connecting-claude-code-credentials";
+    "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 
 pub fn build_managed_secret_value(
     info: &AuthSecretTypeInfo,

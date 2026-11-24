@@ -44,7 +44,7 @@ fn test_search_inline_styles() {
 fn test_search_across_link() {
     App::test((), |mut app| async move {
         let (buffer, _selection) = Buffer::mock_from_markdown(
-            "visit [our website](https://rook.dev) for more",
+            "visit [our website](https://example.com) for more",
             None,
             Box::new(|_, _| IndentBehavior::Ignore),
             &mut app,

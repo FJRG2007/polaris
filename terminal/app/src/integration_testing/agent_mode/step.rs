@@ -213,7 +213,7 @@ pub fn capture_impl_artifacts() -> TestStep {
                         "impl.conversation_debug_link",
                         token
                             .debug_link()
-                            .replace("host.docker.internal:8080", "staging.rook.dev"),
+                            .replace("host.docker.internal:8080", "staging.polaris-terminal.invalid"),
                     );
                 }
                 for usage in conversation.total_token_usage().iter() {

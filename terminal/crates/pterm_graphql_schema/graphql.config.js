@@ -3,7 +3,7 @@ module.exports = {
     // Download the GraphQL schema from the staging server.
     staging: {
       schema: {
-        'https://staging.rook.dev/graphql/v2': {
+        'https://staging.polaris-terminal.invalid/graphql/v2': {
           loader: './api/client-schema.ts'
         }
       },

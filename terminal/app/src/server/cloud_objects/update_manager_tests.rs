@@ -2343,7 +2343,7 @@ fn test_pending_metadata_update_with_rtc() {
             is_welcome_object: false,
             creator_uid: None,
             last_editor_uid: None,
-            current_editor_uid: Some("ian@rook.dev".to_string()),
+            current_editor_uid: Some("ian@example.com".to_string()),
         };
         let notebook: ServerNotebook =
             mock_server_notebook(notebook_id, Owner::mock_current_user(), metadata);
@@ -2479,7 +2479,7 @@ fn test_metadata_update_with_rtc_no_pending() {
             is_welcome_object: false,
             creator_uid: None,
             last_editor_uid: None,
-            current_editor_uid: Some("ian@rook.dev".to_string()),
+            current_editor_uid: Some("ian@example.com".to_string()),
         };
 
         let mocked_metadata_update_message = ObjectUpdateMessage::ObjectMetadataChanged {
@@ -2657,7 +2657,7 @@ fn test_pending_metadata_update_with_polling() {
             is_welcome_object: false,
             creator_uid: None,
             last_editor_uid: None,
-            current_editor_uid: Some("ian@rook.dev".to_string()),
+            current_editor_uid: Some("ian@example.com".to_string()),
         };
 
         // Add a generic object just for kicks and make sure it gets upserted
@@ -2798,7 +2798,7 @@ fn test_metadata_update_with_polling_no_pending() {
             is_welcome_object: false,
             creator_uid: None,
             last_editor_uid: None,
-            current_editor_uid: Some("ian@rook.dev".to_string()),
+            current_editor_uid: Some("ian@example.com".to_string()),
         };
         let mocked_response = InitialLoadResponse {
             updated_notebooks: vec![ServerNotebook::new(
@@ -7164,7 +7164,7 @@ fn test_permissions_update_grants_access() {
         let other_guests = vec![UserProfileWithUID {
             firebase_uid: guest_user_id,
             display_name: Some("Polaris Terminal User".to_string()),
-            email: "user@rook.dev".to_string(),
+            email: "user@example.com".to_string(),
             photo_url: String::new(),
         }];
 
@@ -7375,7 +7375,7 @@ fn test_add_guest_success() {
                     profiles: vec![UserProfileWithUID {
                         firebase_uid: UserUid::new("guest"),
                         display_name: Some("Guest User".to_string()),
-                        email: "guest@rook.dev".to_string(),
+                        email: "guest@example.com".to_string(),
                         photo_url: "http://example.com".to_string(),
                     }],
                 })
@@ -7389,7 +7389,7 @@ fn test_add_guest_success() {
             .update(&mut app, |update_manager, ctx| {
                 update_manager.add_object_guests(
                     server_id,
-                    vec!["guest@rook.dev".to_string()],
+                    vec!["guest@example.com".to_string()],
                     AccessLevel::Editor,
                     ctx,
                 );
@@ -7478,7 +7478,7 @@ fn test_add_guest_failure() {
             .update(&mut app, |update_manager, ctx| {
                 update_manager.add_object_guests(
                     server_id,
-                    vec!["guest@rook.dev".to_string()],
+                    vec!["guest@example.com".to_string()],
                     AccessLevel::Editor,
                     ctx,
                 );

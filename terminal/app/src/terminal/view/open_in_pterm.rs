@@ -31,8 +31,8 @@ use crate::util::openable_file_type::{
 mod tests;
 
 const LEARN_MORE_MARKDOWN_URL: &str =
-    "https://docs.rook.dev/terminal/more-features/markdown-viewer";
-const LEARN_MORE_CODE_URL: &str = "https://docs.rook.dev/code/overview#built-in-code-editor";
+    "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
+const LEARN_MORE_CODE_URL: &str = "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 
 /// A path to a file that can be opened in Polaris Terminal, along with its type.
 #[derive(Debug, Clone, PartialEq, Eq)]

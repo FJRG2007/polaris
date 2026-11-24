@@ -1046,7 +1046,7 @@ impl TeamsPageView {
                 ctx.open_url(upgrade_link);
             }
             UserWorkspacesEvent::GenerateUpgradeLinkRejected(err) => self.show_error(
-                "Failed to generate upgrade link. Please contact us at feedback@rook.dev",
+                "Failed to generate upgrade link. Please contact us at feedback@example.com",
                 Some(err),
                 ctx,
             ),
@@ -1054,7 +1054,7 @@ impl TeamsPageView {
                 ctx.open_url(billing_session_link);
             }
             UserWorkspacesEvent::GenerateStripeBillingPortalLinkRejected(err) => self.show_error(
-                "Failed to generate billing link. Please contact us at feedback@rook.dev",
+                "Failed to generate billing link. Please contact us at feedback@example.com",
                 Some(err),
                 ctx,
             ),
@@ -4753,18 +4753,18 @@ impl SettingsWidget for TeamsWidget {
 #[cfg(test)]
 #[test]
 pub fn test_valid_domains() {
-    assert!(!TeamsPageView::is_valid_domain("@rook.dev"));
+    assert!(!TeamsPageView::is_valid_domain("@example.com"));
     assert!(!TeamsPageView::is_valid_domain("polaris-terminal,"));
     assert!(!TeamsPageView::is_valid_domain("polaris-terminal-dev"));
     assert!(!TeamsPageView::is_valid_domain(".dev"));
     assert!(!TeamsPageView::is_valid_domain("polaris-terminal..dev"));
     assert!(!TeamsPageView::is_valid_domain(" "));
     assert!(!TeamsPageView::is_valid_domain("polaris-terminal!.dev"));
-    assert!(!TeamsPageView::is_valid_domain("rook.dev>"));
-    assert!(!TeamsPageView::is_valid_domain("rook.dev."));
-    assert!(TeamsPageView::is_valid_domain("app.rook.dev"));
+    assert!(!TeamsPageView::is_valid_domain("example.com>"));
+    assert!(!TeamsPageView::is_valid_domain("example.com."));
+    assert!(TeamsPageView::is_valid_domain("app.polaris-terminal.invalid"));
     assert!(TeamsPageView::is_valid_domain("pterm0.dev0"));
-    assert!(TeamsPageView::is_valid_domain("rook.dev"));
+    assert!(TeamsPageView::is_valid_domain("example.com"));
     assert!(TeamsPageView::is_valid_domain("miniclip.com"));
 }
 

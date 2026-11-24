@@ -139,7 +139,7 @@ Figma: none provided. The existing TUI orchestration card is the structural and 
 32. If the user has no cloud environments, the card explains that an environment is required and does not offer an in-TUI creation form.
 
 33. In the no-environment state:
-   - Enter opens `https://oz.rook.dev/environments`, where the user can create an environment.
+   - Enter opens `https://oz.polaris-terminal.invalid/environments`, where the user can create an environment.
    - `R` refreshes cloud environments.
    - Ctrl-C cancels handoff.
 

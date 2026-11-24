@@ -288,12 +288,12 @@ impl TypedActionView for WasmNUXDialog {
                 }
             }
             WasmNUXDialogAction::OpenDownloadDesktopAppLink => {
-                ctx.open_url("https://app.rook.dev/get_pterm");
+                ctx.open_url("https://app.polaris-terminal.invalid/get_pterm");
                 self.requested_download = true;
                 ctx.notify();
             }
             WasmNUXDialogAction::LearnMore => {
-                ctx.open_url("https://www.rook.dev");
+                ctx.open_url("https://fjrg2007.github.io/polaris");
             }
         }
     }

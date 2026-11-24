@@ -61,7 +61,7 @@ fn renders_blocks_inline_styles_and_accessible_links_without_markers() {
         app.add_singleton_model(|_| Appearance::mock());
         app.read(|ctx| {
             let formatted = parse_markdown(
-                "# Overview\n\nA **bold**, *italic*, ~~old~~, `code`, and [link](https://rook.dev).",
+                "# Overview\n\nA **bold**, *italic*, ~~old~~, `code`, and [link](https://example.com).",
             )
             .expect("Markdown should parse");
             let (lines, buffer) = render(&formatted, 80, ctx);
@@ -70,7 +70,7 @@ fn renders_blocks_inline_styles_and_accessible_links_without_markers() {
                 vec![
                     "Overview",
                     "",
-                    "A bold, italic, old, code, and link (https://rook.dev).",
+                    "A bold, italic, old, code, and link (https://example.com).",
                 ]
             );
             assert!(buffer[(0, 0)].modifier.contains(Modifier::BOLD));

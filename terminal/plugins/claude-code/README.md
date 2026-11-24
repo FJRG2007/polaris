@@ -1,6 +1,6 @@
 # Claude Code + Polaris Terminal
 
-Official [Polaris Terminal](https://rook.dev) terminal integration for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+Official [Polaris Terminal](https://fjrg2007.github.io/polaris) terminal integration for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
 ## Features
 
@@ -37,7 +37,7 @@ Once restarted, you'll see a confirmation message and notifications will appear 
 
 ## Requirements
 
-- [Polaris Terminal terminal](https://rook.dev) (macOS, Linux, or Windows)
+- [Polaris Terminal terminal](https://fjrg2007.github.io/polaris) (macOS, Linux, or Windows)
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
 - `jq` for JSON parsing (install via `brew install jq` or your package manager)
 
@@ -62,7 +62,7 @@ Older Polaris Terminal clients that predate the structured notification protocol
 
 ## Configuration
 
-Notifications work out of the box. To customize Polaris Terminal's notification behavior (sounds, system notifications, etc.), see [Polaris Terminal's notification settings](https://docs.rook.dev/features/notifications).
+Notifications work out of the box. To customize Polaris Terminal's notification behavior (sounds, system notifications, etc.), see Polaris Terminal's notification settings.
 
 ## Uninstall
 

@@ -1566,7 +1566,7 @@ impl TypedActionView for CLISubagentView {
                     .write(ClipboardContent::plain_text(debug_id.clone()));
             }
             CLISubagentAction::OpenFeedbackDocs => {
-                ctx.open_url("https://docs.rook.dev/support-and-billing/sending-us-feedback");
+                ctx.open_url("https://github.com/FJRG2007/polaris/tree/main/terminal#readme");
             }
         }
     }

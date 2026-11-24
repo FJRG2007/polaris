@@ -364,7 +364,7 @@ impl View for ExternalEditorView {
             Some(AdditionalInfo {
                 mouse_state: self.markdown_viewer_mouse_state.clone(),
                 on_click_action: Some(ExternalEditorAction::OpenUrl(
-                    "https://docs.rook.dev/terminal/more-features/markdown-viewer".to_string(),
+                    "https://github.com/FJRG2007/polaris/tree/main/terminal#readme".to_string(),
                 )),
                 secondary_text: None,
                 tooltip_override_text: None,

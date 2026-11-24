@@ -3,7 +3,7 @@ pkgver=@@VERSION@@
 pkgrel=@@RELEASE@@
 pkgdesc="The orchestration platform for cloud agents"
 arch=('@@ARCH@@')
-url="https://rook.dev"
+url="https://fjrg2007.github.io/polaris"
 license=('custom')
 depends=(
 	'curl'

@@ -26,7 +26,7 @@ Behavior is specified in `specs/APP-3792/PRODUCT.md`. This document updates the 
 ### Dependency assumptions
 - APP-3801's per-user authenticated daemon model is assumed to land as designed in `specs/APP-3801`: the client sends the current bearer token on `Initialize`, refreshes with `Authenticate`, the daemon stores the credential in memory only, and daemon sockets are partitioned by Polaris Terminal identity. Remote codebase indexing is the first feature that materially depends on daemon-side upstream calls.
 - APP-3790's remote file read path is assumed available for hydrating full file context after retrieval.
-- The v1 design assumes daemon-to-`app.rook.dev` egress is available. That was checked with the initial target enterprise environments. If this assumption fails later, the fallback is a client-proxied `StoreClient`, not part of v1.
+- The v1 design assumes daemon-to-`app.polaris-terminal.invalid` egress is available. That was checked with the initial target enterprise environments. If this assumption fails later, the fallback is a client-proxied `StoreClient`, not part of v1.
 
 Daemon responsibilities:
 - Check its persisted cache when building the startup snapshot, learning about a repo through navigation, or handling index/drop requests.
@@ -62,7 +62,7 @@ Alternative shape: the daemon builds or maintains the remote Merkle tree and fra
 Why rejected for v1:
 - New repos would require syncing the entire tree and enough fragment data over SSH before backend sync can complete. That adds heavy startup traffic on the least reliable leg of the system.
 - APP-3801 exists specifically to let daemon handlers call Polaris Terminal services with the user's token; not using it here loses the main benefit.
-- The only strong argument is resilience when daemon → `app.rook.dev` egress is blocked. The initial customer check says that egress is acceptable, and if it is unavailable, the product should fail visibly rather than silently route a much heavier protocol through SSH.
+- The only strong argument is resilience when daemon → `app.polaris-terminal.invalid` egress is blocked. The initial customer check says that egress is acceptable, and if it is unavailable, the product should fail visibly rather than silently route a much heavier protocol through SSH.
 
 ### Rejected alternative: daemon handles all retrieval
 Alternative shape: the daemon receives `SearchCodebase`, calls `get_relevant_fragments`, hydrates fragments, reranks, and returns final locations.
@@ -362,7 +362,7 @@ Expose remote entries in settings, add the remote-aware speedbump/auto-indexing 
 - **Root hash staleness.** Mitigation: stale state keeps last ready root hash usable until a new ready hash arrives; failed sync does not overwrite the last ready hash.
 
 ## 8. Follow-ups
-- Client-proxied `StoreClient` fallback for hosts that cannot reach `app.rook.dev`.
+- Client-proxied `StoreClient` fallback for hosts that cannot reach `app.polaris-terminal.invalid`.
 - Garbage collection for shared machine-local snapshots when no identity metadata references them.
 - Daemon-direct telemetry for indexing metrics instead of client-forwarded status-only events.
 - Cross-repo remote context across multiple repos on one host.

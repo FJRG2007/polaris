@@ -1,6 +1,6 @@
 # OpenCode + Polaris Terminal
 
-Official [Polaris Terminal](https://rook.dev) terminal integration for [OpenCode](https://opencode.ai).
+Official [Polaris Terminal](https://fjrg2007.github.io/polaris) terminal integration for [OpenCode](https://opencode.ai).
 
 ## Features
 
@@ -40,12 +40,12 @@ cp dist/index.js .opencode/plugins/opencode-polaris-terminal.js
 
 ## Requirements
 
-- [Polaris Terminal terminal](https://rook.dev) (macOS, Linux, or Windows)
+- [Polaris Terminal terminal](https://fjrg2007.github.io/polaris) (macOS, Linux, or Windows)
 - [OpenCode](https://opencode.ai) CLI
 
 ## How It Works
 
-This plugin uses Polaris Terminal's [pluggable notifications](https://docs.rook.dev/features/notifications) feature via OSC escape sequences. When OpenCode triggers an event, the plugin:
+This plugin uses Polaris Terminal's pluggable notifications feature via OSC escape sequences. When OpenCode triggers an event, the plugin:
 
 1. Reads event data from OpenCode's plugin API
 2. Formats a concise notification payload
@@ -60,7 +60,7 @@ The plugin hooks into these OpenCode events:
 
 ## Configuration
 
-Notifications work out of the box. To customize Polaris Terminal's notification behavior (sounds, system notifications, etc.), see [Polaris Terminal's notification settings](https://docs.rook.dev/features/notifications).
+Notifications work out of the box. To customize Polaris Terminal's notification behavior (sounds, system notifications, etc.), see Polaris Terminal's notification settings.
 
 ## Development
 

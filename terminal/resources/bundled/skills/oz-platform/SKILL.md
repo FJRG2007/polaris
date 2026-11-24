@@ -15,8 +15,8 @@ Use the Oz REST API and CLI to:
 ## Looking up documentation
 
 Prefer current, authoritative sources when answering questions or authoring skills about Oz platform behavior:
-* Start with https://docs.rook.dev/llms.txt to discover the relevant documentation page.
-* Every `docs.rook.dev` page has an agent-readable Markdown version at the same URL with `.md` appended. Fetch that version when reading documentation; for example, https://docs.rook.dev/agents/capabilities/computer-use.md.
+* Start with https://github.com/FJRG2007/polaris/tree/main/terminal#readme to discover the relevant documentation page.
+* Every `https://github.com/FJRG2007/polaris/tree/main/terminal#readme` page has an agent-readable Markdown version at the same URL with `.md` appended. Fetch that version when reading documentation; for example, https://github.com/FJRG2007/polaris/tree/main/terminal#readme
 * For CLI commands and flags, also confirm the installed version's behavior with `{{pterm_cli_binary_name}} help` or `{{pterm_cli_binary_name}} help <subcommand>`.
 
 Treat the examples below as starting points, not the sole source of truth for details that can evolve, such as computer-use artifacts, CLI flags, and API behavior. If they conflict with the live Markdown documentation or CLI help, follow the live source.
@@ -25,7 +25,7 @@ Treat the examples below as starting points, not the sole source of truth for de
 
 The Oz CLI is installed as `{{pterm_cli_binary_name}}`. To get help output, use `{{pterm_cli_binary_name}} help` or `{{pterm_cli_binary_name}} help <subcommand>`.
 Prefer `--output-format text` to review the response, or `--output-format json` to parse fields with `jq`.
-You can find more information at https://docs.rook.dev/reference/cli.md.
+You can find more information at https://github.com/FJRG2007/polaris/tree/main/terminal#readme
 
 The most important commands are:
 * `{{pterm_cli_binary_name}} agent run-cloud`: Spawn a new cloud agent. You can configure the prompt, model, environment, and other settings.
@@ -78,7 +78,7 @@ Oz has a REST API for starting and inspecting cloud agents.
 
 All API requests require authentication using an API key. The user can generate API keys in their Polaris Terminal settings, on the `Platform` page (accessible via `{{pterm_url_scheme}}://settings/platform`).
 
-You can find the API and SDK reference here: https://docs.rook.dev/reference/api-and-sdk.md.
+You can find the API and SDK reference here: https://github.com/FJRG2007/polaris/tree/main/terminal#readme
 
 ### TypeScript / JavaScript SDK
 

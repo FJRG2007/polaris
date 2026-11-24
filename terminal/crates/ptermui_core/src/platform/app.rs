@@ -33,7 +33,7 @@ pub struct AppCallbacks {
     /// Callback for when the user clicks "don't show again" on the warning modal.
     pub on_disable_warning_modal: Option<Box<dyn FnMut(&mut AppContext)>>,
     /// Callback on when the internet reachability to a specific host has changed.
-    /// The host name here could be a string for an IP address or domain (e.g. www.rook.dev).
+    /// The host name here could be a string for an IP address or domain (e.g. www.example.com).
     pub on_internet_reachability_changed: Option<Box<dyn FnMut(bool, &mut AppContext)>>,
     pub on_active_window_changed: Option<Box<dyn FnMut(&mut AppContext)>>,
     pub on_new_window_requested: Option<Box<dyn FnMut(&mut AppContext)>>,

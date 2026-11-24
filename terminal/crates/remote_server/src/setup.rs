@@ -600,8 +600,8 @@ pub fn install_script(staging_tarball_path: Option<&str>) -> String {
 
 /// Construct the download URL from the server root URL.
 ///
-/// For example, given `https://app.rook.dev`, returns
-/// `https://app.rook.dev/download/cli`.
+/// For example, given `https://app.polaris-terminal.invalid`, returns
+/// `https://app.polaris-terminal.invalid/download/cli`.
 fn download_url() -> String {
     let base = ChannelState::server_root_url();
     let base = base.trim_end_matches('/');

@@ -142,8 +142,8 @@ fn test_resolve_bare_url() {
             url("http://google.com")
         );
         assert_eq!(
-            resolve(&app, &links, "rook.dev").await,
-            url("http://rook.dev")
+            resolve(&app, &links, "example.com").await,
+            url("http://example.com")
         );
         assert_eq!(
             resolve(&app, &links, "bbc.co.uk").await,
@@ -252,12 +252,12 @@ fn test_resolve_valid_url() {
         let links = init_link_model(&mut app, None);
 
         assert_eq!(
-            resolve(&app, &links, "https://rook.dev").await,
-            url("https://rook.dev")
+            resolve(&app, &links, "https://example.com").await,
+            url("https://example.com")
         );
         assert_eq!(
-            resolve(&app, &links, "mailto:test@rook.dev").await,
-            url("mailto:test@rook.dev")
+            resolve(&app, &links, "mailto:test@example.com").await,
+            url("mailto:test@example.com")
         );
     });
 }

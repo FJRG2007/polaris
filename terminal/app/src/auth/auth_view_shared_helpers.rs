@@ -19,7 +19,7 @@ use ptermui::{Action, AppContext, Element, SingletonEntity as _};
 use crate::settings::PrivacySettings;
 use crate::themes::theme::ThemeKind;
 
-const PRIVACY_URL: &str = "https://rook.dev/privacy";
+const PRIVACY_URL: &str = "https://fjrg2007.github.io/polaris";
 
 pub const AUTH_MODAL_GAP: f32 = 16.;
 const MODAL_CORNER_RADIUS: Radius = Radius::Pixels(8.);

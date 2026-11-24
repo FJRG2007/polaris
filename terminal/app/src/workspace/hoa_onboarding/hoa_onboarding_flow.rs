@@ -469,7 +469,7 @@ impl HoaOnboardingFlow {
             styles: FormattedTextStyles {
                 underline: true,
                 hyperlink: Some(Hyperlink::Url(
-                    "https://docs.rook.dev/agents/capabilities/agent-notifications".into(),
+                    "https://github.com/FJRG2007/polaris/tree/main/terminal#readme".into(),
                 )),
                 ..Default::default()
             },

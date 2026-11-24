@@ -647,7 +647,7 @@ fn test_tools_panel_preferences_activate_after_signup_and_ai_enablement() {
                 .apply_remote_server_auth_context(
                     "test-token".to_string(),
                     "test-user".to_string(),
-                    "test@rook.dev".to_string(),
+                    "test@example.com".to_string(),
                 );
         });
         workspace.update(&mut app, |workspace, ctx| {

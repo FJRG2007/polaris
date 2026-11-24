@@ -377,7 +377,7 @@ impl PromptAlertView {
                     } else {
                         text_fragments.push(FormattedTextFragment::hyperlink(
                             CONTACT_SUPPORT_TEXT,
-                            "mailto:support@rook.dev".to_owned(),
+                            "mailto:support@example.com".to_owned(),
                         ));
                     }
                 } else {

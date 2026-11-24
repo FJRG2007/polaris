@@ -31,7 +31,7 @@ use crate::util::bindings;
 
 const PAGE_TITLE: &str = "Knowledge";
 
-const RULES_DOCS_URL: &str = "https://docs.rook.dev/agents/capabilities/rules";
+const RULES_DOCS_URL: &str = "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 
 pub struct KnowledgePageView {
     page: PageType<Self>,

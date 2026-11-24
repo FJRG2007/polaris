@@ -63,19 +63,19 @@ pub fn sections(ctx: &mut ViewContext<ResourceCenterMainView>) -> Vec<Section> {
             ContentItem {
                 title: "Use your custom prompt",
                 description: "Set up Polaris Terminal to honor your PS1 setting",
-                url: "https://docs.rook.dev/terminal/appearance/prompt",
+                url: "https://github.com/FJRG2007/polaris/tree/main/terminal#readme",
                 button_label: "View documentation",
             },
             ContentItem {
                 title: "Integrate Polaris Terminal with your IDE",
                 description: "Configure Polaris Terminal to launch from your most used development tools",
-                url: "https://docs.rook.dev/terminal/integrations-and-plugins",
+                url: "https://github.com/FJRG2007/polaris/tree/main/terminal#readme",
                 button_label: "View documentation",
             },
             ContentItem {
                 title: "How Polaris Terminal uses Polaris Terminal",
                 description: "Learn how Polaris Terminal's engineering team uses their favorite features",
-                url: "https://www.rook.dev/blog/how-polaris-terminal-uses-polaris-terminal",
+                url: "https://fjrg2007.github.io/polaris",
                 button_label: "Read article",
             },
         ],

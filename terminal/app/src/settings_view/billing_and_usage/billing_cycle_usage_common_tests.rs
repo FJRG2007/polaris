@@ -390,7 +390,7 @@ fn entry_attributed_to(team_uid: Option<&str>) -> BillingCycleUsageEntry {
 fn workspace_member(uid: &str) -> WorkspaceMember {
     WorkspaceMember {
         uid: UserUid::new(uid),
-        email: format!("{uid}@rook.dev"),
+        email: format!("{uid}@example.com"),
         role: MembershipRole::User,
         is_disabled: false,
         usage_info: WorkspaceMemberUsageInfo {
@@ -407,7 +407,7 @@ fn team_with_members(uids: &[&str]) -> Team {
         .iter()
         .map(|uid| TeamMember {
             uid: UserUid::new(uid),
-            email: format!("{uid}@rook.dev"),
+            email: format!("{uid}@example.com"),
             role: MembershipRole::User,
             is_disabled: false,
         })

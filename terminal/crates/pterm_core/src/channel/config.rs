@@ -63,7 +63,7 @@ impl PtermServerConfig {
     /// an unresolvable host simply fails the request.
     ///
     /// What this replaces mattered. The rename rewrote upstream's own
-    /// `warp.dev` into `rook.dev`, which is registered to someone else and
+    /// `warp.dev` into the old project's `.dev` domain, which is registered to someone else and
     /// resolves to live infrastructure, and the shipped OSS binary pointed its
     /// server, RTC, session-sharing and Oz endpoints at it. Nothing is sent at
     /// idle - the OSS channel has no telemetry, crash reporting or autoupdate -

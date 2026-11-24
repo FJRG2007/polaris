@@ -3291,7 +3291,7 @@ fn status_slash_command_opens_dedicated_status_menu_via_shared_structure() {
         // email. No workspace is loaded (Org degrades to the em-dash placeholder)
         // and there is no conversation yet (Session falls back to "Untitled").
         assert!(
-            rendered.contains("test_user@rook.dev"),
+            rendered.contains("test_user@example.com"),
             "Email value:\n{rendered}"
         );
         assert!(rendered.contains("Untitled"), "Session value:\n{rendered}");

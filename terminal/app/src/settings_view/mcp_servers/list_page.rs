@@ -1156,7 +1156,7 @@ impl MCPServersListPageView {
                 ),
                 FormattedTextFragment::hyperlink(
                     "See supported providers.",
-                    "https://docs.rook.dev/agents/capabilities/mcp#file-based-mcp-servers",
+                    "https://github.com/FJRG2007/polaris/tree/main/terminal#readme",
                 ),
             ]
         });
@@ -1194,7 +1194,7 @@ impl MCPServersListPageView {
             FormattedTextFragment::plain_text(DESCRIPTION_TEXT),
             FormattedTextFragment::hyperlink(
                 "Learn more.",
-                "https://docs.rook.dev/agents/capabilities/mcp",
+                "https://github.com/FJRG2007/polaris/tree/main/terminal#readme",
             ),
         ];
 

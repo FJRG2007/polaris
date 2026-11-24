@@ -32,7 +32,7 @@ pub fn make_router() -> Router {
             .on_failure(()),
     );
 
-    // Localhost only. This allowed rook.dev and every subdomain of it, which
+    // Localhost only. This allowed the old project's `.dev` domain and every subdomain of it, which
     // the rename produced from upstream's own domain - so any page on a domain
     // this project does not own could reach the local install-detection server.
     let allow_origin_predicate =

@@ -26,7 +26,7 @@ Key config: `SshExtensionInstallMode::AlwaysInstall` (setting in `app/src/termin
 
 ### Binary deployment problem
 
-The production install script (`crates/remote_server/src/install_remote_server.sh`) downloads from the CDN (`app.rook.dev/download/cli`). This fetches a published binary, not one built from the developer's branch. For integration tests, the binary must come from the current codebase so that changes to the remote-server protocol or logic are tested. The existing `script/deploy_remote_server` already solves this for local development — it cross-compiles for `x86_64-unknown-linux-musl` and uploads via rsync.
+The production install script (`crates/remote_server/src/install_remote_server.sh`) downloads from the CDN (`app.polaris-terminal.invalid/download/cli`). This fetches a published binary, not one built from the developer's branch. For integration tests, the binary must come from the current codebase so that changes to the remote-server protocol or logic are tested. The existing `script/deploy_remote_server` already solves this for local development — it cross-compiles for `x86_64-unknown-linux-musl` and uploads via rsync.
 
 ## Proposed changes
 

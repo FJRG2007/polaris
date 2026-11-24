@@ -79,7 +79,7 @@ const TELEMETRY_DESCRIPTION_OLD: &str = "App analytics help us make the product 
 const TELEMETRY_TITLE: &str = "Help improve Polaris Terminal";
 const TELEMETRY_DESCRIPTION: &str = "App analytics help us make the product better for you. We may collect \
     certain console interactions to improve Polaris Terminal's AI capabilities.";
-const TELEMETRY_DOCS_URL: &str = "https://docs.rook.dev/support-and-community/privacy-and-security/privacy#what-telemetry-data-does-polaris-terminal-collect-and-why";
+const TELEMETRY_DOCS_URL: &str = "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 
 const DATA_MANAGEMENT_TITLE: &str = "Manage your data";
 const DATA_MANAGEMENT_DESCRIPTION: &str = "At any time, you may choose to delete your Polaris Terminal account permanently. \

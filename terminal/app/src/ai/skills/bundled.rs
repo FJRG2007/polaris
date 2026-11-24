@@ -449,7 +449,7 @@ fn display_optional_path(path: Option<PathBuf>) -> String {
 /// Builds the context map for bundled skill variable substitution.
 ///
 /// Supported variables:
-/// - `{{pterm_server_url}}` - The server root URL (e.g., `https://api.rook.dev`)
+/// - `{{pterm_server_url}}` - The server root URL (e.g., `https://api.polaris-terminal.invalid`)
 /// - `{{pterm_cli_binary_name}}` - The CLI binary name (e.g., `polaris-terminal` or `polaris-terminal-cli`)
 /// - `{{ptermctrl_binary_name}}` - The channel-specific Polaris Terminal Control command name
 /// - `{{ptermctrl_wrapper_path}}` - Path to the bundled Polaris Terminal Control wrapper

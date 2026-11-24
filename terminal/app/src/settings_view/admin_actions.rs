@@ -32,12 +32,12 @@ impl AdminActions {
 
     /// Open the support email link
     pub fn contact_support(ctx: &mut AppContext) {
-        ctx.open_url("mailto:support@rook.dev");
+        ctx.open_url("mailto:support@example.com");
     }
 
     /// Open the contact sales page
     pub fn contact_sales(ctx: &mut AppContext) {
-        ctx.open_url("https://rook.dev/contact-sales");
+        ctx.open_url("https://fjrg2007.github.io/polaris");
     }
 }
 

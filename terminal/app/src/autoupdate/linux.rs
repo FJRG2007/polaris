@@ -395,7 +395,7 @@ impl PackageManager {
                     // Back up the existing pacman.conf file just in case
                     // anything goes wrong, then add the repository config.
                     format!(
-                        "mkdir -p {cache_dir_str}{and}\\\ncp /etc/pacman.conf {cache_dir_str}{and}\\\nsudo sh -c \"echo '\n[{repo_name}]\nServer = https://releases.rook.dev/linux/pacman/\\$repo/\\$arch' >> /etc/pacman.conf\"{and}\\\n"
+                        "mkdir -p {cache_dir_str}{and}\\\ncp /etc/pacman.conf {cache_dir_str}{and}\\\nsudo sh -c \"echo '\n[{repo_name}]\nServer = https://releases.polaris-terminal.invalid/linux/pacman/\\$repo/\\$arch' >> /etc/pacman.conf\"{and}\\\n"
                     )
                 } else {
                     String::new()
@@ -405,7 +405,7 @@ impl PackageManager {
                     // it before retrieving the package repository and
                     // installing the updated package.
                     format!(
-                        "sudo pacman-key -r \"linux-maintainers@rook.dev\" --keyserver hkp://keys.openpgp.org:80{and}\\\nsudo pacman-key --lsign-key \"linux-maintainers@rook.dev\"{and}\\\n"
+                        "sudo pacman-key -r \"linux-maintainers@example.com\" --keyserver hkp://keys.openpgp.org:80{and}\\\nsudo pacman-key --lsign-key \"linux-maintainers@example.com\"{and}\\\n"
                     )
                 } else {
                     String::new()
@@ -612,7 +612,7 @@ fn is_pacman_signing_key_installed() -> bool {
             "/etc/pacman.d/gnupg",
             "--list-keys",
             "--with-colons",
-            "linux-maintainers@rook.dev",
+            "linux-maintainers@example.com",
         ])
         .output()
     {

@@ -527,7 +527,7 @@ impl LaunchConfigSaveModal {
                     .link(
                         "Link to Documentation".to_string(),
                         Some(
-                            "https://docs.rook.dev/terminal/sessions/launch-configurations"
+                            "https://github.com/FJRG2007/polaris/tree/main/terminal#readme"
                                 .to_string(),
                         ),
                         None,
