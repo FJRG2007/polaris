@@ -48,7 +48,14 @@ import {
 import { ImportNotesDialog, NewNotebookDialog, NotebookPeopleDialog } from "./notebook-dialogs";
 import { appWrites, type AppWrite } from "@/lib/offline/app-writes";
 import { reachability, subscribeReachability } from "@/lib/reachability";
-import { NOTE_CONFLICT, readNoteSent, saveNoteText, waitingNoteText, type NoteTextPayload } from "./offline-writes";
+import {
+    NOTE_CONFLICT,
+    keepNoteTextOnUnload,
+    readNoteSent,
+    saveNoteText,
+    waitingNoteText,
+    type NoteTextPayload
+} from "./offline-writes";
 
 /** How long a note sits untouched before it is written. Long enough not to
  *  write on every keystroke, short enough that closing the tab is safe. */
@@ -185,6 +192,25 @@ export function NotesView({
         }, SAVE_AFTER);
         return () => clearTimeout(timer);
     }, [note, dirty, title, body, router, shared, reloadWaiting]);
+
+    // What the editor holds and has not saved, as of the last render: read when
+    // the page goes away or another note opens, inside the pause before a save.
+    const unsaved = useRef<() => NoteTextPayload | null>(() => null);
+    useEffect(() => {
+        unsaved.current = () =>
+            note && shared !== "view" && (title !== stored.current.title || body !== stored.current.body)
+                ? { noteId: note.id, title: title.trim() || t("tree.untitled"), body, base: note.updatedAt }
+                : null;
+    });
+    useEffect(() => keepNoteTextOnUnload(() => unsaved.current()), []);
+    useEffect(
+        () => () => {
+            // Leaving this note (another one, another screen) before it saved.
+            const payload = unsaved.current();
+            if (payload) void saveNoteText(payload);
+        },
+        [noteId]
+    );
 
     /** Let go of the device's version: the note goes back to what Polaris has. */
     const discardWaiting = async (entry: AppWrite) => {

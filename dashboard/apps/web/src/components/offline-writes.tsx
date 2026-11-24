@@ -10,12 +10,13 @@
  */
 
 import "@/app/(app)/notes/offline-writes";
-import { appWrites, offlineStore } from "@/lib/offline/app-writes";
+import { appWrites, offlineStore, recoverUnloaded } from "@/lib/offline/app-writes";
 import { useQueueFlusher } from "@/lib/offline/write-queue";
 
 export function OfflineWrites({ userId }: { userId: string }) {
     // Before the first flush: the store reads and writes nothing for nobody.
     offlineStore.setOwner(userId);
-    useQueueFlusher(appWrites.flush, [userId]);
+    // What a tab closed on before it could save goes in line first.
+    useQueueFlusher(() => void recoverUnloaded().then(appWrites.flush), [userId]);
     return null;
 }
