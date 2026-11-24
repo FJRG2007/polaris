@@ -18,6 +18,7 @@ import { Gamepad2, Pickaxe } from "lucide-react";
 import { GameLogo } from "@/components/game-logo";
 import { RelativeTime } from "@/components/relative-time";
 import { useLocale } from "@/components/i18n/i18n-provider";
+import { usePresence } from "@/components/presence-store";
 import type { RecentActivityView } from "@/lib/presence-activity/recent";
 
 /** The small heading over a section of a profile. */
@@ -43,24 +44,49 @@ export function SinceRow({ label, iso, large }: { label: string; iso: string; la
     );
 }
 
-/** What they did lately, under its heading. Nothing at all when there is none. */
+/**
+ * What they did lately, under its heading. Nothing at all when there is none.
+ *
+ * A game they are playing right now is already on the card of what they are
+ * doing, live, so it is left out here while it is - and comes back the moment it
+ * stops, without the profile being read again.
+ */
 export function RecentActivityList({
+    personId,
     heading,
     recent
 }: {
+    personId: string;
     heading: string;
     recent: readonly RecentActivityView[];
 }) {
-    if (recent.length === 0) return null;
+    const live = usePresence(personId)?.activity ?? [];
+    const shown = withoutLive(recent, live);
+    if (shown.length === 0) return null;
     return (
         <section className="flex min-w-0 flex-col gap-2">
             <ProfileSectionHeading>{heading}</ProfileSectionHeading>
             <ul className="flex min-w-0 flex-col gap-2">
-                {recent.map((entry) => (
+                {shown.map((entry) => (
                     <RecentRow key={entry.key} entry={entry} />
                 ))}
             </ul>
         </section>
+    );
+}
+
+/** The entries of a recent list that are not a game being played right now,
+ *  matched by the game's name as the cards of what they are doing are. */
+export function withoutLive(
+    recent: readonly RecentActivityView[],
+    live: readonly core.ActivityView[]
+): readonly RecentActivityView[] {
+    const playing = new Set(
+        live.filter((view) => view.source !== "spotify").map((view) => view.name.toLowerCase())
+    );
+    if (playing.size === 0) return recent;
+    return recent.filter(
+        (entry) => entry.source !== "game" || !playing.has(entry.name.toLowerCase())
     );
 }
 
@@ -82,7 +108,11 @@ function RecentRow({ entry }: { entry: RecentActivityView }) {
                         src={picture}
                         alt=""
                         aria-hidden
-                        className="size-full object-cover [image-rendering:pixelated]"
+                        className={cn(
+                            "size-full object-cover",
+                            // A server's icon is pixel art; a game's store picture is not.
+                            entry.source === "minecraft" && "[image-rendering:pixelated]"
+                        )}
                         onError={() => setBroken(true)}
                     />
                 ) : game ? (

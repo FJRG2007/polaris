@@ -12407,6 +12407,8 @@ model UserActivitySettings {
 // now, so each report adds the minutes since the one before it here; a gap
 // longer than a report's lapse is a closed game, not playtime. Only games that
 // were being shown are counted - a hidden game is never stored anywhere.
+// `lastReportAt` is also when the game was last seen running, which is what a
+// profile's "Recent activity" lists it by once it has been closed.
 model UserGameTime {
     userId       String   @db.Uuid
     // The game's executable, as `UserActivity.key`.

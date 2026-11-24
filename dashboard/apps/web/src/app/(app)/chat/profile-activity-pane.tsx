@@ -168,7 +168,11 @@ function ActivityTab({
                     ))}
                 </section>
             ) : (
-                <RecentActivityList heading={t("profilePane.recent")} recent={recent} />
+                <RecentActivityList
+                    personId={personId}
+                    heading={t("profilePane.recent")}
+                    recent={recent}
+                />
             )}
         </div>
     );
