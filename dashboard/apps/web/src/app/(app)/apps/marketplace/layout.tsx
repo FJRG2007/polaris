@@ -6,9 +6,11 @@ export default function MarketplaceLayout({ children }: { children: ReactNode })
     return (
         <Messages
             // The new-service form's login option (deployService, firewall) rides on
-            // the template form the store opens.
+            // the template form the store opens; the device add-ons shelf draws the
+            // add-on store's own cards and dialogs (account).
             namespaces={[
                 "marketplace",
+                "account",
                 "validation",
                 "catalog",
                 "deploy",

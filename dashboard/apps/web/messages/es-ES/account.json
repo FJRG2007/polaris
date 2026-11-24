@@ -2570,7 +2570,7 @@
             "title": "¿Actualizar {name} a {version}?",
             "added": "Ahora también pide:",
             "noNew": "No pide nada nuevo.",
-            "confirm": "Actualizar"
+            "confirm": "Instalar"
         },
         "auto": {
             "all": "Actualizar complementos solos",
