@@ -107,7 +107,8 @@ Spreadsheets, slides and drawings now show the text editor's saving line
 
 ## Not fixed here
 
-- Creating, moving or deleting a note offline still needs the host.
+- Sharing, publishing, exporting or saving as a template a note the server
+  does not have yet still needs the host.
 
 ## Making, moving and deleting notes offline
 
@@ -118,3 +119,36 @@ its id (`noteCreateSchema.id`), so a replay after a lost answer makes it once; a
 replayed delete of a note already gone answers done. The tree draws the kept
 writes over what the server sent (`notes/offline-tree.ts`) with a clock, or an
 alert when Polaris refused one, and a note made offline opens from the device.
+
+## Renaming, pinning and archiving offline; templates
+
+A note renamed in the tree, pinned, unpinned, archived or restored while
+Polaris cannot be reached is kept as `note.update` with the values it ends with
+(never a toggle), folded into a change waiting right before it, and drawn at
+once: renamed, pinned to the top, out of the tree or out of the archive. A
+move or change of a note made here waits behind its create instead of being
+folded into it, since a create already on its way would be sent without it,
+and a delete of such a note is kept and sent even though its create is
+dropped, for the same reason; a delete of a note that is not there answers
+done.
+
+A note made offline from a template now starts from it: each visit to Notes
+keeps the title and text of the templates it lists on the device
+(`notes/offline-templates.ts`, one request for the ones whose version changed,
+none otherwise), and the note made offline is drawn from that copy. The server
+still applies the template when the note reaches it.
+
+## Mail sent offline
+
+A message sent while Polaris cannot be reached (no answer, or the proxy's
+502/503/504) is kept on the device (`mail/offline-sends.ts`, kind `mail.send`)
+instead of failing in the composer, which closes as on any send and says so.
+It waits above the mailbox with a clock (`mail/kept-sends.tsx`), or with
+Polaris's reason, Try again and Discard when it was refused, and goes into the
+server's outbox when Polaris answers, from whichever screen is open. Each kept
+send carries a key of its own (`sendKey` on `mailComposeSchema`); the server
+claims it before queueing (`queueSendOnce`, table `MailSendKey`, kept 30 days),
+so a replay whose answer was lost is answered with the message already queued
+and it goes once. Once taken it waits out the reader's undo window like any
+send. A draft closed while offline is still not kept on the device, and files
+cannot be attached offline.

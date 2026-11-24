@@ -73,6 +73,7 @@ import {
     X
 } from "lucide-react";
 import * as outbox from "./outbox";
+import { keepSend } from "./offline-sends";
 import { rememberSender } from "./default-sender";
 import { useDisplayFormat } from "@/components/display-format";
 import {
@@ -604,13 +605,22 @@ export function Composer() {
                 };
                 const draftId = (await saves.current?.after((id) => Promise.resolve(id))) ?? null;
                 saves.current?.hold();
-                const outcome = await outbox.queueMessage({
+                const outgoing = {
                     ...fields,
                     inReplyToId: composing?.inReplyToId ?? null,
                     forward: forwarding,
                     sendAt: when,
                     draftId
-                });
+                };
+                const outcome = await outbox.queueMessage(outgoing);
+                // Polaris did not answer: kept on this device and sent when it
+                // does, like a chat message. The composer closes as on any send.
+                if (outbox.isRefused(outcome) && outcome.unreachable && (await keepSend(outgoing))) {
+                    rememberSender(shelf, accountId);
+                    openComposer(null);
+                    toast.show({ title: t("compose.keptOffline") });
+                    return;
+                }
                 if (outbox.isRefused(outcome)) {
                     saves.current?.release();
                     setProblem(mailRefusalText(tm, outcome.error));
@@ -639,7 +649,9 @@ export function Composer() {
             forwarding,
             refreshMailbox,
             startSending,
-            shelf
+            shelf,
+            openComposer,
+            toast
         ]
     );
 

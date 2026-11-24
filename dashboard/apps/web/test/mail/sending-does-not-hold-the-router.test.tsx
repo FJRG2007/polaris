@@ -150,7 +150,7 @@ describe("the composer's requests", () => {
     it("are fetches, not server actions", async () => {
         const composer = await readFile(`${MAIL}composer.tsx`, "utf8");
         expect(composer).toContain("outbox.saveDraft(fields, id)");
-        expect(composer).toContain("outbox.queueMessage({");
+        expect(composer).toContain("outbox.queueMessage(outgoing)");
         expect(composer).toContain("outbox.undoSend(draftId)");
         expect(composer).toContain("outbox.sendNow(draftId)");
         const outbox = await readFile(`${MAIL}outbox.ts`, "utf8");

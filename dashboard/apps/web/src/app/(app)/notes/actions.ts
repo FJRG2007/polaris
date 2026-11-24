@@ -113,6 +113,19 @@ export async function templateFromNoteAction(input: unknown): Promise<{ id?: str
     }
 }
 
+/** At most this many templates are asked for at once: every shelf's, for the
+ *  most shelves a reader is likely to have open. */
+const TEMPLATE_CONTENTS_MAX = 500;
+
+/** The title and text of templates, for this device to keep so a note can start
+ *  from one while Polaris cannot be reached. */
+export async function templateContentsAction(ids: unknown): Promise<templates.NoteTemplateContent[]> {
+    const caller = await actor();
+    const parsed = z.array(core.noteTemplateUpdateSchema.shape.templateId).max(TEMPLATE_CONTENTS_MAX).safeParse(ids);
+    if (!parsed.success) return [];
+    return templates.templateContents(caller, [...new Set(parsed.data)]);
+}
+
 export async function updateTemplateAction(input: unknown): Promise<{ error?: string }> {
     const caller = await actor();
     const t = await getTranslations("notes");

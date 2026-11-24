@@ -28,6 +28,96 @@ pub enum DisplayMode {
 /// `call.mic` or `call.deafen`), or nothing (empty).
 pub type ActionId = String;
 
+/// What a knob of a page follows. Wider than [`Target`]: a page can keep
+/// what Stream Control had (a hand-picked list of apps by name, the
+/// microphone) before the engine drives it, so nothing imported is lost.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum PageKnob {
+    Category {
+        category: String,
+        #[serde(default)]
+        label: String,
+    },
+    /// Apps picked by hand, by the name Stream Control shows; one app is a list of one.
+    Apps {
+        apps: Vec<String>,
+        #[serde(default)]
+        label: String,
+    },
+    Program {
+        program: String,
+        #[serde(default)]
+        label: String,
+    },
+    Microphone {
+        #[serde(default)]
+        label: String,
+    },
+    Output {
+        #[serde(default)]
+        label: String,
+    },
+    None {
+        #[serde(default)]
+        label: String,
+    },
+}
+
+/// What a button of a page does.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum PageAction {
+    /// A Polaris action ([`ActionId`]).
+    Action {
+        action: ActionId,
+    },
+    /// A media key: `playPause`, `next` or `previous`.
+    Media {
+        key: String,
+    },
+    /// Turn to the `next` or `previous` page.
+    Page {
+        to: String,
+    },
+    /// Discord's own mute or deafen (`mute`, `deafen`).
+    Discord {
+        action: String,
+    },
+    None,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageButton {
+    pub action: PageAction,
+    #[serde(default)]
+    pub label: String,
+    /// The label while the button is on; none keeps one label.
+    #[serde(default)]
+    pub toggled_label: Option<String>,
+}
+
+/// Four knobs and four buttons, the way Stream Control lays a page out.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Page {
+    pub knobs: [PageKnob; 4],
+    pub buttons: [PageButton; 4],
+}
+
+/// Pages that come up while one of `apps` is in front.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Profile {
+    pub name: String,
+    pub apps: Vec<String>,
+    pub page: u8,
+}
+
+/// The most pages kept, as many as Stream Control offers.
+pub const MAX_PAGES: usize = 8;
+/// The most profiles kept.
+pub const MAX_PROFILES: usize = 16;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
@@ -37,6 +127,10 @@ pub struct Settings {
     pub tuning: Tuning,
     pub display: DisplayMode,
     pub brightness: u8,
+    /// Every page beyond the live knobs and buttons, as imported from Stream
+    /// Control (`clients/desktop/src/main/addons/hercules-official.ts`, `Layout`).
+    pub pages: Vec<Page>,
+    pub profiles: Vec<Profile>,
 }
 
 impl Default for Settings {
@@ -48,6 +142,8 @@ impl Default for Settings {
             tuning: Tuning::default(),
             display: DisplayMode::Mixer,
             brightness: 80,
+            pages: Vec::new(),
+            profiles: Vec::new(),
         }
     }
 }
@@ -81,6 +177,11 @@ impl Settings {
         }
         set(&mut settings.display, stored.get("display"));
         set(&mut settings.brightness, stored.get("brightness"));
+        settings.pages = valid_items(stored.get("pages"), MAX_PAGES);
+        settings.profiles = valid_items(stored.get("profiles"), MAX_PROFILES);
+        settings
+            .profiles
+            .retain(|profile| usize::from(profile.page) < settings.pages.len().max(1));
         settings.tuning = settings.tuning.clamped();
         settings.brightness = settings.brightness.clamp(10, 100);
         settings
@@ -91,6 +192,22 @@ impl Settings {
 fn set<T: serde::de::DeserializeOwned>(slot: &mut T, value: Option<&serde_json::Value>) {
     if let Some(read) = value.and_then(|value| T::deserialize(value).ok()) {
         *slot = read;
+    }
+}
+
+/// The entries of a stored list that read as `T`, at most `max`: one damaged
+/// page is dropped, never the others.
+fn valid_items<T: serde::de::DeserializeOwned>(
+    value: Option<&serde_json::Value>,
+    max: usize,
+) -> Vec<T> {
+    match value {
+        Some(serde_json::Value::Array(items)) => items
+            .iter()
+            .filter_map(|item| T::deserialize(item).ok())
+            .take(max)
+            .collect(),
+        _ => Vec::new(),
     }
 }
 
@@ -191,4 +308,59 @@ pub fn schema() -> Vec<Field> {
             default: u32::from(defaults.brightness),
         },
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The shape `importStreamControl` writes to `layout.json`, from a real Stream Control 2.05.8 file.
+    const LAYOUT: &str = r#"{"pages":[{"knobs":[{"kind":"category","category":"calls","label":"Calls"},{"kind":"apps","apps":["Brave Browser"],"label":"Multimedia"},{"kind":"category","category":"games","label":"Games"},{"kind":"microphone","label":"Mic"}],"buttons":[{"action":{"kind":"discord","action":"mute"},"label":"Mute","toggledLabel":"Muted"},{"action":{"kind":"discord","action":"deafen"},"label":"Deaf","toggledLabel":null},{"action":{"kind":"media","key":"playPause"},"label":"Play / Pause media","toggledLabel":null},{"action":{"kind":"page","to":"next"},"label":"Next page","toggledLabel":null}]},{"knobs":[{"kind":"none","label":""},{"kind":"output","label":""},{"kind":"program","program":"spotify.exe","label":""},{"kind":"none"}],"buttons":[{"action":{"kind":"page","to":"previous"},"label":"Previous page"},{"action":{"kind":"none"},"label":""},{"action":{"kind":"action","action":"call.mic"},"label":""},{"action":{"kind":"media","key":"next"},"label":"Next media"}]}],"profiles":[{"name":"Games","apps":["game.exe"],"page":1}]}"#;
+
+    #[test]
+    fn reads_the_imported_pages_and_profiles() {
+        let settings = Settings::from_json(LAYOUT);
+        assert_eq!(settings.pages.len(), 2);
+        assert_eq!(
+            settings.pages[0].knobs[1],
+            PageKnob::Apps {
+                apps: vec!["Brave Browser".into()],
+                label: "Multimedia".into()
+            }
+        );
+        assert_eq!(
+            settings.pages[0].knobs[3],
+            PageKnob::Microphone {
+                label: "Mic".into()
+            }
+        );
+        assert_eq!(
+            settings.pages[0].buttons[0].toggled_label.as_deref(),
+            Some("Muted")
+        );
+        assert_eq!(
+            settings.pages[1].buttons[0].action,
+            PageAction::Page {
+                to: "previous".into()
+            }
+        );
+        assert_eq!(settings.profiles[0].page, 1);
+        // The live controls are untouched by pages.
+        assert_eq!(settings.knobs, Settings::default().knobs);
+    }
+
+    #[test]
+    fn a_damaged_page_drops_alone_and_pages_are_capped() {
+        let mut pages: Vec<serde_json::Value> = vec![serde_json::json!({ "knobs": "x" })];
+        let good: serde_json::Value =
+            serde_json::from_str::<serde_json::Value>(LAYOUT).unwrap()["pages"][0].clone();
+        pages.extend(std::iter::repeat_n(good, 12));
+        let json = serde_json::json!({ "pages": pages, "profiles": [{ "name": "x", "apps": [], "page": 40 }] });
+        let settings = Settings::from_json(&json.to_string());
+        assert_eq!(settings.pages.len(), MAX_PAGES);
+        assert!(
+            settings.profiles.is_empty(),
+            "a profile pointing past the pages is dropped"
+        );
+    }
 }

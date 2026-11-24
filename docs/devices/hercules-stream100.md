@@ -246,19 +246,47 @@ the `pages\...` keys and never parses or keeps the rest.
 `clients/desktop/src/main/addons/hercules-official.ts` holds the detection, the
 uninstaller check and the importer; each is pure and tested on fixtures.
 
+### Carrying out the choice
+
+`clients/desktop/src/main/addons/hercules-official-run.ts` (tested with a fake machine)
+does what the person picked, and `official.ts` answers the page through
+`window.polarisDesktop.addons.official(id, request)` (`look`, `choose`,
+`restore`, `launch`; Windows and `hercules-stream100` only, null otherwise):
+
+- Before any step it keeps a copy in `<userData>/addons/official/<id>/official-software.json`:
+  the Run values it may remove and `Stream Control.ini` with every
+  `token`/`secret`/`password` line taken out. The first copy is kept across
+  later choices; uninstalling the add-on does not delete it.
+- Stream Control is asked to close (`taskkill /im`), and forced (`/f`) only if
+  it is still running 5 seconds later.
+- A Run value is removed with `reg.exe delete`; the HKLM one goes through
+  Windows' administrator prompt (PowerShell `Start-Process -Verb RunAs`, the
+  arguments in its environment). A declined prompt stops the choice there.
+- An uninstaller runs only after `Get-AuthenticodeSignature` says `Valid` with
+  a `CN=`/`O=` of Guillemot, the path passed in the environment, never in the
+  command.
+- Restore re-adds the Run values whose program still exists, writes the copy
+  back with today's sign-in lines put back in their sections, and starts
+  Stream Control. An uninstall cannot be undone from here: only the settings
+  go back.
+- `system.launchOfficial` (add-on protocol) starts only the `Stream-control.exe`
+  a Run value or the copy names. It has no permission of its own on purpose:
+  a new permission in the manifest would make every older app refuse the
+  whole signed catalog.
+
 ### Feature parity with Stream Control 2.05
 
 | Stream Control | Polaris add-on today |
 | --- | --- |
-| Pages of 4 knobs + 4 buttons, Next/Previous page buttons | missing: one page |
-| Profiles (`profiles`, `LastProfileKey`) | missing |
-| Knob: multi-app volume with a chosen app list | have as categories (calls, music, games, browser, system, other); a hand-picked app list is missing |
-| Knob: one app, output device, microphone | output: have; one app and microphone: missing from the settings page |
+| Pages of 4 knobs + 4 buttons, Next/Previous page buttons | imported and stored (`Settings.pages`, up to 8, `layout.json`); the engine still drives one page |
+| Profiles (`profiles`, `LastProfileKey`) | in the settings model (`Settings.profiles`); not imported: the only real file read has `profiles=@Invalid()` |
+| Knob: multi-app volume with a chosen app list | have as categories (calls, music, games, browser, system, other); a hand-picked app list is imported and stored (`PageKnob::Apps`, by display name), not yet driven |
+| Knob: one app, output device, microphone | output: have; one app and microphone: in the settings model (`PageKnob::Program`, `Microphone`), not yet driven or imported (descriptor names not seen yet) |
 | Knob press: mute | have |
-| Button: Discord mute / deafen (Discord RPC) | missing (Polaris call mic/deafen exist instead) |
-| Button: media play/pause, next, previous | missing |
+| Button: Discord mute / deafen (Discord RPC) | imported and stored (`PageAction::Discord`); not driven (Polaris call mic/deafen exist instead) |
+| Button: media play/pause, next, previous | imported and stored (`PageAction::Media`); not yet driven |
 | Buttons: OBS / Streamlabs scenes, Voicemeeter, soundboard, hotkeys | missing |
-| Button toggled / untoggled labels | missing |
+| Button toggled / untoggled labels | in the settings model (`PageButton.toggled_label`); not imported (its key not seen yet) |
 | Knob and button colors, LED brightness | missing |
 | Display: mixer, meters, icons, background image | display: only through the Hercules SDK, not built |
 | Broadcast / creator mode | missing |

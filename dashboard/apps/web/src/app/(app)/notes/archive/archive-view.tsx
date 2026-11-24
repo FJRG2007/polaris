@@ -11,21 +11,23 @@
 import { useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
-import { runAction } from "@/lib/run-action";
 import { RelativeTime } from "@/components/relative-time";
 import { Archive, RotateCcw, Trash2 } from "lucide-react";
 import type { ArchivedNote } from "@/lib/notes/note-service";
-import { updateNoteAction } from "../actions";
-import { deletedHere } from "../offline-tree";
-import { NOTE_DELETE, useNoteWrites, writeNote } from "../offline-writes";
+import { deletedHere, pendingUpdate } from "../offline-tree";
+import { NOTE_DELETE, NOTE_UPDATE, useNoteWrites, writeNote } from "../offline-writes";
 import { Button, ConfirmDeleteDialog, EmptyState } from "@polaris/ui";
 
 export function ArchiveView({ notes: served }: { notes: readonly ArchivedNote[] }) {
     const t = useTranslations("notes");
     const router = useRouter();
-    // A delete kept on this device while Polaris was away is gone from here already.
+    // A delete or a restore kept on this device while Polaris was away is gone
+    // from here already.
     const writes = useNoteWrites(() => router.refresh());
-    const notes = served.filter((note) => !deletedHere(writes.entries, note.id));
+    const notes = served.filter(
+        (note) =>
+            !deletedHere(writes.entries, note.id) && pendingUpdate(writes.entries, note.id).archived !== false
+    );
     const [error, setError] = useState("");
     const [deleting, setDeleting] = useState<ArchivedNote | null>(null);
 
@@ -40,8 +42,10 @@ export function ArchiveView({ notes: served }: { notes: readonly ArchivedNote[] 
     }
 
     const restore = async (noteId: string) => {
-        await runAction(() => updateNoteAction({ noteId, archived: false }), setError);
-        router.refresh();
+        setError("");
+        const result = await writeNote(NOTE_UPDATE, { noteId, archived: false }, setError);
+        if (result?.error) setError(result.error);
+        else if (result && !result.queued) router.refresh();
     };
 
     return (

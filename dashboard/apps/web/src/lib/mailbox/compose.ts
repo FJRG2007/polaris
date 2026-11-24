@@ -155,6 +155,53 @@ export async function queueSend(
     return { draftId, sendAt };
 }
 
+/** How long a device's send key answers a replay: longer than any device is
+ *  likely to keep retrying a send whose answer it lost. */
+const SEND_KEY_DAYS = 30;
+
+/** A replay of a send whose first attempt is still being taken: the device
+ *  tries again a moment later, by which time it has its answer. */
+export class SendInProgressError extends Error {}
+
+/**
+ * `queueSend` for a send a device kept offline and may send more than once:
+ * the first one with its key is queued, every later one is answered with what
+ * the first was queued as, and the message goes once. The key is claimed before
+ * anything is written, so two replays racing each other cannot both queue it.
+ */
+export async function queueSendOnce(
+    userId: string,
+    input: ComposeInput,
+    sendKey: string
+): Promise<{ draftId: string; sendAt: Date }> {
+    const now = new Date();
+    await prisma.mailSendKey.deleteMany({ where: { expiresAt: { lt: now } } });
+    try {
+        await prisma.mailSendKey.create({
+            data: { key: sendKey, userId, expiresAt: new Date(now.getTime() + SEND_KEY_DAYS * 86_400_000) }
+        });
+    } catch (caught) {
+        if ((caught as { code?: string } | null)?.code !== "P2002") throw caught;
+        const taken = await prisma.mailSendKey.findUnique({ where: { key: sendKey } });
+        // Somebody else's key answers as a message that is not there.
+        if (!taken || taken.userId !== userId) throw new MailAccessError();
+        if (!taken.draftId || !taken.sendAt) throw new SendInProgressError();
+        return { draftId: taken.draftId, sendAt: taken.sendAt };
+    }
+    try {
+        const queued = await queueSend(userId, input);
+        await prisma.mailSendKey.update({
+            where: { key: sendKey },
+            data: { draftId: queued.draftId, sendAt: queued.sendAt }
+        });
+        return queued;
+    } catch (caught) {
+        // Not taken: the next attempt starts over.
+        await prisma.mailSendKey.delete({ where: { key: sendKey } }).catch(() => undefined);
+        throw caught;
+    }
+}
+
 /**
  * Take it back out of the queue.
  *

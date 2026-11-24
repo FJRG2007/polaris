@@ -60,6 +60,20 @@
             "reply": "Reply",
             "replyAll": "Reply all",
             "forward": "Forward"
-        }
+        },
+        "keptOffline": "Saved on this device. Sends when Polaris is back."
+    },
+    "offline": {
+        "title": "Waiting to send",
+        "noSubject": "(no subject)",
+        "to": "to {name}",
+        "toMany": "to {name} and {count, plural, one {# more} other {# more}}",
+        "waiting": "Sends when Polaris is back",
+        "notSent": "Not sent",
+        "retry": "Try again",
+        "discard": "Discard",
+        "discardTitle": "Discard this message?",
+        "discardQuestion": "Discard \"{subject}\"? It was never sent.",
+        "discardBody": "It is only on this device, so it cannot be brought back."
     }
 }

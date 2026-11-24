@@ -15,6 +15,7 @@ export const NOTE_TEXT = "note.text";
 export const NOTE_CREATE = "note.create";
 export const NOTE_MOVE = "note.move";
 export const NOTE_DELETE = "note.delete";
+export const NOTE_UPDATE = "note.update";
 
 /** What a create is sent with: the action's own input, plus the id it is made with. */
 export interface NoteCreatePayload {
@@ -32,6 +33,15 @@ export interface NoteMovePayload {
     readonly parentId: string | null;
     readonly spaceId: string | null;
     readonly folderId: string | null;
+}
+
+/** A note renamed, pinned, unpinned, archived or restored: the values it ends
+ *  with, never a toggle, so sending it twice changes nothing the second time. */
+export interface NoteUpdatePayload {
+    readonly noteId: string;
+    readonly title?: string;
+    readonly pinned?: boolean;
+    readonly archived?: boolean;
 }
 
 /** A row of the tree, with what this device still holds for it. */
@@ -70,11 +80,12 @@ export function withNoteWrites(shelves: readonly ShelfData[], entries: readonly 
         const found = find(noteId);
         return found ? notes.get(found.shelf)!.splice(found.at, 1)[0]! : null;
     };
-    /** Newest first, after the pinned ones, as the server orders a shelf. */
+    /** Newest first, after the pinned ones, as the server orders a shelf; a
+     *  pinned one first of all. */
     const put = (shelf: string | null, note: TreeNote): void => {
         const list = notes.get(shelf);
         if (!list) return;
-        const at = list.findIndex((other) => !other.pinned);
+        const at = note.pinned ? 0 : list.findIndex((other) => !other.pinned);
         list.splice(at < 0 ? list.length : at, 0, note);
     };
 
@@ -103,6 +114,22 @@ export function withNoteWrites(shelves: readonly ShelfData[], entries: readonly 
         } else if (entry.kind === NOTE_DELETE) {
             // One Polaris refused is drawn again, with why, until it is retried.
             if (entry.state === "pending") take(entry.target);
+        } else if (entry.kind === NOTE_UPDATE) {
+            // One Polaris refused is drawn as Polaris has it, with why.
+            if (entry.state !== "pending") continue;
+            const change = entry.payload as NoteUpdatePayload;
+            const found = find(change.noteId);
+            if (!found) continue;
+            if (change.archived === true) {
+                take(change.noteId);
+                continue;
+            }
+            const note = { ...notes.get(found.shelf)![found.at]!, ...changed(change) };
+            if (change.pinned === undefined) notes.get(found.shelf)![found.at] = note;
+            else {
+                take(change.noteId);
+                put(found.shelf, note);
+            }
         } else if (entry.kind === NOTE_TEXT) {
             const found = find(entry.target);
             const title = (entry.payload as { title?: unknown }).title;
@@ -161,6 +188,44 @@ export function localNote(
         folderId: note.folderId ?? null,
         updatedAt: entry.createdAt
     };
+}
+
+/** The title and pin of an update, as a row takes them. */
+function changed(change: NoteUpdatePayload): { title?: string; pinned?: boolean } {
+    return {
+        ...(change.title !== undefined ? { title: change.title } : {}),
+        ...(change.pinned !== undefined ? { pinned: change.pinned } : {})
+    };
+}
+
+/** What the updates of a note waiting on this device change, oldest first, the
+ *  newest winning: the open note is drawn with them. */
+export function pendingUpdate(
+    entries: readonly AppWrite[],
+    noteId: string | null
+): { title?: string; pinned?: boolean; archived?: boolean } {
+    const update: { title?: string; pinned?: boolean; archived?: boolean } = {};
+    if (!noteId) return update;
+    for (const entry of entries) {
+        if (entry.kind !== NOTE_UPDATE || entry.target !== noteId || entry.state !== "pending") continue;
+        const change = entry.payload as NoteUpdatePayload;
+        Object.assign(update, changed(change), change.archived !== undefined ? { archived: change.archived } : {});
+    }
+    return update;
+}
+
+/** The open note as this device has it: moved, renamed or pinned by what
+ *  still waits to be sent for it. */
+export function noteAsHere(note: NoteView, entries: readonly AppWrite[]): NoteView {
+    let here = note;
+    for (const entry of entries) {
+        if (entry.target !== note.id || entry.state !== "pending") continue;
+        if (entry.kind === NOTE_MOVE) {
+            const move = entry.payload as NoteMovePayload;
+            here = { ...here, parentId: move.parentId, spaceId: move.spaceId, folderId: move.folderId };
+        } else if (entry.kind === NOTE_UPDATE) here = { ...here, ...changed(entry.payload as NoteUpdatePayload) };
+    }
+    return here;
 }
 
 /** Whether a delete of this note is waiting on this device. */

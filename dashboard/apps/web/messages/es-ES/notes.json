@@ -88,7 +88,8 @@
         "conflictTitle": "{title} (copia sin conexión)",
         "notMade": "No se pudo añadir la nota a Polaris.",
         "notMoved": "No se pudo mover la nota.",
-        "notDeleted": "No se pudo borrar la nota."
+        "notDeleted": "No se pudo borrar la nota.",
+        "notChanged": "No se pudo guardar este cambio en la nota."
     },
     "view": {
         "sharedWithYou": "Compartido contigo",

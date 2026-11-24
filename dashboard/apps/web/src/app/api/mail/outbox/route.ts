@@ -9,7 +9,7 @@
  */
 
 import * as core from "@polaris/core";
-import { queueSend } from "@/lib/mailbox/compose";
+import { queueSend, queueSendOnce, SendInProgressError } from "@/lib/mailbox/compose";
 import { apiPermission } from "@/lib/api-session";
 import { answer, jsonBody, refusal } from "@/lib/mailbox/outbox-answer";
 import { readerWords } from "@/lib/i18n/reader-words";
@@ -33,7 +33,7 @@ export async function POST(request: Request): Promise<Response> {
         );
     }
     try {
-        const queued = await queueSend(user.id, {
+        const input = {
             accountId: parsed.data.accountId,
             identityId: parsed.data.identityId,
             to: parsed.data.to,
@@ -49,9 +49,14 @@ export async function POST(request: Request): Promise<Response> {
             requestReceipt: parsed.data.requestReceipt,
             draftId: parsed.data.draftId,
             reaction: parsed.data.reaction
-        });
+        };
+        const queued = parsed.data.sendKey
+            ? await queueSendOnce(user.id, input, parsed.data.sendKey)
+            : await queueSend(user.id, input);
         return answer({ draftId: queued.draftId, sendAt: queued.sendAt.toISOString() });
     } catch (caught) {
+        // Its first attempt is still being taken: asked again in a moment.
+        if (caught instanceof SendInProgressError) return answer({ error: "" }, 409);
         return refusal(caught, "That message could not be sent.");
     }
 }

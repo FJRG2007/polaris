@@ -404,6 +404,10 @@ export const mailComposeSchema = z
         requestReceipt: z.boolean().default(false),
         /** The draft this replaces, so sending it clears the saved copy. */
         draftId: z.string().uuid().nullable().default(null),
+        /** Made by the sending device for a send it kept while Polaris could
+         *  not be reached, so a replay after a lost answer is answered with the
+         *  message already queued instead of sending it twice. */
+        sendKey: z.string().uuid().optional(),
         /** One emoji when this is a reaction to `inReplyToId` rather than a
          *  reply - see `mail-reaction`. "" for everything anybody wrote. */
         reaction: z

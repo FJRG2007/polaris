@@ -9,6 +9,7 @@ import * as official from "@/main/addons/hercules-official";
 const X86 = "C:\\Program Files (x86)";
 const APP_KEY = "{4E736157-448C-4D22-BF3F-1C58BE6E9B9E}";
 const DRV_KEY = "{B59074DF-80BE-4F30-AE11-6AB0B93EDE56}";
+const BS = String.fromCharCode(92);
 
 /** The shape `reg.exe query ... /s` prints, with the values Hercules' 2.05.8 installer registers. */
 const REG = [
@@ -215,6 +216,53 @@ describe("Stream Control's settings", () => {
         expect(result.controls.find((c) => c.page === 0 && c.control === "knob" && c.slot === 1)).toMatchObject({ sources: ["Discord", "Slack"], official: "Apps > Multi-app volume" });
         expect(result.controls.filter((c) => !c.mapped).map((c) => c.official)).toEqual(["Discord > Mute", "Apps > Multi-app volume", "Actions > Previous page"]);
         expect(JSON.stringify(result)).not.toContain("fixture-token");
+    });
+
+    it("keeps every page in the layout: presets, hand-picked apps, media and page buttons, Discord", () => {
+        const knob = (name: string, sources: string[]): official.QtValue[] => [{ nameHierarchy: ["Apps", "Multi-app volume", "Volume"], targetType: 2, type: 1 }, { name, sources }];
+        const button = (path: string[], label: string): official.QtValue[] => [{ nameHierarchy: path, type: 2 }, { label }];
+        const controls: Record<string, official.QtValue> = {};
+        const put = (page: number, slot: number, kind: string, [descriptor, custom]: official.QtValue[]) => {
+            controls[["pages", `page_${page}`, "pageContent", String(slot), `${kind}Descriptor`].join(BS)] = descriptor ?? null;
+            controls[["pages", `page_${page}`, "pageContent", String(slot), `${kind}Customization`].join(BS)] = custom ?? null;
+        };
+        put(0, 1, "knob", knob("Calls", ["Discord"]));
+        put(0, 2, "knob", knob("Multimedia", ["Brave Browser"]));
+        put(0, 1, "button", button(["Discord", "Mute"], "Mute"));
+        put(0, 2, "button", button(["Discord", "Deaf"], "Deaf"));
+        put(0, 3, "button", button(["Actions", "Play / Pause media"], "Play / Pause media"));
+        put(0, 4, "button", button(["Actions", "Next page"], "Next page"));
+        put(1, 1, "button", button(["Actions", "Previous page"], "Previous page"));
+        put(1, 2, "button", button(["Actions", "Previous media"], "Previous media"));
+        put(1, 3, "button", button(["Actions", "Next media"], "Next media"));
+        put(1, 4, "button", button(["Sounds", "Soundboard"], "Boom"));
+        const { layout, controls: read } = official.importStreamControl(ini(controls))!;
+        expect(layout.pages).toHaveLength(2);
+        expect(layout.pages[0]?.knobs.slice(0, 3)).toEqual([
+            { kind: "category", category: "calls", label: "Calls" },
+            { kind: "apps", apps: ["Brave Browser"], label: "Multimedia" },
+            { kind: "none", label: "" }
+        ]);
+        expect(layout.pages[0]?.buttons.map((b) => b.action)).toEqual([
+            { kind: "discord", action: "mute" },
+            { kind: "discord", action: "deafen" },
+            { kind: "media", key: "playPause" },
+            { kind: "page", to: "next" }
+        ]);
+        expect(layout.pages[1]?.buttons.map((b) => b.action)).toEqual([{ kind: "page", to: "previous" }, { kind: "media", key: "previous" }, { kind: "media", key: "next" }, { kind: "none" }]);
+        expect(read.find((c) => c.official === "Sounds > Soundboard")?.kept).toBe(false);
+        expect(layout.profiles).toEqual([]);
+    });
+
+    it("keeps no more than eight pages", () => {
+        const controls: Record<string, official.QtValue> = {};
+        for (let page = 0; page < 12; page++) {
+            controls[["pages", `page_${page}`, "pageContent", "1", "knobDescriptor"].join(BS)] = { nameHierarchy: ["Apps", "Multi-app volume"] };
+            controls[["pages", `page_${page}`, "pageContent", "1", "knobCustomization"].join(BS)] = { name: "Music" };
+        }
+        const result = official.importStreamControl(ini(controls))!;
+        expect(result.pages).toBe(12);
+        expect(result.layout.pages).toHaveLength(official.MAX_PAGES);
     });
 
     it("answers null for a file with no device section", () => {

@@ -11,13 +11,32 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { NoteAccessError, requireNote, requireShelf, type NoteActor } from "@/lib/notes/access";
+import { NoteAccessError, requireNote, requireShelf, shelfSpaceIds, type NoteActor } from "@/lib/notes/access";
 
 export interface NoteTemplateSummary {
     readonly id: string;
     readonly spaceId: string | null;
     readonly name: string;
     readonly isDefault: boolean;
+    /** When it last changed: what a device compares the copy it keeps with. */
+    readonly version: string;
+}
+
+/** What a template starts a note with, for a device to keep and make one from
+ *  while Polaris cannot be reached. */
+export interface NoteTemplateContent {
+    readonly id: string;
+    readonly title: string;
+    readonly body: string;
+    readonly version: string;
+}
+
+/** The templates of the shelves the reader has in reach. */
+function readable(actor: NoteActor, spaceIds: readonly string[]) {
+    return [
+        { spaceId: null, ownerId: actor.id },
+        ...(spaceIds.length ? [{ spaceId: { in: [...spaceIds] } }] : [])
+    ];
 }
 
 /** Every template on the shelves the page lists, in one read: the reader's own
@@ -27,17 +46,29 @@ export async function listTemplates(
     actor: NoteActor,
     spaceIds: readonly string[]
 ): Promise<NoteTemplateSummary[]> {
-    return prisma.noteTemplate.findMany({
-        where: {
-            OR: [
-                { spaceId: null, ownerId: actor.id },
-                ...(spaceIds.length ? [{ spaceId: { in: [...spaceIds] } }] : [])
-            ]
-        },
+    const rows = await prisma.noteTemplate.findMany({
+        where: { OR: readable(actor, spaceIds) },
         orderBy: [{ isDefault: "desc" }, { name: "asc" }],
         take: core.NOTE_TEMPLATES_MAX * (spaceIds.length + 1),
-        select: { id: true, spaceId: true, name: true, isDefault: true }
+        select: { id: true, spaceId: true, name: true, isDefault: true, updatedAt: true }
     });
+    return rows.map(({ updatedAt, ...row }) => ({ ...row, version: updatedAt.toISOString() }));
+}
+
+/** The title and text of the named templates the reader may read; any other
+ *  id is left out rather than refused, as the list a device asks with may be
+ *  older than a removal. */
+export async function templateContents(
+    actor: NoteActor,
+    ids: readonly string[]
+): Promise<NoteTemplateContent[]> {
+    if (ids.length === 0) return [];
+    const rows = await prisma.noteTemplate.findMany({
+        where: { id: { in: [...ids] }, OR: readable(actor, await shelfSpaceIds(actor)) },
+        take: ids.length,
+        select: { id: true, title: true, body: true, updatedAt: true }
+    });
+    return rows.map(({ updatedAt, ...row }) => ({ ...row, version: updatedAt.toISOString() }));
 }
 
 /** A template, once the actor has been allowed `minimum` on its shelf. */

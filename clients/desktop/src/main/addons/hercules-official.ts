@@ -389,6 +389,50 @@ export interface ImportedControl {
     readonly sources: readonly string[];
     /** The add-on setting and value it became, or null when Polaris has no equivalent yet. */
     readonly mapped: { readonly key: string; readonly value: string; } | null;
+    /** Whether it was kept in the imported layout (`layout`), for when the add-on can do it. */
+    readonly kept: boolean;
+}
+
+/** What a knob of an imported page follows (crates/polaris-stream100/src/settings.rs, `PageKnob`). */
+export type LayoutKnob =
+    | { readonly kind: "category"; readonly category: string; readonly label: string; }
+    | { readonly kind: "apps"; readonly apps: readonly string[]; readonly label: string; }
+    | { readonly kind: "program"; readonly program: string; readonly label: string; }
+    | { readonly kind: "microphone"; readonly label: string; }
+    | { readonly kind: "output"; readonly label: string; }
+    | { readonly kind: "none"; readonly label: string; };
+
+/** What a button of an imported page does (settings.rs, `PageAction`). */
+export type LayoutAction =
+    | { readonly kind: "action"; readonly action: string; }
+    | { readonly kind: "media"; readonly key: "playPause" | "next" | "previous"; }
+    | { readonly kind: "page"; readonly to: "next" | "previous"; }
+    | { readonly kind: "discord"; readonly action: "mute" | "deafen"; }
+    | { readonly kind: "none"; };
+
+export interface LayoutButton {
+    readonly action: LayoutAction;
+    readonly label: string;
+    /** The label while the button is on; null when it keeps one label. */
+    readonly toggledLabel: string | null;
+}
+
+export interface LayoutPage {
+    readonly knobs: readonly LayoutKnob[];
+    readonly buttons: readonly LayoutButton[];
+}
+
+/** A set of pages that comes up while one of its apps is in front (settings.rs, `Profile`). */
+export interface LayoutProfile {
+    readonly name: string;
+    readonly apps: readonly string[];
+    readonly page: number;
+}
+
+/** Every page as Stream Control had it, in the add-on's own model (settings.rs `Settings.pages`/`profiles`). */
+export interface Layout {
+    readonly pages: readonly LayoutPage[];
+    readonly profiles: readonly LayoutProfile[];
 }
 
 export interface StreamControlImport {
@@ -396,6 +440,7 @@ export interface StreamControlImport {
     readonly controls: readonly ImportedControl[];
     /** Flat add-on values (`knob1`, `button2`...), from page 1 only: the add-on has one page today. */
     readonly values: Readonly<Record<string, string>>;
+    readonly layout: Layout;
 }
 
 /** Stream Control's knob preset names, to the add-on's knob categories. */
@@ -404,6 +449,39 @@ const KNOB_PRESETS: Readonly<Record<string, string>> = { calls: "calls", chat: "
 function knobValue(hierarchy: string[], name: string): string | null {
     if (hierarchy[0] !== "Apps" || hierarchy[1] !== "Multi-app volume") return null;
     return KNOB_PRESETS[name.trim().toLowerCase()] ?? null;
+}
+
+/** The largest number of pages kept: Stream Control offers eight. */
+export const MAX_PAGES = 8;
+const MAX_LABEL = 40;
+const MAX_APPS = 64;
+
+/** Stream Control's button menu paths (`nameHierarchy`, read from a real 2.05.8 settings file), to the add-on's actions. */
+const BUTTON_ACTIONS: Readonly<Record<string, LayoutAction>> = {
+    "Actions > Play / Pause media": { kind: "media", key: "playPause" },
+    "Actions > Next media": { kind: "media", key: "next" },
+    "Actions > Previous media": { kind: "media", key: "previous" },
+    "Actions > Next page": { kind: "page", to: "next" },
+    "Actions > Previous page": { kind: "page", to: "previous" },
+    "Discord > Mute": { kind: "discord", action: "mute" },
+    "Discord > Deaf": { kind: "discord", action: "deafen" }
+};
+
+function clip(text: string, max: number): string {
+    return text.replace(/[\0-\x1f]/g, "").trim().slice(0, max);
+}
+
+/**
+ * A knob in the layout: a preset name is its category; any other multi-app
+ * knob is the apps hand-picked for it (one app is a list of one).
+ */
+function layoutKnob(hierarchy: readonly string[], name: string, sources: readonly string[]): LayoutKnob | null {
+    const label = clip(name, MAX_LABEL);
+    if (hierarchy[0] !== "Apps" || hierarchy[1] !== "Multi-app volume") return null;
+    const category = KNOB_PRESETS[name.trim().toLowerCase()];
+    if (category) return { kind: "category", category, label };
+    const apps = sources.map((app) => clip(app, 120)).filter(Boolean).slice(0, MAX_APPS);
+    return apps.length ? { kind: "apps", apps, label } : null;
 }
 
 /**
@@ -419,6 +497,7 @@ export function importStreamControl(text: string): StreamControlImport | null {
     if (!device) return null;
     const controls: ImportedControl[] = [];
     const pageIndexes = new Set<number>();
+    const pages = new Map<number, { knobs: (LayoutKnob | null)[]; buttons: (LayoutButton | null)[]; }>();
     for (const key of device.keys()) {
         const match = /^pages\\page_(\d{1,2})\\pageContent\\([1-4])\\(knob|button)Descriptor$/.exec(key);
         if (!match) continue;
@@ -432,19 +511,33 @@ export function importStreamControl(text: string): StreamControlImport | null {
         if (!hierarchy.length) continue;
         const name = typeof custom.name === "string" ? custom.name : typeof custom.label === "string" ? custom.label : "";
         const value = control === "knob" ? knobValue(hierarchy, name) : null;
-        controls.push({
-            page,
-            slot,
-            control,
-            official: hierarchy.slice(0, 2).join(" > "),
-            name,
-            sources: texts(custom.sources ?? null).slice(0, 64),
-            mapped: value ? { key: `${control}${slot}`, value } : null
-        });
+        const official = hierarchy.slice(0, 2).join(" > ");
+        const sources = texts(custom.sources ?? null).slice(0, MAX_APPS);
+        const knob = control === "knob" ? layoutKnob(hierarchy, name, sources) : null;
+        const action = control === "button" ? (BUTTON_ACTIONS[official] ?? null) : null;
+        if (pageIndexes.size <= MAX_PAGES || pages.has(page)) {
+            const slots = pages.get(page) ?? { knobs: [null, null, null, null], buttons: [null, null, null, null] };
+            pages.set(page, slots);
+            if (knob) slots.knobs[slot - 1] = knob;
+            if (action) slots.buttons[slot - 1] = { action, label: clip(name, MAX_LABEL), toggledLabel: null };
+        }
+        controls.push({ page, slot, control, official, name, sources, mapped: value ? { key: `${control}${slot}`, value } : null, kept: Boolean(knob || action) });
     }
     controls.sort((a, b) => a.page - b.page || a.control.localeCompare(b.control) || a.slot - b.slot);
     const first = Math.min(...pageIndexes);
     const values: Record<string, string> = {};
     for (const c of controls) if (c.page === first && c.mapped) values[c.mapped.key] = c.mapped.value;
-    return { pages: pageIndexes.size, controls, values };
+    const layout: Layout = {
+        pages: [...pages.entries()]
+            .sort(([a], [b]) => a - b)
+            .slice(0, MAX_PAGES)
+            .map(([, slots]) => ({
+                knobs: slots.knobs.map((knob) => knob ?? { kind: "none", label: "" }),
+                buttons: slots.buttons.map((button) => button ?? { action: { kind: "none" }, label: "", toggledLabel: null })
+            })),
+        // Stream Control 2.05.8 writes `profiles=@Invalid()` until one is
+        // made; no real profile has been read, so none is guessed at.
+        profiles: []
+    };
+    return { pages: pageIndexes.size, controls, values, layout };
 }

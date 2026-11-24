@@ -189,6 +189,10 @@ pub fn settings_from_addon(values: &Map<String, Value>) -> Settings {
         brightness: number(values, "brightness")
             .unwrap_or(defaults.brightness)
             .clamp(10, 100),
+        // Pages and profiles have no flat form; they come from the imported
+        // layout (`Settings::from_json`).
+        pages: Vec::new(),
+        profiles: Vec::new(),
     }
 }
 

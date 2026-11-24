@@ -206,6 +206,14 @@ export interface PolarisDesktop {
         onChange(listener: () => void): () => void;
         /** Hear the app asking to show an add-on (its "found" notice was clicked). Answers the way to stop. */
         onOpen(listener: (id: string) => void): () => void;
+        /**
+         * The device's official software on this computer, for the install
+         * dialog and the add-on's page: `{ kind: "look" }`, `{ kind: "choose",
+         * choice, accepted }` (carries the choice out, then installs),
+         * `{ kind: "restore" }` and `{ kind: "launch" }`. Answers null for an
+         * add-on with no official software the app knows of.
+         */
+        official(id: string, request: unknown): Promise<unknown>;
     };
     /** Open Windows' Default apps at Polaris, where it can be picked for mailto
      *  links. False where there is no such screen to open (macOS, Linux). */
@@ -812,6 +820,7 @@ export const CHANNELS = {
     addonsViewCall: "desktop:addons-view-call",
     addonsChanged: "desktop:addons-changed",
     addonsOpen: "desktop:addons-open",
+    addonsOfficial: "desktop:addons-official",
     openMailDefaults: "desktop:open-mail-defaults",
     appBadge: "desktop:app-badge",
     appIcon: "desktop:app-icon",

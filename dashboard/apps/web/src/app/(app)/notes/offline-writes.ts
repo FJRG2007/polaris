@@ -2,8 +2,9 @@
 
 /**
  * Notes' kinds of offline write: a note's title and text, kept on this device
- * until the server takes it (`lib/offline/app-writes`), and a note made, moved
- * or deleted while Polaris could not be reached (tried at once otherwise).
+ * until the server takes it (`lib/offline/app-writes`), and a note made, moved,
+ * renamed, pinned, archived or deleted while Polaris could not be reached
+ * (tried at once otherwise).
  *
  * Only the newest text of a note waits - each save replaces the one before it
  * that had not gone yet. It carries the note's version the device last saw, so
@@ -16,6 +17,7 @@ import * as actions from "./actions";
 import { useEffect, useState } from "react";
 import { actionFailureText } from "@/lib/run-action";
 import { noteRequestFailure } from "@/lib/reachability";
+import { keptTemplate } from "./offline-templates";
 import { tryNow, UNANSWERED } from "@/lib/offline/try-now";
 import { newClientKey, type QueueSendResult } from "@/lib/offline/outbox";
 import {
@@ -30,9 +32,9 @@ import {
     type AppWrite
 } from "@/lib/offline/app-writes";
 
-import { NOTE_CREATE, NOTE_DELETE, NOTE_MOVE, NOTE_TEXT } from "./offline-tree";
+import { NOTE_CREATE, NOTE_DELETE, NOTE_MOVE, NOTE_TEXT, NOTE_UPDATE } from "./offline-tree";
 
-export { NOTE_CREATE, NOTE_DELETE, NOTE_MOVE, NOTE_TEXT };
+export { NOTE_CREATE, NOTE_DELETE, NOTE_MOVE, NOTE_TEXT, NOTE_UPDATE };
 
 /** The reason a write is refused when the server would not overwrite and the
  *  reader cannot add a note there to keep both. */
@@ -122,12 +124,13 @@ export function keepNoteTextOnUnload(read: () => NoteTextPayload | null): () => 
     });
 }
 // ---------------------------------------------------------------------------
-// A note made, moved or deleted
+// A note made, moved, changed or deleted
 // ---------------------------------------------------------------------------
 
-type PlaceKind = typeof NOTE_CREATE | typeof NOTE_MOVE | typeof NOTE_DELETE;
+type PlaceKind = typeof NOTE_CREATE | typeof NOTE_MOVE | typeof NOTE_UPDATE | typeof NOTE_DELETE;
 
-const NOTE_KINDS: readonly string[] = [NOTE_CREATE, NOTE_MOVE, NOTE_DELETE, NOTE_TEXT];
+const PLACE_KINDS: readonly PlaceKind[] = [NOTE_CREATE, NOTE_MOVE, NOTE_UPDATE, NOTE_DELETE];
+const NOTE_KINDS: readonly string[] = [...PLACE_KINDS, NOTE_TEXT];
 
 /** Every note write: what the tree is drawn over, and what a new one waits behind. */
 export const isNoteWrite = (entry: AppWrite): boolean => NOTE_KINDS.includes(entry.kind);
@@ -136,6 +139,7 @@ export const isNoteWrite = (entry: AppWrite): boolean => NOTE_KINDS.includes(ent
 const place: Record<PlaceKind, (payload: Record<string, unknown>) => Promise<{ id?: string; error?: string; }>> = {
     [NOTE_CREATE]: (payload) => actions.createNoteAction(payload),
     [NOTE_MOVE]: (payload) => actions.moveNoteAction(payload),
+    [NOTE_UPDATE]: (payload) => actions.updateNoteAction(payload),
     [NOTE_DELETE]: (payload) => actions.deleteNoteAction(String(payload.noteId))
 };
 
@@ -149,7 +153,7 @@ async function deliverPlace(entry: Pick<AppWrite, "kind" | "target" | "payload">
     }
 }
 
-for (const kind of [NOTE_CREATE, NOTE_MOVE, NOTE_DELETE]) registerWriteKind(kind, deliverPlace);
+for (const kind of PLACE_KINDS) registerWriteKind(kind, deliverPlace);
 
 async function noteWrites(): Promise<AppWrite[]> {
     return (await appWrites.readAll())
@@ -158,34 +162,27 @@ async function noteWrites(): Promise<AppWrite[]> {
 }
 
 /**
- * Keep a write in line behind what is already waiting for the same note.
+ * Keep a write in line behind what is already waiting for the same note. Sent
+ * in that order, so the server always has the note before it hears what
+ * happened to it next.
  *
- * - A move of a note made here and not sent yet changes where it will be made.
- * - A move right behind a move folds into it.
- * - A delete of a note made here and not sent forgets it and everything waiting
- *   for it: the server never hears of it. A delete of any other note drops what
- *   was waiting for it (its text, a move) - those would only be deleted with it -
- *   and is kept.
+ * - A move or a change (title, pin, archive) right behind one of its own kind
+ *   folds into it, the newest value winning; every value is absolute, so the
+ *   one it replaced being sent as well changes nothing. Neither is folded into
+ *   a create: one already on its way would be sent without it.
+ * - A delete drops what was waiting for the note - it would only be deleted
+ *   with it - its create included, and is kept itself even for a note the
+ *   server never heard of: that create may already be on its way, and a
+ *   delete of a note that is not there is answered as done.
  */
 async function keepPlace(kind: PlaceKind, target: string, payload: Record<string, unknown>): Promise<boolean> {
     const run = async (): Promise<boolean> => {
         const mine = (await noteWrites()).filter((entry) => entry.target === target);
-        const made = mine.find((entry) => entry.kind === NOTE_CREATE);
-        if (kind === NOTE_DELETE) {
-            for (const entry of mine) if (entry !== made) await offlineStore.forget("writes", entry.key);
-            if (made) {
-                await appWrites.discard(made.key);
-                return true;
-            }
-        }
-        if (kind === NOTE_MOVE && made) {
-            const { noteId: _noteId, ...where } = payload;
-            await appWrites.retry(made, { payload: { ...(made.payload as Record<string, unknown>), ...where } });
-            return true;
-        }
-        const last = mine.filter((entry) => entry.state === "pending").at(-1);
-        const folds = kind === NOTE_MOVE && last?.kind === NOTE_MOVE;
-        const kept = await appWrites.enqueue({ key: newClientKey(), kind, target, payload });
+        if (kind === NOTE_DELETE) for (const entry of mine) await offlineStore.forget("writes", entry.key);
+        const last = kind === NOTE_DELETE ? undefined : mine.filter((entry) => entry.state === "pending").at(-1);
+        const folds = (kind === NOTE_MOVE || kind === NOTE_UPDATE) && last?.kind === kind;
+        const change = folds && last ? { ...(last.payload as Record<string, unknown>), ...payload } : payload;
+        const kept = await appWrites.enqueue({ key: newClientKey(), kind, target, payload: change });
         if (kept && folds && last) await offlineStore.forget("writes", last.key);
         return kept;
     };
@@ -199,7 +196,7 @@ async function keepPlace(kind: PlaceKind, target: string, payload: Record<string
 export type NoteWriteResult = { id?: string; error?: string; queued?: true; };
 
 /**
- * Make, move or delete a note now, or keep the write for when Polaris answers.
+ * Make, move, change or delete a note now, or keep the write for when Polaris answers.
  * Answers what the action answered when it was sent, `{ queued: true }` when it
  * was kept, and null when it failed otherwise (`onFailure` was told).
  *
@@ -223,7 +220,11 @@ export async function writeNote(
         const answer = await tryNow(() => place[kind](input), onFailure);
         if (answer !== UNANSWERED) return answer;
     }
-    if (await keepPlace(kind, target, input)) {
+    // Made from a template: drawn from the copy this device keeps until the
+    // server, which applies the template itself, has it.
+    const start =
+        kind === NOTE_CREATE && typeof input.templateId === "string" ? await keptTemplate(input.templateId) : null;
+    if (await keepPlace(kind, target, start ? { ...input, ...start } : input)) {
         appWrites.flush();
         return kind === NOTE_CREATE ? { id: target, queued: true } : { queued: true };
     }
