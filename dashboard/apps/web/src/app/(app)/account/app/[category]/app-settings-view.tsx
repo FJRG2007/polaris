@@ -26,7 +26,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useNetworkState } from "@enigmax/primitives/react/network";
 import { readDesktopUpdateCheck, type DesktopUpdateCheck, type PolarisDesktop } from "@/lib/desktop-bridge";
-import { MaxUsersRow, ResetOverlay, VoiceWidgetPreview } from "./voice-widget-preview";
+import { MaxUsersRow, OverlayGames, ResetOverlay, VoiceWidgetPreview } from "./voice-widget-preview";
 import { Button, buttonVariants, Card, CardBody, ConfirmDeleteDialog, Select, Skeleton, Switch, useToast } from "@polaris/ui";
 
 /** The last snapshot the app gave, so a category opened next draws without waiting. */
@@ -183,7 +183,9 @@ function InApp({
         );
     }
 
-    const entries = core.appSettingsIn(category).filter((entry) => settingShown(entry, snapshot));
+    const entries = core
+        .appSettingsIn(category)
+        .filter((entry) => core.appSettingOffered(entry, snapshot.features) && settingShown(entry, snapshot));
 
     return (
         <div className="flex flex-col gap-4">
@@ -203,6 +205,9 @@ function InApp({
                         ))}
                     </CardBody>
                 </Card>
+            )}
+            {category === "voice" && snapshot.voiceWidget && (
+                <OverlayGames snapshot={snapshot} settings={settings} onSnapshot={keep} />
             )}
             {category === "voice" && <ResetOverlay settings={settings} onSnapshot={keep} />}
             {category === "clipboard" && <ClearClipboard settings={settings} />}
@@ -261,8 +266,34 @@ function SettingRow({
     let hint: string = t(`items.${key}.hint`);
     if (key === "launcherClipboard" && !snapshot.launcherClipboardPersists) hint = t("clipboard.memoryOnly");
 
+    if (entry.kind === "shortcut" && key === "overlayLockBinding") {
+        const setOverlayShortcut = settings.setOverlayShortcut;
+        if (!setOverlayShortcut) return null;
+        return (
+            <ShortcutRow
+                label={label}
+                hint={hint}
+                shown={snapshot.overlayLockKey ?? ""}
+                problem={snapshot.overlayLockProblem === "taken" ? t("shortcut.taken") : null}
+                settings={settings}
+                onPress={(press) => setOverlayShortcut(press)}
+                onDefault={snapshot.overlayLockBinding ? () => setOverlayShortcut(null) : undefined}
+                onSnapshot={onSnapshot}
+            />
+        );
+    }
     if (entry.kind === "shortcut") {
-        return <ShortcutRow label={label} snapshot={snapshot} settings={settings} onSnapshot={onSnapshot} />;
+        return (
+            <ShortcutRow
+                label={label}
+                hint={t("items.launcherBinding.hint")}
+                shown={snapshot.launcherKey}
+                problem={snapshot.launcherProblem}
+                settings={settings}
+                onPress={(press) => settings.setShortcut(press)}
+                onSnapshot={onSnapshot}
+            />
+        );
     }
     if (entry.kind === "range") {
         return (
@@ -314,16 +345,27 @@ function choiceLabel(t: ReturnType<typeof useTranslations>, key: core.AppSetting
     return t(`items.${key}.options.${id}`);
 }
 
-/** The launcher's key: Change takes the next press, Esc keeps the old one. */
+/** A key the app holds (the launcher's, the overlay's lock): Change takes the
+ *  next press, Esc keeps the old one, and "Use default" puts the default back. */
 function ShortcutRow({
     label,
-    snapshot,
+    hint,
+    shown,
+    problem: held,
     settings,
+    onPress,
+    onDefault,
     onSnapshot
 }: {
     label: string;
-    snapshot: core.AppSettingsSnapshot;
+    hint: string;
+    /** The key in use, as a person reads it. */
+    shown: string;
+    /** Why the key in use is not held, or null. */
+    problem: string | null;
     settings: NonNullable<PolarisDesktop["appSettings"]>;
+    onPress: (press: core.AppKeyPress) => Promise<unknown>;
+    onDefault?: () => Promise<unknown>;
     onSnapshot: (next: core.AppSettingsSnapshot) => void;
 }) {
     const t = useTranslations("appSettings");
@@ -353,8 +395,7 @@ function ShortcutRow({
                 shiftKey: event.shiftKey
             });
             if (!parsed.success) return setInvalid(true);
-            void settings
-                .setShortcut(parsed.data)
+            void onPress(parsed.data)
                 .catch(() => null)
                 .then((answer) => {
                     const next = core.readAppSettings(answer);
@@ -367,18 +408,35 @@ function ShortcutRow({
         };
         document.addEventListener("keydown", press, true);
         return () => document.removeEventListener("keydown", press, true);
-    }, [recording, settings, stop, onSnapshot]);
+    }, [recording, stop, onPress, onSnapshot]);
 
     // Leaving the page while it listens gives the key back to the app.
     useEffect(() => () => stop(), [stop]);
 
-    const problem = invalid ? t("shortcut.invalid") : snapshot.launcherProblem;
+    const problem = invalid ? t("shortcut.invalid") : held;
     return (
         <div className="flex flex-col gap-1">
-            <Row label={label} hint={recording ? t("shortcut.escape") : t("items.launcherBinding.hint")}>
-                <kbd className="truncate rounded border border-border px-1.5 py-0.5 font-mono text-xs">
-                    {snapshot.launcherKey}
+            <Row label={label} hint={recording ? t("shortcut.escape") : hint}>
+                <kbd className="max-w-48 truncate rounded border border-border px-1.5 py-0.5 font-mono text-xs" title={shown}>
+                    {shown}
                 </kbd>
+                {onDefault && !recording && (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                            void onDefault()
+                                .catch(() => null)
+                                .then((answer) => {
+                                    const next = core.readAppSettings(answer);
+                                    if (next) onSnapshot(next);
+                                    else setInvalid(true);
+                                });
+                        }}
+                    >
+                        {t("shortcut.default")}
+                    </Button>
+                )}
                 <Button
                     size="sm"
                     variant="secondary"

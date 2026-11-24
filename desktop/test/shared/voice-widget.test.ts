@@ -13,6 +13,8 @@ import {
     insideRegions,
     lockKeys,
     lookChangeSchema,
+    overlayGameRows,
+    withOverlayGame,
     MAX_PEOPLE,
     MAX_ROWS,
     rowCap,
@@ -218,5 +220,48 @@ describe("clickable regions", () => {
     it("keep the buttons' row while locked, so the window is sized for it", () => {
         expect(widgetSize(3, false, DEFAULT_LOOK, true).height).toBe(widgetSize(3, true, DEFAULT_LOOK).height);
         expect(widgetSize(3, false, { ...DEFAULT_LOOK, names: "never" }, true).width).toBe(widgetSize(3, true, DEFAULT_LOOK).width);
+    });
+});
+
+describe("the overlay's choosable lock key", () => {
+    it("is the only key held once chosen, in or out of a game", () => {
+        expect(lockKeys("win32", true, ["Alt+O", "Alt+O"])).toEqual([["Alt+O", "Alt+O"]]);
+        expect(lockKeys("win32", false, ["F10", "F10"])).toEqual([["F10", "F10"]]);
+    });
+
+    it("leaves the default keys when none was chosen", () => {
+        expect(lockKeys("win32", true, null)).toEqual(lockKeys("win32", true));
+    });
+});
+
+describe("the overlay per game", () => {
+    const cs = { key: "cs2.exe", name: "Counter-Strike 2" };
+    const dota = { key: "dota2.exe", name: "Dota 2" };
+
+    it("hides the widget over a game it was turned off for", () => {
+        const base = { inCall: true, enabled: true, onlyWithGame: false, gameRunning: true };
+        expect(widgetVisible({ ...base, gameOff: true })).toBe(false);
+        expect(widgetVisible({ ...base, gameOff: false })).toBe(true);
+        // From a caller that does not know about games.
+        expect(widgetVisible(base)).toBe(true);
+    });
+
+    it("adds a game once when turned off and drops it when turned on", () => {
+        const off = withOverlayGame([], cs, false);
+        expect(off).toEqual([cs]);
+        expect(withOverlayGame(off, cs, false)).toEqual([cs]);
+        expect(withOverlayGame([cs, dota], cs, true)).toEqual([dota]);
+    });
+
+    it("lists the game running first, then every game turned off", () => {
+        expect(overlayGameRows([], null)).toEqual([]);
+        expect(overlayGameRows([dota], cs)).toEqual([
+            { ...cs, on: true, running: true },
+            { ...dota, on: false, running: false }
+        ]);
+        expect(overlayGameRows([dota, cs], cs)).toEqual([
+            { ...cs, on: false, running: true },
+            { ...dota, on: false, running: false }
+        ]);
     });
 });

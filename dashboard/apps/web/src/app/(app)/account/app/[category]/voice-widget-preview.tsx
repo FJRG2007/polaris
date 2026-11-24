@@ -16,7 +16,7 @@ import * as core from "@polaris/core/app-settings";
 import type { PolarisDesktop } from "@/lib/desktop-bridge";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { HeadphoneOff, Headphones, Mic, MicOff, PhoneOff } from "lucide-react";
-import { Button, Card, CardBody, ControlSlider, cn, useToast } from "@polaris/ui";
+import { Button, Card, CardBody, ControlSlider, Switch, cn, useToast } from "@polaris/ui";
 
 /** The sample call drawn in the preview: fixture people, one talking, one muted, one deafened. */
 const SAMPLE = [
@@ -177,6 +177,67 @@ export function MaxUsersRow({
 }
 
 /** Puts the widget back as it first came; shown only by an app that can. */
+/**
+ * Discord's per-game overlay switch: the game running now and every game the
+ * overlay was turned off for, each with its own switch. A switch moves at once
+ * and goes back when the app refuses it. Absent with an app that predates it.
+ */
+export function OverlayGames({
+    snapshot,
+    settings,
+    onSnapshot
+}: {
+    snapshot: core.AppSettingsSnapshot;
+    settings: NonNullable<PolarisDesktop["appSettings"]>;
+    onSnapshot: (next: core.AppSettingsSnapshot) => void;
+}) {
+    const t = useTranslations("appSettings");
+    const toast = useToast();
+    const setGame = settings.setOverlayGame;
+    if (!setGame || !snapshot.features.includes("overlayGames")) return null;
+    const turn = (key: string, on: boolean) => {
+        const before = snapshot;
+        onSnapshot({ ...before, overlayGames: before.overlayGames.map((game) => (game.key === key ? { ...game, on } : game)) });
+        void setGame(key, on)
+            .catch(() => null)
+            .then((answer) => {
+                const next = core.readAppSettings(answer);
+                if (next) return onSnapshot(next);
+                onSnapshot(before);
+                toast.show({ title: t("saveFailed") });
+            });
+    };
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-4">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-sm">{t("overlay.games")}</span>
+                    <span className="text-xs text-muted-foreground">{t("overlay.gamesHint")}</span>
+                </div>
+                {snapshot.overlayGames.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">{t("overlay.gamesEmpty")}</p>
+                ) : (
+                    snapshot.overlayGames.map((game) => (
+                        <div key={game.key} className="flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                                <span className="truncate text-sm" title={game.name || game.key}>
+                                    {game.name || game.key}
+                                </span>
+                                {game.running && (
+                                    <span className="shrink-0 rounded bg-success/15 px-1.5 py-0.5 text-xs text-success">
+                                        {t("overlay.running")}
+                                    </span>
+                                )}
+                            </div>
+                            <Switch checked={game.on} aria-label={game.name || game.key} onChange={(on) => turn(game.key, on)} />
+                        </div>
+                    ))
+                )}
+            </CardBody>
+        </Card>
+    );
+}
+
 export function ResetOverlay({
     settings,
     onSnapshot

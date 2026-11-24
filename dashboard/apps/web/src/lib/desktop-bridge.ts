@@ -414,6 +414,10 @@ export interface DesktopAppSettings {
     hosts?: DesktopHosts;
     /** Put the voice widget back as it first came; answers the snapshot after it. Absent in older apps. */
     resetOverlay?(): Promise<unknown>;
+    /** A press becomes the overlay's lock key; null puts back the default keys. Answers the snapshot. Absent in older apps. */
+    setOverlayShortcut?(press: AppKeyPress | null): Promise<unknown>;
+    /** Turn the overlay on or off for one game. Answers the snapshot. Absent in older apps. */
+    setOverlayGame?(key: string, on: boolean): Promise<unknown>;
     /** Hear that a value changed anywhere. Answers the way to stop. */
     onChange(listener: () => void): () => void;
     /** Hear the app asking to show a category. Answers the way to stop. */

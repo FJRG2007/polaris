@@ -17,8 +17,19 @@ import { chooseShare, endShare, listShareSources, SOURCE_ID } from "./screen-sha
 import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
 import { strokeSchema } from "@/shared/annotate";
 import { setCallHotkeys } from "./call-hotkeys";
-import { followTextSize as followWidgetTextSize, followVoiceWidgetLook, setVoiceState, setVoiceWidgetClickable, voiceWidgetAction } from "./voice-widget";
-import { launcherBinding, rememberLauncherClipboardKeep, rememberLauncherEngine, rememberTextSize, rememberVoiceWidgetLook, resetVoiceWidgetLayout, textSize, voiceWidgetLook } from "./settings";
+import {
+    followTextSize as followWidgetTextSize,
+    followVoiceWidgetLook,
+    overlayGames,
+    overlayLockStatus,
+    recordOverlayLockKey,
+    setOverlayGame,
+    setOverlayLockBinding,
+    setVoiceState,
+    setVoiceWidgetClickable,
+    voiceWidgetAction
+} from "./voice-widget";
+import { launcherBinding, overlayLockBinding, rememberLauncherClipboardKeep, rememberLauncherEngine, rememberTextSize, rememberVoiceWidgetLook, resetVoiceWidgetLayout, textSize, voiceWidgetLook } from "./settings";
 import { readTextSize } from "@/shared/text-size";
 import { lookChangeSchema, voiceActionSchema, voiceStateSchema, withLookChange } from "@/shared/voice-widget";
 import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
@@ -78,7 +89,7 @@ import {
 } from "electron";
 import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
 import { clearClipboardHistory, followClipboardKeep, launcherStatus, recordLauncherKey, setLauncherBinding } from "./launcher";
-import { appKeyPressSchema, readAppSettingChange, type AppSettingChange } from "@polaris/core/app-settings";
+import { APP_SETTING_FEATURES, appKeyPressSchema, appOverlayGameChangeSchema, readAppSettingChange, type AppSettingChange } from "@polaris/core/app-settings";
 import { bindingFromPress } from "@/shared/launcher-hotkey";
 
 export interface IpcHost extends PushHost {
@@ -765,6 +776,7 @@ export function registerIpc(host: IpcHost): void {
         const status = await launcherStatus();
         const state = host.connectState();
         const look = voiceWidgetLook();
+        const overlayLock = overlayLockStatus();
         return {
             ...host.preferences(),
             voiceWidgetAvatars: look.avatars,
@@ -776,6 +788,11 @@ export function registerIpc(host: IpcHost): void {
             launcherBinding: launcherBinding(),
             launcherKey: status.key,
             launcherProblem: status.problem,
+            overlayLockBinding: overlayLockBinding(),
+            overlayLockKey: overlayLock.key,
+            overlayLockProblem: overlayLock.problem,
+            overlayGames: overlayGames(),
+            features: [...APP_SETTING_FEATURES],
             server: state.address,
             servers: state.servers.map((server) => ({ origin: server.origin, name: server.name }))
         };
@@ -826,11 +843,38 @@ export function registerIpc(host: IpcHost): void {
     });
     ipcMain.handle(CHANNELS.appSettingsRecord, (event, raw: unknown) => {
         const recording = z.boolean().safeParse(raw);
-        if (fromPolaris(event) && recording.success) recordLauncherKey(recording.data);
+        if (!fromPolaris(event) || !recording.success) return;
+        recordLauncherKey(recording.data);
+        recordOverlayLockKey(recording.data);
+    });
+    // The overlay's lock key: a press becomes it, null puts the default keys back.
+    ipcMain.handle(CHANNELS.appSettingsOverlayShortcut, (event, raw: unknown) => {
+        if (!fromPolaris(event)) return null;
+        // Recording is over either way: the launcher takes its own key back.
+        recordLauncherKey(false);
+        let binding = "";
+        if (raw !== null) {
+            const press = appKeyPressSchema.safeParse(raw);
+            const chosen = press.success ? bindingFromPress(press.data, process.platform) : null;
+            if (!chosen) return null;
+            binding = chosen;
+        }
+        // The launcher's key went back to it when recording stopped; one key cannot be both.
+        if (binding && binding === launcherBinding()) return null;
+        if (!setOverlayLockBinding(binding)) return null;
+        changed();
+        return snapshot();
+    });
+    ipcMain.handle(CHANNELS.appSettingsOverlayGame, (event, raw: unknown) => {
+        const change = appOverlayGameChangeSchema.safeParse(raw);
+        if (!fromPolaris(event) || !change.success || !setOverlayGame(change.data.key, change.data.on)) return null;
+        changed();
+        return snapshot();
     });
     ipcMain.handle(CHANNELS.appSettingsShortcut, async (event, raw: unknown) => {
         const press = appKeyPressSchema.safeParse(raw);
         if (!fromPolaris(event) || !press.success) return null;
+        recordOverlayLockKey(false);
         const binding = bindingFromPress(press.data, process.platform);
         if (!binding) return null;
         await setLauncherBinding(binding);

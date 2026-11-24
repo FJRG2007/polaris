@@ -28,7 +28,11 @@ const {
     rememberVoiceWidgetPlace,
     resetVoiceWidgetLayout,
     voiceWidgetLook,
-    voiceWidgetPlace
+    voiceWidgetPlace,
+    overlayLockBinding,
+    overlayOffGames,
+    rememberOverlayLockBinding,
+    rememberOverlayOffGames
 } = await import("@/main/settings");
 
 beforeEach(() => {
@@ -191,7 +195,12 @@ describe("the voice widget's look", () => {
         rememberToggle("overlayQuickActions", false);
         rememberToggle("overlayClickable", true);
         rememberToggle("voiceWidgetGameOnly", true);
+        rememberToggle("voiceWidgetPinned", false);
+        rememberOverlayLockBinding("Mod+Alt+O");
         resetVoiceWidgetLayout();
+        expect(toggle("voiceWidgetPinned")).toBe(true);
+        // A key and the games are not the layout either.
+        expect(overlayLockBinding()).toBe("Mod+Alt+O");
         expect(voiceWidgetLook()).toEqual(defaults);
         expect(voiceWidgetPlace()).toBeNull();
         expect(toggle("overlayQuickActions")).toBe(true);
@@ -206,5 +215,29 @@ describe("the overlay's widgets", () => {
         writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidget: true }));
         expect(toggle("overlayQuickActions")).toBe(true);
         expect(toggle("overlayClickable")).toBe(false);
+    });
+});
+
+describe("the overlay's own choices", () => {
+    it("keep what an install from before them had: pinned, the default keys, every game", () => {
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidget: true, overlayClickable: true }));
+        expect(toggle("voiceWidgetPinned")).toBe(true);
+        expect(overlayLockBinding()).toBe("");
+        expect(overlayOffGames()).toEqual([]);
+    });
+
+    it("drop a game entry that does not read, and keep the rest", () => {
+        writeFileSync(
+            join(folder.path, "settings.json"),
+            JSON.stringify({ overlayOffGames: [{ key: "cs2.exe", name: "Counter-Strike 2" }, { key: "" }, 7, { name: "x" }] })
+        );
+        expect(overlayOffGames()).toEqual([{ key: "cs2.exe", name: "Counter-Strike 2" }]);
+    });
+
+    it("are kept", () => {
+        rememberOverlayOffGames([{ key: "dota2.exe", name: "Dota 2" }]);
+        rememberOverlayLockBinding("F10");
+        expect(overlayOffGames()).toEqual([{ key: "dota2.exe", name: "Dota 2" }]);
+        expect(overlayLockBinding()).toBe("F10");
     });
 });

@@ -120,6 +120,51 @@ describe("the app's settings screen", () => {
         expect(screen.getByRole("switch", { name: "Minimize to tray" }).getAttribute("aria-checked")).toBe("true");
     });
 
+    it("offers the overlay's pin, lock key and per-game switch only to an app that has them", async () => {
+        install(fakeBridge());
+        await draw("voice");
+        expect(screen.queryByRole("switch", { name: "Pin" })).toBeNull();
+        expect(screen.queryByText("Overlay lock key")).toBeNull();
+        expect(screen.queryByText("Overlay in games")).toBeNull();
+        cleanup();
+        forgetAppSettingsSnapshot();
+        const newer = {
+            ...SNAPSHOT,
+            voiceWidgetPinned: true,
+            overlayLockKey: "Shift+` / Ctrl+Shift+`",
+            overlayGames: [{ key: "cs2.exe", name: "Counter-Strike 2", on: true, running: true }],
+            features: ["overlayPin", "overlayLockKey", "overlayGames"]
+        };
+        install(
+            fakeBridge({
+                get: vi.fn(async () => newer),
+                setOverlayShortcut: vi.fn(async () => newer),
+                setOverlayGame: vi.fn(async () => newer)
+            })
+        );
+        await draw("voice");
+        expect(screen.getByRole("switch", { name: "Pin" }).getAttribute("aria-checked")).toBe("true");
+        expect(screen.getByText("Shift+` / Ctrl+Shift+`")).toBeTruthy();
+        expect(screen.getByRole("switch", { name: "Counter-Strike 2" }).getAttribute("aria-checked")).toBe("true");
+    });
+
+    it("turns the overlay off for a game at once and back when the app refuses it", async () => {
+        let refuse: (value: unknown) => void = () => undefined;
+        const setOverlayGame = vi.fn(() => new Promise((resolve) => (refuse = resolve)));
+        const newer = {
+            ...SNAPSHOT,
+            overlayGames: [{ key: "cs2.exe", name: "Counter-Strike 2", on: true, running: true }],
+            features: ["overlayGames"]
+        };
+        install(fakeBridge({ get: vi.fn(async () => newer), setOverlayGame }));
+        await draw("voice");
+        await act(async () => screen.getByRole("switch", { name: "Counter-Strike 2" }).click());
+        expect(setOverlayGame).toHaveBeenCalledWith("cs2.exe", false);
+        expect(screen.getByRole("switch", { name: "Counter-Strike 2" }).getAttribute("aria-checked")).toBe("false");
+        await act(async () => refuse(null));
+        expect(screen.getByRole("switch", { name: "Counter-Strike 2" }).getAttribute("aria-checked")).toBe("true");
+    });
+
     it("names the launcher by the key it holds", async () => {
         install(fakeBridge({ get: vi.fn(async () => ({ ...SNAPSHOT, launcherKey: "Ctrl+K" })) }));
         await draw("search");

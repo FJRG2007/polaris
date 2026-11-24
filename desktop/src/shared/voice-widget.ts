@@ -26,7 +26,14 @@ export const MAX_USERS_LIMIT = 25;
  * keyboard). The same with Ctrl (Cmd on a Mac) always, which nobody types,
  * and which also serves where Discord already holds the first.
  */
-export function lockKeys(platform: NodeJS.Platform, inGame: boolean): readonly (readonly [accelerator: string, label: string])[] {
+export function lockKeys(
+    platform: NodeJS.Platform,
+    inGame: boolean,
+    chosen: readonly [accelerator: string, label: string] | null = null
+): readonly (readonly [accelerator: string, label: string])[] {
+    // A key somebody chose is the only one: falling back to another would
+    // leave them pressing the one they chose while a different one works.
+    if (chosen) return [chosen];
     const withCtrl = ["CommandOrControl+Shift+`", platform === "darwin" ? "Cmd+Shift+`" : "Ctrl+Shift+`"] as const;
     return inGame ? [["Shift+`", "Shift+`"], withCtrl] : [withCtrl];
 }
@@ -77,6 +84,10 @@ export interface WidgetView {
     /** The quick actions are on at all; false hides them even unlocked. Absent
      *  from an older main process, which always had them. */
     readonly buttons?: boolean;
+    /** Pinned: it stays on screen while locked. Unpinned, it shows only while
+     *  unlocked, as Discord's unpinned widgets do. Absent from an older main
+     *  process, which always kept it. */
+    readonly pinned?: boolean;
     /** Which edge the rows sit against: the bottom for a widget in a bottom corner. */
     readonly anchor: "top" | "bottom";
     /** Each face fetched so far, by person id, as a data URL. Sent only when one
@@ -183,15 +194,49 @@ export function insideRegions(point: { readonly x: number; readonly y: number; }
     );
 }
 
-/** Whether the widget is on screen: only in a call, only when switched on, and
- *  - when somebody asked for that - only while a game is running. */
+/** Whether the widget is on screen: only in a call, only when switched on,
+ *  - when somebody asked for that - only while a game is running, and never
+ *  over a game it was turned off for. */
 export function widgetVisible(input: {
     readonly inCall: boolean;
     readonly enabled: boolean;
     readonly onlyWithGame: boolean;
     readonly gameRunning: boolean;
+    /** The game running is one the overlay was turned off for. */
+    readonly gameOff?: boolean;
 }): boolean {
-    return input.inCall && input.enabled && (!input.onlyWithGame || input.gameRunning);
+    return input.inCall && input.enabled && (!input.onlyWithGame || input.gameRunning) && !input.gameOff;
+}
+
+/** A game the overlay was turned off for, by its program, with the name it was seen with. */
+export interface OverlayGame {
+    readonly key: string;
+    readonly name: string;
+}
+
+/** The most games the overlay can be turned off for. */
+export const MAX_OFF_GAMES = 200;
+
+/**
+ * The games the overlay is off for after turning it on or off for one:
+ * turned off, it joins the list (once); turned on, it leaves it.
+ */
+export function withOverlayGame(off: readonly OverlayGame[], game: OverlayGame, on: boolean): OverlayGame[] {
+    const rest = off.filter((entry) => entry.key !== game.key);
+    return on ? rest : [...rest, game].slice(-MAX_OFF_GAMES);
+}
+
+/**
+ * What the settings list for the per-game switch: the game running now
+ * first (on or off), then every game the overlay was turned off for.
+ */
+export function overlayGameRows(
+    off: readonly OverlayGame[],
+    running: OverlayGame | null
+): { key: string; name: string; on: boolean; running: boolean; }[] {
+    const rows = off.map((game) => ({ key: game.key, name: game.name, on: false, running: game.key === running?.key }));
+    if (running && !rows.some((row) => row.running)) rows.unshift({ key: running.key, name: running.name, on: true, running: true });
+    return rows.sort((a, b) => Number(b.running) - Number(a.running));
 }
 
 /** The window's width, in pixels at the default text size: room for a long

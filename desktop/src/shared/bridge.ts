@@ -226,6 +226,11 @@ export interface PolarisDesktop {
         /** Put the voice widget back as it first came (look, corner, widgets);
          *  answers the snapshot after it. Absent in apps that predate it. */
         resetOverlay?(): Promise<unknown>;
+        /** Take the next key press as the overlay's lock key; null puts back
+         *  the default keys. Answers the snapshot. Absent in older apps. */
+        setOverlayShortcut?(press: unknown | null): Promise<unknown>;
+        /** Turn the overlay on or off for one game. Answers the snapshot. Absent in older apps. */
+        setOverlayGame?(key: string, on: boolean): Promise<unknown>;
         /** Hear that a value changed anywhere. Answers the way to stop. */
         onChange(listener: () => void): () => void;
         /** Hear the app asking to show a category. Answers the way to stop. */
@@ -517,7 +522,8 @@ export const PREFERENCE_TOGGLES = [
     "launcherClipboard",
     "launcherGameMode",
     "overlayQuickActions",
-    "overlayClickable"
+    "overlayClickable",
+    "voiceWidgetPinned"
 ] as const;
 
 export type PreferenceToggle = (typeof PREFERENCE_TOGGLES)[number];
@@ -809,6 +815,8 @@ export const CHANNELS = {
     widgetAction: "desktop:widget-action",
     widgetClickable: "desktop:widget-clickable",
     appSettingsResetOverlay: "desktop:app-settings-reset-overlay",
+    appSettingsOverlayShortcut: "desktop:app-settings-overlay-shortcut",
+    appSettingsOverlayGame: "desktop:app-settings-overlay-game",
     openServers: "desktop:open-servers",
     appSettingsGet: "desktop:app-settings-get",
     appSettingsSet: "desktop:app-settings-set",

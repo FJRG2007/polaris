@@ -186,10 +186,14 @@ function draw(view: WidgetView | null): void {
     // Unlocked it is being arranged, so it is drawn whole.
     panel.style.opacity = view.unlocked ? "1" : String(look.opacity / 100);
     panel.classList.toggle("unlocked", view.unlocked);
+    // Unpinned, it is there only while unlocked; locked it draws nothing and
+    // the window lets every click through.
+    const away = !view.unlocked && view.pinned === false;
+    panel.hidden = away;
     // Unlocked, the footer holds the lock key; the buttons are there unless
     // switched off. Locked, they stay only as clickable regions.
     const buttons = view.buttons !== false;
-    lockedActions = !view.unlocked && view.actions === true && buttons;
+    lockedActions = !view.unlocked && !away && view.actions === true && buttons;
     controls.hidden = !view.unlocked && !lockedActions;
     for (const button of [mic, deafen, leave]) button.hidden = !buttons;
     if (!lockedActions) overRegion(false);

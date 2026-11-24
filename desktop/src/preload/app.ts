@@ -140,6 +140,8 @@ const bridge: PolarisDesktop = {
             importText: (text) => ipcRenderer.invoke(CHANNELS.hostsImport, text)
         },
         resetOverlay: () => ipcRenderer.invoke(CHANNELS.appSettingsResetOverlay),
+        setOverlayShortcut: (press) => ipcRenderer.invoke(CHANNELS.appSettingsOverlayShortcut, press),
+        setOverlayGame: (key, on) => ipcRenderer.invoke(CHANNELS.appSettingsOverlayGame, { key, on }),
         onChange: (listener) => {
             const heard = () => listener();
             ipcRenderer.on(CHANNELS.appSettingsChanged, heard);

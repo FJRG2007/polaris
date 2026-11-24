@@ -54,7 +54,19 @@ interface SettingBase<K extends string> {
     readonly dependsOn?: string;
     /** Takes effect once the app starts again. */
     readonly restart?: boolean;
+    /** Shown only by an app that lists this in its snapshot's `features`: an
+     *  older app would refuse the change, or treat it as another setting's. */
+    readonly feature?: AppSettingFeature;
 }
+
+/**
+ * What an app newer than the first settings page can do, each named in its
+ * snapshot so a page drawn by a newer Polaris never offers an older app a
+ * setting it does not have.
+ */
+export const APP_SETTING_FEATURES = ["overlayPin", "overlayLockKey", "overlayGames"] as const;
+
+export type AppSettingFeature = (typeof APP_SETTING_FEATURES)[number];
 
 export type AppSettingEntry =
     | (SettingBase<string> & { readonly kind: "toggle"; readonly default: boolean })
@@ -91,6 +103,22 @@ export const APP_SETTINGS = [
     { key: "voiceWidgetGameOnly", kind: "toggle", category: "voice", default: false, dependsOn: "voiceWidget" },
     { key: "overlayQuickActions", kind: "toggle", category: "voice", default: true, dependsOn: "voiceWidget" },
     { key: "overlayClickable", kind: "toggle", category: "voice", default: false, dependsOn: "overlayQuickActions" },
+    {
+        key: "voiceWidgetPinned",
+        kind: "toggle",
+        category: "voice",
+        default: true,
+        dependsOn: "voiceWidget",
+        feature: "overlayPin"
+    },
+    {
+        key: "overlayLockBinding",
+        kind: "shortcut",
+        category: "voice",
+        default: "",
+        dependsOn: "voiceWidget",
+        feature: "overlayLockKey"
+    },
     {
         key: "voiceWidgetAvatars",
         kind: "choice",
@@ -159,6 +187,7 @@ export const APP_SETTING_TOGGLES = [
     "voiceWidgetGameOnly",
     "overlayQuickActions",
     "overlayClickable",
+    "voiceWidgetPinned",
     "hardwareAcceleration"
 ] as const;
 
@@ -177,6 +206,29 @@ const savedHostSchema = z.object({
     origin: z.string().max(2048),
     name: z.string().max(200).nullable().catch(null)
 });
+
+/** A game the overlay can be turned off for, by the program that runs it. */
+const overlayGameSchema = z.object({
+    key: z.string().min(1).max(260),
+    name: z.string().max(120),
+    on: z.boolean(),
+    /** Running now. */
+    running: z.boolean().catch(false)
+});
+
+export type AppOverlayGame = z.infer<typeof overlayGameSchema>;
+
+/** Turning the overlay on or off for one game, as a screen asks for it. */
+export const appOverlayGameChangeSchema = z
+    .object({ key: z.string().min(1).max(260), on: z.boolean() })
+    .strict();
+
+export type AppOverlayGameChange = z.infer<typeof appOverlayGameChangeSchema>;
+
+/** Whether a setting is offered with this app: one that needs a feature only when the app has it. */
+export function appSettingOffered(entry: AppSettingEntry, features: readonly AppSettingFeature[]): boolean {
+    return !entry.feature || features.includes(entry.feature);
+}
 
 /**
  * What the app answers when asked for its settings: every value, plus the
@@ -204,6 +256,20 @@ const snapshotSchema = z.object({
     voiceWidgetMaxUsers: z.number().int().min(0).max(APP_WIDGET_MAX_USERS).catch(8),
     overlayQuickActions: z.boolean().catch(true),
     overlayClickable: z.boolean().catch(false),
+    voiceWidgetPinned: z.boolean().catch(true),
+    /** The overlay's lock key as chosen, in the dashboard's spelling; empty for the default keys. */
+    overlayLockBinding: z.string().max(40).catch(""),
+    /** The overlay's lock key as a person reads it, and what stops it when it is not held. */
+    overlayLockKey: z.string().max(60).nullable().catch(null),
+    overlayLockProblem: z.string().max(500).nullable().catch(null),
+    /** The game running now and each one the overlay was turned off for, with whether it shows there. */
+    overlayGames: z.array(overlayGameSchema).max(200).catch([]),
+    /** What this app can do beyond the first settings page (`APP_SETTING_FEATURES`); unknown names are dropped. */
+    features: z
+        .array(z.string().max(32))
+        .max(32)
+        .catch([])
+        .transform((names) => APP_SETTING_FEATURES.filter((feature) => names.includes(feature))),
     hardwareAcceleration: z.boolean().catch(true),
     /** The kept choice differs from the one this run started with. */
     restartPending: z.boolean().catch(false),

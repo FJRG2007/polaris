@@ -100,7 +100,7 @@ let loadError: string | null = null;
  * their folder, from the launcher's listing of them (`installedGames`).
  */
 const games = new GameWatcher((game) => {
-    setVoiceWidgetGame(game !== null);
+    setVoiceWidgetGame(game && { key: game.key, name: game.name });
     if (main && !main.isDestroyed()) main.webContents.send(CHANNELS.gameActivity, game);
 }, undefined, () => installedGames());
 // Game mode: the launcher's key reaches the game while it is in front.
@@ -1072,6 +1072,7 @@ function start(): void {
                     voiceWidgetGameOnly: settings.toggle("voiceWidgetGameOnly"),
                     overlayQuickActions: settings.toggle("overlayQuickActions"),
                     overlayClickable: settings.toggle("overlayClickable"),
+                    voiceWidgetPinned: settings.toggle("voiceWidgetPinned"),
                     voiceWidgetLook: settings.voiceWidgetLook(),
                     launcher: settings.toggle("launcher"),
                     launcherClipboard: settings.toggle("launcherClipboard"),

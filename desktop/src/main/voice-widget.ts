@@ -30,14 +30,18 @@ import { serverPath } from "./navigation";
 import { CHANNELS } from "@/shared/bridge";
 import { textScale } from "@/shared/text-size";
 import { holdGlobalKey } from "./call-hotkeys";
+import { displayAccelerator, launcherAccelerator } from "@/shared/launcher-hotkey";
 import { openVoiceWidgetWindow } from "./windows";
 import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
 import { nativeImage, screen, type BrowserWindow, type WebContents } from "electron";
 import {
     cornerPoint,
     lockKeys,
+    overlayGameRows,
     widgetSize,
     widgetVisible,
+    withOverlayGame,
+    type OverlayGame,
     type CallPageAction,
     type VoiceAction,
     type VoiceState,
@@ -56,7 +60,8 @@ const FACE_MIN_PX = 16;
 
 let state: NonNullable<VoiceState> | null = null;
 let holder: WebContents | null = null;
-let gameRunning = false;
+/** The game running now, as the game watcher last saw it. */
+let game: OverlayGame | null = null;
 let unlocked = false;
 let widget: { readonly window: BrowserWindow; ready: boolean; } | null = null;
 let releaseLockKey: (() => void) | null = null;
@@ -112,13 +117,97 @@ function forgetFaces(): void {
     facesChanged = true;
 }
 
-/** Whether a game is running now, as the game watcher last saw it. */
-export function setVoiceWidgetGame(running: boolean): void {
-    if (running === gameRunning) return;
-    gameRunning = running;
+/** The game running now, or null, as the game watcher last saw it. */
+export function setVoiceWidgetGame(next: OverlayGame | null): void {
+    if (next?.key === game?.key && next?.name === game?.name) return;
+    const changedRunning = (next === null) !== (game === null);
+    game = next;
     // The key Shift+` is only taken while a game runs; see `lockKeys`.
-    if (widget && !widget.window.isDestroyed()) holdLockKey();
+    if (changedRunning && widget && !widget.window.isDestroyed()) holdLockKey();
     refreshVoiceWidget();
+}
+
+/** The game running is one the overlay was turned off for. */
+function gameOff(): boolean {
+    return game !== null && settings.overlayOffGames().some((entry) => entry.key === game?.key);
+}
+
+/** The rows of the settings' per-game switch: the game running and every one turned off. */
+export function overlayGames(): ReturnType<typeof overlayGameRows> {
+    return overlayGameRows(settings.overlayOffGames(), game);
+}
+
+/** Turn the overlay on or off for one game: the one running, or one on the list. */
+export function setOverlayGame(key: string, on: boolean): boolean {
+    const known = game?.key === key ? game : settings.overlayOffGames().find((entry) => entry.key === key);
+    if (!known) return false;
+    settings.rememberOverlayOffGames(withOverlayGame(settings.overlayOffGames(), known, on));
+    refreshVoiceWidget();
+    return true;
+}
+
+/** The key somebody chose, as an accelerator and its name, or null for the default keys. */
+function chosenLockKey(): readonly [string, string] | null {
+    const binding = settings.overlayLockBinding();
+    const accelerator = binding ? launcherAccelerator(binding) : null;
+    return accelerator ? [accelerator, displayAccelerator(accelerator, process.platform)] : null;
+}
+
+/** The lock key as the settings show it, and "taken" when the widget is open
+ *  and could not hold it (another program has it). */
+export function overlayLockStatus(): { key: string; problem: "taken" | null; } {
+    const chosen = chosenLockKey();
+    const key = chosen ? chosen[1] : lockKeys(process.platform, true).map(([, label]) => label).join(" / ");
+    const open = widget !== null && !widget.window.isDestroyed();
+    return { key, problem: open && !recordingLock && lockLabel === null ? "taken" : null };
+}
+
+/**
+ * Keep a new lock key ("" for the default keys). A key the system will not
+ * give is not kept: the one before stays, and the answer is false.
+ */
+export function setOverlayLockBinding(binding: string): boolean {
+    if (binding) {
+        const accelerator = launcherAccelerator(binding);
+        if (!accelerator) return false;
+        // Nothing holds the lock key while no widget is open, so ask the
+        // system for it once and let it go again.
+        const open = widget !== null && !widget.window.isDestroyed();
+        if (open) releaseLockKey?.();
+        releaseLockKey = null;
+        lockLabel = null;
+        const trial = holdGlobalKey(accelerator, () => undefined);
+        trial?.();
+        if (!trial) {
+            if (open) holdLockKey();
+            return false;
+        }
+    }
+    settings.rememberOverlayLockBinding(binding);
+    recordingLock = false;
+    if (widget && !widget.window.isDestroyed()) holdLockKey();
+    return true;
+}
+
+/** Recording a new key in the settings: the lock key lets go meanwhile, so
+ *  the press reaches the page, and is taken back after. */
+let recordingLock = false;
+let recordingLockTimer: NodeJS.Timeout | null = null;
+/** The longest a recording keeps the key let go, as the launcher's does. */
+const RECORDING_MS = 30_000;
+
+export function recordOverlayLockKey(recording: boolean): void {
+    if (recordingLockTimer) clearTimeout(recordingLockTimer);
+    recordingLockTimer = null;
+    // Settings closed mid-recording never say they stopped: take it back anyway.
+    if (recording) recordingLockTimer = setTimeout(() => recordOverlayLockKey(false), RECORDING_MS);
+    recordingLock = recording;
+    if (!widget || widget.window.isDestroyed()) return;
+    if (recording) {
+        releaseLockKey?.();
+        releaseLockKey = null;
+        lockLabel = null;
+    } else if (!releaseLockKey) holdLockKey();
 }
 
 /** The call as the page in it last described it, or null outside one. */
@@ -146,7 +235,8 @@ export function refreshVoiceWidget(): void {
         inCall: state !== null,
         enabled: settings.toggle("voiceWidget"),
         onlyWithGame: settings.toggle("voiceWidgetGameOnly"),
-        gameRunning
+        gameRunning: game !== null,
+        gameOff: gameOff()
     });
     if (!visible || !state) {
         closeVoiceWidget();
@@ -257,7 +347,8 @@ function holdLockKey(): void {
     releaseLockKey?.();
     releaseLockKey = null;
     lockLabel = null;
-    for (const [accelerator, label] of lockKeys(process.platform, gameRunning)) {
+    if (recordingLock) return;
+    for (const [accelerator, label] of lockKeys(process.platform, game !== null, chosenLockKey())) {
         releaseLockKey = holdGlobalKey(accelerator, toggleLock);
         if (!releaseLockKey) continue;
         lockLabel = label;
@@ -393,6 +484,7 @@ function draw(replace = false): void {
         look: shape,
         actions: lockedActions(),
         buttons: quickActions(),
+        pinned: settings.toggle("voiceWidgetPinned"),
         anchor: bottom ? "bottom" : "top",
         ...(faceUpdate ? { faces: faceUpdate } : {})
     };
