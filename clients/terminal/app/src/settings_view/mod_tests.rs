@@ -157,8 +157,10 @@ const ALL_SECTIONS: &[SettingsSection] = &[
 /// Sections whose user-facing Display label has deliberately diverged from the
 /// slug it was seeded from, because the slug is a stored contract that the
 /// rename must not follow.
-const SECTIONS_WITH_RENAMED_DISPLAY_LABELS: &[SettingsSection] =
-    &[SettingsSection::PtermCloudAgentAPIKeys];
+const SECTIONS_WITH_RENAMED_DISPLAY_LABELS: &[SettingsSection] = &[
+    SettingsSection::PtermCloudAgentAPIKeys,
+    SettingsSection::Ptermify,
+];
 
 #[test]
 fn all_sections_list_is_exhaustive() {
