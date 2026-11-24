@@ -205,6 +205,13 @@ const EAGER_UI = [
     // later, and the shell's own screens load the module anyway.
     "liveRead.useKeptSnapshot",
     "liveRead.useLiveRead",
+    // An app's action kept while Polaris cannot be reached: functions and a
+    // hook over the device's own queue, no UI to draw later.
+    "offline.attempt",
+    "offline.discard",
+    "offline.keep",
+    "offline.retry",
+    "offline.useKept",
     "metricsHistory.CONSUMPTION_METRICS",
     "metricsHistory.PLAYER_METRICS",
     "relativeTime.RelativeTime",
