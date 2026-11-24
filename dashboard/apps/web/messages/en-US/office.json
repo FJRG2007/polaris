@@ -113,7 +113,9 @@
     "docEditor": {
         "opening": "Opening",
         "saving": "Saving",
-        "thatDidNotSaveYour": "That did not save. Your work is still on screen - check your connection."
+        "thatDidNotSaveYour": "That did not save. Your work is still on screen - check your connection.",
+        "offline": "Saved on this device. Sends when Polaris is back.",
+        "retry": "Try again"
     },
     "export": {
         "thatCouldNotBeMade": "That could not be made. Try again in a moment.",

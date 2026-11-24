@@ -36,10 +36,22 @@ export const OFFLINE_STORE_LIMITS: LocalStoreLimits = {
 export const offlineStore = createLocalStore(indexedDbStore("polaris-offline"), OFFLINE_STORE_LIMITS, snapshotBuild);
 
 const kinds = new Map<string, (entry: AppWrite) => Promise<QueueSendResult>>();
+/** Kinds whose writes add to each other (a document's changes) rather than
+ *  replace each other (a note's whole text). */
+const additive = new Set<string>();
 
-/** Name how one kind of write reaches the server. Called once, at import. */
-export function registerWriteKind(kind: string, deliver: (entry: AppWrite) => Promise<QueueSendResult>): void {
+/**
+ * Name how one kind of write reaches the server. Called once, at import.
+ * `additive` when each write is part of the whole rather than all of it, so
+ * what a closing tab left is put in line beside what was already waiting.
+ */
+export function registerWriteKind(
+    kind: string,
+    deliver: (entry: AppWrite) => Promise<QueueSendResult>,
+    options: { additive?: boolean } = {}
+): void {
     kinds.set(kind, deliver);
+    if (options.additive) additive.add(kind);
 }
 
 export const appWrites: WriteQueue<AppWrite> = createWriteQueue<AppWrite>({
@@ -51,7 +63,7 @@ export const appWrites: WriteQueue<AppWrite> = createWriteQueue<AppWrite>({
     deliver: (entry) => kinds.get(entry.kind)?.(entry) ?? Promise.resolve({ refused: "" })
 });
 
-type NewWrite = Omit<AppWrite, "state" | "attempts" | "createdAt">;
+export type NewWrite = Omit<AppWrite, "state" | "attempts" | "createdAt">;
 
 async function keptFor(kind: string, target: string): Promise<AppWrite[]> {
     return (await appWrites.readAll()).filter((entry) => entry.kind === kind && entry.target === target);
@@ -179,7 +191,13 @@ export function recoverUnloaded(): Promise<void> {
         const key = `${UNLOAD_PREFIX}${owner}`;
         // Each one leaves the list as it is queued (`replaceWrite`); one the
         // device could not keep stays for the next page.
-        for (const entry of readUnloaded(key)) await replaceWrite(entry).catch(() => false);
+        for (const entry of readUnloaded(key)) {
+            if (!additive.has(entry.kind)) {
+                await replaceWrite(entry).catch(() => false);
+                continue;
+            }
+            if (await appWrites.enqueue(entry).catch(() => false)) forgetUnloaded(entry.kind, entry.target);
+        }
     };
     recovering = { owner, done: run() };
     return recovering.done;

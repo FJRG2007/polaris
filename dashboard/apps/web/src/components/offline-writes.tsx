@@ -10,6 +10,7 @@
  */
 
 import "@/app/(app)/notes/offline-writes";
+import "@/app/(app)/office/offline-writes";
 import { appWrites, offlineStore, recoverUnloaded } from "@/lib/offline/app-writes";
 import { useQueueFlusher } from "@/lib/offline/write-queue";
 
