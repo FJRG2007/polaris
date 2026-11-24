@@ -80,6 +80,7 @@ vi.mock("@/lib/chat/access", () => ({
 }));
 
 vi.mock("@/lib/chat/messages", () => ({
+    refusePlainIfSealed: async () => undefined,
     send: async (
         _actor: { id: string },
         input: { channelId: string; body: string },

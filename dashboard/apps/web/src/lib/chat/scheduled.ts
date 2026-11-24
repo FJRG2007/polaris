@@ -24,7 +24,7 @@
  * Server-only.
  */
 
-import { send } from "./messages";
+import { refusePlainIfSealed, send } from "./messages";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { removeStoredFiles, type StoredAttachment } from "./attachments";
@@ -80,6 +80,9 @@ export async function scheduleMessage(
     attachments: readonly StoredAttachment[] = []
 ): Promise<string> {
     const access = await requirePostable(actor, input.channelId);
+    // A scheduled message is stored in the clear until it goes: refused now in
+    // a sealed conversation rather than when it fails to go.
+    await refusePlainIfSealed(input.channelId);
     // Said now rather than discovered when it fails to go. Asked again then as
     // well, through `send`: the owner may close it in between.
     await refuseRoomMention(actor, access, input.body);

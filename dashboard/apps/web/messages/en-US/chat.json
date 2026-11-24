@@ -17,6 +17,7 @@
         "directHasNoName": "A direct message has no name to change",
         "pollNotEditable": "A poll cannot be rewritten. Delete it and ask again.",
         "sealedNotEditable": "This message is encrypted and cannot be edited here. Reload the page and try again.",
+        "sealedOnly": "This conversation is end-to-end encrypted, and this can't be sent in it from here yet.",
         "sealedEditFailed": "The edit could not be saved. Your message is as it was.",
         "pollQuestionRequired": "Ask something first",
         "pollAnswersRequired": "Give it at least two answers",

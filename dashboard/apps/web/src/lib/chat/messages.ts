@@ -21,6 +21,7 @@ import {
     type ChatGroupInviteCard
 } from "./invite-cards";
 import { prisma, Prisma } from "@polaris/db";
+import { conversationSealed } from "@/lib/chat/e2ee/sealed-conversation";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
 import { rulesForChannel } from "./rules";
@@ -744,6 +745,7 @@ async function sendUnguarded(
     sealed: SealedColumns | null = null
 ): Promise<string> {
     const access = await requirePostable(actor, input.channelId);
+    if (!sealed) await refusePlainIfSealed(input.channelId);
     // A space's emoji only inside that space: anything else the text names is
     // written down as its name - see `confineCustomEmoji`.
     input = { ...input, body: await confineCustomEmoji(input.body, access.spaceId) };
@@ -1064,6 +1066,16 @@ async function refuseIfBlocked(actor: ChatActor, access: ChannelAccess): Promise
  * whole instance would punish a busy afternoon in one channel by silencing
  * everybody's direct messages.
  */
+/**
+ * Refuse a write in the clear into a sealed conversation
+ * (`lib/chat/e2ee/sealed-conversation`): a sealed one carries its own content
+ * and never comes through here without it. Off, and so never refusing, while
+ * sealed chat is.
+ */
+export async function refusePlainIfSealed(channelId: string): Promise<void> {
+    if (await conversationSealed(channelId)) throw new ChatRuleError({ key: "errors.sealedOnly" });
+}
+
 async function requireSendable(
     actor: ChatActor,
     access: ChannelAccess,
@@ -1200,6 +1212,9 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
     // put the new words in the clear beside the ciphertext. Its edit is sealed
     // too (`editSealed` in lib/chat/e2ee/sealed-messages, docs/chat-e2ee-mls.md).
     if (message.e2eeEpoch != null) throw new ChatRuleError({ key: "errors.sealedNotEditable" });
+    // Nor a plain message's, once its conversation is sealed: the new words
+    // would be in the clear in a conversation that takes only sealed ones.
+    await refusePlainIfSealed(message.channelId);
     // Held to the space's emoji like a send is, or an edit would be the way in.
     input = { ...input, body: await confineCustomEmoji(input.body, editable.spaceId) };
     // The length and the instance's own limit, but never the wait: slow mode is

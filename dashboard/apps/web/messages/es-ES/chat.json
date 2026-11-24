@@ -17,6 +17,7 @@
         "directHasNoName": "Un mensaje directo no tiene nombre que cambiar",
         "pollNotEditable": "Una encuesta no se puede reescribir. Bórrala y vuelve a preguntar.",
         "sealedNotEditable": "Este mensaje está cifrado y no se puede editar aquí. Recarga la página e inténtalo de nuevo.",
+        "sealedOnly": "Esta conversación está cifrada de extremo a extremo y esto aún no se puede enviar aquí.",
         "sealedEditFailed": "No se pudo guardar la edición. Tu mensaje sigue como estaba.",
         "pollQuestionRequired": "Pregunta algo antes",
         "pollAnswersRequired": "Añade al menos dos respuestas",
