@@ -10,6 +10,10 @@ const ran: { tool: string; input: unknown }[] = [];
 const answered: unknown[][] = [];
 let row: Record<string, unknown> | null = null;
 let claimed = 1;
+const created: Record<string, unknown>[] = [];
+const sealedCalls: { kind: string; args: unknown[] }[] = [];
+/** Whether Polar's device can still open the sealed question. */
+let sealedOpens = true;
 
 function entry(name: string, category: string, writes: boolean) {
     return { name, category, writes };
@@ -26,6 +30,7 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         polarChatCall: {
             findUnique: async () => row,
+            create: async ({ data }: { data: Record<string, unknown> }) => void created.push(data),
             deleteMany: async () => ({ count: claimed })
         },
         chatMessage: {
@@ -34,6 +39,7 @@ vi.mock("@polaris/db", () => ({
                 channelId: "c1",
                 authorId: "u1",
                 parentId: null,
+                replyToId: null,
                 body: "@polar make a task",
                 deletedAt: null
             })
@@ -74,6 +80,16 @@ vi.mock("@/lib/chat/polar-mention", () => ({
         return "m1";
     }
 }));
+vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: Buffer.alloc(32, 7).toString("base64") }) }));
+vi.mock("@/lib/chat/e2ee/sealed-polar", () => ({
+    approveSealedPolar: async (question: unknown, answerId: string, run: () => Promise<unknown>) => {
+        if (!sealedOpens) return false;
+        const done = await run();
+        sealedCalls.push({ kind: "approve", args: [question, answerId, done] });
+        return done !== null;
+    },
+    cancelSealedPolar: async (...args: unknown[]) => void sealedCalls.push({ kind: "cancel", args })
+}));
 vi.mock("@/lib/chat/text", () => ({
     chatWordsFor: async () => (key: string) => key,
     chatText: (_locale: string, text: { key: string }) => text.key
@@ -102,6 +118,9 @@ function pressed(userId: string, value = "call1") {
 beforeEach(() => {
     ran.length = 0;
     answered.length = 0;
+    created.length = 0;
+    sealedCalls.length = 0;
+    sealedOpens = true;
     claimed = 1;
     row = {
         id: "call1",
@@ -195,5 +214,78 @@ describe("a change as it is shown", () => {
         expect(lines[1]).toBe("- name: a b");
         expect(lines[2]!.length).toBeLessThan(220);
         expect(lines).toHaveLength(3);
+    });
+});
+
+describe("a change offered in a sealed conversation", () => {
+    const call = { tool: "tasks_create", title: "tasks_create", input: { list: "Inbox", name: "Fix staging" } };
+    const earlier = [{ tool: "tasks_list", title: "tasks_list", ok: true, text: "3 tasks" }];
+    const hold = () => calls.holdCall({ id: "call1", ownerId: "u1", messageId: "m1", mentionId: "q1", call, done: earlier, sealed: true });
+
+    it("is kept with no word of it in the clear, and opens back whole", async () => {
+        await hold();
+        const kept = created[0]!;
+        expect(kept).toMatchObject({ id: "call1", tool: "tasks_create", input: {} });
+        const stored = JSON.stringify(kept);
+        expect(stored).not.toContain("Fix staging");
+        expect(stored).not.toContain("3 tasks");
+        expect(calls.openHeld(kept as never)).toEqual({ input: call.input, done: earlier, sealed: true });
+        // Plain rows read as before.
+        expect(calls.openHeld({ id: "x", input: { a: 1 }, done: [] })).toEqual({ input: { a: 1 }, done: [], sealed: false });
+    });
+
+    it("does not open on another row", async () => {
+        await hold();
+        expect(calls.openHeld({ ...(created[0] as { input: unknown; done: unknown }), id: "call2" })).toBeNull();
+        const done = created[0]!.done as { sealed: { ciphertext: string } };
+        const bytes = Buffer.from(done.sealed.ciphertext, "base64");
+        bytes[0] = bytes[0]! ^ 1;
+        expect(calls.openHeld({ id: "call1", input: {}, done: { sealed: { ...done.sealed, ciphertext: bytes.toString("base64") } } })).toBeNull();
+    });
+
+    it("runs on approval and is answered sealed, with the earlier changes", async () => {
+        await hold();
+        row = { ...row, ...created[0], createdAt: new Date() };
+        const { press } = pressed("u1");
+        await calls.approveCall(press as never);
+        expect(ran).toEqual([{ tool: "tasks_create", input: call.input }]);
+        expect(answered).toHaveLength(0);
+        expect(sealedCalls).toEqual([
+            {
+                kind: "approve",
+                args: [
+                    { channelId: "c1", messageId: "q1", authorId: "u1", parentId: null, replyToId: null },
+                    "m1",
+                    [...earlier, { tool: "tasks_create", title: "tasks_create", ok: true, text: "tasks_create ran" }]
+                ]
+            }
+        ]);
+    });
+
+    it("runs nothing when Polar can no longer open the question", async () => {
+        await hold();
+        row = { ...row, ...created[0], createdAt: new Date() };
+        sealedOpens = false;
+        const { press } = pressed("u1");
+        await expect(calls.approveCall(press as never)).rejects.toMatchObject({ text: { key: "errors.componentGone" } });
+        expect(ran).toHaveLength(0);
+    });
+
+    it("runs nothing when the kept change no longer opens", async () => {
+        await hold();
+        row = { ...row, ...created[0], id: "call1", done: { sealed: { ciphertext: "AAAA", nonce: "AAAA", keyId: "x" } }, createdAt: new Date() };
+        const { press } = pressed("u1");
+        await expect(calls.approveCall(press as never)).rejects.toMatchObject({ text: { key: "errors.componentGone" } });
+        expect(ran).toHaveLength(0);
+    });
+
+    it("is cancelled sealed, never with a clear body", async () => {
+        await hold();
+        row = { ...row, ...created[0], createdAt: new Date() };
+        const { press, updates } = pressed("u1");
+        await calls.cancelCall(press as never);
+        expect(ran).toHaveLength(0);
+        expect(updates).toEqual([]);
+        expect(sealedCalls).toEqual([{ kind: "cancel", args: ["c1", "m1", "polar.callCancelled"] }]);
     });
 });

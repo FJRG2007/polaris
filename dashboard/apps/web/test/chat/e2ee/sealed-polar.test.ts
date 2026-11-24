@@ -1,8 +1,9 @@
 /**
  * Server-run members in a sealed conversation: Polar, added there, opens a
  * sealed question with its own MLS device, reads the sealed conversation
- * before it, and answers sealed - never in the clear, with no tools and no
- * draft streamed while it writes; a webhook's post there is sealed by the
+ * before it, and answers sealed - never in the clear, with no draft streamed
+ * while it writes; a change it offers is sealed in the answer, and Approve and
+ * Cancel seal what follows over it; a webhook's post there is sealed by the
  * webhook's device. Against a person's device over the route. Skipped where
  * the Node binding is not built (CI's MLS job requires it).
  */
@@ -25,8 +26,9 @@ const state = vi.hoisted(() => ({
     posted: 0,
     sent: 0,
     /** What the model answers next, in order; the usual answer once they run out. */
-    answers: [] as { text: string; problem: string | null }[],
-    updates: [] as Row[]
+    answers: [] as { text: string; problem: string | null; pending?: unknown }[],
+    updates: [] as Row[],
+    held: [] as Row[]
 }));
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: Buffer.alloc(32, 9).toString("base64") }) }));
@@ -85,9 +87,9 @@ vi.mock("@/lib/chat/agent-message", () => ({
 }));
 vi.mock("@/lib/chat/polar-calls", () => ({
     MENTION_STEPS: 3,
-    callComponents: () => [],
-    describeCall: () => "",
-    holdCall: async () => undefined,
+    callComponents: (id: string, asker: string) => [{ type: "button", action: "polar.approve", value: id, for: asker }],
+    describeCall: (call: { title: string; input: unknown }) => `Wants to ${call.title}: ${JSON.stringify(call.input)}`,
+    holdCall: async (input: Row) => void state.held.push(input),
     mentionToolkit: async () => ({ tools: {} }),
     mentionToolRules: () => []
 }));
@@ -95,7 +97,7 @@ vi.mock("@/lib/polar/mention-answer", () => ({
     questionOf: (question: string) => question.replace(/@polar/gi, "").trim(),
     answerMentionWithReason: async (input: Row) => {
         state.asked.push(input);
-        return { ...(state.answers.shift() ?? { text: "You said the build is green.", problem: null }), pending: null };
+        return { pending: null, ...(state.answers.shift() ?? { text: "You said the build is green.", problem: null }) };
     }
 }));
 vi.mock("@polaris/db", async () => ({ prisma: (await import("./support/mls-tables")).memoryPrisma(state), Prisma: { DbNull: null } }));
@@ -104,7 +106,7 @@ const { handleMls } = await import("@/lib/chat/e2ee/mls-handler");
 const { MlsDevice, MlsRequestError } = await import("@/lib/chat/e2ee/mls-client");
 const { IndexedDbMlsStore } = await import("@polaris/core-rs/mls-store");
 const { forgetServiceDevice, withServiceDevice } = await import("@/lib/chat/e2ee/service-device");
-const { answerSealedPolar } = await import("@/lib/chat/e2ee/sealed-polar");
+const { answerSealedPolar, approveSealedPolar, cancelSealedPolar } = await import("@/lib/chat/e2ee/sealed-polar");
 const { postThroughWebhook } = await import("@/lib/chat/webhooks");
 const { pressComponent } = await import("@/lib/chat/component-actions");
 const { encodeSealedContent, decodeSealedContent } = await import("@/lib/chat/e2ee/sealed-chat");
@@ -131,6 +133,7 @@ beforeEach(() => {
     state.posted = 0;
     state.answers = [];
     state.updates = [];
+    state.held = [];
     state.members = new Set([`${ALICE}:${CHANNEL}`]);
 });
 
@@ -195,7 +198,8 @@ describe.skipIf(!nativeFile)("Polar and a webhook against a person's device", ()
         const input = state.asked[0] as { prompt: string; toolkit: unknown; draft?: unknown };
         expect(input.prompt).toContain("Alice: the build is green");
         expect(input.prompt).toContain("what did I say?");
-        expect(input.toolkit).toBeNull();
+        // The asker's tools, as in a plain conversation.
+        expect(input.toolkit).toEqual({ tools: {} });
         expect(input.draft).toBeUndefined();
         expect(state.posted).toBe(0);
 
@@ -241,6 +245,59 @@ describe.skipIf(!nativeFile)("Polar and a webhook against a person's device", ()
         const answer = state.tables.chatMessage?.find((r) => r.agent === "polar") as Row;
         expect(state.updates[0]).toMatchObject({ components: [{ type: "link", href: "/polar/settings/providers" }], edited: false });
         expect(await opened(person, answer.id as string)).toBe("Polar has no provider.");
+    }, 30_000);
+
+    const offer = async () => {
+        const person = await alice();
+        await addPolar();
+        state.answers.push({ text: "I will make it.", problem: null, pending: { tool: "tasks_create", title: "Create task", input: { name: "Fix staging" } } });
+        const asked = await say(person, "@polar make a task called Fix staging");
+        await vi.waitFor(() => expect(state.held).toHaveLength(1), { timeout: 15_000 });
+        const answer = state.tables.chatMessage?.find((r) => r.agent === "polar") as Row;
+        return { person, asked, answer };
+    };
+
+    it("offers a change sealed, its buttons after, and keeps it sealed for the approval", async () => {
+        const { person, answer } = await offer();
+        expect(answer.body).toBe("");
+        const text = await opened(person, answer.id as string);
+        expect(text).toContain("I will make it.");
+        expect(text).toContain("Fix staging");
+        const callId = (state.held[0] as { id: string }).id;
+        expect(state.held[0]).toMatchObject({ messageId: answer.id, ownerId: ALICE, sealed: true });
+        expect(state.updates[0]).toMatchObject({ messageId: answer.id, edited: false, components: [{ action: "polar.approve", value: callId, for: ALICE }] });
+        expect(state.posted).toBe(0);
+    }, 30_000);
+
+    it("answers an approval sealed over the offer, with what was done", async () => {
+        const { person, asked, answer } = await offer();
+        state.answers.push({ text: "Made the task Fix staging.", problem: null });
+        const done = [{ tool: "tasks_create", title: "Create task", ok: true, text: "made it" }];
+        const question = { ...QUESTION, messageId: asked };
+        expect(await approveSealedPolar(question, answer.id as string, async () => done)).toBe(true);
+        expect((state.asked[1] as { prompt: string }).prompt).toContain("made it");
+        expect(state.tables.chatMessage?.filter((r) => r.agent === "polar")).toHaveLength(1);
+        expect(answer).toMatchObject({ body: "", e2eeRevision: 1, components: null });
+        expect(await opened(person, answer.id as string)).toBe("Made the task Fix staging.");
+    }, 30_000);
+
+    it("runs nothing on an approval once Polar is taken out", async () => {
+        const { asked, answer } = await offer();
+        state.tables.chatServiceMember = [];
+        let ran = false;
+        const result = await approveSealedPolar({ ...QUESTION, messageId: asked }, answer.id as string, async () => {
+            ran = true;
+            return [];
+        });
+        expect(result).toBe(false);
+        expect(ran).toBe(false);
+    }, 30_000);
+
+    it("seals a cancellation over the offer and takes its buttons off", async () => {
+        const { person, answer } = await offer();
+        await cancelSealedPolar(CHANNEL, answer.id as string, "Cancelled.");
+        expect(answer).toMatchObject({ body: "", e2eeRevision: 1, components: null });
+        expect(await opened(person, answer.id as string)).toBe("Cancelled.");
     }, 30_000);
 
     it("edits nothing of a person's with Polar's device", async () => {
