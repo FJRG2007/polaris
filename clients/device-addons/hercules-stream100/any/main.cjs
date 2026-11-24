@@ -18,24 +18,28 @@ const RETRY_MS = 3_000;
 const OWNERSHIP_EVERY_MS = 15_000;
 const CALL_TIMEOUT_MS = 10_000;
 
-/** What the add-on's page header says while the controller cannot be read. */
+/**
+ * What the add-on's page header says while the controller cannot be read.
+ * `code` names the sentence so the page can say it in the reader's language;
+ * `detail` is the English one, for an app or page older than codes.
+ */
 function describe(error, ownership) {
-    if (error === "busy") return { state: "busy", detail: "Another program is using the Stream 100." };
-    if (error === "noAccess") return { state: "error", detail: "This computer does not let Polaris open the Stream 100 yet." };
-    if (error === "unsupported") return { state: "error", detail: "The Stream 100 cannot be read on this system yet." };
-    if (error === "io") return { state: "sleeping", detail: "The Stream 100 stopped answering. Trying again." };
+    if (error === "busy") return { state: "busy", code: "otherProgram", detail: "Another program is using the Stream 100." };
+    if (error === "noAccess") return { state: "error", code: "noAccess", detail: "This computer does not let Polaris open the Stream 100 yet." };
+    if (error === "unsupported") return { state: "error", code: "unsupported", detail: "The Stream 100 cannot be read on this system yet." };
+    if (error === "io") return { state: "sleeping", code: "stopped", detail: "The Stream 100 stopped answering. Trying again." };
     const held = ownership?.ownership;
-    if (!held || held.state === "absent") return { state: "sleeping", detail: "Not plugged in." };
+    if (!held || held.state === "absent") return { state: "sleeping", code: "unplugged", detail: "Not plugged in." };
+    if (held.state === "herculesBusy") {
+        return { state: "busy", code: "herculesApp", detail: "Hercules Stream Control is running the Stream 100, so its knobs follow that app for now." };
+    }
     // Closing Stream Control does not free the device: the Hercules driver stays
     // bound to all of it, and Polaris does not read through that driver yet.
-    if (held.state === "herculesBusy") {
-        return { state: "busy", detail: "Hercules Stream Control is running the Stream 100, so its knobs follow that app for now." };
-    }
     if (held.state === "herculesSdk") {
-        return { state: "busy", detail: "The Hercules driver holds the Stream 100 and Polaris cannot read through it yet. Open Hercules Stream Control to use the knobs meanwhile." };
+        return { state: "busy", code: "herculesDriver", detail: "Polaris can't use the Stream 100 yet: the Hercules software has it. Until then, use Hercules Stream Control." };
     }
     if (held.state === "unknown") return { state: "busy", detail: `Another driver holds the Stream 100 (${String(held.service).slice(0, 60)}).` };
-    return { state: "error", detail: "The Stream 100 is plugged in, but its controls were not found." };
+    return { state: "error", code: "noControls", detail: "The Stream 100 is plugged in, but its controls were not found." };
 }
 
 /**

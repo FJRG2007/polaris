@@ -26,7 +26,6 @@ import {
     readAddonSettingValues,
     type AddonEntry,
     type AddonManifest,
-    type AddonPermission,
     type AddonSetting,
     type AddonSettingGroup,
     type AddonSettingValue,
@@ -38,25 +37,21 @@ import {
     addonOffer,
     useAddons,
     useInstallAddon,
+    statusSentence,
+    PERMISSION_KEY,
     type AddonListing,
     type AddonOffer,
     type AddonsBridge,
     type AddonsState
 } from "@/lib/device-addons-client";
 import { pageIsDark } from "@/lib/page-theme";
+import { OfficialSoftware } from "./official-software";
+import { useOfficialChoice } from "./official-choice-dialog";
 import { addonViewHeight, addonViewHello, addonViewUrl, readAddonViewMessage, readAddonViewReply, watchAddonViewLook, ADDON_VIEW_HEIGHT } from "@/lib/device-addon-view";
 
 type Words = ReturnType<typeof useTranslations<"account">>;
 type Tab = "browse" | "installed" | "updates";
 type Category = "" | (typeof ADDON_CATEGORIES)[number];
-
-const PERMISSION_KEY: Record<AddonPermission, string> = {
-    usb: "usb",
-    "audio-sessions": "audioSessions",
-    display: "display",
-    "polaris-actions": "polarisActions",
-    network: "network"
-};
 
 /** The picker's list: `call.leave` reads as hang up, so it is offered once, as `call.hangup`. */
 const PICKABLE_ACTIONS = ADDON_ACTIONS.filter((action) => action !== "call.leave");
@@ -69,10 +64,12 @@ function manifestOf(listing: AddonListing): AddonManifest | null {
     return listing.entry ?? listing.installed?.manifest ?? null;
 }
 
-function runLabel(t: Words, installed: InstalledAddon): { status: string; label: string } {
+/** The badge's short word for how an add-on runs, and the sentence its add-on said about the device, if any. */
+function runLabel(t: Words, installed: InstalledAddon): { status: string; label: string; detail?: string } {
     const run = installed.run;
     if ("status" in run && run.status && (run.state === "running" || run.state === "starting")) {
-        return { status: run.status.state === "connected" ? "running" : run.status.state === "error" ? "failed" : "idle", label: run.status.detail ?? say(t, `status.${run.status.state}`) };
+        const sentence = statusSentence(run.status.code);
+        return { status: run.status.state === "connected" ? "running" : run.status.state === "error" ? "failed" : "idle", label: say(t, `status.${run.status.state}`), detail: sentence ? say(t, sentence) : run.status.detail };
     }
     return { status: run.state === "running" ? "running" : run.state === "failed" || run.state === "missing" ? "failed" : "idle", label: say(t, `status.${run.state}`) };
 }
@@ -140,6 +137,7 @@ function useInstallFlow(bridge: AddonsBridge | null, snapshot: AddonsSnapshot | 
     const toast = useToast();
     const [confirm, element] = useConfirm();
     const install = useInstallAddon(bridge);
+    const [offerOfficial, officialElement] = useOfficialChoice(bridge);
     const start = (entry: AddonEntry) => {
         const installed = snapshot?.installed.find((item) => item.id === entry.id) ?? null;
         const updating = Boolean(installed?.update);
@@ -148,6 +146,7 @@ function useInstallFlow(bridge: AddonsBridge | null, snapshot: AddonsSnapshot | 
         const lead = updating ? (asks.length > 0 ? say(t, "update.added") : say(t, "update.noNew")) : asks.length > 0 ? say(t, "install.asks") : say(t, "install.none");
         const description = [lead, ...asks, ""].join("\n");
         void (async () => {
+            if (!updating && (await offerOfficial(entry))) return;
             const ok = await confirm(
                 updating
                     ? { title: say(t, "update.title", { name: entry.name, version: entry.version }), description, confirmLabel: say(t, "update.confirm") }
@@ -158,7 +157,13 @@ function useInstallFlow(bridge: AddonsBridge | null, snapshot: AddonsSnapshot | 
             if (problem) toast.show({ title: say(t, `failure.${problem === "app-version" ? "appVersion" : problem}`) });
         })();
     };
-    return [start, element];
+    return [
+        start,
+        <>
+            {element}
+            {officialElement}
+        </>
+    ];
 }
 
 function hrefOf(id: string): string {
@@ -739,6 +744,9 @@ export function AddonPage({ id }: { id: string }) {
                             <StatusBadge status={run.status} label={run.label} />
                         </div>
                     ) : null}
+                    {run?.detail ? (
+                        <p className="mt-1 text-sm text-muted-foreground">{run.detail}</p>
+                    ) : null}
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                     {offer.kind !== "installed" ? <OfferButton offer={offer} href={hrefOf(id)} size="md" onInstall={() => entry && startInstall(entry)} /> : null}
@@ -752,6 +760,7 @@ export function AddonPage({ id }: { id: string }) {
                     ) : null}
                 </div>
             </header>
+            <OfficialSoftware id={id} bridge={state.bridge} />
             <p className="text-sm">{manifest.summary}</p>
             {installed?.update && installed.consent.length > 0 ? (
                 <Notice

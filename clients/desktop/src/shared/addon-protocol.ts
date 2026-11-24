@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { ADDON_ACTIONS, type AddonPermission, type AddonSettingValue, type UsbDevice } from "@polaris/core/device-addons";
+import { ADDON_ACTIONS, ADDON_STATUS_CODE, type AddonPermission, type AddonSettingValue, type UsbDevice } from "@polaris/core/device-addons";
 
 /** The methods an add-on may call, and the permission each one needs (null: none). */
 export const ADDON_METHODS = {
@@ -44,7 +44,7 @@ export const addonMessageSchema = z.discriminatedUnion("type", [
     z.object({ type: z.literal("ready") }),
     z.object({ type: z.literal("log"), level: z.enum(["info", "warn", "error"]), text: z.string().max(2_000) }),
     /** What it wants the add-on's Settings page header to say about its device. */
-    z.object({ type: z.literal("status"), state: z.enum(["connected", "sleeping", "busy", "error"]), detail: z.string().max(200).optional() }),
+    z.object({ type: z.literal("status"), state: z.enum(["connected", "sleeping", "busy", "error"]), detail: z.string().max(200).optional(), code: ADDON_STATUS_CODE.optional() }),
     callSchema
 ]);
 

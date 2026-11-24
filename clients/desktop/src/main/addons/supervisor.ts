@@ -36,7 +36,7 @@ export interface AddonRun {
     readonly state: RunState;
     readonly crashes: number;
     /** What the add-on last said about its device. */
-    readonly status: { readonly state: "connected" | "sleeping" | "busy" | "error"; readonly detail?: string; } | null;
+    readonly status: { readonly state: "connected" | "sleeping" | "busy" | "error"; readonly detail?: string; readonly code?: string; } | null;
 }
 
 export interface SupervisorOptions {
@@ -103,7 +103,7 @@ export function createSupervisor(options: SupervisorOptions) {
                 changed();
             } else if (message.type === "log") options.log?.(manifest.id, message.level, message.text);
             else if (message.type === "status") {
-                slot.status = message.detail === undefined ? { state: message.state } : { state: message.state, detail: message.detail };
+                slot.status = { state: message.state, ...(message.detail === undefined ? {} : { detail: message.detail }), ...(message.code === undefined ? {} : { code: message.code }) };
                 changed();
             } else {
                 const verdict = judgeCall(slot.wanted.granted, message.method, message.params);

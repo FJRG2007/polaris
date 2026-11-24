@@ -10,7 +10,7 @@ import { readAddonManifest } from "@polaris/core/device-addons";
 const folder = new URL("../../../../device-addons/hercules-stream100/", import.meta.url);
 const entry = createRequire(import.meta.url)(fileURLToPath(new URL("any/main.cjs", folder))) as {
     run(options: unknown): void;
-    describe(error: string, ownership: unknown): { state: string; detail?: string; };
+    describe(error: string, ownership: unknown): { state: string; detail?: string; code?: string; };
 };
 
 type Read = { report?: Uint8Array; error?: string; };
@@ -71,6 +71,15 @@ describe("Hercules Stream 100 add-on", () => {
         expect(entry.describe("noAccess", null).state).toBe("error");
     });
 
+    it("names every sentence it can, so the page says it in the reader's language", () => {
+        const cases: [string, unknown][] = [["busy", null], ["noAccess", null], ["unsupported", null], ["io", null], ["notFound", { ownership: { state: "absent" } }], ["notFound", { ownership: { state: "herculesBusy" } }], ["notFound", { ownership: { state: "herculesSdk" } }], ["notFound", { ownership: { state: "other" } }]];
+        const codes = cases.map(([error, held]) => entry.describe(error, held).code);
+        expect(codes).toEqual(["otherProgram", "noAccess", "unsupported", "stopped", "unplugged", "herculesApp", "herculesDriver", "noControls"]);
+        for (const [error, held] of cases) expect(addonMessageSchema.safeParse({ type: "status", ...entry.describe(error, held) }).success).toBe(true);
+        // The service's own name is only in the English words, so that one stays uncoded.
+        expect(entry.describe("notFound", { ownership: { state: "unknown", service: "Foo" } }).code).toBeUndefined();
+    });
+
     it("reports in, call actions out to the app, under the names the app knows", async () => {
         const report = new Uint8Array(11);
         const fake = fakeNative([{ error: "notFound" }, { report }], [["call.hangup", "call.mic"]]);
@@ -82,7 +91,7 @@ describe("Hercules Stream 100 add-on", () => {
 
         for (const message of sent) expect(addonMessageSchema.safeParse(message).success).toBe(true);
         expect(sent[0]).toEqual({ type: "ready" });
-        expect(sent).toContainEqual({ type: "status", state: "busy", detail: "The Hercules driver holds the Stream 100 and Polaris cannot read through it yet. Open Hercules Stream Control to use the knobs meanwhile." });
+        expect(sent).toContainEqual({ type: "status", state: "busy", code: "herculesDriver", detail: "Polaris can't use the Stream 100 yet: the Hercules software has it. Until then, use Hercules Stream Control." });
         expect(sent).toContainEqual({ type: "status", state: "connected" });
         expect(fake.feed).toHaveBeenCalledWith(report, 1_000);
         const calls = sent.filter((message) => (message as { type: string; }).type === "call") as { id: number; params: unknown; }[];

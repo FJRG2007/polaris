@@ -379,3 +379,93 @@ What is built on top of it:
 - Sign-out deletes the browser's MLS device, but its leaf stays in each group
   until another member removes it (`reconcile` removes only the leaves of
   accounts that left, not a signed-out device of an account still in it).
+
+## Turning it on: what is missing (2026-11-24)
+
+`POLARIS_INTERNAL_CHAT_E2EE` stays off until every row marked "Yes" below is
+done and verified. Ordered by what has to land first; the percentage is a rough
+share of the work, not of the code.
+
+| # | Gap | Blocks default-on? | Done |
+| --- | --- | --- | --- |
+| 1 | **Real-browser run of the sealed flows.** Not yet run end to end against a production build (see the note under this table). | Yes | ~10% |
+| 2 | **A plain write into a sealed conversation is still accepted.** `conversationSealed` gates only Polar and webhooks; `sendAction`, scheduled messages, polls, attachments, the API, automations and an older desktop or extension build can still post a body in the clear into a conversation that has an `MlsGroup`. Needs a per-conversation "sealed only" cut the server enforces (proposal 8.2 M4, 8.6), with the client capability it depends on. | Yes | 0% |
+| 3 | **Message kinds that are still plain.** Attachments (file bytes and names), voice notes, polls, scheduled messages, forum post titles, server-side translations, link cards. Each needs a sealed form (proposal 10b for files: encrypted in the browser, the key inside the sealed message). Until then a sealed conversation leaks whatever is sent as one of these. | Yes | ~15% (text, edits, replies, threads, Polar, webhooks are sealed) |
+| 4 | **Default-on switch.** `chatE2eeEnabled()` reads `=== "1"`. Default-on has to be on with nothing set and keep an env kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md). | Yes | 0% (one line, last) |
+| 5 | **Migration of existing chats** (proposal 8): nothing is built - no per-conversation state table, no server-side migrator sealing legacy history under `HK(c, legacy)`, no backup gate, no M3 verification, no cut-over, no purge of the plain columns, no admin progress line. Today an existing conversation becomes sealed only from the next message a sealed browser sends; everything before stays plain. | Yes (owner: every existing chat migrated) | 0% |
+| 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
+| 7 | **Key transparency** (proposal 4.6): `AccountKeyVerifier` has no log behind it, so a server could hand out a substitute account key. Safety numbers and key-change notices are not built. | Yes, for "government-grade" | 0% |
+| 8 | **Device hygiene**: a signed-out browser's leaf stays in each group until someone removes it; inactive-device removal (decision 7) and the "new device added" notice are not built. | Yes, for post-compromise security | ~10% |
+| 9 | **Server features that read chat text**: whole-Polaris export/import and backups carry sealed rows but no keys; moderation reports, retention and compliance export (proposal 9), automations that read messages. Each needs its sealed answer or an explicit "not in sealed conversations". | Partly (export/import must round-trip) | ~10% |
+| 10 | **Search on a new browser** (proposal 6.1, encrypted shared index segments): the device index finds only what this browser opened. | No (documented limit) | ~40% |
+| 11 | **Web code trust** (proposal 4.7): published hash of the crypto bundle, extension and desktop checking it, strict CSP and Trusted Types on message rendering. | No for default-on; yes for intelligence deployments | ~10% |
+| 12 | **Large channels**: steady-state commit size with a filled tree is unmeasured (phase 0); batched adds and removes for 10,000-member channels are not built. | For big spaces | ~20% |
+
+Rough overall to "on by default, every existing chat migrated, recoverable":
+about 30%. Text messaging between people on the web, with edits, Polar and
+webhooks, is built and covered by tests against the real MLS binding; the
+migration, the plain-write cut, the other message kinds, `ORK` and
+transparency are the bulk of what is left.
+
+Real-browser run: a production build can be served against a real PostgreSQL
+started natively (no Docker) with every migration applied, two seeded accounts
+and a DM; the run that drives two headless Chromium contexts through sign-in
+(account key creation), a sealed send each way, reload, a sealed edit and a
+second browser of the same account is the next step of row 1.
+
+## Proposal: the organisation recovery key (not built)
+
+Goal: an account that loses every factor of its own gets its account key and
+history back without the server ever being able to do it alone (proposal 3.4
+mode A). Nothing below needs a new `.env` key.
+
+- **The key.** `ORK` is an X-Wing HPKE pair (the account key's suite,
+  `@hpke/hybridkem-x-wing`, its own label), one per organisation and one for
+  the instance (the shared chat), each with a version. It is generated in a
+  custodian's browser, never on the server.
+- **Custodians and quorum.** The admin who sets it up names N custodians among
+  the organisation's admins and a threshold M (proposal: 2 of 3; 1 of 1 allowed
+  on a single-admin instance with the security screen saying so). The private
+  key is split with Shamir M-of-N over GF(256) in the browser, through a vetted
+  implementation in `core-rs` and the existing wasm build, never a hand-rolled
+  one; each share is HPKE-sealed to that custodian's account key
+  (`hybrid-envelope.ts`) and the whole key is wiped. The server stores only the
+  public key and the sealed shares.
+- **Why the server cannot swap it.** The public key goes out inside a statement
+  `{orgId, version, publicKey, custodians, M}` signed by every custodian's
+  account signing key. A client seals to `ORK` only after checking at least M
+  signatures from admins of that organisation whose account keys it has
+  verified (with 4.6, through the transparency log). A statement it cannot
+  verify means nothing is sealed to `ORK`, never a fallback.
+- **What is sealed to it.** (a) The `org` history-key envelope:
+  `sealHistoryKey` adds one envelope per epoch for the conversation's `ORK`
+  (the organisation's for an organisation conversation, the instance's for the
+  shared chat, one per organisation for a DM across organisations), bound to
+  channel, epoch and `ORK` version. (b) An `org` account-key lock: the account
+  key sealed to its organisation's `ORK`, written by the account's own browser
+  after sign-in like the other locks. (c) Legacy history the migration seals for
+  members with no account key.
+- **Recovery.** After a full sign-in (with the second factor if the account has
+  one), the recovering browser opens a request carrying a fresh ephemeral HPKE
+  key. Each approving custodian's browser opens its share with its own account
+  key and reseals it to that ephemeral key; the server only relays sealed
+  shares. With M shares the recovering browser rebuilds the private key in
+  memory, opens the account's `org` lock, re-creates its own locks and wipes
+  `ORK`. Every request and approval goes into the chained audit log and
+  notifies the account and every custodian; requests expire and are rate
+  limited per account.
+- **Rotation.** A custodian change makes a new version. Old versions stay valid
+  for what was sealed under them until a custodian's browser, with the quorum,
+  rebuilds the old key and reseals its envelopes to the new version in batches;
+  then the old shares are deleted. A departing custodian's share alone opens
+  nothing below M.
+- **No-intervention delegation** (proposal 3.5) stays a separate,
+  off-by-default setting that the security screen labels as server custody for
+  the accounts it covers.
+- **Schema (additive).** `ChatRecoveryKey` (`orgId` null for the instance,
+  `version`, `publicKey`, `statement`, `signatures`, `threshold`, `createdAt`,
+  `retiredAt`), `ChatRecoveryShare` (`keyId`, `custodianId`, `envelope`),
+  `ChatRecoveryRequest` and `ChatRecoveryApproval` (sealed share, expiry). The
+  `org` envelope reuses `ChatHistoryKey` with a recipient kind.
+- **Owner decisions.** Default threshold, whether mode B (no `ORK`) is offered
+  per organisation, and the request expiry.
