@@ -161,6 +161,8 @@ export const mlsBody = z.discriminatedUnion("op", [
         messageId: z.string().uuid(),
         epoch,
         senderLeaf: z.number().int().min(0).max(0xffffffff),
+        // The version this one is: the stored one's revision plus one.
+        revision: z.number().int().min(1).max(0x7fffffff),
         ciphertext: base64Url(17, 256 * 1024),
         signature: base64Url(64, 64)
     }),

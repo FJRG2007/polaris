@@ -203,10 +203,10 @@ export async function editSealedMessage(input: SealedEditInput): Promise<string>
 }
 
 /** Open the earlier versions of a sealed message its edit history holds; null for one that does not open here. */
-export async function openSealedVersions(channelId: string, versions: readonly SealedStored[]): Promise<(SealedContent | null)[]> {
+export async function openSealedVersions(channelId: string, messageId: string, versions: readonly SealedStored[]): Promise<(SealedContent | null)[]> {
     if (!versions.length) return [];
     const mls = await device();
-    const bytes = await mls.openVersions(channelId, versions);
+    const bytes = await mls.openVersions(channelId, messageId, versions);
     return bytes.map((opened) => (opened ? decodeSealedContent(opened) : null));
 }
 

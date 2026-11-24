@@ -594,19 +594,68 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
             device: kept!.e2eeDevice as string,
             epoch: String(kept!.e2eeEpoch),
             senderLeaf: kept!.e2eeSenderLeaf as number,
+            revision: (kept!.e2eeRevision as number | null) ?? 0,
             ciphertext: text(kept!.e2eeCiphertext),
             signature: text(kept!.e2eeSignature),
             signatureKey: text(kept!.e2eeSignatureKey)
         };
-        expect((await bob.openVersions(CHANNEL, [version])).map((v) => v && new TextDecoder().decode(v))).toEqual(["first words"]);
-        // Taken out of its place, it does not open as another message.
-        expect(await bob.openVersions(CHANNEL, [{ ...version, clientKey: crypto.randomUUID() }])).toEqual([null]);
+        expect(version.revision).toBe(0);
+        expect(row.e2eeRevision).toBe(1);
+        expect((await bob.openVersions(CHANNEL, id, [version])).map((v) => v && new TextDecoder().decode(v))).toEqual(["first words"]);
+        // Taken out of its place, it does not open as another message or as another revision.
+        expect(await bob.openVersions(CHANNEL, id, [{ ...version, clientKey: crypto.randomUUID() }])).toEqual([null]);
+        expect(await bob.openVersions(CHANNEL, id, [{ ...version, revision: 1 }])).toEqual([null]);
 
         // Where history is not kept, nothing earlier is written.
         state.keepEditHistory = false;
         await alice.editSealed(CHANNEL, id, new TextEncoder().encode("third words"));
         expect(state.tables.chatMessageEdit).toHaveLength(1);
         expect(new TextDecoder().decode((await bob.readSealed(CHANNEL, [id]))[0]!.opened!)).toBe("third words");
+    });
+
+    it("never shows an earlier version as the latest: the revision is signed, and a device keeps the highest it saw", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        const bob = await open(BOB, "bob-phone-1");
+        for (const device of [alice, bob]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB]);
+        await bob.sync(CHANNEL);
+        const id = await alice.sendSealed(CHANNEL, new TextEncoder().encode("v0"));
+        await alice.editSealed(CHANNEL, id, new TextEncoder().encode("v1"));
+        await alice.editSealed(CHANNEL, id, new TextEncoder().encode("v2"));
+        const row = state.tables.chatMessage!.find((r) => r.id === id)!;
+        expect(row.e2eeRevision).toBe(2);
+        const columns = ["e2eeCiphertext", "e2eeEpoch", "e2eeSenderLeaf", "e2eeDevice", "e2eeSignature", "e2eeSignatureKey", "e2eeRevision"] as const;
+        const latest = Object.fromEntries(columns.map((c) => [c, row[c]]));
+        const opened = async (device: typeof bob) => {
+            const [read] = await device.readSealed(CHANNEL, [id]);
+            return read!.opened && new TextDecoder().decode(read!.opened);
+        };
+
+        // The latest version relabelled as an earlier revision does not verify, even for a device that saw nothing yet.
+        row.e2eeRevision = 1;
+        expect(await opened(bob)).toBeNull();
+        Object.assign(row, latest);
+        expect(await opened(bob)).toBe("v2");
+
+        // The server swaps in the version before it, as it was signed: both devices refuse it.
+        const [, previous] = state.tables.chatMessageEdit!;
+        expect(previous!.e2eeRevision).toBe(1);
+        Object.assign(row, Object.fromEntries(columns.map((c) => [c, previous![c]])));
+        expect(await opened(bob)).toBeNull();
+        expect(await opened(alice)).toBeNull();
+        expect((await bob.readSealed(CHANNEL, [id]))[0]!.revision).toBe(1);
+        // Nor does the author edit over it.
+        await expect(alice.editSealed(CHANNEL, id, new TextEncoder().encode("over old"))).rejects.toMatchObject({ reason: "staleRevision" });
+        Object.assign(row, latest);
+        expect(await opened(bob)).toBe("v2");
+
+        // Two edits racing: one lands, the other is sealed again over it as the next revision.
+        await Promise.all([alice.editSealed(CHANNEL, id, new TextEncoder().encode("left")), alice.editSealed(CHANNEL, id, new TextEncoder().encode("right"))]);
+        // A refused transaction puts back a copy of the tables, so the row is looked up again.
+        expect(state.tables.chatMessage!.find((r) => r.id === id)!.e2eeRevision).toBe(4);
+        expect(["left", "right"]).toContain(await opened(bob));
+        expect(state.tables.chatMessageEdit!.map((r) => r.e2eeRevision ?? 0)).toEqual([0, 1, 2, 3]);
     });
 
     it("refuses a sealed edit of somebody else's message, with another device's signature, under an older epoch, or past the window", async () => {
@@ -628,6 +677,7 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
                     messageId: id,
                     epoch: String(row.e2eeEpoch),
                     senderLeaf: 0,
+                    revision: 1,
                     ciphertext: Buffer.alloc(40, 1).toString("base64url"),
                     signature: Buffer.alloc(64, 2).toString("base64url"),
                     ...overrides
@@ -640,6 +690,10 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         expect(await edit({})).toMatchObject({ status: 409, body: { error: "badSignature" } });
         expect(await edit({ epoch: "0" })).toMatchObject({ status: 409, body: { error: "olderEpoch" } });
         expect(await edit({ epoch: "99" })).toMatchObject({ status: 409, body: { error: "futureEpoch" } });
+        // Only the next revision: not the one it has, not one past it, and never none.
+        expect(await edit({ revision: 2 })).toMatchObject({ status: 409, body: { error: "staleRevision" } });
+        expect(await edit({ revision: 0 })).toMatchObject({ status: 400 });
+        expect(await edit({ revision: undefined })).toMatchObject({ status: 400 });
         // A plain message is not edited sealed.
         state.tables.chatMessage!.push({ id: crypto.randomUUID(), channelId: CHANNEL, authorId: ALICE, clientKey: crypto.randomUUID(), body: "plain", deletedAt: null, createdAt: new Date(), e2eeEpoch: null });
         expect(await edit({ messageId: state.tables.chatMessage!.at(-1)!.id })).toMatchObject({ status: 409, body: { error: "notSealed" } });

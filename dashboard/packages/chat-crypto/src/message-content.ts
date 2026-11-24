@@ -5,7 +5,7 @@
  * read the past once it holds `HK` - which MLS alone cannot give it.
  *
  *     K, nonce = HKDF-SHA256(HK, salt = empty,
- *                            info = canonical(LABEL, "message", conversation, epoch, messageId, sender))
+ *                            info = canonical(LABEL, "message", conversation, epoch, messageId, sender[, revision]))
  *     sealed   = version(1) || AES-256-GCM(K, nonce, plaintext, aad = version || info)
  *
  * Key and nonce both come from the derivation (11.1 item 1: no bare random
@@ -23,10 +23,19 @@
  * Ed25519 under the sending device's MLS signature key, made by the binding's
  * `signContent`, over
  *
- *     CONTENT_SIGNATURE_LABEL || canonical(LABEL, "signature", conversation, epoch, messageId, sender, SHA-256(sealed))
+ *     CONTENT_SIGNATURE_LABEL || canonical(LABEL, "signature", conversation, epoch, messageId, sender, [revision,] SHA-256(sealed))
  *
  * so a member holding `HK` - every member, and every device of every member
  * account later - still cannot write a message in another device's name.
+ *
+ * An edit is a new revision of the same message: revision 0 is the message as
+ * sent, and each edit seals and signs the next one. A revision above 0 is in
+ * both the info and the signed payload (after the sender, as the number
+ * `revision`), so a version cannot be passed off as another revision of the
+ * same message, and a reader that has seen revision n can refuse any version
+ * below it - the server cannot hand back an earlier version as the latest.
+ * Revision 0 derives and signs exactly as before revisions existed, so every
+ * message already stored still opens.
  */
 
 import { openHybrid, sealHybrid } from "./hybrid-envelope";
@@ -42,6 +51,8 @@ const TAG_BYTES = 16;
 /** What the binding's `signContent` puts in front of the payload (polaris_core::mls::CONTENT_SIGNATURE_LABEL). */
 const CONTENT_SIGNATURE_LABEL = new TextEncoder().encode("polaris/chat-e2ee/content-signature/v1\u0000");
 const SIGNATURE_BYTES = 64;
+/** The highest revision a binding takes (what `canonical` binds as a number). */
+export const MAX_REVISION = 0xffffffff;
 
 /** What one message's ciphertext is bound to. */
 export interface MessageBinding {
@@ -53,6 +64,8 @@ export interface MessageBinding {
     readonly messageId: string;
     /** The sender's MLS leaf index. */
     readonly senderLeaf: number;
+    /** Which version of the message: 0 (or absent) as sent, then one more per edit. */
+    readonly revision?: number;
 }
 
 export class MessageOpenError extends Error {
@@ -67,12 +80,23 @@ export function newHistoryKey(): Uint8Array {
     return randomBytes(HISTORY_KEY_BYTES);
 }
 
+/** The binding's revision, checked: an unsigned 32-bit integer, 0 when absent. */
+function revisionOf(binding: MessageBinding): number {
+    const revision = binding.revision ?? 0;
+    if (!Number.isInteger(revision) || revision < 0 || revision > MAX_REVISION) throw new RangeError("A revision is an unsigned 32-bit integer");
+    return revision;
+}
+
+/** The revision as a bound field: none for revision 0, which binds as messages always did. */
+const revisionField = (revision: number): number[] => (revision > 0 ? [revision] : []);
+
 function infoOf(binding: MessageBinding): Uint8Array<ArrayBuffer> {
     const { conversationId, epoch, messageId, senderLeaf } = binding;
     if (!conversationId || !messageId) throw new RangeError("A message names its conversation and its id");
     if (!Number.isInteger(senderLeaf) || senderLeaf < 0) throw new RangeError("The sender leaf is a leaf index");
     if (BigInt(epoch) < 0n) throw new RangeError("The epoch is not negative");
-    return owned(canonical(LABEL, "message", conversationId, BigInt(epoch).toString(), messageId, senderLeaf));
+    const revision = revisionField(revisionOf(binding));
+    return owned(canonical(LABEL, "message", conversationId, BigInt(epoch).toString(), messageId, senderLeaf, ...revision));
 }
 
 async function keyAndNonce(historyKey: Uint8Array, info: Uint8Array<ArrayBuffer>): Promise<[CryptoKey, Uint8Array<ArrayBuffer>]> {
@@ -115,8 +139,9 @@ export async function openMessage(historyKey: Uint8Array, binding: MessageBindin
 export async function messageSignaturePayload(binding: MessageBinding, sealed: Uint8Array): Promise<Uint8Array> {
     const { conversationId, epoch, messageId, senderLeaf } = binding;
     infoOf(binding);
+    const revision = revisionField(revisionOf(binding));
     const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", owned(sealed)));
-    return canonical(LABEL, "signature", conversationId, BigInt(epoch).toString(), messageId, senderLeaf, digest);
+    return canonical(LABEL, "signature", conversationId, BigInt(epoch).toString(), messageId, senderLeaf, ...revision, digest);
 }
 
 /**

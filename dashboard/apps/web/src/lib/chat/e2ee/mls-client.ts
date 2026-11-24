@@ -163,7 +163,12 @@ export interface MlsSealedMessage {
     /** `${userId}/${device}` of the device that signed it; null when the server names no account for it. */
     sender: string | null;
     epoch: bigint;
-    /** The content; null when its signature or sealing does not check out, or no key here opens it. */
+    /** Which version of the message this is: 0 as sent, one more per edit. */
+    revision: number;
+    /**
+     * The content; null when its signature or sealing does not check out, no
+     * key here opens it, or it is older than a version this device has seen.
+     */
     opened: Uint8Array | null;
 }
 
@@ -174,6 +179,8 @@ export interface SealedStored {
     device: string;
     epoch: string;
     senderLeaf: number;
+    /** Which version of the message: 0 as sent, one more per edit; absent (0) from older servers. */
+    revision?: number;
     ciphertext: string;
     signature: string;
     signatureKey: string;
@@ -185,6 +192,9 @@ interface SealedWire extends SealedStored {
     /** The account of the signing device when `authorId` is null (a member the server runs); absent from older servers. */
     signer?: string | null;
 }
+
+/** How many times an edit is sealed again when another device's edit landed first. */
+const EDIT_ATTEMPTS = 3;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -521,7 +531,12 @@ export class MlsDevice {
         for (const row of rows) {
             // A member the server runs stores no author; the account its device signs as comes beside it.
             const signer = row.authorId ?? row.signer ?? null;
-            out.push({ id: row.id, authorId: row.authorId, sender: signer ? `${signer}/${row.device}` : null, epoch: BigInt(row.epoch), opened: await this.openStored(channelId, row) });
+            const revision = row.revision ?? 0;
+            // A version below one this device has seen is the server handing back an earlier one: not shown as the message.
+            const current = revision >= this.revisionFloor(channelId, row.id);
+            const opened = current ? await this.openStored(channelId, row) : null;
+            if (opened) this.raiseRevisionFloor(channelId, row.id, revision);
+            out.push({ id: row.id, authorId: row.authorId, sender: signer ? `${signer}/${row.device}` : null, epoch: BigInt(row.epoch), revision, opened });
         }
         return out;
     }
@@ -531,15 +546,43 @@ export class MlsDevice {
      * checked as `readSealed` checks the message; null for one that does not
      * check out or that no key here opens.
      */
-    async openVersions(channelId: string, versions: readonly SealedStored[]): Promise<(Uint8Array | null)[]> {
+    async openVersions(channelId: string, messageId: string, versions: readonly SealedStored[]): Promise<(Uint8Array | null)[]> {
         const out: (Uint8Array | null)[] = [];
-        for (const version of versions) out.push(await this.openStored(channelId, version));
+        for (const version of versions) {
+            const opened = await this.openStored(channelId, version);
+            // A replaced version its device signed means the message is past it.
+            if (opened) this.raiseRevisionFloor(channelId, messageId, (version.revision ?? 0) + 1);
+            out.push(opened);
+        }
         return out;
+    }
+
+    /** The lowest revision this device still takes as the message's current one (0 when it has seen none). */
+    private revisionFloor(channelId: string, messageId: string): number {
+        const kept = Number(this.options.notes.getItem(this.note(`revision/${channelId}/${messageId}`)) ?? 0);
+        return Number.isSafeInteger(kept) && kept > 0 ? kept : 0;
+    }
+
+    /**
+     * Remember that this message is at `revision` or later, so the server can
+     * never hand this device an earlier version as the latest. Only edited
+     * messages leave a note (revision 0 is every message's floor anyway).
+     */
+    private raiseRevisionFloor(channelId: string, messageId: string, revision: number): void {
+        if (revision <= this.revisionFloor(channelId, messageId)) return;
+        try {
+            this.options.notes.setItem(this.note(`revision/${channelId}/${messageId}`), String(revision));
+        } catch (caught) {
+            // A full store only loses the floor for this message; the message still opens.
+            console.warn("polaris: a sealed message's revision could not be kept:", caught);
+        }
     }
 
     private async openStored(channelId: string, row: SealedStored): Promise<Uint8Array | null> {
         const epoch = BigInt(row.epoch);
-        const binding = { conversationId: channelId, epoch, messageId: row.clientKey, senderLeaf: row.senderLeaf };
+        const revision = row.revision ?? 0;
+        if (!Number.isSafeInteger(revision) || revision < 0 || revision > content.MAX_REVISION) return null;
+        const binding = { conversationId: channelId, epoch, messageId: row.clientKey, senderLeaf: row.senderLeaf, revision };
         const ciphertext = fromText(row.ciphertext);
         if (!(await content.verifyMessageSignature(fromText(row.signatureKey), binding, ciphertext, fromText(row.signature)))) return null;
         const key = await this.historyKey(channelId, epoch).catch(() => null);
@@ -551,14 +594,31 @@ export class MlsDevice {
      * group's current history key, bound to the same message id (`clientKey`,
      * the one it was sent with) and signed by this device, and store it in
      * place of the old one (`edit-sealed`). The group is brought up to date
-     * first, as for a send, so nobody who left can open the new words.
+     * first, as for a send, so nobody who left can open the new words. The new
+     * version is the next revision of the one stored; when another device's
+     * edit lands first, it is sealed again over that one.
      * Answers when the server stored it (the row's new edit time).
      */
     async editSealed(channelId: string, messageId: string, plaintext: Uint8Array): Promise<string> {
         this.requireGroup(channelId);
+        for (let attempt = 1; ; attempt++) {
+            try {
+                return await this.editSealedOnce(channelId, messageId, plaintext);
+            } catch (caught) {
+                if (attempt >= EDIT_ATTEMPTS || !(caught instanceof MlsRequestError) || caught.reason !== "staleRevision") throw caught;
+            }
+        }
+    }
+
+    private async editSealedOnce(channelId: string, messageId: string, plaintext: Uint8Array): Promise<string> {
         const read = await this.send({ op: "read-sealed", channelId, messageIds: [messageId] });
-        const clientKey = (read.messages as SealedWire[]).find((row) => row.id === messageId)?.clientKey;
-        if (!clientKey) throw new MlsRequestError(404, "notSealed");
+        const stored = (read.messages as SealedWire[]).find((row) => row.id === messageId);
+        if (!stored?.clientKey) throw new MlsRequestError(404, "notSealed");
+        const { clientKey } = stored;
+        const current = stored.revision ?? 0;
+        // Never an edit over a version older than one this device has seen: the server would be hiding the latest.
+        if (current < this.revisionFloor(channelId, messageId) || current >= content.MAX_REVISION) throw new MlsRequestError(409, "staleRevision");
+        const revision = current + 1;
         await this.pull(channelId);
         await this.reconcile(channelId);
         const groupId = this.requireGroup(channelId);
@@ -566,7 +626,7 @@ export class MlsDevice {
         const key = await this.historyKey(channelId, epoch);
         // Never sent in the clear instead: the caller puts the old text back.
         if (!key) throw new Error("this device holds no history key for the conversation's current epoch");
-        const binding = { conversationId: channelId, epoch, messageId: clientKey, senderLeaf: this.member.ownLeaf(groupId) };
+        const binding = { conversationId: channelId, epoch, messageId: clientKey, senderLeaf: this.member.ownLeaf(groupId), revision };
         const ciphertext = await content.sealMessage(key, binding, plaintext);
         const signature = this.member.signContent(await content.messageSignaturePayload(binding, ciphertext));
         const answer = await this.send({
@@ -576,9 +636,11 @@ export class MlsDevice {
             messageId,
             epoch: epoch.toString(),
             senderLeaf: binding.senderLeaf,
+            revision,
             ciphertext: toText(ciphertext),
             signature: toText(signature)
         });
+        this.raiseRevisionFloor(channelId, messageId, revision);
         return String(answer.editedAt);
     }
 

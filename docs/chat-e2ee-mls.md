@@ -41,7 +41,7 @@ the account to reach it, and so does every account the op names.
 | `application` | an MLS application message for the whole group |
 | `events` | the log after a sequence number: group-wide rows and this device's own Welcomes |
 | `put-history-keys` / `history-keys` | store envelopes (first write wins); read the ones sealed to the caller |
-| `edit-sealed` | a new version of one of the caller's own sealed messages: every plain-edit check, then the device, epoch and signature checks of a send; answers the edit time |
+| `edit-sealed` | a new version of one of the caller's own sealed messages: every plain-edit check, then the device, epoch and signature checks of a send, and exactly the next revision; answers the edit time |
 | `account-keys` | the public account keys (signing, HPKE) of up to 100 named accounts that reach the conversation; an account outside it is left out exactly like one with no key, never refused, so the answer says nothing about accounts the caller shares no conversation with |
 
 Retention: the log keeps the last 256 epochs, pruned every 32 inside the commit
@@ -139,7 +139,8 @@ the scope's edit window), then that the row is sealed, the device is the
 caller's own, the epoch is no newer than the group's and no older than the
 row's (`olderEpoch`: an older key may be held by somebody removed since), and
 that the signature verifies over the same binding as the send, with the row's
-`clientKey` as the message id. It writes the new sealed columns and
+`clientKey` as the message id and the next revision (see "Revisions" below).
+It writes the new sealed columns and
 `editedAt`, clears `translation`, and publishes the row as changed; no link is
 looked up. Where the scope keeps history, the version replaced goes into
 `ChatMessageEdit` with an empty `body` and its sealed columns as they were
@@ -157,10 +158,23 @@ and puts the old one back if the edit is refused. Opened copies are keyed by
 id and `sealedEditedAt` (the row's edit time, on the view and on the list's
 last line), so every device that opened the earlier version opens it again.
 
-Known limit: the signed binding carries no revision, so a server can hand back
-an earlier version of the same epoch in place of the latest, and a reader
-cannot tell. Adding one changes `@polaris/chat-crypto` message content (an
-extension bump) and is not built.
+Revisions: each version of a message is a revision - 0 as sent, one more per
+edit - and the revision is in what the content is derived from and what the
+device signs (`MessageBinding.revision`; revision 0 binds exactly as before
+revisions existed, so every message already stored opens). The server keeps
+it in `e2eeRevision` on the message and on each version its history keeps
+(migration `20281127000000_chat_sealed_revision`, additive, null is 0) and
+takes an edit only as the next revision of the stored one (`staleRevision`
+otherwise); the row moves only from the revision it was read at, so of two
+edits racing one lands and the other device seals again over it. A version
+relabelled as another revision does not verify. A device remembers the
+highest revision it has seen of each edited message (its notes, keyed by
+conversation and message; an opened history version raises it past that
+version), and from then on refuses a lower one as the message - it opens to
+nothing, and its author's device does not edit over it. What no client can
+tell is an edit it has never seen at all: a device that saw only an earlier
+version is shown that one until the server hands it the latest, as with any
+message the server holds back.
 
 Crash safety: an operation's state changes and its request are written in one
 transaction before the request is sent. A commit the server took while the

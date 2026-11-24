@@ -39,10 +39,10 @@ type ShownVersion = ChatMessageVersion & { readonly unopened?: boolean };
 type ShownHistory = Omit<ChatEditHistory, "versions"> & { readonly versions: readonly ShownVersion[] };
 
 /** A sealed message's earlier versions, opened on this device; a plain history is returned as it came. */
-export async function openedHistory(channelId: string, history: ChatEditHistory): Promise<ShownHistory> {
+export async function openedHistory(channelId: string, messageId: string, history: ChatEditHistory): Promise<ShownHistory> {
     const sealed = history.versions.flatMap((version) => (version.sealed ? [version.sealed] : []));
     if (!sealed.length) return history;
-    const opened = await sealedChat.openSealedVersions(channelId, sealed).catch((caught: unknown) => {
+    const opened = await sealedChat.openSealedVersions(channelId, messageId, sealed).catch((caught: unknown) => {
         console.warn("polaris: earlier versions could not be opened here:", caught);
         return sealed.map(() => null);
     });
@@ -87,7 +87,7 @@ export function EditHistoryDialog({
         void polls.editHistory(message.id, unlockProofFor(message.channelId)).then(async (result) => {
             if (!current) return;
             if (result.error) return setError(result.error);
-            const shown = result.history ? await openedHistory(message.channelId, result.history) : null;
+            const shown = result.history ? await openedHistory(message.channelId, message.id, result.history) : null;
             if (current) setHistory(shown);
         });
         return () => {

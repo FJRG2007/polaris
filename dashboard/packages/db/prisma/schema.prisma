@@ -11245,6 +11245,8 @@ model ChatMessage {
     // empty. `e2eeSignature` is the sending device's over it, and
     // `e2eeSignatureKey` the key the server held for that device when it took
     // the message, so a later rekey of the device never orphans the past.
+    // `e2eeRevision` is which version the content and signature are bound to:
+    // null (0) as sent, one more per sealed edit.
     // All null for every message that is not sealed.
     e2eeCiphertext   Bytes?
     e2eeEpoch        BigInt?
@@ -11252,6 +11254,7 @@ model ChatMessage {
     e2eeDevice       String?
     e2eeSignature    Bytes?
     e2eeSignatureKey Bytes?
+    e2eeRevision     Int?
     createdAt   DateTime  @default(now())
 
     channel     ChatChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
@@ -12083,6 +12086,7 @@ model ChatMessageEdit {
     e2eeDevice       String?
     e2eeSignature    Bytes?
     e2eeSignatureKey Bytes?
+    e2eeRevision     Int?
 
     message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 

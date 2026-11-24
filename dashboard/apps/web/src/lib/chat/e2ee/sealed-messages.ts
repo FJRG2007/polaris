@@ -21,10 +21,12 @@
  * Editing one: every check a plain edit makes (`messages.requireRewritable`:
  * the author's own, not deleted, not a poll, inside the edit window), then the
  * same device, epoch and signature checks as taking one, over the same message
- * id - plus an epoch no older than the one it replaces. The version replaced is
- * kept, sealed as it was, where the scope keeps history. What stays open: the
- * signed binding names no revision, so a server could hand back an earlier
- * version of the same epoch in place of the latest.
+ * id - plus an epoch no older than the one it replaces, and the next revision
+ * of the stored one (the revision is in what the device signed, so a reader
+ * that has seen a version refuses any older one handed back as the latest).
+ * The row only moves from the revision it was read at, so two edits racing
+ * cannot both land on it. The version replaced is kept, sealed as it was,
+ * where the scope keeps history.
  *
  * Reading: only messages the account may see - in a conversation it reaches,
  * not deleted, not past their expiry, not another reader's ephemeral answer.
@@ -58,7 +60,7 @@ export interface SealedSend {
 
 /** Why a sealed message was not taken; the route answers it as a refusal. */
 export class SealedRefusal extends Error {
-    constructor(readonly reason: "unknownDevice" | "unknownGroup" | "futureEpoch" | "olderEpoch" | "notSealed" | "badSignature") {
+    constructor(readonly reason: "unknownDevice" | "unknownGroup" | "futureEpoch" | "olderEpoch" | "staleRevision" | "notSealed" | "badSignature") {
         super(`the sealed message was refused (${reason})`);
         this.name = "SealedRefusal";
     }
@@ -113,6 +115,8 @@ export interface SealedEdit {
     messageId: string;
     epoch: bigint;
     senderLeaf: number;
+    /** The version this one is: the stored one's revision plus one. */
+    revision: number;
     ciphertext: Uint8Array;
     signature: Uint8Array;
 }
@@ -130,7 +134,8 @@ export async function editSealed(userId: string, input: SealedEdit): Promise<Dat
                 e2eeSenderLeaf: true,
                 e2eeDevice: true,
                 e2eeSignature: true,
-                e2eeSignatureKey: true
+                e2eeSignatureKey: true,
+                e2eeRevision: true
             }
         }),
         prisma.mlsDevice.findUnique({ where: { userId_device: { userId, device: input.device } }, select: { signatureKey: true } }),
@@ -143,7 +148,10 @@ export async function editSealed(userId: string, input: SealedEdit): Promise<Dat
     if (input.epoch > group.epoch) throw new SealedRefusal("futureEpoch");
     // Never under a key older than the one it replaces: a member removed since could read that one.
     if (input.epoch < stored.e2eeEpoch) throw new SealedRefusal("olderEpoch");
-    const binding = { conversationId: input.channelId, epoch: input.epoch, messageId: stored.clientKey, senderLeaf: input.senderLeaf };
+    // Exactly the next version: an older one would replace a newer, a skipped one leaves a gap nobody signed.
+    const replaced = stored.e2eeRevision ?? null;
+    if (input.revision !== (replaced ?? 0) + 1) throw new SealedRefusal("staleRevision");
+    const binding = { conversationId: input.channelId, epoch: input.epoch, messageId: stored.clientKey, senderLeaf: input.senderLeaf, revision: input.revision };
     const signatureKey = new Uint8Array(device.signatureKey);
     if (!(await content.verifyMessageSignature(signatureKey, binding, input.ciphertext, input.signature))) throw new SealedRefusal("badSignature");
     const editedAt = new Date();
@@ -159,11 +167,13 @@ export async function editSealed(userId: string, input: SealedEdit): Promise<Dat
                     e2eeSenderLeaf: stored.e2eeSenderLeaf,
                     e2eeDevice: stored.e2eeDevice,
                     e2eeSignature: stored.e2eeSignature,
-                    e2eeSignatureKey: stored.e2eeSignatureKey
+                    e2eeSignatureKey: stored.e2eeSignatureKey,
+                    e2eeRevision: replaced
                 }
             });
-        await tx.chatMessage.update({
-            where: { id: input.messageId },
+        // Only from the revision read above: an edit that landed in between leaves this one nothing to move.
+        const moved = await tx.chatMessage.updateMany({
+            where: { id: input.messageId, e2eeRevision: replaced },
             data: {
                 e2eeCiphertext: owned(input.ciphertext),
                 e2eeEpoch: input.epoch,
@@ -171,10 +181,12 @@ export async function editSealed(userId: string, input: SealedEdit): Promise<Dat
                 e2eeDevice: input.device,
                 e2eeSignature: owned(input.signature),
                 e2eeSignatureKey: owned(signatureKey),
+                e2eeRevision: input.revision,
                 editedAt,
                 translation: Prisma.DbNull
             }
         });
+        if (moved.count !== 1) throw new SealedRefusal("staleRevision");
     });
     publishChatChange({ channelId: input.channelId, kind: "posted", actorId: userId, messageIds: [input.messageId] });
     return editedAt;
@@ -249,6 +261,8 @@ export interface SealedRow {
     device: string;
     epoch: bigint;
     senderLeaf: number;
+    /** Which version the content is: 0 as sent, one more per edit. */
+    revision: number;
     ciphertext: Uint8Array;
     signature: Uint8Array;
     signatureKey: Uint8Array;
@@ -277,7 +291,8 @@ export async function readSealed(userId: string, channelId: string, ids: readonl
             e2eeSenderLeaf: true,
             e2eeDevice: true,
             e2eeSignature: true,
-            e2eeSignatureKey: true
+            e2eeSignatureKey: true,
+            e2eeRevision: true
         },
         take: MAX_SEALED_READ
     });
@@ -296,6 +311,7 @@ export async function readSealed(userId: string, channelId: string, ids: readonl
                 device: e2eeDevice,
                 epoch: e2eeEpoch,
                 senderLeaf: e2eeSenderLeaf,
+                revision: row.e2eeRevision ?? 0,
                 ciphertext: new Uint8Array(e2eeCiphertext),
                 signature: new Uint8Array(e2eeSignature),
                 signatureKey: new Uint8Array(e2eeSignatureKey)

@@ -1334,6 +1334,8 @@ export interface SealedVersion {
     readonly device: string;
     readonly epoch: string;
     readonly senderLeaf: number;
+    /** Which version of the message it was: 0 as sent, one more per edit. */
+    readonly revision: number;
     readonly ciphertext: string;
     readonly signature: string;
     readonly signatureKey: string;
@@ -1448,7 +1450,8 @@ export async function editHistory(
                 e2eeSenderLeaf: true,
                 e2eeDevice: true,
                 e2eeSignature: true,
-                e2eeSignatureKey: true
+                e2eeSignatureKey: true,
+                e2eeRevision: true
             }
         }),
         prisma.chatMessage.findUnique({ where: { id: messageId }, select: { clientKey: true } })
@@ -1470,6 +1473,7 @@ export async function editHistory(
                               device: e2eeDevice,
                               epoch: e2eeEpoch.toString(),
                               senderLeaf: e2eeSenderLeaf,
+                              revision: row.e2eeRevision ?? 0,
                               ciphertext: text(e2eeCiphertext),
                               signature: text(e2eeSignature),
                               signatureKey: text(e2eeSignatureKey)

@@ -234,6 +234,7 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                 messageId: body.messageId,
                 epoch: BigInt(body.epoch),
                 senderLeaf: body.senderLeaf,
+                revision: body.revision,
                 ciphertext: bytes(body.ciphertext),
                 signature: bytes(body.signature)
             });
@@ -250,6 +251,7 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                     device: r.device,
                     epoch: r.epoch.toString(),
                     senderLeaf: r.senderLeaf,
+                    revision: r.revision,
                     ciphertext: text(r.ciphertext),
                     signature: text(r.signature),
                     signatureKey: text(r.signatureKey)

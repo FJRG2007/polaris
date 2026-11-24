@@ -52,6 +52,34 @@ describe("message content", () => {
         await expect(content.openMessage(other, BINDING, sealed)).rejects.toBeInstanceOf(content.MessageOpenError);
     });
 
+    it("binds the revision: revision 0 is the message as sent, and no revision opens or verifies as another", async () => {
+        const sent = await content.sealMessage(HK, BINDING, text.encode("v0"));
+        // Revision 0 derives exactly as a binding without one, so every stored message still opens.
+        expect(hex(await content.sealMessage(HK, { ...BINDING, revision: 0 }, text.encode("v0")))).toBe(hex(sent));
+        const edited = await content.sealMessage(HK, { ...BINDING, revision: 2 }, text.encode("v2"));
+        expect(hex(edited)).toMatchInlineSnapshot(`"016f9a9b57c3318c2c1611b50dcfb95c40f1a3"`);
+        expect(new TextDecoder().decode(await content.openMessage(HK, { ...BINDING, revision: 2 }, edited))).toBe("v2");
+        for (const revision of [0, 1, 3]) await expect(content.openMessage(HK, { ...BINDING, revision }, edited)).rejects.toBeInstanceOf(content.MessageOpenError);
+        await expect(content.openMessage(HK, { ...BINDING, revision: 1 }, sent)).rejects.toBeInstanceOf(content.MessageOpenError);
+        expect(hex(await content.messageSignaturePayload({ ...BINDING, revision: 0 }, sent))).toBe(hex(await content.messageSignaturePayload(BINDING, sent)));
+        expect(hex(await content.messageSignaturePayload({ ...BINDING, revision: 1 }, sent))).not.toBe(hex(await content.messageSignaturePayload(BINDING, sent)));
+        for (const revision of [-1, 1.5, content.MAX_REVISION + 1])
+            await expect(content.sealMessage(HK, { ...BINDING, revision }, text.encode("x"))).rejects.toThrow(RangeError);
+    });
+
+    it("verifies a signature only for the revision it was made over", async () => {
+        const pair = (await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"])) as CryptoKeyPair;
+        const publicKey = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
+        const label = text.encode("polaris/chat-e2ee/content-signature/v1\u0000");
+        const binding = { ...BINDING, revision: 4 };
+        const sealed = await content.sealMessage(HK, binding, text.encode("signed"));
+        const payload = await content.messageSignaturePayload(binding, sealed);
+        const signed = new Uint8Array([...label, ...payload]);
+        const signature = new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, pair.privateKey, signed));
+        expect(await content.verifyMessageSignature(publicKey, binding, sealed, signature)).toBe(true);
+        for (const revision of [0, 3, 5]) expect(await content.verifyMessageSignature(publicKey, { ...BINDING, revision }, sealed, signature)).toBe(false);
+    });
+
     it("refuses malformed inputs before deriving anything", async () => {
         await expect(content.sealMessage(new Uint8Array(31), BINDING, text.encode("x"))).rejects.toThrow(RangeError);
         await expect(content.sealMessage(HK, { ...BINDING, senderLeaf: -1 }, text.encode("x"))).rejects.toThrow(RangeError);
