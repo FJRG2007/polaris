@@ -1148,7 +1148,8 @@ fn render_oz_updates(props: OzUpdatesProps<'_>, app: &AppContext) -> Option<Box<
                         })
                         .with_reset_cursor_after_click()
                         .on_click(|_, app, _| {
-                            const CHANGELOG_URL: &str = "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
+                            const CHANGELOG_URL: &str =
+                                "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
                             app.open_url(CHANGELOG_URL);
                         })
                         .with_cursor(Cursor::PointingHand)

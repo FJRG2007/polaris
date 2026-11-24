@@ -211,9 +211,10 @@ pub fn capture_impl_artifacts() -> TestStep {
                 if let Some(token) = conversation.server_conversation_token() {
                     super::record_pending_runtime_tag(
                         "impl.conversation_debug_link",
-                        token
-                            .debug_link()
-                            .replace("host.docker.internal:8080", "staging.polaris-terminal.invalid"),
+                        token.debug_link().replace(
+                            "host.docker.internal:8080",
+                            "staging.polaris-terminal.invalid",
+                        ),
                     );
                 }
                 for usage in conversation.total_token_usage().iter() {

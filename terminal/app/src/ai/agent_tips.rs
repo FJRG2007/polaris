@@ -457,10 +457,7 @@ pub fn get_agent_tips(ctx: &AppContext) -> Vec<AgentTip> {
         tips.push(AgentTip {
             description: "Hold <keybinding> to speak your prompt directly to the agent."
                 .to_string(),
-            link: Some(
-                "https://github.com/FJRG2007/polaris/tree/main/terminal#readme"
-                    .to_string(),
-            ),
+            link: Some("https://github.com/FJRG2007/polaris/tree/main/terminal#readme".to_string()),
             binding_name: Some("FN"),
             action: None,
             kind: AgentTipKind::General,

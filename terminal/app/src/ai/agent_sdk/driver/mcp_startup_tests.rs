@@ -704,8 +704,7 @@ fn ephemeral_installation_id_differs_across_servers_in_same_run() {
     let task_id: AmbientAgentTaskId = "550e8400-e29b-41d4-a716-446655440013".parse().unwrap();
     let slack_config =
         r#"{"mcpServers":{"slack":{"url":"https://app.example.com/mcp/integration-proxy/slack"}}}"#;
-    let linear_config =
-        r#"{"mcpServers":{"linear":{"url":"https://app.example.com/mcp/integration-proxy/linear"}}}"#;
+    let linear_config = r#"{"mcpServers":{"linear":{"url":"https://app.example.com/mcp/integration-proxy/linear"}}}"#;
 
     let slack = AgentDriver::installations_from_managed_client_config_json(
         slack_config,

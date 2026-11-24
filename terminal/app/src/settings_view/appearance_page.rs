@@ -2891,7 +2891,9 @@ impl SettingsWidget for CreateCustomThemeWidget {
                 .ui_builder()
                 .link(
                     "Create your own custom theme".to_string(),
-                    Some("https://github.com/FJRG2007/polaris/tree/main/terminal#readme".to_string()),
+                    Some(
+                        "https://github.com/FJRG2007/polaris/tree/main/terminal#readme".to_string(),
+                    ),
                     None,
                     self.mouse_state.clone(),
                 )

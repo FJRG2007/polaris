@@ -34,8 +34,7 @@ use crate::workflows::WorkflowType;
 use crate::workflows::workflow::{Argument, ArgumentType, Workflow};
 
 const DOCS_URL: &str = "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
-const ENV_DOCS_URL: &str =
-    "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
+const ENV_DOCS_URL: &str = "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 const OZ_URL: &str = "https://oz.polaris-terminal.invalid";
 
 const CONTENT_MAX_WIDTH: f32 = 720.;

@@ -31,8 +31,7 @@ use crate::view_components::{Dropdown as DropdownView, DropdownItem, FilterableD
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
 const OZ_AGENTS_URL: &str = "https://oz.polaris-terminal.invalid/agents?new=true";
-const API_KEY_DOCS_URL: &str =
-    "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
+const API_KEY_DOCS_URL: &str = "https://github.com/FJRG2007/polaris/tree/main/terminal#readme";
 
 const LABEL_FONT_SIZE: f32 = 14.;
 const INPUT_WIDTH: f32 = 428.; // 460px - (2 * 16px) padding
