@@ -60,9 +60,10 @@ runs:
         # build mode, so jobs that produce the same artifacts share an entry and
         # jobs that do not stay out of each other's way.
         shared-key: terminal-${{ inputs.cache_key != '' && inputs.cache_key || inputs.target_os }}
-        # Save even when the job fails, or a job that has never passed never
-        # writes a cache and compiles the whole workspace every run.
-        cache-on-failure: true
+        # Never from a failed job: a cache written by a broken build is
+        # restored by every run after it. The entry is saved by main's push and
+        # its nightly schedule, and every branch and pull request restores it.
+        cache-on-failure: false
         # Dependencies only: a fresh checkout gives every source file a new
         # mtime, so caching the workspace's own crates only made the entries
         # gigabytes larger and saved nothing. The repository's 10 GB cache budget

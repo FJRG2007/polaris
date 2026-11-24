@@ -90,8 +90,13 @@ jobs:
           fi
           echo "terminal=$terminal" >> "$GITHUB_OUTPUT"
 
+  # Formatting, clippy and the release-profile check share one job per
+  # platform. Run apart, each paid for its own runner, setup and dependency
+  # build, and the three macOS legs queued behind each other for the free
+  # plan's few macOS runners (35 to 70 min before a leg started). Together they
+  # still finish well inside the test job, which is the critical path.
   lints:
-    name: Formatting + Clippy (${{ matrix.name }})
+    name: Formatting, Clippy, release profile (${{ matrix.name }})
     needs: changes
     if: needs.changes.outputs.terminal == 'true'
     runs-on: ${{ matrix.runner }}
@@ -111,9 +116,10 @@ jobs:
       - uses: ./.github/actions/terminal-prepare-environment
         with:
           target_os: ${{ matrix.os }}
-          # One cache per build mode. Clippy runs in check mode, so its
-          # dependencies land as .rmeta with no codegen - useless to the test
-          # job, which needs the rlibs.
+          # One cache per job. Clippy and the release check both run in check
+          # mode, so their dependencies land as .rmeta with no codegen - useless
+          # to the test job, which needs the rlibs. The entry holds both
+          # profiles' dependencies (target/debug and target/rlto).
           cache_key: ${{ matrix.os }}-check
       # Formatting is platform independent, so one job is enough.
       - name: Check formatting
@@ -125,6 +131,19 @@ jobs:
         run: |
           cargo clippy --locked --workspace ${{ matrix.clippy_excludes }} \
             --all-targets --tests -- -D warnings
+      # `cargo check` verifies the release profile and its feature set without
+      # paying for codegen and LTO. terminal-release.yml builds the binaries.
+      # It runs after a failed formatting or clippy step too, so one failure
+      # never hides another.
+      - name: Check release compilation (Windows)
+        if: ${{ !cancelled() && matrix.os == 'windows' }}
+        shell: pwsh
+        run: .\script\windows\bundle.ps1 -CHANNEL oss -ARCH x64 -CHECK_ONLY
+      - name: Check release compilation (Unix)
+        if: ${{ !cancelled() && matrix.os != 'windows' }}
+        run: |
+          cargo check --locked -p rook --profile rlto \
+            --bin rook-oss --features release_bundle,gui
 
   test:
     name: Tests (${{ matrix.name }})
@@ -233,47 +252,10 @@ jobs:
             --exclude serve-wasm \
             -E "$filter"
 
-  release-check:
-    name: Release profile compiles (${{ matrix.name }})
-    needs: changes
-    if: needs.changes.outputs.terminal == 'true'
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 150
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.changes.outputs.matrix) }}
-    defaults:
-      run:
-        shell: bash
-        working-directory: terminal
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/terminal-prepare-environment
-        with:
-          target_os: ${{ matrix.os }}
-          # Not the `-rlto` key terminal-release.yml uses: this job only checks,
-          # so its dependencies are .rmeta the tag build cannot link against.
-          cache_key: ${{ matrix.os }}-rlto-check
-          save_cache: 'false'
-      # `cargo check` verifies the release profile and its feature set without
-      # paying for codegen and LTO. terminal-release.yml builds the binaries.
-      - name: Check release compilation (Windows)
-        if: matrix.os == 'windows'
-        shell: pwsh
-        run: .\script\windows\bundle.ps1 -CHANNEL oss -ARCH x64 -CHECK_ONLY
-      - name: Check release compilation (Unix)
-        if: matrix.os != 'windows'
-        run: |
-          cargo check --locked -p rook --profile rlto \
-            --bin rook-oss --features release_bundle,gui
-
   # The one check to require: it always reports, and it is green only when every
   # job above passed, or was skipped because nothing it checks changed.
   terminal:
-    needs: [changes, lints, test, release-check]
+    needs: [changes, lints, test]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
