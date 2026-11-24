@@ -165,7 +165,7 @@ describe("Code's composer is Chat's", () => {
         await screen.findAllByText("Automatic", { exact: false });
         const chatButtons = composerButtons(screen.getByLabelText("Message Polar"));
         expect(chatButtons).toEqual([
-            "Attach files",
+            "Add files, commands and more",
             "Dictate",
             "Microphone and model",
             "Write something to improve it",
@@ -178,7 +178,7 @@ describe("Code's composer is Chat's", () => {
         // The microphone and attach are the very same; a call needs a session, so
         // on a task not yet started it stays, refused.
         expect(codeButtons).toEqual([
-            "Attach files",
+            "Add files, commands and more",
             "Dictate",
             "Microphone and model",
             "Write something to improve it",
@@ -191,7 +191,7 @@ describe("Code's composer is Chat's", () => {
         const form = box.closest("form") as HTMLFormElement;
         const dictate = within(form).getByRole("button", { name: "Dictate" });
         expect((dictate as HTMLButtonElement).disabled).toBe(false);
-        const attach = within(form).getByRole("button", { name: "Attach files" });
+        const attach = within(form).getByRole("button", { name: "Add files, commands and more" });
         expect(attach.getAttribute("aria-disabled")).not.toBe("true");
         const voice = within(form).getByRole("button", { name: /then talk to it/ });
         expect(voice.getAttribute("aria-disabled")).toBe("true");
