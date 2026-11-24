@@ -27,6 +27,9 @@ export interface Outgoing extends DraftFields {
 /** A refusal, in words somebody can act on. */
 export interface Refused {
     readonly error: string;
+    /** Polaris never answered (or only the proxy in front of it did): what was
+     *  asked may be kept on this device and asked again later. */
+    readonly unreachable?: true;
 }
 
 const refusedSchema = z.object({ error: z.string() });
@@ -37,6 +40,9 @@ const sentSchema = z.object({ sent: z.boolean() });
 
 /** Said when the answer is not one this tab understands, or never arrived. */
 const UNREACHABLE = "Polaris could not be reached. Try again.";
+
+/** What the edge answers for Polaris when Polaris is not there. */
+const PROXY_ANSWERS = new Set([502, 503, 504]);
 
 async function ask<T>(
     url: string,
@@ -49,11 +55,12 @@ async function ask<T>(
         const response = await fetch(url, { ...init, cache: "no-store" });
         body = await response.json().catch(() => null);
         if (!response.ok) {
+            if (PROXY_ANSWERS.has(response.status)) return { error: UNREACHABLE, unreachable: true };
             const refused = refusedSchema.safeParse(body);
             return { error: refused.success ? refused.data.error : fallback };
         }
     } catch {
-        return { error: UNREACHABLE };
+        return { error: UNREACHABLE, unreachable: true };
     }
     const parsed = schema.safeParse(body);
     return parsed.success ? parsed.data : { error: fallback };

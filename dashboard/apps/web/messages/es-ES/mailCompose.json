@@ -60,6 +60,20 @@
             "reply": "Responder",
             "replyAll": "Responder a todos",
             "forward": "Reenviar"
-        }
+        },
+        "keptOffline": "Guardado en este dispositivo. Se envía al volver Polaris."
+    },
+    "offline": {
+        "title": "Pendientes de enviar",
+        "noSubject": "(sin asunto)",
+        "to": "para {name}",
+        "toMany": "para {name} y {count, plural, one {# más} other {# más}}",
+        "waiting": "Se envía al volver Polaris",
+        "notSent": "No enviado",
+        "retry": "Reintentar",
+        "discard": "Descartar",
+        "discardTitle": "¿Descartar este mensaje?",
+        "discardQuestion": "¿Descartar «{subject}»? Nunca se envió.",
+        "discardBody": "Solo está en este dispositivo, así que no se puede recuperar."
     }
 }

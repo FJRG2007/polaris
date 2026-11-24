@@ -14,6 +14,9 @@ const calls: string[] = [];
 let refuseAccess = false;
 
 class MailAccessError extends Error {}
+class SendInProgressError extends Error {}
+const BUSY = "0198f0aa-0000-7000-8000-0000000000bb";
+const KEY = "0198f0aa-0000-7000-8000-0000000000cc";
 
 vi.mock("@/lib/api-session", () => ({
     apiPermission: async () => ({ id: "u1" })
@@ -28,6 +31,12 @@ vi.mock("@/lib/mailbox/compose", () => ({
         calls.push(`queue ${input.to.length}`);
         return { draftId: DRAFT, sendAt: new Date("2026-09-19T10:00:10Z") };
     },
+    queueSendOnce: async (_userId: string, _input: unknown, sendKey: string) => {
+        if (sendKey === BUSY) throw new SendInProgressError();
+        calls.push(`queue once ${sendKey}`);
+        return { draftId: DRAFT, sendAt: new Date("2026-09-19T10:00:10Z") };
+    },
+    SendInProgressError,
     cancelSend: async (_userId: string, draftId: string) => {
         if (refuseAccess) throw new MailAccessError("That draft is not yours.");
         calls.push(`undo ${draftId}`);
@@ -71,6 +80,15 @@ describe("sending", () => {
         expect(await response.json()).toEqual({ draftId: DRAFT, sendAt: "2026-09-19T10:00:10.000Z" });
         expect(response.headers.get("cache-control")).toBe("private, no-store");
         expect(calls).toEqual(["queue 1"]);
+    });
+
+    it("queues a send kept offline once, by its key, and asks again later while one is being taken", async () => {
+        const message = { accountId: ACCOUNT, to: [{ name: "", address: "ana@example.com" }], subject: "Hi" };
+        const response = await outbox.POST(post({ ...message, sendKey: KEY }));
+        expect(response.status).toBe(200);
+        expect(calls).toEqual([`queue once ${KEY}`]);
+        const busy = await outbox.POST(post({ ...message, sendKey: BUSY }));
+        expect(busy.status).toBe(409);
     });
 
     it("refuses a message to nobody, in words, and writes nothing", async () => {

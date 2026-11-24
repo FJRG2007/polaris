@@ -15079,6 +15079,23 @@ model MailMessageLabel {
     @@index([labelId, headerId])
 }
 
+// A send a device kept while Polaris could not be reached, once the server has
+// taken it: the device's key, and the draft it was queued as. A replay of the
+// same send (its answer lost on the way back) is answered from here instead of
+// queueing the message a second time. `draftId` is null while the first attempt
+// is still being taken. Deleted once `expiresAt` passes, by the next send that
+// carries a key.
+model MailSendKey {
+    key       String    @id @db.Uuid
+    userId    String    @db.Uuid
+    draftId   String?   @db.Uuid
+    sendAt    DateTime?
+    expiresAt DateTime
+    createdAt DateTime  @default(now())
+
+    @@index([expiresAt])
+}
+
 // Something being written, or waiting for its hour.
 //
 // The same row covers both, because they are the same thing at different times:

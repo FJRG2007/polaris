@@ -23,6 +23,7 @@ import { MAIL_VIEWS } from "./views";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { refusalOf } from "./refusal";
 import { Composer } from "./composer";
+import { KeptSends } from "./kept-sends";
 import { MailRail } from "./mail-rail";
 import { moveToFolderAction } from "./actions";
 import { settleFrames } from "./stream-settle";
@@ -831,6 +832,7 @@ export function MailShell({
                             </Link>
                         ) : null}
                     </div>
+                    <KeptSends />
                     <div
                         className={cn(
                             "min-h-0 flex-1",
