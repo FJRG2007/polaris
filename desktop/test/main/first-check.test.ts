@@ -110,6 +110,39 @@ describe("the first check of a start", () => {
         expect(await ended).toEqual({ kind: "available", version: "0.1.3" });
     });
 
+    it("hands an update Squirrel could not apply to the antivirus notice, once", async () => {
+        answers([release("desktop-v0.1.3")]);
+        const found = vi.fn();
+        const failed = vi.fn();
+        const first = watchForUpdates(found, failed);
+        await first.installing;
+        electron.listeners.get("error")?.();
+        expect(failed).toHaveBeenCalledTimes(1);
+        expect(failed.mock.calls[0]?.[0]).toMatchObject({ version: "0.1.3" });
+        expect(found.mock.calls[0]?.[0]).toMatchObject({ version: "0.1.3" });
+        electron.listeners.get("error")?.();
+        expect(failed).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves the antivirus out when there was simply nothing to install", async () => {
+        answers([release("desktop-v0.1.3")]);
+        const failed = vi.fn();
+        const first = watchForUpdates(vi.fn(), failed);
+        await first.installing;
+        electron.listeners.get("update-not-available")?.();
+        expect(failed).not.toHaveBeenCalled();
+    });
+
+    it("leaves the antivirus out off Windows", async () => {
+        Object.defineProperty(process, "platform", { value: "darwin" });
+        answers([release("desktop-v0.1.3")]);
+        const failed = vi.fn();
+        const first = watchForUpdates(vi.fn(), failed);
+        await first.installing;
+        electron.listeners.get("error")?.();
+        expect(failed).not.toHaveBeenCalled();
+    });
+
     it("answers at once when the download ended before the press waited on it", async () => {
         answers([release("desktop-v0.1.3")]);
         const first = watchForUpdates(vi.fn());

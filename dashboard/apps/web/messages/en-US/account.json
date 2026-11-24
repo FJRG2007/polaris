@@ -1712,7 +1712,8 @@
         "desktop": {
             "app": "Desktop app",
             "recommended": "Recommended",
-            "description": "Polaris on your computer, for Windows, macOS and Linux. Deploy from your own machine and keep an eye on your services in their own window."
+            "description": "Polaris on your computer, for Windows, macOS and Linux. Deploy from your own machine and keep an eye on your services in their own window.",
+            "antivirus": "Antivirus blocking it?"
         },
         "cards": {
             "install": "Install",

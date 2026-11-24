@@ -16,6 +16,9 @@ import { findOnPath } from "./launch";
 import { pathToFileURL } from "node:url";
 import * as pins from "@toolchain/index";
 import * as toolchain from "../toolchain";
+import { showNotice } from "../notices";
+import { openExternal } from "../open-external";
+import { antivirusHelpUrl, antivirusNotice, blockedByAntivirus } from "../antivirus-help";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { homedir, hostname, release } from "node:os";
@@ -456,7 +459,7 @@ class RunnerService {
 
     async #prepare(agents: string[], onProgress: (progress: ToolchainProgressFrame) => void): Promise<{ ok: true; env: Record<string, string>; } | { ok: false; tool: string; code: string; }> {
         const { downloads } = toolchain.plan(process.platform, process.arch, agents);
-        return toolchain.prepareToolchain(downloads, {
+        const result = await toolchain.prepareToolchain(downloads, {
             root: this.#toolRoot(),
             platform: process.platform,
             fetch,
@@ -468,6 +471,9 @@ class RunnerService {
                 onProgress(frame);
             }
         });
+        // The page says it failed; the notice says what to do about it.
+        if (blockedByAntivirus(result)) showNotice(antivirusNotice("toolchain", { guide: () => openExternal(antivirusHelpUrl(app.getLocale())) }));
+        return result;
     }
 
     /** Claude Code and the Agent SDK beside it, and the SDK loaded. */

@@ -10,6 +10,7 @@
 import { Badge } from "../../index";
 import type { ReactNode } from "react";
 import { CliSection } from "./cli-section";
+import { AntivirusHelpLink } from "./antivirus-help";
 import { SystemMark } from "./client-marks";
 import { useTranslations } from "../../i18n";
 import { ExtensionCard } from "./extension-card";
@@ -85,6 +86,7 @@ export function DownloadsPage({
                             <Badge variant="neutral">{t("downloads.desktop.recommended")}</Badge>
                         </p>
                         {desktopFiles}
+                        <AntivirusHelpLink />
                     </div>
                     {/* The other way to have it in a window of its own: the
                         browser's install offer, which needs no download. Drawn

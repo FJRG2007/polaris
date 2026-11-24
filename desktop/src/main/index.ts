@@ -65,6 +65,7 @@ import { addressWords, failoverFor, instanceRecordFor } from "./polaris-api";
 import { AUTHORITY_INVALID, USE_CHROMIUM, pinScope, verifyDecision } from "./local-ca-pin";
 import { activeOrigin, backStep, failedLoadStep, samePlaceOn, titleWith } from "./window-failover";
 import { openExternal } from "./open-external";
+import { antivirusHelpUrl, antivirusNotice } from "./antivirus-help";
 import { installDeviceHeaders } from "./device-headers";
 import { startNativeHost } from "./native-host/service";
 import { DEFAULT_HOLD_MS, UNTRUSTED_WORDS } from "../../../dashboard/packages/core/src/instance-fallback";
@@ -1142,6 +1143,8 @@ function start(): void {
             // form) gets the notice, as do the other windows' pages through the
             // button they draw.
             if (!updates.needsNotice(update, frontPage())) return;
+            // Told already, by the notice that it did not install.
+            if (!update.restart && update.version === didNotInstall) return;
             showNotice(
                 update.restart
                     ? {
@@ -1165,6 +1168,18 @@ function start(): void {
         };
         /** The update the app was about to restart into, unannounced until it opens. */
         let heldBack: Update | null = null;
+        /** The version Squirrel failed to apply, announced with the antivirus guide. */
+        let didNotInstall: string | null = null;
+        const notInstalled = (update: Update) => {
+            didNotInstall = update.version;
+            showNotice(
+                antivirusNotice(
+                    "update",
+                    { guide: () => openExternal(antivirusHelpUrl(app.getLocale())), page: () => openExternal(update.page) },
+                    update.version
+                )
+            );
+        };
         const first = (updateWatch = watchForUpdates((update) => {
             menuUpdate = {
                 version: update.version,
@@ -1179,7 +1194,7 @@ function start(): void {
                 return;
             }
             announce(update);
-        }));
+        }, notInstalled));
 
         void updateBeforeOpening(first, {
             attempted: updateAttempted,
