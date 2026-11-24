@@ -73,11 +73,10 @@ fn cleanup_old_versions(identity_key: &str) {
             let _ = std::fs::remove_file(entry.path());
         }
 
-        // Remove old socket files: server*.sock that aren't the current version.
-        if name_str.ends_with(".sock")
-            && name_str.starts_with("server")
-            && name_str != current_socket
-        {
+        // Remove old socket files that aren't the current version. The directory
+        // holds only this identity's daemon files, and current sockets are named
+        // by their version hash alone (older ones were `server*.sock`).
+        if name_str.ends_with(".sock") && name_str != current_socket {
             log::info!("Proxy: removing old socket file {name_str}");
             let _ = std::fs::remove_file(entry.path());
         }

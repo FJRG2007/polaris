@@ -218,17 +218,17 @@ fn repo(forge: CodeForge, owner: &str, name: &str) -> SourceRepo {
 
 #[test]
 fn merge_repos_dedupes_case_insensitively_and_preserves_environment_order() {
-    let environment = vec![repo(CodeForge::GitHub, "PtermDotDev", "Polaris Terminal")];
+    let environment = vec![repo(CodeForge::GitHub, "AcmeDotDev", "Acme")];
     let additional = vec![
-        repo(CodeForge::GitHub, "ptermdotdev", "polaris-terminal"),
-        repo(CodeForge::GitHub, "ptermdotdev", "polaris-terminal-server"),
+        repo(CodeForge::GitHub, "acmedotdev", "acme"),
+        repo(CodeForge::GitHub, "acmedotdev", "acme-server"),
     ];
 
     assert_eq!(
         merge_repos_deduped(environment, additional).unwrap(),
         vec![
-            repo(CodeForge::GitHub, "PtermDotDev", "Polaris Terminal"),
-            repo(CodeForge::GitHub, "ptermdotdev", "polaris-terminal-server"),
+            repo(CodeForge::GitHub, "AcmeDotDev", "Acme"),
+            repo(CodeForge::GitHub, "acmedotdev", "acme-server"),
         ]
     );
 }

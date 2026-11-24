@@ -704,8 +704,8 @@ fn test_smart_selection_in_single_block() {
 
             let block_index = insert_block(
                 &mut block_list,
-                "echo https://example.com/about hello/world.js\n",
-                "https://example.com/about hello/world.js\n",
+                "echo https://abc.test/about hello/world.js\n",
+                "https://abc.test/about hello/world.js\n",
             );
             let block = block_list
                 .block_at(block_index)
@@ -729,7 +729,7 @@ fn test_smart_selection_in_single_block() {
 
             assert_eq!(
                 block_list.selection_to_string(&semantic_selection, false, ctx),
-                Some("https://example.com/about".to_string())
+                Some("https://abc.test/about".to_string())
             );
             block_list.clear_selection();
 
@@ -747,7 +747,7 @@ fn test_smart_selection_in_single_block() {
 
             assert_eq!(
                 block_list.selection_to_string(&semantic_selection, false, ctx),
-                Some("https://example.com/about".to_string())
+                Some("https://abc.test/about".to_string())
             );
             block_list.clear_selection();
 
@@ -765,7 +765,7 @@ fn test_smart_selection_in_single_block() {
 
             assert_eq!(
                 block_list.selection_to_string(&semantic_selection, false, ctx),
-                Some("https://example.com/about hello".to_string())
+                Some("https://abc.test/about hello".to_string())
             );
             block_list.clear_selection();
 
@@ -799,8 +799,8 @@ fn test_smart_selection_in_multiple_blocks() {
 
             let first_block_index = insert_block(
                 &mut block_list,
-                "echo https://example.com/about hello/world.js\n",
-                "https://example.com/about hello/world.js\n",
+                "echo https://abc.test/about hello/world.js\n",
+                "https://abc.test/about hello/world.js\n",
             );
             let second_block_index =
                 insert_block(&mut block_list, "echo 192.168.0.1\n", "192.168.0.1\n");
@@ -837,7 +837,7 @@ fn test_smart_selection_in_multiple_blocks() {
 
             assert_eq!(
                 block_list.selection_to_string(&semantic_selection, false, ctx),
-                Some("https://example.com/about hello/world.js\nhttps".to_string())
+                Some("https://abc.test/about hello/world.js\nhttps".to_string())
             );
             block_list.clear_selection();
 
@@ -857,7 +857,7 @@ fn test_smart_selection_in_multiple_blocks() {
             assert_eq!(
         block_list.selection_to_string(&semantic_selection, false, ctx),
         Some(
-            "hello/world.js\nhttps://example.com/about hello/world.js\necho 192.168.0.1\n192.168"
+            "hello/world.js\nhttps://abc.test/about hello/world.js\necho 192.168.0.1\n192.168"
                 .to_string()
         )
     );
@@ -930,11 +930,11 @@ fn test_smart_selection_override() {
 
             let block_index = insert_block(
                 &mut block_list,
-                "echo https://example.com/about hello/world",
-                "https://example.com/about hello/world",
+                "echo https://abc.test/about hello/world",
+                "https://abc.test/about hello/world",
             );
 
-            // the override wraps "https://example.com/about hello/world"
+            // the override wraps "https://abc.test/about hello/world"
             block_list.set_smart_select_override(WithinBlock::new(
                 Point::new(0, 5)..=Point::new(5, 3),
                 block_index,
@@ -954,7 +954,7 @@ fn test_smart_selection_override() {
 
             assert_eq!(
                 block_list.selection_to_string(&semantic_selection, false, ctx),
-                Some("https://example.com/about hello/world".to_string())
+                Some("https://abc.test/about hello/world".to_string())
             );
         })
     })

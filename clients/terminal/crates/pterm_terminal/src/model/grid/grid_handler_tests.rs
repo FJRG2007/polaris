@@ -84,9 +84,9 @@ fn regex_right() {
     #[rustfmt::skip]
     let blockgrid = mock_blockgrid("\
         testing66\r\n\
-        Polaris Terminal\n\
+        Roof\n\
         123\r\n\
-        Polaris Terminal\r\n\
+        Roof\r\n\
         123\
     ");
 
@@ -109,9 +109,9 @@ fn regex_left() {
     #[rustfmt::skip]
     let blockgrid = mock_blockgrid("\
         testing66\r\n\
-        Polaris Terminal\n\
+        Roof\n\
         123\r\n\
-        Polaris Terminal\r\n\
+        Roof\r\n\
         123\
     ");
 
@@ -133,7 +133,7 @@ fn regex_left() {
 fn nested_regex() {
     #[rustfmt::skip]
     let blockgrid = mock_blockgrid("\
-        Ro -> Polaris Terminal -> ok\r\n\
+        Ro -> Roof -> ok\r\n\
         ok\
     ");
 
@@ -565,17 +565,17 @@ fn test_secrets_serialization() {
     let mut blockgrid = mock_blockgrid("foo zach@example.com bar");
     blockgrid.maybe_enable_secret_obfuscation(ObfuscateSecrets::Yes);
     blockgrid.grid_handler_mut().mark_secret_range(
-        Point::new(0, 4)..=Point::new(0, 16),
+        Point::new(0, 4)..=Point::new(0, 19),
         IsObfuscated::Yes,
         "zach@example.com".to_string(),
         SecretLevel::User,
     );
 
     assert_eq!(
-        "foo ************* bar",
+        "foo **************** bar",
         blockgrid.grid_handler.bounds_to_string(
             Point::new(0, 0),
-            Point::new(0, 21),
+            Point::new(0, 24),
             false,
             RespectObfuscatedSecrets::Yes,
             false, /* force_secrets_obfuscated */
@@ -597,7 +597,7 @@ fn test_secrets_serialization() {
         "foo zach@example.com bar",
         blockgrid.grid_handler.bounds_to_string(
             Point::new(0, 0),
-            Point::new(0, 21),
+            Point::new(0, 24),
             false,
             RespectObfuscatedSecrets::Yes,
             false, /* force_secrets_obfuscated */
@@ -702,7 +702,7 @@ fn test_find_url_with_delimiter() {
         None
     );
 
-    let blockgrid = mock_blockgrid("https://google.com/search?q=polaris-terminal");
+    let blockgrid = mock_blockgrid("https://google.com/search?q=roof");
     assert_eq!(
         blockgrid
             .grid_handler
@@ -749,7 +749,7 @@ fn test_find_url_omits_trailing_periods() {
             .grid_handler
             .url_at_point(Point { row: 0, col: 10 }),
         Some(Link {
-            range: Point { row: 0, col: 6 }..=Point { row: 0, col: 44 },
+            range: Point { row: 0, col: 6 }..=Point { row: 0, col: 47 },
             is_empty: false
         })
     );
@@ -767,7 +767,7 @@ fn test_find_url_omits_trailing_periods() {
             .grid_handler
             .url_at_point(Point { row: 0, col: 10 }),
         Some(Link {
-            range: Point { row: 0, col: 6 }..=Point { row: 0, col: 44 },
+            range: Point { row: 0, col: 6 }..=Point { row: 0, col: 47 },
             is_empty: false
         })
     );
@@ -779,13 +779,13 @@ fn test_find_url_omits_trailing_periods() {
     );
 
     // Test that it handles a period in the middle of the URL path somewhere.
-    let blockgrid = mock_blockgrid("Visit https://github.com/example.com/Polaris Terminal/issues.");
+    let blockgrid = mock_blockgrid("Visit https://github.com/example.com/polaris/issues.");
     assert_eq!(
         blockgrid
             .grid_handler
             .url_at_point(Point { row: 0, col: 10 }),
         Some(Link {
-            range: Point { row: 0, col: 6 }..=Point { row: 0, col: 44 },
+            range: Point { row: 0, col: 6 }..=Point { row: 0, col: 50 },
             is_empty: false
         })
     );
@@ -794,7 +794,7 @@ fn test_find_url_omits_trailing_periods() {
             .grid_handler
             .url_at_point(Point { row: 0, col: 33 }),
         Some(Link {
-            range: Point { row: 0, col: 6 }..=Point { row: 0, col: 44 },
+            range: Point { row: 0, col: 6 }..=Point { row: 0, col: 50 },
             is_empty: false
         })
     );

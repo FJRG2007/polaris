@@ -683,10 +683,14 @@ fn package_name(channel: Channel) -> &'static str {
 }
 
 fn repo_name(channel: Channel) -> String {
-    let package_name = package_name(channel);
-    let channel_suffix = package_name
-        .strip_prefix("polaris-terminal-stable")
-        .unwrap_or_default();
+    // Stable keeps the bare repository name; every other channel takes the suffix
+    // its package name carries after `polaris-terminal`.
+    let channel_suffix = match channel {
+        Channel::Stable => "",
+        _ => package_name(channel)
+            .strip_prefix("polaris-terminal")
+            .unwrap_or_default(),
+    };
     format!("warpdotdev{channel_suffix}")
 }
 

@@ -607,7 +607,7 @@ fn daemon_socket_name_is_short() {
     // Without GIT_RELEASE_TAG (typical in tests), falls back to unversioned.
     let name = daemon_socket_name();
     // In test builds without GIT_RELEASE_TAG, we get "server.sock".
-    // In release builds, we get "server-{8hex}.sock" = 24 chars.
+    // In release builds, we get "{8hex}.sock" = 13 chars.
     // Either way, the name must be ≤ 24 chars.
     assert!(
         name.len() <= 24,
@@ -633,15 +633,15 @@ fn daemon_pid_name_is_short() {
 #[test]
 fn socket_path_fits_within_sun_path_worst_case() {
     // Worst case: preview channel (longest base dir) + 32-char username
-    // (Linux max) + hashed identity (8 chars) + hashed socket (20 chars).
+    // (Linux max) + hashed identity (8 chars) + hashed socket (13 chars).
     //
-    // Path: /home/{user}/.polaris-terminal-preview/remote-server/{hash8}/server-{hash8}.sock
-    //       6 + 32 + 1 + 29 + 8 + 1 + 20 = 97 bytes → well under 103 (macOS)
+    // Path: /home/{user}/.polaris-terminal-preview/remote-server/{hash8}/{hash8}.sock
+    //       6 + 32 + 26 + 14 + 1 + 8 + 1 + 13 = 101 bytes → well under 103 (macOS)
     let long_home = "/home/a]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]";
     let identity_dir = remote_server_identity_dir_name("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
     assert_eq!(identity_dir.len(), 8);
 
-    let hashed_socket = "server-a1b2c3d4.sock";
+    let hashed_socket = "a1b2c3d4.sock";
     let old_socket = "server-v0.2026.05.13.09.15.stable_01.sock";
 
     // Use .polaris-terminal-preview (longest channel base dir) for worst case.

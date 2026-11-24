@@ -406,7 +406,7 @@ pub enum SurfaceCommand {
     Keybindings(SurfaceOpenCommand),
 
     /// Open or toggle Polaris Terminal Drive.
-    #[command(subcommand)]
+    #[command(subcommand, name = "polaris-terminal-drive")]
     PtermDrive(SurfaceOpenToggleCommand),
 
     /// Toggle the resource center.

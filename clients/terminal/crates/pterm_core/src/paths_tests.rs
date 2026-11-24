@@ -41,7 +41,7 @@ fn test_config_local_dir_path() {
 fn test_macos_config_dir_name_scopes_to_data_profile() {
     assert_eq!(
         macos_config_dir_name_for(Channel::Stable, None),
-        ".polaris/terminal"
+        ".polaris-terminal"
     );
     assert_eq!(
         macos_config_dir_name_for(Channel::Local, None),
@@ -184,7 +184,7 @@ fn test_project_path_for_pterm_app_id() {
             .expect("should be able to compute project dirs");
     cfg_if::cfg_if! {
         if #[cfg(target_os = "macos")] {
-            assert_eq!(project_dirs.project_path(), "dev.polaris.PolarisTerminal");
+            assert_eq!(project_dirs.project_path(), "dev.polaris.Polaris-Terminal");
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
             assert_eq!(project_dirs.project_path(), "polaris-terminal-stable");
         } else if #[cfg(windows)] {

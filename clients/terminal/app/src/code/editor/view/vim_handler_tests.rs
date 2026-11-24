@@ -1292,11 +1292,11 @@ fn test_vim_delete_word_dge() {
 
     App::test((), |mut app| async move {
         initialize_code_editor_app(&mut app);
-        let editor = add_code_editor("echo hello-hi polaris-terminal-dev", &mut app);
+        let editor = add_code_editor("echo hello-hi roof-dev", &mut app);
 
         set_cursor_position(&editor, 1, 20, &mut app);
         vim_user_insert(&editor, "dge", &mut app);
-        assert_eq!(buffer_text(&editor, &app), "echo hello-hi ptermev");
+        assert_eq!(buffer_text(&editor, &app), "echo hello-hi roofev");
         assert_eq!(cursor_position(&editor, &app), (1, 18));
 
         vim_user_insert(&editor, "dge", &mut app);

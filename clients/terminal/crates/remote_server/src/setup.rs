@@ -439,11 +439,15 @@ pub fn version_hash() -> Option<String> {
 /// Returns the daemon socket filename, versioned with a short hash when
 /// a release tag is baked in.
 ///
-/// - With `GIT_RELEASE_TAG`:    `server-{hash8}.sock`  (e.g. `server-a1b2c3d4.sock`)
+/// - With `GIT_RELEASE_TAG`:    `{hash8}.sock`  (e.g. `a1b2c3d4.sock`)
 /// - Without (plain cargo run): `server.sock`
+///
+/// The hashed name carries no prefix: with the longest channel directory
+/// (`.polaris-terminal-preview`) and a 32-character username, a `server-` prefix
+/// would push the socket path past the 103-byte macOS `sun_path` limit.
 pub fn daemon_socket_name() -> String {
     match version_hash() {
-        Some(hash) => format!("server-{hash}.sock"),
+        Some(hash) => format!("{hash}.sock"),
         None => "server.sock".to_string(),
     }
 }

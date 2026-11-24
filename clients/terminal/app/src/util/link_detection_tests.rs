@@ -67,10 +67,10 @@ fn test_detect_urls_stops_at_fullwidth_punctuation() {
 #[test]
 fn test_detect_file_paths_stops_at_fullwidth_punctuation() {
     let dir = tempfile::tempdir().unwrap();
-    let file = dir.path().join("polaris-terminal-rich-content.md");
+    let file = dir.path().join("tool-rich-content.md");
     std::fs::write(&file, "# Hello\n").unwrap();
 
-    let text = "see polaris-terminal-rich-content.md， and polaris-terminal-rich-content.md。";
+    let text = "see tool-rich-content.md， and tool-rich-content.md。";
     let detected_paths = detect_file_paths(dir.path().to_str().unwrap(), text, None);
 
     let link_ranges = detected_paths.keys().cloned().collect_vec();
@@ -84,10 +84,10 @@ fn test_detect_file_paths_stops_at_fullwidth_punctuation() {
 #[test]
 fn test_detect_file_paths_keeps_fullwidth_punctuation_when_it_is_the_filename() {
     let dir = tempfile::tempdir().unwrap();
-    let file = dir.path().join("polaris-terminal-rich-content.md，");
+    let file = dir.path().join("tool-rich-content.md，");
     std::fs::write(&file, "# Hello\n").unwrap();
 
-    let text = "see polaris-terminal-rich-content.md，";
+    let text = "see tool-rich-content.md，";
     let detected_paths = detect_file_paths(dir.path().to_str().unwrap(), text, None);
 
     assert!(detected_paths.contains_key(&(4..25)));

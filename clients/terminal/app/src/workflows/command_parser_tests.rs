@@ -177,13 +177,13 @@ fn test_compute_workflow_display_data_for_linked_history_command() {
     );
     assert_eq!(
         display_data.replaced_ranges,
-        vec![36.into()..58.into(), 155.into()..188.into()]
+        vec![48.into()..70.into(), 167.into()..200.into()]
     );
     assert_eq!(
         display_data.argument_index_to_char_range_map,
         HashMap::from([
-            (0.into(), vec![36.into()..58.into()]),
-            (1.into(), vec![155.into()..188.into()])
+            (0.into(), vec![48.into()..70.into()]),
+            (1.into(), vec![167.into()..200.into()])
         ])
     );
 }
@@ -194,7 +194,7 @@ fn test_compute_workflow_display_data_for_linked_history_command_with_multiple_i
     // This command should be parsed as a workflow-linked command.
     //
     // The workflow contains multiple instances of the same parameter
-    let linked_history_command = r#"echo polaris-terminal polaris-terminal polaris-terminal"#;
+    let linked_history_command = r#"echo tool tool tool"#;
     let display_data = compute_workflow_display_data_for_history_command(
         linked_history_command,
         &WORKFLOW_MULTIPLE_INSTANCES_SAME_PARAMETER,

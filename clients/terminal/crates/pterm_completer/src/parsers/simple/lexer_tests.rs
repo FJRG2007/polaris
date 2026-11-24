@@ -165,7 +165,7 @@ fn test_multiple_whitespace() {
 
 #[test]
 fn test_backtick_escape_char() {
-    let source = r#"& "$HOME\Downloads\Polaris Terminal` Setup.exe" /SP- /SILENT `t`"#;
+    let source = r#"& "$HOME\Downloads\Tool` Setup.exe" /SP- /SILENT `t`"#;
     let tokens: Vec<_> = Lexer::new(source, EscapeChar::Backtick, false)
         .map(|t| (t.item, t.span))
         .collect();
@@ -177,10 +177,7 @@ fn test_backtick_escape_char() {
             (Token::Whitespace(" "), Span::new(1, 2)),
             (Token::DoubleQuote, Span::new(2, 3)),
             (Token::Dollar, Span::new(3, 4)),
-            (
-                Token::Literal(r"HOME\Downloads\Polaris Terminal"),
-                Span::new(4, 23)
-            ),
+            (Token::Literal(r"HOME\Downloads\Tool"), Span::new(4, 23)),
             (Token::EscapeChar("`"), Span::new(23, 24)),
             (Token::Whitespace(" "), Span::new(24, 25)),
             (Token::Literal("Setup.exe"), Span::new(25, 34)),

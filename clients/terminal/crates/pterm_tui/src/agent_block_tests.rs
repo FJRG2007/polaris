@@ -129,7 +129,7 @@ fn first_credit_gate_matches_design_and_opens_upgrade() {
             let mut presenter = TuiPresenter::new();
             let frame = presenter.present_element(
                 render_first_credit_gate(&hover_state, ctx),
-                TuiRect::new(0, 0, 80, 4),
+                TuiRect::new(0, 0, 100, 4),
                 ctx,
             );
             assert_eq!(
@@ -387,7 +387,7 @@ fn out_of_credits_failure_matches_tui_design_and_opens_upgrade() {
                     &out_of_credits_hover_state,
                     ctx,
                 ),
-                TuiRect::new(0, 0, 100, 6),
+                TuiRect::new(0, 0, 120, 6),
                 ctx,
             );
             assert_eq!(

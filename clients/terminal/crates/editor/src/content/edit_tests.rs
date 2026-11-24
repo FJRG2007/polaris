@@ -83,7 +83,7 @@ fn test_highlight_urls() {
                 link: "https://google.com".to_string()
             },
             ParsedUrl {
-                url_range: 23..39,
+                url_range: 23..42,
                 link: "https://example.com".to_string()
             }
         ]
@@ -106,7 +106,7 @@ fn test_highlight_urls_unicode() {
                 link: "https://example.com".to_string()
             },
             ParsedUrl {
-                url_range: 57..73,
+                url_range: 57..76,
                 link: "https://example.com".to_string()
             }
         ]
@@ -157,11 +157,11 @@ fn test_links_not_auto_highlighted() {
         highlight_urls(runs),
         &[
             ParsedUrl {
-                url_range: 14..30,
+                url_range: 14..33,
                 link: "https://example.com".to_string()
             },
             ParsedUrl {
-                url_range: 60..78,
+                url_range: 63..81,
                 link: "https://google.com".to_string()
             }
         ]
@@ -197,7 +197,7 @@ fn test_highlight_url_before_link() {
                 link: "https://example.com".to_string()
             },
             ParsedUrl {
-                url_range: 28..44,
+                url_range: 28..47,
                 link: "https://example.com".to_string()
             }
         ]

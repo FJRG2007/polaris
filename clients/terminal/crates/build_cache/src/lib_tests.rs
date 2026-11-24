@@ -129,16 +129,8 @@ fn is_global(command: &Command) -> bool {
 
 #[test]
 fn repo_cache_key_is_stable_for_canonical_identity() {
-    let first = RepoCacheKey::derive(&identity(
-        " GitHub.COM ",
-        "PolarisTerminalDev",
-        "Polaris Terminal",
-    ));
-    let second = RepoCacheKey::derive(&identity(
-        "github.com",
-        "polaris-terminal-dev",
-        "polaris-terminal",
-    ));
+    let first = RepoCacheKey::derive(&identity(" GitHub.COM ", "AcmeDev", "Acme"));
+    let second = RepoCacheKey::derive(&identity("github.com", "acmedev", "acme"));
     assert_eq!(first, second);
     assert_eq!(first.as_str().len(), 64);
 }

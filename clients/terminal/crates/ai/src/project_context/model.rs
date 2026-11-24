@@ -173,7 +173,7 @@ impl ProjectRules {
 
         match existing_rule {
             Some(rule) => {
-                if file_name.to_lowercase() == "polaris-terminal.md" {
+                if file_name.to_lowercase() == "polaris_terminal.md" {
                     rule.pterm_md = rule_file;
                 } else if file_name.to_lowercase() == "agents.md" {
                     rule.agents_md = rule_file;
@@ -185,7 +185,7 @@ impl ProjectRules {
                     pterm_md: None,
                     agents_md: None,
                 };
-                if file_name.to_lowercase() == "polaris-terminal.md" {
+                if file_name.to_lowercase() == "polaris_terminal.md" {
                     rule.pterm_md = rule_file;
                 } else if file_name.to_lowercase() == "agents.md" {
                     rule.agents_md = rule_file;

@@ -1,7 +1,7 @@
 #import <AppKit/AppKit.h>
 #import <QuartzCore/QuartzCore.h>
 
-@interface NSPasteboard (Polaris Terminal)
+@interface NSPasteboard (PolarisTerminal)
 - (NSArray *)getFilePaths;
 @end
 

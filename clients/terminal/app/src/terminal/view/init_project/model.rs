@@ -521,7 +521,7 @@ impl InitProjectModel {
                     p.file_name()
                         .map(|n| {
                             let name = n.to_string_lossy().to_lowercase();
-                            name == "agents.md" || name == "polaris-terminal.md"
+                            name == "agents.md" || name == "polaris_terminal.md"
                         })
                         .unwrap_or(false)
                 });

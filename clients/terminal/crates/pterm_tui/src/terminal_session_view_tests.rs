@@ -1237,7 +1237,7 @@ fn tui_cli_shell_command_uses_channel_entry_points() {
     );
     assert_eq!(
         super::tui_cli_shell_command(Channel::Stable, "--version"),
-        "polaris-terminal --version"
+        "polaris-terminal-stable --version"
     );
     assert_eq!(
         super::tui_cli_shell_command(Channel::Dev, "--version"),

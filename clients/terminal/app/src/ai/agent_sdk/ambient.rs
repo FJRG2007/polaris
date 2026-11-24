@@ -56,8 +56,10 @@ const STREAM_RETRY_BACKOFF_STEPS: &[u64] = &[1, 2, 5, 10];
 const HTTP_UNPROCESSABLE_ENTITY: u16 = 422;
 #[cfg(not(target_family = "wasm"))]
 const HTTP_NOT_FOUND: u16 = 404;
-const OPERATION_NOT_SUPPORTED_TYPE_URI: &str =
-    "https://github.com/FJRG2007/polaris/tree/main/clients/terminal#readme";
+// The path of the RFC 7807 problem type the server answers with when a run has no
+/// normalized conversation. Matched on its path, not its host: the type URI is an
+/// identifier minted by whichever server the client talks to, not a link to follow.
+const OPERATION_NOT_SUPPORTED_TYPE_PATH: &str = "errors/operation_not_supported";
 
 /// Singleton model that runs async work for ambient agent CLI commands.
 struct AmbientAgentRunner;
@@ -1543,7 +1545,11 @@ fn is_normalized_conversation_unsupported(err: &anyhow::Error) -> bool {
         let Ok(problem) = serde_json::from_str::<Rfc7807Problem>(&status_error.body) else {
             return false;
         };
-        problem.problem_type == OPERATION_NOT_SUPPORTED_TYPE_URI
+        problem
+            .problem_type
+            .strip_prefix("https://")
+            .and_then(|rest| rest.split_once('/'))
+            .is_some_and(|(_host, path)| path == OPERATION_NOT_SUPPORTED_TYPE_PATH)
     })
 }
 

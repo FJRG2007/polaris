@@ -16,7 +16,7 @@ fn worker_hosts_excluding_sorts_dedups_and_filters_empty_and_pterm_hosts() {
             worker("worker-2"),
             worker(""),
             worker("polaris-terminal"),
-            worker("POLARIS_TERMINAL"),
+            worker("POLARIS-TERMINAL"),
             worker("worker-1"),
             worker("worker-2"),
         ],

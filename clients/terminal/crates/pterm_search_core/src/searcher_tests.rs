@@ -129,19 +129,13 @@ fn test_tokenizer_simple() {
 
 #[test]
 fn test_tokenizer_pterm_special_chars() {
-    // Test string includes polaris-terminal-related terms with hyphen, underscore, forward slash, backslash, and colon
-    let test_string = "polaris-terminal-cli/launch_command:run C:\\\\Program_Files\\\\Polaris Terminal\\\\core-engine.dll check_status:/dev/pterm_drive-0";
+    // Test string includes tool-related terms with hyphen, underscore, forward slash, backslash, and colon
+    let test_string = "tool-cli/launch_command:run C:\\\\Program_Files\\\\Tool\\\\core-engine.dll check_status:/dev/tool_drive-0";
     let tokens = token_stream_helper(test_string);
 
     assert_eq!(tokens.len(), 25);
-    assert_token(
-        &tokens[0],
-        0,
-        "polaris-terminal-cli/launch_command:run",
-        0,
-        27,
-    );
-    assert_token(&tokens[1], 1, "polaris-terminal", 0, 4);
+    assert_token(&tokens[0], 0, "tool-cli/launch_command:run", 0, 27);
+    assert_token(&tokens[1], 1, "tool", 0, 4);
     assert_token(&tokens[2], 2, "cli", 5, 8);
     assert_token(&tokens[3], 3, "launch_command", 9, 23);
     assert_token(&tokens[4], 4, "launch", 9, 15);
@@ -150,12 +144,12 @@ fn test_tokenizer_pterm_special_chars() {
     assert_token(
         &tokens[7],
         7,
-        "C:\\\\Program_Files\\\\Polaris Terminal\\\\core-engine",
+        "C:\\\\Program_Files\\\\Tool\\\\core-engine",
         28,
         64,
     );
     assert_token(&tokens[15], 15, "dll", 65, 68);
-    assert_token(&tokens[16], 16, "check_status:/dev/pterm_drive-0", 69, 99);
+    assert_token(&tokens[16], 16, "check_status:/dev/tool_drive-0", 69, 99);
 }
 
 #[test]
@@ -168,10 +162,7 @@ fn test_searcher() {
         search_fields: [name: 1.0],
         id_fields: [id: u64]
     );
-    let search_strings = [
-        "run polaris-terminal on web server",
-        "run polaris-terminal-on-web server",
-    ];
+    let search_strings = ["run tool on web server", "run tool-on-web server"];
 
     let searcher = TEST_SCHEMA.create_searcher(MIN_MEMORY_BUDGET);
     searcher
@@ -186,7 +177,7 @@ fn test_searcher() {
         )
         .unwrap();
 
-    let result = searcher.search_full_doc("polaris-terminal on web").unwrap();
+    let result = searcher.search_full_doc("tool on web").unwrap();
     assert_eq!(
         result.len(),
         2,
@@ -203,14 +194,14 @@ fn test_searcher() {
         "should highlight the correct positions"
     );
 
-    let result = searcher.search_full_doc("polaris-terminal-on-web").unwrap();
+    let result = searcher.search_full_doc("tool-on-web").unwrap();
     assert_eq!(
         result.len(),
         1,
         "should only match the second search string"
     );
     assert_eq!(
-        result[0].values.name, "run polaris-terminal-on-web server",
+        result[0].values.name, "run tool-on-web server",
         "should match the second search string"
     );
     assert_eq!(
@@ -231,10 +222,7 @@ fn test_searcher_scores() {
         id_fields: [id: u64]
     );
 
-    let search_strings = [
-        "run polaris-terminal on web server",
-        "run pterm_on_web:server",
-    ];
+    let search_strings = ["run tool on web server", "run tool_on_web:server"];
 
     let searcher = TEST_SCHEMA.create_searcher(MIN_MEMORY_BUDGET);
     searcher
@@ -249,7 +237,7 @@ fn test_searcher_scores() {
         )
         .unwrap();
 
-    let result = searcher.search_full_doc("polaris-terminal").unwrap();
+    let result = searcher.search_full_doc("tool").unwrap();
     assert_eq!(
         result.len(),
         2,
@@ -265,7 +253,7 @@ fn test_searcher_scores() {
         "the score difference of similar strings should be less than 15%"
     );
 
-    let result = searcher.search_full_doc("polaris-terminal on web").unwrap();
+    let result = searcher.search_full_doc("tool on web").unwrap();
     let score_delta = result[0].score - result[1].score;
     assert!(
         score_delta / result[0].score < 0.15,

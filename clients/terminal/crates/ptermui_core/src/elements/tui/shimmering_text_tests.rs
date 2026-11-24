@@ -23,7 +23,7 @@ const SHIMMER: ColorU = ColorU {
 };
 
 fn element(initial_elapsed: Duration) -> TuiShimmeringText {
-    element_with_text("Pterming", initial_elapsed)
+    element_with_text("Working", initial_elapsed)
 }
 
 fn element_with_text(text: &str, initial_elapsed: Duration) -> TuiShimmeringText {
@@ -50,7 +50,7 @@ fn paints_base_color_before_the_band_reaches_the_text() {
     // At t=0 the band center sits `padding` glyphs before the text, farther
     // than `shimmer_radius` from every glyph, so every cell is the base color.
     let (buffer, _) = render(element(Duration::ZERO));
-    for (index, char) in "Pterming".chars().enumerate() {
+    for (index, char) in "Working".chars().enumerate() {
         let cell = &buffer[(index as u16, 0)];
         assert_eq!(cell.symbol(), char.to_string());
         assert_eq!(cell.fg, Color::Rgb(BASE.r, BASE.g, BASE.b));
@@ -79,22 +79,22 @@ fn appends_and_paints_grouped_suffix_with_one_color_across_the_sweep() {
         config.period * 2 / 3,
         config.period * 3 / 4,
     ] {
-        let (buffer, _) = render(element_with_text("Pterming", elapsed).with_grouped_suffix("..."));
-        assert_eq!(buffer.to_lines()[0], "Pterming...");
+        let (buffer, _) = render(element_with_text("Working", elapsed).with_grouped_suffix("..."));
+        assert_eq!(buffer.to_lines()[0], "Working...");
         let first_dot_color = buffer[(7, 0)].fg;
         assert_eq!(buffer[(8, 0)].fg, first_dot_color);
         assert_eq!(buffer[(9, 0)].fg, first_dot_color);
     }
 
     let (buffer, _) =
-        render(element_with_text("Pterming", config.period / 2).with_grouped_suffix("..."));
+        render(element_with_text("Working", config.period / 2).with_grouped_suffix("..."));
     assert_ne!(buffer[(7, 0)].fg, Color::Rgb(BASE.r, BASE.g, BASE.b));
 }
 
 #[test]
 fn leaves_trailing_ellipsis_ungrouped_by_default() {
     let config = ShimmerConfig::default();
-    let (buffer, _) = render(element_with_text("Pterming...", config.period / 2));
+    let (buffer, _) = render(element_with_text("Working...", config.period / 2));
     assert_ne!(buffer[(7, 0)].fg, buffer[(8, 0)].fg);
     assert_ne!(buffer[(8, 0)].fg, buffer[(9, 0)].fg);
 }

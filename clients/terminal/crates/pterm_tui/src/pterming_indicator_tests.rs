@@ -89,7 +89,7 @@ fn shimmer_only_applies_to_the_pterming_label_and_groups_its_ellipsis() {
         app.read(|app_ctx| {
             let config = ShimmerConfig::default();
             let element = render_pterming_indicator_row(
-                "Pterming",
+                "Working",
                 config.period / 2,
                 TuiText::new("▶▶ Auto approve off").finish(),
                 app_ctx,

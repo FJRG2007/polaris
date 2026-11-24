@@ -3051,7 +3051,7 @@ fn test_multiselect_pasting() {
         });
 
         // Pasting a URL for multiple selections should paste as text.
-        let url_clipboard_content = "https://example.com";
+        let url_clipboard_content = "https://abc.test";
 
         editor.update(&mut app, |editor, ctx| {
             editor.cursor_at(CharOffset::from(1), ctx);
@@ -3065,7 +3065,7 @@ fn test_multiselect_pasting() {
             editor.insert_formatted_from_paste(markdown, url_clipboard_content, ctx);
             assert_eq!(
                 editor.debug_buffer(ctx),
-                "<text><a_https://example.com>https://example.com<a>\\nSecond line\\n<a_https://example.com>https://example.com<a><code:Shell><c_#b4fa72>code<c><text>"
+                "<text><a_https://abc.test>https://abc.test<a>\\nSecond line\\n<a_https://abc.test>https://abc.test<a><code:Shell><c_#b4fa72>code<c><text>"
             );
         });
 
@@ -3082,7 +3082,7 @@ fn test_multiselect_pasting() {
             editor.insert_formatted_from_paste(markdown, "echo test", ctx);
             assert_eq!(
                 editor.debug_buffer(ctx),
-                "<text>echo test<a_https://example.com>https://example.com<a>\\nSecond line\\n<a_https://example.com>https://example.com<a><code:Shell><c_#b4fa72>coecho testde<c><text>"
+                "<text>echo test<a_https://abc.test>https://abc.test<a>\\nSecond line\\n<a_https://abc.test>https://abc.test<a><code:Shell><c_#b4fa72>coecho testde<c><text>"
             );
         });
     });

@@ -79,7 +79,7 @@ fn an_unconfigured_directory_has_no_name() {
 #[cfg(not(target_os = "linux"))]
 #[test]
 fn case_is_ignored_where_the_filesystem_ignores_it() {
-    let names = [("C:/Users/Me/Polaris Terminal", "Polaris Terminal")];
+    let names = [("C:/Users/Me/Polaris-Terminal", "Polaris Terminal")];
     let same_path = "c:/users/me/polaris-terminal/app";
     assert_eq!(
         name_for(&names, same_path).as_deref(),
@@ -92,6 +92,6 @@ fn case_is_ignored_where_the_filesystem_ignores_it() {
 #[cfg(target_os = "linux")]
 #[test]
 fn case_matters_where_the_filesystem_makes_it_matter() {
-    let names = [("/home/me/Polaris Terminal", "Polaris Terminal")];
+    let names = [("/home/me/Polaris-Terminal", "Polaris Terminal")];
     assert_eq!(name_for(&names, "/home/me/polaris-terminal"), None);
 }

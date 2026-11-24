@@ -178,7 +178,7 @@ fn artifact_round_trips_all_variants() {
         Artifact::PullRequest {
             url: "https://github.com/FJRG2007/polaris/pull/123".to_string(),
             branch: "feature-branch".to_string(),
-            repo: Some("polaris-terminal".to_string()),
+            repo: Some("polaris".to_string()),
             number: Some(123),
         },
         Artifact::ExternalReference {
@@ -225,7 +225,7 @@ fn artifact_pull_request_derives_repo_and_number_on_deserialize() {
         Artifact::PullRequest {
             url: "https://github.com/FJRG2007/polaris/pull/456".to_string(),
             branch: "main".to_string(),
-            repo: Some("polaris-terminal".to_string()),
+            repo: Some("polaris".to_string()),
             number: Some(456),
         }
     );

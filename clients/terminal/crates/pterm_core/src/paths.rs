@@ -368,12 +368,12 @@ fn project_dirs_for_app_id(
     cfg_if::cfg_if! {
         if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
             // Adjust the base application name so that we end up with
-            // directories like "polaris-terminal-stable" and "polaris-terminal-dev", to
-            // match our Linux package name.
+            // directories like "polaris-terminal", "polaris-terminal-stable" and
+            // "polaris-terminal-dev", to match our Linux package names.
             let base_app_name = match app_id.application_name() {
-                "Polaris Terminal" => "PolarisTerminal-Terminal".to_owned(),
-                "PolarisTerminal" => "PolarisTerminal-Oss".to_owned(),
-                other if other.starts_with("Polaris Terminal") => other.replace("Polaris Terminal", "PolarisTerminal-Terminal-"),
+                "Polaris Terminal" => "Polaris-Terminal-Stable".to_owned(),
+                "PolarisTerminal" => "Polaris-Terminal".to_owned(),
+                other if other.starts_with("PolarisTerminal") => other.replace("PolarisTerminal", "Polaris-Terminal-"),
                 _ => app_id.application_name().to_owned(),
             };
         } else {

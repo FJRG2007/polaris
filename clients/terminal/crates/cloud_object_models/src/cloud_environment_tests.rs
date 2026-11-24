@@ -204,7 +204,7 @@ fn azure_devops_clone_url_encodes_owner_segments() {
 
     assert_eq!(
         repo.https_clone_url(),
-        "https://dev.azure.com/Polaris Terminal%20Organization/Test%20Project/_git/polaris-terminal"
+        "https://dev.azure.com/Polaris%20Terminal%20Organization/Test%20Project/_git/polaris-terminal"
     );
 }
 
@@ -218,7 +218,7 @@ fn azure_devops_clone_url_encodes_repository_segment() {
 
     assert_eq!(
         repo.https_clone_url(),
-        "https://dev.azure.com/warpdotdev/test-project/_git/Polaris Terminal%20Repo"
+        "https://dev.azure.com/warpdotdev/test-project/_git/Polaris%20Terminal%20Repo"
     );
 }
 

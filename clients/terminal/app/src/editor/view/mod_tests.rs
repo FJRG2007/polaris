@@ -514,7 +514,7 @@ fn test_select_word_with_custom_boundaries() {
             editor.select_word(&DisplayPoint::new(0, 8), ctx);
             assert_eq!(
                 editor.selected_text(ctx),
-                "/.polaris/terminal/themes/foo-bar.yaml"
+                "/.polaris-terminal/themes/foo-bar.yaml"
             );
             editor
         });
@@ -540,7 +540,7 @@ fn test_smart_select_with_drag() {
                 ctx,
             );
             editor.select_word(&DisplayPoint::new(0, 8), ctx);
-            editor.update_selection(DisplayPoint::new(0, 34), Vector2F::zero(), ctx);
+            editor.update_selection(DisplayPoint::new(0, 46), Vector2F::zero(), ctx);
             assert_eq!(
                 editor.selected_text(ctx),
                 "~/.polaris-terminal/themes/foo-bar.yaml andy"
@@ -3297,7 +3297,7 @@ fn test_add_next_occurrence() {
 
         app.add_window(WindowStyle::NotStealFocus, |ctx| {
             let mut editor =
-                EditorView::new_with_base_text("ptermwordptermwordpterm", Default::default(), ctx);
+                EditorView::new_with_base_text("roofwordroofwordroof", Default::default(), ctx);
             editor
                 .select_ranges(vec![DisplayPoint::new(0, 0)..DisplayPoint::new(0, 4)], ctx)
                 .unwrap();
@@ -3308,7 +3308,7 @@ fn test_add_next_occurrence() {
             assert_eq!(editor.buffer_text(ctx), "wordword");
 
             editor.undo(ctx);
-            assert_eq!(editor.buffer_text(ctx), "ptermwordptermwordpterm");
+            assert_eq!(editor.buffer_text(ctx), "roofwordroofwordroof");
             editor.redo(ctx);
             assert_eq!(editor.buffer_text(ctx), "wordword");
 
@@ -3482,11 +3482,8 @@ fn test_autocomplete_symbols() {
         initialize_app(&mut app);
 
         app.add_window(WindowStyle::NotStealFocus, |ctx| {
-            let mut editor = EditorView::new_with_base_text(
-                "word polaris-terminal word",
-                Default::default(),
-                ctx,
-            );
+            let mut editor =
+                EditorView::new_with_base_text("word roof word", Default::default(), ctx);
 
             editor.set_autocomplete_symbols_allowed(true);
             editor
@@ -3500,12 +3497,12 @@ fn test_autocomplete_symbols() {
                 .unwrap();
             editor.add_next_occurrence(ctx);
             editor.user_insert("[", ctx);
-            assert_eq!(editor.buffer_text(ctx), "[word] polaris-terminal [word]");
+            assert_eq!(editor.buffer_text(ctx), "[word] roof [word]");
 
             editor.undo(ctx);
-            assert_eq!(editor.buffer_text(ctx), "word polaris-terminal word");
+            assert_eq!(editor.buffer_text(ctx), "word roof word");
             editor.redo(ctx);
-            assert_eq!(editor.buffer_text(ctx), "[word] polaris-terminal [word]");
+            assert_eq!(editor.buffer_text(ctx), "[word] roof [word]");
 
             editor
         });
@@ -3526,12 +3523,11 @@ fn test_autocomplete_symbols() {
                 autocomplete_symbols: true,
                 ..Default::default()
             };
-            let mut editor =
-                EditorView::new_with_base_text("word polaris-terminal word", options, ctx);
+            let mut editor = EditorView::new_with_base_text("word roof word", options, ctx);
 
             editor.move_to_visual_line_end(ctx);
             editor.user_insert("(", ctx);
-            assert_eq!(editor.buffer_text(ctx), "word polaris-terminal word(");
+            assert_eq!(editor.buffer_text(ctx), "word roof word(");
 
             editor
         });

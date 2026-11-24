@@ -53,7 +53,7 @@ fn test_email_selection() {
             "mail to: acarl005@g.ucla.edu andy+1.hello@example.com",
             33.into()
         ),
-        Some(ByteOffset::range(29..50))
+        Some(ByteOffset::range(29..53))
     );
 }
 

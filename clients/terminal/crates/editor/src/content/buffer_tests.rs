@@ -3178,7 +3178,7 @@ fn test_inline_markdown_roundtrips() {
         "*Complicated **text*** with *nest**ing***",
         "This `is not a [link](https://example.com) due to` precedence",
         "A **`bold code span`** too",
-        "[link1](https://example.com)[**link2**](https://example.com)",
+        "[link1](https://example.org)[**link2**](https://example.com)",
         "Combined *~~italic and strikethrough~~*",
         "Overlapping *~~abc~~def*",
         "This is <u>underlined</u>",

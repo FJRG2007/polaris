@@ -17,7 +17,7 @@ id pterm_get_accessibility_contents(PtermHostView *);
 void pterm_marked_text_updated(PtermHostView *, NSString *, NSRange);
 void pterm_marked_text_cleared(PtermHostView *);
 
-@implementation NSPasteboard (Polaris Terminal)
+@implementation NSPasteboard (PolarisTerminal)
 
 - (NSArray *)getFilePaths {
     NSMutableArray *paths = [NSMutableArray array];
