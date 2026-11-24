@@ -26,7 +26,8 @@ vi.mock("@/lib/chat/e2ee/sealed-chat", () => ({
     sendSealedMessage: async () => "",
     sealedSendFailure: () => "unreachable"
 }));
-vi.mock("@/lib/poll-fetch", () => ({ sendAction: async () => ({}) }));
+const plainSend = vi.fn(async () => ({}));
+vi.mock("@/lib/poll-fetch", () => ({ sendAction: (...args: unknown[]) => plainSend(...(args as [])) }));
 vi.mock("@/lib/reachability", () => ({
     noteRequestFailure: () => undefined,
     isNetworkFailure: (caught: unknown) => caught instanceof TypeError,
@@ -142,6 +143,37 @@ describe("chat changes offline", () => {
             editedAt: "2026-11-24T10:00:00.000Z"
         });
         expect(await outbox.readChanges(CHANNEL)).toHaveLength(0);
+    });
+
+    it("holds a sealed edit on a page without sealed chat, uncounted, until one with it sends it", async () => {
+        sealedOn = true;
+        editSealedMessage.mockRejectedValueOnce(unreachable());
+        await outbox.changeMessage(
+            { op: "edit", channelId: CHANNEL, messageId: MESSAGE, body: "sealed words", sealed: true },
+            vi.fn()
+        );
+        sealedOn = false;
+        for (let round = 0; round < 6; round += 1) await drained();
+        expect(editAction).not.toHaveBeenCalled();
+        const [held] = await outbox.readChanges(CHANNEL);
+        expect(held).toMatchObject({ state: "pending" });
+        expect(held!.attempts).toBeLessThan(2);
+
+        sealedOn = true;
+        editSealedMessage.mockResolvedValue("2026-11-24T11:00:00.000Z");
+        await drained();
+        expect(editSealedMessage).toHaveBeenCalledTimes(2);
+        expect(await outbox.readChanges(CHANNEL)).toHaveLength(0);
+    });
+
+    it("never sends a message written under sealed chat in the clear from a page without it", async () => {
+        sealedOn = true;
+        expect(await outbox.enqueue({ key: "k1", channelId: CHANNEL, body: "secret", replyToId: null })).toBe(true);
+        sealedOn = false;
+        plainSend.mockClear();
+        await drained();
+        expect(plainSend).not.toHaveBeenCalled();
+        expect(await outbox.readOutbox(CHANNEL)).toEqual([expect.objectContaining({ state: "pending", attempts: 0 })]);
     });
 
     it("keeps a refused change as not sent, for retry or discard", async () => {

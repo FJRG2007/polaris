@@ -1063,6 +1063,17 @@ const Message = memo(function Message({
 
     // The words of the message, drawn above its pictures or, for a reader who
     // chose WhatsApp's way in Chat settings, under them.
+    // The clock of a message or a change to it still on this device.
+    const waitingMark = (
+        <span
+            role="img"
+            title={t("messageList.receipt.pending")}
+            aria-label={t("messageList.receipt.pending")}
+            className="ms-1 inline-flex align-middle text-foreground-subtle"
+        >
+            <WaitingClock className="size-3" />
+        </span>
+    );
     const bodyText = (
         <div className={cn("text-sm", captionBelow && "mt-1")}>
             <TranslatableText id={message.id} body={message.body} live={live}>
@@ -1087,16 +1098,7 @@ const Message = memo(function Message({
                     onOpen={() => onExplain(message)}
                 />
             )}
-            {(message.id.startsWith("outbox:") || message.changeWaiting) && (
-                <span
-                    role="img"
-                    title={t("messageList.receipt.pending")}
-                    aria-label={t("messageList.receipt.pending")}
-                    className="ms-1 inline-flex align-middle text-foreground-subtle"
-                >
-                    <WaitingClock className="size-3" />
-                </span>
-            )}
+            {(message.id.startsWith("outbox:") || message.changeWaiting) && waitingMark}
             {message.edited && (
                 // A button, not a label: "(edited)" that cannot be
                 // opened asks the room to take the change on trust.
@@ -1362,6 +1364,8 @@ const Message = memo(function Message({
                         {message.deleted ? (
                             <p className="text-sm italic text-foreground-subtle">
                                 {t("messageList.thisMessageWasDeleted")}
+                                {/* A delete made offline: deleted here, not yet on the server. */}
+                                {message.changeWaiting && waitingMark}
                             </p>
                         ) : notice ? null : invite ? (
                             <GameInviteCard
