@@ -130,21 +130,29 @@ function OfferButton({ offer, href, onInstall, size = "sm" }: { offer: AddonOffe
     }
 }
 
-/** Install with its permissions read out first; a failure is said in a toast. */
-function useInstallFlow(bridge: AddonsBridge | null): [(entry: AddonEntry) => void, ReactNode] {
+/**
+ * Install with its permissions read out first; a failure is said in a toast.
+ * An update reads out only what it asks for that was not accepted before, the
+ * one thing an automatic update never decides for the person.
+ */
+function useInstallFlow(bridge: AddonsBridge | null, snapshot: AddonsSnapshot | null): [(entry: AddonEntry) => void, ReactNode] {
     const t = useTranslations("account");
     const toast = useToast();
     const [confirm, element] = useConfirm();
     const install = useInstallAddon(bridge);
     const start = (entry: AddonEntry) => {
-        const asks = entry.permissions.map((permission) => `- ${say(t, `permission.${PERMISSION_KEY[permission]}`)}`);
-        const description = [
-            asks.length > 0 ? say(t, "install.asks") : say(t, "install.none"),
-            ...asks,
-            ""
-        ].join("\n");
+        const installed = snapshot?.installed.find((item) => item.id === entry.id) ?? null;
+        const updating = Boolean(installed?.update);
+        const listed = updating ? entry.permissions.filter((permission) => !installed?.granted.includes(permission)) : entry.permissions;
+        const asks = listed.map((permission) => `- ${say(t, `permission.${PERMISSION_KEY[permission]}`)}`);
+        const lead = updating ? (asks.length > 0 ? say(t, "update.added") : say(t, "update.noNew")) : asks.length > 0 ? say(t, "install.asks") : say(t, "install.none");
+        const description = [lead, ...asks, ""].join("\n");
         void (async () => {
-            const ok = await confirm({ title: say(t, "install.title", { name: entry.name }), description, confirmLabel: say(t, "install.confirm") });
+            const ok = await confirm(
+                updating
+                    ? { title: say(t, "update.title", { name: entry.name, version: entry.version }), description, confirmLabel: say(t, "update.confirm") }
+                    : { title: say(t, "install.title", { name: entry.name }), description, confirmLabel: say(t, "install.confirm") }
+            );
             if (!ok) return;
             const problem = await install(entry);
             if (problem) toast.show({ title: say(t, `failure.${problem === "app-version" ? "appVersion" : problem}`) });
@@ -239,9 +247,8 @@ export function AddonsStore() {
     const [tab, setTab] = useState<Tab>("browse");
     const [query, setQuery] = useState("");
     const [category, setCategory] = useState<Category>("");
-    const [startInstall, installDialog] = useInstallFlow(state.kind === "ready" || state.kind === "loading" ? state.bridge : null);
-
     const snapshot = state.kind === "ready" ? state.snapshot : null;
+    const [startInstall, installDialog] = useInstallFlow(state.kind === "ready" || state.kind === "loading" ? state.bridge : null, snapshot);
     const listings = useMemo(() => (snapshot ? addonListings(snapshot) : []), [snapshot]);
     const needle = query.trim().toLowerCase();
     const shown = listings.filter((listing) => {
@@ -290,6 +297,7 @@ export function AddonsStore() {
                 categories={[{ value: "" as Category, label: say(t, "category.all") }, ...ADDON_CATEGORIES.map((value) => ({ value, label: say(t, `category.${value}`) }))]}
                 words={{ search: say(t, "filters.search"), categories: say(t, "filters.categories") }}
             />
+            {snapshot && snapshot.installed.length > 0 && state.kind === "ready" ? <AutoUpdateRow bridge={state.bridge} snapshot={snapshot} id={null} /> : null}
             {body}
             {installDialog}
         </div>
@@ -306,8 +314,8 @@ export function AddonsShelf({ query, category, byName, label, kind }: { query: s
     const t = useTranslations("account");
     const locale = useLocale();
     const state = useAddons();
-    const [startInstall, installDialog] = useInstallFlow(state.kind === "ready" || state.kind === "loading" ? state.bridge : null);
     const snapshot = state.kind === "ready" ? state.snapshot : null;
+    const [startInstall, installDialog] = useInstallFlow(state.kind === "ready" || state.kind === "loading" ? state.bridge : null, snapshot);
     const needle = query.trim().toLocaleLowerCase(locale);
     const shown = useMemo(() => {
         const listed = (snapshot ? addonListings(snapshot) : []).filter((listing) => {
@@ -346,6 +354,44 @@ export function AddonsShelf({ query, category, byName, label, kind }: { query: s
             <StoreSection label={label}>{body}</StoreSection>
             {installDialog}
         </>
+    );
+}
+
+/**
+ * Whether updates go in by themselves: for every add-on (`id` null) or one.
+ * Drawn only by an app that keeps the setting; an older one puts none in.
+ */
+function AutoUpdateRow({ bridge, snapshot, id }: { bridge: AddonsBridge; snapshot: AddonsSnapshot; id: string | null }) {
+    const t = useTranslations("account");
+    const toast = useToast();
+    const own = id === null ? null : (snapshot.installed.find((item) => item.id === id)?.autoUpdate ?? null);
+    const held = own ?? snapshot.autoUpdate;
+    const [shown, setShown] = useState<boolean | null>(null);
+    useEffect(() => setShown(null), [held]);
+    const setAutoUpdate = bridge.setAutoUpdate;
+    if (snapshot.autoUpdate === null || !setAutoUpdate) return null;
+    const checked = shown ?? held ?? true;
+    const change = (value: boolean) => {
+        if (value === checked) return;
+        setShown(value);
+        void setAutoUpdate(id, value)
+            .then((done) => {
+                if (!done) throw new Error("refused");
+            })
+            .catch(() => {
+                setShown(null);
+                toast.show({ title: say(t, "auto.failed") });
+            });
+    };
+    const label = id === null ? say(t, "auto.all") : say(t, "auto.one");
+    return (
+        <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{label}</p>
+                <p className="text-sm text-muted-foreground">{say(t, "auto.hint")}</p>
+            </div>
+            <Switch checked={checked} onChange={change} aria-label={label} />
+        </div>
     );
 }
 
@@ -626,7 +672,7 @@ export function AddonPage({ id }: { id: string }) {
     const toast = useToast();
     const [confirm, confirmElement] = useConfirm();
     const bridge = state.kind === "ready" || state.kind === "loading" ? state.bridge : null;
-    const [startInstall, installDialog] = useInstallFlow(bridge);
+    const [startInstall, installDialog] = useInstallFlow(bridge, state.kind === "ready" ? state.snapshot : null);
 
     const back = (
         <Link href="/account/addons" className="text-sm text-muted-foreground hover:underline">
@@ -707,6 +753,21 @@ export function AddonPage({ id }: { id: string }) {
                 </div>
             </header>
             <p className="text-sm">{manifest.summary}</p>
+            {installed?.update && installed.consent.length > 0 ? (
+                <Notice
+                    action={
+                        entry ? (
+                            <Button size="sm" onClick={() => startInstall(entry)}>
+                                {say(t, "notice.review")}
+                            </Button>
+                        ) : undefined
+                    }
+                >
+                    {say(t, "notice.consent", { version: installed.update })}
+                </Notice>
+            ) : null}
+            {installed?.failed ? <Notice>{say(t, "notice.failed", { version: installed.failed })}</Notice> : null}
+            {installed ? <AutoUpdateRow bridge={state.bridge} snapshot={state.snapshot} id={id} /> : null}
             {installed && installed.manifest ? (
                 <section className="flex min-w-0 flex-col gap-2" aria-label={say(t, "detail.settings")}>
                     <h2 className="text-sm font-medium text-muted-foreground">{say(t, "detail.settings")}</h2>
@@ -742,7 +803,9 @@ export function AddonPage({ id }: { id: string }) {
             </section>
             {entry?.changelog ? (
                 <section className="flex min-w-0 flex-col gap-1" aria-label={say(t, "detail.changelog")}>
-                    <h2 className="text-sm font-medium text-muted-foreground">{say(t, "detail.changelog")}</h2>
+                    <h2 className="text-sm font-medium text-muted-foreground">
+                        {installed?.update ? say(t, "detail.changelogFor", { version: installed.update }) : say(t, "detail.changelog")}
+                    </h2>
                     <p className="whitespace-pre-line text-sm">{entry.changelog}</p>
                 </section>
             ) : null}

@@ -200,6 +200,8 @@ export interface PolarisDesktop {
         settings(id: string): Promise<unknown>;
         /** Change one; answers every value after it, or null when refused. */
         setSetting(id: string, key: string, value: unknown): Promise<unknown>;
+        /** Whether updates go in by themselves: for one add-on (`id`), or for all (`id` null); null on one follows all. */
+        setAutoUpdate(id: string | null, value: boolean | null): Promise<boolean>;
         /** A call from the add-on's view, relayed by the page holding its frame: `{ ok, value }` or `{ ok: false, error }`. */
         viewCall(id: string, method: string, params: unknown): Promise<unknown>;
         /** Hear that anything changed (progress, a crash, an install). Answers the way to stop. */
@@ -768,6 +770,7 @@ export const CHANNELS = {
     addonsEnable: "desktop:addons-enable",
     addonsSettings: "desktop:addons-settings",
     addonsSetSetting: "desktop:addons-set-setting",
+    addonsSetAutoUpdate: "desktop:addons-set-auto-update",
     addonsViewCall: "desktop:addons-view-call",
     addonsChanged: "desktop:addons-changed",
     addonsOpen: "desktop:addons-open",

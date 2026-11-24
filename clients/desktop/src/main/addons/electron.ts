@@ -17,6 +17,8 @@ import { addonShortcuts, sameShortcuts, type AddonShortcuts } from "./ways-in";
 import type { AddonChild, WantedAddon } from "./supervisor";
 import { createAddonManager, type AddonManager } from "./manager";
 import { answerOfficial, officialRequestSchema, officialRunnerFor } from "./official";
+import { showNotice } from "../notices";
+import { newsWords } from "./updates";
 import { callPageAction, voiceStateNow, voiceWidgetAction } from "../voice-widget";
 import { ADDON_PERMISSIONS, addonPlatform, type UsbDevice } from "@polaris/core/device-addons";
 import { app, ipcMain, net, Notification, protocol, utilityProcess, webContents, type IpcMainInvokeEvent } from "electron";
@@ -185,6 +187,19 @@ export function startDeviceAddons(showPolaris: (path?: string) => void): AddonMa
             });
             notice.show();
         },
+        notify: (id, news) => {
+            const words = newsWords(news);
+            showNotice({
+                title: words.title,
+                body: words.body,
+                tag: `addon-update:${id}`,
+                silent: true,
+                onClick: () => {
+                    showPolaris();
+                    broadcast(CHANNELS.addonsOpen, id);
+                }
+            });
+        },
         onChange: () => {
             broadcast(CHANNELS.addonsChanged);
             lookAtShortcuts(showPolaris);
@@ -199,6 +214,7 @@ export function startDeviceAddons(showPolaris: (path?: string) => void): AddonMa
     });
     if (usb) devices = usb.list();
     void created.start().finally(() => lookAtShortcuts(showPolaris));
+    created.startUpdates();
     return created;
 }
 
@@ -279,6 +295,12 @@ export function registerAddonIpc(
             console.error(`[add-on ${parsedId.data}] official software: ${error instanceof Error ? error.message : String(error)}`);
             return { ok: false, reason: "failed" };
         }
+    });
+    ipcMain.handle(CHANNELS.addonsSetAutoUpdate, (event, id: unknown, value: unknown) => {
+        const parsedId = z.union([idSchema, z.null()]).safeParse(id);
+        const parsedValue = z.boolean().nullable().safeParse(value);
+        if (!allowed(event) || !parsedId.success || !parsedValue.success) return false;
+        return ready().setAutoUpdate(parsedId.data, parsedValue.data);
     });
     ipcMain.handle(CHANNELS.addonsSetSetting, (event, id: unknown, key: unknown, value: unknown) => {
         const parsed = idSchema.safeParse(id);

@@ -104,7 +104,8 @@ describe("updating, disabling and uninstalling", () => {
             fetcher: fakeFetch({ [PACKAGE_URL]: next })
         });
         expect(result.ok).toBe(true);
-        expect(await readdir(join(dir, "packages", "fixture-mixer"))).toEqual(["1.1.0"]);
+        // The replaced version stays on disk to roll back to (updates.test.ts).
+        expect(await readdir(join(dir, "packages", "fixture-mixer"))).toEqual(["1.0.0", "1.1.0"]);
         expect((await readInstalled(dir)).addons["fixture-mixer"]?.enabled).toBe(false);
     });
 
