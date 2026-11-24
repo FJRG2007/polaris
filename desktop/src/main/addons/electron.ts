@@ -6,7 +6,7 @@
 
 import { z } from "zod";
 import { join } from "node:path";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { packageDir } from "./packages";
 import { judgeViewCall, readViewUrl, resolveViewFile, viewContentType, VIEW_CSP, VIEW_SCHEME } from "./view";
 import { CHANNELS } from "@/shared/bridge";
@@ -16,6 +16,7 @@ import { watchUsb, type UsbWatch } from "./presence";
 import { addonShortcuts, localAddonRows, sameShortcuts, type AddonShortcuts } from "./ways-in";
 import type { AddonChild, WantedAddon } from "./supervisor";
 import { createAddonManager, type AddonManager } from "./manager";
+import { answerOfficial, officialRequestSchema, officialRunnerFor } from "./official";
 import { callPageAction, voiceStateNow, voiceWidgetAction } from "../voice-widget";
 import { ADDON_PERMISSIONS, addonPlatform, type UsbDevice } from "@polaris/core/device-addons";
 import { app, ipcMain, net, Notification, protocol, utilityProcess, webContents, type IpcMainInvokeEvent } from "electron";
@@ -27,6 +28,13 @@ let shortcuts: AddonShortcuts = { installed: [], plugged: [] };
 /** Whether a look at the installed add-ons is under way, and whether another was asked for meanwhile. */
 let looking: Promise<void> | null = null;
 let lookAgain = false;
+
+const addonsDir = () => join(app.getPath("userData"), "addons");
+
+/** Starts the device's official app for an add-on, when one is registered for it here (`official.ts`). */
+function launchOfficial(id: string): Promise<boolean> {
+    return officialRunnerFor(id, addonsDir())?.launch() ?? Promise.resolve(false);
+}
 
 /** Every installed add-on, for the launcher's "Configure <name>" rows. Empty until the manager has started. */
 export function addonShortcutsNow(): AddonShortcuts {
@@ -163,6 +171,7 @@ export function startDeviceAddons(showPolaris: (path?: string) => void): AddonMa
         call: async (id, method, params) => {
             if (method === "settings.get") return manager?.settings(id) ?? null;
             if (method === "polaris.state") return { call: voiceStateNow() };
+            if (method === "system.launchOfficial") return launchOfficial(id);
             // judgeCall checked the shape: one of ADDON_ACTIONS.
             return runAddonAction((params as { action: AddonAction }).action);
         },
@@ -256,9 +265,27 @@ export function registerAddonIpc(
             }
             if (verdict.method === "settings.get") return { ok: true, value: await running.settings(parsed.data) };
             if (verdict.method === "polaris.state") return { ok: true, value: { call: voiceStateNow() } };
+            if (verdict.method === "system.launchOfficial") return { ok: true, value: await launchOfficial(parsed.data) };
             return { ok: true, value: runAddonAction((verdict.params as { action: AddonAction }).action) };
         } catch {
             return { ok: false, error: "failed" };
+        }
+    });
+    ipcMain.handle(CHANNELS.addonsOfficial, async (event, id: unknown, request: unknown) => {
+        const parsedId = idSchema.safeParse(id);
+        const parsedRequest = officialRequestSchema.safeParse(request);
+        if (!allowed(event) || !parsedId.success || !parsedRequest.success) return null;
+        const runner = officialRunnerFor(parsedId.data, addonsDir());
+        if (!runner) return null;
+        const dataDir = join(addonsDir(), "official", parsedId.data);
+        try {
+            return await answerOfficial(runner, ready(), parsedId.data, parsedRequest.data, async (name, text) => {
+                await mkdir(dataDir, { recursive: true });
+                await writeFile(join(dataDir, name), text, "utf8");
+            });
+        } catch (error) {
+            console.error(`[add-on ${parsedId.data}] official software: ${error instanceof Error ? error.message : String(error)}`);
+            return { ok: false, reason: "failed" };
         }
     });
     ipcMain.handle(CHANNELS.addonsSetSetting, (event, id: unknown, key: unknown, value: unknown) => {

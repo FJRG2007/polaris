@@ -151,6 +151,7 @@ const bridge: PolarisDesktop = {
         settings: (id) => ipcRenderer.invoke(CHANNELS.addonsSettings, id),
         setSetting: (id, key, value) => ipcRenderer.invoke(CHANNELS.addonsSetSetting, id, key, value),
         viewCall: (id, method, params) => ipcRenderer.invoke(CHANNELS.addonsViewCall, id, method, params),
+        official: (id, request) => ipcRenderer.invoke(CHANNELS.addonsOfficial, id, request),
         onChange: (listener) => {
             const heard = () => listener();
             ipcRenderer.on(CHANNELS.addonsChanged, heard);

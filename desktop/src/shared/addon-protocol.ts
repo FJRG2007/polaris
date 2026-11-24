@@ -19,7 +19,16 @@ export const ADDON_METHODS = {
     /** The calls and media playing now, for a display. */
     "polaris.state": "polaris-actions",
     /** Its own settings as the person left them. */
-    "settings.get": null
+    "settings.get": null,
+    /**
+     * Start the device's official app again, for an "Open <app>" button. It
+     * needs no permission of its own: the app starts only the one program it
+     * found registered for the add-on's device (`hercules-official-run.ts`),
+     * never a path the add-on names, and an add-on with none is answered
+     * false. A new permission would also make every older app refuse the
+     * whole signed catalog the moment a manifest listed it.
+     */
+    "system.launchOfficial": null
 } as const satisfies Record<string, AddonPermission | null>;
 
 export type AddonMethod = keyof typeof ADDON_METHODS;
@@ -47,7 +56,8 @@ export { ADDON_ACTIONS, type AddonAction } from "@polaris/core/device-addons";
 export const ADDON_PARAMS = {
     "polaris.action": z.object({ action: z.enum(ADDON_ACTIONS) }),
     "polaris.state": z.undefined(),
-    "settings.get": z.undefined()
+    "settings.get": z.undefined(),
+    "system.launchOfficial": z.undefined()
 } as const satisfies Record<AddonMethod, z.ZodType>;
 
 export type AppMessage =
