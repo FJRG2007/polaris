@@ -189,7 +189,7 @@ async function retryPolar({ user, message }: Pressed): Promise<void> {
     const asked = message.replyToId
         ? await prisma.chatMessage.findUnique({
               where: { id: message.replyToId },
-              select: { id: true, channelId: true, authorId: true, parentId: true, body: true, deletedAt: true }
+              select: { id: true, channelId: true, authorId: true, parentId: true, replyToId: true, body: true, deletedAt: true, e2eeEpoch: true }
           })
         : null;
     if (!asked || asked.deletedAt || asked.channelId !== message.channelId) {
@@ -197,6 +197,13 @@ async function retryPolar({ user, message }: Pressed): Promise<void> {
     }
     // The answer spends the asker's access and limits, so only they ask again.
     if (asked.authorId !== user.id) throw new ChatAccessError({ key: "errors.componentNotYours" });
+    // A sealed question has no words here: Polar's device opens it, and seals the new answer over the old.
+    if (asked.e2eeEpoch != null) {
+        const { retrySealedPolar } = await import("./e2ee/sealed-polar");
+        const question = { channelId: asked.channelId, messageId: asked.id, authorId: user.id, parentId: asked.parentId, replyToId: asked.replyToId };
+        if (!(await retrySealedPolar(question, message.id))) throw new ChatAccessError({ key: "errors.componentGone" });
+        return;
+    }
     const { answerPolarMention } = await import("./polar-mention");
     await answerPolarMention(
         {

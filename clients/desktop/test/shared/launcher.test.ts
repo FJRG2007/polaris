@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { convert, evaluate, quickAnswer } from "@/shared/quick-answer";
-import { matchScore, rankedMatches, topMatches, useBoost, USE_BOOST_MAX, webSearchUrl } from "@/shared/launcher";
+import { DEFAULT_SEARCH_ENGINE, launcherEngineOf, matchScore, rankedMatches, SEARCH_ENGINE_IDS, topMatches, useBoost, USE_BOOST_MAX, webSearchUrl } from "@/shared/launcher";
 import { conflictSentence, findLaunchers, likelyHolders } from "@/shared/launcher-conflicts";
 import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipboardProbe } from "@/shared/clipboard-history";
 import { bindingFromPress, DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator, type KeyPress } from "@/shared/launcher-hotkey";
@@ -145,6 +145,21 @@ describe("quick answers", () => {
         expect(quickAnswer("2^10 / 4")?.value).toBe("256");
     });
 
+    it("adds and takes a percentage as a share of the amount, keeping its currency", () => {
+        expect(quickAnswer("539 + 21%")?.value).toBe("652.19");
+        expect(quickAnswer("539 - 21%")?.value).toBe("425.81");
+        expect(quickAnswer("539 * 21%")?.value).toBe("113.19");
+        expect(quickAnswer("21% of 539")?.value).toBe("113.19");
+        expect(quickAnswer("10 % 3")?.value).toBe("1");
+        const money = quickAnswer("539€ + 21%");
+        expect(money?.copy).toBe("652.19");
+        expect(money?.value).toMatch(/652[.,]19/);
+        expect(money?.value).toContain("€");
+        expect(quickAnswer("$10 + 5%")?.copy).toBe("10.50");
+        expect(quickAnswer("539€ + $10")).toBeNull();
+        expect(quickAnswer("2026-11-24")).toBeNull();
+    });
+
     it("converts units within one family", () => {
         expect(convert("5 km to mi")?.value).toBe("3.106855961");
         expect(convert("100 f in c")?.value).toBe("37.77777778");
@@ -173,6 +188,18 @@ describe("the launcher's list", () => {
 
     it("sends a web search with the query encoded", () => {
         expect(webSearchUrl("duckduckgo", " a&b c ")).toBe("https://duckduckgo.com/?q=a%26b%20c");
+        expect(webSearchUrl("google", "539 + 21%")).toBe("https://www.google.com/search?q=539%20%2B%2021%25");
+    });
+
+    it("searches with Google unless somebody picked another engine", () => {
+        expect(DEFAULT_SEARCH_ENGINE).toBe("google");
+        expect(SEARCH_ENGINE_IDS[0]).toBe("google");
+        // The old default, saved by every settings file whether or not it was picked.
+        expect(launcherEngineOf("duckduckgo", false)).toBe("google");
+        expect(launcherEngineOf("duckduckgo", true)).toBe("duckduckgo");
+        expect(launcherEngineOf("bing", false)).toBe("bing");
+        expect(launcherEngineOf("startpage", true)).toBe("startpage");
+        expect(launcherEngineOf("google", false)).toBe("google");
     });
 });
 

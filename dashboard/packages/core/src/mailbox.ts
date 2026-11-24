@@ -588,25 +588,29 @@ export function quoteForReply(body: string, from: MailAddress, sentAt: Date): st
  * Who a reply goes to.
  *
  * Reply-To wins where the sender set one, which is what a mailing list and every
- * no-reply address depend on. Reply-all keeps everybody who was already there
- * minus the person replying, so nobody mails themselves and nobody is dropped.
+ * no-reply address depend on (RFC 5322 3.6.3). Reply-all is what Gmail and
+ * Thunderbird do with it: the people the message was addressed to stay in To,
+ * the people copied stay in Cc, the person replying is in neither, and nobody is
+ * listed twice. Bcc is never carried - it was never on the message anybody else
+ * received.
  */
 export function replyRecipients(
     envelope: MailEnvelope & { readonly replyTo: readonly MailAddress[] },
     self: readonly string[],
     all: boolean
 ): { readonly to: readonly MailAddress[]; readonly cc: readonly MailAddress[] } {
+    const key = (entry: MailAddress) => entry.address.trim().toLowerCase();
     const mine = new Set(self.map((address) => address.trim().toLowerCase()));
-    const notMe = (entry: MailAddress) => !mine.has(entry.address.trim().toLowerCase());
+    const notMe = (entry: MailAddress) => !mine.has(key(entry));
     const primary = envelope.replyTo.length > 0 ? envelope.replyTo : envelope.from;
     // Replying to your own sent message goes to whoever it was sent to, not back
     // to yourself: it is the only reading of "reply" that is ever useful there.
-    const to = primary.filter(notMe).length > 0 ? primary.filter(notMe) : envelope.to.filter(notMe);
-    if (!all) return { to, cc: [] };
-    const already = new Set(to.map((entry) => entry.address.trim().toLowerCase()));
-    const cc = [...envelope.to, ...envelope.cc].filter(
-        (entry) => notMe(entry) && !already.has(entry.address.trim().toLowerCase())
-    );
+    const ownMessage = primary.filter(notMe).length === 0;
+    const answered = ownMessage ? envelope.to.filter(notMe) : primary.filter(notMe);
+    if (!all) return { to: dedupeAddresses(answered), cc: [] };
+    const to = dedupeAddresses([...answered, ...envelope.to.filter(notMe)]);
+    const already = new Set(to.map(key));
+    const cc = envelope.cc.filter((entry) => notMe(entry) && !already.has(key(entry)));
     return { to, cc: dedupeAddresses(cc) };
 }
 

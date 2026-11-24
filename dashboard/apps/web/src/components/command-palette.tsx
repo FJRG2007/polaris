@@ -28,7 +28,6 @@ import { PlainNames } from "@/components/person-name";
 import { usePathname, useRouter } from "next/navigation";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
-import { calculate, calculationDigits, calculationText } from "@/lib/search/calculate";
 import { OPEN_SEARCH_EVENT, requestedQuery, requestedScope } from "@/lib/search/open-search";
 import {
     SegmentedControl,
@@ -125,7 +124,7 @@ function rememberLookup(key: string, hits: SearchHit[]): void {
 
 /** One line of the panel. Everything the arrow keys move through is one of these. */
 type Row =
-    | { kind: "calculation"; id: string; group: string; value: number }
+    | { kind: "calculation"; id: string; group: string; value: core.Calculation }
     | { kind: "command"; id: string; group: string; scope: SearchScopeDefinition }
     | { kind: "clock"; id: string; group: string; command: core.ClockCommand }
     | { kind: "entry"; id: string; group: string; entry: CommandEntry }
@@ -572,16 +571,11 @@ export function CommandPalette({
         [scope, query, appKey]
     );
 
-    // "2 * (3 + 4)": answered as it is typed, and Enter copies the answer.
-    // Never inside a command, where what is typed is a search of that one thing.
-    const calculation = useMemo(() => (scope ? null : calculate(query)), [scope, query]);
+    // "2 * (3 + 4)", "539€ + 21%": answered as it is typed, and Enter copies the
+    // answer. Never inside a command, where what is typed is a search of that one thing.
+    const calculation = useMemo(() => (scope ? null : core.calculation(query)), [scope, query]);
     const answer = useMemo(
-        () =>
-            calculation === null
-                ? null
-                : new Intl.NumberFormat(locale, {
-                      maximumSignificantDigits: calculationDigits(calculation)
-                  }).format(calculation),
+        () => (calculation === null ? null : core.formatCalculation(calculation, locale)),
         [calculation, locale]
     );
 
@@ -787,8 +781,10 @@ export function CommandPalette({
 
     /** The answer takes the place of the sum, caret at the end, to go on working
      *  with it. The field keeps focus, so a phone keeps its keyboard up. */
-    function applyCalculation(value: number): void {
-        const text = calculationText(value);
+    function applyCalculation(result: core.Calculation): void {
+        // Money stays money, so "652.19 EUR - 10%" goes on in euros.
+        const digits = core.calculationText(result.value, result.currency);
+        const text = result.currency === null ? digits : `${digits} ${result.currency}`;
         setQuery(text);
         setActive(0);
         const field = fieldRef.current;
@@ -798,8 +794,8 @@ export function CommandPalette({
 
     /** Put the answer on the clipboard, and say so - or that it could not be. The
      *  panel stays open: copying is a side step, not the end of the sum. */
-    function copyCalculation(value: number): void {
-        const text = calculationText(value);
+    function copyCalculation(result: core.Calculation): void {
+        const text = core.calculationText(result.value, result.currency);
         void navigator.clipboard
             .writeText(text)
             .then(() =>
@@ -893,7 +889,7 @@ export function CommandPalette({
         ) {
             // Nothing selected to copy, so the copy is the answer's.
             event.preventDefault();
-            copyCalculation((rows[active] as { value: number }).value);
+            copyCalculation((rows[active] as { value: core.Calculation }).value);
         } else if (event.key === "Tab" && suggestions.length > 0) {
             // The command being spelled out is one key away from being taken.
             event.preventDefault();

@@ -153,9 +153,105 @@ describe("addresses", () => {
         expect(one.to.map((entry) => entry.address)).toEqual(["ada@x.com"]);
         expect(one.cc).toHaveLength(0);
 
+        // Reply all: who it was addressed to stays in To, who was copied stays
+        // in Cc - the way Gmail and Thunderbird lay it out.
         const all = mailbox.replyRecipients(message, ["me@x.com"], true);
+        expect(all.to.map((entry) => entry.address)).toEqual(["ada@x.com", "cal@x.com"]);
+        expect(all.cc.map((entry) => entry.address)).toEqual(["dee@x.com"]);
+    });
+
+    it("leaves out every address the reader sends as, in any case", () => {
+        const message = {
+            ...envelope({
+                from: [{ name: "Ada", address: "ada@x.com" }],
+                to: [
+                    { name: "Me", address: "ME@x.com" },
+                    { name: "Alias", address: "Alias@Work.example" }
+                ],
+                cc: [
+                    { name: "", address: "me@x.com" },
+                    { name: "Dee", address: "dee@x.com" }
+                ]
+            }),
+            replyTo: []
+        };
+        const all = mailbox.replyRecipients(message, ["me@x.com", "alias@work.example"], true);
         expect(all.to.map((entry) => entry.address)).toEqual(["ada@x.com"]);
-        expect(all.cc.map((entry) => entry.address)).toEqual(["cal@x.com", "dee@x.com"]);
+        expect(all.cc.map((entry) => entry.address)).toEqual(["dee@x.com"]);
+    });
+
+    it("names nobody twice, and keeps the name a copy carried", () => {
+        const message = {
+            ...envelope({
+                from: [{ name: "", address: "ada@x.com" }],
+                to: [
+                    { name: "Ada Lovelace", address: "Ada@x.com" },
+                    { name: "Cal", address: "cal@x.com" }
+                ],
+                cc: [
+                    { name: "Cal again", address: "CAL@x.com" },
+                    { name: "Dee", address: "dee@x.com" },
+                    { name: "", address: "dee@x.com" }
+                ]
+            }),
+            replyTo: []
+        };
+        const all = mailbox.replyRecipients(message, ["me@x.com"], true);
+        expect(all.to).toEqual([
+            { name: "Ada Lovelace", address: "ada@x.com" },
+            { name: "Cal", address: "cal@x.com" }
+        ]);
+        expect(all.cc).toEqual([{ name: "Dee", address: "dee@x.com" }]);
+    });
+
+    it("answers your own sent message to the people it went to", () => {
+        const message = {
+            ...envelope({
+                from: [{ name: "Me", address: "me@x.com" }],
+                to: [
+                    { name: "Bob", address: "bob@x.com" },
+                    { name: "Eve", address: "eve@x.com" }
+                ],
+                cc: [{ name: "Dee", address: "dee@x.com" }]
+            }),
+            replyTo: []
+        };
+        const one = mailbox.replyRecipients(message, ["me@x.com"], false);
+        expect(one.to.map((entry) => entry.address)).toEqual(["bob@x.com", "eve@x.com"]);
+        expect(one.cc).toHaveLength(0);
+        const all = mailbox.replyRecipients(message, ["me@x.com"], true);
+        expect(all.to.map((entry) => entry.address)).toEqual(["bob@x.com", "eve@x.com"]);
+        expect(all.cc.map((entry) => entry.address)).toEqual(["dee@x.com"]);
+    });
+
+    it("puts Reply-To in To on reply all as well, and keeps the others", () => {
+        const message = {
+            ...envelope({
+                from: [{ name: "Ada", address: "ada@x.com" }],
+                to: [
+                    { name: "Me", address: "me@x.com" },
+                    { name: "Cal", address: "cal@x.com" }
+                ],
+                cc: [{ name: "Dee", address: "dee@x.com" }]
+            }),
+            replyTo: [{ name: "Support", address: "help@x.com" }]
+        };
+        const all = mailbox.replyRecipients(message, ["me@x.com"], true);
+        expect(all.to.map((entry) => entry.address)).toEqual(["help@x.com", "cal@x.com"]);
+        expect(all.cc.map((entry) => entry.address)).toEqual(["dee@x.com"]);
+    });
+
+    it("keeps a decoded name with accents and commas as it was", () => {
+        const message = {
+            ...envelope({
+                from: [{ name: "Muñoz, María", address: "maria@x.com" }],
+                to: [{ name: "Me", address: "me@x.com" }]
+            }),
+            replyTo: []
+        };
+        expect(mailbox.replyRecipients(message, ["me@x.com"], false).to).toEqual([
+            { name: "Muñoz, María", address: "maria@x.com" }
+        ]);
     });
 
     it("honours Reply-To, which is what a mailing list depends on", () => {

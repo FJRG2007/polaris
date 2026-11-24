@@ -30,28 +30,10 @@
 import { apiPermission } from "@/lib/api-session";
 import { MailAccessError } from "@/lib/mailbox/access";
 import { readAttachment } from "@/lib/mailbox/messages";
-import { downloadTicketHeaders } from "@/lib/download-ticket";
+import { mailFileResponse } from "@/lib/mailbox/file-response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** A filename, safe to put in a header. A name from outside can carry quotes and
- *  newlines, and a newline in a response header is a header somebody else
- *  wrote. */
-function headerSafe(name: string): string {
-    return name.replace(/[\r\n"\\]/g, " ").slice(0, 200).trim() || "attachment";
-}
-
-/**
- * The types a browser draws and cannot run.
- *
- * SVG is not here and never will be: it is markup, and markup on this origin is
- * script. Neither is anything textual - a `text/plain` served inline is one
- * content-type sniff away from being treated as something else by a browser that
- * is trying to be helpful.
- */
-const DRAWN_INLINE =
-    /^(?:image\/(?:png|jpeg|gif|webp|avif|bmp)|video\/(?:mp4|webm|ogg)|audio\/(?:mpeg|mp4|ogg|wav|webm|flac))$/i;
 
 export async function GET(
     request: Request,
@@ -65,25 +47,7 @@ export async function GET(
 
     try {
         const file = await readAttachment(user.id, attachmentId);
-        const name = headerSafe(file.name);
-        const declared = (file.contentType ?? "").split(";")[0]?.trim() ?? "";
-        // Only for a viewer, and only for what a browser draws rather than runs.
-        const drawn = inline && DRAWN_INLINE.test(declared);
-        return new Response(new Uint8Array(file.bytes), {
-            headers: {
-                "content-type": drawn ? declared : "application/octet-stream",
-                "content-length": String(file.bytes.length),
-                // Says "this download has started" to the page that asked for it - see
-                // `download-ticket`. Nothing at all when no ticket was sent.
-                ...downloadTicketHeaders(request),
-                "content-disposition": `${drawn ? "inline" : "attachment"}; filename="${name}"; filename*=UTF-8''${encodeURIComponent(file.name)}`,
-                "x-content-type-options": "nosniff",
-                // Nothing in here may reach anything, whatever a browser decides
-                // it is looking at.
-                "content-security-policy": "default-src 'none'; sandbox",
-                "cache-control": "private, no-store"
-            }
-        });
+        return mailFileResponse(request, file, inline);
     } catch (caught) {
         // The same answer for "not there" and "not yours", so this cannot be
         // used to find out whether an id is a real one.

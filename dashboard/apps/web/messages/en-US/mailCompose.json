@@ -40,6 +40,7 @@
         "attach": "Attach a file",
         "signature": "Insert your signature",
         "attachTitle": "Attach to this message",
+        "openAttachment": "Open {name}",
         "template": "Insert a template",
         "loadingTemplates": "Loading templates",
         "noTemplates": "No templates for this mailbox yet",

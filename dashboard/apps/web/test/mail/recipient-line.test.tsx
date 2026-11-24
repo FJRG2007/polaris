@@ -25,6 +25,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MessagesWrapper } from "../setup/i18n";
 
 vi.mock("next/navigation", () => ({
+    useSearchParams: () => new URLSearchParams(),
     useRouter: () => ({ refresh: () => undefined, push: () => undefined, replace: () => undefined })
 }));
 

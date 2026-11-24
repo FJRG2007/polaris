@@ -16,6 +16,7 @@
  * delegate, which is what the holder's Share dialog reads as activity.
  */
 
+import { releaseDraftUploads } from "./uploads";
 import { prisma } from "@polaris/db";
 import { addressesFrom } from "./json";
 import type { z } from "zod";
@@ -266,9 +267,12 @@ export async function pruneOrphanDelegateDrafts(now = new Date()): Promise<numbe
     for (const pair of pairs) {
         if (!pair.authorId) continue;
         if (await grantedCapability(pair.authorId, "mail.mailbox", pair.accountId, now)) continue;
-        const { count } = await prisma.mailDraft.deleteMany({
-            where: { ...idle, authorId: pair.authorId, accountId: pair.accountId }
-        });
+        const where = { ...idle, authorId: pair.authorId, accountId: pair.accountId };
+        // The files on them first: the rows cascade with the drafts, the bytes
+        // on storage do not.
+        const doomed = await prisma.mailDraft.findMany({ where, select: { id: true } });
+        await releaseDraftUploads(doomed.map((draft) => draft.id));
+        const { count } = await prisma.mailDraft.deleteMany({ where });
         pruned += count;
     }
     return pruned;

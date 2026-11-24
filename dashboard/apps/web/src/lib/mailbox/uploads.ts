@@ -188,15 +188,73 @@ export async function removeUpload(userId: string, uploadId: string): Promise<vo
     });
     if (!row) return;
     await prisma.mailUpload.delete({ where: { id: row.id } });
-    // The row going is what matters; a file left behind is swept. Failing the
-    // delete because a NAS is briefly down would leave the attachment on screen
-    // after somebody removed it.
+    await deleteBytes(row);
+}
+
+/**
+ * The bytes behind a row that has just gone, unless another row still names
+ * them.
+ *
+ * Every upload is written to a path of its own today - a forward copies the
+ * original's bytes into a new file rather than pointing at them - but the check
+ * is what makes that a fact this code relies on rather than an assumption: a
+ * file another message or draft still lists is never deleted from under it.
+ *
+ * The row going is what matters; a file left behind is found by the storage
+ * sweep. Failing the delete because a NAS is briefly down would leave the
+ * attachment on screen after somebody removed it.
+ */
+async function deleteBytes(row: { connectionId: string | null; path: string; }): Promise<void> {
     try {
+        const still = await prisma.mailUpload.count({
+            where: { path: row.path, connectionId: row.connectionId }
+        });
+        if (still > 0) return;
         const driver = await driverForTarget(row.connectionId ?? LOCAL_TARGET, LOCAL_FOLDER);
         await driver.delete(row.path, { recursive: false });
     } catch {
         /* swept later */
     }
+}
+
+/** The files on one draft, for a composer reopening it. */
+export async function listDraftUploads(userId: string, draftId: string): Promise<StoredUpload[]> {
+    const rows = await prisma.mailUpload.findMany({
+        where: { userId, draftId, kind: "attachment" },
+        orderBy: { createdAt: "asc" },
+        select: {
+            id: true,
+            name: true,
+            size: true,
+            contentType: true,
+            inline: true,
+            contentId: true
+        },
+        take: 200
+    });
+    return rows.map((row) => ({ ...row, size: Number(row.size) }));
+}
+
+/**
+ * Take the files off drafts that are about to be deleted.
+ *
+ * A draft's rows cascade with it, but a row is not the file: once the cascade
+ * has run, nothing points at the bytes and nothing could ever find them again.
+ * So every place that deletes a draft - sending it, discarding it, pruning one
+ * nobody can reach - calls this first, while the paths can still be read. A
+ * message that went keeps nothing here: what was sent is in the Sent folder on
+ * the mail server, bytes and all.
+ */
+export async function releaseDraftUploads(draftIds: readonly string[]): Promise<number> {
+    if (draftIds.length === 0) return 0;
+    const rows = await prisma.mailUpload.findMany({
+        where: { draftId: { in: [...draftIds] } },
+        select: { id: true, connectionId: true, path: true }
+    });
+    if (rows.length === 0) return 0;
+    await prisma.mailUpload.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
+    for (const row of rows) await deleteBytes(row);
+    return rows.length;
 }
 
 /** Hang the files somebody uploaded onto the draft they were uploading into. */
@@ -223,18 +281,13 @@ export async function attachUploads(
     for (const row of stale) await removeUpload(userId, row.id);
 }
 
-/** Uploads nobody attached to anything, gone. Run from the schedule. */
 /**
  * Take every file attached to a mailbox's drafts off the disk.
  *
  * Deleting a mailbox deletes its drafts, and the rows for the files on them go
  * with the drafts - but a row is not the file. The bytes sit on whatever storage
- * they were written to with nothing left pointing at them: the sweep below only
- * knows about uploads whose ROW is still here, so once the cascade has run there
- * is nothing that could ever find them again.
- *
- * Called before the mailbox row goes, which is the only moment the paths can
- * still be read.
+ * they were written to with nothing left pointing at them. Called before the
+ * mailbox row goes, which is the only moment the paths can still be read.
  */
 export async function removeAccountUploads(accountId: string): Promise<number> {
     const rows = await prisma.mailUpload.findMany({
@@ -245,6 +298,8 @@ export async function removeAccountUploads(accountId: string): Promise<number> {
     return rows.length;
 }
 
+/** Uploads nobody attached to anything, gone - then whatever bytes no row names
+ *  at all. Run from the schedule. */
 export async function sweepOrphanUploads(): Promise<number> {
     const orphans = await prisma.mailUpload.findMany({
         where: { draftId: null, createdAt: { lt: new Date(Date.now() - ORPHAN_TTL_MS) } },
@@ -252,5 +307,94 @@ export async function sweepOrphanUploads(): Promise<number> {
         take: 500
     });
     for (const row of orphans) await removeUpload(row.userId, row.id);
-    return orphans.length;
+    const loose = await sweepLooseBytes().catch((caught: unknown) => {
+        console.warn("polaris: the mail attachment storage could not be swept:", caught);
+        return 0;
+    });
+    return orphans.length + loose;
+}
+
+/** A file in the mail folder of some storage, as the sweep sees it. */
+export interface StoredFile {
+    readonly path: string;
+    readonly modifiedAt: Date;
+}
+
+/** The one shape `storeUpload` writes: `polaris/mail/<user>/<uuid>`. */
+const UPLOAD_PATH = /^polaris\/mail\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i;
+
+/**
+ * Which files in storage no upload row names, and are old enough to be sure.
+ *
+ * The bytes are written before the row, so a file younger than the window may be
+ * an upload whose row is a moment away: those are left alone. So is anything not
+ * shaped like `polaris/mail/<user>/<id>`, which this code never wrote. Pure, so
+ * what the sweep would delete can be checked without a disk.
+ */
+export function looseFiles(
+    files: readonly StoredFile[],
+    named: ReadonlySet<string>,
+    now: number,
+    ageMs: number = ORPHAN_TTL_MS
+): string[] {
+    return files
+        .filter((file) => UPLOAD_PATH.test(file.path))
+        .filter((file) => !named.has(file.path))
+        .filter((file) => now - file.modifiedAt.getTime() > ageMs)
+        .map((file) => file.path);
+}
+
+/** How many files one pass may delete, so a large backlog is worked through over
+ *  several runs rather than in one that holds a NAS for minutes. */
+const LOOSE_PER_RUN = 1000;
+
+/**
+ * Bytes on a storage with no row left pointing at them.
+ *
+ * Before drafts released their files on the way out, every sent or discarded
+ * message with an attachment left its bytes behind with no row: the cascade took
+ * the row and nothing took the file. This finds those on every install, existing
+ * ones included, on the next run of the schedule after an update. It walks the
+ * disk Polaris runs on, the storage mail is pointed at now, and every storage a
+ * current upload was written to.
+ */
+async function sweepLooseBytes(): Promise<number> {
+    const targets = new Set<string>([LOCAL_TARGET]);
+    targets.add((await resolveStorageTarget(MAIL_TARGET_KEY)).id);
+    const used = await prisma.mailUpload.findMany({
+        where: { connectionId: { not: null } },
+        distinct: ["connectionId"],
+        select: { connectionId: true },
+        take: 50
+    });
+    for (const row of used) if (row.connectionId) targets.add(row.connectionId);
+
+    let removed = 0;
+    for (const target of targets) {
+        if (removed >= LOOSE_PER_RUN) break;
+        const driver = await driverForTarget(target, LOCAL_FOLDER).catch(() => null);
+        if (!driver) continue;
+        const owners = await driver.list(UPLOAD_ROOT).catch(() => null);
+        if (!owners) continue;
+        for (const owner of owners.entries) {
+            if (owner.kind !== "dir" || removed >= LOOSE_PER_RUN) continue;
+            const listed = await driver.list(owner.path).catch(() => null);
+            if (!listed) continue;
+            const files = listed.entries.filter((entry) => entry.kind === "file");
+            if (files.length === 0) continue;
+            const rows = await prisma.mailUpload.findMany({
+                where: { path: { in: files.map((file) => file.path) } },
+                select: { path: true }
+            });
+            const loose = looseFiles(files, new Set(rows.map((row) => row.path)), Date.now());
+            for (const path of loose.slice(0, LOOSE_PER_RUN - removed)) {
+                // Asked again right before the delete: an upload whose row
+                // landed while this pass was listing is not loose.
+                if ((await prisma.mailUpload.count({ where: { path } })) > 0) continue;
+                await driver.delete(path, { recursive: false }).catch(() => undefined);
+                removed += 1;
+            }
+        }
+    }
+    return removed;
 }

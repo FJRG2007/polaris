@@ -20,6 +20,7 @@
  * once and comes back with a message if the server said no.
  */
 
+import { Marked, useSearchNeedles } from "./search-marks";
 import Link from "next/link";
 import * as core from "@polaris/core";
 import { useMail } from "./mail-shell";
@@ -2602,6 +2603,7 @@ function ThreadRow({
     onStar: () => void;
 }) {
     const t = useTranslations("mail");
+    const needles = useSearchNeedles();
     const unread = thread.unreadCount > 0;
     /** Whether this list is being read by size rather than by date - see
      *  `Stamp`, which is what the row shows for it. */
@@ -2824,15 +2826,27 @@ function ThreadRow({
                                 unread ? "font-medium text-foreground" : "text-muted-foreground"
                             )}
                         >
-                            {thread.subject || t("noSubject")}
+                            {thread.subject ? (
+                                <Marked text={thread.subject} needles={needles} />
+                            ) : (
+                                t("noSubject")
+                            )}
                         </p>
                         <div className="flex min-w-0 flex-1 items-center gap-1.5">
                             <p
                                 title={thread.snippet}
                                 className="min-w-0 flex-1 truncate text-[12px] text-foreground-subtle"
                             >
-                                {thread.snippet}
+                                <Marked text={thread.snippet} needles={needles} />
                             </p>
+                            {thread.matches && thread.matches.length > 0 ? (
+                                <span
+                                    className="shrink-0 rounded bg-warning/15 px-1 text-[10px] font-medium tabular-nums text-foreground"
+                                    data-row-matches=""
+                                >
+                                    {t("searchBox.matchCount", { count: thread.matches.length })}
+                                </span>
+                            ) : null}
                         </div>
                     </div>
                     {wide ? (

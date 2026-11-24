@@ -249,6 +249,9 @@ export function frameDocument(
   /* A message that turned selection off (user-select:none on everything is a
      common newsletter template) left nothing in it to select or copy. */
   #polaris-body,#polaris-body *{-webkit-user-select:text!important;user-select:text!important;}
+  /* The words a search found. After the reader's colours, which clear every
+     background, so a mark is still a mark on a dark page. */
+  #polaris-body mark[data-search-hit]{background-color:#fde68a!important;color:#111111!important;border-radius:2px;}
 </style>
 </body></html>`;
 }

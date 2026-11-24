@@ -54,6 +54,8 @@ const FileViewer = dynamic(
     { ssr: false }
 );
 import { useBusy } from "./use-busy";
+import { Marked, useSearchNeedles } from "./search-marks";
+import { searchMatchIds } from "./search-matches";
 import { SenderFace } from "./sender-face";
 import { readMessage } from "./message-store";
 import { DeliveryNote } from "./delivery-note";
@@ -91,6 +93,7 @@ import {
     BellOff,
     Bookmark,
     ChevronDown,
+    ChevronUp,
     Pin,
     PinOff,
     ListFilter,
@@ -195,16 +198,59 @@ export function ThreadView({
     /** Reactions this tab has sent that the mailbox has not shown back yet. */
     const [reacting, setReacting] = useState<PendingReaction[]>([]);
     const newest = listed.at(-1);
-    const [open, setOpen] = useState<string[]>(newest ? [newest.id] : []);
+    const needles = useSearchNeedles();
+    /**
+     * The messages a search found here, oldest first - the ones opened, marked
+     * and stepped through, the way Gmail opens a searched conversation on its
+     * matches and leaves the rest folded. Named by the list's row when it came
+     * from a search; worked out here from what the pane holds when the
+     * conversation was opened from a link with a search on it.
+     */
+    const matchIds = useMemo(
+        () => searchMatchIds(listed, thread.matches, needles),
+        [listed, thread.matches, needles]
+    );
+    const firstOpen = useCallback(
+        (): string[] =>
+            matchIds.length > 0 ? [...matchIds] : listed.at(-1) ? [listed[listed.length - 1]!.id] : [],
+        [matchIds, listed]
+    );
+    const [open, setOpen] = useState<string[]>(firstOpen);
     const [expandAll, setExpandAll] = useState(false);
+    const [matchAt, setMatchAt] = useState(0);
+    const scroller = useRef<HTMLDivElement | null>(null);
     const self = useMemo(() => accounts.map((account) => account.address), [accounts]);
 
     // The conversation changed under the pane - a different row was clicked, or
     // a reply arrived. Whatever was open belonged to the old one.
     useEffect(() => {
-        setOpen(listed.at(-1) ? [listed[listed.length - 1]!.id] : []);
+        setOpen(firstOpen());
         setExpandAll(false);
-    }, [thread.id, listed.length]);
+        setMatchAt(0);
+    }, [thread.id, listed.length, matchIds.join(" ")]);
+
+    /** Bring one of the matches into view, opening it if it was folded. */
+    const goToMatch = useCallback(
+        (index: number, smooth = true) => {
+            const id = matchIds[index];
+            if (!id) return;
+            setMatchAt(index);
+            setOpen((held) => (held.includes(id) ? held : [...held, id]));
+            requestAnimationFrame(() => {
+                const card = scroller.current?.querySelector<HTMLElement>(
+                    `[data-message-card="${CSS.escape(id)}"]`
+                );
+                card?.scrollIntoView({ block: "start", behavior: smooth ? "smooth" : "auto" });
+            });
+        },
+        [matchIds]
+    );
+
+    // A searched conversation opens on its first match, not at the top of a
+    // thread somebody has to scroll through to find it.
+    useEffect(() => {
+        if (matchIds.length > 0) goToMatch(0, false);
+    }, [thread.id, matchIds.join(" ")]);
 
     useEffect(() => setReacting([]), [thread.id]);
 
@@ -221,14 +267,26 @@ export function ThreadView({
         if (expandAll || listed.length <= KEPT_OPEN + KEPT_FIRST + 1) {
             return listed.map((message) => ({ kind: "message" as const, message }));
         }
-        const first = listed.slice(0, KEPT_FIRST);
-        const last = listed.slice(-KEPT_OPEN);
-        return [
-            ...first.map((message) => ({ kind: "message" as const, message })),
-            { kind: "gap" as const, count: listed.length - first.length - last.length },
-            ...last.map((message) => ({ kind: "message" as const, message }))
-        ];
-    }, [listed, expandAll]);
+        // The beginning, the end, and whatever a search found in between: a
+        // match folded into the middle is a match nobody sees.
+        const kept = new Set([
+            ...listed.slice(0, KEPT_FIRST).map((message) => message.id),
+            ...listed.slice(-KEPT_OPEN).map((message) => message.id),
+            ...matchIds
+        ]);
+        const out: Shown[] = [];
+        let folded = 0;
+        for (const message of listed) {
+            if (kept.has(message.id)) {
+                if (folded > 0) out.push({ kind: "gap", count: folded, key: `gap-${message.id}` });
+                folded = 0;
+                out.push({ kind: "message", message });
+            } else {
+                folded += 1;
+            }
+        }
+        return out;
+    }, [listed, expandAll, matchIds]);
 
     const act = useCallback(
         (action: MailAction) => {
@@ -484,7 +542,7 @@ export function ThreadView({
                         one being read: the list is where it is cut short, and the
                         reading pane is where somebody goes to see the rest. */}
                     <h2 className="break-words text-[17px] font-semibold tracking-tight [overflow-wrap:anywhere]">
-                        {thread.subject || t("noSubject")}
+                        {thread.subject ? <Marked text={thread.subject} needles={needles} /> : t("noSubject")}
                     </h2>
                     {accounts.length > 1 && account ? (
                         <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-foreground-subtle">
@@ -657,11 +715,52 @@ export function ThreadView({
                 </div>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+            {matchIds.length > 0 ? (
+                <div
+                    className="flex min-w-0 items-center gap-2 border-b border-border px-4 py-1.5 text-[12px] text-muted-foreground"
+                    data-search-matches=""
+                >
+                    <span className="min-w-0 flex-1 truncate">
+                        {t("searchBox.matchesHere", { count: matchIds.length })}
+                    </span>
+                    <span className="shrink-0 tabular-nums" aria-live="polite">
+                        {t("searchBox.matchOf", { at: matchAt + 1, count: matchIds.length })}
+                    </span>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7 shrink-0"
+                        aria-label={t("searchBox.previousMatch")}
+                        title={t("searchBox.previousMatch")}
+                        disabled={matchIds.length < 2}
+                        onClick={() =>
+                            goToMatch((matchAt - 1 + matchIds.length) % matchIds.length)
+                        }
+                    >
+                        <ChevronUp className="size-4 shrink-0" aria-hidden />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7 shrink-0"
+                        aria-label={t("searchBox.nextMatch")}
+                        title={t("searchBox.nextMatch")}
+                        disabled={matchIds.length < 2}
+                        onClick={() => goToMatch((matchAt + 1) % matchIds.length)}
+                    >
+                        <ChevronDown className="size-4 shrink-0" aria-hidden />
+                    </Button>
+                </div>
+            ) : null}
+
+            <div
+                ref={scroller}
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3"
+            >
                 <ul className="space-y-1.5">
                     {shown.map((entry) =>
                         entry.kind === "gap" ? (
-                            <li key="gap">
+                            <li key={entry.key}>
                                 <button
                                     type="button"
                                     className="flex w-full items-center gap-2 rounded-md border border-dashed border-border px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground"
@@ -675,6 +774,8 @@ export function ThreadView({
                             <MessageCard
                                 key={entry.message.id}
                                 message={entry.message}
+                                matched={matchIds.includes(entry.message.id)}
+                                needles={needles}
                                 markRead={markRead}
                                 readAlready={readAlready}
                                 accountId={thread.accountId}
@@ -994,7 +1095,7 @@ function reactionChips(
 /** A row in the pane: a message, or the fold standing in for the ones between. */
 type Shown =
     | { readonly kind: "message"; readonly message: MailMessageView }
-    | { readonly kind: "gap"; readonly count: number };
+    | { readonly kind: "gap"; readonly count: number; readonly key: string };
 
 /** How many of a list are drawn before the rest are folded away. Most messages
  *  have one or two recipients; past three a header stops being a line somebody
@@ -1059,6 +1160,8 @@ function RecipientRow({
 
 function MessageCard({
     message,
+    matched,
+    needles,
     open,
     markRead,
     readAlready,
@@ -1074,6 +1177,10 @@ function MessageCard({
     onAct
 }: {
     message: MailMessageView;
+    /** Whether the search in the address found this message. */
+    matched: boolean;
+    /** The words to mark in it - only ever used when it matched. */
+    needles: readonly string[];
     open: boolean;
     markRead: core.MailMarkRead;
     /** The conversation was marked read on the way in - see `ThreadView`. */
@@ -1255,7 +1362,14 @@ function MessageCard({
     const several = message.to.length + message.cc.length > 1;
 
     return (
-        <li className="rounded-md border border-border bg-card">
+        <li
+            className={cn(
+                "scroll-mt-2 rounded-md border bg-card",
+                matched ? "border-warning/60" : "border-border"
+            )}
+            data-message-card={message.id}
+            data-search-match={matched ? "" : undefined}
+        >
             {/* Collapsed, a message is ONE line - who, a glimpse, when - because
                 a conversation is read by scanning down it. It was three lines
                 with the whole preview in the middle, so ten messages filled the
@@ -1336,7 +1450,11 @@ function MessageCard({
                                 {sender ? core.addressName(sender) : t("view.nobody")}
                             </span>
                             <span className="min-w-0 flex-1 truncate text-[12px] text-foreground-subtle">
-                                {message.snippet}
+                                {matched ? (
+                                    <Marked text={message.snippet} needles={needles} />
+                                ) : (
+                                    message.snippet
+                                )}
                             </span>
                             {/* The files are inside the message, which is folded
                             here - and a thread whose list row has a paperclip
@@ -1584,6 +1702,7 @@ function MessageCard({
                                 text={readable.text}
                                 remoteAllowed={readable.remoteAllowed}
                                 trackerVendors={readable.trackerVendors}
+                                highlight={matched ? needles : undefined}
                             />
                             {files.length > 0 ? (
                                 <ul className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">

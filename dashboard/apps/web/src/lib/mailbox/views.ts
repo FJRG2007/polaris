@@ -130,6 +130,12 @@ export interface MailThreadView {
      *  folder being looked at, so opening a conversation from Sent lands on
      *  what was sent rather than on the reply to it. */
     readonly leadMessageId: string;
+    /** Present only on a search's results: which messages of the conversation
+     *  the search found, oldest first, so the reading pane opens those and
+     *  marks the words in them. The row's `snippet` is then the line of the
+     *  best of them around the first word that matched, not the newest
+     *  message's opening. */
+    readonly matches?: readonly string[];
 }
 
 /** What a list is asked for. */
@@ -257,6 +263,17 @@ export async function listThreads(
         : await matchingThreads(accountIds, messageWhere, Object.keys(view).length > 0, terms);
     if (matched && matched.size === 0) return { threads: [], cursor: "" };
 
+    // Best match first, when that was asked for: a page of the ranked ids,
+    // paged by position, because a rank is not a column a cursor can name.
+    const ranked = matched !== null && terms.order === "relevance";
+    const rankFrom = ranked ? rankOffset(query.cursor) : 0;
+    if (ranked && rankFrom < 0) return { threads: [], cursor: "" };
+    const pageIds = matched
+        ? ranked
+            ? [...matched.keys()].slice(rankFrom, rankFrom + query.limit)
+            : [...matched.keys()]
+        : null;
+
     const threads = await prisma.mailThread.findMany({
         where: {
             accountId: { in: accountIds },
@@ -268,8 +285,8 @@ export async function listThreads(
             // Read one is very nearly the whole mailbox. The count is already
             // held on the row, so the question has an exact answer.
             ...(query.readOnly ? { unreadCount: 0 } : {}),
-            ...(matched ? { id: { in: [...matched] } } : {}),
-            ...mailCursorWhere(query.sort, query.cursor)
+            ...(pageIds ? { id: { in: pageIds } } : {}),
+            ...(ranked ? {} : mailCursorWhere(query.sort, query.cursor))
         },
         select: {
             id: true,
@@ -297,8 +314,14 @@ export async function listThreads(
         take: query.limit
     });
 
+    if (ranked && pageIds) {
+        const at = new Map(pageIds.map((id, index) => [id, index]));
+        threads.sort((a, b) => (at.get(a.id) ?? 0) - (at.get(b.id) ?? 0));
+    }
+
     const rows: MailThreadView[] = threads.map((thread) => {
         const offer = offerOf(thread.messages[0]?.headers);
+        const found = matched?.get(thread.id);
         return {
             id: thread.id,
             accountId: thread.accountId,
@@ -308,7 +331,7 @@ export async function listThreads(
             // carry a stylesheet in them, and nobody is going to be told to resync a
             // mailbox to stop looking at that. Running it again over a line that is
             // already clean changes nothing.
-            snippet: core.snippetFrom(thread.snippet),
+            snippet: found?.excerpt || core.snippetFrom(thread.snippet),
             participants: addressesFrom(thread.participants),
             messageCount: thread.messageCount,
             unreadCount: thread.unreadCount,
@@ -327,9 +350,15 @@ export async function listThreads(
                 name: applied.label.name,
                 color: applied.label.color
             })),
-            leadMessageId: thread.messages[0]?.id ?? ""
+            leadMessageId: thread.messages[0]?.id ?? "",
+            ...(found ? { matches: found.ids } : {})
         };
     });
+
+    if (ranked && matched) {
+        const next = rankFrom + query.limit;
+        return { threads: rows, cursor: next < matched.size ? `${RANK_CURSOR}${next}` : "" };
+    }
 
     // Where the next page starts, in whatever shape this order pages by. The
     // reasoning - and the reason it is the page's edge rather than its last row -
@@ -357,6 +386,27 @@ const SEARCH_WINDOW = 2000;
 /** Where the rest of a conversation is not searched from another list. All
  *  Mail is only copies of messages already read from their own folders. */
 const SEARCH_SET_ASIDE = ["trash", "junk", "all"] as const;
+
+/** The cursor of a page of results ordered by how well they match. */
+const RANK_CURSOR = "rank:";
+
+/** Where a ranked page starts: 0 for the first, -1 for a cursor that is not a
+ *  rank (one written for the date order), which has nothing after it here. */
+export function rankOffset(cursor: string): number {
+    const trimmed = cursor.trim();
+    if (!trimmed) return 0;
+    if (!trimmed.startsWith(RANK_CURSOR)) return -1;
+    const at = Number(trimmed.slice(RANK_CURSOR.length));
+    return Number.isInteger(at) && at >= 0 ? at : -1;
+}
+
+/** What a search found in one conversation. */
+interface ThreadMatch {
+    /** The messages that matched, oldest first. */
+    readonly ids: string[];
+    /** The line of the best of them around the first word that matched. */
+    readonly excerpt: string;
+}
 
 /**
  * The conversations a search admits.
@@ -386,7 +436,23 @@ async function matchingThreads(
     inList: Prisma.MailMessageWhereInput,
     narrowed: boolean,
     terms: core.MailSearchTerms
-): Promise<Set<string>> {
+): Promise<Map<string, ThreadMatch>> {
+    // What is exact and has a column is asked of the database, so the window
+    // below is spent on mail that can still match rather than on the newest
+    // messages of the mailbox.
+    const contains = (value: string) => ({ contains: value, mode: "insensitive" as const });
+    const exact: Prisma.MailMessageWhereInput[] = [
+        ...terms.phrases.map((phrase) => ({
+            OR: [
+                { subject: contains(phrase) },
+                { snippet: contains(phrase) },
+                { bodyText: contains(phrase) }
+            ]
+        })),
+        ...terms.subject.map((value) => ({ subject: contains(value) })),
+        ...terms.filename.map((name) => ({ attachments: { some: { name: contains(name) } } })),
+        ...terms.label.map((name) => ({ labels: { some: { label: { name: contains(name) } } } }))
+    ];
     const messages = await prisma.mailMessage.findMany({
         where: {
             accountId: { in: accountIds },
@@ -406,9 +472,11 @@ async function matchingThreads(
                           ...(terms.before ? { lte: new Date(`${terms.before}T23:59:59.999`) } : {})
                       }
                   }
-                : {})
+                : {}),
+            ...(exact.length > 0 ? { AND: exact } : {})
         },
         select: {
+            id: true,
             threadId: true,
             subject: true,
             snippet: true,
@@ -419,13 +487,21 @@ async function matchingThreads(
             hasAttachments: true,
             seen: true,
             flagged: true,
-            sentAt: true
+            sentAt: true,
+            // Only read when the search asks about them; `take: 0` keeps the
+            // shape of the row the same either way.
+            attachments: { select: { name: true }, take: terms.filename.length > 0 ? 50 : 0 },
+            labels: {
+                select: { label: { select: { name: true } } },
+                take: terms.label.length > 0 ? 50 : 0
+            }
         },
         orderBy: { sentAt: "desc" },
         take: SEARCH_WINDOW
     });
 
     const searchable = messages.map((message) => ({
+        id: message.id,
         threadId: message.threadId,
         subject: message.subject,
         snippet: core.snippetFrom(message.snippet),
@@ -439,15 +515,56 @@ async function matchingThreads(
         hasAttachments: message.hasAttachments,
         seen: message.seen,
         flagged: message.flagged,
-        sentAt: message.sentAt
+        sentAt: message.sentAt,
+        attachmentNames: message.attachments.map((file) => file.name),
+        labels: message.labels.map((applied) => applied.label.name)
     }));
 
-    const exact = searchable.filter((message) => core.mailSearchAdmits(message, terms));
-    if (!terms.text) return new Set(exact.map((message) => message.threadId));
+    const admitted = searchable.filter((message) => core.mailSearchAdmits(message, terms));
+    // Best first when there are words to rank by; newest first otherwise, which
+    // is the order they were read in.
+    const found = terms.text
+        ? core.searchItems(admitted, terms.text, MAIL_SEARCH_FIELDS)
+        : admitted;
+    return groupMatches(found, core.mailSearchNeedles(terms));
+}
 
-    return new Set(
-        core.searchItems(exact, terms.text, MAIL_SEARCH_FIELDS).map((message) => message.threadId)
-    );
+/** A message a search found, as far as grouping it needs. */
+export interface FoundMessage {
+    readonly id: string;
+    readonly threadId: string;
+    readonly body: string;
+    readonly snippet: string;
+    readonly sentAt: Date;
+}
+
+/**
+ * The matches gathered by conversation, in the order the conversations were
+ * first met - which is best first for a ranked search. The excerpt is cut from
+ * the best message of each, around the first word it matched.
+ */
+export function groupMatches(
+    found: readonly FoundMessage[],
+    needles: readonly string[]
+): Map<string, ThreadMatch> {
+    const grouped = new Map<string, FoundMessage[]>();
+    for (const message of found) {
+        const held = grouped.get(message.threadId);
+        if (held) held.push(message);
+        else grouped.set(message.threadId, [message]);
+    }
+    const out = new Map<string, ThreadMatch>();
+    for (const [threadId, all] of grouped) {
+        const best = all[0]!;
+        const source = best.body.trim() || best.snippet;
+        out.set(threadId, {
+            ids: [...all]
+                .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime())
+                .map((message) => message.id),
+            excerpt: needles.length > 0 ? core.mailSearchExcerpt(source, needles) : best.snippet
+        });
+    }
+    return out;
 }
 
 /** One message as the search box reads it. */

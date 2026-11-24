@@ -16,6 +16,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** What the query was asked for, so the filters can be read back. */
 let asked: { where: Record<string, unknown> } | null = null;
+/** Every message query, in order, for the searches that ask more than one. */
+let queries: { where: Record<string, unknown> }[] = [];
+/** What the sealed-search liveness check finds (ids still there and reachable). */
+let live: { id: string }[] = [];
 
 /** Real uuids, because the filter schema insists on them - which is itself a
  *  small guard: a channel id that is not one never reaches the query. */
@@ -53,7 +57,10 @@ vi.mock("@polaris/db", () => ({
         // Nobody here has deleted a chat for themselves.
         chatChannelMember: { findMany: async () => [] },
         chatMessage: {
-            findMany: async (query: { where: Record<string, unknown> }) => {
+            findMany: async (query: { where: Record<string, unknown>; select?: Record<string, unknown> }) => {
+                queries.push(query);
+                // The sealed search's check of which named ids are still there selects only the id.
+                if (query.select && Object.keys(query.select).length === 1) return live;
                 asked = query;
                 return [{ id: "message-1", channelId: MINE }];
             }
@@ -79,7 +86,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { searchMessages, olderThan, newerThan, encodeSharedCursor, decodeSharedCursor } = await import(
+const { searchMessages, searchSealedHits, olderThan, newerThan, encodeSharedCursor, decodeSharedCursor } = await import(
     "@/lib/chat/search"
 );
 const core = await import("@polaris/core");
@@ -93,6 +100,8 @@ function query(partial: Partial<core.ChatSearchInput> = {}): core.ChatSearchInpu
 
 beforeEach(() => {
     asked = null;
+    queries = [];
+    live = [];
     reachable = new Set([MINE, ALSO_MINE]);
     joinedMine = null;
     concealed = { hidden: new Set(), locked: new Set(), hideLocked: false };
@@ -362,5 +371,52 @@ describe("a conversation's pages either side of a millisecond", () => {
         const cursor = { createdAt: at(5), id: id(8) };
         expect(olderThan(cursor).createdAt).toEqual({ lte: cursor.createdAt });
         expect(newerThan(cursor).createdAt).toEqual({ gte: cursor.createdAt });
+    });
+});
+
+describe("sealed text a device found", () => {
+    const SEALED_A = "0190a000-0000-7000-8000-00000000000a";
+    const SEALED_B = "0190a000-0000-7000-8000-00000000000b";
+
+    it("asks for only the named sealed rows, never matching the words on the server", async () => {
+        const answer = await searchSealedHits(actor, query({ term: "secret plan" }), [SEALED_A, SEALED_B]);
+        expect(asked?.where.id).toEqual({ in: [SEALED_A, SEALED_B] });
+        expect(asked?.where.e2eeEpoch).toEqual({ not: null });
+        expect(asked?.where.body).toBeUndefined();
+        expect(JSON.stringify(queries)).not.toContain("secret plan");
+        expect(answer.hits.map((hit) => hit.message.id)).toEqual(["message-1"]);
+    });
+
+    it("keeps every rule a search answers to", async () => {
+        concealed = { hidden: new Set([MINE]), locked: new Set(), hideLocked: false };
+        await searchSealedHits(actor, query({ term: "x", authorId: THEIRS }), [SEALED_A]);
+        expect(asked?.where.channelId).toEqual({ in: [ALSO_MINE] });
+        expect(asked?.where.authorId).toBe(THEIRS);
+        expect(asked?.where.deletedAt).toBeNull();
+        expect(asked?.where.kind).toBe("text");
+    });
+
+    it("reaches no conversation the reader is not in", async () => {
+        const answer = await searchSealedHits(actor, query({ term: "x", channelId: THEIRS }), [SEALED_A]);
+        expect(asked).toBeNull();
+        expect(answer.hits).toEqual([]);
+    });
+
+    it("names what is gone - deleted, or out of reach - so the device drops it", async () => {
+        live = [{ id: SEALED_A }];
+        const answer = await searchSealedHits(actor, query({ term: "x" }), [SEALED_A, SEALED_B]);
+        expect(answer.gone).toEqual([SEALED_B]);
+        const check = queries.at(-1)!;
+        expect(check.where).toEqual({ id: { in: [SEALED_A, SEALED_B] }, channelId: { in: [MINE, ALSO_MINE] }, deletedAt: null });
+    });
+
+    it("asks nothing for no ids", async () => {
+        expect(await searchSealedHits(actor, query({ term: "x" }), [])).toEqual({ hits: [], gone: [] });
+        expect(queries).toEqual([]);
+    });
+
+    it("marks a sealed row of a plain search as sealed, so the screen opens it", async () => {
+        await searchMessages(actor, query({ authorId: MINE }));
+        expect((asked as unknown as { select: Record<string, unknown> }).select.e2eeEpoch).toBe(true);
     });
 });

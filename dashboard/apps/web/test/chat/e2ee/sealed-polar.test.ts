@@ -23,7 +23,10 @@ const state = vi.hoisted(() => ({
     seq: 0n,
     asked: [] as Row[],
     posted: 0,
-    sent: 0
+    sent: 0,
+    /** What the model answers next, in order; the usual answer once they run out. */
+    answers: [] as { text: string; problem: string | null }[],
+    updates: [] as Row[]
 }));
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: Buffer.alloc(32, 9).toString("base64") }) }));
@@ -65,14 +68,20 @@ vi.mock("@/lib/chat/access", () => ({
 vi.mock("@/lib/cron/lease", () => ({ withLease: async <T,>(_key: string, _ttl: number, work: () => Promise<T>) => work() }));
 vi.mock("@/lib/chat/text", () => ({ chatWordsFor: async () => (key: string) => key }));
 vi.mock("@/lib/chat/advanced-privacy", () => ({ isShielded: async () => false }));
-vi.mock("@/lib/chat/rules", () => ({ rulesForChannel: async () => ({ maxMessageLength: 4000 }) }));
+vi.mock("@/lib/chat/rules", () => ({ rulesForChannel: async () => ({ maxMessageLength: 4000, keepEditHistory: true }) }));
 vi.mock("@/lib/chat/history-visibility", () => ({ readableSince: async () => null, sinceClause: () => ({}) }));
 vi.mock("@/lib/chat/agent-message", () => ({
     postAgentMessage: async () => {
         state.posted++;
         return crypto.randomUUID();
     },
-    updateAgentMessage: async () => undefined
+    updateAgentMessage: async (input: Row & { components?: unknown[] }) => {
+        state.updates.push(input);
+        const row = state.tables.chatMessage?.find((r) => r.id === input.messageId && r.agent === input.agent);
+        if (!row) return false;
+        if (input.components) row.components = input.components.length ? input.components : null;
+        return true;
+    }
 }));
 vi.mock("@/lib/chat/polar-calls", () => ({
     MENTION_STEPS: 3,
@@ -86,10 +95,10 @@ vi.mock("@/lib/polar/mention-answer", () => ({
     questionOf: (question: string) => question.replace(/@polar/gi, "").trim(),
     answerMentionWithReason: async (input: Row) => {
         state.asked.push(input);
-        return { text: "You said the build is green.", problem: null, pending: null };
+        return { ...(state.answers.shift() ?? { text: "You said the build is green.", problem: null }), pending: null };
     }
 }));
-vi.mock("@polaris/db", async () => ({ prisma: (await import("./support/mls-tables")).memoryPrisma(state) }));
+vi.mock("@polaris/db", async () => ({ prisma: (await import("./support/mls-tables")).memoryPrisma(state), Prisma: { DbNull: null } }));
 
 const { handleMls } = await import("@/lib/chat/e2ee/mls-handler");
 const { MlsDevice, MlsRequestError } = await import("@/lib/chat/e2ee/mls-client");
@@ -97,6 +106,7 @@ const { IndexedDbMlsStore } = await import("@polaris/core-rs/mls-store");
 const { forgetServiceDevice, withServiceDevice } = await import("@/lib/chat/e2ee/service-device");
 const { answerSealedPolar } = await import("@/lib/chat/e2ee/sealed-polar");
 const { postThroughWebhook } = await import("@/lib/chat/webhooks");
+const { pressComponent } = await import("@/lib/chat/component-actions");
 const { encodeSealedContent, decodeSealedContent } = await import("@/lib/chat/e2ee/sealed-chat");
 const { POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID, serviceDevice } = await import("@/lib/chat/service-members");
 type MlsMemberClass = import("@/lib/chat/e2ee/mls-client").MlsMemberClass;
@@ -119,6 +129,8 @@ beforeEach(() => {
     state.seq = 0n;
     state.asked = [];
     state.posted = 0;
+    state.answers = [];
+    state.updates = [];
     state.members = new Set([`${ALICE}:${CHANNEL}`]);
 });
 
@@ -191,6 +203,53 @@ describe.skipIf(!nativeFile)("Polar and a webhook against a person's device", ()
         expect(answer).toMatchObject({ authorId: null, body: "", replyToId: asked, e2eeDevice: serviceDevice(CHANNEL) });
         expect(answer.e2eeCiphertext).toBeInstanceOf(Uint8Array);
         expect(await opened(person, answer.id as string)).toBe("You said the build is green.");
+    }, 30_000);
+
+    it("puts \"Try again\" under a sealed answer that is not one, and seals the new answer over it", async () => {
+        const person = await alice();
+        await addPolar();
+        state.answers.push({ text: "Polar could not answer.", problem: "failed" });
+        const asked = await say(person, "@polar what is the plan?");
+        await vi.waitFor(() => expect(state.updates).toHaveLength(1), { timeout: 15_000 });
+        const answer = state.tables.chatMessage?.find((r) => r.agent === "polar") as Row;
+        // The button goes on after the sealed post, which is not an edit of it.
+        expect(state.updates[0]).toMatchObject({ messageId: answer.id, edited: false, components: [{ type: "button", action: "polar.retry", for: ALICE }] });
+        expect(answer.components).toHaveLength(1);
+        expect(answer.body).toBe("");
+        expect(await opened(person, answer.id as string)).toBe("Polar could not answer.");
+
+        await pressComponent({ id: ALICE, isAdmin: false }, { messageId: answer.id as string, index: 0 });
+        expect(state.asked).toHaveLength(2);
+        expect((state.asked[1] as { prompt: string }).prompt).toContain("what is the plan?");
+        // The same row, its next revision, sealed by Polar's device; nothing posted beside it, nothing in the clear.
+        expect(state.tables.chatMessage?.filter((r) => r.agent === "polar")).toHaveLength(1);
+        expect(answer).toMatchObject({ body: "", replyToId: asked, e2eeRevision: 1, e2eeDevice: serviceDevice(CHANNEL), components: null });
+        expect(state.posted).toBe(0);
+        const [read] = await person.readSealed(CHANNEL, [answer.id as string]);
+        expect(read?.revision).toBe(1);
+        expect(await opened(person, answer.id as string)).toBe("You said the build is green.");
+        // The failed version is kept, sealed as it was.
+        expect(state.tables.chatMessageEdit?.find((r) => r.messageId === answer.id)).toMatchObject({ body: "", e2eeRevision: null });
+    }, 30_000);
+
+    it("moves the provider link of a sealed answer to its button", async () => {
+        const person = await alice();
+        await addPolar();
+        state.answers.push({ text: "Polar has no provider. [Set one up](/polar/settings/providers)", problem: "noProvider" });
+        await say(person, "@polar hello");
+        await vi.waitFor(() => expect(state.updates).toHaveLength(1), { timeout: 15_000 });
+        const answer = state.tables.chatMessage?.find((r) => r.agent === "polar") as Row;
+        expect(state.updates[0]).toMatchObject({ components: [{ type: "link", href: "/polar/settings/providers" }], edited: false });
+        expect(await opened(person, answer.id as string)).toBe("Polar has no provider.");
+    }, 30_000);
+
+    it("edits nothing of a person's with Polar's device", async () => {
+        const person = await alice();
+        await addPolar();
+        const mine = await say(person, "mine to edit");
+        const refused = withServiceDevice("polar", CHANNEL, (device) => device.editSealed(CHANNEL, mine, encodeSealedContent({ body: "Polar's words" })));
+        await expect(refused).rejects.toMatchObject({ reason: "notSealed" });
+        expect(state.tables.chatMessage?.find((r) => r.id === mine)?.e2eeRevision ?? null).toBeNull();
     }, 30_000);
 
     it("leaves a sealed message that does not ask it alone", async () => {

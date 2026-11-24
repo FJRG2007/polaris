@@ -22,7 +22,8 @@ import { useChat } from "./chat-context";
 import { PersonName } from "@/components/person-name";
 import { PersonPressable } from "@/components/person-press";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
-import { searchMessagesAction, searchPeopleAction } from "./actions";
+import { searchPeopleAction } from "./actions";
+import { searchChat, stillMatches } from "./sealed-search";
 import { unlockProofFor } from "./lock-session";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOpenedWithin } from "./opened-sealed";
@@ -72,8 +73,9 @@ export function SearchPanel({
     const [before, setBefore] = useState("");
     const [hits, setHits] = useState<readonly ChatSearchHit[] | null>(null);
     const [busy, setBusy] = useState(false);
-    // A sealed hit (found by who, where or when: its text is not on the server) shows what it opens to here.
-    const shownHits = useOpenedWithin(hits);
+    // A sealed hit shows what it opens to here; one found by its words that no longer holds them is left out.
+    const openedHits = useOpenedWithin(hits);
+    const shownHits = useMemo(() => openedHits?.filter((hit) => stillMatches(hit, term)) ?? null, [openedHits, term]);
 
     const query = useMemo(
         () => ({
@@ -94,9 +96,8 @@ export function SearchPanel({
     const run = async () => {
         if (empty) return;
         setBusy(true);
-        const result = await searchMessagesAction(query, unlockProofFor(channelId));
-        setBusy(false);
-        setHits(result.hits);
+        const found = await searchChat(query, unlockProofFor(channelId)).finally(() => setBusy(false));
+        setHits(found);
     };
 
     // A result somebody edited or deleted after the search ran. Asked again
@@ -118,8 +119,8 @@ export function SearchPanel({
                 });
                 if (!stale) return;
                 const query = asked.current;
-                void searchMessagesAction(query, unlockProofFor(channelId)).then((result) => {
-                    if (asked.current === query) setHits(result.hits);
+                void searchChat(query, unlockProofFor(channelId)).then((found) => {
+                    if (asked.current === query) setHits(found);
                 });
             },
             [hits]

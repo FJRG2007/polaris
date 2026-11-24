@@ -19,7 +19,15 @@
  */
 
 import * as core from "@polaris/core";
-import { Button, Checkbox, DateInput, Input, cn } from "@polaris/ui";
+import {
+    Button,
+    Checkbox,
+    DateInput,
+    Input,
+    SearchableSelect,
+    cn,
+    type SearchableSelectOption
+} from "@polaris/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -29,6 +37,8 @@ import {
     SUGGESTIONS_SELECTOR,
     useContactSuggestions
 } from "./contact-suggestions";
+import { useMail } from "./mail-shell";
+import { SearchChips, SearchOffers, searchOffers, useRecentSearches } from "./search-extras";
 
 /** How long typing settles before the address changes. Long enough that a
  *  sentence is one navigation, short enough that it feels immediate. */
@@ -42,6 +52,10 @@ export function MailSearch() {
     const t = useTranslations("mail");
     const [typed, setTyped] = useState(applied);
     const [filtersOpen, setFiltersOpen] = useState(false);
+    const [focused, setFocused] = useState(false);
+    const [active, setActive] = useState(-1);
+    const { recent, remember, forget } = useRecentSearches();
+    const offers = focused && !filtersOpen ? searchOffers(typed, recent) : [];
 
     // The address changed under the box: a back button, or another screen
     // linking here with a query already on it.
@@ -54,6 +68,7 @@ export function MailSearch() {
             const next = new URLSearchParams(search.toString());
             if (value.trim()) next.set("q", value.trim());
             else next.delete("q");
+            if (value.trim()) remember(value);
             // A new search starts at the top: the cursor belongs to the previous
             // one and would skip the first page of this one.
             next.delete("before");
@@ -61,8 +76,21 @@ export function MailSearch() {
             const query = next.toString();
             router.replace(query ? `${pathname}?${query}` : pathname);
         },
-        [pathname, router, search]
+        [pathname, router, search, remember]
     );
+
+    useEffect(() => setActive(-1), [typed]);
+
+    /** Take one of the choices under the box. */
+    const pick = (offer: (typeof offers)[number]) => {
+        if (offer.kind === "recent") {
+            setTyped(offer.query);
+            apply(offer.query);
+            setFocused(false);
+            return;
+        }
+        setTyped(core.applyMailSearchOperator(typed, offer.insert));
+    };
 
     useEffect(() => {
         if (typed === applied) return;
@@ -71,68 +99,106 @@ export function MailSearch() {
     }, [typed, applied, apply]);
 
     return (
-        <div className="relative">
+        <div className="min-w-0">
             <div className="relative">
-                <Search
-                    className="pointer-events-none absolute start-2 top-1/2 size-3.5 shrink-0 -translate-y-1/2 text-foreground-subtle"
-                    aria-hidden
-                />
-                <Input
-                    value={typed}
-                    onChange={(event) => setTyped(event.target.value)}
-                    onKeyDown={(event) => {
-                        if (event.key === "Enter") apply(typed);
-                        if (event.key === "Escape") setFiltersOpen(false);
-                    }}
-                    placeholder={t("searchBox.placeholder")}
-                    // What the list's keyboard looks for to hand "/" to the search.
-                    data-mail-search=""
-                    aria-label={t("searchBox.placeholder")}
-                    className="h-8 ps-7 pe-14 text-[13px]"
-                />
-                <div className="absolute end-1 top-1/2 flex -translate-y-1/2 items-center">
-                    {typed ? (
+                <div className="relative">
+                    <Search
+                        className="pointer-events-none absolute start-2 top-1/2 size-3.5 shrink-0 -translate-y-1/2 text-foreground-subtle"
+                        aria-hidden
+                    />
+                    <Input
+                        value={typed}
+                        onChange={(event) => setTyped(event.target.value)}
+                        onFocus={() => setFocused(true)}
+                        onBlur={() => setFocused(false)}
+                        role="combobox"
+                        aria-expanded={offers.length > 0}
+                        aria-autocomplete="list"
+                        onKeyDown={(event) => {
+                            if (event.key === "ArrowDown" && offers.length > 0) {
+                                event.preventDefault();
+                                setActive((at) => (at + 1) % offers.length);
+                                return;
+                            }
+                            if (event.key === "ArrowUp" && offers.length > 0) {
+                                event.preventDefault();
+                                setActive((at) => (at <= 0 ? offers.length - 1 : at - 1));
+                                return;
+                            }
+                            if (event.key === "Enter") {
+                                const chosen = offers[active];
+                                if (chosen) {
+                                    event.preventDefault();
+                                    pick(chosen);
+                                    return;
+                                }
+                                apply(typed);
+                                setFocused(false);
+                            }
+                            if (event.key === "Escape") {
+                                setFiltersOpen(false);
+                                setFocused(false);
+                            }
+                        }}
+                        placeholder={t("searchBox.placeholder")}
+                        // What the list's keyboard looks for to hand "/" to the search.
+                        data-mail-search=""
+                        aria-label={t("searchBox.placeholder")}
+                        className="h-8 ps-7 pe-14 text-[13px]"
+                    />
+                    <div className="absolute end-1 top-1/2 flex -translate-y-1/2 items-center">
+                        {typed ? (
+                            <button
+                                type="button"
+                                aria-label={t("searchBox.clear")}
+                                title={t("searchBox.clear")}
+                                className="p-1 text-foreground-subtle hover:text-foreground"
+                                onClick={() => {
+                                    setTyped("");
+                                    apply("");
+                                }}
+                            >
+                                <X className="size-3.5 shrink-0" aria-hidden />
+                            </button>
+                        ) : null}
                         <button
                             type="button"
-                            aria-label={t("searchBox.clear")}
-                            title={t("searchBox.clear")}
-                            className="p-1 text-foreground-subtle hover:text-foreground"
-                            onClick={() => {
-                                setTyped("");
-                                apply("");
-                            }}
+                            aria-label={t("searchBox.options")}
+                            title={t("searchBox.options")}
+                            data-search-options=""
+                            aria-expanded={filtersOpen}
+                            className={cn(
+                                "p-1 text-foreground-subtle hover:text-foreground",
+                                filtersOpen && "text-foreground"
+                            )}
+                            onClick={() => setFiltersOpen((held) => !held)}
                         >
-                            <X className="size-3.5 shrink-0" aria-hidden />
+                            <SlidersHorizontal className="size-3.5 shrink-0" aria-hidden />
                         </button>
-                    ) : null}
-                    <button
-                        type="button"
-                        aria-label={t("searchBox.options")}
-                        title={t("searchBox.options")}
-                        data-search-options=""
-                        aria-expanded={filtersOpen}
-                        className={cn(
-                            "p-1 text-foreground-subtle hover:text-foreground",
-                            filtersOpen && "text-foreground"
-                        )}
-                        onClick={() => setFiltersOpen((held) => !held)}
-                    >
-                        <SlidersHorizontal className="size-3.5 shrink-0" aria-hidden />
-                    </button>
+                    </div>
                 </div>
-            </div>
 
-            {filtersOpen ? (
-                <SearchFilters
-                    from={typed}
-                    onClose={() => setFiltersOpen(false)}
-                    onSearch={(value) => {
-                        setTyped(value);
-                        apply(value);
-                        setFiltersOpen(false);
-                    }}
-                />
-            ) : null}
+                <SearchOffers offers={offers} active={active} onPick={pick} onForget={forget} />
+
+                {filtersOpen ? (
+                    <SearchFilters
+                        from={typed}
+                        onClose={() => setFiltersOpen(false)}
+                        onSearch={(value) => {
+                            setTyped(value);
+                            apply(value);
+                            setFiltersOpen(false);
+                        }}
+                    />
+                ) : null}
+            </div>
+            <SearchChips
+                applied={applied}
+                onChange={(value) => {
+                    setTyped(value);
+                    apply(value);
+                }}
+            />
         </div>
     );
 }
@@ -156,6 +222,7 @@ function SearchFilters({
 }) {
     const t = useTranslations("mail");
     const tc = useTranslations("common");
+    const { labels } = useMail();
     const [terms, setTerms] = useState<core.MailSearchTerms>(() => core.parseMailSearch(from));
     const panel = useRef<HTMLDivElement | null>(null);
 
@@ -170,6 +237,9 @@ function SearchFilters({
             // Nor is a contact picked from an address field's suggestions, which
             // are drawn outside the panel so the panel cannot clip them.
             if ((event.target as HTMLElement).closest(SUGGESTIONS_SELECTOR)) return;
+            // The label picker's list is drawn in a portal, outside the panel.
+            if ((event.target as HTMLElement).closest("[data-radix-popper-content-wrapper]"))
+                return;
             onClose();
         }
         document.addEventListener("mousedown", onDown);
@@ -225,6 +295,25 @@ function SearchFilters({
                     value={one(terms.phrases)}
                     onChange={(value) => set({ phrases: asList(value) })}
                 />
+                <Field
+                    label={t("searchBox.filename")}
+                    value={one(terms.filename)}
+                    onChange={(value) => set({ filename: asList(value.toLowerCase()) })}
+                />
+                <label className="block min-w-0">
+                    <span className="mb-1 block text-[12px] text-muted-foreground">
+                        {t("searchBox.label")}
+                    </span>
+                    <SearchableSelect
+                        aria-label={t("searchBox.label")}
+                        className="h-8 w-full text-[13px]"
+                        value={one(terms.label)}
+                        onValueChange={(value) => set({ label: asList(value) })}
+                        searchPlaceholder={t("searchBox.findLabel")}
+                        emptyText={t("searchBox.noLabel")}
+                        options={labelOptions(labels, one(terms.label), t("searchBox.anyLabel"))}
+                    />
+                </label>
                 <div className="grid grid-cols-2 gap-2">
                     <Field
                         label={t("searchBox.after")}
@@ -289,6 +378,29 @@ function SearchFilters({
             </p>
         </div>
     );
+}
+
+/** The labels to pick from, by name - `label:` matches the name - with "any"
+ *  first and a name typed in the box kept even when no label is called that. */
+function labelOptions(
+    labels: readonly { id: string; name: string; color: string }[],
+    current: string,
+    anyLabel: string
+): SearchableSelectOption[] {
+    const options: SearchableSelectOption[] = labels.map((label) => ({
+        value: label.name.toLowerCase(),
+        label: label.name,
+        icon: (
+            <span
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: label.color }}
+                aria-hidden
+            />
+        )
+    }));
+    if (current && !options.some((option) => option.value === current))
+        options.unshift({ value: current, label: current });
+    return [{ value: "", label: anyLabel }, ...options];
 }
 
 function Field({

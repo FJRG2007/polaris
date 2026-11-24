@@ -40,6 +40,7 @@
         "attach": "Adjuntar archivo",
         "signature": "Insertar tu firma",
         "attachTitle": "Adjuntar a este mensaje",
+        "openAttachment": "Abrir {name}",
         "template": "Insertar una plantilla",
         "loadingTemplates": "Cargando plantillas",
         "noTemplates": "Todavía no hay plantillas para este buzón",

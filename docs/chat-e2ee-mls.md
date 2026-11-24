@@ -229,11 +229,25 @@ on the device, through `openSealed`, with the same page cache.
   (`sendSealedMessage`), then the conversation is read up to it. Chat
   messages are not sent as server pushes, so no notice is drawn anywhere the
   device could not open it.
-- **Search.** The server searches bodies, and a sealed one is empty, so a
-  sealed message is found only by who, where, when and what is attached to it;
-  its text is not searchable. Searching sealed text needs a local index on the
-  device over every message it has opened, which is not built. This is the
-  limit, stated where search is documented for people when the flag goes on.
+- **Search** (`sealed-search-index.ts`, `chat/sealed-search.ts`). The server
+  searches bodies, and a sealed one is empty, so a sealed message's words are
+  matched on the device. Every sealed message the browser opens, sends or
+  edits is kept in the device's index (`polaris-mls-search/<device>` in
+  IndexedDB): each entry sealed with AES-256-GCM under a non-extractable key in
+  the same database, the message id in the additional data, the conversation
+  inside the seal; beside it only the id and the time of its last edit, so a
+  version already kept is not sealed again. The newest version wins; at most
+  20,000 entries, the oldest dropped first. A search with words asks the
+  server for plain matches as before and, at the same time, the index for up
+  to 200 sealed matches, newest first; those ids (never the words) go to
+  `searchSealedAction`, which answers only sealed rows among them through the
+  same reach, chat lock, age gate, history and filters, and names the ones that
+  are deleted or out of reach, which the device drops. Both answers are one
+  list, newest first; a sealed hit that opens to words that no longer match
+  (edited elsewhere) is left out. The index is deleted with the device at
+  sign-out. Its limit: it finds only what this browser opened, so a message
+  never scrolled to here, or opened on another device, is found by who, where,
+  when and what is attached to it, not by its words.
 - **Link cards.** Not made for a sealed message: the server makes a card by
   fetching the link, which would tell it what was sent. The link is still a
   link. A card the sender makes and seals beside the message is the way to
@@ -311,16 +325,25 @@ What is built on top of it:
   (`@polar`, or a reply to Polar) is answered through `answerPolarMention` with
   a `SealedReply`: the conversation before it is opened by the same device, the
   answer is sealed and posted by it as a reply. Only the MLS work holds the
-  device's lease; the model's answer is written outside it. A sealed answer has
-  no tools, no buttons and no draft streamed in the clear.
+  device's lease; the model's answer is written outside it. A sealed answer
+  streams no draft in the clear and has no tools: a change Polar offers waits
+  on the server, with what it would do, until it is approved, and that would
+  keep words of the conversation there in the clear. An answer that is not one
+  gets the same way out as a plain one - "Set up providers" (the link moves out
+  of the sealed text to it) or "Try again" - put on the row after the sealed
+  post, not marked as an edit; the buttons say nothing of what was asked.
+  "Try again" (`retrySealedPolar`) has Polar's device open the question again
+  and seal the new answer over its own row as the next revision (`editSealed`
+  takes that from Polar only for its own sealed answer, signed by the device
+  that posted it, with no edit window), the old version kept sealed where the
+  scope keeps history, and the button taken off.
 - **A webhook posting** (`postThroughWebhook`): in a sealed conversation the
   webhook's device seals the post; the name and picture the call gave stay
   metadata beside it, and no link card is made.
 
 ## Not built yet
 
-- Searching sealed text and sealed link cards (see "Other places a message is
-  shown").
+- Sealed link cards (see "Other places a message is shown").
 - The `org` history-key envelope. The organisation recovery key (proposal 3.5)
   has no public key stored anywhere yet - its custodian setup is not built - so
   nothing can serve it and no `org` envelope can be sealed until it is.

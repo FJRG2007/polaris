@@ -41,15 +41,21 @@ import { trimReceivedHtml, trimReceivedText } from "./trimmed-content";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { markHtml } from "./search-marks";
+
+const NO_NEEDLES: readonly string[] = [];
 
 export function MessageBody({
     html,
     text,
     remoteAllowed,
-    trackerVendors
+    trackerVendors,
+    highlight = NO_NEEDLES
 }: {
     html: string;
     text: string;
+    /** The words a search found in this message, folded, to mark in it. */
+    highlight?: readonly string[];
     /** Whether this mailbox draws pictures at all. They are served through
      *  Polaris either way, so this is a preference rather than a defence. */
     remoteAllowed: boolean;
@@ -103,7 +109,12 @@ export function MessageBody({
 
             {drawn.trim() ? (
                 <>
-                    <SandboxedHtml html={shown} showRemote={remoteAllowed} paper={inForce} />
+                    <SandboxedHtml
+                        html={shown}
+                        showRemote={remoteAllowed}
+                        paper={inForce}
+                        highlight={highlight}
+                    />
                     {trimmedHtml !== null ? (
                         <TrimmedPill
                             className="mt-1 flex"
@@ -237,11 +248,14 @@ export function nextFrameHeight(current: number, claimed: number): number {
 export function SandboxedHtml({
     html,
     showRemote,
-    paper
+    paper,
+    highlight = NO_NEEDLES
 }: {
     html: string;
     showRemote: boolean;
     paper: MessagePaper;
+    /** Words to mark, on the sanitized tree - see `markHtml`. */
+    highlight?: readonly string[];
 }) {
     // What this Polaris is called from where the reader is sitting. Read once,
     // and never during render: the server has no window, and a value that
@@ -295,12 +309,12 @@ export function SandboxedHtml({
      */
     const body = useMemo(() => {
         if (clean === null) return "";
-        const linked = linkifyBareAddresses(clean);
+        const linked = markHtml(linkifyBareAddresses(clean), highlight);
         return linked.replace(
             /(["'])\/api\/mail\/image\//g,
             (_match, quote: string) => `${quote}${origin}/api/mail/image/`
         );
-    }, [clean, origin]);
+    }, [clean, origin, highlight]);
 
     // Whether the frame has said how tall it is. A browser or an extension that
     // stops the frame's one script leaves it at its opening height, scrolling

@@ -1,144 +1,27 @@
 /**
  * Answers worked out on the computer as they are typed: arithmetic
- * (`2^10 / 4`, `sqrt(2) * pi`) and unit conversions (`5 km to mi`,
- * `100 f in c`, `3 gib to mb`). A small recursive-descent parser, never
- * `eval`: what is typed into the launcher is text, not code.
+ * (`2^10 / 4`, `sqrt(2) * pi`, `539€ + 21%`) and unit conversions (`5 km to mi`,
+ * `100 f in c`, `3 gib to mb`). The arithmetic is `@polaris/core`'s calculator,
+ * the one the dashboard's search panel uses, never `eval`: what is typed into
+ * the launcher is text, not code.
  */
+
+import { calculate, calculation, calculationText, formatCalculation } from "@polaris/core/calculate";
 
 export interface QuickAnswer {
     /** The answer as it is shown and copied. */
     readonly value: string;
     /** What it was worked out from, e.g. "5 km in mi". */
     readonly label: string;
+    /** What Enter copies when it is not `value`: plain digits for an amount of
+     *  money shown with its sign, "652.19" for "€652.19". */
+    readonly copy?: string;
 }
 
-const FUNCTIONS: Readonly<Record<string, (x: number) => number>> = {
-    sqrt: Math.sqrt,
-    abs: Math.abs,
-    round: Math.round,
-    floor: Math.floor,
-    ceil: Math.ceil,
-    sin: Math.sin,
-    cos: Math.cos,
-    tan: Math.tan,
-    ln: Math.log,
-    log: Math.log10
-};
-
-const CONSTANTS: Readonly<Record<string, number>> = { pi: Math.PI, e: Math.E };
-
-type Token = { kind: "num"; value: number; } | { kind: "op"; value: string; } | { kind: "word"; value: string; };
-
-function tokenize(text: string): Token[] | null {
-    const tokens: Token[] = [];
-    let at = 0;
-    while (at < text.length) {
-        const char = text[at]!;
-        if (/\s/.test(char)) {
-            at += 1;
-            continue;
-        }
-        const number = /^(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?/i.exec(text.slice(at));
-        if (number) {
-            tokens.push({ kind: "num", value: Number(number[0]) });
-            at += number[0].length;
-            continue;
-        }
-        const word = /^[a-z]+/i.exec(text.slice(at));
-        if (word) {
-            tokens.push({ kind: "word", value: word[0].toLowerCase() });
-            at += word[0].length;
-            continue;
-        }
-        if ("+-*/%^()".includes(char)) {
-            tokens.push({ kind: "op", value: char });
-            at += 1;
-            continue;
-        }
-        return null;
-    }
-    return tokens;
-}
-
-/** The value of an arithmetic expression, or null when it is not one. */
+/** The value of an arithmetic expression, or null when it is not one. The
+ *  dashboard's search panel works sums out with the same parser. */
 export function evaluate(text: string): number | null {
-    const tokens = tokenize(text);
-    if (!tokens || tokens.length === 0 || tokens.length > 200) return null;
-    let at = 0;
-    const peek = () => tokens[at];
-    const isOp = (value: string) => {
-        const token = peek();
-        return token?.kind === "op" && token.value === value;
-    };
-    // expr := term (("+" | "-") term)*
-    const expr = (): number => {
-        let value = term();
-        while (isOp("+") || isOp("-")) {
-            const op = (tokens[at++] as { value: string; }).value;
-            const right = term();
-            value = op === "+" ? value + right : value - right;
-        }
-        return value;
-    };
-    // term := unary (("*" | "/" | "%") unary)*
-    const term = (): number => {
-        let value = unary();
-        while (isOp("*") || isOp("/") || isOp("%")) {
-            const op = (tokens[at++] as { value: string; }).value;
-            const right = unary();
-            value = op === "*" ? value * right : op === "/" ? value / right : value % right;
-        }
-        return value;
-    };
-    // unary := ("-" | "+") unary | power
-    const unary = (): number => {
-        if (isOp("-")) {
-            at += 1;
-            return -unary();
-        }
-        if (isOp("+")) {
-            at += 1;
-            return unary();
-        }
-        return power();
-    };
-    // power := atom ("^" unary)?   (right-associative)
-    const power = (): number => {
-        const base = atom();
-        if (isOp("^")) {
-            at += 1;
-            return base ** unary();
-        }
-        return base;
-    };
-    const atom = (): number => {
-        const token = tokens[at++];
-        if (!token) throw new Error("end");
-        if (token.kind === "num") return token.value;
-        if (token.kind === "op" && token.value === "(") {
-            const value = expr();
-            if (!isOp(")")) throw new Error("paren");
-            at += 1;
-            return value;
-        }
-        if (token.kind === "word") {
-            const fn = FUNCTIONS[token.value];
-            if (fn) {
-                if (!isOp("(")) throw new Error("call");
-                return fn(atom());
-            }
-            const constant = CONSTANTS[token.value];
-            if (constant !== undefined) return constant;
-        }
-        throw new Error("token");
-    };
-    try {
-        const value = expr();
-        if (at !== tokens.length || !Number.isFinite(value)) return null;
-        return value;
-    } catch {
-        return null;
-    }
+    return calculate(text);
 }
 
 /** Each unit as a factor of its family's base, or a pair of functions for temperature. */
@@ -214,7 +97,8 @@ export function quickAnswer(text: string): QuickAnswer | null {
     if (!trimmed || trimmed.length > 300) return null;
     const conversion = convert(trimmed);
     if (conversion) return conversion;
-    if (!/[+\-*/%^(]/.test(trimmed.replace(/^-/, ""))) return null;
-    const value = evaluate(trimmed);
-    return value === null ? null : { value: formatNumber(value), label: trimmed };
+    const result = calculation(trimmed);
+    if (result === null) return null;
+    if (result.currency === null) return { value: formatNumber(result.value), label: trimmed };
+    return { value: formatCalculation(result), label: trimmed, copy: calculationText(result.value, result.currency) };
 }

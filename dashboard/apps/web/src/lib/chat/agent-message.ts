@@ -95,6 +95,12 @@ export interface AgentMessageUpdate {
     readonly body?: string;
     /** The new set, which replaces the old one; an empty list takes them all off. */
     readonly components?: readonly MessageComponentInput[];
+    /**
+     * False when only the buttons go under a message just posted (a sealed
+     * answer's, whose words cannot be posted with them): not an edit, so not
+     * marked as one. Ignored when `body` changes.
+     */
+    readonly edited?: boolean;
 }
 
 /**
@@ -113,7 +119,7 @@ export async function updateAgentMessage(input: AgentMessageUpdate): Promise<boo
         select: { body: true, audience: true }
     });
     if (!current) return false;
-    const editedAt = new Date();
+    const editedAt = input.body === undefined && input.edited === false ? undefined : new Date();
     const keepHistory = input.body !== undefined && input.body !== current.body
         ? (await import("./rules").then((rules) => rules.rulesForChannel(input.channelId))).keepEditHistory
         : false;
@@ -121,14 +127,14 @@ export async function updateAgentMessage(input: AgentMessageUpdate): Promise<boo
         const updated = await tx.chatMessage.updateMany({
             where: { id: input.messageId, channelId: input.channelId, agent: input.agent, deletedAt: null },
             data: {
-                editedAt,
+                ...(editedAt ? { editedAt } : {}),
                 ...(input.body !== undefined ? { body: input.body } : {}),
                 ...(stored !== undefined ? { components: stored.length ? stored : Prisma.DbNull } : {})
             }
         });
         if (updated.count > 0 && keepHistory) {
             await tx.chatMessageEdit.create({
-                data: { messageId: input.messageId, body: current.body, replacedAt: editedAt }
+                data: { messageId: input.messageId, body: current.body, replacedAt: editedAt ?? new Date() }
             });
         }
         return updated.count > 0;

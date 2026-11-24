@@ -1,10 +1,10 @@
 /**
- * The search panel's calculator: arithmetic in, a number out, and anything that
+ * Polaris search's calculator: arithmetic in, a number out, and anything that
  * is not arithmetic left alone so the panel goes on searching for it.
  */
 
 import { describe, expect, it } from "vitest";
-import { calculate, calculationText } from "@/lib/search/calculate";
+import { calculate, calculation, calculationText, formatCalculation } from "../src/calculate.js";
 
 describe("calculate", () => {
     it.each([
@@ -111,7 +111,19 @@ describe("calculate", () => {
         "1,2,3",
         "15 of 200",
         "% of 200",
-        "0 / 0"
+        "0 / 0",
+        "50%",
+        "€539",
+        "539 EUR",
+        "€",
+        "539€ + $10",
+        "10 EUR * 2 USD",
+        "€2026-11-24",
+        "2026-11-24 EUR",
+        "$555-1234",
+        "try 2 + 2",
+        "pen 2 + 2",
+        "10 € €"
     ])("leaves %j alone", (input) => {
         expect(calculate(input)).toBeNull();
     });
@@ -143,5 +155,56 @@ describe("calculate", () => {
             expect(text).not.toMatch(/e/i);
             expect(calculate(`${text} * 1`)).toBe(value);
         }
+    });
+
+    it.each([
+        ["539 + 21%", 652.19],
+        ["539 - 21%", 425.81],
+        ["539 * 21%", 113.19],
+        ["539 / 21%", 2566.666667],
+        ["21% of 539", 113.19],
+        ["539+21%", 652.19],
+        ["100 + 10% + 10%", 121],
+        ["(539 + 21%) * 2", 1304.38],
+        ["2 * (539 + 21%)", 1304.38],
+        ["10% + 5", 5.1],
+        ["200 - 50%", 100],
+        ["50% * 50%", 0.25],
+        ["10 % 3", 1],
+        ["10 %3", 1],
+        ["(10) % (3)", 1],
+        ["1,5 + 10%", 1.65],
+        ["2e3 + 1", 2001],
+        ["1.5e-3 * 1000", 1.5]
+    ])("%s = %d (percentages)", (input, expected) => {
+        expect(calculate(input)).toBe(expected);
+    });
+
+    it.each([
+        ["539€ + 21%", 652.19, "EUR"],
+        ["539 € + 21%", 652.19, "EUR"],
+        ["€539 + 21%", 652.19, "EUR"],
+        ["539 EUR + 21%", 652.19, "EUR"],
+        ["539eur - 21%", 425.81, "EUR"],
+        ["$10 + 5%", 10.5, "USD"],
+        ["10$ * 3", 30, "USD"],
+        ["£20 / 4", 5, "GBP"],
+        ["¥1000 + 10%", 1100, "JPY"],
+        ["(5 + 3)€ * 2", 16, "EUR"],
+        ["€(5 + 3) * 2", 16, "EUR"],
+        ["539€ + 10€", 549, "EUR"],
+        ["539 + 21%", 652.19, null]
+    ])("%s = %d %s", (input, value, currency) => {
+        expect(calculation(input)).toEqual({ value, currency });
+    });
+
+    it("shows money in the reader's locale and copies plain digits", () => {
+        const money = calculation("539€ + 21%")!;
+        expect(formatCalculation(money, "en-US")).toBe("€652.19");
+        expect(formatCalculation(money, "es-ES").replace(/\s/g, " ")).toBe("652,19 €");
+        expect(calculationText(money.value, money.currency)).toBe("652.19");
+        expect(calculationText(calculation("€1000 * 1000")!.value, "EUR")).toBe("1000000.00");
+        expect(calculationText(calculation("¥1000 / 3")!.value, "JPY")).toBe("333");
+        expect(formatCalculation(calculation("1000 * 1,5")!, "de-DE")).toBe("1.500");
     });
 });

@@ -25,7 +25,7 @@ import { readMailPreferences } from "./prefs";
 import { rememberContacts } from "./contacts";
 import { MailAuthError } from "./credentials";
 import { recordCredentialRefusal } from "./refused";
-import { readUpload, attachUploads } from "./uploads";
+import { readUpload, attachUploads, releaseDraftUploads } from "./uploads";
 import { addressesFrom, asJson, stringsFrom } from "./json";
 import { withImap, type MailConnectionSource } from "./imap";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount } from "./access";
@@ -418,6 +418,8 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
         // Gone means gone: the row is the queue entry, not a record of what was
         // sent. What was sent is in the Sent folder, which is where somebody
         // looks for it - and so is its copy in Drafts, which goes with it.
+        // Its files first: the rows cascade with the draft, the bytes do not.
+        await releaseDraftUploads([draft.id]);
         await prisma.mailDraft.delete({ where: { id: draft.id } });
         await removeDraftFromServer(account, draft.id);
         if (draft.inReplyToHeader) await markAnswered(account.id, draft.inReplyToHeader);
@@ -430,6 +432,7 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
             // Sent. Whatever failed after it is logged and the queue entry goes,
             // so the sweep never finds it again.
             console.warn("polaris: a message went, and tidying up after it failed:", caught);
+            await releaseDraftUploads([draft.id]).catch(() => undefined);
             await prisma.mailDraft.deleteMany({ where: { id: draft.id } }).catch(() => undefined);
             publishMail({ accountId: draft.accountId, kind: "sending", actorId: account.userId });
             pickUpSentCopy(account.id, sentCopy);
@@ -947,6 +950,7 @@ export async function discardDraft(
         select: { id: true, account: { select: ACCOUNT_COLUMNS } }
     });
     if (!draft) return;
+    await releaseDraftUploads([draft.id]);
     await prisma.mailDraft.delete({ where: { id: draft.id } });
     await removeDraftFromServer(draft.account, draft.id);
 }

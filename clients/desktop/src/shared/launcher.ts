@@ -113,8 +113,8 @@ export function rankedMatches<T extends Searchable>(
 
 /** The search engines a web search can go to, the first the default. */
 export const SEARCH_ENGINES = {
-    duckduckgo: { name: "DuckDuckGo", url: "https://duckduckgo.com/?q=" },
     google: { name: "Google", url: "https://www.google.com/search?q=" },
+    duckduckgo: { name: "DuckDuckGo", url: "https://duckduckgo.com/?q=" },
     bing: { name: "Bing", url: "https://www.bing.com/search?q=" },
     brave: { name: "Brave Search", url: "https://search.brave.com/search?q=" },
     startpage: { name: "Startpage", url: "https://www.startpage.com/do/search?q=" }
@@ -123,6 +123,19 @@ export const SEARCH_ENGINES = {
 export type SearchEngine = keyof typeof SEARCH_ENGINES;
 
 export const SEARCH_ENGINE_IDS = Object.keys(SEARCH_ENGINES) as [SearchEngine, ...SearchEngine[]];
+
+/** Where a web search goes until somebody picks another engine. */
+export const DEFAULT_SEARCH_ENGINE: SearchEngine = "google";
+
+/**
+ * The engine a web search goes to: what somebody chose, else the default.
+ * DuckDuckGo used to be the default and every saved settings file carries it
+ * whether or not anybody picked it, so it only counts with the marker a choice
+ * made since then writes. Any other engine was always somebody's pick.
+ */
+export function launcherEngineOf(stored: SearchEngine, chosen: boolean): SearchEngine {
+    return chosen || stored !== "duckduckgo" ? stored : DEFAULT_SEARCH_ENGINE;
+}
 
 export function webSearchUrl(engine: SearchEngine, query: string): string {
     return `${SEARCH_ENGINES[engine].url}${encodeURIComponent(query.trim())}`;

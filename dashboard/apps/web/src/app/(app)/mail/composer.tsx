@@ -26,7 +26,10 @@
  * and the missing attachment, which are the two mistakes everybody makes.
  */
 
-import { sendFile } from "@/components/transfers/move-file";
+import dynamic from "next/dynamic";
+import { saveFile, sendFile } from "@/components/transfers/move-file";
+import { isViewable } from "@/app/(app)/drive/viewer/kind";
+import type { ViewerTarget } from "@/app/(app)/drive/viewer/types";
 import { useDockedCorner } from "@/components/docked-corner";
 import Link from "next/link";
 import { useBusy } from "./use-busy";
@@ -70,6 +73,7 @@ import {
     attachFromAddressAction,
     attachFromDriveAction,
     attachFromMessageAction,
+    draftAttachmentsAction,
     fileDraftOnServerAction,
     listTemplatesAction
 } from "./actions";
@@ -91,6 +95,18 @@ import {
     DateInput,
     clearWindowControls
 } from "@polaris/ui";
+
+/** The viewer Drive opens a file in, loaded the first time a file is opened
+ *  rather than with every composer - see the same note in `thread-view`. */
+const FileViewer = dynamic(
+    () => import("@/app/(app)/drive/file-viewer").then((module) => module.FileViewer),
+    { ssr: false }
+);
+
+/** Where the viewer reads an attachment of a message still being written. */
+function uploadUrl(id: string, inline = false): string {
+    return `/api/mail/uploads?id=${encodeURIComponent(id)}${inline ? "&inline=1" : ""}`;
+}
 
 /** How long typing settles before a draft is written. */
 const AUTOSAVE_MS = 3000;
@@ -159,6 +175,24 @@ export function Composer() {
     const [expanded, setExpanded] = useState(false);
     const message = joinComposerBody(body, trimmed);
     const [files, setFiles] = useState<Attached[]>([]);
+    /** The same, for a close that has to wait for a reopened draft's files. */
+    const filesNow = useRef<Attached[]>([]);
+    filesNow.current = files;
+    /**
+     * A reopened draft's files, while they are on their way.
+     *
+     * Nothing saves until they are here: a save names every file the draft
+     * keeps, and one that ran before they arrived named none - which took them
+     * off the draft and off the disk.
+     */
+    const [loadingFiles, setLoadingFiles] = useState(false);
+    const filesLoad = useRef<Promise<void> | null>(null);
+    /** The attachment open in the viewer, and whether the viewer was ever needed. */
+    const [viewing, setViewing] = useState<ViewerTarget | null>(null);
+    const [viewerWanted, setViewerWanted] = useState(false);
+    useEffect(() => {
+        if (viewing) setViewerWanted(true);
+    }, [viewing]);
     const saves = useRef<DraftSaves | null>(null);
     const [sendAt, setSendAt] = useState<Date | null>(null);
     const [queued, setQueued] = useState<{ draftId: string; until: number } | null>(null);
@@ -224,6 +258,7 @@ export function Composer() {
         setTrimmed(split?.tail ?? "");
         setExpanded(false);
         setFiles([]);
+        setViewing(null);
         saves.current = draftSaves(
             {
                 accountId: account,
@@ -251,6 +286,33 @@ export function Composer() {
         // changed, and two replies in a row have to move the caret twice.
         if (composing.inReplyToId && (composing.to ?? []).length > 0) setFocusAt(Date.now());
     }, [composing, accounts, identities]);
+
+    // A reopened draft brings back the files already on it. Keyed on the seed
+    // alone, for the reason the seeding above is.
+    useEffect(() => {
+        const draftId = composing?.draftId;
+        if (!draftId) {
+            setLoadingFiles(false);
+            filesLoad.current = null;
+            return;
+        }
+        let current = true;
+        setLoadingFiles(true);
+        filesLoad.current = (async () => {
+            const outcome = await draftAttachmentsAction({ draftId }).catch(() => null);
+            if (!current) return;
+            if (outcome && "uploads" in outcome) {
+                const held: Attached[] = outcome.uploads;
+                filesNow.current = held;
+                setFiles(held);
+                saves.current?.carry(held.map((file) => file.id));
+            }
+            setLoadingFiles(false);
+        })();
+        return () => {
+            current = false;
+        };
+    }, [composing]);
 
     /** Files being brought over from the message being forwarded, and the ones
      *  that could not be. */
@@ -294,7 +356,7 @@ export function Composer() {
     // The draft, a few seconds after typing stops. Skipped while nothing has been
     // typed - an opened-and-closed composer should not leave an empty draft.
     useEffect(() => {
-        if (!composing || !accountId || !dirty || queued) return;
+        if (!composing || !accountId || !dirty || queued || loadingFiles) return;
         const timer = setTimeout(() => {
             void saves.current?.save({
                 accountId,
@@ -308,7 +370,7 @@ export function Composer() {
             });
         }, AUTOSAVE_MS);
         return () => clearTimeout(timer);
-    }, [composing, accountId, identityId, to, cc, bcc, subject, message, files, dirty, queued]);
+    }, [composing, accountId, identityId, to, cc, bcc, subject, message, files, dirty, queued, loadingFiles]);
 
     /** Put the history into the editor, where it can be read, edited or cut. */
     const showTrimmed = useCallback(() => {
@@ -510,17 +572,20 @@ export function Composer() {
     const close = useCallback(() => {
         openComposer(null);
         if (queued || !accountId) return;
-        const fields: DraftFields = {
-            accountId,
-            identityId: identityId || null,
-            to,
-            cc,
-            bcc,
-            subject,
-            body: message,
-            attachmentIds: files.map((file) => file.id)
-        };
         void (async () => {
+            // A draft closed before its files came back is saved with them, not
+            // without them.
+            await filesLoad.current;
+            const fields: DraftFields = {
+                accountId,
+                identityId: identityId || null,
+                to,
+                cc,
+                bcc,
+                subject,
+                body: message,
+                attachmentIds: filesNow.current.map((file) => file.id)
+            };
             const id = await saves.current?.save(fields);
             if (id) await fileDraftOnServerAction(id);
             refreshMailbox();
@@ -535,7 +600,6 @@ export function Composer() {
         bcc,
         subject,
         message,
-        files,
         refreshMailbox
     ]);
 
@@ -759,10 +823,10 @@ export function Composer() {
                             {/* The body takes whatever is left, so the message is
                                 the biggest thing in the composer rather than a strip
                                 under the headers. */}
-                            <div className="flex min-h-0 flex-1 flex-col gap-2 px-2 py-2">
+                            <div className="flex shrink-0 grow flex-col gap-2 px-2 py-2">
                                 <AiRewriting
                                     active={rewriting}
-                                    className="flex min-h-0 flex-1 flex-col"
+                                    className="flex grow flex-col"
                                 >
                                 <RichTextEditor
                                     value={body}
@@ -816,22 +880,36 @@ export function Composer() {
                             ) : null}
 
                             {files.length > 0 ? (
-                                <ul className="flex flex-wrap gap-2 border-t border-border px-3 py-2">
+                                <ul className="flex max-h-32 shrink-0 flex-wrap gap-2 overflow-y-auto border-t border-border px-3 py-2">
                                     {files.map((file) => (
                                         <li
                                             key={file.id}
-                                            className="flex items-center gap-2 rounded-md border border-border px-2 py-1 text-[12px]"
+                                            className="flex min-w-0 max-w-full items-center gap-2 rounded-md border border-border px-2 py-1 text-[12px]"
                                         >
-                                            <Paperclip
-                                                className="size-3.5 shrink-0 text-foreground-subtle"
-                                                aria-hidden
-                                            />
-                                            <span
-                                                className="max-w-[14rem] truncate"
+                                            <button
+                                                type="button"
+                                                className="flex min-w-0 items-center gap-2 text-muted-foreground hover:text-foreground"
                                                 title={file.name}
+                                                aria-label={t("compose.openAttachment", { name: file.name })}
+                                                data-mail-upload={file.id}
+                                                onClick={() =>
+                                                    isViewable(file.name)
+                                                        ? setViewing({
+                                                              path: file.id,
+                                                              name: file.name,
+                                                              size: String(file.size)
+                                                          })
+                                                        : saveFile(uploadUrl(file.id), file.name)
+                                                }
                                             >
-                                                {file.name}
-                                            </span>
+                                                <Paperclip
+                                                    className="size-3.5 shrink-0 text-foreground-subtle"
+                                                    aria-hidden
+                                                />
+                                                <span className="min-w-0 max-w-[14rem] truncate">
+                                                    {file.name}
+                                                </span>
+                                            </button>
                                             <button
                                                 type="button"
                                                 aria-label={t("recipients.remove", {
@@ -851,12 +929,21 @@ export function Composer() {
                             ) : null}
                         </div>
 
-                        <footer className="flex flex-wrap items-center gap-1 border-t border-border px-3 py-2">
+                        {viewerWanted ? (
+                            <FileViewer
+                                target={viewing}
+                                readOnly
+                                urlFor={(target, inline) => uploadUrl(target.path, inline)}
+                                onOpenChange={(open) => (open ? undefined : setViewing(null))}
+                            />
+                        ) : null}
+
+                        <footer className="flex shrink-0 flex-wrap items-center gap-1 border-t border-border px-3 py-2">
                             <div className="flex items-stretch">
                                 <Button
                                     className="rounded-e-none"
                                     onClick={() => send(sendAt)}
-                                    disabled={sending || to.length === 0 || !accountId}
+                                    disabled={sending || loadingFiles || to.length === 0 || !accountId}
                                 >
                                     {sending ? (
                                         <Loader2
@@ -869,7 +956,7 @@ export function Composer() {
                                     {sendAt ? t("compose.schedule") : t("compose.send")}
                                 </Button>
                                 <SendLaterMenu
-                                    disabled={sending || to.length === 0 || !accountId}
+                                    disabled={sending || loadingFiles || to.length === 0 || !accountId}
                                     chosen={sendAt}
                                     onChoose={(when) => {
                                         setSendAt(when);

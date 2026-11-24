@@ -43,7 +43,51 @@ export async function searchMessages(
      *  history rules the search answers to. */
     page?: SharedPage
 ): Promise<readonly ChatSearchHit[]> {
-    if (core.chatSearchIsEmpty(input) && !input.channelId) return [];
+    return (await runSearch(actor, input, proof, page)).hits;
+}
+
+/** What a search of sealed text found among the messages a device named. */
+export interface SealedSearchAnswer {
+    readonly hits: readonly ChatSearchHit[];
+    /** Named messages that are deleted, or in no conversation this reader reaches: the device drops them from its index. */
+    readonly gone: readonly string[];
+}
+
+/**
+ * The messages a device's own index found for `input.term` among the sealed
+ * text it opened (docs/chat-e2ee-mls.md, Search). The words were matched on
+ * the device; here the ids are put through every rule a search answers to -
+ * reach, the chat lock, the age gate, history, and the other filters - and only
+ * sealed rows are answered, so naming a plain message's id finds nothing the
+ * server's own match did not.
+ */
+export async function searchSealedHits(
+    actor: { id: string },
+    input: core.ChatSearchInput,
+    ids: readonly string[],
+    proof?: string | null
+): Promise<SealedSearchAnswer> {
+    if (ids.length === 0) return { hits: [], gone: [] };
+    const { hits, reachable } = await runSearch(actor, input, proof, undefined, ids);
+    const live = reachable.size
+        ? await prisma.chatMessage.findMany({
+              where: { id: { in: [...ids] }, channelId: { in: [...reachable] }, deletedAt: null },
+              select: { id: true }
+          })
+        : [];
+    const kept = new Set(live.map((row) => row.id));
+    return { hits, gone: ids.filter((id) => !kept.has(id)) };
+}
+
+async function runSearch(
+    actor: { id: string },
+    input: core.ChatSearchInput,
+    proof: string | null | undefined,
+    page: SharedPage | undefined,
+    /** Sealed messages a device matched `input.term` against: searched instead of the bodies. */
+    sealedIds?: readonly string[]
+): Promise<{ hits: readonly ChatSearchHit[]; reachable: ReadonlySet<string> }> {
+    if (core.chatSearchIsEmpty(input) && !input.channelId) return { hits: [], reachable: new Set<string>() };
 
     const [reachable, concealed] = await Promise.all([
         reachableChannelIds(actor),
@@ -62,7 +106,7 @@ export async function searchMessages(
             ? [asked]
             : []
         : [...reachable].filter((id) => !concealed.hidden.has(id) && !concealed.locked.has(id));
-    if (within.length === 0) return [];
+    if (within.length === 0) return { hits: [], reachable };
     const floors = await history.historyFloors(actor.id, within);
 
     const rows = await prisma.chatMessage.findMany({
@@ -76,7 +120,12 @@ export async function searchMessages(
             // System lines - "somebody joined", "a call started" - are noise in a
             // search for something a person said.
             kind: "text",
-            ...(input.term ? { body: { contains: input.term, mode: "insensitive" as const } } : {}),
+            // A sealed body is empty here: its words were matched on the device that opened it.
+            ...(sealedIds
+                ? { id: { in: [...sealedIds] }, e2eeEpoch: { not: null } }
+                : input.term
+                  ? { body: { contains: input.term, mode: "insensitive" as const } }
+                  : {}),
             ...(input.authorId ? { authorId: input.authorId } : {}),
             ...(page?.media ? MEDIA_CLAUSE : attachmentClause(input.has)),
             ...dayClause(input.after, input.before),
@@ -89,7 +138,7 @@ export async function searchMessages(
         take: page?.take ?? core.CHAT_SEARCH_LIMIT,
         select: SEARCH_SELECT
     });
-    if (rows.length === 0) return [];
+    if (rows.length === 0) return { hits: [], reachable };
 
     const channels = await prisma.chatChannel.findMany({
         where: { id: { in: [...new Set(rows.map((row) => row.channelId))] } },
@@ -102,7 +151,7 @@ export async function searchMessages(
     // no such shape to preserve, and a row saying "blocked message" is a row that
     // answers nothing somebody searched for.
     const decorated = (await decorateMessages(actor, rows)).filter((message) => !message.blocked);
-    return decorated.map((message) => {
+    const hits = decorated.map((message) => {
         const channel = named.get(message.channelId);
         return {
             message,
@@ -114,6 +163,7 @@ export async function searchMessages(
             inSpace: Boolean(channel?.spaceId)
         };
     });
+    return { hits, reachable };
 }
 
 /** A page of the gallery: how many messages, and older than which instant. */
@@ -218,5 +268,7 @@ const SEARCH_SELECT = {
     lastReplyAt: true,
     editedAt: true,
     deletedAt: true,
-    createdAt: true
+    createdAt: true,
+    // Whether the row is sealed, so the screen opens it on the device; its bytes are read apart, by `read-sealed`.
+    e2eeEpoch: true
 } as const;

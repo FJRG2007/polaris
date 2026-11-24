@@ -39,7 +39,10 @@ const MODIFIER_KEYS = ["Control", "Alt", "Shift", "Meta"];
 /** The line under the category's title: the phone app's own when the page runs in it. */
 export function AppSettingsIntro({ category }: { category: core.AppSettingCategory }) {
     const t = useTranslations("appSettings");
-    const phone = usePhoneAppSettings() && !useDesktopBridge()?.appSettings;
+    // Both asked on every render: a hook behind `&&` runs only sometimes.
+    const phoneApp = usePhoneAppSettings();
+    const bridge = useDesktopBridge();
+    const phone = phoneApp && !bridge?.appSettings;
     return (
         <p className="text-sm text-muted-foreground">
             {phone && core.phoneHasCategory(category)

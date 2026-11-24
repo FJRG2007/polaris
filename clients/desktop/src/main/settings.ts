@@ -20,7 +20,7 @@ import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { readRelaunchMark, type RelaunchMark } from "@/shared/relaunch";
 import { DEFAULT_LAUNCHER_BINDING } from "@/shared/launcher-hotkey";
 import { AVATAR_SIZES, CORNERS, DEFAULT_LOOK, NAME_MODES, OPACITIES, PEOPLE_MODES, type Opacity, type WidgetLook } from "@/shared/voice-widget";
-import { SEARCH_ENGINE_IDS, type SearchEngine } from "@/shared/launcher";
+import { DEFAULT_SEARCH_ENGINE, SEARCH_ENGINE_IDS, launcherEngineOf, type SearchEngine } from "@/shared/launcher";
 import { CLIPBOARD_KEEP_IDS, DEFAULT_CLIPBOARD_KEEP, clipboardOn, type ClipboardKeep } from "@/shared/clipboard-store";
 
 /** A platform `docker build --platform` takes, or "" for this computer's own. */
@@ -102,7 +102,9 @@ const settingsSchema = z.object({
     // How long the clipboard history keeps a copy.
     launcherClipboardKeep: z.enum(CLIPBOARD_KEEP_IDS).catch(DEFAULT_CLIPBOARD_KEEP),
     // Where a web search from the launcher goes.
-    launcherEngine: z.enum(SEARCH_ENGINE_IDS).catch("duckduckgo")
+    launcherEngine: z.enum(SEARCH_ENGINE_IDS).catch(DEFAULT_SEARCH_ENGINE),
+    // Whether `launcherEngine` is somebody's own choice (see `launcherEngineOf`).
+    launcherEngineChosen: z.boolean().catch(false)
 });
 
 type Settings = z.infer<typeof settingsSchema>;
@@ -133,7 +135,8 @@ const EMPTY: Settings = {
     launcherClipboard: true,
     launcherClipboardChosen: false,
     launcherClipboardKeep: DEFAULT_CLIPBOARD_KEEP,
-    launcherEngine: "duckduckgo"
+    launcherEngine: DEFAULT_SEARCH_ENGINE,
+    launcherEngineChosen: false
 };
 
 /** What a missing or unreadable file comes to; `@polaris/core/app-settings` lists the same. */
@@ -145,7 +148,11 @@ function file(): string {
 
 /** A stored value that nobody chose gives way to today's default. */
 function withDefaults(settings: Settings): Settings {
-    return { ...settings, launcherClipboard: clipboardOn(settings.launcherClipboard, settings.launcherClipboardChosen) };
+    return {
+        ...settings,
+        launcherClipboard: clipboardOn(settings.launcherClipboard, settings.launcherClipboardChosen),
+        launcherEngine: launcherEngineOf(settings.launcherEngine, settings.launcherEngineChosen)
+    };
 }
 
 function load(): Settings {
@@ -355,5 +362,5 @@ export function launcherEngine(): SearchEngine {
 }
 
 export function rememberLauncherEngine(engine: SearchEngine): void {
-    save({ ...load(), launcherEngine: engine });
+    save({ ...load(), launcherEngine: engine, launcherEngineChosen: true });
 }
