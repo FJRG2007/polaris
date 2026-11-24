@@ -26,7 +26,7 @@ vi.mock("@/components/confirm-dialog", () => ({ useConfirm: () => [async () => f
 const { AddonPage } = await import("@/app/(app)/account/addons/addons-view");
 const { resetAddonsCache } = await import("@/lib/device-addons-client");
 
-const raw = JSON.parse(readFileSync(join(process.cwd(), "../../../device-addons/hercules-stream100/manifest.json"), "utf8")) as Record<string, unknown>;
+const raw = JSON.parse(readFileSync(join(process.cwd(), "../../../clients/device-addons/hercules-stream100/manifest.json"), "utf8")) as Record<string, unknown>;
 const manifest = readAddonManifest(raw)!;
 
 function open(rawManifest: unknown) {
