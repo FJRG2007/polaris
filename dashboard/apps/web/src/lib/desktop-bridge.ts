@@ -402,14 +402,138 @@ export interface DesktopAppSettings {
     clearClipboard(): Promise<void>;
     /** Start the app again, for a setting that applies then. */
     relaunch(): Promise<void>;
-    /** Open the app's own page at its hosts, the only place they are changed. */
+    /** Open where the hosts are managed: this page's Hosts when it said it draws
+     *  them, else the app's own hosts window. */
     manageHosts(): Promise<void>;
-    /** Say this page draws the settings, so the tray and menus open them here. */
-    announce(): Promise<void>;
+    /** Say this page draws the settings, so the tray and menus open them here,
+     *  and which of `DESKTOP_SETTINGS_FEATURES` it draws as well. An app older
+     *  than hosts ignores the argument. */
+    announce(features?: readonly DesktopSettingsFeature[]): Promise<void>;
+    /** The hosts the app keeps, managed here. Absent from an app older than that,
+     *  which manages them in its own window (`manageHosts`). */
+    hosts?: DesktopHosts;
     /** Hear that a value changed anywhere. Answers the way to stop. */
     onChange(listener: () => void): () => void;
     /** Hear the app asking to show a category. Answers the way to stop. */
     onOpen(listener: (category: string) => void): () => void;
+}
+
+/** What a page that draws the settings can say it draws besides them. */
+export const DESKTOP_SETTINGS_FEATURES = ["hosts"] as const;
+
+export type DesktopSettingsFeature = (typeof DESKTOP_SETTINGS_FEATURES)[number];
+
+/**
+ * The hosts the desktop app keeps, as `desktop/src/shared/bridge.ts` names them.
+ * Every address is checked by the app with the same schema and probe as its own
+ * hosts window; every answer is read here with the `readDesktopHost*` readers.
+ */
+export interface DesktopHosts {
+    list(): Promise<unknown>;
+    /** Whether a typed address is a Polaris, asked while it is typed. */
+    check(address: string): Promise<unknown>;
+    /** Keep a host after checking it; the windows stay where they are. */
+    add(address: string, name: string): Promise<unknown>;
+    /** Open a listed host in the windows. */
+    switchTo(origin: string): Promise<unknown>;
+    /** Change a listed host's address and name together. */
+    edit(origin: string, address: string, name: string): Promise<unknown>;
+    /** Take a host off the list; removing the one in use closes its windows. */
+    remove(origin: string): Promise<unknown>;
+    status(origin: string): Promise<unknown>;
+    /** The list as a `polaris://hosts` link, for a QR another device scans. */
+    link(): Promise<unknown>;
+    /** Put the list on the clipboard as a code. */
+    copy(): Promise<unknown>;
+    /** Write the list to a file somebody picks. */
+    exportFile(): Promise<unknown>;
+    /** Take in a list from a file somebody picks. */
+    importFile(): Promise<unknown>;
+    /** Take in a list from a pasted or scanned code. */
+    importText(text: string): Promise<unknown>;
+}
+
+const desktopHostRowSchema = z.object({
+    origin: z.string().url().max(2048),
+    name: z.string().max(200).nullable(),
+    host: z.string().max(2048),
+    active: z.boolean()
+});
+
+const desktopHostsSchema = z.object({
+    servers: z.array(desktopHostRowSchema).max(100),
+    error: z.string().max(2000).nullable()
+});
+
+export type DesktopHostRow = z.infer<typeof desktopHostRowSchema>;
+export type DesktopHostsSnapshot = z.infer<typeof desktopHostsSchema>;
+
+/** The hosts the app answered, or null for an answer that is not one. */
+export function readDesktopHosts(raw: unknown): DesktopHostsSnapshot | null {
+    const parsed = desktopHostsSchema.safeParse(raw);
+    return parsed.success ? parsed.data : null;
+}
+
+const desktopOutcomeSchema = z.discriminatedUnion("ok", [
+    z.object({ ok: z.literal(true) }),
+    z.object({ ok: z.literal(false), error: z.string().max(2000) })
+]);
+
+/** A change the app made or refused; anything unreadable is a refusal with no words. */
+export function readDesktopOutcome(raw: unknown): DesktopOutcome {
+    const parsed = desktopOutcomeSchema.safeParse(raw);
+    return parsed.success ? parsed.data : { ok: false, error: "" };
+}
+
+const desktopAddressCheckSchema = z.object({ ok: z.boolean(), message: z.string().max(2000).nullable() });
+
+/** What the app found about a typed address; null message means a newer address replaced it. */
+export type DesktopAddressCheck = z.infer<typeof desktopAddressCheckSchema>;
+
+export function readDesktopAddressCheck(raw: unknown): DesktopAddressCheck {
+    const parsed = desktopAddressCheckSchema.safeParse(raw);
+    return parsed.success ? parsed.data : { ok: false, message: null };
+}
+
+const desktopHostStatusSchema = z.enum(["online", "offline", "unknown"]);
+
+/** How a listed host answered just now; "unknown" when not asked or unreadable. */
+export type DesktopHostStatus = z.infer<typeof desktopHostStatusSchema>;
+
+export function readDesktopHostStatus(raw: unknown): DesktopHostStatus {
+    const parsed = desktopHostStatusSchema.safeParse(raw);
+    return parsed.success ? parsed.data : "unknown";
+}
+
+const desktopHostImportSchema = z.discriminatedUnion("ok", [
+    z.object({
+        ok: z.literal(true),
+        added: z.number().int().min(0),
+        named: z.number().int().min(0),
+        skipped: z.number().int().min(0)
+    }),
+    z.object({ ok: z.literal(false), error: z.string().max(2000).nullable() })
+]);
+
+/** What taking in or writing out a list did. An error of null means it was cancelled. */
+export type DesktopHostImport = z.infer<typeof desktopHostImportSchema>;
+
+export function readDesktopHostImport(raw: unknown): DesktopHostImport {
+    const parsed = desktopHostImportSchema.safeParse(raw);
+    return parsed.success ? parsed.data : { ok: false, error: "" };
+}
+
+const desktopHostCopySchema = z.object({ ok: z.boolean(), count: z.number().int().min(0) });
+
+export function readDesktopHostCopy(raw: unknown): z.infer<typeof desktopHostCopySchema> {
+    const parsed = desktopHostCopySchema.safeParse(raw);
+    return parsed.success ? parsed.data : { ok: false, count: 0 };
+}
+
+/** The `polaris://hosts` link the app made, or null for anything else. */
+export function readDesktopHostsLink(raw: unknown): string | null {
+    const parsed = z.string().max(65536).startsWith("polaris://").safeParse(raw);
+    return parsed.success ? parsed.data : null;
 }
 
 const desktopRelaunchSchema = z.object({

@@ -20,13 +20,6 @@ const bridge: PolarisLocal = {
         submit: (address, name) => ipcRenderer.invoke(CHANNELS.connectSubmit, { address, name: name ?? "" }),
         check: (address) => ipcRenderer.invoke(CHANNELS.connectCheck, address),
         switchTo: (origin) => ipcRenderer.invoke(CHANNELS.connectSwitch, origin),
-        rename: (origin, name) => ipcRenderer.invoke(CHANNELS.connectRename, { origin, name }),
-        edit: (origin, address, name) => ipcRenderer.invoke(CHANNELS.connectEdit, { origin, address, name }),
-        remove: (origin) => ipcRenderer.invoke(CHANNELS.connectRemove, origin),
-        copyHosts: () => ipcRenderer.invoke(CHANNELS.connectHostsCopy),
-        exportHostsFile: () => ipcRenderer.invoke(CHANNELS.connectHostsExport),
-        importHostsFile: () => ipcRenderer.invoke(CHANNELS.connectHostsOpen),
-        importHosts: (text) => ipcRenderer.invoke(CHANNELS.connectHostsImport, text),
         close: () => ipcRenderer.invoke(CHANNELS.connectClose),
         onShown: (listener) => {
             const heard = () => listener();

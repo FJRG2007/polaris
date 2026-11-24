@@ -32,16 +32,7 @@
             <section id="servers-page">
                 <div class="section-head">
                     <p class="section-title">Your hosts</p>
-                    <div class="acts">
-                        <button id="hosts-receive" class="icon" type="button" aria-label="Import hosts from another device" title="Import hosts from another device">
-                            <span data-icon="import"></span>
-                        </button>
-                        <button id="hosts-send" class="icon" type="button" aria-label="Export hosts to another device" title="Export hosts to another device" data-needs-hosts>
-                            <span data-icon="export"></span>
-                        </button>
-                    </div>
                 </div>
-                <p id="transfer-note" class="hint transfer-note" role="status" aria-live="polite" hidden></p>
                 <ul id="server-list" class="server-list" aria-label="Your hosts" hidden></ul>
                 <button id="show-add" class="ghost with-icon" type="button" hidden><span data-icon="plus"></span>Add a host</button>
                 <form id="form" novalidate>
@@ -73,51 +64,6 @@
             </section>
         </main>
         </div>
-        <dialog id="send-dialog" class="wide" aria-labelledby="send-title">
-            <p id="send-title" class="name">Export your hosts</p>
-            <p class="hint">On the other device, open Polaris and choose Import hosts. Only addresses and names travel, never a sign-in.</p>
-            <svg id="qr-code" class="qr" role="img" aria-label="QR code of your hosts"></svg>
-            <p id="qr-too-long" class="banner" hidden>Too many hosts for one QR code. Copy the code or save a file instead.</p>
-            <p class="divider"><span>or</span></p>
-            <div class="alts">
-                <button id="hosts-copy" type="button"><span data-icon="copy"></span>Copy code</button>
-                <button id="hosts-export" type="button"><span data-icon="save"></span>Save as file</button>
-            </div>
-            <p id="send-note" class="hint" role="status" aria-live="polite" hidden></p>
-            <div class="row end">
-                <button id="send-close" class="primary" type="button">Done</button>
-            </div>
-        </dialog>
-        <dialog id="receive-dialog" class="wide" aria-labelledby="receive-title">
-            <p id="receive-title" class="name">Import hosts</p>
-            <div id="receive-scan">
-                <p id="scan-note" class="hint" role="status" aria-live="polite">Hold the other device's QR code up to the camera.</p>
-                <video id="scan-video" class="scan" muted playsinline></video>
-            </div>
-            <div id="receive-paste" hidden>
-                <p class="hint">Paste the code from Copy code on the other device.</p>
-                <textarea id="paste-text" rows="4" spellcheck="false" placeholder="polaris-hosts:..." aria-label="Code of hosts"></textarea>
-                <p id="paste-error" class="error" role="alert" hidden></p>
-            </div>
-            <p class="divider"><span>or</span></p>
-            <div class="alts">
-                <button id="receive-mode" type="button"><span data-icon="paste"></span><span id="receive-mode-label">Paste a code</span></button>
-                <button id="hosts-import" type="button"><span data-icon="open"></span>Open a file</button>
-            </div>
-            <div class="row end">
-                <button id="receive-cancel" class="ghost" type="button">Cancel</button>
-                <button id="paste-confirm" class="primary" type="button" aria-disabled="true" hidden>Import</button>
-            </div>
-        </dialog>
-        <dialog id="confirm-remove" aria-labelledby="remove-title" aria-describedby="remove-body">
-            <p id="remove-title" class="name"></p>
-            <p id="remove-body" class="hint">It only leaves this list. The host and your account stay as they are.</p>
-            <div class="row end">
-                <button id="remove-cancel" class="ghost" type="button">Cancel</button>
-                <!-- enigma: a confirmation button, whose whole job is to be read. -->
-                <button id="remove-confirm" class="danger" type="button">Remove</button>
-            </div>
-        </dialog>
         <script src="connect.js"></script>
     </body>
 </html>

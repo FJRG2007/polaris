@@ -131,7 +131,7 @@ describe("the app's settings screen", () => {
         install(bridge);
         await draw("hosts");
         expect(screen.getByText("Home")).toBeTruthy();
-        expect(screen.getByText("Open now")).toBeTruthy();
+        expect(screen.getByText("In use")).toBeTruthy();
         await act(async () => screen.getByRole("button", { name: "Manage hosts" }).click());
         expect(bridge.appSettings.manageHosts).toHaveBeenCalled();
     });

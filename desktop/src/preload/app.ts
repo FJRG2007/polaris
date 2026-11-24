@@ -124,7 +124,21 @@ const bridge: PolarisDesktop = {
         clearClipboard: () => ipcRenderer.invoke(CHANNELS.appSettingsClearClipboard),
         relaunch: () => ipcRenderer.invoke(CHANNELS.appSettingsRelaunch),
         manageHosts: () => ipcRenderer.invoke(CHANNELS.appSettingsHosts),
-        announce: () => ipcRenderer.invoke(CHANNELS.appSettingsAnnounce),
+        announce: (features) => ipcRenderer.invoke(CHANNELS.appSettingsAnnounce, features ?? []),
+        hosts: {
+            list: () => ipcRenderer.invoke(CHANNELS.hostsList),
+            check: (address) => ipcRenderer.invoke(CHANNELS.hostsCheck, address),
+            add: (address, name) => ipcRenderer.invoke(CHANNELS.hostsAdd, { address, name }),
+            switchTo: (origin) => ipcRenderer.invoke(CHANNELS.hostsSwitch, origin),
+            edit: (origin, address, name) => ipcRenderer.invoke(CHANNELS.hostsEdit, { origin, address, name }),
+            remove: (origin) => ipcRenderer.invoke(CHANNELS.hostsRemove, origin),
+            status: (origin) => ipcRenderer.invoke(CHANNELS.hostsStatus, origin),
+            link: () => ipcRenderer.invoke(CHANNELS.hostsLink),
+            copy: () => ipcRenderer.invoke(CHANNELS.hostsCopy),
+            exportFile: () => ipcRenderer.invoke(CHANNELS.hostsExport),
+            importFile: () => ipcRenderer.invoke(CHANNELS.hostsOpen),
+            importText: (text) => ipcRenderer.invoke(CHANNELS.hostsImport, text)
+        },
         onChange: (listener) => {
             const heard = () => listener();
             ipcRenderer.on(CHANNELS.appSettingsChanged, heard);

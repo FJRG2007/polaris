@@ -31,7 +31,8 @@ export function DesktopAppSettingsListener() {
             const category = readAppSettingCategory(raw);
             if (category) router.push(`/account/app/${category}`);
         });
-        void settings.announce().catch(() => undefined);
+        // Hosts are drawn here only by an app that manages them through the page.
+        void settings.announce(settings.hosts ? ["hosts"] : []).catch(() => undefined);
         keepCategoryPages(APP_SETTING_CATEGORIES, [DEVICE_ADDONS_PATH]);
         return stop;
     }, [settings, router]);

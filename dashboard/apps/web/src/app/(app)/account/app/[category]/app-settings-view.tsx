@@ -20,6 +20,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import * as core from "@polaris/core/app-settings";
 import { useDesktopBridge, usePhoneAppSettings } from "@/components/desktop-app";
+import { HostsManager } from "@/components/this-app/hosts-manager";
 import { phoneAppSettings, type PhoneAppSettings } from "@/lib/mobile-bridge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -76,6 +77,8 @@ export function AppSettingsView({ category }: { category: core.AppSettingCategor
             </Card>
         );
     }
+    // An app that manages its hosts here draws them from its own list, at once.
+    if (category === "hosts" && bridge.appSettings.hosts) return <HostsManager hosts={bridge.appSettings.hosts} />;
     return <InApp bridge={bridge} settings={bridge.appSettings} category={category} />;
 }
 

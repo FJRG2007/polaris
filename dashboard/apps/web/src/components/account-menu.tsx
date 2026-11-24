@@ -428,6 +428,14 @@ export function AccountMenu({
         setWriting(true);
     }
 
+    // An app that manages its hosts in Settings > This app opens them there;
+    // an older one has only its own hosts window.
+    const openHosts = desktop?.appSettings?.hosts
+        ? () => router.push("/account/app/hosts")
+        : desktop?.openServers
+          ? () => void desktop.openServers?.()
+          : undefined;
+
     // Read after mount: the phone app's bridge only exists in the browser.
     const [appSettings, setAppSettings] = useState(false);
     useEffect(() => setAppSettings(phoneApp.hasAppSettings()), []);
@@ -672,8 +680,8 @@ export function AccountMenu({
                             {t("account.friends")}
                         </Link>
                     </DropdownMenuItem>
-                    {desktop?.openServers ? (
-                        <DropdownMenuItem onSelect={() => void desktop.openServers?.()}>
+                    {openHosts ? (
+                        <DropdownMenuItem onSelect={openHosts}>
                             <AppWindow className="size-4" />
                             {t("account.servers")}
                         </DropdownMenuItem>
@@ -700,7 +708,7 @@ export function AccountMenu({
                 status={shownStatus}
                 onStatus={editStatus}
                 onTours={openTourList}
-                onServers={desktop?.openServers ? () => void desktop.openServers?.() : undefined}
+                onServers={openHosts}
                 onAppSettings={appSettings ? openAppSettings : undefined}
                 onSignOut={() => void onSignOut()}
                 gate={gate}

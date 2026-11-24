@@ -12,6 +12,7 @@ import { SERVERS_MAX, type SavedServer } from "@/shared/servers";
 import {
     encodeHostList,
     hostListFile,
+    hostListLink,
     mergeHostLists,
     readHostList
 } from "../../../dashboard/packages/core/src/host-list";
@@ -22,6 +23,11 @@ const FILE_MAX = 64 * 1024;
 export interface HostStore {
     readonly saved: () => SavedServer[];
     readonly keep: (servers: readonly SavedServer[]) => void;
+}
+
+/** The list as a `polaris://hosts` link: what a QR holds, so a phone camera opens the app on it. */
+export function hostsLink(store: HostStore): string {
+    return hostListLink(store.saved());
 }
 
 /** The list as a code, put on the clipboard. */

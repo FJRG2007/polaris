@@ -1,28 +1,24 @@
 /**
- * The hosts window: the first run, Hosts > Manage in Settings > This app, and
- * where a window that could not load comes back to with the reason. The app's
- * own settings are not here: they are the host's Settings > This app, drawn
- * in the Polaris window (`openSettings`), offline included.
+ * The hosts window: only what reaches a Polaris where no Polaris page can be
+ * shown - the first run, before any host, and a host that cannot be opened
+ * (out of reach with nothing kept, or older than this app), with the reason.
+ * Managing the hosts - naming, editing, removing, export and import - is the
+ * host's Settings > This app > Hosts, in the Polaris window (`manageHosts`).
  *
- * Every server this app has opened is a row: pressing Open puts it in front,
- * the pencil names it and the bin takes it off the list. Below, the form adds
- * another. The address is checked as it is typed against the same schema the
- * main process keeps it with. An empty field is incomplete rather than wrong,
- * so it only disables the button; the reason something is not an address
- * appears once there is text. A well-formed address is then asked whether it
- * is a Polaris, 400 ms after typing pauses, and Open stays off until it is.
- * An address already on the list says so at once and is never asked about:
- * its row is the way to open it. The name is optional and kept with the
+ * Every server this app has opened is a row: pressing one opens it. Below, the
+ * form adds another. The address is checked as it is typed against the same
+ * schema the main process keeps it with. An empty field is incomplete rather
+ * than wrong, so it only disables the button; the reason something is not an
+ * address appears once there is text. A well-formed address is then asked
+ * whether it is a Polaris, 400 ms after typing pauses, and Open stays off until
+ * it is. An address already on the list says so at once and is never asked
+ * about: its row is the way to open it. The name is optional and kept with the
  * address, so the row reads "Home" instead of the host.
  */
 
 import { available, byId, dressMark, say } from "./dom";
 import { serverAddressSchema } from "@/shared/server-address";
 import { describeServer, normalizeServerName, SERVER_NAME_MAX, type ServerRow } from "@/shared/servers";
-import { HOST_LIST_PREFIX, hostListLink } from "../../../dashboard/packages/core/src/host-list";
-import { encodeQr, qrSvgPath } from "../../../dashboard/packages/core/src/qr";
-import type { HostImport } from "@/shared/bridge";
-import jsQR from "jsqr";
 import { HOST_UPDATE_PATH, type LocalSettingsState } from "@/shared/settings-route";
 
 dressMark(window.polarisLocal.season);
@@ -37,8 +33,6 @@ const list = byId<HTMLUListElement>("server-list");
 const title = byId<HTMLHeadingElement>("title");
 const showAdd = byId<HTMLButtonElement>("show-add");
 const hideAdd = byId<HTMLButtonElement>("hide-add");
-const removeDialog = byId<HTMLDialogElement>("confirm-remove");
-const removeTitle = byId<HTMLParagraphElement>("remove-title");
 const hint = note.textContent ?? "";
 
 let busy = false;
@@ -46,7 +40,6 @@ let busy = false;
 let known: number | null = null;
 /** The hosts listed, so a typed address already among them is caught as it is typed. */
 let rows: readonly ServerRow[] = [];
-let removing: ServerRow | null = null;
 
 /** How long the field waits after the last keystroke before it asks. */
 const ASK_AFTER_MS = 400;
@@ -56,7 +49,7 @@ let confirmed: string | null = null;
 let asked = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
-/** The address when it can be opened: well-formed, and found to be a Polaris. */
+/** The address when it can be opened: well-formed, not listed, and found to be a Polaris. */
 function check(): string | null {
     const text = input.value;
     const parsed = serverAddressSchema.safeParse(text);
@@ -70,20 +63,12 @@ function check(): string | null {
     }
     const listed = rows.find((row) => row.origin === parsed.data);
     if (listed) {
-        // Typed again with another name, it is a rename: the host is already
-        // there, so the form saves the name instead of refusing it.
-        const typedName = normalizeServerName(nameInput.value);
-        const renaming = typedName !== null && typedName !== listed.name;
-        input.setAttribute("aria-invalid", String(!renaming));
-        note.textContent = renaming
-            ? `Already on your list as ${describeServer(listed)}. Save to rename it.`
-            : `Already on your list as ${describeServer(listed)}.`;
-        note.className = renaming ? "hint" : "error";
-        if (!busy) submit.textContent = renaming ? "Save name" : "Open";
-        available(submit, renaming && !busy);
-        return renaming ? parsed.data : null;
+        input.setAttribute("aria-invalid", "true");
+        note.textContent = `Already on your list as ${describeServer(listed)}.`;
+        note.className = "error";
+        available(submit, false);
+        return null;
     }
-    if (!busy) submit.textContent = "Open";
     const found = confirmed === parsed.data;
     available(submit, found && !busy);
     return found ? parsed.data : null;
@@ -136,37 +121,14 @@ function icon(...paths: string[]): SVGSVGElement {
     return svg;
 }
 
-const PENCIL = ["M12 20h9", "M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"];
-const BIN = ["M3 6h18", "M8 6V4h8v2", "M19 6l-1 14H6L5 6"];
-
 /** The icons the page names with `data-icon`, drawn once it loads. */
 const ICONS: Record<string, string[]> = {
-    send: ["M14.5 21.7a.5.5 0 0 0 .9 0l6.5-19a.5.5 0 0 0-.6-.6l-19 6.5a.5.5 0 0 0 0 .9l7.9 3.2a2 2 0 0 1 1.1 1.1Z", "m21.9 2.1-11 11"],
-    receive: ["M12 3v12", "m7 10 5 5 5-5", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"],
-    copy: ["M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2Z", "M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"],
-    save: ["M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z", "M14 2v4a2 2 0 0 0 2 2h4", "M12 18v-6", "m9 15 3 3 3-3"],
-    open: ["M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z", "M14 2v4a2 2 0 0 0 2 2h4", "M12 12v6", "m15 15-3-3-3 3"],
-    paste: ["M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z", "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"],
-    scan: ["M3 7V5a2 2 0 0 1 2-2h2", "M17 3h2a2 2 0 0 1 2 2v2", "M21 17v2a2 2 0 0 1-2 2h-2", "M7 21H5a2 2 0 0 1-2-2v-2", "M7 12h10"],
-    plus: ["M12 5v14", "M5 12h14"],
-    import: ["M12 3v12", "m7 10 5 5 5-5", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"],
-    export: ["M12 15V3", "m7 8 5-5 5 5", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"]
+    plus: ["M12 5v14", "M5 12h14"]
 };
 
 for (const slot of document.querySelectorAll<HTMLElement>("[data-icon]")) {
     const paths = ICONS[slot.dataset.icon ?? ""];
     if (paths) slot.replaceChildren(icon(...paths));
-}
-
-function iconButton(label: string, paths: string[], onPress: () => void): HTMLButtonElement {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "icon";
-    button.setAttribute("aria-label", label);
-    button.title = label;
-    button.append(icon(...paths));
-    button.addEventListener("click", onPress);
-    return button;
 }
 
 function textButton(label: string, onPress: () => void, primary = false): HTMLButtonElement {
@@ -178,14 +140,15 @@ function textButton(label: string, onPress: () => void, primary = false): HTMLBu
     return button;
 }
 
-/** Run one request from a row, showing what it says when it refuses. */
-async function act(run: () => Promise<{ ok: boolean; error?: string; }>): Promise<void> {
+/** Open a listed host, showing what it says when it cannot. */
+async function openRow(server: ServerRow, where: HTMLElement): Promise<void> {
     if (busy) return;
     busy = true;
     say(failure, null);
+    where.textContent = "Checking...";
     try {
-        const outcome = await run();
-        if (!outcome.ok) say(failure, outcome.error ?? "Something went wrong. Try again.");
+        const outcome = await window.polarisLocal.connect.switchTo(server.origin);
+        if (!outcome.ok) say(failure, outcome.error);
     } catch {
         say(failure, "Something went wrong. Try again.");
     } finally {
@@ -195,7 +158,6 @@ async function act(run: () => Promise<{ ok: boolean; error?: string; }>): Promis
 }
 
 function viewRow(server: ServerRow, row: HTMLLIElement): void {
-    row.classList.remove("editing");
     const label = describeServer(server);
     const open = document.createElement("button");
     open.type = "button";
@@ -218,121 +180,9 @@ function viewRow(server: ServerRow, row: HTMLLIElement): void {
         badge.textContent = "In use";
         open.append(badge);
     }
-    open.addEventListener("click", () => {
-        if (server.active) return;
-        where.textContent = "Checking...";
-        void act(() => window.polarisLocal.connect.switchTo(server.origin));
-    });
-    const acts = document.createElement("div");
-    acts.className = "acts";
-    acts.append(
-        iconButton(`Edit ${label}`, PENCIL, () => editRow(server, row)),
-        iconButton(`Remove ${label}`, BIN, () => askRemove(server))
-    );
-    row.replaceChildren(open, acts);
-}
-
-/** What an edited row would keep, or why it cannot: the same address schema and
- *  name normalizer as the form that adds a host. Null when there is nothing to save. */
-function checkEdit(server: ServerRow, address: string, typedName: string): { origin: string; } | { problem: string | null; } {
-    const parsed = serverAddressSchema.safeParse(address);
-    if (!parsed.success) return { problem: address.trim() ? (parsed.error.issues[0]?.message ?? null) : null };
-    const other = rows.find((row) => row.origin === parsed.data && row.origin !== server.origin);
-    if (other) return { problem: `Already on your list as ${describeServer(other)}.` };
-    const unchanged = parsed.data === server.origin && normalizeServerName(typedName) === server.name;
-    return unchanged ? { problem: null } : { origin: parsed.data };
-}
-
-/** The row as its address and name: Enter or Save keeps them, Escape or Cancel leaves it. */
-function editRow(server: ServerRow, row: HTMLLIElement): void {
-    const editor = document.createElement("form");
-    editor.className = "row-edit";
-    editor.noValidate = true;
-    const field = (text: string, input: HTMLInputElement) => {
-        const label = document.createElement("label");
-        label.className = "field-label";
-        const caption = document.createElement("span");
-        caption.textContent = text;
-        label.append(caption, input);
-        return label;
-    };
-    const address = document.createElement("input");
-    address.type = "url";
-    address.inputMode = "url";
-    address.spellcheck = false;
-    address.value = server.origin;
-    address.placeholder = "https://polaris.example.com";
-    const name = document.createElement("input");
-    name.type = "text";
-    name.spellcheck = false;
-    name.value = server.name ?? "";
-    name.placeholder = server.host;
-    name.maxLength = SERVER_NAME_MAX;
-    const message = document.createElement("p");
-    message.className = "hint";
-    message.setAttribute("aria-live", "polite");
-    const quiet = "A new address is checked before it is kept.";
-    message.textContent = quiet;
-    const save = textButton("Save", () => editor.requestSubmit(), true);
-    save.type = "submit";
-    const cancel = textButton("Cancel", () => viewRow(server, row));
-    cancel.classList.add("ghost");
-    const buttons = document.createElement("div");
-    buttons.className = "row end";
-    buttons.append(cancel, save);
-    let saving = false;
-    const update = () => {
-        const verdict = checkEdit(server, address.value, name.value);
-        const problem = "problem" in verdict ? verdict.problem : null;
-        address.setAttribute("aria-invalid", String(Boolean(problem)));
-        message.textContent = problem ?? quiet;
-        message.className = problem ? "error" : "hint";
-        available(save, "origin" in verdict && !saving);
-        return verdict;
-    };
-    address.addEventListener("input", update);
-    name.addEventListener("input", update);
-    editor.addEventListener("keydown", (event) => {
-        if (event.key !== "Escape") return;
-        // The row's own Escape, not the sheet's.
-        event.preventDefault();
-        viewRow(server, row);
-    });
-    editor.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const verdict = update();
-        if (saving || !("origin" in verdict)) return;
-        saving = true;
-        available(save, false);
-        if (verdict.origin !== server.origin) message.textContent = `Checking ${new URL(verdict.origin).host}...`;
-        void window.polarisLocal.connect
-            .edit(server.origin, address.value, normalizeServerName(name.value) ?? "")
-            .catch(() => ({ ok: false, error: "Something went wrong. Try again." }))
-            .then(async (outcome) => {
-                saving = false;
-                if (!outcome.ok) {
-                    update();
-                    message.textContent = outcome.error ?? "Something went wrong. Try again.";
-                    message.className = "error";
-                    return;
-                }
-                await refresh();
-            });
-    });
-    editor.append(field("Address *", address), field("Name", name), message, buttons);
-    row.classList.add("editing");
-    row.replaceChildren(editor);
-    available(save, false);
-    name.focus();
-    name.select();
-}
-
-/** Asked first and named, as in the extension. Cancel has the focus. */
-function askRemove(server: ServerRow): void {
-    removing = server;
-    removeTitle.textContent = `Remove ${describeServer(server)}?`;
-    removeDialog.showModal();
-    byId<HTMLButtonElement>("remove-cancel").focus();
+    // The host in use is opened again too: here it is the one that did not open.
+    open.addEventListener("click", () => void openRow(server, where));
+    row.replaceChildren(open);
 }
 
 /** With a list the field is one press away; with none, it is the whole screen. */
@@ -348,10 +198,6 @@ function draw(servers: readonly ServerRow[]): void {
     known = servers.length;
     rows = servers;
     list.hidden = servers.length === 0;
-    // Exporting needs something to export; taking a list in never does.
-    for (const button of document.querySelectorAll<HTMLButtonElement>("[data-needs-hosts]")) {
-        button.hidden = servers.length === 0;
-    }
     document.body.classList.toggle("first-run", servers.length === 0);
     title.textContent = servers.length === 0 ? "Open your Polaris" : "Polaris";
     if (first || servers.length === 0) showForm(servers.length === 0);
@@ -372,17 +218,20 @@ function draw(servers: readonly ServerRow[]): void {
 async function refresh(opened = false): Promise<void> {
     const state = await window.polarisLocal.connect.state().catch(() => null);
     draw(state?.servers ?? []);
-    if (opened) explain(state?.settings ?? null);
+    if (opened) {
+        say(failure, state?.error ?? null);
+        explain(state?.settings ?? null);
+    }
 }
 
-// ---- Why this window, when Settings... was asked for ----
+// ---- Why this window, in place of the host's own screen ----
 
 const reason = byId<HTMLElement>("reason");
 const reasonText = byId<HTMLParagraphElement>("reason-text");
 const reasonActs = byId<HTMLElement>("reason-acts");
 
 /**
- * The line over the hosts when Settings... found a Polaris older than its
+ * The line over the hosts when the host in use is older than this app's
  * Settings > This app: what the reader can do about it, with the update when
  * the host lets them run it. Nothing otherwise.
  */
@@ -391,11 +240,11 @@ function explain(state: LocalSettingsState | null): void {
     reasonActs.replaceChildren();
     if (state?.reason !== "outdated") return;
     if (state.canUpdate === true) {
-        reasonText.textContent = "This Polaris is older than this app, so its settings are not in Settings yet. Update Polaris to have them there.";
+        reasonText.textContent = "This Polaris is older than this app, so this app's settings and hosts are not in its Settings yet. Update Polaris to have them there.";
         reasonActs.replaceChildren(textButton("Update Polaris", () => void openUpdate(), true));
     } else {
         // Only an administrator can update it; nobody else is offered a page that would refuse them.
-        reasonText.textContent = "This Polaris is older than this app, so its settings are not in Settings yet. An administrator has to update it.";
+        reasonText.textContent = "This Polaris is older than this app, so this app's settings and hosts are not in its Settings yet. An administrator has to update it.";
     }
 }
 
@@ -416,202 +265,15 @@ if (new URLSearchParams(location.search).has("sheet")) {
     cross.hidden = false;
     cross.addEventListener("click", closeSheet);
     document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && !event.defaultPrevented && !document.querySelector("dialog[open]")) closeSheet();
+        if (event.key === "Escape" && !event.defaultPrevented) closeSheet();
     });
     document.body.addEventListener("mousedown", (event) => {
         if (event.target === document.body) closeSheet();
     });
 }
 
-// ---- Moving the list to and from another device ----
-
-const transferNote = byId<HTMLParagraphElement>("transfer-note");
-const sendDialog = byId<HTMLDialogElement>("send-dialog");
-const sendNote = byId<HTMLParagraphElement>("send-note");
-const receiveDialog = byId<HTMLDialogElement>("receive-dialog");
-const receiveScan = byId<HTMLElement>("receive-scan");
-const receivePaste = byId<HTMLElement>("receive-paste");
-const receiveModeLabel = byId<HTMLSpanElement>("receive-mode-label");
-const receiveModeIcon = byId<HTMLButtonElement>("receive-mode").querySelector<HTMLElement>("[data-icon]");
-const scanVideo = byId<HTMLVideoElement>("scan-video");
-const scanNote = byId<HTMLParagraphElement>("scan-note");
-const pasteText = byId<HTMLTextAreaElement>("paste-text");
-const pasteError = byId<HTMLParagraphElement>("paste-error");
-const pasteConfirm = byId<HTMLButtonElement>("paste-confirm");
-
-function plural(count: number, one: string, many: string): string {
-    return `${count} ${count === 1 ? one : many}`;
-}
-
-/** What a list taken in did, in one line; null when it was cancelled. */
-function describeImport(outcome: HostImport): string | null {
-    if (!outcome.ok) return outcome.error;
-    const parts: string[] = [];
-    if (outcome.added) parts.push(`${plural(outcome.added, "host", "hosts")} added`);
-    if (outcome.named) parts.push(`${plural(outcome.named, "host", "hosts")} named`);
-    if (outcome.skipped) parts.push(`${outcome.skipped} left out: the list is full`);
-    return parts.length ? `${parts.join(", ")}.` : "Every host in it was already on your list.";
-}
-
-async function afterImport(outcome: HostImport): Promise<void> {
-    say(transferNote, describeImport(outcome));
-    if (outcome.ok) await refresh();
-}
-
-/** Send: the QR code first, with the code and the file for when a camera is not at hand. */
-function openSend(): void {
-    say(transferNote, null);
-    say(sendNote, null);
-    // The link, not the bare code: a phone camera opens the Polaris app on it.
-    const modules = encodeQr(hostListLink(rows));
-    const svg = byId<HTMLElement>("qr-code") as unknown as SVGSVGElement;
-    byId("qr-too-long").hidden = modules !== null;
-    svg.style.display = modules ? "" : "none";
-    if (modules) {
-        const { path, size } = qrSvgPath(modules);
-        svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
-        const drawn = document.createElementNS(SVG, "path");
-        drawn.setAttribute("d", path);
-        drawn.setAttribute("fill", "#000000");
-        svg.replaceChildren(drawn);
-    }
-    sendDialog.showModal();
-    byId<HTMLButtonElement>("send-close").focus();
-}
-
-let scanStream: MediaStream | null = null;
-let scanFrame = 0;
-
-function stopCamera(): void {
-    cancelAnimationFrame(scanFrame);
-    for (const track of scanStream?.getTracks() ?? []) track.stop();
-    scanStream = null;
-    scanVideo.srcObject = null;
-}
-
-/** Read frames until one holds a list of hosts; anything else is ignored. */
-function readFrames(canvas: HTMLCanvasElement): void {
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    const frame = () => {
-        if (!scanStream || !context) return;
-        if (scanVideo.readyState >= scanVideo.HAVE_CURRENT_DATA && scanVideo.videoWidth > 0) {
-            canvas.width = scanVideo.videoWidth;
-            canvas.height = scanVideo.videoHeight;
-            context.drawImage(scanVideo, 0, 0);
-            const image = context.getImageData(0, 0, canvas.width, canvas.height);
-            const found = jsQR(image.data, image.width, image.height, { inversionAttempts: "dontInvert" });
-            if (found?.data.startsWith(HOST_LIST_PREFIX)) {
-                receiveDialog.close();
-                void window.polarisLocal.connect.importHosts(found.data).then(afterImport, () => undefined);
-                return;
-            }
-            if (found) say(scanNote, "That QR code is not a list of Polaris hosts.");
-        }
-        scanFrame = requestAnimationFrame(frame);
-    };
-    scanFrame = requestAnimationFrame(frame);
-}
-
-async function startCamera(): Promise<void> {
-    say(scanNote, "Hold the other device's QR code up to the camera.");
-    let stream: MediaStream;
-    try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-    } catch {
-        say(scanNote, "Polaris could not use a camera. Paste a code or open a file instead.");
-        return;
-    }
-    // Closed, or switched to pasting, while the camera was being asked for.
-    if (!receiveDialog.open || receiveScan.hidden) {
-        for (const track of stream.getTracks()) track.stop();
-        return;
-    }
-    scanStream = stream;
-    scanVideo.srcObject = stream;
-    await scanVideo.play().catch(() => undefined);
-    readFrames(document.createElement("canvas"));
-}
-
-/** Receive shows one way at a time: the camera, or a field to paste the code in. */
-function receiveMode(pasting: boolean): void {
-    receiveScan.hidden = pasting;
-    receivePaste.hidden = !pasting;
-    pasteConfirm.hidden = !pasting;
-    receiveModeLabel.textContent = pasting ? "Scan a QR code" : "Paste a code";
-    receiveModeIcon?.replaceChildren(icon(...(ICONS[pasting ? "scan" : "paste"] ?? [])));
-    if (pasting) {
-        stopCamera();
-        say(pasteError, null);
-        checkPaste();
-        pasteText.focus();
-    } else void startCamera();
-}
-
-function openReceive(): void {
-    say(transferNote, null);
-    pasteText.value = "";
-    receiveDialog.showModal();
-    receiveMode(false);
-}
-
-function checkPaste(): boolean {
-    const text = pasteText.value.trim();
-    available(pasteConfirm, text !== "");
-    return text !== "";
-}
-
-async function confirmPaste(): Promise<void> {
-    if (!checkPaste()) return;
-    const outcome = await window.polarisLocal.connect.importHosts(pasteText.value).catch(() => null);
-    if (!outcome || !outcome.ok) {
-        say(pasteError, outcome?.error ?? "Something went wrong. Try again.");
-        return;
-    }
-    receiveDialog.close();
-    await afterImport(outcome);
-}
-
-byId("hosts-send").addEventListener("click", openSend);
-byId("send-close").addEventListener("click", () => sendDialog.close());
-byId("hosts-copy").addEventListener("click", () => {
-    void window.polarisLocal.connect.copyHosts().then(
-        (copied) => say(sendNote, copied.ok ? `Code for ${plural(copied.count, "host", "hosts")} copied. Paste it on the other device.` : "Polaris could not copy the code."),
-        () => say(sendNote, "Polaris could not copy the code.")
-    );
-});
-byId("hosts-export").addEventListener("click", () => {
-    say(sendNote, null);
-    void window.polarisLocal.connect.exportHostsFile().then(
-        (outcome) => say(sendNote, outcome.ok ? "Hosts saved. Open the file on the other device." : outcome.error),
-        () => say(sendNote, "Something went wrong. Try again.")
-    );
-});
-byId("hosts-receive").addEventListener("click", openReceive);
-byId("receive-mode").addEventListener("click", () => receiveMode(receivePaste.hidden));
-byId("receive-cancel").addEventListener("click", () => receiveDialog.close());
-receiveDialog.addEventListener("close", stopCamera);
-pasteText.addEventListener("input", () => {
-    say(pasteError, null);
-    checkPaste();
-});
-pasteText.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) void confirmPaste();
-});
-pasteConfirm.addEventListener("click", () => void confirmPaste());
-byId("hosts-import").addEventListener("click", () => {
-    receiveDialog.close();
-    void window.polarisLocal.connect.importHostsFile().then(afterImport, () =>
-        say(transferNote, "Something went wrong. Try again.")
-    );
-});
 showAdd.addEventListener("click", () => showForm(true));
 hideAdd.addEventListener("click", () => showForm(false));
-byId("remove-cancel").addEventListener("click", () => removeDialog.close());
-byId("remove-confirm").addEventListener("click", () => {
-    const server = removing;
-    removeDialog.close();
-    if (server) void act(() => window.polarisLocal.connect.remove(server.origin));
-});
 nameInput.maxLength = SERVER_NAME_MAX;
 input.addEventListener("input", () => {
     say(failure, null);
@@ -619,24 +281,10 @@ input.addEventListener("input", () => {
     ask();
 });
 
-nameInput.addEventListener("input", () => check());
-
 form.addEventListener("submit", (event) => {
     event.preventDefault();
     const address = check();
     if (!address || busy) return;
-    if (rows.some((row) => row.origin === address)) {
-        const name = normalizeServerName(nameInput.value) ?? "";
-        void act(() => window.polarisLocal.connect.rename(address, name)).then(() => {
-            if (failure.hidden) {
-                input.value = "";
-                nameInput.value = "";
-                check();
-                if (known) showForm(false);
-            }
-        });
-        return;
-    }
     busy = true;
     submit.textContent = "Checking...";
     check();

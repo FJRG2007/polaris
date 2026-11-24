@@ -19,6 +19,8 @@ import { describeServer, type ServerRow } from "@/shared/servers";
 
 export interface MenuActions {
     readonly changeServer: () => void;
+    /** Settings > This app > Hosts, where the hosts are added, named and removed. */
+    readonly manageHosts: () => void;
     readonly switchServer: (origin: string) => void;
     readonly back: () => void;
     readonly reload: () => void;
@@ -46,15 +48,19 @@ function switchTo(actions: MenuActions, servers: readonly ServerRow[]): MenuItem
             ? [
                   {
                       label: "Switch to",
-                      submenu: servers.map((server) => ({
-                          label: describeServer(server),
-                          sublabel: server.name ? server.host : undefined,
-                          type: "radio" as const,
-                          checked: server.active,
-                          click: () => {
-                              if (!server.active) actions.switchServer(server.origin);
-                          }
-                      }))
+                      submenu: [
+                          ...servers.map((server) => ({
+                              label: describeServer(server),
+                              sublabel: server.name ? server.host : undefined,
+                              type: "radio" as const,
+                              checked: server.active,
+                              click: () => {
+                                  if (!server.active) actions.switchServer(server.origin);
+                              }
+                          })),
+                          { type: "separator" as const },
+                          { label: "Manage hosts...", click: actions.manageHosts }
+                      ]
                   }
               ]
             : []

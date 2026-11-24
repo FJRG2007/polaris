@@ -122,7 +122,7 @@ describe("the phone app's settings screen", () => {
         await draw("hosts");
         expect(screen.getByText("Home")).toBeTruthy();
         expect(screen.getByText("https://work.example.test")).toBeTruthy();
-        expect(screen.getByText("Open now")).toBeTruthy();
+        expect(screen.getByText("In use")).toBeTruthy();
         // A phone has no windows: the hint names the app's own screen.
         expect(screen.getByText(/on the app's own screen/)).toBeTruthy();
         expect(screen.queryByText(/window/)).toBeNull();
