@@ -2582,6 +2582,73 @@
             "consent": "Version {version} asks for new permissions and waits for your OK.",
             "review": "Review",
             "failed": "Version {version} did not start here, so the one before was put back."
+        },
+        "statusDetail": {
+            "otherProgram": "Another program is using the Stream 100.",
+            "noAccess": "This computer does not let Polaris open the Stream 100 yet.",
+            "unsupported": "The Stream 100 cannot be read on this system yet.",
+            "stopped": "The Stream 100 stopped answering. Trying again.",
+            "unplugged": "Not plugged in.",
+            "herculesApp": "Hercules Stream Control is running the Stream 100, so its knobs follow that app for now.",
+            "herculesDriver": "Polaris can't use the Stream 100 yet: the Hercules software has it. Until then, use Hercules Stream Control.",
+            "noControls": "The Stream 100 is plugged in, but its controls were not found."
+        },
+        "official": {
+            "title": "Install {name}",
+            "intro": "{app} is on this computer. Choose what to do with it first.",
+            "appName": "The official app",
+            "choices": "What to do with the official app",
+            "choice": {
+                "stop": "Stop it and use Polaris",
+                "uninstall": "Uninstall it",
+                "keep": "Keep both"
+            },
+            "choiceHint": {
+                "stop": "{app} closes and stops starting with Windows. It stays installed.",
+                "uninstall": "Removes {app}. Polaris keeps a copy of its settings.",
+                "keep": "Both stay. Only one can use the knobs at a time."
+            },
+            "adminNote": "Taking it out of start-up and uninstalling it may show Windows' administrator prompt.",
+            "permissions": "Polaris will be allowed to",
+            "import": "Brought over from the official app",
+            "importNone": "Nothing to bring over.",
+            "importCounts": "{mapped} work now, {kept} kept for later, {dropped} not carried over.",
+            "page": "Page {number}",
+            "control": {
+                "knob": "Knob {number}",
+                "button": "Button {number}"
+            },
+            "fate": {
+                "mapped": "Works now",
+                "kept": "Kept for later",
+                "dropped": "Not carried over"
+            },
+            "cancel": "Cancel",
+            "failure": {
+                "uninstallerRefused": "Polaris does not recognise that uninstaller, so nothing was changed.",
+                "nothingToUninstall": "The official app is not installed anymore.",
+                "stopProcess": "The official app could not be closed. Close it and try again.",
+                "removeAutostart": "It could not be taken out of start-up. Try again.",
+                "unsigned": "The uninstaller is not signed by Hercules, so it was not run.",
+                "declined": "The administrator prompt was declined, so nothing was changed.",
+                "uninstaller": "The uninstaller did not finish. Try again.",
+                "failed": "That did not work. Try again."
+            },
+            "installed": "{app} is installed on this computer.",
+            "backup": {
+                "stop": "Polaris stopped the official app. You can put it back as it was.",
+                "uninstall": "Polaris uninstalled the official app. You can put its settings back.",
+                "keep": "Polaris kept a copy of the official app's settings."
+            },
+            "launch": "Open Hercules Stream Control",
+            "launchFailed": "Hercules Stream Control could not be opened.",
+            "restoreAction": "Restore the official app",
+            "restore": {
+                "done": "The official app is back as it was.",
+                "settingsOnly": "Only its settings went back: the app itself is not installed.",
+                "declined": "The administrator prompt was declined, so nothing was changed.",
+                "failed": "The official app could not be restored. Try again."
+            }
         }
     }
 }

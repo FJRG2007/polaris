@@ -2582,6 +2582,73 @@
             "consent": "La versión {version} pide permisos nuevos y espera tu OK.",
             "review": "Revisar",
             "failed": "La versión {version} no arrancó aquí; se volvió a la anterior."
+        },
+        "statusDetail": {
+            "otherProgram": "Otro programa está usando el Stream 100.",
+            "noAccess": "Este equipo aún no deja a Polaris abrir el Stream 100.",
+            "unsupported": "El Stream 100 aún no se puede leer en este sistema.",
+            "stopped": "El Stream 100 dejó de responder. Reintentando.",
+            "unplugged": "No está conectado.",
+            "herculesApp": "Hercules Stream Control controla el Stream 100; sus ruedas siguen esa app por ahora.",
+            "herculesDriver": "Polaris aún no puede usar el Stream 100: lo tiene el software de Hercules. Mientras, usa Hercules Stream Control.",
+            "noControls": "El Stream 100 está conectado, pero no se encontraron sus controles."
+        },
+        "official": {
+            "title": "Instalar {name}",
+            "intro": "{app} está en este equipo. Elige qué hacer con ella primero.",
+            "appName": "La app oficial",
+            "choices": "Qué hacer con la app oficial",
+            "choice": {
+                "stop": "Pararla y usar Polaris",
+                "uninstall": "Desinstalarla",
+                "keep": "Dejar ambas"
+            },
+            "choiceHint": {
+                "stop": "{app} se cierra y deja de iniciarse con Windows. Sigue instalada.",
+                "uninstall": "Quita {app}. Polaris guarda una copia de sus ajustes.",
+                "keep": "Se quedan las dos. Solo una puede usar las ruedas a la vez."
+            },
+            "adminNote": "Quitarla del inicio y desinstalarla puede mostrar el aviso de administrador de Windows.",
+            "permissions": "Polaris podrá",
+            "import": "Traído de la app oficial",
+            "importNone": "No hay nada que traer.",
+            "importCounts": "{mapped} funcionan ya, {kept} guardados para luego, {dropped} sin traer.",
+            "page": "Página {number}",
+            "control": {
+                "knob": "Rueda {number}",
+                "button": "Botón {number}"
+            },
+            "fate": {
+                "mapped": "Funciona ya",
+                "kept": "Para luego",
+                "dropped": "Sin traer"
+            },
+            "cancel": "Cancelar",
+            "failure": {
+                "uninstallerRefused": "Polaris no reconoce ese desinstalador, así que no se cambió nada.",
+                "nothingToUninstall": "La app oficial ya no está instalada.",
+                "stopProcess": "No se pudo cerrar la app oficial. Ciérrala y vuelve a intentarlo.",
+                "removeAutostart": "No se pudo quitar del inicio. Vuelve a intentarlo.",
+                "unsigned": "El desinstalador no está firmado por Hercules, así que no se ejecutó.",
+                "declined": "Se rechazó el aviso de administrador, así que no se cambió nada.",
+                "uninstaller": "El desinstalador no terminó. Vuelve a intentarlo.",
+                "failed": "No funcionó. Vuelve a intentarlo."
+            },
+            "installed": "{app} está instalada en este equipo.",
+            "backup": {
+                "stop": "Polaris paró la app oficial. Puedes dejarla como estaba.",
+                "uninstall": "Polaris desinstaló la app oficial. Puedes recuperar sus ajustes.",
+                "keep": "Polaris guardó una copia de los ajustes de la app oficial."
+            },
+            "launch": "Abrir Hercules Stream Control",
+            "launchFailed": "No se pudo abrir Hercules Stream Control.",
+            "restoreAction": "Restaurar la app oficial",
+            "restore": {
+                "done": "La app oficial vuelve a estar como estaba.",
+                "settingsOnly": "Solo volvieron sus ajustes: la app no está instalada.",
+                "declined": "Se rechazó el aviso de administrador, así que no se cambió nada.",
+                "failed": "No se pudo restaurar la app oficial. Vuelve a intentarlo."
+            }
         }
     }
 }

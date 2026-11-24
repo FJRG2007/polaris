@@ -319,7 +319,13 @@ export function addonText(text: { readonly "en-US": string; readonly [locale: st
     return text[locale] ?? text[locale.split("-")[0] ?? ""] ?? text["en-US"];
 }
 
-const addonStatusSchema = z.object({ state: z.enum(["connected", "sleeping", "busy", "error"]), detail: z.string().max(200).optional() });
+/**
+ * A name for what an add-on says about its device (`herculesDriver`), so a page
+ * can say it in the reader's language; `detail` is the add-on's English words.
+ */
+export const ADDON_STATUS_CODE = z.string().regex(/^[a-z][a-zA-Z0-9]{0,39}$/);
+
+const addonStatusSchema = z.object({ state: z.enum(["connected", "sleeping", "busy", "error"]), detail: z.string().max(200).optional(), code: ADDON_STATUS_CODE.optional() });
 
 /** How an installed add-on runs: its process, or why there is none. */
 const addonRunSchema = z.union([

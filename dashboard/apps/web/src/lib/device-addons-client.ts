@@ -9,6 +9,7 @@
  * from an add-on's page draws at once instead of waiting on the app again.
  */
 
+import { z } from "zod";
 import { useCallback, useEffect, useState } from "react";
 import type { PolarisDesktop } from "@/lib/desktop-bridge";
 import { useDesktopBridge } from "@/components/desktop-app";
@@ -17,11 +18,29 @@ import {
     compareAddonVersions,
     readAddonsSnapshot,
     type AddonEntry,
+    type AddonPermission,
     type AddonsSnapshot,
     type InstalledAddon
 } from "@polaris/core/device-addons";
 
 export type AddonsBridge = NonNullable<PolarisDesktop["addons"]>;
+
+/** Each permission's key under `addons.permission.*`. */
+export const PERMISSION_KEY: Record<AddonPermission, string> = {
+    usb: "usb",
+    "audio-sessions": "audioSessions",
+    display: "display",
+    "polaris-actions": "polarisActions",
+    network: "network"
+};
+
+/** The status sentences an add-on names (`code`) that the page says in its own language (`addons.statusDetail.*`). */
+export const ADDON_STATUS_SENTENCES = ["otherProgram", "noAccess", "unsupported", "stopped", "unplugged", "herculesApp", "herculesDriver", "noControls"] as const;
+
+/** The key of the page's own sentence for an add-on's status code, or null to show the add-on's words. */
+export function statusSentence(code: string | undefined): string | null {
+    return code && (ADDON_STATUS_SENTENCES as readonly string[]).includes(code) ? `statusDetail.${code}` : null;
+}
 
 /** Where the page stands: no desktop app, an app older than add-ons, waiting on it, or its answer. */
 export type AddonsState =
@@ -110,6 +129,23 @@ export function addonListings(snapshot: AddonsSnapshot): AddonListing[] {
 /** Why an install did not happen, as the store words it. */
 export type InstallProblem = "platform" | "app-version" | "download" | "integrity" | "other";
 
+/** The store's wording for why the app refused an install. */
+export function installProblem(reason: string): InstallProblem {
+    switch (reason) {
+        case "platform":
+        case "app-version":
+        case "download":
+            return reason;
+        case "size":
+        case "hash":
+        case "archive":
+        case "manifest":
+            return "integrity";
+        default:
+            return "other";
+    }
+}
+
 /** Install or update one add-on, accepting what it asks for; null when it went in. */
 export function useInstallAddon(bridge: AddonsBridge | null): (entry: AddonEntry) => Promise<InstallProblem | null> {
     return useCallback(
@@ -117,21 +153,91 @@ export function useInstallAddon(bridge: AddonsBridge | null): (entry: AddonEntry
             if (!bridge) return "other";
             const answer = addonInstallResultSchema.safeParse(await bridge.install(entry.id, entry.permissions).catch(() => null));
             if (!answer.success) return "other";
-            if (answer.data.ok) return null;
-            switch (answer.data.reason) {
-                case "platform":
-                case "app-version":
-                case "download":
-                    return answer.data.reason;
-                case "size":
-                case "hash":
-                case "archive":
-                case "manifest":
-                    return "integrity";
-                default:
-                    return "other";
-            }
+            return answer.data.ok ? null : installProblem(answer.data.reason);
         },
         [bridge]
     );
+}
+
+const officialEntrySchema = z.object({ displayName: z.string().max(300), version: z.string().max(100) });
+
+/** What the app found of a device's official software (desktop `addons/official.ts`, `look`). */
+export const officialLookSchema = z.object({
+    found: z
+        .object({
+            app: officialEntrySchema.nullable(),
+            drivers: officialEntrySchema.nullable(),
+            autostart: z.array(z.unknown()).max(100),
+            running: z.boolean()
+        })
+        .nullable(),
+    imported: z
+        .object({
+            pages: z.number().int().min(0).max(100),
+            controls: z
+                .array(
+                    z.object({
+                        page: z.number().int().min(0).max(100),
+                        slot: z.number().int().min(0).max(100),
+                        control: z.enum(["knob", "button"]),
+                        official: z.string().max(300),
+                        name: z.string().max(300),
+                        mapped: z.object({ key: z.string().max(100), value: z.string().max(300) }).nullable(),
+                        kept: z.boolean()
+                    })
+                )
+                .max(2_000)
+        })
+        .nullable(),
+    backup: z.object({ choice: z.enum(["stop", "uninstall", "keep"]), at: z.string().max(100), restored: z.boolean() }).nullable()
+});
+
+export type OfficialLook = z.infer<typeof officialLookSchema>;
+export type OfficialControl = NonNullable<OfficialLook["imported"]>["controls"][number];
+
+/** Every reason the app gives for not carrying a choice out (`ExecuteResult`, or `install` when the add-on did not go in). */
+export const OFFICIAL_FAILURES = ["cancelled", "uninstallerRefused", "nothingToUninstall", "stopProcess", "removeAutostart", "unsigned", "declined", "uninstaller", "install", "failed"] as const;
+export type OfficialFailure = (typeof OFFICIAL_FAILURES)[number];
+
+const officialChooseSchema = z.union([
+    z.object({ ok: z.literal(true) }),
+    z.object({ ok: z.literal(false), reason: z.string().max(100), install: z.string().max(100).optional() })
+]);
+
+/** What choosing answered: done, or why not in the page's words (an unknown reason reads as `failed`). */
+export type OfficialChoiceResult = { readonly ok: true } | { readonly ok: false; readonly reason: OfficialFailure; readonly install: InstallProblem | null };
+
+export function readOfficialChoice(value: unknown): OfficialChoiceResult {
+    const answer = officialChooseSchema.safeParse(value);
+    if (!answer.success) return { ok: false, reason: "failed", install: null };
+    if (answer.data.ok) return { ok: true };
+    const reason = (OFFICIAL_FAILURES as readonly string[]).includes(answer.data.reason) ? (answer.data.reason as OfficialFailure) : "failed";
+    return { ok: false, reason, install: reason === "install" ? installProblem(answer.data.install ?? "") : null };
+}
+
+export const officialRestoreSchema = z.object({
+    ok: z.boolean(),
+    autostart: z.number().int().min(0).max(100),
+    settings: z.boolean(),
+    started: z.boolean(),
+    missing: z.boolean(),
+    declined: z.boolean()
+});
+
+/** How putting the official app back went, as one sentence's key. */
+export type OfficialRestoreOutcome = "done" | "settingsOnly" | "declined" | "failed";
+
+export function readOfficialRestore(value: unknown): OfficialRestoreOutcome {
+    const answer = officialRestoreSchema.safeParse(value);
+    if (!answer.success) return "failed";
+    if (answer.data.declined) return "declined";
+    if (!answer.data.ok) return "failed";
+    return answer.data.missing ? "settingsOnly" : "done";
+}
+
+/** What the app knows of an add-on's official software, or null for none / an app older than it / no answer. */
+export async function lookOfficial(bridge: AddonsBridge | null, id: string): Promise<OfficialLook | null> {
+    if (!bridge?.official) return null;
+    const answer = officialLookSchema.safeParse(await bridge.official(id, { kind: "look" }).catch(() => null));
+    return answer.success ? answer.data : null;
 }

@@ -307,6 +307,8 @@ export interface PolarisDesktop {
         setAutoUpdate?(id: string | null, value: boolean | null): Promise<boolean>;
         /** A call from the add-on's own view, judged by the app. Absent from an app older than views. */
         viewCall?(id: string, method: string, params: unknown): Promise<unknown>;
+        /** The device's official software on this computer (look, choose, restore, launch). Absent from an app older than it. */
+        official?(id: string, request: unknown): Promise<unknown>;
         onChange(listener: () => void): () => void;
         onOpen(listener: (id: string) => void): () => void;
     };
