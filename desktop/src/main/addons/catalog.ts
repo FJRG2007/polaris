@@ -14,9 +14,9 @@ import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { TRUSTED_KEYS, verifySigned, type TrustedKey } from "./signature";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { ADDON_CATALOG_MAX_BYTES, readAddonCatalog, type AddonCatalog } from "@polaris/core/device-addons";
+import { ADDON_CATALOG_MAX_BYTES, ADDON_CATALOG_URL, readAddonCatalog, type AddonCatalog } from "@polaris/core/device-addons";
 
-export const CATALOG_URL = "https://github.com/FJRG2007/polaris/releases/download/device-addons/catalog.json";
+export const CATALOG_URL = ADDON_CATALOG_URL;
 const CATALOG_FILE = "catalog.json";
 const SIGNATURE_FILE = "catalog.json.sig";
 

@@ -44,6 +44,7 @@ import {
     type AddonsBridge,
     type AddonsState
 } from "@/lib/device-addons-client";
+import { addonSettingAnchor } from "@/lib/search/addon-entries";
 import { pageIsDark } from "@/lib/page-theme";
 import { OfficialSoftware } from "./official-software";
 import { useOfficialChoice } from "./official-choice-dialog";
@@ -530,6 +531,14 @@ function AddonSettings({ bridge, manifest }: { bridge: AddonsBridge; manifest: A
         };
     }, [bridge, manifest]);
 
+    // A search result names one setting (`#setting-<key>`); it is drawn only once the values arrive.
+    const loaded = values !== null;
+    useEffect(() => {
+        if (!loaded) return;
+        const id = decodeURIComponent(window.location.hash.slice(1));
+        if (id) document.getElementById(id)?.scrollIntoView({ block: "center" });
+    }, [loaded]);
+
     if (manifest.settings.length === 0) return <p className="text-sm text-muted-foreground">{say(t, "detail.noSettings")}</p>;
     if (!values) return <Skeleton className="h-24 w-full" />;
 
@@ -555,7 +564,11 @@ function AddonSettings({ bridge, manifest }: { bridge: AddonsBridge; manifest: A
                 <SettingGroup key={group?.key ?? ""} group={group} locale={locale}>
                     {settings.map((setting) => {
                         const props: SettingProps = { setting, value: values[setting.key] ?? null, locale, onChange: (value) => change(setting.key, value) };
-                        return group && (group.look === "dials" || group.look === "buttons") ? <SettingTile key={setting.key} look={group.look} {...props} /> : <SettingRow key={setting.key} {...props} />;
+                        return group && (group.look === "dials" || group.look === "buttons") ? <SettingTile key={setting.key} look={group.look} {...props} /> : (
+                            <div key={setting.key} id={addonSettingAnchor(setting.key)} className="min-w-0 scroll-mt-24">
+                                <SettingRow {...props} />
+                            </div>
+                        );
                     })}
                 </SettingGroup>
             ))}

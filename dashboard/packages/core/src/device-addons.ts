@@ -199,6 +199,24 @@ export const addonCatalogSchema = z.object({
 
 export type AddonCatalog = z.infer<typeof addonCatalogSchema>;
 
+
+/**
+ * Where the signed catalog is published - the Polaris repository's
+ * `device-addons` release, the same for every host - and its signature beside
+ * it (`<url>.sig`).
+ */
+export const ADDON_CATALOG_URL = "https://github.com/FJRG2007/polaris/releases/download/device-addons/catalog.json";
+
+/**
+ * The public halves of the keys the catalog may be signed with (raw Ed25519,
+ * hex). Several may be trusted at once, so a key is replaced by shipping its
+ * successor before the catalog moves to it. The desktop app and the dashboard
+ * read the same list.
+ */
+export const ADDON_CATALOG_KEYS: readonly { readonly id: string; readonly publicKey: string }[] = [
+    { id: "addons-2026-11", publicKey: "20ace90f4e0160264f6a05faeabe54478953849fb442ecd0708e850a4c5a846e" }
+];
+
 /** The largest catalog a client reads. */
 export const ADDON_CATALOG_MAX_BYTES = 1024 * 1024;
 

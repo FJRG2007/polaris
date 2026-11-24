@@ -13,7 +13,8 @@ export const LAUNCHER_CHANNELS = {
     hide: "launcher:hide",
     opened: "launcher:opened",
     clearClipboard: "launcher:clear-clipboard",
-    open: "launcher:open"
+    open: "launcher:open",
+    addons: "launcher:addons"
 } as const;
 
 export type LauncherRowKind = "answer" | "polaris" | "page" | "system" | "app" | "polar" | "web" | "clip";
@@ -45,6 +46,8 @@ export interface PolarisLauncher {
     hide(): Promise<void>;
     clearClipboard(): Promise<void>;
     onOpened(listener: () => void): void;
+    /** The device add-ons on this computer, as the main window's bridge answers them (the dashboard's palette only). */
+    addons(): Promise<unknown>;
 }
 
 /** Something listed: its name, its context line and the words it is found by. */

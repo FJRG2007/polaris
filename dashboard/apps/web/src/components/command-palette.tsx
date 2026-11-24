@@ -85,6 +85,7 @@ import {
 } from "@/app/(app)/search-actions";
 import * as polls from "./shared-polls";
 import { readHostRows, type HostRow, type SearchHost } from "@/lib/search/search-host";
+import { useAddonEntries } from "@/lib/search/use-addon-entries";
 import { keepUnlockProofs } from "@/app/(app)/chat/lock-session";
 import { openLockedChatsAction, searchLockAction } from "@/app/(app)/chat/lock-actions";
 import { maybeLockCode, revealLockedChats } from "@/app/(app)/chat/lock-reveal";
@@ -568,14 +569,21 @@ export function CommandPalette({
         [tourRows, tTours]
     );
 
+    // Device add-ons on this computer, from the desktop app; the catalog alone in a browser.
+    const addonRows = useAddonEntries(open, host);
+    const addons = useMemo(
+        () => addonRows.filter((entry) => !reachable.has(entry.href)),
+        [addonRows, reachable]
+    );
+
     /** What fuse matches against: everything, or one scope's slice of the index. */
     const pool = useMemo(() => {
-        if (!scope) return [...navigation, ...tours, ...resourceEntries(resources)];
+        if (!scope) return [...navigation, ...tours, ...addons, ...resourceEntries(resources)];
         if (!scope.resourceKind) return [];
         return resourceEntries(
             resources.filter((resource) => resource.kind === scope.resourceKind)
         );
-    }, [scope, navigation, tours, resources]);
+    }, [scope, navigation, tours, addons, resources]);
 
     const suggestions = useMemo(
         () =>

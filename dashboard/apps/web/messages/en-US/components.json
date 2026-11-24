@@ -199,6 +199,12 @@
     },
     "search": {
         "commands": "Commands",
+        "addons": {
+            "installed": "Device add-ons",
+            "catalog": "Add-ons to install",
+            "setting": "Setting of {name}",
+            "offer": "By {publisher} - {summary}"
+        },
         "recent": "Recent",
         "buttonTitle": "Search ({hint})",
         "label": "Search Polaris",

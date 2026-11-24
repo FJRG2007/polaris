@@ -66,6 +66,8 @@ export interface LauncherHost {
     readonly showPolaris: (path?: string) => void;
     /** The device add-ons installed here, each with its page in Settings, for "Configure <name>". */
     readonly addons?: () => readonly { readonly id: string; readonly name: string; readonly path: string; }[];
+    /** The add-on bridge's snapshot, so the instance's palette lists them with their settings in the reader's language. */
+    readonly addonsSnapshot?: () => Promise<unknown>;
 }
 
 let host: LauncherHost | null = null;
@@ -745,6 +747,11 @@ export function startLauncher(given: LauncherHost): void {
         if (useKey) recordLauncherUse(useKey);
         action();
         return true;
+    });
+    ipcMain.handle(LAUNCHER_CHANNELS.addons, async (event) => {
+        // The instance's own palette only: the window's own panel lists them from `addons` above.
+        if (!fromLauncher(event) || !remote) return null;
+        return (await host?.addonsSnapshot?.().catch(() => null)) ?? null;
     });
     ipcMain.handle(LAUNCHER_CHANNELS.hide, (event) => {
         if (fromLauncher(event)) hide();

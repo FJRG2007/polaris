@@ -57,6 +57,9 @@ export interface SearchHost {
     readonly close: () => void;
     /** Called each time the host brings the search back up. */
     readonly onOpened: (listener: () => void) => void;
+    /** The device add-ons the host's computer has, as the desktop app's
+     *  snapshot (`@polaris/core/device-addons`); absent from a host too old to say. */
+    readonly addons?: () => Promise<unknown>;
 }
 
 /** A path of this instance, and nothing that leaves it. */
