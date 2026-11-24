@@ -4,7 +4,7 @@
  * started again by the plug event.
  *
  * Linux reads sysfs and hears /dev/bus/usb change through inotify. Windows and
- * macOS ask the Rust core's Node binding (crates/polaris-core-node/src/usb.rs,
+ * macOS ask the Rust core's Node binding (crates/polaris-core-usb, through
  * nusb), which sleeps on the operating system's own plug notification. Where
  * that binding is missing or predates USB presence, `watchUsb` answers null
  * ("not known") and every installed add-on runs as if its device were present.
