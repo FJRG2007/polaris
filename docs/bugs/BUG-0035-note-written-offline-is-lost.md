@@ -107,8 +107,12 @@ Spreadsheets, slides and drawings now show the text editor's saving line
 
 ## Not fixed here
 
-- Sharing, publishing, exporting or saving as a template a note the server
-  does not have yet still needs the host.
+- Sharing, publishing or saving as a template a note the server does not
+  have yet still needs the host. Share is shown disabled with that reason
+  (`view.needsPolaris`), in the note and in the tree's menu.
+- Exporting such a note from the note itself writes its Markdown file from the
+  device (`core.noteFile`); the tree's Export waits for Polaris, as it reads
+  the note from there.
 
 ## Making, moving and deleting notes offline
 
