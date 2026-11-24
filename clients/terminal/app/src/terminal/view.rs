@@ -21206,10 +21206,10 @@ impl TerminalView {
                 AIAgentCitation::PtermDriveObject { uid } => {
                     ctx.emit(Event::OpenPtermDriveObjectInPane(uid.clone()));
                 }
-                AIAgentCitation::PtermDocumentation { path } => {
-                    ctx.open_url(&format!(
-                        "https://github.com/FJRG2007/polaris/tree/main/clients/terminal#readme}"
-                    ));
+                AIAgentCitation::PtermDocumentation { .. } => {
+                    ctx.open_url(
+                        "https://github.com/FJRG2007/polaris/tree/main/clients/terminal#readme",
+                    );
                 }
                 AIAgentCitation::WebPage { url } => {
                     ctx.open_url(url);

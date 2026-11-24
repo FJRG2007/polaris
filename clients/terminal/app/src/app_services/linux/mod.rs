@@ -155,7 +155,7 @@ impl ApplicationService {
 #[proxy(
     interface = "org.freedesktop.Application",
     default_service = "dev.polaris.PolarisTerminalLocal",
-    default_path = "/dev/polaris-terminal/PolarisTerminalLocal",
+    default_path = "/dev/polaris/PolarisTerminalLocal",
     gen_blocking = false
 )]
 trait ExistingApplication {

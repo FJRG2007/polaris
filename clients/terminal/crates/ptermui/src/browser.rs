@@ -20,7 +20,7 @@ pub(crate) fn safe_browser_open_url(url: &str) -> Option<String> {
         "http"
         | "https"
         | "mailto"
-        | "polaris-terminal"
+        | "polaris-terminal-stable"
         | "polaris-terminal-preview"
         | "polaris-terminal-dev"
         | "polaris-terminal-local"

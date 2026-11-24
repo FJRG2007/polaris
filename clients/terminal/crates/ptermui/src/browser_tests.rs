@@ -19,7 +19,7 @@ fn safe_browser_open_url_accepts_browser_safe_urls() {
 #[test]
 fn safe_browser_open_url_accepts_pterm_channel_urls() {
     for scheme in [
-        "polaris-terminal",
+        "polaris-terminal-stable",
         "polaris-terminal-preview",
         "polaris-terminal-dev",
         "polaris-terminal-local",

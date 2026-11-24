@@ -20,4 +20,4 @@ Categories=System;TerminalEmulator;
 Terminal=false
 
 # Register ourselves as the handler for polaris-terminal:// URLs.
-MimeType=x-scheme-handler/polaris-terminal;
+MimeType=x-scheme-handler/polaris-terminal-stable;
