@@ -339,6 +339,12 @@ const installedAddonSchema = z.object({
     /** Null when its files are gone or no longer read. */
     manifest: z.unknown().transform((value) => readAddonManifest(value)),
     update: versionSchema.nullable(),
+    /** Its own automatic-update choice; null follows the snapshot's `autoUpdate`. Absent from an older app. */
+    autoUpdate: z.boolean().nullable().default(null),
+    /** What `update` asks for that was not accepted: it waits for the person while any is listed. */
+    consent: z.array(z.enum(ADDON_PERMISSIONS)).max(ADDON_PERMISSIONS.length).default([]),
+    /** A version that failed on this computer and was rolled back from. */
+    failed: versionSchema.nullable().default(null),
     run: addonRunSchema
 });
 
@@ -348,6 +354,8 @@ export const addonsSnapshotSchema = z.object({
     appVersion: z.string().max(40),
     /** Null until a signed catalog was fetched once; a broken one reads as none. */
     catalog: z.unknown().transform((value) => (value === null ? null : readAddonCatalog(value))),
+    /** Whether updates go in by themselves; an app older than the setting says nothing and puts none in. */
+    autoUpdate: z.boolean().nullable().default(null),
     installed: z.array(installedAddonSchema).max(500),
     installing: z.record(z.string(), z.object({ received: z.number().nonnegative(), total: z.number().nonnegative() }))
 });

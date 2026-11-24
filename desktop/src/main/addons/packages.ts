@@ -19,6 +19,7 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import {
     ADDON_PERMISSIONS,
     addonFit,
+    compareAddonVersions,
     readAddonManifest,
     readAddonSettingValues,
     type AddonEntry,
@@ -28,15 +29,28 @@ import {
     type AddonSettingValue
 } from "@polaris/core/device-addons";
 
+const grantedSchema = z.array(z.enum(ADDON_PERMISSIONS));
+
+// Every field after `installedAt` is optional, so a file an earlier app wrote reads as it was.
 const installedSchema = z.object({
     schema: z.literal(1),
+    /** Whether updates are put in by themselves; absent means yes, the way the app updates itself. */
+    autoUpdate: z.boolean().optional(),
     addons: z.record(
         z.string(),
         z.object({
             version: z.string(),
             enabled: z.boolean(),
-            granted: z.array(z.enum(ADDON_PERMISSIONS)),
-            installedAt: z.string()
+            granted: grantedSchema,
+            installedAt: z.string(),
+            /** This add-on's own choice; absent follows `autoUpdate` above. */
+            autoUpdate: z.boolean().optional(),
+            /** The version it was updated from, kept on disk to go back to when this one fails. */
+            previous: z.object({ version: z.string(), granted: grantedSchema }).optional(),
+            /** The last version the person was told about, so each one is announced once. */
+            notified: z.string().optional(),
+            /** A version that failed and was rolled back from: not put in by itself again. */
+            failed: z.string().optional()
         })
     )
 });
@@ -44,7 +58,8 @@ const installedSchema = z.object({
 export type Installed = z.infer<typeof installedSchema>;
 export type InstalledAddon = Installed["addons"][string];
 
-const EMPTY: Installed = { schema: 1, addons: {} };
+/** A fresh empty record each time: callers change what they are given before saving it. */
+const empty = (): Installed => ({ schema: 1, addons: {} });
 /** The most files and unpacked bytes one package may hold. */
 const MAX_FILES = 2_000;
 const MAX_UNPACKED = 400 * 1024 * 1024;
@@ -52,9 +67,9 @@ const MAX_UNPACKED = 400 * 1024 * 1024;
 export async function readInstalled(dir: string): Promise<Installed> {
     try {
         const parsed = installedSchema.safeParse(JSON.parse(await readFile(join(dir, "installed.json"), "utf8")));
-        return parsed.success ? parsed.data : EMPTY;
+        return parsed.success ? parsed.data : empty();
     } catch {
-        return EMPTY;
+        return empty();
     }
 }
 
@@ -130,7 +145,11 @@ function sameAddon(packaged: AddonManifest, entry: AddonEntry): boolean {
     );
 }
 
-/** Install the entry, or update it to the entry's version. An earlier version is removed once the new one is in place. */
+/**
+ * Install the entry, or update it to the entry's version. On an update the
+ * version it replaces stays on disk as `previous`, to go back to when the new
+ * one fails (`rollbackAddon`); the one before that is removed.
+ */
 export async function installAddon(options: InstallOptions): Promise<InstallResult> {
     const { dir, entry } = options;
     const fit = addonFit(entry, options.platform, options.appVersion);
@@ -178,15 +197,50 @@ export async function installAddon(options: InstallOptions): Promise<InstallResu
 
     const installed = await readInstalled(dir);
     const previous = installed.addons[entry.id];
+    const replaced = previous && previous.version !== entry.version ? { version: previous.version, granted: previous.granted } : previous?.previous;
     installed.addons[entry.id] = {
         version: entry.version,
         enabled: previous?.enabled ?? true,
         granted: [...entry.permissions],
-        installedAt: (options.now?.() ?? new Date()).toISOString()
+        installedAt: (options.now?.() ?? new Date()).toISOString(),
+        ...(previous?.autoUpdate === undefined ? {} : { autoUpdate: previous.autoUpdate }),
+        ...(replaced ? { previous: replaced } : {}),
+        ...(previous?.notified === undefined ? {} : { notified: previous.notified }),
+        // Put in on purpose, or a later one: the failure no longer stands in its way.
+        ...(previous?.failed && previous.failed !== entry.version && compareAddonVersions(previous.failed, entry.version) > 0 ? { failed: previous.failed } : {})
     };
     await saveInstalled(dir, installed);
-    if (previous && previous.version !== entry.version) await rm(packageDir(dir, entry.id, previous.version), { recursive: true, force: true });
+    const older = previous?.previous?.version;
+    if (older && older !== entry.version && older !== replaced?.version) await rm(packageDir(dir, entry.id, older), { recursive: true, force: true });
     return { ok: true, manifest: packaged };
+}
+
+/**
+ * Go back to the version an update replaced: its files are still on disk. The
+ * failed version is removed and remembered, so it is not put in by itself again.
+ * Null when there is nothing to go back to.
+ */
+export async function rollbackAddon(dir: string, id: string): Promise<{ from: string; to: string; } | null> {
+    const installed = await readInstalled(dir);
+    const addon = installed.addons[id];
+    const previous = addon?.previous;
+    if (!addon || !previous || previous.version === addon.version) return null;
+    if (!(await installedManifest(dir, id, previous.version))) return null;
+    const from = addon.version;
+    const back: InstalledAddon = { ...addon, version: previous.version, granted: previous.granted, failed: from };
+    delete back.previous;
+    installed.addons[id] = back;
+    await saveInstalled(dir, installed);
+    await rm(packageDir(dir, id, from), { recursive: true, force: true });
+    return { from, to: previous.version };
+}
+
+/** Change one field of the installed record without touching the rest. False when it is not installed. */
+export async function updateInstalled(dir: string, change: (installed: Installed) => boolean): Promise<boolean> {
+    const installed = await readInstalled(dir);
+    if (!change(installed)) return false;
+    await saveInstalled(dir, installed);
+    return true;
 }
 
 /** Remove the add-on's files, settings and record. Removing one that is not installed is not an error. */

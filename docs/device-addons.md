@@ -44,7 +44,8 @@ That is why only packages from the signed catalog install.
 
 ## Cost
 
-Nothing installed: one small file read 3 s after start, no process, no fetch.
+Nothing installed: one small file read 3 s after start (and one a minute later
+and every 6 hours, to see whether anything is installed), no process, no fetch.
 Installed with its device unplugged: no process (sleeping), woken by the plug
 event. The catalog is fetched when the store is opened (refreshed at most every
 6 hours behind the cached copy) or, where plugs can be heard, when a claimed
@@ -57,6 +58,35 @@ system's own plug notification (`crates/polaris-core-usb`, the same
 or older than USB presence, devices are "not known": an installed, enabled add-on
 runs as if its device were present and watches for it itself, and the "found"
 notice is not offered.
+
+## Updates
+
+`desktop/src/main/addons/updates.ts` decides, `manager.ts` acts. With anything
+installed the catalog is looked at a minute after start and every 6 hours, a
+failed look (offline, GitHub down) retried from 5 minutes, doubling up to the
+6 hours; opening the store or plugging a claimed device in looks too.
+
+- A newer version that fits this app goes in by itself, the way the app updates
+  itself, through the same signed, hashed, manifest-checked install. The setting
+  is `autoUpdate` in `installed.json`, for all and per add-on (absent: on), and
+  the Device add-ons page and each add-on's page switch it.
+- A version asking for a permission not accepted before never goes in by
+  itself: it waits, the notice and the add-on's page say what it asks for, and
+  Update reads out only the new permissions.
+- An add-on whose status is `busy` is not updated until it says otherwise.
+- The version an update replaced stays on disk (`previous`); when the new one
+  stops after crashing, the app goes back to it, removes the failed one and
+  never puts that version in by itself again (`failed`). One earlier version is
+  kept, never more.
+- Each version is announced once with a desktop notice (`notified`): updated,
+  waiting for your OK, available (automatic updates off, or it failed before),
+  or rolled back. The notice's text is the catalog entry's `changelog` (from the
+  add-on's `listing.json`), first line. Clicking it opens the add-on's page.
+
+Every field added to `installed.json` and to the snapshot is optional, so an
+older app or page reads the files and answers of a newer one and the other way
+round; an app older than automatic updates shows no switch and updates nothing
+by itself.
 
 ## Settings
 

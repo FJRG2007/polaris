@@ -2554,7 +2554,8 @@
             "installFirst": "Install it to set it up.",
             "saveFailed": "That change was not saved.",
             "toggleFailed": "It could not be switched.",
-            "view": "{name} editor"
+            "view": "{name} editor",
+            "changelogFor": "What's new in {version}"
         },
         "action": {
             "none": "Nothing",
@@ -2564,6 +2565,23 @@
             "share": "Share your screen",
             "hangup": "Hang up",
             "leave": "Hang up"
+        },
+        "update": {
+            "title": "Update {name} to {version}?",
+            "added": "It now also asks to:",
+            "noNew": "It asks for nothing new.",
+            "confirm": "Update"
+        },
+        "auto": {
+            "all": "Update add-ons automatically",
+            "one": "Update automatically",
+            "hint": "Updates that ask for new permissions wait for you.",
+            "failed": "That change was not saved."
+        },
+        "notice": {
+            "consent": "Version {version} asks for new permissions and waits for your OK.",
+            "review": "Review",
+            "failed": "Version {version} did not start here, so the one before was put back."
         }
     }
 }

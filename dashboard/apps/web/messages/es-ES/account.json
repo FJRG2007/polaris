@@ -2554,7 +2554,8 @@
             "installFirst": "Instálalo para configurarlo.",
             "saveFailed": "No se guardó el cambio.",
             "toggleFailed": "No se pudo cambiar.",
-            "view": "Editor {name}"
+            "view": "Editor {name}",
+            "changelogFor": "Novedades de {version}"
         },
         "action": {
             "none": "Nada",
@@ -2564,6 +2565,23 @@
             "share": "Compartir pantalla",
             "hangup": "Colgar",
             "leave": "Colgar"
+        },
+        "update": {
+            "title": "¿Actualizar {name} a {version}?",
+            "added": "Ahora también pide:",
+            "noNew": "No pide nada nuevo.",
+            "confirm": "Actualizar"
+        },
+        "auto": {
+            "all": "Actualizar complementos solos",
+            "one": "Actualizar solo",
+            "hint": "Las que piden permisos nuevos te esperan.",
+            "failed": "Ese cambio no se guardó."
+        },
+        "notice": {
+            "consent": "La versión {version} pide permisos nuevos y espera tu OK.",
+            "review": "Revisar",
+            "failed": "La versión {version} no arrancó aquí; se volvió a la anterior."
         }
     }
 }

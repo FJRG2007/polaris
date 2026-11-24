@@ -303,6 +303,8 @@ export interface PolarisDesktop {
         setEnabled(id: string, enabled: boolean): Promise<boolean>;
         settings(id: string): Promise<unknown>;
         setSetting(id: string, key: string, value: unknown): Promise<unknown>;
+        /** Automatic updates for one add-on, or all (`id` null). Absent from an app older than them. */
+        setAutoUpdate?(id: string | null, value: boolean | null): Promise<boolean>;
         /** A call from the add-on's own view, judged by the app. Absent from an app older than views. */
         viewCall?(id: string, method: string, params: unknown): Promise<unknown>;
         onChange(listener: () => void): () => void;
