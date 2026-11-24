@@ -199,6 +199,7 @@ function InApp({
                 <Hosts
                     servers={snapshot.servers}
                     server={snapshot.server}
+                    hint={t("hosts.manageHint")}
                     onManage={() => void settings.manageHosts()}
                 />
             )}
@@ -414,10 +415,13 @@ function ClearClipboard({ settings }: { settings: NonNullable<PolarisDesktop["ap
 function Hosts({
     servers,
     server,
+    hint,
     onManage
 }: {
     servers: core.AppSettingsSnapshot["servers"];
     server: string | null;
+    /** What the app's own hosts screen is called where it opens: a window on a computer, a screen on a phone. */
+    hint: string;
     onManage: () => void;
 }) {
     const t = useTranslations("appSettings");
@@ -450,7 +454,7 @@ function Hosts({
                         ))}
                     </ul>
                 )}
-                <Row label={t("hosts.manage")} hint={t("hosts.manageHint")}>
+                <Row label={t("hosts.manage")} hint={hint}>
                     <Button size="sm" variant="secondary" onClick={onManage}>
                         {t("hosts.manage")}
                     </Button>
@@ -595,7 +599,14 @@ function InPhone({ settings, category }: { settings: PhoneAppSettings; category:
         );
     }
     if (category === "hosts") {
-        return <Hosts servers={snapshot.servers} server={snapshot.server} onManage={() => void settings.manageHosts()} />;
+        return (
+            <Hosts
+                servers={snapshot.servers}
+                server={snapshot.server}
+                hint={t("phone.hostsHint")}
+                onManage={() => void settings.manageHosts()}
+            />
+        );
     }
     if (category === "updates") return <PhoneUpdates settings={settings} snapshot={snapshot} />;
     return (
