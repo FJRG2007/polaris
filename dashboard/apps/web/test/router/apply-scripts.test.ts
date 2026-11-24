@@ -119,7 +119,11 @@ beforeEach(() => {
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
-describe("what a change leaves on the machine", () => {
+// The cases below run the real scripts through `sh`, a few dozen processes apiece: on
+// Windows (MSYS) starting a process costs a fraction of a second, so a case takes
+// longer than the suite's default timeout there while finishing in well under a
+// second on Linux.
+describe("what a change leaves on the machine", { timeout: 180_000 }, () => {
     it("parses as shell, every one of them", () => {
         const scripts = [
             router.renderApply(PLAN, ACCESS, "one"),
@@ -202,7 +206,7 @@ describe("what a change leaves on the machine", () => {
     });
 });
 
-describe("a port on its own", () => {
+describe("a port on its own", { timeout: 180_000 }, () => {
     const plain = router.routerPlanSchema.parse({
         ...PLAN,
         wans: [{ interface: "eth0", vlan: null }]

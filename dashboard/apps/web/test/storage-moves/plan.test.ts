@@ -279,7 +279,9 @@ function runIn(root: string, script: string): { code: number; out: string } {
 
 const hasSh = spawnSync("sh", ["-c", "true"]).status === 0;
 
-describe.skipIf(!hasSh)("the scripts, run", () => {
+// The copy script starts a few dozen processes; on Windows (MSYS) each costs a
+// fraction of a second, so a case outlives the default timeout there.
+describe.skipIf(!hasSh)("the scripts, run", { timeout: 180_000 }, () => {
     let root = "";
     beforeEach(() => {
         root = mkdtempSync(join(tmpdir(), "polaris-move-")).replaceAll("\\", "/");
