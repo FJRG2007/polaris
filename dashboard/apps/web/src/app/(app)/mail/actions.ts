@@ -47,6 +47,7 @@ import { mailShelfOfTab } from "@/lib/mailbox/shelf";
 import * as templates from "@/lib/mailbox/templates";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as attachFrom from "@/lib/mailbox/attach-from";
+import * as uploads from "@/lib/mailbox/uploads";
 import { MailAuthError } from "@/lib/mailbox/credentials";
 import { MailAccountSignedOut, MailActionRefused } from "@/lib/mailbox/action-refusal";
 import { discoverMailbox } from "@/lib/mailbox/autoconfig";
@@ -991,6 +992,19 @@ export async function attachFromMessageAction(input: unknown) {
     if (!parsed.success) return { error: await errorText("errors.filesCarry") };
     try {
         return await attachFrom.attachFromMessage(userId, parsed.data.messageId);
+    } catch (caught) {
+        return failure(caught, "errors.filesCarry");
+    }
+}
+
+/** The files already on a draft, for a composer reopening it - without them the
+ *  reopened draft showed none, and its first autosave took them off. */
+export async function draftAttachmentsAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = z.object({ draftId: z.string().uuid() }).safeParse(input);
+    if (!parsed.success) return { error: await errorText("errors.filesCarry") };
+    try {
+        return { uploads: await uploads.listDraftUploads(userId, parsed.data.draftId) };
     } catch (caught) {
         return failure(caught, "errors.filesCarry");
     }

@@ -72,7 +72,8 @@ vi.mock("@/lib/mailbox/credentials", () => ({
 }));
 vi.mock("@/lib/mailbox/uploads", () => ({
     readUpload: async () => null,
-    attachUploads: async () => undefined
+    attachUploads: async () => undefined,
+    releaseDraftUploads: async () => 0
 }));
 vi.mock("@/lib/mailbox/imap", () => ({ withImap: async () => undefined }));
 vi.mock("@/lib/mailbox/send", () => ({

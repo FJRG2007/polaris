@@ -21,9 +21,11 @@ import { apiPermission } from "@/lib/api-session";
 import {
     MAX_ARCHIVE_BYTES,
     MAX_ATTACHMENT_BYTES,
+    readUpload,
     removeUpload,
     storeUpload
 } from "@/lib/mailbox/uploads";
+import { mailFileResponse } from "@/lib/mailbox/file-response";
 import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
@@ -101,4 +103,27 @@ export async function DELETE(request: Request): Promise<Response> {
     if (!uploadId) return Response.json({ error: (await readerWords("api"))("errors.nothingNamed") }, { status: 400 });
     await removeUpload(user.id, uploadId);
     return Response.json({});
+}
+
+/**
+ * A file somebody attached to a message they are writing, back to them.
+ *
+ * What lets the composer open an attachment in the viewer before it is sent -
+ * or after the draft is reopened days later. Only ever the uploader's own file:
+ * the lookup is by owner as well as id, and anything else is the same 404.
+ */
+export async function GET(request: Request): Promise<Response> {
+    const user = await apiPermission("mail.use");
+    if (user instanceof Response) return user;
+    const url = new URL(request.url);
+    const uploadId = url.searchParams.get("id") ?? "";
+    if (!/^[0-9a-f-]{36}$/i.test(uploadId)) return new Response("Not found", { status: 404 });
+    try {
+        const file = await readUpload(user.id, uploadId);
+        if (!file) return new Response("Not found", { status: 404 });
+        return mailFileResponse(request, file, url.searchParams.get("inline") === "1");
+    } catch (caught) {
+        console.error("polaris: a mail upload could not be read:", caught);
+        return Response.json({ error: (await readerWords("api"))("errors.attachFailed") }, { status: 502 });
+    }
 }

@@ -148,7 +148,8 @@ vi.mock("@/lib/mailbox/refused", () => ({ recordCredentialRefusal: async () => u
 vi.mock("@/lib/mailbox/credentials", () => ({ MailAuthError: class MailAuthError extends Error {} }));
 vi.mock("@/lib/mailbox/uploads", () => ({
     readUpload: async () => null,
-    attachUploads: async () => undefined
+    attachUploads: async () => undefined,
+    releaseDraftUploads: async () => 0
 }));
 vi.mock("@/lib/mailbox/access", () => ({
     ACCOUNT_COLUMNS: {},
