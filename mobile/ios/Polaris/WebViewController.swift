@@ -10,6 +10,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     /// The page to open first, from a `polaris://open` link; the start otherwise.
     private let path: String?
     private let changeServer: () -> Void
+    /// Opens the host chosen now in a new window, or the address screen when none is left: a host switched to,
+    /// edited or removed from the page's Settings > This app > Hosts (`PageHosts`).
+    private let reopen: () -> Void
     private var web: WKWebView!
     private let failure = UIStackView()
     private let failureText = UILabel()
@@ -24,10 +27,11 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     private var protecting = false
     private let shield = UIView()
 
-    init(host: Host, path: String? = nil, changeServer: @escaping () -> Void) {
+    init(host: Host, path: String? = nil, changeServer: @escaping () -> Void, reopen: @escaping () -> Void) {
         self.host = host
         self.path = path
         self.changeServer = changeServer
+        self.reopen = reopen
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -92,6 +96,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             },
             setSeasonIcon: function (season) {
                 window.webkit.messageHandlers.polarisMobile.postMessage({ seasonIcon: String(season) });
+            },
+            hostsCall: function (id, op, args) {
+                window.webkit.messageHandlers.polarisMobile.postMessage({ kind: "hosts", id: String(id), op: String(op), args: String(args) });
             }
         });
         """
@@ -371,6 +378,15 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             let args = (try? JSONSerialization.jsonObject(with: raw)) as? [String: Any] ?? [:]
             return media.call(id: id, op: op, args: args)
         }
+        // The servers this phone keeps, managed from the page's Settings > This app > Hosts.
+        if kind == "hosts" {
+            guard let op = body["op"] as? String, op.count <= 16, let raw = (body["args"] as? String)?.data(using: .utf8),
+                  raw.count <= 80 * 1024,
+                  let args = (try? JSONSerialization.jsonObject(with: raw)) as? [String: Any] else { return }
+            return PageHosts.call(op: op, args: args, presenter: self, reopen: reopen) { [weak self] json in
+                self?.hostsAnswer(id, json)
+            }
+        }
         if kind == "vpnDown" { return vpnAnswer(id, "") }
         guard kind == "vpnUp", let input = (body["input"] as? String)?.data(using: .utf8), input.count <= 16 * 1024,
               let connection = try? JSONDecoder().decode(VpnHandoff.Connection.self, from: input),
@@ -395,6 +411,12 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     private func vpnAnswer(_ id: String, _ error: String) {
         let call = "window.__polarisMobileVpn && window.__polarisMobileVpn(\(Self.jsString(id)), \(Self.jsString(error)))"
         web.evaluateJavaScript(call, completionHandler: nil)
+    }
+
+    /// One answer to the page's Settings > This app > Hosts, shaped as the desktop app's.
+    private func hostsAnswer(_ id: String, _ json: String) {
+        let call = "window.__polarisMobileHosts && window.__polarisMobileHosts(\(Self.jsString(id)), \(Self.jsString(json)))"
+        web?.evaluateJavaScript(call, completionHandler: nil)
     }
 
     /// One answer to the page's gallery: a JSON object, which can carry a chunk of a photo.

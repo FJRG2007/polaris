@@ -46,8 +46,8 @@ interface PolarisMobileBridge {
     /** The servers the app keeps, managed in Settings > This app > Hosts: `op`
      *  is list, check, add, switch, edit, remove, status, link, copy, export or
      *  import. Answers later, through `window.__polarisMobileHosts(id, json)`,
-     *  shaped as the desktop app's. Absent from an app that manages them in its
-     *  own screen only. */
+     *  shaped as the desktop app's (`PageHosts` in both phone apps). Absent
+     *  from an app that manages them in its own screen only. */
     hostsCall?(id: string, op: string, args: string): void;
     /** A check for a newer build; answers later, through
      *  `window.__polarisMobileUpdate(id, json)`. */

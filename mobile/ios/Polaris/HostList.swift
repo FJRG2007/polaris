@@ -85,6 +85,11 @@ enum HostList {
         return prefix + base64
     }
 
+    /// The same list as the link the desktop app's QR holds, which opens this app wherever it is scanned.
+    static func listLink(_ entries: [Entry]) -> String {
+        Self.link + "?list=" + encode(entries)
+    }
+
     /// A bare http(s) origin, or nil. A bare host in the compact form is https, the only scheme left out of it.
     static func originOf(_ value: String?) -> String? {
         guard let value, value.count <= 2048 else { return nil }

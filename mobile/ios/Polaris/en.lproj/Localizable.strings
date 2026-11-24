@@ -16,9 +16,6 @@
 "server.scanHint" = "Polaris on your computer: open its servers QR and point this iPhone's camera at it to add them all.";
 "hosts.title" = "Your Polaris servers";
 "hosts.scanHint" = "Each one is signed in on its own. To add the servers from Polaris on your computer, point the camera at its servers QR.";
-"hosts.remove" = "Remove";
-"hosts.removeTitle" = "Remove %@?";
-"hosts.removeMessage" = "This iPhone signs out of it and forgets what it kept for it.";
 "link.invalid" = "That link isn't one Polaris can open.";
 "link.hostsInvalid" = "That code doesn't hold any Polaris servers.";
 "link.hostsAdded" = "Added %d servers.";
@@ -37,16 +34,4 @@
 "settings.browser" = "Open in the browser";
 "hosts.open" = "Opens %@";
 "hosts.add" = "Add a Polaris";
-"hosts.edit" = "Edit";
-"hosts.editTitle" = "Edit %@";
-"hosts.address" = "Address";
-"hosts.namePlaceholder" = "Name (optional)";
-"hosts.save" = "Save";
-"hosts.moveUp" = "Move up";
-"hosts.moveDown" = "Move down";
 "hosts.taken" = "Another server on this iPhone already has that address.";
-"hosts.import" = "Import";
-"hosts.export" = "Export";
-"hosts.importTitle" = "Import servers";
-"hosts.importHint" = "Paste the code from Export on another device, or open the file it saved.";
-"hosts.importFile" = "Open a file";
