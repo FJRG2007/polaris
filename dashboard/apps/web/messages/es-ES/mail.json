@@ -625,7 +625,12 @@
             "after": "Desde una fecha",
             "before": "Antes de fecha",
             "newer": "Última semana"
-        }
+        },
+        "filename": "Nombre de adjunto",
+        "label": "Etiqueta",
+        "anyLabel": "Cualquiera",
+        "findLabel": "Buscar etiqueta",
+        "noLabel": "Ninguna"
     },
     "rail": {
         "all": "Todos los buzones",

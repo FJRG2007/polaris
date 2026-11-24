@@ -19,7 +19,15 @@
  */
 
 import * as core from "@polaris/core";
-import { Button, Checkbox, DateInput, Input, cn } from "@polaris/ui";
+import {
+    Button,
+    Checkbox,
+    DateInput,
+    Input,
+    SearchableSelect,
+    cn,
+    type SearchableSelectOption
+} from "@polaris/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -29,6 +37,7 @@ import {
     SUGGESTIONS_SELECTOR,
     useContactSuggestions
 } from "./contact-suggestions";
+import { useMail } from "./mail-shell";
 import { SearchChips, SearchOffers, searchOffers, useRecentSearches } from "./search-extras";
 
 /** How long typing settles before the address changes. Long enough that a
@@ -213,6 +222,7 @@ function SearchFilters({
 }) {
     const t = useTranslations("mail");
     const tc = useTranslations("common");
+    const { labels } = useMail();
     const [terms, setTerms] = useState<core.MailSearchTerms>(() => core.parseMailSearch(from));
     const panel = useRef<HTMLDivElement | null>(null);
 
@@ -227,6 +237,9 @@ function SearchFilters({
             // Nor is a contact picked from an address field's suggestions, which
             // are drawn outside the panel so the panel cannot clip them.
             if ((event.target as HTMLElement).closest(SUGGESTIONS_SELECTOR)) return;
+            // The label picker's list is drawn in a portal, outside the panel.
+            if ((event.target as HTMLElement).closest("[data-radix-popper-content-wrapper]"))
+                return;
             onClose();
         }
         document.addEventListener("mousedown", onDown);
@@ -282,6 +295,25 @@ function SearchFilters({
                     value={one(terms.phrases)}
                     onChange={(value) => set({ phrases: asList(value) })}
                 />
+                <Field
+                    label={t("searchBox.filename")}
+                    value={one(terms.filename)}
+                    onChange={(value) => set({ filename: asList(value.toLowerCase()) })}
+                />
+                <label className="block min-w-0">
+                    <span className="mb-1 block text-[12px] text-muted-foreground">
+                        {t("searchBox.label")}
+                    </span>
+                    <SearchableSelect
+                        aria-label={t("searchBox.label")}
+                        className="h-8 w-full text-[13px]"
+                        value={one(terms.label)}
+                        onValueChange={(value) => set({ label: asList(value) })}
+                        searchPlaceholder={t("searchBox.findLabel")}
+                        emptyText={t("searchBox.noLabel")}
+                        options={labelOptions(labels, one(terms.label), t("searchBox.anyLabel"))}
+                    />
+                </label>
                 <div className="grid grid-cols-2 gap-2">
                     <Field
                         label={t("searchBox.after")}
@@ -346,6 +378,29 @@ function SearchFilters({
             </p>
         </div>
     );
+}
+
+/** The labels to pick from, by name - `label:` matches the name - with "any"
+ *  first and a name typed in the box kept even when no label is called that. */
+function labelOptions(
+    labels: readonly { id: string; name: string; color: string }[],
+    current: string,
+    anyLabel: string
+): SearchableSelectOption[] {
+    const options: SearchableSelectOption[] = labels.map((label) => ({
+        value: label.name.toLowerCase(),
+        label: label.name,
+        icon: (
+            <span
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: label.color }}
+                aria-hidden
+            />
+        )
+    }));
+    if (current && !options.some((option) => option.value === current))
+        options.unshift({ value: current, label: current });
+    return [{ value: "", label: anyLabel }, ...options];
 }
 
 function Field({

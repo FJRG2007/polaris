@@ -21,7 +21,7 @@ vi.mock("next/navigation", () => ({
     usePathname: () => "/mail",
     useSearchParams: () => new URLSearchParams(query)
 }));
-vi.mock("@/app/(app)/mail/mail-shell", () => ({ useMail: () => ({ shelf: "personal" }) }));
+vi.mock("@/app/(app)/mail/mail-shell", () => ({ useMail: () => ({ shelf: "personal", labels: [] }) }));
 const suggestContactsAction = vi.fn();
 vi.mock("@/app/(app)/mail/actions", () => ({
     suggestContactsAction: (...args: unknown[]) => suggestContactsAction(...args)
@@ -123,5 +123,19 @@ describe("where the list is drawn", () => {
     it("never hangs off the right edge", () => {
         const place = placeUnder({ top: 100, bottom: 130, left: 900, width: 300 }, viewport);
         expect(place.left + place.width).toBeLessThanOrEqual(viewport.width);
+    });
+});
+
+describe("the search panel's attachment and label fields", () => {
+    it("write filename: into the box, so nobody has to know the operator", async () => {
+        const user = await openPanel();
+        await user.type(screen.getByRole("textbox", { name: "Attachment name" }), "Factura.pdf");
+        await user.click(screen.getByRole("button", { name: "Search" }));
+        expect(replace).toHaveBeenLastCalledWith("/mail?q=filename%3Afactura.pdf");
+    });
+
+    it("offer the label picker beside it", async () => {
+        await openPanel();
+        expect(screen.getByRole("button", { name: "Label" })).toBeTruthy();
     });
 });

@@ -625,7 +625,12 @@
             "after": "After a date",
             "before": "Before a date",
             "newer": "In the last week"
-        }
+        },
+        "filename": "Attachment name",
+        "label": "Label",
+        "anyLabel": "Any label",
+        "findLabel": "Find a label",
+        "noLabel": "No labels"
     },
     "rail": {
         "all": "All mailboxes",
