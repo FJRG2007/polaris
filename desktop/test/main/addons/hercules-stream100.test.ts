@@ -64,7 +64,7 @@ describe("Hercules Stream 100 add-on", () => {
 
     it("says who holds the controller when it cannot be read", () => {
         expect(entry.describe("notFound", { ownership: { state: "absent" } }).state).toBe("sleeping");
-        expect(entry.describe("notFound", { ownership: { state: "herculesBusy" } }).detail).toMatch(/Hercules driver/);
+        expect(entry.describe("notFound", { ownership: { state: "herculesBusy" } }).detail).toMatch(/Stream Control is running/);
         expect(entry.describe("notFound", { ownership: { state: "unknown", service: "Foo" } }).detail).toMatch(/Foo/);
         expect(entry.describe("busy", null).state).toBe("busy");
         expect(entry.describe("unsupported", null).state).toBe("error");
@@ -82,7 +82,7 @@ describe("Hercules Stream 100 add-on", () => {
 
         for (const message of sent) expect(addonMessageSchema.safeParse(message).success).toBe(true);
         expect(sent[0]).toEqual({ type: "ready" });
-        expect(sent).toContainEqual({ type: "status", state: "busy", detail: "The Hercules driver holds the Stream 100, so Polaris cannot read it yet." });
+        expect(sent).toContainEqual({ type: "status", state: "busy", detail: "The Hercules driver holds the Stream 100 and Polaris cannot read through it yet. Open Hercules Stream Control to use the knobs meanwhile." });
         expect(sent).toContainEqual({ type: "status", state: "connected" });
         expect(fake.feed).toHaveBeenCalledWith(report, 1_000);
         const calls = sent.filter((message) => (message as { type: string; }).type === "call") as { id: number; params: unknown; }[];
