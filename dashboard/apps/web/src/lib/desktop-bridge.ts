@@ -303,6 +303,8 @@ export interface PolarisDesktop {
         setEnabled(id: string, enabled: boolean): Promise<boolean>;
         settings(id: string): Promise<unknown>;
         setSetting(id: string, key: string, value: unknown): Promise<unknown>;
+        /** A call from the add-on's own view, judged by the app. Absent from an app older than views. */
+        viewCall?(id: string, method: string, params: unknown): Promise<unknown>;
         onChange(listener: () => void): () => void;
         onOpen(listener: (id: string) => void): () => void;
     };

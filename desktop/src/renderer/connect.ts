@@ -424,9 +424,89 @@ function buildPages(): Record<AppSettingCategory, HTMLElement> {
     return pages;
 }
 
-const PAGES = buildPages();
+const PAGES: Record<string, HTMLElement> = buildPages();
 
-function showPage(shown: AppSettingCategory): void {
+/**
+ * The device add-ons installed here, after the categories as on the host's
+ * Settings, each with its state and a switch to turn it on or off. Offline
+ * included: the list is the app's own. Their settings open on the host.
+ */
+function buildAddonsPage(): void {
+    const local = window.polarisLocal.connect;
+    if (!local.addons || !local.setAddonEnabled) return;
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.id = "tab-addons";
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-controls", "addons-page");
+    tab.textContent = "Device add-ons";
+    tab.addEventListener("click", () => {
+        showPage("addons");
+        void fill();
+    });
+    tabs.append(tab);
+    const page = document.createElement("section");
+    page.id = "addons-page";
+    page.setAttribute("role", "tabpanel");
+    page.hidden = true;
+    const heading = document.createElement("p");
+    heading.className = "section-title";
+    heading.textContent = "Device add-ons";
+    const list = document.createElement("div");
+    list.className = "settings-list";
+    const empty = document.createElement("p");
+    empty.className = "hint";
+    empty.textContent = "Nothing installed on this computer. Add-ons are installed from Settings > Device add-ons in Polaris.";
+    page.append(heading, list, empty);
+    byId<HTMLElement>("pages").append(page);
+    PAGES.addons = page;
+
+    const fill = async (): Promise<void> => {
+        const rows = await local.addons!().catch(() => null);
+        if (!Array.isArray(rows)) return;
+        empty.hidden = rows.length > 0;
+        list.hidden = rows.length === 0;
+        list.replaceChildren(
+            ...rows.map((row) => {
+                const item = document.createElement("label");
+                item.className = "setting";
+                const text = document.createElement("span");
+                text.className = "setting-text";
+                const name = document.createElement("span");
+                name.className = "name";
+                name.textContent = row.name;
+                const hint = document.createElement("span");
+                hint.className = "hint";
+                hint.textContent = `${row.status} - version ${row.version}`;
+                text.append(name, hint);
+                const toggle = document.createElement("input");
+                toggle.type = "checkbox";
+                toggle.className = "switch";
+                toggle.setAttribute("role", "switch");
+                toggle.setAttribute("aria-label", `Use ${row.name}`);
+                toggle.checked = row.enabled;
+                toggle.addEventListener("change", () => {
+                    const wanted = toggle.checked;
+                    toggle.disabled = true;
+                    void local.setAddonEnabled!(row.id, wanted)
+                        .catch(() => false)
+                        .then((took) => {
+                            // The switch goes back when it did not take.
+                            if (!took) toggle.checked = !wanted;
+                            toggle.disabled = false;
+                        });
+                });
+                item.append(text, toggle);
+                return item;
+            })
+        );
+    };
+    void fill();
+    local.onAddonsChange?.(() => void fill());
+}
+buildAddonsPage();
+
+function showPage(shown: string): void {
     for (const [page, element] of Object.entries(PAGES)) {
         element.hidden = page !== shown;
         byId(`tab-${page}`).setAttribute("aria-selected", String(page === shown));

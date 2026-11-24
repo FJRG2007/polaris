@@ -39,6 +39,13 @@ const bridge: PolarisLocal = {
         setClipboardKeep: (keep) => ipcRenderer.invoke(CHANNELS.connectClipboardKeep, keep),
         setVoiceWidgetLook: (change) => ipcRenderer.invoke(CHANNELS.connectVoiceWidgetLook, change),
         clearClipboardHistory: () => ipcRenderer.invoke(CHANNELS.connectClipboardClear),
+        addons: () => ipcRenderer.invoke(CHANNELS.connectAddons),
+        setAddonEnabled: (id, enabled) => ipcRenderer.invoke(CHANNELS.connectAddonEnable, id, enabled),
+        onAddonsChange: (listener) => {
+            const heard = () => listener();
+            ipcRenderer.on(CHANNELS.addonsChanged, heard);
+            return () => void ipcRenderer.removeListener(CHANNELS.addonsChanged, heard);
+        },
         relaunch: () => ipcRenderer.invoke(CHANNELS.connectRelaunch),
         close: () => ipcRenderer.invoke(CHANNELS.connectClose),
         onShown: (listener) => {

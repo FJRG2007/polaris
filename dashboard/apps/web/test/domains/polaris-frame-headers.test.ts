@@ -33,7 +33,7 @@ describe("Polaris's framing headers", () => {
     it("refuse other sites on every ordinary page", async () => {
         for (const path of ["/", "/home", "/mail", "/cal/book/abc", "/api/health", "/s/token"]) {
             expect(await headersFor(path), path).toEqual({
-                "Content-Security-Policy": `frame-ancestors 'self'; frame-src 'self' ${EMBED_FRAME_ORIGINS.join(" ")}`,
+                "Content-Security-Policy": `frame-ancestors 'self'; frame-src 'self' ${EMBED_FRAME_ORIGINS.join(" ")} polaris-addon:`,
                 "X-Frame-Options": "SAMEORIGIN"
             });
         }
@@ -57,7 +57,7 @@ describe("Polaris's framing headers", () => {
         expect((await headersFor("/analytics"))["X-Frame-Options"]).toBe("SAMEORIGIN");
     });
 
-    it("let a page frame itself and the chat's players, and nothing broader", async () => {
+    it("let a page frame itself, the chat's players and a device add-on's view, and nothing broader", async () => {
         const policy = (await headersFor("/chat"))["Content-Security-Policy"] ?? "";
         const frameSrc = policy
             .split(";")
@@ -65,8 +65,10 @@ describe("Polaris's framing headers", () => {
             .find((directive) => directive.startsWith("frame-src"));
         const sources = (frameSrc ?? "").split(/\s+/).slice(1);
 
-        expect(sources).toEqual(["'self'", ...EMBED_FRAME_ORIGINS]);
-        for (const source of sources.slice(1)) {
+        // The one scheme-only source is the desktop app's own: only it serves
+        // `polaris-addon:`, from the add-on package installed on that computer.
+        expect(sources).toEqual(["'self'", ...EMBED_FRAME_ORIGINS, "polaris-addon:"]);
+        for (const source of sources.slice(1, -1)) {
             // An exact https origin each: no scheme-only source, no wildcard, no path.
             expect(source, source).toMatch(/^https:\/\/[a-z0-9.-]+$/);
         }

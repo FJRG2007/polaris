@@ -18,7 +18,7 @@
  * back is a press, not typing.
  */
 
-import { startDeviceAddons, stopDeviceAddons } from "./addons/electron";
+import { addonShortcutsNow, registerAddonViewScheme, startDeviceAddons, stopDeviceAddons } from "./addons/electron";
 import { appSettingsTarget } from "@polaris/core/app-settings";
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
@@ -819,6 +819,7 @@ function start(): void {
     loadRelaunch();
     startHidden = startedAtLogin(process.argv) && settings.toggle("startMinimized");
 
+    registerAddonViewScheme();
     app.on("browser-window-created", (_event, window) => hideMenuBar(window));
 
     app.on("web-contents-created", (_event, contents) => {
@@ -908,10 +909,10 @@ function start(): void {
         // sessions list groups it with this app (native-host/service.ts).
         startNativeHost({ primary: () => current, server });
 
-        launcher.startLauncher({ server, showPolaris });
+        launcher.startLauncher({ server, showPolaris, addons: () => addonShortcutsNow().installed });
         // Device add-ons start after the window, never before it: with none
         // installed this reads one small file and starts nothing.
-        setTimeout(() => startDeviceAddons(() => showPolaris()), 3_000).unref();
+        setTimeout(() => startDeviceAddons((path) => showPolaris(path)), 3_000).unref();
         registerIpc({
             server,
             showPolaris,

@@ -252,7 +252,7 @@ export function registerIpc(host: IpcHost): void {
         );
     };
     const from = (event: IpcMainInvokeEvent, kind: WindowKind): boolean => kindOf(event.sender) === kind;
-    registerAddonIpc(fromPolaris, () => host.showPolaris());
+    registerAddonIpc(fromPolaris, (path) => host.showPolaris(path), (event) => from(event, "connect"));
 
     ipcMain.handle(CHANNELS.notify, async (event, raw: unknown): Promise<boolean> => {
         if (!fromPolaris(event)) return false;

@@ -371,7 +371,9 @@ const nextConfig = {
      *
      * The same policy says what Polaris itself may frame (`frame-src`): its own
      * pages and the chat's players, and nothing else - so a frame injected into a
-     * page cannot load an arbitrary site inside Polaris.
+     * page cannot load an arbitrary site inside Polaris. `polaris-addon:` is a
+     * device add-on's own view, which only the desktop app serves, from the
+     * package installed on that computer (`desktop/src/main/addons/view.ts`).
      */
     headers: async () => [
         // Nothing Polaris serves belongs in a search engine: not a page, not a
@@ -400,7 +402,7 @@ const nextConfig = {
             headers: [
                 {
                     key: "Content-Security-Policy",
-                    value: `frame-ancestors 'self'; frame-src 'self' ${PLAYER_ORIGINS.join(" ")}`
+                    value: `frame-ancestors 'self'; frame-src 'self' ${PLAYER_ORIGINS.join(" ")} polaris-addon:`
                 },
                 { key: "X-Frame-Options", value: "SAMEORIGIN" }
             ]

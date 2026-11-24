@@ -14,7 +14,7 @@ import { formatBytes } from "@polaris/core";
 import { Loader2, Package } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { StoreCard, StatusBadge } from "@polaris/ui/store-card";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { OverflowMenu, StoreFilters, StoreNoMatch, StoreSection } from "@polaris/ui/store-layout";
 import { Badge, Button, ControlSlider, SegmentedControl, Select, Skeleton, Switch, useToast } from "@polaris/ui";
@@ -41,6 +41,7 @@ import {
     type AddonsBridge,
     type AddonsState
 } from "@/lib/device-addons-client";
+import { addonViewHeight, addonViewTokens, addonViewUrl, readAddonViewMessage, readAddonViewReply, ADDON_VIEW_HEIGHT } from "@/lib/device-addon-view";
 
 type Words = ReturnType<typeof useTranslations<"account">>;
 type Tab = "browse" | "installed" | "updates";
@@ -394,6 +395,59 @@ function AddonSettings({ bridge, manifest }: { bridge: AddonsBridge; manifest: A
     );
 }
 
+/**
+ * The add-on's own view, for what its declared settings cannot draw: a frame
+ * with scripts and nothing else (no same origin, so it reaches neither this
+ * page nor its storage), served by the app from the installed package. It gets
+ * the page's tokens and locale, and every call it makes is read here and
+ * judged by the app.
+ */
+function AddonView({ bridge, manifest, view }: { bridge: AddonsBridge; manifest: AddonManifest; view: string }) {
+    const t = useTranslations("account");
+    const locale = useLocale();
+    const frame = useRef<HTMLIFrameElement>(null);
+    const [height, setHeight] = useState<number>(ADDON_VIEW_HEIGHT.min * 2);
+    const viewCall = bridge.viewCall;
+
+    useEffect(() => {
+        if (!viewCall) return;
+        const target = () => frame.current?.contentWindow ?? null;
+        const post = (message: unknown) => target()?.postMessage(message, "*");
+        const heard = (event: MessageEvent) => {
+            // Only its own frame; a sandboxed frame's origin is "null".
+            if (!target() || event.source !== target()) return;
+            const message = readAddonViewMessage(event.data);
+            if (!message) return;
+            if (message.type === "ready") {
+                post({ type: "hello", locale, tokens: addonViewTokens(getComputedStyle(document.documentElement)), theme: document.documentElement.classList.contains("light") ? "light" : "dark" });
+                return;
+            }
+            if (message.type === "resize") {
+                setHeight(addonViewHeight(message.height));
+                return;
+            }
+            void viewCall(manifest.id, message.method, message.params)
+                .then(readAddonViewReply, () => readAddonViewReply(null))
+                .then((reply) => post({ type: "reply", id: message.id, ...reply }));
+        };
+        window.addEventListener("message", heard);
+        return () => window.removeEventListener("message", heard);
+    }, [viewCall, manifest.id, locale]);
+
+    if (!viewCall) return null;
+    return (
+        <iframe
+            ref={frame}
+            src={addonViewUrl(manifest.id, view)}
+            sandbox="allow-scripts"
+            referrerPolicy="no-referrer"
+            title={say(t, "detail.view", { name: manifest.name })}
+            className="w-full min-w-0 rounded-md border border-border bg-background"
+            style={{ height }}
+        />
+    );
+}
+
 function Fact({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="min-w-0">
@@ -494,6 +548,7 @@ export function AddonPage({ id }: { id: string }) {
                 <section className="flex min-w-0 flex-col gap-2" aria-label={say(t, "detail.settings")}>
                     <h2 className="text-sm font-medium text-muted-foreground">{say(t, "detail.settings")}</h2>
                     <AddonSettings bridge={state.bridge} manifest={installed.manifest} />
+                    {installed.manifest.view ? <AddonView bridge={state.bridge} manifest={installed.manifest} view={installed.manifest.view} /> : null}
                 </section>
             ) : null}
             {entry && entry.screenshots.length > 0 ? (

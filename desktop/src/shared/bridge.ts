@@ -199,6 +199,8 @@ export interface PolarisDesktop {
         settings(id: string): Promise<unknown>;
         /** Change one; answers every value after it, or null when refused. */
         setSetting(id: string, key: string, value: unknown): Promise<unknown>;
+        /** A call from the add-on's view, relayed by the page holding its frame: `{ ok, value }` or `{ ok: false, error }`. */
+        viewCall(id: string, method: string, params: unknown): Promise<unknown>;
         /** Hear that anything changed (progress, a crash, an install). Answers the way to stop. */
         onChange(listener: () => void): () => void;
         /** Hear the app asking to show an add-on (its "found" notice was clicked). Answers the way to stop. */
@@ -445,6 +447,16 @@ export const PREFERENCE_TOGGLES = ["minimizeToTray", "startMinimized", "voiceWid
 
 export type PreferenceToggle = (typeof PREFERENCE_TOGGLES)[number];
 
+/** What the app's own settings page lists for an installed device add-on, offline included. */
+export interface LocalAddonRow {
+    readonly id: string;
+    readonly name: string;
+    readonly version: string;
+    readonly enabled: boolean;
+    /** How it is doing, in words, as the add-on's page in Settings says it. */
+    readonly status: string;
+}
+
 export interface PolarisLocal {
     /** The season the main process drew the Polaris mark in for this window,
      *  as it came (`SEASON_ARGUMENT`); null for the plain mark. */
@@ -485,6 +497,12 @@ export interface PolarisLocal {
         setVoiceWidgetLook(change: LookChange): Promise<boolean>;
         /** Forget every copy the launcher kept. */
         clearClipboardHistory(): Promise<void>;
+        /** The device add-ons installed here, from the app itself (none on an app older than them). */
+        addons?(): Promise<readonly LocalAddonRow[]>;
+        /** Turn an installed add-on on or off. Whether it took. */
+        setAddonEnabled?(id: string, enabled: boolean): Promise<boolean>;
+        /** Heard when an add-on is installed, removed, turned on or off, or its device comes or goes. */
+        onAddonsChange?(listener: () => void): () => void;
         /** Close and open the app again, so a setting read at start applies. */
         relaunch(): Promise<Outcome>;
         /** Put the settings away. */
@@ -780,6 +798,7 @@ export const CHANNELS = {
     addonsEnable: "desktop:addons-enable",
     addonsSettings: "desktop:addons-settings",
     addonsSetSetting: "desktop:addons-set-setting",
+    addonsViewCall: "desktop:addons-view-call",
     addonsChanged: "desktop:addons-changed",
     addonsOpen: "desktop:addons-open",
     openMailDefaults: "desktop:open-mail-defaults",
@@ -832,6 +851,8 @@ export const CHANNELS = {
     connectHostsImport: "local:connect-hosts-import",
     connectCheck: "local:connect-check",
     connectClose: "local:connect-close",
+    connectAddons: "local:connect-addons",
+    connectAddonEnable: "local:connect-addon-enable",
     connectShown: "local:connect-shown",
     connectCheckUpdates: "local:connect-check-updates",
     connectUpdateDownloaded: "local:connect-update-downloaded",

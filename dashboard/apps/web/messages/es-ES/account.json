@@ -2553,7 +2553,8 @@
             "notFound": "Este complemento no está en el equipo ni en la lista.",
             "installFirst": "Instálalo para configurarlo.",
             "saveFailed": "No se guardó el cambio.",
-            "toggleFailed": "No se pudo cambiar."
+            "toggleFailed": "No se pudo cambiar.",
+            "view": "Editor {name}"
         },
         "action": {
             "none": "Nada",

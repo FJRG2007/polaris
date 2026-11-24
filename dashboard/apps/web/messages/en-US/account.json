@@ -2553,7 +2553,8 @@
             "notFound": "This add-on is not on this computer or in the list.",
             "installFirst": "Install it to set it up.",
             "saveFailed": "That change was not saved.",
-            "toggleFailed": "It could not be switched."
+            "toggleFailed": "It could not be switched.",
+            "view": "{name} editor"
         },
         "action": {
             "none": "Nothing",

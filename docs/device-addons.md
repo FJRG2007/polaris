@@ -65,6 +65,31 @@ controls. Values are kept per device in `addons/settings/<id>.json`, checked
 against the declaration on every read and write. An add-on may also name a
 `view` for what plain settings cannot draw, shown in a sandboxed frame.
 
+## Views
+
+A view is a page in the package (`manifest.view`, e.g. `view/index.html`). The
+desktop app serves the folder holding it as `polaris-addon://<id>/`
+(`desktop/src/main/addons/view.ts`): only files of that folder, only web file
+types, under a policy that loads nothing from elsewhere and reaches no network.
+The add-on's page in Settings frames it with `sandbox="allow-scripts"` (no same
+origin) and speaks `postMessage` (`apps/web/src/lib/device-addon-view.ts`):
+
+- the view sends `{type: "ready"}`, and gets `{type: "hello", locale, theme, tokens}`
+  (the page's design tokens, e.g. `--background`, `--primary`, `--radius`);
+- `{type: "resize", height}` sets the frame's height (120 to 1600 px);
+- `{type: "call", id, method, params}` gets `{type: "reply", id, ok, value | error}`.
+  The methods are the process's own (`settings.get`, `polaris.state`,
+  `polaris.action`, judged against the granted permissions) and `settings.set`
+  (`{key, value}`, checked against the declared settings), which only a view has.
+
+## Ways in
+
+The store's Installed tab, the "found" notice, a launcher row "Configure <name>"
+for every installed add-on, a tray item while its device is plugged in
+(`addons/ways-in.ts`; Windows and Linux, which have the tray), and a Device
+add-ons page in the app's own settings that lists them and turns them on and
+off offline.
+
 ## Publishing an add-on
 
 `device-addons/<id>/manifest.json`, optional `listing.json` (`icon`,

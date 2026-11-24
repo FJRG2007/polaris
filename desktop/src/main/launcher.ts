@@ -64,6 +64,8 @@ export interface LauncherHost {
     readonly server: () => string | null;
     /** Show the Polaris window at a path of the Polaris in use. */
     readonly showPolaris: (path?: string) => void;
+    /** The device add-ons installed here, each with its page in Settings, for "Configure <name>". */
+    readonly addons?: () => readonly { readonly id: string; readonly name: string; readonly path: string; }[];
 }
 
 let host: LauncherHost | null = null;
@@ -254,6 +256,10 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
                 add({ kind: "polaris", title: entry.label, subtitle: entry.context }, () => host?.showPolaris(entry.href), entryKey(entry));
             }
             for (const page of rankedMatches(query, PAGES.map((page) => ({ ...page, context: "Polaris" })), 3, pageKey, uses)) addPage(page);
+            const addonPages = (host?.addons?.() ?? []).map((addon) => ({ label: `Configure ${addon.name}`, path: addon.path, context: addon.name }));
+            for (const page of rankedMatches(query, addonPages, 3, pageKey, uses)) {
+                add({ kind: "page", title: page.label, subtitle: "Device add-on - opens its settings" }, () => host?.showPolaris(page.path), pageKey(page));
+            }
         }
         const commandKey = (command: SystemCommand) => `system:${command.id}`;
         const commands = systemCommands(process.platform, process.env).map((command) => ({ ...command, ...searchableCommand(command) }));
