@@ -278,7 +278,8 @@ describe("updates in the manager", () => {
         await manager.checkUpdates();
         expect(await installedVersion(dir)).toBe("1.0.0");
         child.speak({ type: "status", state: "connected" });
-        await settle();
+        // The update the free status sets off runs on its own: wait for it, not a fixed 20 ms.
+        for (let i = 0; i < 50 && (await installedVersion(dir)) !== "1.1.0"; i++) await settle();
         await manager.snapshot();
         expect(await installedVersion(dir)).toBe("1.1.0");
     });
