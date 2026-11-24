@@ -7,10 +7,18 @@ import { runSnapshot, type SnapshotDeps } from "@/main/runner/snapshots";
 import { snapshotAnswerSchema } from "../../../../dashboard/packages/core/src/runner-protocol";
 import type { GitOutput, GitReadOptions } from "@/main/runner/workspace";
 
+/**
+ * This process's environment without git's own variables. Run from a git hook
+ * (a pre-push, the gate), `GIT_DIR` and `GIT_INDEX_FILE` point at the repository
+ * being pushed, and git obeys them over the folder it is run in: the test then
+ * failed, and its `git init` turned that repository bare.
+ */
+const hostEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")));
+
 /** Real git, as the runner runs it: an argument array and no shell. */
 function gitRead(args: string[], options: GitReadOptions): Promise<GitOutput> {
     return new Promise((resolve) => {
-        const child = spawn("git", args, { cwd: options.cwd, env: { ...process.env, ...options.env }, stdio: ["ignore", "pipe", "ignore"] });
+        const child = spawn("git", args, { cwd: options.cwd, env: { ...hostEnv, ...options.env }, stdio: ["ignore", "pipe", "ignore"] });
         const chunks: Buffer[] = [];
         child.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
         child.once("error", () => resolve({ code: 127, stdout: Buffer.alloc(0), total: 0 }));
