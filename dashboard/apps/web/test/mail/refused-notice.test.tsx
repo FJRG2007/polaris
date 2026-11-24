@@ -27,6 +27,7 @@ const shelves: string[] = [];
 const held: { answer: Promise<void> } = { answer: Promise.resolve() };
 
 vi.mock("next/navigation", () => ({
+    useSearchParams: () => new URLSearchParams(),
     useRouter: () => ({ refresh: () => undefined, push: () => undefined, replace: () => undefined })
 }));
 vi.mock("@/app/(app)/mail/actions", () => ({

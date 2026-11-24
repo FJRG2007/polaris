@@ -488,9 +488,13 @@ async function matchingThreads(
             seen: true,
             flagged: true,
             sentAt: true,
-            attachments: terms.filename.length > 0 ? { select: { name: true } } : undefined,
-            labels:
-                terms.label.length > 0 ? { select: { label: { select: { name: true } } } } : undefined
+            // Only read when the search asks about them; `take: 0` keeps the
+            // shape of the row the same either way.
+            attachments: { select: { name: true }, take: terms.filename.length > 0 ? 50 : 0 },
+            labels: {
+                select: { label: { select: { name: true } } },
+                take: terms.label.length > 0 ? 50 : 0
+            }
         },
         orderBy: { sentAt: "desc" },
         take: SEARCH_WINDOW
@@ -512,8 +516,8 @@ async function matchingThreads(
         seen: message.seen,
         flagged: message.flagged,
         sentAt: message.sentAt,
-        attachmentNames: (message.attachments ?? []).map((file) => file.name),
-        labels: (message.labels ?? []).map((applied) => applied.label.name)
+        attachmentNames: message.attachments.map((file) => file.name),
+        labels: message.labels.map((applied) => applied.label.name)
     }));
 
     const admitted = searchable.filter((message) => core.mailSearchAdmits(message, terms));

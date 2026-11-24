@@ -34,7 +34,10 @@ describe("marking text", () => {
     });
 
     it("marks every occurrence and merges ones that overlap", () => {
-        const hits = marks.mailSearchHits("report quarterly report", ["quarterly report", "report"]);
+        const hits = marks.mailSearchHits("report quarterly report", [
+            "quarterly report",
+            "report"
+        ]);
         expect(hits).toEqual([
             [0, 6],
             [7, 23]
@@ -90,7 +93,9 @@ describe("chips", () => {
 
 describe("operator hints", () => {
     it("offers the operators the last word starts", () => {
-        expect(marks.mailSearchOperatorHints("invoice fr").map((one) => one.insert)).toEqual(["from:"]);
+        expect(marks.mailSearchOperatorHints("invoice fr").map((one) => one.insert)).toEqual([
+            "from:"
+        ]);
         expect(marks.mailSearchOperatorHints("is:").map((one) => one.insert)).toEqual([
             "is:unread",
             "is:read",
@@ -146,8 +151,12 @@ describe("the new operators", () => {
             attachmentNames: ["Factura-2026.pdf"],
             labels: ["Work"]
         };
-        expect(search.mailSearchAdmits(message, search.parseMailSearch("filename:factura"))).toBe(true);
-        expect(search.mailSearchAdmits(message, search.parseMailSearch("filename:contrato"))).toBe(false);
+        expect(search.mailSearchAdmits(message, search.parseMailSearch("filename:factura"))).toBe(
+            true
+        );
+        expect(search.mailSearchAdmits(message, search.parseMailSearch("filename:contrato"))).toBe(
+            false
+        );
         expect(search.mailSearchAdmits(message, search.parseMailSearch("label:work"))).toBe(true);
         expect(search.mailSearchAdmits(message, search.parseMailSearch("label:home"))).toBe(false);
     });
