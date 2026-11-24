@@ -27,7 +27,7 @@ grouping is decided, what a block holds against, and what is not done yet.
   `/etc/machine-id`) and send `sha256("polaris-device-v1\0" + id)` - never the id
   itself. One shared reader: `dashboard/packages/core/src/device-identity-node.ts`.
 - Desktop: `x-polaris-device` / `x-polaris-device-name` headers, added only to
-  requests to the active server origin (`desktop/src/main/device-headers.ts`).
+  requests to the active server origin (`clients/desktop/src/main/device-headers.ts`).
 - CLI and Stream Deck: an optional `device: { id, osVersion }` field on
   `/api/cli/authorize` and `/api/deck/authorize`. Older servers strip it; older
   clients omit it.

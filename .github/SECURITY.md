@@ -16,5 +16,5 @@ Polaris ships as a rolling release from `main`, installed from the Update button
 
 ## Polaris Terminal
 
-The terminal under `terminal/` is covered by this same policy and the same private channel. It is released on its own
+The terminal under `clients/terminal/` is covered by this same policy and the same private channel. It is released on its own
 `terminal-v*` tags, and the supported version is the latest of those releases.

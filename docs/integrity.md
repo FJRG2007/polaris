@@ -85,7 +85,7 @@ registered on every saved server). Firefox's manifest v2 build cannot register a
 page script at runtime, so it does not check yet.
 
 **The desktop app.** The Polaris window runs the same check as the extension
-(`desktop/src/preload/integrity.ts`, `desktop/src/main/integrity.ts`, both on
+(`clients/desktop/src/preload/integrity.ts`, `clients/desktop/src/main/integrity.ts`, both on
 `@polaris/core/integrity` and `@polaris/core/integrity-guard`): the preload
 hashes what the page loaded, the main process fetches the manifest from GitHub
 through the window's own session (so a pinned local certificate still works)
@@ -115,8 +115,8 @@ does not already catch, and Next.js' `experimental.sri` is not in use here.
 
 The desktop app's own code is protected by Electron fuses: `RunAsNode`, `NODE_OPTIONS` and the inspector are off, the app loads only
 from its archive, and the archive's integrity is checked against the hash embedded
-in the binary (`desktop/forge.config.js`). How an update is checked depends on the
-system (`desktop/src/main/updates.ts`):
+in the binary (`clients/desktop/forge.config.js`). How an update is checked depends on the
+system (`clients/desktop/src/main/updates.ts`):
 
 - **macOS**: Squirrel.Mac applies an update only when its code signature matches
   the running app's, and the app updates itself only when it is Developer ID signed.

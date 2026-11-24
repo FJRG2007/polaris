@@ -196,7 +196,7 @@ the input itself makes possible, each with its guard in
 | Display transport | not written: `nusb` 0.2 has no isochronous transfers, and initialization is not understood (above) |
 | Per-app audio backends | Windows Core Audio and PulseAudio/PipeWire done; macOS answers unsupported |
 | Desktop binding (`crates/polaris-stream100-node`) | `Controller` (reports in, volume out, actions back) and `Reader` (reads on a worker thread, `await reader.next(500)`) |
-| Device add-on (`device-addons/hercules-stream100`) | manifest generated from the crate (`cargo run -p polaris-stream100 --example manifest`, a test keeps them equal), entry `any/main.cjs`, native module built per platform by `.github/workflows/device-addons.yml` (Windows x64, Linux x64). Settings live only on the add-on's page, never in the app's own settings |
+| Device add-on (`clients/device-addons/hercules-stream100`) | manifest generated from the crate (`cargo run -p polaris-stream100 --example manifest`, a test keeps them equal), entry `any/main.cjs`, native module built per platform by `.github/workflows/device-addons.yml` (Windows x64, Linux x64). Settings live only on the add-on's page, never in the app's own settings |
 | Game category | the engine takes running games (`Controller.setGames`), but the add-on protocol has no method that hands them over yet, so Games follows only the apps the classifier knows |
 
 ### Needed from a real device

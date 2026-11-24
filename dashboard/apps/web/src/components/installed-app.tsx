@@ -12,7 +12,7 @@
  * the row says where.
  *
  * On the downloads page the offer is a row of the desktop card, under the native
- * desktop app's (`desktop/` in the repository) own downloads. Whether there is
+ * desktop app's (`clients/desktop/` in the repository) own downloads. Whether there is
  * one to download is a question for GitHub, so that list streams in behind a
  * boundary of its own and nothing here waits on it. Inside that app the offer says so instead of offering to install anything.
  */

@@ -382,7 +382,7 @@ export async function androidDownload(repo: string): Promise<AppDownload | null>
 
 /**
  * Whether a TV release carries what the desktop app installs from: the APK and
- * the checksum list it verifies it against (`desktop/src/main/tv-install.ts`).
+ * the checksum list it verifies it against (`clients/desktop/src/main/tv-install.ts`).
  * A release without both is one the install refuses, so it is not offered.
  */
 export function tvInstallable(release: AppDownload | null): boolean {

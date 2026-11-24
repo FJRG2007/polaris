@@ -20,7 +20,7 @@
     { "id": "huawei-refusal", "source": "https://github.com/simbasjungles/free-my-tv#any-tv" },
     {
         "id": "android-check",
-        "source": "https://github.com/FJRG2007/polaris/blob/main/desktop/src/main/tv-install.ts"
+        "source": "https://github.com/FJRG2007/polaris/blob/main/clients/desktop/src/main/tv-install.ts"
     },
     {
         "id": "android-too-old",

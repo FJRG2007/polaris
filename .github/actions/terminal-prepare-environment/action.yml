@@ -1,9 +1,9 @@
 name: Prepare the terminal build environment
 description: >-
   Toolchain, build dependencies, protoc, Node and the Rust cache for a job that
-  builds the terminal/ Cargo workspace. Ported from Rook's prepare_environment
+  builds the clients/terminal/ Cargo workspace. Ported from Rook's prepare_environment
   action; the LFS steps are gone (Polaris has no LFS) and the paths point at
-  terminal/ instead of the repository root.
+  clients/terminal/ instead of the repository root.
 inputs:
   target_os:
     required: true
@@ -49,11 +49,11 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ runner.temp }}/polaris-terminal-assets
-        key: polaris-terminal-assets-${{ hashFiles('terminal/crates/input_classifier/build.rs') }}
+        key: polaris-terminal-assets-${{ hashFiles('clients/terminal/crates/input_classifier/build.rs') }}
 
     - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       with:
-        workspaces: terminal -> target
+        workspaces: clients/terminal -> target
         # `shared-key` rather than `key`: `key` is *added* to a cache key that
         # already includes the job, so a matrix leg could not reuse what the
         # same leg of an earlier run had compiled. Callers pass one key per
@@ -77,7 +77,7 @@ runs:
     # download entirely when the pinned version is already present.
     - name: Install cargo-binstall
       shell: bash
-      working-directory: terminal
+      working-directory: clients/terminal
       run: ./script/install_cargo_binstall
 
     - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
@@ -87,7 +87,7 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      working-directory: terminal
+      working-directory: clients/terminal
       run: |
         if ${{ inputs.target_os == 'macos' }}; then
           if ${{ inputs.install_release_deps == 'true' }}; then

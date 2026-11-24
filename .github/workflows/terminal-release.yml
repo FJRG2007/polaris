@@ -1,7 +1,7 @@
 name: terminal release
 
 # Polaris Terminal installers, attached to the GitHub release of a
-# `terminal-v*` tag (Rook's release.yml, run from terminal/). Push a tag, run
+# `terminal-v*` tag (Rook's release.yml, run from clients/terminal/). Push a tag, run
 # this by hand, or let terminal-auto-release.yml cut one.
 #
 # The tag is `terminal-v0.YYYY.MM.DD.HH.MM.oss_NN`. The bundle scripts embed the
@@ -53,7 +53,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: terminal
+        working-directory: clients/terminal
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -197,8 +197,8 @@ jobs:
               \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \) 2>/dev/null || true
             exit 1
           fi
-          echo "path=terminal/$found" >> "$GITHUB_OUTPUT"
-          echo "Found terminal/$found"
+          echo "path=clients/terminal/$found" >> "$GITHUB_OUTPUT"
+          echo "Found clients/terminal/$found"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -229,6 +229,6 @@ jobs:
           name: polaris-terminal-pdb-${{ steps.tag.outputs.value }}
           path: |
             ${{ steps.bundle_windows.outputs.pdb_file_path }}
-            terminal/target/x86_64-pc-windows-msvc/rlto/*.pdb
+            clients/terminal/target/x86_64-pc-windows-msvc/rlto/*.pdb
           if-no-files-found: warn
           retention-days: 90

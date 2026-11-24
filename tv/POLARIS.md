@@ -20,7 +20,7 @@ that cannot take it.
   both files.
 - **Local certificate.** A Polaris's local https addresses (polaris.local, its LAN IP) carry a certificate from
   the instance's own local CA. When `/api/instance`, read over an https usual address, publishes
-  `localCaSha256`, `PolarisLocalCa` (the copy of `desktop/src/main/local-ca-pin.ts`) accepts on those other
+  `localCaSha256`, `PolarisLocalCa` (the copy of `clients/desktop/src/main/local-ca-pin.ts`) accepts on those other
   https hosts only - never the usual one - a chain whose leaf names the host and is not a CA, with every
   certificate in date and each signed by the next up to a certificate with that SHA-256. Everything else keeps
   the system's trust. With a pin the plain-http alternates are dropped, so the key never crosses the network

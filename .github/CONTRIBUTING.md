@@ -128,9 +128,9 @@ right to contribute.
 
 ## Working on Polaris Terminal
 
-The terminal lives in `terminal/`, its own Cargo workspace with its own toolchain (`terminal/rust-toolchain.toml`).
-Everything below runs from inside `terminal/`; [`terminal/CLAUDE.md`](../terminal/CLAUDE.md) is the full engineering
-guide and [`terminal/README.md`](../terminal/README.md) the overview.
+The terminal lives in `clients/terminal/`, its own Cargo workspace with its own toolchain (`clients/terminal/rust-toolchain.toml`).
+Everything below runs from inside `clients/terminal/`; [`clients/terminal/CLAUDE.md`](../clients/terminal/CLAUDE.md) is the full engineering
+guide and [`clients/terminal/README.md`](../clients/terminal/README.md) the overview.
 
 ```bash
 ./script/bootstrap   # platform-specific setup
@@ -139,11 +139,11 @@ cargo run            # build and run the terminal
 ```
 
 - **Tests.** A bug fix carries a regression test; non-trivial logic carries unit tests; a user-facing flow gets
-  end-to-end coverage under `terminal/crates/integration/` when it can be exercised that way. Run them with
+  end-to-end coverage under `clients/terminal/crates/integration/` when it can be exercised that way. Run them with
   `cargo nextest run`. Visual changes include before and after screenshots.
 - **Style.** `./script/format --check` and `cargo clippy --workspace --all-targets --tests -- -D warnings` must pass.
   Prefer imports over path qualifiers, inline format args (`println!("{x}")`), and exhaustive `match` over `_`.
-- **Specs.** A change that needs one first adds `terminal/specs/GH<issue-number>/product.md` (testable behavior
+- **Specs.** A change that needs one first adds `clients/terminal/specs/GH<issue-number>/product.md` (testable behavior
   invariants) and `tech.md` (context, proposed changes, testing), and the pull request carries the discussion.
-- **CI.** `.github/workflows/terminal.yml` runs only when something under `terminal/` changed; its `terminal` job is
+- **CI.** `.github/workflows/terminal.yml` runs only when something under `clients/terminal/` changed; its `terminal` job is
   the check to wait for.

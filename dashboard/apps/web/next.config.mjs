@@ -373,7 +373,7 @@ const nextConfig = {
      * pages and the chat's players, and nothing else - so a frame injected into a
      * page cannot load an arbitrary site inside Polaris. `polaris-addon:` is a
      * device add-on's own view, which only the desktop app serves, from the
-     * package installed on that computer (`desktop/src/main/addons/view.ts`).
+     * package installed on that computer (`clients/desktop/src/main/addons/view.ts`).
      */
     headers: async () => [
         // Nothing Polaris serves belongs in a search engine: not a page, not a

@@ -44,7 +44,7 @@ Electron: the page piled up event listeners on every navigation (`PageTiming`,
 fixed in `04551960b6`), which would have happened under Tauri too.
 
 Rust stays where it earns its place: small native helpers beside the app, as
-the VPN helper (`desktop/vpn-helper`) already is, not a second shell.
+the VPN helper (`clients/desktop/vpn-helper`) already is, not a second shell.
 
 ### A native GPUI rewrite is not planned
 

@@ -11,7 +11,7 @@
  *
  * Inside the Polaris desktop app, "Choose folder" hands the folder to the app,
  * which zips it from the disk with the same exclusions and limits - they are
- * copied in `desktop/src/main/zip-rules.ts`, and a change here belongs there too.
+ * copied in `clients/desktop/src/main/zip-rules.ts`, and a change here belongs there too.
  */
 
 import * as deployActions from "./actions";

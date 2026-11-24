@@ -5,7 +5,7 @@ import java.net.URLDecoder;
 
 /**
  * `polaris://open?server=<origin>&path=<path>`: a page of a Polaris, opened in this app by a link somebody followed -
- * the same link, read the same way, as the desktop app's (`desktop/src/shared/deep-link.ts`).
+ * the same link, read the same way, as the desktop app's (`clients/desktop/src/shared/deep-link.ts`).
  *
  * Any website can start such a link, so it only ever names a page to show: it carries nothing, and a page acts only on
  * what somebody then presses. A Polaris that is not on this phone is never opened from one without a yes. Pure, so it

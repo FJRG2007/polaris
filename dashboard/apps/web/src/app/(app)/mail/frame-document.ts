@@ -2,7 +2,7 @@
  * The document a received message is drawn inside: its policy, base target,
  * colours, height reporter and link handling. Kept apart from the React
  * component so the desktop app's Electron harness can draw exactly this page
- * without the rest of the dashboard (desktop/test/electron/links).
+ * without the rest of the dashboard (clients/desktop/test/electron/links).
  */
 
 import * as selectionMenu from "@/lib/selection-menu";

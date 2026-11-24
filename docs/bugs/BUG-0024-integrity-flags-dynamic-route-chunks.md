@@ -9,7 +9,7 @@ related:
   - dashboard/packages/core/src/integrity-guard.ts
   - dashboard/packages/core/test/integrity.test.ts
   - dashboard/apps/extension/src/entrypoints/background.ts
-  - desktop/src/main/integrity.ts
+  - clients/desktop/src/main/integrity.ts
 reported: 2026-11-23
 fixed: 2026-11-23
 fix_commit: "fix(integrity): a dynamic route's code no longer reads as changed (e3c1f78a05)"

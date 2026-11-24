@@ -133,7 +133,7 @@ describe("launcher settings", () => {
 describe("Polaris Desktop", () => {
     // Desktop is outside the dashboard's workspace and cannot import this
     // package, so its own default is held to this one here.
-    const desktop = fileURLToPath(new URL("../../../../desktop/src/shared/launcher-hotkey.ts", import.meta.url));
+    const desktop = fileURLToPath(new URL("../../../../clients/desktop/src/shared/launcher-hotkey.ts", import.meta.url));
 
     it.runIf(existsSync(desktop))("defaults to the same global key", () => {
         const found = /DEFAULT_LAUNCHER_BINDING\s*=\s*"([^"]+)"/.exec(readFileSync(desktop, "utf8"))?.[1];

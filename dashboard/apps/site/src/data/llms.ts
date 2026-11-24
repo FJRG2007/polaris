@@ -28,7 +28,7 @@ export const REPOSITORY_MAP: readonly { readonly path: string; readonly what: st
     { path: "dashboard/docker", what: "The Docker Compose stack an install runs" },
     { path: "dashboard/scripts", what: "The installer, the updater and their tests" },
     { path: "crates/polaris-hostd", what: "The host daemon that runs containers for the dashboard" },
-    { path: "desktop", what: "The desktop app" },
+    { path: "clients/desktop", what: "The desktop app" },
     { path: "tv", what: "Polaris on TVs" },
     { path: "docs/features", what: "The guides this site's Docs section is rendered from, in English and Spanish" },
     { path: "docs/developers", what: "MCP, analytics and telemetry for developers" }

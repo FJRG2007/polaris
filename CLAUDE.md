@@ -401,15 +401,15 @@ the same dashboard runs fine.
 - **Nothing on a timer may start a process.** The game check ran `tasklist`
   every 15 s: 1.2-1.5 s of processor and ~3 s of wall time a run, for as long as
   the app was open, and the window stuttered with it. Windows now asks one
-  PowerShell that stays open (`WindowsLister` in `desktop/src/main/game-detect.ts`).
+  PowerShell that stays open (`WindowsLister` in `clients/desktop/src/main/game-detect.ts`).
 - **No `ipcRenderer.sendSync`, and preloads stay small.** A preload runs before
   every load of the dashboard; the full zod build made it ~1 MB. Preloads and the
-  schemas they import use `zod/mini`. `desktop/test/build/page-weight.test.ts`
+  schemas they import use `zod/mini`. `clients/desktop/test/build/page-weight.test.ts`
   fails on a preload over its ceiling or any `sendSync` in `src`.
 - **Never listen on a network address.** Binding `0.0.0.0` or joining a
   multicast group is what raises Windows' "allow on private/public networks"
   prompt, again for every binary and install path. TV discovery asks with mDNS
-  QU queries from a port the system picks (`desktop/src/main/tv-mdns.ts`); the
+  QU queries from a port the system picks (`clients/desktop/src/main/tv-mdns.ts`); the
   only listener left is the VPN helper on loopback.
 - **A release is the pushed `desktop-v<version>` tag**, after the version bump
   is on main. Without the tag nobody gets the change.

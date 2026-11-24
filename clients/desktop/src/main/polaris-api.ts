@@ -1,0 +1,257 @@
+/**
+ * Calls to the Polaris Deploy API with the pasted key - the same routes the
+ * `polaris` CLI calls.
+ *
+ * Sent through Chromium's network stack (`net`) rather than Node's, so a request
+ * from here trusts the certificates and uses the proxy the window does: if the
+ * dashboard opens, these reach it too.
+ *
+ * Only the key goes with them, never the window's session cookie: the key is
+ * what the Deploy API accepts, and it can be revoked on its own.
+ */
+
+import { createFailover, learnInstance, type Failover, type InstanceRecord } from "../../../../dashboard/packages/core/src/instance-fallback";
+import { z } from "zod";
+import { join } from "node:path";
+import { app, net } from "electron";
+import type { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { describeNetError, errorText, netErrorCode } from "./reachability";
+import { markCertificateFailure } from "./window-failover";
+import { RELEARN_MS, readStoredInstance, writeStoredInstance } from "./instance-store";
+
+/** A refusal or failure, with a sentence for the push window. */
+export class ApiFailure extends Error {
+    constructor(
+        readonly status: number,
+        message: string
+    ) {
+        super(message);
+    }
+}
+
+export const KEY_REFUSED = "The API key was refused - it may have been revoked or have expired. Paste a new one.";
+
+/**
+ * The same Polaris on its local addresses, learned over the server's own address
+ * once its key is accepted (`learnServer`) and kept on disk (`instance-store`), so
+ * an app started while the internet is down still has them. A request goes to a
+ * local address only after it proved, by signature, that it is this Polaris - see
+ * `@polaris/core/instance-fallback`.
+ */
+const failovers = new Map<string, Failover>();
+/** What each server said about itself, as the failovers above were built from. */
+const records = new Map<string, InstanceRecord>();
+
+function instancesFile(): string {
+    return join(app.getPath("userData"), "instances.json");
+}
+
+/**
+ * `net.fetch`, with a refused certificate marked for the failover
+ * (`markCertificateFailure`).
+ */
+async function netFetch(url: string, init?: RequestInit): Promise<Response> {
+    try {
+        return await net.fetch(url, init);
+    } catch (caught) {
+        throw markCertificateFailure(caught);
+    }
+}
+
+/** Learn the server's identity and local addresses over its own address. Best-effort; an older Polaris has none. */
+export async function learnServer(server: string): Promise<InstanceRecord | null> {
+    const instance = await learnInstance(server, netFetch);
+    if (!instance) return null;
+    failovers.set(server, createFailover({ primary: server, instance, fetch: netFetch }));
+    records.set(server, instance);
+    try {
+        writeStoredInstance(instancesFile(), server, instance);
+    } catch {
+        // Kept in memory for this run; the next start learns it again.
+    }
+    return instance;
+}
+
+/**
+ * Who a listed server is: the record kept on disk, or asked over its own address
+ * when there is none yet. Public, no key: a server added without one is still
+ * recognized when the same Polaris is typed under another name.
+ */
+export async function knownInstance(server: string): Promise<InstanceRecord | null> {
+    const stored = readStoredInstance(instancesFile(), server);
+    if (stored) return stored.record;
+    return learnServer(server).catch(() => null);
+}
+
+const asked = new Set<string>();
+
+/**
+ * The failover for a server, read back from disk the first time it is asked for.
+ * Undefined while nothing has been learned about it yet - asking also starts
+ * learning it, so a server opened while online can fail over the next time.
+ */
+export function failoverFor(server: string): Failover | undefined {
+    const held = failovers.get(server);
+    if (held) return held;
+    const stored = readStoredInstance(instancesFile(), server);
+    if (!stored) {
+        // A key kept from before the addresses were learned: ask once this run.
+        if (!asked.has(server)) {
+            asked.add(server);
+            void learnServer(server).catch(() => undefined);
+        }
+        return undefined;
+    }
+    const failover = createFailover({ primary: server, instance: stored.record, fetch: netFetch });
+    failovers.set(server, failover);
+    records.set(server, stored.record);
+    const stale = Date.now() - stored.learnedAt > RELEARN_MS;
+    const unpinned = !stored.record.localCaSha256?.length && !asked.has(server);
+    if (unpinned) asked.add(server);
+    if (stale || unpinned) void learnServer(server).catch(() => undefined);
+    return failover;
+}
+
+/**
+ * What was learned about a server over its own address - in memory, or read back
+ * from disk the first time - or null. Synchronous: the certificate check asks it
+ * on every verification.
+ */
+export function instanceRecordFor(server: string): InstanceRecord | null {
+    if (!records.has(server)) failoverFor(server);
+    return records.get(server) ?? null;
+}
+
+/** "Using your local network address" while on one, otherwise null. */
+export function addressWords(server: string): string | null {
+    return failoverFor(server)?.status().words ?? null;
+}
+
+export interface Caller {
+    readonly server: string;
+    readonly key: string;
+}
+
+/** The failure a non-2xx answer stands for, in the instance's own words when it
+ *  gave some - every Deploy API refusal is `{ "error": "..." }`. */
+function refusal(status: number, body: unknown): ApiFailure {
+    if (status === 401) return new ApiFailure(401, KEY_REFUSED);
+    const said = body && typeof body === "object" ? (body as { error?: unknown; }).error : undefined;
+    return new ApiFailure(status, typeof said === "string" ? said : `Polaris answered with HTTP ${status}.`);
+}
+
+function unreachable(caught: unknown, caller: Caller): ApiFailure {
+    return new ApiFailure(0, describeNetError(netErrorCode(errorText(caught)), new URL(caller.server).host));
+}
+
+/**
+ * A request with the key, answering the response or an `ApiFailure`.
+ *
+ * A streamed answer (a build log followed with `?follow=1`) arrives as it is
+ * written, except that Chromium holds the first kilobyte of a `text/plain`
+ * answer while it sniffs its type - so a build's first few lines can appear
+ * together rather than one by one.
+ */
+export async function call(caller: Caller, path: string, init: RequestInit = {}): Promise<Response> {
+    const headers = new Headers(init.headers);
+    headers.set("authorization", `Bearer ${caller.key}`);
+    let response: Response;
+    const options: RequestInit = { ...init, headers, credentials: "omit", cache: "no-store" };
+    const failover = failoverFor(caller.server);
+    try {
+        response = failover
+            ? await failover.request(path, options)
+            : await net.fetch(`${caller.server}${path}`, options);
+    } catch (caught) {
+        if ((caught as Error).name === "AbortError") throw caught;
+        throw unreachable(caught, caller);
+    }
+    if (response.ok) return response;
+    throw refusal(response.status, await response.json().catch(() => null));
+}
+
+/**
+ * POST a file as the body, streamed: read from disk as the network takes it,
+ * never held in memory - an image archive can be gigabytes. `net.fetch` reads a
+ * stream body whole before sending it, so this uses `net.request`, whose request
+ * is a writable stream with back-pressure. Answers the parsed JSON body.
+ */
+export async function sendFile(
+    caller: Caller,
+    path: string,
+    body: Readable,
+    headers: Readonly<Record<string, string>>,
+    signal: AbortSignal
+): Promise<unknown> {
+    const origin = (await failoverFor(caller.server)?.resolve()) ?? caller.server;
+    const request = net.request({ method: "POST", url: `${origin}${path}`, credentials: "omit", cache: "no-store" });
+    request.chunkedEncoding = true;
+    request.setHeader("authorization", `Bearer ${caller.key}`);
+    for (const [name, value] of Object.entries(headers)) request.setHeader(name, value);
+
+    const answered = new Promise<{ status: number; text: string; }>((resolve, reject) => {
+        request.on("response", (response) => {
+            let text = "";
+            response.on("data", (chunk: Buffer) => {
+                text += chunk.toString("utf8");
+            });
+            response.on("end", () => resolve({ status: response.statusCode, text }));
+            response.on("error", reject);
+        });
+        request.on("error", reject);
+        request.on("abort", () => reject(new DOMException("The upload was canceled.", "AbortError")));
+    });
+    // Settled whichever way the upload goes, so a refusal mid-upload is not also
+    // reported as an unhandled rejection.
+    answered.catch(() => undefined);
+    const abort = () => request.abort();
+    signal.addEventListener("abort", abort, { once: true });
+    try {
+        // Electron's ClientRequest is a Writable at run time; its typings predate that.
+        await pipeline(body, request as unknown as NodeJS.WritableStream);
+        const { status, text } = await answered;
+        let parsed: unknown = null;
+        try {
+            parsed = JSON.parse(text);
+        } catch {
+            parsed = null;
+        }
+        if (status < 200 || status >= 300) throw refusal(status, parsed);
+        return parsed;
+    } catch (caught) {
+        if (signal.aborted || caught instanceof ApiFailure) throw caught;
+        throw unreachable(caught, caller);
+    } finally {
+        signal.removeEventListener("abort", abort);
+    }
+}
+
+/** A JSON answer, checked against the shape the route documents. */
+export async function callJson<T>(caller: Caller, path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
+    const response = await call(caller, path, init);
+    const parsed = schema.safeParse(await response.json().catch(() => null));
+    if (!parsed.success) throw new ApiFailure(response.status, "Polaris answered with something this app does not understand.");
+    return parsed.data;
+}
+
+/** `GET /api/v1/me`: who the key acts as. */
+export const meSchema = z.object({
+    user: z.object({ name: z.string().nullable().optional(), username: z.string().nullable().optional() })
+});
+
+/** `GET /api/v1/deploy/services/:id/image`: the repository to tag the image under. */
+export const imageTargetSchema = z.object({ repository: z.string().min(1).max(512) });
+
+/** `POST /api/v1/deploy/services/:id/image`: the deployment that was started. */
+export const startedSchema = z.object({ deploymentId: z.string().min(1).max(64) });
+
+/** `GET /api/v1/deploy/deployments/:id?tail=1`: where a deployment is. */
+export const deploymentSchema = z.object({
+    status: z.string(),
+    error: z.string().nullable().optional(),
+    done: z.boolean(),
+    nextOffset: z.number().int().nonnegative().optional()
+});
+
+export type DeploymentState = z.infer<typeof deploymentSchema>;

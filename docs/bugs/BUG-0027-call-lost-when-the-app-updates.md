@@ -7,10 +7,10 @@ location: dashboard/apps/web/src/app/(app)/chat/call-resume.ts
 related:
   - dashboard/apps/web/src/app/(app)/chat/call-session.tsx
   - dashboard/apps/web/src/lib/desktop-bridge.ts
-  - desktop/src/shared/relaunch.ts
-  - desktop/src/main/relaunch.ts
-  - desktop/src/main/updates.ts
-  - desktop/src/main/ipc.ts
+  - clients/desktop/src/shared/relaunch.ts
+  - clients/desktop/src/main/relaunch.ts
+  - clients/desktop/src/main/updates.ts
+  - clients/desktop/src/main/ipc.ts
   - mobile/android/app/src/main/java/app/polaris/mobile/SelfUpdate.java
   - mobile/android/app/src/main/java/app/polaris/mobile/InCall.java
 reported: 2026-11-23

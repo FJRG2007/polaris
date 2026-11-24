@@ -10,7 +10,7 @@
 //!   creates the pipe with the creating user's default DACL, under which only
 //!   that user, SYSTEM and administrators may write to it.
 //!
-//! `desktop/src/main/native-host/ipc-path.ts` computes the same locations.
+//! `clients/desktop/src/main/native-host/ipc-path.ts` computes the same locations.
 
 use std::io::{Read, Write};
 

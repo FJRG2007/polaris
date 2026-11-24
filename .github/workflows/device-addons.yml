@@ -1,5 +1,5 @@
 # Device add-ons (docs/device-addons.md): build every add-on under
-# device-addons/, write the catalog, sign it, and publish all of it on the
+# clients/device-addons/, write the catalog, sign it, and publish all of it on the
 # `device-addons` release, which the desktop app reads from any host.
 name: Device add-ons
 
@@ -7,8 +7,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "device-addons/**"
-      - "scripts/device-addons/**"
+      - "clients/device-addons/**"
       - ".github/workflows/device-addons.yml"
   workflow_dispatch:
 
@@ -70,15 +69,15 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           pattern: native-*
-          path: device-addons
+          path: clients/device-addons
           merge-multiple: true
       - name: Install fflate
-        working-directory: desktop
+        working-directory: clients/desktop
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Build and sign the catalog
         env:
           DEVICE_ADDONS_SIGNING_KEY: ${{ secrets.DEVICE_ADDONS_SIGNING_KEY }}
-        run: node scripts/device-addons/publish.mjs device-addons "$RUNNER_TEMP/device-addons"
+        run: node clients/device-addons/scripts/publish.mjs clients/device-addons "$RUNNER_TEMP/device-addons"
       - name: Publish on the device-addons release
         env:
           GH_TOKEN: ${{ github.token }}

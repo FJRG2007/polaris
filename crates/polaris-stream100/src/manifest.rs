@@ -1,7 +1,7 @@
 //! How this module describes itself to the desktop app: the device add-on
 //! manifest (`docs/device-addons.md`, schema in `@polaris/core/device-addons`).
 //!
-//! `device-addons/hercules-stream100/manifest.json` is this function's output,
+//! `clients/device-addons/hercules-stream100/manifest.json` is this function's output,
 //! checked by a test, so the published package and the code cannot drift. The
 //! desktop watches for the USB id it claims and runs the add-on only while
 //! such a device can be there; with no controller nothing runs.

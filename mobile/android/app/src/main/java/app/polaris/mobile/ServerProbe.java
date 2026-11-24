@@ -10,7 +10,7 @@ import org.json.JSONObject;
 
 /**
  * "Is this a Polaris?", asked while the address is typed, the same three questions in the same order as the desktop
- * app (desktop/src/shared/server-identity.ts): /api/polaris/identity, then for an install that predates it
+ * app (clients/desktop/src/shared/server-identity.ts): /api/polaris/identity, then for an install that predates it
  * /api/instance, then /api/health. An address is kept only when one of them answers in Polaris's own shape, so a
  * typo says "that is not Polaris" here instead of opening a window onto somebody else's site.
  */

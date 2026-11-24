@@ -1,13 +1,13 @@
 name: Desktop
 
-# The Polaris desktop app (desktop/): typecheck and test it on any change there,
+# The Polaris desktop app (clients/desktop/): typecheck and test it on any change there,
 # and on a `desktop-v*` tag - or by hand - build the installers on Windows, macOS
 # and Linux and attach them to the tag's GitHub release.
 #
 # Its own npm project with its own lockfile: nothing here installs the
 # dashboard's dependencies, and nothing in the dashboard's CI installs these.
 #
-# Unsigned unless the signing secrets exist (see desktop/README.md for their
+# Unsigned unless the signing secrets exist (see clients/desktop/README.md for their
 # names). Secrets are handed only to the step that signs, never to `npm ci`,
 # which runs third-party install scripts, and only on a `desktop-v*` tag or on
 # main: a run by hand from any other branch builds unsigned.
@@ -21,7 +21,7 @@ name: Desktop
 # the difference.
 #
 # The release also carries the macOS update feeds and a SHA256SUMS of every
-# file, which the app's self-update reads (desktop/src/main/updates.ts).
+# file, which the app's self-update reads (clients/desktop/src/main/updates.ts).
 #
 # Node 22 on purpose: the packager's zip extractor stops silently, reporting
 # success, on newer Node, and the installers come out empty.
@@ -33,7 +33,7 @@ on:
     branches:
       - main
     paths:
-      - "desktop/**"
+      - "clients/desktop/**"
       - "dashboard/packages/core/src/tv-compat/**"
       - "dashboard/packages/core/src/search-text.ts"
       - "dashboard/packages/core-rs/**"
@@ -42,7 +42,7 @@ on:
       - ".github/workflows/desktop.yml"
   pull_request:
     paths:
-      - "desktop/**"
+      - "clients/desktop/**"
       - "dashboard/packages/core/src/tv-compat/**"
       - "dashboard/packages/core/src/search-text.ts"
       - "dashboard/packages/core-rs/**"
@@ -60,17 +60,17 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: desktop
+        working-directory: clients/desktop
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: desktop/package-lock.json
+          cache-dependency-path: clients/desktop/package-lock.json
       - run: npm ci
       # What ships is only the bundled app and its runtime dependencies; the build
-      # tooling's advisories are reviewed in desktop/README.md.
+      # tooling's advisories are reviewed in clients/desktop/README.md.
       - run: npm audit --omit=dev --audit-level=high
       - run: npm run typecheck
       - run: npm test
@@ -95,7 +95,7 @@ jobs:
     timeout-minutes: 45
     defaults:
       run:
-        working-directory: desktop
+        working-directory: clients/desktop
         shell: bash
     steps:
       - uses: actions/checkout@v7
@@ -103,7 +103,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: desktop/package-lock.json
+          cache-dependency-path: clients/desktop/package-lock.json
 
       - name: The tag names this version
         if: startsWith(github.ref, 'refs/tags/')
@@ -215,7 +215,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: polaris-desktop-${{ runner.os }}-${{ matrix.arch }}
-          path: desktop/out/make/**
+          path: clients/desktop/out/make/**
           if-no-files-found: error
 
   # Whether SignPath is set up at all. Secrets cannot be read in a job's `if`.
@@ -252,7 +252,7 @@ jobs:
     timeout-minutes: 210
     defaults:
       run:
-        working-directory: desktop
+        working-directory: clients/desktop
         shell: bash
     steps:
       - uses: actions/checkout@v7
@@ -262,7 +262,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: desktop/package-lock.json
+          cache-dependency-path: clients/desktop/package-lock.json
       - run: npm ci
         timeout-minutes: 10
 
@@ -295,7 +295,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-app-Windows-x64
-          path: desktop/out/Polaris-win32-x64/
+          path: clients/desktop/out/Polaris-win32-x64/
           if-no-files-found: error
           retention-days: 1
 
@@ -311,7 +311,7 @@ jobs:
           wait-for-completion: true
           # A release signing request waits for a person to approve it.
           wait-for-completion-timeout-in-seconds: 2700
-          output-artifact-directory: ${{ github.workspace }}/desktop/out/signed-app
+          output-artifact-directory: ${{ github.workspace }}/clients/desktop/out/signed-app
 
       - name: Make the installer from the signed app
         timeout-minutes: 20
@@ -333,7 +333,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-installer-Windows-x64
-          path: desktop/out/make/squirrel.windows/x64/Polaris-Setup.exe
+          path: clients/desktop/out/make/squirrel.windows/x64/Polaris-Setup.exe
           if-no-files-found: error
           retention-days: 1
 
@@ -348,7 +348,7 @@ jobs:
           github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
           wait-for-completion: true
           wait-for-completion-timeout-in-seconds: 2700
-          output-artifact-directory: ${{ github.workspace }}/desktop/out/signed-installer
+          output-artifact-directory: ${{ github.workspace }}/clients/desktop/out/signed-installer
 
       - name: Put the signed installer in place
         timeout-minutes: 5
@@ -360,7 +360,7 @@ jobs:
         timeout-minutes: 5
         with:
           name: polaris-signed-Windows-x64
-          path: desktop/out/make/**
+          path: clients/desktop/out/make/**
           if-no-files-found: error
 
   release:
@@ -375,7 +375,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          sparse-checkout: desktop/build
+          sparse-checkout: clients/desktop/build
       - uses: actions/download-artifact@v4
         with:
           pattern: polaris-desktop-*
@@ -410,7 +410,7 @@ jobs:
               echo "No macOS $arch zip to point the update feed at." >&2
               exit 1
             fi
-            node desktop/build/mac-feed.cjs "$arch" "$version" "https://github.com/$REPOSITORY/releases/download/$TAG/$(basename "$zip")" installers
+            node clients/desktop/build/mac-feed.cjs "$arch" "$version" "https://github.com/$REPOSITORY/releases/download/$TAG/$(basename "$zip")" installers
           done
           find installers -type f \( -name '*.exe' -o -name '*.nupkg' -o -name 'RELEASES' -o -name 'RELEASES-darwin-*.json' -o -name '*.dmg' -o -name '*.zip' -o -name '*.deb' -o -name '*.AppImage' \) \
             -exec sha256sum {} + | sed -E 's#^([0-9a-f]{64}) [ *].*/#\1  #' | sort -k 2 > SHA256SUMS
@@ -427,7 +427,7 @@ jobs:
           # The repository releases the dashboard too; the desktop app is not
           # made its "latest release".
           make_latest: "false"
-          body: "[Code signing policy](https://github.com/${{ github.repository }}/blob/main/desktop/CODE_SIGNING.md)"
+          body: "[Code signing policy](https://github.com/${{ github.repository }}/blob/main/clients/desktop/CODE_SIGNING.md)"
           files: |
             installers/**/*.exe
             installers/**/*.nupkg

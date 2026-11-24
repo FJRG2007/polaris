@@ -2,7 +2,7 @@
  * The settings an installed Polaris app keeps on the device itself - the
  * desktop app today - described once for every screen that draws them.
  *
- * The app owns the values and their storage (`desktop/src/main/settings.ts`);
+ * The app owns the values and their storage (`clients/desktop/src/main/settings.ts`);
  * this is only what a screen needs to draw them: the key, its kind, the value
  * the app uses when nothing was chosen, and the category it is listed under.
  * The dashboard's Settings draws its "This app" group from it, reading and

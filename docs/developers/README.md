@@ -6,8 +6,8 @@ Polaris is a monorepo with three pillars:
   app, shared `@polaris/*` packages). This is the main product surface.
 - **`crates/`** - the Rust side: the privileged `polaris-hostd` host daemon,
   in one Cargo workspace.
-- **`desktop/`** - the native desktop app (Electron): its own npm workspace,
-  independent of `dashboard/`. See [`../../desktop/README.md`](../../desktop/README.md).
+- **`clients/desktop/`** - the native desktop app (Electron): its own npm workspace,
+  independent of `dashboard/`. See [`../../clients/desktop/README.md`](../../clients/desktop/README.md).
 
 The three are independent: you can work on the dashboard without a Rust
 toolchain, on the host daemon without touching Node, and on the desktop app
@@ -29,7 +29,10 @@ polaris/
 │   ├── packages/              # @polaris/{config,core,db,auth,storage,ui,app-host,...}
 │   ├── docker/                # Dockerfile, compose, Caddy
 │   └── scripts/               # install / update / dev
-└── desktop/                   # native desktop app (Electron, own npm workspace)
+└── clients/
+    ├── desktop/               # native desktop app (Electron, own npm workspace)
+    ├── device-addons/         # device add-ons the desktop app installs
+    └── terminal/              # Polaris Terminal, its own Cargo workspace
 ```
 
 ## Dashboard
@@ -91,7 +94,7 @@ dashboard's full edition (native mounts, host filesystem, Docker access).
 ## Desktop app
 
 Its own npm workspace, not part of the `dashboard/` one. See
-[`../../desktop/README.md`](../../desktop/README.md) for development and release
+[`../../clients/desktop/README.md`](../../clients/desktop/README.md) for development and release
 commands.
 
 ## Distribution
@@ -100,7 +103,7 @@ commands.
   tags, alongside the `polaris-hostd` static musl binaries.
 - **Desktop app** ships as platform installers attached to a GitHub release on
   `desktop-v*` tags (`.github/workflows/desktop.yml`). See
-  [`../../desktop/README.md`](../../desktop/README.md).
+  [`../../clients/desktop/README.md`](../../clients/desktop/README.md).
 - **Stream Deck plugin** ships as a `.streamDeckPlugin` file attached to a
   `streamdeck-v*` release, cut by itself whenever a push to `main` changes what
   the plugin ships (`.github/workflows/streamdeck.yml`). The Elgato Marketplace

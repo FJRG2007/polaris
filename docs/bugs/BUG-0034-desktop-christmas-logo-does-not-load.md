@@ -3,14 +3,14 @@ id: BUG-0034
 title: In Polaris desktop the Christmas Polaris logo does not load
 status: fixed-watching
 area: desktop / app icon
-location: desktop/src/main/app-icon.ts
+location: clients/desktop/src/main/app-icon.ts
 related:
-  - desktop/src/main/tray.ts
-  - desktop/src/main/windows.ts
-  - desktop/src/main/notices.ts
-  - desktop/src/renderer/dom.ts
-  - desktop/src/preload/local.ts
-  - desktop/test/main/app-icon.test.ts
+  - clients/desktop/src/main/tray.ts
+  - clients/desktop/src/main/windows.ts
+  - clients/desktop/src/main/notices.ts
+  - clients/desktop/src/renderer/dom.ts
+  - clients/desktop/src/preload/local.ts
+  - clients/desktop/test/main/app-icon.test.ts
 reported: 2026-11-24
 fixed: 2026-11-24
 fix_commit: "fix(desktop): the season's Polaris mark from the first frame, on the splash, the taskbar and the tray"
@@ -63,7 +63,7 @@ All four seasons go through the same path; any failure leaves the shipped icon.
 
 ## Verified
 
-- `desktop/test/main/app-icon.test.ts`: the stored reports round-trip and settle
+- `clients/desktop/test/main/app-icon.test.ts`: the stored reports round-trip and settle
   on the season, broken or hostile files start plain, stale hosts are dropped;
   the local-screen season for no reports / seasons off / a custom calendar; the
   .ico layout; the Squirrel app id; every local page that draws `mark.svg`

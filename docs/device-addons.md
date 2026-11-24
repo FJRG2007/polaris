@@ -14,12 +14,12 @@ of Tauri's updater (Ed25519 over the exact bytes, public key in the app).
 | Piece | Where |
 |---|---|
 | Manifest, catalog, settings schema (zod 3 and 4) | `dashboard/packages/core/src/device-addons.ts` |
-| Catalog fetch, signature, stale-while-revalidate cache | `desktop/src/main/addons/catalog.ts`, `signature.ts` |
-| Install, update, disable, uninstall, settings files | `desktop/src/main/addons/packages.ts` |
-| One process per add-on, restart with backoff, permission gate | `desktop/src/main/addons/supervisor.ts`, `desktop/src/shared/addon-protocol.ts` |
-| USB presence (plug events, no polling) | `desktop/src/main/addons/presence.ts`, `crates/polaris-core-node/src/usb.rs` |
-| Electron wiring and the page bridge `window.polarisDesktop.addons` | `desktop/src/main/addons/electron.ts` |
-| Build, sign, publish | `scripts/device-addons/publish.mjs`, `.github/workflows/device-addons.yml` |
+| Catalog fetch, signature, stale-while-revalidate cache | `clients/desktop/src/main/addons/catalog.ts`, `signature.ts` |
+| Install, update, disable, uninstall, settings files | `clients/desktop/src/main/addons/packages.ts` |
+| One process per add-on, restart with backoff, permission gate | `clients/desktop/src/main/addons/supervisor.ts`, `clients/desktop/src/shared/addon-protocol.ts` |
+| USB presence (plug events, no polling) | `clients/desktop/src/main/addons/presence.ts`, `crates/polaris-core-node/src/usb.rs` |
+| Electron wiring and the page bridge `window.polarisDesktop.addons` | `clients/desktop/src/main/addons/electron.ts` |
+| Build, sign, publish | `clients/device-addons/scripts/publish.mjs`, `.github/workflows/device-addons.yml` |
 
 ## Trust
 
@@ -69,7 +69,7 @@ against the declaration on every read and write. An add-on may also name a
 
 A view is a page in the package (`manifest.view`, e.g. `view/index.html`). The
 desktop app serves the folder holding it as `polaris-addon://<id>/`
-(`desktop/src/main/addons/view.ts`): only files of that folder, only web file
+(`clients/desktop/src/main/addons/view.ts`): only files of that folder, only web file
 types, under a policy that loads nothing from elsewhere and reaches no network.
 The add-on's page in Settings frames it with `sandbox="allow-scripts"` (no same
 origin) and speaks `postMessage` (`apps/web/src/lib/device-addon-view.ts`):
@@ -96,8 +96,8 @@ off offline.
 
 ## Publishing an add-on
 
-`device-addons/<id>/manifest.json`, optional `listing.json` (`icon`,
+`clients/device-addons/<id>/manifest.json`, optional `listing.json` (`icon`,
 `screenshots`, `changelog`), and the files under `any/` and `<platform>/` (a
 platform's own files laid over `any/`). A native module is not committed: the
 workflow builds it per platform into `<platform>/` before packaging (the
-`native` job). A push to main touching `device-addons/**` publishes the catalog.
+`native` job). A push to main touching `clients/device-addons/**` publishes the catalog.

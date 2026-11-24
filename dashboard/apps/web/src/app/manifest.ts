@@ -5,7 +5,7 @@
  * in the dock, the taskbar or the home screen - on Windows, macOS, Linux,
  * ChromeOS and Android alike - and stays whatever version the instance is
  * running, because it is the instance. Nothing to download, sign or keep
- * updated separately; the native app in `desktop/` is the download for what a
+ * updated separately; the native app in `clients/desktop/` is the download for what a
  * browser window cannot do.
  *
  * The icons wear the season on the server's date (`serverSeason`), at

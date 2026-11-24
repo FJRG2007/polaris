@@ -48,7 +48,7 @@ no era Electron: la página acumulaba escuchadores de eventos en cada navegació
 (`PageTiming`, arreglado en `04551960b6`), y con Tauri habría pasado igual.
 
 Rust se queda donde aporta: pequeños ayudantes nativos junto a la app, como ya
-es el de la VPN (`desktop/vpn-helper`), no un segundo contenedor.
+es el de la VPN (`clients/desktop/vpn-helper`), no un segundo contenedor.
 
 ### No hay planes de reescribir la interfaz en GPUI
 

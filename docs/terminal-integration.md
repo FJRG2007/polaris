@@ -1,7 +1,7 @@
 # Polaris Terminal: integrating Rook
 
 Rook (github `FJRG2007/rook`) is a Windows-tuned fork of Warp's open-source
-terminal. It moves into this repository at `terminal/` and becomes Polaris
+terminal. It moves into this repository at `clients/terminal/` and becomes Polaris
 Terminal. This page records, per area, what Rook does today, what Polaris
 already exposes for it, the gap, and the step that closes it. It was written
 from a read-only study of Rook at `e27330095` (upstream Warp through
@@ -12,10 +12,10 @@ from a read-only study of Rook at `e27330095` (upstream Warp through
 - **License.** Rook's workspace is `AGPL-3.0-only` (with Warp's MIT-licensed UI
   framework crates, kept under `LICENSE-MIT`). Polaris is `AGPL-3.0-only` too, so
   the code moves without relicensing. Keep `LICENSE-MIT` and `about.toml` /
-  `about.hbs` (the `cargo about` third-party notice) inside `terminal/`. New
+  `about.hbs` (the `cargo about` third-party notice) inside `clients/terminal/`. New
   crates written for the terminal on the Polaris side follow the workspace
   license field of the workspace they live in.
-- **A separate Cargo workspace.** `terminal/` keeps its own `Cargo.toml`,
+- **A separate Cargo workspace.** `clients/terminal/` keeps its own `Cargo.toml`,
   `Cargo.lock` and `rust-toolchain.toml` (Rook pins `1.94.0` with rustfmt,
   clippy and rust-analyzer; the root pins `stable` plus the musl targets for
   hostd and the tunnel). Merging the two workspaces would put about 80 crates
@@ -24,15 +24,15 @@ from a read-only study of Rook at `e27330095` (upstream Warp through
   fingerprint check pins. The root `Cargo.toml` therefore needs
   `exclude = [..., "terminal"]` once the directory exists, so a `cargo` command
   run at the root never adopts it. Polaris crates the terminal consumes (for
-  example `polaris-core`) are referenced by path from `terminal/`, not the other
+  example `polaris-core`) are referenced by path from `clients/terminal/`, not the other
   way round.
 - **Keep Rook's `.gitattributes` rules, re-rooted.** Its terminal recordings
   (`app/src/terminal/ref_tests/data/** -text`) must stay byte-exact or seven
   reference tests fail on macOS and Linux only. Every pattern gains the
-  `terminal/` prefix.
+  `clients/terminal/` prefix.
 - **Preserve the executable bit** when copying (Rook's own CLAUDE.md: 60 files
   under `script/` landed as 644 once and broke every non-Windows CI job). Copy
-  with `git archive` / `git read-tree --prefix=terminal/` (or a subtree merge,
+  with `git archive` / `git read-tree --prefix=clients/terminal/` (or a subtree merge,
   which also keeps history), never `robocopy`.
 
 ## Rename map
@@ -72,9 +72,9 @@ vocabulary, `XWarpPointer`) carries over unchanged.
 - **Polaris:** root Cargo workspace for hostd, tunnel, core and their bindings,
   toolchain `stable`.
 - **Gap:** none beyond the separation above.
-- **Step:** move the tree to `terminal/` unchanged except for the rename; add
-  `"terminal"` to the root workspace `exclude`; keep `terminal/rust-toolchain.toml`
-  (rustup picks the nearest one, so `cargo` inside `terminal/` gets 1.94.0).
+- **Step:** move the tree to `clients/terminal/` unchanged except for the rename; add
+  `"terminal"` to the root workspace `exclude`; keep `clients/terminal/rust-toolchain.toml`
+  (rustup picks the nearest one, so `cargo` inside `clients/terminal/` gets 1.94.0).
 
 ### CI
 
@@ -85,8 +85,8 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   `auto-release.yml` (tags main after a green CI with non-doc changes).
 - **Polaris:** `.github/workflows/terminal.yml` (added with this page) is the
   path-filtered scaffold: unfiltered triggers, a `changes` job that looks for
-  `terminal/**`, and a single `terminal` result job that always reports. While
-  `terminal/` does not exist it reports green in seconds.
+  `clients/terminal/**`, and a single `terminal` result job that always reports. While
+  `clients/terminal/` does not exist it reports green in seconds.
 - **Gap:** the real build jobs.
 - **Step:** port Rook's `ci.yml` jobs into `terminal.yml` behind
   `needs.changes.outputs.terminal == 'true'`, with `working-directory: terminal`
@@ -94,7 +94,7 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   as `terminal-release.yml` on `terminal-v*` tags. Do not port
   `auto-release.yml` as-is: it would tag every main push that touches anything
   outside docs, which in this repository is every dashboard change; restrict
-  its diff to `terminal/`.
+  its diff to `clients/terminal/`.
 
 ### LFS
 
@@ -103,8 +103,8 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   models `bert_tiny_v1..v3.onnx` (54 MB).
 - **Polaris:** no LFS today.
 - **Gap:** every clone of Polaris would pull 130 MB it does not use.
-- **Step:** keep LFS scoped to `terminal/` only (`terminal/**/*.pdb`,
-  `terminal/crates/input_classifier/models/**`), and have every non-terminal CI
+- **Step:** keep LFS scoped to `clients/terminal/` only (`clients/terminal/**/*.pdb`,
+  `clients/terminal/crates/input_classifier/models/**`), and have every non-terminal CI
   job check out with `lfs: false` (the default). Better still, check whether the
   `.pdb` files are needed in the repository at all - they are debug symbols for
   the bundled ConPTY and could be fetched by the bundling script from the
@@ -360,7 +360,7 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   parsing, and the GitHub query filters the repository's releases to that prefix
   (the Polaris repository releases many products, so "latest release" is not the
   terminal's). `script/release_tag` and `script/update_plist` learn the prefix.
-  Auto-tagging only for changes under `terminal/`.
+  Auto-tagging only for changes under `clients/terminal/`.
 - **Built:** `app/src/autoupdate/github.rs` lists the `terminal-v*` tags
   (`git/matching-refs/tags/terminal-v`), orders them, and reads the release of
   the newest that is final and has this platform's installer (up to three
@@ -413,7 +413,7 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   `www.` go to the Polaris site; addresses become `@example.com`; every server
   host becomes `<name>.polaris-terminal.invalid`; tests and fixtures use
   `example.com` so a bare domain, a subdomain and a suffix keep their shape. The
-  guard is the `No rook.dev under terminal/` step of the `changes` job in
+  guard is the `No rook.dev under clients/terminal/` step of the `changes` job in
   `.github/workflows/terminal.yml`, which runs on every push, docs-only included.
 
 ## Built in Polaris for this
@@ -423,11 +423,11 @@ vocabulary, `XWarpPointer`) carries over unchanged.
 | `terminal` sign-in kind (device grant, scopes `polar.use`, `polar.spend`) | `apps/web/src/lib/terminal/scopes.ts`, `lib/cli/sign-in.ts`, `packages/auth/src/api-keys.ts` |
 | `POST /api/terminal/authorize`, `POST /api/terminal/authorize/claim`, `DELETE /api/terminal/session` | `apps/web/src/app/api/terminal/` |
 | Approval page `/account/terminal` and Sessions label | `app/(app)/account/terminal/page.tsx`, `lib/device-sessions/kinds.ts` |
-| CI scaffold for `terminal/**` | `.github/workflows/terminal.yml` |
+| CI scaffold for `clients/terminal/**` | `.github/workflows/terminal.yml` |
 | Remote-control relay at `/api/deploy/ws/terminal`, scope `terminal.control`, `TerminalInstance` | `apps/web/terminal-relay.mjs`, `apps/web/src/lib/terminal/relay.ts`, `app/api/terminal/relay/route.ts` |
 | Live pane output, `/account/terminals`, `terminal.instance` shares (people and link) | `terminal-relay.mjs`, `lib/terminal/instances.ts`, `app/(app)/account/terminals/`, `/k/<token>` |
 | `plr terminal list` / `run`, `GET /api/terminal/instances`, `terminal.control` in `CLI_SCOPES` | `packages/cli/src/commands/terminal.ts`, `packages/cli/src/terminal-local.ts`, `app/api/terminal/instances/` |
-| Desktop shared sign-in, `POST /api/terminal/authorize/describe` and `/answer` | `desktop/src/main/native-host/terminal-sign-in.ts`, `lib/cli/approval.ts` |
+| Desktop shared sign-in, `POST /api/terminal/authorize/describe` and `/answer` | `clients/desktop/src/main/native-host/terminal-sign-in.ts`, `lib/cli/approval.ts` |
 
 Not built, with the design above: terminal objects (`/api/terminal/objects`).
 
@@ -438,16 +438,16 @@ side before the tree exists. In order:
 
 1. **Decide LFS first.** Drop the ConPTY `.pdb` files (fetch them in the
    bundling script) or keep them under LFS, then add `.gitattributes` rules
-   scoped to `terminal/**/*.pdb` and `terminal/crates/input_classifier/models/**`.
+   scoped to `clients/terminal/**/*.pdb` and `clients/terminal/crates/input_classifier/models/**`.
    An LFS object once pushed stays in the history.
 2. **Bring the tree in with history and file modes:** `git subtree add
-   --prefix=terminal <rook remote> main` (or `git read-tree --prefix=terminal/`),
-   never a file copy. Check that `git ls-files -s terminal/script | grep -c 100755`
+   --prefix=terminal <rook remote> main` (or `git read-tree --prefix=clients/terminal/`),
+   never a file copy. Check that `git ls-files -s clients/terminal/script | grep -c 100755`
    matches Rook's count.
-3. **Re-root `.gitattributes`:** every Rook pattern gains `terminal/`
-   (`terminal/app/src/terminal/ref_tests/data/** -text` above all).
+3. **Re-root `.gitattributes`:** every Rook pattern gains `clients/terminal/`
+   (`clients/terminal/app/src/terminal/ref_tests/data/** -text` above all).
 4. **Cargo:** add `"terminal"` to `exclude` in the root `Cargo.toml`; keep
-   `terminal/Cargo.toml`, `Cargo.lock` and `rust-toolchain.toml` (1.94.0). Run
+   `clients/terminal/Cargo.toml`, `Cargo.lock` and `rust-toolchain.toml` (1.94.0). Run
    `cargo metadata` at the root and confirm no terminal crate appears and the
    root `Cargo.lock` is unchanged (the tunnel fingerprint check pins it).
 5. **Rename** with `script/rebrand.py` and the Polaris target, per the rename
@@ -455,13 +455,13 @@ side before the tree exists. In order:
    `POLARIS_TERMINAL_*`, AppId `dev.polaris.PolarisTerminal`, URL schemes
    `polaris-terminal*`), in one commit, bootstrap scripts and `plugins/` included.
 6. **rook.dev sweep** by category (see "The rook.dev links"), then the test that
-   greps `terminal/` for `rook\.dev` and fails on a hit.
+   greps `clients/terminal/` for `rook\.dev` and fails on a hit.
 7. **CI:** port Rook's `ci.yml` jobs into `.github/workflows/terminal.yml` behind
    `needs.changes.outputs.terminal == 'true'`, with `working-directory: terminal`
    and `Swatinem/rust-cache` `workspaces: terminal -> target`; keep the single
    `terminal` result job as the required check. Add `terminal-release.yml` on
    `terminal-v*` tags (Rook's `release.yml`, asset names renamed). Auto-tag only
-   for diffs under `terminal/`.
+   for diffs under `clients/terminal/`.
 8. **Update channel:** `ParsedVersion` and `github::compare_release_tags` strip a
    leading `terminal-`; the release query filters to that prefix;
    `script/release_tag` and `script/update_plist` learn it.
@@ -490,7 +490,7 @@ side before the tree exists. In order:
    - User data: the one-time copy from `~/.rook-oss` / `~/.rook` and the
      `dev.rook.RookOss` data directory, with a marker.
    - Scripting: install-if-missing for the CLI (see "CLI integration").
-10. **Verify:** `cargo nextest run` in `terminal/` on the three systems through
+10. **Verify:** `cargo nextest run` in `clients/terminal/` on the three systems through
     CI, `npm run build` in `dashboard/`, a sign-in from a fresh terminal against
     a real instance (browser path and Desktop path), `plr terminal run app.ping`
     locally and through the relay, and a pane watched from `/account/terminals`.

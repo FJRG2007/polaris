@@ -1,8 +1,7 @@
 # Repository layout
 
-What each top-level entry is, and the proposed regroup of the client apps
-under one folder. The regroup is not done yet; it waits for a quiet window on
-`desktop/`, because several branches edit it at once.
+What each top-level entry is, and how the client apps came to sit under
+`clients/`.
 
 ## Today
 
@@ -14,15 +13,12 @@ under one folder. The regroup is not done yet; it waits for a quiet window on
 | `CITATION.cff`, `LICENSE`, `NOTICE.md` | Citation and legal. |
 | `CLAUDE.md` | Repo-wide constraints for agents. |
 | `README.md` | The project page (Spanish copy in `docs/README.es.md`). |
-| `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` | The root Rust workspace (`crates/`, `vendor/`); `terminal` is excluded. `Cargo.lock` is pinned by the tunnel fingerprint check. |
+| `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` | The root Rust workspace (`crates/`, `vendor/`); `clients/terminal` is excluded. `Cargo.lock` is pinned by the tunnel fingerprint check. |
 | `crates/` | Rust crates: core (and its node/wasm/opaque bindings), hostd, native host, stream100, tunnel. |
 | `dashboard/` | The Polaris server: web app, site, extension, Stream Deck plugin, CLI, packages, Docker files, install and update scripts. |
-| `desktop/` | The Electron desktop app. |
-| `device-addons/` | Device add-ons (Hercules Stream 100). |
+| `clients/` | The apps that are not the server: `desktop/` (Electron), `terminal/` (Polaris Terminal, its own Cargo workspace, `docs/terminal-integration.md`) and `device-addons/` (Hercules Stream 100, with its publisher in `scripts/`). |
 | `docs/` | Design notes, plans, bug and vulnerability ledgers, media. |
 | `mobile/` | The Android and iOS apps. |
-| `scripts/` | Only `device-addons/publish.mjs`, the add-on publisher. |
-| `terminal/` | Polaris Terminal, its own Cargo workspace (`docs/terminal-integration.md`). |
 | `tv/` | Polaris TV: launcher, add-ons, themes, device notes, tools. |
 | `vendor/` | Vendored `smoltcp`. |
 
@@ -38,9 +34,9 @@ files stay too: the tunnel fingerprint pins `Cargo.lock`, and
 `dashboard/docker/docker-compose.yml` builds hostd from
 `crates/polaris-hostd/Dockerfile`.
 
-## Proposed regroup
+## The regroup
 
-The client apps move under `clients/`:
+The client apps moved under `clients/`:
 
 | From | To |
 | --- | --- |
@@ -49,13 +45,16 @@ The client apps move under `clients/`:
 | `device-addons/` | `clients/device-addons/` |
 | `scripts/device-addons/publish.mjs` | `clients/device-addons/scripts/publish.mjs` (the root `scripts/` then goes) |
 
-The root then holds `.claude/`, `.github/`, `clients/`, `crates/`,
+The root now holds `.claude/`, `.github/`, `clients/`, `crates/`,
 `dashboard/`, `docs/`, `mobile/`, `tv/`, `vendor/` and the files above.
 
-### What has to change with it
+### What changed with it
 
-Counted on `feat/terminal-rename` at the time of writing; the regroup commit
-re-runs the same `git grep`s, since other branches keep adding references.
+Counted on `feat/terminal-rename` while it was planned; the regroup commit
+re-ran the same `git grep`s and changed every reference to the moved folders
+(mobile, TV and site entries below were for the full regroup and did not
+change). One shipped link moved with it: `tv-compat/quirks.json` names a
+desktop source file, which a deployed dashboard shows until it updates.
 
 - **Relative imports one level deeper.** `desktop/`: 45 files import
   `../../../dashboard/...` (or four levels from `src/main/native-host`,

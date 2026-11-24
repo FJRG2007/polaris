@@ -29,7 +29,7 @@ fn audio_error(error: AudioError) -> napi::Error {
     napi::Error::from_reason(error.to_string())
 }
 
-/// The device add-on manifest (`device-addons/hercules-stream100/manifest.json`).
+/// The device add-on manifest (`clients/device-addons/hercules-stream100/manifest.json`).
 #[napi(catch_unwind)]
 pub fn manifest_json() -> napi::Result<String> {
     json(&manifest::manifest())

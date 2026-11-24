@@ -5,9 +5,9 @@ status: fixed-watching
 area: calls / desktop
 location: dashboard/apps/web/src/app/(app)/chat/use-sfu-call.ts
 related:
-  - desktop/src/preload/outside-links.ts
-  - desktop/src/main/ipc.ts
-  - desktop/src/main/windows.ts
+  - clients/desktop/src/preload/outside-links.ts
+  - clients/desktop/src/main/ipc.ts
+  - clients/desktop/src/main/windows.ts
 reported: 2026-11-21
 fixed: 2026-11-21
 fix_commit: "fix(chat): a call no longer hangs up when a link to another site is opened"
@@ -49,7 +49,7 @@ for navigations that are cancelled. Use `pagehide`.
 
 ## Verified
 
-- `desktop/test/renderer/outside-links.test.ts`: which clicks are taken and
+- `clients/desktop/test/renderer/outside-links.test.ts`: which clicks are taken and
   which are left to the page.
 - Desktop navigation and open-external suites.
 

@@ -18,7 +18,7 @@ Third-party store extensions are not features; the extension platform is.
 
 | Surface | What it is | What only it can do |
 | --- | --- | --- |
-| Desktop | Alt+Space window (`desktop/src/main/launcher.ts`), showing the dashboard's palette or its own panel (`renderer/launcher.tsx`) | Programs, the system clipboard, the OS (lock, sleep, windows, files), system-wide keys |
+| Desktop | Alt+Space window (`clients/desktop/src/main/launcher.ts`), showing the dashboard's palette or its own panel (`renderer/launcher.tsx`) | Programs, the system clipboard, the OS (lock, sleep, windows, files), system-wide keys |
 | Web palette | Ctrl+K / Alt+Space in the dashboard (`components/command-palette.tsx`) | Everything in the instance: pages, records, people, commands |
 | Browser extension | The on-page launcher (`apps/extension/src/entrypoints/launcher-ui.tsx`) | The page in front: its fields, its selection, its tab |
 | Mobile app | The dashboard in the phone shell | Share sheet, widgets, the phone's own search |
@@ -63,7 +63,7 @@ Surfaces: D desktop, W web palette, E extension, M mobile, T TV.
 | Quicklinks (saved URL with a query slot) | missing | D W E M | Stored on the account, `{query}` placeholder, opened by name |
 | File search | partial | D W | Web: Drive results through the palette scopes. Desktop: local files missing (OS index: Windows Search, Spotlight `mdfind`, `locate`) |
 | Window management (halves, thirds, maximize, move to display) | missing | D | Native window APIs per OS; macOS needs Accessibility permission |
-| System commands (lock, sleep, restart, shut down, log out, empty bin) | have | D | Registry in `@polaris/core` `launcher-commands`, per-OS programs in `desktop/src/shared/system-commands.ts`; restart, shut down, log out and empty bin ask first. Hidden where the OS has no dependable command (lock on macOS, log out on Linux without a session id) |
+| System commands (lock, sleep, restart, shut down, log out, empty bin) | have | D | Registry in `@polaris/core` `launcher-commands`, per-OS programs in `clients/desktop/src/shared/system-commands.ts`; restart, shut down, log out and empty bin ask first. Hidden where the OS has no dependable command (lock on macOS, log out on Linux without a session id) |
 | Script commands | missing | D | Run a user script from the launcher; needs a sandbox and a Settings screen to add them |
 | Run (shell command) | missing | D | Same boundary as script commands |
 | Extensions and store | partial | D W E | Polaris apps marketplace and the app extension registry (`docs/app-boundaries.md`); apps do not yet contribute launcher commands |
@@ -113,5 +113,5 @@ Surfaces: D desktop, W web palette, E extension, M mobile, T TV.
 
 | Slice | Surface | Where |
 | --- | --- | --- |
-| Frecency ranking | D | `packages/core/src/frecency.ts`, `desktop/src/main/launcher-usage.ts` |
-| System commands | D (own panel and the dashboard's palette in the window) | `packages/core/src/launcher-commands.ts`, `desktop/src/shared/system-commands.ts`, `apps/web/src/lib/search/search-host.ts` |
+| Frecency ranking | D | `packages/core/src/frecency.ts`, `clients/desktop/src/main/launcher-usage.ts` |
+| System commands | D (own panel and the dashboard's palette in the window) | `packages/core/src/launcher-commands.ts`, `clients/desktop/src/shared/system-commands.ts`, `apps/web/src/lib/search/search-host.ts` |

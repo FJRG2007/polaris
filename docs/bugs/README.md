@@ -15,7 +15,7 @@ Security findings are not kept here; they live in
 | BUG-0002 | A conversation scrolls up into older messages on its own | Chat | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/channel-view.tsx | 2026-11-21 |
 | BUG-0003 | Polar's messages are named "somebody who has left", and its delete preview has no face or AI tag | Chat | Fixed, watching | dashboard/apps/web/src/lib/chat/author-name.ts | 2026-11-21 |
 | BUG-0004 | Polar answers a mention with its tool call written out as text | Polar | Fixed, watching | dashboard/apps/web/src/lib/polar/mention-answer.ts | 2026-11-21 |
-| BUG-0005 | Polaris desktop seems not to open on its first start, and again after a host is added | Desktop | Fixed, watching | desktop/src/main/window-front.ts | 2026-11-21 |
+| BUG-0005 | Polaris desktop seems not to open on its first start, and again after a host is added | Desktop | Fixed, watching | clients/desktop/src/main/window-front.ts | 2026-11-21 |
 | BUG-0006 | Opening a link to another site in Polaris desktop ends the call | Calls | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/use-sfu-call.ts | 2026-11-21 |
 | BUG-0007 | Polar's side panel opens on the old chat, then on an empty one when opened again | Polar | Regressed, see BUG-0016 | dashboard/apps/web/src/components/polar/polar-panel.tsx | 2026-11-21 |
 | BUG-0008 | Items from a modpack's mods are missing from the Minecraft item picker | Game servers | Fixed, watching | dashboard/apps/game-servers/src/lib/minecraft/mod-items-service.ts | 2026-11-21 |
@@ -33,7 +33,7 @@ Security findings are not kept here; they live in
 | BUG-0020 | A link in a received email does nothing when clicked in Polaris desktop | Desktop | Open | dashboard/apps/web/src/app/(app)/mail/message-body.tsx | 2026-11-23 |
 | BUG-0021 | A Gmail mailbox asks to be connected again when its authorization still works | Mail | Fixed, watching | dashboard/apps/web/src/lib/mailbox/credentials.ts | 2026-11-23 |
 | BUG-0022 | The browser extension's automatic updates leave it versions behind, with nothing on screen | Extension | Fixed, watching | dashboard/apps/extension/scripts/install.ps1 | 2026-11-23 |
-| BUG-0023 | Polaris desktop does not seem to open with the computer, or opens minutes later | Desktop | Fixed, watching | desktop/src/main/login-item.ts | 2026-11-23 |
+| BUG-0023 | Polaris desktop does not seem to open with the computer, or opens minutes later | Desktop | Fixed, watching | clients/desktop/src/main/login-item.ts | 2026-11-23 |
 | BUG-0024 | Pages with a dynamic route are told their code was changed, and password fields are blocked | Integrity | Fixed, watching | dashboard/packages/core/src/integrity-paths.ts | 2026-11-23 |
 | BUG-0025 | In Polaris desktop the top right of the window shows different or missing buttons compared with the web | Desktop | Fixed, watching | dashboard/packages/ui/src/shell/window-controls.ts | 2026-11-23 |
 | BUG-0026 | Sharing a screen larger than 4K freezes the sharer, and the others cannot watch it | Calls | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/call-quality.ts | 2026-11-23 |
@@ -41,8 +41,8 @@ Security findings are not kept here; they live in
 | BUG-0028 | A message with a link is not shown as sent until its preview has loaded | Chat | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/outbox.ts | 2026-11-23 |
 | BUG-0029 | Typing @ in a group DM shows only Polar, @here and @everyone at first | Chat | Fixed, watching | dashboard/apps/web/src/components/rich-text/suggestion.tsx | 2026-11-23 |
 | BUG-0030 | The @ picker is a small desktop popover on an iPhone | Chat | Fixed, watching | dashboard/apps/web/src/components/rich-text/suggestion.tsx | 2026-11-23 |
-| BUG-0031 | The desktop voice widget shows initials instead of people's profile pictures | Desktop | Fixed, watching | desktop/src/main/voice-widget.ts | 2026-11-23 |
+| BUG-0031 | The desktop voice widget shows initials instead of people's profile pictures | Desktop | Fixed, watching | clients/desktop/src/main/voice-widget.ts | 2026-11-23 |
 | BUG-0032 | In Polaris desktop, pressing "View full profile" in a direct message froze the window for a while | Chat | Open, not reproduced | dashboard/apps/web/src/app/(app)/chat/profile-details.tsx | 2026-11-23 |
 | BUG-0033 | With Polaris unreachable, only the chat opens | Dashboard | Partly fixed | dashboard/apps/web/public/sw.js | 2026-11-23 |
-| BUG-0034 | In Polaris desktop the Christmas Polaris logo does not load | Desktop | Fixed, watching | desktop/src/main/app-icon.ts | 2026-11-24 |
+| BUG-0034 | In Polaris desktop the Christmas Polaris logo does not load | Desktop | Fixed, watching | clients/desktop/src/main/app-icon.ts | 2026-11-24 |
 | BUG-0035 | A note written offline is never saved | Dashboard | Partly fixed | dashboard/apps/web/src/app/(app)/notes/notes-view.tsx | 2026-11-23 |

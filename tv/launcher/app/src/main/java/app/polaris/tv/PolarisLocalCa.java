@@ -37,7 +37,7 @@ import javax.net.ssl.X509TrustManager;
 
 /**
  * Accepting the same Polaris's own local certificate on its local https address, with nothing installed on the
- * TV: this launcher's copy of desktop/src/main/local-ca-pin.ts.
+ * TV: this launcher's copy of clients/desktop/src/main/local-ca-pin.ts.
  *
  * A Polaris's local names (polaris.local, its LAN IP) carry a certificate from the instance's own local CA, which
  * the TV does not trust. GET /api/instance publishes that CA's SHA-256, learned only over the usual https address.

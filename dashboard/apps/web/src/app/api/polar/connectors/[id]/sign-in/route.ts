@@ -5,7 +5,7 @@
  *      screen navigates to: it sends the window on to the authorization
  *      server, or back to the screen with why it could not. The desktop app
  *      keeps a round trip that starts on this address in its own window
- *      (`desktop/src/main/navigation.ts`), so the callback lands where the
+ *      (`clients/desktop/src/main/navigation.ts`), so the callback lands where the
  *      person is signed in instead of in their system browser.
  */
 

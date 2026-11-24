@@ -1,8 +1,8 @@
 name: terminal auto-release
 
 # Cuts a terminal release whenever main passes the terminal workflow with
-# changes under terminal/ that the last `terminal-v*` tag does not have. Rook's
-# auto-release.yml, restricted to terminal/: in this repository almost every
+# changes under clients/terminal/ that the last `terminal-v*` tag does not have. Rook's
+# auto-release.yml, restricted to clients/terminal/: in this repository almost every
 # push to main is a dashboard change, and none of those is a new terminal.
 #
 # The tag is pushed with GITHUB_TOKEN, and a push made with that token starts no
@@ -10,7 +10,7 @@ name: terminal auto-release
 # workflow_dispatch - the one event GITHUB_TOKEN is allowed to trigger.
 #
 # The first terminal release is cut by hand (`script/release_tag` in
-# terminal/, then push the tag): with no `terminal-v*` tag yet there is nothing
+# clients/terminal/, then push the tag): with no `terminal-v*` tag yet there is nothing
 # to compare against, and this workflow does nothing.
 on:
   workflow_run:
@@ -73,15 +73,15 @@ jobs:
             exit 0
           fi
 
-          # Only terminal/, minus what cannot change the binary: its docs and
+          # Only clients/terminal/, minus what cannot change the binary: its docs and
           # top-level markdown.
-          unshipped='^terminal/(docs/.+|[^/]+[.]md|LICENSE[^/]*)$'
-          if ! git diff --name-only "$last" "$head" -- terminal | grep -qvE "$unshipped"; then
+          unshipped='^clients/terminal/(docs/.+|[^/]+[.]md|LICENSE[^/]*)$'
+          if ! git diff --name-only "$last" "$head" -- clients/terminal | grep -qvE "$unshipped"; then
             echo "nothing that ships in the terminal since $last"
             exit 0
           fi
 
-          tag="$(cd terminal && script/release_tag)"
+          tag="$(cd clients/terminal && script/release_tag)"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git tag -a "$tag" -m "Polaris Terminal $tag" "$head"

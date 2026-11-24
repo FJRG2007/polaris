@@ -11,7 +11,7 @@ related:
   - dashboard/packages/ui/src/tailwind-preset.ts
   - dashboard/apps/web/src/app/(app)/mail/composer.tsx
   - dashboard/apps/web/src/app/(app)/apps/deploy/service-detail.tsx
-  - desktop/src/main/windows.ts
+  - clients/desktop/src/main/windows.ts
 reported: 2026-11-23
 fixed: 2026-11-23
 fix_commit: "fix(ui): the desktop app's window buttons never cover a control the web shows"
@@ -26,7 +26,7 @@ close were expected there; other controls were different or missing.
 ## Cause (confirmed in code)
 
 The desktop window has no title bar (`titleBarStyle: "hidden"` with
-`titleBarOverlay`, `desktop/src/main/windows.ts`): the system's buttons are
+`titleBarOverlay`, `clients/desktop/src/main/windows.ts`): the system's buttons are
 drawn over the top right of the page, about 138 px wide and 47 px tall at 100%
 zoom, and the page is told where through `env(titlebar-area-*)`. No header
 control is gated on the desktop bridge (only the update button and the account
@@ -105,8 +105,8 @@ nothing moves there.
 ## Not verified
 
 - The real desktop window was not run: the overlay geometry (138 x 47 px) is
-  read from `desktop/src/main/windows.ts` and `desktop/src/shared/title-bar.ts`,
-  not observed. No change in `desktop/` was needed.
+  read from `clients/desktop/src/main/windows.ts` and `clients/desktop/src/shared/title-bar.ts`,
+  not observed. No change in `clients/desktop/` was needed.
 - The real `env(titlebar-area-*)` values in Electron were not observed; the
   frame's end padding was simulated in Chrome.
 - Controls a page portals into the header slot (Deploy's project and
@@ -130,7 +130,7 @@ open, and a picture at fit that could no longer be dragged.
   with its close at the top right and no `clearWindowControls`. The sweep let it
   through because any `bg-black/` surface counted as a backdrop.
 - **The seam**: the window buttons are one flat colour, read by the desktop
-  preload (`desktop/src/shared/title-bar.ts`) as the first *opaque* background
+  preload (`clients/desktop/src/shared/title-bar.ts`) as the first *opaque* background
   under them. With a dialog open that skipped the dimmed backdrop and took the
   undimmed page, so a light block sat in the corner of a dark screen. A
   full-window surface moved below the band also left the app's header,
@@ -167,7 +167,7 @@ open, and a picture at fit that could no longer be dragged.
   and the band above it has the viewer's ground.
 - `apps/web/test/components/use-zoom-pan.test.tsx`: a drag moves an unzoomed
   picture with `looseAtFit`, it stays, and a zoom puts it back.
-- `desktop/test/shared/title-bar.test.ts`: an 80% black backdrop over a white
+- `clients/desktop/test/shared/title-bar.test.ts`: an 80% black backdrop over a white
   header gives `#333333`; nothing opaque gives no colour.
 
 ### Not verified

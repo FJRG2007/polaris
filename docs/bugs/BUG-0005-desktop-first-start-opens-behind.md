@@ -3,10 +3,10 @@ id: BUG-0005
 title: Polaris desktop seems not to open on its first start, and again after a host is added
 status: fixed-watching
 area: desktop / windows
-location: desktop/src/main/window-front.ts
+location: clients/desktop/src/main/window-front.ts
 related:
-  - desktop/src/main/windows.ts
-  - desktop/src/main/index.ts
+  - clients/desktop/src/main/windows.ts
+  - clients/desktop/src/main/index.ts
 reported: 2026-11-21
 fixed: 2026-11-21
 fix_commit: "fix(desktop): the first start and an added host open in front of you"
@@ -51,7 +51,7 @@ window has closed: replace a window by waiting for the next one's `show`
 
 ## Verified
 
-- `desktop/test/main/window-front.test.ts`: the first run lifts once; the hosts
+- `clients/desktop/test/main/window-front.test.ts`: the first run lifts once; the hosts
   window stays until Polaris shows, and closes at once when it already is.
 - Desktop typecheck, full test suite and build.
 

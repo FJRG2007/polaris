@@ -3,12 +3,12 @@ id: BUG-0023
 title: Polaris desktop does not seem to open with the computer, or opens minutes later
 status: fixed-watching
 area: desktop
-location: desktop/src/main/login-item.ts
+location: clients/desktop/src/main/login-item.ts
 related:
-  - desktop/src/main/index.ts
-  - desktop/src/main/settings.ts
-  - desktop/src/main/squirrel.ts
-  - desktop/src/renderer/connect.html
+  - clients/desktop/src/main/index.ts
+  - clients/desktop/src/main/settings.ts
+  - clients/desktop/src/main/squirrel.ts
+  - clients/desktop/src/renderer/connect.html
 reported: 2026-11-23
 fixed: 2026-11-23
 fix_commit: "fix(desktop): Polaris opens at sign-in, not minutes after it"

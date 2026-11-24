@@ -1,13 +1,13 @@
 name: terminal
 
 # Polaris Terminal (docs/terminal-integration.md): a separate Cargo workspace
-# under terminal/, with its own Cargo.lock and rust-toolchain.toml. These are
+# under clients/terminal/, with its own Cargo.lock and rust-toolchain.toml. These are
 # Rook's CI jobs (formatting, clippy, nextest, the release profile), run from
-# terminal/.
+# clients/terminal/.
 #
 # No `paths:` filter on the triggers: a filtered workflow never reports, and a
 # required check that never reports stays pending forever. `changes` decides
-# instead, every job after it is skipped when nothing under terminal/ that can
+# instead, every job after it is skipped when nothing under clients/terminal/ that can
 # affect the build changed, and `terminal` always reports.
 
 on:
@@ -32,7 +32,7 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
   # Carries fail-fast = false and immediate failure output; see
-  # terminal/.config/nextest.toml.
+  # clients/terminal/.config/nextest.toml.
   NEXTEST_PROFILE: ci
 
 jobs:
@@ -62,12 +62,12 @@ jobs:
             echo "matrix=[$linux,$macos,$windows]" >> "$GITHUB_OUTPUT"
           fi
 
-          # What can affect the terminal build: anything under terminal/ except
+          # What can affect the terminal build: anything under clients/terminal/ except
           # its documentation, plus the workflow and action that build it. Note
-          # what is NOT excluded: terminal/resources/** and terminal/plugins/**
+          # what is NOT excluded: clients/terminal/resources/** and clients/terminal/plugins/**
           # hold bundled skills whose markdown the tests read.
-          code='^(terminal/|\.github/workflows/terminal\.yml$|\.github/actions/terminal-)'
-          docs='^terminal/(docs/.+|[^/]+[.]md|LICENSE[^/]*)$'
+          code='^(clients/terminal/|\.github/workflows/terminal\.yml$|\.github/actions/terminal-)'
+          docs='^clients/terminal/(docs/.+|[^/]+[.]md|LICENSE[^/]*)$'
           case "$EVENT" in
             pull_request) from="$BASE" ;;
             push) from="$BEFORE" ;;
@@ -84,13 +84,13 @@ jobs:
           fi
           echo "terminal=$terminal" >> "$GITHUB_OUTPUT"
       # rook.dev is registered to somebody else and resolves, so no link,
-      # address or host under terminal/ may name it (docs/terminal-integration.md,
+      # address or host under clients/terminal/ may name it (docs/terminal-integration.md,
       # "The rook.dev links"). Here rather than in lints so a docs-only change
       # is checked too.
-      - name: No rook.dev under terminal/
+      - name: No rook.dev under clients/terminal/
         run: |
-          if git grep -n 'rook\.dev' -- terminal; then
-            echo "::error::terminal/ names rook.dev, a domain this project does not own"
+          if git grep -n 'rook\.dev' -- clients/terminal; then
+            echo "::error::clients/terminal/ names rook.dev, a domain this project does not own"
             exit 1
           fi
 
@@ -107,7 +107,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: terminal
+        working-directory: clients/terminal
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -149,7 +149,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: terminal
+        working-directory: clients/terminal
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -231,7 +231,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: terminal
+        working-directory: clients/terminal
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

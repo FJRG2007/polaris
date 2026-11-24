@@ -3,12 +3,12 @@ id: BUG-0031
 title: The desktop voice widget shows initials instead of people's profile pictures
 status: fixed-watching
 area: desktop / calls
-location: desktop/src/main/voice-widget.ts
+location: clients/desktop/src/main/voice-widget.ts
 related:
-  - desktop/src/shared/voice-widget.ts
-  - desktop/src/renderer/voice-widget.ts
-  - desktop/src/renderer/voice-widget.html
-  - desktop/src/preload/app.ts
+  - clients/desktop/src/shared/voice-widget.ts
+  - clients/desktop/src/renderer/voice-widget.ts
+  - clients/desktop/src/renderer/voice-widget.html
+  - clients/desktop/src/preload/app.ts
   - dashboard/apps/web/src/app/(app)/chat/desktop-voice-widget.ts
   - dashboard/apps/web/src/lib/desktop-bridge.ts
 reported: 2026-11-23
@@ -33,7 +33,7 @@ each other:
 1. The dashboard never sent one. `voiceWidgetState` published `id`, `name`,
    `speaking`, `muted` and `deafened`, and no account id or picture path.
 2. The desktop could not have accepted one. The person schema in
-   `desktop/src/shared/voice-widget.ts` is a `strictObject`, so a page that
+   `clients/desktop/src/shared/voice-widget.ts` is a `strictObject`, so a page that
    added a field would have had its whole state refused and the widget closed.
 3. The widget could not have loaded one either. Its page is a local file with
    `default-src 'none'` (no `img-src`), and it has no sign-in to the Polaris:

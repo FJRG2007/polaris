@@ -1,0 +1,15 @@
+# Polaris Terminal Tab Config
+# Stored in ~/.polaris-terminal/tab_configs/ — rename this file and edit anytime!
+#
+# Tip: Ask Oz to update this tab config for you using /skills -> /update-tab-config!
+#   e.g. "/update-tab-config turn this into a 2x2 tab config with one pane running my dev server"
+#
+# Docs at https://github.com/FJRG2007/polaris/tree/main/clients/terminal#readme
+
+name = "My Tab Config"
+
+[[panes]]
+id = "main"
+type = "terminal"
+# directory = "~/code/my-project"
+commands = []

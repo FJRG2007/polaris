@@ -158,11 +158,11 @@ updates:
           - "wasm-media-encoders"
           - "wxt"
 
-  # Polaris Terminal's own Cargo workspace (terminal/Cargo.lock). Security
+  # Polaris Terminal's own Cargo workspace (clients/terminal/Cargo.lock). Security
   # updates only: every pull request here starts a full build of a workspace of
   # about 80 crates, which a routine version bump is not worth.
   - package-ecosystem: cargo
-    directory: /terminal
+    directory: /clients/terminal
     schedule:
       interval: weekly
       day: monday

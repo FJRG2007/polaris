@@ -642,7 +642,7 @@ On your local network it is also reachable at **`http://polaris.local`** (mDNS),
 and at **`http://polaris`** from the machine running it.
 
 The desktop app (Windows, macOS, Linux) opens an instance in its own window with
-system notifications; see [`desktop/README.md`](desktop/README.md).
+system notifications; see [`clients/desktop/README.md`](clients/desktop/README.md).
 
 ## Requirements
 
@@ -686,4 +686,4 @@ under Apache-2.0.
 
 To cite Polaris, use [CITATION.cff](CITATION.cff).
 
-Windows builds: [code signing policy](desktop/CODE_SIGNING.md).
+Windows builds: [code signing policy](clients/desktop/CODE_SIGNING.md).

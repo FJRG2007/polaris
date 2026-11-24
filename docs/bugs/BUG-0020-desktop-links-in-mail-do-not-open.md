@@ -6,14 +6,14 @@ area: mail / desktop
 location: dashboard/apps/web/src/app/(app)/mail/message-body.tsx
 related:
   - dashboard/apps/web/src/lib/open-link.ts
-  - desktop/src/main/windows.ts
-  - desktop/src/main/open-external.ts
-  - desktop/src/main/default-browser.ts
+  - clients/desktop/src/main/windows.ts
+  - clients/desktop/src/main/open-external.ts
+  - clients/desktop/src/main/default-browser.ts
   - dashboard/apps/web/src/app/(app)/mail/frame-document.ts
   - dashboard/apps/web/src/app/(app)/mail/sanitize.ts
   - dashboard/apps/web/src/components/rich-text/code-run.tsx
-  - desktop/src/main/navigation.ts
-  - desktop/src/preload/outside-links.ts
+  - clients/desktop/src/main/navigation.ts
+  - clients/desktop/src/preload/outside-links.ts
 reported: 2026-11-23
 fixed: null
 fix_commit: null
@@ -157,7 +157,7 @@ direct launch there. Status stays **open** until they confirm on 0.1.60.
 
 ## Regression test
 
-- `desktop/test/main/open-external.test.ts`: a several-thousand-character
+- `clients/desktop/test/main/open-external.test.ts`: a several-thousand-character
   tracking link reaches the system whole; an address with spaces is normalised
   before both routes; `file:`, `javascript:`, custom schemes and UNC paths never
   reach a route.
@@ -170,11 +170,11 @@ direct launch there. Status stays **open** until they confirm on 0.1.60.
   preload and the dashboard's real mail frame and `openLink`. Mail button left
   and middle click, a plain link and a `target=_blank` link all reach
   `shell.openExternal`.
-- `desktop/test/main/default-browser.test.ts`: Brave, Chrome (current and
+- `clients/desktop/test/main/default-browser.test.ts`: Brave, Chrome (current and
   older), Edge, Firefox, Opera (unquoted path), Outlook command lines;
   `%VAR%` expansion; localised `reg.exe` output; ProgId traversal and
   shell programs refused.
-- `desktop/test/electron/links/` (`npm run test:electron`): the harness above,
+- `clients/desktop/test/electron/links/` (`npm run test:electron`): the harness above,
   now in the repo, with the registry reader, launcher, `shell.openExternal`,
   dialog and clipboard injected as recorders. Also checks the dialog and Copy
   link when every route fails.

@@ -1,7 +1,7 @@
 /**
  * The Polaris desktop app, seen from the page it opens.
  *
- * The app (`desktop/` at the repository root) loads this dashboard in a window of
+ * The app (`clients/desktop/` at the repository root) loads this dashboard in a window of
  * its own and puts one object on the page, `window.polarisDesktop`, for the
  * things a browser tab cannot do: notices drawn by the operating system, a
  * folder zipped straight from the disk, a build pushed from the computer's own
@@ -9,7 +9,7 @@
  * computer. In a browser there is no such object, and every caller here falls
  * back to what the browser does.
  *
- * The shape is kept here as well as in `desktop/src/shared/bridge.ts` - the two
+ * The shape is kept here as well as in `clients/desktop/src/shared/bridge.ts` - the two
  * projects share no code. Detection checks the members it uses rather than
  * trusting that something with the right name is the app.
  */
@@ -31,7 +31,7 @@ export interface DesktopVpnStatus {
     readonly nodeId: string | null;
 }
 
-/** Where installing on a TV has got to, as `desktop/src/shared/bridge.ts` names it. */
+/** Where installing on a TV has got to, as `clients/desktop/src/shared/bridge.ts` names it. */
 export type DesktopTvPhase =
     | "ready"
     | "searching"
@@ -136,7 +136,7 @@ export interface DesktopVoiceState {
     readonly selfDeafened: boolean;
 }
 
-/** This computer's runner, as the desktop reports it (`desktop/src/shared/bridge.ts`). */
+/** This computer's runner, as the desktop reports it (`clients/desktop/src/shared/bridge.ts`). */
 export interface DesktopComputerState {
     readonly paired: boolean;
     readonly state: "connecting" | "online" | "offline" | "unpaired" | "outdated" | "replaced" | "stopped";
@@ -384,7 +384,7 @@ export interface PolarisDesktop {
     appSettings?: DesktopAppSettings;
 }
 
-/** The app's own settings, as `desktop/src/shared/bridge.ts` names them. */
+/** The app's own settings, as `clients/desktop/src/shared/bridge.ts` names them. */
 export interface DesktopAppSettings {
     /** Every value and the facts beside them. */
     get(): Promise<unknown>;
