@@ -19,6 +19,8 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
+const network = vi.hoisted(() => ({ online: true, recovered: 0 }));
+vi.mock("@enigmax/primitives/react/network", () => ({ useNetworkState: () => network }));
 
 const { AppSettingsView, forgetAppSettingsSnapshot } = await import(
     "../../src/app/(app)/account/app/[category]/app-settings-view"
@@ -89,6 +91,7 @@ async function draw(category: (typeof APP_SETTING_CATEGORIES)[number]) {
 beforeEach(() => forgetAppSettingsSnapshot());
 afterEach(() => {
     cleanup();
+    network.online = true;
     delete (window as { polarisDesktop?: unknown }).polarisDesktop;
 });
 
@@ -137,6 +140,18 @@ describe("the app's settings screen", () => {
         install(fakeBridge({ get: vi.fn(async () => ({ ...SNAPSHOT, restartPending: true })) }));
         await draw("advanced");
         expect(screen.getByRole("button", { name: "Restart now" })).toBeTruthy();
+    });
+
+    it("keeps the update check for a connection when the page was opened offline", async () => {
+        const checkForUpdates = vi.fn(async () => ({ kind: "current" }));
+        install({ ...fakeBridge(), checkForUpdates });
+        network.online = false;
+        await draw("updates");
+        const check = screen.getByRole("button", { name: "Check for updates" });
+        expect(check.getAttribute("aria-disabled")).toBe("true");
+        expect(screen.getByText(appSettingsMessages.updates.offline)).toBeTruthy();
+        await act(async () => check.click());
+        expect(checkForUpdates).not.toHaveBeenCalled();
     });
 
     it("says where these settings are changed when the page is not in the app", async () => {

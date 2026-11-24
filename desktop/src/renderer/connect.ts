@@ -1,6 +1,8 @@
 /**
- * The settings window: the first run, File > Settings, and where a window that
- * could not load comes back to with the reason.
+ * The hosts window: the first run, Hosts > Manage in Settings > This app, and
+ * where a window that could not load comes back to with the reason. The app's
+ * own settings are not here: they are the host's Settings > This app, drawn
+ * in the Polaris window (`openSettings`), offline included.
  *
  * Every server this app has opened is a row: pressing Open puts it in front,
  * the pencil names it and the bin takes it off the list. Below, the form adds
@@ -16,19 +18,12 @@
 
 import { available, byId, dressMark, say } from "./dom";
 import { serverAddressSchema } from "@/shared/server-address";
-import { describeUpdateCheck, type UpdateCheck } from "@/shared/update-check";
 import { describeServer, normalizeServerName, SERVER_NAME_MAX, type ServerRow } from "@/shared/servers";
-import { encodeHostList, HOST_LIST_PREFIX, hostListLink } from "../../../dashboard/packages/core/src/host-list";
+import { HOST_LIST_PREFIX, hostListLink } from "../../../dashboard/packages/core/src/host-list";
 import { encodeQr, qrSvgPath } from "../../../dashboard/packages/core/src/qr";
-import type { HostImport, LauncherStatus } from "@/shared/bridge";
-import { picker } from "./picker";
-import { SEARCH_ENGINE_IDS, SEARCH_ENGINES, type SearchEngine } from "@/shared/launcher";
-import type { ClipboardKeep } from "@/shared/clipboard-store";
-import { OPACITIES, type LookChange } from "@/shared/voice-widget";
-import { bindingFromPress } from "@/shared/launcher-hotkey";
+import type { HostImport } from "@/shared/bridge";
 import jsQR from "jsqr";
-import { APP_SETTING_CATEGORIES, APP_SETTINGS, type AppSettingCategory } from "@polaris/core/app-settings";
-import { HOST_UPDATE_PATH, settingsPath, type LocalSettingsState } from "@/shared/settings-route";
+import { HOST_UPDATE_PATH, type LocalSettingsState } from "@/shared/settings-route";
 
 dressMark(window.polarisLocal.season);
 
@@ -40,30 +35,10 @@ const failure = byId<HTMLParagraphElement>("failure");
 const note = byId<HTMLSpanElement>("address-note");
 const list = byId<HTMLUListElement>("server-list");
 const title = byId<HTMLHeadingElement>("title");
-const tabs = byId<HTMLElement>("tabs");
-const nav = byId<HTMLElement>("nav");
-const searchBox = byId<HTMLLabelElement>("search-box");
-const search = byId<HTMLInputElement>("settings-search");
-const searchEmpty = byId<HTMLParagraphElement>("search-empty");
-const serversPage = byId<HTMLElement>("servers-page");
 const showAdd = byId<HTMLButtonElement>("show-add");
 const hideAdd = byId<HTMLButtonElement>("hide-add");
 const removeDialog = byId<HTMLDialogElement>("confirm-remove");
 const removeTitle = byId<HTMLParagraphElement>("remove-title");
-const openAtLogin = byId<HTMLInputElement>("open-at-login");
-const hardwareAcceleration = byId<HTMLInputElement>("hardware-acceleration");
-const toggles = {
-    minimizeToTray: byId<HTMLInputElement>("minimize-to-tray"),
-    startMinimized: byId<HTMLInputElement>("start-minimized"),
-    voiceWidget: byId<HTMLInputElement>("voice-widget"),
-    voiceWidgetGameOnly: byId<HTMLInputElement>("voice-widget-game-only"),
-    launcher: byId<HTMLInputElement>("launcher"),
-    launcherClipboard: byId<HTMLInputElement>("launcher-clipboard"),
-    launcherGameMode: byId<HTMLInputElement>("launcher-game-mode")
-} as const;
-const restartDialog = byId<HTMLDialogElement>("confirm-restart");
-const restartFailure = byId<HTMLParagraphElement>("restart-failure");
-const restartPending = byId<HTMLElement>("restart-pending");
 const hint = note.textContent ?? "";
 
 let busy = false;
@@ -368,177 +343,6 @@ function showForm(shown: boolean): void {
     if (shown) input.focus();
 }
 
-/** The name of each category, as the host's Settings lists them. */
-const CATEGORY_NAMES: Record<AppSettingCategory, string> = {
-    general: "General",
-    window: "Window and tray",
-    search: "Search and shortcuts",
-    clipboard: "Clipboard",
-    voice: "Voice widget and games",
-    hosts: "Hosts",
-    advanced: "Advanced",
-    updates: "Updates"
-};
-
-/** A page's title, as each page of the host's Settings opens with one. */
-function pageTitle(text: string): HTMLHeadingElement {
-    const heading = document.createElement("h2");
-    heading.className = "page-title";
-    heading.textContent = text;
-    return heading;
-}
-
-/**
- * One page per category of the shared schema (`@polaris/core/app-settings`),
- * the same categories in the same order as Settings > This app on the host.
- * The rows are written once in the markup, each naming its setting, and are
- * moved here into the page of that setting's category - so the schema, not
- * the markup, decides where a setting is listed. The hosts are their own page.
- */
-function buildPages(): Record<AppSettingCategory, HTMLElement> {
-    const holder = byId<HTMLElement>("pages");
-    const categoryOf = new Map<string, AppSettingCategory>(APP_SETTINGS.map((entry) => [entry.key, entry.category]));
-    const pages = { hosts: serversPage } as Record<AppSettingCategory, HTMLElement>;
-    const lists = new Map<AppSettingCategory, HTMLElement>();
-    for (const category of APP_SETTING_CATEGORIES) {
-        const tab = document.createElement("button");
-        tab.type = "button";
-        tab.id = `tab-${category}`;
-        tab.setAttribute("role", "tab");
-        tab.setAttribute("aria-controls", `${category}-page`);
-        tab.textContent = CATEGORY_NAMES[category];
-        tab.addEventListener("click", () => showPage(category));
-        tabs.append(tab);
-        if (category === "hosts") continue;
-        const page = document.createElement("section");
-        page.id = `${category}-page`;
-        page.setAttribute("role", "tabpanel");
-        page.hidden = true;
-        const list = document.createElement("div");
-        list.className = "settings-list";
-        page.append(pageTitle(CATEGORY_NAMES[category]), list);
-        holder.append(page);
-        pages[category] = page;
-        lists.set(category, list);
-    }
-    serversPage.id = "hosts-page";
-    serversPage.prepend(pageTitle(CATEGORY_NAMES.hosts));
-    for (const row of document.querySelectorAll<HTMLElement>("[data-setting], [data-category]")) {
-        const category = (row.dataset.category as AppSettingCategory | undefined) ?? categoryOf.get(row.dataset.setting ?? "");
-        const list = category ? lists.get(category) : undefined;
-        if (!category || !list) continue;
-        // A row goes in its page's list; anything else (the version line, a notice) below it.
-        if (row.classList.contains("setting") || row.parentElement?.classList.contains("settings-list")) list.append(row);
-        else pages[category].append(row);
-    }
-    for (const id of ["general-page", "advanced-page"]) document.getElementById(id)?.remove();
-    return pages;
-}
-
-const PAGES: Record<string, HTMLElement> = buildPages();
-
-/**
- * The device add-ons installed here, after the categories as on the host's
- * Settings, each with its state and a switch to turn it on or off. Offline
- * included: the list is the app's own. Their settings open on the host.
- */
-function buildAddonsPage(): void {
-    const local = window.polarisLocal.connect;
-    if (!local.addons || !local.setAddonEnabled) return;
-    const tab = document.createElement("button");
-    tab.type = "button";
-    tab.id = "tab-addons";
-    tab.setAttribute("role", "tab");
-    tab.setAttribute("aria-controls", "addons-page");
-    tab.textContent = "Device add-ons";
-    tab.addEventListener("click", () => {
-        showPage("addons");
-        void fill();
-    });
-    tabs.append(tab);
-    const page = document.createElement("section");
-    page.id = "addons-page";
-    page.setAttribute("role", "tabpanel");
-    page.hidden = true;
-    const list = document.createElement("div");
-    list.className = "settings-list";
-    // Nothing installed: the store is on the host, so the way there is a button,
-    // never directions to a menu.
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    const emptyText = document.createElement("p");
-    emptyText.className = "hint";
-    emptyText.textContent = "Nothing installed on this computer yet.";
-    const browse = textButton("Browse add-ons", () => void openOnHost(settingsPath("addons")), true);
-    empty.append(emptyText, browse);
-    page.append(pageTitle("Device add-ons"), list, empty);
-    byId<HTMLElement>("pages").append(page);
-    PAGES.addons = page;
-
-    const fill = async (): Promise<void> => {
-        const rows = await local.addons!().catch(() => null);
-        if (!Array.isArray(rows)) return;
-        empty.hidden = rows.length > 0;
-        list.hidden = rows.length === 0;
-        list.replaceChildren(
-            ...rows.map((row) => {
-                const item = document.createElement("label");
-                item.className = "setting";
-                const text = document.createElement("span");
-                text.className = "setting-text";
-                const name = document.createElement("span");
-                name.className = "name";
-                name.textContent = row.name;
-                const hint = document.createElement("span");
-                hint.className = "hint";
-                hint.textContent = `${row.status} - version ${row.version}`;
-                text.append(name, hint);
-                const toggle = document.createElement("input");
-                toggle.type = "checkbox";
-                toggle.className = "switch";
-                toggle.setAttribute("role", "switch");
-                toggle.setAttribute("aria-label", `Use ${row.name}`);
-                toggle.checked = row.enabled;
-                toggle.addEventListener("change", () => {
-                    const wanted = toggle.checked;
-                    toggle.disabled = true;
-                    void local.setAddonEnabled!(row.id, wanted)
-                        .catch(() => false)
-                        .then((took) => {
-                            // The switch goes back when it did not take.
-                            if (!took) toggle.checked = !wanted;
-                            toggle.disabled = false;
-                        });
-                });
-                item.append(text, toggle);
-                return item;
-            })
-        );
-    };
-    void fill();
-    local.onAddonsChange?.(() => void fill());
-}
-buildAddonsPage();
-
-/** The page shown, and the one to go back to once a search is cleared. */
-let currentPage = "hosts";
-
-function showPage(shown: string): void {
-    if (!PAGES[shown]) return;
-    currentPage = shown;
-    if (search.value) {
-        search.value = "";
-        filterSettings("");
-    }
-    for (const [page, element] of Object.entries(PAGES)) {
-        element.hidden = page !== shown;
-        byId(`tab-${page}`).setAttribute("aria-selected", String(page === shown));
-    }
-    // In a narrow window the categories scroll across; the chosen one stays in view.
-    byId(`tab-${shown}`).scrollIntoView({ block: "nearest", inline: "nearest" });
-}
-showPage("hosts");
-
 function draw(servers: readonly ServerRow[]): void {
     const first = known === null;
     known = servers.length;
@@ -548,8 +352,6 @@ function draw(servers: readonly ServerRow[]): void {
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-needs-hosts]")) {
         button.hidden = servers.length === 0;
     }
-    nav.hidden = servers.length === 0;
-    searchBox.hidden = servers.length === 0;
     document.body.classList.toggle("first-run", servers.length === 0);
     title.textContent = servers.length === 0 ? "Open your Polaris" : "Polaris";
     if (first || servers.length === 0) showForm(servers.length === 0);
@@ -570,116 +372,38 @@ function draw(servers: readonly ServerRow[]): void {
 async function refresh(opened = false): Promise<void> {
     const state = await window.polarisLocal.connect.state().catch(() => null);
     draw(state?.servers ?? []);
-    if (opened) openAt(state?.settings ?? null);
+    if (opened) explain(state?.settings ?? null);
 }
 
-// ---- Why this page, and not the host's Settings ----
+// ---- Why this window, when Settings... was asked for ----
 
 const reason = byId<HTMLElement>("reason");
 const reasonText = byId<HTMLParagraphElement>("reason-text");
 const reasonActs = byId<HTMLElement>("reason-acts");
 
 /**
- * Open a page of the host in the Polaris window. When it cannot be - no host
- * in reach, or one older than the page - the notice says which, with the
- * button that fixes it.
+ * The line over the hosts when Settings... found a Polaris older than its
+ * Settings > This app: what the reader can do about it, with the update when
+ * the host lets them run it. Nothing otherwise.
  */
-async function openOnHost(path: string): Promise<void> {
-    const outcome = (await window.polarisLocal.connect.openOnHost?.(path).catch(() => null)) ?? "offline";
-    if (outcome === "opened") return;
-    const state = await window.polarisLocal.connect.state().catch(() => null);
-    explain(outcome, state?.settings?.canUpdate === true);
-}
-
-/**
- * The notice over every page when the host's Settings could not be opened:
- * out of reach, or a Polaris from before this app's settings were in it. Each
- * says what the reader can do about it, with the button that does it.
- */
-function explain(why: LocalSettingsState["reason"], canUpdate = false): void {
-    reason.hidden = why === null;
-    if (why === "outdated" && canUpdate) {
-        reasonText.textContent =
-            "Your Polaris is older than this app, so these settings open here instead of in Settings. Update Polaris to have them there, next to the rest.";
-        reasonActs.replaceChildren(textButton("Update Polaris", () => void openOnHost(HOST_UPDATE_PATH), true));
-    } else if (why === "outdated") {
+function explain(state: LocalSettingsState | null): void {
+    reason.hidden = state?.reason !== "outdated";
+    reasonActs.replaceChildren();
+    if (state?.reason !== "outdated") return;
+    if (state.canUpdate === true) {
+        reasonText.textContent = "This Polaris is older than this app, so its settings are not in Settings yet. Update Polaris to have them there.";
+        reasonActs.replaceChildren(textButton("Update Polaris", () => void openUpdate(), true));
+    } else {
         // Only an administrator can update it; nobody else is offered a page that would refuse them.
-        reasonText.textContent =
-            "Your Polaris is older than this app, so these settings open here instead of in Settings. An administrator has to update Polaris to have them there.";
-        reasonActs.replaceChildren();
-    } else if (why === "offline") {
-        reasonText.textContent = "Polaris cannot be reached, so these are the settings kept on this computer.";
-        reasonActs.replaceChildren(textButton("Connect", () => showPage("hosts"), true));
-    } else reasonActs.replaceChildren();
-}
-
-/** The place and the notice the app opened this page with. */
-function openAt(state: LocalSettingsState | null): void {
-    explain(state?.reason ?? null, state?.canUpdate === true);
-    if (state && known) showPage(state.place);
-}
-
-// ---- Search, as the host's Settings search finds a setting ----
-
-/** Lower case and without accents, so a word typed either way finds the row. */
-function folded(text: string): string {
-    return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-}
-
-/**
- * Every page at once, showing only the rows whose name or hint holds every
- * word typed, under the title of their page; cleared, the page that was open
- * comes back. A page with no rows of its own (the hosts) is found by its title.
- */
-function filterSettings(query: string): void {
-    const words = folded(query).split(/\s+/).filter(Boolean);
-    document.body.classList.toggle("searching", words.length > 0);
-    let found = 0;
-    for (const [name, page] of Object.entries(PAGES)) {
-        const rows = [...page.querySelectorAll<HTMLElement>(".setting")];
-        if (words.length === 0) {
-            page.hidden = name !== currentPage;
-            for (const row of rows) delete row.dataset.searchMiss;
-            continue;
-        }
-        const title = folded(page.querySelector(".page-title")?.textContent ?? "");
-        let matches = 0;
-        for (const row of rows) {
-            const text = `${title} ${folded(row.textContent ?? "")}`;
-            const hit = words.every((word) => text.includes(word));
-            if (hit) {
-                delete row.dataset.searchMiss;
-                if (!row.hidden) matches++;
-            } else row.dataset.searchMiss = "";
-        }
-        const hit = matches > 0 || (rows.length === 0 && words.every((word) => title.includes(word)));
-        page.hidden = !hit;
-        if (hit) found++;
-    }
-    searchEmpty.hidden = words.length === 0 || found > 0;
-    for (const name of Object.keys(PAGES)) {
-        byId(`tab-${name}`).setAttribute("aria-selected", String(words.length === 0 && name === currentPage));
+        reasonText.textContent = "This Polaris is older than this app, so its settings are not in Settings yet. An administrator has to update it.";
     }
 }
 
-search.addEventListener("input", () => filterSettings(search.value));
-search.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && search.value) {
-        event.preventDefault();
-        search.value = "";
-        filterSettings("");
-    }
-});
-document.addEventListener("keydown", (event) => {
-    if (searchBox.hidden) return;
-    // Ctrl+K, or / outside a field, puts the cursor in the search, as in Polaris.
-    const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
-    if ((event.key === "k" && (event.ctrlKey || event.metaKey)) || (event.key === "/" && !typing)) {
-        event.preventDefault();
-        search.focus();
-        search.select();
-    }
-});
+/** The host's update page, in the Polaris window; when it cannot open, why. */
+async function openUpdate(): Promise<void> {
+    const outcome = (await window.polarisLocal.connect.openOnHost?.(HOST_UPDATE_PATH).catch(() => null)) ?? "offline";
+    if (outcome !== "opened") say(failure, "Polaris cannot be reached right now. Try again in a moment.");
+}
 
 // Laid over the Polaris window: Escape, the cross or a press beside the card
 // puts it away.
@@ -888,315 +612,6 @@ byId("remove-confirm").addEventListener("click", () => {
     removeDialog.close();
     if (server) void act(() => window.polarisLocal.connect.remove(server.origin));
 });
-openAtLogin.addEventListener("change", () => {
-    const wanted = openAtLogin.checked;
-    say(failure, null);
-    void window.polarisLocal.connect
-        .setOpenAtLogin(wanted)
-        .catch(() => false)
-        .then((applied) => {
-            if (applied) return;
-            openAtLogin.checked = !wanted;
-            say(failure, "Polaris could not change this on this computer.");
-        });
-});
-const launcherRecord = byId<HTMLButtonElement>("launcher-record");
-const launcherKeyHint = byId<HTMLSpanElement>("launcher-key-hint");
-const launcherProblem = byId<HTMLParagraphElement>("launcher-problem");
-const launcherName = byId<HTMLSpanElement>("launcher-name");
-const launcherOnHint = byId<HTMLSpanElement>("launcher-on-hint");
-const launcherClipboardHint = byId<HTMLSpanElement>("launcher-clipboard-hint");
-const launcherKeepRow = byId<HTMLDivElement>("launcher-keep-row");
-const clearClipsDialog = byId<HTMLDialogElement>("confirm-clear-clips");
-/** Said under "Clipboard history": where the copies are kept, and for how long. */
-const CLIPBOARD_HINT = {
-    kept: 'Polaris search keeps what you copy on this computer, encrypted, for the time below. Passwords from password managers are skipped. Type "clip" to see them.',
-    memory: 'This computer has no system key store, so copies stay in memory and are gone when Polaris closes. Passwords from password managers are skipped. Type "clip" to see them.'
-} as const;
-/** Saving a choice from a dropdown; a refusal is said where the switches say theirs. */
-function savedOrSay(saving: Promise<boolean>): void {
-    say(failure, null);
-    void saving.catch(() => false).then((kept) => {
-        if (!kept) say(failure, "Polaris could not save this setting. Try again.");
-    });
-}
-const launcherEngine = picker(
-    byId("launcher-engine"),
-    SEARCH_ENGINE_IDS.map((id) => ({ value: id, label: SEARCH_ENGINES[id].name })),
-    (value) => savedOrSay(window.polarisLocal.connect.setLauncherEngine(value as SearchEngine))
-);
-const launcherKeep = picker(
-    byId("launcher-keep"),
-    [
-        { value: "day", label: "1 day" },
-        { value: "week", label: "1 week" },
-        { value: "month", label: "1 month" },
-        { value: "quarter", label: "3 months" }
-    ],
-    (value) => savedOrSay(window.polarisLocal.connect.setClipboardKeep(value as ClipboardKeep))
-);
-/** The voice widget's looks, the choices Discord's overlay voice widget offers. */
-function lookPicker<K extends LookChange["key"]>(key: K, options: readonly { value: string; label: string; }[]) {
-    const id = `voice-widget-${key}`;
-    const chosen = picker(byId(id), options, (value) =>
-        savedOrSay(window.polarisLocal.connect.setVoiceWidgetLook({ key, value: key === "opacity" ? Number(value) : value } as LookChange))
-    );
-    return { picker: chosen, row: byId<HTMLDivElement>(`${id}-row`) };
-}
-const widgetLook = {
-    avatars: lookPicker("avatars", [
-        { value: "large", label: "Large" },
-        { value: "small", label: "Small" }
-    ]),
-    names: lookPicker("names", [
-        { value: "always", label: "Always" },
-        { value: "speaking", label: "While talking" },
-        { value: "never", label: "Never" }
-    ]),
-    people: lookPicker("people", [
-        { value: "always", label: "Everyone in the call" },
-        { value: "speaking", label: "Only who is talking" }
-    ]),
-    opacity: lookPicker("opacity", OPACITIES.map((value) => ({ value: String(value), label: `${value}%` }))),
-    corner: lookPicker("corner", [
-        { value: "top-left", label: "Top left" },
-        { value: "top-right", label: "Top right" },
-        { value: "bottom-left", label: "Bottom left" },
-        { value: "bottom-right", label: "Bottom right" }
-    ])
-};
-const launcherClear = byId<HTMLButtonElement>("launcher-clear");
-const launcherClearRow = byId<HTMLDivElement>("launcher-clear-row");
-let recordingKey = false;
-
-/** The search shortcut as the system left it, and who likely holds it when it is taken. */
-function drawLauncherStatus(status: LauncherStatus): void {
-    launcherKeyHint.textContent = status.others.length && status.held
-        ? `${status.key} - also installed: ${status.others.join(", ")}`
-        : status.key;
-    // The switch is named by the key it holds, as the extension's settings name theirs.
-    launcherName.textContent = `${status.key} search`;
-    launcherProblem.hidden = !status.problem;
-    launcherProblem.textContent = status.problem ?? "";
-}
-
-async function showLauncherStatus(): Promise<void> {
-    const status = await window.polarisLocal.connect.launcherStatus().catch(() => null);
-    if (status) drawLauncherStatus(status);
-}
-
-function stopRecording(): void {
-    recordingKey = false;
-    launcherRecord.textContent = "Change";
-    document.removeEventListener("keydown", recordKey, true);
-}
-
-/** The next press becomes the shortcut; Esc keeps the old one. */
-function recordKey(event: KeyboardEvent): void {
-    event.preventDefault();
-    event.stopPropagation();
-    if (event.key === "Escape") {
-        stopRecording();
-        void window.polarisLocal.connect.recordLauncherKey(false).then(showLauncherStatus);
-        return;
-    }
-    const binding = bindingFromPress(event, platformOf());
-    if (!binding) {
-        if (!["Control", "Alt", "Shift", "Meta"].includes(event.key)) {
-            launcherProblem.hidden = false;
-            launcherProblem.textContent = "Use Ctrl, Alt or Cmd with a key, or a function key.";
-        }
-        return;
-    }
-    stopRecording();
-    void window.polarisLocal.connect
-        .setLauncherBinding(binding)
-        .catch(() => null)
-        .then((status) => {
-            if (status) drawLauncherStatus(status);
-            else void window.polarisLocal.connect.recordLauncherKey(false).then(showLauncherStatus);
-        });
-}
-
-/** The platform the page runs on, as Node names it, for how keys are spelled. */
-function platformOf(): NodeJS.Platform {
-    const agent = navigator.userAgent;
-    return /Mac/.test(agent) ? "darwin" : /Windows/.test(agent) ? "win32" : "linux";
-}
-
-launcherRecord.addEventListener("click", () => {
-    if (recordingKey) {
-        stopRecording();
-        void window.polarisLocal.connect.recordLauncherKey(false).then(showLauncherStatus);
-        return;
-    }
-    recordingKey = true;
-    launcherRecord.textContent = "Press the new shortcut...";
-    launcherProblem.hidden = true;
-    void window.polarisLocal.connect.recordLauncherKey(true);
-    document.addEventListener("keydown", recordKey, true);
-});
-launcherClear.addEventListener("click", () => clearClipsDialog.showModal());
-byId("clear-clips-cancel").addEventListener("click", () => clearClipsDialog.close());
-byId("clear-clips-confirm").addEventListener("click", () => {
-    clearClipsDialog.close();
-    void window.polarisLocal.connect.clearClipboardHistory().then(() => {
-        launcherClear.textContent = "Cleared";
-        setTimeout(() => (launcherClear.textContent = "Clear"), 1500);
-    });
-});
-/** The rows that only mean something with the history on, and the search on. */
-function followLauncher(): void {
-    const searching = toggles.launcher.checked;
-    const keeping = searching && toggles.launcherClipboard.checked;
-    launcherOnHint.textContent = searching
-        ? "Your shortcut opens Polaris search over any app."
-        : "The shortcut does nothing outside Polaris.";
-    launcherEngine.disabled = !searching;
-    toggles.launcherClipboard.disabled = !searching;
-    toggles.launcherGameMode.disabled = !searching;
-    // Only Windows can tell what is in front.
-    byId("launcher-game-mode-row").hidden = platformOf() !== "win32";
-    launcherKeepRow.hidden = !keeping;
-    launcherClearRow.hidden = !keeping;
-}
-void showLauncherStatus();
-/** "Only while a game is running" means nothing with the widget off. */
-function followVoiceWidget(): void {
-    toggles.voiceWidgetGameOnly.disabled = !toggles.voiceWidget.checked;
-    for (const { row } of Object.values(widgetLook)) row.hidden = !toggles.voiceWidget.checked;
-    launcherRecord.disabled = !toggles.launcher.checked;
-    followLauncher();
-}
-for (const [name, input] of Object.entries(toggles) as [keyof typeof toggles, HTMLInputElement][]) {
-    input.addEventListener("change", () => {
-        const wanted = input.checked;
-        say(failure, null);
-        followVoiceWidget();
-        void window.polarisLocal.connect
-            .setToggle(name, wanted)
-            .catch(() => false)
-            .then((kept) => {
-                if (kept) {
-                    if (name === "launcher") void showLauncherStatus();
-                    return;
-                }
-                input.checked = !wanted;
-                followVoiceWidget();
-                say(failure, "Polaris could not save this setting. Try again.");
-            });
-    });
-}
-/** Close and open the app again; on a refusal, say why where the press was. */
-function relaunch(): void {
-    say(restartFailure, null);
-    void window.polarisLocal.connect
-        .relaunch()
-        .catch(() => ({ ok: false, error: "Polaris could not restart. Close it and open it again." }) as const)
-        .then((outcome) => {
-            if (outcome.ok) return;
-            if (restartDialog.open) say(restartFailure, outcome.error);
-            else say(failure, outcome.error);
-        });
-}
-hardwareAcceleration.addEventListener("change", () => {
-    const wanted = hardwareAcceleration.checked;
-    say(failure, null);
-    void window.polarisLocal.connect
-        .setHardwareAcceleration(wanted)
-        .catch(() => false)
-        .then(async (kept) => {
-            if (!kept) {
-                hardwareAcceleration.checked = !wanted;
-                say(failure, "Polaris could not save this setting. Try again.");
-                return;
-            }
-            const preferences = await window.polarisLocal.connect.preferences().catch(() => null);
-            const pending = preferences?.restartPending ?? true;
-            restartPending.hidden = !pending;
-            // Turned back to what this run already uses: nothing to restart for.
-            if (!pending) return;
-            say(restartFailure, null);
-            restartDialog.showModal();
-        });
-});
-byId("restart-later").addEventListener("click", () => restartDialog.close());
-byId("restart-now").addEventListener("click", relaunch);
-byId("restart-pending-now").addEventListener("click", relaunch);
-const loadPreferences = () => window.polarisLocal.connect.preferences().catch(() => null).then((preferences) => {
-    if (!preferences) return;
-    openAtLogin.checked = preferences.openAtLogin;
-    hardwareAcceleration.checked = preferences.hardwareAcceleration;
-    toggles.minimizeToTray.checked = preferences.minimizeToTray;
-    toggles.startMinimized.checked = preferences.startMinimized;
-    toggles.voiceWidget.checked = preferences.voiceWidget;
-    toggles.voiceWidgetGameOnly.checked = preferences.voiceWidgetGameOnly;
-    for (const key of Object.keys(widgetLook) as (keyof typeof widgetLook)[]) widgetLook[key].picker.value = String(preferences.voiceWidgetLook[key]);
-    toggles.launcher.checked = preferences.launcher;
-    toggles.launcherClipboard.checked = preferences.launcherClipboard;
-    toggles.launcherGameMode.checked = preferences.launcherGameMode;
-    launcherEngine.value = preferences.launcherEngine;
-    launcherKeep.value = preferences.launcherClipboardKeep;
-    launcherClipboardHint.textContent = preferences.launcherClipboardPersists ? CLIPBOARD_HINT.kept : CLIPBOARD_HINT.memory;
-    followVoiceWidget();
-    restartPending.hidden = !preferences.restartPending;
-    byId("version").textContent = `Polaris ${preferences.version}`;
-});
-const preferencesLoaded = loadPreferences();
-
-const checkUpdates = byId<HTMLButtonElement>("check-updates");
-const restartUpdate = byId<HTMLButtonElement>("restart-update");
-const updatePage = byId<HTMLButtonElement>("update-page");
-const updateStatus = byId<HTMLParagraphElement>("update-status");
-checkUpdates.addEventListener("click", () => {
-    if (checkUpdates.getAttribute("aria-disabled") === "true") return;
-    available(checkUpdates, false);
-    restartUpdate.hidden = true;
-    updatePage.hidden = true;
-    updateStatus.className = "hint";
-    updateStatus.textContent = "Checking for updates...";
-    void window.polarisLocal.connect
-        .checkForUpdates()
-        .catch(() => ({ kind: "failed", reason: "Polaris did not answer." }) as const)
-        .then(showUpdateCheck);
-});
-/** Say what a check found; a download keeps the button until it ends, then
- *  says what it came to, so one press reaches "Restart now". */
-function showUpdateCheck(found: UpdateCheck): void {
-    updateStatus.textContent = describeUpdateCheck(found);
-    updateStatus.className = found.kind === "failed" ? "error" : "hint";
-    restartUpdate.hidden = found.kind !== "ready";
-    updatePage.hidden = found.kind !== "available";
-    if (found.kind !== "downloading") {
-        available(checkUpdates, true);
-        return;
-    }
-    void window.polarisLocal.connect
-        .updateDownloaded()
-        .catch(() => ({ kind: "failed", reason: "Polaris did not answer." }) as const)
-        .then((ended) => showUpdateCheck(ended.kind === "downloading" ? { kind: "failed", reason: "Try again." } : ended));
-}
-updatePage.addEventListener("click", () => {
-    void window.polarisLocal.connect
-        .openUpdatePage()
-        .catch(() => false)
-        .then((opened) => {
-            if (opened) return;
-            updateStatus.textContent = "The download page could not be opened. Check for updates again.";
-            updateStatus.className = "error";
-        });
-});
-restartUpdate.addEventListener("click", () => {
-    void window.polarisLocal.connect
-        .restartToUpdate()
-        .catch(() => ({ ok: false, error: "Polaris could not restart. Close it and open it again." }))
-        .then((outcome) => {
-            if (outcome.ok) return;
-            updateStatus.textContent = outcome.error ?? "Polaris could not restart. Close it and open it again.";
-            updateStatus.className = "error";
-        });
-});
-
 nameInput.maxLength = SERVER_NAME_MAX;
 input.addEventListener("input", () => {
     say(failure, null);
@@ -1256,23 +671,20 @@ const stateLoaded = window.polarisLocal.connect.state().catch(() => null).then((
     if (state?.address && !input.value && servers.length === 0) input.value = state.address;
     say(failure, state?.error ?? null);
     draw(servers);
-    openAt(state?.settings ?? null);
+    explain(state?.settings ?? null);
     check();
     ask();
 });
 
-// The page as written is the first run's - the address form, no tabs - so it
-// stays out of sight until the list and the settings are in, rather than
-// showing that form for a moment and swapping it for the tabs.
-void Promise.allSettled([stateLoaded, preferencesLoaded]).then(() => {
+// The page as written is the first run's - the address form, no list - so it
+// stays out of sight until the list is in, rather than showing that form for a
+// moment and swapping it for the list.
+void stateLoaded.then(() => {
     delete byId("panel").dataset.loading;
     if (!form.hidden) input.focus();
 });
 
 // Kept open between visits (`openLocalSheet` hides it instead of closing it):
-// shown again, it reads the list and the settings anew, since either may have
+// shown again, it reads the list and the reason anew, since either may have
 // changed elsewhere while it was away.
-window.polarisLocal.connect.onShown?.(() => {
-    void refresh(true);
-    void loadPreferences();
-});
+window.polarisLocal.connect.onShown?.(() => void refresh(true));

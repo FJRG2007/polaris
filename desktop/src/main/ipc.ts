@@ -19,7 +19,6 @@ import { strokeSchema } from "@/shared/annotate";
 import { setCallHotkeys } from "./call-hotkeys";
 import { followTextSize as followWidgetTextSize, followVoiceWidgetLook, setVoiceState, voiceWidgetAction } from "./voice-widget";
 import { launcherBinding, rememberLauncherClipboardKeep, rememberLauncherEngine, rememberTextSize, rememberVoiceWidgetLook, textSize, voiceWidgetLook } from "./settings";
-import { CLIPBOARD_KEEP_IDS } from "@/shared/clipboard-store";
 import { readTextSize } from "@/shared/text-size";
 import { lookChangeSchema, voiceActionSchema, voiceStateSchema, withLookChange } from "@/shared/voice-widget";
 import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
@@ -44,7 +43,6 @@ import {
     CHANNELS,
     type ComputerFolderPick,
     type ComputerPairOutcome,
-    PREFERENCE_TOGGLES,
     type CustomGameInput,
     type GameActivity,
     type Outcome,
@@ -76,7 +74,6 @@ import {
     webContents
 } from "electron";
 import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
-import { SEARCH_ENGINE_IDS } from "@/shared/launcher";
 import { clearClipboardHistory, followClipboardKeep, launcherStatus, recordLauncherKey, setLauncherBinding } from "./launcher";
 import { appKeyPressSchema, readAppSettingChange, type AppSettingChange } from "@polaris/core/app-settings";
 import { bindingFromPress } from "@/shared/launcher-hotkey";
@@ -96,7 +93,7 @@ export interface IpcHost extends PushHost {
     /** Close and open the app again, unless something running would be lost. */
     readonly relaunch: () => Outcome;
     readonly connectState: () => { address: string | null; error: string | null; servers: ServerRow[]; settings: LocalSettingsState; };
-    /** Open a page of the host in the Polaris window; false with none to open it in. */
+    /** Open the host's update page in the Polaris window; "offline" with none to open it in. */
     readonly openOnHost: (path: string) => Promise<HostPageOutcome>;
     readonly connectSubmit: (raw: unknown, name?: string) => Promise<Outcome>;
     readonly connectCheck: (raw: unknown) => Promise<AddressCheck>;
@@ -124,10 +121,6 @@ export interface IpcHost extends PushHost {
     readonly holdCall: (sender: number, origin: string, note: string | null) => void;
     /** Ask for a newer version now, from a press. */
     readonly checkUpdates: () => Promise<UpdateCheck>;
-    /** What the download a check began came to, once it has. */
-    readonly updateDownloaded: () => Promise<UpdateCheck>;
-    /** Open the download page of the version announced, if there is one. */
-    readonly openUpdatePage: () => boolean;
     /** This page draws the app's settings: the tray and the menus open them there. */
     readonly settingsAnnounced: (sender: WebContents) => void;
 }
@@ -255,7 +248,7 @@ export function registerIpc(host: IpcHost): void {
         );
     };
     const from = (event: IpcMainInvokeEvent, kind: WindowKind): boolean => kindOf(event.sender) === kind;
-    registerAddonIpc(fromPolaris, (path) => host.showPolaris(path), (event) => from(event, "connect"));
+    registerAddonIpc(fromPolaris, (path) => host.showPolaris(path));
 
     ipcMain.handle(CHANNELS.notify, async (event, raw: unknown): Promise<boolean> => {
         if (!fromPolaris(event)) return false;
@@ -752,49 +745,8 @@ export function registerIpc(host: IpcHost): void {
             ? host.editServer(input.data.origin, input.data.address, input.data.name)
             : REFUSED;
     });
-    ipcMain.handle(CHANNELS.connectPreferences, (event) => (from(event, "connect") ? host.preferences() : null));
-    ipcMain.handle(CHANNELS.connectOpenAtLogin, async (event, raw: unknown): Promise<boolean> => {
-        const open = z.boolean().safeParse(raw);
-        return from(event, "connect") && open.success && (await host.setOpenAtLogin(open.data));
-    });
-    ipcMain.handle(CHANNELS.connectHardwareAcceleration, (event, raw: unknown): boolean => {
-        const on = z.boolean().safeParse(raw);
-        return from(event, "connect") && on.success && host.setHardwareAcceleration(on.data);
-    });
-    ipcMain.handle(CHANNELS.connectLauncherStatus, (event) => (from(event, "connect") ? launcherStatus() : null));
-    ipcMain.handle(CHANNELS.connectLauncherBinding, (event, raw: unknown) => {
-        const binding = z.string().max(40).safeParse(raw);
-        return from(event, "connect") && binding.success ? setLauncherBinding(binding.data) : null;
-    });
-    ipcMain.handle(CHANNELS.connectLauncherRecord, (event, raw: unknown) => {
-        const recording = z.boolean().safeParse(raw);
-        if (from(event, "connect") && recording.success) recordLauncherKey(recording.data);
-    });
-    ipcMain.handle(CHANNELS.connectLauncherEngine, (event, raw: unknown): boolean => {
-        const engine = z.enum(SEARCH_ENGINE_IDS).safeParse(raw);
-        if (!from(event, "connect") || !engine.success) return false;
-        rememberLauncherEngine(engine.data);
-        return true;
-    });
-    ipcMain.handle(CHANNELS.connectClipboardKeep, (event, raw: unknown): boolean => {
-        const keep = z.enum(CLIPBOARD_KEEP_IDS).safeParse(raw);
-        if (!from(event, "connect") || !keep.success) return false;
-        rememberLauncherClipboardKeep(keep.data);
-        followClipboardKeep();
-        return true;
-    });
-    ipcMain.handle(CHANNELS.connectVoiceWidgetLook, (event, raw: unknown): boolean => {
-        const change = lookChangeSchema.safeParse(raw);
-        if (!from(event, "connect") || !change.success) return false;
-        rememberVoiceWidgetLook(withLookChange(voiceWidgetLook(), change.data));
-        followVoiceWidgetLook();
-        return true;
-    });
-    ipcMain.handle(CHANNELS.connectClipboardClear, (event) => {
-        if (from(event, "connect")) clearClipboardHistory();
-    });
 
-    // The same settings, for the host's own Settings page ("This app"). The
+    // The app's settings, for the host's own Settings page ("This app"). The
     // values are this computer's, so the page only reads and changes them
     // through these calls, each validated here; the list of hosts is only read,
     // since it decides which server this app trusts - it is changed from the
@@ -802,7 +754,7 @@ export function registerIpc(host: IpcHost): void {
     const changed = (): void => {
         for (const contents of webContents.getAllWebContents()) {
             const kind = kindOf(contents);
-            if (kind === "polaris" || kind === "connect") contents.send(CHANNELS.appSettingsChanged);
+            if (kind === "polaris") contents.send(CHANNELS.appSettingsChanged);
         }
     };
     const snapshot = async () => {
@@ -888,22 +840,7 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.appSettingsAnnounce, (event) => {
         if (fromPolaris(event)) host.settingsAnnounced(event.sender);
     });
-    ipcMain.handle(CHANNELS.connectToggle, (event, raw: unknown): boolean => {
-        const input = z
-            .object({ name: z.enum(PREFERENCE_TOGGLES), on: z.boolean() })
-            .safeParse(raw);
-        return from(event, "connect") && input.success && host.setToggle(input.data.name, input.data.on);
-    });
-    // Takes nothing from the page.
-    ipcMain.handle(CHANNELS.connectRelaunch, (event) => (from(event, "connect") ? host.relaunch() : REFUSED));
-    ipcMain.handle(CHANNELS.connectCheckUpdates, (event) => (from(event, "connect") ? host.checkUpdates() : null));
-    // Takes nothing: waits on the download the app itself began.
-    ipcMain.handle(CHANNELS.connectUpdateDownloaded, (event) => (from(event, "connect") ? host.updateDownloaded() : null));
-    // Takes nothing, as from the page: only into what the app installed itself.
-    ipcMain.handle(CHANNELS.connectRestart, (event) => (from(event, "connect") ? host.updates.install() : REFUSED));
-    // Takes nothing: only the page of the version the app itself announced.
-    ipcMain.handle(CHANNELS.connectUpdatePage, (event) => from(event, "connect") && host.openUpdatePage());
-    // Only the host pages the bundled settings point at, by their exact address.
+    // Only the host's update page, by its exact address.
     ipcMain.handle(CHANNELS.connectOpenOnHost, (event, raw: unknown) => {
         const path = readHostPath(raw);
         return from(event, "connect") && path !== null ? host.openOnHost(path) : "offline";

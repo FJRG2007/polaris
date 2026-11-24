@@ -7,7 +7,6 @@
  */
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
-import { readUpdateCheck } from "@/shared/update-check";
 import type { StrokeInput } from "@/shared/annotate";
 import type { WidgetView } from "@/shared/voice-widget";
 import { applyTextSize } from "./text-size";
@@ -28,35 +27,12 @@ const bridge: PolarisLocal = {
         exportHostsFile: () => ipcRenderer.invoke(CHANNELS.connectHostsExport),
         importHostsFile: () => ipcRenderer.invoke(CHANNELS.connectHostsOpen),
         importHosts: (text) => ipcRenderer.invoke(CHANNELS.connectHostsImport, text),
-        preferences: () => ipcRenderer.invoke(CHANNELS.connectPreferences),
-        setOpenAtLogin: (open) => ipcRenderer.invoke(CHANNELS.connectOpenAtLogin, open),
-        setHardwareAcceleration: (on) => ipcRenderer.invoke(CHANNELS.connectHardwareAcceleration, on),
-        setToggle: (name, on) => ipcRenderer.invoke(CHANNELS.connectToggle, { name, on }),
-        launcherStatus: () => ipcRenderer.invoke(CHANNELS.connectLauncherStatus),
-        setLauncherBinding: (binding) => ipcRenderer.invoke(CHANNELS.connectLauncherBinding, binding),
-        recordLauncherKey: (recording) => ipcRenderer.invoke(CHANNELS.connectLauncherRecord, recording),
-        setLauncherEngine: (engine) => ipcRenderer.invoke(CHANNELS.connectLauncherEngine, engine),
-        setClipboardKeep: (keep) => ipcRenderer.invoke(CHANNELS.connectClipboardKeep, keep),
-        setVoiceWidgetLook: (change) => ipcRenderer.invoke(CHANNELS.connectVoiceWidgetLook, change),
-        clearClipboardHistory: () => ipcRenderer.invoke(CHANNELS.connectClipboardClear),
-        addons: () => ipcRenderer.invoke(CHANNELS.connectAddons),
-        setAddonEnabled: (id, enabled) => ipcRenderer.invoke(CHANNELS.connectAddonEnable, id, enabled),
-        onAddonsChange: (listener) => {
-            const heard = () => listener();
-            ipcRenderer.on(CHANNELS.addonsChanged, heard);
-            return () => void ipcRenderer.removeListener(CHANNELS.addonsChanged, heard);
-        },
-        relaunch: () => ipcRenderer.invoke(CHANNELS.connectRelaunch),
         close: () => ipcRenderer.invoke(CHANNELS.connectClose),
         onShown: (listener) => {
             const heard = () => listener();
             ipcRenderer.on(CHANNELS.connectShown, heard);
             return () => void ipcRenderer.removeListener(CHANNELS.connectShown, heard);
         },
-        checkForUpdates: async () => readUpdateCheck(await ipcRenderer.invoke(CHANNELS.connectCheckUpdates)),
-        updateDownloaded: async () => readUpdateCheck(await ipcRenderer.invoke(CHANNELS.connectUpdateDownloaded)),
-        restartToUpdate: () => ipcRenderer.invoke(CHANNELS.connectRestart),
-        openUpdatePage: () => ipcRenderer.invoke(CHANNELS.connectUpdatePage),
         openOnHost: (path) => ipcRenderer.invoke(CHANNELS.connectOpenOnHost, path)
     },
     apiKey: {

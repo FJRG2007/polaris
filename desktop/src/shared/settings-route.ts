@@ -2,14 +2,15 @@
  * Where Settings... opens - from the tray, the app menu, or anything else that
  * asks for the app's settings: the host's own Settings > This app, inside the
  * Polaris window with its sidebar and search, whenever a host is known. There
- * is one view of these settings; the page bundled with the app is only for the
- * first run, before any host, and for a host older than the screen.
+ * is one view of these settings and the app draws none of its own: before any
+ * host, and on a host older than the screen, the hosts window opens instead,
+ * saying why and offering the update.
  *
  * The page the window is on says it draws these settings (`announce`), and then
  * the app only asks it to open a category. When it has not said so - the
  * window is closed, on the sign-in page, an error page, or a host older than
  * the screen - the host is asked whether the screen exists, and only a host
- * that answers that it does not gets the bundled page, told why so it can offer
+ * that answers that it does not gets the hosts window, told why so it can offer
  * the update. A host that does not answer is opened all the same: the window's
  * service worker keeps every category's page, so the same screen draws offline
  * and every value on it, being this computer's, stays editable.
@@ -17,7 +18,7 @@
  * Pure, so the decision can be asserted without Electron.
  */
 
-import { readAppSettingCategory, type AppSettingCategory } from "@polaris/core/app-settings";
+import type { AppSettingCategory } from "@polaris/core/app-settings";
 
 /** A category of This app, or the device add-ons listed after them. */
 export type SettingsPlace = AppSettingCategory | "addons";
@@ -25,11 +26,6 @@ export type SettingsPlace = AppSettingCategory | "addons";
 /** The address of a place on the host. */
 export function settingsPath(place: SettingsPlace): string {
     return place === "addons" ? "/account/addons" : `/account/app/${place}`;
-}
-
-/** A place named by a page, or null for anything else. */
-export function readSettingsPlace(raw: unknown): SettingsPlace | null {
-    return raw === "addons" ? "addons" : readAppSettingCategory(raw);
 }
 
 /**
@@ -48,13 +44,10 @@ export function readSettingsProbe(status: number | null): SettingsProbe {
     return "unreachable";
 }
 
-/** Why the bundled page is opened instead, shown at its top with what fixes it. */
-export type LocalSettingsReason = "offline" | "outdated";
-
-/** What the bundled page is told when it opens: the place, and why it is open. */
+/** What the hosts window is told when Settings... opened it: null on the first
+ *  run, "outdated" for a host from before Settings > This app. */
 export interface LocalSettingsState {
-    readonly place: SettingsPlace;
-    readonly reason: LocalSettingsReason | null;
+    readonly reason: "outdated" | null;
     /** Whether the person signed in may update the host, as the host itself
      *  answers for its update page; only then is the update offered. */
     readonly canUpdate?: boolean;
@@ -68,8 +61,8 @@ export type SettingsRoute =
     | { readonly kind: "navigate"; readonly path: string; }
     /** Ask the host first; decided again with its answer. */
     | { readonly kind: "probe"; readonly path: string; }
-    /** The bundled page, and why. Null on the first run, with no host yet. */
-    | { readonly kind: "local"; readonly reason: LocalSettingsReason | null; };
+    /** The hosts window, and why. Null on the first run, with no host yet. */
+    | { readonly kind: "local"; readonly reason: LocalSettingsState["reason"]; };
 
 export interface SettingsRouteState {
     /** The host the windows are open on, or null before any. */
@@ -102,7 +95,7 @@ export function settingsRoute(place: SettingsPlace, state: SettingsRouteState): 
     }
 }
 
-/** The host's page that updates it, opened from the bundled page. */
+/** The host's page that updates it, opened from the hosts window. */
 export const HOST_UPDATE_PATH = "/admin/updates";
 
 /**
@@ -124,11 +117,9 @@ export function readUpdateAccess(status: number | null): boolean {
 }
 
 /** What came of asking the Polaris window to open a host page. */
-export type HostPageOutcome = "opened" | LocalSettingsReason;
+export type HostPageOutcome = "opened" | "offline";
 
-/** The host pages the bundled page may open in the Polaris window. */
+/** The one host page the hosts window may open in the Polaris window: the update. */
 export function readHostPath(raw: unknown): string | null {
-    if (raw === HOST_UPDATE_PATH) return raw;
-    const place = typeof raw === "string" ? readSettingsPlace(raw.replace(/^\/account\/(?:app\/)?/, "")) : null;
-    return place && settingsPath(place) === raw ? raw : null;
+    return raw === HOST_UPDATE_PATH ? raw : null;
 }

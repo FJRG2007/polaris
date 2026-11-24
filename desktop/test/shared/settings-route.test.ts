@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { APP_SETTING_CATEGORIES } from "@polaris/core/app-settings";
-import { HOST_UPDATE_ACCESS_PATH, HOST_UPDATE_PATH, readHostPath, readSettingsPlace, readSettingsProbe, readUpdateAccess, settingsPath, settingsRoute, type SettingsPlace, type SettingsRouteState } from "@/shared/settings-route";
+import { HOST_UPDATE_ACCESS_PATH, HOST_UPDATE_PATH, readHostPath, readSettingsProbe, readUpdateAccess, settingsPath, settingsRoute, type SettingsPlace, type SettingsRouteState } from "@/shared/settings-route";
 
 const HOST = "https://polaris.example.com";
 const loaded: SettingsRouteState = { origin: HOST, pageLoaded: true, pageAnnounced: false, probe: null };
@@ -18,15 +18,15 @@ describe("settingsRoute", () => {
         expect(settingsRoute("search", { ...loaded, probe: "present" })).toEqual({ kind: "navigate", path: "/account/app/search" });
     });
 
-    it("opens the host's address behind its sign-in rather than the bundled page", () => {
+    it("opens the host's address behind its sign-in rather than the hosts window", () => {
         expect(settingsRoute("general", { ...loaded, probe: "signed-out" })).toEqual({ kind: "navigate", path: "/account/app/general" });
     });
 
-    it("opens the bundled page, saying Polaris needs an update, on a host without the screen", () => {
+    it("opens the hosts window, saying Polaris needs an update, on a host without the screen", () => {
         expect(settingsRoute("general", { ...loaded, probe: "missing" })).toEqual({ kind: "local", reason: "outdated" });
     });
 
-    it("opens the host's Settings, not the bundled page, when the host does not answer", () => {
+    it("opens the host's Settings, not the hosts window, when the host does not answer", () => {
         // Offline the window's worker draws the kept page: the same screen.
         expect(settingsRoute("general", { ...loaded, probe: "unreachable" })).toEqual({ kind: "navigate", path: "/account/app/general" });
     });
@@ -38,7 +38,7 @@ describe("settingsRoute", () => {
         expect(settingsRoute("clipboard", { ...closed, probe: "unreachable" })).toEqual({ kind: "navigate", path: "/account/app/clipboard" });
     });
 
-    it("opens the bundled page with no notice before any host", () => {
+    it("opens the hosts window with no notice before any host", () => {
         expect(settingsRoute("general", { ...loaded, origin: null, pageAnnounced: true })).toEqual({ kind: "local", reason: null });
         expect(settingsRoute("general", { ...loaded, origin: null, probe: "unreachable" })).toEqual({ kind: "local", reason: null });
     });
@@ -49,7 +49,7 @@ describe("settingsRoute", () => {
         expect(settingsRoute("general", { ...crashed, probe: "present" })).toEqual({ kind: "navigate", path: "/account/app/general" });
     });
 
-    it("opens the bundled page only for a host without the screen, or before any host", () => {
+    it("opens the hosts window only for a host without the screen, or before any host", () => {
         const places: SettingsPlace[] = [...APP_SETTING_CATEGORIES, "addons"];
         const probes = [null, "present", "signed-out", "unreachable", "missing"] as const;
         for (const place of places) {
@@ -86,23 +86,15 @@ describe("readSettingsProbe", () => {
     });
 });
 
-describe("host pages the bundled page may open", () => {
-    it("takes every settings place and the update page", () => {
-        expect(readHostPath(settingsPath("general"))).toBe("/account/app/general");
-        expect(readHostPath(settingsPath("addons"))).toBe("/account/addons");
+describe("host pages the hosts window may open", () => {
+    it("takes the update page", () => {
         expect(readHostPath(HOST_UPDATE_PATH)).toBe(HOST_UPDATE_PATH);
     });
 
-    it("refuses anything else", () => {
-        for (const raw of ["/account/app/nope", "/account/security", "https://evil.example/account/addons", "/account/app/general?x=1", "/account/addons/x", "", null, 3]) {
+    it("refuses anything else, settings places included", () => {
+        for (const raw of [settingsPath("general"), settingsPath("addons"), "/account/security", "https://evil.example/admin/updates", "/admin/updates?x=1", "", null, 3]) {
             expect(readHostPath(raw)).toBeNull();
         }
-    });
-
-    it("reads only known places", () => {
-        expect(readSettingsPlace("addons")).toBe("addons");
-        expect(readSettingsPlace("hosts")).toBe("hosts");
-        expect(readSettingsPlace("../admin")).toBeNull();
     });
 });
 

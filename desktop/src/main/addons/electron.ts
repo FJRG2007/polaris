@@ -13,7 +13,7 @@ import { CHANNELS } from "@/shared/bridge";
 import type { AddonAction } from "@/shared/addon-protocol";
 import { setTrayAddons } from "../tray";
 import { watchUsb, type UsbWatch } from "./presence";
-import { addonShortcuts, localAddonRows, sameShortcuts, type AddonShortcuts } from "./ways-in";
+import { addonShortcuts, sameShortcuts, type AddonShortcuts } from "./ways-in";
 import type { AddonChild, WantedAddon } from "./supervisor";
 import { createAddonManager, type AddonManager } from "./manager";
 import { answerOfficial, officialRequestSchema, officialRunnerFor } from "./official";
@@ -213,17 +213,9 @@ const idSchema = z.string().regex(/^[a-z][a-z0-9-]{1,47}$/);
 /** The bridge's channels; `allowed` is the host's check that the asking page is the Polaris one. */
 export function registerAddonIpc(
     allowed: (event: IpcMainInvokeEvent) => boolean,
-    showPolaris: (path?: string) => void,
-    /** The app's own settings page, which lists the installed add-ons and turns them on and off, offline too. */
-    local: (event: IpcMainInvokeEvent) => boolean = () => false
+    showPolaris: (path?: string) => void
 ): void {
     const ready = () => startDeviceAddons(showPolaris);
-    ipcMain.handle(CHANNELS.connectAddons, async (event) => (local(event) ? localAddonRows((await ready().snapshot()).installed) : []));
-    ipcMain.handle(CHANNELS.connectAddonEnable, (event, id: unknown, enabled: unknown) => {
-        const parsed = idSchema.safeParse(id);
-        if (!local(event) || !parsed.success || typeof enabled !== "boolean") return false;
-        return ready().setEnabled(parsed.data, enabled);
-    });
     ipcMain.handle(CHANNELS.addonsGet, (event) => (allowed(event) ? ready().snapshot() : null));
     ipcMain.handle(CHANNELS.addonsRefresh, async (event) => {
         if (allowed(event)) await ready().refresh();

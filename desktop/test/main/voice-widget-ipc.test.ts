@@ -25,7 +25,8 @@ vi.mock("electron", () => ({
     net: {},
     nativeImage: {},
     Notification: class {},
-    safeStorage: {}
+    safeStorage: {},
+    webContents: { getAllWebContents: () => [] }
 }));
 
 const kinds = vi.hoisted(() => new Map<number, string>());
@@ -104,7 +105,16 @@ describe("the widget's buttons", () => {
 });
 
 describe("the widget's switches", () => {
-    it.each([["voiceWidget"], ["voiceWidgetGameOnly"]])("are kept from the settings window: %s", (name) => {
-        expect(handlers.get(CHANNELS.connectToggle)?.(event("connect"), { name, on: true })).toBe(true);
+    it.each([["voiceWidget"], ["voiceWidgetGameOnly"]])("are kept from the host's Settings > This app: %s", async (name) => {
+        const setToggle = vi.fn(() => true);
+        handlers.clear();
+        const { registerIpc } = await import("@/main/ipc");
+        registerIpc({ server: () => ORIGIN, setToggle, preferences: () => ({}), connectState: () => ({ address: ORIGIN, servers: [] }) } as unknown as IpcHost);
+        await handlers.get(CHANNELS.appSettingsSet)?.(event("polaris"), { key: name, value: true });
+        expect(setToggle).toHaveBeenCalledWith(name, true);
+    });
+
+    it("are not taken from any other window", async () => {
+        expect(await handlers.get(CHANNELS.appSettingsSet)?.(event("connect"), { key: "voiceWidget", value: true })).toBeNull();
     });
 });
