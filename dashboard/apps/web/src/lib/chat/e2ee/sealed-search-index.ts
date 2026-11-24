@@ -175,6 +175,14 @@ export class SealedSearchIndex {
         return out;
     }
 
+    /** What the index keeps for `id`: its words and the version they are, once a search has read it in. */
+    entry(id: string): IndexedSealed | undefined {
+        const kept = this.entries.get(id);
+        if (!kept) return undefined;
+        const { folded: _folded, ...entry } = kept;
+        return entry;
+    }
+
     /** Drop these messages (deleted, or no longer reachable). */
     async forget(ids: readonly string[]): Promise<void> {
         if (!ids.length) return;

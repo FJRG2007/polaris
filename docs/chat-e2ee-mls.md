@@ -247,7 +247,12 @@ on the device, through `openSealed`, with the same page cache.
   (edited elsewhere) is left out. The index is deleted with the device at
   sign-out. Its limit: it finds only what this browser opened, so a message
   never scrolled to here, or opened on another device, is found by who, where,
-  when and what is attached to it, not by its words.
+  when and what is attached to it, not by its words. The launcher's Chat
+  lookup (`search/sealed-lookup.ts`, loaded only while sealed chat is on, for
+  the scopes that list messages) asks the same index and the same action with
+  no unlock proof, as its server lookup does, so a locked or hidden
+  conversation stays out; a row shows the words this device opened, and a hit
+  whose kept words are an older version than the server's is left out.
 - **Link cards.** Not made for a sealed message: the server makes a card by
   fetching the link, which would tell it what was sent. The link is still a
   link. A card the sender makes and seals beside the message is the way to
@@ -326,9 +331,20 @@ What is built on top of it:
   a `SealedReply`: the conversation before it is opened by the same device, the
   answer is sealed and posted by it as a reply. Only the MLS work holds the
   device's lease; the model's answer is written outside it. A sealed answer
-  streams no draft in the clear and has no tools: a change Polar offers waits
-  on the server, with what it would do, until it is approved, and that would
-  keep words of the conversation there in the clear. An answer that is not one
+  streams no draft in the clear. It has the asker's tools, as a plain answer
+  does: a read runs at once and what it found reaches the conversation only
+  inside the sealed answer. A change it offers is written, with what it would
+  do, into that sealed answer, Approve and Cancel go on the row after it
+  (`callComponents`), and the `PolarChatCall` row that waits for the approval
+  keeps only the tool's name readable: its input and the changes done before
+  it are sealed together in `done` under POLARIS_MASTER_KEY - the key Polar's
+  device state there is already sealed under - with the row's id inside, so a
+  value copied onto another row does not open. "Approve"
+  (`approveSealedPolar`) has Polar's device open the question first - a
+  question it can no longer open runs nothing and answers the press as gone -
+  then runs the change as the asker and seals the next answer over the offer;
+  "Cancel" (`cancelSealedPolar`) seals the cancelled sentence over it. Either
+  way the buttons come off. An answer that is not one
   gets the same way out as a plain one - "Set up providers" (the link moves out
   of the sealed text to it) or "Try again" - put on the row after the sealed
   post, not marked as an edit; the buttons say nothing of what was asked.
