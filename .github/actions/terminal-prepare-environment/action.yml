@@ -1,0 +1,181 @@
+name: Prepare the terminal build environment
+description: >-
+  Toolchain, build dependencies, protoc, Node and the Rust cache for a job that
+  builds the terminal/ Cargo workspace. Ported from Rook's prepare_environment
+  action; the LFS steps are gone (Polaris has no LFS) and the paths point at
+  terminal/ instead of the repository root.
+inputs:
+  target_os:
+    required: true
+    description: The target OS that we're building for ("macos", "linux", "windows", or "wasm").
+  install_test_deps:
+    description: If true, dependencies needed for running tests will be installed.
+  install_release_deps:
+    description: If true, dependencies needed for building release artifacts will be installed (e.g., cargo-about for license generation).
+  cache_key:
+    description: If set, the cache key to use. If unset, the cache key will be derived from the target OS.
+  save_cache:
+    description: If false, the Rust cache is restored but never saved. Defaults to true; saving still only happens on main.
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Make GitHub token available in the environment
+      shell: bash
+      run: echo "GH_TOKEN=${{ github.token }}" >> $GITHUB_ENV
+
+    - name: Set up git for Windows
+      if: ${{ inputs.target_os == 'windows' }}
+      shell: bash
+      run: git config --system core.longpaths true
+
+    - name: Set CARGO_HOME location
+      if: ${{ inputs.target_os == 'windows' }}
+      shell: bash
+      run: echo "CARGO_HOME=C:\cargo" >> $GITHUB_ENV
+
+    # The classifier model the input_classifier build script downloads from the
+    # terminal-assets-v1 release (pinned by sha256 there). Cached so a run does
+    # not fetch it again; the build script checks the digest either way.
+    - name: Point the build at the cached terminal assets
+      shell: bash
+      run: |
+        dir="${RUNNER_TEMP}/polaris-terminal-assets"
+        mkdir -p "$dir"
+        echo "POLARIS_TERMINAL_ASSETS_DIR=$dir" >> "$GITHUB_ENV"
+
+    - name: Restore the terminal assets
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/polaris-terminal-assets
+        key: polaris-terminal-assets-${{ hashFiles('terminal/crates/input_classifier/build.rs') }}
+
+    - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      with:
+        workspaces: terminal -> target
+        # `shared-key` rather than `key`: `key` is *added* to a cache key that
+        # already includes the job, so a matrix leg could not reuse what the
+        # same leg of an earlier run had compiled. Callers pass one key per
+        # build mode, so jobs that produce the same artifacts share an entry and
+        # jobs that do not stay out of each other's way.
+        shared-key: terminal-${{ inputs.cache_key != '' && inputs.cache_key || inputs.target_os }}
+        # Save even when the job fails, or a job that has never passed never
+        # writes a cache and compiles the whole workspace every run.
+        cache-on-failure: true
+        # Dependencies only: a fresh checkout gives every source file a new
+        # mtime, so caching the workspace's own crates only made the entries
+        # gigabytes larger and saved nothing. The repository's 10 GB cache budget
+        # is shared with every other Polaris workflow.
+        cache-workspace-crates: false
+        # Save from main only. A cache saved by a tag run is scoped to that tag
+        # and can be restored by nothing else.
+        save-if: ${{ inputs.save_cache != 'false' && github.ref == 'refs/heads/main' }}
+
+    # The script pins the binstall version, verifies the archive against an
+    # in-repo SHA-256, retries transient download failures, and skips the
+    # download entirely when the pinned version is already present.
+    - name: Install cargo-binstall
+      shell: bash
+      working-directory: terminal
+      run: ./script/install_cargo_binstall
+
+    - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+      if: ${{ inputs.target_os == 'macos' }}
+      with:
+        xcode-version: '26'
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: terminal
+      run: |
+        if ${{ inputs.target_os == 'macos' }}; then
+          if ${{ inputs.install_release_deps == 'true' }}; then
+            ./script/install_cargo_release_deps
+            # `script/macos/bundle` packages the .app with `cargo bundle`.
+            ./script/install_cargo_bundle
+          else
+            ./script/install_cargo_build_deps
+          fi
+        elif ${{ inputs.target_os == 'linux' }}; then
+          # A vendor repository the runner image ships with can be caught
+          # mid-publish and fail its hash check, which makes `apt-get update`
+          # exit 100. None of those repositories provides a package this build
+          # installs, so retry once and carry on: the installs below are what
+          # fail, loudly, if a package is genuinely unavailable.
+          sudo apt-get update -y || sudo apt-get update -y || true
+
+          if ${{ inputs.install_test_deps == 'true' }}; then
+            ./script/linux/install_test_deps
+          elif ${{ inputs.install_release_deps == 'true' }}; then
+            ./script/linux/install_build_deps
+            ./script/install_cargo_release_deps
+          else
+            ./script/linux/install_build_deps
+          fi
+        elif ${{ inputs.target_os == 'windows' }}; then
+          ./script/windows/install_build_deps.ps1
+          if ${{ inputs.install_release_deps == 'true' }}; then
+            ./script/install_cargo_release_deps
+          fi
+        elif ${{ inputs.target_os == 'wasm' }}; then
+          sudo apt update -y || sudo apt update -y || true
+          ./script/wasm/install_build_deps
+        else
+          echo "::error::Missing logic to install build dependencies for OS \"${{ inputs.target_os }}\""
+          exit 1
+        fi
+
+    - name: Install Node
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      with:
+        node-version: 20.9.0
+
+    - name: Enable Corepack
+      # The right version of `yarn` to build TS command signatures.
+      shell: bash
+      run: corepack enable
+
+    - name: Install protoc for generating rust bindings of protobuf APIs
+      id: install_protoc
+      uses: ConorMacBride/install-package@3e7ad059e07782ee54fa35f827df52aae0626f30 # v1
+      # Don't fail the job here so the Windows (release download) and macOS
+      # (brew) fallbacks below have a chance to run.
+      continue-on-error: true
+      with:
+        brew: protobuf
+        choco: protoc
+
+    - name: Install protoc from the protobuf release (fallback for Windows)
+      # Chocolatey exits 0 when its feed times out, so check for the binary
+      # itself and fetch the same version from the protobuf release, verified
+      # against its digest.
+      if: ${{ inputs.target_os == 'windows' }}
+      shell: pwsh
+      env:
+        PROTOC_VERSION: "36.1"
+        PROTOC_SHA256: 390e515cb456e6a978553bdb57baf087b054885077fd6da7f7ff0160279c07d6
+      run: |
+        if (Get-Command protoc -ErrorAction SilentlyContinue) { exit 0 }
+        $zip = Join-Path $env:RUNNER_TEMP "protoc.zip"
+        $dir = Join-Path $env:RUNNER_TEMP "protoc"
+        $url = "https://github.com/protocolbuffers/protobuf/releases/download/v$env:PROTOC_VERSION/protoc-$env:PROTOC_VERSION-win64.zip"
+        Invoke-WebRequest -Uri $url -OutFile $zip
+        if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne $env:PROTOC_SHA256) {
+          throw "protoc-$env:PROTOC_VERSION-win64.zip does not match its published digest"
+        }
+        Expand-Archive $zip -DestinationPath $dir -Force
+        Add-Content $env:GITHUB_PATH (Join-Path $dir "bin")
+        & (Join-Path $dir "bin\protoc.exe") --version
+
+    - name: Install protoc via brew without index update (fallback for macOS)
+      if: ${{ inputs.target_os == 'macos' && steps.install_protoc.outcome == 'failure' }}
+      shell: bash
+      run: HOMEBREW_NO_AUTO_UPDATE=1 brew install protobuf
+
+    - name: Fail if protoc install did not succeed
+      if: ${{ inputs.target_os != 'windows' && inputs.target_os != 'macos' && steps.install_protoc.outcome == 'failure' }}
+      shell: bash
+      run: |
+        echo "::error::protoc install step failed on ${{ inputs.target_os }}"
+        exit 1

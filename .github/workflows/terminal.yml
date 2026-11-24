@@ -1,19 +1,24 @@
 name: terminal
 
 # Polaris Terminal (docs/terminal-integration.md): a separate Cargo workspace
-# under terminal/, with its own Cargo.lock and rust-toolchain.toml. This is the
-# scaffold the import fills in - until terminal/ exists every run reports green
-# in seconds.
+# under terminal/, with its own Cargo.lock and rust-toolchain.toml. These are
+# Rook's CI jobs (formatting, clippy, nextest, the release profile), run from
+# terminal/.
 #
 # No `paths:` filter on the triggers: a filtered workflow never reports, and a
 # required check that never reports stays pending forever. `changes` decides
-# instead, every job after it is skipped when nothing under terminal/ changed
-# (or terminal/ does not exist yet), and `terminal` always reports.
+# instead, every job after it is skipped when nothing under terminal/ that can
+# affect the build changed, and `terminal` always reports.
 
 on:
   push:
   pull_request:
   workflow_dispatch:
+  # A push builds and tests on Linux only; the macOS and Windows legs run on
+  # this schedule, on demand and on a pull request, so a platform-only break
+  # surfaces within a day rather than at release.
+  schedule:
+    - cron: "0 3 * * *"
 
 concurrency:
   group: terminal-${{ github.ref }}
@@ -25,6 +30,10 @@ permissions:
 env:
   CARGO_INCREMENTAL: "0"
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Carries fail-fast = false and immediate failure output; see
+  # terminal/.config/nextest.toml.
+  NEXTEST_PROFILE: ci
 
 jobs:
   changes:
@@ -32,6 +41,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       terminal: ${{ steps.diff.outputs.terminal }}
+      matrix: ${{ steps.diff.outputs.matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -43,53 +53,202 @@ jobs:
           BEFORE: ${{ github.event.before }}
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          # Nothing to build until the workspace has been imported.
-          if [ ! -f terminal/Cargo.toml ]; then
-            echo "terminal=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          linux='{"os":"linux","name":"Linux","runner":"ubuntu-latest","clippy_excludes":"--exclude rook_completer"}'
+          macos='{"os":"macos","name":"macOS","runner":"macos-latest","clippy_excludes":"--exclude rook_completer"}'
+          windows='{"os":"windows","name":"Windows","runner":"windows-latest","clippy_excludes":""}'
+          if [ "$EVENT" = "push" ]; then
+            echo "matrix=[$linux]" >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix=[$linux,$macos,$windows]" >> "$GITHUB_OUTPUT"
           fi
-          pattern='^(terminal/|\.github/workflows/terminal\.yml$)'
+
+          # What can affect the terminal build: anything under terminal/ except
+          # its documentation, plus the workflow and action that build it. Note
+          # what is NOT excluded: terminal/resources/** and terminal/plugins/**
+          # hold bundled skills whose markdown the tests read.
+          code='^(terminal/|\.github/workflows/terminal\.yml$|\.github/actions/terminal-)'
+          docs='^terminal/(docs/.+|[^/]+[.]md|LICENSE[^/]*)$'
           case "$EVENT" in
             pull_request) from="$BASE" ;;
             push) from="$BEFORE" ;;
             *) from="" ;;
           esac
-          # A first push, a dispatch, or a base missing from the history (a force
-          # push) has nothing safe to compare against, so it builds.
+          # A first push, a dispatch, the schedule, or a base missing from the
+          # history has nothing safe to compare against, so it builds.
           if [ -z "$from" ] || [ "$from" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$from^{commit}" 2>/dev/null; then
             terminal=true
-          elif git diff --name-only "$from" "$GITHUB_SHA" | grep -Eq "$pattern"; then
+          elif git diff --name-only "$from" "$GITHUB_SHA" | grep -E "$code" | grep -vqE "$docs"; then
             terminal=true
           else
             terminal=false
           fi
           echo "terminal=$terminal" >> "$GITHUB_OUTPUT"
 
-  # Formatting is platform independent, so it runs once. The clippy, test and
-  # release-profile jobs per OS are ported from Rook's ci.yml when the code
-  # arrives, each behind the same `needs.changes.outputs.terminal` condition and
-  # listed in the result job's `needs`.
-  fmt:
+  lints:
+    name: Formatting + Clippy (${{ matrix.name }})
     needs: changes
     if: needs.changes.outputs.terminal == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.matrix) }}
     defaults:
       run:
+        shell: bash
         working-directory: terminal
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # rustup reads terminal/rust-toolchain.toml from the working directory, so
-      # this installs the terminal's pinned toolchain, not the root's.
-      - run: rustup show active-toolchain || rustup toolchain install
-      - run: cargo fmt --all --check
+      - uses: ./.github/actions/terminal-prepare-environment
+        with:
+          target_os: ${{ matrix.os }}
+          # One cache per build mode. Clippy runs in check mode, so its
+          # dependencies land as .rmeta with no codegen - useless to the test
+          # job, which needs the rlibs.
+          cache_key: ${{ matrix.os }}-check
+      # Formatting is platform independent, so one job is enough.
+      - name: Check formatting
+        if: matrix.os == 'linux'
+        run: cargo fmt --all -- --check
+      # `--all-features` is omitted: pprof and the other profiling features do
+      # not compile on every target.
+      - name: Clippy
+        run: |
+          cargo clippy --locked --workspace ${{ matrix.clippy_excludes }} \
+            --all-targets --tests -- -D warnings
+
+  test:
+    name: Tests (${{ matrix.name }})
+    needs: changes
+    if: needs.changes.outputs.terminal == 'true'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    # No debug info in the test build: every one of the ~90 test binaries would
+    # carry line tables into its link and into the cache. A failing test still
+    # reports its file and line; only RUST_BACKTRACE frames lose line numbers.
+    env:
+      CARGO_PROFILE_DEV_DEBUG: 0
+      CARGO_PROFILE_TEST_DEBUG: 0
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.matrix) }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: terminal
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/terminal-prepare-environment
+        with:
+          target_os: ${{ matrix.os }}
+          install_test_deps: 'true'
+          cache_key: ${{ matrix.os }}-test
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: nextest
+      - name: Report runner resources
+        run: |
+          df -h . || true
+          free -h || true
+          nproc || true
+      # `serve-wasm` is excluded from the build: it carries no tests and
+      # `--workspace` would pull it back in past `default-members`.
+      #
+      # `integration` is filtered rather than excluded: excluding it drops the
+      # `integration_tests` feature from the unit-test build of the app crate,
+      # which flips every `cfg!(feature = "integration_tests")` branch.
+      #
+      # --no-fail-fast so one broken test does not hide the others.
+      - name: Run tests
+        run: |
+          # One rustc in this build peaks near 9.4G of the Linux runner's 15G, so
+          # nothing runs beside it there. A sampler reports memory every 15 s
+          # because a runner killed for memory leaves no trace of its own.
+          if [ "${{ matrix.os }}" = "linux" ]; then
+            export CARGO_BUILD_JOBS=1
+            (
+              while :; do
+                printf '[resources] %s %s | %s\n' \
+                  "$(date -u +%H:%M:%S)" \
+                  "$(free -m | awk '/^Mem:/ {printf "used=%sM avail=%sM", $3, $7} /^Swap:/ {printf " swap=%sM", $3}')" \
+                  "$(ps -eo rss,comm --sort=-rss | awk 'NR>1 && NR<5 {printf "%s=%dM ", $2, $1/1024}')"
+                sleep 15
+              done
+            ) &
+            resource_monitor=$!
+            trap 'kill "$resource_monitor" 2>/dev/null || true' EXIT
+          fi
+          # Tests that ask the machine for a real shell (zsh, bash, fish) and
+          # read back its options. A hosted Unix runner does not reliably
+          # provide that, so they are excluded there by name, never by pattern.
+          # All eight failed before Rook's first commit; none is a regression.
+          filter='not package(integration)'
+          if [ "${{ matrix.os }}" != "windows" ]; then
+            for shell_dependent in \
+              ai::agent_events::message_hydrator_tests::read_message_with_timeout_retries_transient_failures_until_success \
+              ai::agent_events::message_hydrator_tests::read_message_with_timeout_times_out_after_retrying_transient_failures \
+              ai::agent_sdk::driver::tests::idle_timeout_sender_later_send_after_supersedes_earlier \
+              auth::auth_manager::auth_manager_test::pending_api_key_failure_leaves_auth_state_logged_out \
+              search::command_search::searcher::tests::test_history_data_source_reflects_live_exit_status_update \
+              terminal::input::decorations::tests::test_decorations_with_multibyte_chars \
+              terminal::input::tests::test_histignorespace_support_in_zsh \
+              workspaces::user_workspaces::user_workspaces_tests::test_remove_user_from_team_rejected_emits_error_event_without_updating_workspaces
+            do
+              filter="$filter and not test(=$shell_dependent)"
+            done
+          fi
+          cargo nextest run --workspace --locked --no-fail-fast \
+            --exclude serve-wasm \
+            -E "$filter"
+
+  release-check:
+    name: Release profile compiles (${{ matrix.name }})
+    needs: changes
+    if: needs.changes.outputs.terminal == 'true'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.matrix) }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: terminal
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/terminal-prepare-environment
+        with:
+          target_os: ${{ matrix.os }}
+          # Not the `-rlto` key terminal-release.yml uses: this job only checks,
+          # so its dependencies are .rmeta the tag build cannot link against.
+          cache_key: ${{ matrix.os }}-rlto-check
+          save_cache: 'false'
+      # `cargo check` verifies the release profile and its feature set without
+      # paying for codegen and LTO. terminal-release.yml builds the binaries.
+      - name: Check release compilation (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: .\script\windows\bundle.ps1 -CHANNEL oss -ARCH x64 -CHECK_ONLY
+      - name: Check release compilation (Unix)
+        if: matrix.os != 'windows'
+        run: |
+          cargo check --locked -p rook --profile rlto \
+            --bin rook-oss --features release_bundle,gui
 
   # The one check to require: it always reports, and it is green only when every
   # job above passed, or was skipped because nothing it checks changed.
   terminal:
-    needs: [changes, fmt]
+    needs: [changes, lints, test, release-check]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

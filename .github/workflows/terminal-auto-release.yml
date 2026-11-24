@@ -1,0 +1,90 @@
+name: terminal auto-release
+
+# Cuts a terminal release whenever main passes the terminal workflow with
+# changes under terminal/ that the last `terminal-v*` tag does not have. Rook's
+# auto-release.yml, restricted to terminal/: in this repository almost every
+# push to main is a dashboard change, and none of those is a new terminal.
+#
+# The tag is pushed with GITHUB_TOKEN, and a push made with that token starts no
+# workflow, so terminal-release.yml is started explicitly through
+# workflow_dispatch - the one event GITHUB_TOKEN is allowed to trigger.
+#
+# The first terminal release is cut by hand (`script/release_tag` in
+# terminal/, then push the tag): with no `terminal-v*` tag yet there is nothing
+# to compare against, and this workflow does nothing.
+on:
+  workflow_run:
+    workflows: [terminal]
+    types: [completed]
+    branches: [main]
+
+# One decision at a time, never cancelled: the second run sees the tag the first
+# one pushed and stops there.
+concurrency:
+  group: terminal-auto-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    name: Tag and start the release
+    # A push to main from this repository that passed. Scheduled and pull
+    # request runs check nothing new about what main ships.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Decide and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TESTED: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          # Only the commit main points at now. An older one that passed is
+          # superseded, and the newer commit's own run decides for it.
+          head="$(git rev-parse HEAD)"
+          if [ "$head" != "$TESTED" ]; then
+            echo "main moved on to $head after $TESTED was tested; leaving it to that run"
+            exit 0
+          fi
+
+          if git tag --points-at "$head" | grep -q '^terminal-v'; then
+            echo "$head is already released"
+            exit 0
+          fi
+
+          if ! last="$(git describe --tags --abbrev=0 --match 'terminal-v*' "$head" 2>/dev/null)"; then
+            echo "no terminal-v* tag yet; the first terminal release is cut by hand"
+            exit 0
+          fi
+
+          # Only terminal/, minus what cannot change the binary: its docs and
+          # top-level markdown.
+          unshipped='^terminal/(docs/.+|[^/]+[.]md|LICENSE[^/]*)$'
+          if ! git diff --name-only "$last" "$head" -- terminal | grep -qvE "$unshipped"; then
+            echo "nothing that ships in the terminal since $last"
+            exit 0
+          fi
+
+          tag="$(cd terminal && script/release_tag)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "$tag" -m "Polaris Terminal $tag" "$head"
+          git push origin "$tag"
+          gh workflow run terminal-release.yml --ref main -f tag="$tag"
+          echo "::notice::released $tag ($(git rev-list --count "$last..$head") commits since $last)"

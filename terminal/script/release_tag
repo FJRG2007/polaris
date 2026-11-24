@@ -2,7 +2,11 @@
 #
 # Prints the tag for a release cut right now.
 #
-# The shape is `v0.YYYY.MM.DD.HH.MM.channel_NN`, in UTC. It is not a choice made
+# The shape is `terminal-v0.YYYY.MM.DD.HH.MM.channel_NN`, in UTC. The Polaris
+# repository releases several products, so the `terminal-` prefix keeps these
+# tags apart from the others; everything after it is the version itself.
+#
+# The version shape is `v0.YYYY.MM.DD.HH.MM.channel_NN`. It is not a choice made
 # here: `ParsedVersion` accepts nothing else, and `script/update_plist` reads the
 # same fields to build the numeric CFBundleVersion Apple asks for - both were
 # already written for it, and the `v0.1.x` tags this fork started with were the
@@ -27,8 +31,8 @@ MINUTE="$(date -u +%Y.%m.%d.%H.%M)"
 
 counter=0
 while git rev-parse -q --verify \
-    "refs/tags/$(printf 'v0.%s.%s_%02d' "$MINUTE" "$CHANNEL" "$counter")" >/dev/null; do
+    "refs/tags/$(printf 'terminal-v0.%s.%s_%02d' "$MINUTE" "$CHANNEL" "$counter")" >/dev/null; do
   counter=$((counter + 1))
 done
 
-printf 'v0.%s.%s_%02d\n' "$MINUTE" "$CHANNEL" "$counter"
+printf 'terminal-v0.%s.%s_%02d\n' "$MINUTE" "$CHANNEL" "$counter"
