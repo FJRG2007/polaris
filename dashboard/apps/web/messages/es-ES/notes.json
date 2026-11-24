@@ -75,6 +75,16 @@
         "wikiLinks": "Los enlaces escritos como [[otra nota]] se conectan cuando todo está dentro.",
         "bringIn": "Importar"
     },
+    "offline": {
+        "waiting": "Guardada en este dispositivo. Se envía al volver Polaris.",
+        "notSaved": "No se pudo guardar la nota. Tu texto sigue aquí.",
+        "conflict": "La nota cambió en otro sitio mientras la tuya esperaba a enviarse.",
+        "keepMine": "Usar la mía",
+        "retry": "Reintentar",
+        "discard": "Descartar",
+        "keptCopy": "La nota cambió en otro sitio mientras la tuya esperaba. Tu versión se guardó como <link>otra nota</link>.",
+        "conflictTitle": "{title} (copia sin conexión)"
+    },
     "view": {
         "sharedWithYou": "Compartido contigo",
         "publicLink": "Enlace público",

@@ -28,6 +28,7 @@
 import { dropAllSnapshots } from "@/lib/snapshot-cache";
 import { dropMailCache } from "@/lib/mailbox/mail-cache";
 import { dropChatStore } from "@/lib/chat/offline/chat-cache";
+import { dropOfflineStore } from "@/lib/offline/app-writes";
 import { SHELL_CACHE } from "@/lib/offline/offline-shell";
 import { MENU_KEY as APP_MENU_KEY, STORE_KEY as APP_USAGE_KEY } from "@/lib/app-usage";
 import { pauseAutomaticPasskey } from "@/lib/local-passkeys";
@@ -64,6 +65,8 @@ export async function forgetAccountTraces(): Promise<void> {
     }
     await dropMailCache().catch(() => undefined);
     await dropChatStore().catch(() => undefined);
+    // Notes, documents and tasks written offline and not sent yet (`lib/offline/app-writes`).
+    await dropOfflineStore().catch(() => undefined);
     // The pages the service worker kept to open offline (`public/sw.js`).
     await globalThis.caches?.delete(SHELL_CACHE).catch(() => undefined);
     // The media fetched ahead for offline reading (`chat/media-download`).

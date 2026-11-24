@@ -75,6 +75,16 @@
         "wikiLinks": "Links written as [[another note]] are connected once everything is in.",
         "bringIn": "Bring them in"
     },
+    "offline": {
+        "waiting": "Saved on this device. Sends when Polaris is back.",
+        "notSaved": "This note could not be saved. Your text is still here.",
+        "conflict": "This note changed somewhere else while yours waited to be sent.",
+        "keepMine": "Keep mine",
+        "retry": "Try again",
+        "discard": "Discard mine",
+        "keptCopy": "This note changed somewhere else while yours waited. Your version was kept as <link>a separate note</link>.",
+        "conflictTitle": "{title} (offline copy)"
+    },
     "view": {
         "sharedWithYou": "Shared with you",
         "publicLink": "Public link",

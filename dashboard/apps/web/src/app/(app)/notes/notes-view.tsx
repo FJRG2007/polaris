@@ -25,13 +25,15 @@ import { canWrite, NoteTree, type ShelfData } from "./note-tree";
 import { ManageTemplatesDialog, SaveAsTemplateDialog, TemplatePickerDialog } from "./note-templates";
 import type { NoteTemplateSummary } from "@/lib/notes/template-service";
 import { RelativeTime } from "@/components/relative-time";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { Backlink } from "@/lib/notes/link-service";
 import type { NoteSummary, NoteView } from "@/lib/notes/note-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { Badge, Button, ConfirmDeleteDialog, EmptyState, Input } from "@polaris/ui";
 import {
+    AlertCircle,
     Archive,
+    Clock,
     ChevronRight,
     Download,
     LayoutTemplate,
@@ -44,6 +46,9 @@ import {
     Trash2
 } from "lucide-react";
 import { ImportNotesDialog, NewNotebookDialog, NotebookPeopleDialog } from "./notebook-dialogs";
+import { appWrites, type AppWrite } from "@/lib/offline/app-writes";
+import { reachability, subscribeReachability } from "@/lib/reachability";
+import { NOTE_CONFLICT, readNoteSent, saveNoteText, waitingNoteText, type NoteTextPayload } from "./offline-writes";
 
 /** How long a note sits untouched before it is written. Long enough not to
  *  write on every keystroke, short enough that closing the tab is safe. */
@@ -87,37 +92,115 @@ export function NotesView({
     // "Saved" line is not a guess.
     const stored = useRef({ title: note?.title ?? "", body: note?.body ?? "" });
 
+    // The newest save of this note still on this device: waiting for Polaris,
+    // or refused and waiting for the reader (`offline-writes`).
+    const [waiting, setWaiting] = useState<AppWrite | null>(null);
+    // The note the device's version was kept as, when the note changed elsewhere.
+    const [keptCopy, setKeptCopy] = useState<string | null>(null);
+    const reach = useSyncExternalStore(subscribeReachability, reachability, reachability);
+
     useEffect(() => {
-        setTitle(note?.title ?? "");
-        setBody(note?.body ?? "");
-        stored.current = { title: note?.title ?? "", body: note?.body ?? "" };
         setError("");
+        setKeptCopy(null);
+    }, [note?.id]);
+
+    useEffect(() => {
+        const incoming = { title: note?.title ?? "", body: note?.body ?? "" };
+        // The server answering with what this device wrote: the editor may
+        // already hold what was typed since, which must not be put back.
+        if (incoming.title === stored.current.title && incoming.body === stored.current.body) return;
+        setTitle(incoming.title);
+        setBody(incoming.body);
+        stored.current = incoming;
     }, [note?.id, note?.title, note?.body]);
+
+    const noteId = note?.id ?? null;
+    const reloadWaiting = useCallback(async () => {
+        if (!noteId) return setWaiting(null);
+        const entry = await waitingNoteText(noteId);
+        setWaiting((shown) => (shown?.key === entry?.key && shown?.state === entry?.state ? shown : entry));
+    }, [noteId]);
+
+    useEffect(() => {
+        if (!noteId) return;
+        let live = true;
+        // Opening a note whose last words were written here and not sent yet:
+        // those words are the note, as far as its reader is concerned.
+        void waitingNoteText(noteId).then((entry) => {
+            if (!live) return;
+            setWaiting(entry);
+            if (!entry) return;
+            const kept = entry.payload as NoteTextPayload;
+            setTitle(kept.title);
+            setBody(kept.body);
+            stored.current = { title: kept.title, body: kept.body };
+        });
+        const unsubscribe = appWrites.subscribe((event) => {
+            if (event && event.entry.target !== noteId) return;
+            if (event && "sent" in event) {
+                const sent = readNoteSent(event.sent);
+                if ("copyId" in sent) setKeptCopy(sent.copyId);
+                router.refresh();
+            }
+            void reloadWaiting();
+        });
+        return () => {
+            live = false;
+            unsubscribe();
+        };
+    }, [noteId, reloadWaiting, router]);
 
     const dirty = Boolean(note) && (title !== stored.current.title || body !== stored.current.body);
 
     useEffect(() => {
-        if (!note || !dirty) return;
+        if (!note || !dirty || shared === "view") return;
         const timer = setTimeout(async () => {
-            setSaving(true);
+            const before = stored.current;
             const written = { title: title.trim() || t("tree.untitled"), body };
-            const result = await runAction(
-                () => actions.updateNoteAction({ noteId: note.id, ...written }),
-                setError
-            );
+            // Kept on this device before anything is sent: from here on, closing
+            // the tab or losing the network loses nothing.
+            stored.current = { title, body };
+            setSaving(true);
+            setError("");
+            const outcome = await saveNoteText({ noteId: note.id, ...written, base: note.updatedAt });
             setSaving(false);
-            if (result?.error) {
-                setError(result.error);
+            if ("now" in outcome) {
+                // This device keeps nothing (a private window): sent at once, as before.
+                const answer = outcome.now;
+                if (answer !== "unreachable" && "sent" in answer) {
+                    const sent = readNoteSent(answer.sent);
+                    if ("copyId" in sent) setKeptCopy(sent.copyId);
+                    router.refresh();
+                    return;
+                }
+                stored.current = before;
+                setError(
+                    answer === "unreachable" || answer.refused === NOTE_CONFLICT || !answer.refused
+                        ? t("offline.notSaved")
+                        : answer.refused
+                );
                 return;
             }
-            // Recorded before the refresh: the list re-renders with the new
-            // title, and without this the note would look dirty again.
-            stored.current = { title, body };
-            router.refresh();
+            void reloadWaiting();
         }, SAVE_AFTER);
         return () => clearTimeout(timer);
-    }, [note, dirty, title, body, router]);
+    }, [note, dirty, title, body, router, shared, reloadWaiting]);
 
+    /** Let go of the device's version: the note goes back to what Polaris has. */
+    const discardWaiting = async (entry: AppWrite) => {
+        await appWrites.discard(entry.key);
+        const server = { title: note?.title ?? "", body: note?.body ?? "" };
+        setTitle(server.title);
+        setBody(server.body);
+        stored.current = server;
+        router.refresh();
+    };
+
+    const waitingOffline =
+        waiting?.state === "pending" &&
+        (waiting.attempts > 0 ||
+            !reach.reachable ||
+            (typeof navigator !== "undefined" && navigator.onLine === false));
     const act = async (run: () => Promise<{ error?: string }>) => {
         const result = await runAction(run, setError);
         if (!result?.error) router.refresh();
@@ -301,15 +384,82 @@ export function NotesView({
                             )}
                         </div>
 
-                        <p className="text-xs text-muted-foreground" aria-live="polite">
-                            {saving
-                                ? t("view.saving")
-                                : dirty
-                                  ? t("view.unsaved")
-                                  : t.rich("view.saved", {
-                                        time: () => <RelativeTime key="time" iso={note.updatedAt} />
-                                    })}
+                        <p
+                            className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
+                            aria-live="polite"
+                        >
+                            {waitingOffline ? (
+                                <>
+                                    <Clock className="size-3 shrink-0" />
+                                    <span className="min-w-0 truncate">{t("offline.waiting")}</span>
+                                </>
+                            ) : saving || waiting?.state === "pending" ? (
+                                t("view.saving")
+                            ) : dirty ? (
+                                t("view.unsaved")
+                            ) : (
+                                t.rich("view.saved", {
+                                    time: () => <RelativeTime key="time" iso={note.updatedAt} />
+                                })
+                            )}
                         </p>
+
+                        {waiting?.state === "failed" && (
+                            <div
+                                role="alert"
+                                className="flex flex-wrap items-center gap-2 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                            >
+                                <AlertCircle className="size-4 shrink-0" />
+                                <span className="min-w-0 flex-1">
+                                    {waiting.reason === NOTE_CONFLICT
+                                        ? t("offline.conflict")
+                                        : waiting.reason || t("offline.notSaved")}
+                                </span>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() =>
+                                        void appWrites.retry(
+                                            waiting,
+                                            waiting.reason === NOTE_CONFLICT
+                                                ? {
+                                                      payload: {
+                                                          ...(waiting.payload as NoteTextPayload),
+                                                          base: null
+                                                      }
+                                                  }
+                                                : undefined
+                                        )
+                                    }
+                                >
+                                    {waiting.reason === NOTE_CONFLICT
+                                        ? t("offline.keepMine")
+                                        : t("offline.retry")}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => void discardWaiting(waiting)}
+                                >
+                                    {t("offline.discard")}
+                                </Button>
+                            </div>
+                        )}
+
+                        {keptCopy && (
+                            <p role="status" className="rounded-md bg-muted px-3 py-2 text-sm">
+                                {t.rich("offline.keptCopy", {
+                                    link: (chunks) => (
+                                        <NextLink
+                                            href={`/notes?note=${keptCopy}`}
+                                            className="underline"
+                                        >
+                                            {chunks}
+                                        </NextLink>
+                                    )
+                                })}
+                            </p>
+                        )}
 
                         {error && (
                             <p

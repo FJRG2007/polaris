@@ -14,6 +14,7 @@ import { AppChrome } from "@/components/app-chrome";
 import { ProvideAppHostUi } from "@/components/app-host/client";
 import { SessionKeeper } from "@/components/session-keeper";
 import { AccountWatcher } from "@/components/account-watcher";
+import { OfflineWrites } from "@/components/offline-writes";
 import { PageTiming } from "@/components/telemetry/page-timing";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -29,6 +30,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             {/* The real account behind the session: an administrator looking at
                 Polaris as somebody else is still signed in as themselves. */}
             <AccountWatcher userId={user.viewingAs?.actorId ?? user.id} />
+            {/* What this device wrote while Polaris could not be reached. */}
+            <OfflineWrites userId={user.id} />
             {children}
         </AppChrome>
     );

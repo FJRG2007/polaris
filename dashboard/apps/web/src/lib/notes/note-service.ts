@@ -233,6 +233,65 @@ export async function updateNote(input: core.NoteUpdateInput): Promise<boolean> 
     return changed.count > 0;
 }
 
+export type NoteTextSaved =
+    | { readonly updatedAt: Date }
+    | { readonly stale: { spaceId: string | null; folderId: string | null; parentId: string | null } }
+    | null;
+
+/**
+ * Write a note's title and text as written on a device that last saw the note
+ * at `base` - the autosave, which may be replayed from an offline queue long
+ * after it was typed.
+ *
+ * The check and the write are one statement: the row is written only while its
+ * version is still `base` or older, so an edit made elsewhere since is never
+ * overwritten by a device that never saw it. That case answers `stale`, with
+ * where the note lives, for the caller to keep both. No `base` overwrites
+ * (the reader chose their version). Null when the note no longer exists.
+ */
+export async function saveNoteText(
+    input: { noteId: string; title: string; body: string },
+    base: Date | null
+): Promise<NoteTextSaved> {
+    const changed = await prisma.note.updateMany({
+        where: { id: input.noteId, ...(base ? { updatedAt: { lte: base } } : {}) },
+        data: { title: input.title, body: input.body }
+    });
+    const note = await prisma.note.findUnique({
+        where: { id: input.noteId },
+        select: { updatedAt: true, spaceId: true, folderId: true, parentId: true }
+    });
+    if (!note) return null;
+    if (changed.count === 0)
+        return { stale: { spaceId: note.spaceId, folderId: note.folderId, parentId: note.parentId } };
+    await syncNoteLinks(input.noteId, input.body);
+    return { updatedAt: note.updatedAt };
+}
+
+/**
+ * The device's version of a note that changed elsewhere, kept beside it as its
+ * own note. Its id is the device's write key, so a replay after a lost answer
+ * finds the copy already made instead of making a second.
+ */
+export async function keepConflictCopy(
+    userId: string,
+    copyId: string,
+    placement: { spaceId: string | null; folderId: string | null; parentId: string | null },
+    text: { title: string; body: string }
+): Promise<string> {
+    try {
+        await prisma.note.create({
+            data: { id: copyId, userId, ...placement, ...text },
+            select: { id: true }
+        });
+    } catch (caught) {
+        if ((caught as { code?: string } | null)?.code !== "P2002") throw caught;
+        return copyId;
+    }
+    if (text.body) await syncNoteLinks(copyId, text.body);
+    return copyId;
+}
+
 /**
  * Move a note: to another parent, another folder, another shelf, or out to the
  * top of one.

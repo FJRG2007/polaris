@@ -6,13 +6,16 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const dropped = { snapshots: 0, mail: 0, chat: 0 };
+const dropped = { snapshots: 0, mail: 0, chat: 0, writes: 0 };
 vi.mock("@/lib/snapshot-cache", () => ({ dropAllSnapshots: () => void (dropped.snapshots += 1) }));
 vi.mock("@/lib/mailbox/mail-cache", () => ({
     dropMailCache: async () => void (dropped.mail += 1)
 }));
 vi.mock("@/lib/chat/offline/chat-cache", () => ({
     dropChatStore: async () => void (dropped.chat += 1)
+}));
+vi.mock("@/lib/offline/app-writes", () => ({
+    dropOfflineStore: async () => void (dropped.writes += 1)
 }));
 
 const {
@@ -52,6 +55,7 @@ beforeEach(() => {
     dropped.snapshots = 0;
     dropped.mail = 0;
     dropped.chat = 0;
+    dropped.writes = 0;
     assign.mockReset();
     Object.defineProperty(window, "location", {
         value: { ...window.location, assign },
@@ -83,7 +87,7 @@ describe("forgetAccountTraces", () => {
         seedTraces();
         await forgetAccountTraces();
         expect(storedKeys()).toEqual(["polaris.theme", "polaris.mic.device"]);
-        expect(dropped).toEqual({ snapshots: 1, mail: 1, chat: 1 });
+        expect(dropped).toEqual({ snapshots: 1, mail: 1, chat: 1, writes: 1 });
     });
 });
 

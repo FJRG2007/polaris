@@ -13,6 +13,7 @@
  * open - so the sentence comes back and the caller shows it where it happened.
  */
 
+import { z } from "zod";
 import * as core from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { revalidatePath } from "next/cache";
@@ -33,6 +34,8 @@ import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 
 const NOTES_PATH = "/notes";
 const ARCHIVE_PATH = "/notes/archive";
+/** `noteTitle` in core: a conflict copy's longer title is cut to fit it. */
+const NOTE_TITLE_MAX = 200;
 
 /** Guesses at one link's password, per address, per window. Low, because the
  *  password on a public link is the only thing standing in front of it. */
@@ -165,6 +168,63 @@ export async function updateNoteAction(input: unknown): Promise<{ error?: string
         return {};
     } catch (caught) {
         return failure(caught, (await getTranslations("notes"))("errors.noteSave"));
+    }
+}
+
+const noteTextSaveSchema = z.object({
+    noteId: core.noteUpdateSchema.shape.noteId,
+    title: core.noteUpdateSchema.shape.title.unwrap(),
+    body: core.noteUpdateSchema.shape.body.unwrap(),
+    /** The note's version the device last saw; null writes regardless. */
+    baseUpdatedAt: z.string().datetime().nullable(),
+    /** The device's write key: the id of the copy kept on a conflict. */
+    copyId: z.string().uuid()
+});
+
+/**
+ * The autosave, live or replayed from this device's offline queue
+ * (`notes/offline-writes`). Answers the note's new version; on an edit made
+ * elsewhere since `baseUpdatedAt`, leaves that edit alone and keeps the device's
+ * text as a note of its own beside it (`copyId`), or `conflict` where the reader
+ * cannot add notes there.
+ */
+export async function saveNoteTextAction(
+    input: unknown
+): Promise<{ updatedAt?: string; copyId?: string; conflict?: true; error?: string }> {
+    const caller = await actor();
+    const t = await getTranslations("notes");
+    const parsed = noteTextSaveSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? t("errors.noteSave") };
+    const { noteId, title, body, baseUpdatedAt, copyId } = parsed.data;
+
+    try {
+        await access.requireNote(caller, noteId, "member").catch(async (refused: unknown) => {
+            if ((await access.sharedNote(caller, noteId)) !== "edit") throw refused;
+        });
+        const saved = await notes.saveNoteText(
+            { noteId, title, body },
+            baseUpdatedAt ? new Date(baseUpdatedAt) : null
+        );
+        if (!saved) return { error: t("errors.noteGone") };
+        if ("updatedAt" in saved) {
+            refresh();
+            return { updatedAt: saved.updatedAt.toISOString() };
+        }
+        const placed = await access
+            .requirePlacement(caller, { spaceId: saved.stale.spaceId, folderId: saved.stale.folderId })
+            .then(
+                () => true,
+                () => false
+            );
+        if (!placed) return { conflict: true };
+        const kept = await notes.keepConflictCopy(caller.id, copyId, saved.stale, {
+            title: t("offline.conflictTitle", { title }).slice(0, NOTE_TITLE_MAX),
+            body
+        });
+        refresh();
+        return { copyId: kept };
+    } catch (caught) {
+        return failure(caught, t("errors.noteSave"));
     }
 }
 
