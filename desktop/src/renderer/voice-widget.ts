@@ -10,7 +10,8 @@ import { byId } from "./dom";
 import {
     faceColor,
     initials,
-    MAX_ROWS,
+    insideRegions,
+    rowCap,
     shownPeople,
     showsName,
     type VoiceAction,
@@ -167,9 +168,10 @@ function draw(view: WidgetView | null): void {
     const present = new Set(participants.map((person) => person.id));
     for (const id of rows.keys()) if (!present.has(id)) rows.delete(id);
     const shown = shownPeople(participants, look);
-    const lines = shown.slice(0, MAX_ROWS).map((person) => row(person, look));
-    const note = shown.length > MAX_ROWS
-        ? `and ${shown.length - MAX_ROWS} more`
+    const cap = rowCap(look);
+    const lines = shown.slice(0, cap).map((person) => row(person, look));
+    const note = shown.length > cap
+        ? `and ${shown.length - cap} more`
         // Only who talks is drawn and nobody is: unlocked, it still shows what it is.
         : shown.length === 0 && view.unlocked ? "Nobody is talking" : null;
     if (note) {
@@ -184,15 +186,45 @@ function draw(view: WidgetView | null): void {
     // Unlocked it is being arranged, so it is drawn whole.
     panel.style.opacity = view.unlocked ? "1" : String(look.opacity / 100);
     panel.classList.toggle("unlocked", view.unlocked);
-    controls.hidden = !view.unlocked;
+    // Unlocked, the footer holds the lock key; the buttons are there unless
+    // switched off. Locked, they stay only as clickable regions.
+    const buttons = view.buttons !== false;
+    lockedActions = !view.unlocked && view.actions === true && buttons;
+    controls.hidden = !view.unlocked && !lockedActions;
+    for (const button of [mic, deafen, leave]) button.hidden = !buttons;
+    if (!lockedActions) overRegion(false);
     mic.replaceChildren(icon(selfMuted ? "micOff" : "mic"));
     mic.classList.toggle("on", selfMuted);
     label(mic, selfMuted ? "Unmute" : "Mute");
     deafen.replaceChildren(icon(selfDeafened ? "headphonesOff" : "headphones"));
     deafen.classList.toggle("on", selfDeafened);
     label(deafen, selfDeafened ? "Undeafen" : "Deafen");
-    lockHint.textContent = view.lockKey ? `${view.lockKey} to lock` : "";
+    lockHint.textContent = view.lockKey && view.unlocked ? `${view.lockKey} to lock` : "";
 }
+
+/** The quick actions are on the widget while it is locked, as clickable regions. */
+let lockedActions = false;
+/** What the main process was last told about the pointer. */
+let over = false;
+
+function overRegion(on: boolean): void {
+    if (on === over) return;
+    over = on;
+    void window.polarisLocal.voiceWidget.clickable(on).catch(() => undefined);
+}
+
+/** The buttons' boxes: the only places a locked widget takes a click. */
+function regions(): DOMRect[] {
+    return [mic, deafen, leave].filter((button) => !button.hidden).map((button) => button.getBoundingClientRect());
+}
+
+// Locked, the window lets clicks through but still hears the pointer move
+// (forwarded), so it can ask for clicks while the pointer is on a button.
+document.addEventListener("mousemove", (event) => {
+    if (!lockedActions) return;
+    overRegion(insideRegions({ x: event.clientX, y: event.clientY }, regions()));
+});
+document.addEventListener("mouseleave", () => overRegion(false));
 
 function press(action: VoiceAction): void {
     void window.polarisLocal.voiceWidget.act(action).catch(() => false);

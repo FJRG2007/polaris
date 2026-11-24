@@ -2827,7 +2827,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Voice widget and games", // i18n-ignore
             href: "/account/app/voice",
             icon: AudioLines,
-            keywords: ["overlay", "voice widget", "call widget", "games", "in game", "show voice widget during calls", "only while a game is running", "avatar size", "show names", "show people", "opacity", "position"],
+            keywords: ["overlay", "voice widget", "call widget", "games", "in game", "show voice widget during calls", "only while a game is running", "avatar size", "show names", "show people", "opacity", "position", "quick actions", "clickable while locked", "clickable regions", "max users displayed", "reset default layout"],
             group: THIS_APP_GROUP,
             desktopOnly: true
         },

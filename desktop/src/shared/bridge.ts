@@ -223,6 +223,9 @@ export interface PolarisDesktop {
             /** Take in a list from a pasted or scanned code. */
             importText(text: string): Promise<HostImport>;
         };
+        /** Put the voice widget back as it first came (look, corner, widgets);
+         *  answers the snapshot after it. Absent in apps that predate it. */
+        resetOverlay?(): Promise<unknown>;
         /** Hear that a value changed anywhere. Answers the way to stop. */
         onChange(listener: () => void): () => void;
         /** Hear the app asking to show a category. Answers the way to stop. */
@@ -470,6 +473,10 @@ export interface Preferences {
     readonly voiceWidget: boolean;
     /** That widget only while a game is running. */
     readonly voiceWidgetGameOnly: boolean;
+    /** Mute, deafen and leave on the widget. */
+    readonly overlayQuickActions: boolean;
+    /** Those buttons stay and take clicks while the widget is locked. */
+    readonly overlayClickable: boolean;
     /** How the widget looks. */
     readonly voiceWidgetLook: WidgetLook;
     /** The launcher opens with its key from anywhere. */
@@ -501,7 +508,17 @@ export interface LauncherStatus {
 }
 
 /** The switches the settings window keeps with one call. */
-export const PREFERENCE_TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly", "launcher", "launcherClipboard", "launcherGameMode"] as const;
+export const PREFERENCE_TOGGLES = [
+    "minimizeToTray",
+    "startMinimized",
+    "voiceWidget",
+    "voiceWidgetGameOnly",
+    "launcher",
+    "launcherClipboard",
+    "launcherGameMode",
+    "overlayQuickActions",
+    "overlayClickable"
+] as const;
 
 export type PreferenceToggle = (typeof PREFERENCE_TOGGLES)[number];
 
@@ -556,6 +573,9 @@ export interface PolarisLocal {
     readonly voiceWidget: {
         onView(listener: (view: WidgetView | null) => void): () => void;
         act(action: VoiceAction): Promise<boolean>;
+        /** While locked, take clicks (true: the pointer is over a clickable
+         *  region) or let them through to the game (false). */
+        clickable(on: boolean): Promise<void>;
     };
 }
 
@@ -787,6 +807,8 @@ export const CHANNELS = {
     callAction: "desktop:call-action",
     widgetView: "desktop:widget-view",
     widgetAction: "desktop:widget-action",
+    widgetClickable: "desktop:widget-clickable",
+    appSettingsResetOverlay: "desktop:app-settings-reset-overlay",
     openServers: "desktop:open-servers",
     appSettingsGet: "desktop:app-settings-get",
     appSettingsSet: "desktop:app-settings-set",

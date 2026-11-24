@@ -1070,6 +1070,8 @@ function start(): void {
                     startMinimized: settings.toggle("startMinimized"),
                     voiceWidget: settings.toggle("voiceWidget"),
                     voiceWidgetGameOnly: settings.toggle("voiceWidgetGameOnly"),
+                    overlayQuickActions: settings.toggle("overlayQuickActions"),
+                    overlayClickable: settings.toggle("overlayClickable"),
                     voiceWidgetLook: settings.voiceWidgetLook(),
                     launcher: settings.toggle("launcher"),
                     launcherClipboard: settings.toggle("launcherClipboard"),

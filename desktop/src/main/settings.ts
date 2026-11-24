@@ -19,7 +19,7 @@ import { DEFAULT_TEXT_SIZE, readTextSize, type TextSize } from "@/shared/text-si
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { readRelaunchMark, type RelaunchMark } from "@/shared/relaunch";
 import { DEFAULT_LAUNCHER_BINDING } from "@/shared/launcher-hotkey";
-import { AVATAR_SIZES, CORNERS, DEFAULT_LOOK, NAME_MODES, OPACITIES, PEOPLE_MODES, type Opacity, type WidgetLook } from "@/shared/voice-widget";
+import { AVATAR_SIZES, CORNERS, DEFAULT_LOOK, MAX_USERS_LIMIT, NAME_MODES, OPACITIES, PEOPLE_MODES, type Opacity, type WidgetLook } from "@/shared/voice-widget";
 import { DEFAULT_SEARCH_ENGINE, SEARCH_ENGINE_IDS, launcherEngineOf, type SearchEngine } from "@/shared/launcher";
 import { CLIPBOARD_KEEP_IDS, DEFAULT_CLIPBOARD_KEEP, clipboardOn, type ClipboardKeep } from "@/shared/clipboard-store";
 
@@ -86,6 +86,13 @@ const settingsSchema = z.object({
     voiceWidgetPeople: z.enum(PEOPLE_MODES).catch(DEFAULT_LOOK.people),
     voiceWidgetOpacity: z.enum(OPACITY_CHOICES).catch(String(DEFAULT_LOOK.opacity) as OpacityChoice),
     voiceWidgetCorner: z.enum(CORNERS).catch(DEFAULT_LOOK.corner),
+    // The most people the widget lists before "and N more"; 0 (Off) lists everybody.
+    voiceWidgetMaxUsers: z.number().int().min(0).max(MAX_USERS_LIMIT).catch(DEFAULT_LOOK.maxUsers),
+    // On unless somebody turned it off: mute, deafen and leave on the widget.
+    overlayQuickActions: z.boolean().catch(true),
+    // Off unless somebody turned it on: those buttons stay on the widget while
+    // it is locked and take clicks there, while the rest lets clicks through.
+    overlayClickable: z.boolean().catch(false),
     // The account's text size last seen in the Polaris window, or null before one was.
     textSize: z.unknown().transform(readTextSize).catch(null),
     // On unless somebody turned it off: the launcher opens with its key from anywhere.
@@ -129,6 +136,9 @@ const EMPTY: Settings = {
     voiceWidgetPeople: DEFAULT_LOOK.people,
     voiceWidgetOpacity: String(DEFAULT_LOOK.opacity) as OpacityChoice,
     voiceWidgetCorner: DEFAULT_LOOK.corner,
+    voiceWidgetMaxUsers: DEFAULT_LOOK.maxUsers,
+    overlayQuickActions: true,
+    overlayClickable: false,
     textSize: null,
     launcher: true,
     launcherBinding: DEFAULT_LAUNCHER_BINDING,
@@ -267,7 +277,7 @@ export function rememberHardwareAcceleration(on: boolean): void {
 }
 
 /** The switches kept as they are and read when they matter. */
-export const TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly", "launcher", "launcherClipboard", "launcherGameMode"] as const;
+export const TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly", "launcher", "launcherClipboard", "launcherGameMode", "overlayQuickActions", "overlayClickable"] as const;
 
 export type Toggle = (typeof TOGGLES)[number];
 
@@ -305,8 +315,26 @@ export function voiceWidgetLook(): WidgetLook {
         names: settings.voiceWidgetNames,
         people: settings.voiceWidgetPeople,
         opacity: Number(settings.voiceWidgetOpacity) as Opacity,
-        corner: settings.voiceWidgetCorner
+        corner: settings.voiceWidgetCorner,
+        maxUsers: settings.voiceWidgetMaxUsers
     };
+}
+
+/** Put the widget back as it first came: Discord's look, its corner, and every widget on. */
+export function resetVoiceWidgetLayout(): void {
+    save({
+        ...load(),
+        voiceWidgetPlace: null,
+        voiceWidgetAvatars: DEFAULT_LOOK.avatars,
+        voiceWidgetNames: DEFAULT_LOOK.names,
+        voiceWidgetPeople: DEFAULT_LOOK.people,
+        voiceWidgetOpacity: String(DEFAULT_LOOK.opacity) as OpacityChoice,
+        voiceWidgetCorner: DEFAULT_LOOK.corner,
+        voiceWidgetMaxUsers: DEFAULT_LOOK.maxUsers,
+        voiceWidget: true,
+        overlayQuickActions: true,
+        overlayClickable: false
+    });
 }
 
 /** Keep a new look. A new corner forgets where the widget was dragged, so it goes there. */
@@ -320,6 +348,7 @@ export function rememberVoiceWidgetLook(look: WidgetLook): void {
         voiceWidgetPeople: look.people,
         voiceWidgetOpacity: String(look.opacity) as OpacityChoice,
         voiceWidgetCorner: look.corner,
+        voiceWidgetMaxUsers: look.maxUsers,
         ...(moved ? { voiceWidgetPlace: null } : {})
     });
 }

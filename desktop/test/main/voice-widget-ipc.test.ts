@@ -105,14 +105,15 @@ describe("the widget's buttons", () => {
 });
 
 describe("the widget's switches", () => {
-    it.each([["voiceWidget"], ["voiceWidgetGameOnly"]])("are kept from the host's Settings > This app: %s", async (name) => {
+    it.each([["voiceWidget"], ["voiceWidgetGameOnly"], ["overlayQuickActions"], ["overlayClickable"]])("are kept from the host's Settings > This app: %s", async (name) => {
         const setToggle = vi.fn(() => true);
         handlers.clear();
         const { registerIpc } = await import("@/main/ipc");
         registerIpc({ server: () => ORIGIN, setToggle, preferences: () => ({}), connectState: () => ({ address: ORIGIN, servers: [] }) } as unknown as IpcHost);
         await handlers.get(CHANNELS.appSettingsSet)?.(event("polaris"), { key: name, value: true });
         expect(setToggle).toHaveBeenCalledWith(name, true);
-    });
+        // The first case imports the whole IPC module, slow on a loaded machine.
+    }, 20_000);
 
     it("are not taken from any other window", async () => {
         expect(await handlers.get(CHANNELS.appSettingsSet)?.(event("connect"), { key: "voiceWidget", value: true })).toBeNull();

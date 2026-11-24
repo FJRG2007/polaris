@@ -9,6 +9,13 @@
  * shows mute, deafen and leave, and can be dragged; where it is left is kept.
  * Until it is dragged it sits in the corner chosen in the settings.
  *
+ * With clickable regions on, the quick actions (mute, deafen, leave) stay on
+ * it while locked and take clicks there: the window lets every click through
+ * and forwards the pointer's moves, and its page says when the pointer is over
+ * a button (`setVoiceWidgetClickable`) - only then does it take the click.
+ * That is Electron's documented click-through pattern, and what Discord calls
+ * the overlay's clickable regions.
+ *
  * The page in the call says what to draw (`setVoiceState`), and a press on the
  * widget goes back to that page as its call keys do (`voiceWidgetAction`).
  *
@@ -55,6 +62,8 @@ let widget: { readonly window: BrowserWindow; ready: boolean; } | null = null;
 let releaseLockKey: (() => void) | null = null;
 /** The name of the lock key held, or null when every one was taken. */
 let lockLabel: string | null = null;
+/** The pointer is over a clickable region while locked, so clicks land on the widget. */
+let takingClicks = false;
 /** The look chosen in the settings, read when the widget opens and when it changes. */
 let look: WidgetLook | null = null;
 /** Each face asked for in this call, by address: a data URL, or null for none. */
@@ -148,7 +157,32 @@ export function refreshVoiceWidget(): void {
     draw();
 }
 
+/** The quick actions are on the widget at all. */
+function quickActions(): boolean {
+    return settings.toggle("overlayQuickActions");
+}
+
+/** The quick actions stay, and take clicks, while the widget is locked. */
+function lockedActions(): boolean {
+    return quickActions() && settings.toggle("overlayClickable");
+}
+
+/**
+ * The widget's page says the pointer is over (true) or off (false) one of its
+ * clickable regions. Only while locked, and only with clickable regions on:
+ * unlocked it takes every click anyway.
+ */
+export function setVoiceWidgetClickable(on: boolean): void {
+    if (!widget || widget.window.isDestroyed() || unlocked) return;
+    const take = on && lockedActions();
+    if (take === takingClicks) return;
+    takingClicks = take;
+    if (take) widget.window.setIgnoreMouseEvents(false);
+    else widget.window.setIgnoreMouseEvents(true, { forward: true });
+}
+
 export function closeVoiceWidget(): void {
+    takingClicks = false;
     releaseLockKey?.();
     releaseLockKey = null;
     lockLabel = null;
@@ -190,7 +224,7 @@ function cornerOfScreen(size: { width: number; height: number; }): { x: number; 
 /** The widget's size, grown with the account's text size: its page is drawn in rem. */
 function size(people: number, open: boolean): { width: number; height: number; } {
     const scale = textScale(settings.textSize());
-    const base = widgetSize(people, open, currentLook());
+    const base = widgetSize(people, open, currentLook(), lockedActions());
     return { width: Math.round(base.width * scale), height: Math.round(base.height * scale) };
 }
 
@@ -243,6 +277,7 @@ function remember(): void {
 function toggleLock(): void {
     if (!widget || widget.window.isDestroyed()) return;
     unlocked = !unlocked;
+    takingClicks = false;
     const { window } = widget;
     // Unlocked it takes clicks and can be dragged; locked, clicks go through.
     window.setFocusable(unlocked);
@@ -335,6 +370,8 @@ function facesView(): Readonly<Record<string, string>> | undefined {
 function draw(replace = false): void {
     if (!widget || widget.window.isDestroyed() || !state) return;
     const { window } = widget;
+    // Clickable regions switched off while the pointer sat on one.
+    if (takingClicks && !lockedActions()) setVoiceWidgetClickable(false);
     const shape = currentLook();
     const bounds = window.getBounds();
     const { width, height } = size(state.participants.length, unlocked);
@@ -354,6 +391,8 @@ function draw(replace = false): void {
         unlocked,
         lockKey: lockLabel,
         look: shape,
+        actions: lockedActions(),
+        buttons: quickActions(),
         anchor: bottom ? "bottom" : "top",
         ...(faceUpdate ? { faces: faceUpdate } : {})
     };

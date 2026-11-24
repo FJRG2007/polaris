@@ -10,9 +10,12 @@ import {
     DEFAULT_LOOK,
     faceColor,
     initials,
+    insideRegions,
     lockKeys,
     lookChangeSchema,
+    MAX_PEOPLE,
     MAX_ROWS,
+    rowCap,
     showsName,
     shownPeople,
     voiceActionSchema,
@@ -162,5 +165,58 @@ describe("the widget's size and corner", () => {
         ["bottom-right", { x: 1920 - 240 - 16, y: 40 + 1000 - 100 - 16 }]
     ] as const)("sits %s of the work area", (corner, point) => {
         expect(cornerPoint(area, { width: 240, height: 100 }, corner, 16)).toEqual(point);
+    });
+});
+
+describe("max users displayed", () => {
+    it("caps the rows at the chosen number, Off listing everybody", () => {
+        expect(rowCap(DEFAULT_LOOK)).toBe(MAX_ROWS);
+        expect(rowCap({ maxUsers: 5 })).toBe(5);
+        expect(rowCap({ maxUsers: 0 })).toBe(MAX_PEOPLE);
+        expect(rowCap({})).toBe(MAX_ROWS);
+    });
+
+    it("sizes the window for the capped rows and the line that counts the rest", () => {
+        const five = { ...DEFAULT_LOOK, maxUsers: 5 };
+        expect(widgetSize(5, false, five).height).toBe(widgetSize(5, false, DEFAULT_LOOK).height);
+        expect(widgetSize(12, false, five).height).toBeLessThan(widgetSize(12, false, DEFAULT_LOOK).height);
+        expect(widgetSize(12, false, five).height).toBeGreaterThan(widgetSize(5, false, five).height);
+        expect(widgetSize(20, false, { ...DEFAULT_LOOK, maxUsers: 0 }).height).toBeGreaterThan(widgetSize(20, false, DEFAULT_LOOK).height);
+    });
+
+    it("is one whole number from Off to 25 when it is changed", () => {
+        expect(lookChangeSchema.safeParse({ key: "maxUsers", value: 0 }).success).toBe(true);
+        expect(lookChangeSchema.safeParse({ key: "maxUsers", value: 25 }).success).toBe(true);
+        expect(lookChangeSchema.safeParse({ key: "maxUsers", value: 26 }).success).toBe(false);
+        expect(lookChangeSchema.safeParse({ key: "maxUsers", value: -1 }).success).toBe(false);
+        expect(lookChangeSchema.safeParse({ key: "maxUsers", value: 7.5 }).success).toBe(false);
+        expect(withLookChange(DEFAULT_LOOK, { key: "maxUsers", value: 12 }).maxUsers).toBe(12);
+    });
+});
+
+describe("clickable regions", () => {
+    const buttons = [
+        { x: 8, y: 100, width: 32, height: 32 },
+        { x: 44, y: 100, width: 32, height: 32 }
+    ];
+
+    it("take a point on a button and let every other one through", () => {
+        expect(insideRegions({ x: 10, y: 110 }, buttons)).toBe(true);
+        expect(insideRegions({ x: 75, y: 131 }, buttons)).toBe(true);
+        expect(insideRegions({ x: 42, y: 110 }, buttons)).toBe(false);
+        expect(insideRegions({ x: 10, y: 20 }, buttons)).toBe(false);
+        // The far edges belong to what is next to the box.
+        expect(insideRegions({ x: 40, y: 110 }, buttons)).toBe(false);
+        expect(insideRegions({ x: 10, y: 132 }, buttons)).toBe(false);
+    });
+
+    it("never take a click for a hidden (empty) button or with no regions", () => {
+        expect(insideRegions({ x: 0, y: 0 }, [{ x: 0, y: 0, width: 0, height: 0 }])).toBe(false);
+        expect(insideRegions({ x: 5, y: 5 }, [])).toBe(false);
+    });
+
+    it("keep the buttons' row while locked, so the window is sized for it", () => {
+        expect(widgetSize(3, false, DEFAULT_LOOK, true).height).toBe(widgetSize(3, true, DEFAULT_LOOK).height);
+        expect(widgetSize(3, false, { ...DEFAULT_LOOK, names: "never" }, true).width).toBe(widgetSize(3, true, DEFAULT_LOOK).width);
     });
 });

@@ -139,6 +139,7 @@ const bridge: PolarisDesktop = {
             importFile: () => ipcRenderer.invoke(CHANNELS.hostsOpen),
             importText: (text) => ipcRenderer.invoke(CHANNELS.hostsImport, text)
         },
+        resetOverlay: () => ipcRenderer.invoke(CHANNELS.appSettingsResetOverlay),
         onChange: (listener) => {
             const heard = () => listener();
             ipcRenderer.on(CHANNELS.appSettingsChanged, heard);

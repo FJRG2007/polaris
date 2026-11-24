@@ -26,6 +26,7 @@ const {
     updateAttempted,
     rememberVoiceWidgetLook,
     rememberVoiceWidgetPlace,
+    resetVoiceWidgetLayout,
     voiceWidgetLook,
     voiceWidgetPlace
 } = await import("@/main/settings");
@@ -152,7 +153,7 @@ describe("the restart the app made itself", () => {
 });
 
 describe("the voice widget's look", () => {
-    const defaults = { avatars: "large", names: "always", people: "always", opacity: 100, corner: "top-left" };
+    const defaults = { avatars: "large", names: "always", people: "always", opacity: 100, corner: "top-left", maxUsers: 8 } as const;
 
     it("is Discord's defaults for a file from before it existed", () => {
         writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidget: true }));
@@ -166,10 +167,44 @@ describe("the voice widget's look", () => {
 
     it("is kept, and a new corner forgets where it was dragged", () => {
         rememberVoiceWidgetPlace({ x: 300, y: 200 });
-        rememberVoiceWidgetLook({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "top-left" });
-        expect(voiceWidgetLook()).toEqual({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "top-left" });
+        rememberVoiceWidgetLook({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "top-left", maxUsers: 8 });
+        expect(voiceWidgetLook()).toEqual({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "top-left", maxUsers: 8 });
         expect(voiceWidgetPlace()).toEqual({ x: 300, y: 200 });
-        rememberVoiceWidgetLook({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "bottom-right" });
+        rememberVoiceWidgetLook({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "bottom-right", maxUsers: 8 });
         expect(voiceWidgetPlace()).toBeNull();
+    });
+
+    it("keeps how many people it lists, and reads a stored value out of range as the default", () => {
+        rememberVoiceWidgetLook({ ...defaults, maxUsers: 0 });
+        expect(voiceWidgetLook().maxUsers).toBe(0);
+        rememberVoiceWidgetLook({ ...defaults, maxUsers: 25 });
+        expect(voiceWidgetLook().maxUsers).toBe(25);
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidgetMaxUsers: 99 }));
+        expect(voiceWidgetLook().maxUsers).toBe(8);
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidgetMaxUsers: 2.5 }));
+        expect(voiceWidgetLook().maxUsers).toBe(8);
+    });
+
+    it("goes back to its first layout: look, corner, place and every widget", () => {
+        rememberVoiceWidgetLook({ avatars: "small", names: "never", people: "speaking", opacity: 40, corner: "bottom-right", maxUsers: 3 });
+        rememberVoiceWidgetPlace({ x: 10, y: 20 });
+        rememberToggle("overlayQuickActions", false);
+        rememberToggle("overlayClickable", true);
+        rememberToggle("voiceWidgetGameOnly", true);
+        resetVoiceWidgetLayout();
+        expect(voiceWidgetLook()).toEqual(defaults);
+        expect(voiceWidgetPlace()).toBeNull();
+        expect(toggle("overlayQuickActions")).toBe(true);
+        expect(toggle("overlayClickable")).toBe(false);
+        // Not part of the layout: when it shows is somebody's own choice.
+        expect(toggle("voiceWidgetGameOnly")).toBe(true);
+    });
+});
+
+describe("the overlay's widgets", () => {
+    it("have the quick actions on and clickable regions off on a file from before them", () => {
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidget: true }));
+        expect(toggle("overlayQuickActions")).toBe(true);
+        expect(toggle("overlayClickable")).toBe(false);
     });
 });

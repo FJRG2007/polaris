@@ -17,8 +17,8 @@ import { chooseShare, endShare, listShareSources, SOURCE_ID } from "./screen-sha
 import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
 import { strokeSchema } from "@/shared/annotate";
 import { setCallHotkeys } from "./call-hotkeys";
-import { followTextSize as followWidgetTextSize, followVoiceWidgetLook, setVoiceState, voiceWidgetAction } from "./voice-widget";
-import { launcherBinding, rememberLauncherClipboardKeep, rememberLauncherEngine, rememberTextSize, rememberVoiceWidgetLook, textSize, voiceWidgetLook } from "./settings";
+import { followTextSize as followWidgetTextSize, followVoiceWidgetLook, setVoiceState, setVoiceWidgetClickable, voiceWidgetAction } from "./voice-widget";
+import { launcherBinding, rememberLauncherClipboardKeep, rememberLauncherEngine, rememberTextSize, rememberVoiceWidgetLook, resetVoiceWidgetLayout, textSize, voiceWidgetLook } from "./settings";
 import { readTextSize } from "@/shared/text-size";
 import { lookChangeSchema, voiceActionSchema, voiceStateSchema, withLookChange } from "@/shared/voice-widget";
 import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
@@ -460,6 +460,11 @@ export function registerIpc(host: IpcHost): void {
         const action = voiceActionSchema.safeParse(raw);
         return from(event, "voice-widget") && action.success && voiceWidgetAction(action.data);
     });
+    // The widget's pointer over (true) or off (false) a region that takes clicks while locked.
+    ipcMain.handle(CHANNELS.widgetClickable, (event, raw: unknown): void => {
+        const on = z.boolean().safeParse(raw);
+        if (from(event, "voice-widget") && on.success) setVoiceWidgetClickable(on.data);
+    });
 
     ipcMain.handle(CHANNELS.gameCurrent, (event) => {
         if (!fromPolaris(event)) return { game: null, reporter: false };
@@ -767,6 +772,7 @@ export function registerIpc(host: IpcHost): void {
             voiceWidgetPeople: look.people,
             voiceWidgetOpacity: String(look.opacity),
             voiceWidgetCorner: look.corner,
+            voiceWidgetMaxUsers: look.maxUsers,
             launcherBinding: launcherBinding(),
             launcherKey: status.key,
             launcherProblem: status.problem,
@@ -805,6 +811,8 @@ export function registerIpc(host: IpcHost): void {
                 return changeLook({ key: "opacity", value: Number(change.value) });
             case "voiceWidgetCorner":
                 return changeLook({ key: "corner", value: change.value });
+            case "voiceWidgetMaxUsers":
+                return changeLook({ key: "maxUsers", value: change.value });
             default:
                 return host.setToggle(change.key, change.value);
         }
@@ -835,6 +843,13 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.appSettingsRelaunch, (event) => (fromPolaris(event) ? host.relaunch() : REFUSED));
     ipcMain.handle(CHANNELS.appSettingsHosts, (event) => {
         if (fromPolaris(event)) host.manageHosts(event.sender);
+    });
+    ipcMain.handle(CHANNELS.appSettingsResetOverlay, async (event) => {
+        if (!fromPolaris(event)) return null;
+        resetVoiceWidgetLayout();
+        followVoiceWidgetLook();
+        changed();
+        return snapshot();
     });
     ipcMain.handle(CHANNELS.appSettingsAnnounce, (event, raw: unknown) => {
         // An older page sends nothing: it draws the settings and not the hosts.

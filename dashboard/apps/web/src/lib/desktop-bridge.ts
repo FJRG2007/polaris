@@ -412,6 +412,8 @@ export interface DesktopAppSettings {
     /** The hosts the app keeps, managed here. Absent from an app older than that,
      *  which manages them in its own window (`manageHosts`). */
     hosts?: DesktopHosts;
+    /** Put the voice widget back as it first came; answers the snapshot after it. Absent in older apps. */
+    resetOverlay?(): Promise<unknown>;
     /** Hear that a value changed anywhere. Answers the way to stop. */
     onChange(listener: () => void): () => void;
     /** Hear the app asking to show a category. Answers the way to stop. */

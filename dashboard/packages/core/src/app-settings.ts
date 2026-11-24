@@ -42,6 +42,10 @@ export const APP_WIDGET_PEOPLE = ["always", "speaking"] as const;
 /** Percentages, kept as text so every choice crosses the bridge the same way. */
 export const APP_WIDGET_OPACITIES = ["100", "80", "60", "40"] as const;
 export const APP_WIDGET_CORNERS = ["top-left", "top-right", "bottom-left", "bottom-right"] as const;
+/** "Max users displayed": a whole number up to this, where 0 is Off (everybody). */
+export const APP_WIDGET_MAX_USERS = 25;
+/** The marks under that slider, as Discord draws them. */
+export const APP_WIDGET_MAX_USERS_MARKS = [0, 5, 10, 15, 20, 25] as const;
 
 interface SettingBase<K extends string> {
     readonly key: K;
@@ -55,7 +59,15 @@ interface SettingBase<K extends string> {
 export type AppSettingEntry =
     | (SettingBase<string> & { readonly kind: "toggle"; readonly default: boolean })
     | (SettingBase<string> & { readonly kind: "choice"; readonly options: readonly string[]; readonly default: string })
-    | (SettingBase<string> & { readonly kind: "shortcut"; readonly default: string });
+    | (SettingBase<string> & { readonly kind: "shortcut"; readonly default: string })
+    | (SettingBase<string> & {
+          readonly kind: "range";
+          readonly min: number;
+          readonly max: number;
+          readonly step: number;
+          readonly marks: readonly number[];
+          readonly default: number;
+      });
 
 /** Every setting, in the order each category lists them. */
 export const APP_SETTINGS = [
@@ -77,6 +89,8 @@ export const APP_SETTINGS = [
     },
     { key: "voiceWidget", kind: "toggle", category: "voice", default: true },
     { key: "voiceWidgetGameOnly", kind: "toggle", category: "voice", default: false, dependsOn: "voiceWidget" },
+    { key: "overlayQuickActions", kind: "toggle", category: "voice", default: true, dependsOn: "voiceWidget" },
+    { key: "overlayClickable", kind: "toggle", category: "voice", default: false, dependsOn: "overlayQuickActions" },
     {
         key: "voiceWidgetAvatars",
         kind: "choice",
@@ -99,6 +113,17 @@ export const APP_SETTINGS = [
         category: "voice",
         default: "always",
         options: APP_WIDGET_PEOPLE,
+        dependsOn: "voiceWidget"
+    },
+    {
+        key: "voiceWidgetMaxUsers",
+        kind: "range",
+        category: "voice",
+        default: 8,
+        min: 0,
+        max: APP_WIDGET_MAX_USERS,
+        step: 1,
+        marks: APP_WIDGET_MAX_USERS_MARKS,
         dependsOn: "voiceWidget"
     },
     {
@@ -132,6 +157,8 @@ export const APP_SETTING_TOGGLES = [
     "launcherClipboard",
     "voiceWidget",
     "voiceWidgetGameOnly",
+    "overlayQuickActions",
+    "overlayClickable",
     "hardwareAcceleration"
 ] as const;
 
@@ -174,6 +201,9 @@ const snapshotSchema = z.object({
     voiceWidgetPeople: z.enum(APP_WIDGET_PEOPLE).catch("always"),
     voiceWidgetOpacity: z.enum(APP_WIDGET_OPACITIES).catch("100"),
     voiceWidgetCorner: z.enum(APP_WIDGET_CORNERS).catch("top-left"),
+    voiceWidgetMaxUsers: z.number().int().min(0).max(APP_WIDGET_MAX_USERS).catch(8),
+    overlayQuickActions: z.boolean().catch(true),
+    overlayClickable: z.boolean().catch(false),
     hardwareAcceleration: z.boolean().catch(true),
     /** The kept choice differs from the one this run started with. */
     restartPending: z.boolean().catch(false),
@@ -206,7 +236,10 @@ export const appSettingChangeSchema = z.union([
     z.object({ key: z.literal("voiceWidgetNames"), value: z.enum(APP_WIDGET_NAMES) }).strict(),
     z.object({ key: z.literal("voiceWidgetPeople"), value: z.enum(APP_WIDGET_PEOPLE) }).strict(),
     z.object({ key: z.literal("voiceWidgetOpacity"), value: z.enum(APP_WIDGET_OPACITIES) }).strict(),
-    z.object({ key: z.literal("voiceWidgetCorner"), value: z.enum(APP_WIDGET_CORNERS) }).strict()
+    z.object({ key: z.literal("voiceWidgetCorner"), value: z.enum(APP_WIDGET_CORNERS) }).strict(),
+    z
+        .object({ key: z.literal("voiceWidgetMaxUsers"), value: z.number().int().min(0).max(APP_WIDGET_MAX_USERS) })
+        .strict()
 ]);
 
 export type AppSettingChange = z.infer<typeof appSettingChangeSchema>;

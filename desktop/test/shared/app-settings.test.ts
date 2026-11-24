@@ -45,9 +45,9 @@ describe("the shared settings schema", () => {
     });
 
     it("lists every voice widget look the app keeps", () => {
-        const keys = Object.keys(SETTING_DEFAULTS).filter((key) => /^voiceWidget(Avatars|Names|People|Opacity|Corner)$/.test(key));
+        const keys = Object.keys(SETTING_DEFAULTS).filter((key) => /^voiceWidget(Avatars|Names|People|Opacity|Corner|MaxUsers)$/.test(key));
         const listed = APP_SETTINGS.map((entry) => entry.key as string);
-        expect(keys).toHaveLength(5);
+        expect(keys).toHaveLength(6);
         for (const key of keys) expect(listed, key).toContain(key);
     });
 });
@@ -63,6 +63,10 @@ describe("a change crossing the bridge", () => {
         expect(readAppSettingChange({ key: "voiceWidgetOpacity", value: "60" })).toEqual({ key: "voiceWidgetOpacity", value: "60" });
         expect(readAppSettingChange({ key: "voiceWidgetOpacity", value: 60 })).toBeNull();
         expect(readAppSettingChange({ key: "voiceWidgetCorner", value: "middle" })).toBeNull();
+        expect(readAppSettingChange({ key: "voiceWidgetMaxUsers", value: 0 })).toEqual({ key: "voiceWidgetMaxUsers", value: 0 });
+        expect(readAppSettingChange({ key: "voiceWidgetMaxUsers", value: 26 })).toBeNull();
+        expect(readAppSettingChange({ key: "voiceWidgetMaxUsers", value: "5" })).toBeNull();
+        expect(readAppSettingChange({ key: "overlayClickable", value: true })).toEqual({ key: "overlayClickable", value: true });
         expect(readAppSettingChange(null)).toBeNull();
     });
 });
@@ -76,6 +80,9 @@ describe("the app's answer as the page reads it", () => {
         expect(snapshot?.servers).toEqual([]);
         expect(snapshot?.voiceWidgetOpacity).toBe("100");
         expect(snapshot?.voiceWidgetCorner).toBe("top-left");
+        expect(snapshot?.voiceWidgetMaxUsers).toBe(8);
+        expect(snapshot?.overlayQuickActions).toBe(true);
+        expect(snapshot?.overlayClickable).toBe(false);
         expect(readAppSettings("nope")).toBeNull();
     });
 });

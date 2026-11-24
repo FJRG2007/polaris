@@ -26,6 +26,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useNetworkState } from "@enigmax/primitives/react/network";
 import { readDesktopUpdateCheck, type DesktopUpdateCheck, type PolarisDesktop } from "@/lib/desktop-bridge";
+import { MaxUsersRow, ResetOverlay, VoiceWidgetPreview } from "./voice-widget-preview";
 import { Button, buttonVariants, Card, CardBody, ConfirmDeleteDialog, Select, Skeleton, Switch, useToast } from "@polaris/ui";
 
 /** The last snapshot the app gave, so a category opened next draws without waiting. */
@@ -37,6 +38,16 @@ export function forgetAppSettingsSnapshot(): void {
 }
 
 const MODIFIER_KEYS = ["Control", "Alt", "Shift", "Meta"];
+
+/** Whether a setting is listed: every switch it sits under, all the way up, is on. */
+export function settingShown(entry: core.AppSettingEntry, snapshot: core.AppSettingsSnapshot): boolean {
+    let parent = entry.dependsOn;
+    for (let depth = 0; parent && depth < 8; depth++) {
+        if (snapshot[parent as core.AppSettingKey] !== true) return false;
+        parent = (core.APP_SETTINGS as readonly core.AppSettingEntry[]).find((item) => item.key === parent)?.dependsOn;
+    }
+    return true;
+}
 
 /** The line under the category's title: the phone app's own when the page runs in it. */
 export function AppSettingsIntro({ category }: { category: core.AppSettingCategory }) {
@@ -172,12 +183,11 @@ function InApp({
         );
     }
 
-    const entries = core
-        .appSettingsIn(category)
-        .filter((entry) => !entry.dependsOn || snapshot[entry.dependsOn as core.AppSettingKey] === true);
+    const entries = core.appSettingsIn(category).filter((entry) => settingShown(entry, snapshot));
 
     return (
         <div className="flex flex-col gap-4">
+            {category === "voice" && snapshot.voiceWidget && <VoiceWidgetPreview snapshot={snapshot} />}
             {entries.length > 0 && (
                 <Card>
                     <CardBody className="flex flex-col gap-4">
@@ -194,6 +204,7 @@ function InApp({
                     </CardBody>
                 </Card>
             )}
+            {category === "voice" && <ResetOverlay settings={settings} onSnapshot={keep} />}
             {category === "clipboard" && <ClearClipboard settings={settings} />}
             {category === "advanced" && snapshot.restartPending && (
                 <Card>
@@ -252,6 +263,18 @@ function SettingRow({
 
     if (entry.kind === "shortcut") {
         return <ShortcutRow label={label} snapshot={snapshot} settings={settings} onSnapshot={onSnapshot} />;
+    }
+    if (entry.kind === "range") {
+        return (
+            <MaxUsersRow
+                entry={entry}
+                value={snapshot[key] as number}
+                onChange={(next) => {
+                    const change = core.readAppSettingChange({ key, value: next });
+                    if (change) onChange(change);
+                }}
+            />
+        );
     }
     if (entry.kind === "choice") {
         const value = snapshot[key] as string;
