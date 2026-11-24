@@ -1,6 +1,9 @@
-*.pdb filter=lfs diff=lfs merge=lfs -text
-crates/input_classifier/models/** filter=lfs diff=lfs merge=lfs -text
-crates/input_classifier/models/**/*tokenizer.json -filter -diff -merge text linguist-generated=true
+# Polaris's root .gitattributes normalises text to LF; the terminal tree kept
+# its files byte-for-byte as Rook stored them, so undo that here.
+* !text !eol
+
+# No LFS: the classifier weights are fetched by crates/input_classifier/build.rs.
+crates/input_classifier/models/**/*tokenizer.json text linguist-generated=true
 
 # Terminal recordings and their reference grids are byte streams, not text.
 # Without this git normalised their CRLF on commit and dropped the carriage

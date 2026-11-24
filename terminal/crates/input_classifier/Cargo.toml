@@ -2,6 +2,7 @@
 name = "input_classifier"
 authors = ["Rook Contributors"]
 edition = "2024"
+build = "build.rs"
 publish.workspace = true
 license.workspace = true
 
@@ -24,9 +25,8 @@ onnx_ort = [
     "dep:parking_lot",
 ]
 onnx = ["dep:rust-embed", "dep:tokenizers"]
-# Selects which BERT-tiny ONNX model bytes are embedded via rust-embed; enable exactly one.
-nld_classifier_v1 = ["onnx_candle"]
-nld_classifier_v2 = ["onnx_candle"]
+# Embeds the BERT-tiny ONNX model via rust-embed. build.rs fetches the weights
+# (pinned by sha256) from the terminal-assets release when this is enabled.
 nld_classifier_v3 = ["onnx_candle"]
 # Selects which shell-command heuristic behavior is used. If both are enabled, v2 wins.
 nld_heuristic_v1 = []
@@ -57,6 +57,9 @@ serde.workspace = true
 smol_str.workspace = true
 tokenizers = { version = "0.21.4", optional = true }
 rook_completer.workspace = true
+
+[build-dependencies]
+sha2.workspace = true
 
 [dev-dependencies]
 rook_features.workspace = true

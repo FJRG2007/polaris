@@ -73,11 +73,7 @@ use rook_completer::util::parse_current_commands_and_tokens;
 #[cfg(feature = "onnx")]
 fn default_onnx_model() -> Option<OnnxModel> {
     cfg_if::cfg_if! {
-        if #[cfg(feature = "nld_classifier_v1")] {
-            Some(OnnxModel::BertTinyV1)
-        } else if #[cfg(feature = "nld_classifier_v2")] {
-            Some(OnnxModel::BertTinyV2)
-        } else if #[cfg(feature = "nld_classifier_v3")] {
+        if #[cfg(feature = "nld_classifier_v3")] {
             Some(OnnxModel::BertTinyV3)
         } else {
             None

@@ -7019,6 +7019,7 @@ dependencies = [
  "rook_features",
  "rust-embed 8.7.2",
  "serde",
+ "sha2 0.10.9",
  "smol_str",
  "tokenizers 0.21.4",
 ]
