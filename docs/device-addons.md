@@ -17,7 +17,7 @@ of Tauri's updater (Ed25519 over the exact bytes, public key in the app).
 | Catalog fetch, signature, stale-while-revalidate cache | `desktop/src/main/addons/catalog.ts`, `signature.ts` |
 | Install, update, disable, uninstall, settings files | `desktop/src/main/addons/packages.ts` |
 | One process per add-on, restart with backoff, permission gate | `desktop/src/main/addons/supervisor.ts`, `desktop/src/shared/addon-protocol.ts` |
-| USB presence (plug events, no polling) | `desktop/src/main/addons/presence.ts`, `crates/polaris-core-node/src/usb.rs` |
+| USB presence (plug events, no polling) | `desktop/src/main/addons/presence.ts`, `crates/polaris-core-usb` |
 | Electron wiring and the page bridge `window.polarisDesktop.addons` | `desktop/src/main/addons/electron.ts` |
 | Build, sign, publish | `scripts/device-addons/publish.mjs`, `.github/workflows/device-addons.yml` |
 
@@ -51,7 +51,7 @@ device is plugged in.
 
 USB presence is heard on Linux (sysfs + inotify). On Windows and macOS the Rust
 core's Node binding lists vendor and product ids and sleeps on the operating
-system's own plug notification (`crates/polaris-core-node/src/usb.rs`, the same
+system's own plug notification (`crates/polaris-core-usb`, the same
 `nusb` as the Stream 100 crate; nothing is opened). Where that binding is missing
 or older than USB presence, devices are "not known": an installed, enabled add-on
 runs as if its device were present and watches for it itself, and the "found"

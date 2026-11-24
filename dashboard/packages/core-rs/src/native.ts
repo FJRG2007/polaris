@@ -79,7 +79,7 @@ export function nativeMlsMember<T>(directory?: string): T {
     return loaded.MlsMember as T;
 }
 
-/** USB presence from the Node binding (`crates/polaris-core-node/src/usb.rs`). */
+/** USB presence from the Node binding (`crates/polaris-core-usb`, re-exported through polaris-core). */
 export interface NativeUsb {
     /** `[{"vendorId": ..., "productId": ...}, ...]` for every plugged device. */
     usbDevicesJson(): string;

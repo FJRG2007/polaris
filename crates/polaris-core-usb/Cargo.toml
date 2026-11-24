@@ -1,0 +1,20 @@
+[package]
+name = "polaris-core-usb"
+version = "0.1.0"
+description = "Which USB devices are plugged in, and word when that changes, for the desktop's device add-ons (docs/device-addons.md). polaris-core re-exports it behind its `usb` feature, so the Node binding stays a thin wrapper."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# The same nusb as crates/polaris-stream100, so the workspace carries one USB
+# stack; ids only, nothing opened.
+nusb = "=0.2.9"
+futures-core = "=0.3.34"
+serde_json = { workspace = true }

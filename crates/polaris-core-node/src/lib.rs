@@ -9,9 +9,9 @@
 //! aborting the process (built with the `release-node` profile, which
 //! unwinds).
 
-mod usb;
-
-use napi::bindgen_prelude::{BigInt, Uint8Array};
+use napi::bindgen_prelude::{BigInt, Uint8Array, Unknown};
+use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
+use napi::Status;
 use napi_derive::napi;
 
 /// The code a domain error carries across the boundary.
@@ -632,4 +632,46 @@ pub fn phone_format_international(value: String) -> napi::Result<Option<String>,
 #[napi(catch_unwind)]
 pub fn phone_country_from_regions(regions: Vec<Option<String>>) -> Option<&'static str> {
     polaris_core::phone::phone_country_from_regions(regions.iter().map(Option::as_deref))
+}
+
+// USB presence for the desktop's device add-ons, polaris_core::usb: vendor
+// and product ids only, nothing opened.
+
+fn usb_error(error: polaris_core::usb::Error) -> napi::Error {
+    napi::Error::from_reason(error.to_string())
+}
+
+/// The plugged devices as `[{"vendorId":1784,"productId":57427}, ...]`.
+#[napi(catch_unwind)]
+pub fn usb_devices_json() -> napi::Result<String> {
+    polaris_core::usb::devices_json().map_err(usb_error)
+}
+
+/// A running watch; `close` stops word reaching JavaScript.
+#[napi]
+pub struct UsbWatch {
+    inner: polaris_core::usb::Watch,
+}
+
+#[napi]
+impl UsbWatch {
+    #[napi]
+    pub fn close(&self) {
+        polaris_core::usb::Watch::close(&self.inner);
+    }
+}
+
+/// The JavaScript callback: weak, so a watch never keeps the process alive.
+type OnChange = ThreadsafeFunction<u32, Unknown<'static>, u32, Status, false, true>;
+
+/// Call `on_change` (with a running count) after each plug or unplug; the
+/// caller lists the devices again with `usbDevicesJson`. Word stops once
+/// JavaScript has released the callback.
+#[napi(catch_unwind)]
+pub fn watch_usb(on_change: OnChange) -> napi::Result<UsbWatch> {
+    polaris_core::usb::watch(move |count| {
+        on_change.call(count, ThreadsafeFunctionCallMode::NonBlocking) != Status::Closing
+    })
+    .map(|inner| UsbWatch { inner })
+    .map_err(usb_error)
 }

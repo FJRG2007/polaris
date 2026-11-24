@@ -32,6 +32,10 @@ mls = [
 # OPAQUE (RFC 9807) for password sign-in (docs/chat-e2ee-phase1.md). Off by
 # default; the Node binding and the dedicated OPAQUE WebAssembly module turn it on.
 opaque = ["dep:opaque-ke", "dep:argon2", "dep:sha2", "dep:base64", "dep:generic-array", "dep:rand_core", "dep:rand_chacha"]
+# USB presence for the desktop's device add-ons: platform I/O, so it is its own
+# crate and only re-exported here. Off by default; only the Node binding turns
+# it on, never a WebAssembly build.
+usb = ["dep:polaris-core-usb"]
 
 [dependencies]
 # Pinned exactly: the stored group state and the wire format are tied to the
@@ -56,6 +60,7 @@ argon2 = { version = "=0.5.3", default-features = false, features = ["alloc"], o
 sha2 = { version = "0.10", default-features = false, optional = true }
 base64 = { version = "0.22", default-features = false, features = ["alloc"], optional = true }
 generic-array = { version = "=0.14.7", optional = true }
+polaris-core-usb = { path = "../polaris-core-usb", optional = true }
 
 # Leftmost-first matching, like JavaScript's backtracking engine on the
 # metadata patterns (none use backreferences or lookaround). regex-lite keeps

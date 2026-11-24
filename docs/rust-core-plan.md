@@ -70,6 +70,8 @@ crates/
   polaris-core/                  pure logic, no I/O, no platform code; one module per domain
     src/<domain>/...             e.g. phone, mls, search, sync, media
   polaris-core-node/             napi-rs binding -> @polaris/core-native (server, Electron main)
+  polaris-core-usb/              platform I/O the Node binding needs (USB presence); polaris-core
+                                 re-exports it behind its `usb` feature, never built for wasm
   polaris-core-wasm/             wasm-bindgen binding -> @polaris/core-wasm (browser, extension, WebView)
   polaris-core-ffi/              uniffi binding -> Kotlin/Swift (native mobile screens, later)
   polaris-core-vectors/          golden test vectors shared by every target (JSON fixtures + generator)
