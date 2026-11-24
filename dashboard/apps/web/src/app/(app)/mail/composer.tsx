@@ -53,7 +53,8 @@ import { keepSignatureDelimiter, signatureBlock, splitAtSignature, withSignature
 import { joinComposerBody, trimComposerBody } from "./trimmed-content";
 import { TrimmedPill } from "./trimmed-pill";
 import { draftSaves, type DraftFields, type DraftSaves, type DraftWriter } from "./draft-saves";
-import { answerSeed, type AnswerKind } from "./answering";
+import { readMessage } from "./message-store";
+import { answerSeed, draftAnswerKind, type AnswerContext, type AnswerKind } from "./answering";
 import {
     Check,
     ChevronDown,
@@ -225,16 +226,21 @@ export function Composer() {
     const [ownLine, setOwnLine] = useState(false);
     /**
      * Reply, Reply all or Forward, for a composer one of those opened. Switched
-     * from the composer itself - see `switchAnswer`. A reopened draft has no
-     * message to rebuild from, so it keeps the kind it was saved as.
+     * from the composer itself - see `switchAnswer`. A draft reopened from
+     * Drafts gets the same switch once the message it answers has loaded.
      */
     const [switched, setSwitched] = useState<{ seed: ComposerSeed; kind: AnswerKind } | null>(
         null
     );
+    const [restored, setRestored] = useState<{ seed: ComposerSeed; context: AnswerContext } | null>(
+        null
+    );
     // Held with the seed it belongs to, so the render a new seed arrives in
     // does not read the last composer's choice for this one.
+    const answering =
+        composing?.answering ?? (restored && restored.seed === composing ? restored.context : null);
     const answerKind =
-        switched && switched.seed === composing ? switched.kind : (composing?.answering?.kind ?? null);
+        switched && switched.seed === composing ? switched.kind : (answering?.kind ?? null);
     const forwarding = answerKind ? answerKind === "forward" : Boolean(composing?.forward);
     /** The files a forward brought over, which a switch back to a reply drops. */
     const carriedIds = useRef<string[]>([]);
@@ -310,6 +316,39 @@ export function Composer() {
         if (composing.inReplyToId && (composing.to ?? []).length > 0) setFocusAt(Date.now());
     }, [composing, accounts, identities]);
 
+    // A reopened reply or forward loads the message it answers, which is what
+    // switching between Reply, Reply all and Forward rebuilds from. The draft
+    // keeps that message by id; one that is gone, or cannot be opened, leaves
+    // the draft as it was saved, without the switch.
+    useEffect(() => {
+        const messageId = composing?.inReplyToId;
+        if (!composing?.draftId || !messageId || composing.answering) return;
+        let current = true;
+        const seed = composing;
+        void readMessage(messageId).then(
+            (opened) => {
+                if (!current) return;
+                const self = accounts.map((account) => account.address);
+                const message = opened.envelope;
+                const kind = draftAnswerKind(message, self, {
+                    to: seed.to ?? [],
+                    cc: seed.cc ?? [],
+                    forward: seed.forward ?? false
+                });
+                setRestored({
+                    seed,
+                    context: { kind, message, self, quoted: opened.readable.text }
+                });
+            },
+            () => undefined
+        );
+        return () => {
+            current = false;
+        };
+        // The mailboxes refresh often; the message is held by the store, so
+        // answering again costs no request.
+    }, [composing, accounts]);
+
     // A reopened draft brings back the files already on it. Keyed on the seed
     // alone, for the reason the seeding above is.
     useEffect(() => {
@@ -342,11 +381,12 @@ export function Composer() {
     const [carrying, setCarrying] = useState(false);
     const [notCarried, setNotCarried] = useState<string[]>([]);
 
-    // A forward brings the original's files with it. A reopened draft already
-    // has whatever survived of them, so only a fresh forward asks.
+    // A forward brings the original's files with it. A draft reopened as a
+    // forward already has whatever survived of them, so only a fresh forward -
+    // or a reopened reply switched to one - asks.
     useEffect(() => {
         setNotCarried([]);
-        if (!forwarding || !composing?.inReplyToId || composing.draftId) {
+        if (!forwarding || !composing?.inReplyToId || (composing.draftId && composing.forward)) {
             setCarrying(false);
             return;
         }
@@ -436,7 +476,7 @@ export function Composer() {
      */
     const switchAnswer = useCallback(
         (kind: AnswerKind) => {
-            const context = composing?.answering;
+            const context = answering;
             if (!composing || !context || !answerKind || kind === answerKind) return;
             const was = answerSeed(answerKind, context.message, context.self, context.quoted);
             const next = answerSeed(kind, context.message, context.self, context.quoted);
@@ -461,7 +501,7 @@ export function Composer() {
             }
             setSwitched({ seed: composing, kind });
         },
-        [composing, answerKind, subject, trimmed]
+        [composing, answering, answerKind, subject, trimmed]
     );
 
     const attach = useCallback(
@@ -759,7 +799,7 @@ export function Composer() {
                 inert={queued ? true : undefined}
             >
                 <header className="flex items-center gap-1 border-b border-border px-3 py-2">
-                    {answerKind && composing.answering && posture !== "minimized" ? (
+                    {answerKind && answering && posture !== "minimized" ? (
                         <AnswerSwitch kind={answerKind} onSwitch={switchAnswer} />
                     ) : null}
                     <button

@@ -143,3 +143,33 @@ export function answerSeed(
     const answering: AnswerContext = { kind, message, self, quoted };
     return { ...seed, answering };
 }
+
+/**
+ * Which way a draft reopened from Drafts was answering its message.
+ *
+ * The draft keeps the message it answers and whether it forwards it, not which
+ * button opened it - so a reply is told from a reply to all by who it is
+ * addressed to. Recipients that match what Reply all would have filled in are
+ * a reply to all; anything else, including a reply somebody added a name to,
+ * is a reply, and the switch is there to say otherwise.
+ */
+export function draftAnswerKind(
+    message: AnswerableMessage,
+    self: readonly string[],
+    draft: {
+        readonly to: readonly core.MailAddress[];
+        readonly cc: readonly core.MailAddress[];
+        readonly forward: boolean;
+    }
+): AnswerKind {
+    if (draft.forward) return "forward";
+    const key = (list: readonly core.MailAddress[]) =>
+        [...new Set(list.map((one) => one.address.trim().toLowerCase()))].sort().join("\n");
+    const written = key([...draft.to, ...draft.cc]);
+    const single = replySeed(message, self, false, "");
+    const all = replySeed(message, self, true, "");
+    const everybody = key([...all.to, ...all.cc]);
+    return written === everybody && everybody !== key([...single.to, ...single.cc])
+        ? "reply-all"
+        : "reply";
+}
