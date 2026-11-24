@@ -23,7 +23,9 @@ function message(id: string, threadId: string, day: number, body: string) {
         hasAttachments: false,
         seen: true,
         flagged: false,
-        sentAt: new Date(`2026-09-${String(day).padStart(2, "0")}T10:00:00Z`)
+        sentAt: new Date(`2026-09-${String(day).padStart(2, "0")}T10:00:00Z`),
+        attachments: [],
+        labels: []
     };
 }
 

@@ -164,7 +164,8 @@ export function mailSearchChips(terms: MailSearchTerms): MailSearchChip[] {
     }
     if (terms.hasAttachment)
         chips.push({ id: "has:attachment", operator: "has", value: "attachment", negated: false });
-    if (terms.hasLink) chips.push({ id: "has:link", operator: "has", value: "link", negated: false });
+    if (terms.hasLink)
+        chips.push({ id: "has:link", operator: "has", value: "link", negated: false });
     if (terms.unread !== null)
         chips.push({
             id: "is:unread",
@@ -174,7 +175,8 @@ export function mailSearchChips(terms: MailSearchTerms): MailSearchChip[] {
         });
     if (terms.starred !== null)
         chips.push({ id: "is:starred", operator: "is", value: "starred", negated: !terms.starred });
-    if (terms.after) chips.push({ id: "after", operator: "after", value: terms.after, negated: false });
+    if (terms.after)
+        chips.push({ id: "after", operator: "after", value: terms.after, negated: false });
     if (terms.before)
         chips.push({ id: "before", operator: "before", value: terms.before, negated: false });
     return chips;
@@ -222,9 +224,7 @@ export type MailSearchOperatorKey = (typeof MAIL_SEARCH_OPERATORS)[number]["key"
  * line, when it is the start of one. Nothing for a word that already has its
  * colon, or for an empty one - a list under an empty box is in the way.
  */
-export function mailSearchOperatorHints(
-    line: string
-): (typeof MAIL_SEARCH_OPERATORS)[number][] {
+export function mailSearchOperatorHints(line: string): (typeof MAIL_SEARCH_OPERATORS)[number][] {
     const last = /(?:^|\s)-?([a-z_:]*)$/i.exec(line)?.[1]?.toLowerCase() ?? "";
     if (!last) return [];
     return MAIL_SEARCH_OPERATORS.filter(

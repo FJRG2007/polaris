@@ -25,7 +25,9 @@ const INBOX_MESSAGE = {
     hasAttachments: false,
     seen: true,
     flagged: false,
-    sentAt: new Date("2026-09-20T10:00:00Z")
+    sentAt: new Date("2026-09-20T10:00:00Z"),
+    attachments: [],
+    labels: []
 };
 const SENT_REPLY = {
     ...INBOX_MESSAGE,

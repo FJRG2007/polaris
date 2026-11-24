@@ -360,7 +360,8 @@ export function mailSearchAdmits(message: MailSearchable, terms: MailSearchTerms
     if (terms.hasAttachment && !message.hasAttachments) return false;
     if (!matchesEvery(message.attachmentNames ?? [], terms.filename)) return false;
     if (!matchesEvery(message.labels ?? [], terms.label)) return false;
-    if (terms.hasLink && !/https?:\/\/\S+/i.test(`${message.snippet} ${message.body}`)) return false;
+    if (terms.hasLink && !/https?:\/\/\S+/i.test(`${message.snippet} ${message.body}`))
+        return false;
     if (terms.unread !== null && message.seen === terms.unread) return false;
     if (terms.starred !== null && message.flagged !== terms.starred) return false;
     if (terms.after && message.sentAt < new Date(`${terms.after}T00:00:00`)) return false;

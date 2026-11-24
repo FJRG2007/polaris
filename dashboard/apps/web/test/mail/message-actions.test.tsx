@@ -21,6 +21,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
+    useSearchParams: () => new URLSearchParams(),
     useRouter: () => ({ refresh: () => undefined, push: () => undefined, replace: () => undefined })
 }));
 
