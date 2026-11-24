@@ -9,7 +9,7 @@ fn dispatches_worker_invocation_instead_of_tui_frontend() {
     ));
     std::fs::write(&empty_file, []).expect("failed to create empty worker-dispatch fixture");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_pterm-tui-oss"))
+    let output = Command::new(env!("CARGO_BIN_EXE_polaris-terminal-tui-oss"))
         .arg("ripgrep-search")
         .arg("__pterm_tui_worker_dispatch_probe__")
         .arg(&empty_file)
