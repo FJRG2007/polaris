@@ -14,7 +14,7 @@ const ROUTE = new URL("../../src/app/api/notifications/stream/route.ts", import.
 
 describe("Management's count on the notification stream", () => {
     it("is read off a frame that carries it", () => {
-        const waiting = { reports: 1, cases: 0, update: true, apis: 0, total: 2 };
+        const waiting = { reports: 1, cases: 0, update: true, apis: 0, apps: 0, total: 2 };
         expect(waitingInFrame(JSON.stringify({ items: [], waiting }))).toEqual(waiting);
     });
 

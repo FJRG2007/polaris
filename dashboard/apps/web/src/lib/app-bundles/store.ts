@@ -297,7 +297,10 @@ const Pin = z.object({
     source: z.enum(["image", "registry"]),
     version: z.string().max(64).optional(),
     revision: z.string().max(64).optional(),
-    notes: z.string().max(300).optional()
+    notes: z.string().max(300).optional(),
+    /** What that build asked to reach; absent on a build that asked for nothing
+     *  and on one recorded before builds said. */
+    permissions: z.array(z.string().max(64)).max(32).optional()
 });
 
 const BundleStateSchema = z.object({

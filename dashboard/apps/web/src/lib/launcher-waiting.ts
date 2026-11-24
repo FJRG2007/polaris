@@ -38,7 +38,7 @@ export type LauncherWaitingApp = (typeof LAUNCHER_WAITING_APPS)[number];
 export const LAUNCHER_ITEMS_PER_APP = 5;
 
 /** The Management entries, which are kinds of work rather than rows. */
-export const ADMIN_ITEM_IDS = ["reports", "cases", "update", "apis"] as const;
+export const ADMIN_ITEM_IDS = ["reports", "cases", "update", "apis", "apps"] as const;
 
 export type AdminItemId = (typeof ADMIN_ITEM_IDS)[number];
 

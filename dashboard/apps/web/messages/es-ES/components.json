@@ -2051,6 +2051,13 @@
         "nextMonth": "Mes siguiente"
     },
     "appUpdates": {
+        "autoAll": "Autoactualizar las apps",
+        "autoFailed": "No se ha podido guardar ese ajuste. Inténtalo de nuevo.",
+        "autoOne": "Se actualiza sola (ajuste propio de esta app)",
+        "autoFollows": "Se actualiza sola (igual que todas las apps)",
+        "autoFor": "Actualizar {name} automáticamente",
+        "heldPermissions": "Esta actualización pide acceso que {name} no tenía ({permissions}), así que te espera. Actualiza ahora para aceptarlo.",
+        "heldFailed": "Esta versión ya falló aquí, así que no se instala sola. Actualiza ahora para volver a probarla.",
         "title": "Apps",
         "body": "Cada app se actualiza por su cuenta, sin reiniciar Polaris.",
         "check": "Buscar novedades",

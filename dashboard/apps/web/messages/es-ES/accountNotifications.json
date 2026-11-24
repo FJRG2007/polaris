@@ -526,6 +526,14 @@
             "label": "Actualizado automáticamente",
             "description": "Se ha ejecutado una actualización programada o automática, y cómo ha ido."
         },
+        "appsUpdate": {
+            "label": "App con actualización",
+            "description": "Se ha publicado una versión más nueva de una app instalada, y qué cambia."
+        },
+        "appsUpdated": {
+            "label": "Una app se ha actualizado sola",
+            "description": "Una app ha instalado su versión más nueva por sí misma, o ha vuelto atrás al fallar."
+        },
         "instanceAnnouncement": {
             "label": "Aviso de la administración",
             "description": "Un mensaje que un administrador de esta instancia te ha enviado a ti o a un grupo del que formas parte."

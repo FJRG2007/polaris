@@ -193,6 +193,20 @@
         "expiredMine": "Ya no se usa. Las ejecuciones pasan a la siguiente clave de tu lista, o a la del despliegue.",
         "expiredDeployment": "Ya no se usa. Las ejecuciones pasan a la siguiente clave de la lista, o a la que haya traído cada cuenta."
     },
+    "appUpdate": {
+        "readyTitle": "{name} {version} está disponible",
+        "readyBody": "Qué cambia: {notes} {plan}",
+        "readyBodyPlain": "{plan}",
+        "planManual": "Las actualizaciones automáticas están desactivadas para ella. Actualízala desde sus ajustes.",
+        "planPermissions": "Pide acceso que no tenía ({permissions}), así que espera a que lo revises en sus ajustes.",
+        "updatedTitle": "{name} se ha actualizado sola a {version}",
+        "updatedBody": "Qué cambia: {notes}",
+        "updatedBodyPlain": "Ya está usando la versión nueva.",
+        "rolledBackTitle": "{name} ha vuelto a {version}",
+        "rolledBackBody": "La versión {failed} no se mantuvo en marcha, así que vuelve a funcionar la anterior. No se volverá a probar sola; actualízala desde sus ajustes cuando salga un arreglo.",
+        "failedTitle": "{name} no ha podido actualizarse sola",
+        "failedBody": "No se ha podido instalar la versión {version}, y sigue funcionando la actual. Vuelve a intentarlo desde sus ajustes."
+    },
     "update": {
         "readyTitle": "Hay una actualización de Polaris lista para instalar",
         "readyBody": "Build {sha}. {plan}",

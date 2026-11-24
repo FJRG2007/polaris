@@ -178,8 +178,20 @@ describe("a release on an app's channel", () => {
             version: "0.2.0",
             revision: "abc123",
             notes: "A change line.",
-            hostApi: "1.0"
+            hostApi: "1.0",
+            permissions: []
         });
+    });
+
+    it("names what it asks to reach, keeping only plain names, each once", async () => {
+        const { readRelease } = await import("@/lib/app-bundles/releases");
+        const oci = ociManifest("tiny", builds.two!.digest, builds.two!.size, {
+            permissions: "mcp:drive.read, net,net,Bad Name,"
+        });
+        expect(readRelease(Buffer.from(oci.bytes), oci.digest).permissions).toEqual([
+            "mcp:drive.read",
+            "net"
+        ]);
     });
 
     it("is refused when it is not what the registry named, or not an app", async () => {

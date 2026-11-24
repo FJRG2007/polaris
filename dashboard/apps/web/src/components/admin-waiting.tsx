@@ -44,6 +44,7 @@ export interface AdminWaiting {
     readonly cases: number;
     readonly update: boolean;
     readonly apis: number;
+    readonly apps: number;
     readonly total: number;
 }
 
@@ -52,6 +53,7 @@ export const NO_ADMIN_WAITING: AdminWaiting = {
     cases: 0,
     update: false,
     apis: 0,
+    apps: 0,
     total: 0
 };
 
@@ -74,6 +76,8 @@ const waitingSchema = z.object({
     update: z.boolean(),
     // Absent from a server older than this page, which counted no APIs.
     apis: z.number().default(0),
+    // Absent from a server older than this page, which counted no app updates.
+    apps: z.number().default(0),
     total: z.number()
 });
 

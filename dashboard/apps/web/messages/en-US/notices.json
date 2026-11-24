@@ -193,6 +193,20 @@
         "expiredMine": "It is no longer used. Runs fall back to the next key in your list, or to the deployment's.",
         "expiredDeployment": "It is no longer used. Runs fall back to the next key in the list, or to whatever each account brought itself."
     },
+    "appUpdate": {
+        "readyTitle": "{name} {version} is available",
+        "readyBody": "What changed: {notes} {plan}",
+        "readyBodyPlain": "{plan}",
+        "planManual": "Automatic updates are off for it. Update it from its settings.",
+        "planPermissions": "It asks for access it did not have ({permissions}), so it waits for you to review it in its settings.",
+        "updatedTitle": "{name} updated itself to {version}",
+        "updatedBody": "What changed: {notes}",
+        "updatedBodyPlain": "It is running the new release now.",
+        "rolledBackTitle": "{name} went back to {version}",
+        "rolledBackBody": "Release {failed} did not keep running, so the one before it is serving again. It will not be tried by itself again; update it from its settings when a fix is out.",
+        "failedTitle": "{name} could not update itself",
+        "failedBody": "Release {version} could not be installed, and the release serving now keeps serving. Try it again from its settings."
+    },
     "update": {
         "readyTitle": "A Polaris update is ready to install",
         "readyBody": "Build {sha}. {plan}",

@@ -12,12 +12,25 @@ import { ArrowUpCircle, RotateCcw, RotateCw } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AppUpdateRow } from "@/lib/app-bundles/actions";
 import type { UpdateRefusal } from "@/lib/app-bundles/releases";
-import { Button, Card, CardBody, CardHeader, CardTitle, ProgressBar, Skeleton } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    ProgressBar,
+    Skeleton,
+    Switch
+} from "@polaris/ui";
 import { buildLabel, newerBuild, progressPercent, useAppUpdates } from "./use-app-updates";
 
-export function AppUpdatesCard() {
+export function AppUpdatesCard({ appId }: { appId?: string } = {}) {
     const t = useTranslations("components");
-    const { rows, failed, busy, refusals, load, change } = useAppUpdates();
+    const { rows: all, failed, busy, refusals, load, change, autoAll, setAuto, autoFailed } =
+        useAppUpdates();
+    const rows = appId ? (all?.filter((row) => row.id === appId) ?? null) : all;
+    // One app's settings show its card only while it has builds of its own.
+    if (appId && rows?.length === 0) return null;
 
     return (
         <Card className="mt-4" id="app-updates">
@@ -36,6 +49,22 @@ export function AppUpdatesCard() {
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">{t("appUpdates.body")}</p>
+                {!appId ? (
+                    <label className="flex items-center justify-between gap-3">
+                        <span className="min-w-0 text-sm">{t("appUpdates.autoAll")}</span>
+                        <Switch
+                            checked={autoAll ?? true}
+                            disabled={autoAll === null}
+                            onChange={(auto) => void setAuto(null, auto)}
+                            aria-label={t("appUpdates.autoAll")}
+                        />
+                    </label>
+                ) : null}
+                {autoFailed ? (
+                    <p role="alert" className="text-sm text-danger">
+                        {t("appUpdates.autoFailed")}
+                    </p>
+                ) : null}
                 {rows === null && !failed ? (
                     <div className="flex flex-col gap-2" aria-hidden>
                         <Skeleton className="h-12 w-full" />
@@ -58,6 +87,7 @@ export function AppUpdatesCard() {
                         locked={busy !== null}
                         refused={refusals[row.id]}
                         onChange={(kind) => void change(row.id, kind)}
+                        onAuto={(auto) => void setAuto(row.id, auto)}
                     />
                 ))}
             </CardBody>
@@ -70,13 +100,15 @@ function AppRow({
     busy,
     locked,
     refused,
-    onChange
+    onChange,
+    onAuto
 }: {
     row: AppUpdateRow;
     busy: boolean;
     locked: boolean;
     refused?: UpdateRefusal;
     onChange: (kind: "update" | "rollback") => void;
+    onAuto: (auto: boolean) => void;
 }) {
     const t = useTranslations("components");
     const newer = newerBuild(row);
@@ -134,6 +166,29 @@ function AppRow({
                     ) : null}
                 </div>
             </div>
+            {newer?.runs && row.decision === "permissions" ? (
+                <p role="status" className="break-words text-xs text-warning">
+                    {t("appUpdates.heldPermissions", {
+                        name: row.name,
+                        permissions: row.newPermissions.join(", ")
+                    })}
+                </p>
+            ) : null}
+            {newer?.runs && row.decision === "failedBefore" ? (
+                <p role="status" className="break-words text-xs text-warning">
+                    {t("appUpdates.heldFailed")}
+                </p>
+            ) : null}
+            <label className="flex items-center justify-between gap-3">
+                <span className="min-w-0 text-xs text-muted-foreground">
+                    {t(row.autoOwn ? "appUpdates.autoOne" : "appUpdates.autoFollows")}
+                </span>
+                <Switch
+                    checked={row.auto}
+                    onChange={onAuto}
+                    aria-label={t("appUpdates.autoFor", { name: row.name })}
+                />
+            </label>
             {busy ? (
                 <div className="flex flex-col gap-1" aria-live="polite">
                     <ProgressBar

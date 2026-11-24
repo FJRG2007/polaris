@@ -37,6 +37,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import { getSetting } from "@/lib/setting-store";
+import { appsWaitingOnUpdate } from "@/lib/app-bundles/auto-update";
 import { autoUpdatePolicyHere } from "@/lib/update-watcher";
 import { badgeMarks, DISMISSED_KEYS, markSeen, type BadgeScreen } from "@/lib/badge-seen";
 
@@ -55,6 +56,8 @@ export interface AdminWaiting {
     readonly update: boolean;
     /** Google APIs recorded as switched off for this Polaris. */
     readonly apis: number;
+    /** Installed apps whose newest release waits on an administrator. */
+    readonly apps: number;
     /** The three as one number, which is what a badge has room for. */
     readonly total: number;
 }
@@ -64,6 +67,7 @@ export const NOTHING_WAITING: AdminWaiting = {
     cases: 0,
     update: false,
     apis: 0,
+    apps: 0,
     total: 0
 };
 
@@ -182,7 +186,7 @@ export async function adminWaiting(userId?: string): Promise<AdminWaiting> {
         const at = laterOf(visit, seenAt(marks?.dismissed.get(key)));
         return at ? { createdAt: { gt: at } } : {};
     };
-    const [reports, cases, build, apiMarks] = await Promise.all([
+    const [reports, cases, build, apiMarks, appIds] = await Promise.all([
         prisma.chatReport
             .count({ where: { status: "open", ...since(DISMISSED_KEYS.reports) } })
             .catch(() => 0),
@@ -190,14 +194,23 @@ export async function adminWaiting(userId?: string): Promise<AdminWaiting> {
             .count({ where: { status: "open", ...since(DISMISSED_KEYS.cases) } })
             .catch(() => 0),
         updateWaiting().catch(() => null),
-        apisOff().catch(() => [] as string[])
+        apisOff().catch(() => [] as string[]),
+        appsWaitingOnUpdate().catch(() => [] as string[])
     ]);
     const apis = unseenApisOff(apiMarks, marks?.dismissed.get(DISMISSED_KEYS.apis));
     const update =
         build !== null &&
         marks?.seen?.get("admin.update") !== build &&
         marks?.dismissed.get(DISMISSED_KEYS.update) !== build;
-    return { reports, cases, update, apis, total: reports + cases + (update ? 1 : 0) + apis };
+    const apps = appIds.length;
+    return {
+        reports,
+        cases,
+        update,
+        apis,
+        apps,
+        total: reports + cases + (update ? 1 : 0) + apis + apps
+    };
 }
 
 /**

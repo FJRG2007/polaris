@@ -1162,6 +1162,25 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "apps.update",
+        group: "system",
+        label: "An app has an update",
+        description: "A newer release of an installed app is published, and what changed.",
+        level: "info",
+        // In the bell: an app's update is announced once per release, and the
+        // one that waits on a person (new permissions, automatic updates off)
+        // is the reason to have it at all.
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "apps.updated",
+        group: "system",
+        label: "An app updated on its own",
+        description: "An app took its newest release by itself, or went back when it failed.",
+        level: "success",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "instance.announcement",
         group: "system",
         label: "Announcement from your administrator",
