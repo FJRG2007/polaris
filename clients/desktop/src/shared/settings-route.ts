@@ -101,10 +101,18 @@ export function settingsRoute(place: SettingsPlace, state: SettingsRouteState): 
 export const HOST_UPDATE_PATH = "/admin/updates";
 
 /**
- * Whether the host's update page lets the signed-in person in, from its answer
- * asked without following a redirect: the page itself for an administrator;
- * anything else - sent home as refused, to the sign-in, no answer - is not a
- * page this person can use, so no update button is offered for it.
+ * What is asked to learn whether the signed-in person may update the host: the
+ * update log, which answers 403 to anybody but an administrator - the same flag
+ * the update page checks. The page itself cannot be asked: it streams, so a
+ * refused person still gets a 200 whose body redirects them home.
+ */
+export const HOST_UPDATE_ACCESS_PATH = "/api/updates/logs";
+
+/**
+ * Whether the host lets the signed-in person update it, from the answer to
+ * `HOST_UPDATE_ACCESS_PATH` asked without following a redirect: 2xx for an
+ * administrator; anything else - refused, signed out, a host without that
+ * endpoint, no answer - is no update button.
  */
 export function readUpdateAccess(status: number | null): boolean {
     return status !== null && status >= 200 && status < 300;
