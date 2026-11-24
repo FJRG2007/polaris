@@ -211,14 +211,17 @@ export function createAddonManager(options: ManagerOptions) {
         }
     }
 
-    /** Say it once: the version is written down as announced before the notice goes out. */
+    /**
+     * Say it once: the version is written down as announced before the notice goes out.
+     * A failed write skips this notice (the next look says it) and never stops the updates after it.
+     */
     async function tell(id: string, version: string, news: UpdateNews): Promise<void> {
         const fresh = await updateInstalled(options.dir, (installed) => {
             const addon = installed.addons[id];
             if (!addon || announced(addon.notified, version)) return false;
             addon.notified = version;
             return true;
-        });
+        }).catch(() => false);
         if (fresh) options.notify?.(id, news);
     }
 
@@ -432,13 +435,15 @@ export function createAddonManager(options: ManagerOptions) {
                 const entry = catalog?.addons.find((item) => item.id === id);
                 if (!entry) return { ok: false as const, reason: "unknown" as const };
                 const result = await put(id, entry, accepted);
-                // Put in by the person: nothing more to announce about this version.
+                // Put in by the person: nothing more to announce about this version. Only
+                // bookkeeping: failing to write it down must not report an install that
+                // went in as failed (0.1.99 did, when Windows refused the rename).
                 if (result.ok) {
                     await updateInstalled(options.dir, (installed) => {
                         const addon = installed.addons[id];
                         if (addon) addon.notified = entry.version;
                         return Boolean(addon);
-                    });
+                    }).catch((error: unknown) => console.warn(`[addons] ${id} ${entry.version} is installed; noting it as announced failed:`, error));
                 }
                 return result;
             });
