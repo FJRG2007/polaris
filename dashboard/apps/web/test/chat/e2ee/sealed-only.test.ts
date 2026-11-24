@@ -19,7 +19,8 @@ vi.mock("@polaris/db", () => ({
 }));
 
 import { conversationSealed } from "@/lib/chat/e2ee/sealed-conversation";
-import { refusePlainIfSealed } from "@/lib/chat/messages";
+import { refusalForPage, refusePlainIfSealed } from "@/lib/chat/messages";
+import { ChatRuleError } from "@/lib/chat/access";
 
 const SEALED = "sealed-channel";
 const PLAIN = "plain-channel";
@@ -43,6 +44,21 @@ describe("sealed only", () => {
     it("takes a plain write into a conversation that has no group", async () => {
         expect(await conversationSealed(PLAIN)).toBe(false);
         await expect(refusePlainIfSealed(PLAIN)).resolves.toBeUndefined();
+    });
+
+    it("tells a page that does not seal to reload, and one that seals what it cannot send yet", async () => {
+        const refused = (pageSeals: boolean) =>
+            refusalForPage(pageSeals, () => refusePlainIfSealed(SEALED)).catch((caught: unknown) => caught);
+        expect(await refused(false)).toMatchObject({ text: { key: "errors.sealedOnlyReload" } });
+        expect(await refused(true)).toMatchObject({ text: { key: "errors.sealedOnly" } });
+        expect(await refused(false)).toBeInstanceOf(ChatRuleError);
+    });
+
+    it("leaves every other refusal and an answer as they were", async () => {
+        const other = new ChatRuleError({ key: "errors.notInConversation" });
+        await expect(refusalForPage(false, async () => { throw other; })).rejects.toBe(other);
+        await expect(refusalForPage(false, async () => "id")).resolves.toBe("id");
+        await expect(refusalForPage(false, () => refusePlainIfSealed(PLAIN))).resolves.toBeUndefined();
     });
 
     it("refuses nothing while sealed chat is off", async () => {

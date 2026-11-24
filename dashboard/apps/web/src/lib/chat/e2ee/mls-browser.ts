@@ -9,6 +9,7 @@
 import { IndexedDbMlsStore } from "@polaris/core-rs/mls-store";
 import { fetchTransport, MlsDevice, type MlsDeviceOptions, type MlsMemberClass } from "./mls-client";
 import { IndexedDbHistoryKeyStore } from "./mls-history-keys";
+import { deviceAcrossTabs } from "./device-across-tabs";
 import { SealedSearchIndex } from "./sealed-search-index";
 
 const BASE = "/core-rs/mls/";
@@ -53,9 +54,14 @@ export function browserDeviceId(userId: string): string {
 export async function openBrowserDevice(userId: string, account?: MlsDeviceOptions["account"]): Promise<MlsDevice> {
     const device = browserDeviceId(userId);
     const [MlsMember, store, historyKeys] = await Promise.all([loadMlsMember(), IndexedDbMlsStore.open(device), IndexedDbHistoryKeyStore.open(device)]);
-    const opened = await MlsDevice.open({ userId, device, MlsMember, store, historyKeys, ...(account ? { account } : {}), notes: localStorage, transport: fetchTransport() });
-    await opened.register();
-    return opened;
+    // Every tab of this browser shares the device: one operation at a time, each on the newest store (`device-across-tabs`).
+    return deviceAcrossTabs(
+        device,
+        store,
+        (tracked) => MlsDevice.open({ userId, device, MlsMember, store: tracked, historyKeys, ...(account ? { account } : {}), notes: localStorage, transport: fetchTransport() }),
+        { locks: typeof navigator !== "undefined" ? (navigator.locks ?? null) : null, notes: localStorage },
+        (opened) => opened.register()
+    );
 }
 
 /**

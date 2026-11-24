@@ -84,6 +84,20 @@ and resends whatever an earlier run committed and never sent. Then:
 - A device that reads its own removal forgets the group; a later Welcome, or a
   rejoin the server allows (the account still reaches the conversation), brings
   it back.
+- **Every tab of a browser shares its device** (`device-across-tabs.ts`). One
+  store and one leaf per browser and account, but each tab holds the member in
+  memory, so before this a second tab acted on a copy the first had moved past:
+  its sends failed ("no group with that id"), it rejoined, and the group's epoch
+  climbed with every turn between tabs. Each operation now holds the device's
+  Web Lock (`polaris-mls/device/<device>`, one holder across the browser), and a
+  tab whose last operation predates another tab's write to the store opens the
+  device again from it first. Writes move a generation noted in localStorage
+  (`polaris-mls/generation/<device>`); reads do not, so tabs that only read never
+  make the others reload. Without the Web Locks API (an old browser, or a page
+  over plain HTTP, where it is not offered) one tab's operations still run in
+  turn and each starts from the newest store; only two tabs acting in the same
+  instant can still meet. `hasGroup` and `groupOf` answer from the shared notes
+  at once.
 - `sendApplication` catches up first, so a message is never sealed in an epoch
   the group has left; `sync` reads the log and returns the messages from others.
 
@@ -388,8 +402,8 @@ share of the work, not of the code.
 
 | # | Gap | Blocks default-on? | Done |
 | --- | --- | --- | --- |
-| 1 | **Real-browser run of the sealed flows.** The text flows passed end to end against a production build on 2026-11-24 (see the note under this table). Not yet driven in a browser: sealed search from the launcher and the panel, switching Polar into a sealed conversation, a webhook posting over HTTP, Polar's Approve and Cancel (needs a provider), two tabs contending for the device lease. | Yes | ~50% |
-| 2 | **Sealed only, enforced by the server.** Built: once a conversation has an `MlsGroup` (and sealed chat is on), every write in the clear from a person is refused with `errors.sealedOnly` - `messages.send` without sealed columns (so `sendAction`, replies from a notice, forwards, polls, attachments and saved media, locations, forum posts, the HTTP API, MCP tools, invite and game cards), a plain `edit`, and `scheduleMessage` at scheduling time (`refusePlainIfSealed`, `lib/chat/e2ee/sealed-conversation.ts`; see "Sealed only"). Left: the client capability signal (an older desktop or extension build gets the refusal sentence, not a prompt to update), and the per-conversation state the migration (row 5) needs to switch a conversation to sealed-only before its group exists. | Yes | ~70% |
+| 1 | **Real-browser run of the sealed flows.** The text flows passed end to end against a production build on 2026-11-24 (see the note under this table). Also passed in a browser (2026-11-24, round 18): the launcher's Chat search finding a sealed message by its words on the sender's and the reader's browser; a webhook posting over HTTP into a sealed group (204, stored sealed under the given name, opened by both members, `?wait=true` answered); two tabs of one browser sending in turn and at once, every message opened by the other side - which showed the tabs fighting over the device, now fixed ("Every tab of a browser shares its device"; the fix itself is unit-tested and not yet re-run in a browser). Not yet: the chat panel's own search, the "Polar in this chat" switch (the driver did not reach it through the info panel), Polar's Approve and Cancel (needs a provider). | Yes | ~65% |
+| 2 | **Sealed only, enforced by the server.** Built: once a conversation has an `MlsGroup` (and sealed chat is on), every write in the clear from a person is refused with `errors.sealedOnly` - `messages.send` without sealed columns (so `sendAction`, replies from a notice, forwards, polls, attachments and saved media, locations, forum posts, the HTTP API, MCP tools, invite and game cards), a plain `edit`, and `scheduleMessage` at scheduling time (`refusePlainIfSealed`, `lib/chat/e2ee/sealed-conversation.ts`; see "Sealed only"). A page loaded before sealed chat was on is told to reload instead (`errors.sealedOnlyReload`, see "Sealed only"). Left: the per-conversation state the migration (row 5) needs to switch a conversation to sealed-only before its group exists. | Yes | ~75% |
 | 3 | **Message kinds that are still plain.** Attachments (file bytes and names), voice notes, polls, scheduled messages, forum post titles, server-side translations, link cards. Each needs a sealed form (proposal 10b for files: encrypted in the browser, the key inside the sealed message). Until then a sealed conversation leaks whatever is sent as one of these. | Yes | ~15% (text, edits, replies, threads, Polar, webhooks are sealed) |
 | 4 | **Default-on switch.** `chatE2eeEnabled()` reads `=== "1"`. Default-on has to be on with nothing set and keep an env kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md). | Yes | 0% (one line, last) |
 | 5 | **Migration of existing chats** (proposal 8): nothing is built - no per-conversation state table, no server-side migrator sealing legacy history under `HK(c, legacy)`, no backup gate, no M3 verification, no cut-over, no purge of the plain columns, no admin progress line. Today an existing conversation becomes sealed only from the next message a sealed browser sends; everything before stays plain. | Yes (owner: every existing chat migrated) | 0% |
@@ -436,11 +450,24 @@ sits in the one place every person-authored message passes through:
 (`refusePlainIfSealed`), `messages.edit` refuses a plain edit of an older plain
 message, and `scheduleMessage` refuses at scheduling time, because a scheduled
 message is stored in the clear until it goes. The sentence is
-`errors.sealedOnly`; it is what an older desktop or extension build, a call to
-the API, or a kind of message with no sealed form yet (row 3: files, voice,
-polls, locations, forum posts, invite and game cards) gets in a sealed
-conversation. A browser with sealed chat on never reaches it, because its
-outbox seals every text send.
+`errors.sealedOnly`; it is what a call to the API or a kind of message with no
+sealed form yet (row 3: files, voice, polls, locations, forum posts, invite and
+game cards) gets in a sealed conversation. A browser with sealed chat on never
+reaches it with text, because its outbox seals every text send.
+
+The page that does not seal is told to reload (`errors.sealedOnlyReload`,
+`messages.refusalForPage`). The desktop app, the extension and the phone apps
+draw chat from the instance's own pages, so the client that sends text in the
+clear into a sealed conversation is a page loaded before sealed chat was on
+there: a tab left open across the update, a desktop window not reloaded since.
+`sendAction` (the `/api/chat/send` route) and `replyFromNoticeAction` answer
+that sentence, since a page that seals never sends text through them.
+`editAction` answers it unless the page says it seals (its second argument,
+`sealedChatActive()`; a build from before that sends nothing and is told to
+reload): a page that seals still edits a plain message from before the group in
+the clear, which reloading would not fix, so it keeps `errors.sealedOnly`
+until that edit has a sealed form (row 5). Scheduling keeps `errors.sealedOnly`
+everywhere: no page can schedule sealed yet.
 
 Not refused, on purpose: what the server writes itself - Polar's and Tasks'
 answers (`agent-message.ts`; Polar's go sealed through `polar-member.ts` when

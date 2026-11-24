@@ -246,7 +246,10 @@ async function sendChange(change: ChangeRequest): Promise<ChangeAnswer | { refus
         }
     }
     if (change.op === "edit") {
-        const result = await actions.editAction({ messageId: change.messageId, body: change.body });
+        const result = await actions.editAction(
+            { messageId: change.messageId, body: change.body },
+            sealedChat.sealedChatActive()
+        );
         return result.error ? { refused: result.error } : {};
     }
     if (change.op === "react") {

@@ -1076,6 +1076,27 @@ export async function refusePlainIfSealed(channelId: string): Promise<void> {
     if (await conversationSealed(channelId)) throw new ChatRuleError({ key: "errors.sealedOnly" });
 }
 
+/**
+ * The sealed-only refusal, told to the page that caused it.
+ *
+ * A page with sealed chat open seals every text send and every edit of a sealed
+ * message, so a refusal it still meets is a kind with no sealed form yet, and
+ * `errors.sealedOnly` says so. A page that does not seal was loaded before
+ * sealed chat was on here (an open tab across the update, a desktop window that
+ * has not reloaded); the one thing that fixes it is loading it again, so that is
+ * what it is told (`errors.sealedOnlyReload`). The API and the server's own
+ * paths never come through here and keep the plain sentence.
+ */
+export async function refusalForPage<T>(pageSeals: boolean, run: () => Promise<T>): Promise<T> {
+    try {
+        return await run();
+    } catch (caught) {
+        if (!pageSeals && caught instanceof ChatRuleError && caught.text.key === "errors.sealedOnly")
+            throw new ChatRuleError({ key: "errors.sealedOnlyReload" });
+        throw caught;
+    }
+}
+
 async function requireSendable(
     actor: ChatActor,
     access: ChannelAccess,
