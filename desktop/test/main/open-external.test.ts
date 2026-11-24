@@ -8,7 +8,10 @@ import { describe, expect, it, vi } from "vitest";
 const openExternal = vi.fn();
 vi.mock("electron", () => ({ shell: { openExternal }, clipboard: { writeText: vi.fn() } }));
 
-const { openOutside, outsideAddress, routesFor } = await import("../../src/main/open-external");
+const { RouteUnavailable, openOutside, openOutsideOutcome, outsideAddress, routesFor } = await import("../../src/main/open-external");
+
+/** The log lines that record a failure; a working route logs with a null error. */
+const failures = (log: ReturnType<typeof vi.fn>) => log.mock.calls.filter(([, error]) => error !== null);
 
 const deps = (open: () => Promise<void>, fallback: (() => Promise<void>) | null = vi.fn(async () => undefined)) => {
     const first = vi.fn(open);
@@ -16,7 +19,7 @@ const deps = (open: () => Promise<void>, fallback: (() => Promise<void>) | null 
     return {
         open: first,
         fallback: second,
-        routes: [{ name: "first", run: first }, ...(second ? [{ name: "second", run: second }] : [])],
+        routes: [{ name: "first", run: first, confirms: true }, ...(second ? [{ name: "second", run: second, confirms: true }] : [])],
         log: vi.fn()
     };
 };
@@ -27,7 +30,7 @@ describe("openOutside", () => {
         await expect(openOutside("https://cursor.com/login?a=1&b=2", spy)).resolves.toBe(true);
         expect(spy.open).toHaveBeenCalledWith("https://cursor.com/login?a=1&b=2");
         expect(spy.fallback).not.toHaveBeenCalled();
-        expect(spy.log).not.toHaveBeenCalled();
+        expect(failures(spy.log)).toHaveLength(0);
     });
 
     it("logs a rejection and retries through the fallback", async () => {
@@ -35,7 +38,7 @@ describe("openOutside", () => {
             throw new Error("Failed to open: Application not found");
         });
         await expect(openOutside("https://opencode.ai/auth", spy)).resolves.toBe(true);
-        expect(spy.log).toHaveBeenCalledTimes(1);
+        expect(failures(spy.log)).toHaveLength(1);
         expect(spy.fallback).toHaveBeenCalledWith("https://opencode.ai/auth");
     });
 
@@ -114,7 +117,7 @@ describe("routesFor", () => {
         await expect(openOutside("https://example.com/a", { routes: routesFor("win32", fake), log })).resolves.toBe(true);
         expect(fake.launch).toHaveBeenCalledWith(BRAVE, ["--single-argument", "https://example.com/a"]);
         expect(fake.open).not.toHaveBeenCalled();
-        expect(log).not.toHaveBeenCalled();
+        expect(failures(log)).toHaveLength(0);
     });
 
     it("falls back to the system hand-over on Windows when the browser cannot be started", async () => {
@@ -123,7 +126,38 @@ describe("routesFor", () => {
         const log = vi.fn();
         await expect(openOutside("https://example.com/a", { routes: routesFor("win32", fake), log })).resolves.toBe(true);
         expect(fake.open).toHaveBeenCalledWith("https://example.com/a");
-        expect(log).toHaveBeenCalledTimes(1);
+        expect(failures(log)).toHaveLength(1);
+    });
+
+    // BUG-0020: the browser was started but the running copy never took the
+    // link, and that counted as opened - no other route, no dialog, no log.
+    it("does not call a refused hand-over opened: Windows is asked and the person is still shown the address", async () => {
+        const fake = system();
+        fake.launch.mockRejectedValueOnce(new Error("brave.exe exited with code 21"));
+        const log = vi.fn();
+        await expect(openOutsideOutcome("https://example.com/a", { routes: routesFor("win32", fake), log })).resolves.toBe("unconfirmed");
+        expect(fake.open).toHaveBeenCalledWith("https://example.com/a");
+        expect(String(failures(log)[0]?.[1])).toContain("code 21");
+    });
+
+    it("needs no dialog when a browser took the link, or when Windows was the only route there was", async () => {
+        await expect(openOutsideOutcome("https://example.com/a", { routes: routesFor("win32", system()), log: vi.fn() })).resolves.toBe("opened");
+        const store = system();
+        store.readRegistry.mockResolvedValue(null);
+        await expect(openOutsideOutcome("https://example.com/a", { routes: routesFor("win32", store), log: vi.fn() })).resolves.toBe("opened");
+    });
+
+    it("logs every attempt by host only, never the whole address", async () => {
+        const fake = system();
+        fake.launch.mockRejectedValueOnce(new Error("exited with code 21"));
+        const log = vi.fn();
+        await openOutsideOutcome("https://example.com/reset?token=secret-value", { routes: routesFor("win32", fake), log });
+        expect(log).toHaveBeenCalledTimes(2);
+        for (const [message] of log.mock.calls) {
+            expect(message).toContain("https://example.com");
+            expect(message).not.toContain("secret-value");
+        }
+        expect(new RouteUnavailable("x")).toBeInstanceOf(Error);
     });
 
     it("falls back when no command is registered (a Store browser)", async () => {

@@ -5,9 +5,9 @@
  * browser. On some machines that hand-over fails without a word (BUG-0020): no
  * rejection, no browser. This reads the same registration Windows would use -
  * the scheme's `UserChoice` ProgId, then that ProgId's `shell\open\command` -
- * and starts the program it names with the link as one argument. Starting a
- * process is something this side can see succeed or fail, which the hand-over
- * never was.
+ * and starts the program it names with the link as one argument, then reads
+ * the started process's exit code to learn whether the link was taken - which
+ * the hand-over never says.
  *
  * The command line is parsed here, never given to a shell: the program and its
  * arguments go to `spawn` as an array, so nothing in a link is ever read as a
@@ -20,7 +20,7 @@ import { spawn } from "node:child_process";
 /** Reads one value from the registry: null when the key or value is not there. */
 export type RegistryReader = (key: string, value: string | null) => Promise<string | null>;
 
-/** Starts a program detached; resolves once the process exists. */
+/** Starts a program detached; resolves once it took the link, rejects when it did not. */
 export type Launcher = (file: string, args: readonly string[]) => Promise<void>;
 
 export interface Launch {
@@ -188,24 +188,63 @@ export const readRegistry: RegistryReader = (key, value) =>
     });
 
 /**
- * Start a program detached from this one. Resolves once the operating system
- * has created the process - the one thing that can be confirmed: a browser that
- * is already running takes the link and lets the new process exit, with an
- * exit code that differs between browsers and says nothing about the link.
+ * Exit codes of a browser process that handed its link to the copy already
+ * running. 0 is Firefox's remote hand-over and Chromium's fast path
+ * (`chrome_exe_main_win.cc`, which the `--single-argument` switch every
+ * Chromium browser registers skips); 24 is Chromium's
+ * `NORMAL_EXIT_PROCESS_NOTIFIED` (`chrome/common/chrome_result_codes.h`),
+ * the code Brave, Chrome, Edge, Opera and Vivaldi exit with once the running
+ * browser took the link.
  */
-export const launchDetached: Launcher = (file, args) =>
-    new Promise((resolve, reject) => {
+const HANDED_OVER = new Set([0, 24]);
+
+/** What a browser process's exit code says about the link it was given. */
+export function exitMeaning(code: number | null): string {
+    if (code === 21) return "the browser reported its profile in use: it could not reach its own open window to give it the link";
+    if (code === null) return "the browser was stopped before it took the link";
+    return "the browser exited without taking the link";
+}
+
+/** How long a started browser has to hand its link over before it counts as the
+ *  browser itself - a cold start that keeps running. A hand-over is a message
+ *  to the running copy and ends in about a second. */
+export const SETTLE_MS = 8_000;
+
+/**
+ * Start the browser detached and wait for what it does with the link.
+ *
+ * Starting the process is not opening the link. With the browser already
+ * running, the started process is only a messenger: it gives the link to the
+ * running copy and exits. Counting the start as success (desktop 0.1.60-0.1.90)
+ * reported a refused hand-over as opened, so no other route was tried and
+ * nothing was said (BUG-0020). Resolves when the process exits with a
+ * hand-over code, or is still running after `SETTLE_MS` (it became the
+ * browser); rejects with the exit code otherwise.
+ */
+export function launchDetached(file: string, args: readonly string[], settleMs: number = SETTLE_MS): Promise<void> {
+    return new Promise((resolve, reject) => {
         if (!existsSync(file)) {
             reject(new Error(`${file} is not there`));
             return;
         }
         const child = spawn(file, [...args], { detached: true, stdio: "ignore", windowsHide: false });
-        child.once("error", reject);
-        child.once("spawn", () => {
-            child.unref();
-            resolve();
+        let settled = false;
+        const finish = (error: Error | null) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            if (error) reject(error);
+            else resolve();
+        };
+        const timer = setTimeout(() => finish(null), settleMs);
+        child.once("error", (error) => finish(error));
+        child.once("spawn", () => child.unref());
+        child.once("exit", (code) => {
+            if (code !== null && HANDED_OVER.has(code)) finish(null);
+            else finish(new Error(`${file} exited with code ${String(code)}: ${exitMeaning(code)}`));
         });
     });
+}
 
 /**
  * A command-line opener on macOS (`open`) or Linux (`xdg-open`), whose exit code
