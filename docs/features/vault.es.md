@@ -1,6 +1,6 @@
 # Bóveda
 
-[Read in English](vault.md) - [Volver al README](../../README.es.md)
+[Read in English](vault.md) - [Volver al README](../README.es.md)
 
 Un gestor de contraseñas que habla el protocolo de Bitwarden, así que las apps
 y extensiones de Bitwarden apuntan a tu propio Polaris, como lo harían a

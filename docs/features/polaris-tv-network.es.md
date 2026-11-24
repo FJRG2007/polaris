@@ -1,6 +1,6 @@
 # Bloquea anuncios en cualquier tele
 
-[Read in English](polaris-tv-network.md) - [Volver al README](../../README.es.md)
+[Read in English](polaris-tv-network.md) - [Volver al README](../README.es.md)
 
 Las teles Roku, Vizio, Hisense VIDAA, LG y Samsung todavía no pueden usar Polaris TV, y algunas nunca
 podrán. Aun así buscan cada anuncio y rastreador por su nombre, así que el Filtro de red puede negar esos

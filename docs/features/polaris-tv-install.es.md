@@ -1,6 +1,6 @@
 # Instala Polaris TV
 
-[Read in English](polaris-tv-install.md) - [Volver al README](../../README.es.md)
+[Read in English](polaris-tv-install.md) - [Volver al README](../README.es.md)
 
 Polaris TV se instala desde la app de escritorio de Polaris, en un ordenador de la misma red que la tele o
 conectado a ella por cable USB. Los pasos son los mismos en todas las teles: lo que cambia según la marca

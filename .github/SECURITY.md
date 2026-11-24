@@ -13,3 +13,8 @@ A useful report includes:
 ## Supported versions
 
 Polaris ships as a rolling release from `main`, installed from the Update button in Settings. Fixes land in the latest build only, so the supported version is the latest one: update before reporting, and check that the problem is still there.
+
+## Polaris Terminal
+
+The terminal under `terminal/` is covered by this same policy and the same private channel. It is released on its own
+`terminal-v*` tags, and the supported version is the latest of those releases.

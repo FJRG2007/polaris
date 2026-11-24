@@ -1,6 +1,6 @@
 # Calendario
 
-[Read in English](calendar.md) - [Volver al README](../../README.es.md)
+[Read in English](calendar.md) - [Volver al README](../README.es.md)
 
 Tus calendarios y los que enlaces - Google, Microsoft 365, cualquier servidor
 CalDAV o un feed ICS - en un sitio, sincronizados en los dos sentidos.

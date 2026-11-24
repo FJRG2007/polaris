@@ -1,6 +1,6 @@
 # Chat
 
-[Read in English](chat.md) - [Volver al README](../../README.es.md)
+[Read in English](chat.md) - [Volver al README](../README.es.md)
 
 Espacios con canales de texto y de voz, chats de grupo y mensajes directos,
 para todos los que tienen cuenta en tu Polaris. Las llamadas tienen su propia

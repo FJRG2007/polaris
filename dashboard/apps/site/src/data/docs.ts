@@ -165,7 +165,7 @@ export function readmeSections(readme: string): DocSection[] {
             continue;
         }
         if (!current) continue;
-        for (const match of line.matchAll(/docs\/features\/([a-z0-9-]+)(?:\.es)?\.md/g)) {
+        for (const match of line.matchAll(/(?:docs\/)?features\/([a-z0-9-]+)(?:\.es)?\.md/g)) {
             const slug = match[1]!;
             if (seen.has(slug)) continue;
             seen.add(slug);

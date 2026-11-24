@@ -1,6 +1,6 @@
 # CRM
 
-[Read in English](crm.md) - [Volver al README](../../README.es.md)
+[Read in English](crm.md) - [Volver al README](../README.es.md)
 
 Empresas, personas y las oportunidades en las que trabajas, para una
 organización. La propia organización es el espacio de trabajo, no un registro:

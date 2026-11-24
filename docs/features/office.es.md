@@ -1,6 +1,6 @@
 # Office
 
-[Read in English](office.md) - [Volver al README](../../README.es.md)
+[Read in English](office.md) - [Volver al README](../README.es.md)
 
 Documentos, hojas de cálculo, presentaciones, diagramas y comparativas,
 guardados en Polaris y editados en equipo.

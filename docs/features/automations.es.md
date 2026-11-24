@@ -1,6 +1,6 @@
 # Automatizaciones
 
-[Read in English](automations.md) - [Volver al README](../../README.es.md)
+[Read in English](automations.md) - [Volver al README](../README.es.md)
 
 Cuando algo ocurre, se hace otra cosa en tus apps. Cada automatización se ejecuta
 como quien la publicó.

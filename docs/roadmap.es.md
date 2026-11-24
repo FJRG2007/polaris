@@ -1,6 +1,6 @@
 # Hoja de ruta
 
-[Read in English](roadmap.md) - [Volver al README](../README.es.md)
+[Read in English](roadmap.md) - [Volver al README](README.es.md)
 
 Hacia dónde va Polaris: las decisiones de plataforma que afectan a todos los
 clientes y un resumen de la hoja de ruta de cada área, con el enlace a su

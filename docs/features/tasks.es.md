@@ -1,6 +1,6 @@
 # Tareas
 
-[Read in English](tasks.md) - [Volver al README](../../README.es.md)
+[Read in English](tasks.md) - [Volver al README](../README.es.md)
 
 Espacios, listas y el trabajo que contienen, para una persona o para toda una
 organización. Las tareas se enlazan con el resto de Polaris: una tarea puede

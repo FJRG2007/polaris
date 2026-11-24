@@ -42,7 +42,7 @@ Contributions to Polaris are welcome. Here is how you can contribute:
 2. Create your working branch from the `main` branch: `git checkout main -b feat/my-awesome-feature`
    (`fix/...` for a bug fix).
 3. Set up the part you are changing - the dashboard, the Rust crates and plugins, or the
-   desktop app. The [developer guide](docs/developers/README.md) covers each one. For the
+   desktop app. The [developer guide](../docs/developers/README.md) covers each one. For the
    dashboard:
 
    ```sh
@@ -51,7 +51,7 @@ Contributions to Polaris are welcome. Here is how you can contribute:
    npm run dev:up            # http://localhost:3000, no containers needed
    ```
 
-4. Write code for a bug fix or for your new awesome feature. Read [CLAUDE.md](CLAUDE.md)
+4. Write code for a bug fix or for your new awesome feature. Read [CLAUDE.md](../CLAUDE.md)
    first: it lists the rules that are specific to this project, such as "the person running
    Polaris never touches a terminal" and how an installed copy receives your change.
 5. Write test cases for your changes, and run the checks before opening a pull request:
@@ -108,15 +108,15 @@ irm https://raw.githubusercontent.com/FJRG2007/enigma/main/scripts/install.ps1 |
 npx enigma-cli@latest install --all --yes
 ```
 
-The agent also reads [CLAUDE.md](CLAUDE.md), which holds the rules specific to
+The agent also reads [CLAUDE.md](../CLAUDE.md), which holds the rules specific to
 Polaris. A pull request written by an agent is reviewed like any other: you are
 responsible for what it contains, so read it and run the checks above before
 opening it.
 
 ## License of contributions
 
-Polaris is licensed under the [GNU AGPL-3.0](LICENSE) with the additional terms
-in [NOTICE.md](NOTICE.md), and is also offered under a separate commercial
+Polaris is licensed under the [GNU AGPL-3.0](../LICENSE) with the additional terms
+in [NOTICE.md](../NOTICE.md), and is also offered under a separate commercial
 license. By submitting a contribution, you agree that:
 
 * it is licensed under the AGPL-3.0 and those additional terms, and
@@ -125,3 +125,25 @@ license. By submitting a contribution, you agree that:
 
 You keep the copyright of what you contribute. Only submit work you have the
 right to contribute.
+
+## Working on Polaris Terminal
+
+The terminal lives in `terminal/`, its own Cargo workspace with its own toolchain (`terminal/rust-toolchain.toml`).
+Everything below runs from inside `terminal/`; [`terminal/CLAUDE.md`](../terminal/CLAUDE.md) is the full engineering
+guide and [`terminal/README.md`](../terminal/README.md) the overview.
+
+```bash
+./script/bootstrap   # platform-specific setup
+cargo run            # build and run the terminal
+./script/presubmit   # fmt, clippy, and tests
+```
+
+- **Tests.** A bug fix carries a regression test; non-trivial logic carries unit tests; a user-facing flow gets
+  end-to-end coverage under `terminal/crates/integration/` when it can be exercised that way. Run them with
+  `cargo nextest run`. Visual changes include before and after screenshots.
+- **Style.** `./script/format --check` and `cargo clippy --workspace --all-targets --tests -- -D warnings` must pass.
+  Prefer imports over path qualifiers, inline format args (`println!("{x}")`), and exhaustive `match` over `_`.
+- **Specs.** A change that needs one first adds `terminal/specs/GH<issue-number>/product.md` (testable behavior
+  invariants) and `tech.md` (context, proposed changes, testing), and the pull request carries the discussion.
+- **CI.** `.github/workflows/terminal.yml` runs only when something under `terminal/` changed; its `terminal` job is
+  the check to wait for.

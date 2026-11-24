@@ -1,6 +1,6 @@
 # Correo
 
-[Read in English](mail.md) - [Volver al README](../../README.es.md)
+[Read in English](mail.md) - [Volver al README](../README.es.md)
 
 Todos tus buzones - Gmail, Outlook, iCloud, Fastmail, Yahoo, Proton a través
 de su Bridge o cualquier cuenta IMAP - en una bandeja, leídos y respondidos

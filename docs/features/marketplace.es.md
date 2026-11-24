@@ -1,6 +1,6 @@
 # Marketplace
 
-[Read in English](marketplace.md) - [Volver al README](../../README.es.md)
+[Read in English](marketplace.md) - [Volver al README](../README.es.md)
 
 Las apps que Polaris puede añadir, instaladas con un clic: Calendario, CRM,
 Herramientas, un servidor de correo para tus dominios, servidores de juegos

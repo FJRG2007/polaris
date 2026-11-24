@@ -1,6 +1,6 @@
 # Configurar integraciones
 
-[Read in English](integrations-setup.md) - [Volver al README](../README.es.md)
+[Read in English](integrations-setup.md) - [Volver al README](README.es.md)
 
 Dónde pulsar, qué pegar y qué permite cada servicio. La mayoría los configura
 una vez un administrador en **Gestión > Integraciones e IA > Integraciones**:

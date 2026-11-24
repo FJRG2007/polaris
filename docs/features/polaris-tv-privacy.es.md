@@ -1,6 +1,6 @@
 # Ajustes de privacidad por marca
 
-[Read in English](polaris-tv-privacy.md) - [Volver al README](../../README.es.md)
+[Read in English](polaris-tv-privacy.md) - [Volver al README](../README.es.md)
 
 Casi todas las smart TV informan de lo que ves (a menudo llamado ACR, información de visualización o Live
 Plus) y crean un perfil publicitario. Estos son los menús que lo desactivan, marca por marca. Las rutas

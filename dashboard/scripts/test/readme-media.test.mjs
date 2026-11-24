@@ -277,7 +277,7 @@ function pagesIn(language) {
               .filter((file) => file.endsWith(".es.md") === (language === "es"))
               .map((file) => join(features, file))
         : [];
-    return [join(repo, language === "es" ? "README.es.md" : "README.md"), ...pages];
+    return [language === "es" ? join(repo, "docs", "README.es.md") : join(repo, "README.md"), ...pages];
 }
 
 /** Every local file a page links or shows, resolved from where the page is. */

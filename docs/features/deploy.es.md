@@ -1,6 +1,6 @@
 # Deploy
 
-[Read in English](deploy.md) - [Volver al README](../../README.es.md)
+[Read in English](deploy.md) - [Volver al README](../README.es.md)
 
 Ejecuta apps en tus propias máquinas desde un repositorio Git, una imagen o una
 subida, con sus bases de datos, volúmenes y dominios. Los proyectos de Vercel,

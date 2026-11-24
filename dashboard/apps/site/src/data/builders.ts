@@ -259,9 +259,9 @@ export function parseShowcase(markdown: string): ShowcaseSection[] {
         const heading = (part.split(/\r?\n/, 1)[0] ?? "").trim();
         const items: ShowcaseItem[] = [];
         for (const cell of part.split(/<td\b/).slice(1)) {
-            const dark = /<img src="docs\/assets\/media\/([^"]+)"[^>]*alt="([^"]*)"/.exec(cell);
+            const dark = /<img src="(?:docs\/)?assets\/media\/([^"]+)"[^>]*alt="([^"]*)"/.exec(cell);
             if (!dark) continue;
-            const light = /srcset="docs\/assets\/media\/([^"]+)"/.exec(cell);
+            const light = /srcset="(?:docs\/)?assets\/media\/([^"]+)"/.exec(cell);
             const sub = /<sub>[\s\S]*?<b>([^<]+)<\/b>(?:<\/a>)?:?\s*([^<]*)<\/sub>/.exec(cell);
             items.push({
                 name: sub?.[1]?.trim() ?? dark[2] ?? "",

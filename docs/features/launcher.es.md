@@ -1,6 +1,6 @@
 # Lanzador de apps
 
-[Read in English](launcher.md) - [Volver al README](../../README.es.md)
+[Read in English](launcher.md) - [Volver al README](../README.es.md)
 
 El menú de la esquina superior izquierda abre todas las apps que puedes usar y
 dice qué te espera en cada una.

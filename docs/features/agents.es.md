@@ -1,6 +1,6 @@
 # Agentes
 
-[Read in English](agents.md) - [Volver al README](../../README.es.md)
+[Read in English](agents.md) - [Volver al README](../README.es.md)
 
 Agentes de programación en tus repositorios. Una ejecución revisa pull
 requests, responde issues, arregla checks fallidos y abre pull requests cuando

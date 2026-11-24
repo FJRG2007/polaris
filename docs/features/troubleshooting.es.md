@@ -1,6 +1,6 @@
 # Cuando no se puede acceder a Polaris
 
-[Read in English](troubleshooting.md) - [Volver al README](../../README.es.md)
+[Read in English](troubleshooting.md) - [Volver al README](../README.es.md)
 
 Qué comprobar cuando una pantalla dice que no se puede acceder a Polaris, en el orden
 que encuentra la causa más rápido. Solo [En la propia máquina](#en-la-propia-maquina) usa una terminal, para cuando no

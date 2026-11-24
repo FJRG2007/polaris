@@ -1,6 +1,6 @@
 # ¿Funciona en mi tele?
 
-[Read in English](polaris-tv-compatibility.md) - [Volver al README](../../README.es.md)
+[Read in English](polaris-tv-compatibility.md) - [Volver al README](../README.es.md)
 
 Si tu tele usa Android TV o Google TV, versión 8 o posterior, sí. Tu modelo no tiene que estar en la
 lista: abre Ajustes > Información en la tele y, si pone Android TV o Google TV con versión 8 o superior,

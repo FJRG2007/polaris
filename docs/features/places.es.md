@@ -1,6 +1,6 @@
 # Lugares
 
-[Read in English](places.md) - [Volver al README](../../README.es.md)
+[Read in English](places.md) - [Volver al README](../README.es.md)
 
 Tus lugares, sus cámaras y sus dispositivos: qué han visto, qué está encendido y
 qué hacer al respecto. Un lugar es una casa, una oficina, un taller: cualquier

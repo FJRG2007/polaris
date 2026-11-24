@@ -20,7 +20,7 @@
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="docs/roadmap.md">Roadmap</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-  <a href="README.es.md">Español</a>
+  <a href="docs/README.es.md">Español</a>
   <hr />
 </div>
 
@@ -477,7 +477,7 @@ What is built versus in progress is tracked in
 
 ## Where it runs
 
-The interface is in English and Spanish ([en español](README.es.md)), and each account picks its own.
+The interface is in English and Spanish ([en español](docs/README.es.md)), and each account picks its own.
 
 | Client                                                                        | Status                                                                                                                                                      |
 | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -662,8 +662,8 @@ additional **server** managed from a Linux install.
 ## Contributing
 
 How to report a bug, propose a change and open a pull request is in
-[CONTRIBUTING.md](CONTRIBUTING.md); everyone taking part follows the
-[code of conduct](CODE_OF_CONDUCT.md). The monorepo layout, the development
+[CONTRIBUTING.md](.github/CONTRIBUTING.md); everyone taking part follows the
+[code of conduct](.github/CODE_OF_CONDUCT.md). The monorepo layout, the development
 loop, how to build and test the dashboard and the Rust components, and the
 release flow all live in the [developer guide](docs/developers/README.md).
 Where Polaris is going, area by area, is in the [roadmap](docs/roadmap.md).

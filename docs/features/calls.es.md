@@ -1,6 +1,6 @@
 # Llamadas
 
-[Read in English](calls.md) - [Volver al README](../../README.es.md)
+[Read in English](calls.md) - [Volver al README](../README.es.md)
 
 Voz y vídeo en tres sitios: un canal de voz al que la gente entra cuando
 quiere, una reunión con su propio enlace y una llamada dentro de un mensaje

@@ -1,6 +1,6 @@
 # Polar
 
-[Read in English](polar.md) - [Volver al README](../../README.es.md)
+[Read in English](polar.md) - [Volver al README](../README.es.md)
 
 El asistente de Polaris. Pregunta por la página en la que estás y haz cosas
 con tu propio acceso, en su propia página o junto a cualquier pantalla.

@@ -1,6 +1,6 @@
 # Drive
 
-[Read in English](drive.md) - [Volver al README](../../README.es.md)
+[Read in English](drive.md) - [Volver al README](../README.es.md)
 
 Un explorador para tu propia unidad y todo el almacenamiento que conectes:
 discos locales, SFTP, buckets compatibles con S3, recursos SMB y NFS, UniFi

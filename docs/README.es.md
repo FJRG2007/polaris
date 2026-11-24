@@ -1,0 +1,515 @@
+<div align="center">
+  <h1>Polaris</h1>
+  <h3>Tu equipo y tus servidores, desde un sitio que es tuyo.</h3>
+  <a href="../README.md">English</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="#instalar">Instalar</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="#todo-se-conecta">Integraciones</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="roadmap.es.md">Hoja de ruta</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="#licencia">Licencia</a>
+  <hr />
+</div>
+
+Despliegues, archivos, chat, llamadas, correo, tareas y servidores de juegos en
+tus propias máquinas. Se instala con una línea y todo lo demás se hace desde el
+navegador.
+
+Sustituye las herramientas sueltas que acaba teniendo un home lab o un equipo
+pequeño - despliegues, compartir archivos, gestor de contraseñas, monitorización,
+analítica, chat, gestor de tareas - por una sola instalación y unas mismas
+cuentas. Las apps comparten datos: una tarea enlaza el despliegue del que trata y
+un archivo de Drive se adjunta a un mensaje sin volver a subirlo.
+
+La guía completa (qué incluye cada app, requisitos, uso y desarrollo) está en el
+[README en inglés](../README.md).
+
+## Un vistazo
+
+### En todas partes
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="assets/media/ecosystem-light-es-desktop.webp">
+    <img src="assets/media/ecosystem-dark-es-desktop.webp" alt="Polaris en la app de escritorio, un móvil, tus servidores y la extensión del navegador">
+  </picture>
+</p>
+
+### Hablar
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="features/chat.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/chat-light-es-desktop.webp">
+        <img src="assets/media/chat-dark-es-desktop.webp" alt="Chat: espacios, canales, hilos y mensajes directos">
+      </picture>
+      </a>
+      <br><sub><a href="features/chat.es.md"><b>Chat</b></a>: espacios, canales, hilos y mensajes directos</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="features/calls.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/talk-light-es-desktop.webp">
+        <img src="assets/media/talk-dark-es-desktop.webp" alt="Llamadas: salas de voz, videollamadas, pantallas compartidas y reuniones">
+      </picture>
+      </a>
+      <br><sub><a href="features/calls.es.md"><b>Llamadas</b></a>: salas de voz, videollamadas, pantallas compartidas y reuniones</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="features/calls.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/soundboard-light-es-desktop.webp">
+        <img src="assets/media/soundboard-dark-es-desktop.webp" alt="La botonera en una llamada: los sonidos de Polaris y los del espacio">
+      </picture>
+      </a>
+      <br><sub><a href="features/calls.es.md"><b>Botonera</b></a>: los sonidos de Polaris y los del espacio, en la llamada</sub>
+    </td>
+  </tr>
+</table>
+
+### Trabajo
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="features/tasks.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/tasks-light-es-desktop.webp">
+        <img src="assets/media/tasks-dark-es-desktop.webp" alt="Tareas: listas, tableros, sprints y objetivos">
+      </picture>
+      </a>
+      <br><sub><a href="features/tasks.es.md"><b>Tareas</b></a>: listas, tableros, sprints y objetivos</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="features/calendar.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/calendar-light-es-desktop.webp">
+        <img src="assets/media/calendar-dark-es-desktop.webp" alt="Calendario: todos tus calendarios, sincronizados en los dos sentidos">
+      </picture>
+      </a>
+      <br><sub><a href="features/calendar.es.md"><b>Calendario</b></a>: todos tus calendarios, sincronizados en los dos sentidos</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="features/mail.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/mail-light-es-desktop.webp">
+        <img src="assets/media/mail-dark-es-desktop.webp" alt="Correo: todos los buzones en una bandeja">
+      </picture>
+      </a>
+      <br><sub><a href="features/mail.es.md"><b>Correo</b></a>: todos los buzones en una bandeja</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="features/office.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/office-light-es-desktop.webp">
+        <img src="assets/media/office-dark-es-desktop.webp" alt="Office: documentos, hojas, presentaciones y diagramas">
+      </picture>
+      </a>
+      <br><sub><a href="features/office.es.md"><b>Office</b></a>: documentos, hojas, presentaciones y diagramas</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="features/notes.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/notes-light-es-desktop.webp">
+        <img src="assets/media/notes-dark-es-desktop.webp" alt="Notas: notas para ti y libretas para tu equipo">
+      </picture>
+      </a>
+      <br><sub><a href="features/notes.es.md"><b>Notas</b></a>: notas para ti y libretas para tu equipo</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="features/polar.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/polar-light-es-desktop.webp">
+        <img src="assets/media/polar-dark-es-desktop.webp" alt="Polar respondiendo una pregunta">
+      </picture>
+      </a>
+      <br><sub><a href="features/polar.es.md"><b>Polar</b></a>: pregunta lo que sea y haz cosas</sub>
+    </td>
+  </tr>
+</table>
+
+### Archivos y secretos
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="features/drive.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/drive-light-es-desktop.webp">
+        <img src="assets/media/drive-dark-es-desktop.webp" alt="Drive: tu unidad y todo tu almacenamiento">
+      </picture>
+      </a>
+      <br><sub><a href="features/drive.es.md"><b>Drive</b></a>: tu unidad y todo tu almacenamiento</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="features/vault.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/vault-light-es-desktop.webp">
+        <img src="assets/media/vault-dark-es-desktop.webp" alt="Bóveda: contraseñas y códigos de un solo uso">
+      </picture>
+      </a>
+      <br><sub><a href="features/vault.es.md"><b>Bóveda</b></a>: contraseñas y códigos de un solo uso, compartidos con tu equipo</sub>
+    </td>
+  </tr>
+</table>
+
+### En el navegador
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="features/polar.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/polar-side-panel-light-es-desktop.webp">
+        <img src="assets/media/polar-side-panel-dark-es-desktop.webp" alt="Polar en el panel lateral, respondiendo sobre una página y usándola">
+      </picture>
+      </a>
+      <br><sub><a href="features/polar.es.md"><b>Panel lateral de Polar</b></a>: pregunta por la página en la que estás y que lo haga ahí</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="features/vault.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/extension-autofill-light-es-desktop.webp">
+        <img src="assets/media/extension-autofill-dark-es-desktop.webp" alt="La extensión rellenando un formulario de acceso desde la bóveda">
+      </picture>
+      </a>
+      <br><sub><a href="features/vault.es.md"><b>Autocompletar</b></a>: tus accesos rellenados en cualquier sitio desde la bóveda</sub>
+    </td>
+  </tr>
+</table>
+
+### Poner cosas en marcha
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="features/deploy.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/deploy-project-light-es-desktop.webp">
+        <img src="assets/media/deploy-project-dark-es-desktop.webp" alt="Deploy: apps, bases de datos y dominios en tus máquinas">
+      </picture>
+      </a>
+      <br><sub><a href="features/deploy.es.md"><b>Deploy</b></a>: apps, bases de datos y dominios en tus máquinas</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="features/marketplace.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/marketplace-light-es-desktop.webp">
+        <img src="assets/media/marketplace-dark-es-desktop.webp" alt="Marketplace: apps instaladas con un clic">
+      </picture>
+      </a>
+      <br><sub><a href="features/marketplace.es.md"><b>Marketplace</b></a>: apps instaladas con un clic</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="features/game-servers.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/games-light-es-desktop.webp">
+        <img src="assets/media/games-dark-es-desktop.webp" alt="Servidores de juegos: Minecraft, ARK y FiveM en tus propias máquinas">
+      </picture>
+      </a>
+      <br><sub><a href="features/game-servers.es.md"><b>Servidores de juegos</b></a>: Minecraft, ARK y FiveM en tus propias máquinas</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="features/places.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/places-light-es-desktop.webp">
+        <img src="assets/media/places-dark-es-desktop.webp" alt="Lugares: las cámaras de un lugar junto a las cerraduras, luces y clima de cada estancia">
+      </picture>
+      </a>
+      <br><sub><a href="features/places.es.md"><b>Lugares</b></a>: cámaras y control de dispositivos de cada lugar</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="features/automations.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/automations-light-es-desktop.webp">
+        <img src="assets/media/automations-dark-es-desktop.webp" alt="Automatizaciones: cuando algo ocurre, se hace otra cosa">
+      </picture>
+      </a>
+      <br><sub><a href="features/automations.es.md"><b>Automatizaciones</b></a>: cuando algo ocurre, se hace otra cosa</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="features/watch.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/watch-light-es-desktop.webp">
+        <img src="assets/media/watch-dark-es-desktop.webp" alt="Monitorización: servidores, servicios y contenedores de un vistazo">
+      </picture>
+      </a>
+      <br><sub><a href="features/watch.es.md"><b>Monitorización</b></a>: servidores, servicios y contenedores de un vistazo</sub>
+    </td>
+  </tr>
+</table>
+
+### Moverse
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="features/launcher.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/launcher-light-es-desktop.webp">
+        <img src="assets/media/launcher-dark-es-desktop.webp" alt="Lanzador de apps: todas las apps y lo que espera en cada una">
+      </picture>
+      </a>
+      <br><sub><a href="features/launcher.es.md"><b>Lanzador de apps</b></a>: todas las apps y lo que espera en cada una</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="features/settings.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/settings-light-es-desktop.webp">
+        <img src="assets/media/settings-dark-es-desktop.webp" alt="Ajustes: los del despliegue y los de tu cuenta">
+      </picture>
+      </a>
+      <br><sub><a href="features/settings.es.md"><b>Ajustes</b></a>: los del despliegue y los de tu cuenta</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="features/settings.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="assets/media/settings-users-light-es-desktop.webp">
+        <img src="assets/media/settings-users-dark-es-desktop.webp" alt="Personas: cada cuenta con sus roles, límites e invitaciones">
+      </picture>
+      </a>
+      <br><sub><a href="features/settings.es.md"><b>Personas y acceso</b></a>: quién entra, sus roles y qué le limita</sub>
+    </td>
+  </tr>
+</table>
+
+## Si ya pagas por estas
+
+Lo que Polaris sustituye, en tu propio hardware y con una sola cuenta:
+
+| Lo que usas hoy                                           | Lo que Polaris ejecuta en su lugar                                                                                                                                                                           |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Railway, Render, Fly                                      | Despliegues desde un repositorio o una imagen, en sus servidores o en tus propias máquinas                                                                                                                   |
+| Discord, Slack, WhatsApp, Telegram                        | Un solo chat: canales y servidores, mensajes directos, llamadas, reuniones, notas de voz, clips de pantalla                                                                                                  |
+| GitHub Actions                                            | Los mismos workflows en tus propios runners, así un repositorio privado no gasta minutos                                                                                                                     |
+| n8n                                                       | Automatizaciones en un lienzo: disparadores de Polaris, Lugares y webhooks, lógica, bucles, llamadas HTTP, código y pruebas                                                                                  |
+| CodeRabbit                                                | Revisiones y agentes de código que se ejecutan aquí, con tus propias claves de modelo                                                                                                                        |
+| Pterodactyl y un montón de scripts                        | Servidores de juegos (Minecraft, ARK y FiveM) con mundos, mods, recursos, jugadores y horarios                                                                                                               |
+| ClickUp, Jira, Linear                                     | Espacios, listas, tableros, sprints, objetivos, documentos y control de tiempo, o conecta tu Linear o Jira y mantén sus issues reflejadas, con el estado de vuelta                                           |
+| Google Calendar, Proton Calendar                          | Vistas de día a año, compartir y enlaces públicos, sincronización bidireccional con Google, Microsoft y cualquier servidor CalDAV, recordatorios, invitaciones y páginas de reserva donde otros eligen hueco |
+| Home Assistant, una app de cámaras                        | Lugares: cámaras con vista en directo, detecciones, clips y avisos, además de interruptores, enchufes, luces, cerraduras, aires acondicionados y purificadores de una docena de marcas, con automatizaciones |
+| La web de tu fabricante de NAS                            | Un explorador de archivos para todos tus NAS, con compartir y puntos de entrega                                                                                                                              |
+| Bitwarden, 1Password                                      | Una bóveda a la que pueden apuntar tus apps de Bitwarden, cifrada en el navegador                                                                                                                            |
+| El panel de Cloudflare                                    | Un firewall propio: reglas, bloqueos por país y red, defensas contra bots, baneos                                                                                                                            |
+| Una herramienta de backups y un cliente de bases de datos | Copias programadas con restauración, y Postgres, MySQL, MariaDB, MongoDB y Redis                                                                                                                             |
+| Google Analytics, Plausible                               | Analítica sin cookies para los sitios que alojas                                                                                                                                                             |
+
+## Instalar
+
+Tres pasos. No abres ni editas ningún archivo y no escribes ningún token:
+
+1. **Ejecuta un comando** en la máquina donde vivirá Polaris. Instala todo
+   (dashboard, base de datos, proxy inverso, daemon de host), crea todas las
+   contraseñas y secretos, y lo arranca.
+
+   ```bash
+   # macOS / Linux
+   curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
+
+   # Windows (PowerShell)
+   irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.ps1 | iex
+   ```
+
+2. **Abre el enlace que muestra al final.** Es como
+   `http://polaris.local/oauth/setup?token=...` y ya lleva el token. Copia la
+   línea entera en el navegador. Si `polaris.local` no abre en ese equipo, deja
+   todo desde `/oauth/setup` y cambia solo el principio por `https://127.0.0.1`
+   en la propia máquina. Para entrar desde otro equipo por la IP de la máquina
+   hay que activar
+   [entrar por IP local](features/troubleshooting.es.md#abrir-polaris-por-su-direccion-ip).
+   El certificado es autofirmado hasta que un dominio apunte aquí, así que el
+   navegador avisa una vez.
+
+3. **Crea el administrador** en esa página. Desde ahí todo se hace en el
+   navegador.
+
+¿Perdiste el enlace? Ejecuta `polaris setup` en la misma máquina y lo vuelve a
+mostrar. ¿Algo no funciona? [Cuando no se puede acceder a Polaris](features/troubleshooting.es.md)
+reúne los arreglos, y `polaris doctor` en la máquina dice la causa.
+
+Linux es el host recomendado. Para instalarlo a mano con Docker Compose, sigue los
+pasos de [Install](../README.md#install). No edites `.env` a mano en una instalación
+hecha con el instalador.
+
+Para actualizar, usa el botón Actualizar de Ajustes.
+
+## Dónde funciona
+
+La interfaz está en español e inglés, y cada cuenta elige la suya.
+
+| Cliente                                                                                 | Estado                                                                                                                                                       |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| App web, instalable desde el navegador                                                  | Disponible                                                                                                                                                   |
+| Extensión para Chrome y Firefox: rellena formularios de inicio de sesión desde tu vault | Disponible ([versiones](https://github.com/FJRG2007/polaris/releases?q=extension))                                                                           |
+| Servidor MCP para Claude, ChatGPT, Cursor, VS Code y otros clientes de IA               | Disponible ([configuración](connecting-ai-assistants.md))                                                                                               |
+| CLI para desarrolladores (`plr`): despliegues, logs, reinicios                          | Disponible ([versiones](https://github.com/FJRG2007/polaris/releases?q=cli))                                                                                 |
+| Plugin de Stream Deck (app de Stream Deck, OpenDeck) y módulo de Bitfocus Companion     | Disponible ([Stream Deck](https://github.com/FJRG2007/polaris/releases?q=streamdeck), [Companion](https://github.com/FJRG2007/polaris/releases?q=companion)) |
+| App de escritorio para Windows, macOS y Linux                                           | Próximamente: en el repositorio, sin versión publicada                                                                                                       |
+| Apps para iOS y Android                                                                 | Próximamente                                                                                                                                                 |
+
+## Todo se conecta
+
+Los servicios con los que Polaris ya habla. Cada uno se activa desde la interfaz.
+
+|                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <img src="assets/logos/google.svg" width="28" height="28" alt="Google" title="Google">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | **Google**: inicio de sesión, Calendar y Tasks sincronizados en los dos sentidos, Gmail como buzón, Google Drive como almacenamiento, Docs y Sheets importados a Office |
+| <img src="assets/logos/microsoft.svg" width="28" height="28" alt="Microsoft" title="Microsoft">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | **Microsoft 365**: calendario de Outlook sincronizado, correo de Outlook, OneDrive como almacenamiento                                                                  |
+| <img src="assets/logos/github.svg" width="28" height="28" alt="GitHub" title="GitHub"> <img src="assets/logos/github-copilot.svg" width="28" height="28" alt="GitHub Copilot" title="GitHub Copilot">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | **GitHub**: inicio de sesión, desplegar repositorios, ejecutar Actions en tus propios runners, leer pull requests e issues                                              |
+| <img src="assets/logos/linear.svg" width="28" height="28" alt="Linear" title="Linear"> <img src="assets/logos/jira.svg" width="28" height="28" alt="Jira" title="Jira">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | **Linear y Jira**: issues reflejadas en Tasks, con el estado devuelto                                                                                                   |
+| <img src="assets/logos/icloud.svg" width="28" height="28" alt="iCloud" title="iCloud"> <img src="assets/logos/nextcloud.svg" width="28" height="28" alt="Nextcloud" title="Nextcloud">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | **CalDAV**: iCloud, Nextcloud, Fastmail, Yahoo o cualquier servidor CalDAV, además de feeds ICS                                                                         |
+| <img src="assets/logos/telegram.svg" width="28" height="28" alt="Telegram" title="Telegram"> <img src="assets/logos/whatsapp.svg" width="28" height="28" alt="WhatsApp" title="WhatsApp"> <img src="assets/logos/discord.svg" width="28" height="28" alt="Discord" title="Discord"> <img src="assets/logos/slack.svg" width="28" height="28" alt="Slack" title="Slack">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | **Inbox**: conversaciones de Telegram, WhatsApp, Discord y Slack en un solo sitio                                                                                       |
+| <img src="assets/logos/dropbox.svg" width="28" height="28" alt="Dropbox" title="Dropbox"> <img src="assets/logos/ubiquiti.svg" width="28" height="28" alt="Ubiquiti UniFi" title="Ubiquiti UniFi"> <img src="assets/logos/docker.svg" width="28" height="28" alt="Docker" title="Docker">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | **Almacenamiento y hosts**: Dropbox, UniFi UNAS, S3, SFTP, SMB y NFS en Drive; el motor Docker de cada servidor que añades                                              |
+| <img src="assets/logos/vercel.svg" width="28" height="28" alt="Vercel" title="Vercel"> <img src="assets/logos/railway.svg" width="28" height="28" alt="Railway" title="Railway"> <img src="assets/logos/aws.svg" width="28" height="28" alt="AWS" title="AWS">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | **Desplegar fuera**: proyectos de Vercel, Railway y AWS (ECS, Amplify) junto a los tuyos                                                                                |
+| <img src="assets/logos/cloudflare.svg" width="28" height="28" alt="Cloudflare" title="Cloudflare"> <img src="assets/logos/ngrok.svg" width="28" height="28" alt="ngrok" title="ngrok"> <img src="assets/logos/duckdns.svg" width="28" height="28" alt="DuckDNS" title="DuckDNS">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | **Red**: registros DNS y túneles con Cloudflare, túneles de ngrok, nombres de DuckDNS                                                                                   |
+| <img src="assets/logos/anthropic.svg" width="28" height="28" alt="Anthropic" title="Anthropic"> <img src="assets/logos/openai.svg" width="28" height="28" alt="OpenAI" title="OpenAI"> <img src="assets/logos/gemini.svg" width="28" height="28" alt="Google Gemini" title="Google Gemini"> <img src="assets/logos/xai.svg" width="28" height="28" alt="xAI" title="xAI"> <img src="assets/logos/deepseek.svg" width="28" height="28" alt="DeepSeek" title="DeepSeek"> <img src="assets/logos/moonshot.svg" width="28" height="28" alt="Moonshot AI" title="Moonshot AI"> <img src="assets/logos/groq.svg" width="28" height="28" alt="Groq" title="Groq"> <img src="assets/logos/cerebras.svg" width="28" height="28" alt="Cerebras" title="Cerebras"> <img src="assets/logos/openrouter.svg" width="28" height="28" alt="OpenRouter" title="OpenRouter">                                                                               | **Modelos**: tus propias claves para estos y más de 50 proveedores                                                                                                      |
+| <img src="assets/logos/claude.svg" width="28" height="28" alt="Claude" title="Claude"> <img src="assets/logos/cursor.svg" width="28" height="28" alt="Cursor" title="Cursor"> <img src="assets/logos/opencode.svg" width="28" height="28" alt="OpenCode" title="OpenCode"> <img src="assets/logos/vscode.svg" width="28" height="28" alt="Visual Studio Code" title="Visual Studio Code">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | **Agentes de código**: Claude Code, Codex, Gemini CLI, Copilot CLI, Cursor CLI, OpenCode y 9 más en sesiones en vivo; los clientes MCP se conectan como tú              |
+| <img src="assets/logos/tuya.svg" width="28" height="28" alt="Tuya" title="Tuya"> <img src="assets/logos/tp-link.svg" width="28" height="28" alt="TP-Link" title="TP-Link"> <img src="assets/logos/shelly.svg" width="28" height="28" alt="Shelly" title="Shelly"> <img src="assets/logos/philips-hue.svg" width="28" height="28" alt="Philips Hue" title="Philips Hue"> <img src="assets/logos/ikea.svg" width="28" height="28" alt="IKEA" title="IKEA"> <img src="assets/logos/gree.svg" width="28" height="28" alt="Gree" title="Gree"> <img src="assets/logos/philips.svg" width="28" height="28" alt="Philips" title="Philips"> <img src="assets/logos/home-assistant.svg" width="28" height="28" alt="Home Assistant" title="Home Assistant"> <img src="assets/logos/switchbot.svg" width="28" height="28" alt="SwitchBot" title="SwitchBot"> <img src="assets/logos/nuki.svg" width="28" height="28" alt="Nuki" title="Nuki"> | **Places**: enchufes, luces, cerraduras y climatización de estas marcas; cámaras Tapo, VIGI, Reolink, Hikvision, Dahua, Amcrest o cualquier cámara ONVIF o RTSP         |
+| <img src="assets/logos/steam.svg" width="28" height="28" alt="Steam" title="Steam"> <img src="assets/logos/epic-games.svg" width="28" height="28" alt="Epic Games" title="Epic Games"> <img src="assets/logos/minecraft.svg" width="28" height="28" alt="Minecraft" title="Minecraft"> <img src="assets/logos/discord.svg" width="28" height="28" alt="Discord" title="Discord">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | **Servidores de juegos**: los jugadores vinculan sus cuentas para que el servidor los reconozca                                                                         |
+| <img src="assets/logos/spotify.svg" width="28" height="28" alt="Spotify" title="Spotify"> <img src="assets/logos/tenor.svg" width="28" height="28" alt="Tenor" title="Tenor"> <img src="assets/logos/giphy.svg" width="28" height="28" alt="GIPHY" title="GIPHY">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | **Chat**: escuchar juntos en Spotify, GIFs de Tenor y GIPHY, filtro de ruido de Krisp en llamadas                                                                       |
+| <img src="assets/logos/virustotal.svg" width="28" height="28" alt="VirusTotal" title="VirusTotal"> <img src="assets/logos/criminal-ip.svg" width="28" height="28" alt="Criminal IP" title="Criminal IP">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | **Seguridad**: archivos subidos analizados por VirusTotal, direcciones maliciosas bloqueadas con Criminal IP o Dymo                                                     |
+| <img src="assets/logos/bitwarden.svg" width="28" height="28" alt="Bitwarden" title="Bitwarden"> <img src="assets/logos/keepassxc.svg" width="28" height="28" alt="KeePassXC" title="KeePassXC"> <img src="assets/logos/vaultwarden.svg" width="28" height="28" alt="Vaultwarden" title="Vaultwarden">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | **Vault**: las apps y extensiones de Bitwarden apuntan a él, como lo harían a Vaultwarden; importa de Bitwarden, KeePass o cualquier CSV                                |
+| <img src="assets/logos/obsidian.svg" width="28" height="28" alt="Obsidian" title="Obsidian">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | **Notas**: un vault de Obsidian, o cualquier carpeta de Markdown, importado con sus enlaces                                                                             |
+| <img src="assets/logos/postgresql.svg" width="28" height="28" alt="PostgreSQL" title="PostgreSQL"> <img src="assets/logos/mysql.svg" width="28" height="28" alt="MySQL" title="MySQL"> <img src="assets/logos/mariadb.svg" width="28" height="28" alt="MariaDB" title="MariaDB"> <img src="assets/logos/mongodb.svg" width="28" height="28" alt="MongoDB" title="MongoDB"> <img src="assets/logos/redis.svg" width="28" height="28" alt="Redis" title="Redis">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | **Bases de datos**: desplegadas o externas, para explorar, consultar y respaldar                                                                                        |
+
+Mail acepta además cualquier cuenta IMAP e importa archivos `.mbox` y `.eml`.
+
+## Las apps se enlazan entre sí
+
+Lo que se crea en una app se alcanza desde las demás sin copiarlo.
+
+- **Menciónalo.** Escribe `#` en un mensaje de chat, un correo, una tarea o una nota para enlazar una tarea, un doc o una nota. Un enlace pegado a una tarea, evento, canal o mensaje se convierte en una tarjeta con su estado actual.
+- **Adjunta desde Drive.** Chat, Mail, Tasks y Office toman un archivo directamente de Drive, sin descargarlo y volver a subirlo.
+- **Planifícalo en Calendar.** Crea una tarea que vence en un hueco, o da a un evento un enlace de reunión de Polaris.
+- **Pásaselo a un agente.** Una tarea va a un agente de código desde su panel; el agente la lee y la mueve con el servidor MCP de Polaris.
+- **Entérate en Chat.** Las alertas de cámaras y dispositivos de Places llegan como mensajes.
+
+```mermaid
+flowchart LR
+    Drive -- adjuntar --> Chat
+    Drive -- adjuntar --> Mail
+    Drive -- adjuntar --> Tasks
+    Drive -- abrir como documento --> Office
+    Chat -- "mención con #" --> Tasks
+    Mail -- "mención con #" --> Tasks
+    Notes -- "mención con #" --> Tasks
+    Calendar -- nueva tarea con fecha --> Tasks
+    Calendar -- enlace de reunión --> Chat
+    Tasks -- pasar a un agente --> Agents
+```
+
+## Incluido en cada app que despliegas
+
+Funciona con cualquier servicio que Polaris despliegue, sin SDK, agente ni cambios en el código de la app: se ejecuta en el edge o en el host.
+
+|                                                                                                                                                                                                                                                                                                                                             | En lugar de                                         | Polaris                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <img src="assets/logos/google-analytics.svg" width="28" height="28" alt="Google Analytics" title="Google Analytics"> <img src="assets/logos/plausible.svg" width="28" height="28" alt="Plausible Analytics" title="Plausible Analytics"> <img src="assets/logos/umami.svg" width="28" height="28" alt="Umami" title="Umami"> | Google Analytics, Plausible, Umami                  | **Analytics** leída del log de accesos del edge, sin etiqueta script                                                                                   |
+| <img src="assets/logos/cloudflare.svg" width="28" height="28" alt="Cloudflare" title="Cloudflare">                                                                                                                                                                                                                                     | Cloudflare WAF y Access                             | **Firewall** delante de cada ruta: reglas por país y red, defensa contra bots, detección de inyecciones, baneos y un muro de inicio de sesión opcional |
+| <img src="assets/logos/beekeeper-studio.svg" width="28" height="28" alt="Beekeeper Studio" title="Beekeeper Studio">                                                                                                                                                                                                                   | Beekeeper Studio y otros clientes de bases de datos | **Bases de datos**: explorar y consultar Postgres, MySQL, MariaDB, MongoDB y Redis                                                                     |
+| <img src="assets/logos/uptime-kuma.svg" width="28" height="28" alt="Uptime Kuma" title="Uptime Kuma">                                                                                                                                                                                                                                  | Uptime Kuma y otros monitores de disponibilidad     | **Watch**: cada dominio comprobado, y aviso si una caída se mantiene                                                                                   |
+| <img src="assets/logos/datadog.svg" width="28" height="28" alt="Datadog" title="Datadog">                                                                                                                                                                                                                                              | Datadog y otros agentes de métricas                 | **Métricas** de cada contenedor y servidor, leídas por SSH y Docker                                                                                    |
+| <img src="assets/logos/lets-encrypt.svg" width="28" height="28" alt="Let's Encrypt" title="Let's Encrypt">                                                                                                                                                                                                                             | Certbot                                             | **HTTPS**: certificados de Let's Encrypt emitidos y renovados para cada dominio público                                                                |
+
+<img src="assets/logos/sentry.svg" width="20" height="20" alt="Sentry" title="Sentry"> El seguimiento de errores es la excepción: **Telemetry** recibe eventos del SDK de Sentry que tu app ya usa, así que el único cambio es el DSN.
+
+## Cómo funciona
+
+### Actualizar
+
+El botón Actualizar de Ajustes es como se actualiza un Polaris instalado. La edición limitada no tiene daemon de host, así que allí el botón indica que las actualizaciones no están disponibles.
+
+```mermaid
+flowchart LR
+    A[Botón Actualizar] --> B[dashboard]
+    B -- edición completa: POST /v1/update --> C[polaris-hostd]
+    B -- edición limitada: sin hostd --> Y[actualizaciones no disponibles]
+    C -- comando de actualización definido --> D[polaris-updater]
+    D --> E[scripts/update.sh]
+    E --> F[descargar la versión]
+    F --> G[añadir ajustes nuevos a .env]
+    G --> H[arrancar el nuevo dashboard, retirar el anterior]
+    C -- sin comando de actualización --> X[501: no disponible]
+```
+
+### Cuando no se puede acceder a Polaris
+
+[Qué comprobar](features/troubleshooting.es.md) cuando una pantalla dice que no se puede acceder a Polaris. Nada de esto necesita una terminal.
+
+### Cuando un antivirus bloquea Polaris
+
+[Qué excluir](features/antivirus.es.md), y dónde, en Microsoft Defender, Malwarebytes y los demás antivirus principales.
+
+### Una petición a través del edge
+
+Cada router tiene una prioridad explícita, de mayor a menor. Las rutas con reglas de firewall pasan por el guard antes de llegar a la app.
+
+```mermaid
+flowchart LR
+    R[petición] --> T[Traefik]
+    T -- "110: ruta de llamadas, protegida" --> L[LiveKit]
+    T -- "100: /livekit, /api/deploy/ws" --> P[LiveKit, terminal]
+    T -- "50: dominios del dashboard" --> D[dashboard]
+    T -- "40: dominios de apps desplegadas" --> G{guard del firewall}
+    G -- permitida --> S[contenedor de la app]
+    G -- denegada --> B[página de bloqueo]
+    T -- "10: resto" --> D
+    T -- "1: nombre sin ruta" --> V[página vacía]
+```
+
+### Desplegar una app
+
+```mermaid
+flowchart LR
+    A[Repositorio Git] --> B[build en el servidor o en una máquina de build elegida]
+    U[subida] --> B
+    I[imagen] --> C
+    B --> C
+    C[contenedor en el host de Polaris o un servidor añadido] --> E[Traefik de ese servidor: ruta y firewall]
+    E --> F[tu dominio, un túnel de Cloudflare o ngrok, o DuckDNS]
+```
+
+### Estructura del repositorio
+
+```mermaid
+flowchart TB
+    subgraph dashboard
+        web[apps/web: dashboard Next.js]
+        apps[apps/calendar, places, game-servers, crm]
+        ext[apps/extension: extensión del navegador]
+        pkgs[packages: core, db, ui, storage, deploy, ...]
+        svc[services: edge-guard, camera-relay, vision, face, hytale]
+        cli[packages/cli: CLI para desarrolladores]
+    end
+    hostd[crates/polaris-hostd: daemon de host en Rust]
+    desk[desktop: app Electron]
+    web --> pkgs
+    apps --> pkgs
+    cli --> web
+    desk --> web
+    ext --> web
+    web -- socket unix --> hostd
+```
+
+## Licencia
+
+Polaris se distribuye bajo la [GNU AGPL-3.0](../LICENSE) con los términos adicionales
+de [NOTICE.md](../NOTICE.md). Para usarlo fuera de esos términos, por ejemplo en un
+producto de código cerrado, pide una licencia comercial (ver
+[NOTICE.md](../NOTICE.md)).

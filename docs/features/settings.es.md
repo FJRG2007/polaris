@@ -1,6 +1,6 @@
 # Ajustes
 
-[Read in English](settings.md) - [Volver al README](../../README.es.md)
+[Read in English](settings.md) - [Volver al README](../README.es.md)
 
 Dos tipos de ajustes: los del despliegue, para quien administra Polaris, y los
 de la cuenta de cada persona.

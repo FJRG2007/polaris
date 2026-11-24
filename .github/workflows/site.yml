@@ -10,7 +10,7 @@ on:
     branches: [main]
     paths:
       - "README.md"
-      - "README.es.md"
+      - "docs/README.es.md"
       - "docs/assets/**"
       # The guides the site renders as pages (scripts/generate.ts).
       - "docs/features/**"

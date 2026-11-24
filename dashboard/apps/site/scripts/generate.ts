@@ -430,7 +430,7 @@ const install = site.parseInstallLines(readmeEn);
 if (!install.unix || !install.windows) {
     throw new Error("README.md: the install lines were not found (see parseInstallLines)");
 }
-const readmeEs = read(join(root, "README.es.md"));
+const readmeEs = read(join(root, "docs", "README.es.md"));
 const replacesEn = site.parseReplaces(readmeEn, /already pay/i, logos);
 const replacesEs = site.parseReplaces(readmeEs, /ya pagas/i, logos);
 const showcaseEs = site.parseShowcase(readmeEs);
@@ -643,8 +643,8 @@ async function guides(spanish: boolean): Promise<docs.DocPage[]> {
                   renderDoc(
                       INTEGRATIONS,
                       `# ${connected.title}\n\n${connected.markdown}`,
-                      "",
-                      spanish ? "README.es.md" : "README.md"
+                      spanish ? "docs" : "",
+                      spanish ? "docs/README.es.md" : "README.md"
                   )
               ]
             : []),

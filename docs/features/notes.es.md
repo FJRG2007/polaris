@@ -1,6 +1,6 @@
 # Notas
 
-[Read in English](notes.md) - [Volver al README](../../README.es.md)
+[Read in English](notes.md) - [Volver al README](../README.es.md)
 
 Notas para ti y libretas para tu equipo, escritas con el mismo editor que el
 resto de Polaris. Las notas se anidan unas bajo otras, se archivan en carpetas

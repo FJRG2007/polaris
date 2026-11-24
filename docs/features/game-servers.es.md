@@ -1,6 +1,6 @@
 # Servidores de juegos
 
-[Read in English](game-servers.md) - [Volver al README](../../README.es.md)
+[Read in English](game-servers.md) - [Volver al README](../README.es.md)
 
 Servidores de Minecraft (Java y Bedrock), ARK y FiveM en tus propias máquinas,
 creados y gestionados desde Polaris, cada uno con una dirección en tu dominio.

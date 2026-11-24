@@ -1,6 +1,6 @@
 # Cuando un antivirus bloquea Polaris
 
-[Read in English](antivirus.md) - [Volver al README](../../README.es.md)
+[Read in English](antivirus.md) - [Volver al README](../README.es.md)
 
 Algunos antivirus detienen la app de escritorio de Polaris, sus actualizaciones o la página
 de tu Polaris en el navegador. Lo habitual es que pase con versiones de la app de escritorio

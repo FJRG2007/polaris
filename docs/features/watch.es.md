@@ -1,6 +1,6 @@
 # Monitorización
 
-[Read in English](watch.md) - [Volver al README](../../README.es.md)
+[Read in English](watch.md) - [Volver al README](../README.es.md)
 
 Servidores, servicios y contenedores: qué están haciendo y qué va mal, con
 alarmas sobre su salud, picos y caídas.

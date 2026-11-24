@@ -1,6 +1,6 @@
 # MCP: herramientas, búsqueda y categorías
 
-[Read in English](mcp.md) - [Volver al README](../../README.es.md)
+[Read in English](mcp.md) - [Volver al README](../README.es.md)
 
 Polaris es un único servidor MCP (`/api/mcp`) para todas las apps instaladas en
 él. Un modelo se conecta una vez y llega por él a hogar, correo, calendario,
