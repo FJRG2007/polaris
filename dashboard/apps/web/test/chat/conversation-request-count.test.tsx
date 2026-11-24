@@ -72,6 +72,8 @@ vi.mock("@/app/(app)/chat/actions", () => ({
 // One message written on this device that the server never took back: it
 // stays drawn as sending, which is what keeps the screen reading again.
 vi.mock("@/app/(app)/chat/outbox", () => ({
+    // One list for every render, as the real hook keeps.
+    useChatChanges: ((none: readonly unknown[]) => () => none)([]),
     readOutbox: async () => [
         { key: "k1", channelId: "c1", body: "never settles", state: "pending", attempts: 0, createdAt: new Date().toISOString() }
     ],

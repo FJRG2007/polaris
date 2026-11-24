@@ -14,10 +14,11 @@
  * once, and comes back with the reason if the server refuses.
  */
 
-import * as actions from "./actions";
+import * as outbox from "./outbox";
 import * as core from "@polaris/core";
 import { AuthorFace, AuthorTag } from "./author-face";
-import { runAction } from "@/lib/run-action";
+import { actionFailureText } from "@/lib/run-action";
+import { DELETED_MESSAGE } from "@/lib/chat/offline/outbox";
 import { useAppUrl } from "@/components/app-url";
 import { referenced } from "./message-references";
 import type { SpaceEmojiScope } from "./space-emoji";
@@ -53,24 +54,6 @@ export function deleteKeyWithShift(event: KeyboardEvent): boolean {
     return matchShortcut(plain, ["chat.delete"]) === "chat.delete";
 }
 
-/** Everything a deleted message drops on screen. The server resolves the cards,
- *  previews and forwards from the text, and a tombstone has no text - so any of
- *  them left behind is this browser showing what the message said after it was
- *  taken back. */
-const TOMBSTONE: Partial<ChatMessageView> = {
-    body: "",
-    deleted: true,
-    reactions: [],
-    attachments: [],
-    references: [],
-    invites: [],
-    groupInvites: [],
-    link: null,
-    preview: null,
-    previewPending: false,
-    forwardable: false
-};
-
 export function useMessageDelete({
     setMessages,
     setError,
@@ -94,12 +77,17 @@ export function useMessageDelete({
         );
 
     const remove = async (message: ChatMessageView) => {
-        swap(message.id, (entry) => ({ ...entry, ...TOMBSTONE }));
-        const result = await runAction(() => actions.deleteMessageAction(message.id), setError);
-        if (!result || result.error) {
+        swap(message.id, (entry) => ({ ...entry, ...DELETED_MESSAGE }));
+        // Kept on this device when Polaris does not answer: drawn deleted, and
+        // sent when it is back.
+        const result = await outbox.changeMessage(
+            { op: "delete", channelId: message.channelId, messageId: message.id },
+            setError
+        );
+        if (!result || "error" in result) {
             // Put back exactly what was there, reactions and cards included.
             swap(message.id, () => message);
-            if (result?.error) setError(result.error);
+            if (result) setError(result.error || actionFailureText());
         }
         await onDone?.();
     };

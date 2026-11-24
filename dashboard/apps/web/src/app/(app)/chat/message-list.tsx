@@ -1087,7 +1087,7 @@ const Message = memo(function Message({
                     onOpen={() => onExplain(message)}
                 />
             )}
-            {message.id.startsWith("outbox:") && (
+            {(message.id.startsWith("outbox:") || message.changeWaiting) && (
                 <span
                     role="img"
                     title={t("messageList.receipt.pending")}

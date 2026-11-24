@@ -224,6 +224,16 @@ describe("reacting with a space's emoji", () => {
         expect(reactions).toEqual([]);
     });
 
+    it("asked as a state (an outbox sending it again), lands once however often it arrives", async () => {
+        const set = (on: boolean) => react(ada, { messageId: "message-1", emoji: `<:wave:${WAVE}>`, on });
+        await expect(set(true)).resolves.toBe(true);
+        await expect(set(true)).resolves.toBe(true);
+        expect(reactions).toHaveLength(1);
+        await expect(set(false)).resolves.toBe(false);
+        await expect(set(false)).resolves.toBe(false);
+        expect(reactions).toEqual([]);
+    });
+
     it("can still be taken back after the emoji was deleted", async () => {
         reactions = [{ id: "r1", emoji: `<:old:${DELETED}>` }];
         await expect(press(`<:old:${DELETED}>`)).resolves.toBe(false);

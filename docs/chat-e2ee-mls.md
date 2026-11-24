@@ -200,6 +200,12 @@ device or its WebAssembly, and every send and read is the plain one. On:
   the entry; anything else leaves it queued. It is never sent in the clear
   instead. The device is opened with the account key's HPKE pair from this
   browser's own lock (`deviceAccountHpke`), when it holds one.
+- **Waiting on the device.** What the outbox keeps (a message, or an edit
+  made with Polaris out of reach) has its words sealed at rest under a
+  non-extractable AES-256-GCM key in the same store (`lib/offline/at-rest`),
+  never in the clear; with no WebCrypto it is not kept at all and is sent at
+  once. A kept edit of a sealed message is sealed through the group only when
+  it is sent, as the next revision over the version it replaced.
 - **What is sealed.** `{"v":1,"body":...,"translation"?:...}` as UTF-8 JSON,
   parsed on open against the same schema as a plain send; anything else opens
   to nothing.

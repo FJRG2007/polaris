@@ -38,7 +38,8 @@ export function withOpened(
 ): readonly ChatMessageView[] {
     let changed = false;
     const out = messages.map((message) => {
-        if (!message.sealed) return message;
+        // A row drawn with an edit still waiting here already carries its words.
+        if (!message.sealed || message.changeWaiting) return message;
         const content = opened(message.id, message.sealedEditedAt);
         if (!content) return message;
         changed = true;
