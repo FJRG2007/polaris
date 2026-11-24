@@ -23,7 +23,7 @@ export default async function AppSettingsPage({ params }: { params: Promise<{ ca
     const t = await getTranslations("appSettings");
 
     return (
-        <Messages namespaces={["appSettings"]}>
+        <Messages namespaces={["appSettings", "vault"]}>
             <div className="mx-auto flex max-w-2xl flex-col gap-4">
                 <div>
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">
