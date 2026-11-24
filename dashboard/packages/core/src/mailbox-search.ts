@@ -37,7 +37,17 @@ export interface MailSearchTerms {
     /** `after:` and `before:`, as `yyyy-mm-dd`, or "" for neither. */
     readonly after: string;
     readonly before: string;
+    /** `filename:` - the name of a file attached to the message. */
+    readonly filename: readonly string[];
+    /** `label:` - a label put on the message, by its name. */
+    readonly label: readonly string[];
+    /** `order:relevance` puts the best match first; the default is the list's
+     *  own order, newest first, which is what Gmail does. */
+    readonly order: MailSearchOrder;
 }
+
+/** How a search's results are ordered. */
+export type MailSearchOrder = "date" | "relevance";
 
 export const EMPTY_SEARCH: MailSearchTerms = {
     text: "",
@@ -52,7 +62,10 @@ export const EMPTY_SEARCH: MailSearchTerms = {
     unread: null,
     starred: null,
     after: "",
-    before: ""
+    before: "",
+    filename: [],
+    label: [],
+    order: "date"
 };
 
 /** Everything that means the same thing, so a habit from another client works
@@ -81,6 +94,9 @@ export function parseMailSearch(input: string, now: Date = new Date()): MailSear
     let starred: boolean | null = null;
     let after = "";
     let before = "";
+    const filename: string[] = [];
+    const label: string[] = [];
+    let order: MailSearchOrder = "date";
 
     for (const token of tokenize(input)) {
         const negated = token.startsWith("-") && token.length > 1;
@@ -112,6 +128,20 @@ export function parseMailSearch(input: string, now: Date = new Date()): MailSear
         }
         if (key === "subject") {
             subject.push(value);
+            continue;
+        }
+        if (key === "filename") {
+            filename.push(value.toLowerCase());
+            continue;
+        }
+        if (key === "label") {
+            label.push(value.toLowerCase());
+            continue;
+        }
+        if (key === "order" || key === "sort") {
+            const what = value.toLowerCase();
+            if (what === "relevance" || what === "relevant") order = "relevance";
+            else if (what === "date" || what === "newest") order = "date";
             continue;
         }
         if (key === "has") {
@@ -156,7 +186,10 @@ export function parseMailSearch(input: string, now: Date = new Date()): MailSear
         unread,
         starred,
         after,
-        before
+        before,
+        filename,
+        label,
+        order
     };
 }
 
@@ -175,7 +208,9 @@ export function searchIsEmpty(terms: MailSearchTerms): boolean {
         terms.unread === null &&
         terms.starred === null &&
         !terms.after &&
-        !terms.before
+        !terms.before &&
+        terms.filename.length === 0 &&
+        terms.label.length === 0
     );
 }
 
@@ -199,6 +234,9 @@ export function formatMailSearch(terms: MailSearchTerms): string {
     if (terms.starred === true) parts.push("is:starred");
     if (terms.after) parts.push(`after:${terms.after}`);
     if (terms.before) parts.push(`before:${terms.before}`);
+    for (const value of terms.filename) parts.push(`filename:${quote(value)}`);
+    for (const value of terms.label) parts.push(`label:${quote(value)}`);
+    if (terms.order === "relevance") parts.push("order:relevance");
     for (const phrase of terms.phrases) parts.push(`"${phrase}"`);
     for (const value of terms.without) parts.push(`-${quote(value)}`);
     if (terms.text) parts.push(terms.text);
@@ -294,6 +332,10 @@ export interface MailSearchable {
     readonly seen: boolean;
     readonly flagged: boolean;
     readonly sentAt: Date;
+    /** The names of the files on it, when the caller read them. */
+    readonly attachmentNames?: readonly string[];
+    /** The names of the labels on it, when the caller read them. */
+    readonly labels?: readonly string[];
 }
 
 /** Whether a message satisfies everything that has to be exactly true. What is
@@ -316,6 +358,8 @@ export function mailSearchAdmits(message: MailSearchable, terms: MailSearchTerms
     if (!matchesEvery(message.to, terms.to)) return false;
     if (!matchesEvery(message.cc, terms.cc)) return false;
     if (terms.hasAttachment && !message.hasAttachments) return false;
+    if (!matchesEvery(message.attachmentNames ?? [], terms.filename)) return false;
+    if (!matchesEvery(message.labels ?? [], terms.label)) return false;
     if (terms.hasLink && !/https?:\/\/\S+/i.test(`${message.snippet} ${message.body}`)) return false;
     if (terms.unread !== null && message.seen === terms.unread) return false;
     if (terms.starred !== null && message.flagged !== terms.starred) return false;

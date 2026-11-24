@@ -78,6 +78,7 @@ export * from "./mailto.js";
 export * from "./mailbox-providers.js";
 export * from "./mailbox-mbox.js";
 export * from "./mailbox-search.js";
+export * from "./mailbox-search-marks.js";
 export * from "./mailbox-spam.js";
 export * from "./mailbox-delivery.js";
 export * from "./mailbox-brands.js";
