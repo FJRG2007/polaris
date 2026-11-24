@@ -54,6 +54,48 @@ final class PageBridge {
         activity.runOnUiThread(activity::changeServer);
     }
 
+    /**
+     * What Settings > This app draws, as JSON: the version, the servers (the one open marked), the General rows this
+     * phone has, and whether this copy checks for updates itself ("check") or a store does ("store"). Read through a
+     * schema on the page (`readPhoneAppSettings`), which drops any field it does not know.
+     */
+    @JavascriptInterface
+    public String appSettings() {
+        org.json.JSONObject out = new org.json.JSONObject();
+        try {
+            out.put("version", BuildConfig.VERSION_NAME);
+            ServerStore.Host active = ServerStore.active(activity);
+            out.put("server", active == null ? org.json.JSONObject.NULL : active.origin);
+            org.json.JSONArray servers = new org.json.JSONArray();
+            for (ServerStore.Host host : ServerStore.all(activity)) {
+                org.json.JSONObject one = new org.json.JSONObject();
+                one.put("origin", host.origin);
+                one.put("name", host.name == null || host.name.isEmpty() ? org.json.JSONObject.NULL : host.name);
+                servers.put(one);
+            }
+            out.put("servers", servers);
+            out.put("actions", new org.json.JSONArray(HostsActivity.actions(activity)));
+            out.put("updates", UpdateCheck.byStore(activity) ? "store" : "check");
+        } catch (org.json.JSONException impossible) {
+            return "{}";
+        }
+        return out.toString();
+    }
+
+    /** Open the screen one of Settings > This app's General rows names; `HostsActivity.act` refuses any other. */
+    @JavascriptInterface
+    public void appSettingsAction(String action) {
+        if (action == null || action.length() > 32) return;
+        activity.runOnUiThread(() -> HostsActivity.act(activity, action));
+    }
+
+    /** Check for a newer build now; the answer comes back to `window.__polarisMobileUpdate(id, json)`. */
+    @JavascriptInterface
+    public void checkForUpdates(String id) {
+        if (!validId(id)) return;
+        activity.runOnUiThread(() -> activity.checkForUpdates(id));
+    }
+
     /** "camera" when the file picker's last answer was taken with the camera just now, "gallery" for anything picked
      *  from the phone, and "" before anything was picked. */
     @JavascriptInterface

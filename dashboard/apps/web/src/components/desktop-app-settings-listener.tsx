@@ -10,17 +10,19 @@
  *
  * It also asks the service worker to keep every category's page, so each one
  * opens with the host out of reach even if it was never opened here before (a
- * page the worker kept is what a navigation gets offline).
+ * page the worker kept is what a navigation gets offline). The phone app's
+ * categories are kept the same way inside the phone app.
  */
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { APP_SETTING_CATEGORIES, readAppSettingCategory } from "@polaris/core/app-settings";
-import { useDesktopBridge } from "@/components/desktop-app";
+import { useDesktopBridge, usePhoneAppSettings } from "@/components/desktop-app";
+import { APP_PHONE_CATEGORIES, APP_SETTING_CATEGORIES, readAppSettingCategory } from "@polaris/core/app-settings";
 
 export function DesktopAppSettingsListener() {
     const settings = useDesktopBridge()?.appSettings;
     const router = useRouter();
+    const phone = usePhoneAppSettings();
 
     useEffect(() => {
         if (!settings) return;
@@ -29,16 +31,20 @@ export function DesktopAppSettingsListener() {
             if (category) router.push(`/account/app/${category}`);
         });
         void settings.announce().catch(() => undefined);
-        keepCategoryPages();
+        keepCategoryPages(APP_SETTING_CATEGORIES);
         return stop;
     }, [settings, router]);
+
+    useEffect(() => {
+        if (phone && !settings) keepCategoryPages(APP_PHONE_CATEGORIES);
+    }, [phone, settings]);
 
     return null;
 }
 
-function keepCategoryPages(): void {
+function keepCategoryPages(categories: readonly string[]): void {
     if (!("serviceWorker" in navigator) || !navigator.onLine) return;
-    const paths = APP_SETTING_CATEGORIES.map((category) => `/account/app/${category}`);
+    const paths = categories.map((category) => `/account/app/${category}`);
     void navigator.serviceWorker.ready
         .then((registration) => registration.active?.postMessage({ type: "keep-pages", paths }))
         .catch(() => undefined);

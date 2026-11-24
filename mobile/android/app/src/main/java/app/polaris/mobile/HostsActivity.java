@@ -175,27 +175,71 @@ public final class HostsActivity extends Activity {
     /** Notifications, language, Vault autofill and the browser: one row each, the system's own screen behind most. */
     private void drawAppRows() {
         appRows.removeAllViews();
-        appRows.addView(setting(R.string.settings_notifications, getString(R.string.settings_notifications_hint), view ->
-                system(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                        .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()))));
-        // Android 13 and later choose a language per app; before that the app follows the phone's.
-        if (android.os.Build.VERSION.SDK_INT >= 33) {
-            appRows.addView(setting(R.string.settings_language, getString(R.string.settings_language_hint), view ->
-                    system(new Intent(Settings.ACTION_APP_LOCALE_SETTINGS)
-                            .setData(Uri.fromParts("package", getPackageName(), null)))));
-        }
-        appRows.addView(setting(R.string.vault_title, getString(R.string.vault_hint), view ->
-                startActivity(new Intent(this, VaultActivity.class))));
         ServerStore.Host active = ServerStore.active(this);
-        if (active != null) {
-            appRows.addView(setting(R.string.settings_browser, active.origin, view -> {
+        for (String action : actions(this)) {
+            switch (action) {
+                case "notifications":
+                    appRows.addView(setting(R.string.settings_notifications,
+                            getString(R.string.settings_notifications_hint), view -> act(this, action)));
+                    break;
+                case "language":
+                    appRows.addView(setting(R.string.settings_language, getString(R.string.settings_language_hint),
+                            view -> act(this, action)));
+                    break;
+                case "vault":
+                    appRows.addView(setting(R.string.vault_title, getString(R.string.vault_hint),
+                            view -> act(this, action)));
+                    break;
+                case "browser":
+                    appRows.addView(setting(R.string.settings_browser, active.origin, view -> act(this, action)));
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    /**
+     * The rows this phone has, in order, by the names the page's Settings > This app uses for them
+     * (`APP_PHONE_ACTIONS` in the dashboard): one list for both screens, so they never disagree.
+     */
+    static java.util.List<String> actions(Activity activity) {
+        java.util.List<String> names = new ArrayList<>();
+        names.add("notifications");
+        // Android 13 and later choose a language per app; before that the app follows the phone's.
+        if (android.os.Build.VERSION.SDK_INT >= 33) names.add("language");
+        names.add("vault");
+        if (ServerStore.active(activity) != null) names.add("browser");
+        return names;
+    }
+
+    /** Opens the screen a row names. Anything not in `actions` is refused, so a page cannot name another. */
+    static void act(Activity activity, String action) {
+        if (action == null || !actions(activity).contains(action)) return;
+        switch (action) {
+            case "notifications":
+                system(activity, new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, activity.getPackageName()));
+                return;
+            case "language":
+                system(activity, new Intent(Settings.ACTION_APP_LOCALE_SETTINGS)
+                        .setData(Uri.fromParts("package", activity.getPackageName(), null)));
+                return;
+            case "vault":
+                activity.startActivity(new Intent(activity, VaultActivity.class));
+                return;
+            case "browser":
+                ServerStore.Host active = ServerStore.active(activity);
+                if (active == null) return;
                 try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(active.origin))
+                    activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(active.origin))
                             .addCategory(Intent.CATEGORY_BROWSABLE));
                 } catch (ActivityNotFoundException none) {
-                    Toast.makeText(this, R.string.link_unsupported, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(activity, R.string.link_unsupported, Toast.LENGTH_SHORT).show();
                 }
-            }));
+                return;
+            default:
+                break;
         }
     }
 
@@ -217,12 +261,12 @@ public final class HostsActivity extends Activity {
     }
 
     /** One of the system's screens for this app, or its details page where that one is missing. */
-    private void system(Intent intent) {
+    private static void system(Activity activity, Intent intent) {
         try {
-            startActivity(intent);
+            activity.startActivity(intent);
         } catch (ActivityNotFoundException missing) {
-            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                    .setData(Uri.fromParts("package", getPackageName(), null)));
+            activity.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.fromParts("package", activity.getPackageName(), null)));
         }
     }
 

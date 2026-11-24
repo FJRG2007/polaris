@@ -431,6 +431,12 @@ export function AccountMenu({
     // Read after mount: the phone app's bridge only exists in the browser.
     const [appSettings, setAppSettings] = useState(false);
     useEffect(() => setAppSettings(phoneApp.hasAppSettings()), []);
+    // An app that draws its settings in Settings > This app opens them there;
+    // an older one has only its own screen.
+    const openAppSettings = () => {
+        if (phoneApp.hasPhoneAppSettings()) router.push("/account/app/general");
+        else phoneApp.openAppSettings();
+    };
 
     async function onSignOut() {
         // Only this account: any other signed in on this browser takes over.
@@ -673,7 +679,7 @@ export function AccountMenu({
                         </DropdownMenuItem>
                     ) : null}
                     {appSettings ? (
-                        <DropdownMenuItem onSelect={() => void phoneApp.openAppSettings()}>
+                        <DropdownMenuItem onSelect={openAppSettings}>
                             <AppWindow className="size-4" />
                             {t("account.appSettings")}
                         </DropdownMenuItem>
@@ -695,7 +701,7 @@ export function AccountMenu({
                 onStatus={editStatus}
                 onTours={openTourList}
                 onServers={desktop?.openServers ? () => void desktop.openServers?.() : undefined}
-                onAppSettings={appSettings ? () => void phoneApp.openAppSettings() : undefined}
+                onAppSettings={appSettings ? openAppSettings : undefined}
                 onSignOut={() => void onSignOut()}
                 gate={gate}
             />

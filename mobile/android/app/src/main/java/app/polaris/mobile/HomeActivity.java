@@ -603,6 +603,8 @@ public final class HomeActivity extends Activity {
         NoticeService.start(this);
         DoorWidget.redrawAll(this);
         if (web != null) hostChanged();
+        // Back from the app's own screens (its servers, notifications, language): Settings > This app reads again.
+        if (web != null) web.evaluateJavascript("window.dispatchEvent(new Event(\"polaris-mobile-app-settings\"))", null);
         // On every return to the app, not only a cold start: Android keeps an app alive for days.
         UpdateCheck.maybeRun(this);
         SelfUpdate.offerPending(this);
@@ -745,6 +747,29 @@ public final class HomeActivity extends Activity {
     String vpnKey() {
         String key = VpnTunnel.get(this).publicKey(origin);
         return key == null ? "" : key;
+    }
+
+    /** A check for updates the page's Settings asked for; the answer goes to `window.__polarisMobileUpdate`. */
+    void checkForUpdates(String id) {
+        if (UpdateCheck.byStore(this)) {
+            updateAnswer(id, "store", null);
+            return;
+        }
+        UpdateCheck.check(this, null, (kind, version) -> updateAnswer(id, kind, version));
+    }
+
+    private void updateAnswer(String id, String kind, String version) {
+        if (web == null) return;
+        JSONObject answer = new JSONObject();
+        try {
+            answer.put("kind", kind);
+            if (version != null) answer.put("version", version);
+        } catch (org.json.JSONException impossible) {
+            return;
+        }
+        String call = "window.__polarisMobileUpdate && window.__polarisMobileUpdate(" + JSONObject.quote(id) + ","
+                + JSONObject.quote(answer.toString()) + ")";
+        web.evaluateJavascript(call, null);
     }
 
     /** How one request of the page's ended: "" when it worked, else a code it puts in words. */

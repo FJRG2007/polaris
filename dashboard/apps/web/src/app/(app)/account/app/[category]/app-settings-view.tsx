@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * One category of the desktop app's own settings, drawn from the shared schema
+ * One category of the desktop or phone app's own settings, drawn from the shared schema
  * (`@polaris/core/app-settings`) and read and written through the app's bridge.
  *
  * Every read is local - the app answers over IPC, no network - and the last
@@ -10,12 +10,17 @@
  * back when the app refuses it. The app says when a value changed anywhere
  * else (its tray, its own page, another window), and the page reads again then
  * and whenever it comes back into view.
+ *
+ * The phone app lists fewer categories (`APP_PHONE_CATEGORIES`) and keeps no
+ * values the page changes: its General category opens a screen of the app or
+ * of the phone per row, and its servers are changed on its own screen.
  */
 
 import Link from "next/link";
 import { Check } from "lucide-react";
 import * as core from "@polaris/core/app-settings";
-import { useDesktopBridge } from "@/components/desktop-app";
+import { useDesktopBridge, usePhoneAppSettings } from "@/components/desktop-app";
+import { phoneAppSettings, type PhoneAppSettings } from "@/lib/mobile-bridge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { readDesktopUpdateCheck, type DesktopUpdateCheck, type PolarisDesktop } from "@/lib/desktop-bridge";
@@ -31,9 +36,27 @@ export function forgetAppSettingsSnapshot(): void {
 
 const MODIFIER_KEYS = ["Control", "Alt", "Shift", "Meta"];
 
+/** The line under the category's title: the phone app's own when the page runs in it. */
+export function AppSettingsIntro({ category }: { category: core.AppSettingCategory }) {
+    const t = useTranslations("appSettings");
+    const phone = usePhoneAppSettings() && !useDesktopBridge()?.appSettings;
+    return (
+        <p className="text-sm text-muted-foreground">
+            {phone && core.phoneHasCategory(category)
+                ? t(`phone.intros.${category}`)
+                : t(`categories.${category}.intro`)}
+        </p>
+    );
+}
+
 export function AppSettingsView({ category }: { category: core.AppSettingCategory }) {
     const bridge = useDesktopBridge();
+    const phone = usePhoneAppSettings();
     const t = useTranslations("appSettings");
+    if (!bridge?.appSettings && phone) {
+        const settings = phoneAppSettings();
+        if (settings) return <InPhone settings={settings} category={category} />;
+    }
     if (!bridge?.appSettings) {
         return (
             <Card>
@@ -172,7 +195,13 @@ function InApp({
                     </CardBody>
                 </Card>
             )}
-            {category === "hosts" && <Hosts snapshot={snapshot} settings={settings} />}
+            {category === "hosts" && (
+                <Hosts
+                    servers={snapshot.servers}
+                    server={snapshot.server}
+                    onManage={() => void settings.manageHosts()}
+                />
+            )}
             {category === "updates" && <Updates bridge={bridge} version={snapshot.version} />}
         </div>
     );
@@ -383,21 +412,23 @@ function ClearClipboard({ settings }: { settings: NonNullable<PolarisDesktop["ap
 }
 
 function Hosts({
-    snapshot,
-    settings
+    servers,
+    server,
+    onManage
 }: {
-    snapshot: core.AppSettingsSnapshot;
-    settings: NonNullable<PolarisDesktop["appSettings"]>;
+    servers: core.AppSettingsSnapshot["servers"];
+    server: string | null;
+    onManage: () => void;
 }) {
     const t = useTranslations("appSettings");
     return (
         <Card>
             <CardBody className="flex flex-col gap-4">
-                {snapshot.servers.length === 0 ? (
+                {servers.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t("hosts.none")}</p>
                 ) : (
                     <ul className="flex flex-col gap-3">
-                        {snapshot.servers.map((host) => (
+                        {servers.map((host) => (
                             <li key={host.origin} className="flex min-w-0 items-center justify-between gap-3">
                                 <div className="flex min-w-0 flex-col">
                                     <span className="truncate text-sm" title={host.name ?? host.origin}>
@@ -409,7 +440,7 @@ function Hosts({
                                         </span>
                                     )}
                                 </div>
-                                {host.origin === snapshot.server && (
+                                {host.origin === server && (
                                     <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                                         <Check className="size-3.5 shrink-0" aria-hidden />
                                         {t("hosts.current")}
@@ -420,7 +451,7 @@ function Hosts({
                     </ul>
                 )}
                 <Row label={t("hosts.manage")} hint={t("hosts.manageHint")}>
-                    <Button size="sm" variant="secondary" onClick={() => void settings.manageHosts()}>
+                    <Button size="sm" variant="secondary" onClick={onManage}>
                         {t("hosts.manage")}
                     </Button>
                 </Row>
@@ -504,6 +535,141 @@ function Updates({ bridge, version }: { bridge: PolarisDesktop; version: string 
                             {t("updates.check")}
                         </Button>
                     ) : null}
+                </Row>
+            </CardBody>
+        </Card>
+    );
+}
+
+/** The app says a value changed on one of its own screens (its servers, mostly). */
+const PHONE_CHANGED = "polaris-mobile-app-settings";
+
+function InPhone({ settings, category }: { settings: PhoneAppSettings; category: core.AppSettingCategory; }) {
+    const t = useTranslations("appSettings");
+    const [snapshot, setSnapshot] = useState<core.AppPhoneSnapshot | null>(() => settings.read());
+
+    useEffect(() => {
+        const refresh = () => {
+            const next = settings.read();
+            if (next) setSnapshot(next);
+        };
+        const visible = () => {
+            if (document.visibilityState === "visible") refresh();
+        };
+        refresh();
+        window.addEventListener("focus", refresh);
+        window.addEventListener(PHONE_CHANGED, refresh);
+        document.addEventListener("visibilitychange", visible);
+        return () => {
+            window.removeEventListener("focus", refresh);
+            window.removeEventListener(PHONE_CHANGED, refresh);
+            document.removeEventListener("visibilitychange", visible);
+        };
+    }, [settings]);
+
+    if (!core.phoneHasCategory(category)) {
+        return (
+            <Card>
+                <CardBody className="flex flex-col items-start gap-3">
+                    <div className="min-w-0">
+                        <h2 className="text-sm font-medium">{t("phone.notHere.title")}</h2>
+                        <p className="text-xs text-muted-foreground">{t("phone.notHere.body")}</p>
+                    </div>
+                    <Link href="/account/app/general" className={buttonVariants({ size: "sm", variant: "secondary" })}>
+                        {t("phone.notHere.back")}
+                    </Link>
+                </CardBody>
+            </Card>
+        );
+    }
+    if (!snapshot) {
+        return (
+            <Card>
+                <CardBody className="flex flex-col items-start gap-3">
+                    <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
+                    <Button size="sm" variant="secondary" onClick={() => setSnapshot(settings.read())}>
+                        {t("retry")}
+                    </Button>
+                </CardBody>
+            </Card>
+        );
+    }
+    if (category === "hosts") {
+        return <Hosts servers={snapshot.servers} server={snapshot.server} onManage={() => void settings.manageHosts()} />;
+    }
+    if (category === "updates") return <PhoneUpdates settings={settings} snapshot={snapshot} />;
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-4">
+                {snapshot.actions.map((action) => (
+                    <Row
+                        key={action}
+                        label={t(`phone.actions.${action}.label`)}
+                        hint={action === "browser" && snapshot.server ? snapshot.server : t(`phone.actions.${action}.hint`)}
+                    >
+                        <Button size="sm" variant="secondary" onClick={() => void settings.open(action)}>
+                            {t("phone.open")}
+                        </Button>
+                    </Row>
+                ))}
+                {snapshot.actions.length === 0 && <p className="text-sm text-muted-foreground">{t("phone.none")}</p>}
+            </CardBody>
+        </Card>
+    );
+}
+
+type PhoneUpdateState = { readonly kind: "idle"; } | { readonly kind: "checking"; } | core.AppPhoneUpdateCheck;
+
+function PhoneUpdates({ settings, snapshot }: { settings: PhoneAppSettings; snapshot: core.AppPhoneSnapshot; }) {
+    const t = useTranslations("appSettings");
+    const [state, setState] = useState<PhoneUpdateState>({ kind: "idle" });
+    const live = useRef(true);
+    useEffect(() => {
+        live.current = true;
+        return () => {
+            live.current = false;
+        };
+    }, []);
+
+    const message = (() => {
+        if (snapshot.updates === "store") return t("updates.unsupported");
+        switch (state.kind) {
+            case "idle":
+                return null;
+            case "checking":
+                return t("updates.checking");
+            case "current":
+                return t("updates.current");
+            case "available":
+                return t("phone.updateOffered", { version: state.version });
+            case "store":
+                return t("updates.unsupported");
+            case "failed":
+                return t("updates.failed");
+        }
+    })();
+    const busy = state.kind === "checking";
+
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-3">
+                <Row label={t("updates.version", { version: snapshot.version })} hint={message}>
+                    {snapshot.updates === "check" && (
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            aria-disabled={busy}
+                            onClick={() => {
+                                if (busy) return;
+                                setState({ kind: "checking" });
+                                void settings.checkForUpdates().then((answer) => {
+                                    if (live.current) setState(answer);
+                                });
+                            }}
+                        >
+                            {t("updates.check")}
+                        </Button>
+                    )}
                 </Row>
             </CardBody>
         </Card>

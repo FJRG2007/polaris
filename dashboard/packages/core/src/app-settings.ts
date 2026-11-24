@@ -240,3 +240,89 @@ export function appSettingsTarget(state: {
 }): "host" | "local" {
     return state.pageLoaded && state.pageAnnounced ? "host" : "local";
 }
+
+/**
+ * The categories the phone app lists, of the same group: its servers, its
+ * version, and the rest of what it keeps on the phone (notifications,
+ * language, Vault autofill) under General. The other categories are the
+ * desktop app's alone.
+ */
+export const APP_PHONE_CATEGORIES = ["general", "hosts", "updates"] as const satisfies readonly AppSettingCategory[];
+
+export type AppPhoneCategory = (typeof APP_PHONE_CATEGORIES)[number];
+
+/** Whether the phone app lists a category. */
+export function phoneHasCategory(category: AppSettingCategory): category is AppPhoneCategory {
+    return (APP_PHONE_CATEGORIES as readonly string[]).includes(category);
+}
+
+/**
+ * What the phone app opens from its General category, in the order listed.
+ * Each one is a screen of the app or of the phone itself (its notification
+ * and language settings), so the values never cross the bridge: the page only
+ * asks for the screen. The app names the ones this phone has.
+ */
+export const APP_PHONE_ACTIONS = ["notifications", "language", "vault", "browser"] as const;
+
+export type AppPhoneAction = (typeof APP_PHONE_ACTIONS)[number];
+
+const phoneSnapshotSchema = z.object({
+    version: z.string().max(64).catch(""),
+    server: z.string().max(2048).nullable().catch(null),
+    servers: z.array(savedHostSchema).max(200).catch([]),
+    /** Unknown names, from a newer app, are dropped rather than failing the rest. */
+    actions: z
+        .array(z.string().max(32))
+        .max(16)
+        .catch([])
+        .transform((names) => APP_PHONE_ACTIONS.filter((action) => names.includes(action))),
+    /** "check" when this copy updates itself, "store" when a store does, "none" when the app cannot say. */
+    updates: z.enum(["check", "store", "none"]).catch("none")
+});
+
+export type AppPhoneSnapshot = z.infer<typeof phoneSnapshotSchema>;
+
+/** The phone app's answer (a JSON text, as its bridge returns one) as a snapshot, or null. */
+export function readPhoneAppSettings(raw: unknown): AppPhoneSnapshot | null {
+    let value = raw;
+    if (typeof raw === "string") {
+        if (raw.length > 256 * 1024) return null;
+        try {
+            value = JSON.parse(raw);
+        } catch {
+            return null;
+        }
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const parsed = phoneSnapshotSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
+}
+
+/** An action the page asks the phone app for, or null for one it does not know. */
+export function readPhoneAppAction(raw: unknown): AppPhoneAction | null {
+    const parsed = z.enum(APP_PHONE_ACTIONS).safeParse(raw);
+    return parsed.success ? parsed.data : null;
+}
+
+const phoneUpdateCheckSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("current") }),
+    z.object({ kind: z.literal("failed") }),
+    z.object({ kind: z.literal("store") }),
+    z.object({ kind: z.literal("available"), version: z.string().min(1).max(64) })
+]);
+
+export type AppPhoneUpdateCheck = z.infer<typeof phoneUpdateCheckSchema>;
+
+/** What the phone app answered a check for updates with; anything unreadable counts as a check that failed. */
+export function readPhoneUpdateCheck(raw: unknown): AppPhoneUpdateCheck {
+    let value = raw;
+    if (typeof raw === "string") {
+        try {
+            value = JSON.parse(raw);
+        } catch {
+            return { kind: "failed" };
+        }
+    }
+    const parsed = phoneUpdateCheckSchema.safeParse(value);
+    return parsed.success ? parsed.data : { kind: "failed" };
+}

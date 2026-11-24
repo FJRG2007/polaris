@@ -1,0 +1,1 @@
+Los ajustes de la app ahora se abren dentro de los Ajustes de Polaris, en Esta app: avisos, idioma, relleno con Vault, tus servidores y la versión, con la búsqueda de actualizaciones.

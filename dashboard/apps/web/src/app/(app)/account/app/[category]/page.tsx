@@ -1,6 +1,6 @@
 /**
- * Settings > This app (/account/app/<category>): the desktop app's own
- * settings, one screen per category.
+ * Settings > This app (/account/app/<category>): the desktop or phone app's
+ * own settings, one screen per category.
  *
  * Nothing is read on the server: the values live on the computer, and the page
  * reads and writes them through the app's bridge (`AppSettingsView`). Outside
@@ -11,7 +11,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
-import { AppSettingsView } from "./app-settings-view";
+import { AppSettingsIntro, AppSettingsView } from "./app-settings-view";
 import { readAppSettingCategory } from "@polaris/core/app-settings";
 
 export const dynamic = "force-dynamic";
@@ -23,16 +23,16 @@ export default async function AppSettingsPage({ params }: { params: Promise<{ ca
     const t = await getTranslations("appSettings");
 
     return (
-        <div className="mx-auto flex max-w-2xl flex-col gap-4">
-            <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
-                    {t(`categories.${category}.title`)}
-                </h1>
-                <p className="text-sm text-muted-foreground">{t(`categories.${category}.intro`)}</p>
-            </div>
-            <Messages namespaces={["appSettings"]}>
+        <Messages namespaces={["appSettings"]}>
+            <div className="mx-auto flex max-w-2xl flex-col gap-4">
+                <div>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t(`categories.${category}.title`)}
+                    </h1>
+                    <AppSettingsIntro category={category} />
+                </div>
                 <AppSettingsView category={category} />
-            </Messages>
-        </div>
+            </div>
+        </Messages>
     );
 }

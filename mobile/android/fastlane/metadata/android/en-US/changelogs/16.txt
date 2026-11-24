@@ -1,0 +1,1 @@
+The app's own settings now open inside Polaris's Settings, under This app: notifications, language, Vault autofill, your servers and the version, with a check for updates.

@@ -6,6 +6,7 @@
  * Client-only.
  */
 
+import * as core from "@polaris/core/app-settings";
 import type { DesktopOutcome, DesktopVpnStatus, PolarisDesktop } from "@/lib/desktop-bridge";
 
 interface PolarisMobileBridge {
@@ -37,6 +38,14 @@ interface PolarisMobileBridge {
     swipeBack?(available: boolean): void;
     /** The app's own settings: its servers, notifications, language, version. */
     changeServer?(): void;
+    /** What Settings > This app draws, as JSON (`readPhoneAppSettings`). Absent
+     *  from an app older than the feature, which keeps its own screen only. */
+    appSettings?(): string;
+    /** Open one of the screens its General category lists (`APP_PHONE_ACTIONS`). */
+    appSettingsAction?(action: string): void;
+    /** A check for a newer build; answers later, through
+     *  `window.__polarisMobileUpdate(id, json)`. */
+    checkForUpdates?(id: string): void;
     /** Live location run by the app's own foreground service until the given
      *  moment (epoch ms), so it keeps moving with the page closed. */
     startLiveLocation?(untilMs: number): void;
@@ -260,4 +269,85 @@ export function openAppSettings(): boolean {
     } catch {
         return false;
     }
+}
+
+/**
+ * The phone app's own settings as Settings > This app reads them: every read
+ * is the app's answer from the phone (no network), every action a screen of
+ * the app or of the phone. Null in a browser and in an app too old to.
+ */
+export interface PhoneAppSettings {
+    read(): core.AppPhoneSnapshot | null;
+    open(action: core.AppPhoneAction): boolean;
+    /** The app's own screen for its servers, where they are added and changed. */
+    manageHosts(): boolean;
+    checkForUpdates(): Promise<core.AppPhoneUpdateCheck>;
+}
+
+/** Whether this app draws its settings in Settings > This app. */
+export function hasPhoneAppSettings(): boolean {
+    return typeof bridge()?.appSettings === "function";
+}
+
+/** How long a check may take before the page stops waiting: the app gives up on the releases after 10 s. */
+const UPDATE_WAIT_MS = 30_000;
+
+type UpdateWindow = Window & { __polarisMobileUpdate?: (id: string, json: string) => void };
+
+const checking = new Map<string, (answer: core.AppPhoneUpdateCheck) => void>();
+
+function updateRequest(found: PolarisMobileBridge): Promise<core.AppPhoneUpdateCheck> {
+    const target = window as UpdateWindow;
+    target.__polarisMobileUpdate ??= (id, json) => {
+        const resolve = checking.get(id);
+        checking.delete(id);
+        resolve?.(core.readPhoneUpdateCheck(json));
+    };
+    requests += 1;
+    const id = `update-${requests}-${Date.now().toString(36)}`;
+    return new Promise((resolve) => {
+        const timer = window.setTimeout(() => {
+            checking.delete(id);
+            resolve({ kind: "failed" });
+        }, UPDATE_WAIT_MS);
+        checking.set(id, (answer) => {
+            window.clearTimeout(timer);
+            resolve(answer);
+        });
+        try {
+            found.checkForUpdates?.(id);
+        } catch {
+            checking.delete(id);
+            window.clearTimeout(timer);
+            resolve({ kind: "failed" });
+        }
+    });
+}
+
+export function phoneAppSettings(): PhoneAppSettings | null {
+    const found = bridge();
+    if (typeof found?.appSettings !== "function") return null;
+    return {
+        read: () => {
+            try {
+                return core.readPhoneAppSettings(found.appSettings?.());
+            } catch {
+                return null;
+            }
+        },
+        open: (action) => {
+            if (typeof found.appSettingsAction !== "function") return false;
+            try {
+                found.appSettingsAction(action);
+                return true;
+            } catch {
+                return false;
+            }
+        },
+        manageHosts: openAppSettings,
+        checkForUpdates: () =>
+            typeof found.checkForUpdates === "function"
+                ? updateRequest(found)
+                : Promise.resolve({ kind: "failed" } as const)
+    };
 }

@@ -10,6 +10,7 @@
 import { useToast } from "@polaris/ui";
 import { useSyncExternalStore } from "react";
 import { MonitorUp, ScrollText } from "lucide-react";
+import { hasPhoneAppSettings } from "@/lib/mobile-bridge";
 import { desktopBridge, type DesktopOutcome, type PolarisDesktop } from "@/lib/desktop-bridge";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -25,6 +26,12 @@ export function useDesktopBridge(): PolarisDesktop | null {
  *  Settings > This app; false on the server and in a browser. */
 export function useDesktopAppSettings(): boolean {
     return !!useDesktopBridge()?.appSettings;
+}
+
+/** Whether this page runs inside a phone app that draws its own settings in
+ *  Settings > This app; false on the server and in a browser. */
+export function usePhoneAppSettings(): boolean {
+    return useSyncExternalStore(never, hasPhoneAppSettings, () => false);
 }
 
 const ICON_BUTTON =

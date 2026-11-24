@@ -26,7 +26,7 @@ import { AccountSwitcherDialog } from "@/components/device-accounts";
 import { SHEET_ROW as ROW, SheetGroup as Group, SheetRowLabel as RowLabel } from "@/components/sheet-rows";
 import { setAccountSheetOpen, useAccountSheetOpen } from "@/components/account-sheet-state";
 import { AppWindow, ArrowLeftRight, Check, ChevronRight, Compass, LogOut, MessageSquareText, X } from "lucide-react";
-import { useDesktopAppSettings } from "@/components/desktop-app";
+import { useDesktopAppSettings, usePhoneAppSettings } from "@/components/desktop-app";
 
 const NO_GATE: nav.SectionGate = { isAdmin: false, held: [], installed: [] };
 
@@ -70,6 +70,7 @@ export function AccountSheet({
     const label = useNavLabel();
     const open = useAccountSheetOpen();
     const desktop = useDesktopAppSettings();
+    const phone = usePhoneAppSettings();
     const [switching, setSwitching] = useState(false);
     const close = () => setAccountSheetOpen(false);
     // Closed before whatever the row does next, so a dialog it opens replaces
@@ -81,7 +82,7 @@ export function AccountSheet({
 
     const account = nav.POLARIS_APPS.find((app) => app.id === "account");
     const sections = (nav.APP_SECTIONS.account ?? []).filter(
-        (section) => !section.hidden && nav.sectionOffered(section, { ...gate, desktop })
+        (section) => !section.hidden && nav.sectionOffered(section, { ...gate, desktop, phone })
     );
     const groups = nav.sectionGroups(sections, account ? label(account.label) : "", label);
 

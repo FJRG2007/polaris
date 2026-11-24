@@ -696,6 +696,9 @@ export interface AppSection {
     /** A setting of the desktop app, kept on the computer: offered only inside
      *  the app, whose bridge is what reads and writes it. */
     desktopOnly?: boolean;
+    /** With `desktopOnly`: offered inside the phone app too, which keeps this
+     *  category of its own settings on the phone. */
+    phoneApp?: boolean;
 }
 
 /**
@@ -712,6 +715,8 @@ export interface SectionGate {
     /** Whether this page runs inside the desktop app that draws its own settings
      *  here; absent counts as not. */
     readonly desktop?: boolean;
+    /** The same for the phone app; absent counts as not. */
+    readonly phone?: boolean;
 }
 
 /**
@@ -723,7 +728,7 @@ export interface SectionGate {
  * screen for something this Polaris does not have.
  */
 export function sectionOffered(section: AppSection, gate: SectionGate): boolean {
-    if (section.desktopOnly && !gate.desktop) return false;
+    if (section.desktopOnly && !gate.desktop && !(section.phoneApp && gate.phone)) return false;
     if (section.requiresApp && !gate.installed.includes(section.requiresApp)) return false;
     if (section.reachedBy && gate.held.includes(section.reachedBy)) return true;
     if (section.adminOnly && !gate.isAdmin) return false;
@@ -2784,13 +2789,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         // The desktop app's own settings, one screen per category of
         // `APP_SETTING_CATEGORIES`: kept on the computer and offered only inside
         // the app, the way Discord lists its app settings beside the account's.
+        // The phone app lists General, Hosts and Updates (`APP_PHONE_CATEGORIES`).
         {
             label: "General", // i18n-ignore
             href: "/account/app/general",
             icon: Power,
             keywords: ["desktop", "startup", "open at login", "start with the computer", "tray"],
             group: THIS_APP_GROUP,
-            desktopOnly: true
+            desktopOnly: true,
+            phoneApp: true
         },
         {
             label: "Window and tray", // i18n-ignore
@@ -2830,7 +2837,8 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: Server,
             keywords: ["servers", "switch server", "polaris address", "connect"],
             group: THIS_APP_GROUP,
-            desktopOnly: true
+            desktopOnly: true,
+            phoneApp: true
         },
         {
             label: "Advanced", // i18n-ignore
@@ -2846,7 +2854,8 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: RefreshCw,
             keywords: ["version", "check for updates", "restart", "desktop app"],
             group: THIS_APP_GROUP,
-            desktopOnly: true
+            desktopOnly: true,
+            phoneApp: true
         },
         // Hardware support the desktop app installs on this computer only.
         {

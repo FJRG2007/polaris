@@ -50,7 +50,7 @@ import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { useInstalledNav } from "@/components/use-installed-nav";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
-import { useDesktopAppSettings } from "@/components/desktop-app";
+import { useDesktopAppSettings, usePhoneAppSettings } from "@/components/desktop-app";
 
 export function AppSidebar({
     appIds = [],
@@ -116,6 +116,7 @@ export function AppSidebar({
     const unread = useAppUnread();
     const marks = useLauncherMarks(railIds.some((id) => (unread[id] ?? 0) > 0));
     const desktop = useDesktopAppSettings();
+    const phone = usePhoneAppSettings();
     const sections = subapp
         ? subapp.sections
         : onOverview
@@ -129,7 +130,7 @@ export function AppSidebar({
         // the three: it advertises something, spends a navigation, and says no
         // somewhere nobody can act on it. A screen for an app nobody installed is
         // left out the same way.
-        if (!nav.sectionOffered(section, { isAdmin, held, installed: installedApps, desktop })) return false;
+        if (!nav.sectionOffered(section, { isAdmin, held, installed: installedApps, desktop, phone })) return false;
         // Outside an organization - and inside one before the answer arrives -
         // the baseline rail is the entries that ask for nothing.
         if (!org) return !section.permission;

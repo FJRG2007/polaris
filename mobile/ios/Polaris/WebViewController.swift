@@ -36,6 +36,15 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    /// Back from the app's own screens (its servers): Settings > This app on the page reads again.
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        let settings = Self.jsString(Self.appSettingsJSON())
+        web?.evaluateJavaScript(
+            "window.__polarisMobileSettings = \(settings); window.dispatchEvent(new Event(\"polaris-mobile-app-settings\"))"
+        )
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = Palette.background
@@ -56,6 +65,10 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             platform: function () { return "ios"; },
             version: function () { return "\(version)"; },
             changeServer: function () { window.webkit.messageHandlers.polarisMobile.postMessage("changeServer"); },
+            appSettings: function () { return window.__polarisMobileSettings || \(Self.jsString(Self.appSettingsJSON())); },
+            appSettingsAction: function (action) {
+                window.webkit.messageHandlers.polarisMobile.postMessage({ appSettingsAction: String(action) });
+            },
             openExternal: function (url) { window.webkit.messageHandlers.polarisMobile.postMessage({ openExternal: String(url) }); },
             canVpn: function () { return \(vpnKey.isEmpty ? "false" : "true"); },
             vpnDeviceName: function () { return \(Self.jsString(UIDevice.current.name)); },
@@ -336,6 +349,19 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             if season.count <= 32 { SeasonIcon.apply(season) }
             return
         }
+        // A row of Settings > This app's General category: the app's page in the Settings app (notifications,
+        // language), or this Polaris in Safari. Nothing else is opened from here.
+        if let body = message.body as? [String: Any], let action = body["appSettingsAction"] as? String {
+            switch action {
+            case "notifications":
+                if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+            case "browser":
+                if let url = URL(string: origin) { UIApplication.shared.open(url) }
+            default:
+                break
+            }
+            return
+        }
         guard let body = message.body as? [String: Any], let kind = body["kind"] as? String,
               let id = body["id"] as? String, id.count <= 40,
               id.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) || $0 == "-" }) else { return }
@@ -380,6 +406,27 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     }
 
     /// A string as a JavaScript literal.
+    /// What Settings > This app draws, as JSON (`readPhoneAppSettings` on the page): the version, the servers with the
+    /// one open, the General rows this phone has, and no update check of its own - its store or Xcode updates it.
+    private static func appSettingsJSON() -> String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        let servers: [[String: Any]] = ServerStore.all.map { host in
+            var one: [String: Any] = ["origin": host.origin, "name": NSNull()]
+            if let name = host.name, !name.isEmpty { one["name"] = name }
+            return one
+        }
+        let body: [String: Any] = [
+            "version": version,
+            "server": ServerStore.active.map { $0.origin as Any } ?? NSNull(),
+            "servers": servers,
+            "actions": ["notifications", "browser"],
+            "updates": "none"
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: body),
+              let text = String(data: data, encoding: .utf8) else { return "{}" }
+        return text
+    }
+
     private static func jsString(_ value: String) -> String {
         guard let data = try? JSONEncoder().encode([value]), let array = String(data: data, encoding: .utf8) else { return "\"\"" }
         return String(array.dropFirst().dropLast())

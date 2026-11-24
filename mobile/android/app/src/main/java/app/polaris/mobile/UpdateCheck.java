@@ -122,20 +122,37 @@ final class UpdateCheck {
      */
     static void checkNow(Activity activity, android.widget.TextView status) {
         status.setText(R.string.settings_update_checking);
+        check(activity, status, (kind, version) -> {
+            if ("failed".equals(kind)) status.setText(R.string.settings_update_failed);
+            else if ("current".equals(kind)) status.setText(R.string.settings_update_latest);
+            else status.setText(activity.getString(R.string.update_title, version));
+        });
+    }
+
+    /** How a check by hand ended: "current", "available" with its version, or "failed". On the main thread. */
+    interface Answer {
+        void said(String kind, String version);
+    }
+
+    /**
+     * The check by hand, for this app's own screen (`status`, which then follows the download) and for the page's
+     * Settings (no `status`): a newer version is offered the way the daily check offers it either way.
+     */
+    static void check(Activity activity, android.widget.TextView status, Answer answer) {
         new Thread(() -> {
             String[] found;
             try {
                 found = newest(fetch(), BuildConfig.VERSION_NAME);
             } catch (Exception offline) {
-                activity.runOnUiThread(() -> status.setText(R.string.settings_update_failed));
+                activity.runOnUiThread(() -> answer.said("failed", null));
                 return;
             }
             activity.runOnUiThread(() -> {
                 if (found == null) {
-                    status.setText(R.string.settings_update_latest);
+                    answer.said("current", null);
                     return;
                 }
-                status.setText(activity.getString(R.string.update_title, found[0]));
+                answer.said("available", found[0]);
                 if (SelfUpdate.supported(activity)) SelfUpdate.found(activity, found[0], found[1], true, status);
                 else offerBrowser(activity, found[0], found[1]);
             });
