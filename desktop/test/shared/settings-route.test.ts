@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HOST_UPDATE_PATH, readHostPath, readSettingsPlace, readSettingsProbe, readUpdateAccess, settingsPath, settingsRoute, type SettingsRouteState } from "@/shared/settings-route";
+import { HOST_UPDATE_ACCESS_PATH, HOST_UPDATE_PATH, readHostPath, readSettingsPlace, readSettingsProbe, readUpdateAccess, settingsPath, settingsRoute, type SettingsRouteState } from "@/shared/settings-route";
 
 const HOST = "https://polaris.example.com";
 const loaded: SettingsRouteState = { origin: HOST, pageLoaded: true, pageAnnounced: false, probe: null };
@@ -79,6 +79,11 @@ describe("host pages the bundled page may open", () => {
 });
 
 describe("readUpdateAccess", () => {
+    it("asks an endpoint that refuses with a status, not the streamed page that answers 200 before redirecting", () => {
+        expect(HOST_UPDATE_ACCESS_PATH).toMatch(/^\/api\//);
+        expect(HOST_UPDATE_ACCESS_PATH).not.toBe(HOST_UPDATE_PATH);
+    });
+
     it("offers the update only when the host lets this person into its update page", () => {
         expect(readUpdateAccess(200)).toBe(true);
     });

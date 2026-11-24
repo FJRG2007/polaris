@@ -19,7 +19,7 @@
  */
 
 import { addonShortcutsNow, registerAddonViewScheme, startDeviceAddons, stopDeviceAddons } from "./addons/electron";
-import { HOST_UPDATE_PATH, readSettingsProbe, readUpdateAccess, settingsRoute, type HostPageOutcome, type LocalSettingsState, type SettingsPlace, type SettingsProbe } from "@/shared/settings-route";
+import { HOST_UPDATE_ACCESS_PATH, HOST_UPDATE_PATH, readSettingsProbe, readUpdateAccess, settingsRoute, type HostPageOutcome, type LocalSettingsState, type SettingsPlace, type SettingsProbe } from "@/shared/settings-route";
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
 import { runner } from "./runner";
@@ -537,12 +537,12 @@ async function probeStatus(window: BrowserWindow, origin: string, path: string):
 }
 
 /**
- * Whether the person signed in on the window may update the host: its update
- * page is asked, so the answer is the check the host itself enforces, on a host
- * of any age. Only then does the bundled page offer the update.
+ * Whether the person signed in on the window may update the host: the host is
+ * asked (`HOST_UPDATE_ACCESS_PATH`), so the answer is the check it enforces
+ * itself. Only then does the bundled page offer the update.
  */
 async function canUpdateHost(window: BrowserWindow, origin: string): Promise<boolean> {
-    return readUpdateAccess(await probeStatus(window, origin, HOST_UPDATE_PATH));
+    return readUpdateAccess(await probeStatus(window, origin, HOST_UPDATE_ACCESS_PATH));
 }
 
 /**
