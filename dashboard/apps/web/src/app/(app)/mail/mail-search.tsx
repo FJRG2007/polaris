@@ -314,7 +314,10 @@ function SearchFilters({
                         options={labelOptions(labels, one(terms.label), t("searchBox.anyLabel"))}
                     />
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                {/* The two dates take a row of their own: side by side in one
+                    column of the panel, a date field is too narrow to read its
+                    own placeholder in a list pane or on a phone. */}
+                <div className="col-span-2 grid grid-cols-2 gap-2">
                     <Field
                         label={t("searchBox.after")}
                         type="date"
@@ -415,7 +418,7 @@ function Field({
     onChange: (value: string) => void;
 }) {
     return (
-        <label className="block">
+        <label className="block min-w-0">
             <span className="mb-1 block text-[12px] text-muted-foreground">{label}</span>
             {type === "date" ? (
                 <DateInput value={value} onValueChange={onChange} aria-label={label} />
