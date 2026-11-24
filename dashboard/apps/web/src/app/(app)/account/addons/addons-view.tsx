@@ -192,7 +192,7 @@ function StoreSkeleton() {
     );
 }
 
-function AddonCard({ listing, snapshot, onInstall }: { listing: AddonListing; snapshot: AddonsSnapshot; onInstall: (entry: AddonEntry) => void }) {
+function AddonCard({ listing, snapshot, onInstall, kind }: { listing: AddonListing; snapshot: AddonsSnapshot; onInstall: (entry: AddonEntry) => void; kind?: string }) {
     const t = useTranslations("account");
     const manifest = manifestOf(listing);
     if (!manifest) return null;
@@ -214,7 +214,12 @@ function AddonCard({ listing, snapshot, onInstall }: { listing: AddonListing; sn
             }
             byline={say(t, "card.by", { publisher: manifest.publisher })}
             summary={manifest.summary}
-            badges={<Badge>{say(t, `category.${manifest.category}`)}</Badge>}
+            badges={
+                <>
+                    {kind ? <Badge className="border-primary/40 text-primary">{kind}</Badge> : null}
+                    <Badge>{say(t, `category.${manifest.category}`)}</Badge>
+                </>
+            }
             status={run ? <StatusBadge status={run.status} label={run.label} /> : null}
             actions={
                 <>
@@ -286,6 +291,59 @@ export function AddonsStore() {
             {body}
             {installDialog}
         </div>
+    );
+}
+
+/**
+ * The add-ons as the Marketplace lists them, on a shelf of their own after the
+ * apps: the same cards and install flow as the store above, each marked as an
+ * add-on. Outside the desktop app there is nothing to install them with, so the
+ * shelf says so and offers the app. A search or category that leaves none hides it.
+ */
+export function AddonsShelf({ query, category, byName, label, kind }: { query: string; category: string; byName: boolean; label: string; kind: string }) {
+    const t = useTranslations("account");
+    const locale = useLocale();
+    const state = useAddons();
+    const [startInstall, installDialog] = useInstallFlow(state.kind === "ready" || state.kind === "loading" ? state.bridge : null);
+    const snapshot = state.kind === "ready" ? state.snapshot : null;
+    const needle = query.trim().toLocaleLowerCase(locale);
+    const shown = useMemo(() => {
+        const listed = (snapshot ? addonListings(snapshot) : []).filter((listing) => {
+            const manifest = manifestOf(listing);
+            if (!manifest || (category && manifest.category !== category)) return false;
+            return !needle || `${manifest.name} ${manifest.publisher} ${manifest.summary}`.toLocaleLowerCase(locale).includes(needle);
+        });
+        return byName ? listed.sort((a, b) => (manifestOf(a)?.name ?? "").localeCompare(manifestOf(b)?.name ?? "", locale)) : listed;
+    }, [snapshot, category, needle, byName, locale]);
+
+    let body: ReactNode;
+    if (state.kind === "browser" || state.kind === "old-app") {
+        if (needle || category) return null;
+        body = (
+            <div className="col-span-full min-w-0">
+                <NotHere state={state} />
+            </div>
+        );
+    } else if (!snapshot) {
+        body = (
+            <div className="col-span-full min-w-0">
+                <StoreSkeleton />
+            </div>
+        );
+    } else if (shown.length === 0) {
+        if (needle || category || snapshot.catalog) return null;
+        body = (
+            <div className="col-span-full min-w-0">
+                <Notice>{say(t, "empty.offline")}</Notice>
+            </div>
+        );
+    } else body = shown.map((listing) => <AddonCard key={listing.id} listing={listing} snapshot={snapshot} onInstall={startInstall} kind={kind} />);
+
+    return (
+        <>
+            <StoreSection label={label}>{body}</StoreSection>
+            {installDialog}
+        </>
     );
 }
 

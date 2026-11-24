@@ -107,6 +107,52 @@ irm https://example.test/install.ps1 | iex
 ## Next
 `;
 
+const addon = (id: string, extra: Partial<site.SiteAddon> = {}): site.SiteAddon => ({
+    id,
+    name: id.toUpperCase(),
+    publisher: "Polaris",
+    byline: "By Polaris",
+    summary: `${id} summary`,
+    category: `${site.ADDON_CATEGORY_PREFIX}devices`,
+    categoryLabel: "Devices",
+    version: "0.1.0",
+    minAppVersion: "0.1.0",
+    platforms: ["Windows (x64)"],
+    devices: [`${id} controller`],
+    permissions: [],
+    changelog: "",
+    icon: null,
+    ...extra
+});
+
+describe("device add-ons in the marketplace", () => {
+    it("lists apps and add-ons apart by kind", () => {
+        expect(site.kindShows("all", "", "apps")).toBe(true);
+        expect(site.kindShows("all", "", "addons")).toBe(true);
+        expect(site.kindShows("apps", "", "addons")).toBe(false);
+        expect(site.kindShows("addons", "", "apps")).toBe(false);
+    });
+
+    it("keeps an add-on category from listing apps, and an app category from listing add-ons", () => {
+        expect(site.kindShows("all", "addon:devices", "apps")).toBe(false);
+        expect(site.kindShows("all", "addon:devices", "addons")).toBe(true);
+        expect(site.kindShows("all", "Tools", "addons")).toBe(false);
+        expect(site.kindShows("all", "Tools", "apps")).toBe(true);
+    });
+
+    it("finds an add-on by the device it drives and sorts by name", () => {
+        const addons = [addon("zeta"), addon("alpha", { devices: ["Hercules Stream 100"] })];
+        const filter = { query: "", category: "", sort: "name" as const, locale: "en" as const };
+        expect(site.filterSiteAddons(addons, filter).map((item) => item.id)).toEqual(["alpha", "zeta"]);
+        expect(site.filterSiteAddons(addons, { ...filter, query: "hercules" }).map((item) => item.id)).toEqual(["alpha"]);
+        expect(site.filterSiteAddons(addons, { ...filter, category: "addon:audio" })).toEqual([]);
+    });
+
+    it("names each add-on category once, prefixed apart from the apps' own", () => {
+        expect(site.addonCategories([addon("a"), addon("b")])).toEqual([{ id: "addon:devices", label: "Devices" }]);
+    });
+});
+
 describe("README", () => {
     it("reads the replaces table with the logos the repository has", () => {
         const rows = site.parseReplaces(

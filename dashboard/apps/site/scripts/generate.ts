@@ -22,6 +22,7 @@ import {
     STREAMDECK_TAG_PREFIX
 } from "@polaris/ui/account-downloads/app-releases";
 import { initialsInk, tintFor } from "@polaris/core";
+import { readAddonManifest } from "@polaris/core/device-addons";
 import { appNeeds } from "@/lib/apps/app-needs";
 import { appReplaces } from "@/lib/apps/replaces";
 import type { AppManifest } from "@/lib/apps/catalog";
@@ -261,6 +262,88 @@ function storeWords(webLocale: string): site.StoreWords {
         needs: t("detail.needs"),
         information: t("detail.information"),
         games: t("detail.games")
+    };
+}
+
+/* Device add-ons: the manifests CI signs into the catalog (docs/device-addons.md). */
+
+const addonsDir = join(root, "device-addons");
+const addonIconsDir = join(siteDir, "public", "addon-icons");
+rmSync(addonIconsDir, { recursive: true, force: true });
+
+/** Every add-on folder's manifest and listing, read through the core schema; a bad one stops the build. */
+const addonSources = (existsSync(addonsDir) ? readdirSync(addonsDir).sort() : [])
+    .filter((id) => existsSync(join(addonsDir, id, "manifest.json")))
+    .map((id) => {
+        const manifest = readAddonManifest(JSON.parse(read(join(addonsDir, id, "manifest.json"))));
+        if (!manifest || manifest.id !== id) throw new Error(`device-addons/${id}: manifest does not read`);
+        const listingFile = join(addonsDir, id, "listing.json");
+        const listing = (existsSync(listingFile) ? JSON.parse(read(listingFile)) : {}) as {
+            icon?: unknown;
+            changelog?: unknown;
+        };
+        let icon: string | null = null;
+        if (typeof listing.icon === "string" && /^[\w.-]+\.(png|svg|webp)$/.test(listing.icon)) {
+            mkdirSync(addonIconsDir, { recursive: true });
+            icon = `${id}-${manifest.version}-${listing.icon}`;
+            copyFileSync(join(addonsDir, id, listing.icon), join(addonIconsDir, icon));
+        }
+        return {
+            manifest,
+            icon,
+            changelog: typeof listing.changelog === "string" ? listing.changelog : ""
+        };
+    });
+
+const PERMISSION_WORDS: Record<string, string> = {
+    usb: "usb",
+    "audio-sessions": "audioSessions",
+    display: "display",
+    "polaris-actions": "polarisActions",
+    network: "network"
+};
+
+function addonList(webLocale: string, siteWords: typeof enWords): site.SiteAddon[] {
+    const t = translator(messages(webLocale, "account"));
+    const platforms = siteWords.market.addon.platform as Record<string, string>;
+    return addonSources.map(({ manifest, icon, changelog }) => ({
+        id: manifest.id,
+        name: manifest.name,
+        publisher: manifest.publisher,
+        byline: t("addons.card.by", { publisher: manifest.publisher }),
+        summary: manifest.summary,
+        category: `${site.ADDON_CATEGORY_PREFIX}${manifest.category}`,
+        categoryLabel: t(`addons.category.${manifest.category}`),
+        version: manifest.version,
+        minAppVersion: manifest.minAppVersion,
+        platforms: Object.keys(manifest.entries).map((platform) => platforms[platform] ?? platform),
+        devices: [...new Set(manifest.claims.map((claim) => claim.name))],
+        permissions: manifest.permissions.map((permission) =>
+            t(`addons.permission.${PERMISSION_WORDS[permission] ?? permission}`)
+        ),
+        changelog,
+        icon
+    }));
+}
+
+function addonWords(webLocale: string): site.AddonWords {
+    const t = translator(messages(webLocale, "marketplace"));
+    const account = translator(messages(webLocale, "account"));
+    return {
+        kinds: {
+            label: t("view.kinds.label"),
+            all: t("view.kinds.all"),
+            apps: t("view.kinds.apps"),
+            addons: t("view.kinds.addons")
+        },
+        shelf: t("view.shelves.addons"),
+        kindApp: t("card.kindApp"),
+        kindAddon: t("card.kindAddon"),
+        search: account("addons.filters.search"),
+        publisher: account("addons.detail.publisher"),
+        permissions: account("addons.detail.permissions"),
+        changelog: account("addons.detail.changelog"),
+        noPermissions: account("addons.install.none")
     };
 }
 
@@ -711,6 +794,8 @@ const data: site.SiteData = {
             store: storeWords("en-US"),
             builtIn: builtIn("en-US", showcaseEn),
             builtInWords: builtInWords("en-US"),
+            addons: addonList("en-US", enWords),
+            addonWords: addonWords("en-US"),
             replaces: replacesEn,
             showcase: showcaseEn
         },
@@ -721,7 +806,9 @@ const data: site.SiteData = {
             replaces: replacesEs.length ? replacesEs : replacesEn,
             showcase: showcaseEsLocal,
             builtIn: builtIn("es-ES", showcaseEsLocal),
-            builtInWords: builtInWords("es-ES")
+            builtInWords: builtInWords("es-ES"),
+            addons: addonList("es-ES", esWords),
+            addonWords: addonWords("es-ES")
         }
     },
     docs: { en: docsEn, es: docsEs },
